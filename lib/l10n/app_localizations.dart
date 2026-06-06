@@ -6791,7 +6791,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutPageJoinDiscord.
   ///
   /// In en, this message translates to:
-  /// **'Join us on Discord'**
+  /// **'Join Discord'**
   String get aboutPageJoinDiscord;
 
   /// No description provided for @displaySettingsPageShowUserAvatarTitle.

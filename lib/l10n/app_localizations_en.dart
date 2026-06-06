@@ -3610,7 +3610,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutPageJoinQQGroup => 'Join our QQ Group';
 
   @override
-  String get aboutPageJoinDiscord => 'Join us on Discord';
+  String get aboutPageJoinDiscord => 'Join Discord';
 
   @override
   String get displaySettingsPageShowUserAvatarTitle => 'Show User Avatar';

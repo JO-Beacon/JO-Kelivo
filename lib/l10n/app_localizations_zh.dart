@@ -3491,7 +3491,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutPageJoinQQGroup => '加入QQ群';
 
   @override
-  String get aboutPageJoinDiscord => '在 Discord 中加入我们';
+  String get aboutPageJoinDiscord => '加入 Discord';
 
   @override
   String get displaySettingsPageShowUserAvatarTitle => '显示用户头像';
@@ -8468,7 +8468,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get aboutPageJoinQQGroup => '加入QQ群';
 
   @override
-  String get aboutPageJoinDiscord => '在 Discord 中加入我们';
+  String get aboutPageJoinDiscord => '加入 Discord';
 
   @override
   String get displaySettingsPageShowUserAvatarTitle => '显示用户头像';
@@ -13443,7 +13443,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get aboutPageJoinQQGroup => '加入 QQ 群';
 
   @override
-  String get aboutPageJoinDiscord => '加入我們的 Discord';
+  String get aboutPageJoinDiscord => '加入 Discord';
 
   @override
   String get displaySettingsPageShowUserAvatarTitle => '顯示使用者頭像';
