@@ -1426,10 +1426,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageExportToFile => '导出为文件';
 
   @override
+  String get backupPageExportKelivoBackup => '导出为 Kelivo 备份';
+
+  @override
   String get backupPageExportToFileSubtitle => '导出APP数据为文件';
 
   @override
   String get backupPageImportBackupFile => '备份文件导入';
+
+  @override
+  String get backupPageImportKelivoBackup => '从 Kelivo 备份导入';
 
   @override
   String get backupPageImportBackupFileSubtitle => '导入本地备份文件';
@@ -1512,10 +1518,26 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageLocalBackup => '本地备份';
 
   @override
+  String get backupPageUserDataDirectoryTitle => '用户数据目录';
+
+  @override
+  String get backupPageUserDataDirectoryDescription =>
+      '打开聊天、文件、图片、头像、缓存和日志所在的主目录。';
+
+  @override
+  String get backupPageOpenUserDataDirectory => '打开用户数据目录';
+
+  @override
+  String get backupPageOpenUserDataFailed => '打开用户数据目录失败';
+
+  @override
   String get backupPageImportFromCherryStudio => '从 Cherry Studio 导入';
 
   @override
   String get backupPageImportFromChatbox => '从 Chatbox 导入';
+
+  @override
+  String get backupPageImportFromDeepSeek => '从 DeepSeek 网页版/App 导入';
 
   @override
   String get backupReminderSectionTitle => '备份提醒';
@@ -3716,6 +3738,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get displaySettingsPageNewChatOnLaunchSubtitle => '应用启动时自动创建新对话';
+
+  @override
+  String get displaySettingsPageDesktopWideChatLayoutTitle => '聊天区域拉宽';
+
+  @override
+  String get displaySettingsPageDesktopWideChatLayoutSubtitle =>
+      '在桌面端让消息列表和输入栏尽量占满可用宽度。';
 
   @override
   String get displaySettingsPageChatFontSizeTitle => '聊天字体大小';
@@ -6403,10 +6432,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageExportToFile => '导出为文件';
 
   @override
+  String get backupPageExportKelivoBackup => '导出为 Kelivo 备份';
+
+  @override
   String get backupPageExportToFileSubtitle => '导出APP数据为文件';
 
   @override
   String get backupPageImportBackupFile => '备份文件导入';
+
+  @override
+  String get backupPageImportKelivoBackup => '从 Kelivo 备份导入';
 
   @override
   String get backupPageImportBackupFileSubtitle => '导入本地备份文件';
@@ -6489,10 +6524,26 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageLocalBackup => '本地备份';
 
   @override
+  String get backupPageUserDataDirectoryTitle => '用户数据目录';
+
+  @override
+  String get backupPageUserDataDirectoryDescription =>
+      '打开聊天、文件、图片、头像、缓存和日志所在的主目录。';
+
+  @override
+  String get backupPageOpenUserDataDirectory => '打开用户数据目录';
+
+  @override
+  String get backupPageOpenUserDataFailed => '打开用户数据目录失败';
+
+  @override
   String get backupPageImportFromCherryStudio => '从 Cherry Studio 导入';
 
   @override
   String get backupPageImportFromChatbox => '从 Chatbox 导入';
+
+  @override
+  String get backupPageImportFromDeepSeek => '从 DeepSeek 网页版/App 导入';
 
   @override
   String get backupReminderSectionTitle => '备份提醒';
@@ -8693,6 +8744,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageNewChatOnLaunchSubtitle => '应用启动时自动创建新对话';
+
+  @override
+  String get displaySettingsPageDesktopWideChatLayoutTitle => '聊天区域拉宽';
+
+  @override
+  String get displaySettingsPageDesktopWideChatLayoutSubtitle =>
+      '在桌面端让消息列表和输入栏尽量占满可用宽度。';
 
   @override
   String get displaySettingsPageChatFontSizeTitle => '聊天字体大小';
@@ -11380,10 +11438,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageExportToFile => '匯出為檔案';
 
   @override
+  String get backupPageExportKelivoBackup => '匯出為 Kelivo 備份';
+
+  @override
   String get backupPageExportToFileSubtitle => '匯出APP資料為檔案';
 
   @override
   String get backupPageImportBackupFile => '備份檔案匯入';
+
+  @override
+  String get backupPageImportKelivoBackup => '從 Kelivo 備份匯入';
 
   @override
   String get backupPageImportBackupFileSubtitle => '匯入本機備份檔案';
@@ -11466,10 +11530,26 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageLocalBackup => '本機備份';
 
   @override
+  String get backupPageUserDataDirectoryTitle => '使用者資料目錄';
+
+  @override
+  String get backupPageUserDataDirectoryDescription =>
+      '開啟聊天、檔案、圖片、頭像、快取和日誌所在的主目錄。';
+
+  @override
+  String get backupPageOpenUserDataDirectory => '開啟使用者資料目錄';
+
+  @override
+  String get backupPageOpenUserDataFailed => '開啟使用者資料目錄失敗';
+
+  @override
   String get backupPageImportFromCherryStudio => '從 Cherry Studio 匯入';
 
   @override
   String get backupPageImportFromChatbox => '從 Chatbox 匯入';
+
+  @override
+  String get backupPageImportFromDeepSeek => '從 DeepSeek 網頁版/App 匯入';
 
   @override
   String get backupReminderSectionTitle => '備份提醒';
@@ -13668,6 +13748,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageNewChatOnLaunchSubtitle => '應用程式啟動時自動建立新對話';
+
+  @override
+  String get displaySettingsPageDesktopWideChatLayoutTitle => '聊天區域拉寬';
+
+  @override
+  String get displaySettingsPageDesktopWideChatLayoutSubtitle =>
+      '在桌面端讓訊息列表和輸入欄盡量佔滿可用寬度。';
 
   @override
   String get displaySettingsPageChatFontSizeTitle => '聊天字體大小';

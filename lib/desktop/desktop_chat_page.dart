@@ -10,6 +10,6 @@ class DesktopChatPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Reuse existing chat experience (tablet branch) without modifying mobile implementation.
-    return const HomePage();
+    return const HomePage(desktopChatEntry: true);
   }
 }

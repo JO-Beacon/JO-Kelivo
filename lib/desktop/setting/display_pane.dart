@@ -27,6 +27,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ChatMessageBackgroundRow(),
                   _RowDivider(),
+                  _ToggleRowDesktopWideChatLayout(),
+                  _RowDivider(),
                   _TopicPositionRow(),
                 ],
               ),
@@ -468,6 +470,23 @@ class _ThemeDotState extends State<_ThemeDot> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ToggleRowDesktopWideChatLayout extends StatelessWidget {
+  const _ToggleRowDesktopWideChatLayout();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageDesktopWideChatLayoutTitle,
+      subtitle: l10n.displaySettingsPageDesktopWideChatLayoutSubtitle,
+      value: sp.desktopWideChatLayout,
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setDesktopWideChatLayout(v),
     );
   }
 }

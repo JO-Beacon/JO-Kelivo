@@ -2849,6 +2849,12 @@ abstract class AppLocalizations {
   /// **'Export to File'**
   String get backupPageExportToFile;
 
+  /// No description provided for @backupPageExportKelivoBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Export as Kelivo Backup'**
+  String get backupPageExportKelivoBackup;
+
   /// No description provided for @backupPageExportToFileSubtitle.
   ///
   /// In en, this message translates to:
@@ -2860,6 +2866,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Import Backup File'**
   String get backupPageImportBackupFile;
+
+  /// No description provided for @backupPageImportKelivoBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from Kelivo Backup'**
+  String get backupPageImportKelivoBackup;
 
   /// No description provided for @backupPageImportBackupFileSubtitle.
   ///
@@ -3017,6 +3029,30 @@ abstract class AppLocalizations {
   /// **'Local Backup'**
   String get backupPageLocalBackup;
 
+  /// No description provided for @backupPageUserDataDirectoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'User Data Directory'**
+  String get backupPageUserDataDirectoryTitle;
+
+  /// No description provided for @backupPageUserDataDirectoryDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the main directory for chats, files, images, avatars, cache, and logs.'**
+  String get backupPageUserDataDirectoryDescription;
+
+  /// No description provided for @backupPageOpenUserDataDirectory.
+  ///
+  /// In en, this message translates to:
+  /// **'Open User Data Directory'**
+  String get backupPageOpenUserDataDirectory;
+
+  /// No description provided for @backupPageOpenUserDataFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to open user data directory'**
+  String get backupPageOpenUserDataFailed;
+
   /// No description provided for @backupPageImportFromCherryStudio.
   ///
   /// In en, this message translates to:
@@ -3028,6 +3064,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Import from Chatbox'**
   String get backupPageImportFromChatbox;
+
+  /// No description provided for @backupPageImportFromDeepSeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from DeepSeek Web/App'**
+  String get backupPageImportFromDeepSeek;
 
   /// No description provided for @backupReminderSectionTitle.
   ///
@@ -7207,6 +7249,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Automatically create a new chat on launch'**
   String get displaySettingsPageNewChatOnLaunchSubtitle;
+
+  /// No description provided for @displaySettingsPageDesktopWideChatLayoutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Wide chat area'**
+  String get displaySettingsPageDesktopWideChatLayoutTitle;
+
+  /// No description provided for @displaySettingsPageDesktopWideChatLayoutSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use all available width for messages and the input bar on desktop.'**
+  String get displaySettingsPageDesktopWideChatLayoutSubtitle;
 
   /// No description provided for @displaySettingsPageChatFontSizeTitle.
   ///

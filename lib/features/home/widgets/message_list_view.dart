@@ -129,6 +129,7 @@ class MessageListView extends StatefulWidget {
     this.onLoadMoreBefore,
     this.hasMoreAfter = false,
     this.onLoadMoreAfter,
+    this.maxContentWidth = ChatLayoutConstants.maxContentWidth,
   });
 
   final ScrollController scrollController;
@@ -155,6 +156,7 @@ class MessageListView extends StatefulWidget {
   final Set<String> selectedItems;
   final EdgeInsetsGeometry dividerPadding;
   final double bottomContentPadding;
+  final double? maxContentWidth;
   final String? pinnedStreamingMessageId;
   final bool isPinnedIndicatorActive;
   final ValueNotifier<bool> isProcessingFiles;
@@ -258,9 +260,13 @@ class _MessageListViewState extends State<MessageListView> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final horizontalPad =
-            ((constraints.maxWidth - ChatLayoutConstants.maxContentWidth) / 2)
-                .clamp(0.0, double.infinity);
+        final maxContentWidth = widget.maxContentWidth;
+        final horizontalPad = maxContentWidth == null
+            ? 0.0
+            : ((constraints.maxWidth - maxContentWidth) / 2).clamp(
+                0.0,
+                double.infinity,
+              );
 
         return ValueListenableBuilder<bool>(
           valueListenable: widget.isProcessingFiles,

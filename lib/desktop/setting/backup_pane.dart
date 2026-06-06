@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
@@ -14,6 +15,7 @@ import '../../core/providers/settings_provider.dart';
 import '../../core/services/chat/chat_service.dart';
 import '../../core/services/backup/cherry_importer.dart';
 import '../../core/services/backup/chatbox_importer.dart';
+import '../../utils/app_directories.dart';
 import '../../utils/platform_utils.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../shared/widgets/snackbar.dart';
@@ -152,6 +154,31 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     s3BackupProvider.updateConfig(cfg);
   }
 
+  Future<void> _openUserDataDirectory() async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final dir = await AppDirectories.getAppDataDirectory();
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+      final ok = await launchUrl(Uri.file(dir.path));
+      if (!ok && mounted) {
+        showAppSnackBar(
+          context,
+          message: l10n.backupPageOpenUserDataFailed,
+          type: NotificationType.error,
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.backupPageOpenUserDataFailed,
+        type: NotificationType.error,
+      );
+    }
+  }
+
   Future<void> _applyS3Partial({
     String? endpoint,
     String? region,
@@ -282,6 +309,50 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 6)),
+
+              if (PlatformUtils.isDesktop) ...[
+                SliverToBoxAdapter(
+                  child: _sectionCard(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  l10n.backupPageUserDataDirectoryTitle,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: cs.onSurface.withValues(alpha: 0.95),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  l10n.backupPageUserDataDirectoryDescription,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: cs.onSurface.withValues(alpha: 0.65),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          _DeskIosButton(
+                            label: l10n.backupPageOpenUserDataDirectory,
+                            filled: false,
+                            dense: true,
+                            onTap: _openUserDataDirectory,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 10)),
+              ],
 
               // Backup management (applies to WebDAV and local import/export)
               SliverToBoxAdapter(
@@ -805,7 +876,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                       runSpacing: 6,
                       children: [
                         _DeskIosButton(
-                          label: l10n.backupPageExportToFile,
+                          label: l10n.backupPageExportKelivoBackup,
                           filled: false,
                           dense: true,
                           onTap: () async {
@@ -815,7 +886,8 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                             final file = await backupProvider.exportToFile();
                             String? savePath = await FilePicker.platform
                                 .saveFile(
-                                  dialogTitle: l10n.backupPageExportToFile,
+                                  dialogTitle:
+                                      l10n.backupPageExportKelivoBackup,
                                   fileName: file.uri.pathSegments.last,
                                   type: FileType.custom,
                                   allowedExtensions: ['zip'],
@@ -836,7 +908,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                           },
                         ),
                         _DeskIosButton(
-                          label: l10n.backupPageImportBackupFile,
+                          label: l10n.backupPageImportKelivoBackup,
                           filled: false,
                           dense: true,
                           onTap: () async {
@@ -1015,6 +1087,12 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                               );
                             }
                           },
+                        ),
+                        _DeskIosButton(
+                          label: l10n.backupPageImportFromDeepSeek,
+                          filled: false,
+                          dense: true,
+                          onTap: () {},
                         ),
                       ],
                     ),

@@ -62,7 +62,9 @@ import 'home_mobile_layout.dart';
 import 'home_desktop_layout.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  const HomePage({super.key, this.desktopChatEntry = false});
+
+  final bool desktopChatEntry;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -849,6 +851,15 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildTabletBody(BuildContext context, ColorScheme cs) {
     final bottomContentPadding = _controller.inputBarHeight + 16;
+    final settings = context.watch<SettingsProvider>();
+    final useWideChatLayout =
+        widget.desktopChatEntry && settings.desktopWideChatLayout;
+    final maxChatWidth = useWideChatLayout
+        ? null
+        : ChatLayoutConstants.maxContentWidth;
+    final maxInputWidth = useWideChatLayout
+        ? null
+        : ChatLayoutConstants.maxInputWidth;
 
     return ChatInputOverlayLayout(
       topInset: kToolbarHeight + MediaQuery.paddingOf(context).top,
@@ -866,6 +877,7 @@ class _HomePageState extends State<HomePage>
                       vertical: 8,
                       horizontal: 12,
                     ),
+                    maxContentWidth: maxChatWidth,
                   ),
                 )
                 .animate(
@@ -877,9 +889,9 @@ class _HomePageState extends State<HomePage>
       ),
       bottomOverlay: _controller.selecting
           ? ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: ChatLayoutConstants.maxInputWidth,
-              ),
+              constraints: maxInputWidth == null
+                  ? const BoxConstraints()
+                  : BoxConstraints(maxWidth: maxInputWidth),
               child: ChatSelectionExportBar(
                 key: _selectionExportBarKey,
                 onExportMarkdown: _controller.exportSelectedAsMarkdown,
@@ -904,9 +916,9 @@ class _HomePageState extends State<HomePage>
                     Widget input = _buildChatInputBar(context, isTablet: true);
                     input = Center(
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(
-                          maxWidth: ChatLayoutConstants.maxInputWidth,
-                        ),
+                        constraints: maxInputWidth == null
+                            ? const BoxConstraints()
+                            : BoxConstraints(maxWidth: maxInputWidth),
                         child: input,
                       ),
                     );
@@ -1053,6 +1065,7 @@ class _HomePageState extends State<HomePage>
     BuildContext context, {
     required double bottomContentPadding,
     required EdgeInsetsGeometry dividerPadding,
+    double? maxContentWidth,
   }) {
     if (_controller.isTemporaryConversation &&
         _controller.chatController.collapsedMessages.isEmpty) {
@@ -1088,6 +1101,7 @@ class _HomePageState extends State<HomePage>
             : const <String>[],
         bottomContentPadding: bottomContentPadding,
         dividerPadding: dividerPadding,
+        maxContentWidth: maxContentWidth,
         streamingContentNotifier: _controller.streamingContentNotifier,
         spotlightMessageId: _controller.spotlightMessageId,
         spotlightToken: _controller.spotlightToken,

@@ -1467,10 +1467,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageExportToFile => 'Export to File';
 
   @override
+  String get backupPageExportKelivoBackup => 'Export as Kelivo Backup';
+
+  @override
   String get backupPageExportToFileSubtitle => 'Export app data to a file';
 
   @override
   String get backupPageImportBackupFile => 'Import Backup File';
+
+  @override
+  String get backupPageImportKelivoBackup => 'Import from Kelivo Backup';
 
   @override
   String get backupPageImportBackupFileSubtitle => 'Import a local backup file';
@@ -1553,10 +1559,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageLocalBackup => 'Local Backup';
 
   @override
+  String get backupPageUserDataDirectoryTitle => 'User Data Directory';
+
+  @override
+  String get backupPageUserDataDirectoryDescription =>
+      'Open the main directory for chats, files, images, avatars, cache, and logs.';
+
+  @override
+  String get backupPageOpenUserDataDirectory => 'Open User Data Directory';
+
+  @override
+  String get backupPageOpenUserDataFailed =>
+      'Failed to open user data directory';
+
+  @override
   String get backupPageImportFromCherryStudio => 'Import from Cherry Studio';
 
   @override
   String get backupPageImportFromChatbox => 'Import from Chatbox';
+
+  @override
+  String get backupPageImportFromDeepSeek => 'Import from DeepSeek Web/App';
 
   @override
   String get backupReminderSectionTitle => 'Backup Reminder';
@@ -3865,6 +3888,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get displaySettingsPageNewChatOnLaunchSubtitle =>
       'Automatically create a new chat on launch';
+
+  @override
+  String get displaySettingsPageDesktopWideChatLayoutTitle => 'Wide chat area';
+
+  @override
+  String get displaySettingsPageDesktopWideChatLayoutSubtitle =>
+      'Use all available width for messages and the input bar on desktop.';
 
   @override
   String get displaySettingsPageChatFontSizeTitle => 'Chat Font Size';

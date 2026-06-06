@@ -130,6 +130,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_lazy_history_enabled_v1';
   static const String _displayDesktopMessageNavButtonsModeKey =
       'display_desktop_message_nav_buttons_mode_v1';
+  static const String _displayDesktopWideChatLayoutKey =
+      'display_desktop_wide_chat_layout_v1';
   static const String _displayUseNewAssistantAvatarUxKey =
       'display_use_new_assistant_avatar_ux_v1';
   static const String _displayShowProviderInModelCapsuleKey =
@@ -825,6 +827,8 @@ class SettingsProvider extends ChangeNotifier {
       prefs.getString(_displayDesktopMessageNavButtonsModeKey),
       legacyEnabled: _showMessageNavButtons,
     );
+    _desktopWideChatLayout =
+        prefs.getBool(_displayDesktopWideChatLayoutKey) ?? false;
     _useNewAssistantAvatarUx =
         prefs.getBool(_displayUseNewAssistantAvatarUxKey) ?? false;
     _showProviderInModelCapsule =
@@ -3152,6 +3156,16 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
       DesktopMessageNavButtonsMode.scroll;
   DesktopMessageNavButtonsMode get desktopMessageNavButtonsMode =>
       _desktopMessageNavButtonsMode;
+
+  bool _desktopWideChatLayout = false;
+  bool get desktopWideChatLayout => _desktopWideChatLayout;
+  Future<void> setDesktopWideChatLayout(bool v) async {
+    if (_desktopWideChatLayout == v) return;
+    _desktopWideChatLayout = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_displayDesktopWideChatLayoutKey, v);
+  }
 
   Future<void> setDesktopMessageNavButtonsMode(
     DesktopMessageNavButtonsMode mode,

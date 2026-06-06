@@ -1199,14 +1199,14 @@ class _BackupPageState extends State<BackupPage> {
                     _iosNavRow(
                       context,
                       icon: Lucide.Export,
-                      label: l10n.backupPageExportToFile,
+                      label: l10n.backupPageExportKelivoBackup,
                       onTap: () => _doExport(context, vm),
                     ),
                     _iosDivider(context),
                     _iosNavRow(
                       context,
                       icon: Lucide.Import2,
-                      label: l10n.backupPageImportBackupFile,
+                      label: l10n.backupPageImportKelivoBackup,
                       onTap: () => _doImportLocal(context, vm),
                     ),
                     _iosDivider(context),
@@ -1348,6 +1348,13 @@ class _BackupPageState extends State<BackupPage> {
                           }
                         });
                       },
+                    ),
+                    _iosDivider(context),
+                    _iosNavRow(
+                      context,
+                      icon: Lucide.Box,
+                      label: l10n.backupPageImportFromDeepSeek,
+                      onTap: () {},
                     ),
                   ],
                 ),
