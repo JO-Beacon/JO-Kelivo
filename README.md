@@ -19,6 +19,8 @@
 
 🔗 [下载最新版本的JO-Kelivo](https://github.com/JO-Beacon/JO-Kelivo/releases/latest)
 
+[Release日志](Release日志.md)
+
 # 已继承的 [原版Kelivo](https://github.com/Chevey339/kelivo) 功能特性
 
 - 🎨 **现代化设计** - Material You 设计语言，支持动态主题色(Android12+)
