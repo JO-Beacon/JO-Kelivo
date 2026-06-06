@@ -55,10 +55,10 @@ class Win32Window {
   // Return a RECT representing the bounds of the current client area.
   RECT GetClientArea();
 
-  // Dispatches link if any and restores an existing window with the same
-  // title if it is found. This helps keeping the app as a single instance
-  // on Windows by reusing the existing window instead of creating a new one.
-  static bool SendAppLinkToInstance(const std::wstring& title);
+  // Restores an existing JO-Kelivo runner window if it is found. This helps
+  // keeping the app as a single instance on Windows by reusing the existing
+  // window instead of creating a new one.
+  static bool SendAppLinkToInstance();
 
  protected:
   // Processes and route salient window messages for mouse handling,

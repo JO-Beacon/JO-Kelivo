@@ -6,7 +6,7 @@ param(
 
   [string] $OutputDir = ".",
 
-  [string] $InnoSetupCompiler = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+  [string] $InnoSetupCompiler = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -29,9 +29,24 @@ $outputDirResolved = if (Test-Path $OutputDir) {
   (Resolve-Path (New-Item -ItemType Directory -Force -Path $OutputDir)).Path
 }
 
-if (-not (Test-Path $InnoSetupCompiler)) {
-  throw "Inno Setup compiler not found: $InnoSetupCompiler"
+if ([string]::IsNullOrWhiteSpace($InnoSetupCompiler)) {
+  $candidatePaths = @(
+    (Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 6\ISCC.exe"),
+    "C:\Program Files\Inno Setup 6\ISCC.exe",
+    "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+  )
+
+  $InnoSetupCompiler = $candidatePaths |
+    Where-Object { $_ -and (Test-Path $_) } |
+    Select-Object -First 1
 }
+
+if ([string]::IsNullOrWhiteSpace($InnoSetupCompiler) -or
+    -not (Test-Path $InnoSetupCompiler)) {
+  throw "Inno Setup compiler not found. Install Inno Setup 6 or pass -InnoSetupCompiler explicitly."
+}
+
+Write-Host "Using Inno Setup compiler: $InnoSetupCompiler"
 
 $innoSetupDir = Split-Path -Parent $InnoSetupCompiler
 $zhLangCompiler = Join-Path $innoSetupDir "Languages\ChineseSimplified.isl"

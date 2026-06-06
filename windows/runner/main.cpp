@@ -17,9 +17,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   HANDLE instance_mutex =
       ::CreateMutexW(nullptr, TRUE, L"JOKelivoMutex");
   if (instance_mutex != nullptr && ::GetLastError() == ERROR_ALREADY_EXISTS) {
-    // Another instance is already running; try to bring its window to front
-    // instead of creating a new one.
-    Win32Window::SendAppLinkToInstance(L"jo_kelivo");
+    // Another JO-Kelivo instance is already running; try to bring its window to
+    // front instead of creating a new one.
+    Win32Window::SendAppLinkToInstance();
     return 0;
   }
 
