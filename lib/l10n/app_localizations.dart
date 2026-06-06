@@ -6677,14 +6677,20 @@ abstract class AppLocalizations {
   /// No description provided for @aboutPageAppName.
   ///
   /// In en, this message translates to:
-  /// **'Kelivo'**
+  /// **'JO-Kelivo'**
   String get aboutPageAppName;
 
   /// No description provided for @aboutPageAppDescription.
   ///
   /// In en, this message translates to:
-  /// **'Open-source AI Assistant'**
+  /// **'Open-source AI assistant based on Kelivo'**
   String get aboutPageAppDescription;
+
+  /// No description provided for @aboutPageKelivoSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'About Kelivo'**
+  String get aboutPageKelivoSectionTitle;
 
   /// No description provided for @aboutPageNoQQGroup.
   ///

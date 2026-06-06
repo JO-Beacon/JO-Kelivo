@@ -3548,10 +3548,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutPageEasterEggButton => 'Nice!';
 
   @override
-  String get aboutPageAppName => 'Kelivo';
+  String get aboutPageAppName => 'JO-Kelivo';
 
   @override
-  String get aboutPageAppDescription => 'Open-source AI Assistant';
+  String get aboutPageAppDescription =>
+      'Open-source AI assistant based on Kelivo';
+
+  @override
+  String get aboutPageKelivoSectionTitle => 'About Kelivo';
 
   @override
   String get aboutPageNoQQGroup => 'No QQ group yet';

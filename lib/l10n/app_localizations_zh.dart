@@ -3430,10 +3430,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutPageEasterEggButton => '好的';
 
   @override
-  String get aboutPageAppName => 'Kelivo';
+  String get aboutPageAppName => 'JO-Kelivo';
 
   @override
-  String get aboutPageAppDescription => '开源AI 助手';
+  String get aboutPageAppDescription => '基于 Kelivo 的开源 AI 助手';
+
+  @override
+  String get aboutPageKelivoSectionTitle => '关于 Kelivo';
 
   @override
   String get aboutPageNoQQGroup => '暂无QQ群';
@@ -8404,10 +8407,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get aboutPageEasterEggButton => '好的';
 
   @override
-  String get aboutPageAppName => 'Kelivo';
+  String get aboutPageAppName => 'JO-Kelivo';
 
   @override
-  String get aboutPageAppDescription => '开源 AI 助手';
+  String get aboutPageAppDescription => '基于 Kelivo 的开源 AI 助手';
+
+  @override
+  String get aboutPageKelivoSectionTitle => '关于 Kelivo';
 
   @override
   String get aboutPageNoQQGroup => '暂无QQ群';
@@ -13376,10 +13382,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get aboutPageEasterEggButton => '好的';
 
   @override
-  String get aboutPageAppName => 'Kelivo';
+  String get aboutPageAppName => 'JO-Kelivo';
 
   @override
-  String get aboutPageAppDescription => '開源 AI 助理';
+  String get aboutPageAppDescription => '基於 Kelivo 的開源 AI 助理';
+
+  @override
+  String get aboutPageKelivoSectionTitle => '關於 Kelivo';
 
   @override
   String get aboutPageNoQQGroup => '暫無QQ群';

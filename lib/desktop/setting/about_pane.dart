@@ -145,7 +145,7 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
 
               const SizedBox(height: 16),
 
-              // Info and links
+              // JO-Kelivo info and links
               _DeskCard(
                 title: l10n.settingsPageAbout,
                 children: [
@@ -159,6 +159,41 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
                     icon: lucide.Lucide.Phone,
                     label: l10n.aboutPageSystem,
                     detail: systemDetail,
+                  ),
+                  const _DeskRowDivider(),
+                  _DeskNavRowSvg(
+                    svgAsset: 'assets/icons/github.svg',
+                    label: l10n.aboutPageGithub,
+                    onTap: () =>
+                        _openUrl('https://github.com/JO-Beacon/JO-Kelivo'),
+                  ),
+                  const _DeskRowDivider(),
+                  _DeskNavRow(
+                    icon: lucide.Lucide.FileText,
+                    label: l10n.aboutPageLicense,
+                    onTap: () => _openUrl(
+                      'https://github.com/JO-Beacon/JO-Kelivo/blob/main/LICENSE',
+                    ),
+                  ),
+                  const _DeskRowDivider(),
+                  _DeskNavRowSvg(
+                    svgAsset: 'assets/icons/tencent-qq.svg',
+                    label: l10n.aboutPageJoinQQGroup,
+                    onTap: () => _openUrl('https://qm.qq.com/q/OQaXetKssC'),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 16),
+
+              // Original Kelivo info and links
+              _DeskCard(
+                title: l10n.aboutPageKelivoSectionTitle,
+                children: [
+                  _DeskInfoRow(
+                    icon: lucide.Lucide.Code,
+                    label: l10n.aboutPageVersion,
+                    detail: l10n.aboutPageVersionDetail('1.1.15', '52'),
                   ),
                   const _DeskRowDivider(),
                   _DeskNavRow(
@@ -194,7 +229,6 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
                     onTap: () => _openUrl('https://discord.gg/Tb8DyvvV5T'),
                   ),
                   const _DeskRowDivider(),
-                  // Donation item (desktop): mirrors mobile "Sponsor"
                   _DeskNavRow(
                     icon: lucide.Lucide.Heart,
                     label: l10n.settingsPageSponsor,
