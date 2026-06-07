@@ -7259,7 +7259,7 @@ abstract class AppLocalizations {
   /// No description provided for @displaySettingsPageDesktopWideChatLayoutSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Use all available width for messages and the input bar on desktop.'**
+  /// **'Use all available width for messages and the input bar in desktop, tablet, or landscape wide-screen layouts.'**
   String get displaySettingsPageDesktopWideChatLayoutSubtitle;
 
   /// No description provided for @displaySettingsPageChatFontSizeTitle.

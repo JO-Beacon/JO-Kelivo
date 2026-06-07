@@ -1261,7 +1261,7 @@
   "desktopDisplaySettingsTopicPositionRight": "右側",
   "displaySettingsPageNewChatOnLaunchSubtitle": "應用程式啟動時自動建立新對話",
   "displaySettingsPageDesktopWideChatLayoutTitle": "聊天區域拉寬",
-  "displaySettingsPageDesktopWideChatLayoutSubtitle": "在桌面端讓訊息列表和輸入欄盡量佔滿可用寬度。",
+  "displaySettingsPageDesktopWideChatLayoutSubtitle": "在桌面端、平板或橫向寬螢幕佈局中，讓訊息列表和輸入欄盡量佔滿可用寬度。",
   "displaySettingsPageChatFontSizeTitle": "聊天字體大小",
   "displaySettingsPageAutoScrollEnableTitle": "自動回到底部",
   "displaySettingsPageAutoScrollIdleTitle": "自動回到底部延遲",

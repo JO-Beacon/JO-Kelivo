@@ -1620,7 +1620,7 @@
   "desktopDisplaySettingsTopicPositionRight": "Right",
   "displaySettingsPageNewChatOnLaunchSubtitle": "Automatically create a new chat on launch",
   "displaySettingsPageDesktopWideChatLayoutTitle": "Wide chat area",
-  "displaySettingsPageDesktopWideChatLayoutSubtitle": "Use all available width for messages and the input bar on desktop.",
+  "displaySettingsPageDesktopWideChatLayoutSubtitle": "Use all available width for messages and the input bar in desktop, tablet, or landscape wide-screen layouts.",
   "displaySettingsPageChatFontSizeTitle": "Chat Font Size",
   "displaySettingsPageAutoScrollEnableTitle": "Auto-scroll to bottom",
   "displaySettingsPageAutoScrollIdleTitle": "Auto-Scroll Back Delay",

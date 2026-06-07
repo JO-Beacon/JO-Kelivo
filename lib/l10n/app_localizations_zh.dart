@@ -3744,7 +3744,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get displaySettingsPageDesktopWideChatLayoutSubtitle =>
-      '在桌面端让消息列表和输入栏尽量占满可用宽度。';
+      '在桌面端、平板或横屏宽屏布局中，让消息列表和输入栏尽量占满可用宽度。';
 
   @override
   String get displaySettingsPageChatFontSizeTitle => '聊天字体大小';
@@ -8750,7 +8750,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageDesktopWideChatLayoutSubtitle =>
-      '在桌面端让消息列表和输入栏尽量占满可用宽度。';
+      '在桌面端、平板或横屏宽屏布局中，让消息列表和输入栏尽量占满可用宽度。';
 
   @override
   String get displaySettingsPageChatFontSizeTitle => '聊天字体大小';
@@ -13754,7 +13754,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageDesktopWideChatLayoutSubtitle =>
-      '在桌面端讓訊息列表和輸入欄盡量佔滿可用寬度。';
+      '在桌面端、平板或橫向寬螢幕佈局中，讓訊息列表和輸入欄盡量佔滿可用寬度。';
 
   @override
   String get displaySettingsPageChatFontSizeTitle => '聊天字體大小';

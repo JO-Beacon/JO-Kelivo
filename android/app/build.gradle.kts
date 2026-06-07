@@ -7,6 +7,14 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val pubspecVersion = rootProject.file("../pubspec.yaml")
+    .readLines()
+    .first { it.trimStart().startsWith("version:") }
+    .substringAfter("version:")
+    .trim()
+val androidVersionName = pubspecVersion.substringBefore("+")
+val androidVersionCode = pubspecVersion.substringAfter("+").toInt()
+
 android {
     namespace = "com.psyche.jokelivo"
     compileSdk = flutter.compileSdkVersion
@@ -29,8 +37,8 @@ android {
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        versionCode = androidVersionCode
+        versionName = androidVersionName
     }
 
     val keystorePropertiesFile = rootProject.file("key.properties")
@@ -55,6 +63,15 @@ android {
             if (keystorePropertiesFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
             }
+        }
+    }
+}
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.outputs.forEach { output ->
+            output.versionCode.set(androidVersionCode)
+            output.versionName.set(androidVersionName)
         }
     }
 }

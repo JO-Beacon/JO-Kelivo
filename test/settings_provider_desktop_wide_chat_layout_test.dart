@@ -12,14 +12,14 @@ Future<void> _waitForSettingsLoad() async {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  group('SettingsProvider desktop wide chat layout', () {
+  group('SettingsProvider wide chat layout', () {
     test('defaults to disabled', () async {
       SharedPreferences.setMockInitialValues({});
       final settings = SettingsProvider();
 
       await _waitForSettingsLoad();
 
-      expect(settings.desktopWideChatLayout, isFalse);
+      expect(settings.wideChatLayout, isFalse);
     });
 
     test('loads persisted enabled value', () async {
@@ -30,7 +30,7 @@ void main() {
 
       await _waitForSettingsLoad();
 
-      expect(settings.desktopWideChatLayout, isTrue);
+      expect(settings.wideChatLayout, isTrue);
     });
 
     test('persists toggle changes to preferences', () async {
@@ -38,9 +38,9 @@ void main() {
       final settings = SettingsProvider();
 
       await _waitForSettingsLoad();
-      await settings.setDesktopWideChatLayout(true);
+      await settings.setWideChatLayout(true);
 
-      expect(settings.desktopWideChatLayout, isTrue);
+      expect(settings.wideChatLayout, isTrue);
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getBool('display_desktop_wide_chat_layout_v1'), isTrue);
     });

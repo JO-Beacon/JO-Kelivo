@@ -3894,7 +3894,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get displaySettingsPageDesktopWideChatLayoutSubtitle =>
-      'Use all available width for messages and the input bar on desktop.';
+      'Use all available width for messages and the input bar in desktop, tablet, or landscape wide-screen layouts.';
 
   @override
   String get displaySettingsPageChatFontSizeTitle => 'Chat Font Size';

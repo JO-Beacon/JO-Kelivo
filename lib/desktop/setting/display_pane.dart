@@ -484,9 +484,8 @@ class _ToggleRowDesktopWideChatLayout extends StatelessWidget {
     return _ToggleRow(
       label: l10n.displaySettingsPageDesktopWideChatLayoutTitle,
       subtitle: l10n.displaySettingsPageDesktopWideChatLayoutSubtitle,
-      value: sp.desktopWideChatLayout,
-      onChanged: (v) =>
-          context.read<SettingsProvider>().setDesktopWideChatLayout(v),
+      value: sp.wideChatLayout,
+      onChanged: (v) => context.read<SettingsProvider>().setWideChatLayout(v),
     );
   }
 }

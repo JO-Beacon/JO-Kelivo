@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/services/haptics.dart';
 import '../../../core/services/storage/storage_usage_service.dart';
@@ -11,6 +12,7 @@ import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../utils/app_directories.dart';
 import '../../../utils/platform_utils.dart';
 import '../../chat/pages/image_viewer_page.dart';
 import 'log_viewer_page.dart';
@@ -321,6 +323,31 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     }
   }
 
+  Future<void> _openUserDataDirectory() async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final dir = await AppDirectories.getAppDataDirectory();
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+      final ok = await launchUrl(Uri.file(dir.path));
+      if (!ok && mounted) {
+        showAppSnackBar(
+          context,
+          message: l10n.backupPageOpenUserDataFailed,
+          type: NotificationType.error,
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.backupPageOpenUserDataFailed,
+        type: NotificationType.error,
+      );
+    }
+  }
+
   Future<void> _openCategoryDetail(StorageUsageCategoryKey key) async {
     final report = _report;
     if (report == null) return;
@@ -474,6 +501,17 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                   ],
                 ],
               ),
+              if (!widget.embedded) ...[
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: IosTileButton(
+                    label: l10n.backupPageOpenUserDataDirectory,
+                    icon: Lucide.FolderOpen,
+                    onTap: _openUserDataDirectory,
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               Expanded(
                 child: Row(
@@ -591,6 +629,12 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
               ],
             ),
           ),
+        ),
+        const SizedBox(height: 12),
+        IosTileButton(
+          label: l10n.backupPageOpenUserDataDirectory,
+          icon: Lucide.FolderOpen,
+          onTap: _openUserDataDirectory,
         ),
         const SizedBox(height: 12),
         _iosSectionCard(

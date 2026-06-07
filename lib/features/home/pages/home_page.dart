@@ -852,8 +852,7 @@ class _HomePageState extends State<HomePage>
   Widget _buildTabletBody(BuildContext context, ColorScheme cs) {
     final bottomContentPadding = _controller.inputBarHeight + 16;
     final settings = context.watch<SettingsProvider>();
-    final useWideChatLayout =
-        widget.desktopChatEntry && settings.desktopWideChatLayout;
+    final useWideChatLayout = settings.wideChatLayout;
     final maxChatWidth = useWideChatLayout
         ? null
         : ChatLayoutConstants.maxContentWidth;

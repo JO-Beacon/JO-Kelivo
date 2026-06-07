@@ -117,15 +117,13 @@ jobs:
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
           echo "✅ 签名配置已写入"
       - name: 🏗️ 构建 APK
-        run: flutter build apk --release --split-per-abi
-
-      - name: 📦 重命名 APK
         run: |
-          cd build/app/outputs/flutter-apk
-          for file in app-*-release.apk; do
-            abi=$(echo "$file" | sed -E 's/app-(.*)-release\.apk/\1/')
-            mv "$file" "JO-Kelivo_android_${VERSION}_${abi}.apk"
-          done
+          flutter build apk --release --target-platform android-arm64
+          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/JO-Kelivo_android_${VERSION}_arm64-v8a.apk
+          flutter build apk --release --target-platform android-arm
+          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/JO-Kelivo_android_${VERSION}_armeabi-v7a.apk
+          flutter build apk --release --target-platform android-x64
+          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/JO-Kelivo_android_${VERSION}_x86_64.apk
       - name: 🚀 发布到 Release
         if: ${{ github.event.inputs.publish_release == 'true' && github.event.inputs.release_tag != '' }}
         uses: softprops/action-gh-release@v2

@@ -30,10 +30,9 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
-    context.watch<SettingsProvider>();
+    final settings = context.watch<SettingsProvider>();
 
     String paletteName() {
-      final settings = context.read<SettingsProvider>();
       final palette = ThemePalettes.byId(settings.themePaletteId);
       return Localizations.localeOf(context).languageCode == 'zh'
           ? palette.displayNameZh
@@ -220,6 +219,16 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                   );
                 },
                 onTap: () => _showChatMessageBackgroundSheet(context),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.Maximize2,
+                label: l10n.displaySettingsPageDesktopWideChatLayoutTitle,
+                subtitle: l10n.displaySettingsPageDesktopWideChatLayoutSubtitle,
+                value: settings.wideChatLayout,
+                onChanged: (v) =>
+                    context.read<SettingsProvider>().setWideChatLayout(v),
               ),
               _iosDivider(context),
               _iosNavRow(
