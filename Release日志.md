@@ -86,3 +86,62 @@ JO-Kelivo-v0.1.1+1-windows-x64-portable.zip
 JO-Kelivo-v0.1.1+1-windows-x64-portable.zip.sha256
 JO-Kelivo-v0.1.1+1-windows-x64-setup.exe
 JO-Kelivo-v0.1.1+1-windows-x64-setup.exe.sha256
+
+
+---
+
+# 0.1.2+2
+
+## Release notes
+
+```markdown
+# JO-Kelivo 0.1.2+2
+
+发布时间：2026-06-07
+基于原版 Kelivo 版本：1.1.15+52
+源码获取：本 Release 页面附带的 Source code 压缩包；也可从本仓库对应 tag 获取完整源码。
+
+## 说明
+
+JO-Kelivo 是基于原版 Kelivo 的非官方修改版本，不代表原版作者发布、维护或背书。
+
+感谢原版 Kelivo 作者及贡献者的开源工作。原项目版权归原作者及贡献者所有。
+
+本项目作为原版 Kelivo 的修改版本，继续按 GNU AGPL-3.0 发布。若本 Release 分发二进制产物，对应源代码可通过本 Release 页面附带的 Source code 压缩包或本仓库对应 tag 获取。GNU AGPL-3.0 许可证全文见仓库根目录 LICENSE。
+
+## 本版本变更
+
+- 新增“聊天区域拉宽”显示设置：移动端宽屏/平板布局和桌面端均可选择让聊天消息列表与输入栏尽量占满可用宽度；默认关闭，保留原有窄宽度阅读体验。
+- 修复新版本检测来源：JO-Kelivo 现在固定检查 JO-Beacon/JO-Kelivo 的 GitHub Releases，不再跟随原版 Kelivo 更新源。
+- 更新检测会按当前平台匹配 JO-Kelivo Release assets，并避免把 `.sha1` / `.sha256` 校验文件误作为更新包。
+
+## 许可证合规提示
+
+- 本项目整体继续按 GNU AGPL-3.0 发布；许可证全文见仓库根目录 LICENSE。
+- 本 Release 若附带 Android APK、Windows 安装包或 Windows 便携包等二进制产物，对应源代码会（且必须）在同一 Release 页面通过 Source code 压缩包或清晰链接提供。
+- 第三方依赖仍遵循其各自许可证；本项目不改变第三方依赖原有许可证条款。
+- JO-Kelivo 是原版 Kelivo 的非官方改版，不代表原版作者发布、维护或背书；原项目版权归原作者及贡献者所有。
+
+## SHA-256
+
+```text
+6e750c5838e6dfc3eeabb4088440df851ca716cf6c7fde7e85510037be0afa39  JO-Kelivo-v0.1.2+2-android-arm64-v8a-release.apk
+f56f8de4b17dc8c91fc13616eec105dfdcfdd98648d415cebbff831b96e0d5ca  JO-Kelivo-v0.1.2+2-android-armeabi-v7a-release.apk
+5f61b5eddb2d29a96c4cc76633fb3ab039e6b18a63a542d304ce18020a7ab6f3  JO-Kelivo-v0.1.2+2-android-x86_64-release.apk
+be18d168a61d814fbcc2854047d4fde4caf39eb4c8705a9f476ec7e849f70cb8  JO-Kelivo-v0.1.2+2-windows-x64-portable.zip
+7aa79eb8731e330219f272afe66f1c7b27924788ff03fededc5df7c3289cf3d1  JO-Kelivo-v0.1.2+2-windows-x64-setup.exe
+```
+```
+
+## 二进制文件名字（不含源码）
+
+JO-Kelivo-v0.1.2+2-android-arm64-v8a-release.apk
+JO-Kelivo-v0.1.2+2-android-arm64-v8a-release.apk.sha256
+JO-Kelivo-v0.1.2+2-android-armeabi-v7a-release.apk
+JO-Kelivo-v0.1.2+2-android-armeabi-v7a-release.apk.sha256
+JO-Kelivo-v0.1.2+2-android-x86_64-release.apk
+JO-Kelivo-v0.1.2+2-android-x86_64-release.apk.sha256
+JO-Kelivo-v0.1.2+2-windows-x64-portable.zip
+JO-Kelivo-v0.1.2+2-windows-x64-portable.zip.sha256
+JO-Kelivo-v0.1.2+2-windows-x64-setup.exe
+JO-Kelivo-v0.1.2+2-windows-x64-setup.exe.sha256

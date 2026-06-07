@@ -130,10 +130,7 @@ class SettingsProvider extends ChangeNotifier {
       'display_lazy_history_enabled_v1';
   static const String _displayDesktopMessageNavButtonsModeKey =
       'display_desktop_message_nav_buttons_mode_v1';
-  // Keep the legacy storage key for backward compatibility. The feature now
-  // applies to any wide chat layout, not only the desktop entry.
-  static const String _displayWideChatLayoutKey =
-      'display_desktop_wide_chat_layout_v1';
+  static const String _displayWideChatLayoutKey = 'display_wide_chat_layout_v1';
   static const String _displayUseNewAssistantAvatarUxKey =
       'display_use_new_assistant_avatar_ux_v1';
   static const String _displayShowProviderInModelCapsuleKey =

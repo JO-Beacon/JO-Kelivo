@@ -52,7 +52,7 @@
 - **历史消息附件可视化编辑** - 编辑历史消息时，图片和文件会以附件形式展示，支持删除、替换和继续添加。
 - **用户消息图片分离显示** - 可选择将用户消息中的图片显示在气泡下方独立区域，消息内容格式保持兼容。
 - **应用身份独立化** - JO-Kelivo 与 [原版Kelivo](https://github.com/Chevey339/kelivo) 使用不同应用标识和数据目录，可并存安装；数据通过导入导出迁移。
-
+- 新增“聊天区域拉宽”显示设置
 # JO-Kelivo改版概述
 
 JO-Kelivo 是基于 [原版 Kelivo](https://github.com/Chevey339/kelivo) （以下简称“[原版](https://github.com/Chevey339/kelivo)”）的改版 fork。[原版](https://github.com/Chevey339/kelivo) 采用 GNU AGPL-3.0 许可证，本项目依规定继续按 GNU AGPL-3.0 发布。

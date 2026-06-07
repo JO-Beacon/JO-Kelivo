@@ -83,6 +83,4 @@ installer.iss
 /repair_chat_archive/BUG/*.fixed.json
 
 /参考文件/
-安卓APK.lnk
 lib/core/services/api/providers/google_vertex.dart
-windows安装程序.lnk

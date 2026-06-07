@@ -24,7 +24,7 @@ void main() {
 
     test('loads persisted enabled value', () async {
       SharedPreferences.setMockInitialValues({
-        'display_desktop_wide_chat_layout_v1': true,
+        'display_wide_chat_layout_v1': true,
       });
       final settings = SettingsProvider();
 
@@ -42,7 +42,7 @@ void main() {
 
       expect(settings.wideChatLayout, isTrue);
       final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getBool('display_desktop_wide_chat_layout_v1'), isTrue);
+      expect(prefs.getBool('display_wide_chat_layout_v1'), isTrue);
     });
   });
 }
