@@ -1,0 +1,194 @@
+name: Build Linux
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: '发布到 GitHub Release'
+        required: false
+        default: false
+        type: boolean
+      release_tag:
+        description: 'Release 标签，例如 v0.1.3'
+        required: false
+        default: ''
+        type: string
+      prerelease:
+        description: '标记为预发布版本'
+        required: false
+        default: false
+        type: boolean
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: '3.44.1'
+
+jobs:
+  build-linux-x64:
+    name: Build Linux x64
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang \
+            cmake \
+            file \
+            libayatana-appindicator3-dev \
+            libfuse2 \
+            libgstreamer-plugins-base1.0-dev \
+            libgstreamer1.0-dev \
+            libgtk-3-dev \
+            libkeybinder-3.0-dev \
+            ninja-build \
+            patchelf \
+            pkg-config
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Inject fallback secrets
+        shell: bash
+        run: |
+          mkdir -p lib/secrets
+          cat > lib/secrets/fallback.dart <<'EOF'
+          const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';
+          EOF
+
+      - name: Resolve version
+        shell: bash
+        run: |
+          set -euo pipefail
+          raw_version="$(awk '/^version:/ {print $2; exit}' pubspec.yaml)"
+          version="$raw_version"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            version="${GITHUB_REF_NAME#v}"
+          elif [ "${{ inputs.publish_release || false }}" != "true" ]; then
+            short_sha="$(git rev-parse --short HEAD)"
+            version="${version}_${short_sha}"
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "VERSION_NUMBER=${version%%+*}" >> "$GITHUB_ENV"
+          echo "Resolved version: $version"
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build Linux
+        run: flutter build linux --release
+
+      - name: Package tar.gz
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -C build/linux/x64/release/bundle -czf "JO-Kelivo-v${VERSION}-linux-x64.tar.gz" .
+
+      - name: Package AppImage
+        shell: bash
+        run: |
+          set -euo pipefail
+          wget -O appimagetool "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
+          chmod +x appimagetool
+
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+          cp -r build/linux/x64/release/bundle/* AppDir/usr/bin/
+
+          cat > AppDir/AppRun <<'EOF'
+          #!/bin/bash
+          set -e
+          SELF="$(readlink -f "$0")"
+          HERE="${SELF%/*}"
+          export PATH="${HERE}/usr/bin:${PATH}"
+          exec "${HERE}/usr/bin/jo_kelivo" "$@"
+          EOF
+          chmod +x AppDir/AppRun
+
+          cat > AppDir/jo_kelivo.desktop <<'EOF'
+          [Desktop Entry]
+          Name=JO-Kelivo
+          Exec=jo_kelivo
+          Icon=jo_kelivo
+          Type=Application
+          Categories=Utility;
+          EOF
+
+          install -Dm644 assets/app_icon.png AppDir/jo_kelivo.png
+          install -Dm644 assets/app_icon.png AppDir/usr/share/icons/hicolor/256x256/apps/jo_kelivo.png
+
+          ARCH=x86_64 ./appimagetool AppDir "JO-Kelivo-v${VERSION}-linux-x64.AppImage"
+
+      - name: Package DEB
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p deb/DEBIAN
+          mkdir -p deb/opt/jo_kelivo
+          mkdir -p deb/usr/bin
+          mkdir -p deb/usr/share/applications
+          mkdir -p deb/usr/share/icons/hicolor/256x256/apps
+
+          cp -r build/linux/x64/release/bundle/* deb/opt/jo_kelivo/
+          ln -s /opt/jo_kelivo/jo_kelivo deb/usr/bin/jo_kelivo
+          install -Dm644 assets/app_icon.png deb/usr/share/icons/hicolor/256x256/apps/jo_kelivo.png
+
+          cat > deb/usr/share/applications/jo_kelivo.desktop <<'EOF'
+          [Desktop Entry]
+          Name=JO-Kelivo
+          Exec=/opt/jo_kelivo/jo_kelivo
+          Icon=jo_kelivo
+          Type=Application
+          Categories=Utility;
+          EOF
+
+          cat > deb/DEBIAN/control <<EOF
+          Package: jo-kelivo
+          Version: ${VERSION_NUMBER}
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Maintainer: Psyche <maintainer@example.com>
+          Depends: libgtk-3-0, libstdc++6, libglu1-mesa, libgstreamer1.0-0, libgstreamer-plugins-base1.0-0, libglib2.0-0, libc6
+          Description: JO-Kelivo Linux application
+           A cross-platform Flutter LLM chat client.
+          EOF
+
+          dpkg-deb --build deb "JO-Kelivo-v${VERSION}-linux-x64.deb"
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Linux-x64
+          path: |
+            JO-Kelivo-v*-linux-x64.tar.gz
+            JO-Kelivo-v*-linux-x64.AppImage
+            JO-Kelivo-v*-linux-x64.deb
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: ${{ github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && inputs.publish_release && inputs.release_tag != '') }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || inputs.release_tag }}
+          name: ${{ github.ref_type == 'tag' && github.ref_name || inputs.release_tag }}
+          prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || false }}
+          files: |
+            JO-Kelivo-v*-linux-x64.tar.gz
+            JO-Kelivo-v*-linux-x64.AppImage
+            JO-Kelivo-v*-linux-x64.deb
