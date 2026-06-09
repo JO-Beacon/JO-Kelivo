@@ -1,9 +1,0 @@
-[project]
-name = "repair-chat-archive"
-version = "0.1.0"
-description = "Standalone Kelivo chats.json message version order repair tool."
-requires-python = ">=3.10"
-dependencies = []
-
-[tool.pytest.ini_options]
-python_files = ["test_*.py"]

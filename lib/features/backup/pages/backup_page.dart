@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -16,6 +17,7 @@ import '../../../core/providers/backup_reminder_provider.dart';
 import '../../../core/providers/s3_backup_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/backup/data_sync.dart';
 import '../../../core/services/native_file_save.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../core/services/backup/cherry_importer.dart';
@@ -86,9 +88,9 @@ class _BackupPageState extends State<BackupPage> {
                 Center(
                   child: Text(
                     l10n.backupPageImportFromCherryStudio,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: AppFontWeights.semibold,
                     ),
                   ),
                 ),
@@ -215,6 +217,15 @@ class _BackupPageState extends State<BackupPage> {
     Future<T> Function() task,
   ) => _runWithLoadingOverlay(context, task);
 
+  void _showNotSupported(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    showAppSnackBar(
+      context,
+      message: l10n.backupPageNotSupportedYet,
+      type: NotificationType.info,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -250,7 +261,7 @@ class _BackupPageState extends State<BackupPage> {
               text,
               style: TextStyle(
                 fontSize: 13,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeights.semibold,
                 color: cs.onSurface.withValues(alpha: 0.8),
               ),
             ),
@@ -1354,7 +1365,7 @@ class _BackupPageState extends State<BackupPage> {
                       context,
                       icon: Lucide.Box,
                       label: l10n.backupPageImportFromDeepSeek,
-                      onTap: () {},
+                      onTap: () => _showNotSupported(context),
                     ),
                   ],
                 ),
@@ -1372,44 +1383,50 @@ class _BackupPageState extends State<BackupPage> {
       context,
       () => vm.exportToFile(),
     );
-    if (!context.mounted) return;
 
-    final isMobile = Platform.isAndroid || Platform.isIOS;
-    if (isMobile) {
-      try {
-        final saved = await NativeFileSave.saveFileFromPath(
-          sourcePath: file.path,
-          fileName: file.uri.pathSegments.last,
-        );
-        if (saved && context.mounted) {
-          await context.read<BackupReminderProvider>().recordBackupCompleted();
-        }
-      } catch (e) {
-        if (!context.mounted) return;
-        showAppSnackBar(
-          context,
-          message: e.toString(),
-          type: NotificationType.error,
-        );
-      }
-    } else {
-      final savePath = await FilePicker.platform.saveFile(
-        dialogTitle: l10n.backupPageExportToFile,
-        fileName: file.uri.pathSegments.last,
-        type: FileType.custom,
-        allowedExtensions: ['zip'],
-      );
-      if (savePath != null) {
+    try {
+      if (!context.mounted) return;
+      final isMobile = Platform.isAndroid || Platform.isIOS;
+      if (isMobile) {
         try {
-          await File(savePath).parent.create(recursive: true);
-          await file.copy(savePath);
-          if (context.mounted) {
+          final saved = await NativeFileSave.saveFileFromPath(
+            sourcePath: file.path,
+            fileName: file.uri.pathSegments.last,
+          );
+          if (saved && context.mounted) {
             await context
                 .read<BackupReminderProvider>()
                 .recordBackupCompleted();
           }
-        } catch (_) {}
+        } catch (e) {
+          if (!context.mounted) return;
+          showAppSnackBar(
+            context,
+            message: e.toString(),
+            type: NotificationType.error,
+          );
+        }
+      } else {
+        final savePath = await FilePicker.platform.saveFile(
+          dialogTitle: l10n.backupPageExportToFile,
+          fileName: file.uri.pathSegments.last,
+          type: FileType.custom,
+          allowedExtensions: ['zip'],
+        );
+        if (savePath != null) {
+          try {
+            await File(savePath).parent.create(recursive: true);
+            await file.copy(savePath);
+            if (context.mounted) {
+              await context
+                  .read<BackupReminderProvider>()
+                  .recordBackupCompleted();
+            }
+          } catch (_) {}
+        }
       }
+    } finally {
+      await DataSync.cleanupTemporaryBackupFile(file);
     }
   }
 
@@ -1832,7 +1849,7 @@ class _TactileTextButtonState extends State<_TactileTextButton> {
           widget.label,
           style: TextStyle(
             fontSize: 15,
-            fontWeight: FontWeight.w600,
+            fontWeight: AppFontWeights.semibold,
             color: _pressed ? press : base,
           ),
         ),
@@ -2011,10 +2028,7 @@ Widget _iosNavRow(
                 Expanded(
                   child: Text(
                     label,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: c,
-                    ), //, fontWeight: FontWeight.w500),
+                    style: TextStyle(fontSize: 15, color: c),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -2081,7 +2095,10 @@ class _IosOutlineButtonState extends State<_IosOutlineButton> {
           ),
           child: Text(
             widget.label,
-            style: TextStyle(color: cs.primary, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: cs.primary,
+              fontWeight: AppFontWeights.semibold,
+            ),
           ),
         ),
       ),
@@ -2129,7 +2146,10 @@ class _IosFilledButtonState extends State<_IosFilledButton> {
           ),
           child: Text(
             widget.label,
-            style: TextStyle(color: cs.onPrimary, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: cs.onPrimary,
+              fontWeight: AppFontWeights.semibold,
+            ),
           ),
         ),
       ),
@@ -2164,7 +2184,7 @@ Widget _iosSwitchRow(
                 ],
                 Expanded(
                   child: Text(label, style: TextStyle(fontSize: 15, color: c)),
-                ), //, fontWeight: FontWeight.w500))),
+                ),
                 IosSwitch(value: value, onChanged: onChanged),
               ],
             ),
@@ -2217,9 +2237,9 @@ class _RemoteListSheet extends StatelessWidget {
                   Center(
                     child: Text(
                       l10n.backupPageRemoteBackups,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: AppFontWeights.semibold,
                       ),
                     ),
                   ),
@@ -2283,8 +2303,8 @@ class _RemoteListSheet extends StatelessWidget {
                                           it.displayName,
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w600,
+                                          style: TextStyle(
+                                            fontWeight: AppFontWeights.semibold,
                                           ),
                                         ),
                                         const SizedBox(height: 4),
@@ -2381,7 +2401,7 @@ class _ActionCard extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                      style: TextStyle(fontWeight: AppFontWeights.semibold),
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -2489,9 +2509,9 @@ class _WebDavSettingsSheetState extends State<_WebDavSettingsSheet> {
                     child: Center(
                       child: Text(
                         l10n.backupPageWebDavServerSettings,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeights.semibold,
                         ),
                       ),
                     ),
@@ -2650,9 +2670,9 @@ class _S3SettingsSheetState extends State<_S3SettingsSheet> {
                     child: Center(
                       child: Text(
                         l10n.backupPageS3ServerSettings,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeights.semibold,
                         ),
                       ),
                     ),

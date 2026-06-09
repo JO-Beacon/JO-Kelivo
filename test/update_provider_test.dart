@@ -12,35 +12,35 @@ void main() {
           'body': 'Release notes',
           'assets': [
             {
-              'name': 'JO-Kelivo_android_0.2.0+3_armeabi-v7a.apk',
+              'name': 'JO-Kelivo-v0.2.0+3-android-armeabi-v7a-release.apk',
               'browser_download_url': 'https://example.com/android-v7a.apk',
             },
             {
-              'name': 'JO-Kelivo_android_0.2.0+3_arm64-v8a.apk',
+              'name': 'JO-Kelivo-v0.2.0+3-android-arm64-v8a-release.apk',
               'browser_download_url': 'https://example.com/android-arm64.apk',
             },
             {
-              'name': 'JO-Kelivo_windows_0.2.0+3.zip',
+              'name': 'JO-Kelivo-v0.2.0+3-windows-x64-portable.zip',
               'browser_download_url': 'https://example.com/windows.zip',
             },
             {
-              'name': 'JO-Kelivo_windows_0.2.0+3_setup.exe',
+              'name': 'JO-Kelivo-v0.2.0+3-windows-x64-setup.exe',
               'browser_download_url': 'https://example.com/windows.exe',
             },
             {
-              'name': 'JO-Kelivo_macos_0.2.0+3.dmg',
+              'name': 'JO-Kelivo-v0.2.0+3-macos-universal-dmg.dmg',
               'browser_download_url': 'https://example.com/macos.dmg',
             },
             {
-              'name': 'JO-Kelivo_linux_0.2.0+3.tar.gz',
+              'name': 'JO-Kelivo-v0.2.0+3-linux-x64-tar.gz',
               'browser_download_url': 'https://example.com/linux.tar.gz',
             },
             {
-              'name': 'JO-Kelivo_linux_0.2.0+3.AppImage',
+              'name': 'JO-Kelivo-v0.2.0+3-linux-x64-appimage.AppImage',
               'browser_download_url': 'https://example.com/linux.AppImage',
             },
             {
-              'name': 'JO-Kelivo_android_0.2.0+3_arm64-v8a.apk.sha256',
+              'name': 'JO-Kelivo-v0.2.0+3-android-arm64-v8a-release.apk.sha256',
               'browser_download_url': 'https://example.com/android.sha256',
             },
             {

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../theme/app_font_weights.dart';
 import '../../../theme/design_tokens.dart';
 
 class ChatSelectionExportBar extends StatelessWidget {
@@ -81,7 +82,7 @@ class ChatSelectionExportBar extends StatelessWidget {
                         Row(
                           children: [
                             Expanded(
-                              child: _ExportPillButton(
+                              child: _SelectionActionButton(
                                 icon: Lucide.FileText,
                                 label: l10n.chatSelectionExportTxt,
                                 color: cs.tertiary,
@@ -91,7 +92,7 @@ class ChatSelectionExportBar extends StatelessWidget {
                             ),
                             const SizedBox(width: 10),
                             Expanded(
-                              child: _ExportPillButton(
+                              child: _SelectionActionButton(
                                 icon: Lucide.BookOpenText,
                                 label: l10n.chatSelectionExportMd,
                                 color: cs.primary,
@@ -101,7 +102,7 @@ class ChatSelectionExportBar extends StatelessWidget {
                             ),
                             const SizedBox(width: 10),
                             Expanded(
-                              child: _ExportPillButton(
+                              child: _SelectionActionButton(
                                 icon: Lucide.Image,
                                 label: l10n.chatSelectionExportImage,
                                 color: cs.secondary,
@@ -150,8 +151,8 @@ class ChatSelectionExportBar extends StatelessWidget {
   }
 }
 
-class _ExportPillButton extends StatelessWidget {
-  const _ExportPillButton({
+class _SelectionActionButton extends StatelessWidget {
+  const _SelectionActionButton({
     required this.icon,
     required this.label,
     required this.color,
@@ -194,7 +195,7 @@ class _ExportPillButton extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: dense ? 13 : 14,
-                fontWeight: FontWeight.w800,
+                fontWeight: AppFontWeights.emphasis,
                 color: color,
                 letterSpacing: 0.2,
               ),
@@ -271,7 +272,7 @@ class _ToggleCard extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: AppFontWeights.emphasis,
                   color: fg,
                 ),
               ),

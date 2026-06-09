@@ -27,6 +27,9 @@ void main() {
     String? queuedPreviewText,
     VoidCallback? onCancelQueuedInput,
     String? conversationId,
+    String? sendButtonTooltip,
+    ThemeData? theme,
+    bool backgroundImageActive = false,
   }) {
     return MultiProvider(
       providers: [
@@ -38,6 +41,7 @@ void main() {
         ),
       ],
       child: MaterialApp(
+        theme: theme,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
@@ -51,6 +55,8 @@ void main() {
             queuedPreviewText: queuedPreviewText,
             onCancelQueuedInput: onCancelQueuedInput,
             conversationId: conversationId,
+            sendButtonTooltip: sendButtonTooltip,
+            backgroundImageActive: backgroundImageActive,
           ),
         ),
       ),
@@ -97,6 +103,25 @@ void main() {
     await tapSendButton(tester);
 
     expect(controller.text, 'keep me');
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('发送按钮可显示编辑态保存并发送提示', (tester) async {
+    final controller = TextEditingController(text: 'edited message');
+    final focusNode = FocusNode();
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        sendButtonTooltip: 'Save & Send',
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+      ),
+    );
+
+    expect(find.byTooltip('Save & Send'), findsOneWidget);
 
     controller.dispose();
     focusNode.dispose();
@@ -265,9 +290,404 @@ void main() {
     controller.dispose();
     focusNode.dispose();
   });
+
+  testWidgets('输入框在亮色主题下有稳定底色', (tester) async {
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        theme: ThemeData.light(),
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+      ),
+    );
+
+    final decoration = _mainInputDecoration(tester);
+    expect(decoration.color?.a, greaterThanOrEqualTo(0.70));
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('输入框在暗色主题下不是纯透明毛玻璃', (tester) async {
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        theme: ThemeData.dark(),
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+      ),
+    );
+
+    final decoration = _mainInputDecoration(tester);
+    expect(decoration.color?.a, greaterThanOrEqualTo(0.60));
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('输入框在背景图模式下降低纯色覆盖', (tester) async {
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        theme: ThemeData.light(),
+        backgroundImageActive: true,
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+      ),
+    );
+
+    final decoration = _mainInputDecoration(tester);
+    expect(decoration.color?.a, inExclusiveRange(0.35, 0.70));
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('图片和文件预览显示在主输入框内部顶部，并提供移除和替换入口', (tester) async {
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+    final mediaController = ChatInputBarController();
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        mediaController: mediaController,
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+      ),
+    );
+
+    mediaController
+      ..addFiles(const [
+        DocumentAttachment(
+          path: '/tmp/draft.pdf',
+          fileName: 'draft.pdf',
+          mime: 'application/pdf',
+        ),
+      ])
+      ..addImages(['missing-draft-image.png']);
+    await tester.pump();
+
+    final surfaceFinder = _mainInputSurfaceFinder();
+    expect(surfaceFinder, findsOneWidget);
+    expect(
+      find.descendant(of: surfaceFinder, matching: find.text('draft.pdf')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: surfaceFinder, matching: find.byType(Image)),
+      findsOneWidget,
+    );
+    final imagePreviewsFinder = find.byKey(
+      const ValueKey('chat-input-image-previews'),
+    );
+    final documentPreviewsFinder = find.byKey(
+      const ValueKey('chat-input-document-previews'),
+    );
+    expect(imagePreviewsFinder, findsOneWidget);
+    expect(documentPreviewsFinder, findsOneWidget);
+
+    final imagePreviewsRect = tester.getRect(imagePreviewsFinder);
+    final documentPreviewsRect = tester.getRect(documentPreviewsFinder);
+    expect(
+      imagePreviewsRect.bottom,
+      lessThanOrEqualTo(documentPreviewsRect.top),
+    );
+
+    final imageRect = tester.getRect(find.byType(Image));
+    final removeButtonRect = tester.getRect(
+      find.byKey(const ValueKey('chat-input-image-remove:0')),
+    );
+    final replaceButtonRect = tester.getRect(
+      find.byKey(const ValueKey('chat-input-image-replace:0')),
+    );
+    expect(imageRect.contains(removeButtonRect.topLeft), isTrue);
+    expect(imageRect.contains(removeButtonRect.bottomRight), isTrue);
+    expect(imageRect.contains(replaceButtonRect.topLeft), isTrue);
+    expect(imageRect.contains(replaceButtonRect.bottomRight), isTrue);
+    expect(removeButtonRect.width, lessThan(22));
+    expect(removeButtonRect.height, lessThan(22));
+    expect(replaceButtonRect.width, lessThan(22));
+    expect(replaceButtonRect.height, lessThan(22));
+    expect(
+      find.descendant(of: imagePreviewsFinder, matching: find.byType(InkWell)),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: documentPreviewsFinder,
+        matching: find.byType(InkWell),
+      ),
+      findsNothing,
+    );
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('历史消息附件恢复后可删除并按当前状态提交', (tester) async {
+    final controller = TextEditingController(text: 'edited historical prompt');
+    final focusNode = FocusNode();
+    final mediaController = ChatInputBarController();
+    ChatInputData? submitted;
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        mediaController: mediaController,
+        onSend: (input) async {
+          submitted = input;
+          return ChatInputSubmissionResult.rejected;
+        },
+      ),
+    );
+
+    mediaController.restoreInput(
+      const ChatInputData(
+        text: 'ignored by media controller',
+        imagePaths: ['missing-historical-image.png'],
+        documents: [
+          DocumentAttachment(
+            path: '/tmp/history.pdf',
+            fileName: 'history.pdf',
+            mime: 'application/pdf',
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('chat-input-image-previews')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('chat-input-document-previews')),
+      findsOneWidget,
+    );
+    expect(find.text('history.pdf'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('chat-input-image-remove:0')));
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('chat-input-image-previews')),
+      findsNothing,
+    );
+
+    await tapSendButton(tester);
+
+    expect(submitted?.text, 'edited historical prompt');
+    expect(submitted?.imagePaths, isEmpty);
+    expect(submitted?.documents.map((document) => document.fileName), [
+      'history.pdf',
+    ]);
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('取消编辑清理恢复出来的历史附件草稿', (tester) async {
+    final controller = TextEditingController(text: 'draft');
+    final focusNode = FocusNode();
+    final mediaController = ChatInputBarController();
+    ChatInputData? submitted;
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        mediaController: mediaController,
+        onSend: (input) async {
+          submitted = input;
+          return ChatInputSubmissionResult.rejected;
+        },
+      ),
+    );
+
+    mediaController.restoreInput(
+      const ChatInputData(
+        text: 'ignored by media controller',
+        imagePaths: ['missing-historical-image.png'],
+        documents: [
+          DocumentAttachment(
+            path: '/tmp/history.pdf',
+            fileName: 'history.pdf',
+            mime: 'application/pdf',
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('chat-input-image-previews')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('chat-input-document-previews')),
+      findsOneWidget,
+    );
+
+    mediaController.clearDraft();
+    await tester.pump();
+
+    expect(controller.text, isEmpty);
+    expect(
+      find.byKey(const ValueKey('chat-input-image-previews')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('chat-input-document-previews')),
+      findsNothing,
+    );
+
+    await tapSendButton(tester);
+    expect(submitted, isNull);
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('历史附件恢复后可继续新增附件并提交', (tester) async {
+    final controller = TextEditingController(text: 'edited prompt');
+    final focusNode = FocusNode();
+    final mediaController = ChatInputBarController();
+    ChatInputData? submitted;
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        mediaController: mediaController,
+        onSend: (input) async {
+          submitted = input;
+          return ChatInputSubmissionResult.rejected;
+        },
+      ),
+    );
+
+    mediaController.restoreInput(
+      const ChatInputData(
+        text: 'ignored by media controller',
+        imagePaths: ['missing-historical-image.png'],
+      ),
+    );
+    mediaController.addImages(['missing-added-image.png']);
+    mediaController.addFiles(const [
+      DocumentAttachment(
+        path: '/tmp/added.txt',
+        fileName: 'added.txt',
+        mime: 'text/plain',
+      ),
+    ]);
+    await tester.pump();
+
+    await tapSendButton(tester);
+
+    expect(submitted?.imagePaths, [
+      'missing-historical-image.png',
+      'missing-added-image.png',
+    ]);
+    expect(submitted?.documents.map((document) => document.fileName), [
+      'added.txt',
+    ]);
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('历史附件图片可通过控制器替换后提交', (tester) async {
+    final controller = TextEditingController(text: 'edited prompt');
+    final focusNode = FocusNode();
+    final mediaController = ChatInputBarController();
+    ChatInputData? submitted;
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        mediaController: mediaController,
+        onSend: (input) async {
+          submitted = input;
+          return ChatInputSubmissionResult.rejected;
+        },
+      ),
+    );
+
+    mediaController.restoreInput(
+      const ChatInputData(
+        text: '',
+        imagePaths: ['missing-historical-image.png'],
+      ),
+    );
+    mediaController.replaceImageAt(0, 'missing-replaced-image.png');
+    await tester.pump();
+
+    await tapSendButton(tester);
+
+    expect(submitted?.imagePaths, ['missing-replaced-image.png']);
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('输入框外层底部留白只下移一点', (tester) async {
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+      ),
+    );
+
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Padding &&
+            widget.padding == const EdgeInsets.fromLTRB(12, 4, 12, 8),
+      ),
+      findsOneWidget,
+    );
+
+    controller.dispose();
+    focusNode.dispose();
+  });
 }
 
 Future<void> tapSendButton(WidgetTester tester) async {
   await tester.tap(find.byIcon(Lucide.ArrowUp));
   await tester.pumpAndSettle();
+}
+
+Finder _mainInputSurfaceFinder() {
+  return find.byWidgetPredicate(
+    (widget) =>
+        widget is Container &&
+        widget.decoration is BoxDecoration &&
+        (widget.decoration! as BoxDecoration).borderRadius ==
+            BorderRadius.circular(20),
+  );
+}
+
+BoxDecoration _mainInputDecoration(WidgetTester tester) {
+  final candidates = tester
+      .widgetList<Container>(_mainInputSurfaceFinder())
+      .map((widget) => widget.decoration)
+      .whereType<BoxDecoration>()
+      .toList();
+
+  expect(candidates, hasLength(1));
+  return candidates.single;
 }

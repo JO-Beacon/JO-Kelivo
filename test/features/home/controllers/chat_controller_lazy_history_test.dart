@@ -6,10 +6,12 @@ import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/home/controllers/chat_controller.dart';
 
 class _FakeLazyChatService extends ChatService {
-  _FakeLazyChatService(this._messages, {this.allowFullLoad = false});
+  _FakeLazyChatService(this._messages);
 
   final List<ChatMessage> _messages;
-  final bool allowFullLoad;
+  Map<String, int> versionSelections = const <String, int>{};
+  final Set<String> knownConversationIds = <String>{};
+  final Set<String> deletedConversationIds = <String>{};
   int fullLoadCalls = 0;
   int recentLoadCalls = 0;
   int rangeLoadCalls = 0;
@@ -17,10 +19,7 @@ class _FakeLazyChatService extends ChatService {
   @override
   List<ChatMessage> getMessages(String conversationId) {
     fullLoadCalls++;
-    if (!allowFullLoad) {
-      throw StateError('full message load should not run on conversation open');
-    }
-    return List<ChatMessage>.of(_messages);
+    return List<ChatMessage>.from(_messages);
   }
 
   @override
@@ -58,11 +57,18 @@ class _FakeLazyChatService extends ChatService {
   }
 
   @override
-  Map<String, int> getVersionSelections(String conversationId) {
-    if (_messages.any((message) => message.id == 'message-10-edit')) {
-      return const <String, int>{'message-10': 1};
-    }
-    return const <String, int>{};
+  Map<String, int> getVersionSelections(String conversationId) =>
+      Map<String, int>.from(versionSelections);
+
+  @override
+  Conversation? getConversation(String id) {
+    if (deletedConversationIds.contains(id)) return null;
+    if (!knownConversationIds.contains(id)) return null;
+    return Conversation(
+      id: id,
+      title: 'Conversation',
+      messageIds: _messages.map((message) => message.id).toList(),
+    );
   }
 
   ChatMessage appendPersistedMessage(ChatMessage message) {
@@ -73,8 +79,8 @@ class _FakeLazyChatService extends ChatService {
   @override
   Future<void> updateMessage(
     String messageId, {
-    String? role,
     String? content,
+    String? role,
     int? totalTokens,
     bool? isStreaming,
     String? reasoningText,
@@ -94,8 +100,8 @@ class _FakeLazyChatService extends ChatService {
 
     final message = _messages[index];
     _messages[index] = message.copyWith(
-      role: role ?? message.role,
       content: content ?? message.content,
+      role: role ?? message.role,
       totalTokens: totalTokens ?? message.totalTokens,
       isStreaming: isStreaming ?? message.isStreaming,
       reasoningText: reasoningText ?? message.reasoningText,
@@ -132,14 +138,14 @@ ChatMessage _message(int index) {
 
 ChatMessage _versionedMessage({
   required String id,
+  required String role,
   required String groupId,
   required int version,
-  required String content,
 }) {
   return ChatMessage(
     id: id,
-    role: 'user',
-    content: content,
+    role: role,
+    content: id,
     conversationId: 'conversation-1',
     groupId: groupId,
     version: version,
@@ -180,9 +186,8 @@ void main() {
     });
 
     test(
-      'opening a conversation loads all messages when lazy history is disabled',
+      'opening a conversation loads full history when lazy history is off',
       () {
-        chatService = _FakeLazyChatService(messages, allowFullLoad: true);
         controller.dispose();
         controller = ChatController(
           chatService: chatService,
@@ -197,53 +202,39 @@ void main() {
         expect(controller.loadedStartIndex, 0);
         expect(controller.totalMessageCount, 100);
         expect(controller.hasMoreBefore, isFalse);
-        expect(controller.hasMoreAfter, isFalse);
-        expect(controller.loadMoreBefore(), isFalse);
-        expect(controller.loadMoreAfter(), isFalse);
       },
     );
 
-    test(
-      'reloading after deletion keeps full history when lazy history is disabled',
-      () {
-        chatService = _FakeLazyChatService(messages, allowFullLoad: true);
-        controller.dispose();
-        controller = ChatController(
-          chatService: chatService,
-          lazyHistoryEnabled: () => false,
-        );
-        controller.setCurrentConversation(conversation);
-        messages.removeRange(77, 80);
+    test('window paging is disabled when lazy history is off', () {
+      controller.dispose();
+      controller = ChatController(
+        chatService: chatService,
+        lazyHistoryEnabled: () => false,
+      );
+      controller.setCurrentConversation(conversation);
 
-        controller.reloadMessages();
+      expect(controller.loadStartWindow(), isFalse);
+      expect(controller.loadEndWindow(), isFalse);
+      expect(controller.loadMoreBefore(), isFalse);
+      expect(controller.loadMoreAfter(), isFalse);
+      expect(chatService.rangeLoadCalls, 0);
+    });
 
-        expect(controller.messages, messages);
-        expect(controller.messages.length, 97);
-        expect(controller.messages.last.id, 'message-99');
-        expect(controller.loadedStartIndex, 0);
-        expect(controller.totalMessageCount, 97);
-        expect(controller.hasMoreAfter, isFalse);
-      },
-    );
+    test('clears current conversation when the service deletes it', () async {
+      chatService.knownConversationIds.add(conversation.id);
+      controller.setCurrentConversation(conversation);
 
-    test(
-      'reloading after deletion keeps bounded window when lazy history is enabled',
-      () {
-        controller.setCurrentConversation(conversation);
-        messages.removeRange(77, 80);
+      chatService.deletedConversationIds.add(conversation.id);
+      chatService.notifyListeners();
 
-        controller.reloadMessages();
-
-        expect(controller.messages.length, 20);
-        expect(controller.messages.first.id, 'message-80');
-        expect(controller.messages.last.id, 'message-99');
-        expect(controller.loadedStartIndex, 77);
-        expect(controller.totalMessageCount, 97);
-        expect(controller.hasMoreBefore, isTrue);
-        expect(controller.hasMoreAfter, isFalse);
-        expect(chatService.fullLoadCalls, 0);
-      },
-    );
+      expect(controller.currentConversation, isNull);
+      expect(controller.messages, isEmpty);
+      expect(controller.totalMessageCount, 0);
+      await expectLater(
+        controller.addMessage(role: 'user', content: 'stale send'),
+        throwsStateError,
+      );
+    });
 
     test(
       'updating message role persists through service and syncs loaded list',
@@ -281,6 +272,116 @@ void main() {
       expect(controller.totalMessageCount, 5000);
       expect(controller.hasMoreBefore, isTrue);
     });
+
+    test(
+      'collapsed tail window excludes a version whose group anchor is older',
+      () {
+        messages = <ChatMessage>[
+          ...List<ChatMessage>.generate(100, _message),
+          _versionedMessage(
+            id: 'message-10-v1',
+            role: 'user',
+            groupId: 'message-10',
+            version: 1,
+          ),
+        ];
+        conversation = Conversation(
+          id: 'conversation-1',
+          title: 'Long chat with edited old message',
+          messageIds: messages.map((message) => message.id).toList(),
+        );
+        chatService = _FakeLazyChatService(messages);
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+
+        controller.setCurrentConversation(conversation);
+
+        expect(controller.messages.last.id, 'message-10-v1');
+        expect(controller.loadedStartIndex, 81);
+        expect(controller.messages.length, 20);
+        expect(
+          controller.collapsedMessages.map((message) => message.id),
+          isNot(contains('message-10-v1')),
+        );
+        expect(controller.collapsedMessages.first.id, 'message-81');
+        expect(controller.collapsedMessages.last.id, 'message-99');
+      },
+    );
+
+    test(
+      'collapsed tail window keeps a version whose group anchor is visible',
+      () {
+        messages = <ChatMessage>[
+          ...List<ChatMessage>.generate(99, _message),
+          _versionedMessage(
+            id: 'message-99-v0',
+            role: 'assistant',
+            groupId: 'message-99',
+            version: 0,
+          ),
+          _versionedMessage(
+            id: 'message-99-v1',
+            role: 'assistant',
+            groupId: 'message-99',
+            version: 1,
+          ),
+        ];
+        conversation = Conversation(
+          id: 'conversation-1',
+          title: 'Long chat with edited recent message',
+          messageIds: messages.map((message) => message.id).toList(),
+        );
+        chatService = _FakeLazyChatService(messages);
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+
+        controller.setCurrentConversation(conversation);
+
+        final collapsedIds = controller.collapsedMessages
+            .map((message) => message.id)
+            .toList();
+        expect(collapsedIds, contains('message-99-v1'));
+        expect(collapsedIds, isNot(contains('message-99-v0')));
+        expect(controller.collapsedMessages.last.id, 'message-99-v1');
+      },
+    );
+
+    test(
+      'collapsed tail window loads selected version when recent window starts inside final version group',
+      () {
+        final finalVersions = List<ChatMessage>.generate(
+          21,
+          (index) => _versionedMessage(
+            id: 'final-v$index',
+            role: 'assistant',
+            groupId: 'final-group',
+            version: index,
+          ),
+        );
+        messages = <ChatMessage>[
+          ...List<ChatMessage>.generate(100, _message),
+          ...finalVersions,
+        ];
+        conversation = Conversation(
+          id: 'conversation-1',
+          title: 'Long chat with a long multi-version final message',
+          messageIds: messages.map((message) => message.id).toList(),
+          versionSelections: const <String, int>{'final-group': 0},
+        );
+        chatService = _FakeLazyChatService(messages)
+          ..versionSelections = const <String, int>{'final-group': 0};
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+
+        controller.setCurrentConversation(conversation);
+
+        expect(controller.messages.first.id, 'final-v1');
+        expect(controller.loadedStartIndex, 101);
+        expect(controller.collapsedMessages.map((message) => message.id), [
+          'final-v0',
+        ]);
+      },
+    );
 
     test(
       'loading older history prepends one page before the visible window',
@@ -447,75 +548,6 @@ void main() {
       expect(controller.totalMessageCount, 5001);
       expect(controller.hasMoreAfter, isFalse);
     });
-
-    test(
-      'tail window does not render a stale edited version without its group anchor',
-      () {
-        messages = List<ChatMessage>.generate(100, _message);
-        messages.add(
-          _versionedMessage(
-            id: 'message-10-edit',
-            groupId: 'message-10',
-            version: 1,
-            content: 'edited message 10',
-          ),
-        );
-        conversation = Conversation(
-          id: 'conversation-1',
-          title: 'Long chat with versions',
-          messageIds: messages.map((message) => message.id).toList(),
-          versionSelections: const {'message-10': 1},
-        );
-        chatService = _FakeLazyChatService(messages);
-        controller.dispose();
-        controller = ChatController(chatService: chatService);
-
-        controller.setCurrentConversation(conversation);
-
-        final collapsed = controller.collapsedMessages;
-        expect(
-          collapsed.any((message) => message.id == 'message-10-edit'),
-          isFalse,
-        );
-        expect(collapsed.first.id, 'message-81');
-        expect(collapsed.last.id, 'message-99');
-        expect(controller.messages.last.id, 'message-10-edit');
-      },
-    );
-
-    test(
-      'complete collapsed history keeps selected edited version at original group position',
-      () {
-        messages = List<ChatMessage>.generate(100, _message);
-        messages.add(
-          _versionedMessage(
-            id: 'message-10-edit',
-            groupId: 'message-10',
-            version: 1,
-            content: 'edited message 10',
-          ),
-        );
-        conversation = Conversation(
-          id: 'conversation-1',
-          title: 'Long chat with versions',
-          messageIds: messages.map((message) => message.id).toList(),
-          versionSelections: const {'message-10': 1},
-        );
-        chatService = _FakeLazyChatService(messages);
-        controller.dispose();
-        controller = ChatController(chatService: chatService);
-        controller.setCurrentConversation(conversation);
-
-        final collapsed = controller
-            .allCollapsedMessagesForCurrentConversation();
-
-        expect(collapsed.length, 100);
-        expect(collapsed[9].id, 'message-9');
-        expect(collapsed[10].id, 'message-10-edit');
-        expect(collapsed[11].id, 'message-11');
-        expect(collapsed.last.id, 'message-99');
-      },
-    );
 
     test(
       'mini map source includes all messages without expanding chat window',

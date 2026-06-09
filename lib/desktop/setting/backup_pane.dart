@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
@@ -21,6 +20,7 @@ import '../../shared/widgets/ios_switch.dart';
 import '../../shared/widgets/snackbar.dart';
 import '../../features/backup/widgets/backup_reminder_helpers.dart';
 import '../widgets/desktop_select_dropdown.dart';
+import '../../theme/app_font_weights.dart';
 
 class DesktopBackupPane extends StatefulWidget {
   const DesktopBackupPane({super.key});
@@ -158,10 +158,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     final l10n = AppLocalizations.of(context)!;
     try {
       final dir = await AppDirectories.getAppDataDirectory();
-      if (!await dir.exists()) {
-        await dir.create(recursive: true);
-      }
-      final ok = await launchUrl(Uri.file(dir.path));
+      final ok = await AppDirectories.openDirectory(dir);
       if (!ok && mounted) {
         showAppSnackBar(
           context,
@@ -288,7 +285,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                             l10n.backupPageTitle,
                             style: TextStyle(
                               fontSize: 14,
-                              fontWeight: FontWeight.w400,
+                              fontWeight: AppFontWeights.regular,
                               color: cs.onSurface.withValues(alpha: 0.9),
                             ),
                           ),
@@ -310,50 +307,6 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 6)),
 
-              if (PlatformUtils.isDesktop) ...[
-                SliverToBoxAdapter(
-                  child: _sectionCard(
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  l10n.backupPageUserDataDirectoryTitle,
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                    color: cs.onSurface.withValues(alpha: 0.95),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  l10n.backupPageUserDataDirectoryDescription,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: cs.onSurface.withValues(alpha: 0.65),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          _DeskIosButton(
-                            label: l10n.backupPageOpenUserDataDirectory,
-                            filled: false,
-                            dense: true,
-                            onTap: _openUserDataDirectory,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SliverToBoxAdapter(child: SizedBox(height: 10)),
-              ],
-
               // Backup management (applies to WebDAV and local import/export)
               SliverToBoxAdapter(
                 child: _sectionCard(
@@ -367,7 +320,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                               l10n.backupPageBackupManagement,
                               style: TextStyle(
                                 fontSize: 15,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: AppFontWeights.semibold,
                                 color: cs.onSurface.withValues(alpha: 0.95),
                               ),
                             ),
@@ -414,6 +367,49 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
+              SliverToBoxAdapter(
+                child: _sectionCard(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                l10n.backupPageUserDataDirectoryTitle,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: AppFontWeights.semibold,
+                                  color: cs.onSurface.withValues(alpha: 0.95),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                l10n.backupPageUserDataDirectoryDescription,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: cs.onSurface.withValues(alpha: 0.65),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        _DeskIosButton(
+                          label: l10n.backupPageOpenUserDataDirectory,
+                          filled: false,
+                          dense: true,
+                          onTap: _openUserDataDirectory,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 10)),
+
               // WebDAV settings card with left label right input, realtime save
               SliverToBoxAdapter(
                 child: _sectionCard(
@@ -427,7 +423,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                               l10n.backupPageWebDavServerSettings,
                               style: TextStyle(
                                 fontSize: 15,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: AppFontWeights.semibold,
                                 color: cs.onSurface.withValues(alpha: 0.95),
                               ),
                             ),
@@ -442,7 +438,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                         child: TextField(
                           controller: _url,
                           enabled: !busy,
-                          style: const TextStyle(fontSize: 14),
+                          style: TextStyle(fontSize: 14),
                           decoration: _deskInputDecoration(context).copyWith(
                             hintText:
                                 'https://dav.example.com/remote.php/webdav/',
@@ -459,7 +455,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                         child: TextField(
                           controller: _username,
                           enabled: !busy,
-                          style: const TextStyle(fontSize: 14),
+                          style: TextStyle(fontSize: 14),
                           decoration: _deskInputDecoration(
                             context,
                           ).copyWith(hintText: l10n.backupPageUsername),
@@ -476,7 +472,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                           controller: _password,
                           enabled: !busy,
                           obscureText: true,
-                          style: const TextStyle(fontSize: 14),
+                          style: TextStyle(fontSize: 14),
                           decoration: _deskInputDecoration(
                             context,
                           ).copyWith(hintText: '••••••••'),
@@ -492,7 +488,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                         child: TextField(
                           controller: _path,
                           enabled: !busy,
-                          style: const TextStyle(fontSize: 14),
+                          style: TextStyle(fontSize: 14),
                           decoration: _deskInputDecoration(
                             context,
                           ).copyWith(hintText: 'kelivo_backups'),
@@ -616,7 +612,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                               l10n.backupPageS3ServerSettings,
                               style: TextStyle(
                                 fontSize: 15,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: AppFontWeights.semibold,
                                 color: cs.onSurface.withValues(alpha: 0.95),
                               ),
                             ),
@@ -631,7 +627,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                         child: TextField(
                           controller: _s3Endpoint,
                           enabled: !busy,
-                          style: const TextStyle(fontSize: 14),
+                          style: TextStyle(fontSize: 14),
                           decoration: _deskInputDecoration(
                             context,
                           ).copyWith(hintText: 'https://s3.amazonaws.com'),
@@ -647,7 +643,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                         child: TextField(
                           controller: _s3Region,
                           enabled: !busy,
-                          style: const TextStyle(fontSize: 14),
+                          style: TextStyle(fontSize: 14),
                           decoration: _deskInputDecoration(
                             context,
                           ).copyWith(hintText: 'us-east-1 / auto'),
@@ -663,7 +659,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                         child: TextField(
                           controller: _s3Bucket,
                           enabled: !busy,
-                          style: const TextStyle(fontSize: 14),
+                          style: TextStyle(fontSize: 14),
                           decoration: _deskInputDecoration(
                             context,
                           ).copyWith(hintText: l10n.backupPageS3Bucket),
@@ -679,7 +675,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                         child: TextField(
                           controller: _s3AccessKeyId,
                           enabled: !busy,
-                          style: const TextStyle(fontSize: 14),
+                          style: TextStyle(fontSize: 14),
                           decoration: _deskInputDecoration(
                             context,
                           ).copyWith(hintText: l10n.backupPageS3AccessKeyId),
@@ -696,7 +692,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                           controller: _s3SecretAccessKey,
                           enabled: !busy,
                           obscureText: true,
-                          style: const TextStyle(fontSize: 14),
+                          style: TextStyle(fontSize: 14),
                           decoration: _deskInputDecoration(
                             context,
                           ).copyWith(hintText: '••••••••'),
@@ -713,7 +709,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                           controller: _s3SessionToken,
                           enabled: !busy,
                           obscureText: true,
-                          style: const TextStyle(fontSize: 14),
+                          style: TextStyle(fontSize: 14),
                           decoration: _deskInputDecoration(
                             context,
                           ).copyWith(hintText: l10n.backupPageS3SessionToken),
@@ -729,7 +725,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                         child: TextField(
                           controller: _s3Prefix,
                           enabled: !busy,
-                          style: const TextStyle(fontSize: 14),
+                          style: TextStyle(fontSize: 14),
                           decoration: _deskInputDecoration(
                             context,
                           ).copyWith(hintText: 'kelivo_backups'),
@@ -862,9 +858,9 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                         Expanded(
                           child: Text(
                             l10n.backupPageLocalBackup,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 15,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: AppFontWeights.semibold,
                             ),
                           ),
                         ),
@@ -1092,7 +1088,13 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                           label: l10n.backupPageImportFromDeepSeek,
                           filled: false,
                           dense: true,
-                          onTap: () {},
+                          onTap: () {
+                            showAppSnackBar(
+                              context,
+                              message: l10n.backupPageNotSupportedYet,
+                              type: NotificationType.info,
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -1119,7 +1121,7 @@ class _BackupReminderDesktopSection extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: 6),
           child: Text(
             l10n.backupReminderSectionTitle,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            style: TextStyle(fontSize: 15, fontWeight: AppFontWeights.semibold),
           ),
         ),
         _ItemRow(
@@ -1337,9 +1339,9 @@ class _RemoteItemCardState extends State<_RemoteItemCard> {
                     widget.item.displayName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: AppFontWeights.semibold,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -1512,9 +1514,9 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
                   Expanded(
                     child: Text(
                       widget.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: AppFontWeights.emphasis,
                       ),
                     ),
                   ),
@@ -1714,9 +1716,9 @@ class _RestoreModeDialog extends StatelessWidget {
             children: [
               Text(
                 l10n.backupPageSelectImportMode,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: AppFontWeights.emphasis,
                 ),
               ),
               const SizedBox(height: 6),
@@ -1808,7 +1810,7 @@ class _RestoreModeTileState extends State<_RestoreModeTile> {
               children: [
                 Text(
                   widget.title,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+                  style: TextStyle(fontWeight: AppFontWeights.emphasis),
                 ),
                 const SizedBox(height: 6),
                 Text(
@@ -1931,7 +1933,7 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
               widget.label,
               style: TextStyle(
                 color: textColor,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeights.semibold,
                 fontSize: widget.dense ? 13 : 14,
               ),
             ),

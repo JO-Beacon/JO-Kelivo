@@ -1,4 +1,4 @@
-package com.psyche.jokelivo
+﻿package com.psyche.jokelivo
 
 import android.app.Activity
 import android.content.ActivityNotFoundException

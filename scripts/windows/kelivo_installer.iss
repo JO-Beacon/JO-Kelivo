@@ -4,7 +4,7 @@
 #define MyAppId "{{D4C6D2A7-8F3E-4D7B-9D55-6B6B6D2E5A91}}"
 
 #ifndef AppVersion
-  #error AppVersion must be provided, for example: ISCC.exe /DAppVersion=1.1.15+1 scripts\windows\kelivo_installer.iss
+  #error AppVersion must be provided, for example: ISCC.exe /DAppVersion=0.1.3+3 scripts\windows\kelivo_installer.iss
 #endif
 
 #ifndef SourceDir
@@ -23,7 +23,7 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 OutputDir={#OutputDir}
-OutputBaseFilename=JO-Kelivo_windows_{#AppVersion}_setup
+OutputBaseFilename=JO-Kelivo-v{#AppVersion}-windows-x64-setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -38,15 +38,15 @@ Name: "chinesesimplified"; MessagesFile: "{#ChineseMessagesFile}"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "desktopicon"; Description: "鍒涘缓妗岄潰蹇嵎鏂瑰紡"; GroupDescription: "闄勫姞鍥炬爣:"
+Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "附加图标:"
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-Name: "{group}\鍗歌浇 {#MyAppName}"; Filename: "{uninstallexe}"
+Name: "{group}\卸载 {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "鍚姩 {#MyAppName}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "启动 {#MyAppName}"; Flags: nowait postinstall skipifsilent

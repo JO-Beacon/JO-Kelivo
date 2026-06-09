@@ -27,8 +27,6 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ChatMessageBackgroundRow(),
                   _RowDivider(),
-                  _ToggleRowDesktopWideChatLayout(),
-                  _RowDivider(),
                   _TopicPositionRow(),
                 ],
               ),
@@ -68,8 +66,6 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ToggleRowShowUserMsgActions(),
                   _RowDivider(),
-                  _ToggleRowSeparateUserMessageImageAttachments(),
-                  _RowDivider(),
                   _ToggleRowShowModelIcon(),
                   _RowDivider(),
                   _ToggleRowUseNewAssistantAvatarUx(),
@@ -98,8 +94,6 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _ToggleRowAssistantMarkdown(),
                   _RowDivider(),
                   _AutoCollapseCodeBlocksSection(),
-                  _RowDivider(),
-                  _ToggleRowLazyHistory(),
                 ],
               ),
               const SizedBox(height: 16),
@@ -116,13 +110,17 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ToggleRowInsertSuggestionOnly(),
                   _RowDivider(),
+                  _ToggleRowInsertNewAssistantAtTop(),
+                  _RowDivider(),
+                  _ToggleRowWideChatLayout(),
+                  _RowDivider(),
+                  _ToggleRowLazyHistory(),
+                  _RowDivider(),
                   _ToggleRowRegenerateDeleteTrailingMessages(),
                   _RowDivider(),
                   _ToggleRowShowRegenerateConfirmDialog(),
                   _RowDivider(),
                   _ToggleRowShowUpdates(),
-                  _RowDivider(),
-                  _ToggleRowInsertNewAssistantAtTop(),
                   _RowDivider(),
                   _ToggleRowShowChatListDate(),
                   _RowDivider(),
@@ -195,7 +193,7 @@ class _SettingsCard extends StatelessWidget {
                 // Align card title with other panes (15, semi-bold)
                 style: TextStyle(
                   fontSize: 15,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                   color: cs.onSurface,
                 ),
               ),
@@ -246,7 +244,7 @@ class _LabeledRow extends StatelessWidget {
               // Match other settings row labels (14, normal, slightly dimmed)
               style: TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w400,
+                fontWeight: AppFontWeights.regular,
                 color: cs.onSurface.withValues(alpha: 0.9),
                 decoration: TextDecoration.none,
               ),
@@ -366,7 +364,7 @@ class _ThemeModeSegmentedState extends State<_ThemeModeSegmented> {
                         // Reduce segmented labels to 14 for consistency
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: FontWeight.w400,
+                          fontWeight: AppFontWeights.regular,
                           color: (mode == items[i].$1)
                               ? cs.primary
                               : cs.onSurface.withValues(alpha: 0.82),
@@ -470,22 +468,6 @@ class _ThemeDotState extends State<_ThemeDot> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _ToggleRowDesktopWideChatLayout extends StatelessWidget {
-  const _ToggleRowDesktopWideChatLayout();
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final sp = context.watch<SettingsProvider>();
-    return _ToggleRow(
-      label: l10n.displaySettingsPageDesktopWideChatLayoutTitle,
-      subtitle: l10n.displaySettingsPageDesktopWideChatLayoutSubtitle,
-      value: sp.wideChatLayout,
-      onChanged: (v) => context.read<SettingsProvider>().setWideChatLayout(v),
     );
   }
 }
@@ -692,8 +674,8 @@ class _SimpleOptionTileState extends State<_SimpleOptionTile> {
                       fontSize: 14,
                       color: cs.onSurface.withValues(alpha: 0.88),
                       fontWeight: widget.selected
-                          ? FontWeight.w600
-                          : FontWeight.w400,
+                          ? AppFontWeights.semibold
+                          : AppFontWeights.regular,
                     ),
                   ),
                 ),
@@ -740,7 +722,7 @@ class _AppLanguageRowState extends State<_AppLanguageRow> {
         // measure desired content width for centering under trigger
         double measureContentWidth() {
           // Keep measurement consistent with dropdown item text (14)
-          final style = const TextStyle(fontSize: 14);
+          final style = TextStyle(fontSize: 14);
           final labels = <String>[
             '🖥️ ${AppLocalizations.of(ctx)!.settingsPageSystemMode}',
             '🇨🇳 ${AppLocalizations.of(ctx)!.displaySettingsPageLanguageChineseLabel}',
@@ -903,7 +885,7 @@ class _HoverDropdownButton extends StatelessWidget {
                         style: TextStyle(
                           fontSize: fontSize,
                           color: cs.onSurface.withValues(alpha: 0.9),
-                          fontWeight: FontWeight.w400,
+                          fontWeight: AppFontWeights.regular,
                         ),
                       ),
                     ),
@@ -928,7 +910,7 @@ class _HoverDropdownButton extends StatelessWidget {
                       style: TextStyle(
                         fontSize: fontSize,
                         color: cs.onSurface.withValues(alpha: 0.9),
-                        fontWeight: FontWeight.w400,
+                        fontWeight: AppFontWeights.regular,
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -1282,10 +1264,7 @@ class _LanguageDropdownItemState extends State<_LanguageDropdownItem> {
             children: [
               Text(
                 widget.item.flag,
-                style: const TextStyle(
-                  fontSize: 16,
-                  decoration: TextDecoration.none,
-                ),
+                style: TextStyle(fontSize: 16, decoration: TextDecoration.none),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -1705,7 +1684,7 @@ Future<String?> _showDesktopFontChooserDialog(
                   style: TextStyle(
                     color: cs2.onSurface,
                     fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -1754,9 +1733,9 @@ Future<String?> _showDesktopFontChooserDialog(
                         Expanded(
                           child: Text(
                             title,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: AppFontWeights.emphasis,
                             ),
                           ),
                         ),
@@ -2011,24 +1990,6 @@ class _ToggleRowShowUserMsgActions extends StatelessWidget {
   }
 }
 
-class _ToggleRowSeparateUserMessageImageAttachments extends StatelessWidget {
-  const _ToggleRowSeparateUserMessageImageAttachments();
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final sp = context.watch<SettingsProvider>();
-    return _ToggleRow(
-      label: l10n.displaySettingsPageSeparateUserMessageImageAttachmentsTitle,
-      subtitle:
-          l10n.displaySettingsPageSeparateUserMessageImageAttachmentsSubtitle,
-      value: sp.separateUserMessageImageAttachments,
-      onChanged: (v) => context
-          .read<SettingsProvider>()
-          .setSeparateUserMessageImageAttachments(v),
-    );
-  }
-}
-
 class _ToggleRowShowModelIcon extends StatelessWidget {
   const _ToggleRowShowModelIcon();
   @override
@@ -2266,6 +2227,51 @@ class _ToggleRowInsertSuggestionOnly extends StatelessWidget {
   }
 }
 
+class _ToggleRowInsertNewAssistantAtTop extends StatelessWidget {
+  const _ToggleRowInsertNewAssistantAtTop();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageInsertNewAssistantAtTopTitle,
+      value: sp.insertNewAssistantAtTop,
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setInsertNewAssistantAtTop(v),
+    );
+  }
+}
+
+class _ToggleRowWideChatLayout extends StatelessWidget {
+  const _ToggleRowWideChatLayout();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageDesktopWideChatLayoutTitle,
+      subtitle: l10n.displaySettingsPageDesktopWideChatLayoutSubtitle,
+      value: sp.wideChatLayout,
+      onChanged: (v) => context.read<SettingsProvider>().setWideChatLayout(v),
+    );
+  }
+}
+
+class _ToggleRowLazyHistory extends StatelessWidget {
+  const _ToggleRowLazyHistory();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageLazyHistoryTitle,
+      value: sp.lazyHistoryEnabled,
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setLazyHistoryEnabled(v),
+    );
+  }
+}
+
 class _ToggleRowRegenerateDeleteTrailingMessages extends StatelessWidget {
   const _ToggleRowRegenerateDeleteTrailingMessages();
   @override
@@ -2328,7 +2334,7 @@ class _ToggleRowRequestLogging extends StatelessWidget {
               l10n.requestLogSettingTitle,
               style: TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w400,
+                fontWeight: AppFontWeights.regular,
                 color: cs.onSurface.withValues(alpha: 0.9),
                 decoration: TextDecoration.none,
               ),
@@ -2385,7 +2391,7 @@ class _ToggleRowFlutterLogging extends StatelessWidget {
               l10n.flutterLogSettingTitle,
               style: TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w400,
+                fontWeight: AppFontWeights.regular,
                 color: cs.onSurface.withValues(alpha: 0.9),
                 decoration: TextDecoration.none,
               ),
@@ -2436,21 +2442,6 @@ class _ToggleRowShowUpdates extends StatelessWidget {
       label: l10n.displaySettingsPageShowUpdatesTitle,
       value: sp.showAppUpdates,
       onChanged: (v) => context.read<SettingsProvider>().setShowAppUpdates(v),
-    );
-  }
-}
-
-class _ToggleRowInsertNewAssistantAtTop extends StatelessWidget {
-  const _ToggleRowInsertNewAssistantAtTop();
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final sp = context.watch<SettingsProvider>();
-    return _ToggleRow(
-      label: l10n.displaySettingsPageInsertNewAssistantAtTopTitle,
-      value: sp.insertNewAssistantAtTop,
-      onChanged: (v) =>
-          context.read<SettingsProvider>().setInsertNewAssistantAtTop(v),
     );
   }
 }
@@ -2590,9 +2581,9 @@ class _ToggleRowNewChatOnLaunch extends StatelessWidget {
 class _ToggleRow extends StatelessWidget {
   const _ToggleRow({
     required this.label,
-    this.subtitle,
     required this.value,
     required this.onChanged,
+    this.subtitle,
   });
   final String label;
   final String? subtitle;
@@ -2614,19 +2605,19 @@ class _ToggleRow extends StatelessWidget {
                   // Reduce toggle row label size to 14 to match other panes
                   style: TextStyle(
                     fontSize: 14,
-                    fontWeight: FontWeight.w400,
+                    fontWeight: AppFontWeights.regular,
                     color: cs.onSurface.withValues(alpha: 0.9),
                     decoration: TextDecoration.none,
                   ),
                 ),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 4),
+                if (subtitle != null && subtitle!.isNotEmpty) ...[
+                  const SizedBox(height: 3),
                   Text(
                     subtitle!,
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w400,
-                      color: cs.onSurface.withValues(alpha: 0.58),
+                      fontWeight: AppFontWeights.regular,
+                      color: cs.onSurface.withValues(alpha: 0.56),
                       decoration: TextDecoration.none,
                     ),
                   ),
@@ -2638,21 +2629,6 @@ class _ToggleRow extends StatelessWidget {
           IosSwitch(value: value, onChanged: onChanged),
         ],
       ),
-    );
-  }
-}
-
-class _ToggleRowLazyHistory extends StatelessWidget {
-  const _ToggleRowLazyHistory();
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final sp = context.watch<SettingsProvider>();
-    return _ToggleRow(
-      label: l10n.displaySettingsPageLazyHistoryTitle,
-      value: sp.lazyHistoryEnabled,
-      onChanged: (v) =>
-          context.read<SettingsProvider>().setLazyHistoryEnabled(v),
     );
   }
 }

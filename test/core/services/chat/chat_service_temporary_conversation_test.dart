@@ -5,9 +5,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
-import 'package:Kelivo/core/models/chat_input_data.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
-import 'package:Kelivo/features/chat/utils/message_attachment_parser.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);
@@ -173,79 +171,6 @@ void main() {
     });
   });
 
-  group('MessageAttachmentParser', () {
-    test('keeps plain text without attachments unchanged', () {
-      final parsed = MessageAttachmentParser.parse('hello\nworld');
-
-      expect(parsed.text, 'hello\nworld');
-      expect(parsed.imagePaths, isEmpty);
-      expect(parsed.documents, isEmpty);
-      expect(parsed.toContent(), 'hello\nworld');
-    });
-
-    test('parses image markers and rebuilds compatible content', () {
-      final parsed = MessageAttachmentParser.parse(
-        'see this\n[image:C:/tmp/a.png]\n[image:/tmp/b.webp]',
-      );
-
-      expect(parsed.text, 'see this');
-      expect(parsed.imagePaths, ['C:/tmp/a.png', '/tmp/b.webp']);
-      expect(
-        parsed.toContent(),
-        'see this\n[image:C:/tmp/a.png]\n[image:/tmp/b.webp]',
-      );
-    });
-
-    test('parses file markers and rebuilds compatible content', () {
-      final parsed = MessageAttachmentParser.parse(
-        'read this\n[file:/tmp/a.pdf|a.pdf|application/pdf]',
-      );
-
-      expect(parsed.text, 'read this');
-      expect(parsed.documents, hasLength(1));
-      expect(parsed.documents.single.path, '/tmp/a.pdf');
-      expect(parsed.documents.single.fileName, 'a.pdf');
-      expect(parsed.documents.single.mime, 'application/pdf');
-      expect(
-        parsed.toContent(),
-        'read this\n[file:/tmp/a.pdf|a.pdf|application/pdf]',
-      );
-    });
-
-    test('parses mixed attachments and allows removing an attachment', () {
-      final parsed = MessageAttachmentParser.parse(
-        'mixed\n[image:/tmp/a.png]\n[file:/tmp/a.txt|a.txt|text/plain]',
-      );
-
-      final content = MessageAttachmentParser.buildContent(
-        text: parsed.text,
-        imagePaths: const [],
-        documents: parsed.documents,
-      );
-
-      expect(content, 'mixed\n[file:/tmp/a.txt|a.txt|text/plain]');
-    });
-
-    test('builds content from structured edit result data', () {
-      final content = MessageAttachmentParser.buildContent(
-        text: 'updated',
-        imagePaths: const ['/tmp/new.png'],
-        documents: const [
-          DocumentAttachment(
-            path: '/tmp/new.pdf',
-            fileName: 'new.pdf',
-            mime: 'application/pdf',
-          ),
-        ],
-      );
-
-      expect(
-        content,
-        'updated\n[image:/tmp/new.png]\n[file:/tmp/new.pdf|new.pdf|application/pdf]',
-      );
-    });
-  });
-
   group('ChatService message version ordering', () {
     test(
       'edited message version is inserted next to its original group',
@@ -272,20 +197,9 @@ void main() {
           content: 'third',
         );
 
-        final editedContent = MessageAttachmentParser.buildContent(
-          text: 'first edited',
-          imagePaths: const ['/tmp/edited.png'],
-          documents: const [
-            DocumentAttachment(
-              path: '/tmp/edited.pdf',
-              fileName: 'edited.pdf',
-              mime: 'application/pdf',
-            ),
-          ],
-        );
         final edited = await service.appendMessageVersion(
           messageId: first.id,
-          content: editedContent,
+          content: 'first edited',
         );
 
         expect(edited, isNotNull);
@@ -295,13 +209,10 @@ void main() {
           second.id,
           third.id,
         ]);
-        expect(service.getMessages(conversation.id).map((m) => m.id), [
-          first.id,
-          edited.id,
-          second.id,
-          third.id,
-        ]);
-        expect(edited.content, editedContent);
+        expect(
+          service.getMessages(conversation.id).map((message) => message.id),
+          [first.id, edited.id, second.id, third.id],
+        );
         expect(service.getVersionSelections(conversation.id), {
           first.id: edited.version,
         });
@@ -354,15 +265,46 @@ void main() {
           secondUser.id,
           secondAssistant.id,
         ]);
-        expect(service.getMessages(conversation.id).map((m) => m.id), [
-          firstUser.id,
-          firstAssistant.id,
-          regenerated.id,
-          secondUser.id,
-          secondAssistant.id,
-        ]);
+        expect(
+          service.getMessages(conversation.id).map((message) => message.id),
+          [
+            firstUser.id,
+            firstAssistant.id,
+            regenerated.id,
+            secondUser.id,
+            secondAssistant.id,
+          ],
+        );
       },
     );
+
+    test('ordinary new message is still appended to the tail', () async {
+      final service = ChatService();
+      await service.init();
+
+      final conversation = await service.createDraftConversation(title: 'Chat');
+      final first = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'first',
+      );
+      final second = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: 'second',
+      );
+      final ordinary = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'ordinary tail message',
+      );
+
+      expect(service.getConversation(conversation.id)!.messageIds, [
+        first.id,
+        second.id,
+        ordinary.id,
+      ]);
+    });
 
     test(
       'versioned message falls back to tail when group anchor is missing',

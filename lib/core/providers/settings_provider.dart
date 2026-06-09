@@ -10,6 +10,7 @@ import 'dart:async';
 import 'dart:convert';
 import '../services/search/search_service.dart';
 import '../services/tts/network_tts.dart';
+import '../services/tts/tts_text_selection.dart';
 import '../services/network/request_logger.dart';
 import '../services/logging/flutter_logger.dart';
 import '../models/api_keys.dart';
@@ -113,8 +114,6 @@ class SettingsProvider extends ChangeNotifier {
       'display_show_model_timestamp_v1';
   static const String _displayShowUserMessageActionsKey =
       'display_show_user_message_actions_v1';
-  static const String _displaySeparateUserMessageImageAttachmentsKey =
-      'display_separate_user_message_image_attachments_v1';
   static const String _displayAutoCollapseThinkingKey =
       'display_auto_collapse_thinking_v1';
   static const String _displayCollapseThinkingStepsKey =
@@ -130,7 +129,6 @@ class SettingsProvider extends ChangeNotifier {
       'display_lazy_history_enabled_v1';
   static const String _displayDesktopMessageNavButtonsModeKey =
       'display_desktop_message_nav_buttons_mode_v1';
-  static const String _displayWideChatLayoutKey = 'display_wide_chat_layout_v1';
   static const String _displayUseNewAssistantAvatarUxKey =
       'display_use_new_assistant_avatar_ux_v1';
   static const String _displayShowProviderInModelCapsuleKey =
@@ -156,10 +154,13 @@ class SettingsProvider extends ChangeNotifier {
       'display_keep_sidebar_open_on_topic_tap_v1';
   static const String _displayKeepAssistantListExpandedOnSidebarCloseKey =
       'display_keep_assistant_list_expanded_on_sidebar_close_v1';
-  static const String _displayInsertNewAssistantAtTopKey =
-      'display_insert_new_assistant_at_top_v1';
   static const String _displayNewChatOnAssistantSwitchKey =
       'display_new_chat_on_assistant_switch_v1';
+  static const String _displayInsertNewAssistantAtTopKey =
+      'display_insert_new_assistant_at_top_v1';
+  static const String _displayWideChatLayoutKey = 'display_wide_chat_layout_v1';
+  static const String _displayDesktopWideChatLayoutLegacyKey =
+      'display_desktop_wide_chat_layout_v1';
   static const String _displayNewChatOnLaunchKey =
       'display_new_chat_on_launch_v1';
   static const String _displayNewChatAfterDeleteKey =
@@ -225,6 +226,15 @@ class SettingsProvider extends ChangeNotifier {
   // Android background chat generation mode
   static const String _androidBackgroundChatModeKey =
       'android_background_chat_mode_v1';
+  // iOS background generation settings
+  static const String _iosBackgroundGenerationEnabledKey =
+      'ios_background_generation_enabled_v1';
+  static const String _iosBackgroundTaskRefreshEnabledKey =
+      'ios_background_task_refresh_enabled_v1';
+  static const String _iosLiveActivityEnabledKey =
+      'ios_live_activity_enabled_v1';
+  static const String _iosBackgroundNotificationsEnabledKey =
+      'ios_background_notifications_enabled_v1';
   // Fonts
   static const String _displayAppFontFamilyKey = 'display_app_font_family_v1';
   static const String _displayCodeFontFamilyKey = 'display_code_font_family_v1';
@@ -269,6 +279,9 @@ class SettingsProvider extends ChangeNotifier {
   // TTS services (network)
   static const String _ttsServicesKey = 'tts_services_v1';
   static const String _ttsSelectedKey = 'tts_selected_v1';
+  static const String _ttsAutoPlayAssistantRepliesKey =
+      'tts_auto_play_assistant_replies_v1';
+  static const String _ttsTextSelectionModeKey = 'tts_text_selection_mode_v1';
   // Desktop UI
   static const String _desktopSidebarWidthKey = 'desktop_sidebar_width_v1';
   static const String _desktopSidebarOpenKey = 'desktop_sidebar_open_v1';
@@ -278,9 +291,13 @@ class SettingsProvider extends ChangeNotifier {
   // ===== Network TTS services =====
   List<TtsServiceOptions> _ttsServices = const <TtsServiceOptions>[];
   int _ttsServiceSelected = -1; // -1 => use System TTS
+  bool _ttsAutoPlayAssistantReplies = false;
+  TtsTextSelectionMode _ttsTextSelectionMode = TtsTextSelectionMode.fullText;
   List<TtsServiceOptions> get ttsServices => _ttsServices;
   int get ttsServiceSelected => _ttsServiceSelected;
   bool get usingSystemTts => _ttsServiceSelected < 0;
+  bool get ttsAutoPlayAssistantReplies => _ttsAutoPlayAssistantReplies;
+  TtsTextSelectionMode get ttsTextSelectionMode => _ttsTextSelectionMode;
   TtsServiceOptions? get selectedTtsService =>
       (_ttsServiceSelected >= 0 && _ttsServiceSelected < _ttsServices.length)
       ? _ttsServices[_ttsServiceSelected]
@@ -381,15 +398,42 @@ class SettingsProvider extends ChangeNotifier {
     return resolveApiModelIdOverride(ov, modelId);
   }
 
-  bool supportsOpenAIXhighReasoning(String providerKey, String modelId) {
+  bool supportsXhighReasoning(String providerKey, String modelId) {
     final cfg = getProviderConfig(providerKey);
     final kind = ProviderConfig.classify(
       cfg.id,
       explicitType: cfg.providerType,
     );
-    if (kind != ProviderKind.openai) return false;
-    final modelForCheck = resolveOpenAIUpstreamModelId(providerKey, modelId);
-    return openAISupportsXhighReasoning(modelForCheck);
+    switch (kind) {
+      case ProviderKind.openai:
+        final modelForCheck = resolveOpenAIUpstreamModelId(
+          providerKey,
+          modelId,
+        );
+        return openAISupportsXhighReasoning(modelForCheck);
+      case ProviderKind.claude:
+        final rawOv = cfg.modelOverrides[modelId];
+        final ov = rawOv is Map ? rawOv.cast<String, dynamic>() : null;
+        final modelForCheck = resolveApiModelIdOverride(ov, modelId);
+        return _isDeepSeekClaudeCompatible(cfg, modelForCheck);
+      case ProviderKind.google:
+        return false;
+    }
+  }
+
+  bool supportsOpenAIXhighReasoning(String providerKey, String modelId) {
+    return supportsXhighReasoning(providerKey, modelId);
+  }
+
+  bool _isDeepSeekClaudeCompatible(ProviderConfig cfg, String modelId) {
+    final lowerModelId = modelId.trim().toLowerCase();
+    if (lowerModelId.contains('deepseek')) return true;
+    final baseUrl = cfg.baseUrl.trim().toLowerCase();
+    final providerId = cfg.id.trim().toLowerCase();
+    final providerName = cfg.name.trim().toLowerCase();
+    return baseUrl.contains('api.deepseek.com') ||
+        providerId.contains('deepseek') ||
+        providerName.contains('deepseek');
   }
 
   // Explicitly ensure a provider config exists in memory (without persisting to storage).
@@ -808,8 +852,6 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayShowModelTimestampKey) ?? legacyModelNameTs;
     _showUserMessageActions =
         prefs.getBool(_displayShowUserMessageActionsKey) ?? true;
-    _separateUserMessageImageAttachments =
-        prefs.getBool(_displaySeparateUserMessageImageAttachmentsKey) ?? false;
     _autoCollapseThinking =
         prefs.getBool(_displayAutoCollapseThinkingKey) ?? true;
     _collapseThinkingSteps =
@@ -826,7 +868,6 @@ class SettingsProvider extends ChangeNotifier {
       prefs.getString(_displayDesktopMessageNavButtonsModeKey),
       legacyEnabled: _showMessageNavButtons,
     );
-    _wideChatLayout = prefs.getBool(_displayWideChatLayoutKey) ?? false;
     _useNewAssistantAvatarUx =
         prefs.getBool(_displayUseNewAssistantAvatarUxKey) ?? false;
     _showProviderInModelCapsule =
@@ -851,8 +892,6 @@ class SettingsProvider extends ChangeNotifier {
     _keepAssistantListExpandedOnSidebarClose =
         prefs.getBool(_displayKeepAssistantListExpandedOnSidebarCloseKey) ??
         false;
-    _insertNewAssistantAtTop =
-        prefs.getBool(_displayInsertNewAssistantAtTopKey) ?? false;
     _requestLogEnabled = prefs.getBool(_requestLogEnabledKey) ?? false;
     await RequestLogger.setEnabled(_requestLogEnabled);
     _flutterLogEnabled = prefs.getBool(_flutterLogEnabledKey) ?? false;
@@ -870,6 +909,12 @@ class SettingsProvider extends ChangeNotifier {
     _newChatOnLaunch = prefs.getBool(_displayNewChatOnLaunchKey) ?? true;
     _newChatOnAssistantSwitch =
         prefs.getBool(_displayNewChatOnAssistantSwitchKey) ?? false;
+    _insertNewAssistantAtTop =
+        prefs.getBool(_displayInsertNewAssistantAtTopKey) ?? false;
+    _wideChatLayout =
+        prefs.getBool(_displayWideChatLayoutKey) ??
+        prefs.getBool(_displayDesktopWideChatLayoutLegacyKey) ??
+        false;
     _newChatAfterDelete = prefs.getBool(_displayNewChatAfterDeleteKey) ?? false;
     // Enter to send on mobile: iOS defaults to true, Android defaults to false
     final enterToSendPref = prefs.getBool(_displayEnterToSendOnMobileKey);
@@ -1023,6 +1068,14 @@ class SettingsProvider extends ChangeNotifier {
     } catch (_) {
       _androidBackgroundChatMode = AndroidBackgroundChatMode.off;
     }
+    _iosBackgroundGenerationEnabled =
+        prefs.getBool(_iosBackgroundGenerationEnabledKey) ?? false;
+    _iosBackgroundTaskRefreshEnabled =
+        prefs.getBool(_iosBackgroundTaskRefreshEnabledKey) ?? false;
+    _iosLiveActivityEnabled =
+        prefs.getBool(_iosLiveActivityEnabledKey) ?? false;
+    _iosBackgroundNotificationsEnabled =
+        prefs.getBool(_iosBackgroundNotificationsEnabledKey) ?? false;
 
     // load search settings
     final searchServicesStr = prefs.getString(_searchServicesKey);
@@ -1087,6 +1140,11 @@ class SettingsProvider extends ChangeNotifier {
       _ttsServiceSelected = _ttsServices.isEmpty ? -1 : 0;
       await prefs.setInt(_ttsSelectedKey, _ttsServiceSelected);
     }
+    _ttsAutoPlayAssistantReplies =
+        prefs.getBool(_ttsAutoPlayAssistantRepliesKey) ?? false;
+    _ttsTextSelectionMode = TtsTextSelectionModeStorage.fromStorageValue(
+      prefs.getString(_ttsTextSelectionModeKey),
+    );
     // webdav config
     final webdavStr = prefs.getString(_webDavConfigKey);
     if (webdavStr != null && webdavStr.isNotEmpty) {
@@ -1247,6 +1305,22 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_ttsSelectedKey, _ttsServiceSelected);
+  }
+
+  Future<void> setTtsAutoPlayAssistantReplies(bool value) async {
+    if (_ttsAutoPlayAssistantReplies == value) return;
+    _ttsAutoPlayAssistantReplies = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_ttsAutoPlayAssistantRepliesKey, value);
+  }
+
+  Future<void> setTtsTextSelectionMode(TtsTextSelectionMode mode) async {
+    if (_ttsTextSelectionMode == mode) return;
+    _ttsTextSelectionMode = mode;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_ttsTextSelectionModeKey, mode.storageValue);
   }
 
   // ===== User Font Settings =====
@@ -2078,6 +2152,79 @@ class SettingsProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
+  // ===== iOS background chat generation =====
+  bool _iosBackgroundGenerationEnabled = false;
+  bool get iosBackgroundGenerationEnabled => _iosBackgroundGenerationEnabled;
+  Future<void> setIosBackgroundGenerationEnabled(bool v) async {
+    if (_iosBackgroundGenerationEnabled == v) return;
+    _iosBackgroundGenerationEnabled = v;
+    if (!v) {
+      _iosBackgroundTaskRefreshEnabled = false;
+      _iosLiveActivityEnabled = false;
+      _iosBackgroundNotificationsEnabled = false;
+    }
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(
+      _iosBackgroundGenerationEnabledKey,
+      _iosBackgroundGenerationEnabled,
+    );
+    if (!v) {
+      await prefs.setBool(_iosBackgroundTaskRefreshEnabledKey, false);
+      await prefs.setBool(_iosLiveActivityEnabledKey, false);
+      await prefs.setBool(_iosBackgroundNotificationsEnabledKey, false);
+    }
+  }
+
+  bool _iosBackgroundTaskRefreshEnabled = false;
+  bool get iosBackgroundTaskRefreshEnabled => _iosBackgroundTaskRefreshEnabled;
+  Future<void> setIosBackgroundTaskRefreshEnabled(bool v) async {
+    if (_iosBackgroundTaskRefreshEnabled == v) return;
+    _iosBackgroundTaskRefreshEnabled = v;
+    if (v) _iosBackgroundGenerationEnabled = true;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(
+      _iosBackgroundTaskRefreshEnabledKey,
+      _iosBackgroundTaskRefreshEnabled,
+    );
+    if (v) {
+      await prefs.setBool(_iosBackgroundGenerationEnabledKey, true);
+    }
+  }
+
+  bool _iosLiveActivityEnabled = false;
+  bool get iosLiveActivityEnabled => _iosLiveActivityEnabled;
+  Future<void> setIosLiveActivityEnabled(bool v) async {
+    if (_iosLiveActivityEnabled == v) return;
+    _iosLiveActivityEnabled = v;
+    if (v) _iosBackgroundGenerationEnabled = true;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_iosLiveActivityEnabledKey, _iosLiveActivityEnabled);
+    if (v) {
+      await prefs.setBool(_iosBackgroundGenerationEnabledKey, true);
+    }
+  }
+
+  bool _iosBackgroundNotificationsEnabled = false;
+  bool get iosBackgroundNotificationsEnabled =>
+      _iosBackgroundNotificationsEnabled;
+  Future<void> setIosBackgroundNotificationsEnabled(bool v) async {
+    if (_iosBackgroundNotificationsEnabled == v) return;
+    _iosBackgroundNotificationsEnabled = v;
+    if (v) _iosBackgroundGenerationEnabled = true;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(
+      _iosBackgroundNotificationsEnabledKey,
+      _iosBackgroundNotificationsEnabled,
+    );
+    if (v) {
+      await prefs.setBool(_iosBackgroundGenerationEnabledKey, true);
+    }
+  }
+
   void setDynamicColorSupported(bool v) {
     if (_dynamicColorSupported == v) return;
     _dynamicColorSupported = v;
@@ -2096,6 +2243,38 @@ class SettingsProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final map = _providerConfigs.map((k, v) => MapEntry(k, v.toJson()));
     await prefs.setString(_providerConfigsKey, jsonEncode(map));
+  }
+
+  Future<int> deleteModels(String providerKey, Set<String> modelIds) async {
+    if (modelIds.isEmpty) return 0;
+    final old = _providerConfigs[providerKey];
+    if (old == null) return 0;
+    final deletedModelIds = old.models
+        .where((modelId) => modelIds.contains(modelId))
+        .toSet();
+    if (deletedModelIds.isEmpty) return 0;
+    final nextModels = old.models
+        .where((modelId) => !deletedModelIds.contains(modelId))
+        .toList();
+    final deletedCount = old.models.length - nextModels.length;
+
+    final nextOverrides = nextModels.isEmpty
+        ? <String, dynamic>{}
+        : Map<String, dynamic>.from(old.modelOverrides);
+    if (nextModels.isNotEmpty) {
+      for (final modelId in deletedModelIds) {
+        nextOverrides.remove(modelId);
+      }
+    }
+
+    await setProviderConfig(
+      providerKey,
+      old.copyWith(models: nextModels, modelOverrides: nextOverrides),
+    );
+    for (final modelId in deletedModelIds) {
+      await clearSelectionsForModel(providerKey, modelId);
+    }
+    return deletedCount;
   }
 
   // ===== Provider Avatars =====
@@ -2922,17 +3101,6 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     await prefs.setBool(_displayShowUserMessageActionsKey, v);
   }
 
-  bool _separateUserMessageImageAttachments = false;
-  bool get separateUserMessageImageAttachments =>
-      _separateUserMessageImageAttachments;
-  Future<void> setSeparateUserMessageImageAttachments(bool v) async {
-    if (_separateUserMessageImageAttachments == v) return;
-    _separateUserMessageImageAttachments = v;
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_displaySeparateUserMessageImageAttachmentsKey, v);
-  }
-
   bool _showModelIcon = true;
   bool get showModelIcon => _showModelIcon;
   Future<void> setShowModelIcon(bool v) async {
@@ -3115,6 +3283,28 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     await prefs.setBool(_displayNewChatOnAssistantSwitchKey, v);
   }
 
+  // Display: place newly created or copied assistants at the top.
+  bool _insertNewAssistantAtTop = false;
+  bool get insertNewAssistantAtTop => _insertNewAssistantAtTop;
+  Future<void> setInsertNewAssistantAtTop(bool v) async {
+    if (_insertNewAssistantAtTop == v) return;
+    _insertNewAssistantAtTop = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_displayInsertNewAssistantAtTopKey, v);
+  }
+
+  // Display: use full available width for wide chat layouts.
+  bool _wideChatLayout = false;
+  bool get wideChatLayout => _wideChatLayout;
+  Future<void> setWideChatLayout(bool v) async {
+    if (_wideChatLayout == v) return;
+    _wideChatLayout = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_displayWideChatLayoutKey, v);
+  }
+
   // Display: create a new chat after deleting one
   bool _newChatAfterDelete = false;
   bool get newChatAfterDelete => _newChatAfterDelete;
@@ -3154,16 +3344,6 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
       DesktopMessageNavButtonsMode.scroll;
   DesktopMessageNavButtonsMode get desktopMessageNavButtonsMode =>
       _desktopMessageNavButtonsMode;
-
-  bool _wideChatLayout = false;
-  bool get wideChatLayout => _wideChatLayout;
-  Future<void> setWideChatLayout(bool v) async {
-    if (_wideChatLayout == v) return;
-    _wideChatLayout = v;
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_displayWideChatLayoutKey, v);
-  }
 
   Future<void> setDesktopMessageNavButtonsMode(
     DesktopMessageNavButtonsMode mode,
@@ -3538,17 +3718,6 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     await prefs.setBool(_displayKeepAssistantListExpandedOnSidebarCloseKey, v);
   }
 
-  // Display: insert newly created or copied assistants at the top.
-  bool _insertNewAssistantAtTop = false;
-  bool get insertNewAssistantAtTop => _insertNewAssistantAtTop;
-  Future<void> setInsertNewAssistantAtTop(bool v) async {
-    if (_insertNewAssistantAtTop == v) return;
-    _insertNewAssistantAtTop = v;
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_displayInsertNewAssistantAtTopKey, v);
-  }
-
   // Network: request logging (debug)
   bool _requestLogEnabled = false;
   bool get requestLogEnabled => _requestLogEnabled;
@@ -3699,6 +3868,10 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._searchEnabled = searchEnabled ?? _searchEnabled;
     copy._searchAutoTestOnLaunch =
         searchAutoTestOnLaunch ?? _searchAutoTestOnLaunch;
+    copy._ttsServices = _ttsServices;
+    copy._ttsServiceSelected = _ttsServiceSelected;
+    copy._ttsAutoPlayAssistantReplies = _ttsAutoPlayAssistantReplies;
+    copy._ttsTextSelectionMode = _ttsTextSelectionMode;
     // Copy other fields
     copy._providersOrder = _providersOrder;
     copy._themeMode = _themeMode;
@@ -3734,8 +3907,6 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._showTokenStats = _showTokenStats;
     copy._showUserNameTimestamp = _showUserNameTimestamp;
     copy._showUserMessageActions = _showUserMessageActions;
-    copy._separateUserMessageImageAttachments =
-        _separateUserMessageImageAttachments;
     copy._showUserName = _showUserName;
     copy._showUserTimestamp = _showUserTimestamp;
     copy._showModelName = _showModelName;
@@ -3761,7 +3932,6 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._keepSidebarOpenOnTopicTap = _keepSidebarOpenOnTopicTap;
     copy._keepAssistantListExpandedOnSidebarClose =
         _keepAssistantListExpandedOnSidebarClose;
-    copy._insertNewAssistantAtTop = _insertNewAssistantAtTop;
     copy._requestLogEnabled = _requestLogEnabled;
     copy._flutterLogEnabled = _flutterLogEnabled;
     copy._logSaveOutput = _logSaveOutput;
@@ -3770,7 +3940,14 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._appLaunchCount = _appLaunchCount;
     copy._newChatOnLaunch = _newChatOnLaunch;
     copy._newChatOnAssistantSwitch = _newChatOnAssistantSwitch;
+    copy._insertNewAssistantAtTop = _insertNewAssistantAtTop;
+    copy._wideChatLayout = _wideChatLayout;
     copy._newChatAfterDelete = _newChatAfterDelete;
+    copy._iosBackgroundGenerationEnabled = _iosBackgroundGenerationEnabled;
+    copy._iosBackgroundTaskRefreshEnabled = _iosBackgroundTaskRefreshEnabled;
+    copy._iosLiveActivityEnabled = _iosLiveActivityEnabled;
+    copy._iosBackgroundNotificationsEnabled =
+        _iosBackgroundNotificationsEnabled;
     copy._desktopSendShortcut = _desktopSendShortcut;
     copy._desktopMessageNavButtonsMode = _desktopMessageNavButtonsMode;
     copy._chatFontScale = _chatFontScale;
@@ -4053,6 +4230,28 @@ class ProviderConfig {
   final String? balanceResultPath;
   // Anthropic/OpenRouter Claude prompt caching for stable system prompts.
   final bool? claudePromptCachingEnabled;
+  final String? claudePromptCachingTtl;
+
+  static const String claudePromptCachingTtl5m = '5m';
+  static const String claudePromptCachingTtl1h = '1h';
+
+  static String resolveClaudePromptCachingTtl(String? value) {
+    switch (value?.trim().toLowerCase()) {
+      case claudePromptCachingTtl1h:
+        return claudePromptCachingTtl1h;
+      case claudePromptCachingTtl5m:
+      default:
+        return claudePromptCachingTtl5m;
+    }
+  }
+
+  static Map<String, dynamic> claudePromptCacheControl(String? ttl) {
+    final cacheControl = <String, dynamic>{'type': 'ephemeral'};
+    if (resolveClaudePromptCachingTtl(ttl) == claudePromptCachingTtl1h) {
+      cacheControl['ttl'] = claudePromptCachingTtl1h;
+    }
+    return cacheControl;
+  }
 
   static String resolveProxyType(String? value) {
     switch (value?.trim().toLowerCase()) {
@@ -4095,6 +4294,7 @@ class ProviderConfig {
     this.balanceApiPath,
     this.balanceResultPath,
     this.claudePromptCachingEnabled = false,
+    this.claudePromptCachingTtl = claudePromptCachingTtl5m,
   });
 
   // Sentinel for copyWith nullability control (allow explicit null set)
@@ -4131,6 +4331,7 @@ class ProviderConfig {
     String? balanceApiPath,
     String? balanceResultPath,
     bool? claudePromptCachingEnabled,
+    String? claudePromptCachingTtl,
   }) => ProviderConfig(
     id: id ?? this.id,
     enabled: enabled ?? this.enabled,
@@ -4168,6 +4369,8 @@ class ProviderConfig {
     balanceResultPath: balanceResultPath ?? this.balanceResultPath,
     claudePromptCachingEnabled:
         claudePromptCachingEnabled ?? this.claudePromptCachingEnabled,
+    claudePromptCachingTtl:
+        claudePromptCachingTtl ?? this.claudePromptCachingTtl,
   );
 
   Map<String, dynamic> toJson() => {
@@ -4201,6 +4404,9 @@ class ProviderConfig {
     'balanceApiPath': balanceApiPath,
     'balanceResultPath': balanceResultPath,
     'claudePromptCachingEnabled': claudePromptCachingEnabled,
+    'claudePromptCachingTtl': resolveClaudePromptCachingTtl(
+      claudePromptCachingTtl,
+    ),
   };
 
   factory ProviderConfig.fromJson(Map<String, dynamic> json) => ProviderConfig(
@@ -4251,6 +4457,9 @@ class ProviderConfig {
     balanceResultPath: json['balanceResultPath'] as String?,
     claudePromptCachingEnabled:
         json['claudePromptCachingEnabled'] as bool? ?? false,
+    claudePromptCachingTtl: resolveClaudePromptCachingTtl(
+      json['claudePromptCachingTtl'] as String?,
+    ),
   );
 
   static ProviderKind classify(String key, {ProviderKind? explicitType}) {
@@ -4365,8 +4574,10 @@ class ProviderConfig {
           keyManagement: const KeyManagementConfig(),
           aihubmixAppCodeEnabled: false,
           balanceEnabled: false,
-          balanceApiPath: '/credits',
-          balanceResultPath: 'data.total_usage',
+          balanceApiPath: lowerKey.contains('deepseek')
+              ? ''
+              : _defaultBalanceApiPath(key),
+          balanceResultPath: _defaultBalanceResultPath(key),
           claudePromptCachingEnabled: false,
         );
       case ProviderKind.openai:
@@ -4522,7 +4733,6 @@ class ProviderConfig {
   static bool _defaultBalanceEnabled(String key) {
     final k = key.toLowerCase();
     return k.contains('aihubmix') ||
-        k.contains('deepseek') ||
         k.contains('openrouter') ||
         k.contains('vercel') ||
         k.contains('silicon') ||

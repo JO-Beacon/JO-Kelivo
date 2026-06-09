@@ -25,34 +25,31 @@ Future<MessageMoreAction?> _openMoreSheet(
   MessageMoreAction? selectedAction;
 
   await tester.pumpWidget(
-    MaterialApp(
-      localizationsDelegates: const [
-        AppLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: AppLocalizations.supportedLocales,
-      builder: (context, child) {
-        return ChangeNotifierProvider<SettingsProvider>(
-          create: (_) => SettingsProvider(),
-          child: child,
-        );
-      },
-      home: Scaffold(
-        body: Builder(
-          builder: (context) {
-            return TextButton(
-              onPressed: () async {
-                selectedAction = await showMessageMoreSheet(
-                  context,
-                  _message(role: role),
-                  canDeleteAllVersions: canDeleteAllVersions,
-                );
-              },
-              child: const Text('open'),
-            );
-          },
+    ChangeNotifierProvider(
+      create: (_) => SettingsProvider(),
+      child: MaterialApp(
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: Builder(
+            builder: (context) {
+              return TextButton(
+                onPressed: () async {
+                  selectedAction = await showMessageMoreSheet(
+                    context,
+                    _message(role: role),
+                    canDeleteAllVersions: canDeleteAllVersions,
+                  );
+                },
+                child: const Text('open'),
+              );
+            },
+          ),
         ),
       ),
     ),
@@ -73,6 +70,7 @@ void main() {
   testWidgets('多版本消息菜单显示删除全部版本', (tester) async {
     await _openMoreSheet(tester, canDeleteAllVersions: true);
 
+    expect(find.text('Select Messages'), findsOneWidget);
     expect(find.text('Delete This Version'), findsOneWidget);
     expect(find.text('Delete All Versions'), findsOneWidget);
   });
@@ -80,6 +78,7 @@ void main() {
   testWidgets('单版本消息菜单不显示删除全部版本', (tester) async {
     await _openMoreSheet(tester, canDeleteAllVersions: false);
 
+    expect(find.text('Select Messages'), findsOneWidget);
     expect(find.text('Delete This Version'), findsOneWidget);
     expect(find.text('Delete All Versions'), findsNothing);
   });

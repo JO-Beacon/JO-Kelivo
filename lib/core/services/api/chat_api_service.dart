@@ -230,7 +230,9 @@ class ChatApiService {
     String raw, {
     required bool allowRemoteImages,
     required bool allowLocalImages,
+    bool allowDataImages = true,
     bool keepRemoteMarkdownText = true,
+    bool keepDisallowedImageText = true,
   }) async {
     if (raw.isEmpty) return const _ParsedTextAndImages('', <_ImageRef>[]);
     final mdImg = RegExp(r'!\[[^\]]*\]\(([^)]+)\)');
@@ -241,6 +243,72 @@ class ChatApiService {
     final buf = StringBuffer();
     int i = 0;
     while (i < raw.length) {
+      // Skip fenced code blocks (``` or ~~~): content inside is never an image.
+      if ((raw.startsWith('```', i) || raw.startsWith('~~~', i)) &&
+          (i == 0 || raw[i - 1] == '\n')) {
+        final fence = raw.substring(i, i + 3);
+        buf.write(fence);
+        i += 3;
+        // Skip the rest of the opening fence line (language tag, etc.)
+        while (i < raw.length && raw[i] != '\n') {
+          buf.write(raw[i]);
+          i++;
+        }
+        // Advance until the matching closing fence at the start of a line.
+        bool closed = false;
+        while (i < raw.length) {
+          if (raw[i] == '\n') {
+            buf.write(raw[i]);
+            i++;
+            if (raw.startsWith(fence, i)) {
+              buf.write(fence);
+              i += 3;
+              // Skip trailing content on the closing fence line.
+              while (i < raw.length && raw[i] != '\n') {
+                buf.write(raw[i]);
+                i++;
+              }
+              closed = true;
+              break;
+            }
+          } else {
+            buf.write(raw[i]);
+            i++;
+          }
+        }
+        if (!closed) {
+          // Unclosed fence: rest of text was written as-is already.
+        }
+        continue;
+      }
+      // Skip inline code spans (backtick sequences).
+      if (raw[i] == '`') {
+        // Determine the length of the opening backtick sequence.
+        int tickLen = 0;
+        while (i + tickLen < raw.length && raw[i + tickLen] == '`') {
+          tickLen++;
+        }
+        final openTicks = raw.substring(i, i + tickLen);
+        buf.write(openTicks);
+        i += tickLen;
+        // Advance until the matching closing backtick sequence.
+        bool closedTick = false;
+        while (i < raw.length) {
+          if (raw.startsWith(openTicks, i)) {
+            buf.write(openTicks);
+            i += tickLen;
+            closedTick = true;
+            break;
+          }
+          buf.write(raw[i]);
+          i++;
+        }
+        if (!closedTick) {
+          // Unclosed inline code: content was already written.
+        }
+        continue;
+      }
+
       final m1 = mdImg.matchAsPrefix(raw, i);
       final m2 = customImg.matchAsPrefix(raw, i);
       if (m1 != null) {
@@ -254,7 +322,11 @@ class ChatApiService {
         }
         // Inline base64 / data URLs: always treat as image but keep them out of text.
         if (url.startsWith('data:')) {
-          images.add(_ImageRef('data', url));
+          if (allowDataImages) {
+            images.add(_ImageRef('data', url));
+          } else if (keepDisallowedImageText) {
+            buf.write(full);
+          }
           i = m1.end;
           continue;
         }
@@ -263,7 +335,7 @@ class ChatApiService {
           if (!allowRemoteImages) {
             // Model does not accept image input (or we intentionally skip http images):
             // keep original markdown so the model can see the template.
-            buf.write(full);
+            if (keepDisallowedImageText) buf.write(full);
             i = m1.end;
             continue;
           }
@@ -284,7 +356,7 @@ class ChatApiService {
         }
         // Local / relative path: only treat as image when the file exists.
         if (!allowLocalImages) {
-          buf.write(full);
+          if (keepDisallowedImageText) buf.write(full);
           i = m1.end;
           continue;
         }
@@ -317,13 +389,17 @@ class ChatApiService {
           continue;
         }
         if (p.startsWith('data:')) {
-          images.add(_ImageRef('data', p));
+          if (allowDataImages) {
+            images.add(_ImageRef('data', p));
+          } else if (keepDisallowedImageText) {
+            buf.write(full);
+          }
           i = m2.end;
           continue;
         }
         if (p.startsWith('http://') || p.startsWith('https://')) {
           if (!allowRemoteImages) {
-            buf.write(full);
+            if (keepDisallowedImageText) buf.write(full);
             i = m2.end;
             continue;
           }
@@ -332,7 +408,7 @@ class ChatApiService {
           continue;
         }
         if (!allowLocalImages) {
-          buf.write(full);
+          if (keepDisallowedImageText) buf.write(full);
           i = m2.end;
           continue;
         }
@@ -374,6 +450,74 @@ class ChatApiService {
     return b64;
   }
 
+  static String _textFromContentParts(dynamic content) {
+    if (content is String) return content.trim();
+    if (content is! List) return (content ?? '').toString().trim();
+
+    final buffer = StringBuffer();
+    for (final part in content) {
+      if (part is String) {
+        buffer.write(part);
+        continue;
+      }
+      if (part is! Map) continue;
+      final type = (part['type'] ?? '').toString();
+      if (type.isNotEmpty &&
+          type != 'text' &&
+          type != 'input_text' &&
+          type != 'output_text') {
+        continue;
+      }
+      final text = (part['text'] ?? part['content'] ?? '').toString();
+      if (text.isEmpty) continue;
+      if (buffer.isNotEmpty) buffer.write('\n');
+      buffer.write(text);
+    }
+    return buffer.toString().trim();
+  }
+
+  static Future<String> _stripImageMarkersFromText(String raw) async {
+    final parsed = await _parseTextAndImages(
+      raw,
+      allowRemoteImages: false,
+      allowLocalImages: false,
+      allowDataImages: false,
+      keepRemoteMarkdownText: false,
+      keepDisallowedImageText: false,
+    );
+    return parsed.text;
+  }
+
+  static Future<dynamic> _stripImageInputsFromContent(dynamic content) async {
+    if (content is String) return _stripImageMarkersFromText(content);
+    if (content is List) {
+      return _stripImageMarkersFromText(_textFromContentParts(content));
+    }
+    if (content is Map) {
+      return _stripImageMarkersFromText(_textFromContentParts([content]));
+    }
+    return content;
+  }
+
+  static Future<List<Map<String, dynamic>>> _stripImageInputsFromMessages(
+    List<Map<String, dynamic>> messages,
+  ) async {
+    final out = <Map<String, dynamic>>[];
+    for (final message in messages) {
+      final copy = Map<String, dynamic>.from(message);
+      copy.remove(multimodalInternalMediaPathsKey);
+      if (copy.containsKey('content')) {
+        copy['content'] = await _stripImageInputsFromContent(copy['content']);
+      }
+      out.add(copy);
+    }
+    return out;
+  }
+
+  static bool _supportsImageInput(ProviderConfig config, String modelId) {
+    return _effectiveModelInfo(config, modelId).input.contains(Modality.image);
+  }
+
   static http.Client _clientFor(ProviderConfig cfg, CancelToken cancelToken) {
     final enabled = cfg.proxyEnabled == true;
     final host = (cfg.proxyHost ?? '').trim();
@@ -397,6 +541,13 @@ class ChatApiService {
     return DioHttpClient(cancelToken: cancelToken);
   }
 
+  static String _decodeUtf8Body(
+    http.Response response, {
+    bool allowMalformed = false,
+  }) {
+    return utf8.decode(response.bodyBytes, allowMalformed: allowMalformed);
+  }
+
   static Stream<ChatStreamChunk> sendMessageStream({
     required ProviderConfig config,
     required String modelId,
@@ -413,6 +564,7 @@ class ChatApiService {
     bool stream = true,
     String? requestId,
     bool allowImagesApiRouting = true,
+    bool ocrActive = false,
   }) async* {
     final kind = ProviderConfig.classify(
       config.id,
@@ -427,19 +579,32 @@ class ChatApiService {
       } catch (_) {}
       _activeCancelTokens[rid] = cancelToken;
     }
-    final safeMessages = _sanitizeMessages(messages);
+    final useOpenAIImagesApi =
+        kind == ProviderKind.openai &&
+        allowImagesApiRouting &&
+        _shouldUseOpenAIImagesApi(config, modelId);
+    final unicodeSafeMessages = _sanitizeMessages(messages);
+    final stripUnsupportedImageInputs =
+        !ocrActive &&
+        !useOpenAIImagesApi &&
+        !_supportsImageInput(config, modelId);
+    final safeMessages = stripUnsupportedImageInputs
+        ? await _stripImageInputsFromMessages(unicodeSafeMessages)
+        : unicodeSafeMessages;
+    final safeUserImagePaths = stripUnsupportedImageInputs
+        ? const <String>[]
+        : userImagePaths;
     final client = _clientFor(config, cancelToken);
 
     try {
       if (kind == ProviderKind.openai) {
-        if (allowImagesApiRouting &&
-            _shouldUseOpenAIImagesApi(config, modelId)) {
+        if (useOpenAIImagesApi) {
           yield* _sendOpenAIImagesStream(
             client,
             config,
             modelId,
             safeMessages,
-            userImagePaths: userImagePaths,
+            userImagePaths: safeUserImagePaths,
             extraHeaders: extraHeaders,
             extraBody: extraBody,
           );
@@ -449,7 +614,7 @@ class ChatApiService {
             config,
             modelId,
             safeMessages,
-            userImagePaths: userImagePaths,
+            userImagePaths: safeUserImagePaths,
             thinkingBudget: thinkingBudget,
             temperature: temperature,
             topP: topP,
@@ -466,7 +631,7 @@ class ChatApiService {
             config,
             modelId,
             safeMessages,
-            userImagePaths: userImagePaths,
+            userImagePaths: safeUserImagePaths,
             thinkingBudget: thinkingBudget,
             temperature: temperature,
             topP: topP,
@@ -484,7 +649,7 @@ class ChatApiService {
           config,
           modelId,
           safeMessages,
-          userImagePaths: userImagePaths,
+          userImagePaths: safeUserImagePaths,
           thinkingBudget: thinkingBudget,
           temperature: temperature,
           topP: topP,
@@ -505,7 +670,7 @@ class ChatApiService {
             config: config,
             modelId: modelId,
             messages: safeMessages,
-            userImagePaths: userImagePaths,
+            userImagePaths: safeUserImagePaths,
             thinkingBudget: thinkingBudget,
             temperature: temperature,
             topP: topP,
@@ -522,7 +687,7 @@ class ChatApiService {
             config,
             modelId,
             safeMessages,
-            userImagePaths: userImagePaths,
+            userImagePaths: safeUserImagePaths,
             thinkingBudget: thinkingBudget,
             temperature: temperature,
             topP: topP,
@@ -539,7 +704,7 @@ class ChatApiService {
             config,
             modelId,
             safeMessages,
-            userImagePaths: userImagePaths,
+            userImagePaths: safeUserImagePaths,
             thinkingBudget: thinkingBudget,
             temperature: temperature,
             topP: topP,
@@ -756,9 +921,11 @@ class ChatApiService {
           body: jsonEncode(body),
         );
         if (resp.statusCode < 200 || resp.statusCode >= 300) {
-          throw HttpException('HTTP ${resp.statusCode}: ${resp.body}');
+          final responseText = _decodeUtf8Body(resp, allowMalformed: true);
+          throw HttpException('HTTP ${resp.statusCode}: $responseText');
         }
-        final data = jsonDecode(resp.body);
+        final responseText = _decodeUtf8Body(resp);
+        final data = jsonDecode(responseText);
         if (config.useResponseApi == true) {
           // Prefer SDK-style convenience when present
           final ot = data['output_text'];
@@ -806,10 +973,18 @@ class ChatApiService {
           thinkingBudget,
         );
         final thinking = isReasoning
-            ? _claudeThinkingConfig(upstreamModelId, thinkingBudget)
+            ? _claudeThinkingConfig(
+                upstreamModelId,
+                thinkingBudget,
+                config: config,
+              )
             : null;
         final outputConfig = isReasoning
-            ? _claudeOutputConfig(upstreamModelId, thinkingBudget)
+            ? _claudeOutputConfig(
+                upstreamModelId,
+                thinkingBudget,
+                config: config,
+              )
             : null;
         final body = <String, dynamic>{
           'model': upstreamModelId,
@@ -844,13 +1019,23 @@ class ChatApiService {
           body: jsonEncode(body),
         );
         if (resp.statusCode < 200 || resp.statusCode >= 300) {
-          throw HttpException('HTTP ${resp.statusCode}: ${resp.body}');
+          final responseText = _decodeUtf8Body(resp, allowMalformed: true);
+          throw HttpException('HTTP ${resp.statusCode}: $responseText');
         }
-        final data = jsonDecode(resp.body);
+        final responseText = _decodeUtf8Body(resp);
+        final data = jsonDecode(responseText);
         final content = data['content'] as List?;
         if (content != null && content.isNotEmpty) {
-          final text = content.first['text'];
-          return (text ?? '').toString();
+          final buf = StringBuffer();
+          for (final item in content) {
+            if (item is! Map) continue;
+            if ((item['type'] ?? '').toString() != 'text') continue;
+            final text = item['text'];
+            if (text is String && text.isNotEmpty) {
+              buf.write(text);
+            }
+          }
+          return buf.toString();
         }
         return '';
       } else {
@@ -951,9 +1136,11 @@ class ChatApiService {
           body: jsonEncode(body),
         );
         if (resp.statusCode < 200 || resp.statusCode >= 300) {
-          throw HttpException('HTTP ${resp.statusCode}: ${resp.body}');
+          final responseText = _decodeUtf8Body(resp, allowMalformed: true);
+          throw HttpException('HTTP ${resp.statusCode}: $responseText');
         }
-        final data = jsonDecode(resp.body);
+        final responseText = _decodeUtf8Body(resp);
+        final data = jsonDecode(responseText);
         final candidates = data['candidates'] as List?;
         if (candidates != null && candidates.isNotEmpty) {
           final parts = candidates.first['content']?['parts'] as List?;
@@ -1003,6 +1190,21 @@ class ChatApiService {
   }
 
   static bool _isClaudeReasoningEnabled(int? budget) => budget != 0;
+
+  static bool _isDeepSeekClaudeCompatible(
+    String modelId, {
+    ProviderConfig? config,
+  }) {
+    final lowerModelId = modelId.trim().toLowerCase();
+    if (lowerModelId.contains('deepseek')) return true;
+    if (config == null) return false;
+    final baseUrl = config.baseUrl.trim().toLowerCase();
+    final providerId = config.id.trim().toLowerCase();
+    final providerName = config.name.trim().toLowerCase();
+    return baseUrl.contains('api.deepseek.com') ||
+        providerId.contains('deepseek') ||
+        providerName.contains('deepseek');
+  }
 
   static bool _supportsClaudeAdaptiveThinking(String modelId) {
     final lower = modelId.trim().toLowerCase();
@@ -1084,10 +1286,14 @@ class ChatApiService {
 
   static Map<String, dynamic>? _claudeThinkingConfig(
     String modelId,
-    int? budget,
-  ) {
+    int? budget, {
+    ProviderConfig? config,
+  }) {
     if (!_isClaudeReasoningEnabled(budget)) {
       return <String, dynamic>{'type': 'disabled'};
+    }
+    if (_isDeepSeekClaudeCompatible(modelId, config: config)) {
+      return <String, dynamic>{'type': 'enabled'};
     }
     if (_supportsClaudeAdaptiveThinking(modelId)) {
       return <String, dynamic>{'type': 'adaptive', 'display': 'summarized'};
@@ -1100,8 +1306,17 @@ class ChatApiService {
 
   static Map<String, dynamic>? _claudeOutputConfig(
     String modelId,
-    int? budget,
-  ) {
+    int? budget, {
+    ProviderConfig? config,
+  }) {
+    if (_isDeepSeekClaudeCompatible(modelId, config: config)) {
+      if (!_isClaudeReasoningEnabled(budget)) return null;
+      final effort = _claudeEffortForBudget(budget);
+      if (effort == 'auto' || effort == 'off') return null;
+      return <String, dynamic>{
+        'effort': (effort == 'xhigh' || effort == 'max') ? 'max' : 'high',
+      };
+    }
     if (!_supportsClaudeAdaptiveThinking(modelId) ||
         !_isClaudeReasoningEnabled(budget)) {
       return null;
@@ -1230,6 +1445,13 @@ class _GeminiSignatureMeta {
   bool get hasText => (textKey ?? '').isNotEmpty && textValue != null;
   bool get hasImages => images.isNotEmpty;
   bool get hasAny => hasText || hasImages;
+}
+
+class _ResponsesImageGenerationResult {
+  final String base64;
+  final String? outputFormat;
+
+  const _ResponsesImageGenerationResult({this.base64 = '', this.outputFormat});
 }
 
 class ChatStreamChunk {

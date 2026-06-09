@@ -22,7 +22,9 @@ abstract final class MessageAttachmentParser {
   MessageAttachmentParser._();
 
   static final RegExp _imageMarker = RegExp(r'\n?\[image:([^\]]+)\]');
-  static final RegExp _fileMarker = RegExp(r'\n?\[file:(.+?)\|(.+?)\|(.+?)\]');
+  static final RegExp _fileMarker = RegExp(
+    r'\n?\[file:([^\]|]+)\|([^\]|]*)\|([^\]]*)\]',
+  );
 
   static ParsedMessageAttachments parse(String content) {
     final images = <String>[];

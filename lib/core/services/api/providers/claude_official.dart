@@ -1,5 +1,25 @@
 part of '../chat_api_service.dart';
 
+int _readClaudeUsageInt(dynamic value) {
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value) ?? 0;
+  return 0;
+}
+
+TokenUsage _claudeUsageFromMap(Map<String, dynamic> usage) {
+  final inTok = _readClaudeUsageInt(usage['input_tokens']);
+  final outTok = _readClaudeUsageInt(usage['output_tokens']);
+  final cached =
+      _readClaudeUsageInt(usage['cache_read_input_tokens']) +
+      _readClaudeUsageInt(usage['cache_creation_input_tokens']);
+  return TokenUsage(
+    promptTokens: inTok,
+    completionTokens: outTok,
+    cachedTokens: cached,
+    totalTokens: inTok + outTok,
+  );
+}
+
 Stream<ChatStreamChunk> _sendClaudeStream(
   http.Client client,
   ProviderConfig config,
@@ -27,6 +47,9 @@ Stream<ChatStreamChunk> _sendClaudeStream(
     config,
     modelId,
   ).abilities.contains(ModelAbility.reasoning);
+  final skipRedactedThinkingBlocks = BuiltInToolsHelper.isOpenRouterProvider(
+    config,
+  );
 
   // Extract system prompt (Anthropic uses top-level `system`)
   String systemPrompt = '';
@@ -82,6 +105,24 @@ Stream<ChatStreamChunk> _sendClaudeStream(
         .toSet();
   }
 
+  Map<String, dynamic>? assistantBlockForClaudeRequest(Map block) {
+    final type = (block['type'] ?? '').toString();
+    if (skipRedactedThinkingBlocks && type == 'redacted_thinking') {
+      return null;
+    }
+    return block.map((key, value) => MapEntry(key.toString(), value));
+  }
+
+  List<Map<String, dynamic>> assistantBlocksForClaudeRequest(
+    Iterable<Map> blocks,
+  ) {
+    return [
+      for (final block in blocks)
+        if (assistantBlockForClaudeRequest(block) case final sanitized?)
+          sanitized,
+    ];
+  }
+
   List<Map<String, dynamic>>? anthropicBlocksFromToolCallMetadata(
     List toolCalls,
   ) {
@@ -101,10 +142,9 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       if (anthropic is! Map) continue;
       final blocks = anthropic['assistant_blocks'];
       if (blocks is! List || blocks.isEmpty) continue;
-      final candidate = blocks
-          .whereType<Map>()
-          .map((e) => e.cast<String, dynamic>())
-          .toList();
+      final candidate = assistantBlocksForClaudeRequest(
+        blocks.whereType<Map>(),
+      );
       final matchCount = toolUseIdsInBlocks(
         candidate,
       ).where(expectedIds.contains).length;
@@ -307,10 +347,10 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       topP,
     );
     final thinking = isReasoning
-        ? _claudeThinkingConfig(upstreamModelId, thinkingBudget)
+        ? _claudeThinkingConfig(upstreamModelId, thinkingBudget, config: config)
         : null;
     final outputConfig = isReasoning
-        ? _claudeOutputConfig(upstreamModelId, thinkingBudget)
+        ? _claudeOutputConfig(upstreamModelId, thinkingBudget, config: config)
         : null;
 
     // Prepare request body per round
@@ -321,7 +361,9 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       'stream': stream,
       if (systemPrompt.isNotEmpty) 'system': systemPrompt,
       if (config.claudePromptCachingEnabled == true)
-        'cache_control': {'type': 'ephemeral'},
+        'cache_control': ProviderConfig.claudePromptCacheControl(
+          config.claudePromptCachingTtl,
+        ),
       if (!omitSamplingParams &&
           !_isClaudeReasoningEnabled(thinkingBudget) &&
           temperature != null)
@@ -360,15 +402,9 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       try {
         final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
         if (u != null) {
-          final inTok = (u['input_tokens'] ?? 0) as int? ?? 0;
-          final outTok = (u['output_tokens'] ?? 0) as int? ?? 0;
-          final round = TokenUsage(
-            promptTokens: inTok,
-            completionTokens: outTok,
-            cachedTokens: 0,
-            totalTokens: inTok + outTok,
+          totalUsage = (totalUsage ?? const TokenUsage()).merge(
+            _claudeUsageFromMap(u),
           );
-          totalUsage = (totalUsage ?? const TokenUsage()).merge(round);
         }
       } catch (_) {}
       final content = (obj['content'] as List?) ?? const <dynamic>[];
@@ -386,7 +422,8 @@ Stream<ChatStreamChunk> _sendClaudeStream(
             assistantBlocks.add({'type': 'text', 'text': t});
             buf.write(t);
           }
-        } else if (type == 'thinking' || type == 'redacted_thinking') {
+        } else if (type == 'thinking' ||
+            (type == 'redacted_thinking' && !skipRedactedThinkingBlocks)) {
           // Preserve thinking blocks unmodified for tool-use continuation.
           // When thinking is enabled, the next request must include the last assistant
           // message starting with a thinking/redacted_thinking block.
@@ -558,7 +595,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
               }
             } else if (cb is Map && (cb['type'] == 'redacted_thinking')) {
               flushTextBlock();
-              if (idx != null) {
+              if (!skipRedactedThinkingBlocks && idx != null) {
                 assistantBlocks.add({'type': 'redacted_thinking', 'data': ''});
                 redactedThinkingIndexToAssistantBlock[idx] =
                     assistantBlocks.length - 1;
@@ -865,11 +902,9 @@ Stream<ChatStreamChunk> _sendClaudeStream(
             }
           } else if (type == 'message_delta') {
             final u = obj['usage'] ?? obj['message']?['usage'];
-            if (u != null) {
-              final inTok = (u['input_tokens'] ?? 0) as int;
-              final outTok = (u['output_tokens'] ?? 0) as int;
+            if (u is Map) {
               usage = (usage ?? const TokenUsage()).merge(
-                TokenUsage(promptTokens: inTok, completionTokens: outTok),
+                _claudeUsageFromMap(u.cast<String, dynamic>()),
               );
               roundTokens = usage.totalTokens;
             }
@@ -905,10 +940,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       totalUsage = (totalUsage ?? const TokenUsage()).merge(usage);
     }
 
-    // If no client tool calls, only continue when the server explicitly asks
-    // for another round. Server tools such as web_search can complete within
-    // the same turn; treating every server tool as continuation replays the
-    // finished answer and can trigger repeated search loops.
+    // If no client tool calls, decide whether to continue (pause_turn/server tool) or finalize
     if (anthToolUse.isEmpty) {
       final sr = lastStopReason ?? '';
       if (sr == 'pause_turn') {

@@ -38,6 +38,7 @@ class _ProviderBalanceBadgeState extends State<ProviderBalanceBadge> {
   String? _cacheKey;
   String _value = '~';
   String? _error;
+  String? _errorCode;
 
   @override
   void didChangeDependencies() {
@@ -57,11 +58,7 @@ class _ProviderBalanceBadgeState extends State<ProviderBalanceBadge> {
       widget.providerKey,
       defaultName: widget.displayName,
     );
-    final kind = ProviderConfig.classify(
-      config.id,
-      explicitType: config.providerType,
-    );
-    if (kind != ProviderKind.openai || config.balanceEnabled != true) return;
+    if (config.balanceEnabled != true) return;
 
     final key = [
       config.id,
@@ -80,10 +77,12 @@ class _ProviderBalanceBadgeState extends State<ProviderBalanceBadge> {
         setState(() {
           _value = cached;
           _error = null;
+          _errorCode = null;
         });
       } else {
         _value = cached;
         _error = null;
+        _errorCode = null;
       }
       return;
     }
@@ -91,6 +90,7 @@ class _ProviderBalanceBadgeState extends State<ProviderBalanceBadge> {
     void reset() {
       _value = '~';
       _error = null;
+      _errorCode = null;
     }
 
     if (notify) {
@@ -109,12 +109,19 @@ class _ProviderBalanceBadgeState extends State<ProviderBalanceBadge> {
       setState(() {
         _value = value;
         _error = null;
+        _errorCode = null;
       });
     } catch (e) {
       if (!mounted || _cacheKey != key) return;
       setState(() {
         _value = '!';
-        _error = e.toString();
+        if (e is ProviderBalanceException) {
+          _error = e.message;
+          _errorCode = e.code;
+        } else {
+          _error = e.toString();
+          _errorCode = null;
+        }
       });
     }
   }
@@ -126,11 +133,7 @@ class _ProviderBalanceBadgeState extends State<ProviderBalanceBadge> {
       widget.providerKey,
       defaultName: widget.displayName,
     );
-    final kind = ProviderConfig.classify(
-      config.id,
-      explicitType: config.providerType,
-    );
-    if (kind != ProviderKind.openai || config.balanceEnabled != true) {
+    if (config.balanceEnabled != true) {
       return const SizedBox.shrink();
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -158,10 +161,12 @@ class _ProviderBalanceBadgeState extends State<ProviderBalanceBadge> {
     );
 
     if (_error == null) return child;
+    final l10n = AppLocalizations.of(context)!;
+    final message = _errorCode == 'full_balance_api_url_required'
+        ? l10n.providerDetailPageBalanceFullUrlRequired
+        : _error!;
     return Tooltip(
-      message: AppLocalizations.of(
-        context,
-      )!.providerDetailPageBalanceError(_error!),
+      message: l10n.providerDetailPageBalanceError(message),
       child: child,
     );
   }

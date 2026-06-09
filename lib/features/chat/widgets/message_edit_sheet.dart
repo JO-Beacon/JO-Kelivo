@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../core/services/haptics.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
-import '../../../core/services/haptics.dart';
+import '../../../theme/app_font_weights.dart';
 import '../models/message_edit_result.dart';
 import '../utils/message_attachment_parser.dart';
 import 'message_attachment_editor.dart';
@@ -27,7 +29,9 @@ Future<MessageEditResult?> showMessageEditSheet(
 
 class _MessageEditSheet extends StatefulWidget {
   const _MessageEditSheet({required this.message});
+
   final ChatMessage message;
+
   @override
   State<_MessageEditSheet> createState() => _MessageEditSheetState();
 }
@@ -74,7 +78,6 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     return Padding(
-      // Ensure keyboard-safe bottom inset for the sheet
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: DraggableScrollableSheet(
         expand: false,
@@ -124,7 +127,7 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
                           l10n.messageEditPageSaveAndSend,
                           style: TextStyle(
                             color: cs.primary,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: AppFontWeights.emphasis,
                           ),
                         ),
                       ),
@@ -132,9 +135,9 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
                     Center(
                       child: Text(
                         l10n.messageEditPageTitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeights.semibold,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -162,7 +165,7 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
                           l10n.messageEditPageSave,
                           style: TextStyle(
                             color: cs.primary,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: AppFontWeights.emphasis,
                           ),
                         ),
                       ),

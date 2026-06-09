@@ -8,6 +8,7 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/backup/pages/backup_page.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/snackbar.dart';
 
 Future<BackupReminderProvider> _createReminderProvider({
   bool enabled = false,
@@ -38,7 +39,7 @@ Widget _buildHarness({
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      home: const BackupPage(),
+      home: const AppSnackBarOverlay(child: BackupPage()),
     ),
   );
 }
@@ -80,5 +81,38 @@ void main() {
       expect(find.text('Last Backup'), findsOneWidget);
       expect(find.text('Next Reminder'), findsOneWidget);
     });
+    testWidgets(
+      'shows DeepSeek placeholder without backup-page data directory',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        final settings = SettingsProvider();
+        final reminder = await _createReminderProvider();
+
+        await tester.pumpWidget(
+          _buildHarness(settings: settings, reminder: reminder),
+        );
+        await tester.pump();
+
+        expect(find.text('User Data Directory'), findsNothing);
+        expect(find.text('Open User Data Directory'), findsNothing);
+
+        await tester.scrollUntilVisible(
+          find.text('Import from DeepSeek Web/App'),
+          500,
+        );
+        await tester.drag(find.byType(ListView), const Offset(0, -120));
+        await tester.pump();
+        expect(find.text('Import from DeepSeek Web/App'), findsOneWidget);
+
+        final deepSeekTopLeft = tester.getTopLeft(
+          find.text('Import from DeepSeek Web/App'),
+        );
+        await tester.tapAt(deepSeekTopLeft + const Offset(8, 8));
+        await tester.pump();
+
+        expect(find.text('Not supported yet'), findsOneWidget);
+        await tester.pump(const Duration(seconds: 4));
+      },
+    );
   });
 }

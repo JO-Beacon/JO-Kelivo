@@ -119,28 +119,28 @@ jobs:
       - name: 🏗️ 构建 APK
         run: |
           flutter build apk --release --target-platform android-arm64
-          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/JO-Kelivo_android_${VERSION}_arm64-v8a.apk
+          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/JO-Kelivo-v${VERSION}-android-arm64-v8a-release.apk
           flutter build apk --release --target-platform android-arm
-          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/JO-Kelivo_android_${VERSION}_armeabi-v7a.apk
+          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/JO-Kelivo-v${VERSION}-android-armeabi-v7a-release.apk
           flutter build apk --release --target-platform android-x64
-          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/JO-Kelivo_android_${VERSION}_x86_64.apk
+          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/JO-Kelivo-v${VERSION}-android-x86_64-release.apk
       - name: 📤 上传构建产物 (arm64-v8a)
         uses: actions/upload-artifact@v4
         with:
           name: Android-arm64-v8a
-          path: build/app/outputs/flutter-apk/JO-Kelivo_android_*_arm64-v8a.apk
+          path: build/app/outputs/flutter-apk/JO-Kelivo-v*-android-arm64-v8a-release.apk
 
       - name: 📤 上传构建产物 (armeabi-v7a)
         uses: actions/upload-artifact@v4
         with:
           name: Android-armeabi-v7a
-          path: build/app/outputs/flutter-apk/JO-Kelivo_android_*_armeabi-v7a.apk
+          path: build/app/outputs/flutter-apk/JO-Kelivo-v*-android-armeabi-v7a-release.apk
 
       - name: 📤 上传构建产物 (x86_64)
         uses: actions/upload-artifact@v4
         with:
           name: Android-x86_64
-          path: build/app/outputs/flutter-apk/JO-Kelivo_android_*_x86_64.apk
+          path: build/app/outputs/flutter-apk/JO-Kelivo-v*-android-x86_64-release.apk
 
   # iOS 构建
   ios:
@@ -185,12 +185,12 @@ jobs:
           cd build/ios/iphoneos
           mkdir Payload
           cp -r Runner.app Payload/
-          zip -r ../../../JO-Kelivo_ios_${VERSION}.ipa Payload
+          zip -r ../../../JO-Kelivo-v${VERSION}-ios-universal-release.ipa Payload
       - name: 📤 上传构建产物
         uses: actions/upload-artifact@v4
         with:
           name: iOS-IPA
-          path: JO-Kelivo_ios_*.ipa
+          path: JO-Kelivo-v*-ios-universal-release.ipa
 
   # macOS 构建
   macos:
@@ -239,17 +239,17 @@ jobs:
             --window-size 800 400 \
             --icon-size 100 \
             --app-drop-link 600 185 \
-            "JO-Kelivo_macos_${VERSION}.dmg" \
+            "JO-Kelivo-v${VERSION}-macos-universal-dmg.dmg" \
             "build/macos/Build/Products/Release/JO-Kelivo.app" || true
           # 如果 create-dmg 失败，使用简单方式
-          if [ ! -f "JO-Kelivo_macos_${VERSION}.dmg" ]; then
-            hdiutil create -volname JO-Kelivo -srcfolder build/macos/Build/Products/Release/JO-Kelivo.app -ov -format UDZO JO-Kelivo_macos_${VERSION}.dmg
+          if [ ! -f "JO-Kelivo-v${VERSION}-macos-universal-dmg.dmg" ]; then
+            hdiutil create -volname JO-Kelivo -srcfolder build/macos/Build/Products/Release/JO-Kelivo.app -ov -format UDZO JO-Kelivo-v${VERSION}-macos-universal-dmg.dmg
           fi
       - name: 📤 上传构建产物
         uses: actions/upload-artifact@v4
         with:
           name: macOS-DMG
-          path: JO-Kelivo_macos_*.dmg
+          path: JO-Kelivo-v*-macos-universal-dmg.dmg
 
   # Windows 构建
   windows:
@@ -307,7 +307,7 @@ jobs:
       - name: 📦 打包 ZIP
         shell: pwsh
         run: |
-          Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath "JO-Kelivo_windows_$env:VERSION.zip"
+          Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath "JO-Kelivo-v$env:VERSION-windows-x64-portable.zip"
       - name: 🔧 安装 Inno Setup
         run: choco install innosetup -y
 
@@ -365,7 +365,7 @@ jobs:
           DefaultDirName={autopf}\{#MyAppName}
           DefaultGroupName={#MyAppName}
           OutputDir=.
-          OutputBaseFilename=JO-Kelivo_windows_{#MyAppVersion}_setup
+          OutputBaseFilename=JO-Kelivo-v{#MyAppVersion}-windows-x64-setup
           Compression=lzma2
           SolidCompression=yes
           WizardStyle=modern
@@ -394,13 +394,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Windows-ZIP
-          path: JO-Kelivo_windows_*.zip
+          path: JO-Kelivo-v*-windows-x64-portable.zip
 
       - name: 📤 上传构建产物 (Installer)
         uses: actions/upload-artifact@v4
         with:
           name: Windows-Installer
-          path: JO-Kelivo_windows_*_setup.exe
+          path: JO-Kelivo-v*-windows-x64-setup.exe
 
   # Linux 构建
   linux:
@@ -454,7 +454,7 @@ jobs:
       - name: 📦 打包 tar.gz
         run: |
           cd build/linux/x64/release/bundle
-          tar -czf ../../../../../JO-Kelivo_linux_${VERSION}.tar.gz .
+          tar -czf ../../../../../JO-Kelivo-v${VERSION}-linux-x64-tar.gz .
       - name: 📦 创建 AppImage
         run: |
           # 下载 appimagetool
@@ -500,7 +500,7 @@ jobs:
           install -Dm644 "$ICON_SOURCE" "AppDir/usr/share/icons/hicolor/256x256/apps/jo_kelivo.png"
           
           # 构建 AppImage
-          ARCH=x86_64 ./appimagetool AppDir JO-Kelivo_linux_${VERSION}.AppImage
+          ARCH=x86_64 ./appimagetool AppDir JO-Kelivo-v${VERSION}-linux-x64-appimage.AppImage
       - name: 📦 创建 DEB 包
         run: |
           # 创建 DEB 目录结构
@@ -558,7 +558,7 @@ jobs:
           chmod +x deb/opt/jo_kelivo/jo_kelivo.sh
           
           # 构建 DEB 包
-          dpkg-deb --build deb JO-Kelivo_linux_${VERSION}_amd64.deb
+          dpkg-deb --build deb JO-Kelivo-v${VERSION}-linux-x64-deb.deb
       - name: 📦 创建 RPM 包
         run: |
           # 创建 RPM 构建目录
@@ -628,12 +628,12 @@ jobs:
           
           # 构建 RPM
           rpmbuild -bb ~/rpmbuild/SPECS/jo_kelivo.spec
-          cp ~/rpmbuild/RPMS/x86_64/jo_kelivo-${VERSION_NUMBER}-1.*.rpm JO-Kelivo_linux_${VERSION}.rpm
+          cp ~/rpmbuild/RPMS/x86_64/jo_kelivo-${VERSION_NUMBER}-1.*.rpm JO-Kelivo-v${VERSION}-linux-x64-rpm.rpm
       - name: 🔍 RPM 元数据（调试）
         shell: bash
         run: |
           set -euxo pipefail
-          RPM_FILE="JO-Kelivo_linux_${VERSION}.rpm"
+          RPM_FILE="JO-Kelivo-v${VERSION}-linux-x64-rpm.rpm"
           echo "RPM file: ${RPM_FILE}"
           cp -f ~/rpmbuild/SPECS/jo_kelivo.spec rpm-spec.spec
           rpm -qp --info "${RPM_FILE}" | tee rpm-info.txt
@@ -652,31 +652,31 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          RPM_FILE="JO-Kelivo_linux_${VERSION}.rpm"
+          RPM_FILE="JO-Kelivo-v${VERSION}-linux-x64-rpm.rpm"
           docker run --rm -v "${PWD}:/work" -w /work fedora:43 bash -lc "dnf -y install ./${RPM_FILE}"
       - name: 📤 上传构建产物 (tar.gz)
         uses: actions/upload-artifact@v4
         with:
           name: Linux-tar.gz
-          path: JO-Kelivo_linux_*.tar.gz
+          path: JO-Kelivo-v*-linux-x64-tar.gz
 
       - name: 📤 上传构建产物 (AppImage)
         uses: actions/upload-artifact@v4
         with:
           name: Linux-AppImage
-          path: JO-Kelivo_linux_*.AppImage
+          path: JO-Kelivo-v*-linux-x64-appimage.AppImage
 
       - name: 📤 上传构建产物 (DEB)
         uses: actions/upload-artifact@v4
         with:
           name: Linux-DEB
-          path: JO-Kelivo_linux_*_amd64.deb
+          path: JO-Kelivo-v*-linux-x64-deb.deb
 
       - name: 📤 上传构建产物 (RPM)
         uses: actions/upload-artifact@v4
         with:
           name: Linux-RPM
-          path: JO-Kelivo_linux_*.rpm
+          path: JO-Kelivo-v*-linux-x64-rpm.rpm
 
   # 统一发布 Release（避免竞态条件）
   release:

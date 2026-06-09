@@ -12,6 +12,7 @@ import '../../../shared/widgets/ios_form_text_field.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/loading_dialog_card.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../theme/app_font_weights.dart';
 import '../../../theme/design_tokens.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -52,6 +53,7 @@ import '../widgets/message_list_view.dart';
 import '../widgets/chat_input_section.dart';
 import '../widgets/chat_input_overlay_layout.dart';
 import '../widgets/chat_selection_app_bar.dart';
+import '../widgets/chat_selection_delete_bar.dart';
 import '../widgets/chat_selection_export_bar.dart';
 import '../utils/model_display_helper.dart';
 import '../utils/chat_layout_constants.dart';
@@ -62,17 +64,19 @@ import 'home_mobile_layout.dart';
 import 'home_desktop_layout.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key, this.desktopChatEntry = false});
-
-  final bool desktopChatEntry;
+  const HomePage({super.key});
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _TemporaryConversationEmptyState extends StatelessWidget {
-  const _TemporaryConversationEmptyState({required this.bottomContentPadding});
+  const _TemporaryConversationEmptyState({
+    required this.topContentPadding,
+    required this.bottomContentPadding,
+  });
 
+  final double topContentPadding;
   final double bottomContentPadding;
 
   @override
@@ -82,7 +86,12 @@ class _TemporaryConversationEmptyState extends StatelessWidget {
 
     return Center(
       child: Padding(
-        padding: EdgeInsets.fromLTRB(32, 24, 32, bottomContentPadding + 24),
+        padding: EdgeInsets.fromLTRB(
+          32,
+          topContentPadding + 24,
+          32,
+          bottomContentPadding + 24,
+        ),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
           child: Column(
@@ -101,7 +110,7 @@ class _TemporaryConversationEmptyState extends StatelessWidget {
                   fontSize: 15,
                   height: 1.45,
                   color: cs.onSurface.withValues(alpha: 0.68),
-                  fontWeight: FontWeight.w500,
+                  fontWeight: AppFontWeights.medium,
                 ),
               ),
             ],
@@ -200,7 +209,7 @@ class _CompressContextOptionsDialogState
                         l10n.compressContextOptionsTitle,
                         style: TextStyle(
                           fontSize: 17,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.emphasis,
                           color: cs.onSurface,
                         ),
                       ),
@@ -247,7 +256,7 @@ class _CompressContextOptionsDialogState
                     style: TextStyle(
                       fontSize: 12,
                       color: cs.error,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: AppFontWeights.medium,
                     ),
                   ),
                 ],
@@ -352,7 +361,7 @@ class _SegmentButton extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontSize: 13,
-            fontWeight: FontWeight.w700,
+            fontWeight: AppFontWeights.emphasis,
             color: selected ? cs.primary : cs.onSurface.withValues(alpha: 0.78),
           ),
         ),
@@ -394,7 +403,7 @@ class _DialogActionButton extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontSize: 14,
-            fontWeight: FontWeight.w700,
+            fontWeight: AppFontWeights.emphasis,
             color: primary ? cs.onPrimary : cs.onSurface,
           ),
         ),
@@ -421,7 +430,7 @@ class _HomePageState extends State<HomePage>
   final BackdropKey _messageListBackdropKey = BackdropKey();
   final GlobalKey _inputBarKey = GlobalKey();
   final GlobalKey _selectionMiniMapKey = GlobalKey();
-  final GlobalKey _selectionExportBarKey = GlobalKey();
+  final GlobalKey _selectionActionBarKey = GlobalKey();
   bool _scrollNavHovering = false;
   StreamSubscription<String>? _processTextSub;
 
@@ -674,10 +683,22 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildMobileBody(BuildContext context, ColorScheme cs) {
     final bottomContentPadding = _controller.inputBarHeight + 16;
+    final topContentPadding = _chatTopOverlayInset(context) + 8;
+    final backgroundImageActive = _assistantBackgroundActive(context);
+    final useWideChatLayout = context.watch<SettingsProvider>().wideChatLayout;
+    final maxChatWidth = useWideChatLayout
+        ? null
+        : ChatLayoutConstants.maxContentWidth;
 
     return ChatInputOverlayLayout(
-      topInset: kToolbarHeight + MediaQuery.paddingOf(context).top,
-      background: _buildChatBackground(context, cs),
+      topInset: _chatTopOverlayInset(context),
+      background: backgroundImageActive
+          ? _buildChatBackground(context, cs)
+          : null,
+      topBackground: backgroundImageActive
+          ? _buildChatBackground(context, cs)
+          : null,
+      backgroundImageActive: backgroundImageActive,
       content: Builder(
         builder: (context) {
           final content = KeyedSubtree(
@@ -686,11 +707,13 @@ class _HomePageState extends State<HomePage>
             ),
             child: _buildMessageListView(
               context,
+              topContentPadding: topContentPadding,
               bottomContentPadding: bottomContentPadding,
               dividerPadding: const EdgeInsets.symmetric(
                 vertical: 10,
                 horizontal: AppSpacing.md,
               ),
+              maxContentWidth: maxChatWidth,
             ),
           );
           final isAndroid =
@@ -710,16 +733,7 @@ class _HomePageState extends State<HomePage>
         },
       ),
       bottomOverlay: _controller.selecting
-          ? ChatSelectionExportBar(
-              key: _selectionExportBarKey,
-              onExportMarkdown: _controller.exportSelectedAsMarkdown,
-              onExportTxt: _controller.exportSelectedAsTxt,
-              onExportImage: _controller.exportSelectedAsImage,
-              showThinkingTools: _controller.showThinkingTools,
-              showThinkingContent: _controller.showThinkingContent,
-              onToggleThinkingTools: _controller.toggleThinkingTools,
-              onToggleThinkingContent: _controller.toggleThinkingContent,
-            )
+          ? _buildSelectionActionBar(context)
           : NotificationListener<SizeChangedLayoutNotification>(
               onNotification: (n) {
                 WidgetsBinding.instance.addPostFrameCallback(
@@ -734,7 +748,7 @@ class _HomePageState extends State<HomePage>
                 ),
               ),
             ),
-      foreground: _buildScrollButtons(),
+      foreground: _buildForegroundOverlay(context),
     );
   }
 
@@ -820,10 +834,10 @@ class _HomePageState extends State<HomePage>
     if (collapsed.isEmpty) return;
 
     if (PlatformUtils.isDesktop &&
-        _selectionExportBarKey.currentContext != null) {
+        _selectionActionBarKey.currentContext != null) {
       await showDesktopMiniMapPopover(
         context,
-        anchorKey: _selectionExportBarKey,
+        anchorKey: _selectionActionBarKey,
         messages: collapsed,
         selecting: true,
         selectedMessageIds: _controller.selectedItems,
@@ -849,10 +863,42 @@ class _HomePageState extends State<HomePage>
     );
   }
 
+  Widget _buildSelectionActionBar(BuildContext context) {
+    if (_controller.selectionMode == ChatSelectionMode.delete) {
+      return ChatSelectionDeleteBar(
+        key: _selectionActionBarKey,
+        hasMultiVersionSelection:
+            _controller.selectedMessagesIncludeMultipleVersions,
+        onDeleteCurrentVersions: () {
+          unawaited(
+            _handleDeleteSelectedMessages(context, deleteAllVersions: false),
+          );
+        },
+        onDeleteAllVersions: () {
+          unawaited(
+            _handleDeleteSelectedMessages(context, deleteAllVersions: true),
+          );
+        },
+      );
+    }
+
+    return ChatSelectionExportBar(
+      key: _selectionActionBarKey,
+      onExportMarkdown: _controller.exportSelectedAsMarkdown,
+      onExportTxt: _controller.exportSelectedAsTxt,
+      onExportImage: _controller.exportSelectedAsImage,
+      showThinkingTools: _controller.showThinkingTools,
+      showThinkingContent: _controller.showThinkingContent,
+      onToggleThinkingTools: _controller.toggleThinkingTools,
+      onToggleThinkingContent: _controller.toggleThinkingContent,
+    );
+  }
+
   Widget _buildTabletBody(BuildContext context, ColorScheme cs) {
     final bottomContentPadding = _controller.inputBarHeight + 16;
-    final settings = context.watch<SettingsProvider>();
-    final useWideChatLayout = settings.wideChatLayout;
+    final topContentPadding = _chatTopOverlayInset(context) + 8;
+    final backgroundImageActive = _assistantBackgroundActive(context);
+    final useWideChatLayout = context.watch<SettingsProvider>().wideChatLayout;
     final maxChatWidth = useWideChatLayout
         ? null
         : ChatLayoutConstants.maxContentWidth;
@@ -861,7 +907,11 @@ class _HomePageState extends State<HomePage>
         : ChatLayoutConstants.maxInputWidth;
 
     return ChatInputOverlayLayout(
-      topInset: kToolbarHeight + MediaQuery.paddingOf(context).top,
+      topInset: _chatTopOverlayInset(context),
+      topBackground: backgroundImageActive
+          ? _buildAssistantBackground(context)
+          : null,
+      backgroundImageActive: backgroundImageActive,
       content: FadeTransition(
         opacity: _controller.convoFade,
         child:
@@ -871,6 +921,7 @@ class _HomePageState extends State<HomePage>
                   ),
                   child: _buildMessageListView(
                     context,
+                    topContentPadding: topContentPadding,
                     bottomContentPadding: bottomContentPadding,
                     dividerPadding: const EdgeInsets.symmetric(
                       vertical: 8,
@@ -888,19 +939,10 @@ class _HomePageState extends State<HomePage>
       ),
       bottomOverlay: _controller.selecting
           ? ConstrainedBox(
-              constraints: maxInputWidth == null
-                  ? const BoxConstraints()
-                  : BoxConstraints(maxWidth: maxInputWidth),
-              child: ChatSelectionExportBar(
-                key: _selectionExportBarKey,
-                onExportMarkdown: _controller.exportSelectedAsMarkdown,
-                onExportTxt: _controller.exportSelectedAsTxt,
-                onExportImage: _controller.exportSelectedAsImage,
-                showThinkingTools: _controller.showThinkingTools,
-                showThinkingContent: _controller.showThinkingContent,
-                onToggleThinkingTools: _controller.toggleThinkingTools,
-                onToggleThinkingContent: _controller.toggleThinkingContent,
+              constraints: BoxConstraints(
+                maxWidth: maxInputWidth ?? double.infinity,
               ),
+              child: _buildSelectionActionBar(context),
             )
           : NotificationListener<SizeChangedLayoutNotification>(
               onNotification: (n) {
@@ -915,9 +957,9 @@ class _HomePageState extends State<HomePage>
                     Widget input = _buildChatInputBar(context, isTablet: true);
                     input = Center(
                       child: ConstrainedBox(
-                        constraints: maxInputWidth == null
-                            ? const BoxConstraints()
-                            : BoxConstraints(maxWidth: maxInputWidth),
+                        constraints: BoxConstraints(
+                          maxWidth: maxInputWidth ?? double.infinity,
+                        ),
                         child: input,
                       ),
                     );
@@ -926,7 +968,7 @@ class _HomePageState extends State<HomePage>
                 ),
               ),
             ),
-      foreground: _buildScrollButtons(),
+      foreground: _buildForegroundOverlay(context),
     );
   }
 
@@ -954,45 +996,43 @@ class _HomePageState extends State<HomePage>
           if (!file.existsSync()) return const SizedBox.shrink();
           provider = FileImage(file);
         }
-        return Positioned.fill(
-          child: Stack(
-            children: [
-              Positioned.fill(
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  image: DecorationImage(
+                    image: provider,
+                    fit: BoxFit.cover,
+                    colorFilter: ColorFilter.mode(
+                      Colors.black.withValues(alpha: 0.04),
+                      BlendMode.srcATop,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned.fill(
+              child: IgnorePointer(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    image: DecorationImage(
-                      image: provider,
-                      fit: BoxFit.cover,
-                      colorFilter: ColorFilter.mode(
-                        Colors.black.withValues(alpha: 0.04),
-                        BlendMode.srcATop,
-                      ),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: () {
+                        final top = (0.20 * maskStrength).clamp(0.0, 1.0);
+                        final bottom = (0.50 * maskStrength).clamp(0.0, 1.0);
+                        return [
+                          cs.surface.withValues(alpha: top),
+                          cs.surface.withValues(alpha: bottom),
+                        ];
+                      }(),
                     ),
                   ),
                 ),
               ),
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: () {
-                          final top = (0.20 * maskStrength).clamp(0.0, 1.0);
-                          final bottom = (0.50 * maskStrength).clamp(0.0, 1.0);
-                          return [
-                            cs.surface.withValues(alpha: top),
-                            cs.surface.withValues(alpha: bottom),
-                          ];
-                        }(),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         );
       },
     );
@@ -1043,6 +1083,24 @@ class _HomePageState extends State<HomePage>
     );
   }
 
+  bool _assistantBackgroundActive(BuildContext context) {
+    final bgRaw =
+        (context.watch<AssistantProvider>().currentAssistant?.background ?? '')
+            .trim();
+    if (bgRaw.isEmpty) return false;
+    if (bgRaw.startsWith('http')) return true;
+    try {
+      final fixed = SandboxPathResolver.fix(bgRaw);
+      return File(fixed).existsSync();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  double _chatTopOverlayInset(BuildContext context) {
+    return kToolbarHeight + MediaQuery.paddingOf(context).top;
+  }
+
   /// Map persisted truncateIndex (raw message count) to collapsed index.
   int _computeTruncCollapsedIndex() {
     final int truncRaw = _controller.chatController.loadedWindowTruncateIndex();
@@ -1062,6 +1120,7 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildMessageListView(
     BuildContext context, {
+    required double topContentPadding,
     required double bottomContentPadding,
     required EdgeInsetsGeometry dividerPadding,
     double? maxContentWidth,
@@ -1069,6 +1128,7 @@ class _HomePageState extends State<HomePage>
     if (_controller.isTemporaryConversation &&
         _controller.chatController.collapsedMessages.isEmpty) {
       return _TemporaryConversationEmptyState(
+        topContentPadding: topContentPadding,
         bottomContentPadding: bottomContentPadding,
       );
     }
@@ -1098,6 +1158,7 @@ class _HomePageState extends State<HomePage>
             ? (_controller.currentConversation?.chatSuggestions ??
                   const <String>[])
             : const <String>[],
+        topContentPadding: topContentPadding,
         bottomContentPadding: bottomContentPadding,
         dividerPadding: dividerPadding,
         maxContentWidth: maxContentWidth,
@@ -1127,9 +1188,15 @@ class _HomePageState extends State<HomePage>
         onForkConversation: (message) => _controller.forkConversation(message),
         onShareMessage: (index, messages) =>
             _controller.shareMessage(index, messages),
-        onSpeakMessage: (message) => _controller.speakMessage(message),
+        onSelectMessages: (index, messages) =>
+            _controller.startMessageSelection(
+              messageIndex: index,
+              messageList: messages,
+              mode: ChatSelectionMode.delete,
+            ),
         onSwitchMessageRole: (message, role) =>
             _controller.switchMessageRole(message, role),
+        onSpeakMessage: (message) => _controller.speakMessage(message),
         onSuggestionTap: (suggestion) => _controller.sendSuggestion(suggestion),
         onRecoveredAskUserAnswer: (message, part, result) =>
             _controller.submitRecoveredAskUserAnswer(message, part, result),
@@ -1236,6 +1303,7 @@ class _HomePageState extends State<HomePage>
       onLongPressLearning: _showLearningPromptSheet,
       onClearContext: _controller.clearContext,
       onCompressContext: _handleDesktopCompressContext,
+      backgroundImageActive: _assistantBackgroundActive(context),
     );
   }
 
@@ -1291,6 +1359,10 @@ class _HomePageState extends State<HomePage>
         );
       },
     );
+  }
+
+  Widget _buildForegroundOverlay(BuildContext context) {
+    return Stack(fit: StackFit.expand, children: [_buildScrollButtons()]);
   }
 
   Future<void> _openMiniMap() async {
@@ -1357,9 +1429,9 @@ class _HomePageState extends State<HomePage>
                     ),
                     child: Text(
                       AppLocalizations.of(context)!.homePageDropToUpload,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: AppFontWeights.semibold,
                       ),
                     ),
                   ),
@@ -1615,7 +1687,7 @@ class _HomePageState extends State<HomePage>
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(
               l10n.homePageDelete,
-              style: const TextStyle(color: Colors.red),
+              style: TextStyle(color: Colors.red),
             ),
           ),
         ],
@@ -1632,6 +1704,59 @@ class _HomePageState extends State<HomePage>
     }
 
     await _controller.deleteMessage(message: message, byGroup: byGroup);
+  }
+
+  Future<void> _handleDeleteSelectedMessages(
+    BuildContext context, {
+    required bool deleteAllVersions,
+  }) async {
+    final l10n = AppLocalizations.of(context)!;
+    if (_controller.selectedItems.isEmpty) {
+      showAppSnackBar(
+        context,
+        message: l10n.chatSelectionSelectMessagesToDelete,
+        type: NotificationType.info,
+      );
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          deleteAllVersions
+              ? l10n.homePageDeleteAllVersions
+              : l10n.chatSelectionDeleteSelected,
+        ),
+        content: Text(
+          deleteAllVersions
+              ? l10n.chatSelectionDeleteSelectedAllVersionsConfirm(
+                  _controller.selectedItems.length,
+                )
+              : l10n.chatSelectionDeleteSelectedConfirm(
+                  _controller.selectedItems.length,
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.homePageCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              l10n.homePageDelete,
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    await _controller.deleteSelectedMessages(
+      deleteAllVersions: deleteAllVersions,
+    );
   }
 
   Map<String, TranslationUiState> _buildTranslationUiStates() {

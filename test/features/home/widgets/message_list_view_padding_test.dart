@@ -60,6 +60,137 @@ void main() {
     isProcessingFiles.dispose();
   });
 
+  testWidgets('默认消息列表宽度在大屏居中留白', (tester) async {
+    tester.view.physicalSize = const Size(1000, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final scrollController = ScrollController();
+    final observerController = ListObserverController(
+      controller: scrollController,
+    );
+    final isProcessingFiles = ValueNotifier<bool>(false);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1000,
+            child: MessageListView(
+              scrollController: scrollController,
+              observerController: observerController,
+              messages: const [],
+              byGroup: const {},
+              versionSelections: const {},
+              reasoning: const {},
+              reasoningSegments: const {},
+              contentSplits: const {},
+              toolParts: const {},
+              translations: const {},
+              selecting: false,
+              selectedItems: const {},
+              dividerPadding: EdgeInsets.zero,
+              isProcessingFiles: isProcessingFiles,
+              maxContentWidth: 400,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final listView = tester.widget<ListView>(find.byType(ListView));
+    final padding = listView.padding as EdgeInsets;
+    expect(padding.left, 300);
+    expect(padding.right, 300);
+
+    scrollController.dispose();
+    isProcessingFiles.dispose();
+  });
+
+  testWidgets('宽屏消息列表关闭最大宽度时不额外留白', (tester) async {
+    final scrollController = ScrollController();
+    final observerController = ListObserverController(
+      controller: scrollController,
+    );
+    final isProcessingFiles = ValueNotifier<bool>(false);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1000,
+            child: MessageListView(
+              scrollController: scrollController,
+              observerController: observerController,
+              messages: const [],
+              byGroup: const {},
+              versionSelections: const {},
+              reasoning: const {},
+              reasoningSegments: const {},
+              contentSplits: const {},
+              toolParts: const {},
+              translations: const {},
+              selecting: false,
+              selectedItems: const {},
+              dividerPadding: EdgeInsets.zero,
+              isProcessingFiles: isProcessingFiles,
+              maxContentWidth: null,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final listView = tester.widget<ListView>(find.byType(ListView));
+    final padding = listView.padding as EdgeInsets;
+    expect(padding.left, 0);
+    expect(padding.right, 0);
+
+    scrollController.dispose();
+    isProcessingFiles.dispose();
+  });
+
+  testWidgets('消息列表顶部留白使用传入的导航栏覆盖高度', (tester) async {
+    final scrollController = ScrollController();
+    final observerController = ListObserverController(
+      controller: scrollController,
+    );
+    final isProcessingFiles = ValueNotifier<bool>(false);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MessageListView(
+            scrollController: scrollController,
+            observerController: observerController,
+            messages: const [],
+            byGroup: const {},
+            versionSelections: const {},
+            reasoning: const {},
+            reasoningSegments: const {},
+            contentSplits: const {},
+            toolParts: const {},
+            translations: const {},
+            selecting: false,
+            selectedItems: const {},
+            dividerPadding: EdgeInsets.zero,
+            isProcessingFiles: isProcessingFiles,
+            topContentPadding: 88,
+            bottomContentPadding: 144,
+          ),
+        ),
+      ),
+    );
+
+    final listView = tester.widget<ListView>(find.byType(ListView));
+    expect((listView.padding as EdgeInsets).top, 88);
+    expect((listView.padding as EdgeInsets).bottom, 144);
+
+    scrollController.dispose();
+    isProcessingFiles.dispose();
+  });
+
   testWidgets('置顶流式指示器激活时保留额外底部空间', (tester) async {
     final scrollController = ScrollController();
     final observerController = ListObserverController(
@@ -94,95 +225,6 @@ void main() {
 
     final listView = tester.widget<ListView>(find.byType(ListView));
     expect((listView.padding as EdgeInsets).bottom, 156);
-
-    scrollController.dispose();
-    isProcessingFiles.dispose();
-  });
-
-  testWidgets('默认限制消息列表横向宽度并保留两侧留白', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(1200, 800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    final scrollController = ScrollController();
-    final observerController = ListObserverController(
-      controller: scrollController,
-    );
-    final isProcessingFiles = ValueNotifier<bool>(false);
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SizedBox(
-            width: 1200,
-            child: MessageListView(
-              scrollController: scrollController,
-              observerController: observerController,
-              messages: const [],
-              byGroup: const {},
-              versionSelections: const {},
-              reasoning: const {},
-              reasoningSegments: const {},
-              contentSplits: const {},
-              toolParts: const {},
-              translations: const {},
-              selecting: false,
-              selectedItems: const {},
-              dividerPadding: EdgeInsets.zero,
-              isProcessingFiles: isProcessingFiles,
-            ),
-          ),
-        ),
-      ),
-    );
-
-    final listView = tester.widget<ListView>(find.byType(ListView));
-    final padding = listView.padding as EdgeInsets;
-    expect(padding.left, 170);
-    expect(padding.right, 170);
-
-    scrollController.dispose();
-    isProcessingFiles.dispose();
-  });
-
-  testWidgets('空宽度限制时消息列表使用全部可用宽度', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(1200, 800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    final scrollController = ScrollController();
-    final observerController = ListObserverController(
-      controller: scrollController,
-    );
-    final isProcessingFiles = ValueNotifier<bool>(false);
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SizedBox(
-            width: 1200,
-            child: MessageListView(
-              scrollController: scrollController,
-              observerController: observerController,
-              messages: const [],
-              byGroup: const {},
-              versionSelections: const {},
-              reasoning: const {},
-              reasoningSegments: const {},
-              contentSplits: const {},
-              toolParts: const {},
-              translations: const {},
-              selecting: false,
-              selectedItems: const {},
-              dividerPadding: EdgeInsets.zero,
-              isProcessingFiles: isProcessingFiles,
-              maxContentWidth: null,
-            ),
-          ),
-        ),
-      ),
-    );
-
-    final listView = tester.widget<ListView>(find.byType(ListView));
-    final padding = listView.padding as EdgeInsets;
-    expect(padding.left, 0);
-    expect(padding.right, 0);
 
     scrollController.dispose();
     isProcessingFiles.dispose();

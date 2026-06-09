@@ -5,18 +5,32 @@ import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
 import 'package:Kelivo/shared/widgets/export_capture_scope.dart';
 import 'package:Kelivo/shared/widgets/mermaid_image_cache.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/theme/palettes.dart';
+import 'package:Kelivo/theme/theme_factory.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
+import 'package:flutter_math_fork/tex.dart' show TexEncoderExt;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Finder _findMathWidget() {
   return find.byType(Math);
+}
+
+List<Math> _mathWidgets(WidgetTester tester) {
+  return tester.widgetList<Math>(_findMathWidget()).toList();
+}
+
+List<String> _encodedMathTex(WidgetTester tester) {
+  return _mathWidgets(
+    tester,
+  ).map((widget) => widget.ast?.greenRoot.encodeTeX() ?? '').toList();
 }
 
 List<WidgetSpan> _collectWidgetSpans(InlineSpan span) {
@@ -34,6 +48,43 @@ List<WidgetSpan> _widgetSpansFromRichText(WidgetTester tester) {
   final spans = <WidgetSpan>[];
   for (final richText in tester.widgetList<RichText>(find.byType(RichText))) {
     spans.addAll(_collectWidgetSpans(richText.text));
+  }
+  return spans;
+}
+
+class _ResolvedTextSpan {
+  const _ResolvedTextSpan(this.text, this.style);
+
+  final String text;
+  final TextStyle style;
+}
+
+List<_ResolvedTextSpan> _collectResolvedTextSpans(
+  InlineSpan span, [
+  TextStyle? inheritedStyle,
+]) {
+  if (span is! TextSpan) return const [];
+
+  final effectiveStyle =
+      inheritedStyle?.merge(span.style) ?? span.style ?? const TextStyle();
+  final spans = <_ResolvedTextSpan>[];
+  final text = span.text;
+  if (text != null && text.isNotEmpty) {
+    spans.add(_ResolvedTextSpan(text, effectiveStyle));
+  }
+  final children = span.children;
+  if (children != null) {
+    for (final child in children) {
+      spans.addAll(_collectResolvedTextSpans(child, effectiveStyle));
+    }
+  }
+  return spans;
+}
+
+List<_ResolvedTextSpan> _resolvedTextSpansFromRichText(WidgetTester tester) {
+  final spans = <_ResolvedTextSpan>[];
+  for (final richText in tester.widgetList<RichText>(find.byType(RichText))) {
+    spans.addAll(_collectResolvedTextSpans(richText.text));
   }
   return spans;
 }
@@ -213,6 +264,10 @@ Widget _markdownHarness(
   double? width,
   bool streaming = false,
   Map<String, Object>? preferences,
+  void Function(String id)? onCitationTap,
+  ThemeData? theme,
+  ThemeData? darkTheme,
+  ThemeMode? themeMode,
 }) {
   SharedPreferences.setMockInitialValues(preferences ?? {});
   return ChangeNotifierProvider(
@@ -220,9 +275,16 @@ Widget _markdownHarness(
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
+      theme: theme,
+      darkTheme: darkTheme,
+      themeMode: themeMode,
       home: Scaffold(
         body: width == null
-            ? MarkdownWithCodeHighlight(text: text, streaming: streaming)
+            ? MarkdownWithCodeHighlight(
+                text: text,
+                streaming: streaming,
+                onCitationTap: onCitationTap,
+              )
             : Align(
                 alignment: Alignment.topLeft,
                 child: SizedBox(
@@ -230,6 +292,7 @@ Widget _markdownHarness(
                   child: MarkdownWithCodeHighlight(
                     text: text,
                     streaming: streaming,
+                    onCitationTap: onCitationTap,
                   ),
                 ),
               ),
@@ -328,6 +391,79 @@ void main() {
       '| Bob \\| Jr. | said "hello" |  |',
     );
   });
+
+  testWidgets(
+    'MarkdownWithCodeHighlight renders grouped raw citation metadata as separate capsules',
+    (tester) async {
+      final tapped = <String>[];
+
+      await tester.pumpWidget(
+        _markdownHarness(
+          '包含 3,000 万毫秒/月 [citation:1:96d0ed, 4:5675a3]',
+          width: 360,
+          onCitationTap: tapped.add,
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('1'), findsOneWidget);
+      expect(find.text('4'), findsOneWidget);
+      expect(find.textContaining('citation:1:96d0ed'), findsNothing);
+
+      await tester.tap(find.text('1'));
+      await tester.tap(find.text('4'));
+
+      expect(tapped, ['96d0ed', '5675a3']);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight renders shorthand raw citation metadata by index',
+    (tester) async {
+      final tapped = <String>[];
+
+      await tester.pumpWidget(
+        _markdownHarness(
+          '参考这个结论 [citation:2]',
+          width: 360,
+          onCitationTap: tapped.add,
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('2'), findsOneWidget);
+      expect(find.textContaining('citation:2'), findsNothing);
+
+      await tester.tap(find.text('2'));
+
+      expect(tapped, ['2']);
+    },
+  );
+
+  testWidgets('MarkdownWithCodeHighlight keeps citation metadata inside code', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _markdownHarness('`[citation:1:96d0ed]`', width: 360),
+    );
+    await tester.pump();
+
+    expect(find.textContaining('citation:1:96d0ed'), findsOneWidget);
+    expect(find.text('1'), findsNothing);
+  });
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps citation-labeled normal links as links',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness('[citation](https://example.com)', width: 360),
+      );
+      await tester.pump();
+
+      expect(find.text('citation'), findsOneWidget);
+      expect(find.text('https'), findsNothing);
+    },
+  );
 
   testWidgets('MarkdownWithCodeHighlight applies markdown image dimensions', (
     tester,
@@ -1064,6 +1200,77 @@ ${rows.join('\n')}
   );
 
   testWidgets(
+    'MarkdownWithCodeHighlight renders light default blockquote line as gray',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          '> 引用内容\n> 第二行',
+          width: 320,
+          theme: buildLightThemeForScheme(ThemePalettes.defaultPalette.light),
+        ),
+      );
+      await tester.pump();
+
+      final blockquote = find.byKey(const ValueKey('markdown-blockquote'));
+      expect(blockquote, findsOneWidget);
+
+      final blockquoteWidget = tester.widget<Container>(blockquote);
+      expect(blockquoteWidget.color, isNull);
+      expect(blockquoteWidget.decoration, isNull);
+
+      final line = find.descendant(
+        of: blockquote,
+        matching: find.byKey(const ValueKey('markdown-blockquote-line')),
+      );
+      expect(line, findsOneWidget);
+      expect(tester.getSize(line).width, 3);
+
+      final lineDecoration =
+          tester.widget<DecoratedBox>(line).decoration as BoxDecoration;
+      final cs = Theme.of(tester.element(blockquote)).colorScheme;
+      expect(lineDecoration.color, cs.onSurfaceVariant.withValues(alpha: 0.36));
+      expect(
+        lineDecoration.color,
+        isNot(cs.outlineVariant.withValues(alpha: 0.82)),
+      );
+      expect(lineDecoration.borderRadius, BorderRadius.circular(2));
+      expect(lineDecoration.border, isNull);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps dark default blockquote line gray',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          '> 引用内容\n> 第二行',
+          width: 320,
+          theme: buildLightThemeForScheme(ThemePalettes.defaultPalette.light),
+          darkTheme: buildDarkThemeForScheme(ThemePalettes.defaultPalette.dark),
+          themeMode: ThemeMode.dark,
+        ),
+      );
+      await tester.pump();
+
+      final blockquote = find.byKey(const ValueKey('markdown-blockquote'));
+      expect(blockquote, findsOneWidget);
+
+      final line = find.descendant(
+        of: blockquote,
+        matching: find.byKey(const ValueKey('markdown-blockquote-line')),
+      );
+      expect(line, findsOneWidget);
+
+      final lineDecoration =
+          tester.widget<DecoratedBox>(line).decoration as BoxDecoration;
+      final cs = Theme.of(tester.element(blockquote)).colorScheme;
+      expect(lineDecoration.color, cs.onSurfaceVariant.withValues(alpha: 0.48));
+      expect(lineDecoration.borderRadius, BorderRadius.circular(2));
+      expect(lineDecoration.border, isNull);
+    },
+  );
+
+  testWidgets(
     'MarkdownWithCodeHighlight keeps late document tables stable after code blocks',
     (tester) async {
       const prefix = r'''
@@ -1657,6 +1864,54 @@ A-->B
   });
 
   testWidgets(
+    'MarkdownWithCodeHighlight keeps escaped and math pipes inside table cells',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+| 项目 | 左对齐 | 居中 | 右对齐 |
+| :--- | :--- | :---: | ---: |
+| 普通文本 | alpha | beta | 123 |
+| 粗斜代码 | **bold** | *italic* | `code` |
+| 转义竖线 | a \| b | c \| d | 456 |
+| 行内数学 | $a+b$ | $\|x\|=1$ | $P(A\mid B)$ |
+'''),
+      );
+      await tester.pump();
+
+      final table = tester.widget<Table>(find.byType(Table).first);
+      expect(table.children, hasLength(5));
+      expect(table.children.map((row) => row.children.length), everyElement(4));
+      expect(_findMathWidget(), findsNWidgets(3));
+
+      final richTextPlainText = tester
+          .widgetList<RichText>(
+            find.descendant(
+              of: find.byType(Table),
+              matching: find.byType(RichText),
+            ),
+          )
+          .map((widget) => widget.text.toPlainText());
+      final selectablePlainText = tester
+          .widgetList<SelectableText>(
+            find.descendant(
+              of: find.byType(Table),
+              matching: find.byType(SelectableText),
+            ),
+          )
+          .map((widget) => widget.textSpan?.toPlainText() ?? widget.data ?? '');
+      final tableText = [
+        ...richTextPlainText,
+        ...selectablePlainText,
+      ].join('\n');
+
+      expect(tableText, contains('a | b'));
+      expect(tableText, contains('c | d'));
+      expect(tableText, isNot(contains(r'a \| b')));
+      expect(tableText, isNot(contains(r'c \| d')));
+    },
+  );
+
+  testWidgets(
     'MarkdownWithCodeHighlight keeps dollar signs inside table code',
     (tester) async {
       _overrideMarkdownTablePlatform(TargetPlatform.android);
@@ -1827,21 +2082,255 @@ A-->B
     (tester) async {
       await tester.pumpWidget(
         _markdownHarness(r'''
-分别$10和$20
+价格 $10 不渲染。
 
-分别 $10和$ 20
+范围$\pm 2$ 有效。
 
-分别$10$和$20$
+标点：$x+y$。
 
-分别 $10$ 和$20$
+空格 $a+b$ 有效。
 '''),
       );
       await tester.pump();
 
+      expect(_findMathWidget(), findsNWidgets(3));
+      expect(find.textContaining(r'$10'), findsOneWidget);
+      expect(find.textContaining(r'$\pm 2$'), findsNothing);
+      expect(find.textContaining(r'$x+y$'), findsNothing);
+      expect(find.textContaining(r'$a+b$'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight renders compact dollar math next to Chinese prose',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'（$PaCO_2$ 降至 30）范围$\pm 2$，目标$SpO_2$。'),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsNWidgets(3));
+      expect(find.textContaining(r'$PaCO_2$'), findsNothing);
+      expect(find.textContaining(r'$\pm 2$'), findsNothing);
+      expect(find.textContaining(r'$SpO_2$'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight renders numeric TeX dollar math without spanning prose',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          r'蕴含的能量高达 $9 \times 10^{16} \, \text{J}$，相当于约 2100 万吨 TNT 炸药的爆炸当量。太阳每秒将约 $4.3 \times 10^9 \, \text{kg}$ 的质量转化为能量',
+        ),
+      );
+      await tester.pump();
+
       expect(_findMathWidget(), findsNWidgets(2));
-      expect(find.textContaining(r'分别$10和$20'), findsOneWidget);
-      expect(find.textContaining(r'分别$10$和$20$'), findsOneWidget);
-      expect(find.textContaining(r'和$20$'), findsOneWidget);
+      expect(find.textContaining(r'$9 \times'), findsNothing);
+      expect(find.textContaining(r'$4.3 \times'), findsNothing);
+      expect(find.textContaining('相当于约 2100 万吨 TNT'), findsOneWidget);
+      expect(
+        find.textContaining(r'，相当于约 2100 万吨 TNT 炸药的爆炸当量。太阳每秒将约 $4.3'),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(r'MarkdownWithCodeHighlight renders paren math with set braces', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _markdownHarness(r'集合\(A = {x \in \mathbb{R} : x^2 < 4}\)等价于开区间。'),
+    );
+    await tester.pump();
+
+    expect(_findMathWidget(), findsOneWidget);
+    expect(find.textContaining(r'\(A ='), findsNothing);
+    expect(find.textContaining('等价于开区间'), findsOneWidget);
+  });
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight renders dollar math with escaped set braces',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'集合$A = \{x \in \mathbb{R} : x^2 < 4\}$等价于开区间。'),
+      );
+      await tester.pump();
+
+      final mathWidgets = _mathWidgets(tester);
+      expect(mathWidgets, hasLength(1));
+      expect(mathWidgets.single.parseError, isNull);
+      final encoded = _encodedMathTex(tester).single;
+      expect(encoded, contains(r'\{'));
+      expect(encoded, contains(r'\}'));
+      expect(encoded, contains(r'\mathbb{R}'));
+      expect(find.textContaining(r'\(A ='), findsNothing);
+      expect(find.textContaining(r'$A ='), findsNothing);
+      expect(find.textContaining('等价于开区间'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight keeps escaped inline delimiters literal',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          r'*literal\* and **strong\** and `code\` and [label\](https://example.com)',
+        ),
+      );
+      await tester.pump();
+
+      final spans = _resolvedTextSpansFromRichText(tester);
+      final plainText = spans.map((span) => span.text).join();
+
+      expect(
+        plainText,
+        contains(
+          r'*literal* and **strong** and `code` and [label](https://example.com)',
+        ),
+      );
+      expect(
+        spans.where(
+          (span) =>
+              span.text.contains('literal') &&
+              span.style.fontStyle == FontStyle.italic,
+        ),
+        isEmpty,
+      );
+      expect(
+        spans.where(
+          (span) =>
+              span.text.contains('strong') &&
+              span.style.fontWeight == FontWeight.bold,
+        ),
+        isEmpty,
+      );
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight renders paren math with literal special characters',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+在Markdown中#表示标题，但在公式中\(#\)是符号。
+集合\({1, 2, 3}\)有三个元素。注意在LaTeX中花括号需要转义\({}\)。
+序列\({a_n}_{n=1}^{\infty}\)收敛。
+集合\(A = {x \in \mathbb{R} : x^2 < 4}\)等价于开区间。
+'''),
+      );
+      await tester.pump();
+
+      final mathWidgets = _mathWidgets(tester);
+      expect(mathWidgets, hasLength(5));
+      expect(
+        mathWidgets.map((widget) => widget.parseError),
+        everyElement(isNull),
+      );
+      final encoded = _encodedMathTex(tester);
+      expect(encoded[0], contains(r'\#'));
+      expect(encoded[1], contains(r'\{'));
+      expect(encoded[1], contains(r'\}'));
+      expect(encoded[2], contains(r'\{\}'));
+      expect(encoded[3], contains(r'\{'));
+      expect(encoded[3], contains(r'\}'));
+      expect(encoded[3], contains(r'_{n=1}^{\infty}'));
+      expect(encoded[4], contains(r'\{'));
+      expect(encoded[4], contains(r'\}'));
+      expect(encoded[4], contains(r'\mathbb{R}'));
+      expect(find.textContaining(r'\(#\)'), findsNothing);
+      expect(find.textContaining(r'\({1, 2, 3}\)'), findsNothing);
+      expect(find.textContaining(r'\({}\)'), findsNothing);
+      expect(find.textContaining(r'\({a_n}_{n=1}^{\infty}\)'), findsNothing);
+      expect(find.textContaining(r'\(A = {x \in'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps literal double dollars from spanning prose',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          r'$\&$在LaTeX中需要转义，而$$符号通常用于块级公式。后文$a$$b$$c$。$x$$=$$1$。结束',
+        ),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsNWidgets(7));
+      expect(find.textContaining('在LaTeX中需要转义'), findsOneWidget);
+      expect(find.textContaining(r'$$符号通常用于块级公式。后文'), findsOneWidget);
+      expect(find.textContaining(r'b$$c'), findsNothing);
+      expect(find.textContaining(r'x$$=$$1'), findsNothing);
+      expect(find.textContaining('结束'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps long inline math stress document stable',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+集合\(A = {x \in \mathbb{R} : x^2 < 4}\)等价于开区间$(-2, 2)$。
+
+$\&$在LaTeX中需要转义，而$$符号通常用于块级公式。
+
+> 费马大定理指出：当整数$n > 2$时，方程$x^n + y^n = z^n$没有正整数解。
+
+$a$$b$$c$。$x$$=$$1$。
+
+$f((x))$，$g([x])$，$h(\{x\})$，$\langle a, b \rangle$。
+'''),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsAtLeastNWidgets(14));
+      expect(find.textContaining(r'\(A ='), findsNothing);
+      expect(find.textContaining(r'$$符号通常用于块级公式'), findsOneWidget);
+      expect(find.textContaining(r'b$$c'), findsNothing);
+      expect(find.textContaining(r'x$$=$$1'), findsNothing);
+      expect(find.textContaining(r'$n > 2$'), findsNothing);
+      expect(find.textContaining(r'$f((x))$'), findsNothing);
+      expect(find.textContaining('费马大定理指出'), findsOneWidget);
+      expect(find.textContaining('在LaTeX中需要转义'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight avoids common dollar math false positives',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+价格是 $50 到 $100。
+开头空格：$ PaCO_2$。
+结尾空格：$PaCO_2 $。
+跨行：$PaCO_2
+$。
+有效：$PaCO_2$。
+'''),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsOneWidget);
+      expect(find.textContaining(r'$50 到 $100'), findsOneWidget);
+      expect(find.textContaining(r'$ PaCO_2$'), findsOneWidget);
+      expect(find.textContaining(r'$PaCO_2 $'), findsOneWidget);
+      expect(find.textContaining(r'有效：$PaCO_2$'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight does not span malformed dollar math on one line',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'价格 $10 到 $100；开头空格 $ PaCO_2$；结尾空格 $PaCO_2 $。'),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsNothing);
+      expect(find.textContaining(r'$10 到 $100'), findsOneWidget);
+      expect(find.textContaining(r'$ PaCO_2$'), findsOneWidget);
+      expect(find.textContaining(r'$PaCO_2 $'), findsOneWidget);
     },
   );
 
@@ -2141,37 +2630,113 @@ void main() {}
     expect(find.text('dart'), findsOneWidget);
   });
 
-  testWidgets('MarkdownWithCodeHighlight toggles auto-collapsed code block', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _markdownHarness(
-        '''
+  testWidgets(
+    'MarkdownWithCodeHighlight toggles auto-collapsed code block from header',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          '''
 ```dart
 line1
 line2
 line3
 ```
 ''',
-        preferences: const {
-          'display_auto_collapse_code_block_v1': true,
-          'display_auto_collapse_code_block_lines_v1': 2,
-        },
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.pumpAndSettle();
+          preferences: const {
+            'display_auto_collapse_code_block_v1': true,
+            'display_auto_collapse_code_block_lines_v1': 2,
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.pumpAndSettle();
 
-    expect(find.text('Expand'), findsOneWidget);
-    expect(find.textContaining('line3'), findsNothing);
-    expect(find.textContaining('folded'), findsNothing);
+      expect(find.text('Expand'), findsNothing);
+      expect(find.text('Collapse'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('code-block-collapse-icon-switcher')),
+        findsOneWidget,
+      );
+      expect(find.byIcon(Lucide.ChevronRight), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('dart')).dx,
+        lessThan(tester.getTopLeft(find.byIcon(Lucide.ChevronRight)).dx),
+      );
+      expect(find.textContaining('line3'), findsNothing);
+      expect(find.textContaining('folded'), findsNothing);
 
-    await tester.tap(find.text('Expand'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('dart'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Collapse'), findsOneWidget);
-    expect(find.textContaining('line3'), findsOneWidget);
-  });
+      expect(find.text('Expand'), findsNothing);
+      expect(find.text('Collapse'), findsNothing);
+      expect(find.byIcon(Lucide.ChevronRight), findsNothing);
+      expect(find.textContaining('line3'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight shows collapsed code tail fade when hidden lines exist',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          '''
+```dart
+fade1
+fade2
+fade3
+```
+''',
+          preferences: const {
+            'display_auto_collapse_code_block_v1': true,
+            'display_auto_collapse_code_block_lines_v1': 2,
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('code-block-collapsed-tail-fade')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('fade3'), findsNothing);
+
+      await tester.tap(find.text('dart'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('code-block-collapsed-tail-fade')),
+        findsNothing,
+      );
+      expect(find.textContaining('fade3'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight omits collapsed code tail fade without hidden lines',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness('''
+```dart
+exact1
+exact2
+```
+'''),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('dart'));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Lucide.ChevronRight), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('code-block-collapsed-tail-fade')),
+        findsNothing,
+      );
+      expect(find.textContaining('exact2'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'MarkdownWithCodeHighlight shows full code after auto-collapse is disabled',
@@ -2200,7 +2765,8 @@ disable3
       await settings.setAutoCollapseCodeBlock(true);
       await tester.pumpAndSettle();
 
-      expect(find.text('Expand'), findsOneWidget);
+      expect(find.text('Expand'), findsNothing);
+      expect(find.text('Collapse'), findsNothing);
       expect(find.textContaining('disable3'), findsNothing);
 
       await settings.setAutoCollapseCodeBlock(false);
@@ -2208,6 +2774,18 @@ disable3
 
       expect(find.text('Expand'), findsNothing);
       expect(find.text('Collapse'), findsNothing);
+      expect(find.textContaining('disable3'), findsOneWidget);
+
+      await tester.tap(find.text('dart'));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Lucide.ChevronRight), findsOneWidget);
+      expect(find.textContaining('disable3'), findsNothing);
+
+      await tester.tap(find.text('dart'));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Lucide.ChevronRight), findsNothing);
       expect(find.textContaining('disable3'), findsOneWidget);
     },
   );
@@ -2235,10 +2813,11 @@ alpha3
     await tester.pumpAndSettle();
     await tester.pumpAndSettle();
 
-    expect(find.text('Expand'), findsOneWidget);
+    expect(find.text('Expand'), findsNothing);
+    expect(find.text('Collapse'), findsNothing);
     expect(find.textContaining('alpha3'), findsNothing);
 
-    await tester.tap(find.text('Expand'));
+    await tester.tap(find.text('dart'));
     await tester.pumpAndSettle();
 
     streamText.value = '''
@@ -2251,10 +2830,11 @@ alpha4
 ''';
     await tester.pumpAndSettle();
 
-    expect(find.text('Collapse'), findsOneWidget);
+    expect(find.text('Expand'), findsNothing);
+    expect(find.text('Collapse'), findsNothing);
     expect(find.textContaining('alpha4'), findsOneWidget);
 
-    await tester.tap(find.text('Collapse'));
+    await tester.tap(find.text('dart'));
     await tester.pumpAndSettle();
 
     streamText.value = '''
@@ -2268,7 +2848,8 @@ alpha5
 ''';
     await tester.pumpAndSettle();
 
-    expect(find.text('Expand'), findsOneWidget);
+    expect(find.text('Expand'), findsNothing);
+    expect(find.text('Collapse'), findsNothing);
     expect(find.textContaining('alpha5'), findsNothing);
   });
 
@@ -2296,7 +2877,7 @@ press3
       await tester.pumpAndSettle();
 
       final expandGesture = await tester.startGesture(
-        tester.getCenter(find.text('Expand')),
+        tester.getCenter(find.text('dart')),
       );
       streamText.value = '''
 ```dart
@@ -2310,11 +2891,12 @@ press4
       await expandGesture.up();
       await tester.pumpAndSettle();
 
-      expect(find.text('Collapse'), findsOneWidget);
+      expect(find.text('Expand'), findsNothing);
+      expect(find.text('Collapse'), findsNothing);
       expect(find.textContaining('press4'), findsOneWidget);
 
       final collapseGesture = await tester.startGesture(
-        tester.getCenter(find.text('Collapse')),
+        tester.getCenter(find.text('dart')),
       );
       streamText.value = '''
 ```dart
@@ -2329,7 +2911,8 @@ press5
       await collapseGesture.up();
       await tester.pumpAndSettle();
 
-      expect(find.text('Expand'), findsOneWidget);
+      expect(find.text('Expand'), findsNothing);
+      expect(find.text('Collapse'), findsNothing);
       expect(find.textContaining('press5'), findsNothing);
     },
   );
@@ -2432,6 +3015,23 @@ press5
     expect(plainText, isNot(contains('<br>')));
     expect(plainText, isNot(contains('<a href=')));
     expect(find.text('链接'), findsOneWidget);
+  });
+
+  testWidgets('MarkdownWithCodeHighlight normalizes strong weight on Android', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      await tester.pumpWidget(_markdownHarness('这是 **粗体** 文本'));
+      await tester.pump();
+
+      final spans = _resolvedTextSpansFromRichText(tester);
+      final strongSpan = spans.singleWhere((span) => span.text == '粗体');
+
+      expect(strongSpan.style.fontWeight, FontWeight.w500);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 
   testWidgets('MarkdownWithCodeHighlight keeps p tag spacing compact', (

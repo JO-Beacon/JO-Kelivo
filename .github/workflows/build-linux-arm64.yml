@@ -80,7 +80,7 @@ jobs:
       - name: 📦 打包 tar.gz
         run: |
           cd build/linux/arm64/release/bundle
-          tar -czf ../../../../../JO-Kelivo_linux_${VERSION}_arm64.tar.gz .
+          tar -czf ../../../../../JO-Kelivo-v${VERSION}-linux-arm64-tar.gz .
 
       - name: 📦 创建 AppImage
         run: |
@@ -127,7 +127,7 @@ jobs:
           install -Dm644 "$ICON_SOURCE" "AppDir/usr/share/icons/hicolor/256x256/apps/jo_kelivo.png"
 
           # 构建 AppImage
-          ARCH=aarch64 ./appimagetool AppDir JO-Kelivo_linux_${VERSION}_arm64.AppImage
+          ARCH=aarch64 ./appimagetool AppDir JO-Kelivo-v${VERSION}-linux-arm64-appimage.AppImage
 
       - name: 📦 创建 DEB 包
         run: |
@@ -182,7 +182,7 @@ jobs:
           chmod +x deb/opt/jo_kelivo/jo_kelivo.sh
 
           # 构建 DEB 包
-          dpkg-deb --build deb JO-Kelivo_linux_${VERSION}_arm64.deb
+          dpkg-deb --build deb JO-Kelivo-v${VERSION}-linux-arm64-deb.deb
 
       - name: 📦 创建 RPM 包
         run: |
@@ -249,12 +249,12 @@ jobs:
 
           # 构建 RPM
           rpmbuild -bb ~/rpmbuild/SPECS/jo_kelivo.spec
-          cp ~/rpmbuild/RPMS/aarch64/jo_kelivo-${VERSION_NUMBER}-1.*.rpm JO-Kelivo_linux_${VERSION}_arm64.rpm
+          cp ~/rpmbuild/RPMS/aarch64/jo_kelivo-${VERSION_NUMBER}-1.*.rpm JO-Kelivo-v${VERSION}-linux-arm64-rpm.rpm
       - name: 🔍 RPM 元数据（调试）
         shell: bash
         run: |
           set -euxo pipefail
-          RPM_FILE="JO-Kelivo_linux_${VERSION}_arm64.rpm"
+          RPM_FILE="JO-Kelivo-v${VERSION}-linux-arm64-rpm.rpm"
           echo "RPM file: ${RPM_FILE}"
           cp -f ~/rpmbuild/SPECS/jo_kelivo.spec rpm-spec.spec
           rpm -qp --info "${RPM_FILE}" | tee rpm-info.txt
@@ -273,7 +273,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          RPM_FILE="JO-Kelivo_linux_${VERSION}_arm64.rpm"
+          RPM_FILE="JO-Kelivo-v${VERSION}-linux-arm64-rpm.rpm"
           docker run --rm -v "${PWD}:/work" -w /work fedora:43 bash -lc "dnf -y install ./${RPM_FILE}"
 
       - name: 🚀 发布到 Release
@@ -284,31 +284,31 @@ jobs:
           name: ${{ github.event.inputs.release_tag }}
           prerelease: ${{ github.event.inputs.prerelease }}
           files: |
-            JO-Kelivo_linux_*_arm64.tar.gz
-            JO-Kelivo_linux_*_arm64.AppImage
-            JO-Kelivo_linux_*_arm64.deb
-            JO-Kelivo_linux_*_arm64.rpm
+            JO-Kelivo-v*-linux-arm64-tar.gz
+            JO-Kelivo-v*-linux-arm64-appimage.AppImage
+            JO-Kelivo-v*-linux-arm64-deb.deb
+            JO-Kelivo-v*-linux-arm64-rpm.rpm
 
       - name: 📤 上传构建产物 (tar.gz)
         uses: actions/upload-artifact@v4
         with:
           name: Linux-ARM64-tar.gz
-          path: JO-Kelivo_linux_*_arm64.tar.gz
+          path: JO-Kelivo-v*-linux-arm64-tar.gz
 
       - name: 📤 上传构建产物 (AppImage)
         uses: actions/upload-artifact@v4
         with:
           name: Linux-ARM64-AppImage
-          path: JO-Kelivo_linux_*_arm64.AppImage
+          path: JO-Kelivo-v*-linux-arm64-appimage.AppImage
 
       - name: 📤 上传构建产物 (DEB)
         uses: actions/upload-artifact@v4
         with:
           name: Linux-ARM64-DEB
-          path: JO-Kelivo_linux_*_arm64.deb
+          path: JO-Kelivo-v*-linux-arm64-deb.deb
 
       - name: 📤 上传构建产物 (RPM)
         uses: actions/upload-artifact@v4
         with:
           name: Linux-ARM64-RPM
-          path: JO-Kelivo_linux_*_arm64.rpm
+          path: JO-Kelivo-v*-linux-arm64-rpm.rpm

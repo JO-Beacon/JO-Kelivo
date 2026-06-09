@@ -29,6 +29,7 @@ import 'mermaid_image_cache.dart';
 import 'plantuml_block.dart';
 import 'package:path/path.dart' as p;
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/theme_factory.dart' show getPlatformFontFallback;
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -152,14 +153,13 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
     if (cbIdx != -1) components[cbIdx] = ModernCheckBoxMd();
     final rbIdx = components.indexWhere((c) => c is RadioButtonMd);
     if (rbIdx != -1) components[rbIdx] = ModernRadioMd();
+    final tableIdx = components.indexWhere((c) => c is TableMd);
+    if (tableIdx != -1) components[tableIdx] = EscapeAwareTableMd();
     // Prepend custom renderers in priority order (fence first)
     // Temporarily disable custom bold label line transformer to avoid
     // interfering with block parsing for complex documents.
     // components.insert(0, LabelValueLineMd());
     components.removeWhere((c) => c is CodeBlockMd);
-    // Ensure backslash-escaped punctuation renders literally (e.g., \*, \`, \[)
-    // Must run before emphasis/links/code parsing to neutralize markers.
-    components.insert(0, BackslashEscapeMd());
     // Conditionally add LaTeX/math renderers
     if (settings.enableMathRendering) {
       // Block-level LaTeX (e.g., $$...$$ or \[...\])
@@ -194,10 +194,31 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
       }
     }
 
+    final boldIdxInline = inlineComponents.indexWhere((c) => c is BoldMd);
+    if (boldIdxInline != -1) {
+      inlineComponents[boldIdxInline] = EscapeAwareBoldMd();
+    }
+    final italicIdxInline = inlineComponents.indexWhere((c) => c is ItalicMd);
+    if (italicIdxInline != -1) {
+      inlineComponents[italicIdxInline] = EscapeAwareItalicMd();
+    }
+    final imageIdxInline = inlineComponents.indexWhere((c) => c is ImageMd);
+    if (imageIdxInline != -1) {
+      inlineComponents[imageIdxInline] = EscapeAwareImageMd();
+    }
+    final codeIdxInline = inlineComponents.indexWhere(
+      (c) => c is HighlightedText,
+    );
+    if (codeIdxInline != -1) {
+      inlineComponents[codeIdxInline] = EscapeAwareHighlightedTextMd();
+    }
     final linkIdxInline = inlineComponents.indexWhere((c) => c is ATagMd);
     if (linkIdxInline != -1) {
       inlineComponents[linkIdxInline] = LineSafeLinkMd();
     }
+    // Keep escaped punctuation out of block parsing so it cannot split
+    // \( ... \) math containing \{...\}; inline math is registered ahead of it.
+    inlineComponents.add(BackslashEscapeMd());
     // codeBuilder handles rendering. A custom BlockMd for fences can
     // interfere with block segmentation in some cases.
     // Resolve user preferred code font family (default to monospace)
@@ -307,15 +328,13 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
         final label = span.toPlainText().trim();
         // Special handling: [citation](index:id)
         if (label.toLowerCase() == 'citation') {
-          final parts = url.split(':');
-          if (parts.length == 2) {
-            final indexText = parts[0].trim();
-            final id = parts[1].trim();
+          final citation = _parseCitationRef(url);
+          if (citation != null) {
             final cs = Theme.of(ctx).colorScheme;
             return GestureDetector(
               onTap: () {
-                if (widget.onCitationTap != null && id.isNotEmpty) {
-                  widget.onCitationTap!(id);
+                if (widget.onCitationTap != null && citation.id.isNotEmpty) {
+                  widget.onCitationTap!(citation.id);
                 } else {
                   // Fallback: do nothing
                 }
@@ -329,8 +348,8 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  indexText,
-                  style: const TextStyle(fontSize: 12, height: 1.0),
+                  citation.indexText,
+                  style: TextStyle(fontSize: 12, height: 1.0),
                 ),
               ),
             );
@@ -348,8 +367,8 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
         );
       },
       orderedListBuilder: (ctx, no, child, cfg) {
-        final style = (cfg.style ?? const TextStyle()).copyWith(
-          fontWeight: FontWeight.w400,
+        final style = (cfg.style ?? TextStyle()).copyWith(
+          fontWeight: AppFontWeights.regular,
         );
         // Apply a soft compensation so when chat scale != 100%,
         // list items don't visually feel larger/smaller than body text.
@@ -383,8 +402,8 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
       // Signature in gpt_markdown 1.1.4: (BuildContext ctx, Widget child, GptMarkdownConfig cfg) -> Widget
       // We compose the bullet + content here to control scaling/spacing.
       unOrderedListBuilder: (ctx, child, cfg) {
-        final style = (cfg.style ?? const TextStyle()).copyWith(
-          fontWeight: FontWeight.w400,
+        final style = (cfg.style ?? TextStyle()).copyWith(
+          fontWeight: AppFontWeights.regular,
         );
         final double kListComp =
             MarkdownWithCodeHighlight.kMarkdownListScaleCompensation;
@@ -532,7 +551,7 @@ Map<String, TextStyle> _transparentBgTheme(Map<String, TextStyle> base) {
   if (root != null) {
     m['root'] = root.copyWith(backgroundColor: Colors.transparent);
   } else {
-    m['root'] = const TextStyle(backgroundColor: Colors.transparent);
+    m['root'] = TextStyle(backgroundColor: Colors.transparent);
   }
   return m;
 }
@@ -605,6 +624,14 @@ String _preprocessFences(
   var out = input.replaceAll('\r\n', '\n');
   out = _maskBlockquoteFenceMarkers(out);
 
+  // Move fenced code from list lines to the next line before masking so list
+  // fences are protected from later inline math normalization.
+  final bulletFence = RegExp(
+    r"^(\s*(?:[*+-]|\d+\.)\s+)```([^\s`]*)\s*$",
+    multiLine: true,
+  );
+  out = out.replaceAllMapped(bulletFence, (m) => "${m[1]}\n```${m[2]}");
+
   // STEP 1: MASKING - Protect code blocks from LaTeX processing
   // This prevents $...$ inside code from being converted to LaTeX
   final Map<String, String> codeMap = {};
@@ -670,6 +697,7 @@ String _preprocessFences(
     final url = match.group(2);
     return '[$text]($url)';
   });
+  out = _normalizeRawCitationMetadata(out);
 
   // Normalize inline $...$ math into \( ... \) so it always matches the LaTeX
   // renderer (even when vendors emit single-dollar math mixed with prose).
@@ -704,13 +732,6 @@ String _preprocessFences(
         : '\n';
     return '$prefix\$\$\n$body\n\$\$$suffix';
   });
-
-  // 1) Move fenced code from list lines to the next line: "* ```lang" -> "*\n```lang"
-  final bulletFence = RegExp(
-    r"^(\s*(?:[*+-]|\d+\.)\s+)```([^\s`]*)\s*$",
-    multiLine: true,
-  );
-  out = out.replaceAllMapped(bulletFence, (m) => "${m[1]}\n```${m[2]}");
 
   // 2) Dedent opening fences: leading spaces before ```lang
   final dedentOpen = RegExp(r"^[ \t]+```([^\n`]*)\s*$", multiLine: true);
@@ -779,6 +800,69 @@ String _preprocessFences(
   });
 
   return out;
+}
+
+String _normalizeRawCitationMetadata(String input) {
+  final rawCitation = RegExp(
+    r'\[citation:([^\]\r\n]+)\]',
+    caseSensitive: false,
+  );
+  return input.replaceAllMapped(rawCitation, (match) {
+    final refs = _parseCitationRefList(match.group(1) ?? '');
+    if (refs.isEmpty) return match.group(0)!;
+    return refs.map((ref) => '[citation](${ref.markdownTarget})').join(' ');
+  });
+}
+
+List<_CitationRef> _parseCitationRefList(String raw) {
+  final refs = <_CitationRef>[];
+  for (final rawPart in raw.split(',')) {
+    var part = rawPart.trim();
+    if (part.isEmpty) return const <_CitationRef>[];
+    if (part.toLowerCase().startsWith('citation:')) {
+      part = part.substring('citation:'.length).trim();
+    }
+    final ref = _parseCitationRef(part);
+    if (ref == null) return const <_CitationRef>[];
+    refs.add(ref);
+  }
+  return refs;
+}
+
+_CitationRef? _parseCitationRef(String raw) {
+  final trimmed = raw.trim();
+  if (trimmed.isEmpty) return null;
+
+  final separator = trimmed.indexOf(':');
+  final hasSeparator = separator != -1;
+  final indexText = separator == -1
+      ? trimmed
+      : trimmed.substring(0, separator).trim();
+  final id = separator == -1
+      ? indexText
+      : trimmed.substring(separator + 1).trim();
+
+  if (!_isCitationIndex(indexText) ||
+      (hasSeparator && !RegExp(r'\d').hasMatch(indexText)) ||
+      id.isEmpty) {
+    return null;
+  }
+  if (id.contains(')') || id.contains(']') || RegExp(r'\s').hasMatch(id)) {
+    return null;
+  }
+  return _CitationRef(indexText: indexText, id: id);
+}
+
+bool _isCitationIndex(String value) =>
+    RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(value);
+
+class _CitationRef {
+  const _CitationRef({required this.indexText, required this.id});
+
+  final String indexText;
+  final String id;
+
+  String get markdownTarget => indexText == id ? indexText : '$indexText:$id';
 }
 
 String _maskBlockquoteFenceMarkers(String input) {
@@ -940,8 +1024,75 @@ String _streamingTableDividerFor(int columnCount) =>
 List<String> _splitMarkdownTableLine(String line) {
   var trimmed = line.trim();
   if (trimmed.startsWith('|')) trimmed = trimmed.substring(1);
-  if (trimmed.endsWith('|')) trimmed = trimmed.substring(0, trimmed.length - 1);
-  return trimmed.split('|');
+  if (trimmed.endsWith('|') && !_isEscaped(trimmed, trimmed.length - 1)) {
+    trimmed = trimmed.substring(0, trimmed.length - 1);
+  }
+
+  final cells = <String>[];
+  final cell = StringBuffer();
+  var dollarMathEnd = -1;
+  var parenMathEnd = -1;
+
+  for (var i = 0; i < trimmed.length; i++) {
+    final ch = trimmed.codeUnitAt(i);
+
+    if (i > dollarMathEnd && i > parenMathEnd) {
+      if (ch == 0x24 && !_isEscaped(trimmed, i)) {
+        final close = _findClosingDollarMathInTableCell(trimmed, i + 1);
+        if (close != -1) dollarMathEnd = close;
+      } else if (ch == 0x5C && i + 1 < trimmed.length) {
+        final next = trimmed.codeUnitAt(i + 1);
+        if (next == 0x28) {
+          final close = _findClosingParenMathInTableCell(trimmed, i + 2);
+          if (close != -1) parenMathEnd = close + 1;
+        }
+      }
+    }
+
+    if (ch == 0x7C &&
+        !_isEscaped(trimmed, i) &&
+        i > dollarMathEnd &&
+        i > parenMathEnd) {
+      cells.add(cell.toString());
+      cell.clear();
+      continue;
+    }
+
+    cell.writeCharCode(ch);
+  }
+  cells.add(cell.toString());
+  return cells;
+}
+
+int _findClosingDollarMathInTableCell(String input, int start) {
+  final end = math.min(input.length, start + _maxInlineMathBodyLength + 1);
+  for (var i = start; i < end; i++) {
+    final ch = input.codeUnitAt(i);
+    if (ch == 0x0A) return -1;
+    if (ch == 0x5C) {
+      i++;
+      continue;
+    }
+    if (ch != 0x24) continue;
+
+    final body = input.substring(start, i);
+    if (_isValidDollarMathBody(body, allowUnescapedPipes: true) &&
+        _canCloseDollarMath(input, i)) {
+      return i;
+    }
+    return -1;
+  }
+  return -1;
+}
+
+int _findClosingParenMathInTableCell(String input, int start) {
+  final end = math.min(input.length, start + _maxInlineMathBodyLength + 2);
+  for (var i = start; i < end - 1; i++) {
+    final ch = input.codeUnitAt(i);
+    if (ch == 0x0A) return -1;
+    if (ch == 0x5C && input.codeUnitAt(i + 1) == 0x29) return i;
+  }
+  return -1;
 }
 
 String _completeStreamingTableRow(String line, int columnCount) {
@@ -1007,7 +1158,7 @@ bool _isValidStreamingDollarMathBody(String body) {
 
 // Safe math renderer that falls back to plain text when parsing fails.
 Widget _renderMath(String tex, {TextStyle? style, bool displayMode = false}) {
-  final resolved = style ?? const TextStyle();
+  final resolved = style ?? TextStyle();
   final normalizedTex = _normalizeMathTex(tex);
   try {
     return Math.tex(
@@ -1022,7 +1173,7 @@ Widget _renderMath(String tex, {TextStyle? style, bool displayMode = false}) {
 }
 
 TextStyle _inlineMathTextStyle(TextStyle? style) {
-  final base = style ?? const TextStyle();
+  final base = style ?? TextStyle();
   final baseSize = base.fontSize ?? 15.5;
   return base.copyWith(fontSize: baseSize * 1.2);
 }
@@ -1031,18 +1182,166 @@ WidgetSpan _inlineMathSpan(Widget math) {
   return WidgetSpan(
     alignment: PlaceholderAlignment.baseline,
     baseline: TextBaseline.alphabetic,
-    child: SelectionContainer.disabled(child: math),
+    child: SelectionContainer.disabled(
+      child: _InlineMathScrollable(child: math),
+    ),
   );
+}
+
+/// Horizontally scrollable inline math that preserves baseline alignment.
+///
+/// [SingleChildScrollView] breaks baseline forwarding because its internal
+/// [RenderViewport] does not implement [computeDistanceToActualBaseline].
+/// This widget uses a custom [RenderObject] that lays out the child
+/// unconstrained in width, reports correct baseline, and paints with a
+/// horizontal scroll offset driven by a [GestureDetector].
+class _InlineMathScrollable extends StatefulWidget {
+  const _InlineMathScrollable({required this.child});
+  final Widget child;
+
+  @override
+  State<_InlineMathScrollable> createState() => _InlineMathScrollableState();
+}
+
+class _InlineMathScrollableState extends State<_InlineMathScrollable> {
+  double _scrollOffset = 0.0;
+  double _maxScroll = 0.0;
+
+  void _onHorizontalDragUpdate(DragUpdateDetails d) {
+    setState(() {
+      _scrollOffset = (_scrollOffset - d.delta.dx).clamp(0.0, _maxScroll);
+    });
+  }
+
+  void _updateMaxScroll(double childWidth, double viewportWidth) {
+    _maxScroll = (childWidth - viewportWidth).clamp(0.0, double.infinity);
+    // Ensure current offset stays valid after relayout.
+    if (_scrollOffset > _maxScroll) {
+      _scrollOffset = _maxScroll;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragUpdate: _onHorizontalDragUpdate,
+      child: _InlineMathScrollableRenderWidget(
+        scrollOffset: _scrollOffset,
+        onMetrics: _updateMaxScroll,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+class _InlineMathScrollableRenderWidget extends SingleChildRenderObjectWidget {
+  const _InlineMathScrollableRenderWidget({
+    required this.scrollOffset,
+    required this.onMetrics,
+    required Widget child,
+  }) : super(child: child);
+
+  final double scrollOffset;
+  final void Function(double childWidth, double viewportWidth) onMetrics;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderInlineMathScrollable(
+        initialScrollOffset: scrollOffset,
+        onMetrics: onMetrics,
+      );
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderInlineMathScrollable renderObject,
+  ) {
+    renderObject
+      ..scrollOffset = scrollOffset
+      ..onMetrics = onMetrics;
+  }
+}
+
+class _RenderInlineMathScrollable extends RenderProxyBox {
+  _RenderInlineMathScrollable({
+    required double initialScrollOffset,
+    required this.onMetrics,
+  }) : _scrollOffset = initialScrollOffset;
+
+  double _scrollOffset;
+  set scrollOffset(double value) {
+    if (_scrollOffset == value) return;
+    _scrollOffset = value;
+    markNeedsPaint();
+  }
+
+  void Function(double childWidth, double viewportWidth) onMetrics;
+
+  @override
+  void performLayout() {
+    final child = this.child;
+    if (child == null) {
+      size = constraints.smallest;
+      return;
+    }
+    child.layout(
+      constraints.copyWith(maxWidth: double.infinity),
+      parentUsesSize: true,
+    );
+    size = constraints.constrain(child.size);
+    // Notify stateful widget of the scrollable extent.
+    if (child.size.width > size.width) {
+      onMetrics(child.size.width, size.width);
+    }
+  }
+
+  @override
+  double? computeDistanceToActualBaseline(TextBaseline baseline) {
+    return child?.getDistanceToActualBaseline(baseline);
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final child = this.child;
+    if (child == null) return;
+    if (child.size.width <= size.width) {
+      context.paintChild(child, offset);
+      return;
+    }
+    context.pushClipRect(needsCompositing, offset, Offset.zero & size, (
+      context,
+      clipOffset,
+    ) {
+      context.paintChild(child, clipOffset - Offset(_scrollOffset, 0));
+    });
+  }
+
+  @override
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) {
+    final child = this.child;
+    if (child == null) return false;
+    return result.addWithPaintOffset(
+      offset: Offset(-_scrollOffset, 0),
+      position: position,
+      hitTest: (result, transformed) =>
+          child.hitTest(result, position: transformed),
+    );
+  }
 }
 
 String _replaceInlineDollarMath(String input) {
   final buf = StringBuffer();
   var i = 0;
+  var previousDollarWasInlineClose = false;
   while (i < input.length) {
     if (input.codeUnitAt(i) == 0x24 &&
         !_isEscaped(input, i) &&
-        !_isDoubleDollar(input, i) &&
-        _canOpenDollarMath(input, i)) {
+        _canOpenDollarMath(
+          input,
+          i,
+          allowAdjacentOpen: previousDollarWasInlineClose,
+        )) {
       final close = _findClosingDollarMath(input, i + 1);
       if (close != -1) {
         final body = input.substring(i + 1, close);
@@ -1051,10 +1350,12 @@ String _replaceInlineDollarMath(String input) {
           ..write(body)
           ..write(r'\)');
         i = close + 1;
+        previousDollarWasInlineClose = true;
         continue;
       }
     }
     buf.writeCharCode(input.codeUnitAt(i));
+    previousDollarWasInlineClose = false;
     i++;
   }
   return buf.toString();
@@ -1073,7 +1374,7 @@ int _findClosingDollarMath(String input, int start) {
       i++;
       continue;
     }
-    if (ch != 0x24 || _isDoubleDollar(input, i)) continue;
+    if (ch != 0x24) continue;
 
     final body = input.substring(start, i);
     if (_isValidDollarMathBody(
@@ -1083,6 +1384,7 @@ int _findClosingDollarMath(String input, int start) {
         _canCloseDollarMath(input, i)) {
       return i;
     }
+    return -1;
   }
   return -1;
 }
@@ -1115,25 +1417,62 @@ bool _containsUnescapedPipe(String input) {
   return false;
 }
 
-bool _canOpenDollarMath(String input, int index) {
+bool _canOpenDollarMath(
+  String input,
+  int index, {
+  bool allowAdjacentOpen = false,
+}) {
+  if (index + 1 >= input.length) return false;
+  final next = input.codeUnitAt(index + 1);
+  if (!_canStartDollarMathBody(next)) return false;
   if (index == 0) return true;
   final prev = input.codeUnitAt(index - 1);
-  return _isWhitespaceCodeUnit(prev) || _isDollarMathOpeningBoundary(prev);
-}
-
-bool _isDollarMathOpeningBoundary(int codeUnit) {
-  if (codeUnit == 0x28) return true; // (
-  if (codeUnit == 0x3A) return true; // :
-  if (codeUnit == 0xFF1A) return true; // full-width colon
-  if (codeUnit == 0xFF0C) return true; // full-width comma
-  return false;
+  if (prev == 0x24) {
+    return allowAdjacentOpen && _canStartAdjacentDollarMathBody(next);
+  }
+  return _isWhitespaceCodeUnit(prev) || _isDollarMathBoundary(prev);
 }
 
 bool _canCloseDollarMath(String input, int index) {
+  if (index == 0 || _isWhitespaceCodeUnit(input.codeUnitAt(index - 1))) {
+    return false;
+  }
   final nextIndex = index + 1;
   if (nextIndex >= input.length) return true;
   final next = input.codeUnitAt(nextIndex);
-  return next != 0x24 && !_isAsciiLetterOrDigit(next);
+  if (next == 0x24) return true;
+  return next != 0x24 &&
+      (_isWhitespaceCodeUnit(next) || _isDollarMathBoundary(next));
+}
+
+bool _isDollarMathBoundary(int codeUnit) {
+  return _isAsciiPunctuation(codeUnit) ||
+      _isUnicodePunctuation(codeUnit) ||
+      _isCjkCodeUnit(codeUnit);
+}
+
+bool _canStartDollarMathBody(int codeUnit) {
+  if (_isWhitespaceCodeUnit(codeUnit) || codeUnit == 0x24) return false;
+  if (_isAsciiLetterOrDigit(codeUnit) || codeUnit == 0x5C) return true;
+  if (codeUnit == 0x28 || codeUnit == 0x5B || codeUnit == 0x7B) return true;
+  if (codeUnit == 0x2B || codeUnit == 0x2D) return true;
+  if (codeUnit == 0x7C) return true; // |
+  return !_isClosingOrSentencePunctuation(codeUnit);
+}
+
+bool _canStartAdjacentDollarMathBody(int codeUnit) {
+  if (_isAsciiLetterOrDigit(codeUnit) || codeUnit == 0x5C) return true;
+  if (codeUnit == 0x28 || codeUnit == 0x5B || codeUnit == 0x7B) return true;
+  return codeUnit == 0x2B ||
+      codeUnit == 0x2D ||
+      codeUnit == 0x2A ||
+      codeUnit == 0x2F ||
+      codeUnit == 0x3C ||
+      codeUnit == 0x3D ||
+      codeUnit == 0x3E ||
+      codeUnit == 0x5E ||
+      codeUnit == 0x5F ||
+      codeUnit == 0x7C;
 }
 
 bool _isDoubleDollar(String input, int index) {
@@ -1156,19 +1495,220 @@ bool _isWhitespaceCodeUnit(int codeUnit) {
       codeUnit == 0x0D;
 }
 
+bool _isAsciiDigit(int codeUnit) {
+  return codeUnit >= 0x30 && codeUnit <= 0x39;
+}
+
 bool _isAsciiLetterOrDigit(int codeUnit) {
-  return (codeUnit >= 0x30 && codeUnit <= 0x39) ||
+  return _isAsciiDigit(codeUnit) ||
       (codeUnit >= 0x41 && codeUnit <= 0x5A) ||
       (codeUnit >= 0x61 && codeUnit <= 0x7A);
 }
 
+bool _isClosingOrSentencePunctuation(int codeUnit) {
+  return codeUnit == 0x21 ||
+      codeUnit == 0x22 ||
+      codeUnit == 0x27 ||
+      codeUnit == 0x29 ||
+      codeUnit == 0x2C ||
+      codeUnit == 0x2E ||
+      codeUnit == 0x3A ||
+      codeUnit == 0x3B ||
+      codeUnit == 0x3F ||
+      codeUnit == 0x5D ||
+      codeUnit == 0x7D ||
+      _isUnicodePunctuation(codeUnit);
+}
+
+bool _isAsciiPunctuation(int codeUnit) {
+  return (codeUnit >= 0x21 && codeUnit <= 0x2F) ||
+      (codeUnit >= 0x3A && codeUnit <= 0x40) ||
+      (codeUnit >= 0x5B && codeUnit <= 0x60) ||
+      (codeUnit >= 0x7B && codeUnit <= 0x7E);
+}
+
+bool _isUnicodePunctuation(int codeUnit) {
+  return (codeUnit >= 0x2000 && codeUnit <= 0x206F) ||
+      (codeUnit >= 0x3000 && codeUnit <= 0x303F) ||
+      (codeUnit >= 0xFE10 && codeUnit <= 0xFE1F) ||
+      (codeUnit >= 0xFE30 && codeUnit <= 0xFE4F) ||
+      (codeUnit >= 0xFF01 && codeUnit <= 0xFF0F) ||
+      (codeUnit >= 0xFF1A && codeUnit <= 0xFF20) ||
+      (codeUnit >= 0xFF3B && codeUnit <= 0xFF40) ||
+      (codeUnit >= 0xFF5B && codeUnit <= 0xFF65);
+}
+
+bool _isCjkCodeUnit(int codeUnit) {
+  return (codeUnit >= 0x3400 && codeUnit <= 0x4DBF) ||
+      (codeUnit >= 0x4E00 && codeUnit <= 0x9FFF) ||
+      (codeUnit >= 0xF900 && codeUnit <= 0xFAFF);
+}
+
 String _normalizeMathTex(String tex) {
-  return tex.replaceAllMapped(RegExp(r'\\\|([\s\S]*?)\\\|'), (match) {
+  final escapedSpecials = _escapeInlineMathSpecials(tex);
+  final normalizedBraces = _escapeLikelyLiteralMathBraces(escapedSpecials);
+  return normalizedBraces.replaceAllMapped(RegExp(r'\\\|([\s\S]*?)\\\|'), (
+    match,
+  ) {
     final body = match.group(1) ?? '';
     return r'\lVert '
         '$body'
         r' \rVert';
   });
+}
+
+String _escapeInlineMathSpecials(String tex) {
+  final buf = StringBuffer();
+  for (var i = 0; i < tex.length; i++) {
+    final ch = tex.codeUnitAt(i);
+    if (ch == 0x23 && !_isEscaped(tex, i)) {
+      buf.write(r'\#');
+    } else {
+      buf.writeCharCode(ch);
+    }
+  }
+  return buf.toString();
+}
+
+String _escapeLikelyLiteralMathBraces(String tex) {
+  final escapeOpens = <int>{};
+  final escapeCloses = <int>{};
+  final stack = <int>[];
+
+  for (var i = 0; i < tex.length; i++) {
+    final ch = tex.codeUnitAt(i);
+    if (ch == 0x5C) {
+      i++;
+      continue;
+    }
+    if (ch == 0x7B) {
+      stack.add(i);
+      continue;
+    }
+    if (ch != 0x7D || stack.isEmpty) continue;
+
+    final open = stack.removeLast();
+    if (stack.isNotEmpty) continue;
+    if (_looksLikeLiteralMathBraceGroup(tex, open, i)) {
+      escapeOpens.add(open);
+      escapeCloses.add(i);
+    }
+  }
+
+  if (escapeOpens.isEmpty) return tex;
+  final buf = StringBuffer();
+  for (var i = 0; i < tex.length; i++) {
+    if (escapeOpens.contains(i)) {
+      buf.write(r'\{');
+    } else if (escapeCloses.contains(i)) {
+      buf.write(r'\}');
+    } else {
+      buf.writeCharCode(tex.codeUnitAt(i));
+    }
+  }
+  return buf.toString();
+}
+
+bool _looksLikeLiteralMathBraceGroup(String tex, int open, int close) {
+  if (_isCommandArgumentBrace(tex, open) || _isScriptArgumentBrace(tex, open)) {
+    return false;
+  }
+  if (!_hasLiteralBraceBoundaryBefore(tex, open)) return false;
+
+  final body = tex.substring(open + 1, close).trim();
+  if (body.isEmpty) return true;
+  if (body.startsWith(r'\')) return false;
+  if (_nextNonWhitespaceCodeUnit(tex, close + 1) == 0x5F &&
+      body.contains('_')) {
+    return true;
+  }
+  return body.contains(',') ||
+      body.contains(':') ||
+      body.contains(';') ||
+      body.contains(r'\in') ||
+      body.contains(r'\notin') ||
+      body.contains(r'\mid') ||
+      body.contains('|');
+}
+
+bool _isCommandArgumentBrace(String tex, int open) {
+  final prev = _previousNonWhitespaceIndex(tex, open - 1);
+  if (prev == -1) return false;
+
+  if (tex.codeUnitAt(prev) == 0x5D) {
+    final optionalOpen = _findMatchingOpenBracket(tex, prev);
+    if (optionalOpen != -1) {
+      final beforeOptional = _previousNonWhitespaceIndex(tex, optionalOpen - 1);
+      if (beforeOptional != -1 && _endsControlWordAt(tex, beforeOptional)) {
+        return true;
+      }
+    }
+  }
+
+  return _endsControlWordAt(tex, prev);
+}
+
+bool _isScriptArgumentBrace(String tex, int open) {
+  final prev = _previousNonWhitespaceIndex(tex, open - 1);
+  if (prev == -1) return false;
+  final ch = tex.codeUnitAt(prev);
+  return ch == 0x5E || ch == 0x5F;
+}
+
+bool _hasLiteralBraceBoundaryBefore(String tex, int open) {
+  final prev = _previousNonWhitespaceIndex(tex, open - 1);
+  if (prev == -1) return true;
+  final ch = tex.codeUnitAt(prev);
+  if (ch == 0x5C || ch == 0x5E || ch == 0x5F || ch == 0x7D) return false;
+  if (_isAsciiLetterOrDigit(ch)) return false;
+  return true;
+}
+
+int _previousNonWhitespaceIndex(String input, int index) {
+  for (var i = index; i >= 0; i--) {
+    if (!_isWhitespaceCodeUnit(input.codeUnitAt(i))) return i;
+  }
+  return -1;
+}
+
+int _nextNonWhitespaceCodeUnit(String input, int index) {
+  for (var i = index; i < input.length; i++) {
+    final ch = input.codeUnitAt(i);
+    if (!_isWhitespaceCodeUnit(ch)) return ch;
+  }
+  return -1;
+}
+
+bool _endsControlWordAt(String tex, int index) {
+  if (index < 0 || index >= tex.length) return false;
+  var start = index;
+  while (start >= 0 && _isAsciiLetter(tex.codeUnitAt(start))) {
+    start--;
+  }
+  return start < index && start >= 0 && tex.codeUnitAt(start) == 0x5C;
+}
+
+bool _isAsciiLetter(int codeUnit) {
+  return (codeUnit >= 0x41 && codeUnit <= 0x5A) ||
+      (codeUnit >= 0x61 && codeUnit <= 0x7A);
+}
+
+int _findMatchingOpenBracket(String tex, int close) {
+  var depth = 0;
+  for (var i = close; i >= 0; i--) {
+    final ch = tex.codeUnitAt(i);
+    if (ch == 0x5C) {
+      i--;
+      continue;
+    }
+    if (ch == 0x5D) {
+      depth++;
+    } else if (ch == 0x5B) {
+      depth--;
+      if (depth == 0) return i;
+    }
+  }
+  return -1;
 }
 
 String _softBreakInline(String input) {
@@ -1417,6 +1957,8 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
     final borderColor = _codeBlockBorderColor(cs, isDark);
     final isEffectivelyExpanded = _isEffectivelyExpanded(settings);
     final isCollapsed = !isEffectivelyExpanded;
+    final showCollapsedTailFade =
+        isCollapsed && _hasCollapsedHiddenLines(settings);
 
     return Container(
       width: double.infinity,
@@ -1442,15 +1984,29 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
             child: Row(
               children: [
                 Expanded(
-                  child: Text(
-                    _displayLanguage(context, widget.language),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: cs.onSurfaceVariant.withValues(alpha: 0.72),
-                      height: 1.0,
+                  child: _CodeBlockHeaderToggle(
+                    expanded: isEffectivelyExpanded,
+                    onTap: () => _toggleExpanded(settings),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            _displayLanguage(context, widget.language),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: AppFontWeights.medium,
+                              color: cs.onSurfaceVariant.withValues(
+                                alpha: 0.72,
+                              ),
+                              height: 1.0,
+                            ),
+                          ),
+                        ),
+                        _CodeBlockCollapseIcon(collapsed: isCollapsed),
+                      ],
                     ),
                   ),
                 ),
@@ -1491,29 +2047,32 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
             width: double.infinity,
             color: bodyBg,
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+            child: Stack(
               children: [
-                AnimatedSize(
-                  duration: const Duration(milliseconds: 220),
-                  curve: Curves.easeOutCubic,
-                  alignment: Alignment.topLeft,
-                  clipBehavior: Clip.hardEdge,
-                  child: buildCodeView(
-                    isCollapsed
-                        ? _collapsedHighlightedCode(settings)
-                        : _trimTrailingNewlines(widget.code),
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                      alignment: Alignment.topLeft,
+                      clipBehavior: Clip.hardEdge,
+                      child: buildCodeView(
+                        isCollapsed
+                            ? _collapsedHighlightedCode(settings)
+                            : _trimTrailingNewlines(widget.code),
+                      ),
+                    ),
+                  ],
                 ),
-                if (_shouldShowFoldControl(settings)) ...[
-                  const SizedBox(height: 4),
-                  _CodeBlockFoldControl(
-                    expanded: isEffectivelyExpanded,
-                    onTap: () => _toggleExpanded(settings),
-                    textStyle: codeTextStyle,
+                if (showCollapsedTailFade)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: _CodeBlockCollapsedTailFade(color: bodyBg),
                   ),
-                ],
               ],
             ),
           ),
@@ -1522,9 +2081,20 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
     );
   }
 
+  bool _hasCollapsedHiddenLines(SettingsProvider settings) {
+    return _exceedsLineThreshold(
+      widget.code,
+      _collapsedVisibleLineCount(settings),
+    );
+  }
+
+  int _collapsedVisibleLineCount(SettingsProvider settings) {
+    return settings.autoCollapseCodeBlockLines.clamp(1, 999999);
+  }
+
   bool _isEffectivelyExpanded(SettingsProvider settings) {
-    if (!settings.autoCollapseCodeBlock) return true;
     if (_manuallyToggled) return _expanded;
+    if (!settings.autoCollapseCodeBlock) return true;
     return !_exceedsLineThreshold(
       widget.code,
       settings.autoCollapseCodeBlockLines,
@@ -1635,16 +2205,8 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
     }
   }
 
-  bool _shouldShowFoldControl(SettingsProvider settings) {
-    if (!settings.autoCollapseCodeBlock) return false;
-    return _exceedsLineThreshold(
-      widget.code,
-      settings.autoCollapseCodeBlockLines,
-    );
-  }
-
   String _collapsedHighlightedCode(SettingsProvider settings) {
-    final visibleLines = settings.autoCollapseCodeBlockLines.clamp(1, 999999);
+    final visibleLines = _collapsedVisibleLineCount(settings);
     final trimmed = _trimTrailingNewlines(widget.code);
     if (trimmed.isEmpty) return trimmed;
     return trimmed.split(RegExp(r'\r\n|\r|\n')).take(visibleLines).join('\n');
@@ -1701,6 +2263,35 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
     if (s.isEmpty) return s;
     final end = _trimTrailingNewlinesEndIndex(s);
     return end == s.length ? s : s.substring(0, end);
+  }
+}
+
+class _CodeBlockCollapsedTailFade extends StatelessWidget {
+  const _CodeBlockCollapsedTailFade({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: SizedBox(
+        key: const ValueKey('code-block-collapsed-tail-fade'),
+        height: 24,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                color.withValues(alpha: 0),
+                color.withValues(alpha: 0.72),
+                color,
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -1771,6 +2362,88 @@ typedef MermaidBitmapRenderOverride =
 @visibleForTesting
 MermaidBitmapRenderOverride? debugMermaidBitmapRenderOverride;
 
+class _CodeBlockHeaderToggle extends StatelessWidget {
+  const _CodeBlockHeaderToggle({
+    required this.expanded,
+    required this.onTap,
+    required this.child,
+  });
+
+  final bool expanded;
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final label = expanded
+        ? l10n.codeBlockCollapseButton
+        : l10n.codeBlockExpandButton;
+
+    return SelectionContainer.disabled(
+      child: Semantics(
+        button: true,
+        label: label,
+        onTap: onTap,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: Listener(
+            behavior: HitTestBehavior.opaque,
+            onPointerDown: (_) => onTap(),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CodeBlockCollapseIcon extends StatelessWidget {
+  const _CodeBlockCollapseIcon({required this.collapsed});
+
+  final bool collapsed;
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.maybeOf(context);
+    final reduceMotion =
+        (media?.disableAnimations ?? false) ||
+        (media?.accessibleNavigation ?? false);
+    final duration = reduceMotion
+        ? Duration.zero
+        : const Duration(milliseconds: 160);
+    final cs = Theme.of(context).colorScheme;
+
+    return AnimatedSwitcher(
+      key: const ValueKey('code-block-collapse-icon-switcher'),
+      duration: duration,
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) {
+        return FadeTransition(opacity: animation, child: child);
+      },
+      child: collapsed
+          ? Row(
+              key: const ValueKey('code-block-collapse-icon-visible'),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(width: 4),
+                Icon(
+                  Lucide.ChevronRight,
+                  size: 14,
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.56),
+                ),
+              ],
+            )
+          : const SizedBox(
+              key: ValueKey('code-block-collapse-icon-hidden'),
+              width: 0,
+              height: 14,
+            ),
+    );
+  }
+}
+
 class _CodeBlockIconAction extends StatelessWidget {
   const _CodeBlockIconAction({
     required this.icon,
@@ -1798,57 +2471,6 @@ class _CodeBlockIconAction extends StatelessWidget {
           size: 16,
           padding: const EdgeInsets.all(4),
           color: color,
-        ),
-      ),
-    );
-  }
-}
-
-class _CodeBlockFoldControl extends StatelessWidget {
-  const _CodeBlockFoldControl({
-    required this.expanded,
-    required this.onTap,
-    required this.textStyle,
-  });
-
-  final bool expanded;
-  final VoidCallback onTap;
-  final TextStyle textStyle;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
-    final label = expanded
-        ? l10n.codeBlockCollapseButton
-        : l10n.codeBlockExpandButton;
-
-    return SelectionContainer.disabled(
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Listener(
-          behavior: HitTestBehavior.opaque,
-          onPointerDown: (_) => onTap(),
-          child: SizedBox(
-            width: double.infinity,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      expanded ? Lucide.ChevronUp : Lucide.ChevronDown,
-                      size: (textStyle.fontSize ?? 13) * 1.18,
-                      color: cs.onSurfaceVariant.withValues(alpha: 0.5),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(label, style: textStyle.copyWith(color: cs.onSurface)),
-                  ],
-                ),
-              ),
-            ),
-          ),
         ),
       ),
     );
@@ -2430,7 +3052,7 @@ class _MarkdownTableCell extends StatelessWidget {
     final baseStyle = style.copyWith(
       fontSize: header ? 13.0 : 13.5,
       height: 1.42,
-      fontWeight: header ? FontWeight.w600 : FontWeight.w400,
+      fontWeight: header ? AppFontWeights.semibold : AppFontWeights.regular,
       color: header ? cs.onSurface : cs.onSurface.withValues(alpha: 0.90),
       fontFamily: appFontFamily ?? style.fontFamily,
     );
@@ -2540,7 +3162,7 @@ class _MarkdownTableToolbar extends StatelessWidget {
               style: TextStyle(
                 color: cs.onSurfaceVariant.withValues(alpha: 0.80),
                 fontSize: 12,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeights.semibold,
                 height: 1.0,
               ),
             ),
@@ -3048,11 +3670,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
         isDark ? atomOneDarkReasonableTheme : githubTheme,
       ),
       padding: EdgeInsets.zero,
-      textStyle: const TextStyle(
-        fontFamily: 'monospace',
-        fontSize: 13,
-        height: 1.5,
-      ),
+      textStyle: TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.5),
     );
 
     return Padding(
@@ -3494,8 +4112,8 @@ class _MermaidTabButtonState extends State<_MermaidTabButton> {
                   fontSize: 13,
                   height: 1.35,
                   fontWeight: widget.selected
-                      ? FontWeight.w600
-                      : FontWeight.w500,
+                      ? AppFontWeights.semibold
+                      : AppFontWeights.medium,
                   color: widget.selected
                       ? widget.colors.textPrimary
                       : widget.colors.textSecondary,
@@ -3820,7 +4438,7 @@ class AtxHeadingMd extends BlockMd {
     final lvl = hashes.length;
     final level = lvl < 1 ? 1 : (lvl > 6 ? 6 : lvl);
 
-    final innerCfg = config.copyWith(style: const TextStyle());
+    final innerCfg = config.copyWith(style: TextStyle());
     final inner = TextSpan(
       children: MarkdownComponent.generate(context, raw, innerCfg, true),
     );
@@ -3871,28 +4489,28 @@ class AtxHeadingMd extends BlockMd {
     // Explicit sizes ensure visible contrast over the body (16.0)
     switch (level) {
       case 1:
-        base = const TextStyle(fontSize: 24);
+        base = TextStyle(fontSize: 24);
         break;
       case 2:
-        base = const TextStyle(fontSize: 20);
+        base = TextStyle(fontSize: 20);
         break;
       case 3:
-        base = const TextStyle(fontSize: 18);
+        base = TextStyle(fontSize: 18);
         break;
       case 4:
-        base = const TextStyle(fontSize: 16);
+        base = TextStyle(fontSize: 16);
         break;
       case 5:
-        base = const TextStyle(fontSize: 15);
+        base = TextStyle(fontSize: 15);
         break;
       default:
-        base = const TextStyle(fontSize: 14);
+        base = TextStyle(fontSize: 14);
     }
     final weight = switch (level) {
-      1 => FontWeight.w700,
-      2 => FontWeight.w600,
-      3 => FontWeight.w600,
-      _ => FontWeight.w500,
+      1 => AppFontWeights.strong,
+      2 => AppFontWeights.semibold,
+      3 => AppFontWeights.semibold,
+      _ => AppFontWeights.medium,
     };
     final ls = switch (level) {
       1 => isZh ? 0.0 : 0.1,
@@ -3928,7 +4546,7 @@ class SetextHeadingMd extends BlockMd {
     final underline = (m.group(2) ?? '').trim();
     final level = underline.startsWith('=') ? 1 : 2;
 
-    final innerCfg = config.copyWith(style: const TextStyle());
+    final innerCfg = config.copyWith(style: TextStyle());
     final inner = TextSpan(
       children: MarkdownComponent.generate(context, title, innerCfg, true),
     );
@@ -3977,14 +4595,13 @@ class LabelValueLineMd extends InlineMd {
     final t = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
     // 继承基础样式，确保字间距/行高一致
-    final base =
-        (config.style ?? t.bodyMedium ?? const TextStyle(fontSize: 14));
+    final base = (config.style ?? t.bodyMedium ?? TextStyle(fontSize: 14));
     final labelStyle = base.copyWith(
-      fontWeight: FontWeight.w700, // 与 ** 加粗视觉一致
+      fontWeight: AppFontWeights.strong,
       color: cs.onSurface,
     );
     final valueStyle = base.copyWith(
-      fontWeight: FontWeight.w400,
+      fontWeight: AppFontWeights.regular,
       color: cs.onSurface.withValues(alpha: 0.92),
     );
 
@@ -4007,7 +4624,7 @@ class LabelValueLineMd extends InlineMd {
   }
 }
 
-// Modern, app-styled block quote with soft background and accent border
+// Minimal block quote with a neutral rounded leading line.
 class ModernBlockQuote extends InlineMd {
   @override
   bool get inline => false;
@@ -4032,10 +4649,12 @@ class ModernBlockQuote extends InlineMd {
       }
     }
     final data = _unmaskBlockquoteFenceMarkers(sb.toString().trim());
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = cs.primaryContainer.withValues(alpha: isDark ? 0.18 : 0.12);
-    final accent = cs.primary.withValues(alpha: isDark ? 0.90 : 0.80);
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final lineColor = cs.onSurfaceVariant.withValues(
+      alpha: isDark ? 0.48 : 0.36,
+    );
     final innerComponents =
         (config.components ?? MarkdownComponent.globalComponents)
             .where((component) => component is! CodeBlockMd)
@@ -4056,14 +4675,30 @@ class ModernBlockQuote extends InlineMd {
       child: Container(
         key: const ValueKey('markdown-blockquote'),
         margin: const EdgeInsets.symmetric(vertical: 6),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border(left: BorderSide(color: accent, width: 3)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-          child: innerMarkdown,
+        child: Stack(
+          children: [
+            PositionedDirectional(
+              start: 0,
+              top: 2,
+              bottom: 2,
+              width: 3,
+              child: DecoratedBox(
+                key: const ValueKey('markdown-blockquote-line'),
+                decoration: BoxDecoration(
+                  color: lineColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsetsDirectional.only(
+                start: 13,
+                top: 2,
+                bottom: 2,
+              ),
+              child: innerMarkdown,
+            ),
+          ],
         ),
       ),
     );
@@ -4192,7 +4827,7 @@ class ModernCheckBoxMd extends BlockMd {
     final content = match?[2] ?? '';
     final cs = Theme.of(context).colorScheme;
 
-    final contentStyle = (config.style ?? const TextStyle()).copyWith(
+    final contentStyle = (config.style ?? TextStyle()).copyWith(
       decoration: checked ? TextDecoration.lineThrough : null,
       color: (config.style?.color ?? cs.onSurface).withValues(
         alpha: checked ? 0.75 : 1.0,
@@ -4252,7 +4887,7 @@ class ModernRadioMd extends BlockMd {
     final content = match?[2] ?? '';
     final cs = Theme.of(context).colorScheme;
 
-    final contentStyle = (config.style ?? const TextStyle()).copyWith(
+    final contentStyle = (config.style ?? TextStyle()).copyWith(
       color: (config.style?.color ?? cs.onSurface).withValues(
         alpha: selected ? 0.95 : 1.0,
       ),
@@ -4305,10 +4940,133 @@ class ModernRadioMd extends BlockMd {
   }
 }
 
+class EscapeAwareTableMd extends TableMd {
+  @override
+  Widget build(
+    BuildContext context,
+    String text,
+    final GptMarkdownConfig config,
+  ) {
+    final value = text
+        .trim()
+        .split('\n')
+        .where((line) => line.trim().isNotEmpty)
+        .map<Map<int, String>>(
+          (line) => _splitMarkdownTableLine(line.trim()).asMap(),
+        )
+        .toList();
+
+    if (value.isEmpty) return Text('', style: config.style);
+
+    final hasHeader = value.length >= 2;
+    final columnAlignments = <TextAlign>[];
+
+    if (hasHeader) {
+      final separatorRow = value[1];
+      for (var index = 0; index < separatorRow.length; index++) {
+        final separator = (separatorRow[index] ?? '').trim();
+        final hasLeftColon = separator.startsWith(':');
+        final hasRightColon = separator.endsWith(':');
+
+        if (hasLeftColon && hasRightColon) {
+          columnAlignments.add(TextAlign.center);
+        } else if (hasRightColon) {
+          columnAlignments.add(TextAlign.right);
+        } else {
+          columnAlignments.add(TextAlign.left);
+        }
+      }
+    }
+
+    var maxCol = 0;
+    for (final row in value) {
+      if (maxCol < row.length) maxCol = row.length;
+    }
+    if (maxCol == 0) return Text('', style: config.style);
+
+    while (columnAlignments.length < maxCol) {
+      columnAlignments.add(TextAlign.left);
+    }
+
+    final tableBuilder = config.tableBuilder;
+    if (tableBuilder == null) {
+      return super.build(context, text, config);
+    }
+
+    final customTable = List<CustomTableRow?>.generate(value.length, (
+      rowIndex,
+    ) {
+      if (hasHeader && rowIndex == 1) return null;
+      final row = value[rowIndex];
+      if (row.isEmpty) return null;
+
+      final fields = List<CustomTableField>.generate(maxCol, (fieldIndex) {
+        return CustomTableField(
+          data: row[fieldIndex] ?? '',
+          alignment: columnAlignments[fieldIndex],
+        );
+      });
+      return CustomTableRow(isHeader: rowIndex == 0, fields: fields);
+    }).nonNulls.toList();
+
+    return tableBuilder(
+      context,
+      customTable,
+      config.style ?? const TextStyle(),
+      config,
+    );
+  }
+}
+
 // Prevent link regex from spanning across lines (dotAll=true in engine).
 class LineSafeLinkMd extends ATagMd {
   @override
-  RegExp get exp => RegExp(r"(?<!\!)\[[^\]\n]+\]\([^\s]*\)");
+  RegExp get exp =>
+      RegExp(r"(?<!\\)(?<!\!)\[[^\]\n]+(?<!\\)\]\([^\s\n]*(?<!\\)\)");
+}
+
+class EscapeAwareImageMd extends ImageMd {
+  @override
+  RegExp get exp =>
+      RegExp(r"(?<!\\)\!\[[^\[\]\n]*(?<!\\)\]\([^\s\n]*(?<!\\)\)");
+}
+
+class EscapeAwareBoldMd extends BoldMd {
+  @override
+  RegExp get exp =>
+      RegExp(r"(?<![\\*])\*\*(?!\s)(.+?)(?<![\s\\])\*\*(?!\*)", dotAll: true);
+
+  @override
+  InlineSpan span(BuildContext context, String text, GptMarkdownConfig config) {
+    final match = exp.firstMatch(text.trim());
+    final conf = config.copyWith(
+      style:
+          config.style?.copyWith(fontWeight: AppFontWeights.strong) ??
+          TextStyle(fontWeight: AppFontWeights.strong),
+    );
+    return TextSpan(
+      children: MarkdownComponent.generate(
+        context,
+        '${match?[1]}',
+        conf,
+        false,
+      ),
+      style: conf.style,
+    );
+  }
+}
+
+class EscapeAwareItalicMd extends ItalicMd {
+  @override
+  RegExp get exp => RegExp(
+    r"(?<![\\*])\*(?!\*)(?!\s)(.+?)(?<![\s\\*])\*(?!\*)",
+    dotAll: true,
+  );
+}
+
+class EscapeAwareHighlightedTextMd extends HighlightedText {
+  @override
+  RegExp get exp => RegExp(r"(?<!\\)`(?!`)(.+?)(?<![\\`])`(?!`)");
 }
 
 /// Treat backslash-escaped punctuation as a literal character, so that
@@ -4322,7 +5080,7 @@ class BackslashEscapeMd extends InlineMd {
   // CommonMark escape set (subset), excluding parentheses to keep LaTeX intact.
   // Matches a backslash followed by one escapable punctuation character.
   // Include $ so \$ in regular text renders as literal dollar sign.
-  RegExp get exp => RegExp(r"\\([\\`*_{}\[\]#+\-.!$])");
+  RegExp get exp => RegExp(r"\\([\\`*_{}\[\]#+\-.!$|])");
 
   @override
   InlineSpan span(BuildContext context, String text, GptMarkdownConfig config) {
@@ -4423,11 +5181,11 @@ class _DetailsHtmlBlockState extends State<_DetailsHtmlBlock> {
     final borderColor = cs.outlineVariant.withValues(
       alpha: isDark ? 0.18 : 0.30,
     );
-    final summaryStyle = (widget.config.style ?? const TextStyle()).copyWith(
+    final summaryStyle = (widget.config.style ?? TextStyle()).copyWith(
       color: cs.onSurface,
-      fontWeight: FontWeight.w500,
+      fontWeight: AppFontWeights.medium,
     );
-    final bodyStyle = (widget.config.style ?? const TextStyle()).copyWith(
+    final bodyStyle = (widget.config.style ?? TextStyle()).copyWith(
       color: cs.onSurface,
     );
     final bodyConfig = widget.config.copyWith(style: bodyStyle);
@@ -4493,7 +5251,7 @@ class _DetailsHtmlBlockState extends State<_DetailsHtmlBlock> {
                 opacity: animation,
                 child: SizeTransition(
                   sizeFactor: animation,
-                  axisAlignment: -1,
+                  alignment: const AlignmentDirectional(-1.0, -1.0),
                   child: child,
                 ),
               );
@@ -4554,7 +5312,7 @@ class HtmlAnchorMd extends InlineMd {
         onTap: url.isEmpty ? null : () => config.onLinkTap?.call(url, linkText),
         child: Text(
           linkText,
-          style: (config.style ?? const TextStyle()).copyWith(
+          style: (config.style ?? TextStyle()).copyWith(
             color: cs.primary,
             decoration: TextDecoration.none,
           ),

@@ -37,10 +37,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPageColorMode => 'Color Mode';
 
   @override
-  String get settingsPageDisplay => 'Display';
+  String get settingsPageDisplay => 'Preferences';
 
   @override
-  String get settingsPageDisplaySubtitle => 'Appearance and text size';
+  String get settingsPageDisplaySubtitle =>
+      'Appearance, behavior, and interaction preferences';
 
   @override
   String get settingsPageAssistant => 'Assistant';
@@ -265,7 +266,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPageLogs => 'Logs';
 
   @override
-  String get settingsPageSponsor => 'Sponsor';
+  String get settingsPageSponsor => 'Sponsor Kelivo';
 
   @override
   String get settingsPageShare => 'Share';
@@ -956,6 +957,113 @@ class AppLocalizationsEn extends AppLocalizations {
       'Background Generation (Android)';
 
   @override
+  String get displaySettingsPageIosBackgroundChatTitle =>
+      'Background Generation (iOS)';
+
+  @override
+  String get iosBackgroundSettingsPageTitle => 'iOS Background Generation';
+
+  @override
+  String get iosBackgroundStatusOn => 'On';
+
+  @override
+  String get iosBackgroundStatusOff => 'Off';
+
+  @override
+  String get iosBackgroundGenerationEnableTitle => 'Background Generation';
+
+  @override
+  String get iosBackgroundGenerationEnableSubtitle =>
+      'Use iOS background time to keep the current reply running after the app leaves the foreground.';
+
+  @override
+  String get iosBackgroundTaskRefreshTitle => 'Background Task Recovery';
+
+  @override
+  String get iosBackgroundTaskRefreshSubtitle =>
+      'Ask iOS for refresh and processing opportunities when system conditions allow.';
+
+  @override
+  String get iosLiveActivityTitle => 'Live Activity';
+
+  @override
+  String get iosLiveActivitySubtitle =>
+      'Show background replies on the Lock Screen and Dynamic Island when supported.';
+
+  @override
+  String get iosBackgroundNotificationsTitle => 'Task Notifications';
+
+  @override
+  String get iosBackgroundNotificationsSubtitle =>
+      'Send a local notification when a background reply completes or is interrupted.';
+
+  @override
+  String get iosBackgroundLimitNoticeTitle => 'iOS may still suspend work';
+
+  @override
+  String get iosBackgroundLimitNoticeBody =>
+      'These options use Apple-supported background time, BackgroundTasks, notifications, and Live Activities. They improve continuity but cannot force iOS to keep JO-Kelivo running forever.';
+
+  @override
+  String get iosBackgroundUnsupportedLiveActivity =>
+      'Requires iOS 16.1 or later and Live Activities enabled in Settings.';
+
+  @override
+  String get iosBackgroundNativeStatusTitle => 'System status';
+
+  @override
+  String get iosBackgroundNativeStatusUnavailable =>
+      'Unavailable until running on iOS';
+
+  @override
+  String get iosBackgroundLiveActivityAvailable => 'Live Activities available';
+
+  @override
+  String get iosBackgroundLiveActivityUnavailable =>
+      'Live Activities unavailable';
+
+  @override
+  String get iosBackgroundNotificationsAuthorized => 'Notifications allowed';
+
+  @override
+  String get iosBackgroundNotificationsNotAuthorized =>
+      'Notifications not allowed';
+
+  @override
+  String get iosBackgroundGenerationActiveTitle => 'JO-Kelivo is generating';
+
+  @override
+  String get iosBackgroundGenerationActiveDetail =>
+      'The assistant is replying in the background';
+
+  @override
+  String get iosBackgroundGenerationStreamingDetail =>
+      'Receiving assistant response';
+
+  @override
+  String iosBackgroundGenerationTokenCount(int count) {
+    return '$count tokens';
+  }
+
+  @override
+  String get iosBackgroundGenerationCompleteTitle => 'Generation complete';
+
+  @override
+  String get iosBackgroundGenerationCompleteDetail =>
+      'Assistant reply is ready';
+
+  @override
+  String get iosBackgroundGenerationInterruptedTitle =>
+      'Generation interrupted';
+
+  @override
+  String get iosBackgroundGenerationInterruptedDetail =>
+      'The background reply stopped before completion';
+
+  @override
+  String get iosBackgroundGenerationCancelledDetail => 'Generation stopped';
+
+  @override
   String get androidBackgroundStatusOn => 'On';
 
   @override
@@ -981,7 +1089,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Assistant reply has been generated';
 
   @override
-  String get androidBackgroundNotificationTitle => 'Kelivo is running';
+  String get androidBackgroundNotificationTitle => 'JO-Kelivo is running';
 
   @override
   String get androidBackgroundNotificationText =>
@@ -1467,19 +1575,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageExportToFile => 'Export to File';
 
   @override
-  String get backupPageExportKelivoBackup => 'Export as Kelivo Backup';
+  String get backupPageExportToFileSubtitle => 'Export app data to a file';
 
   @override
-  String get backupPageExportToFileSubtitle => 'Export app data to a file';
+  String get backupPageExportKelivoBackup => 'Export as Kelivo Backup';
 
   @override
   String get backupPageImportBackupFile => 'Import Backup File';
 
   @override
+  String get backupPageImportBackupFileSubtitle => 'Import a local backup file';
+
+  @override
   String get backupPageImportKelivoBackup => 'Import from Kelivo Backup';
 
   @override
-  String get backupPageImportBackupFileSubtitle => 'Import a local backup file';
+  String get backupPageOpenUserDataDirectory => 'Open User Data Directory';
+
+  @override
+  String get backupPageOpenUserDataFailed =>
+      'Failed to open user data directory';
+
+  @override
+  String get backupPageUserDataDirectoryTitle => 'User Data Directory';
+
+  @override
+  String get backupPageUserDataDirectoryDescription =>
+      'Open the main app data folder for chat data, uploads, images, avatars, cache, and logs.';
 
   @override
   String get backupPageImportFromOtherApps => 'Import from Other Apps';
@@ -1506,7 +1628,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageDeleteConfirmTitle => 'Confirm Deletion';
 
   @override
-  String backupPageDeleteConfirmContent(String name) {
+  String backupPageDeleteConfirmContent(Object name) {
     return 'Are you sure you want to delete remote backup \"$name\"? This action cannot be undone.';
   }
 
@@ -1557,20 +1679,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupPageLocalBackup => 'Local Backup';
-
-  @override
-  String get backupPageUserDataDirectoryTitle => 'User Data Directory';
-
-  @override
-  String get backupPageUserDataDirectoryDescription =>
-      'Open the main directory for chats, files, images, avatars, cache, and logs.';
-
-  @override
-  String get backupPageOpenUserDataDirectory => 'Open User Data Directory';
-
-  @override
-  String get backupPageOpenUserDataFailed =>
-      'Failed to open user data directory';
 
   @override
   String get backupPageImportFromCherryStudio => 'Import from Cherry Studio';
@@ -1856,19 +1964,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageMoreSheetShare => 'Share';
 
   @override
+  String get messageMoreSheetSelectMessages => 'Select Messages';
+
+  @override
   String get messageMoreSheetCreateBranch => 'Create Branch';
-
-  @override
-  String get messageMoreSheetDelete => 'Delete This Version';
-
-  @override
-  String get messageMoreSheetDeleteAllVersions => 'Delete All Versions';
 
   @override
   String get messageMoreSheetSwitchToUser => 'Switch to User';
 
   @override
   String get messageMoreSheetSwitchToAssistant => 'Switch to Model';
+
+  @override
+  String get messageMoreSheetDelete => 'Delete This Version';
+
+  @override
+  String get messageMoreSheetDeleteAllVersions => 'Delete All Versions';
 
   @override
   String get reasoningBudgetSheetOff => 'Off';
@@ -1976,6 +2087,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get chatMessageWidgetSearchResultsTitle => 'Search results';
+
+  @override
+  String get chatMessageWidgetCitationSourcesTitle => 'Citation sources';
+
+  @override
   String get chatMessageWidgetRegenerateTooltip => 'Regenerate';
 
   @override
@@ -2035,6 +2152,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatMessageWidgetWriteClipboard => 'Write Clipboard';
 
   @override
+  String get chatMessageWidgetSpeakingTitle => 'Speaking:';
+
+  @override
+  String chatMessageWidgetSpeakText(String text) {
+    return 'Speaking: $text';
+  }
+
+  @override
   String chatMessageWidgetToolCall(String name) {
     return 'Tool Call: $name';
   }
@@ -2058,7 +2183,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String chatMessageWidgetCitationsCount(int count) {
-    return 'Citations ($count)';
+    return '$count citations';
   }
 
   @override
@@ -2080,6 +2205,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatSelectionThinkingContent => 'Thinking content';
+
+  @override
+  String get chatSelectionDeleteSelected => 'Delete Selected';
+
+  @override
+  String get chatSelectionSelectMessagesToDelete =>
+      'Please select messages to delete';
+
+  @override
+  String chatSelectionDeleteSelectedConfirm(int count) {
+    return 'Delete $count selected version(s)? This cannot be undone.';
+  }
+
+  @override
+  String chatSelectionDeleteSelectedAllVersionsConfirm(int count) {
+    return 'Delete all versions of $count selected message(s)? This cannot be undone.';
+  }
 
   @override
   String get messageExportSheetAssistant => 'Assistant';
@@ -2134,9 +2276,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get displaySettingsPageAutoCollapseCodeBlockTitle =>
       'Auto-collapse Code Blocks';
-
-  @override
-  String get displaySettingsPageLazyHistoryTitle => 'Lazy-load chat history';
 
   @override
   String get displaySettingsPageAutoCollapseCodeBlockLinesTitle =>
@@ -2415,6 +2554,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatInputBarDisableImageModeTooltip => 'Turn off image mode';
 
   @override
+  String get chatInputBarReplaceImageTooltip => 'Replace image';
+
+  @override
+  String get chatInputBarRemoveImageTooltip => 'Remove image';
+
+  @override
   String get chatInputBarQueuedPending => 'Queued to send';
 
   @override
@@ -2661,6 +2806,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get defaultModelPageOcrModelSubtitle =>
       'Used for extracting text and descriptions from images';
+
+  @override
+  String get defaultModelPageOcrModelRequiresImageInput =>
+      'Select a model tagged with image input for OCR';
 
   @override
   String get defaultModelPagePromptLabel => 'Prompt';
@@ -3002,7 +3151,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get providerDetailPageClaudePromptCachingHelp =>
-      'Adds cache_control to the system prompt for Claude requests through Anthropic or OpenRouter.';
+      'Adds cache_control to Claude requests through Anthropic or OpenRouter.';
+
+  @override
+  String get providerDetailPageClaudePromptCachingTtlTitle => 'Cache TTL';
+
+  @override
+  String get providerDetailPageClaudePromptCachingTtlHelp =>
+      '5 minutes is the default. 1 hour costs more to write but can reduce rebuilds in long conversations.';
+
+  @override
+  String get providerDetailPageClaudePromptCachingTtl5m => '5 min';
+
+  @override
+  String get providerDetailPageClaudePromptCachingTtl1h => '1 hour';
 
   @override
   String get providerDetailPageBalanceTitle => 'Account Balance';
@@ -3011,7 +3173,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providerDetailPageBalanceInfo => 'Get account balance';
 
   @override
-  String get providerDetailPageBalanceApiPathLabel => 'Balance API Path';
+  String get providerDetailPageBalanceApiPathLabel => 'Balance API URL or path';
 
   @override
   String get providerDetailPageBalanceResultPathLabel => 'Result JSON Path';
@@ -3038,6 +3200,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String providerDetailPageBalanceError(String message) {
     return 'Balance query failed: $message';
   }
+
+  @override
+  String get providerDetailPageBalanceFullUrlRequired =>
+      'The main API endpoint is not OpenAI-compatible. Enter a full OpenAI-compatible balance API URL.';
 
   @override
   String get providerDetailPageVertexAiTitle => 'Vertex AI';
@@ -3665,14 +3831,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Display copy, resend, and more buttons below your messages';
 
   @override
-  String get displaySettingsPageSeparateUserMessageImageAttachmentsTitle =>
-      'Separate User Message Images';
-
-  @override
-  String get displaySettingsPageSeparateUserMessageImageAttachmentsSubtitle =>
-      'Show uploaded images below your message bubble instead of inside it';
-
-  @override
   String get displaySettingsPageShowModelNameTimestampTitle =>
       'Show Model Name & Timestamp';
 
@@ -3735,6 +3893,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Insert suggestions without sending';
 
   @override
+  String get displaySettingsPageInsertNewAssistantAtTopTitle =>
+      'Place new and copied assistants at top';
+
+  @override
+  String get displaySettingsPageLazyHistoryTitle => 'Lazy-load chat history';
+
+  @override
+  String get displaySettingsPageDesktopWideChatLayoutTitle => 'Wide chat area';
+
+  @override
+  String get displaySettingsPageDesktopWideChatLayoutSubtitle =>
+      'Use all available width for messages and the input bar in desktop, tablet, or landscape wide-screen layouts.';
+
+  @override
   String get displaySettingsPageShowToolResultSummarySubtitle =>
       'Display the summary text below tool steps';
 
@@ -3780,10 +3952,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle =>
       'Don\'t collapse assistant list when closing sidebar';
-
-  @override
-  String get displaySettingsPageInsertNewAssistantAtTopTitle =>
-      'Place new and copied assistants at top';
 
   @override
   String get displaySettingsPageShowUpdatesTitle => 'Show Updates';
@@ -3888,13 +4056,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get displaySettingsPageNewChatOnLaunchSubtitle =>
       'Automatically create a new chat on launch';
-
-  @override
-  String get displaySettingsPageDesktopWideChatLayoutTitle => 'Wide chat area';
-
-  @override
-  String get displaySettingsPageDesktopWideChatLayoutSubtitle =>
-      'Use all available width for messages and the input bar in desktop, tablet, or landscape wide-screen layouts.';
 
   @override
   String get displaySettingsPageChatFontSizeTitle => 'Chat Font Size';
@@ -4009,6 +4170,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ttsServicesPageTitle => 'Text-to-Speech';
 
   @override
+  String get ttsServicesPageSettingsTooltip => 'TTS settings';
+
+  @override
   String get ttsServicesPageAddTooltip => 'Add';
 
   @override
@@ -4119,6 +4283,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ttsServicesFieldSpeedLabel => 'Speed';
 
   @override
+  String get ttsServicesFieldLanguageTypeLabel => 'Language type';
+
+  @override
+  String get ttsServicesFieldLanguageLabel => 'Language';
+
+  @override
+  String get ttsServicesValidationApiKeyRequired => 'API Key is required';
+
+  @override
   String get ttsServicesViewDetailsButton => 'View details';
 
   @override
@@ -4126,6 +4299,92 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ttsServicesCloseButton => 'Close';
+
+  @override
+  String get ttsSettingsPageTitle => 'TTS Settings';
+
+  @override
+  String get ttsSettingsPlaybackSection => 'Playback';
+
+  @override
+  String get ttsSettingsAutoPlayTitle => 'Auto-play Assistant Replies';
+
+  @override
+  String get ttsSettingsAutoPlayDescription =>
+      'Start TTS automatically after an assistant reply finishes.';
+
+  @override
+  String get ttsSettingsTextSelectionSection => 'Text Selection';
+
+  @override
+  String get ttsSettingsTextSelectionFallbackDescription =>
+      'If no matching text is found, the full reply is played.';
+
+  @override
+  String get ttsSettingsTextSelectionFullTextTitle => 'Full text';
+
+  @override
+  String get ttsSettingsTextSelectionFullTextDescription =>
+      'Play the complete assistant reply.';
+
+  @override
+  String get ttsSettingsTextSelectionQuotedOnlyTitle => 'Quoted text only';
+
+  @override
+  String get ttsSettingsTextSelectionQuotedOnlyDescription =>
+      'Play text inside “”, ‘’, \"\", \'\', 「」, or 『』.';
+
+  @override
+  String get ttsSettingsTextSelectionOutsideParenthesesTitle =>
+      'Outside parentheses';
+
+  @override
+  String get ttsSettingsTextSelectionOutsideParenthesesDescription =>
+      'Skip text inside () and （）.';
+
+  @override
+  String get ttsSettingsTextSelectionItalicOnlyTitle => 'Italic text only';
+
+  @override
+  String get ttsSettingsTextSelectionItalicOnlyDescription =>
+      'Play Markdown or HTML italic text.';
+
+  @override
+  String get ttsSettingsTextSelectionNonItalicTitle => 'Non-italic text only';
+
+  @override
+  String get ttsSettingsTextSelectionNonItalicDescription =>
+      'Skip Markdown or HTML italic text.';
+
+  @override
+  String get ttsFloatingPlayerLabel => 'TTS player';
+
+  @override
+  String get ttsFloatingPauseTooltip => 'Pause';
+
+  @override
+  String get ttsFloatingResumeTooltip => 'Resume';
+
+  @override
+  String get ttsFloatingReplayTooltip => 'Replay';
+
+  @override
+  String get ttsFloatingRewind15Tooltip => 'Back 15 seconds';
+
+  @override
+  String get ttsFloatingForward15Tooltip => 'Forward 15 seconds';
+
+  @override
+  String get ttsFloatingSpeedTooltip => 'Playback speed';
+
+  @override
+  String get ttsFloatingCloseTooltip => 'Close player';
+
+  @override
+  String get ttsFloatingExpandTooltip => 'Expand playback controls';
+
+  @override
+  String get ttsFloatingCollapseTooltip => 'Collapse playback controls';
 
   @override
   String imageViewerPageShareFailedOpenFile(String message) {
@@ -4198,7 +4457,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get settingsShare => 'Kelivo - Open Source AI Assistant';
+  String get settingsShare => 'JO-Kelivo - Open Source AI Assistant';
 
   @override
   String get searchProviderBingLocalDescription =>
@@ -4299,6 +4558,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Serper Google Search API. Fast web results with optional country, language, time, and page filters.';
 
   @override
+  String get searchServiceNameQuerit => 'Querit';
+
+  @override
+  String get searchProviderQueritDescription =>
+      'Querit Search API for LLM applications. Returns real-time web results with site, time, country, and language filters.';
+
+  @override
   String get searchServiceNameGrok => 'Grok';
 
   @override
@@ -4320,6 +4586,35 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get searchServicesDialogPageInvalid =>
       'Page must be a positive integer.';
+
+  @override
+  String get searchServicesDialogSitesIncludeOptional =>
+      'Include sites (optional)';
+
+  @override
+  String get searchServicesDialogSitesExcludeOptional =>
+      'Exclude sites (optional)';
+
+  @override
+  String get searchServicesDialogTimeRangeOptional => 'Time range (optional)';
+
+  @override
+  String get searchServicesDialogCountriesOptional => 'Countries (optional)';
+
+  @override
+  String get searchServicesDialogLanguagesOptional => 'Languages (optional)';
+
+  @override
+  String get searchServicesDialogSitesHint => 'example.com, docs.example.com';
+
+  @override
+  String get searchServicesDialogTimeRangeHint => 'd7';
+
+  @override
+  String get searchServicesDialogCountriesHint => 'united states, japan';
+
+  @override
+  String get searchServicesDialogLanguagesHint => 'english, japanese';
 
   @override
   String get generationInterrupted => 'Generation interrupted';
@@ -4478,6 +4773,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get assistantEditLocalToolClipboardSubtitle =>
       'Read or write plain text from the device clipboard when explicitly needed.';
+
+  @override
+  String get assistantEditLocalToolTextToSpeechTitle => 'Text to Speech';
+
+  @override
+  String get assistantEditLocalToolTextToSpeechSubtitle =>
+      'Let the assistant read text aloud with the configured TTS playback.';
 
   @override
   String get assistantEditLocalToolAskUserTitle => 'Ask User';
@@ -4715,6 +5017,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatInputBarOcrTooltip => 'Image OCR';
 
   @override
+  String get providerDetailPageMultiSelectButton => 'Multi-select';
+
+  @override
   String get providerDetailPageBatchDetectButton => 'Detect';
 
   @override
@@ -4728,6 +5033,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get providerDetailPageDetectFailed => 'Detection failed';
+
+  @override
+  String get providerDetailPageDeleteSelectedModelsButton => 'Delete';
+
+  @override
+  String get providerDetailPageDeleteSelectedModelsTooltip =>
+      'Delete selected models';
+
+  @override
+  String providerDetailPageDeleteSelectedModelsConfirm(int count) {
+    return 'Delete $count selected model(s)? This cannot be undone.';
+  }
+
+  @override
+  String providerDetailPageSelectedModelsDeletedSnackbar(int count) {
+    return 'Deleted $count model(s)';
+  }
+
+  @override
+  String get providerDetailPageDeleteAllModelsTooltip => 'Delete all models';
 
   @override
   String get providerDetailPageDeleteAllModelsWarning =>
@@ -5053,7 +5378,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get toolApprovalDenyHint => 'Reason (optional)';
 
   @override
-  String toolApprovalDeniedMessage(String toolName, String reason) {
+  String toolApprovalDeniedMessage(Object reason, Object toolName) {
     return 'Tool call \"$toolName\" was denied by user. Reason: $reason';
   }
 
@@ -5084,7 +5409,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String askUserCardQuestionCount(int count) {
-    return 'Ask $count questions';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Ask $count questions',
+      one: 'Ask 1 question',
+    );
+    return '$_temp0';
   }
 
   @override

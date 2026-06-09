@@ -8,9 +8,11 @@ import 'dart:ui' as ui;
 
 import '../icons/lucide_adapter.dart' as lucide;
 import '../l10n/app_localizations.dart';
+import '../theme/app_font_weights.dart';
 import '../theme/palettes.dart';
 import '../core/providers/settings_provider.dart';
 import '../core/providers/model_provider.dart';
+import '../core/services/logging/flutter_logger.dart';
 import '../core/services/model_override_resolver.dart';
 import '../core/services/provider_balance_service.dart';
 import 'model_fetch_dialog.dart' show showModelFetchDialog;
@@ -145,7 +147,7 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
             l10n.settingsPageTitle, // 固定显示“设置”
             style: TextStyle(
               fontSize: 14,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeights.semibold,
               color: cs.onSurface,
               decoration: TextDecoration.none,
             ),
@@ -413,7 +415,7 @@ class _MenuItemState extends State<_MenuItem> {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 14.5,
-                    fontWeight: FontWeight.w400,
+                    fontWeight: AppFontWeights.regular,
                     color: fg,
                     decoration: TextDecoration.none,
                   ),

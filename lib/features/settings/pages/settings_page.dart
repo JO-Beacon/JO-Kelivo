@@ -10,6 +10,7 @@ import '../../mcp/pages/mcp_page.dart';
 import '../../assistant/pages/assistant_settings_page.dart';
 import 'about_page.dart';
 import 'tts_services_page.dart';
+import 'sponsor_page.dart';
 import 'log_viewer_page.dart';
 import '../../search/pages/search_services_page.dart';
 import '../../backup/pages/backup_page.dart';
@@ -22,6 +23,7 @@ import '../../stats/pages/stats_page.dart';
 import '../../../core/services/storage/storage_usage_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/services/haptics.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -96,7 +98,7 @@ class SettingsPage extends StatelessWidget {
         text,
         style: TextStyle(
           fontSize: 13,
-          fontWeight: FontWeight.w600,
+          fontWeight: AppFontWeights.semibold,
           color: cs.onSurface.withValues(alpha: 0.8),
         ),
       ),
@@ -355,7 +357,9 @@ class SettingsPage extends StatelessWidget {
                 icon: Lucide.Library,
                 label: l10n.settingsPageDocs,
                 onTap: () async {
-                  final uri = Uri.parse('https://kelivo.psycheas.top/');
+                  final uri = Uri.parse(
+                    'https://github.com/JO-Beacon/JO-Kelivo',
+                  );
                   if (!await launchUrl(uri, mode: LaunchMode.platformDefault)) {
                     await launchUrl(uri, mode: LaunchMode.externalApplication);
                   }
@@ -374,6 +378,17 @@ class SettingsPage extends StatelessWidget {
                   },
                 ),
               ],
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.Heart,
+                label: l10n.settingsPageSponsor,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const SponsorPage()),
+                  );
+                },
+              ),
               // _iosDivider(context),
               // _iosNavRow(
               //   context,
@@ -560,7 +575,7 @@ Widget _iosNavRow(
                     style: TextStyle(
                       fontSize: 15,
                       color: c,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: AppFontWeights.medium,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

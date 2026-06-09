@@ -11,6 +11,7 @@ ProviderConfig _claudeConfig(
   String baseUrl, {
   Map<String, dynamic> modelOverrides = const <String, dynamic>{},
   bool claudePromptCachingEnabled = false,
+  String? claudePromptCachingTtl,
 }) {
   return ProviderConfig(
     id: 'ClaudeCompatTest',
@@ -21,6 +22,7 @@ ProviderConfig _claudeConfig(
     providerType: ProviderKind.claude,
     modelOverrides: modelOverrides,
     claudePromptCachingEnabled: claudePromptCachingEnabled,
+    claudePromptCachingTtl: claudePromptCachingTtl,
   );
 }
 
@@ -37,6 +39,20 @@ ProviderConfig _vertexClaudeConfig({
     vertexAI: true,
     location: 'global',
     projectId: 'test-project',
+    modelOverrides: modelOverrides,
+  );
+}
+
+ProviderConfig _deepSeekClaudeConfig({
+  Map<String, dynamic> modelOverrides = const <String, dynamic>{},
+}) {
+  return ProviderConfig(
+    id: 'DeepSeekClaudeCompatTest',
+    enabled: true,
+    name: 'DeepSeekClaudeCompatTest',
+    apiKey: 'test-key',
+    baseUrl: 'https://api.deepseek.com/anthropic',
+    providerType: ProviderKind.claude,
     modelOverrides: modelOverrides,
   );
 }
@@ -60,6 +76,7 @@ Future<Map<String, dynamic>> _captureClaudeRequestBody({
   double? temperature,
   double? topP,
   bool claudePromptCachingEnabled = false,
+  String? claudePromptCachingTtl,
   List<Map<String, dynamic>> messages = const [
     {'role': 'user', 'content': 'hello'},
   ],
@@ -91,6 +108,7 @@ Future<Map<String, dynamic>> _captureClaudeRequestBody({
     config: _claudeConfig(
       'http://${server.address.address}:${server.port}',
       claudePromptCachingEnabled: claudePromptCachingEnabled,
+      claudePromptCachingTtl: claudePromptCachingTtl,
     ),
     modelId: modelId,
     messages: messages,
@@ -107,6 +125,9 @@ Future<Map<String, dynamic>> _captureClaudeRequestBody({
 Future<Map<String, dynamic>> _captureClaudeGenerateTextBody({
   required String modelId,
   int? thinkingBudget,
+  List<Map<String, dynamic>> responseContent = const [
+    {'type': 'text', 'text': 'ok'},
+  ],
 }) async {
   late Map<String, dynamic> requestBody;
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -122,9 +143,7 @@ Future<Map<String, dynamic>> _captureClaudeGenerateTextBody({
     request.response.write(
       jsonEncode({
         'id': 'msg_1',
-        'content': [
-          {'type': 'text', 'text': 'ok'},
-        ],
+        'content': responseContent,
         'usage': {'input_tokens': 1, 'output_tokens': 1},
       }),
     );
@@ -204,6 +223,55 @@ Future<Map<String, dynamic>> _captureClaudeBuiltInSearchBody({
   return requestBody;
 }
 
+Future<Map<String, dynamic>> _captureClaudeProviderBody({
+  required String modelId,
+  required ProviderConfig config,
+  int? thinkingBudget,
+  double? temperature,
+  double? topP,
+}) async {
+  late Map<String, dynamic> requestBody;
+  final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+  addTearDown(() async {
+    await server.close(force: true);
+  });
+
+  server.listen((request) async {
+    requestBody = (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
+        .cast<String, dynamic>();
+    request.response.statusCode = HttpStatus.ok;
+    request.response.headers.contentType = ContentType.json;
+    request.response.write(
+      jsonEncode({
+        'id': 'msg_1',
+        'content': [
+          {'type': 'text', 'text': 'ok'},
+        ],
+        'usage': {'input_tokens': 1, 'output_tokens': 1},
+      }),
+    );
+    await request.response.close();
+  });
+
+  final effectiveConfig = config.copyWith(
+    baseUrl: 'http://${server.address.address}:${server.port}',
+  );
+  final chunks = await ChatApiService.sendMessageStream(
+    config: effectiveConfig,
+    modelId: modelId,
+    messages: const [
+      {'role': 'user', 'content': 'hello'},
+    ],
+    thinkingBudget: thinkingBudget,
+    temperature: temperature,
+    topP: topP,
+    stream: false,
+  ).toList();
+
+  expect(chunks.last.isDone, isTrue);
+  return requestBody;
+}
+
 void main() {
   group('Claude thinking compatibility', () {
     test(
@@ -223,6 +291,41 @@ void main() {
         expect((body['messages'] as List).cast<Map>().single['role'], 'user');
       },
     );
+
+    test(
+      'prompt caching can request official Claude one hour cache ttl',
+      () async {
+        final body = await _captureClaudeRequestBody(
+          modelId: 'claude-sonnet-4-6',
+          claudePromptCachingEnabled: true,
+          claudePromptCachingTtl: '1h',
+          messages: const [
+            {'role': 'system', 'content': 'Stable persona and long context.'},
+            {'role': 'user', 'content': 'hello'},
+          ],
+        );
+
+        expect(body['cache_control'], {'type': 'ephemeral', 'ttl': '1h'});
+      },
+    );
+
+    test('prompt caching ttl round trips through provider config json', () {
+      final config = ProviderConfig(
+        id: 'ClaudeCompatTest',
+        enabled: true,
+        name: 'ClaudeCompatTest',
+        apiKey: 'test-key',
+        baseUrl: 'https://api.anthropic.com/v1',
+        providerType: ProviderKind.claude,
+        claudePromptCachingEnabled: true,
+        claudePromptCachingTtl: '1h',
+      );
+
+      final roundTripped = ProviderConfig.fromJson(config.toJson());
+
+      expect(roundTripped.claudePromptCachingEnabled, isTrue);
+      expect(roundTripped.claudePromptCachingTtl, '1h');
+    });
 
     test(
       'prompt caching disabled omits official Claude cache control',
@@ -339,6 +442,17 @@ void main() {
       );
     });
 
+    test('generateText Claude path reads text after thinking block', () async {
+      await _captureClaudeGenerateTextBody(
+        modelId: 'deepseek-v4-pro',
+        thinkingBudget: -1,
+        responseContent: const [
+          {'type': 'thinking', 'thinking': '先思考。'},
+          {'type': 'text', 'text': 'ok'},
+        ],
+      );
+    });
+
     test('Claude built-in search support list includes Opus 4.7', () {
       expect(
         BuiltInToolsHelper.isClaudeBuiltInSearchSupportedModel(
@@ -348,37 +462,12 @@ void main() {
       );
     });
 
-    test('DeepSeek V4 supports Anthropic built-in search', () {
-      final cfg = ProviderConfig.defaultsFor('DeepSeek');
-
-      expect(
-        BuiltInToolsHelper.isClaudeBuiltInSearchSupportedModel(
-          'deepseek-v4-pro',
-        ),
-        isTrue,
-      );
-      expect(
-        BuiltInToolsHelper.isClaudeBuiltInSearchSupportedModel(
-          'deepseek-v4-flash',
-        ),
-        isTrue,
-      );
-      expect(
-        BuiltInToolsHelper.supportsBuiltInSearchForModel(
-          cfg: cfg,
-          modelId: 'deepseek-v4-pro',
-        ),
-        isTrue,
-      );
-    });
-
-    test('Claude dynamic web search support matrix excludes DeepSeek', () {
+    test('Claude dynamic web search support matrix is official-only', () {
       final official = _claudeConfig(
         'http://localhost',
         modelOverrides: const <String, dynamic>{},
       );
       final vertex = _vertexClaudeConfig();
-      final deepSeek = ProviderConfig.defaultsFor('DeepSeek');
 
       expect(
         BuiltInToolsHelper.supportsClaudeDynamicWebSearchForModel(
@@ -405,13 +494,6 @@ void main() {
         BuiltInToolsHelper.supportsClaudeDynamicWebSearchForModel(
           cfg: vertex,
           modelId: 'claude-opus-4-7',
-        ),
-        isFalse,
-      );
-      expect(
-        BuiltInToolsHelper.supportsClaudeDynamicWebSearchForModel(
-          cfg: deepSeek,
-          modelId: 'deepseek-v4-pro',
         ),
         isFalse,
       );
@@ -444,133 +526,178 @@ void main() {
       );
     });
 
-    test('DeepSeek V4 built-in search uses legacy search tool only', () async {
-      final body = await _captureClaudeBuiltInSearchBody(
-        modelId: 'deepseek-v4-pro',
-        config: ProviderConfig.defaultsFor('DeepSeek').copyWith(
+    test(
+      'DeepSeek Claude-compatible built-in search uses old web search tool',
+      () async {
+        final cfg = _deepSeekClaudeConfig(
           modelOverrides: const <String, dynamic>{
-            'deepseek-v4-pro': <String, dynamic>{
+            'deepseek-chat': <String, dynamic>{
               'builtInTools': <String>[BuiltInToolNames.search],
               'webSearch': <String, dynamic>{
                 'toolVersion': 'web_search_20260209',
               },
             },
           },
-        ),
-      );
-
-      final tools = (body['tools'] as List).cast<Map<String, dynamic>>();
-      expect(
-        tools.any((tool) => tool['type'] == 'web_search_20250305'),
-        isTrue,
-      );
-      expect(
-        tools.any((tool) => tool['type'] == 'web_search_20260209'),
-        isFalse,
-      );
-      expect(
-        tools.any((tool) => tool['type'] == 'code_execution_20250825'),
-        isFalse,
-      );
-    });
-
-    test('server web search end_turn does not start another round', () async {
-      var requestCount = 0;
-      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      addTearDown(() async {
-        await server.close(force: true);
-      });
-
-      server.listen((request) async {
-        requestCount += 1;
-        request.response.statusCode = HttpStatus.ok;
-        request.response.headers.contentType = ContentType(
-          'text',
-          'event-stream',
         );
-        void writeSse(Map<String, dynamic> event) {
-          request.response.add(utf8.encode('data: ${jsonEncode(event)}\n\n'));
-        }
 
-        writeSse({
-          'type': 'message_start',
-          'message': {
-            'id': 'msg_1',
-            'usage': {'input_tokens': 1, 'output_tokens': 0},
-          },
-        });
-        writeSse({
-          'type': 'content_block_start',
-          'index': 0,
-          'content_block': {
-            'type': 'server_tool_use',
-            'id': 'srv_1',
-            'name': 'web_search',
-          },
-        });
-        writeSse({
-          'type': 'content_block_delta',
-          'index': 0,
-          'delta': {
-            'type': 'input_json_delta',
-            'partial_json': '{"query":"Kelivo"}',
-          },
-        });
-        writeSse({'type': 'content_block_stop', 'index': 0});
-        writeSse({
-          'type': 'content_block_start',
-          'index': 1,
-          'content_block': {
-            'type': 'web_search_tool_result',
-            'tool_use_id': 'srv_1',
-            'content': [
-              {
-                'type': 'web_search_result',
-                'title': 'Kelivo',
-                'url': 'https://example.com/kelivo',
-              },
-            ],
-          },
-        });
-        writeSse({'type': 'content_block_stop', 'index': 1});
-        writeSse({
-          'type': 'content_block_start',
-          'index': 2,
-          'content_block': {'type': 'text', 'text': ''},
-        });
-        writeSse({
-          'type': 'content_block_delta',
-          'index': 2,
-          'delta': {'type': 'text_delta', 'text': '搜索完成。'},
-        });
-        writeSse({'type': 'content_block_stop', 'index': 2});
-        writeSse({
-          'type': 'message_delta',
-          'delta': {'stop_reason': 'end_turn'},
-          'usage': {'input_tokens': 1, 'output_tokens': 2},
-        });
-        writeSse({'type': 'message_stop'});
-        await request.response.close();
-      });
+        expect(
+          BuiltInToolsHelper.supportsBuiltInSearchForModel(
+            cfg: cfg,
+            modelId: 'deepseek-chat',
+          ),
+          isTrue,
+        );
+        expect(
+          BuiltInToolsHelper.supportsClaudeDynamicWebSearchForModel(
+            cfg: cfg,
+            modelId: 'deepseek-chat',
+          ),
+          isFalse,
+        );
 
-      final chunks = await ChatApiService.sendMessageStream(
-        config: ProviderConfig.defaultsFor('DeepSeek').copyWith(
-          baseUrl: 'http://${server.address.address}:${server.port}',
+        final body = await _captureClaudeBuiltInSearchBody(
+          modelId: 'deepseek-chat',
+          config: cfg,
+        );
+
+        final tools = (body['tools'] as List).cast<Map<String, dynamic>>();
+        expect(
+          tools.any((tool) => tool['type'] == 'web_search_20250305'),
+          isTrue,
+        );
+        expect(
+          tools.any((tool) => tool['type'] == 'web_search_20260209'),
+          isFalse,
+        );
+        expect(
+          tools.any((tool) => tool['type'] == 'code_execution_20250825'),
+          isFalse,
+        );
+      },
+    );
+
+    test(
+      'DeepSeek server web search end_turn does not trigger a continuation request',
+      () async {
+        final requestBodies = <Map<String, dynamic>>[];
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          requestBodies.add(
+            (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
+                .cast<String, dynamic>(),
+          );
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+          );
+          request.response.write('''
+event: message_start
+data: {"type":"message_start","message":{"id":"msg_1","type":"message","role":"assistant","model":"deepseek-v4-flash","content":[],"stop_reason":null,"usage":{"input_tokens":1,"output_tokens":0}}}
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"server_tool_use","id":"srv_1","name":"web_search","input":{}}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\\"query\\":\\"kelivo\\"}"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0}
+
+event: content_block_start
+data: {"type":"content_block_start","index":1,"content_block":{"type":"web_search_tool_result","tool_use_id":"srv_1","content":[{"type":"web_search_result","title":"Kelivo","url":"https://example.com"}]}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":1}
+
+event: content_block_start
+data: {"type":"content_block_start","index":2,"content_block":{"type":"text","text":""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"text_delta","text":"done"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":2}
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"input_tokens":10,"output_tokens":5,"server_tool_use":{"web_search_requests":1}}}
+
+event: message_stop
+data: {"type":"message_stop"}
+
+''');
+          await request.response.close();
+        });
+
+        final cfg = _deepSeekClaudeConfig(
           modelOverrides: const <String, dynamic>{
-            'deepseek-v4-pro': <String, dynamic>{
+            'deepseek-v4-flash': <String, dynamic>{
               'builtInTools': <String>[BuiltInToolNames.search],
             },
           },
-        ),
-        modelId: 'deepseek-v4-pro',
-        messages: const [
-          {'role': 'user', 'content': '查一下 Kelivo'},
-        ],
-      ).toList();
+        ).copyWith(baseUrl: 'http://${server.address.address}:${server.port}');
 
-      expect(chunks.any((chunk) => chunk.content == '搜索完成。'), isTrue);
-      expect(chunks.last.isDone, isTrue);
-      expect(requestCount, 1);
+        final chunks = await ChatApiService.sendMessageStream(
+          config: cfg,
+          modelId: 'deepseek-v4-flash',
+          messages: const [
+            {'role': 'user', 'content': '搜索一下kelivo'},
+          ],
+          stream: true,
+        ).toList();
+
+        expect(chunks.where((chunk) => chunk.content == 'done'), hasLength(1));
+        expect(chunks.last.isDone, isTrue);
+        expect(requestBodies, hasLength(1));
+      },
+    );
+
+    test('DeepSeek Claude-compatible auto thinking stays enabled', () async {
+      final body = await _captureClaudeProviderBody(
+        modelId: 'deepseek-v4-pro',
+        config: _deepSeekClaudeConfig(),
+        thinkingBudget: -1,
+      );
+
+      expect(body['thinking'], {'type': 'enabled'});
+      expect(body.containsKey('output_config'), isFalse);
+    });
+
+    test('DeepSeek Claude-compatible explicit thinking uses effort', () async {
+      final mediumBody = await _captureClaudeProviderBody(
+        modelId: 'deepseek-v4-pro',
+        config: _deepSeekClaudeConfig(),
+        thinkingBudget: 16000,
+      );
+      final maxBody = await _captureClaudeProviderBody(
+        modelId: 'deepseek-v4-pro',
+        config: _deepSeekClaudeConfig(),
+        thinkingBudget: 64000,
+      );
+
+      expect(mediumBody['thinking'], {'type': 'enabled'});
+      expect(mediumBody['output_config'], {'effort': 'high'});
+      expect(maxBody['thinking'], {'type': 'enabled'});
+      expect(maxBody['output_config'], {'effort': 'max'});
+    });
+
+    test('DeepSeek Claude-compatible off thinking stays disabled', () async {
+      final body = await _captureClaudeProviderBody(
+        modelId: 'deepseek-v4-pro',
+        config: _deepSeekClaudeConfig(),
+        thinkingBudget: 0,
+        temperature: 0.7,
+        topP: 0.8,
+      );
+
+      expect(body['thinking'], {'type': 'disabled'});
+      expect(body.containsKey('output_config'), isFalse);
+      expect(body['temperature'], 0.7);
+      expect(body['top_p'], 0.8);
     });
 
     test(
@@ -684,6 +811,209 @@ void main() {
       expect(toolResultContent.single['type'], 'tool_result');
       expect(toolResultContent.single['tool_use_id'], 'toolu_1');
     });
+
+    test(
+      'OpenRouter Claude tool continuation skips redacted thinking blocks',
+      () async {
+        final requestBodies = <Map<String, dynamic>>[];
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        var requestCount = 0;
+        server.listen((request) async {
+          requestCount += 1;
+          requestBodies.add(
+            (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
+                .cast<String, dynamic>(),
+          );
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+            charset: 'utf-8',
+          );
+
+          if (requestCount == 1) {
+            request.response.write('''
+event: message_start
+data: {"type":"message_start","message":{"id":"msg_1","type":"message","role":"assistant","content":[],"model":"claude-opus-4-6","stop_reason":null}}
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"redacted_thinking","data":""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"redacted_thinking_delta","data":"openrouter-redacted-fragment"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0}
+
+event: content_block_start
+data: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_1","name":"lookup","input":{}}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\\"query\\":\\"Kelivo\\"}"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":1}
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"input_tokens":1,"output_tokens":1}}
+
+event: message_stop
+data: {"type":"message_stop"}
+
+''');
+          } else {
+            request.response.write('''
+event: message_start
+data: {"type":"message_start","message":{"id":"msg_2","type":"message","role":"assistant","content":[],"model":"claude-opus-4-6","stop_reason":null}}
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"done"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0}
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"input_tokens":1,"output_tokens":1}}
+
+event: message_stop
+data: {"type":"message_stop"}
+
+''');
+          }
+          await request.response.close();
+        });
+
+        final chunks = await ChatApiService.sendMessageStream(
+          config:
+              _claudeConfig(
+                'http://${server.address.address}:${server.port}',
+              ).copyWith(
+                id: 'OpenRouter',
+                name: 'OpenRouter',
+                baseUrl: 'http://${server.address.address}:${server.port}',
+              ),
+          modelId: 'claude-opus-4-6',
+          messages: const [
+            {'role': 'user', 'content': '查一下 Kelivo'},
+          ],
+          tools: const [
+            {
+              'type': 'function',
+              'function': {
+                'name': 'lookup',
+                'parameters': {
+                  'type': 'object',
+                  'properties': {
+                    'query': {'type': 'string'},
+                  },
+                },
+              },
+            },
+          ],
+          onToolCall: (name, args, {toolCallId}) async => '{"result":"ok"}',
+        ).toList();
+
+        expect(chunks.last.isDone, isTrue);
+        expect(requestBodies, hasLength(2));
+        final secondMessages = (requestBodies[1]['messages'] as List)
+            .cast<Map>();
+        final assistantContent = (secondMessages[1]['content'] as List)
+            .cast<Map>();
+        final toolResultContent = (secondMessages[2]['content'] as List)
+            .cast<Map>();
+
+        expect(
+          assistantContent.any((block) => block['type'] == 'redacted_thinking'),
+          isFalse,
+        );
+        expect(assistantContent.single['type'], 'tool_use');
+        expect(assistantContent.single['id'], 'toolu_1');
+        expect(toolResultContent.single['type'], 'tool_result');
+        expect(toolResultContent.single['tool_use_id'], 'toolu_1');
+      },
+    );
+
+    test(
+      'completed memory tool turn remains valid when followed by user text',
+      () async {
+        final body = await _captureClaudeRequestBody(
+          modelId: 'claude-opus-4-7',
+          thinkingBudget: 16000,
+          messages: const [
+            {'role': 'user', 'content': 'trigger message'},
+            {
+              'role': 'assistant',
+              'content': '\n\n',
+              'tool_calls': [
+                {
+                  'id': 'toolu_01SBaeK3UtXTQmybQjpPZurX',
+                  'type': 'function',
+                  'function': {
+                    'name': 'create_memory',
+                    'arguments': '{"content":"test"}',
+                  },
+                  'metadata': {
+                    'anthropic': {
+                      'assistant_blocks': [
+                        {
+                          'type': 'thinking',
+                          'thinking': '需要记录这个偏好。',
+                          'signature': 'sig-memory-turn',
+                        },
+                        {
+                          'type': 'tool_use',
+                          'id': 'toolu_01SBaeK3UtXTQmybQjpPZurX',
+                          'name': 'create_memory',
+                          'input': {'content': 'test'},
+                        },
+                      ],
+                    },
+                  },
+                },
+              ],
+            },
+            {
+              'role': 'tool',
+              'tool_call_id': 'toolu_01SBaeK3UtXTQmybQjpPZurX',
+              'name': 'create_memory',
+              'content': 'test',
+            },
+            {'role': 'assistant', 'content': 'confirmed'},
+            {'role': 'user', 'content': 'ok'},
+          ],
+        );
+
+        final messages = (body['messages'] as List).cast<Map>();
+        final assistantContent = (messages[1]['content'] as List).cast<Map>();
+        final toolResultContent = (messages[2]['content'] as List).cast<Map>();
+
+        expect(messages.map((message) => message['role']).toList(), [
+          'user',
+          'assistant',
+          'user',
+          'assistant',
+          'user',
+        ]);
+        expect(assistantContent[0]['type'], 'thinking');
+        expect(assistantContent[0]['signature'], 'sig-memory-turn');
+        expect(assistantContent[1]['type'], 'tool_use');
+        expect(assistantContent[1]['id'], 'toolu_01SBaeK3UtXTQmybQjpPZurX');
+        expect(toolResultContent.single['type'], 'tool_result');
+        expect(
+          toolResultContent.single['tool_use_id'],
+          'toolu_01SBaeK3UtXTQmybQjpPZurX',
+        );
+        expect(messages[3]['content'], 'confirmed');
+        expect(messages[4]['content'], 'ok');
+      },
+    );
 
     test(
       'history tool replay uses complete Claude assistant tool blocks',

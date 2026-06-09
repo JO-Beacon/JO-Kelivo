@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+
 import '../core/models/chat_input_data.dart';
 import '../core/models/chat_message.dart';
 import '../features/chat/models/message_edit_result.dart';
 import '../features/chat/utils/message_attachment_parser.dart';
 import '../features/chat/widgets/message_attachment_editor.dart';
-import '../l10n/app_localizations.dart';
 import '../icons/lucide_adapter.dart';
+import '../l10n/app_localizations.dart';
+import '../theme/app_font_weights.dart';
 
 Future<MessageEditResult?> showMessageEditDesktopDialog(
   BuildContext context, {
@@ -20,6 +22,7 @@ Future<MessageEditResult?> showMessageEditDesktopDialog(
 
 class _MessageEditDesktopDialog extends StatefulWidget {
   const _MessageEditDesktopDialog({required this.message});
+
   final ChatMessage message;
 
   @override
@@ -92,9 +95,9 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                     children: [
                       Text(
                         l10n.messageEditPageTitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.emphasis,
                         ),
                       ),
                       const Spacer(),
@@ -113,7 +116,7 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                           l10n.messageEditPageSaveAndSend,
                           style: TextStyle(
                             color: cs.primary,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: AppFontWeights.semibold,
                           ),
                         ),
                       ),
@@ -129,7 +132,7 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                           l10n.messageEditPageSave,
                           style: TextStyle(
                             color: cs.primary,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: AppFontWeights.semibold,
                           ),
                         ),
                       ),
@@ -194,7 +197,7 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                               vertical: 12,
                             ),
                           ),
-                          style: const TextStyle(fontSize: 15, height: 1.5),
+                          style: TextStyle(fontSize: 15, height: 1.5),
                         ),
                         const SizedBox(height: 14),
                         MessageAttachmentEditor(

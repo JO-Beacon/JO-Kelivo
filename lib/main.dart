@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'dart:async';
@@ -38,7 +38,7 @@ import 'core/services/logging/flutter_logger.dart';
 import 'features/home/services/ask_user_interaction_service.dart';
 import 'features/home/services/tool_approval_service.dart';
 import 'utils/sandbox_path_resolver.dart';
-import 'shared/widgets/snackbar.dart';
+import 'shared/widgets/app_overlays.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:system_fonts/system_fonts.dart';
 import 'dart:io'
@@ -101,7 +101,7 @@ Future<void> _initDesktopWindow() async {
       await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
     }
     // Initialize and show desktop window with persisted size/position
-    await DesktopWindowController.instance.initializeAndShow(title: 'Kelivo');
+    await DesktopWindowController.instance.initializeAndShow(title: 'JO-Kelivo');
   } catch (_) {
     // Ignore on unsupported platforms.
   }
@@ -130,7 +130,10 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => McpProvider()),
         ChangeNotifierProvider(create: (_) => ToolApprovalService()),
         ChangeNotifierProvider(create: (_) => AskUserInteractionService()),
-        ChangeNotifierProvider(create: (_) => AssistantProvider()),
+        ChangeNotifierProvider(
+          create: (ctx) =>
+              AssistantProvider(chatService: ctx.read<ChatService>()),
+        ),
         ChangeNotifierProvider(create: (_) => TagProvider()),
         ChangeNotifierProvider(create: (_) => TtsProvider()),
         ChangeNotifierProvider(create: (_) => UpdateProvider()),
@@ -349,11 +352,11 @@ class MyApp extends StatelessWidget {
               final themedLight = applyAppFont(light);
               final themedDark = applyAppFont(dark);
               // Log top-level colors likely used by widgets (card/bg/shadow approximations)
-              // debugPrint('[Theme/App] Light scaffoldBg=${light.colorScheme.surface.value.toRadixString(16)} card≈${light.colorScheme.surface.value.toRadixString(16)} shadow=${light.colorScheme.shadow.value.toRadixString(16)}');
-              // debugPrint('[Theme/App] Dark scaffoldBg=${dark.colorScheme.surface.value.toRadixString(16)} card≈${dark.colorScheme.surface.value.toRadixString(16)} shadow=${dark.colorScheme.shadow.value.toRadixString(16)}');
+              // debugPrint('[Theme/App] Light scaffoldBg=${light.colorScheme.surface.value.toRadixString(16)} card鈮?{light.colorScheme.surface.value.toRadixString(16)} shadow=${light.colorScheme.shadow.value.toRadixString(16)}');
+              // debugPrint('[Theme/App] Dark scaffoldBg=${dark.colorScheme.surface.value.toRadixString(16)} card鈮?{dark.colorScheme.surface.value.toRadixString(16)} shadow=${dark.colorScheme.shadow.value.toRadixString(16)}');
               return MaterialApp(
                 debugShowCheckedModeBanner: false,
-                title: 'Kelivo',
+                title: 'JO-Kelivo',
                 // App UI language; null = follow system (respects iOS per-app language)
                 locale: settings.appLocaleForMaterialApp,
                 supportedLocales: AppLocalizations.supportedLocales,
@@ -429,17 +432,16 @@ class MyApp extends StatelessWidget {
                   }
 
                   // Enforce app font as a default across the tree for Texts without explicit family
+                  final appWithOverlays = AppOverlays(
+                    child: child ?? const SizedBox.shrink(),
+                  );
                   return AnnotatedRegion<SystemUiOverlayStyle>(
                     value: overlay,
                     child: effectiveAppFont == null
-                        ? AppSnackBarOverlay(
-                            child: child ?? const SizedBox.shrink(),
-                          )
+                        ? appWithOverlays
                         : DefaultTextStyle.merge(
                             style: TextStyle(fontFamily: effectiveAppFont),
-                            child: AppSnackBarOverlay(
-                              child: child ?? const SizedBox.shrink(),
-                            ),
+                            child: appWithOverlays,
                           ),
                   );
                 },

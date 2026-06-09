@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
 import '../../features/settings/pages/debug_page.dart';
+import '../../theme/app_font_weights.dart';
 
 class DesktopAboutPane extends StatefulWidget {
   const DesktopAboutPane({super.key});
@@ -19,6 +20,9 @@ class DesktopAboutPane extends StatefulWidget {
 enum _InfoLoadState { loading, loaded, failed }
 
 class _DesktopAboutPaneState extends State<DesktopAboutPane> {
+  static const String _upstreamKelivoVersion = '1.1.16';
+  static const String _upstreamKelivoBuildNumber = '60';
+
   String _version = '';
   String _buildNumber = '';
   String _systemInfo = '';
@@ -125,7 +129,7 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
                     l10n.settingsPageAbout,
                     style: TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.w400,
+                      fontWeight: AppFontWeights.regular,
                       color: cs.onSurface.withValues(alpha: 0.9),
                     ),
                   ),
@@ -175,12 +179,6 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
                       'https://github.com/JO-Beacon/JO-Kelivo/blob/main/LICENSE',
                     ),
                   ),
-                  const _DeskRowDivider(),
-                  _DeskNavRowSvg(
-                    svgAsset: 'assets/icons/tencent-qq.svg',
-                    label: l10n.aboutPageJoinQQGroup,
-                    onTap: () => _openUrl('https://qm.qq.com/q/OQaXetKssC'),
-                  ),
                 ],
               ),
 
@@ -193,7 +191,10 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
                   _DeskInfoRow(
                     icon: lucide.Lucide.Code,
                     label: l10n.aboutPageVersion,
-                    detail: l10n.aboutPageVersionDetail('1.1.15', '52'),
+                    detail: l10n.aboutPageVersionDetail(
+                      _upstreamKelivoVersion,
+                      _upstreamKelivoBuildNumber,
+                    ),
                   ),
                   const _DeskRowDivider(),
                   _DeskNavRow(
@@ -321,9 +322,9 @@ class _AppHeaderCardState extends State<_AppHeaderCard> {
                       children: [
                         Text(
                           l10n.aboutPageAppName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: AppFontWeights.emphasis,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -380,7 +381,7 @@ class _DeskCard extends StatelessWidget {
                 title,
                 style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: AppFontWeights.emphasis,
                   color: cs.onSurface,
                 ),
               ),
@@ -647,9 +648,9 @@ Future<void> _showSponsorDesktopDialog(BuildContext context) async {
                     Expanded(
                       child: Text(
                         l10n.settingsPageSponsor,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.emphasis,
                         ),
                       ),
                     ),

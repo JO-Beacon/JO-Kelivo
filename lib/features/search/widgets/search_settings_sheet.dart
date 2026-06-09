@@ -12,6 +12,7 @@ import '../../../utils/brand_assets.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
+import '../../../theme/app_font_weights.dart';
 
 Future<void> showSearchSettingsSheet(BuildContext context) async {
   await showModalBottomSheet(
@@ -110,13 +111,14 @@ class _SearchSettingsSheet extends StatelessWidget {
     final settings = context.watch<SettingsProvider>();
     final settingsNotifier = context.read<SettingsProvider>();
     final ap = context.watch<AssistantProvider>();
+    final assistantNotifier = context.read<AssistantProvider>();
     final a = ap.currentAssistant;
     final services = settings.searchServices;
     final selected = settings.searchServiceSelected.clamp(
       0,
       services.isNotEmpty ? services.length - 1 : 0,
     );
-    final enabled = settings.searchEnabled;
+    final enabled = ap.currentSearchEnabled;
 
     // Determine if current selected model supports built-in search
     final providerKey = a?.chatModelProvider ?? settings.currentModelProvider;
@@ -175,9 +177,9 @@ class _SearchSettingsSheet extends StatelessWidget {
                   child: Text(
                     l10n.searchSettingsSheetTitle,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: AppFontWeights.emphasis,
                     ),
                   ),
                 ),
@@ -206,7 +208,8 @@ class _SearchSettingsSheet extends StatelessWidget {
                             enabled: v,
                           );
                           if (v) {
-                            await settingsNotifier.setSearchEnabled(false);
+                            await assistantNotifier
+                                .setSearchEnabledForCurrentAssistant(false);
                           }
                         },
                         padding: const EdgeInsets.symmetric(
@@ -224,9 +227,9 @@ class _SearchSettingsSheet extends StatelessWidget {
                                 children: [
                                   Text(
                                     l10n.searchSettingsSheetBuiltinSearchTitle,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 14,
-                                      fontWeight: FontWeight.w700,
+                                      fontWeight: AppFontWeights.emphasis,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
@@ -247,9 +250,10 @@ class _SearchSettingsSheet extends StatelessWidget {
                                   enabled: v,
                                 );
                                 if (v) {
-                                  await settingsNotifier.setSearchEnabled(
-                                    false,
-                                  );
+                                  await assistantNotifier
+                                      .setSearchEnabledForCurrentAssistant(
+                                        false,
+                                      );
                                 }
                               },
                             ),
@@ -300,9 +304,9 @@ class _SearchSettingsSheet extends StatelessWidget {
                                     children: [
                                       Text(
                                         l10n.searchSettingsSheetClaudeDynamicSearchTitle,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 14,
-                                          fontWeight: FontWeight.w700,
+                                          fontWeight: AppFontWeights.emphasis,
                                         ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
@@ -350,9 +354,9 @@ class _SearchSettingsSheet extends StatelessWidget {
                     duration: const Duration(milliseconds: 260),
                     onTap: () {
                       Haptics.light();
-                      context.read<SettingsProvider>().setSearchEnabled(
-                        !enabled,
-                      );
+                      context
+                          .read<AssistantProvider>()
+                          .setSearchEnabledForCurrentAssistant(!enabled);
                     },
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -369,9 +373,9 @@ class _SearchSettingsSheet extends StatelessWidget {
                             children: [
                               Text(
                                 l10n.searchSettingsSheetWebSearchTitle,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 14,
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: AppFontWeights.emphasis,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -395,8 +399,8 @@ class _SearchSettingsSheet extends StatelessWidget {
                         IosSwitch(
                           value: enabled,
                           onChanged: (v) => context
-                              .read<SettingsProvider>()
-                              .setSearchEnabled(v),
+                              .read<AssistantProvider>()
+                              .setSearchEnabledForCurrentAssistant(v),
                         ),
                       ],
                     ),
@@ -439,7 +443,7 @@ class _SearchSettingsSheet extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     fontSize: 15,
-                                    fontWeight: FontWeight.w500,
+                                    fontWeight: AppFontWeights.medium,
                                     color: onColor,
                                   ),
                                 ),
@@ -551,7 +555,7 @@ class _BrandBadge extends StatelessWidget {
         name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
         style: TextStyle(
           color: cs.primary,
-          fontWeight: FontWeight.w700,
+          fontWeight: AppFontWeights.emphasis,
           fontSize: size * 0.42,
         ),
       ),

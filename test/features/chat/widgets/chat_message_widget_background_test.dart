@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,13 +8,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
-import 'package:Kelivo/core/providers/user_provider.dart';
-import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
+import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
+import 'package:Kelivo/features/home/controllers/stream_controller.dart'
+    as home_stream;
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 
 SettingsProvider _createSettings(ChatMessageBackgroundStyle style) {
   final rawStyle = switch (style) {
@@ -33,18 +35,23 @@ Widget _buildHarness({
   required SettingsProvider settings,
   required Widget child,
   AskUserInteractionService? askUserService,
+  TtsProvider? ttsProvider,
+  Locale? locale,
 }) {
   return MultiProvider(
     providers: [
       ChangeNotifierProvider<SettingsProvider>.value(value: settings),
-      ChangeNotifierProvider(create: (_) => UserProvider()),
-      ChangeNotifierProvider(create: (_) => TtsProvider()),
+      if (ttsProvider != null)
+        ChangeNotifierProvider<TtsProvider>.value(value: ttsProvider)
+      else
+        ChangeNotifierProvider(create: (_) => TtsProvider()),
       ChangeNotifierProvider(create: (_) => ToolApprovalService()),
       ChangeNotifierProvider<AskUserInteractionService>.value(
         value: askUserService ?? AskUserInteractionService(),
       ),
     ],
     child: MaterialApp(
+      locale: locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(body: child),
@@ -55,10 +62,293 @@ Widget _buildHarness({
 Color _expectedNeutralStrong() =>
     ThemeData.light().colorScheme.onSurface.withValues(alpha: 0.78);
 
+Finder _findNetworkImage(String url) {
+  return find.byWidgetPredicate(
+    (widget) =>
+        widget is Image &&
+        widget.image is NetworkImage &&
+        (widget.image as NetworkImage).url == url,
+  );
+}
+
+class _RecordingTtsProvider extends TtsProvider {
+  final spokenTexts = <String>[];
+
+  @override
+  bool get isAvailable => true;
+
+  @override
+  Future<void> speak(String text, {bool flush = true}) async {
+    spokenTexts.add(text);
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('ChatMessageWidget card background style', () {
+    testWidgets('search citations render source capsule with favicon stack', (
+      tester,
+    ) async {
+      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          locale: const Locale('zh'),
+          child: ChatMessageWidget(
+            message: ChatMessage(
+              role: 'assistant',
+              content: 'Answer with search citations.',
+              conversationId: 'conversation-search-capsule',
+            ),
+            showModelIcon: false,
+            toolParts: const [
+              ToolUIPart(
+                id: 'builtin-search-result',
+                toolName: 'builtin_search',
+                arguments: {},
+                content:
+                    '{"items":[{"title":"One","url":"https://one.example.com/a","text":"A"},{"title":"Two","url":"https://two.example.com/b","text":"B"},{"title":"Three","url":"https://three.example.com/c","text":"C"},{"title":"Four","url":"https://four.example.com/d","text":"D"}]}',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('4个引用'), findsOneWidget);
+      expect(find.byIcon(Lucide.BookOpen), findsNothing);
+
+      final capsule = tester.widget<IosCardPress>(
+        find.ancestor(
+          of: find.text('4个引用'),
+          matching: find.byType(IosCardPress),
+        ),
+      );
+      expect(capsule.borderRadius, BorderRadius.circular(20));
+      expect(capsule.baseColor, Colors.transparent);
+      expect(
+        capsule.border,
+        Border.all(color: Colors.black.withValues(alpha: 0.10), width: 0.8),
+      );
+      expect(
+        capsule.padding,
+        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      );
+
+      expect(
+        _findNetworkImage('https://favicone.com/one.example.com'),
+        findsOneWidget,
+      );
+      expect(
+        _findNetworkImage('https://favicone.com/two.example.com'),
+        findsOneWidget,
+      );
+      expect(
+        _findNetworkImage('https://favicone.com/three.example.com'),
+        findsOneWidget,
+      );
+      expect(
+        _findNetworkImage('https://favicone.com/four.example.com'),
+        findsNothing,
+      );
+
+      await tester.tap(find.text('4个引用'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('搜索结果'), findsOneWidget);
+      expect(find.text('Four'), findsOneWidget);
+    });
+
+    testWidgets('search citations summarize all search results in one reply', (
+      tester,
+    ) async {
+      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          locale: const Locale('zh'),
+          child: ChatMessageWidget(
+            message: ChatMessage(
+              role: 'assistant',
+              content: 'Answer with multiple search calls.',
+              conversationId: 'conversation-search-capsule-multiple',
+            ),
+            showModelIcon: false,
+            toolParts: const [
+              ToolUIPart(
+                id: 'builtin-search-first',
+                toolName: 'builtin_search',
+                arguments: {},
+                content:
+                    '{"items":[{"title":"First source","url":"https://one.example.com/a","text":"A"},{"title":"Second source","url":"https://two.example.com/b","text":"B"}]}',
+              ),
+              ToolUIPart(
+                id: 'search-web-second',
+                toolName: 'search_web',
+                arguments: {'query': 'Kelivo release'},
+                content:
+                    '{"items":[{"title":"Third source","url":"https://three.example.com/c","text":"C"}]}',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('3个引用'), findsOneWidget);
+
+      await tester.tap(find.text('3个引用'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('搜索结果'), findsOneWidget);
+      expect(find.text('First source'), findsOneWidget);
+      expect(find.text('Second source'), findsOneWidget);
+      expect(find.text('Third source'), findsOneWidget);
+    });
+
+    testWidgets(
+      'search citation capsule uses latest streaming result for the same id',
+      (tester) async {
+        final settings = _createSettings(
+          ChatMessageBackgroundStyle.defaultStyle,
+        );
+        final controller = home_stream.StreamController(
+          chatService: ChatService(),
+          onStateChanged: () {},
+          getSettingsProvider: () => settings,
+          getCurrentConversationId: () => 'conversation-search-same-id',
+        );
+        final message = ChatMessage(
+          id: 'assistant-search-same-id',
+          role: 'assistant',
+          content: 'Answer with incremental search citations.',
+          conversationId: 'conversation-search-same-id',
+          isStreaming: true,
+        );
+        final state = home_stream.StreamingState(
+          home_stream.GenerationContext(
+            assistantMessage: message,
+            apiMessages: const [],
+            userImagePaths: const [],
+            allowImagesApiRouting: false,
+            providerKey: 'test',
+            modelId: 'test-model',
+            assistant: null,
+            settings: settings,
+            config: ProviderConfig(
+              id: 'test',
+              enabled: true,
+              name: 'Test',
+              apiKey: '',
+              baseUrl: '',
+            ),
+            toolDefs: const [],
+            supportsReasoning: true,
+            enableReasoning: true,
+            streamOutput: true,
+          ),
+        );
+
+        Future<void> upsertToolEventInDb(
+          String messageId, {
+          required String id,
+          required String name,
+          required Map<String, dynamic> arguments,
+          String? content,
+          Map<String, dynamic>? metadata,
+        }) async {}
+
+        await controller.handleToolResultsChunk(
+          ChatStreamChunk(
+            content: '',
+            isDone: false,
+            totalTokens: 0,
+            toolResults: [
+              ToolResultInfo(
+                id: 'builtin_search',
+                name: 'builtin_search',
+                arguments: const <String, dynamic>{},
+                content:
+                    '{"items":[{"title":"First source","url":"https://one.example.com/a","text":"A"}]}',
+              ),
+            ],
+          ),
+          state,
+          upsertToolEventInDb: upsertToolEventInDb,
+        );
+        await controller.handleToolResultsChunk(
+          ChatStreamChunk(
+            content: '',
+            isDone: false,
+            totalTokens: 0,
+            toolResults: [
+              ToolResultInfo(
+                id: 'builtin_search',
+                name: 'builtin_search',
+                arguments: const <String, dynamic>{},
+                content:
+                    '{"items":[{"title":"First source","url":"https://one.example.com/a","text":"A"},{"title":"Second source","url":"https://two.example.com/b","text":"B"}]}',
+              ),
+            ],
+          ),
+          state,
+          upsertToolEventInDb: upsertToolEventInDb,
+        );
+
+        await tester.pumpWidget(
+          _buildHarness(
+            settings: settings,
+            locale: const Locale('zh'),
+            child: ChatMessageWidget(
+              message: message,
+              showModelIcon: false,
+              toolParts: controller.toolParts[message.id],
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.text('2个引用'), findsOneWidget);
+      },
+    );
+
+    testWidgets('search citation capsule falls back when source url is invalid', (
+      tester,
+    ) async {
+      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          locale: const Locale('zh'),
+          child: ChatMessageWidget(
+            message: ChatMessage(
+              role: 'assistant',
+              content: 'Answer with one broken citation.',
+              conversationId: 'conversation-search-capsule-invalid-url',
+            ),
+            showModelIcon: false,
+            toolParts: const [
+              ToolUIPart(
+                id: 'builtin-search-invalid-url',
+                toolName: 'builtin_search',
+                arguments: {},
+                content:
+                    '{"items":[{"title":"Broken","url":"","text":"No usable source"}]}',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('1个引用'), findsOneWidget);
+      expect(find.byIcon(Lucide.Globe), findsOneWidget);
+    });
+
     testWidgets('thinking/tool timeline card uses blur in frosted mode', (
       tester,
     ) async {
@@ -311,6 +601,12 @@ void main() {
                 arguments: {'action': 'write', 'text': 'hello'},
                 content: '{"success":true,"text":"hello"}',
               ),
+              ToolUIPart(
+                id: 'tts',
+                toolName: 'text_to_speech',
+                arguments: {'text': 'Replay this line'},
+                content: '{"success":true}',
+              ),
             ],
           ),
         ),
@@ -321,6 +617,17 @@ void main() {
       expect(find.text('Time Info'), findsOneWidget);
       expect(find.text('Read Clipboard'), findsOneWidget);
       expect(find.text('Write Clipboard'), findsOneWidget);
+      expect(find.text('Speaking:'), findsOneWidget);
+      expect(find.text('Replay this line'), findsOneWidget);
+      expect(find.byTooltip('Replay'), findsOneWidget);
+      final replayButton = tester.widget<IosIconButton>(
+        find.descendant(
+          of: find.byTooltip('Replay'),
+          matching: find.byType(IosIconButton),
+        ),
+      );
+      expect(replayButton.minSize, 30);
+      expect(replayButton.padding, const EdgeInsets.all(6));
       expect(find.text('Clipboard'), findsNothing);
       expect(find.text('Tool Result: get_time_info'), findsNothing);
       expect(find.text('Tool Result: clipboard_tool'), findsNothing);
@@ -342,6 +649,92 @@ void main() {
         ),
         findsOneWidget,
       );
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is Icon && widget.icon == Lucide.Volume2,
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('text to speech replay button speaks the tool text', (
+      tester,
+    ) async {
+      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+      final ttsProvider = _RecordingTtsProvider();
+      addTearDown(ttsProvider.dispose);
+
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          ttsProvider: ttsProvider,
+          child: ChatMessageWidget(
+            message: ChatMessage(
+              role: 'assistant',
+              content: '',
+              conversationId: 'conversation-local-tts-replay',
+              isStreaming: true,
+            ),
+            showModelIcon: false,
+            toolParts: const [
+              ToolUIPart(
+                id: 'tts',
+                toolName: 'text_to_speech',
+                arguments: {'text': 'Replay this line'},
+                content: '{"success":true}',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      await tester.tap(find.byTooltip('Replay'));
+      await tester.pump();
+
+      expect(ttsProvider.spokenTexts, ['Replay this line']);
+      expect(find.byTooltip('Replay'), findsOneWidget);
+    });
+
+    testWidgets('text to speech tool card opens details for long text', (
+      tester,
+    ) async {
+      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          child: ChatMessageWidget(
+            message: ChatMessage(
+              role: 'assistant',
+              content: '',
+              conversationId: 'conversation-local-tts-toggle',
+              isStreaming: true,
+            ),
+            showModelIcon: false,
+            toolParts: const [
+              ToolUIPart(
+                id: 'tts',
+                toolName: 'text_to_speech',
+                arguments: {'text': 'Replay this line'},
+                content: '{"success":true}',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.byTooltip('Replay'), findsOneWidget);
+
+      await tester.tap(find.text('Speaking:'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Arguments'), findsOneWidget);
+      expect(find.text('Replay this line'), findsWidgets);
+      expect(find.byTooltip('Replay'), findsOneWidget);
     });
 
     testWidgets('unclosed think tag remains visible as assistant content', (
@@ -432,127 +825,6 @@ void main() {
       );
     });
 
-    testWidgets('user image attachments stay inside bubble by default', (
-      tester,
-    ) async {
-      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
-      final imageFile = File(
-        '${Directory.systemTemp.path}/kelivo-chat-message-widget-image-inline.png',
-      );
-      imageFile.writeAsBytesSync(
-        base64Decode(
-          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
-        ),
-      );
-      addTearDown(() {
-        if (imageFile.existsSync()) imageFile.deleteSync();
-      });
-
-      await tester.pumpWidget(
-        _buildHarness(
-          settings: settings,
-          child: ChatMessageWidget(
-            message: ChatMessage(
-              id: 'user-image-message-inline',
-              role: 'user',
-              content: 'Look at this\n[image:${imageFile.path}]',
-              conversationId: 'conversation-user-image',
-            ),
-            showUserAvatar: false,
-          ),
-        ),
-      );
-      await tester.pump();
-
-      expect(find.textContaining('Look at this'), findsOneWidget);
-      expect(find.textContaining('[image:'), findsNothing);
-
-      final attachments = find.byKey(
-        const ValueKey(
-          'user_inline_image_attachments_user-image-message-inline',
-        ),
-      );
-      expect(attachments, findsOneWidget);
-      expect(
-        find.byKey(
-          const ValueKey(
-            'user_separate_image_attachments_user-image-message-inline',
-          ),
-        ),
-        findsNothing,
-      );
-      expect(
-        find.descendant(of: attachments, matching: find.byType(Image)),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets(
-      'user image attachments can render outside text bubble and remain openable',
-      (tester) async {
-        final settings = _createSettings(
-          ChatMessageBackgroundStyle.defaultStyle,
-        );
-        await settings.setSeparateUserMessageImageAttachments(true);
-        final imageFile = File(
-          '${Directory.systemTemp.path}/kelivo-chat-message-widget-image-separated.png',
-        );
-        imageFile.writeAsBytesSync(
-          base64Decode(
-            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
-          ),
-        );
-        addTearDown(() {
-          if (imageFile.existsSync()) imageFile.deleteSync();
-        });
-
-        await tester.pumpWidget(
-          _buildHarness(
-            settings: settings,
-            child: ChatMessageWidget(
-              message: ChatMessage(
-                id: 'user-image-message-separated',
-                role: 'user',
-                content: 'Look at this\n[image:${imageFile.path}]',
-                conversationId: 'conversation-user-image',
-              ),
-              showUserAvatar: false,
-            ),
-          ),
-        );
-        await tester.pump();
-
-        expect(find.textContaining('Look at this'), findsOneWidget);
-        expect(find.textContaining('[image:'), findsNothing);
-
-        final attachments = find.byKey(
-          const ValueKey(
-            'user_separate_image_attachments_user-image-message-separated',
-          ),
-        );
-        expect(attachments, findsOneWidget);
-        expect(
-          find.byKey(
-            const ValueKey(
-              'user_inline_image_attachments_user-image-message-separated',
-            ),
-          ),
-          findsNothing,
-        );
-        expect(
-          find.descendant(of: attachments, matching: find.byType(Image)),
-          findsOneWidget,
-        );
-
-        await tester.tap(
-          find.descendant(of: attachments, matching: find.byType(Image)),
-        );
-        await tester.pumpAndSettle();
-
-        expect(find.byType(ImageViewerPage), findsOneWidget);
-      },
-    );
-
     testWidgets('ask user card submits selected answer', (tester) async {
       final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
       final askUserService = AskUserInteractionService();
@@ -605,7 +877,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
-      expect(find.text('Choose scope?'), findsNWidgets(2));
+      expect(find.text('Choose scope?'), findsOneWidget);
       expect(find.text('Ask User'), findsNothing);
       expect(find.text('Needs your answer'), findsNothing);
       expect(find.text('Minimal'), findsOneWidget);
@@ -676,14 +948,14 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('Choose scope?'), findsNWidgets(2));
+      expect(find.text('Choose scope?'), findsOneWidget);
       expect(find.text('Complete'), findsOneWidget);
 
       await tester.tap(find.byIcon(Lucide.ChevronUp).last);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));
 
-      expect(find.text('Choose scope?'), findsOneWidget);
+      expect(find.text('Choose scope?'), findsNothing);
       expect(find.text('Complete'), findsNothing);
     });
 

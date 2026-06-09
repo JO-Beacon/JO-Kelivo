@@ -29,7 +29,7 @@ class _DesktopAssistantsBody extends StatelessWidget {
                           )!.desktopAssistantsListTitle,
                           style: TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w400,
+                            fontWeight: AppFontWeights.regular,
                             color: cs.onSurface.withValues(alpha: 0.9),
                           ),
                         ),
@@ -49,8 +49,7 @@ class _DesktopAssistantsBody extends StatelessWidget {
                     buildDefaultDragHandles: false,
                     padding: EdgeInsets.zero,
                     itemCount: assistants.length,
-                    onReorder: (oldIndex, newIndex) async {
-                      if (newIndex > oldIndex) newIndex -= 1;
+                    onReorderItem: (oldIndex, newIndex) async {
                       await context.read<AssistantProvider>().reorderAssistants(
                         oldIndex,
                         newIndex,
@@ -129,12 +128,12 @@ class _AddAssistantButtonState extends State<_AddAssistantButton> {
       child: GestureDetector(
         onTap: () async {
           final assistantProvider = context.read<AssistantProvider>();
-          final insertAtTop = context
-              .read<SettingsProvider>()
-              .insertNewAssistantAtTop;
           final name = await _showAddAssistantDesktopDialog(context);
           if (name == null || name.trim().isEmpty) return;
           if (!context.mounted) return;
+          final insertAtTop = context
+              .read<SettingsProvider>()
+              .insertNewAssistantAtTop;
           await assistantProvider.addAssistant(
             name: name.trim(),
             context: context,
@@ -182,9 +181,9 @@ Future<String?> _showAddAssistantDesktopDialog(BuildContext context) async {
                       Expanded(
                         child: Text(
                           l10n.assistantSettingsAddSheetTitle,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: AppFontWeights.emphasis,
                           ),
                         ),
                       ),
@@ -380,9 +379,9 @@ Future<bool?> _confirmDeleteDesktop(BuildContext context) async {
                               l10n.assistantSettingsDeleteDialogTitle,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 13,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: AppFontWeights.emphasis,
                               ),
                             ),
                           ),
@@ -528,7 +527,7 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
               widget.label,
               style: TextStyle(
                 color: textColor,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeights.semibold,
                 fontSize: widget.dense ? 13 : 14,
               ),
             ),
@@ -590,9 +589,9 @@ class _DesktopAssistantCardState extends State<_DesktopAssistantCard> {
                               widget.item.name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 16,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: AppFontWeights.emphasis,
                               ),
                             ),
                           ),
@@ -751,7 +750,7 @@ class _AssistantAvatarDesktop extends StatelessWidget {
         letter,
         style: TextStyle(
           color: cs.primary,
-          fontWeight: FontWeight.w700,
+          fontWeight: AppFontWeights.emphasis,
           fontSize: size * 0.42,
         ),
       ),

@@ -1,4 +1,4 @@
-#include "my_application.h"
+﻿#include "my_application.h"
 
 #include <flutter_linux/flutter_linux.h>
 #include <gio/gio.h>

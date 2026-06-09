@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -30,18 +30,32 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.psyche.jokelivo.background-generation.refresh</string>
+		<string>com.psyche.jokelivo.background-generation.processing</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Kelivo 闇€瑕佷娇鐢ㄧ浉鏈烘媿鎽勭収鐗囷紝浠ヤ究鎮ㄥ皢鍥剧墖鍙戦€佺粰 AI 鍔╂墜杩涜鍒嗘瀽銆傛偍鍙互閫夋嫨鏄惁涓婁紶鐓х墖銆?/ Kelivo uses the camera to capture photos that you can share with AI assistants for analysis. Your photo may be uploaded by your choice.</string>
+	<string>JO-Kelivo 需要使用相机拍摄照片，以便您将图片发送给 AI 助手进行分析。您可以选择是否上传照片。 / JO-Kelivo uses the camera to capture photos that you can share with AI assistants for analysis. Your photo may be uploaded by your choice.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>鎴戜滑浣跨敤鎮ㄧ殑闊抽鏁版嵁杩涜璇煶璇嗗埆銆傛偍鐨勬暟鎹敱绯荤粺澶勭悊锛涙垜浠笉浼氭敹闆嗚繖浜涗俊鎭?/ We use your audio data for speech recognition. Your data is processed by system; we do not collect that information.</string>
+	<string>我们使用您的音频数据进行语音识别。您的数据由系统处理；我们不会收集这些信息 / We use your audio data for speech recognition. Your data is processed by system; we do not collect that information.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>鍏佽淇濆瓨鍥剧墖鍒扮浉鍐岋紝鎮ㄧ殑鏁版嵁灏嗕繚瀛樺湪鏈湴銆? Allow saving images to your photo library.Your data will be saved locally.</string>
+	<string>允许保存图片到相册，您的数据将保存在本地。/ Allow saving images to your photo library. Your data will be saved locally.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>鍏佽璁块棶鐩稿唽浠ラ€夋嫨澶村儚鍥剧墖 / Allow access to your photos to pick an avatar.</string>
+	<string>允许访问相册以选择头像图片 / Allow access to your photos to pick an avatar.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>processing</string>
+	</array>
 	<key>UIDesignRequiresCompatibility</key>
 	<true/>
 	<key>UIFileSharingEnabled</key>

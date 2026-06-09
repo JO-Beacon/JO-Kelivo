@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -13,7 +14,6 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../core/services/haptics.dart';
 import 'debug_page.dart';
 import 'log_viewer_page.dart';
-import 'sponsor_page.dart';
 
 class AboutPage extends StatefulWidget {
   const AboutPage({super.key});
@@ -23,6 +23,9 @@ class AboutPage extends StatefulWidget {
 }
 
 class _AboutPageState extends State<AboutPage> {
+  static const String _upstreamKelivoVersion = '1.1.16';
+  static const String _upstreamKelivoBuildNumber = '60';
+
   String _version = '';
   String _buildNumber = '';
   String _systemInfo = '';
@@ -342,9 +345,9 @@ class _AboutPageState extends State<AboutPage> {
                         children: [
                           Text(
                             l10n.aboutPageAppName,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 16,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: AppFontWeights.semibold,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -409,13 +412,6 @@ class _AboutPageState extends State<AboutPage> {
                   'https://github.com/JO-Beacon/JO-Kelivo/blob/main/LICENSE',
                 ),
               ),
-              _iosDivider(context),
-              _iosNavRowSvgLeading(
-                context,
-                svgAsset: 'assets/icons/tencent-qq.svg',
-                label: l10n.aboutPageJoinQQGroup,
-                onTap: () => _openUrl('https://qm.qq.com/q/OQaXetKssC'),
-              ),
             ],
           ),
 
@@ -430,8 +426,12 @@ class _AboutPageState extends State<AboutPage> {
                 context,
                 icon: Lucide.Code,
                 label: l10n.aboutPageVersion,
-                detailBuilder: (_) =>
-                    Text(l10n.aboutPageVersionDetail('1.1.15', '52')),
+                detailBuilder: (_) => Text(
+                  l10n.aboutPageVersionDetail(
+                    _upstreamKelivoVersion,
+                    _upstreamKelivoBuildNumber,
+                  ),
+                ),
                 onTap: _onVersionTap,
               ),
               _iosDivider(context),
@@ -439,12 +439,7 @@ class _AboutPageState extends State<AboutPage> {
                 context,
                 icon: Lucide.Earth,
                 label: l10n.aboutPageWebsite,
-                onTap: () async {
-                  final uri = Uri.parse('https://kelivo.psycheas.top/');
-                  if (!await launchUrl(uri, mode: LaunchMode.platformDefault)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  }
-                },
+                onTap: () => _openUrl('https://kelivo.psycheas.top/'),
               ),
               _iosDivider(context),
               _iosNavRowSvgLeading(
@@ -475,17 +470,6 @@ class _AboutPageState extends State<AboutPage> {
                 svgAsset: 'assets/icons/discord.svg',
                 label: l10n.aboutPageJoinDiscord,
                 onTap: () => _openUrl('https://discord.gg/Tb8DyvvV5T'),
-              ),
-              _iosDivider(context),
-              _iosNavRow(
-                context,
-                icon: Lucide.Heart,
-                label: l10n.settingsPageSponsor,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const SponsorPage()),
-                  );
-                },
               ),
             ],
           ),
@@ -527,6 +511,21 @@ Widget _iosSectionCard({required List<Widget> children}) {
   );
 }
 
+Widget _iosSectionHeader(BuildContext context, String title) {
+  final cs = Theme.of(context).colorScheme;
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 6),
+    child: Text(
+      title,
+      style: TextStyle(
+        fontSize: 13,
+        fontWeight: AppFontWeights.semibold,
+        color: cs.onSurface.withValues(alpha: 0.62),
+      ),
+    ),
+  );
+}
+
 Widget _iosDivider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;
   return Divider(
@@ -535,21 +534,6 @@ Widget _iosDivider(BuildContext context) {
     indent: 54,
     endIndent: 12,
     color: cs.outlineVariant.withValues(alpha: 0.18),
-  );
-}
-
-Widget _iosSectionHeader(BuildContext context, String title) {
-  final cs = Theme.of(context).colorScheme;
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 4),
-    child: Text(
-      title,
-      style: TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: cs.onSurface.withValues(alpha: 0.65),
-      ),
-    ),
   );
 }
 

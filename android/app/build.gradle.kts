@@ -1,33 +1,20 @@
-import java.util.Properties
+﻿import java.util.Properties
 
 plugins {
     id("com.android.application")
-    id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    // The Flutter Gradle Plugin must be applied after the Android Gradle plugin.
     id("dev.flutter.flutter-gradle-plugin")
 }
-
-val pubspecVersion = rootProject.file("../pubspec.yaml")
-    .readLines()
-    .first { it.trimStart().startsWith("version:") }
-    .substringAfter("version:")
-    .trim()
-val androidVersionName = pubspecVersion.substringBefore("+")
-val androidVersionCode = pubspecVersion.substringAfter("+").toInt()
 
 android {
     namespace = "com.psyche.jokelivo"
     compileSdk = flutter.compileSdkVersion
 //    ndkVersion = flutter.ndkVersion
-    ndkVersion = "28.2.13676358"
+    ndkVersion = "27.0.12077973"
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
         isCoreLibraryDesugaringEnabled = true
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
     }
 
     defaultConfig {
@@ -37,8 +24,8 @@ android {
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        versionCode = androidVersionCode
-        versionName = androidVersionName
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
     }
 
     val keystorePropertiesFile = rootProject.file("key.properties")
@@ -67,12 +54,9 @@ android {
     }
 }
 
-androidComponents {
-    onVariants(selector().all()) { variant ->
-        variant.outputs.forEach { output ->
-            output.versionCode.set(androidVersionCode)
-            output.versionName.set(androidVersionName)
-        }
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11
     }
 }
 

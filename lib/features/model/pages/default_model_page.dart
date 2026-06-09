@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../icons/lucide_adapter.dart';
+import '../../../shared/widgets/snackbar.dart';
 import '../widgets/model_select_sheet.dart';
 import '../widgets/ocr_prompt_sheet.dart';
+import '../utils/ocr_model_capability.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../core/services/haptics.dart';
+import '../../../theme/app_font_weights.dart';
 
 class DefaultModelPage extends StatelessWidget {
   const DefaultModelPage({super.key});
@@ -172,6 +175,19 @@ class DefaultModelPage extends StatelessWidget {
             onPick: () async {
               final sel = await showModelSelector(context);
               if (sel != null) {
+                if (!modelSupportsOcrImageInput(
+                  settings,
+                  sel.providerKey,
+                  sel.modelId,
+                )) {
+                  if (!context.mounted) return;
+                  showAppSnackBar(
+                    context,
+                    message: l10n.defaultModelPageOcrModelRequiresImageInput,
+                    type: NotificationType.error,
+                  );
+                  return;
+                }
                 await settings.setOcrModel(sel.providerKey, sel.modelId);
               }
             },
@@ -221,9 +237,9 @@ class DefaultModelPage extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   l10n.defaultModelPagePromptLabel,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -331,9 +347,9 @@ class DefaultModelPage extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   l10n.defaultModelPagePromptLabel,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -446,9 +462,9 @@ class DefaultModelPage extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   l10n.defaultModelPagePromptLabel,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -559,9 +575,9 @@ class DefaultModelPage extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   l10n.defaultModelPagePromptLabel,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -671,9 +687,9 @@ class DefaultModelPage extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   l10n.defaultModelPagePromptLabel,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -841,9 +857,9 @@ class _ModelCard extends StatelessWidget {
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: AppFontWeights.semibold,
                     ),
                   ),
                 ),
@@ -912,9 +928,9 @@ class _ModelCard extends StatelessWidget {
                             modelDisplay ?? (providerName ?? '-'),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: AppFontWeights.semibold,
                             ),
                           ),
                         ),
@@ -968,7 +984,7 @@ class _BrandAvatar extends StatelessWidget {
         name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
         style: TextStyle(
           color: cs.primary,
-          fontWeight: FontWeight.w700,
+          fontWeight: AppFontWeights.emphasis,
           fontSize: size * 0.42,
         ),
       );

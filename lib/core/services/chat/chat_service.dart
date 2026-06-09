@@ -111,6 +111,64 @@ class ChatService extends ChangeNotifier {
     return conversation.messageIds.indexOf(messageId);
   }
 
+  Map<String, int> getFirstMessageIndicesForGroups(
+    String conversationId,
+    Iterable<String> groupIds,
+  ) {
+    final remaining = groupIds.where((id) => id.isNotEmpty).toSet();
+    if (remaining.isEmpty) return const <String, int>{};
+
+    final result = <String, int>{};
+    final count = getMessageCount(conversationId);
+    for (
+      var start = 0;
+      start < count && remaining.isNotEmpty;
+      start += defaultLoadedWindowMax
+    ) {
+      final range = getMessagesRange(
+        conversationId,
+        start: start,
+        limit: defaultLoadedWindowMax,
+      );
+      for (var offset = 0; offset < range.length; offset++) {
+        final message = range[offset];
+        final groupId = message.groupId ?? message.id;
+        if (remaining.remove(groupId)) {
+          result[groupId] = start + offset;
+          if (remaining.isEmpty) break;
+        }
+      }
+    }
+
+    return result;
+  }
+
+  List<ChatMessage> getMessagesForGroups(
+    String conversationId,
+    Iterable<String> groupIds,
+  ) {
+    final remaining = groupIds.where((id) => id.isNotEmpty).toSet();
+    if (remaining.isEmpty) return const <ChatMessage>[];
+
+    final result = <ChatMessage>[];
+    final count = getMessageCount(conversationId);
+    for (var start = 0; start < count; start += defaultLoadedWindowMax) {
+      final range = getMessagesRange(
+        conversationId,
+        start: start,
+        limit: defaultLoadedWindowMax,
+      );
+      for (final message in range) {
+        final groupId = message.groupId ?? message.id;
+        if (remaining.contains(groupId)) {
+          result.add(message);
+        }
+      }
+    }
+
+    return result;
+  }
+
   ChatMessage? _messageForConversation(
     String conversationId,
     String messageId,
@@ -283,57 +341,38 @@ class ChatService extends ChangeNotifier {
   Future<void> deleteConversation(String id) async {
     if (!_initialized) return;
 
-    // If it's a draft and never persisted, just drop it.
-    if (_draftConversations.containsKey(id)) {
-      _draftConversations.remove(id);
-      _temporaryConversationIds.remove(id);
-      final messages = _messagesCache[id] ?? const <ChatMessage>[];
-      for (final message in messages) {
-        _temporaryToolEvents.remove(message.id);
-        _temporaryGeminiThoughtSigs.remove(message.id);
-      }
-      _messagesCache.remove(id);
-      if (_currentConversationId == id) {
-        _currentConversationId = null;
-      }
-      notifyListeners();
-      return;
-    }
+    final deleted =
+        await _deleteDraftConversation(id) ||
+        await _deletePersistedConversation(id);
+    if (!deleted) return;
 
+    // Delete orphaned files (not referenced by any remaining conversation)
+    await _cleanupOrphanUploads();
+
+    notifyListeners();
+  }
+
+  Future<bool> _deleteDraftConversation(String id) async {
+    if (!_draftConversations.containsKey(id)) return false;
+
+    _draftConversations.remove(id);
+    _temporaryConversationIds.remove(id);
+    final messages = _messagesCache[id] ?? const <ChatMessage>[];
+    for (final message in messages) {
+      _temporaryToolEvents.remove(message.id);
+      _temporaryGeminiThoughtSigs.remove(message.id);
+    }
+    _messagesCache.remove(id);
+    if (_currentConversationId == id) {
+      _currentConversationId = null;
+    }
+    return true;
+  }
+
+  Future<bool> _deletePersistedConversation(String id) async {
     final conversation = _conversationsBox.get(id);
-    if (conversation == null) return;
+    if (conversation == null) return false;
 
-    // Collect local file paths referenced by messages in this conversation
-    final Set<String> pathsToMaybeDelete = <String>{};
-    for (final messageId in conversation.messageIds) {
-      final message = _messagesBox.get(messageId);
-      if (message == null) continue;
-      final content = message.content;
-      // [image:/abs/path]
-      final imgRe = RegExp(r"\[image:(.+?)\]");
-      for (final m in imgRe.allMatches(content)) {
-        final pth = m.group(1)?.trim();
-        if (pth != null &&
-            pth.isNotEmpty &&
-            !pth.startsWith('http') &&
-            !pth.startsWith('data:')) {
-          pathsToMaybeDelete.add(pth);
-        }
-      }
-      // [file:/abs/path|filename|mime]
-      final fileRe = RegExp(r"\[file:(.+?)\|(.+?)\|(.+?)\]");
-      for (final m in fileRe.allMatches(content)) {
-        final pth = m.group(1)?.trim();
-        if (pth != null &&
-            pth.isNotEmpty &&
-            !pth.startsWith('http') &&
-            !pth.startsWith('data:')) {
-          pathsToMaybeDelete.add(pth);
-        }
-      }
-    }
-
-    // Delete all messages
     for (final messageId in conversation.messageIds) {
       final msg = _messagesBox.get(messageId);
       if (msg != null && msg.role == 'assistant') {
@@ -347,20 +386,40 @@ class ChatService extends ChangeNotifier {
       await _messagesBox.delete(messageId);
     }
 
-    // Delete conversation
     await _conversationsBox.delete(id);
-
-    // Remove cached messages
-    // Clear cache
     _messagesCache.remove(id);
-
-    // Delete orphaned files (not referenced by any remaining conversation)
-    await _cleanupOrphanUploads();
 
     if (_currentConversationId == id) {
       _currentConversationId = null;
     }
+    return true;
+  }
 
+  Future<void> deleteConversationsForAssistant(String assistantId) async {
+    if (!_initialized) await init();
+
+    final targetId = assistantId.trim();
+    if (targetId.isEmpty) return;
+
+    final persistedConversationIds = _conversationsBox.values
+        .where((conversation) => conversation.assistantId == targetId)
+        .map((conversation) => conversation.id)
+        .toList(growable: false);
+    final draftConversationIds = _draftConversations.values
+        .where((conversation) => conversation.assistantId == targetId)
+        .map((conversation) => conversation.id)
+        .toList(growable: false);
+
+    var deleted = false;
+    for (final conversationId in draftConversationIds) {
+      deleted = await _deleteDraftConversation(conversationId) || deleted;
+    }
+    for (final conversationId in persistedConversationIds) {
+      deleted = await _deletePersistedConversation(conversationId) || deleted;
+    }
+
+    if (!deleted) return;
+    await _cleanupOrphanUploads();
     notifyListeners();
   }
 
@@ -923,8 +982,8 @@ class ChatService extends ChangeNotifier {
 
   Future<void> updateMessage(
     String messageId, {
-    String? role,
     String? content,
+    String? role,
     int? totalTokens,
     bool? isStreaming,
     String? reasoningText,
@@ -944,8 +1003,8 @@ class ChatService extends ChangeNotifier {
     if (message == null) return;
 
     final updatedMessage = message.copyWith(
-      role: role ?? message.role,
       content: content ?? message.content,
+      role: role ?? message.role,
       totalTokens: totalTokens ?? message.totalTokens,
       isStreaming: isStreaming ?? message.isStreaming,
       reasoningText: reasoningText ?? message.reasoningText,
@@ -991,7 +1050,6 @@ class ChatService extends ChangeNotifier {
   /// widgets watching ChatService (e.g., side_drawer).
   Future<void> updateMessageSilent(
     String messageId, {
-    String? role,
     String? content,
     int? totalTokens,
     bool? isStreaming,
@@ -1012,7 +1070,6 @@ class ChatService extends ChangeNotifier {
     if (message == null) return;
 
     final updatedMessage = message.copyWith(
-      role: role ?? message.role,
       content: content ?? message.content,
       totalTokens: totalTokens ?? message.totalTokens,
       isStreaming: isStreaming ?? message.isStreaming,

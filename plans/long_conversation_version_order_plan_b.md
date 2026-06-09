@@ -1,4 +1,4 @@
-# 长会话版本消息错乱 BUG：方案 B 修复计划
+# 长会话版本消息错乱 BUG：方案 B 优化计划
 
 ## 背景与 BUG 动机
 
@@ -70,7 +70,7 @@
 - 长会话中编辑旧消息后，新版本不会出现在会话尾部窗口。
 - 长会话中重新生成旧助手消息后，新版本不会出现在会话尾部窗口。
 - 完整折叠历史仍能在原始消息位置显示选中的新版本。
-- 模型请求上下文保持现有正确行为，不因 UI 修复改变。
+- 模型请求上下文保持现有正确行为，不因 UI 优化改变。
 - 运行 [`test/features/home/controllers/chat_controller_lazy_history_test.dart`](../test/features/home/controllers/chat_controller_lazy_history_test.dart) 通过。
 - 运行 `flutter analyze` 通过。
 
@@ -158,7 +158,7 @@
 
 更推荐第 1 种或第 3 种，避免扩散过多新 API。
 
-### 编辑消息修复
+### 编辑消息优化
 
 修改 [`ChatService.appendMessageVersion()`](../lib/core/services/chat/chat_service.dart)：
 
@@ -166,7 +166,7 @@
 - 改为插入到同组最后一个消息 ID 后。
 - `_messagesCache[cid]` 也按同样位置插入，不能简单 `arr.add(newMsg)`。
 
-### 重新生成修复
+### 重新生成优化
 
 修改 [`MessageGenerationService.createAssistantPlaceholder()`](../lib/features/home/services/message_generation_service.dart) 或它调用的 [`ChatService.addMessage()`](../lib/core/services/chat/chat_service.dart)：
 
@@ -193,7 +193,7 @@
 - 编辑旧消息时，新版本插回同一消息组附近。
 - 重新生成旧助手消息时，新版本插回同一消息组附近。
 - 普通新消息仍追加到会话尾部。
-- 旧备份和旧本地数据仍可读取，不因修复崩溃。
+- 旧备份和旧本地数据仍可读取，不因优化崩溃。
 
 这一步解决的是“以后不要继续制造新的尾部错位版本消息”。
 
@@ -208,15 +208,15 @@
 - 扫描每个会话的 `messageIds`。
 - 找出同一 `groupId` 下散落到尾部或远离原始锚点的版本消息。
 - 把版本消息移动回同组消息附近。
-- 输出新的修复文件，例如 `chats.fixed.json`。
+- 输出新的优化文件，例如 `chats.optimized.json`。
 
 推荐文件输出策略：
 
 - 原文件：`chats.json`
 - 自动备份：`chats.backup.json`
-- 修复输出：`chats.fixed.json`
+- 优化输出：`chats.optimized.json`
 
-第二阶段脚本只改变 `messageIds` 的顺序，不改变 `Conversation` / `ChatMessage` 字段结构，不新增备份格式字段。这样修复后的存档仍能导入未修复上游 Kelivo；但未修复上游后续继续编辑旧消息时，仍可能重新产生新的尾部错位版本消息。
+第二阶段脚本只改变 `messageIds` 的顺序，不改变 `Conversation` / `ChatMessage` 字段结构，不新增备份格式字段。这样优化后的存档仍能导入未优化上游 Kelivo；但未优化上游后续继续编辑旧消息时，仍可能重新产生新的尾部错位版本消息。
 
 ## 旧数据兼容策略
 
@@ -234,7 +234,7 @@
 - 完整历史折叠仍应尽量把旧版本放回原始位置显示。
 - 当前窗口内如果只出现旧尾部版本、缺少原始锚点，仍由展示层过滤掉。
 - 新产生的版本不再进入尾部，从源头减少复发。
-- 修复脚本处理过的 `chats.fixed.json` 不应改变备份格式，只改变消息 ID 顺序。
+- 优化脚本处理过的 `chats.optimized.json` 不应改变备份格式，只改变消息 ID 顺序。
 
 ## 测试计划
 
@@ -254,42 +254,44 @@
 
 ## 执行步骤
 
-### 第一阶段：应用修复
+### 第一阶段：应用优化
 
 1. 补一个失败测试：长会话中多个旧消息编辑版本被追加到尾部时，尾部窗口仍残留错乱。
 2. 修改 [`ChatService.appendMessageVersion()`](../lib/core/services/chat/chat_service.dart)，让编辑版本插回同组附近。
 3. 修改 [`ChatService.addMessage()`](../lib/core/services/chat/chat_service.dart) 或 [`MessageGenerationService.createAssistantPlaceholder()`](../lib/features/home/services/message_generation_service.dart)，让重新生成版本插回同组附近。
 4. 调整 `_messagesCache` 的插入位置，确保 UI 当前内存窗口和持久化顺序一致。
 5. 复查 [`ChatController.collapseVersions()`](../lib/features/home/controllers/chat_controller.dart) 的方案 A 过滤逻辑，确认不会隐藏方案 B 生成的正常版本。
-6. 更新 [`README.md`](../README.md)，说明方案 A 仅降低概率，最终采用方案 B 源头修复。
+6. 更新 [`README.md`](../README.md)，说明方案 A 仅降低概率，最终采用方案 B 源头优化。
 7. 运行 `dart format`。
 8. 运行相关测试。
 9. 运行 `flutter analyze`。
 10. 视改动影响运行 `flutter test`。
 
-### 第二阶段：旧存档修复脚本
+### 第二阶段：旧存档优化脚本
 
-1. 新增完全独立的 Python 工具目录 [`repair_chat_archive/`](../repair_chat_archive/)，不放进 Kelivo 内部 [`scripts/`](../scripts/) 流程。
+1. 新增完全独立的 Python 工具目录 [`optimize_chat_archive/`](../optimize_chat_archive/)，不放进 Kelivo 内部 [`scripts/`](../scripts/) 流程。
 2. 工具只使用 Python 标准库，不导入 Kelivo 的 [`lib/`](../lib/) 代码，不依赖 Flutter / Dart 运行环境。
-3. 入口文件为 [`repair_chat_archive/repair_chat_archive.py`](../repair_chat_archive/repair_chat_archive.py)，配套 [`repair_chat_archive/pyproject.toml`](../repair_chat_archive/pyproject.toml)、[`repair_chat_archive/README.md`](../repair_chat_archive/README.md) 和测试目录 [`repair_chat_archive/tests/`](../repair_chat_archive/tests/)。
+3. 入口文件为 [`optimize_chat_archive/optimize_chat_archive.py`](../optimize_chat_archive/optimize_chat_archive.py)，配套 [`optimize_chat_archive/pyproject.toml`](../optimize_chat_archive/pyproject.toml)、[`optimize_chat_archive/README.md`](../optimize_chat_archive/README.md) 和测试目录 [`optimize_chat_archive/tests/`](../optimize_chat_archive/tests/)。
 4. 脚本读取输入的 `chats.json`，解析 `conversations` 和 `messages`。
 5. 对每个会话建立消息 ID 到消息对象的索引。
 6. 按当前 `messageIds` 顺序扫描，识别每条消息的归属组：`groupId ?? id`。
 7. 对 `version > 0` 且存在有效 `groupId` 的版本消息，尝试移动回同组非版本锚点附近。
 8. 保持同组版本消息相对顺序稳定。
 9. 不改变消息内容、消息 ID、版本号、时间戳、会话 ID、`versionSelections` 或备份 schema。
-10. 遇到重复 `messageIds`、缺失消息、找不到非版本锚点、JSON 结构异常时，保守跳过并输出原因，不强行修复。
-11. 输出修复报告：处理会话数、修改会话数、移动消息数、跳过原因。
-12. 默认不覆盖原文件，输出 `chats.fixed.json`，同时保留 `chats.backup.json`。
-13. 用单元测试验证：修复前后 JSON 可解析、消息数量不变、会话数量不变、所有 `messageIds` 集合不变、正常修复/边界输入/错误路径均覆盖。
+10. 遇到重复 `messageIds`、缺失消息、找不到非版本锚点、JSON 结构异常时，保守跳过并输出原因，不强行优化。
+11. 输出优化报告：处理会话数、修改会话数、移动消息数、跳过原因。
+12. 默认不覆盖原文件，输出 `chats.optimized.json`，同时保留 `chats.backup.json`。
+13. 用单元测试验证：优化前后 JSON 可解析、消息数量不变、会话数量不变、所有 `messageIds` 集合不变、正常优化/边界输入/错误路径均覆盖。
 
 ## 完成后的交付说明必须包含
 
 - 改了哪些文件。
 - 方案 B 如何保证新版本不再追加到尾部。
 - 旧存档如何兼容。
-- 如果实现了第二阶段脚本，说明脚本输入、输出、备份文件、修复报告和未修改字段。
+- 如果实现了第二阶段脚本，说明脚本输入、输出、备份文件、优化报告和未修改字段。
 - 哪些测试覆盖了编辑、重新生成、旧数据兼容。
 - 如果实现了脚本，说明脚本验证了哪些不变量：会话数量、消息数量、消息 ID 完整性、JSON 可解析性。
 - 运行了哪些验证命令。
 - 没有运行的验证及风险边界。
+
+

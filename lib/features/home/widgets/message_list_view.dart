@@ -39,6 +39,8 @@ typedef OnDeleteAllVersions =
 typedef OnForkConversation = Future<void> Function(ChatMessage message);
 typedef OnShareMessage =
     void Function(int messageIndex, List<ChatMessage> messages);
+typedef OnSelectMessages =
+    void Function(int messageIndex, List<ChatMessage> messages);
 typedef OnSpeakMessage = Future<void> Function(ChatMessage message);
 typedef OnSwitchMessageRole =
     Future<void> Function(ChatMessage message, String role);
@@ -99,6 +101,7 @@ class MessageListView extends StatefulWidget {
     required this.selecting,
     required this.selectedItems,
     required this.dividerPadding,
+    this.topContentPadding = 8,
     this.bottomContentPadding = 16,
     this.pinnedStreamingMessageId,
     this.isPinnedIndicatorActive = false,
@@ -115,8 +118,10 @@ class MessageListView extends StatefulWidget {
     this.onDeleteAllVersions,
     this.onForkConversation,
     this.onShareMessage,
+    this.onSelectMessages,
     this.onSpeakMessage,
     this.onSwitchMessageRole,
+    this.maxContentWidth = ChatLayoutConstants.maxContentWidth,
     this.suggestions = const <String>[],
     this.onSuggestionTap,
     this.onRecoveredAskUserAnswer,
@@ -129,7 +134,6 @@ class MessageListView extends StatefulWidget {
     this.onLoadMoreBefore,
     this.hasMoreAfter = false,
     this.onLoadMoreAfter,
-    this.maxContentWidth = ChatLayoutConstants.maxContentWidth,
   });
 
   final ScrollController scrollController;
@@ -155,8 +159,8 @@ class MessageListView extends StatefulWidget {
   final bool selecting;
   final Set<String> selectedItems;
   final EdgeInsetsGeometry dividerPadding;
+  final double topContentPadding;
   final double bottomContentPadding;
-  final double? maxContentWidth;
   final String? pinnedStreamingMessageId;
   final bool isPinnedIndicatorActive;
   final ValueNotifier<bool> isProcessingFiles;
@@ -183,8 +187,10 @@ class MessageListView extends StatefulWidget {
   final OnDeleteAllVersions? onDeleteAllVersions;
   final OnForkConversation? onForkConversation;
   final OnShareMessage? onShareMessage;
+  final OnSelectMessages? onSelectMessages;
   final OnSpeakMessage? onSpeakMessage;
   final OnSwitchMessageRole? onSwitchMessageRole;
+  final double? maxContentWidth;
   final List<String> suggestions;
   final OnSuggestionTap? onSuggestionTap;
   final OnRecoveredAskUserAnswer? onRecoveredAskUserAnswer;
@@ -275,7 +281,7 @@ class _MessageListViewState extends State<MessageListView> {
               controller: widget.scrollController,
               padding: EdgeInsets.fromLTRB(
                 horizontalPad,
-                8,
+                widget.topContentPadding,
                 horizontalPad,
                 widget.bottomContentPadding +
                     (widget.isPinnedIndicatorActive ? 12 : 0),
@@ -810,7 +816,7 @@ class _MessageListViewState extends State<MessageListView> {
       onSpeak: message.role == 'assistant'
           ? () => widget.onSpeakMessage?.call(message)
           : null,
-      onEdit: (message.role == 'user' || message.role == 'assistant')
+      onEdit: (message.role == 'assistant' || message.role == 'user')
           ? () => widget.onEditMessage?.call(message)
           : null,
       onDelete: message.role == 'user'
@@ -832,6 +838,8 @@ class _MessageListViewState extends State<MessageListView> {
           await widget.onForkConversation?.call(message);
         } else if (action == MessageMoreAction.share) {
           widget.onShareMessage?.call(index, widget.messages);
+        } else if (action == MessageMoreAction.selectMessages) {
+          widget.onSelectMessages?.call(index, widget.messages);
         } else if (action == MessageMoreAction.switchToUser) {
           await widget.onSwitchMessageRole?.call(message, 'user');
         } else if (action == MessageMoreAction.switchToAssistant) {

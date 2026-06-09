@@ -13,11 +13,16 @@ import '../../../core/services/chat/chat_service.dart';
 /// - Conversation stream subscriptions
 /// - Message grouping and collapsing logic
 class ChatController extends ChangeNotifier {
-  ChatController({
+  factory ChatController({
     required ChatService chatService,
     bool Function()? lazyHistoryEnabled,
-  }) : _chatService = chatService,
-       _lazyHistoryEnabled = lazyHistoryEnabled ?? (() => true);
+  }) {
+    return ChatController._(chatService, lazyHistoryEnabled ?? (() => true));
+  }
+
+  ChatController._(this._chatService, this._lazyHistoryEnabled) {
+    _chatService.addListener(_syncCurrentConversationWithService);
+  }
 
   final ChatService _chatService;
   final bool Function() _lazyHistoryEnabled;
@@ -56,6 +61,7 @@ class ChatController extends ChangeNotifier {
   List<ChatMessage>? _collapsedCache;
   Map<String, int>? _collapsedIdToIndex;
   Map<String, List<ChatMessage>>? _groupCache;
+  List<ChatMessage>? _messagesWithVisibleGroupsCache;
 
   /// Conversation IDs that are currently generating (streaming).
   final Set<String> _loadingConversationIds = <String>{};
@@ -80,6 +86,14 @@ class ChatController extends ChangeNotifier {
 
   /// Get the ChatService instance.
   ChatService get chatService => _chatService;
+
+  void _syncCurrentConversationWithService() {
+    final conversation = _currentConversation;
+    if (conversation == null) return;
+    if (_chatService.getConversation(conversation.id) != null) return;
+    _clearCurrentConversationState();
+    notifyListeners();
+  }
 
   // ============================================================================
   // Conversation Management
@@ -160,12 +174,16 @@ class ChatController extends ChangeNotifier {
 
   /// Clear the current conversation state.
   void clearCurrentConversation() {
+    _clearCurrentConversationState();
+    notifyListeners();
+  }
+
+  void _clearCurrentConversationState() {
     _currentConversation = null;
     _messages = [];
     _loadedStartIndex = 0;
     _totalMessageCount = 0;
-    _versionSelections.clear();
-    notifyListeners();
+    _versionSelections = <String, int>{};
   }
 
   void _loadInitialMessageWindow(String conversationId) {
@@ -294,6 +312,16 @@ class ChatController extends ChangeNotifier {
     );
     if (targetIndex < 0) return false;
 
+    return _loadWindowAroundIndex(targetIndex, leadingContext: leadingContext);
+  }
+
+  bool _loadWindowAroundIndex(
+    int targetIndex, {
+    int leadingContext = ChatService.defaultHistoryPageSize,
+  }) {
+    final conversation = _currentConversation;
+    if (conversation == null || targetIndex < 0) return false;
+
     _totalMessageCount = _chatService.getMessageCount(conversation.id);
     if (_totalMessageCount == 0) return false;
 
@@ -402,6 +430,11 @@ class ChatController extends ChangeNotifier {
     if (_currentConversation == null) {
       throw StateError('No current conversation');
     }
+    if (_chatService.getConversation(_currentConversation!.id) == null) {
+      _clearCurrentConversationState();
+      notifyListeners();
+      throw StateError('No current conversation');
+    }
 
     if (hasMoreAfter) {
       loadEndWindow();
@@ -446,6 +479,22 @@ class ChatController extends ChangeNotifier {
     _totalMessageCount = _chatService.getMessageCount(conversation.id);
 
     if (!wasAtTail) {
+      final groupId = message.groupId ?? message.id;
+      final firstIndices = _chatService.getFirstMessageIndicesForGroups(
+        conversation.id,
+        <String>{groupId},
+      );
+      final anchorIndex = firstIndices[groupId];
+      if (anchorIndex != null) {
+        final loadedEnd = _loadedStartIndex + _messages.length;
+        if (anchorIndex >= _loadedStartIndex && anchorIndex < loadedEnd) {
+          notifyListeners();
+          return false;
+        }
+        if (_loadWindowAroundIndex(anchorIndex)) {
+          return true;
+        }
+      }
       return loadEndWindow();
     }
 
@@ -477,15 +526,15 @@ class ChatController extends ChangeNotifier {
   /// Update a message by ID with optional new values.
   Future<void> updateMessage(
     String messageId, {
-    String? role,
     String? content,
+    String? role,
     int? totalTokens,
     bool? isStreaming,
   }) async {
     await _chatService.updateMessage(
       messageId,
-      role: role,
       content: content,
+      role: role,
       totalTokens: totalTokens,
       isStreaming: isStreaming,
     );
@@ -494,8 +543,8 @@ class ChatController extends ChangeNotifier {
     final index = _messages.indexWhere((m) => m.id == messageId);
     if (index != -1) {
       _messages[index] = _messages[index].copyWith(
-        role: role ?? _messages[index].role,
         content: content ?? _messages[index].content,
+        role: role ?? _messages[index].role,
         totalTokens: totalTokens ?? _messages[index].totalTokens,
         isStreaming: isStreaming ?? _messages[index].isStreaming,
       );
@@ -653,45 +702,16 @@ class ChatController extends ChangeNotifier {
   List<ChatMessage> collapseVersions(List<ChatMessage> items) {
     final Map<String, List<ChatMessage>> byGroup =
         <String, List<ChatMessage>>{};
-    final Map<String, int> firstLocalIndexByGroup = <String, int>{};
     final List<String> order = <String>[];
 
-    for (var i = 0; i < items.length; i++) {
-      final m = items[i];
+    for (final m in items) {
       final gid = (m.groupId ?? m.id);
       final list = byGroup.putIfAbsent(gid, () {
         order.add(gid);
-        firstLocalIndexByGroup[gid] = i;
         return <ChatMessage>[];
       });
       list.add(m);
     }
-
-    final currentConversationId = _currentConversation?.id;
-    final isLoadedWindow = identical(items, _messages);
-    final loadedEndIndex = _loadedStartIndex + _messages.length;
-
-    final orderedGroups = <_MessageGroupOrder>[];
-    for (final gid in order) {
-      final persistedIndex = currentConversationId == null
-          ? -1
-          : _chatService.getMessageIndex(currentConversationId, gid);
-      if (isLoadedWindow &&
-          persistedIndex >= 0 &&
-          (persistedIndex < _loadedStartIndex ||
-              persistedIndex >= loadedEndIndex)) {
-        continue;
-      }
-      orderedGroups.add(
-        _MessageGroupOrder(
-          groupId: gid,
-          orderIndex: persistedIndex >= 0
-              ? persistedIndex
-              : _loadedStartIndex + (firstLocalIndexByGroup[gid] ?? 0),
-        ),
-      );
-    }
-    orderedGroups.sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
 
     // Sort each group by version
     for (final e in byGroup.entries) {
@@ -700,9 +720,9 @@ class ChatController extends ChangeNotifier {
 
     // Select the appropriate version from each group
     final out = <ChatMessage>[];
-    for (final group in orderedGroups) {
-      final vers = byGroup[group.groupId]!;
-      final sel = _versionSelections[group.groupId];
+    for (final gid in order) {
+      final vers = byGroup[gid]!;
+      final sel = _versionSelections[gid];
       final idx = (sel != null && sel >= 0 && sel < vers.length)
           ? sel
           : (vers.length - 1);
@@ -712,21 +732,110 @@ class ChatController extends ChangeNotifier {
     return out;
   }
 
-  static int compareVersionedMessagesForDisplay(ChatMessage a, ChatMessage b) {
-    final groupCompare = (a.groupId ?? a.id).compareTo(b.groupId ?? b.id);
-    if (groupCompare != 0) return groupCompare;
-    return a.version.compareTo(b.version);
-  }
-
   /// Get messages collapsed by version (cached).
   List<ChatMessage> get collapsedMessages {
     if (_collapsedCache != null) return _collapsedCache!;
-    _collapsedCache = collapseVersions(_messages);
+    _collapsedCache = collapseVersions(_messagesWithVisibleGroups());
     _collapsedIdToIndex = <String, int>{};
     for (int i = 0; i < _collapsedCache!.length; i++) {
       _collapsedIdToIndex![_collapsedCache![i].id] = i;
     }
     return _collapsedCache!;
+  }
+
+  List<ChatMessage> _messagesWithVisibleGroups() {
+    if (_messagesWithVisibleGroupsCache != null) {
+      return _messagesWithVisibleGroupsCache!;
+    }
+
+    final conversation = _currentConversation;
+    if (conversation == null || _messages.isEmpty) {
+      return _messagesWithVisibleGroupsCache = _messages;
+    }
+
+    final targetGroupIds = <String>{};
+    final versionedGroupIds = <String>{};
+    for (final message in _messages) {
+      final groupId = message.groupId ?? message.id;
+      if (_versionSelections.containsKey(groupId)) {
+        targetGroupIds.add(groupId);
+      }
+      if (message.version > 0) {
+        targetGroupIds.add(groupId);
+        versionedGroupIds.add(groupId);
+      }
+    }
+    if (targetGroupIds.isEmpty) {
+      return _messagesWithVisibleGroupsCache = _messages;
+    }
+
+    final visibleVersions = _chatService.getMessagesForGroups(
+      conversation.id,
+      targetGroupIds,
+    );
+    if (visibleVersions.isEmpty) {
+      return _messagesWithVisibleGroupsCache = _messages;
+    }
+
+    final visibleIds = {for (final message in _messages) message.id};
+    final byGroup = <String, List<ChatMessage>>{};
+    for (final message in visibleVersions) {
+      final groupId = message.groupId ?? message.id;
+      byGroup.putIfAbsent(groupId, () => <ChatMessage>[]).add(message);
+    }
+
+    Map<String, int> firstIndices = const <String, int>{};
+    if (_loadedStartIndex > 0 && versionedGroupIds.isNotEmpty) {
+      firstIndices = _chatService.getFirstMessageIndicesForGroups(
+        conversation.id,
+        versionedGroupIds,
+      );
+    }
+    final firstLoadedGroupId = _messages.isEmpty
+        ? null
+        : (_messages.first.groupId ?? _messages.first.id);
+    final previousLoadedGroupId = _previousLoadedMessageGroupId(
+      conversation.id,
+    );
+
+    final result = <ChatMessage>[];
+    final emitted = <String>{};
+    for (final message in _messages) {
+      final groupId = message.groupId ?? message.id;
+      final groupMessages = byGroup[groupId] ?? <ChatMessage>[message];
+      final groupAnchorIndex = firstIndices[groupId] ?? _loadedStartIndex;
+      final startsInsideGroup =
+          groupId == firstLoadedGroupId && groupId == previousLoadedGroupId;
+      if (groupAnchorIndex < _loadedStartIndex &&
+          message.version > 0 &&
+          !startsInsideGroup) {
+        continue;
+      }
+      if (emitted.add(groupId)) {
+        for (final candidate in groupMessages) {
+          result.add(candidate);
+          emitted.add(candidate.id);
+        }
+      } else if (!visibleIds.contains(message.id) && emitted.add(message.id)) {
+        result.add(message);
+      }
+    }
+
+    return _messagesWithVisibleGroupsCache = result;
+  }
+
+  String? _previousLoadedMessageGroupId(String conversationId) {
+    if (_loadedStartIndex <= 0) return null;
+
+    final previous = _chatService.getMessagesRange(
+      conversationId,
+      start: _loadedStartIndex - 1,
+      limit: 1,
+    );
+    if (previous.isEmpty) return null;
+
+    final message = previous.single;
+    return message.groupId ?? message.id;
   }
 
   /// O(1) lookup of a message's index in the collapsed list.
@@ -761,7 +870,7 @@ class ChatController extends ChangeNotifier {
   Map<String, List<ChatMessage>> groupMessagesByGroup() {
     final Map<String, List<ChatMessage>> byGroup =
         <String, List<ChatMessage>>{};
-    for (final m in _messages) {
+    for (final m in _messagesWithVisibleGroups()) {
       final gid = (m.groupId ?? m.id);
       byGroup.putIfAbsent(gid, () => <ChatMessage>[]).add(m);
     }
@@ -780,6 +889,7 @@ class ChatController extends ChangeNotifier {
     _collapsedCache = null;
     _collapsedIdToIndex = null;
     _groupCache = null;
+    _messagesWithVisibleGroupsCache = null;
   }
 
   @override
@@ -794,14 +904,8 @@ class ChatController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _chatService.removeListener(_syncCurrentConversationWithService);
     cancelAllStreams();
     super.dispose();
   }
-}
-
-class _MessageGroupOrder {
-  const _MessageGroupOrder({required this.groupId, required this.orderIndex});
-
-  final String groupId;
-  final int orderIndex;
 }

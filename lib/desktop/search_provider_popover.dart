@@ -11,6 +11,7 @@ import '../core/services/api/builtin_tools.dart';
 import '../core/services/search/search_service.dart';
 import '../utils/brand_assets.dart';
 import '../l10n/app_localizations.dart';
+import '../theme/app_font_weights.dart';
 
 /// Show a desktop-only floating popover for search provider selection.
 /// It appears above the chat input bar with blurred background, top rounded corners,
@@ -308,7 +309,7 @@ class _SearchContent extends StatelessWidget {
       providerKey,
       cfg.copyWith(modelOverrides: overrides),
     );
-    await sp.setSearchEnabled(false);
+    await ap.setSearchEnabledForCurrentAssistant(false);
   }
 
   Future<void> _disableBuiltInSearch(
@@ -353,7 +354,7 @@ class _SearchContent extends StatelessWidget {
       0,
       services.isNotEmpty ? services.length - 1 : 0,
     );
-    final enabled = sp.searchEnabled;
+    final enabled = ap.currentSearchEnabled;
     final settingsNotifier = context.read<SettingsProvider>();
     final done = onDone;
     final supportsBuiltIn = _supportsBuiltInSearch(sp, ap);
@@ -378,7 +379,7 @@ class _SearchContent extends StatelessWidget {
         selected: false,
         onTap: () async {
           await _disableBuiltInSearch(sp, ap);
-          await settingsNotifier.setSearchEnabled(false);
+          await ap.setSearchEnabledForCurrentAssistant(false);
           done();
         },
       ),
@@ -435,7 +436,7 @@ class _SearchContent extends StatelessWidget {
             onTap: () async {
               await settingsNotifier.setSearchServiceSelected(i);
               await _disableBuiltInSearch(sp, ap);
-              await settingsNotifier.setSearchEnabled(true);
+              await ap.setSearchEnabledForCurrentAssistant(true);
               done();
             },
           ),
@@ -525,9 +526,9 @@ class _RowItemState extends State<_RowItem> {
                   widget.label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w400,
+                    fontWeight: AppFontWeights.regular,
                     decoration: TextDecoration.none,
                   ).copyWith(color: onColor),
                 ),
@@ -562,7 +563,7 @@ class _BrandIcon extends StatelessWidget {
     if (asset == null) {
       return Text(
         name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
-        style: TextStyle(fontWeight: FontWeight.w700, color: color),
+        style: TextStyle(fontWeight: AppFontWeights.emphasis, color: color),
       );
     }
     if (asset.endsWith('.svg')) {

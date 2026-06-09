@@ -126,7 +126,7 @@ void main() {
       );
     });
 
-    test('rejects non OpenAI compatible providers', () {
+    test('non OpenAI-compatible providers require a full balance API URL', () {
       final config = ProviderConfig(
         id: 'Gemini',
         enabled: true,
@@ -135,13 +135,67 @@ void main() {
         baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
         providerType: ProviderKind.google,
         balanceEnabled: true,
+        balanceApiPath: '/credits',
       );
 
       expect(
         () => ProviderBalanceService.fetchBalance(config),
-        throwsA(isA<ProviderBalanceException>()),
+        throwsA(
+          isA<ProviderBalanceException>().having(
+            (e) => e.code,
+            'code',
+            'full_balance_api_url_required',
+          ),
+        ),
       );
     });
+
+    test(
+      'non OpenAI-compatible providers can query a configured full balance API URL',
+      () async {
+        final requests = <HttpRequest>[];
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          requests.add(request);
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode({
+              'data': {'balance': 42},
+            }),
+          );
+          await request.response.close();
+        });
+
+        final config = ProviderConfig(
+          id: 'ClaudeBalanceTest',
+          enabled: true,
+          name: 'ClaudeBalanceTest',
+          apiKey: 'balance-key',
+          baseUrl: 'https://api.anthropic.com/v1',
+          providerType: ProviderKind.claude,
+          balanceEnabled: true,
+          balanceApiPath:
+              'http://${server.address.address}:${server.port}/v1/credits',
+          balanceResultPath: 'data.balance',
+        );
+
+        final balance = await ProviderBalanceService.fetchBalance(config);
+
+        expect(balance, '42.00');
+        expect(requests, hasLength(1));
+        expect(requests.single.method, 'GET');
+        expect(requests.single.uri.path, '/v1/credits');
+        expect(
+          requests.single.headers.value(HttpHeaders.authorizationHeader),
+          'Bearer balance-key',
+        );
+      },
+    );
   });
 
   group('ProviderConfig balance defaults', () {
@@ -152,6 +206,7 @@ void main() {
         final openRouter = ProviderConfig.defaultsFor('OpenRouter');
         final siliconFlow = ProviderConfig.defaultsFor('SiliconFlow');
         final vercel = ProviderConfig.defaultsFor('Vercel');
+        final deepSeek = ProviderConfig.defaultsFor('DeepSeek');
         final moonshot = ProviderConfig.defaultsFor('Moonshot');
 
         expect(aihubmix.balanceEnabled, isTrue);
@@ -169,22 +224,14 @@ void main() {
         expect(vercel.balanceEnabled, isTrue);
         expect(vercel.balanceApiPath, '/credits');
         expect(vercel.balanceResultPath, 'balance');
-        expect(moonshot.balanceEnabled, isTrue);
-        expect(moonshot.balanceApiPath, '/users/me/balance');
-        expect(moonshot.balanceResultPath, 'data.available_balance');
-      },
-    );
-
-    test(
-      'DeepSeek defaults to Anthropic-compatible provider without balance',
-      () {
-        final deepSeek = ProviderConfig.defaultsFor('DeepSeek');
-
         expect(deepSeek.providerType, ProviderKind.claude);
         expect(deepSeek.baseUrl, 'https://api.deepseek.com/anthropic');
         expect(deepSeek.balanceEnabled, isFalse);
-        expect(deepSeek.balanceApiPath, '/credits');
-        expect(deepSeek.balanceResultPath, 'data.total_usage');
+        expect(deepSeek.balanceApiPath, isEmpty);
+        expect(deepSeek.balanceResultPath, 'balance_infos[0].total_balance');
+        expect(moonshot.balanceEnabled, isTrue);
+        expect(moonshot.balanceApiPath, '/users/me/balance');
+        expect(moonshot.balanceResultPath, 'data.available_balance');
       },
     );
   });

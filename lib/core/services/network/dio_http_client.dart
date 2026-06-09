@@ -57,9 +57,8 @@ class NetworkProxyConfig {
 }
 
 class DioHttpClient extends http.BaseClient {
-  DioHttpClient({NetworkProxyConfig? proxy, CancelToken? cancelToken})
-    : _proxy = proxy,
-      _cancelToken = cancelToken ?? CancelToken(),
+  DioHttpClient({this._proxy, CancelToken? cancelToken})
+    : _cancelToken = cancelToken ?? CancelToken(),
       _dio = Dio(
         BaseOptions(
           connectTimeout: null,
@@ -165,7 +164,7 @@ class DioHttpClient extends http.BaseClient {
     } catch (_) {}
 
     final reqHeaders = Map<String, String>.from(request.headers);
-    reqHeaders.putIfAbsent('User-Agent', () => 'Kelivo');
+    reqHeaders.putIfAbsent('User-Agent', () => 'JO-Kelivo');
 
     if (RequestLogger.enabled) {
       RequestLogger.logLine('[REQ $reqId] $method $uri');

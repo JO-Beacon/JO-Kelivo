@@ -136,7 +136,7 @@ class DesktopTrayController with TrayListener, WindowListener {
       // On Windows we may have `preventClose` enabled to support
       // "close to tray". Temporarily disable it and send a normal
       // close so the window can exit immediately without being
-      // intercepted by the minimize‑to‑tray logic.
+      // intercepted by the minimize-to-tray logic.
       if (defaultTargetPlatform == TargetPlatform.windows) {
         try {
           await windowManager.setPreventClose(false);
@@ -157,39 +157,38 @@ class DesktopTrayController with TrayListener, WindowListener {
 
   @override
   void onTrayIconMouseDown() {
-    // Left‑click: bring main window to front.
+    // Left-click: bring main window to front.
     if (!_isDesktop) return;
     _showWindow();
   }
 
   @override
   void onTrayIconRightMouseDown() async {
-    // Right‑click: 弹出托盘菜单。
-    // 使用内部标记防止在一次交互周期内重复弹出，
-    // 否则在某些 Windows 环境下会看到第二个偏移的菜单。
+    // Right-click: show the tray context menu.
+    // Guard against duplicate popups in a single interaction cycle.
     if (_contextMenuOpen) {
       return;
     }
+
     _contextMenuOpen = true;
     try {
-      // Windows 环境下建议在弹出菜单前尝试聚焦窗口，
-      // 以避免部分环境中菜单不会在点击其他地方时自动关闭。
+      // On Windows, focusing the window before opening the menu helps the menu
+      // close normally when the user clicks elsewhere.
       if (defaultTargetPlatform == TargetPlatform.windows) {
         try {
           await windowManager.focus();
         } catch (_) {}
       }
       await trayManager.popUpContextMenu();
-    } catch (_) {}
-    // 无论是点击菜单项还是点击其他地方关闭菜单，
-    // popUpContextMenu 都会在菜单关闭后返回，这里统一重置标记。
-    _contextMenuOpen = false;
+    } catch (_) {
+    } finally {
+      _contextMenuOpen = false;
+    }
   }
 
   @override
   void onTrayMenuItemClick(MenuItem menuItem) {
-    // 任一菜单项被点击视为一次菜单交互结束，
-    // 额外保险地解除防抖标记（即使 Future 尚未完成）。
+    // Treat a menu item click as the end of this tray menu interaction.
     _contextMenuOpen = false;
   }
 
