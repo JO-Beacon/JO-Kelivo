@@ -204,3 +204,60 @@ JO-Kelivo-v0.1.3+3-windows-x64-portable.zip
 JO-Kelivo-v0.1.3+3-windows-x64-portable.zip.sha256
 JO-Kelivo-v0.1.3+3-windows-x64-setup.exe
 JO-Kelivo-v0.1.3+3-windows-x64-setup.exe.sha256
+
+# 0.1.4+4
+
+## Release notes
+
+```markdown
+# JO-Kelivo 0.1.4+4
+
+发布时间：2026-06-10
+基于原版 Kelivo 版本：1.1.16+60
+源码获取：本 Release 页面附带的 Source code 压缩包；也可从本仓库对应 tag 获取完整源码。
+
+## 说明
+
+JO-Kelivo 是基于原版 Kelivo 的非官方修改版本，不代表原版作者发布、维护或背书。
+
+感谢原版 Kelivo 作者及贡献者的开源工作。原项目版权归原作者及贡献者所有。
+
+本项目作为原版 Kelivo 的修改版本，继续按 GNU AGPL-3.0 发布。若本 Release 分发 Android APK、Windows 安装包或 Windows 便携包等二进制产物，对应源代码可通过本 Release 页面附带的 Source code 压缩包或本仓库对应 tag 获取。GNU AGPL-3.0 许可证全文见仓库根目录 LICENSE。
+
+## 本版本变更
+
+- 基于当前本地代码状态补建 `0.1.4+4` Android 与 Windows x64 发布产物，并按 JO-Kelivo Release 命名规范归档。
+- Android 继续仅发布 APK，不发布 AAB；本次使用正式签名配置构建 3 个 ABI 拆分包：`arm64-v8a`、`armeabi-v7a`、`x86_64`。
+- Windows 安装程序继续通过 Inno Setup 构建，并保持 `JO-Kelivo-v0.1.4+4-windows-x64-setup.exe` 命名。
+- Windows 便携包继续基于 `build/windows/x64/runner/Release` 目录打包，并保持 `JO-Kelivo-v0.1.4+4-windows-x64-portable.zip` 命名。
+- 安装器构建时自动补齐缺失的 `ChineseSimplified.isl`，延续中文安装界面与乱码修复结果。
+
+## 许可证合规提示
+
+- 本项目整体继续按 GNU AGPL-3.0 发布；许可证全文见仓库根目录 LICENSE。
+- 本 Release 若附带 Android APK、Windows 安装包或 Windows 便携包等二进制产物，对应源代码会（且必须）在同一 Release 页面通过 Source code 压缩包或清晰链接提供。
+- 第三方依赖仍遵循其各自许可证；本项目不改变第三方依赖原有许可证条款。
+- JO-Kelivo 是原版 Kelivo 的非官方改版，不代表原版作者发布、维护或背书；原项目版权归原作者及贡献者所有。
+- Android 产物仅发布 APK；本版本已补建 Android 3 个 ABI 拆分 APK 与 Windows x64 产物。
+
+## SHA-256
+
+13259d03f0c20c3a6a7ac5f519db252d86ed430e7a49184cdb903d3fd2c89827  JO-Kelivo-v0.1.4+4-android-arm64-v8a-release.apk
+38a8b09c66079c575e799e6e5a2daec80f7fe99baab7b55aa56d5f9c997f52d6  JO-Kelivo-v0.1.4+4-android-armeabi-v7a-release.apk
+a48ef6b4d14923ca5e4df7b03763a6793dac54b155ee691c0d4c67c388d44334  JO-Kelivo-v0.1.4+4-android-x86_64-release.apk
+6379513ad232ff4840cdf9c64d8148b7025c62a5833d5a2b455e4005916bbd9c  JO-Kelivo-v0.1.4+4-windows-x64-portable.zip
+9e5f818c9f4d0adccc26087e6f5fc8ecf4161fcd09024245645f38811015b403  JO-Kelivo-v0.1.4+4-windows-x64-setup.exe
+```
+
+## 二进制文件名字（不含源码）
+
+JO-Kelivo-v0.1.4+4-android-arm64-v8a-release.apk
+JO-Kelivo-v0.1.4+4-android-arm64-v8a-release.apk.sha256
+JO-Kelivo-v0.1.4+4-android-armeabi-v7a-release.apk
+JO-Kelivo-v0.1.4+4-android-armeabi-v7a-release.apk.sha256
+JO-Kelivo-v0.1.4+4-android-x86_64-release.apk
+JO-Kelivo-v0.1.4+4-android-x86_64-release.apk.sha256
+JO-Kelivo-v0.1.4+4-windows-x64-portable.zip
+JO-Kelivo-v0.1.4+4-windows-x64-portable.zip.sha256
+JO-Kelivo-v0.1.4+4-windows-x64-setup.exe
+JO-Kelivo-v0.1.4+4-windows-x64-setup.exe.sha256

@@ -1767,6 +1767,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageEditPageHint => '输入消息内容…';
 
   @override
+  String get messageEditCloseConfirmTitle => '要保存修改吗？';
+
+  @override
+  String get messageEditCloseConfirmContent => '关闭前要保存这次编辑吗？';
+
+  @override
+  String get messageEditCloseConfirmCancel => '取消';
+
+  @override
+  String get messageEditCloseConfirmDiscard => '不保存';
+
+  @override
+  String get messageEditCloseConfirmSave => '保存';
+
+  @override
   String get messageEditAttachmentsTitle => '附件';
 
   @override
@@ -7082,6 +7097,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get messageEditPageHint => '输入消息内容…';
 
   @override
+  String get messageEditCloseConfirmTitle => '要保存修改吗？';
+
+  @override
+  String get messageEditCloseConfirmContent => '关闭前要保存这次编辑吗？';
+
+  @override
+  String get messageEditCloseConfirmCancel => '取消';
+
+  @override
+  String get messageEditCloseConfirmDiscard => '不保存';
+
+  @override
+  String get messageEditCloseConfirmSave => '保存';
+
+  @override
   String get messageEditAttachmentsTitle => '附件';
 
   @override
@@ -12394,6 +12424,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get messageEditPageHint => '輸入訊息內容…';
+
+  @override
+  String get messageEditCloseConfirmTitle => '要儲存修改嗎？';
+
+  @override
+  String get messageEditCloseConfirmContent => '關閉前要儲存這次編輯嗎？';
+
+  @override
+  String get messageEditCloseConfirmCancel => '取消';
+
+  @override
+  String get messageEditCloseConfirmDiscard => '不儲存';
+
+  @override
+  String get messageEditCloseConfirmSave => '儲存';
 
   @override
   String get messageEditAttachmentsTitle => '附件';

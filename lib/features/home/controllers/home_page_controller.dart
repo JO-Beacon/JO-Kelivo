@@ -976,6 +976,8 @@ class HomePageController extends ChangeNotifier {
     if (!result.shouldSend) return;
     if (message.role == 'assistant') {
       await regenerateAtMessage(newMsg, assistantAsNewReply: true);
+    } else {
+      await regenerateAtMessage(newMsg);
     }
   }
 

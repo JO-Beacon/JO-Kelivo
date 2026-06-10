@@ -3509,6 +3509,36 @@ abstract class AppLocalizations {
   /// **'Enter message…'**
   String get messageEditPageHint;
 
+  /// No description provided for @messageEditCloseConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Save changes?'**
+  String get messageEditCloseConfirmTitle;
+
+  /// No description provided for @messageEditCloseConfirmContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Do you want to save your edits before closing?'**
+  String get messageEditCloseConfirmContent;
+
+  /// No description provided for @messageEditCloseConfirmCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get messageEditCloseConfirmCancel;
+
+  /// No description provided for @messageEditCloseConfirmDiscard.
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t Save'**
+  String get messageEditCloseConfirmDiscard;
+
+  /// No description provided for @messageEditCloseConfirmSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get messageEditCloseConfirmSave;
+
   /// No description provided for @messageEditAttachmentsTitle.
   ///
   /// In en, this message translates to:

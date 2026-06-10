@@ -1826,6 +1826,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageEditPageHint => 'Enter message…';
 
   @override
+  String get messageEditCloseConfirmTitle => 'Save changes?';
+
+  @override
+  String get messageEditCloseConfirmContent =>
+      'Do you want to save your edits before closing?';
+
+  @override
+  String get messageEditCloseConfirmCancel => 'Cancel';
+
+  @override
+  String get messageEditCloseConfirmDiscard => 'Don\'t Save';
+
+  @override
+  String get messageEditCloseConfirmSave => 'Save';
+
+  @override
   String get messageEditAttachmentsTitle => 'Attachments';
 
   @override
