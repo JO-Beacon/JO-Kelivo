@@ -263,4 +263,55 @@ JO-Kelivo-v0.1.4+4-windows-x64-setup.exe.sha256
 
 # 0.1.5+5
 
-草稿：尝试修复更新自动提示；Build Linux尝试修复
+## Release notes
+
+```markdown
+# JO-Kelivo 0.1.5+5
+
+发布时间：2026-06-10
+基于原版 Kelivo 版本：1.1.16+60
+源码获取：本 Release 页面附带的 Source code 压缩包；也可从本仓库对应 tag 获取完整源码。
+
+## 说明
+
+JO-Kelivo 是基于原版 Kelivo 的非官方修改版本，不代表原版作者发布、维护或背书。
+
+感谢原版 Kelivo 作者及贡献者的开源工作。原项目版权归原作者及贡献者所有。
+
+本项目作为原版 Kelivo 的修改版本，继续按 GNU AGPL-3.0 发布。若本 Release 分发 Android APK、Windows 安装包或 Windows 便携包等二进制产物，对应源代码可通过本 Release 页面附带的 Source code 压缩包或本仓库对应 tag 获取。GNU AGPL-3.0 许可证全文见仓库根目录 LICENSE。
+
+## 本版本变更
+
+- 尝试修复新版本发布后应用内更新提示不自动出现的问题，让 JO-Kelivo 能更稳定地从本仓库 Release 检测到可用更新。
+- 调整更新检测相关发布资产匹配逻辑，继续避免把 `.sha256` 校验文件当作可安装更新包。
+- 尝试修复 Linux 构建流程，补齐后续发布 Linux 桌面产物所需的构建兼容性处理；本次 Release 仍以 Android APK 与 Windows x64 产物为主。
+
+## 许可证合规提示
+
+- 本项目整体继续按 GNU AGPL-3.0 发布；许可证全文见仓库根目录 LICENSE。
+- 本 Release 若附带 Android APK、Windows 安装包或 Windows 便携包等二进制产物，对应源代码会（且必须）在同一 Release 页面通过 Source code 压缩包或清晰链接提供。
+- 第三方依赖仍遵循其各自许可证；本项目不改变第三方依赖原有许可证条款。
+- JO-Kelivo 是原版 Kelivo 的非官方改版，不代表原版作者发布、维护或背书；原项目版权归原作者及贡献者所有。
+- Android 产物仅发布 APK；本版本发布 Android 3 个 ABI 拆分 APK 与 Windows x64 产物，Linux 构建修复属于构建链路准备，不代表本 Release 已发布 Linux 二进制包。
+
+## SHA-256
+
+3d65bbbb5eb9899f37f7d9fcbce541ce2d8cb0e854f7aad1cfbd45763e2cd33d  JO-Kelivo-v0.1.5+5-android-arm64-v8a-release.apk
+5c34f128f5ff7b828546eb80d8d2c257a0016ff9c5a020875fd9a6fd07c2b79a  JO-Kelivo-v0.1.5+5-android-armeabi-v7a-release.apk
+a307e4212ed8a98257272a5294a7a8dd327cf2b814feeaa78fd76cc07ee75c1a  JO-Kelivo-v0.1.5+5-android-x86_64-release.apk
+1a32b223c43df911c8f0ee600a4c5ba59a15167b6cc1f6d7246bdd33eb53276b  JO-Kelivo-v0.1.5+5-windows-x64-portable.zip
+9210207799345642660d636b0885a3b5d2847e35b4e98fbd33e8c1fa00054aab  JO-Kelivo-v0.1.5+5-windows-x64-setup.exe
+```
+
+## 二进制文件名字（不含源码）
+
+JO-Kelivo-v0.1.5+5-android-arm64-v8a-release.apk
+JO-Kelivo-v0.1.5+5-android-arm64-v8a-release.apk.sha256
+JO-Kelivo-v0.1.5+5-android-armeabi-v7a-release.apk
+JO-Kelivo-v0.1.5+5-android-armeabi-v7a-release.apk.sha256
+JO-Kelivo-v0.1.5+5-android-x86_64-release.apk
+JO-Kelivo-v0.1.5+5-android-x86_64-release.apk.sha256
+JO-Kelivo-v0.1.5+5-windows-x64-portable.zip
+JO-Kelivo-v0.1.5+5-windows-x64-portable.zip.sha256
+JO-Kelivo-v0.1.5+5-windows-x64-setup.exe
+JO-Kelivo-v0.1.5+5-windows-x64-setup.exe.sha256
