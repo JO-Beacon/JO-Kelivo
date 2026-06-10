@@ -82,4 +82,39 @@ void main() {
       expect(info.downloads, isEmpty);
     });
   });
+
+  group('UpdateProvider version comparison', () {
+    test('treats remote version with build metadata as newer', () {
+      expect(
+        UpdateProvider.isRemoteNewerForTest(
+          remoteVersion: '0.1.4+4',
+          currentVersion: '0.1.3',
+        ),
+        isTrue,
+      );
+    });
+
+    test(
+      'does not treat same semantic version with build metadata as newer',
+      () {
+        expect(
+          UpdateProvider.isRemoteNewerForTest(
+            remoteVersion: '0.1.4+4',
+            currentVersion: '0.1.4',
+          ),
+          isFalse,
+        );
+      },
+    );
+
+    test('accepts v-prefixed remote versions with build metadata', () {
+      expect(
+        UpdateProvider.isRemoteNewerForTest(
+          remoteVersion: 'v0.1.4+4',
+          currentVersion: '0.1.3',
+        ),
+        isTrue,
+      );
+    });
+  });
 }

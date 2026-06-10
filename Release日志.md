@@ -260,3 +260,7 @@ JO-Kelivo-v0.1.4+4-windows-x64-portable.zip
 JO-Kelivo-v0.1.4+4-windows-x64-portable.zip.sha256
 JO-Kelivo-v0.1.4+4-windows-x64-setup.exe
 JO-Kelivo-v0.1.4+4-windows-x64-setup.exe.sha256
+
+# 0.1.5+5
+
+草稿：尝试修复更新自动提示；Build Linux尝试修复

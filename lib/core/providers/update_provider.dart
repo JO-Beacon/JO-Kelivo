@@ -176,25 +176,36 @@ class UpdateProvider extends ChangeNotifier {
     }
   }
 
-  bool _isRemoteNewer({
+  @visibleForTesting
+  static bool isRemoteNewerForTest({
     required String remoteVersion,
     required String currentVersion,
   }) {
-    // Compare semantic versions only (ignore internal build numbers)
-    List<int> parseVer(String v) {
-      final parts = v.split('.');
-      final nums = <int>[];
-      for (int i = 0; i < 3; i++) {
-        nums.add(i < parts.length ? int.tryParse(parts[i]) ?? 0 : 0);
-      }
-      return nums;
-    }
+    return _isRemoteNewer(
+      remoteVersion: remoteVersion,
+      currentVersion: currentVersion,
+    );
+  }
 
-    final a = parseVer(remoteVersion);
-    final b = parseVer(currentVersion);
-    if (a[0] != b[0]) return a[0] > b[0];
-    if (a[1] != b[1]) return a[1] > b[1];
-    if (a[2] != b[2]) return a[2] > b[2];
+  static bool _isRemoteNewer({
+    required String remoteVersion,
+    required String currentVersion,
+  }) {
+    final a = _parseVersion(remoteVersion);
+    final b = _parseVersion(currentVersion);
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return a[i] > b[i];
+    }
     return false;
+  }
+
+  static List<int> _parseVersion(String version) {
+    final normalized = version.trim().replaceFirst(RegExp(r'^[vV]'), '');
+    final versionPart = normalized.split('+').first.split('-').first;
+    final parts = versionPart.split('.');
+    return List<int>.generate(
+      3,
+      (index) => index < parts.length ? int.tryParse(parts[index]) ?? 0 : 0,
+    );
   }
 }
