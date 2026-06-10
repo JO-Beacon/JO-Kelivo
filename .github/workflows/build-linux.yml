@@ -98,7 +98,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tar -C build/linux/x64/release/bundle -czf "JO-Kelivo-v${VERSION}-linux-x64.tar.gz" .
+          tar -C build/linux/x64/release/bundle -czf "JO-Kelivo-v${VERSION}-linux-x64-archive.tar.gz" .
 
       - name: Package AppImage
         shell: bash
@@ -133,7 +133,7 @@ jobs:
           install -Dm644 assets/app_icon.png AppDir/jo_kelivo.png
           install -Dm644 assets/app_icon.png AppDir/usr/share/icons/hicolor/256x256/apps/jo_kelivo.png
 
-          ARCH=x86_64 ./appimagetool AppDir "JO-Kelivo-v${VERSION}-linux-x64.AppImage"
+          ARCH=x86_64 ./appimagetool AppDir "JO-Kelivo-v${VERSION}-linux-x64-appimage.AppImage"
 
       - name: Package DEB
         shell: bash
@@ -170,16 +170,16 @@ jobs:
            A cross-platform Flutter LLM chat client.
           EOF
 
-          dpkg-deb --build deb "JO-Kelivo-v${VERSION}-linux-x64.deb"
+          dpkg-deb --build deb "JO-Kelivo-v${VERSION}-linux-x64-deb.deb"
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Linux-x64
           path: |
-            JO-Kelivo-v*-linux-x64.tar.gz
-            JO-Kelivo-v*-linux-x64.AppImage
-            JO-Kelivo-v*-linux-x64.deb
+            JO-Kelivo-v*-linux-x64-archive.tar.gz
+            JO-Kelivo-v*-linux-x64-appimage.AppImage
+            JO-Kelivo-v*-linux-x64-deb.deb
           if-no-files-found: error
 
       - name: Publish GitHub Release
@@ -190,6 +190,6 @@ jobs:
           name: ${{ github.ref_type == 'tag' && github.ref_name || inputs.release_tag }}
           prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || false }}
           files: |
-            JO-Kelivo-v*-linux-x64.tar.gz
-            JO-Kelivo-v*-linux-x64.AppImage
-            JO-Kelivo-v*-linux-x64.deb
+            JO-Kelivo-v*-linux-x64-archive.tar.gz
+            JO-Kelivo-v*-linux-x64-appimage.AppImage
+            JO-Kelivo-v*-linux-x64-deb.deb

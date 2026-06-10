@@ -15,7 +15,7 @@
 
 - ✅ **[Android](https://github.com/JO-Beacon/JO-Kelivo/releases/latest)**
 - ✅ **[Windows AMD64](https://github.com/JO-Beacon/JO-Kelivo/releases/latest)**
-- 📌 Linux（已纳入计划，可先使用 [Kelivo](https://github.com/Chevey339/kelivo) ）
+- ✅ **[Linux AMD64](https://github.com/JO-Beacon/JO-Kelivo/releases/latest)**
 - ❌ OpenHarmony （暂无计划，可使用 [kelivo-ohos](https://github.com/Chevey339/kelivo-ohos) ）
 - ❌ MacOS （暂无计划，可使用 [Kelivo](https://github.com/Chevey339/kelivo) ）
 - ❌ iOS （暂无计划，可使用 [Kelivo](https://github.com/Chevey339/kelivo) ）
