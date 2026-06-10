@@ -77,4 +77,3 @@ internationalization.md
 /build/installer-languages/
 
 /参考文件/
-lib/core/services/api/providers/google_vertex.dart
