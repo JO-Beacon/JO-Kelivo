@@ -172,6 +172,31 @@ flutter test
 - Do not expand scope just because you spotted something that "could be unified". Finish the current task first, then decide whether to open a separate refactoring task.
 - When touching a path dependency, treat it as an independent module. Do not only patch the surface at the root repo level.
 
+#### 3.7.1 External Baseline Replacement and Git History Boundary
+
+- JO-Kelivo intentionally maintains Git history independent from any external baseline source. The baseline is replaceable implementation input, not part of JO-Kelivo's repository identity; it may come from official Kelivo, another Kelivo fork, or another explicitly selected compatible codebase.
+- Replacing the baseline does NOT mean reconnecting commit ancestry to the selected source. Do not assume official Kelivo must remain the permanent or only possible baseline.
+- Unless the user explicitly requests a Git-history strategy change, external baseline work must start from the current JO-Kelivo branch and preserve its linear history. Do not:
+  - Create the replacement branch from an external baseline tag or branch
+  - Rebase JO-Kelivo onto external baseline history
+  - Merge unrelated external baseline history with `--allow-unrelated-histories`, including `-s ours` history-bridge merges
+  - Replace `origin`, add an upstream remote, or otherwise change Git remotes as an implicit part of a source upgrade
+- Treat external source under `参考文件/**` as read-only comparison input. Record the selected source repository or fork, version, tag or commit hash when available, and applicable license/attribution requirements, but do not treat the reference directory as a Git working tree or copy target wholesale.
+- Apply external baseline upgrades as a controlled source snapshot replacement:
+  - Archive or tag the current JO-Kelivo state before replacement
+  - Classify paths as JO-owned, baseline-owned, generated, build artifacts, or explicitly excluded before copying anything
+  - Review and accept external files by functional scope; a baseline-only file enters JO-Kelivo only when its runtime, build, test, or dependency role is understood
+  - Preserve JO-owned identity, data isolation, update source, release policy, workflows, maintenance records, and packaging rules unless the task explicitly changes them
+  - Never copy `.git/**`, `.dart_tool/**`, `build/**`, external personal environment files, or unrelated external workflows and documentation
+  - Regenerate generated outputs with repository commands instead of copying or hand-editing them
+- Restore and verify JO-Kelivo application identity and data-directory isolation before running the upgraded app or exercising any baseline-provided data migration. Such migration must operate on the JO-Kelivo data directory, never a baseline application's data directory.
+- Replay JO behavior by requirement against the new architecture, not by blindly restoring old files or patches. If the selected baseline changed storage, models, routing, or persistence, adapt the JO behavior to the new source of truth and explicitly decide whether the old patch is replayed, replaced, or retired.
+- Delivery notes for an external baseline replacement must state:
+  - Previous and new baseline sources and versions
+  - Accepted and intentionally excluded top-level path groups
+  - JO patches replayed, replaced, or retired
+  - Data, import/export, platform identity, and release compatibility results
+
 ### 3.8 Desktop Tasks: Determine Entry Layer First
 
 - When the task mentions desktop, Windows, macOS, Linux, tray, hotkeys, window, context menu, or desktop settings, first determine which layer the issue belongs to:
@@ -240,7 +265,7 @@ flutter test
 ## 4. Recommended Execution Order
 
 1. `git status --short` -- confirm workspace baseline.
-2. Read relevant code and config. Write clear acceptance criteria. For desktop tasks, confirm entry topology first: `main.dart` -> `lib/desktop/**` -> shared chat layout.
+2. Read relevant code and config. Write clear acceptance criteria. For desktop tasks, confirm entry topology first: `main.dart` -> `lib/desktop/**` -> shared chat layout. For external baseline work, confirm the independent-history rule and classify path ownership before replacement.
 3. Batch all independent context reads, searches, and status checks in parallel, then decide the minimal change landing point.
 4. List requirement scenarios and verification methods first, then make minimal changes. Do not mix in unrelated refactoring.
 5. Run the generation, formatting, analysis, and test commands relevant to this task.
@@ -267,6 +292,7 @@ flutter test
 - At least one round of self-review completed, checking maintainability, performance, security, style consistency, and compatibility boundary.
 - No real secrets, build artifacts, or unrelated files committed.
 - If workflows / platform directories / path dependencies were touched, corresponding extra verification has been done.
+- External baseline work remained on JO-Kelivo history unless the user explicitly approved a history strategy change; source provenance, accepted/excluded paths, and replayed/replaced/retired JO patches are recorded.
 
 ## 6. External Best Practices
 
