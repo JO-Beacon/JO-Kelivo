@@ -193,7 +193,7 @@ flutter test
   - Replace `origin`, add an upstream remote, or otherwise change Git remotes as an implicit part of a source upgrade
 - Treat external source under `参考文件/**` as read-only comparison input. Record the selected source repository or fork, version, tag or commit hash when available, and applicable license/attribution requirements, but do not treat the reference directory as a Git working tree or copy target wholesale.
 - Apply external baseline upgrades as a controlled source snapshot replacement:
-  - Archive or tag the current JO-Kelivo state before replacement
+  - Before replacement, ensure the intended pre-replacement JO-Kelivo state is committed, record its exact commit hash, and create the replacement branch from that commit. A tag or separate archive may be added as an optional human-readable reference, but is not mandatory and does not substitute for committing the intended state or maintaining a real backup when one is needed
   - Classify paths as JO-owned, baseline-owned, mixed, generated, source-controlled compatibility adapters, local migration-control material, build artifacts, or explicitly excluded before copying anything
   - Review and accept external files by functional scope; a baseline-only file enters JO-Kelivo only when its runtime, build, test, or dependency role is understood
   - Preserve JO-owned identity, data isolation, update source, release policy, workflows, maintenance records, and packaging rules unless the task explicitly changes them
@@ -303,7 +303,7 @@ flutter test
 - No real secrets, build artifacts, or unrelated files committed.
 - No new, previously untracked, or force-added `plans/**` path is staged or committed; pre-existing tracked plan files were not modified unless the task explicitly requested their cleanup.
 - If workflows / platform directories / path dependencies were touched, corresponding extra verification has been done.
-- External baseline work remained on JO-Kelivo history unless the user explicitly approved a history strategy change; source provenance, accepted/excluded paths, and replayed/replaced/retired JO patches are recorded.
+- External baseline work remained on JO-Kelivo history unless the user explicitly approved a history strategy change; the exact pre-replacement JO commit and replacement branch point, source provenance, accepted/excluded paths, and replayed/replaced/retired JO patches are recorded.
 
 ## 6. External Best Practices
 
