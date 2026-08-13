@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../utils/brand_assets.dart';
+import '../../../utils/avatar_cache.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
@@ -27,12 +28,14 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import 'multi_key_manager_page.dart';
 import 'provider_balance_page.dart';
+import 'provider_custom_request_page.dart';
 import 'provider_network_page.dart';
 import '../../../core/services/haptics.dart';
 import '../../provider/widgets/provider_balance_badge.dart';
 import '../../provider/widgets/provider_avatar.dart';
 import '../../../utils/model_grouping.dart';
 import '../../../theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 class ProviderDetailPage extends StatefulWidget {
   const ProviderDetailPage({
@@ -136,6 +139,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         'DeepSeek',
         'Tensdaq',
         'AIhubmix',
+        '随想AI中转站',
         'Aliyun',
         'Zhipu AI',
         'Claude',
@@ -263,7 +267,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                           onPressed: () => Navigator.of(ctx).pop(true),
                           child: Text(
                             l10n.providerDetailPageDeleteButton,
-                            style: TextStyle(color: Colors.red),
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
                           ),
                         ),
                       ],
@@ -396,6 +402,12 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                       ),
                     ),
                     const SizedBox(height: 10),
+                    row(l10n.providerAvatarChooseBuiltInIcon, () async {
+                      await _pickProviderIcon();
+                    }),
+                    row(l10n.providerAvatarInputLobehubIcon, () async {
+                      await _inputLobehubIcon();
+                    }),
                     row(l10n.sideDrawerChooseImage, () async {
                       try {
                         final settings = context.read<SettingsProvider>();
@@ -456,9 +468,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                 decoration: InputDecoration(
                   hintText: l10n.sideDrawerImageUrlDialogHint,
                   filled: true,
-                  fillColor: Theme.of(ctx2).brightness == Brightness.dark
-                      ? Colors.white10
-                      : const Color(0xFFF2F3F5),
+                  fillColor: ctx2.appColors.surfaceFill,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: const BorderSide(color: Colors.transparent),
@@ -510,6 +520,284 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         await settings.setProviderAvatarUrl(widget.keyName, url);
       }
     }
+  }
+
+  Future<void> _inputLobehubIcon() async {
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.read<SettingsProvider>();
+    final controller = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        bool valid(String s) => s.trim().isNotEmpty;
+        String value = '';
+        return StatefulBuilder(
+          builder: (ctx2, setLocal) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              backgroundColor: cs.surface,
+              title: Text(l10n.providerAvatarLobehubDialogTitle),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: TextField(
+                  controller: controller,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: l10n.providerAvatarLobehubDialogHint,
+                    filled: true,
+                    fillColor: ctx2.appColors.surfaceFill,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.transparent),
+                    ),
+                    enabledBorder: const OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(12)),
+                      borderSide: BorderSide(color: Colors.transparent),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: cs.primary.withValues(alpha: 0.4),
+                      ),
+                    ),
+                  ),
+                  onChanged: (v) => setLocal(() => value = v),
+                  onSubmitted: (_) {
+                    if (valid(value)) Navigator.of(ctx2).pop(true);
+                  },
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: Text(l10n.sideDrawerCancel),
+                ),
+                TextButton(
+                  onPressed: valid(value)
+                      ? () => Navigator.of(ctx).pop(true)
+                      : null,
+                  child: Text(
+                    l10n.sideDrawerSave,
+                    style: TextStyle(
+                      color: valid(value)
+                          ? cs.primary
+                          : cs.onSurface.withValues(alpha: 0.38),
+                      fontWeight: AppFontWeights.semibold,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (ok == true) {
+      final name = controller.text.trim();
+      if (name.isNotEmpty) {
+        await settings.setProviderAvatarLobehub(widget.keyName, name);
+        if (mounted) setState(() {});
+      }
+    }
+  }
+
+  // 后台预热 LobeHub 图标缓存（彩色优先，失败回退单色），不阻塞 UI。
+  // 顺序需与 ProviderAvatar._resolveLobehubPath 保持一致，避免缓存键不一致。
+  void _prewarmLobehubIcon(String n) {
+    if (n.isEmpty) return;
+    Future.microtask(() async {
+      if (!n.endsWith('-color') && !n.endsWith('-text')) {
+        final colored = await AvatarCache.getPath(
+          BrandAssets.lobehubIconUrl('$n-color'),
+        );
+        if (colored != null) return;
+      }
+      await AvatarCache.getPath(BrandAssets.lobehubIconUrl(n));
+    });
+  }
+
+  Future<void> _pickProviderIcon() async {
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.read<SettingsProvider>();
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final icons = BrandAssets.selectableIcons;
+
+    // 若当前头像为 LobeHub 自定义图标，预热缓存，使弹窗与详情页头像无需等待下载。
+    final current = settings.getProviderConfig(widget.keyName);
+    if (current.avatarType == 'lobehub' &&
+        (current.avatarValue ?? '').isNotEmpty) {
+      _prewarmLobehubIcon(current.avatarValue!.trim().toLowerCase());
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        String query = '';
+        return StatefulBuilder(
+          builder: (ctx, setLocal) {
+            final q = query.trim().toLowerCase();
+            final filtered = q.isEmpty
+                ? icons
+                : icons
+                      .where(
+                        (o) =>
+                            o.label.toLowerCase().contains(q) ||
+                            o.id.toLowerCase().contains(q),
+                      )
+                      .toList();
+            return AlertDialog(
+              backgroundColor: cs.surface,
+              title: Text(l10n.providerAvatarIconDialogTitle),
+              content: SizedBox(
+                width: MediaQuery.of(ctx).size.width * 0.8,
+                height: MediaQuery.of(ctx).size.height * 0.5,
+                child: Column(
+                  children: [
+                    TextField(
+                      decoration: InputDecoration(
+                        hintText: l10n.providerAvatarIconSearchHint,
+                        prefixIcon: const Icon(Lucide.Search, size: 18),
+                        isDense: true,
+                        filled: true,
+                        fillColor: context.appColors.surfaceFill,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: Colors.transparent,
+                          ),
+                        ),
+                        enabledBorder: const OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(12)),
+                          borderSide: BorderSide(color: Colors.transparent),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: cs.primary.withValues(alpha: 0.4),
+                          ),
+                        ),
+                      ),
+                      onChanged: (v) => setLocal(() => query = v),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: filtered.isEmpty
+                          ? Center(
+                              child: Text(
+                                l10n.providerAvatarIconNoResults,
+                                style: TextStyle(
+                                  color: cs.onSurface.withValues(alpha: 0.6),
+                                ),
+                              ),
+                            )
+                          : GridView.builder(
+                              itemCount: filtered.length,
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 4,
+                                    mainAxisSpacing: 8,
+                                    crossAxisSpacing: 8,
+                                    childAspectRatio: 1,
+                                  ),
+                              itemBuilder: (ctx, i) {
+                                final opt = filtered[i];
+                                final cfg = settings.getProviderConfig(
+                                  widget.keyName,
+                                );
+                                final selected =
+                                    cfg.avatarType == 'icon' &&
+                                    cfg.avatarValue == opt.asset;
+                                final isSvg = opt.asset.endsWith('.svg');
+                                final needsMono =
+                                    isDark &&
+                                    BrandAssets.assetNeedsDarkInvert(opt.asset);
+                                return Semantics(
+                                  label: opt.label,
+                                  child: Tooltip(
+                                    message: opt.label,
+                                    child: IosCardPress(
+                                      borderRadius: BorderRadius.circular(12),
+                                      baseColor: cs.surface,
+                                      onTap: () {
+                                        Navigator.of(ctx).pop();
+                                        Future.microtask(() async {
+                                          await settings.setProviderAvatarIcon(
+                                            widget.keyName,
+                                            opt.asset,
+                                          );
+                                          if (mounted) setState(() {});
+                                        });
+                                      },
+                                      padding: const EdgeInsets.all(8),
+                                      child: Center(
+                                        child: AspectRatio(
+                                          aspectRatio: 1,
+                                          child: Container(
+                                            decoration: BoxDecoration(
+                                              color: cs.primary.withValues(
+                                                alpha: isDark ? 0.18 : 0.10,
+                                              ),
+                                              shape: BoxShape.circle,
+                                              border: selected
+                                                  ? Border.all(
+                                                      color: cs.primary,
+                                                      width: 2,
+                                                    )
+                                                  : null,
+                                            ),
+                                            alignment: Alignment.center,
+                                            child: FractionallySizedBox(
+                                              widthFactor: 0.65,
+                                              heightFactor: 0.65,
+                                              child: isSvg
+                                                  ? SvgPicture.asset(
+                                                      opt.asset,
+                                                      fit: BoxFit.contain,
+                                                      colorFilter: needsMono
+                                                          ? ColorFilter.mode(
+                                                              cs.onSurface,
+                                                              BlendMode.srcIn,
+                                                            )
+                                                          : null,
+                                                    )
+                                                  : Image.asset(
+                                                      opt.asset,
+                                                      fit: BoxFit.contain,
+                                                      color: needsMono
+                                                          ? cs.onSurface
+                                                          : null,
+                                                      colorBlendMode: needsMono
+                                                          ? BlendMode.srcIn
+                                                          : null,
+                                                    ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text(l10n.sideDrawerCancel),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Widget _buildConfigTab(
@@ -675,6 +963,59 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           ),
           const SizedBox(height: 12),
         ],
+        if (widget.keyName.toLowerCase() == '随想ai中转站') ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: cs.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: cs.primary.withValues(alpha: 0.35)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '可靠高效的 API 中继服务，提供 Claude、Codex、Gemini 等中继服务。注重隐私·无数据倒卖·无模型掺水，充值额度 1:1，按量付费。多线路冗余、跨区域容灾、自动故障切换，长链路 SSE 不中断。',
+                  style: TextStyle(color: cs.onSurface.withValues(alpha: 0.8)),
+                ),
+                const SizedBox(height: 6),
+                Text.rich(
+                  TextSpan(
+                    text: '官网：',
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.8),
+                    ),
+                    children: [
+                      TextSpan(
+                        text: 'https://sui-xiang.com',
+                        style: TextStyle(
+                          color: cs.primary,
+                          fontWeight: AppFontWeights.emphasis,
+                        ),
+                        recognizer: TapGestureRecognizer()
+                          ..onTap = () async {
+                            final uri = Uri.parse('https://sui-xiang.com');
+                            try {
+                              final ok = await launchUrl(
+                                uri,
+                                mode: LaunchMode.externalApplication,
+                              );
+                              if (!ok) {
+                                await launchUrl(uri);
+                              }
+                            } catch (_) {
+                              await launchUrl(uri);
+                            }
+                          },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         // 顶部管理分组标题（左侧缩进以对齐卡片内容）
         Padding(
           padding: const EdgeInsets.only(left: 12),
@@ -730,12 +1071,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                 },
                 builder: (pressed) {
                   final base = Theme.of(context).colorScheme.onSurface;
-                  final isDark =
-                      Theme.of(context).brightness == Brightness.dark;
                   final target = pressed
                       ? (Color.lerp(
                               base,
-                              isDark ? Colors.black : Colors.white,
+                              Theme.of(context).colorScheme.surface,
                               0.55,
                             ) ??
                             base)
@@ -852,14 +1191,8 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               builder: (pressed) {
                 final cs2 = Theme.of(context).colorScheme;
                 final base = cs2.onSurface;
-                final isDark = Theme.of(context).brightness == Brightness.dark;
                 final target = pressed
-                    ? (Color.lerp(
-                            base,
-                            isDark ? Colors.black : Colors.white,
-                            0.55,
-                          ) ??
-                          base)
+                    ? (Color.lerp(base, cs2.surface, 0.55) ?? base)
                     : base;
                 return TweenAnimationBuilder<Color?>(
                   tween: ColorTween(end: target),
@@ -877,6 +1210,50 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                           Expanded(
                             child: Text(
                               l10n.providerDetailPageNetworkTab,
+                              style: TextStyle(fontSize: 15, color: c),
+                            ),
+                          ),
+                          Icon(Lucide.ChevronRight, size: 16, color: c),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+            _TactileRow(
+              onTap: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ProviderCustomRequestPage(
+                      providerKey: widget.keyName,
+                      providerDisplayName: widget.displayName,
+                    ),
+                  ),
+                );
+              },
+              builder: (pressed) {
+                final cs2 = Theme.of(context).colorScheme;
+                final base = cs2.onSurface;
+                final target = pressed
+                    ? (Color.lerp(base, cs2.surface, 0.55) ?? base)
+                    : base;
+                return TweenAnimationBuilder<Color?>(
+                  tween: ColorTween(end: target),
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, color, _) {
+                    final c = color ?? base;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              l10n.providerDetailPageCustomRequestTitle,
                               style: TextStyle(fontSize: 15, color: c),
                             ),
                           ),
@@ -1028,6 +1405,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     final models = cfg.models;
     final allSelected =
         _selectedModels.length == models.length && models.isNotEmpty;
+    final hasFailedDetectedModels = _failedDetectedModels(models).isNotEmpty;
     return Stack(
       children: [
         if (models.isEmpty)
@@ -1296,6 +1674,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               l10n: l10n,
               cs: cs,
               allSelected: allSelected,
+              hasFailedDetectedModels: hasFailedDetectedModels,
             ),
           )
         else
@@ -1325,7 +1704,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     Widget? suffix,
     ValueChanged<String>? onChanged,
   }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1349,7 +1727,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           decoration: InputDecoration(
             hintText: hint,
             filled: true,
-            fillColor: isDark ? Colors.white10 : Colors.white,
+            fillColor: context.appColors.surfaceCard,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(
@@ -1405,11 +1783,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         });
       },
       builder: (pressed) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
         final base = cs.onSurface;
         final target = pressed
-            ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ??
-                  base)
+            ? (Color.lerp(base, cs.surface, 0.55) ?? base)
             : base;
         return TweenAnimationBuilder<Color?>(
           tween: ColorTween(end: target),
@@ -1462,10 +1838,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final Color base = cs.surface;
-    final Color bg = isDark
-        ? Color.lerp(base, Colors.white, 0.06)!
-        : Color.lerp(base, Colors.white, 0.92)!;
+    final Color bg = context.appColors.surfaceCard;
     return Container(
       decoration: BoxDecoration(
         color: bg,
@@ -1474,9 +1847,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
           width: 0.6,
         ),
-        // boxShadow: [
-        //   if (!isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 6, offset: const Offset(0, 1)),
-        // ],
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(children: children),
@@ -1493,11 +1863,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     return _TactileRow(
       onTap: onTap,
       builder: (pressed) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
         final base = cs.onSurface;
         final target = pressed
-            ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ??
-                  base)
+            ? (Color.lerp(base, cs.surface, 0.55) ?? base)
             : base;
         return TweenAnimationBuilder<Color?>(
           tween: ColorTween(end: target),
@@ -1535,11 +1903,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     return _TactileRow(
       onTap: null,
       builder: (pressed) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
         final base = cs.onSurface;
         final target = pressed
-            ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ??
-                  base)
+            ? (Color.lerp(base, cs.surface, 0.55) ?? base)
             : base;
         return TweenAnimationBuilder<Color?>(
           tween: ColorTween(end: target),
@@ -1618,10 +1984,8 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       builder: (pressed) {
         final cs = Theme.of(context).colorScheme;
         final base = cs.onSurface;
-        final isDark = Theme.of(context).brightness == Brightness.dark;
         final target = pressed
-            ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ??
-                  base)
+            ? (Color.lerp(base, cs.surface, 0.55) ?? base)
             : base;
         return TweenAnimationBuilder<Color?>(
           tween: ColorTween(end: target),
@@ -1670,10 +2034,8 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       builder: (pressed) {
         final cs = Theme.of(context).colorScheme;
         final base = cs.onSurface;
-        final isDark = Theme.of(context).brightness == Brightness.dark;
         final target = pressed
-            ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ??
-                  base)
+            ? (Color.lerp(base, cs.surface, 0.55) ?? base)
             : base;
         return TweenAnimationBuilder<Color?>(
           tween: ColorTween(end: target),
@@ -1770,10 +2132,8 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       onTap: () => Navigator.of(ctx).pop(k),
       builder: (pressed) {
         final base = cs.onSurface;
-        final isDark = Theme.of(ctx).brightness == Brightness.dark;
         final target = pressed
-            ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ??
-                  base)
+            ? (Color.lerp(base, cs.surface, 0.55) ?? base)
             : base;
         return TweenAnimationBuilder<Color?>(
           tween: ColorTween(end: target),
@@ -1876,7 +2236,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     List<Widget>? actions,
     ValueChanged<String>? onChanged,
   }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1908,7 +2267,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             hintText: hint,
             filled: true,
             alignLabelWithHint: true,
-            fillColor: isDark ? Colors.white10 : Colors.white,
+            fillColor: context.appColors.surfaceCard,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(
@@ -1988,12 +2347,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     required EdgeInsetsGeometry padding,
     required double maxWidth,
   }) {
-    final toolbarColor = Theme.of(context).brightness == Brightness.dark
-        ? Color.alphaBlend(
-            Colors.white.withValues(alpha: 0.12),
-            colorScheme.surface,
-          )
-        : const Color(0xFFF2F3F5);
+    final toolbarColor = context.appColors.surfaceFill;
 
     return Align(
       alignment: Alignment.bottomCenter,
@@ -2097,6 +2451,17 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     );
   }
 
+  Widget _buildToolbarTooltip({
+    required String message,
+    required Widget child,
+  }) {
+    return Tooltip(
+      message: message,
+      triggerMode: TooltipTriggerMode.longPress,
+      child: child,
+    );
+  }
+
   Widget _buildActionToolbarButton({
     required String label,
     required IconData icon,
@@ -2108,56 +2473,59 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     bool destructive = false,
   }) {
     final fg = destructive ? colorScheme.error : colorScheme.primary;
-    return Semantics(
-      button: true,
-      label: label,
-      child: _TactileRow(
-        pressedScale: 0.97,
-        haptics: false,
-        onTap: onTap,
-        builder: (pressed) {
-          return Container(
-            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-            decoration: BoxDecoration(
-              color: destructive
-                  ? colorScheme.error.withValues(alpha: 0.1)
-                  : (outlined
-                        ? null
-                        : colorScheme.primary.withValues(alpha: 0.12)),
-              borderRadius: BorderRadius.circular(999),
-              border: outlined
-                  ? Border.all(
-                      color: colorScheme.primary.withValues(alpha: 0.35),
-                    )
-                  : null,
-            ),
-            padding: padding,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, size: destructive ? 18 : 20, color: fg),
-                if (showLabel) ...[
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: fg,
-                        fontSize: 14,
-                        fontWeight: outlined
-                            ? AppFontWeights.semibold
-                            : AppFontWeights.medium,
+    return _buildToolbarTooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        label: label,
+        child: _TactileRow(
+          pressedScale: 0.97,
+          haptics: false,
+          onTap: onTap,
+          builder: (pressed) {
+            return Container(
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+              decoration: BoxDecoration(
+                color: destructive
+                    ? colorScheme.error.withValues(alpha: 0.1)
+                    : (outlined
+                          ? null
+                          : colorScheme.primary.withValues(alpha: 0.12)),
+                borderRadius: BorderRadius.circular(999),
+                border: outlined
+                    ? Border.all(
+                        color: colorScheme.primary.withValues(alpha: 0.35),
+                      )
+                    : null,
+              ),
+              padding: padding,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: destructive ? 18 : 20, color: fg),
+                  if (showLabel) ...[
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: fg,
+                          fontSize: 14,
+                          fontWeight: outlined
+                              ? AppFontWeights.semibold
+                              : AppFontWeights.medium,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
-              ],
-            ),
-          );
-        },
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -2166,6 +2534,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     required AppLocalizations l10n,
     required ColorScheme cs,
     required bool allSelected,
+    required bool hasFailedDetectedModels,
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -2193,7 +2562,113 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             ? l10n.mcpAssistantSheetClearAll
             : l10n.mcpAssistantSheetSelectAll;
         final selectIcon = allSelected ? Lucide.Square : Lucide.CheckSquare;
+        final detectLabel = _isDetecting
+            ? l10n.providerDetailPageBatchDetecting
+            : l10n.providerDetailPageBatchDetectButton;
+        final deleteFailedLabel =
+            l10n.providerDetailPageDeleteFailedDetectedModelsButton;
         final deleteDisabled = _selectedModels.isEmpty || _isDetecting;
+        final deleteFailedDisabled = !hasFailedDetectedModels || _isDetecting;
+        final buttonTextStyle = DefaultTextStyle.of(context).style.merge(
+          TextStyle(fontSize: 14, fontWeight: AppFontWeights.semibold),
+        );
+        final textScaler = MediaQuery.textScalerOf(context);
+        final textDirection = Directionality.of(context);
+        final locale = Localizations.maybeLocaleOf(context);
+
+        double labelWidth(String label) {
+          final painter = TextPainter(
+            text: TextSpan(text: label, style: buttonTextStyle),
+            maxLines: 1,
+            textDirection: textDirection,
+            textScaler: textScaler,
+            locale: locale,
+          )..layout();
+          return painter.width;
+        }
+
+        double buttonWidth({
+          required String label,
+          required bool showLabel,
+          required EdgeInsets padding,
+          double iconSize = 20,
+        }) {
+          final width =
+              padding.horizontal +
+              iconSize +
+              (showLabel ? 8 + labelWidth(label) : 0);
+          return width < 44 ? 44 : width;
+        }
+
+        final toolbarInnerWidth =
+            availableWidth - horizontalMargin * 2 - toolbarPadding.horizontal;
+        final toolbarTextBudget = toolbarInnerWidth - 8;
+        double totalWidth({
+          required bool showSelectLabel,
+          required bool showDetectLabel,
+          required bool showDeleteLabel,
+        }) {
+          return buttonWidth(
+                label: selectLabel,
+                showLabel: showSelectLabel,
+                padding: iconOnlyPadding,
+              ) +
+              itemGap +
+              buttonWidth(
+                label: '',
+                showLabel: false,
+                padding: iconButtonPadding,
+                iconSize: 18,
+              ) +
+              itemGap +
+              buttonWidth(
+                label: detectLabel,
+                showLabel: showDetectLabel,
+                padding: showDetectLabel ? textButtonPadding : iconOnlyPadding,
+              ) +
+              (hasFailedDetectedModels
+                  ? itemGap +
+                        buttonWidth(
+                          label: deleteFailedLabel,
+                          showLabel: false,
+                          padding: iconOnlyPadding,
+                        )
+                  : 0) +
+              itemGap +
+              buttonWidth(
+                label: l10n.providerDetailPageDeleteSelectedModelsButton,
+                showLabel: showDeleteLabel,
+                padding: iconOnlyPadding,
+              );
+        }
+
+        var showSelectLabel = true;
+        var showDetectLabel = true;
+        var showDeleteLabel = true;
+        if (totalWidth(
+              showSelectLabel: showSelectLabel,
+              showDetectLabel: showDetectLabel,
+              showDeleteLabel: showDeleteLabel,
+            ) >
+            toolbarTextBudget) {
+          showDeleteLabel = false;
+        }
+        if (totalWidth(
+              showSelectLabel: showSelectLabel,
+              showDetectLabel: showDetectLabel,
+              showDeleteLabel: showDeleteLabel,
+            ) >
+            toolbarTextBudget) {
+          showSelectLabel = false;
+        }
+        if (totalWidth(
+              showSelectLabel: showSelectLabel,
+              showDetectLabel: showDetectLabel,
+              showDeleteLabel: showDeleteLabel,
+            ) >
+            toolbarTextBudget) {
+          showDetectLabel = false;
+        }
 
         return _buildToolbarShell(
           colorScheme: cs,
@@ -2206,41 +2681,45 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               _buildSelectionToolbarSelectButton(
                 label: selectLabel,
                 icon: selectIcon,
-                showLabel: !compact,
+                showLabel: showSelectLabel,
                 padding: iconOnlyPadding,
                 colorScheme: cs,
                 allSelected: allSelected,
               ),
               SizedBox(width: itemGap),
               _buildSelectionToolbarStreamButton(
+                label: l10n.providerDetailPageUseStreamingLabel,
                 padding: iconButtonPadding,
                 colorScheme: cs,
               ),
               SizedBox(width: itemGap),
-              if (compact)
-                _buildSelectionToolbarDetectButton(
-                  l10n: l10n,
+              _buildSelectionToolbarDetectButton(
+                l10n: l10n,
+                showLabel: showDetectLabel,
+                padding: showDetectLabel ? textButtonPadding : iconOnlyPadding,
+                colorScheme: cs,
+              ),
+              if (hasFailedDetectedModels) ...[
+                SizedBox(width: itemGap),
+                _buildSelectionToolbarDestructiveButton(
+                  label: deleteFailedLabel,
+                  icon: Lucide.CircleX,
                   showLabel: false,
                   padding: iconOnlyPadding,
+                  disabled: deleteFailedDisabled,
                   colorScheme: cs,
-                )
-              else
-                Flexible(
-                  fit: FlexFit.loose,
-                  child: _buildSelectionToolbarDetectButton(
-                    l10n: l10n,
-                    showLabel: true,
-                    padding: textButtonPadding,
-                    colorScheme: cs,
-                  ),
+                  onTap: _confirmDeleteFailedDetectedModels,
                 ),
+              ],
               SizedBox(width: itemGap),
-              _buildSelectionToolbarDeleteButton(
-                l10n: l10n,
-                showLabel: !compact,
+              _buildSelectionToolbarDestructiveButton(
+                label: l10n.providerDetailPageDeleteSelectedModelsButton,
+                icon: Lucide.Trash2,
+                showLabel: showDeleteLabel,
                 padding: iconOnlyPadding,
                 disabled: deleteDisabled,
                 colorScheme: cs,
+                onTap: _confirmDeleteSelectedModels,
               ),
             ],
           ),
@@ -2257,112 +2736,126 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     required ColorScheme colorScheme,
     required bool allSelected,
   }) {
-    return Semantics(
-      button: true,
-      label: label,
-      child: _TactileRow(
-        pressedScale: 0.97,
-        haptics: false,
-        onTap: () {
-          if (allSelected) {
-            setState(() {
-              _selectedModels.clear();
-            });
-          } else {
-            _selectAll();
-          }
-        },
-        builder: (pressed) {
-          return Container(
-            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: colorScheme.onSurface.withValues(alpha: 0.2),
-              ),
-              color: pressed
-                  ? colorScheme.onSurface.withValues(alpha: 0.06)
-                  : null,
-            ),
-            padding: padding,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 160),
-                  transitionBuilder: (child, anim) =>
-                      ScaleTransition(scale: anim, child: child),
-                  child: Icon(
-                    icon,
-                    key: ValueKey(allSelected),
-                    size: 20,
-                    color: colorScheme.onSurface,
-                  ),
+    return _buildToolbarTooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        label: label,
+        child: _TactileRow(
+          pressedScale: 0.97,
+          haptics: false,
+          onTap: () {
+            if (allSelected) {
+              setState(() {
+                _selectedModels.clear();
+              });
+            } else {
+              _selectAll();
+            }
+          },
+          builder: (pressed) {
+            return Container(
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: colorScheme.onSurface.withValues(alpha: 0.2),
                 ),
-                if (showLabel) ...[
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: colorScheme.onSurface,
-                        fontSize: 14,
-                        fontWeight: AppFontWeights.semibold,
-                      ),
+                color: pressed
+                    ? colorScheme.onSurface.withValues(alpha: 0.06)
+                    : null,
+              ),
+              padding: padding,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 160),
+                    transitionBuilder: (child, anim) =>
+                        ScaleTransition(scale: anim, child: child),
+                    child: Icon(
+                      icon,
+                      key: ValueKey(allSelected),
+                      size: 20,
+                      color: colorScheme.onSurface,
                     ),
                   ),
+                  if (showLabel) ...[
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colorScheme.onSurface,
+                          fontSize: 14,
+                          fontWeight: AppFontWeights.semibold,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
-            ),
-          );
-        },
+              ),
+            );
+          },
+        ),
       ),
     );
   }
 
   Widget _buildSelectionToolbarStreamButton({
+    required String label,
     required EdgeInsetsGeometry padding,
     required ColorScheme colorScheme,
   }) {
-    return _TactileRow(
-      pressedScale: 0.97,
-      haptics: false,
-      onTap: () => setState(() => _detectUseStream = !_detectUseStream),
-      builder: (pressed) {
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-          padding: padding,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: colorScheme.onSurface.withValues(alpha: 0.2),
-            ),
-            color: pressed
-                ? colorScheme.onSurface.withValues(alpha: 0.06)
-                : (_detectUseStream
-                      ? colorScheme.onSurface.withValues(alpha: 0.08)
-                      : Colors.transparent),
-          ),
-          child: Center(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 160),
-              transitionBuilder: (child, anim) =>
-                  ScaleTransition(scale: anim, child: child),
-              child: Icon(
-                _detectUseStream ? Lucide.AudioWaveform : Lucide.SquareEqual,
-                key: ValueKey(_detectUseStream),
-                size: 18,
-                color: colorScheme.onSurface,
+    return _buildToolbarTooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        label: label,
+        toggled: _detectUseStream,
+        child: _TactileRow(
+          pressedScale: 0.97,
+          haptics: false,
+          onTap: () => setState(() => _detectUseStream = !_detectUseStream),
+          builder: (pressed) {
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+              padding: padding,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: colorScheme.onSurface.withValues(alpha: 0.2),
+                ),
+                color: pressed
+                    ? colorScheme.onSurface.withValues(alpha: 0.06)
+                    : (_detectUseStream
+                          ? colorScheme.onSurface.withValues(alpha: 0.08)
+                          : Colors.transparent),
               ),
-            ),
-          ),
-        );
-      },
+              child: Center(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 160),
+                  transitionBuilder: (child, anim) =>
+                      ScaleTransition(scale: anim, child: child),
+                  child: Icon(
+                    _detectUseStream
+                        ? Lucide.AudioWaveform
+                        : Lucide.SquareEqual,
+                    key: ValueKey(_detectUseStream),
+                    size: 18,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -2376,118 +2869,125 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     final label = _isDetecting
         ? l10n.providerDetailPageBatchDetecting
         : l10n.providerDetailPageBatchDetectButton;
-    return Semantics(
-      button: true,
-      label: label,
-      enabled: !disabled,
-      child: _TactileRow(
-        pressedScale: 0.97,
-        haptics: false,
-        onTap: disabled ? null : _startDetection,
-        builder: (pressed) {
-          return Container(
-            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-            decoration: BoxDecoration(
-              color: disabled
-                  ? colorScheme.onSurface.withValues(alpha: 0.1)
-                  : colorScheme.primary.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            padding: padding,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  _isDetecting ? Lucide.Loader : Lucide.HeartPulse,
-                  size: 20,
-                  color: disabled
-                      ? colorScheme.onSurface.withValues(alpha: 0.5)
-                      : colorScheme.primary,
-                ),
-                if (showLabel) ...[
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: disabled
-                            ? colorScheme.onSurface.withValues(alpha: 0.5)
-                            : colorScheme.primary,
-                        fontSize: 14,
-                        fontWeight: AppFontWeights.semibold,
+    return _buildToolbarTooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        label: label,
+        enabled: !disabled,
+        child: _TactileRow(
+          pressedScale: 0.97,
+          haptics: false,
+          onTap: disabled ? null : _startDetection,
+          builder: (pressed) {
+            return Container(
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+              decoration: BoxDecoration(
+                color: disabled
+                    ? colorScheme.onSurface.withValues(alpha: 0.1)
+                    : colorScheme.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              padding: padding,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    _isDetecting ? Lucide.Loader : Lucide.HeartPulse,
+                    size: 20,
+                    color: disabled
+                        ? colorScheme.onSurface.withValues(alpha: 0.5)
+                        : colorScheme.primary,
+                  ),
+                  if (showLabel) ...[
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: disabled
+                              ? colorScheme.onSurface.withValues(alpha: 0.5)
+                              : colorScheme.primary,
+                          fontSize: 14,
+                          fontWeight: AppFontWeights.semibold,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
-              ],
-            ),
-          );
-        },
+              ),
+            );
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildSelectionToolbarDeleteButton({
-    required AppLocalizations l10n,
+  Widget _buildSelectionToolbarDestructiveButton({
+    required String label,
+    required IconData icon,
     required bool showLabel,
     required EdgeInsetsGeometry padding,
     required bool disabled,
     required ColorScheme colorScheme,
+    required VoidCallback onTap,
   }) {
-    final label = l10n.providerDetailPageDeleteSelectedModelsButton;
-    return Semantics(
-      button: true,
-      label: label,
-      enabled: !disabled,
-      child: _TactileRow(
-        pressedScale: 0.97,
-        haptics: false,
-        onTap: disabled ? null : _confirmDeleteSelectedModels,
-        builder: (pressed) {
-          return Container(
-            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-            decoration: BoxDecoration(
-              color: disabled
-                  ? colorScheme.onSurface.withValues(alpha: 0.1)
-                  : colorScheme.error.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            padding: padding,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Lucide.Trash2,
-                  size: 20,
-                  color: disabled
-                      ? colorScheme.onSurface.withValues(alpha: 0.5)
-                      : colorScheme.error,
-                ),
-                if (showLabel) ...[
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: disabled
-                            ? colorScheme.onSurface.withValues(alpha: 0.5)
-                            : colorScheme.error,
-                        fontSize: 14,
-                        fontWeight: AppFontWeights.semibold,
+    return _buildToolbarTooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        label: label,
+        enabled: !disabled,
+        child: _TactileRow(
+          pressedScale: 0.97,
+          haptics: false,
+          onTap: disabled ? null : onTap,
+          builder: (pressed) {
+            return Container(
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+              decoration: BoxDecoration(
+                color: disabled
+                    ? colorScheme.onSurface.withValues(alpha: 0.1)
+                    : colorScheme.error.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              padding: padding,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    icon,
+                    size: 20,
+                    color: disabled
+                        ? colorScheme.onSurface.withValues(alpha: 0.5)
+                        : colorScheme.error,
+                  ),
+                  if (showLabel) ...[
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: disabled
+                              ? colorScheme.onSurface.withValues(alpha: 0.5)
+                              : colorScheme.error,
+                          fontSize: 14,
+                          fontWeight: AppFontWeights.semibold,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
-              ],
-            ),
-          );
-        },
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -2515,6 +3015,14 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       _selectedModels.clear();
       _selectedModels.addAll(cfg.models);
     });
+  }
+
+  Set<String> _failedDetectedModels(Iterable<String> models) {
+    final currentModels = models.toSet();
+    return {
+      for (final entry in _detectionResults.entries)
+        if (!entry.value && currentModels.contains(entry.key)) entry.key,
+    };
   }
 
   Future<void> _clearAssistantSelectionsForModels(
@@ -2549,18 +3057,44 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   Future<void> _confirmDeleteSelectedModels() async {
     if (_selectedModels.isEmpty || _isDetecting) return;
     final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
     final modelsToDelete = Set<String>.from(_selectedModels);
+    await _confirmDeleteModels(
+      modelsToDelete,
+      l10n.providerDetailPageDeleteSelectedModelsConfirm(modelsToDelete.length),
+    );
+  }
+
+  Future<void> _confirmDeleteFailedDetectedModels() async {
+    if (_isDetecting) return;
+    final settings = context.read<SettingsProvider>();
+    final cfg = settings.getProviderConfig(
+      widget.keyName,
+      defaultName: widget.displayName,
+    );
+    final modelsToDelete = _failedDetectedModels(cfg.models);
+    if (modelsToDelete.isEmpty) return;
+    final l10n = AppLocalizations.of(context)!;
+    await _confirmDeleteModels(
+      modelsToDelete,
+      l10n.providerDetailPageDeleteFailedDetectedModelsConfirm(
+        modelsToDelete.length,
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteModels(
+    Set<String> modelsToDelete,
+    String confirmMessage,
+  ) async {
+    if (modelsToDelete.isEmpty) return;
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: cs.surface,
         title: Text(l10n.providerDetailPageConfirmDeleteTitle),
-        content: Text(
-          l10n.providerDetailPageDeleteSelectedModelsConfirm(
-            modelsToDelete.length,
-          ),
-        ),
+        content: Text(confirmMessage),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -2872,10 +3406,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                             decoration: InputDecoration(
                               hintText: l10n.providerDetailPageFilterHint,
                               filled: true,
-                              fillColor:
-                                  Theme.of(ctx).brightness == Brightness.dark
-                                  ? Colors.white10
-                                  : const Color(0xFFF2F3F5),
+                              fillColor: ctx.appColors.surfaceFill,
                               prefixIcon: Icon(
                                 Lucide.Search,
                                 size: 20,
@@ -3064,13 +3595,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                           builder: (_) {
                                             return Container(
                                               decoration: BoxDecoration(
-                                                color:
-                                                    Theme.of(
-                                                          context,
-                                                        ).brightness ==
-                                                        Brightness.dark
-                                                    ? Colors.white10
-                                                    : const Color(0xFFF2F3F5),
+                                                color: context
+                                                    .appColors
+                                                    .surfaceFill,
                                                 borderRadius:
                                                     BorderRadius.circular(12),
                                               ),
@@ -3484,7 +4011,7 @@ class _ModelCard extends StatelessWidget {
               child: Icon(
                 detectionResult! ? Lucide.CheckCircle : Lucide.XCircle,
                 size: 16,
-                color: detectionResult! ? Colors.green : cs.error,
+                color: detectionResult! ? context.appColors.success : cs.error,
               ),
             ),
           )
@@ -3804,7 +4331,7 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
     required bool success,
     required String message,
   }) {
-    final color = success ? Colors.green : cs.error;
+    final color = success ? context.appColors.success : cs.error;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -3861,6 +4388,7 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
       context,
       widget.providerKey,
       widget.providerDisplayName,
+      initialModelId: _selectedModelId,
     );
     if (selected != null) {
       setState(() {
@@ -3902,9 +4430,15 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
 Future<String?> showModelPickerForTest(
   BuildContext context,
   String providerKey,
-  String providerDisplayName,
-) async {
-  final sel = await showModelSelector(context, limitProviderKey: providerKey);
+  String providerDisplayName, {
+  String? initialModelId,
+}) async {
+  final sel = await showModelSelector(
+    context,
+    limitProviderKey: providerKey,
+    initialProviderKey: initialModelId == null ? null : providerKey,
+    initialModelId: initialModelId,
+  );
   return sel?.modelId;
 }
 
@@ -3946,17 +4480,11 @@ class _BrandAvatar extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final asset = BrandAssets.assetForName(name);
-    final lower = name.toLowerCase();
-    final bool mono =
-        isDark &&
-        (RegExp(r'openai|gpt|o\\d').hasMatch(lower) ||
-            RegExp(r'grok|xai').hasMatch(lower) ||
-            RegExp(r'openrouter').hasMatch(lower));
+    final mono =
+        asset != null && isDark && BrandAssets.assetNeedsDarkInvert(asset);
     return CircleAvatar(
       radius: size / 2,
-      backgroundColor: isDark
-          ? Colors.white10
-          : cs.primary.withValues(alpha: 0.1),
+      backgroundColor: cs.primary.withValues(alpha: isDark ? 0.18 : 0.1),
       child: asset == null
           ? Text(
               name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
@@ -3972,7 +4500,7 @@ class _BrandAvatar extends StatelessWidget {
                     width: size * 0.7,
                     height: size * 0.7,
                     colorFilter: mono
-                        ? const ColorFilter.mode(Colors.white, BlendMode.srcIn)
+                        ? ColorFilter.mode(cs.onSurface, BlendMode.srcIn)
                         : null,
                   )
                 : Image.asset(
@@ -3980,7 +4508,7 @@ class _BrandAvatar extends StatelessWidget {
                     width: size * 0.7,
                     height: size * 0.7,
                     fit: BoxFit.contain,
-                    color: mono ? Colors.white : null,
+                    color: mono ? cs.onSurface : null,
                     colorBlendMode: mono ? BlendMode.srcIn : null,
                   )),
     );
@@ -4247,9 +4775,7 @@ class _PromptCachingTtlSegmentedControl extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final background = isDark
-        ? Colors.white.withValues(alpha: 0.08)
-        : Colors.black.withValues(alpha: 0.05);
+    final background = cs.onSurface.withValues(alpha: isDark ? 0.08 : 0.05);
 
     return Semantics(
       label: semanticLabel,

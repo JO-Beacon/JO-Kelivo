@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/builtin_tools.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'package:Kelivo/core/utils/multimodal_input_utils.dart';
 
 ProviderConfig _claudeConfig(
   String baseUrl, {
@@ -367,6 +368,172 @@ void main() {
     );
 
     test(
+      'Opus 4.8 uses adaptive thinking with xhigh effort and strips sampling',
+      () async {
+        final body = await _captureClaudeRequestBody(
+          modelId: 'claude-opus-4-8',
+          thinkingBudget: 64000,
+          temperature: 0.7,
+          topP: 0.8,
+        );
+
+        expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+        expect(body['output_config'], {'effort': 'xhigh'});
+        expect(body.containsKey('temperature'), isFalse);
+        expect(body.containsKey('top_p'), isFalse);
+      },
+    );
+
+    test('Opus 4.8 maps max reasoning to max effort', () async {
+      final body = await _captureClaudeRequestBody(
+        modelId: 'claude-opus-4.8',
+        thinkingBudget: 128000,
+      );
+
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'max'});
+    });
+
+    test('Opus 5 uses summarized adaptive thinking and max effort', () async {
+      final body = await _captureClaudeRequestBody(
+        modelId: 'claude-opus-5',
+        thinkingBudget: 128000,
+        temperature: 0.7,
+        topP: 0.8,
+      );
+
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'max'});
+      expect(body['max_tokens'], 128000);
+      expect(body.containsKey('temperature'), isFalse);
+      expect(body.containsKey('top_p'), isFalse);
+    });
+
+    test('Sonnet 5 can disable thinking but still rejects sampling', () async {
+      final body = await _captureClaudeRequestBody(
+        modelId: 'claude-sonnet-5',
+        thinkingBudget: 0,
+        temperature: 0.7,
+        topP: 0.8,
+      );
+
+      expect(body['thinking'], {'type': 'disabled'});
+      expect(body.containsKey('output_config'), isFalse);
+      expect(body['max_tokens'], 128000);
+      expect(body.containsKey('temperature'), isFalse);
+      expect(body.containsKey('top_p'), isFalse);
+    });
+
+    test('Fable 5 never sends unsupported disabled thinking', () async {
+      final offBody = await _captureClaudeRequestBody(
+        modelId: 'claude-fable-5',
+        thinkingBudget: 0,
+        temperature: 0.7,
+        topP: 0.8,
+      );
+      final mediumBody = await _captureClaudeRequestBody(
+        modelId: 'claude-fable-5',
+        thinkingBudget: 16000,
+      );
+
+      expect(offBody.containsKey('thinking'), isFalse);
+      expect(offBody.containsKey('output_config'), isFalse);
+      expect(offBody.containsKey('temperature'), isFalse);
+      expect(offBody.containsKey('top_p'), isFalse);
+      expect(mediumBody['thinking'], {
+        'type': 'adaptive',
+        'display': 'summarized',
+      });
+      expect(mediumBody['output_config'], {'effort': 'medium'});
+    });
+
+    test('Fable 5 maps max reasoning to max effort', () async {
+      final body = await _captureClaudeRequestBody(
+        modelId: 'claude-fable-5',
+        thinkingBudget: 128000,
+      );
+
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'max'});
+    });
+
+    test(
+      'Mythos 5 never sends disabled thinking and returns summaries',
+      () async {
+        final offBody = await _captureClaudeRequestBody(
+          modelId: 'claude-mythos-5',
+          thinkingBudget: 0,
+        );
+        final maxBody = await _captureClaudeRequestBody(
+          modelId: 'claude-mythos-5',
+          thinkingBudget: 128000,
+        );
+
+        expect(offBody.containsKey('thinking'), isFalse);
+        expect(offBody.containsKey('output_config'), isFalse);
+        expect(maxBody['thinking'], {
+          'type': 'adaptive',
+          'display': 'summarized',
+        });
+        expect(maxBody['output_config'], {'effort': 'max'});
+        expect(maxBody['max_tokens'], 128000);
+      },
+    );
+
+    test('OpenRouter Anthropic format uses Claude messages path', () async {
+      late Uri requestUri;
+      late Map<String, dynamic> requestBody;
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        requestUri = request.uri;
+        requestBody =
+            (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
+                .cast<String, dynamic>();
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'id': 'msg_1',
+            'content': [
+              {'type': 'text', 'text': 'ok'},
+            ],
+            'usage': {'input_tokens': 1, 'output_tokens': 1},
+          }),
+        );
+        await request.response.close();
+      });
+
+      final chunks = await ChatApiService.sendMessageStream(
+        config: ProviderConfig(
+          id: 'OpenRouterAnthropic',
+          enabled: true,
+          name: 'OpenRouter Anthropic',
+          apiKey: 'test-key',
+          baseUrl: 'http://${server.address.address}:${server.port}',
+          providerType: ProviderKind.claude,
+        ),
+        modelId: 'anthropic/claude-fable-5',
+        messages: const [
+          {'role': 'user', 'content': 'hello'},
+        ],
+        thinkingBudget: 16000,
+        stream: false,
+      ).toList();
+
+      expect(chunks.last.isDone, isTrue);
+      expect(requestUri.path, '/messages');
+      expect(requestBody['thinking'], {
+        'type': 'adaptive',
+        'display': 'summarized',
+      });
+      expect(requestBody['output_config'], {'effort': 'medium'});
+    });
+
+    test(
       'Opus 4.7 off keeps sampling params and omits output config',
       () async {
         final body = await _captureClaudeRequestBody(
@@ -442,6 +609,18 @@ void main() {
       );
     });
 
+    test(
+      'generateText Claude path omits temperature when thinking is off',
+      () async {
+        final body = await _captureClaudeGenerateTextBody(
+          modelId: 'claude-haiku-4-5',
+          thinkingBudget: 0,
+        );
+
+        expect(body.containsKey('temperature'), isFalse);
+      },
+    );
+
     test('generateText Claude path reads text after thinking block', () async {
       await _captureClaudeGenerateTextBody(
         modelId: 'deepseek-v4-pro',
@@ -453,14 +632,23 @@ void main() {
       );
     });
 
-    test('Claude built-in search support list includes Opus 4.7', () {
-      expect(
-        BuiltInToolsHelper.isClaudeBuiltInSearchSupportedModel(
-          'claude-opus-4-7',
-        ),
-        isTrue,
-      );
-    });
+    test(
+      'Claude built-in search support list includes latest Claude 5 models',
+      () {
+        for (final modelId in const [
+          'claude-opus-4-8',
+          'claude-fable-5',
+          'claude-mythos-5',
+          'claude-opus-5',
+          'claude-sonnet-5',
+        ]) {
+          expect(
+            BuiltInToolsHelper.isClaudeBuiltInSearchSupportedModel(modelId),
+            isTrue,
+          );
+        }
+      },
+    );
 
     test('Claude dynamic web search support matrix is official-only', () {
       final official = _claudeConfig(
@@ -472,7 +660,28 @@ void main() {
       expect(
         BuiltInToolsHelper.supportsClaudeDynamicWebSearchForModel(
           cfg: official,
-          modelId: 'claude-opus-4-7',
+          modelId: 'claude-opus-4-8',
+        ),
+        isTrue,
+      );
+      expect(
+        BuiltInToolsHelper.supportsClaudeDynamicWebSearchForModel(
+          cfg: official,
+          modelId: 'claude-opus-5',
+        ),
+        isTrue,
+      );
+      expect(
+        BuiltInToolsHelper.supportsClaudeDynamicWebSearchForModel(
+          cfg: official,
+          modelId: 'claude-sonnet-5',
+        ),
+        isTrue,
+      );
+      expect(
+        BuiltInToolsHelper.supportsClaudeDynamicWebSearchForModel(
+          cfg: official,
+          modelId: 'claude-fable-5',
         ),
         isTrue,
       );
@@ -1170,9 +1379,12 @@ data: {"type":"message_stop"}
         ),
         modelId: 'claude-sonnet-4-6',
         messages: [
-          {'role': 'user', 'content': 'inspect'},
+          {
+            'role': 'user',
+            'content': 'inspect',
+            multimodalInternalMediaPathsKey: [file.path],
+          },
         ],
-        userImagePaths: [file.path],
         onToolCall: (name, args, {toolCallId}) async => '{"result":"ok"}',
         stream: false,
       ).toList();
@@ -1189,6 +1401,7 @@ data: {"type":"message_stop"}
       );
       expect(imagePart['source']['media_type'], 'image/png');
       expect(imagePart['source']['data'], 'AQIDBA==');
+      expect(jsonEncode(requestBodies[1]), isNot(contains('[image:')));
     });
   });
 }

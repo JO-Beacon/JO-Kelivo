@@ -1,74 +1,66 @@
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 import '../models/quick_phrase.dart';
+import 'json_blob_store.dart';
 
-class QuickPhraseStore {
+class QuickPhraseStore extends JsonBlobStore<QuickPhrase> {
+  QuickPhraseStore(super._preferences);
+
   static const String _phrasesKey = 'quick_phrases_v1';
-  static List<QuickPhrase>? _cache;
 
-  static Future<List<QuickPhrase>> getAll() async {
-    if (_cache != null) return List.of(_cache!);
-    final prefs = await SharedPreferences.getInstance();
-    final json = prefs.getString(_phrasesKey);
-    if (json == null || json.isEmpty) {
-      _cache = [];
-      return [];
-    }
-    try {
-      final list = jsonDecode(json) as List;
-      _cache = list
-          .map((e) => QuickPhrase.fromJson(e as Map<String, dynamic>))
-          .toList();
-      return List.of(_cache!);
-    } catch (_) {
-      _cache = [];
-      return [];
-    }
-  }
+  @override
+  String get storageKey => _phrasesKey;
 
-  static Future<List<QuickPhrase>> getGlobal() async {
+  @override
+  QuickPhrase decodeItem(Map<String, dynamic> json) =>
+      QuickPhrase.fromJson(json);
+
+  @override
+  Map<String, dynamic> encodeItem(QuickPhrase item) => item.toJson();
+
+  Future<List<QuickPhrase>> getAll() => readAll();
+
+  Future<List<QuickPhrase>> getGlobal() async {
     final all = await getAll();
-    return all.where((p) => p.isGlobal).toList();
+    return all.where((phrase) => phrase.isGlobal).toList();
   }
 
-  static Future<List<QuickPhrase>> getForAssistant(String assistantId) async {
+  Future<List<QuickPhrase>> getForAssistant(String assistantId) async {
     final all = await getAll();
     return all
-        .where((p) => !p.isGlobal && p.assistantId == assistantId)
+        .where(
+          (phrase) => !phrase.isGlobal && phrase.assistantId == assistantId,
+        )
         .toList();
   }
 
-  static Future<void> save(List<QuickPhrase> phrases) async {
-    _cache = phrases;
-    final prefs = await SharedPreferences.getInstance();
-    final json = jsonEncode(phrases.map((p) => p.toJson()).toList());
-    await prefs.setString(_phrasesKey, json);
+  Future<void> save(List<QuickPhrase> phrases) {
+    return runExclusive(() => writeAll(phrases));
   }
 
-  static Future<void> add(QuickPhrase phrase) async {
-    final all = await getAll();
-    all.add(phrase);
-    await save(all);
+  Future<void> add(QuickPhrase phrase) {
+    return runExclusive(() async {
+      final all = await readAll();
+      all.add(phrase);
+      await writeAll(all);
+    });
   }
 
-  static Future<void> update(QuickPhrase phrase) async {
-    final all = await getAll();
-    final index = all.indexWhere((p) => p.id == phrase.id);
-    if (index != -1) {
+  Future<void> update(QuickPhrase phrase) {
+    return runExclusive(() async {
+      final all = await readAll();
+      final index = all.indexWhere((existing) => existing.id == phrase.id);
+      if (index == -1) return;
       all[index] = phrase;
-      await save(all);
-    }
+      await writeAll(all);
+    });
   }
 
-  static Future<void> delete(String id) async {
-    final all = await getAll();
-    all.removeWhere((p) => p.id == id);
-    await save(all);
+  Future<void> delete(String id) {
+    return runExclusive(() async {
+      final all = await readAll();
+      all.removeWhere((phrase) => phrase.id == id);
+      await writeAll(all);
+    });
   }
 
-  static Future<void> clear() async {
-    _cache = [];
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_phrasesKey);
-  }
+  Future<void> clear() => save(const <QuickPhrase>[]);
 }

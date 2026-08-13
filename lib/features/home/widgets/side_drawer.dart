@@ -45,8 +45,10 @@ import '../../../desktop/hotkeys/sidebar_tab_bus.dart';
 import '../../../desktop/desktop_settings_navigation_bus.dart';
 import 'dart:async';
 import '../../../features/search/services/global_session_search_service.dart';
+import '../controllers/chat_actions.dart';
 import 'assistant_avatar.dart';
 import 'assistant_entry_actions.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 class SideDrawer extends StatefulWidget {
   const SideDrawer({
@@ -95,6 +97,42 @@ class SideDrawer extends StatefulWidget {
   final Future<void> Function(String conversationId, String messageId)?
   onOpenGlobalSearchResult;
 
+  /// Number of times the conversation-list area has (re)built. The sidebar
+  /// subscribes only to conversation-list semantics, so unrelated ChatService
+  /// notifications must not increase this count.
+  @visibleForTesting
+  static int debugConversationListBuildCount = 0;
+
+  /// Number of times the flattened sidebar row list has been recomputed.
+  /// Theme/animation rebuilds with an unchanged memo key must not increase
+  /// this count.
+  @visibleForTesting
+  static int debugSidebarRowsComputeCount = 0;
+
+  /// Testing hook: forces a host [setState] without changing the sidebar-rows
+  /// memo key `(conversationListRevision, initialized, query, assistantId)`.
+  @visibleForTesting
+  static VoidCallback? debugRequestConversationListHostRebuild;
+
+  /// Exposes the private conversation tile type for viewport widget tests.
+  @visibleForTesting
+  static Type get debugChatTileType => _ChatTile;
+
+  /// Enter-animation delay for a sidebar tile at [indexInSection].
+  ///
+  /// Caps absolute-index stagger so virtualized deep rows never wait multiple
+  /// seconds. Pinned rows use a slightly larger per-step delay than date rows.
+  @visibleForTesting
+  static Duration debugSidebarTileStaggerDelay({
+    required int indexInSection,
+    required bool pinnedSection,
+  }) {
+    final stepMs = pinnedSection ? 20 : 16;
+    return Duration(
+      milliseconds: stepMs * math.min(indexInSection, _kMaxSidebarStaggerIndex),
+    );
+  }
+
   @override
   State<SideDrawer> createState() => _SideDrawerState();
 }
@@ -124,10 +162,24 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   String? _selectedResultConversationId;
   String? _hoveredResultConversationId;
   bool _globalSearchHasRun = false;
+  bool _globalSearchLoading = false;
+  int _globalSearchRequestId = 0;
+  String? _runningGlobalSearchQuery;
+
+  // Flattened sidebar rows memoized by (conversationListRevision,
+  // initialized, query, assistantId) so theme/animation rebuilds skip the
+  // O(n) rebuild.
+  int? _cachedSidebarRowsRevision;
+  bool? _cachedSidebarRowsInitialized;
+  String? _cachedSidebarRowsQuery;
+  String? _cachedSidebarRowsAssistantId;
+  List<_SidebarRow>? _cachedSidebarRows;
 
   @override
   void initState() {
     super.initState();
+    SideDrawer.debugRequestConversationListHostRebuild =
+        _debugRequestConversationListHostRebuild;
     _attachCloseTicker(widget.closePickerTicker);
     _mobileSearchFocusNode.addListener(() {
       if (_isDesktop) return;
@@ -191,7 +243,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   }) async {
     final l10n = AppLocalizations.of(context)!;
     final chatService = context.read<ChatService>();
-    final isPinned = chatService.getConversation(chat.id)?.isPinned ?? false;
+    final isPinned = chat.isPinned;
     final isDesktop =
         defaultTargetPlatform == TargetPlatform.macOS ||
         defaultTargetPlatform == TargetPlatform.windows ||
@@ -226,9 +278,17 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
             },
           ),
           DesktopContextMenuItem(
+            icon: Lucide.Copy,
+            label: l10n.sideDrawerMenuCopy,
+            onTap: () async {
+              await chatService.duplicateConversation(chat.id);
+            },
+          ),
+          DesktopContextMenuItem(
             icon: Lucide.Shuffle,
             label: l10n.sideDrawerMenuMoveTo,
             onTap: () async {
+              if (widget.loadingConversationIds.contains(chat.id)) return;
               final conv = chatService.getConversation(chat.id);
               final movingCurrent =
                   chatService.currentConversationId == chat.id;
@@ -259,11 +319,11 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
               );
               if (!mounted) return;
               if (targetId != null) {
-                await chatService.moveConversationToAssistant(
+                final moved = await chatService.moveConversationToAssistant(
                   conversationId: chat.id,
                   assistantId: targetId,
                 );
-                if (!mounted) return;
+                if (!mounted || !moved) return;
                 if (movingCurrent ||
                     chatService.currentConversationId == null) {
                   final closeDrawer = !keepSidebarOpenOnTopicTap;
@@ -290,6 +350,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
               final deletingCurrent =
                   chatService.currentConversationId == chat.id;
               final nextId = _nextRecentConversation(chatService, chat.id);
+              await ChatActions.cancelActiveGenerationFor(chat.id);
               await chatService.deleteConversation(chat.id);
               if (!context.mounted) return;
               showAppSnackBar(
@@ -411,9 +472,19 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                       },
                     ),
                     row(
+                      icon: Lucide.Copy,
+                      label: l10n.sideDrawerMenuCopy,
+                      action: () async {
+                        await chatService.duplicateConversation(chat.id);
+                      },
+                    ),
+                    row(
                       icon: Lucide.Shuffle,
                       label: l10n.sideDrawerMenuMoveTo,
                       action: () async {
+                        if (widget.loadingConversationIds.contains(chat.id)) {
+                          return;
+                        }
                         final conv = chatService.getConversation(chat.id);
                         final movingCurrent =
                             chatService.currentConversationId == chat.id;
@@ -450,11 +521,12 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                         );
                         if (!mounted) return;
                         if (targetId != null) {
-                          await chatService.moveConversationToAssistant(
-                            conversationId: chat.id,
-                            assistantId: targetId,
-                          );
-                          if (!mounted) return;
+                          final moved = await chatService
+                              .moveConversationToAssistant(
+                                conversationId: chat.id,
+                                assistantId: targetId,
+                              );
+                          if (!mounted || !moved) return;
                           if (movingCurrent ||
                               chatService.currentConversationId == null) {
                             final closeDrawer = !keepSidebarOpenOnTopicTap;
@@ -475,7 +547,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                     row(
                       icon: Lucide.Trash,
                       label: l10n.sideDrawerMenuDelete,
-                      color: Colors.redAccent,
+                      color: Theme.of(context).colorScheme.error,
                       action: () async {
                         final confirmed = await _confirmDeleteConversation(
                           context,
@@ -489,6 +561,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                           chatService,
                           chat.id,
                         );
+                        await ChatActions.cancelActiveGenerationFor(chat.id);
                         await chatService.deleteConversation(chat.id);
                         if (!context.mounted) return;
                         showAppSnackBar(
@@ -536,7 +609,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
               onPressed: () => Navigator.of(ctx).pop(true),
               child: Text(
                 l10n.sideDrawerMenuDelete,
-                style: TextStyle(color: Colors.red),
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
             ),
           ],
@@ -658,23 +731,18 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
 
     if (provKey == null || mdlId == null) return;
     final cfg = settings.getProviderConfig(provKey);
-    final budget = assistant?.thinkingBudget ?? settings.thinkingBudget;
-
-    // Content
-    final msgs = chatService.getMessages(conversationId);
-    final joined = msgs
-        .where((m) => m.content.isNotEmpty)
-        .map(
-          (m) =>
-              '${m.role == 'assistant' ? 'Assistant' : 'User'}: ${m.content}',
-        )
-        .join('\n\n');
-    final content = joined.length > 3000 ? joined.substring(0, 3000) : joined;
+    final budget = settings.titleGenerationThinkingBudgetFor(
+      assistant?.thinkingBudget,
+    );
     final locale = Localizations.localeOf(context).toLanguageTag();
-    final prompt = settings.titlePrompt
-        .replaceAll('{locale}', locale)
-        .replaceAll('{content}', content);
+
     try {
+      // Content (shared source builder with HomeViewModel title generation;
+      // applies truncateIndex and collapses multi-version groups)
+      final content = await chatService.generateTitleSource(conversationId);
+      final prompt = settings.titlePrompt
+          .replaceAll('{locale}', locale)
+          .replaceAll('{content}', content);
       final title = (await ChatApiService.generateText(
         config: cfg,
         modelId: mdlId,
@@ -683,17 +751,48 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       )).trim();
       if (title.isNotEmpty) {
         await chatService.renameConversation(conversationId, title);
+      } else if (context.mounted) {
+        final l10n = AppLocalizations.of(context)!;
+        showAppSnackBar(
+          context,
+          message: l10n.backgroundTaskFailed(
+            l10n.defaultModelPageTitleModelTitle,
+            'empty_response',
+          ),
+          type: NotificationType.error,
+        );
       }
     } catch (e) {
       FlutterLogger.log(
         '[SideDrawer] Regenerate title failed: $e',
         tag: 'SideDrawer',
       );
+      if (context.mounted) {
+        final l10n = AppLocalizations.of(context)!;
+        showAppSnackBar(
+          context,
+          message: l10n.backgroundTaskFailed(
+            l10n.defaultModelPageTitleModelTitle,
+            e.toString(),
+          ),
+          type: NotificationType.error,
+        );
+      }
     }
+  }
+
+  void _debugRequestConversationListHostRebuild() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    if (identical(
+      SideDrawer.debugRequestConversationListHostRebuild,
+      _debugRequestConversationListHostRebuild,
+    )) {
+      SideDrawer.debugRequestConversationListHostRebuild = null;
+    }
     _assistantPickerEntry?.remove();
     _assistantPickerEntry = null;
     _closeTicker?.removeListener(_handleCloseTick);
@@ -736,20 +835,45 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     }
   }
 
-  void _runGlobalSearch() {
-    if (_query.trim().isEmpty) {
+  Future<void> _runGlobalSearch() async {
+    final query = _query.trim();
+    if (query.isEmpty) {
       _clearGlobalSearchState(clearText: false);
       return;
     }
-    final chatService = context.read<ChatService>();
-    final results = GlobalSessionSearchService.search(
-      chatService: chatService,
-      query: _query,
-    );
+    if (_globalSearchLoading && _runningGlobalSearchQuery == query) return;
+
+    final requestId = ++_globalSearchRequestId;
     setState(() {
-      _globalSearchResults = results;
-      _globalSearchHasRun = true;
+      _globalSearchLoading = true;
+      _runningGlobalSearchQuery = query;
+      _globalSearchResults = const [];
+      _globalSearchHasRun = false;
     });
+
+    final chatService = context.read<ChatService>();
+    try {
+      final results = await GlobalSessionSearchService.search(
+        chatService: chatService,
+        query: query,
+      );
+      if (!mounted ||
+          requestId != _globalSearchRequestId ||
+          query != _query.trim()) {
+        return;
+      }
+      setState(() {
+        _globalSearchResults = results;
+        _globalSearchHasRun = true;
+      });
+    } finally {
+      if (mounted && requestId == _globalSearchRequestId) {
+        setState(() {
+          _globalSearchLoading = false;
+          _runningGlobalSearchQuery = null;
+        });
+      }
+    }
   }
 
   void _submitMobileGlobalSearch() {
@@ -763,6 +887,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   }
 
   void _clearGlobalSearchState({bool clearText = false}) {
+    _globalSearchRequestId++;
     if (clearText && _searchController.text.isNotEmpty) {
       _searchController.clear();
     }
@@ -770,6 +895,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       _query = clearText ? '' : _searchController.text;
       _globalSearchResults = const [];
       _globalSearchHasRun = false;
+      _globalSearchLoading = false;
+      _runningGlobalSearchQuery = null;
       _selectedResultConversationId = null;
       _hoveredResultConversationId = null;
     });
@@ -852,17 +979,28 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    final textBase = isDark ? Colors.white : Colors.black;
+    final textBase = cs.onSurface;
     final tokens = _query
         .trim()
         .toLowerCase()
         .split(RegExp(r'\s+'))
         .where((e) => e.isNotEmpty)
         .toList();
-    final highlightColor = isDark
-        ? const Color(0xFFB8860B).withValues(alpha: 0.55)
-        : const Color(0xFFFFD700).withValues(alpha: 0.55);
+    final highlightColor = context.appColors.searchHighlight;
+
+    if (_globalSearchLoading) {
+      return Align(
+        alignment: Alignment.topCenter,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 28),
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+          ),
+        ),
+      );
+    }
 
     if (!_globalSearchHasRun) {
       if (!_isDesktop) {
@@ -1057,7 +1195,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     return fmt.format(date);
   }
 
-  List<_ChatGroup> _groupByDate(BuildContext context, List<ChatItem> source) {
+  List<_ChatGroup> _groupByDate(List<ChatItem> source) {
     final items = [...source];
     // group by day (truncate time)
     final map = <DateTime, List<ChatItem>>{};
@@ -1070,10 +1208,105 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     return [
       for (final k in keys)
         _ChatGroup(
-          label: _dateLabel(context, k),
+          date: k,
           items: (map[k]!..sort((a, b) => b.created.compareTo(a.created))),
         ),
     ];
+  }
+
+  /// Memoized flatten of pinned section + date groups into sidebar rows.
+  /// Recomputes only when `(revision, initialized, query, assistantId)`
+  /// changes.
+  /// Headers store stable date buckets (not localized labels) so locale
+  /// switches can re-render without bumping this memo.
+  List<_SidebarRow> _sidebarRowsFor({
+    required int revision,
+    required bool initialized,
+    required String query,
+    required String? assistantId,
+    required ChatService chatService,
+  }) {
+    if (_cachedSidebarRows != null &&
+        _cachedSidebarRowsRevision == revision &&
+        _cachedSidebarRowsInitialized == initialized &&
+        _cachedSidebarRowsQuery == query &&
+        _cachedSidebarRowsAssistantId == assistantId) {
+      return _cachedSidebarRows!;
+    }
+    SideDrawer.debugSidebarRowsComputeCount++;
+    final rows = _computeSidebarRows(
+      chatService: chatService,
+      assistantId: assistantId,
+      query: query,
+    );
+    _cachedSidebarRows = rows;
+    _cachedSidebarRowsRevision = revision;
+    _cachedSidebarRowsInitialized = initialized;
+    _cachedSidebarRowsQuery = query;
+    _cachedSidebarRowsAssistantId = assistantId;
+    return rows;
+  }
+
+  List<_SidebarRow> _computeSidebarRows({
+    required ChatService chatService,
+    required String? assistantId,
+    required String query,
+  }) {
+    final q = query.trim().toLowerCase();
+    final pinned = <ChatItem>[];
+    final rest = <ChatItem>[];
+    // Single pass: filter assistant + query, split pinned/rest via ChatItem.isPinned.
+    for (final c in chatService.getAllConversations()) {
+      if (c.assistantId != assistantId && c.assistantId != null) continue;
+      final title = c.title;
+      if (q.isNotEmpty && !title.toLowerCase().contains(q)) continue;
+      final item = ChatItem(
+        id: c.id,
+        title: title,
+        created: c.updatedAt,
+        isPinned: c.isPinned,
+      );
+      if (item.isPinned) {
+        pinned.add(item);
+      } else {
+        rest.add(item);
+      }
+    }
+    pinned.sort((a, b) => b.created.compareTo(a.created));
+    final groups = _groupByDate(rest);
+
+    final rows = <_SidebarRow>[];
+    if (pinned.isNotEmpty) {
+      rows.add(const _SidebarHeaderRow(kind: _SidebarHeaderKind.pinned));
+      for (var i = 0; i < pinned.length; i++) {
+        rows.add(
+          _SidebarTileRow(
+            chat: pinned[i],
+            indexInSection: i,
+            kind: _SidebarHeaderKind.pinned,
+          ),
+        );
+      }
+    }
+    for (final group in groups) {
+      rows.add(
+        _SidebarHeaderRow(
+          kind: _SidebarHeaderKind.date,
+          dateBucket: group.date,
+        ),
+      );
+      for (var i = 0; i < group.items.length; i++) {
+        rows.add(
+          _SidebarTileRow(
+            chat: group.items[i],
+            indexInSection: i,
+            kind: _SidebarHeaderKind.date,
+            dateBucket: group.date,
+          ),
+        );
+      }
+    }
+    return rows;
   }
 
   void _openBackupSettings() {
@@ -1189,40 +1422,9 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    final textBase = isDark ? Colors.white : Colors.black; // 纯黑（白天），夜间自动适配
-    final chatService = context.watch<ChatService>();
+    final textBase = cs.onSurface; // 纯黑（白天），夜间自动适配
     final ap = context.watch<AssistantProvider>();
     final currentAssistantId = ap.currentAssistantId;
-    final conversations = chatService
-        .getAllConversations()
-        .where(
-          (c) => c.assistantId == currentAssistantId || c.assistantId == null,
-        )
-        .toList();
-    // Use last-activity time (updatedAt) for ordering and grouping
-    final all = conversations
-        .map((c) => ChatItem(id: c.id, title: c.title, created: c.updatedAt))
-        .toList();
-
-    final base = _query.trim().isEmpty
-        ? all
-        : all
-              .where(
-                (c) => c.title.toLowerCase().contains(_query.toLowerCase()),
-              )
-              .toList();
-    final pinnedList =
-        base
-            .where(
-              (c) => (chatService.getConversation(c.id)?.isPinned ?? false),
-            )
-            .toList()
-          ..sort((a, b) => b.created.compareTo(a.created));
-    final rest = base
-        .where((c) => !(chatService.getConversation(c.id)?.isPinned ?? false))
-        .toList();
-    final groups = _groupByDate(context, rest);
 
     // Avatar renderer: emoji / url / file / default initial
     Widget avatarWidget(String name, UserProvider up, {double size = 40}) {
@@ -1413,11 +1615,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                       return l10n.sideDrawerSearchHint;
                                     })(),
                                     filled: true,
-                                    fillColor: isDark
-                                        ? Colors.white10
-                                        : Colors.grey.shade200.withValues(
-                                            alpha: 0.80,
-                                          ),
+                                    fillColor: context.appColors.surfaceFill,
                                     isDense: true,
                                     isCollapsed: true,
                                     prefixIcon: Padding(
@@ -1667,9 +1865,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                                   ? ''
                                                   : _mobileSearchHint(),
                                               filled: true,
-                                              fillColor: isDark
-                                                  ? Colors.white10
-                                                  : Colors.grey.shade200
+                                              fillColor: context.appColors.surfaceFill
                                                         .withValues(
                                                           alpha: 0.80,
                                                         ),
@@ -2024,22 +2220,6 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                   if (widget.globalSearchMode) {
                     return _buildGlobalSearchResultsList(context);
                   }
-                  if (useTabs) {
-                    return _DesktopTabViews(
-                      controller: _tabController!,
-                      listController: _listController,
-                      buildAssistants: () => _buildAssistantsList(context),
-                      buildConversations: () => _buildConversationsList(
-                        context,
-                        cs,
-                        textBase,
-                        chatService,
-                        pinnedList,
-                        groups,
-                        includeUpdateBanner: true,
-                      ),
-                    );
-                  }
                   if (assistOnly) {
                     return ListView(
                       controller: _listController,
@@ -2049,43 +2229,91 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                       ],
                     );
                   }
-                  if (topicsOnly) {
-                    final isDesktop = _isDesktop;
-                    final topPad =
-                        context.watch<SettingsProvider>().showChatListDate
-                        ? (isDesktop ? 2.0 : 4.0)
-                        : 10.0;
-                    return ListView(
-                      controller: _listController,
-                      padding: EdgeInsets.fromLTRB(10, topPad, 10, 16),
-                      children: [
-                        _buildConversationsList(
+                  // Sidebar fine-grained subscription (cache plan measure 16):
+                  // the list rebuilds only when conversation-list semantics
+                  // change; message/streaming notifications keep the cached
+                  // subtree.
+                  return Selector<
+                    ChatService,
+                    ({int revision, bool initialized})
+                  >(
+                    selector: (context, service) => (
+                      revision: service.conversationListRevision,
+                      initialized: service.initialized,
+                    ),
+                    builder: (context, selection, _) {
+                      SideDrawer.debugConversationListBuildCount++;
+                      final chatService = context.read<ChatService>();
+                      final assistantId = context
+                          .watch<AssistantProvider>()
+                          .currentAssistantId;
+                      // Use last-activity time (updatedAt) for ordering and grouping.
+                      // Flattened + memoized by
+                      // (revision, initialized, query, assistantId).
+                      final rows = _sidebarRowsFor(
+                        revision: selection.revision,
+                        initialized: selection.initialized,
+                        query: _query,
+                        assistantId: assistantId,
+                        chatService: chatService,
+                      );
+                      if (useTabs) {
+                        final isDesktop = _isDesktop;
+                        final topPad =
+                            context.watch<SettingsProvider>().showChatListDate
+                            ? (isDesktop ? 2.0 : 4.0)
+                            : 10.0;
+                        return _DesktopTabViews(
+                          controller: _tabController!,
+                          buildAssistants: () => _buildAssistantsList(context),
+                          buildConversations: () => _buildConversationsList(
+                            context,
+                            cs,
+                            textBase,
+                            chatService,
+                            rows,
+                            includeUpdateBanner: true,
+                            controller: _listController,
+                            padding: EdgeInsets.fromLTRB(10, topPad, 10, 16),
+                          ),
+                        );
+                      }
+                      if (topicsOnly) {
+                        final isDesktop = _isDesktop;
+                        final topPad =
+                            context.watch<SettingsProvider>().showChatListDate
+                            ? (isDesktop ? 2.0 : 4.0)
+                            : 10.0;
+                        return _buildConversationsList(
                           context,
                           cs,
                           textBase,
                           chatService,
-                          pinnedList,
-                          groups,
+                          rows,
                           includeUpdateBanner: true,
-                        ),
-                      ],
-                    );
-                  }
-                  return _LegacyListArea(
-                    listController: _listController,
-                    isDesktop: _isDesktop,
-                    assistantsExpanded: _assistantsExpanded,
-                    buildAssistants: () =>
-                        _buildAssistantsList(context, inlineMode: true),
-                    buildConversations: () => _buildConversationsList(
-                      context,
-                      cs,
-                      textBase,
-                      chatService,
-                      pinnedList,
-                      groups,
-                      includeUpdateBanner: true,
-                    ),
+                          controller: _listController,
+                          padding: EdgeInsets.fromLTRB(10, topPad, 10, 16),
+                        );
+                      }
+                      return _LegacyListArea(
+                        isDesktop: _isDesktop,
+                        assistantsExpanded: _assistantsExpanded,
+                        buildAssistants: () =>
+                            _buildAssistantsList(context, inlineMode: true),
+                        buildConversations: (leading, padding) =>
+                            _buildConversationsList(
+                              context,
+                              cs,
+                              textBase,
+                              chatService,
+                              rows,
+                              includeUpdateBanner: true,
+                              controller: _listController,
+                              padding: padding,
+                              leading: leading,
+                            ),
+                      );
+                    },
                   );
                 }(),
               ),
@@ -2612,9 +2840,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                       decoration: InputDecoration(
                         hintText: l10n.sideDrawerEmojiDialogHint,
                         filled: true,
-                        fillColor: Theme.of(ctx).brightness == Brightness.dark
-                            ? Colors.white10
-                            : const Color(0xFFF2F3F5),
+                        fillColor: ctx.appColors.surfaceFill,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(color: Colors.transparent),
@@ -2724,9 +2950,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                 decoration: InputDecoration(
                   hintText: l10n.sideDrawerImageUrlDialogHint,
                   filled: true,
-                  fillColor: Theme.of(ctx).brightness == Brightness.dark
-                      ? Colors.white10
-                      : const Color(0xFFF2F3F5),
+                  fillColor: ctx.appColors.surfaceFill,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(color: Colors.transparent),
@@ -2851,9 +3075,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                 decoration: InputDecoration(
                   hintText: l10n.sideDrawerQQAvatarInputHint,
                   filled: true,
-                  fillColor: Theme.of(ctx).brightness == Brightness.dark
-                      ? Colors.white10
-                      : const Color(0xFFF2F3F5),
+                  fillColor: ctx.appColors.surfaceFill,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(color: Colors.transparent),
@@ -3004,7 +3226,6 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       context: context,
       builder: (ctx) {
         final cs = Theme.of(ctx).colorScheme;
-        final isDark = Theme.of(ctx).brightness == Brightness.dark;
         String value = controller.text;
         bool valid(String v) => v.trim().isNotEmpty && v.trim() != initial;
         return StatefulBuilder(
@@ -3033,9 +3254,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                       labelText: l10n.sideDrawerNicknameLabel,
                       hintText: l10n.sideDrawerNicknameHint,
                       filled: true,
-                      fillColor: isDark
-                          ? Colors.white10
-                          : const Color(0xFFF2F3F5),
+                      fillColor: context.appColors.surfaceFill,
                       counterText: '',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -3106,8 +3325,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   Widget _buildAssistantsList(BuildContext context, {bool inlineMode = false}) {
     final ap2 = context.watch<AssistantProvider>();
     final tp = context.watch<TagProvider>();
-    final isDark2 = Theme.of(context).brightness == Brightness.dark;
-    final textBase2 = isDark2 ? Colors.white : Colors.black;
+    final textBase2 = Theme.of(context).colorScheme.onSurface;
 
     List<Assistant> assistants = ap2.assistants;
     // Apply search filter when:
@@ -3243,271 +3461,310 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   }
 
   // Build conversations list area, optionally including the update banner.
+  // Owns scrolling via [ListView.builder] over the flattened [rows].
   Widget _buildConversationsList(
     BuildContext context,
     ColorScheme cs,
     Color textBase,
     ChatService chatService,
-    List<ChatItem> pinnedList,
-    List<_ChatGroup> groups, {
+    List<_SidebarRow> rows, {
     bool includeUpdateBanner = false,
+    ScrollController? controller,
+    EdgeInsetsGeometry? padding,
+    Widget? leading,
   }) {
-    final children = <Widget>[];
-    if (includeUpdateBanner) {
-      children.add(
-        Builder(
-          builder: (context) {
-            final settings = context.watch<SettingsProvider>();
-            final upd = context.watch<UpdateProvider>();
-            if (!settings.showAppUpdates) return const SizedBox.shrink();
-            final info = upd.available;
-            if (upd.checking && info == null) return const SizedBox.shrink();
-            if (info == null) return const SizedBox.shrink();
-            final url = info.bestDownloadUrl();
-            if (url == null || url.isEmpty) return const SizedBox.shrink();
-            final ver = info.version;
-            final build = info.build;
-            final l10n = AppLocalizations.of(context)!;
-            final title = build != null
-                ? l10n.sideDrawerUpdateTitleWithBuild(ver, build)
-                : l10n.sideDrawerUpdateTitle(ver);
-            final cs2 = Theme.of(context).colorScheme;
-            final isDark2 = Theme.of(context).brightness == Brightness.dark;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Material(
-                color: isDark2 ? Colors.white10 : const Color(0xFFF2F3F5),
-                borderRadius: BorderRadius.circular(12),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: () async {
-                    final uri = Uri.parse(url);
-                    try {
-                      // ignore: deprecated_member_use
-                      await launchUrl(uri);
-                    } catch (_) {
-                      Clipboard.setData(ClipboardData(text: url));
-                      if (!context.mounted) return;
-                      showAppSnackBar(
-                        context,
-                        message: l10n.sideDrawerLinkCopied,
-                        type: NotificationType.success,
-                      );
-                    }
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Lucide.BadgeInfo,
-                              size: 18,
-                              color: cs2.primary,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                title,
-                                style: TextStyle(
-                                  fontWeight: AppFontWeights.emphasis,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        if ((info.notes ?? '').trim().isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          Text(
-                            info.notes!,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: cs2.onSurface.withValues(alpha: 0.8),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
+    // Cold start only: before ChatService init completes the lists below are
+    // empty, so render tile placeholders instead of a blank area.
+    if (!chatService.initialized) {
+      return ListView(
+        controller: controller,
+        padding: padding ?? EdgeInsets.zero,
+        children: [
+          if (leading != null) leading,
+          const _ConversationListSkeleton(),
+        ],
       );
     }
 
-    children.add(
-      PageTransitionSwitcher(
-        duration: const Duration(milliseconds: 260),
-        reverse: false,
-        transitionBuilder: (child, primary, secondary) => FadeThroughTransition(
-          fillColor: Colors.transparent,
-          animation: CurvedAnimation(
-            parent: primary,
-            curve: Curves.easeOutCubic,
-          ),
-          secondaryAnimation: CurvedAnimation(
-            parent: secondary,
-            curve: Curves.easeInCubic,
-          ),
-          child: child,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          key: ValueKey(
-            '${_query}_${[...pinnedList.map((c) => c.id), ...groups.expand((g) => g.items.map((c) => c.id))].join(',')}',
-          ),
-          children: [
-            if (pinnedList.isNotEmpty) ...[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 6, 0, 6),
-                child:
-                    Text(
-                          AppLocalizations.of(context)!.sideDrawerPinnedLabel,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: AppFontWeights.semibold,
-                            color: cs.primary,
+    final banner = includeUpdateBanner
+        ? Builder(
+            builder: (context) {
+              final settings = context.watch<SettingsProvider>();
+              final upd = context.watch<UpdateProvider>();
+              if (!settings.showAppUpdates) return const SizedBox.shrink();
+              final info = upd.available;
+              if (upd.checking && info == null) return const SizedBox.shrink();
+              if (info == null) return const SizedBox.shrink();
+              final url = info.bestDownloadUrl();
+              if (url == null || url.isEmpty) return const SizedBox.shrink();
+              final ver = info.version;
+              final build = info.build;
+              final l10n = AppLocalizations.of(context)!;
+              final title = build != null
+                  ? l10n.sideDrawerUpdateTitleWithBuild(ver, build)
+                  : l10n.sideDrawerUpdateTitle(ver);
+              final cs2 = Theme.of(context).colorScheme;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Material(
+                  color: context.appColors.surfaceFill,
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () async {
+                      final uri = Uri.parse(url);
+                      try {
+                        // ignore: deprecated_member_use
+                        await launchUrl(uri);
+                      } catch (_) {
+                        Clipboard.setData(ClipboardData(text: url));
+                        if (!context.mounted) return;
+                        showAppSnackBar(
+                          context,
+                          message: l10n.sideDrawerLinkCopied,
+                          type: NotificationType.success,
+                        );
+                      }
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Lucide.BadgeInfo,
+                                size: 18,
+                                color: cs2.primary,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  title,
+                                  style: TextStyle(
+                                    fontWeight: AppFontWeights.emphasis,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        )
-                        .animate()
-                        .fadeIn(duration: 180.ms)
-                        .moveY(
-                          begin: 4,
-                          end: 0,
-                          duration: 220.ms,
-                          curve: Curves.easeOutCubic,
-                        ),
-              ),
-              Column(
-                children: [
-                  for (int i = 0; i < pinnedList.length; i++)
-                    _ChatTile(
-                          chat: pinnedList[i],
-                          textColor: textBase,
-                          selected:
-                              pinnedList[i].id ==
-                              chatService.currentConversationId,
-                          loading: widget.loadingConversationIds.contains(
-                            pinnedList[i].id,
-                          ),
-                          onTap: () {
-                            final closeDrawer = !context
-                                .read<SettingsProvider>()
-                                .keepSidebarOpenOnTopicTap;
-                            widget.onSelectConversation?.call(
-                              pinnedList[i].id,
-                              closeDrawer: closeDrawer,
-                            );
-                          },
-                          onLongPress: () =>
-                              _showChatMenu(context, pinnedList[i]),
-                          onSecondaryTap: (pos) => _showChatMenu(
-                            context,
-                            pinnedList[i],
-                            anchor: pos,
-                          ),
-                        )
-                        .animate(key: ValueKey('pin-${pinnedList[i].id}'))
-                        .fadeIn(duration: 220.ms, delay: (20 * i).ms)
-                        .moveY(
-                          begin: 8,
-                          end: 0,
-                          duration: 260.ms,
-                          curve: Curves.easeOutCubic,
-                          delay: (20 * i).ms,
-                        ),
-                ],
-              ),
-              const SizedBox(height: 8),
-            ],
-            for (final group in groups) ...[
-              if (context.watch<SettingsProvider>().showChatListDate)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 6, 0, 6),
-                  child:
-                      Text(
-                            group.label,
-                            textAlign: TextAlign.left,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: AppFontWeights.semibold,
-                              color: cs.primary,
+                          if ((info.notes ?? '').trim().isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              info.notes!,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: cs2.onSurface.withValues(alpha: 0.8),
+                              ),
                             ),
-                          )
-                          .animate()
-                          .fadeIn(duration: 180.ms)
-                          .moveY(
-                            begin: 4,
-                            end: 0,
-                            duration: 220.ms,
-                            curve: Curves.easeOutCubic,
-                          ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-              Column(
-                children: [
-                  for (int j = 0; j < group.items.length; j++)
-                    _ChatTile(
-                          chat: group.items[j],
-                          textColor: textBase,
-                          selected:
-                              group.items[j].id ==
-                              chatService.currentConversationId,
-                          loading: widget.loadingConversationIds.contains(
-                            group.items[j].id,
-                          ),
-                          onTap: () {
-                            final closeDrawer = !context
-                                .read<SettingsProvider>()
-                                .keepSidebarOpenOnTopicTap;
-                            widget.onSelectConversation?.call(
-                              group.items[j].id,
-                              closeDrawer: closeDrawer,
-                            );
-                          },
-                          onLongPress: () =>
-                              _showChatMenu(context, group.items[j]),
-                          onSecondaryTap: (pos) => _showChatMenu(
-                            context,
-                            group.items[j],
-                            anchor: pos,
-                          ),
-                        )
-                        .animate(
-                          key: ValueKey(
-                            'grp-${group.label}-${group.items[j].id}',
-                          ),
-                        )
-                        .fadeIn(duration: 220.ms, delay: (16 * j).ms)
-                        .moveY(
-                          begin: 6,
-                          end: 0,
-                          duration: 240.ms,
-                          curve: Curves.easeOutCubic,
-                          delay: (16 * j).ms,
-                        ),
-                ],
-              ),
-              if (context.watch<SettingsProvider>().showChatListDate)
-                const SizedBox(height: 8),
-            ],
-          ],
+              );
+            },
+          )
+        : null;
+
+    // Light transition signature (cache plan measure 16): changes on the same
+    // membership/order events as the previous id-join string without
+    // allocating it.
+    var listSignature = _query.hashCode;
+    for (final row in rows) {
+      if (row is _SidebarTileRow) {
+        listSignature = Object.hash(listSignature, row.chat.id);
+      }
+    }
+
+    final showDates = context.watch<SettingsProvider>().showChatListDate;
+    final visibleRows = <_SidebarRow>[
+      for (final row in rows)
+        if (row is! _SidebarHeaderRow ||
+            row.kind != _SidebarHeaderKind.date ||
+            showDates)
+          row,
+    ];
+
+    final leadingCount = leading != null ? 1 : 0;
+    final bannerCount = banner != null ? 1 : 0;
+    final prefixCount = leadingCount + bannerCount;
+
+    return PageTransitionSwitcher(
+      duration: const Duration(milliseconds: 260),
+      reverse: false,
+      transitionBuilder: (child, primary, secondary) => FadeThroughTransition(
+        fillColor: Colors.transparent,
+        animation: CurvedAnimation(
+          parent: primary,
+          curve: Curves.easeOutCubic,
         ),
+        secondaryAnimation: CurvedAnimation(
+          parent: secondary,
+          curve: Curves.easeInCubic,
+        ),
+        child: child,
+      ),
+      child: ListView.builder(
+        key: ValueKey(listSignature),
+        controller: controller,
+        padding: padding ?? EdgeInsets.zero,
+        itemCount: prefixCount + visibleRows.length,
+        itemBuilder: (context, index) {
+          if (leading != null && index == 0) return leading;
+          if (banner != null && index == leadingCount) return banner;
+          final rowIndex = index - prefixCount;
+          final row = visibleRows[rowIndex];
+          if (row is _SidebarHeaderRow) {
+            final headerLabel = switch (row.kind) {
+              _SidebarHeaderKind.pinned =>
+                AppLocalizations.of(context)!.sideDrawerPinnedLabel,
+              _SidebarHeaderKind.date => _dateLabel(context, row.dateBucket!),
+            };
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(14, 6, 0, 6),
+              child:
+                  Text(
+                        headerLabel,
+                        textAlign: TextAlign.left,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: AppFontWeights.semibold,
+                          color: cs.primary,
+                        ),
+                      )
+                      .animate()
+                      .fadeIn(duration: 180.ms)
+                      .moveY(
+                        begin: 4,
+                        end: 0,
+                        duration: 220.ms,
+                        curve: Curves.easeOutCubic,
+                      ),
+            );
+          }
+
+          final tile = row as _SidebarTileRow;
+          final isPinnedSection = tile.kind == _SidebarHeaderKind.pinned;
+          // Cap absolute-index stagger to the first ~8 visual items so
+          // virtualized far rows (e.g. index 1000) never wait multiple seconds.
+          final staggerDelay = SideDrawer.debugSidebarTileStaggerDelay(
+            indexInSection: tile.indexInSection,
+            pinnedSection: isPinnedSection,
+          );
+          final chatTile =
+              _ChatTile(
+                    chat: tile.chat,
+                    textColor: textBase,
+                    loading: widget.loadingConversationIds.contains(
+                      tile.chat.id,
+                    ),
+                    onTap: () {
+                      final keepOpen = context
+                          .read<SettingsProvider>()
+                          .keepSidebarOpenOnTopicTap;
+                      final closeDrawer = keepOpen == false;
+                      widget.onSelectConversation?.call(
+                        tile.chat.id,
+                        closeDrawer: closeDrawer,
+                      );
+                    },
+                    onLongPress: () => _showChatMenu(context, tile.chat),
+                    onSecondaryTap: (pos) =>
+                        _showChatMenu(context, tile.chat, anchor: pos),
+                  )
+                  .animate(
+                    key: ValueKey(
+                      isPinnedSection
+                          ? 'pin-${tile.chat.id}'
+                          : 'grp-${_sidebarDateBucketKey(tile.dateBucket)}-${tile.chat.id}',
+                    ),
+                  )
+                  .fadeIn(
+                    duration: 220.ms,
+                    delay: staggerDelay,
+                  )
+                  .moveY(
+                    begin: isPinnedSection ? 8 : 6,
+                    end: 0,
+                    duration: (isPinnedSection ? 260 : 240).ms,
+                    curve: Curves.easeOutCubic,
+                    delay: staggerDelay,
+                  );
+
+          final isLastInSection =
+              rowIndex + 1 >= visibleRows.length ||
+              visibleRows[rowIndex + 1] is _SidebarHeaderRow;
+          final needsSectionGap =
+              isLastInSection && (isPinnedSection || showDates);
+          if (!needsSectionGap) return chatTile;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: chatTile,
+          );
+        },
       ),
     );
-
-    return Column(children: children);
   }
+
+}
+
+/// Max absolute index that still contributes to tile enter stagger.
+/// Indices beyond this share the same delay (~112–140ms).
+const int _kMaxSidebarStaggerIndex = 7;
+
+String _sidebarDateBucketKey(DateTime? date) {
+  if (date == null) return '';
+  final y = date.year.toString().padLeft(4, '0');
+  final m = date.month.toString().padLeft(2, '0');
+  final d = date.day.toString().padLeft(2, '0');
+  return '$y-$m-$d';
 }
 
 class _ChatGroup {
-  final String label;
+  final DateTime date;
   final List<ChatItem> items;
-  _ChatGroup({required this.label, required this.items});
+  _ChatGroup({required this.date, required this.items});
 }
+
+enum _SidebarHeaderKind { pinned, date }
+
+sealed class _SidebarRow {
+  const _SidebarRow();
+}
+
+class _SidebarHeaderRow extends _SidebarRow {
+  const _SidebarHeaderRow({required this.kind, this.dateBucket})
+    : assert(
+        kind == _SidebarHeaderKind.pinned
+            ? dateBucket == null
+            : dateBucket != null,
+      );
+
+  final _SidebarHeaderKind kind;
+
+  /// Stable local calendar day for date headers; null when [kind] is pinned.
+  /// Localized label is resolved at render time from [AppLocalizations].
+  final DateTime? dateBucket;
+}
+
+class _SidebarTileRow extends _SidebarRow {
+  const _SidebarTileRow({
+    required this.chat,
+    required this.indexInSection,
+    required this.kind,
+    this.dateBucket,
+  });
+  final ChatItem chat;
+  final int indexInSection;
+  final _SidebarHeaderKind kind;
+
+  /// Stable local-day bucket for date-section animation keys; null when pinned.
+  final DateTime? dateBucket;
+}
+
 
 class _ChatTile extends StatefulWidget {
   const _ChatTile({
@@ -3516,7 +3773,6 @@ class _ChatTile extends StatefulWidget {
     this.onTap,
     this.onLongPress,
     this.onSecondaryTap,
-    this.selected = false,
     this.loading = false,
   });
 
@@ -3525,7 +3781,6 @@ class _ChatTile extends StatefulWidget {
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final void Function(Offset globalPosition)? onSecondaryTap;
-  final bool selected;
   final bool loading;
 
   @override
@@ -3534,28 +3789,53 @@ class _ChatTile extends StatefulWidget {
 
 class _ChatTileState extends State<_ChatTile> {
   bool _hovered = false;
+  bool _prefetchTriggered = false;
   bool get _isDesktop =>
       defaultTargetPlatform == TargetPlatform.macOS ||
       defaultTargetPlatform == TargetPlatform.windows ||
       defaultTargetPlatform == TargetPlatform.linux;
 
+  /// Desktop hover warm-up (cache plan measure 14): fills the service cache
+  /// so a subsequent tap hits the in-memory fast path. Cache-only;
+  /// loadTimelinePage notifies no listeners.
+  void _prefetchOnHover() {
+    if (_prefetchTriggered) return;
+    _prefetchTriggered = true;
+    final chatService = context.read<ChatService>();
+    // The current conversation is already loaded and backfilled.
+    if (chatService.currentConversationId == widget.chat.id) return;
+    unawaited(() async {
+      try {
+        await chatService.loadTimelinePage(
+          widget.chat.id,
+          limit: ChatService.defaultTimelineInitialSlots,
+        );
+      } catch (_) {
+        // Prefetch failures lose nothing user-visible.
+      }
+    }());
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    // Per-tile selection subscription (cache plan measure 16): switching the
+    // current conversation rebuilds only the affected tiles, not the list.
+    final selected = context.select<ChatService, bool>(
+      (service) => service.currentConversationId == widget.chat.id,
+    );
     final embedded =
         context.findAncestorWidgetOfExactType<SideDrawer>()?.embedded ?? false;
     final Color tileColor;
     if (embedded) {
       // In tablet embedded mode, keep selected highlight, others transparent
-      tileColor = widget.selected
+      tileColor = selected
           ? cs.primary.withValues(alpha: 0.16)
           : Colors.transparent;
     } else {
-      tileColor = widget.selected
-          ? cs.primary.withValues(alpha: 0.12)
-          : cs.surface;
+      tileColor = selected ? cs.primary.withValues(alpha: 0.12) : cs.surface;
     }
-    final base = _isDesktop && !widget.selected && _hovered
+    final base = _isDesktop && !selected && _hovered
         ? (embedded
               ? cs.primary.withValues(alpha: 0.08)
               : cs.surface.withValues(alpha: 0.9))
@@ -3575,7 +3855,10 @@ class _ChatTileState extends State<_ChatTile> {
         },
         child: MouseRegion(
           onEnter: (_) {
-            if (_isDesktop) setState(() => _hovered = true);
+            if (_isDesktop) {
+              setState(() => _hovered = true);
+              _prefetchOnHover();
+            }
           },
           onExit: (_) {
             if (_isDesktop) setState(() => _hovered = false);
@@ -3762,9 +4045,7 @@ class _DesktopSidebarTabsState extends State<_DesktopSidebarTabs> {
             final double segW = (constraints.maxWidth - pad * 2) / 2;
             return Container(
               decoration: BoxDecoration(
-                color: isDark
-                    ? Colors.white10
-                    : Colors.grey.shade200.withValues(alpha: 0.80),
+                color: context.appColors.surfaceFill,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Stack(
@@ -3923,40 +4204,27 @@ class _DesktopSidebarTabsState extends State<_DesktopSidebarTabs> {
 class _DesktopTabViews extends StatelessWidget {
   const _DesktopTabViews({
     required this.controller,
-    required this.listController,
     required this.buildAssistants,
     required this.buildConversations,
   });
   final TabController controller;
-  final ScrollController listController;
   final Widget Function() buildAssistants;
+  /// Conversations pane owns its own virtualized scroll view (and controller).
   final Widget Function() buildConversations;
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop =
-        defaultTargetPlatform == TargetPlatform.macOS ||
-        defaultTargetPlatform == TargetPlatform.windows ||
-        defaultTargetPlatform == TargetPlatform.linux;
-    final topPad = context.watch<SettingsProvider>().showChatListDate
-        ? (isDesktop ? 2.0 : 4.0)
-        : 10.0;
     return TabBarView(
       controller: controller,
       physics: const BouncingScrollPhysics(),
       children: [
-        // Assistants
+        // Assistants — leave as a non-virtualized children dump.
         ListView(
-          controller: listController,
           padding: const EdgeInsets.fromLTRB(10, 2, 10, 16),
           children: [buildAssistants()],
         ),
-        // Topics (conversations)
-        ListView(
-          controller: listController,
-          padding: EdgeInsets.fromLTRB(10, topPad, 10, 16),
-          children: [buildConversations()],
-        ),
+        // Topics (conversations) — virtualized list owns scrolling.
+        buildConversations(),
       ],
     );
   }
@@ -3965,55 +4233,47 @@ class _DesktopTabViews extends StatelessWidget {
 // Legacy (mobile/tablet): original single-list layout with optional inline assistants
 class _LegacyListArea extends StatelessWidget {
   const _LegacyListArea({
-    required this.listController,
     required this.isDesktop,
     required this.assistantsExpanded,
     required this.buildAssistants,
     required this.buildConversations,
   });
-  final ScrollController listController;
   final bool isDesktop;
   final bool assistantsExpanded;
   final Widget Function() buildAssistants;
-  final Widget Function() buildConversations;
+  /// Builds the virtualized conversations list that owns scrolling, with the
+  /// inline assistants [leading] widget and shared [padding].
+  final Widget Function(Widget leading, EdgeInsets padding) buildConversations;
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      controller: listController,
-      padding: EdgeInsets.fromLTRB(
-        10,
-        (context.watch<SettingsProvider>().showChatListDate ||
-                assistantsExpanded)
-            ? (isDesktop ? 2 : 4)
-            : 10,
-        10,
-        16,
-      ),
-      children: [
-        // Inline assistants
-        AnimatedSize(
-          duration: const Duration(milliseconds: 260),
-          curve: Curves.easeInOutCubic,
-          alignment: Alignment.topCenter,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
-            transitionBuilder: (child, animation) =>
-                FadeTransition(opacity: animation, child: child),
-            child: !assistantsExpanded
-                ? const SizedBox.shrink()
-                : KeyedSubtree(
-                    key: const ValueKey('assistants-inline'),
-                    child: buildAssistants(),
-                  ),
-          ),
-        ),
-        // Conversations
-        buildConversations(),
-      ],
+    final padding = EdgeInsets.fromLTRB(
+      10,
+      (context.watch<SettingsProvider>().showChatListDate || assistantsExpanded)
+          ? (isDesktop ? 2 : 4)
+          : 10,
+      10,
+      16,
     );
+    final leading = AnimatedSize(
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeInOutCubic,
+      alignment: Alignment.topCenter,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 220),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) =>
+            FadeTransition(opacity: animation, child: child),
+        child: !assistantsExpanded
+            ? const SizedBox.shrink()
+            : KeyedSubtree(
+                key: const ValueKey('assistants-inline'),
+                child: buildAssistants(),
+              ),
+      ),
+    );
+    return buildConversations(leading, padding);
   }
 }
 
@@ -4122,6 +4382,77 @@ class _AssistantInlineTileState extends State<_AssistantInlineTile> {
           ? null
           : (details) => widget.onSecondaryTapDown!(details.globalPosition),
       child: content,
+    );
+  }
+}
+
+/// Tile-shaped shimmer skeleton shown only while ChatService is still
+/// initializing; real tiles render as soon as the first notify lands.
+class _ConversationListSkeleton extends StatefulWidget {
+  const _ConversationListSkeleton();
+
+  @override
+  State<_ConversationListSkeleton> createState() =>
+      _ConversationListSkeletonState();
+}
+
+class _ConversationListSkeletonState extends State<_ConversationListSkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final barColor = cs.onSurface.withValues(alpha: 0.08);
+
+    Widget bar({required double widthFactor, required double height}) {
+      return FractionallySizedBox(
+        widthFactor: widthFactor,
+        child: Container(
+          height: height,
+          decoration: BoxDecoration(
+            color: barColor,
+            borderRadius: BorderRadius.circular(height / 2),
+          ),
+        ),
+      );
+    }
+
+    Widget tile({required double titleFactor, required double metaFactor}) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            bar(widthFactor: titleFactor, height: 14),
+            const SizedBox(height: 8),
+            bar(widthFactor: metaFactor, height: 10),
+          ],
+        ),
+      );
+    }
+
+    return FadeTransition(
+      opacity: _pulse.drive(Tween<double>(begin: 0.45, end: 1.0)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          tile(titleFactor: 0.72, metaFactor: 0.42),
+          tile(titleFactor: 0.56, metaFactor: 0.34),
+          tile(titleFactor: 0.66, metaFactor: 0.48),
+          tile(titleFactor: 0.5, metaFactor: 0.3),
+          tile(titleFactor: 0.62, metaFactor: 0.38),
+        ],
+      ),
     );
   }
 }

@@ -1,5 +1,7 @@
+import "../../support/business_test_harness.dart";
 import 'dart:async';
 
+import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
 import 'package:Kelivo/shared/widgets/export_capture_scope.dart';
@@ -16,8 +18,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_math_fork/tex.dart' show TexEncoderExt;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gpt_markdown/gpt_markdown.dart' show GptMarkdown;
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 Finder _findMathWidget() {
   return find.byType(Math);
@@ -259,19 +261,24 @@ List<int> _displayedImageBytes(WidgetTester tester) {
   return (provider as MemoryImage).bytes;
 }
 
+Finder _findSoftHorizontalRule() {
+  return find.byKey(const ValueKey('markdown-soft-horizontal-rule'));
+}
+
 Widget _markdownHarness(
   String text, {
   double? width,
   bool streaming = false,
-  Map<String, Object>? preferences,
+  BusinessPreferences? businessPreferences,
   void Function(String id)? onCitationTap,
   ThemeData? theme,
   ThemeData? darkTheme,
   ThemeMode? themeMode,
 }) {
-  SharedPreferences.setMockInitialValues(preferences ?? {});
   return ChangeNotifierProvider(
-    create: (_) => SettingsProvider(),
+    create: (_) => SettingsProvider(
+      businessPreferences ?? createBusinessTestPreferences(),
+    ),
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
@@ -309,11 +316,12 @@ void _overrideMarkdownTablePlatform(TargetPlatform platform) {
 Widget _streamingMarkdownHarness(
   ValueListenable<String> text, {
   double? width,
-  Map<String, Object>? preferences,
+  BusinessPreferences? businessPreferences,
 }) {
-  SharedPreferences.setMockInitialValues(preferences ?? {});
   return ChangeNotifierProvider(
-    create: (_) => SettingsProvider(),
+    create: (_) => SettingsProvider(
+      businessPreferences ?? createBusinessTestPreferences(),
+    ),
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
@@ -340,13 +348,11 @@ Widget _streamingMarkdownHarness(
 
 Widget _settingsHarness({
   required Widget child,
-  Map<String, Object>? preferences,
   required void Function(SettingsProvider settings) onSettingsReady,
 }) {
-  SharedPreferences.setMockInitialValues(preferences ?? {});
   return ChangeNotifierProvider(
     create: (_) {
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(createBusinessTestPreferences());
       onSettingsReady(settings);
       return settings;
     },
@@ -391,6 +397,60 @@ void main() {
       '| Bob \\| Jr. | said "hello" |  |',
     );
   });
+
+  testWidgets(
+    'MarkdownWithCodeHighlight renders markdown horizontal rule markers',
+    (tester) async {
+      for (final marker in ['---', '***', '___']) {
+        await tester.pumpWidget(
+          _markdownHarness('Before\n\n$marker\n\nAfter', width: 360),
+        );
+        await tester.pump();
+
+        expect(
+          _findSoftHorizontalRule(),
+          findsOneWidget,
+          reason: '$marker should render as a horizontal rule',
+        );
+        expect(
+          find.textContaining(marker),
+          findsNothing,
+          reason: '$marker should not remain as visible marker text',
+        );
+        expect(find.textContaining('Before'), findsOneWidget);
+        expect(find.textContaining('After'), findsOneWidget);
+      }
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps non-hr asterisks out of horizontal rules',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness('''
+* list item
+
+Inline ***strong emphasis*** text.
+
+```markdown
+***
+```
+''', width: 360),
+      );
+      await tester.pump();
+
+      expect(_findSoftHorizontalRule(), findsNothing);
+      expect(find.textContaining('list item'), findsOneWidget);
+      expect(find.textContaining('strong emphasis'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(SelectableHighlightView),
+          matching: find.textContaining('***'),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets(
     'MarkdownWithCodeHighlight renders grouped raw citation metadata as separate capsules',
@@ -476,6 +536,7 @@ void main() {
     final image = tester.widget<Image>(find.byType(Image));
     expect(image.width, 42.0);
     expect(image.height, 24.0);
+    expect(image.image, isA<ResizeImage>());
   });
 
   testWidgets(
@@ -906,6 +967,67 @@ ${rows.join('\n')}
       expect(plainText, isNot(contains('row39')));
     },
   );
+
+  testWidgets('D5 completed table builds bounded row pages', (tester) async {
+    final rows = List<String>.generate(
+      1000,
+      (index) => '| row$index | value$index |',
+    );
+    await tester.pumpWidget(
+      _markdownHarness('''
+| Name | Value |
+| - | - |
+${rows.join('\n')}
+''', width: 360),
+    );
+    await tester.pump();
+
+    String renderedTableText() => tester
+        .widgetList<RichText>(
+          find.descendant(
+            of: find.byKey(const ValueKey('markdown-table-body')),
+            matching: find.byType(RichText),
+          ),
+        )
+        .map((widget) => widget.text.toPlainText())
+        .join('\n');
+
+    expect(renderedTableText(), contains('row0'));
+    expect(renderedTableText(), isNot(contains('row999')));
+    expect(
+      find.byKey(const ValueKey('markdown-table-row-pager')),
+      findsOneWidget,
+    );
+
+    tester
+        .widget<TextButton>(
+          find.byKey(const ValueKey('markdown-table-show-more')),
+        )
+        .onPressed!();
+    await tester.pump();
+
+    expect(renderedTableText(), contains('row100'));
+    expect(renderedTableText(), isNot(contains('row999')));
+  });
+
+  testWidgets('D5 completed code uses a lazy chunk viewport', (tester) async {
+    final code = List<String>.generate(
+      10000,
+      (index) => 'line$index',
+    ).join('\n');
+    await tester.pumpWidget(
+      _markdownHarness('```text\n$code\n```', width: 500),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('virtualized-code-view')), findsOneWidget);
+    expect(find.byType(SelectableHighlightView), findsWidgets);
+    expect(
+      find.byType(SelectableHighlightView).evaluate().length,
+      lessThan(10),
+    );
+    expect(find.textContaining('line9999'), findsNothing);
+  });
 
   testWidgets(
     'MarkdownWithCodeHighlight keeps an unfinished streaming table row in table layout',
@@ -1839,6 +1961,9 @@ A-->B
   testWidgets('MarkdownWithCodeHighlight applies app font to table text', (
     tester,
   ) async {
+    final harness = await createBusinessTestHarness(
+      initial: const {'display_app_font_family_v1': 'Courier'},
+    );
     await tester.pumpWidget(
       _markdownHarness(
         '''
@@ -1847,7 +1972,7 @@ A-->B
 | Alpha | Beta |
 ''',
         width: 360,
-        preferences: const {'display_app_font_family_v1': 'Courier'},
+        businessPreferences: harness.preferences,
       ),
     );
     await tester.pump();
@@ -2030,10 +2155,13 @@ A-->B
   testWidgets('MarkdownWithCodeHighlight keeps dollar math switch scoped', (
     tester,
   ) async {
+    final harness = await createBusinessTestHarness(
+      initial: const {'display_enable_dollar_latex_v1': false},
+    );
     await tester.pumpWidget(
       _markdownHarness(
         r'Inline $a+b$ and \(c+d\)',
-        preferences: const {'display_enable_dollar_latex_v1': false},
+        businessPreferences: harness.preferences,
       ),
     );
     await tester.pump();
@@ -2244,6 +2372,33 @@ A-->B
       expect(find.textContaining(r'\({}\)'), findsNothing);
       expect(find.textContaining(r'\({a_n}_{n=1}^{\infty}\)'), findsNothing);
       expect(find.textContaining(r'\(A = {x \in'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight keeps hex colors in inline math color commands',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+颜色\(\color{#FF5733}{A}\)，文字色\(\textcolor{#228B22}{B}\)，背景\(\colorbox{#197}{C}\)，符号\(#\)。
+'''),
+      );
+      await tester.pump();
+
+      final mathWidgets = _mathWidgets(tester);
+      expect(mathWidgets, hasLength(4));
+      expect(
+        mathWidgets.map((widget) => widget.parseError),
+        everyElement(isNull),
+      );
+      final encoded = _encodedMathTex(tester);
+      expect(encoded[0].toLowerCase(), contains('ff5733'));
+      expect(encoded[0], isNot(contains(r'\#FF5733')));
+      expect(encoded[1].toLowerCase(), contains('228b22'));
+      expect(encoded[1], isNot(contains(r'\#228B22')));
+      expect(encoded[2], isNot(contains(r'\#197')));
+      expect(encoded[3], contains(r'\#'));
+      expect(find.textContaining(r'\(\color{#FF5733}{A}\)'), findsNothing);
     },
   );
 
@@ -2631,22 +2786,63 @@ void main() {}
   });
 
   testWidgets(
-    'MarkdownWithCodeHighlight toggles auto-collapsed code block from header',
+    'MarkdownWithCodeHighlight keeps details tags literal in html code blocks',
     (tester) async {
       await tester.pumpWidget(
-        _markdownHarness(
-          '''
+        _markdownHarness('''
+```html
+<!DOCTYPE html>
+<html>
+<body>
+<details>
+  <summary>点击展开/折叠内容</summary>
+  <p>这里是可以折叠的内容。</p>
+</details>
+</body>
+</html>
+```
+'''),
+      );
+      await tester.pump();
+
+      expect(find.text('html'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(SelectableHighlightView),
+          matching: find.textContaining('<details>'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(SelectableHighlightView),
+          matching: find.textContaining('<summary>点击展开/折叠内容</summary>'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('点击展开/折叠内容'), findsNothing);
+      expect(find.byKey(const ValueKey('details-collapsed')), findsNothing);
+      expect(find.byKey(const ValueKey('details-expanded')), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight toggles auto-collapsed code block from header',
+    (tester) async {
+      final harness = await createBusinessTestHarness(
+        initial: const {
+          'display_auto_collapse_code_block_v1': true,
+          'display_auto_collapse_code_block_lines_v1': 2,
+        },
+      );
+      await tester.pumpWidget(
+        _markdownHarness('''
 ```dart
 line1
 line2
 line3
 ```
-''',
-          preferences: const {
-            'display_auto_collapse_code_block_v1': true,
-            'display_auto_collapse_code_block_lines_v1': 2,
-          },
-        ),
+''', businessPreferences: harness.preferences),
       );
       await tester.pumpAndSettle();
       await tester.pumpAndSettle();
@@ -2678,20 +2874,20 @@ line3
   testWidgets(
     'MarkdownWithCodeHighlight shows collapsed code tail fade when hidden lines exist',
     (tester) async {
+      final harness = await createBusinessTestHarness(
+        initial: const {
+          'display_auto_collapse_code_block_v1': true,
+          'display_auto_collapse_code_block_lines_v1': 2,
+        },
+      );
       await tester.pumpWidget(
-        _markdownHarness(
-          '''
+        _markdownHarness('''
 ```dart
 fade1
 fade2
 fade3
 ```
-''',
-          preferences: const {
-            'display_auto_collapse_code_block_v1': true,
-            'display_auto_collapse_code_block_lines_v1': 2,
-          },
-        ),
+''', businessPreferences: harness.preferences),
       );
       await tester.pumpAndSettle();
       await tester.pumpAndSettle();
@@ -2800,14 +2996,17 @@ alpha2
 alpha3
 ```
 ''');
+    final harness = await createBusinessTestHarness(
+      initial: const {
+        'display_auto_collapse_code_block_v1': true,
+        'display_auto_collapse_code_block_lines_v1': 2,
+      },
+    );
 
     await tester.pumpWidget(
       _streamingMarkdownHarness(
         streamText,
-        preferences: const {
-          'display_auto_collapse_code_block_v1': true,
-          'display_auto_collapse_code_block_lines_v1': 2,
-        },
+        businessPreferences: harness.preferences,
       ),
     );
     await tester.pumpAndSettle();
@@ -2863,14 +3062,17 @@ press2
 press3
 ```
 ''');
+      final harness = await createBusinessTestHarness(
+        initial: const {
+          'display_auto_collapse_code_block_v1': true,
+          'display_auto_collapse_code_block_lines_v1': 2,
+        },
+      );
 
       await tester.pumpWidget(
         _streamingMarkdownHarness(
           streamText,
-          preferences: const {
-            'display_auto_collapse_code_block_v1': true,
-            'display_auto_collapse_code_block_lines_v1': 2,
-          },
+          businessPreferences: harness.preferences,
         ),
       );
       await tester.pumpAndSettle();
@@ -2918,13 +3120,26 @@ press5
   );
 
   testWidgets(
-    'MarkdownWithCodeHighlight renders details collapsed then expands',
+    'MarkdownWithCodeHighlight renders wrapped details collapsed then expands',
     (tester) async {
       await tester.pumpWidget(
-        _markdownHarness('<details><summary>更多信息</summary>隐藏内容</details>'),
+        _markdownHarness('''
+<theater>
+<details><summary>更多信息</summary>隐藏内容</details>
+</theater>
+返回 List<String> 给 <username>
+'''),
       );
       await tester.pump();
 
+      expect(
+        find.textContaining(RegExp(r'</?theater>'), findRichText: true),
+        findsNothing,
+      );
+      expect(
+        find.textContaining('返回 List<String> 给 <username>', findRichText: true),
+        findsOneWidget,
+      );
       expect(find.text('更多信息'), findsOneWidget);
       expect(find.text('隐藏内容', findRichText: true), findsNothing);
 
@@ -3166,6 +3381,169 @@ void main() {
       );
       expect(plainText, isNot(contains('<details>')));
       expect(plainText, isNot(contains('<a href=')));
+    },
+  );
+
+  testWidgets(
+    'SelectableHighlightView reuses parsed highlight nodes across remounts',
+    (tester) async {
+      debugResetHighlightNodeCache();
+      addTearDown(debugResetHighlightNodeCache);
+
+      Widget view(String source) => MaterialApp(
+        home: Scaffold(
+          body: SelectableHighlightView(
+            source,
+            language: 'dart',
+            theme: const {},
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(view('final lruCachedAlpha = 1;'));
+      expect(debugHighlightParseCount, 1);
+
+      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+      await tester.pumpWidget(view('final lruCachedAlpha = 1;'));
+      expect(debugHighlightParseCount, 1);
+
+      await tester.pumpWidget(view('final lruCachedBeta = 2;'));
+      expect(debugHighlightParseCount, 2);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight reuses built markdown until theme or font changes',
+    (tester) async {
+      late StateSetter rebuild;
+      var dark = false;
+      var fontSize = 15.5;
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider(
+          create: (_) => SettingsProvider(createBusinessTestPreferences()),
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              rebuild = setState;
+              return MaterialApp(
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                theme: buildLightThemeForScheme(
+                  ThemePalettes.defaultPalette.light,
+                ),
+                darkTheme: buildDarkThemeForScheme(
+                  ThemePalettes.defaultPalette.dark,
+                ),
+                themeMode: dark ? ThemeMode.dark : ThemeMode.light,
+                home: Scaffold(
+                  body: MarkdownWithCodeHighlight(
+                    text: 'cached body text',
+                    baseStyle: TextStyle(fontSize: fontSize, height: 1.5),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+
+      GptMarkdown builtMarkdown() =>
+          tester.widget<GptMarkdown>(find.byType(GptMarkdown));
+
+      final initial = builtMarkdown();
+
+      rebuild(() {});
+      await tester.pump();
+      expect(identical(initial, builtMarkdown()), isTrue);
+
+      rebuild(() => dark = true);
+      await tester.pump();
+      // MaterialApp animates theme changes; let the lerp finish.
+      await tester.pump(const Duration(milliseconds: 300));
+      final darkMarkdown = builtMarkdown();
+      expect(identical(initial, darkMarkdown), isFalse);
+      expect(find.textContaining('cached body text'), findsOneWidget);
+
+      rebuild(() {});
+      await tester.pump();
+      expect(identical(darkMarkdown, builtMarkdown()), isTrue);
+
+      rebuild(() => fontSize = 16.5);
+      await tester.pump();
+      expect(identical(darkMarkdown, builtMarkdown()), isFalse);
+      expect(find.textContaining('cached body text'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight rethemes code without reparsing highlight nodes',
+    (tester) async {
+      debugResetHighlightNodeCache();
+      addTearDown(debugResetHighlightNodeCache);
+
+      late StateSetter rebuild;
+      var dark = false;
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider(
+          create: (_) => SettingsProvider(createBusinessTestPreferences()),
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              rebuild = setState;
+              return MaterialApp(
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                theme: buildLightThemeForScheme(
+                  ThemePalettes.defaultPalette.light,
+                ),
+                darkTheme: buildDarkThemeForScheme(
+                  ThemePalettes.defaultPalette.dark,
+                ),
+                themeMode: dark ? ThemeMode.dark : ThemeMode.light,
+                home: const Scaffold(
+                  body: MarkdownWithCodeHighlight(
+                    text: '```dart\nfinal rethemedValue = 42;\n```',
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+
+      Set<Color?> codeSpanColors() {
+        final richText = tester.widget<SelectableText>(
+          find.descendant(
+            of: find.byType(SelectableHighlightView),
+            matching: find.byType(SelectableText),
+          ),
+        );
+        final colors = <Color?>{};
+        void walk(InlineSpan span) {
+          if (span is! TextSpan) return;
+          if (span.style?.color != null) colors.add(span.style!.color);
+          span.children?.forEach(walk);
+        }
+
+        walk(richText.textSpan!);
+        return colors;
+      }
+
+      final lightColors = codeSpanColors();
+      expect(lightColors, isNotEmpty);
+      expect(debugHighlightParseCount, 1);
+
+      rebuild(() => dark = true);
+      await tester.pump();
+      // MaterialApp animates theme changes; let the lerp finish.
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final darkColors = codeSpanColors();
+      expect(debugHighlightParseCount, 1);
+      expect(darkColors, isNotEmpty);
+      expect(darkColors, isNot(lightColors));
     },
   );
 }

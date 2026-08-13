@@ -1,16 +1,24 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:archive/archive.dart';
+import 'dart:isolate';
+
+import 'package:archive/archive_io.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:path/path.dart' as p;
-import 'package:shared_preferences/shared_preferences.dart';
+import '../../database/business_repository.dart';
+import '../../database/business_settings_router.dart';
 import '../../models/api_keys.dart';
 import '../../models/backup.dart';
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
-import '../../providers/settings_provider.dart';
+import '../../models/message_part.dart';
 import '../chat/chat_service.dart';
 import '../../../utils/app_directories.dart';
+import '../../../utils/sandbox_path_resolver.dart';
 import 'cherry_direct_backup_reader.dart';
+
+export 'cherry_direct_backup_reader.dart'
+    show CherryUnsupportedBackupVersionException;
 
 class CherryImportResult {
   final int providers;
@@ -30,7 +38,7 @@ class CherryImportResult {
 class CherryImporter {
   CherryImporter._();
 
-  // Persisted keys used by SettingsProvider/AssistantProvider
+  // Published backup keys used by the business settings router.
   static const String _providersKey = 'provider_configs_v1';
   static const String _providersOrderKey = 'providers_order_v1';
   static const String _assistantsKey = 'assistants_v1';
@@ -38,7 +46,7 @@ class CherryImporter {
   static Future<CherryImportResult> importFromCherryStudio({
     required File file,
     required RestoreMode mode,
-    required SettingsProvider settings,
+    required BusinessRepository businessRepository,
     required ChatService chatService,
   }) async {
     // 1) Load JSON from ZIP/BAK (best-effort)
@@ -187,15 +195,15 @@ class CherryImporter {
       }
     }
 
-    // 5) Import providers into Settings (SharedPreferences)
-    final importedProviders = await _importProviders(
-      cherryProviders,
-      settings,
-      mode,
+    // 5) Parse business data before opening the single write transaction.
+    final importedProviders = _parseProviders(cherryProviders);
+    final importedAssistants = _parseAssistants(cherryAssistants);
+    await _importBusinessData(
+      businessRepository: businessRepository,
+      mode: mode,
+      providers: importedProviders,
+      assistants: importedAssistants,
     );
-
-    // 6) Import assistants (persist to SharedPreferences, restart recommended)
-    final importedAssistants = await _importAssistants(cherryAssistants, mode);
 
     // If overwrite, clear chats/files BEFORE writing any uploads to avoid deletion later
     if (!chatService.initialized) {
@@ -259,6 +267,7 @@ class CherryImporter {
           (fileObj?['type']?.toString().toLowerCase().startsWith('image') ??
               false);
       if (fileObj != null && (fileObj['id'] ?? '').toString().isNotEmpty) {
+        final originPath = (fileObj['path'] ?? '').toString().trim();
         (pendingAttachmentsByMessage[messageId] ??= <_PendingAttachmentRef>[])
             .add(
               _PendingAttachmentRef(
@@ -266,6 +275,7 @@ class CherryImporter {
                 name: (fileObj['origin_name'] ?? fileObj['name'] ?? '')
                     .toString(),
                 mime: (fileObj['type'] ?? '').toString(),
+                originPath: originPath.isNotEmpty ? originPath : null,
                 isImage: isImageType,
               ),
             );
@@ -292,8 +302,8 @@ class CherryImporter {
     );
 
     return CherryImportResult(
-      providers: importedProviders,
-      assistants: importedAssistants,
+      providers: importedProviders.length,
+      assistants: importedAssistants.length,
       conversations: convCountAndMsgCount.$1,
       messages: convCountAndMsgCount.$2,
       files: pathsByFileId.length + convCountAndMsgCount.$3,
@@ -302,63 +312,219 @@ class CherryImporter {
 
   // ---------- helpers ----------
 
+  /// Cap for *speculative* ZIP-entry probes only (unknown / non-`.json` names).
+  static const int defaultSpeculativeJsonProbeBytes = 32 * 1024 * 1024;
+
+  /// Absolute ceiling for in-archive identified `.json` entries only.
+  /// Whole-file and gunzipped JSON remain uncapped.
+  static const int defaultIdentifiedArchiveJsonBytes = 256 * 1024 * 1024;
+
+  /// Test seam to shrink the speculative probe budget without large fixtures.
+  @visibleForTesting
+  static int? debugSpeculativeJsonProbeBytes;
+
+  /// Test seam for the in-archive identified `.json` ceiling.
+  @visibleForTesting
+  static int? debugIdentifiedArchiveJsonBytes;
+
+  @visibleForTesting
+  static int get speculativeJsonProbeBytes =>
+      debugSpeculativeJsonProbeBytes ?? defaultSpeculativeJsonProbeBytes;
+
+  @visibleForTesting
+  static int get identifiedArchiveJsonBytes =>
+      debugIdentifiedArchiveJsonBytes ?? defaultIdentifiedArchiveJsonBytes;
+
+  /// Counts ZIP entry content accesses during JSON probe passes (not metadata).
+  @visibleForTesting
+  static int debugZipJsonProbeDecodeCount = 0;
+
+  @visibleForTesting
+  static void debugResetJsonProbeBudgets() {
+    debugSpeculativeJsonProbeBytes = null;
+    debugIdentifiedArchiveJsonBytes = null;
+    debugZipJsonProbeDecodeCount = 0;
+  }
+
+  static const Set<String> _blockedSpeculativeProbeExtensions = <String>{
+    '.sqlite',
+    '.db',
+    '.ldb',
+    '.log',
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.gif',
+    '.webp',
+    '.pdf',
+    '.bin',
+    '.exe',
+    '.dll',
+    '.so',
+    '.dylib',
+    '.wasm',
+    '.mp3',
+    '.mp4',
+    '.wav',
+    '.zip',
+    '.gz',
+  };
+
+  static String _entryBaseName(String name) {
+    final normalized = name.replaceAll('\\', '/').toLowerCase();
+    return normalized.split('/').last;
+  }
+
+  /// Archive entries ending in `.json` are treated as identified JSON targets.
+  @visibleForTesting
+  static bool isIdentifiedJsonEntryName(String name) {
+    return _entryBaseName(name).endsWith('.json');
+  }
+
+  /// True when [name] has no directory component (archive-root entry).
+  @visibleForTesting
+  static bool isArchiveRootEntryName(String name) {
+    var normalized = name.replaceAll('\\', '/');
+    while (normalized.startsWith('./')) {
+      normalized = normalized.substring(2);
+    }
+    while (normalized.startsWith('/')) {
+      normalized = normalized.substring(1);
+    }
+    return normalized.isNotEmpty && !normalized.contains('/');
+  }
+
+  /// Whether a non-`.json` ZIP entry may be decompressed as a speculative
+  /// JSON probe. Size is checked against [speculativeJsonProbeBytes] before
+  /// touching [ArchiveFile.content] (which would decompress and cache).
+  @visibleForTesting
+  static bool isSpeculativeJsonEntryCandidate(String name, int size) {
+    if (size <= 0 || size > speculativeJsonProbeBytes) return false;
+    if (isIdentifiedJsonEntryName(name)) return false;
+    final base = _entryBaseName(name);
+    for (final ext in _blockedSpeculativeProbeExtensions) {
+      if (base.endsWith(ext)) return false;
+    }
+    return true;
+  }
+
+  /// Whether an in-archive `.json` entry may be decompressed. Bounded by
+  /// [identifiedArchiveJsonBytes] so nested attachment dumps cannot OOM.
+  @visibleForTesting
+  static bool isIdentifiedArchiveJsonEntryCandidate(String name, int size) {
+    if (size <= 0 || size > identifiedArchiveJsonBytes) return false;
+    return isIdentifiedJsonEntryName(name);
+  }
+
+  static bool _looksLikeZip(List<int> bytes) {
+    return bytes.length >= 4 &&
+        bytes[0] == 0x50 &&
+        bytes[1] == 0x4b &&
+        (bytes[2] == 0x03 || bytes[2] == 0x05 || bytes[2] == 0x07) &&
+        (bytes[3] == 0x04 || bytes[3] == 0x06 || bytes[3] == 0x08);
+  }
+
+  static bool _looksLikeGzip(List<int> bytes) {
+    return bytes.length >= 2 && bytes[0] == 0x1f && bytes[1] == 0x8b;
+  }
+
+  static Map<String, dynamic>? _tryParseBackupJson(String text) {
+    try {
+      final obj = jsonDecode(text) as Map<String, dynamic>;
+      if (obj.containsKey('localStorage') && obj.containsKey('indexedDB')) {
+        return obj;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  static Map<String, dynamic>? _tryDecodeBackupJsonBytes(
+    List<int> raw, {
+    required bool allowMalformed,
+  }) {
+    try {
+      return _tryParseBackupJson(
+        utf8.decode(raw, allowMalformed: allowMalformed),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Map<String, dynamic>? _tryParseZipJsonEntry(
+    ArchiveFile entry, {
+    required bool identified,
+  }) {
+    if (!entry.isFile || entry.size <= 0) return null;
+    if (identified) {
+      if (!isIdentifiedArchiveJsonEntryCandidate(entry.name, entry.size)) {
+        return null;
+      }
+    } else if (!isSpeculativeJsonEntryCandidate(entry.name, entry.size)) {
+      return null;
+    }
+    try {
+      debugZipJsonProbeDecodeCount++;
+      final raw = entry.content;
+      if (identified) {
+        if (raw.length > identifiedArchiveJsonBytes) return null;
+      } else if (raw.length > speculativeJsonProbeBytes) {
+        return null;
+      }
+      return _tryDecodeBackupJsonBytes(raw, allowMalformed: identified);
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<Map<String, dynamic>> _readCherryBackupFile(File file) async {
     final bytes = await file.readAsBytes();
 
-    // Helper to verify structure looks like Cherry backup
-    Map<String, dynamic>? tryParseBackupJson(String text) {
-      try {
-        final obj = jsonDecode(text) as Map<String, dynamic>;
-        if (obj.containsKey('localStorage') && obj.containsKey('indexedDB')) {
-          return obj;
-        }
-      } catch (_) {}
-      return null;
+    // Whole-file JSON (not ZIP/GZIP): uncapped, allowMalformed.
+    if (!_looksLikeZip(bytes) && !_looksLikeGzip(bytes)) {
+      final obj = _tryDecodeBackupJsonBytes(bytes, allowMalformed: true);
+      if (obj != null) return obj;
     }
 
-    // 1) Try as plain JSON text
-    try {
-      final content = await file.readAsString();
-      final obj = tryParseBackupJson(content);
-      if (obj != null) return obj;
-    } catch (_) {}
-
-    // 2) Try ZIP: scan all file entries and pick the one that parses to expected JSON
+    // ZIP: version-gate from metadata.json before any entry probe.
     try {
       final archive = ZipDecoder().decodeBytes(bytes);
+      CherryDirectBackupReader.readMetadataOrThrowIfUnsupported(archive);
       for (final entry in archive) {
-        if (!entry.isFile) continue;
-        try {
-          final content = utf8.decode(
-            entry.content as List<int>,
-            allowMalformed: true,
-          );
-          final obj = tryParseBackupJson(content);
-          if (obj != null) return obj;
-        } catch (_) {
-          // skip non-text entries
-        }
+        if (!isArchiveRootEntryName(entry.name)) continue;
+        final obj = _tryParseZipJsonEntry(entry, identified: true);
+        if (obj != null) return obj;
+      }
+      for (final entry in archive) {
+        if (isArchiveRootEntryName(entry.name)) continue;
+        final obj = _tryParseZipJsonEntry(entry, identified: true);
+        if (obj != null) return obj;
+      }
+      for (final entry in archive) {
+        final obj = _tryParseZipJsonEntry(entry, identified: false);
+        if (obj != null) return obj;
       }
       final directBackup = CherryDirectBackupReader.readArchive(archive);
       if (directBackup != null) return directBackup;
+    } on CherryUnsupportedBackupVersionException {
+      rethrow;
     } catch (_) {}
 
-    // 3) Try GZIP (some .bak may be gzip-compressed JSON)
-    try {
-      final gunzipped = GZipDecoder().decodeBytes(bytes, verify: false);
-      final content = utf8.decode(gunzipped, allowMalformed: true);
-      final obj = tryParseBackupJson(content);
-      if (obj != null) return obj;
-    } catch (_) {}
+    // GZIP JSON payload: uncapped, allowMalformed.
+    if (_looksLikeGzip(bytes)) {
+      try {
+        final gunzipped = GZipDecoder().decodeBytes(bytes, verify: false);
+        final obj = _tryDecodeBackupJsonBytes(gunzipped, allowMalformed: true);
+        if (obj != null) return obj;
+      } catch (_) {}
+    }
 
     throw Exception('Unable to read Cherry backup file');
   }
 
-  static Future<int> _importProviders(
+  static Map<String, Map<String, dynamic>> _parseProviders(
     List<dynamic> cherryProviders,
-    SettingsProvider settings,
-    RestoreMode mode,
-  ) async {
+  ) {
     // Build imported map id -> ProviderConfig JSON-like
     final imported = <String, Map<String, dynamic>>{};
 
@@ -465,66 +631,12 @@ class CherryImporter {
       imported[id] = map;
     }
 
-    final prefs = await SharedPreferences.getInstance();
-
-    if (mode == RestoreMode.overwrite) {
-      await prefs.setString(_providersKey, jsonEncode(imported));
-      await prefs.setStringList(_providersOrderKey, imported.keys.toList());
-      return imported.length;
-    }
-
-    // merge mode: merge into existing providers without removing any
-    Map<String, dynamic> current = const <String, dynamic>{};
-    try {
-      final raw = prefs.getString(_providersKey);
-      if (raw != null && raw.isNotEmpty) {
-        current = jsonDecode(raw) as Map<String, dynamic>;
-      }
-    } catch (_) {}
-
-    final merged = <String, dynamic>{}..addAll(current);
-    for (final entry in imported.entries) {
-      if (!merged.containsKey(entry.key)) {
-        merged[entry.key] = entry.value;
-      } else {
-        // Update with non-empty fields from imported
-        final cur = (merged[entry.key] as Map).map(
-          (k, v) => MapEntry(k.toString(), v),
-        );
-        final inc = entry.value;
-        final next = Map<String, dynamic>.from(cur);
-        void putIfNotEmpty(String k) {
-          final v = inc[k];
-          if (v == null) return;
-          if (v is String && v.trim().isEmpty) return;
-          next[k] = v;
-        }
-
-        for (final k in inc.keys) {
-          putIfNotEmpty(k);
-        }
-        merged[entry.key] = next;
-      }
-    }
-
-    await prefs.setString(_providersKey, jsonEncode(merged));
-
-    // Merge providers order: append new ids at end, keep existing order
-    final existedOrder =
-        prefs.getStringList(_providersOrderKey) ?? const <String>[];
-    final orderSet = existedOrder.toList();
-    for (final id in imported.keys) {
-      if (!orderSet.contains(id)) orderSet.add(id);
-    }
-    await prefs.setStringList(_providersOrderKey, orderSet);
-
-    return imported.length;
+    return imported;
   }
 
-  static Future<int> _importAssistants(
+  static List<Map<String, dynamic>> _parseAssistants(
     List<dynamic> cherryAssistants,
-    RestoreMode mode,
-  ) async {
+  ) {
     // Map to our Assistant JSON list (as stored by Assistant.encodeList)
     final out = <Map<String, dynamic>>[];
     for (final a in cherryAssistants) {
@@ -571,53 +683,454 @@ class CherryImporter {
         'customHeaders': const <Map<String, String>>[],
         'customBody': const <Map<String, String>>[],
         'enableMemory': false,
-        'enableRecentChatsReference': false,
+        'allowPastConversationRecall': false,
       };
       out.add(json);
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    if (mode == RestoreMode.overwrite) {
-      await prefs.setString(_assistantsKey, jsonEncode(out));
-      return out.length;
-    }
-
-    // merge: merge by id; update systemPrompt if provided, keep other local values
-    List<dynamic> existing = const <dynamic>[];
-    try {
-      final raw = prefs.getString(_assistantsKey);
-      if (raw != null && raw.isNotEmpty) {
-        existing = jsonDecode(raw) as List<dynamic>;
-      }
-    } catch (_) {}
-    final byId = <String, Map<String, dynamic>>{
-      for (final e in existing)
-        if (e is Map && e['id'] != null)
-          e['id'].toString(): e.map((k, v) => MapEntry(k.toString(), v)),
-    };
-    for (final a in out) {
-      final id = a['id'] as String;
-      if (!byId.containsKey(id)) {
-        byId[id] = a;
-      } else {
-        final local = byId[id]!;
-        // Update prompt if incoming has non-empty
-        final incPrompt = (a['systemPrompt'] as String?)?.trim() ?? '';
-        if (incPrompt.isNotEmpty) local['systemPrompt'] = incPrompt;
-        // Update model fields if provided
-        if (a['chatModelProvider'] != null) {
-          local['chatModelProvider'] = a['chatModelProvider'];
-        }
-        if (a['chatModelId'] != null) local['chatModelId'] = a['chatModelId'];
-      }
-    }
-    final merged = byId.values.toList();
-    await prefs.setString(_assistantsKey, jsonEncode(merged));
-    return out.length;
+    return out;
   }
 
-  /// Decode a DOS date/time packed value (from ZIP entry's lastModTime) into
-  /// a [DateTime]. Returns null when the date portion is zero (unset).
+  static Future<void> _importBusinessData({
+    required BusinessRepository businessRepository,
+    required RestoreMode mode,
+    required Map<String, Map<String, dynamic>> providers,
+    required List<Map<String, dynamic>> assistants,
+  }) {
+    return businessRepository.transformSnapshot((current) {
+      final settings = BusinessSettingsRouter.exportSnapshot(current);
+      if (mode == RestoreMode.overwrite) {
+        settings[_providersKey] = jsonEncode(providers);
+        settings[_providersOrderKey] = providers.keys.toList();
+        settings[_assistantsKey] = jsonEncode(assistants);
+        return BusinessSettingsRouter.normalizeAndRoute(settings);
+      }
+
+      final currentProviders = _jsonObjectMap(
+        settings[_providersKey],
+        _providersKey,
+      );
+      for (final entry in providers.entries) {
+        final local = currentProviders[entry.key];
+        if (local is! Map) {
+          currentProviders[entry.key] = entry.value;
+          continue;
+        }
+        final next = local.map((key, value) => MapEntry(key.toString(), value));
+        for (final importedField in entry.value.entries) {
+          final value = importedField.value;
+          if (value == null || (value is String && value.trim().isEmpty)) {
+            continue;
+          }
+          next[importedField.key] = value;
+        }
+        currentProviders[entry.key] = next;
+      }
+      settings[_providersKey] = jsonEncode(currentProviders);
+
+      final order = List<String>.from(
+        (settings[_providersOrderKey] as List).cast<String>(),
+      );
+      for (final providerId in providers.keys) {
+        if (!order.contains(providerId)) order.add(providerId);
+      }
+      settings[_providersOrderKey] = order;
+
+      final currentAssistants = _jsonObjectList(
+        settings[_assistantsKey],
+        _assistantsKey,
+      );
+      final assistantsById = <String, Map<String, dynamic>>{
+        for (final assistant in currentAssistants)
+          if (assistant['id'] != null) assistant['id'].toString(): assistant,
+      };
+      for (final assistant in assistants) {
+        final id = assistant['id'] as String;
+        final local = assistantsById[id];
+        if (local == null) {
+          assistantsById[id] = assistant;
+          continue;
+        }
+        final prompt = (assistant['systemPrompt'] as String?)?.trim() ?? '';
+        if (prompt.isNotEmpty) local['systemPrompt'] = prompt;
+        if (assistant['chatModelProvider'] != null) {
+          local['chatModelProvider'] = assistant['chatModelProvider'];
+        }
+        if (assistant['chatModelId'] != null) {
+          local['chatModelId'] = assistant['chatModelId'];
+        }
+      }
+      settings[_assistantsKey] = jsonEncode(assistantsById.values.toList());
+      return BusinessSettingsRouter.normalizeAndRoute(settings);
+    }, writeReceipt: true);
+  }
+
+  static Map<String, dynamic> _jsonObjectMap(Object? raw, String key) {
+    if (raw is! String) throw FormatException(key);
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map || decoded.values.any((value) => value is! Map)) {
+      throw FormatException(key);
+    }
+    return decoded.map((field, value) => MapEntry(field.toString(), value));
+  }
+
+  static List<Map<String, dynamic>> _jsonObjectList(Object? raw, String key) {
+    if (raw is! String) throw FormatException(key);
+    final decoded = jsonDecode(raw);
+    if (decoded is! List || decoded.any((value) => value is! Map)) {
+      throw FormatException(key);
+    }
+    return decoded
+        .cast<Map>()
+        .map(
+          (value) => value.map(
+            (field, fieldValue) => MapEntry(field.toString(), fieldValue),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  static Future<Map<String, String>> _materializeFiles(
+    Map<String, Map<String, dynamic>> filesById,
+    Set<String> usedIds, {
+    File? backupArchive,
+  }) async {
+    final uploadDir = await AppDirectories.getUploadDirectory();
+    if (!await uploadDir.exists()) await uploadDir.create(recursive: true);
+
+    final filesPayload = <String, Map<String, dynamic>>{
+      for (final id in usedIds)
+        if (filesById[id] != null)
+          id: Map<String, dynamic>.from(filesById[id]!),
+    };
+    final backupPath = backupArchive?.path;
+    final uploadDirPath = uploadDir.path;
+    final used = usedIds.toList(growable: false);
+
+    // ArchiveFile / InputFileStream are not sendable; keep the ZIP open only
+    // inside the isolate and exchange plain path maps across the boundary.
+    return Isolate.run(
+      () => _materializeFilesSync(
+        backupPath: backupPath,
+        uploadDirPath: uploadDirPath,
+        filesById: filesPayload,
+        usedIds: used,
+      ),
+    );
+  }
+
+  /// Synchronous attachment materialization — runs inside an [Isolate].
+  static Map<String, String> _materializeFilesSync({
+    required String? backupPath,
+    required String uploadDirPath,
+    required Map<String, Map<String, dynamic>> filesById,
+    required List<String> usedIds,
+  }) {
+    Map<String, ArchiveFile>? filesIndexByBase;
+    Map<String, ArchiveFile>? filesIndexByRel;
+    Map<String, ArchiveFile>? filesIndexById;
+    Map<String, String>? diskFilesIndexByBase;
+    Map<String, String>? diskFilesIndexByRel;
+    Map<String, String>? diskFilesIndexById;
+
+    InputFileStream? inputStream;
+    Archive? archive;
+    if (backupPath != null) {
+      try {
+        inputStream = InputFileStream(backupPath);
+        archive = ZipDecoder().decodeStream(inputStream);
+        final byBase = <String, ArchiveFile>{};
+        final byRel = <String, ArchiveFile>{};
+        final byId = <String, ArchiveFile>{};
+        final uuidLike = RegExp(r'^[0-9a-fA-F-]{10,}$');
+        for (final e in archive) {
+          if (!e.isFile) continue;
+          final norm = _normalizeZipEntryPath(e.name);
+          final base = p.basename(norm);
+          byBase[base] = e;
+          final l = norm.toLowerCase();
+          int idx = l.indexOf('/data/files/');
+          if (idx != -1) {
+            byRel[l.substring(idx + 1)] = e;
+          }
+          idx = l.indexOf('/files/');
+          if (idx != -1) {
+            byRel[l.substring(idx + 1)] = e;
+          }
+          final noExt = base.contains('.')
+              ? base.substring(0, base.lastIndexOf('.'))
+              : base;
+          if (uuidLike.hasMatch(noExt)) {
+            byId[noExt] = e;
+          }
+        }
+        if (byBase.isNotEmpty) filesIndexByBase = byBase;
+        if (byRel.isNotEmpty) filesIndexByRel = byRel;
+        if (byId.isNotEmpty) filesIndexById = byId;
+      } catch (_) {
+        // not a zip, ignore
+        archive = null;
+        try {
+          inputStream?.closeSync();
+        } catch (_) {}
+        inputStream = null;
+      }
+
+      try {
+        final parent = Directory(p.dirname(backupPath));
+        final candidates = <Directory>[
+          Directory(p.join(parent.path, 'Data', 'Files')),
+          Directory(p.join(parent.path, 'Files')),
+          Directory(p.join(parent.path, 'files')),
+        ];
+        final byBase = <String, String>{};
+        final byRel = <String, String>{};
+        final byId = <String, String>{};
+        final uuidLike = RegExp(r'^[0-9a-fA-F-]{10,}$');
+        for (final dir in candidates) {
+          if (!dir.existsSync()) continue;
+          for (final ent in dir.listSync(recursive: true, followLinks: false)) {
+            if (ent is! File) continue;
+            final abs = ent.path;
+            final base = p.basename(abs);
+            byBase[base] = abs;
+            final l = _normalizeZipEntryPath(abs).toLowerCase();
+            int idx = l.indexOf('/data/files/');
+            if (idx != -1) {
+              byRel[l.substring(idx + 1)] = abs;
+            }
+            idx = l.indexOf('/files/');
+            if (idx != -1) {
+              byRel[l.substring(idx + 1)] = abs;
+            }
+            final noExt = base.contains('.')
+                ? base.substring(0, base.lastIndexOf('.'))
+                : base;
+            if (uuidLike.hasMatch(noExt)) {
+              byId[noExt] = abs;
+            }
+          }
+        }
+        if (byBase.isNotEmpty) diskFilesIndexByBase = byBase;
+        if (byRel.isNotEmpty) diskFilesIndexByRel = byRel;
+        if (byId.isNotEmpty) diskFilesIndexById = byId;
+      } catch (_) {}
+    }
+
+    try {
+      final result = <String, String>{};
+      for (final id in usedIds) {
+        final meta = filesById[id];
+        if (meta == null) continue;
+        final name = (meta['origin_name'] ?? meta['name'] ?? 'file').toString();
+        final ext = (meta['ext'] ?? '').toString();
+        final safeName = name.replaceAll(RegExp(r'[/\\\0]'), '_');
+        final fn = safeName.isNotEmpty
+            ? safeName
+            : (ext.isNotEmpty ? 'file.$ext' : 'file');
+        // `id` comes straight from the imported archive's JSON. Sanitize it
+        // like the display name: an id such as `x/../../y` would otherwise
+        // escape the upload directory on Windows, whose Win32 path
+        // normalization resolves `..` lexically without requiring the
+        // intermediate directory to exist.
+        final safeId = id.replaceAll(RegExp(r'[/\\\0]'), '_');
+        final fileName = 'cherry_${safeId}_$fn';
+        final outPath = p.join(uploadDirPath, fileName);
+        // Defense in depth: never write outside the upload directory even if
+        // a future refactor weakens the sanitization above.
+        if (!p.isWithin(p.normalize(uploadDirPath), p.normalize(outPath))) {
+          continue;
+        }
+
+        if (File(outPath).existsSync()) {
+          result[id] = outPath;
+          continue;
+        }
+
+        final base64Str = (meta['base64'] ?? '') as String;
+        final contentStr = (meta['content'] ?? '') as String;
+        try {
+          if (base64Str.isNotEmpty) {
+            String b64 = base64Str;
+            final idx = b64.indexOf('base64,');
+            if (idx != -1) b64 = b64.substring(idx + 7);
+            File(outPath).writeAsBytesSync(base64.decode(b64));
+            result[id] = outPath;
+            continue;
+          }
+        } catch (_) {}
+
+        try {
+          if (contentStr.isNotEmpty) {
+            File(outPath).writeAsStringSync(contentStr);
+            result[id] = outPath;
+            continue;
+          }
+        } catch (_) {}
+
+        try {
+          final mp = (meta['path'] ?? '').toString();
+          if (mp.isNotEmpty) {
+            String rel = _normalizeZipEntryPath(mp).trim();
+            if (rel.startsWith('file://')) {
+              rel = rel.substring('file://'.length);
+            }
+            if (rel.startsWith('/')) rel = rel.substring(1);
+            final lowerRel = rel.toLowerCase();
+            final relKeys = <String>{
+              lowerRel,
+              lowerRel.startsWith('files/') ? lowerRel : 'files/$lowerRel',
+              lowerRel.startsWith('data/files/')
+                  ? lowerRel
+                  : 'data/files/$lowerRel',
+            };
+            var done = false;
+            for (final key in relKeys) {
+              if (!done &&
+                  filesIndexByRel != null &&
+                  filesIndexByRel.containsKey(key)) {
+                if (_writeArchiveEntryToFile(filesIndexByRel[key]!, outPath)) {
+                  result[id] = outPath;
+                  done = true;
+                }
+              }
+              if (!done &&
+                  diskFilesIndexByRel != null &&
+                  diskFilesIndexByRel.containsKey(key)) {
+                if (_copyDiskFileToUpload(diskFilesIndexByRel[key]!, outPath)) {
+                  result[id] = outPath;
+                  done = true;
+                }
+              }
+              if (done) break;
+            }
+            if (done) continue;
+          }
+        } catch (_) {}
+
+        try {
+          final candidates = <String>{};
+          void add(String? s) {
+            if (s != null && s.trim().isNotEmpty) {
+              candidates.add(p.basename(s));
+            }
+          }
+
+          add(meta['name']?.toString());
+          add(meta['origin_name']?.toString());
+          add(meta['path']?.toString());
+          var done = false;
+          for (final base in candidates) {
+            if (!done &&
+                filesIndexByBase != null &&
+                filesIndexByBase.containsKey(base)) {
+              if (_writeArchiveEntryToFile(filesIndexByBase[base]!, outPath)) {
+                result[id] = outPath;
+                done = true;
+              }
+            }
+            if (!done &&
+                diskFilesIndexByBase != null &&
+                diskFilesIndexByBase.containsKey(base)) {
+              if (_copyDiskFileToUpload(diskFilesIndexByBase[base]!, outPath)) {
+                result[id] = outPath;
+                done = true;
+              }
+            }
+            if (done) break;
+          }
+          if (done) continue;
+        } catch (_) {}
+
+        try {
+          String fileExt = (meta['ext'] ?? '').toString().trim();
+          if (fileExt.isEmpty) {
+            final n = (meta['name'] ?? '').toString();
+            final b = p.basename(n);
+            if (b.contains('.')) fileExt = b.substring(b.lastIndexOf('.') + 1);
+          }
+          final extNoDot = fileExt.startsWith('.')
+              ? fileExt.substring(1)
+              : fileExt;
+          final idPlus = extNoDot.isNotEmpty ? '$id.$extNoDot' : id;
+          if (filesIndexById != null && filesIndexById.containsKey(id)) {
+            if (_writeArchiveEntryToFile(filesIndexById[id]!, outPath)) {
+              result[id] = outPath;
+              continue;
+            }
+          }
+          if (filesIndexByBase != null &&
+              filesIndexByBase.containsKey(idPlus)) {
+            if (_writeArchiveEntryToFile(filesIndexByBase[idPlus]!, outPath)) {
+              result[id] = outPath;
+              continue;
+            }
+          }
+          if (diskFilesIndexById != null &&
+              diskFilesIndexById.containsKey(id)) {
+            if (_copyDiskFileToUpload(diskFilesIndexById[id]!, outPath)) {
+              result[id] = outPath;
+              continue;
+            }
+          }
+          if (diskFilesIndexByBase != null &&
+              diskFilesIndexByBase.containsKey(idPlus)) {
+            if (_copyDiskFileToUpload(diskFilesIndexByBase[idPlus]!, outPath)) {
+              result[id] = outPath;
+              continue;
+            }
+          }
+        } catch (_) {}
+      }
+      return result;
+    } finally {
+      try {
+        archive?.clearSync();
+      } catch (_) {}
+      try {
+        inputStream?.closeSync();
+      } catch (_) {}
+    }
+  }
+
+  /// ZIP entry names and on-disk paths may use `\` (Windows) or `/`.
+  static String _normalizeZipEntryPath(String name) {
+    return name.replaceAll('\\', '/');
+  }
+
+  static bool _writeArchiveEntryToFile(ArchiveFile entry, String outPath) {
+    final output = _ExactSizeOutputFileStream(
+      outPath,
+      expectedBytes: entry.size,
+    );
+    var written = false;
+    try {
+      entry.writeContent(output);
+      output.verifyComplete();
+      written = true;
+    } catch (_) {
+      // Partial writes are cleaned up below, once the stream is closed.
+    } finally {
+      output.closeSync();
+    }
+    if (!written) {
+      try {
+        File(outPath).deleteSync();
+      } catch (_) {}
+      return false;
+    }
+    // The disk-copy fallback preserves source timestamps; keep both in step.
+    final dt = _decodeDosDateTime(entry.lastModTime);
+    if (dt != null) {
+      try {
+        File(outPath).setLastModifiedSync(dt);
+      } catch (_) {}
+    }
+    return true;
+  }
+
+  /// Decode a DOS date/time packed value (from a ZIP entry's `lastModTime`)
+  /// into a [DateTime]. Returns null when the date portion is zero (unset).
   static DateTime? _decodeDosDateTime(int packed) {
     final dosDate = packed >> 16;
     final dosTime = packed & 0xFFFF;
@@ -635,313 +1148,17 @@ class CherryImporter {
     }
   }
 
-  static Future<Map<String, String>> _materializeFiles(
-    Map<String, Map<String, dynamic>> filesById,
-    Set<String> usedIds, {
-    File? backupArchive,
-  }) async {
-    final uploadDir = await AppDirectories.getUploadDirectory();
-    if (!await uploadDir.exists()) await uploadDir.create(recursive: true);
-
-    // If a ZIP is provided, index entries under common folders for quick lookup
-    Map<String, ArchiveFile>? filesIndexByBase;
-    Map<String, ArchiveFile>?
-    filesIndexByRel; // normalized rel path like files/x.pdf or data/files/uuid.png
-    Map<String, ArchiveFile>? filesIndexById; // id (without ext) -> entry
-    Map<String, String>?
-    diskFilesIndexByBase; // basename -> absolute path (if importing from extracted folder)
-    Map<String, String>?
-    diskFilesIndexByRel; // normalized rel path -> absolute path
-    Map<String, String>?
-    diskFilesIndexById; // id (without ext) -> absolute path
-    if (backupArchive != null) {
+  static bool _copyDiskFileToUpload(String srcPath, String outPath) {
+    try {
+      final src = File(srcPath);
+      src.copySync(outPath);
       try {
-        final bytes = await backupArchive.readAsBytes();
-        final archive = ZipDecoder().decodeBytes(bytes, verify: false);
-        final byBase = <String, ArchiveFile>{};
-        final byRel = <String, ArchiveFile>{};
-        final byId = <String, ArchiveFile>{};
-        final uuidLike = RegExp(r'^[0-9a-fA-F-]{10,}$');
-        for (final e in archive) {
-          if (!e.isFile) continue;
-          final norm = e.name.replaceAll('\\\\', '/');
-          final base = p.basename(norm);
-          // by basename
-          byBase[base] = e;
-          // by normalized rel under common roots
-          final l = norm.toLowerCase();
-          int idx = l.indexOf('/data/files/');
-          if (idx != -1) {
-            final rel = l.substring(idx + 1);
-            byRel[rel] = e;
-          }
-          idx = l.indexOf('/files/');
-          if (idx != -1) {
-            final rel = l.substring(idx + 1);
-            byRel[rel] = e;
-          }
-          // by id without ext
-          final noExt = base.contains('.')
-              ? base.substring(0, base.lastIndexOf('.'))
-              : base;
-          if (uuidLike.hasMatch(noExt)) {
-            byId[noExt] = e;
-          }
-        }
-        if (byBase.isNotEmpty) filesIndexByBase = byBase;
-        if (byRel.isNotEmpty) filesIndexByRel = byRel;
-        if (byId.isNotEmpty) filesIndexById = byId;
-      } catch (_) {
-        // not a zip, ignore
-      }
-      // Also try sibling directories when importing from an extracted folder
-      try {
-        final parent = Directory(p.dirname(backupArchive.path));
-        final candidates = <Directory>[
-          Directory(p.join(parent.path, 'Data', 'Files')),
-          Directory(p.join(parent.path, 'Files')),
-          Directory(p.join(parent.path, 'files')),
-        ];
-        final byBase = <String, String>{};
-        final byRel = <String, String>{};
-        final byId = <String, String>{};
-        final uuidLike = RegExp(r'^[0-9a-fA-F-]{10,}$');
-        for (final dir in candidates) {
-          if (!await dir.exists()) continue;
-          for (final ent in dir.listSync(recursive: true, followLinks: false)) {
-            if (ent is! File) continue;
-            final abs = ent.path;
-            final base = p.basename(abs);
-            byBase[base] = abs;
-            final l = abs.replaceAll('\\\\', '/').toLowerCase();
-            int idx = l.indexOf('/data/files/');
-            if (idx != -1) {
-              final rel = l.substring(idx + 1);
-              byRel[rel] = abs;
-            }
-            idx = l.indexOf('/files/');
-            if (idx != -1) {
-              final rel = l.substring(idx + 1);
-              byRel[rel] = abs;
-            }
-            final noExt = base.contains('.')
-                ? base.substring(0, base.lastIndexOf('.'))
-                : base;
-            if (uuidLike.hasMatch(noExt)) {
-              byId[noExt] = abs;
-            }
-          }
-        }
-        if (byBase.isNotEmpty) diskFilesIndexByBase = byBase;
-        if (byRel.isNotEmpty) diskFilesIndexByRel = byRel;
-        if (byId.isNotEmpty) diskFilesIndexById = byId;
+        File(outPath).setLastModifiedSync(src.lastModifiedSync());
       } catch (_) {}
+      return true;
+    } catch (_) {
+      return false;
     }
-
-    final result = <String, String>{};
-    for (final id in usedIds) {
-      final meta = filesById[id];
-      if (meta == null) continue;
-      final name = (meta['origin_name'] ?? meta['name'] ?? 'file').toString();
-      final ext = (meta['ext'] ?? '').toString();
-      final safeName = name.replaceAll(RegExp(r'[/\\\0]'), '_');
-      final fn = safeName.isNotEmpty
-          ? safeName
-          : (ext.isNotEmpty ? 'file.$ext' : 'file');
-      final fileName = 'cherry_${id}_$fn';
-      final outPath = p.join(uploadDir.path, fileName);
-
-      // If already written, reuse path
-      if (await File(outPath).exists()) {
-        result[id] = outPath;
-        continue;
-      }
-
-      // Prefer base64 -> content -> archive(Data/Files) -> url (url not downloaded)
-      final base64Str = (meta['base64'] ?? '') as String;
-      final contentStr = (meta['content'] ?? '') as String;
-      try {
-        if (base64Str.isNotEmpty) {
-          // Strip data URL prefix if present
-          String b64 = base64Str;
-          final idx = b64.indexOf('base64,');
-          if (idx != -1) b64 = b64.substring(idx + 7);
-          final bytes = base64.decode(b64);
-          await File(outPath).writeAsBytes(bytes);
-          result[id] = outPath;
-          continue;
-        }
-      } catch (_) {}
-
-      try {
-        if (contentStr.isNotEmpty) {
-          await File(outPath).writeAsString(contentStr);
-          result[id] = outPath;
-          continue;
-        }
-      } catch (_) {}
-
-      // Try from archive/disk using multiple strategies
-      // 1) by normalized rel path from meta.path
-      try {
-        final mp = (meta['path'] ?? '').toString();
-        if (mp.isNotEmpty) {
-          String rel = mp.replaceAll('\\\\', '/').trim();
-          if (rel.startsWith('file://')) rel = rel.substring('file://'.length);
-          if (rel.startsWith('/')) rel = rel.substring(1);
-          final lowerRel = rel.toLowerCase();
-          final relKeys = <String>{
-            lowerRel,
-            lowerRel.startsWith('files/') ? lowerRel : 'files/$lowerRel',
-            lowerRel.startsWith('data/files/')
-                ? lowerRel
-                : 'data/files/$lowerRel',
-          };
-          bool done = false;
-          for (final key in relKeys) {
-            if (!done &&
-                filesIndexByRel != null &&
-                filesIndexByRel.containsKey(key)) {
-              final entry = filesIndexByRel[key]!;
-              final bytes = entry.content as List<int>;
-              await File(outPath).writeAsBytes(bytes);
-              result[id] = outPath;
-              done = true;
-              final dt = _decodeDosDateTime(entry.lastModTime);
-              if (dt != null) {
-                try {
-                  await File(outPath).setLastModified(dt);
-                } catch (_) {}
-              }
-            }
-            if (!done &&
-                diskFilesIndexByRel != null &&
-                diskFilesIndexByRel.containsKey(key)) {
-              final src = diskFilesIndexByRel[key]!;
-              final bytes = await File(src).readAsBytes();
-              await File(outPath).writeAsBytes(bytes);
-              result[id] = outPath;
-              done = true;
-              try {
-                await File(
-                  outPath,
-                ).setLastModified(await File(src).lastModified());
-              } catch (_) {}
-            }
-            if (done) break;
-          }
-          if (done) continue;
-        }
-      } catch (_) {}
-
-      // 2) by filename candidates: name, origin_name, basename(path)
-      try {
-        final candidates = <String>{};
-        void add(String? s) {
-          if (s != null && s.trim().isNotEmpty) candidates.add(p.basename(s));
-        }
-
-        add(meta['name']?.toString());
-        add(meta['origin_name']?.toString());
-        add(meta['path']?.toString());
-        bool done = false;
-        for (final base in candidates) {
-          if (!done &&
-              filesIndexByBase != null &&
-              filesIndexByBase.containsKey(base)) {
-            final entry = filesIndexByBase[base]!;
-            final bytes = entry.content as List<int>;
-            await File(outPath).writeAsBytes(bytes);
-            result[id] = outPath;
-            done = true;
-            final dt = _decodeDosDateTime(entry.lastModTime);
-            if (dt != null) {
-              try {
-                await File(outPath).setLastModified(dt);
-              } catch (_) {}
-            }
-          }
-          if (!done &&
-              diskFilesIndexByBase != null &&
-              diskFilesIndexByBase.containsKey(base)) {
-            final src = diskFilesIndexByBase[base]!;
-            final bytes = await File(src).readAsBytes();
-            await File(outPath).writeAsBytes(bytes);
-            result[id] = outPath;
-            done = true;
-            try {
-              await File(
-                outPath,
-              ).setLastModified(await File(src).lastModified());
-            } catch (_) {}
-          }
-          if (done) break;
-        }
-        if (done) continue;
-      } catch (_) {}
-
-      // 3) by id + ext
-      try {
-        String ext = (meta['ext'] ?? '').toString().trim();
-        if (ext.isEmpty) {
-          final n = (meta['name'] ?? '').toString();
-          final b = p.basename(n);
-          if (b.contains('.')) ext = b.substring(b.lastIndexOf('.') + 1);
-        }
-        final extNoDot = ext.startsWith('.') ? ext.substring(1) : ext;
-        final idPlus = extNoDot.isNotEmpty ? '$id.$extNoDot' : id;
-        if (filesIndexById != null && filesIndexById.containsKey(id)) {
-          final entry = filesIndexById[id]!;
-          final bytes = entry.content as List<int>;
-          await File(outPath).writeAsBytes(bytes);
-          result[id] = outPath;
-          final dt = _decodeDosDateTime(entry.lastModTime);
-          if (dt != null) {
-            try {
-              await File(outPath).setLastModified(dt);
-            } catch (_) {}
-          }
-          continue;
-        }
-        if (filesIndexByBase != null && filesIndexByBase.containsKey(idPlus)) {
-          final entry = filesIndexByBase[idPlus]!;
-          final bytes = entry.content as List<int>;
-          await File(outPath).writeAsBytes(bytes);
-          result[id] = outPath;
-          final dt = _decodeDosDateTime(entry.lastModTime);
-          if (dt != null) {
-            try {
-              await File(outPath).setLastModified(dt);
-            } catch (_) {}
-          }
-          continue;
-        }
-        if (diskFilesIndexById != null && diskFilesIndexById.containsKey(id)) {
-          final src = diskFilesIndexById[id]!;
-          final bytes = await File(src).readAsBytes();
-          await File(outPath).writeAsBytes(bytes);
-          result[id] = outPath;
-          try {
-            await File(outPath).setLastModified(await File(src).lastModified());
-          } catch (_) {}
-          continue;
-        }
-        if (diskFilesIndexByBase != null &&
-            diskFilesIndexByBase.containsKey(idPlus)) {
-          final src = diskFilesIndexByBase[idPlus]!;
-          final bytes = await File(src).readAsBytes();
-          await File(outPath).writeAsBytes(bytes);
-          result[id] = outPath;
-          try {
-            await File(outPath).setLastModified(await File(src).lastModified());
-          } catch (_) {}
-          continue;
-        }
-      } catch (_) {}
-
-      // If neither available, we cannot materialize this file; skip (message will fall back to URL/none)
-    }
-    return result;
   }
 
   // Returns (conversations, messages, extraFilesSaved)
@@ -958,15 +1175,13 @@ class CherryImporter {
     if (!chatService.initialized) await chatService.init();
 
     // Build map of existing conv ids for merge
-    final existingConvs = chatService.getAllConversations();
+    final existingConvs = chatService.getAllCompleteConversations();
     final existingConvIds = existingConvs.map((c) => c.id).toSet();
     final existingMsgIds = <String>{};
     if (mode == RestoreMode.merge) {
+      // Ids only: full message loads would flush the LRU cache for no gain.
       for (final c in existingConvs) {
-        final msgs = chatService.getMessages(c.id);
-        for (final m in msgs) {
-          existingMsgIds.add(m.id);
-        }
+        existingMsgIds.addAll(await chatService.getMessageIds(c.id));
       }
     }
 
@@ -1041,9 +1256,9 @@ class CherryImporter {
         );
         final totalTokens = (usage?['total_tokens'] as num?)?.toInt();
 
-        // Attachments -> appended as user-style markers or assistant markdown
+        // Attachments -> structured ImagePart/FilePart (no mid-pipeline markers)
         final files = (m['files'] as List?) ?? const <dynamic>[];
-        final attachmentLines = <String>[];
+        final attachmentParts = <MessagePart>[];
         for (final f in files) {
           if (f is! Map) continue;
           final fid = (f['id'] ?? '').toString();
@@ -1051,25 +1266,57 @@ class CherryImporter {
           final name = (f['origin_name'] ?? f['name'] ?? 'file').toString();
           final mime = (f['type'] ?? '').toString();
           final savedPath = filePaths[fid];
+          final isImageByMeta =
+              mime.toLowerCase().startsWith('image') ||
+              (name.toLowerCase().contains('.') &&
+                  RegExp(
+                    r"\.(png|jpg|jpeg|gif|webp)",
+                  ).hasMatch(name.toLowerCase()));
           if (savedPath != null && savedPath.isNotEmpty) {
-            final isImage =
-                mime.toLowerCase().startsWith('image') ||
-                (name.toLowerCase().contains('.') &&
-                    RegExp(
-                      r"\.(png|jpg|jpeg|gif|webp)",
-                    ).hasMatch(name.toLowerCase()));
-            attachmentLines.add(
-              _formatAttachmentLine(role, isImage, savedPath, name, mime),
+            attachmentParts.add(
+              _attachmentPart(
+                isImage: isImageByMeta,
+                target: savedPath,
+                name: name,
+                mime: mime,
+              ),
             );
           } else {
             // Fallback to URL if present (no download)
             final url = (f['url'] ?? '').toString();
             if (url.isNotEmpty) {
-              final isImage = url.toLowerCase().contains(
-                RegExp(r"\.(png|jpg|jpeg|gif|webp)$"),
+              // Trust known image MIME even on extensionless / presigned URLs.
+              final lowerUrl = url.toLowerCase();
+              final isImage =
+                  mime.toLowerCase().startsWith('image/') ||
+                  RegExp(
+                    r'\.(png|jpg|jpeg|gif|webp)(?:$|[?#])',
+                  ).hasMatch(lowerUrl);
+              attachmentParts.add(
+                _attachmentPart(
+                  isImage: isImage,
+                  target: url,
+                  name: name,
+                  mime: mime,
+                ),
               );
-              attachmentLines.add(
-                _formatAttachmentLine(role, isImage, url, name, mime),
+            } else {
+              // Archive file missing and no URL — keep an unavailable part so
+              // the attachment is not silently dropped from history.
+              // Prefer an archive-relative origin path when present; otherwise a
+              // stable non-empty placeholder (uri must not be empty).
+              final originPath = (f['path'] ?? '').toString().trim();
+              final placeholder = originPath.isNotEmpty
+                  ? originPath
+                  : 'cherry-missing:$fid';
+              attachmentParts.add(
+                _attachmentPart(
+                  isImage: isImageByMeta,
+                  target: placeholder,
+                  name: name,
+                  mime: mime,
+                  unavailable: true,
+                ),
               );
             }
           }
@@ -1082,41 +1329,71 @@ class CherryImporter {
         for (final ref in extraAtt) {
           if (ref.fileId != null) {
             final savedPath = filePaths[ref.fileId!];
-            if (savedPath != null) {
-              attachmentLines.add(
-                _formatAttachmentLine(
-                  role,
-                  ref.isImage,
-                  savedPath,
-                  ref.name ?? (ref.isImage ? 'image' : 'file'),
-                  ref.mime ??
-                      (ref.isImage ? 'image/png' : 'application/octet-stream'),
+            final fileName = ref.name ?? (ref.isImage ? 'image' : 'file');
+            final fileMime =
+                ref.mime ??
+                (ref.isImage ? 'image/png' : 'application/octet-stream');
+            if (savedPath != null && savedPath.isNotEmpty) {
+              attachmentParts.add(
+                _attachmentPart(
+                  isImage: ref.isImage,
+                  target: savedPath,
+                  name: fileName,
+                  mime: fileMime,
+                ),
+              );
+            } else {
+              // Same contract as m['files']: keep an unavailable placeholder
+              // when the archive file is missing.
+              final originPath = (ref.originPath ?? '').trim();
+              final placeholder = originPath.isNotEmpty
+                  ? originPath
+                  : 'cherry-missing:${ref.fileId}';
+              attachmentParts.add(
+                _attachmentPart(
+                  isImage: ref.isImage,
+                  target: placeholder,
+                  name: fileName,
+                  mime: fileMime,
+                  unavailable: true,
                 ),
               );
             }
           } else if (ref.dataUrl != null) {
             final savedPath = await _saveDataUrlToUpload(ref.dataUrl!);
+            final fileName = ref.name ?? (ref.isImage ? 'image' : 'file');
+            final fileMime =
+                ref.mime ??
+                (ref.isImage ? 'image/png' : 'application/octet-stream');
             if (savedPath != null) {
               extraSaved += 1;
-              attachmentLines.add(
-                _formatAttachmentLine(
-                  role,
-                  ref.isImage,
-                  savedPath,
-                  ref.name ?? (ref.isImage ? 'image' : 'file'),
-                  ref.mime ??
-                      (ref.isImage ? 'image/png' : 'application/octet-stream'),
+              attachmentParts.add(
+                _attachmentPart(
+                  isImage: ref.isImage,
+                  target: savedPath,
+                  name: fileName,
+                  mime: fileMime,
+                ),
+              );
+            } else {
+              attachmentParts.add(
+                _attachmentPart(
+                  isImage: ref.isImage,
+                  target: 'cherry-missing:data-url',
+                  name: fileName,
+                  mime: fileMime,
+                  unavailable: true,
                 ),
               );
             }
           } else if (ref.url != null && ref.url!.isNotEmpty) {
-            attachmentLines.add(
-              _formatAttachmentLine(
-                role,
-                ref.isImage,
-                ref.url!,
-                ref.name ?? (ref.isImage ? 'image' : 'file'),
-                ref.mime ??
+            attachmentParts.add(
+              _attachmentPart(
+                isImage: ref.isImage,
+                target: ref.url!,
+                name: ref.name ?? (ref.isImage ? 'image' : 'file'),
+                mime:
+                    ref.mime ??
                     (ref.isImage ? 'image/png' : 'application/octet-stream'),
               ),
             );
@@ -1139,19 +1416,23 @@ class CherryImporter {
               final saved = await _saveDataUrlToUpload(s);
               if (saved != null) {
                 extraSaved += 1;
-                attachmentLines.add(
-                  _formatAttachmentLine(
-                    role,
-                    true,
-                    saved,
-                    'image',
-                    'image/png',
+                attachmentParts.add(
+                  _attachmentPart(
+                    isImage: true,
+                    target: saved,
+                    name: 'image',
+                    mime: 'image/png',
                   ),
                 );
               }
             } else if (s.startsWith('http://') || s.startsWith('https://')) {
-              attachmentLines.add(
-                _formatAttachmentLine(role, true, s, 'image', 'image/png'),
+              attachmentParts.add(
+                _attachmentPart(
+                  isImage: true,
+                  target: s,
+                  name: 'image',
+                  mime: 'image/png',
+                ),
               );
             } else {
               // raw base64 without prefix
@@ -1160,13 +1441,12 @@ class CherryImporter {
               );
               if (saved != null) {
                 extraSaved += 1;
-                attachmentLines.add(
-                  _formatAttachmentLine(
-                    role,
-                    true,
-                    saved,
-                    'image',
-                    'image/png',
+                attachmentParts.add(
+                  _attachmentPart(
+                    isImage: true,
+                    target: saved,
+                    name: 'image',
+                    mime: 'image/png',
                   ),
                 );
               }
@@ -1182,13 +1462,12 @@ class CherryImporter {
               final saved = await _saveDataUrlToUpload(du);
               if (saved != null) {
                 extraSaved += 1;
-                attachmentLines.add(
-                  _formatAttachmentLine(
-                    role,
-                    true,
-                    saved,
-                    'image',
-                    'image/png',
+                attachmentParts.add(
+                  _attachmentPart(
+                    isImage: true,
+                    target: saved,
+                    name: 'image',
+                    mime: 'image/png',
                   ),
                 );
               }
@@ -1197,17 +1476,13 @@ class CherryImporter {
             content = _stripDataImageUrls(content);
           }
         }
-        final mergedContent = attachmentLines.isEmpty
-            ? content
-            : (content.isEmpty
-                  ? attachmentLines.join('\n')
-                  : '$content\n${attachmentLines.join('\n')}');
+        final parts = <MessagePart>[TextPart(content), ...attachmentParts];
 
         messages.add(
           ChatMessage(
             id: msgId,
             role: role,
-            content: mergedContent,
+            parts: parts,
             timestamp: ts,
             modelId: modelId,
             providerId: providerId,
@@ -1249,29 +1524,27 @@ class CherryImporter {
     return (convCount, msgCount, extraSaved);
   }
 
-  static String _formatAttachmentLine(
-    String role,
-    bool isImage,
-    String target,
-    String name,
-    String mime,
-  ) {
-    if (role == 'assistant') {
-      if (isImage) {
-        return '![]($target)';
-      } else {
-        final label = (name.isNotEmpty ? name : 'file');
-        return '[$label]($target)';
-      }
-    } else {
-      if (isImage) {
-        return '[image:$target]';
-      } else {
-        final m = (mime.isEmpty ? 'application/octet-stream' : mime);
-        final label = (name.isNotEmpty ? name : 'file');
-        return '[file:$target|$label|$m]';
-      }
+  static MessagePart _attachmentPart({
+    required bool isImage,
+    required String target,
+    required String name,
+    required String mime,
+    bool unavailable = false,
+  }) {
+    final uri = SandboxPathResolver.canonicalize(target);
+    if (isImage) {
+      return ImagePart(
+        uri: uri,
+        mime: mime.isNotEmpty ? mime : null,
+        unavailable: unavailable,
+      );
     }
+    return FilePart(
+      uri: uri,
+      name: name.isNotEmpty ? name : 'file',
+      mime: mime.isNotEmpty ? mime : 'application/octet-stream',
+      unavailable: unavailable,
+    );
   }
 
   static List<String> _extractDataImageUrls(String text) {
@@ -1331,12 +1604,62 @@ class CherryImporter {
   }
 }
 
+/// Verifies an archive entry wrote exactly [expectedBytes].
+class _ExactSizeOutputFileStream extends OutputFileStream {
+  _ExactSizeOutputFileStream(String path, {required this.expectedBytes})
+    : super.withFileHandle(FileHandle(path, mode: FileAccess.write));
+
+  final int expectedBytes;
+  int _writtenBytes = 0;
+
+  void _reserve(int bytes) {
+    if (bytes < 0 || _writtenBytes + bytes > expectedBytes) {
+      throw const FormatException('zip_entry_size');
+    }
+    _writtenBytes += bytes;
+  }
+
+  @override
+  void writeByte(int value) {
+    _reserve(1);
+    super.writeByte(value);
+  }
+
+  @override
+  void writeBytes(List<int> bytes, {int? length}) {
+    final writeLength = length ?? bytes.length;
+    if (writeLength < 0 || writeLength > bytes.length) {
+      throw RangeError.range(writeLength, 0, bytes.length, 'length');
+    }
+    _reserve(writeLength);
+    super.writeBytes(bytes, length: writeLength);
+  }
+
+  @override
+  void writeStream(InputStream stream) {
+    const chunkSize = 1024 * 1024;
+    while (!stream.isEOS) {
+      final readSize = stream.length < chunkSize ? stream.length : chunkSize;
+      final bytes = stream.readBytes(readSize).toUint8List();
+      if (bytes.isEmpty) break;
+      writeBytes(bytes);
+    }
+  }
+
+  void verifyComplete() {
+    if (_writtenBytes != expectedBytes) {
+      throw const FormatException('zip_entry_size');
+    }
+  }
+}
+
 class _PendingAttachmentRef {
   final String? fileId; // if present, resolve via filePaths
   final String? dataUrl; // if present, save as file
   final String? url; // remote url
   final String? name;
   final String? mime;
+  final String? originPath; // archive-relative path when available
   final bool isImage;
   const _PendingAttachmentRef({
     this.fileId,
@@ -1344,6 +1667,7 @@ class _PendingAttachmentRef {
     this.url,
     this.name,
     this.mime,
+    this.originPath,
     this.isImage = true,
   });
 }

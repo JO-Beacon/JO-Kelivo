@@ -1,16 +1,33 @@
-﻿<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+ <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+     xmlns:tools="http://schemas.android.com/tools">
     <!-- Photo access for picking images -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.VIBRATE"/>
+    <!-- Microphone access for voice input waveform -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Foreground service + notifications for background execution (Android only) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+     <!-- Assistant local tools: calendar query/create -->
+     <uses-permission android:name="android.permission.READ_CALENDAR" />
+     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
+     <!-- Assistant local tools: screen time. Special permission granted by the
+          user via the 'Usage access' settings page (opened by the tool). -->
+     <uses-permission
+         android:name="android.permission.PACKAGE_USAGE_STATS"
+         tools:ignore="ProtectedPermissions" />
+    <!-- OS auto-backup/device-transfer can restore a partial SQLite file
+         family (db without -wal, receipt without db), which the fail-closed
+         startup gate rejects. Kelivo ships its own backup (WebDAV/S3/local
+         export), so system backup is disabled. -->
     <application
-        android:label="JO-Kelivo"
+        android:label="Kelivo"
         android:name="${applicationName}"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
         android:usesCleartextTraffic="true"
         android:requestLegacyExternalStorage="true"
         android:icon="@mipmap/ic_launcher">
@@ -41,6 +58,21 @@
                 <data android:mimeType="text/plain"/>
             </intent-filter>
         </activity>
+        <activity
+            android:name=".McpOAuthCallbackActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="psyche.kelivo" android:host="mcp-oauth-callback"/>
+            </intent-filter>
+        </activity>
         <!-- Foreground service to keep Flutter isolate alive for background generation -->
         <service
             android:name="de.julianassmann.flutter_background.IsolateHolderService"
@@ -69,6 +101,10 @@
         <!-- Allow querying TTS service on Android 11+ -->
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+        <!-- Allow checking whether a system speech recognizer is installed. -->
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
         </intent>
     </queries>
 </manifest>

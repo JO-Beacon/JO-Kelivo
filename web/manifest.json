@@ -1,6 +1,6 @@
-﻿{
-    "name": "JO-Kelivo",
-    "short_name": "JO-Kelivo",
+{
+    "name": "kelivo",
+    "short_name": "kelivo",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#FFFFFF",

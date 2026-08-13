@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/features/home/controllers/chat_actions.dart';
@@ -20,6 +23,149 @@ ChatMessage _message({
 }
 
 void main() {
+  test('unlimited context reads the complete persisted conversation', () {
+    expect(
+      ChatActions.contextReadLimit(
+        assistant: const Assistant(
+          id: 'assistant-1',
+          name: 'Unlimited',
+          limitContextMessages: false,
+        ),
+        persistedMessageCount: 1507,
+      ),
+      1507,
+    );
+    expect(
+      ChatActions.contextReadLimit(
+        assistant: const Assistant(
+          id: 'assistant-1',
+          name: 'Limited',
+          contextMessageSize: 64,
+          limitContextMessages: true,
+        ),
+        persistedMessageCount: 1507,
+      ),
+      64,
+    );
+    // Default assistants leave context unlimited (D-30 / 5d42eebc).
+    expect(
+      ChatActions.contextReadLimit(
+        assistant: const Assistant(
+          id: 'assistant-1',
+          name: 'Default unlimited',
+          contextMessageSize: 64,
+        ),
+        persistedMessageCount: 1507,
+      ),
+      1507,
+    );
+    expect(
+      ChatActions.contextReadLimit(
+        assistant: const Assistant(
+          id: 'assistant-1',
+          name: 'Unlimited with missing count',
+          limitContextMessages: false,
+        ),
+        persistedMessageCount: 0,
+      ),
+      Assistant.maxContextMessageSize,
+    );
+  });
+
+  test('unknown sentinel must not be passed into contextReadLimit', () {
+    expect(
+      () => ChatActions.contextReadLimit(
+        assistant: const Assistant(
+          id: 'assistant-1',
+          name: 'Unlimited',
+          limitContextMessages: false,
+        ),
+        persistedMessageCount: -1,
+      ),
+      throwsA(isA<AssertionError>()),
+    );
+  });
+
+  test(
+    'resolveContextReadLimit awaits real count for unlimited assistants',
+    () async {
+      var resolveCalls = 0;
+      final limit = await ChatActions.resolveContextReadLimit(
+        assistant: const Assistant(
+          id: 'assistant-1',
+          name: 'Unlimited',
+          limitContextMessages: false,
+        ),
+        resolvePersistedCount: () async {
+          resolveCalls += 1;
+          return 1507;
+        },
+      );
+      expect(limit, 1507);
+      expect(resolveCalls, 1);
+      expect(limit, isNot(Assistant.maxContextMessageSize));
+    },
+  );
+
+  test(
+    'resolveContextReadLimit skips count lookup when context is limited',
+    () async {
+      var resolveCalls = 0;
+      final limit = await ChatActions.resolveContextReadLimit(
+        assistant: const Assistant(
+          id: 'assistant-1',
+          name: 'Limited',
+          contextMessageSize: 64,
+          limitContextMessages: true,
+        ),
+        resolvePersistedCount: () async {
+          resolveCalls += 1;
+          return 1507;
+        },
+      );
+      expect(limit, 64);
+      expect(resolveCalls, 0);
+    },
+  );
+
+  test('send/regenerate/continue paths await context limit resolution', () {
+    final source = File(
+      'lib/features/home/controllers/chat_actions.dart',
+    ).readAsStringSync();
+    expect(
+      'maxMessages: await _contextReadLimit(assistant, conversation),'
+          .allMatches(source)
+          .length,
+      3,
+      reason: 'send, regenerate, and continue must each await resolved counts',
+    );
+    expect(source.contains('maxMessages: _contextReadLimit('), isFalse);
+  });
+
+  test('only temporary regeneration physically removes trailing messages', () {
+    expect(
+      ChatActions.shouldPhysicallyRemoveRegenerationTail(
+        deleteTrailingEnabled: false,
+        isTemporaryConversation: false,
+      ),
+      isFalse,
+    );
+    expect(
+      ChatActions.shouldPhysicallyRemoveRegenerationTail(
+        deleteTrailingEnabled: true,
+        isTemporaryConversation: false,
+      ),
+      isFalse,
+    );
+    expect(
+      ChatActions.shouldPhysicallyRemoveRegenerationTail(
+        deleteTrailingEnabled: true,
+        isTemporaryConversation: true,
+      ),
+      isTrue,
+    );
+  });
+
   group('ChatActions.buildRegenerationMessages', () {
     test('长会话窗口重试会保留目标消息之前的完整历史前缀', () {
       final messages = <ChatMessage>[

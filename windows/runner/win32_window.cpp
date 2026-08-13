@@ -17,7 +17,6 @@ namespace {
 #endif
 
 constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
-constexpr const wchar_t kJOKelivoWindowProp[] = L"JOKelivoMainWindow";
 
 /// Registry key for app theme preference.
 ///
@@ -36,24 +35,6 @@ using EnableNonClientDpiScaling = BOOL __stdcall(HWND hwnd);
 // scale factor
 int Scale(int source, double scale_factor) {
   return static_cast<int>(source * scale_factor);
-}
-
-BOOL CALLBACK FindJOKelivoWindow(HWND hwnd, LPARAM lparam) {
-  if (!::GetProp(hwnd, kJOKelivoWindowProp)) {
-    return TRUE;
-  }
-
-  wchar_t class_name[256] = {0};
-  if (::GetClassName(hwnd, class_name, 256) == 0) {
-    return TRUE;
-  }
-
-  if (wcscmp(class_name, kWindowClassName) != 0) {
-    return TRUE;
-  }
-
-  *reinterpret_cast<HWND*>(lparam) = hwnd;
-  return FALSE;
 }
 
 // Dynamically loads the |EnableNonClientDpiScaling| from the User32 module.
@@ -144,10 +125,10 @@ bool Win32Window::Create(const std::wstring& title,
                          const Size& size) {
   Destroy();
 
-  // Before creating a new window, first check whether there is already a
-  // JO-Kelivo-marked Flutter runner window. If so, bring that window to the
-  // foreground instead of creating another one.
-  if (SendAppLinkToInstance()) {
+  // Before creating a new window, first check whether there is already an
+  // existing window with the same class name and title. If so, bring that
+  // window to the foreground instead of creating another one.
+  if (SendAppLinkToInstance(title)) {
     return false;
   }
 
@@ -170,7 +151,6 @@ bool Win32Window::Create(const std::wstring& title,
     return false;
   }
 
-  ::SetProp(window, kJOKelivoWindowProp, reinterpret_cast<HANDLE>(1));
   UpdateTheme(window);
 
   return OnCreate();
@@ -260,7 +240,6 @@ void Win32Window::Destroy() {
   OnDestroy();
 
   if (window_handle_) {
-    ::RemoveProp(window_handle_, kJOKelivoWindowProp);
     DestroyWindow(window_handle_);
     window_handle_ = nullptr;
   }
@@ -292,11 +271,10 @@ RECT Win32Window::GetClientArea() {
 }
 
 // static
-bool Win32Window::SendAppLinkToInstance() {
-  // 1. Look for a Flutter runner window marked as JO-Kelivo. Keep the default
-  //    Flutter window class because bitsdojo_window depends on it.
-  HWND hwnd = nullptr;
-  ::EnumWindows(FindJOKelivoWindow, reinterpret_cast<LPARAM>(&hwnd));
+bool Win32Window::SendAppLinkToInstance(const std::wstring& title) {
+  // 1. Look for a window that matches the Flutter runner window class and the
+  //    given title.
+  HWND hwnd = ::FindWindow(kWindowClassName, title.c_str());
 
   if (hwnd) {
     // 2. Query the current placement so we can restore it appropriately.

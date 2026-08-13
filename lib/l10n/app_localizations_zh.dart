@@ -123,6 +123,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceCategoryChatData => '聊天记录';
 
   @override
+  String get storageSpaceCategoryLegacyChatData => '聊天记录（旧）';
+
+  @override
+  String get storageSpaceCategoryRestoreTraces => '恢复痕迹';
+
+  @override
+  String get storageSpaceRestoreTracesHint => '恢复完成后保留的旧数据快照。清理不会影响当前应用数据。';
+
+  @override
+  String get storageSpaceClearRestoreTracesButton => '清理恢复痕迹';
+
+  @override
+  String get storageSpaceClearRestoreTracesConfirmMessage =>
+      '确定清理已完成恢复留下的旧数据快照吗？当前数据库、设置和文件不会受到影响。';
+
+  @override
+  String get storageSpaceSubCompletedRestoreRuns => '已完成的恢复快照';
+
+  @override
   String get storageSpaceCategoryAssistantData => '助手';
 
   @override
@@ -143,6 +162,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceSafeToClearHint => '可安全清理，不影响聊天记录。';
 
   @override
+  String get storageSpaceLegacyChatDataHint =>
+      '这是迁移到 SQLite 前保留的 Hive 旧文件。清理后不会删除当前聊天记录。';
+
+  @override
   String get storageSpaceNotSafeToClearHint => '可能影响聊天记录，请谨慎删除。';
 
   @override
@@ -156,6 +179,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get storageSpaceSubChatToolEvents => '工具事件';
+
+  @override
+  String get storageSpaceSubChatDatabase => '聊天数据库';
+
+  @override
+  String get storageSpaceSubChatWriteAheadLog => '写入日志';
+
+  @override
+  String get storageSpaceSubChatSharedMemory => '共享内存索引';
 
   @override
   String get storageSpaceSubAssistantAvatars => '头像';
@@ -212,6 +244,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceClearLogsButton => '清理日志';
 
   @override
+  String get storageSpaceClearLegacyChatDataButton => '清理旧聊天记录';
+
+  @override
+  String get storageSpaceClearLegacyChatDataConfirmMessage =>
+      '确定清理保留的旧聊天文件吗？当前 SQLite 聊天记录不会受到影响。';
+
+  @override
   String get storageSpaceViewLogsButton => '查看日志';
 
   @override
@@ -247,6 +286,33 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get storageSpaceSourceLabel => '来源';
+
+  @override
+  String get storageSpaceSourceAll => '全部';
+
+  @override
+  String get storageSpaceSourceUserUpload => '用户上传';
+
+  @override
+  String get storageSpaceSourceAssistant => '助手发出';
+
+  @override
+  String get storageSpaceSortLabel => '排序';
+
+  @override
+  String get storageSpaceSortNewest => '最新';
+
+  @override
+  String get storageSpaceSortOldest => '最旧';
+
+  @override
+  String get storageSpaceSortLargest => '最大';
+
+  @override
+  String get storageSpaceSortSmallest => '最小';
+
+  @override
   String get settingsPageAboutSection => '关于';
 
   @override
@@ -262,7 +328,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPageLogs => '日志';
 
   @override
-  String get settingsPageSponsor => '赞助kelivo';
+  String get settingsPageSponsor => '赞助';
 
   @override
   String get settingsPageShare => '分享';
@@ -483,15 +549,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantProviderNewAssistantName => '新助手';
 
   @override
-  String assistantProviderSampleAssistantSystemPrompt(
-    String model_name,
-    String cur_datetime,
-    String locale,
-    String timezone,
-    String device_info,
-    String system_version,
-  ) {
-    return '你是$model_name, 一个人工智能助手，乐意为用户提供准确，有益的帮助。现在时间是$cur_datetime，用户设备语言为$locale，时区为$timezone，用户正在使用$device_info，版本$system_version。如果用户没有明确说明，请使用用户设备语言进行回复。';
+  String assistantProviderSampleAssistantSystemPrompt(String model_name) {
+    return '你是$model_name，一位乐于助人的 AI 助手。请准确、简洁地回答问题；不确定时如实说明。需要时可使用清晰结构（短段落或列表）。默认使用用户的语言回复。';
   }
 
   @override
@@ -971,7 +1030,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get iosBackgroundLimitNoticeBody =>
-      '这些选项使用 Apple 支持的后台时间、BackgroundTasks、通知和实时活动。它们能提升连续性，但不能强制 iOS 永久保持 JO-Kelivo 运行。';
+      '这些选项使用 Apple 支持的后台时间、BackgroundTasks、通知和实时活动。它们能提升连续性，但不能强制 iOS 永久保持 Kelivo 运行。';
 
   @override
   String get iosBackgroundUnsupportedLiveActivity =>
@@ -996,7 +1055,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get iosBackgroundNotificationsNotAuthorized => '通知未允许';
 
   @override
-  String get iosBackgroundGenerationActiveTitle => 'JO-Kelivo 正在生成';
+  String get iosBackgroundGenerationActiveTitle => 'Kelivo 正在生成';
 
   @override
   String get iosBackgroundGenerationActiveDetail => '助手正在后台回复';
@@ -1049,7 +1108,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get notificationChatCompletedBody => '助手回复已生成';
 
   @override
-  String get androidBackgroundNotificationTitle => 'JO-Kelivo 正在运行';
+  String get androidBackgroundNotificationTitle => 'Kelivo 正在运行';
 
   @override
   String get androidBackgroundNotificationText => '后台保持聊天生成';
@@ -1268,6 +1327,42 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditPreviewTitle => '预览';
 
   @override
+  String get assistantEditPromptTimeVarWarning =>
+      '在系统提示词中使用时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中，费用和首字延迟都会上升。需要让模型知道当前时间时，请改用下方的「追加当前时间」开关。';
+
+  @override
+  String get assistantEditPromptAppendTimeTitle => '追加当前时间';
+
+  @override
+  String get assistantEditPromptAppendTimeSubtitle =>
+      '在每条用户消息末尾追加发送时刻。时间在请求末尾，不影响 Prompt 缓存。';
+
+  @override
+  String get assistantEditPromptAppendTimeInfoTitle => '追加时间格式';
+
+  @override
+  String assistantEditPromptAppendTimeInfoBody(String example) {
+    return '开启后，会在每条用户消息末尾先空一行，再追加如下标签：\n\n$example\n\n时间取该消息自己的发送时刻，重试时保持不变。';
+  }
+
+  @override
+  String get assistantEditPromptAppendTimeInfoClose => '知道了';
+
+  @override
+  String get assistantEditPromptTimeVarDialogTitle => '系统提示词中含时间变量';
+
+  @override
+  String assistantEditPromptTimeVarDialogBody(String variables) {
+    return '你的系统提示词里用了 $variables。系统提示词每次请求都会重新渲染，含时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中。建议移除这些变量，改用「追加当前时间」——它把时间放在请求末尾，不影响前缀。';
+  }
+
+  @override
+  String get assistantEditPromptTimeVarDialogRemove => '去移除';
+
+  @override
+  String get assistantEditPromptTimeVarDialogKeep => '仍然开启';
+
+  @override
   String get codeBlockPreviewButton => '预览';
 
   @override
@@ -1479,7 +1574,101 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageRestartRequired => '需要重启应用';
 
   @override
-  String get backupPageRestartContent => '恢复完成，需要重启以完全生效。';
+  String get backupPageRestartContent => '导入成功。重启 Kelivo 后将安全应用。';
+
+  @override
+  String backupPageRestartContentWithSkipped(int count) {
+    return '导入已完成，但已跳过 $count 个消息顺序非法的会话。重启 Kelivo 后将安全应用已导入的数据。';
+  }
+
+  @override
+  String get restartAppFailedMessage => 'Kelivo 无法自动重启，请完全关闭后重新打开。';
+
+  @override
+  String get backupRestoreRolledBackTitle => '恢复已回滚';
+
+  @override
+  String get backupRestoreRolledBackContent => '恢复未能完成。Kelivo 已验证并保留原有数据。';
+
+  @override
+  String get backupRestoreFailureTitle => '恢复需要处理';
+
+  @override
+  String get backupRestoreFailureContent =>
+      'Kelivo 无法验证完整的原有或新数据，因此未打开聊天数据。请关闭 Kelivo 后重试；若问题反复出现，请保留诊断码以便支持人员排查。';
+
+  @override
+  String get backupRestoreBusinessLeaseUnavailableTitle => 'Kelivo 已在运行';
+
+  @override
+  String get backupRestoreBusinessLeaseUnavailableContent =>
+      'Kelivo 的数据仍被另一个应用进程占用。请关闭其他 Kelivo 窗口后重新启动；当前进程尚未打开聊天数据。';
+
+  @override
+  String get backupRestoreFailureRestartButton => '重启 Kelivo';
+
+  @override
+  String get backupRestoreFailureCopyButton => '复制诊断码';
+
+  @override
+  String get backupRestoreFailureCopied => '已复制诊断码';
+
+  @override
+  String backupRestoreFailureDiagnostic(String code) {
+    return '诊断码：$code';
+  }
+
+  @override
+  String get startupRecoveryMoreOptions => '更多恢复选项';
+
+  @override
+  String get startupRecoveryRepairButton => '修复并重启';
+
+  @override
+  String get startupRecoveryExportButton => '导出我的数据副本';
+
+  @override
+  String get startupRecoveryResetButton => '重置数据';
+
+  @override
+  String get startupRecoveryBusy => '处理中…';
+
+  @override
+  String get startupRecoveryExportSucceeded => '已保存一份数据副本。';
+
+  @override
+  String get startupRecoveryExportFailed => '无法导出数据副本。';
+
+  @override
+  String get startupRecoveryRepairFailed => '修复未能解决问题。请先导出数据副本，然后重置。';
+
+  @override
+  String get startupRecoveryResetFailed => '重置失败。请彻底关闭 Kelivo 后重新打开。';
+
+  @override
+  String get startupRecoveryResetDialogTitle => '重置全部数据？';
+
+  @override
+  String get startupRecoveryResetDialogContent =>
+      '这将永久删除本设备上 Kelivo 的数据库并重新开始。如果之后可能还需要这些数据，请先导出一份副本。此操作无法撤销。';
+
+  @override
+  String get startupRecoveryResetDialogConfirm => '重置并重启';
+
+  @override
+  String get startupRecoveryResetDialogCancel => '取消';
+
+  @override
+  String get startupDatabaseUpdateRequiredTitle => '请更新 Kelivo 以继续';
+
+  @override
+  String get startupDatabaseUpdateRequiredContent =>
+      '本设备上的聊天数据库由更新版本的 Kelivo 创建，当前版本无法打开。数据未被改动。请安装最新版 Kelivo 后重新打开。';
+
+  @override
+  String backupPageRestoreFailedMessage(String error) {
+    return '恢复失败：$error';
+  }
 
   @override
   String get backupPageOK => '好的';
@@ -1491,19 +1680,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageSelectImportMode => '选择导入模式';
 
   @override
-  String get backupPageSelectImportModeDescription => '请选择如何导入备份数据：';
+  String get backupPageSelectImportModeDescription =>
+      '请选择恢复方式。聊天和文件开关决定本次恢复的组件。';
 
   @override
   String get backupPageOverwriteMode => '完全覆盖';
 
   @override
-  String get backupPageOverwriteModeDescription => '清空本地所有数据后恢复';
+  String get backupPageOverwriteModeDescription => '仅替换已选组件；保留未选组件及无关本地设置';
 
   @override
-  String get backupPageMergeMode => '智能合并';
+  String get backupPageMergeMode => '合并';
 
   @override
-  String get backupPageMergeModeDescription => '仅添加不存在的数据（智能去重）';
+  String get backupPageMergeModeDescription =>
+      '保留本地数据并加入备份数据；相同会话会跳过，冲突会话会重新分配 ID。';
 
   @override
   String get backupPageRestore => '恢复';
@@ -1524,29 +1715,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageExportToFileSubtitle => '导出APP数据为文件';
 
   @override
-  String get backupPageExportKelivoBackup => '导出为 Kelivo 备份';
-
-  @override
   String get backupPageImportBackupFile => '备份文件导入';
 
   @override
   String get backupPageImportBackupFileSubtitle => '导入本地备份文件';
-
-  @override
-  String get backupPageImportKelivoBackup => '从 Kelivo 备份导入';
-
-  @override
-  String get backupPageOpenUserDataDirectory => '打开用户数据目录';
-
-  @override
-  String get backupPageOpenUserDataFailed => '打开用户数据目录失败';
-
-  @override
-  String get backupPageUserDataDirectoryTitle => '用户数据目录';
-
-  @override
-  String get backupPageUserDataDirectoryDescription =>
-      '打开应用主数据目录，用于查看聊天数据、上传文件、图片、头像、缓存和日志。';
 
   @override
   String get backupPageImportFromOtherApps => '从其他APP导入';
@@ -1617,6 +1789,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageS3PathStyle => '路径风格（Path-style）';
 
   @override
+  String get backupPageUserAgent => 'User-Agent';
+
+  @override
+  String get backupPageUserAgentHint => '可选';
+
+  @override
   String get backupPageSave => '保存';
 
   @override
@@ -1629,10 +1807,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageImportFromCherryStudio => '从 Cherry Studio 导入';
 
   @override
-  String get backupPageImportFromChatbox => '从 Chatbox 导入';
+  String backupPageCherryStudioUnsupportedBackupVersion(String version) {
+    return '此备份使用 Cherry Studio 格式版本 $version，Kelivo 目前尚无法导入。请改用 Cherry Studio v1 导出备份，或等待后续版本支持 Cherry Studio v2。';
+  }
 
   @override
-  String get backupPageImportFromDeepSeek => '从 DeepSeek 网页版/App 导入';
+  String get backupPageImportFromChatbox => '从 Chatbox 导入';
 
   @override
   String get backupReminderSectionTitle => '备份提醒';
@@ -1767,37 +1947,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageEditPageHint => '输入消息内容…';
 
   @override
-  String get messageEditCloseConfirmTitle => '要保存修改吗？';
+  String get userMessageEditSaveOnly => '仅保存';
 
   @override
-  String get messageEditCloseConfirmContent => '关闭前要保存这次编辑吗？';
+  String get userMessageEditUnsupportedSnackbar => '该内容不支持编辑';
 
   @override
-  String get messageEditCloseConfirmCancel => '取消';
+  String get userMessageEditOverwriteTitle => '提示';
 
   @override
-  String get messageEditCloseConfirmDiscard => '不保存';
-
-  @override
-  String get messageEditCloseConfirmSave => '保存';
-
-  @override
-  String get messageEditAttachmentsTitle => '附件';
-
-  @override
-  String get messageEditAddImage => '添加图片';
-
-  @override
-  String get messageEditAddFile => '添加文件';
-
-  @override
-  String get messageEditNoAttachments => '暂无附件';
-
-  @override
-  String get messageEditReplaceImage => '替换图片';
-
-  @override
-  String get messageEditRemoveAttachment => '移除附件';
+  String get userMessageEditOverwriteContent => '修改将覆盖输入框已有内容，是否覆盖？';
 
   @override
   String get selectCopyPageTitle => '选择复制';
@@ -1923,12 +2082,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageMoreSheetCreateBranch => '创建分支';
 
   @override
-  String get messageMoreSheetSwitchToUser => '切换为用户';
-
-  @override
-  String get messageMoreSheetSwitchToAssistant => '切换为模型';
-
-  @override
   String get messageMoreSheetDelete => '删除本版本';
 
   @override
@@ -1951,6 +2104,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get reasoningBudgetSheetXhigh => '极限推理';
+
+  @override
+  String get reasoningBudgetSheetMax => '全力推理';
 
   @override
   String get reasoningBudgetSheetTitle => '思维链强度';
@@ -2029,6 +2185,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatMessageWidgetOpenLinkError => '打开链接失败';
 
   @override
+  String get chatMessageWidgetAttachmentUnavailable => '附件不可用';
+
+  @override
   String chatMessageWidgetCitationsTitle(int count) {
     return '引用（共$count条）';
   }
@@ -2075,15 +2234,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatMessageWidgetDeepThinking => '深度思考';
 
   @override
-  String get chatMessageWidgetCreateMemory => '创建记忆';
-
-  @override
-  String get chatMessageWidgetEditMemory => '编辑记忆';
-
-  @override
-  String get chatMessageWidgetDeleteMemory => '删除记忆';
-
-  @override
   String chatMessageWidgetWebSearch(String query) {
     return '联网检索: $query';
   }
@@ -2104,6 +2254,30 @@ class AppLocalizationsZh extends AppLocalizations {
   String chatMessageWidgetSpeakText(String text) {
     return '正在朗读: $text';
   }
+
+  @override
+  String get chatMessageWidgetMemoryRead => '读取记忆';
+
+  @override
+  String get chatMessageWidgetMemoryUpdate => '更新记忆';
+
+  @override
+  String get chatMessageWidgetMemorySearchProfile => '检索记忆';
+
+  @override
+  String get chatMessageWidgetMemoryEdit => '编辑记忆';
+
+  @override
+  String get chatMessageWidgetMemoryDelete => '删除记忆';
+
+  @override
+  String get chatMessageWidgetUpdateUserProfile => '更新用户画像';
+
+  @override
+  String get chatMessageWidgetChatSearch => '搜索历史对话';
+
+  @override
+  String get chatMessageWidgetCreateMemory => '创建记忆';
 
   @override
   String chatMessageWidgetToolCall(String name) {
@@ -2293,6 +2467,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sideDrawerMenuRegenerateTitle => '重新生成标题';
 
   @override
+  String get sideDrawerMenuCopy => '复制';
+
+  @override
   String get sideDrawerMenuMoveTo => '移动到';
 
   @override
@@ -2412,6 +2589,30 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sideDrawerReset => '重置';
 
   @override
+  String get providerAvatarChooseBuiltInIcon => '选择内置图标';
+
+  @override
+  String get providerAvatarIconDialogTitle => '选择内置图标';
+
+  @override
+  String get providerAvatarIconSearchHint => '搜索图标';
+
+  @override
+  String get providerAvatarIconNoResults => '未找到图标';
+
+  @override
+  String get providerAvatarInputLobehubIcon => '输入 LobeHub 图标';
+
+  @override
+  String get providerAvatarChooseLobehubIcon => '输入 LobeHub 图标';
+
+  @override
+  String get providerAvatarLobehubDialogTitle => '输入 LobeHub 图标';
+
+  @override
+  String get providerAvatarLobehubDialogHint => '输入 LobeHub 图标名，如 openai';
+
+  @override
   String get sideDrawerEmojiDialogTitle => '选择表情';
 
   @override
@@ -2473,16 +2674,28 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatInputBarMoreTooltip => '更多';
 
   @override
+  String get chatInputBarVoiceInputTooltip => '语音输入';
+
+  @override
+  String get chatInputBarVoiceCancelTooltip => '取消录音';
+
+  @override
+  String get chatInputBarVoiceStopTooltip => '停止并转为文字';
+
+  @override
+  String get chatInputBarVoiceSendTooltip => '转文字并发送';
+
+  @override
+  String get chatInputBarVoiceTranscribing => '正在识别…';
+
+  @override
+  String get chatInputBarImageProcessing => '正在处理图片';
+
+  @override
   String get chatInputBarImageMode => '绘图模式';
 
   @override
   String get chatInputBarDisableImageModeTooltip => '关闭绘图模式';
-
-  @override
-  String get chatInputBarReplaceImageTooltip => '替换图片';
-
-  @override
-  String get chatInputBarRemoveImageTooltip => '移除图片';
 
   @override
   String get chatInputBarQueuedPending => '排队中';
@@ -2530,7 +2743,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mcpPageStatusDisconnected => '未连接';
 
   @override
+  String get mcpPageStatusAuthorizationRequired => '需要授权';
+
+  @override
+  String get mcpPageStatusAuthorizing => '授权中…';
+
+  @override
   String get mcpPageStatusDisabled => '已禁用';
+
+  @override
+  String get mcpPageOAuthRequired => '需要 OAuth 登录';
+
+  @override
+  String get mcpPageOAuthSignIn => 'OAuth 登录';
 
   @override
   String mcpPageToolsCount(int enabled, int total) {
@@ -2666,6 +2891,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get defaultModelPageTitleModelSubtitle => '用于总结对话标题的模型，推荐使用快速且便宜的模型';
 
   @override
+  String get titleModelThinkingTitle => '是否开启思考';
+
+  @override
   String get defaultModelPageSummaryModelTitle => '摘要模型';
 
   @override
@@ -2720,6 +2948,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get defaultModelPageOcrModelTitle => 'OCR 模型';
+
+  @override
+  String backgroundTaskFailed(String task, String error) {
+    return '$task失败：$error';
+  }
 
   @override
   String get defaultModelPageOcrModelSubtitle => '用于对图片执行文字识别的模型';
@@ -3012,6 +3245,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerDetailPageModelsTab => '模型';
 
   @override
+  String get providerDetailPageCustomRequestTitle => '自定义请求';
+
+  @override
+  String get providerDetailPageCustomRequestDescription =>
+      '应用于此供应商的所有模型。模型配置优先于此处，此处配置优先于助手配置。';
+
+  @override
   String get providerDetailPageNetworkTab => '网络代理';
 
   @override
@@ -3073,7 +3313,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerDetailPageBalanceInfo => '获取账户余额';
 
   @override
-  String get providerDetailPageBalanceApiPathLabel => '余额 API 地址或路径';
+  String get providerDetailPageBalanceApiPathLabel => '余额 API 路径';
 
   @override
   String get providerDetailPageBalanceResultPathLabel => '结果 JSON 路径';
@@ -3099,10 +3339,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String providerDetailPageBalanceError(String message) {
     return '余额查询失败：$message';
   }
-
-  @override
-  String get providerDetailPageBalanceFullUrlRequired =>
-      '主 API 端点不是 OpenAI 兼容格式，请填写完整的 OpenAI 兼容余额 API 地址。';
 
   @override
   String get providerDetailPageVertexAiTitle => 'Vertex AI';
@@ -3585,6 +3821,128 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchServicesEditDialogRegionOptional => '地区（可选，默认 us-en）';
 
   @override
+  String get searchServiceEditorProviderTypeTitle => '搜索提供商';
+
+  @override
+  String get searchServiceEditorConfigurationTitle => '服务配置';
+
+  @override
+  String get searchServiceEditorNoConfiguration => '此提供商无需额外配置。';
+
+  @override
+  String get searchServiceEditorMultiKeyTitle => '多 Key 轮询';
+
+  @override
+  String get searchServiceEditorMultiKeyNone => '未配置';
+
+  @override
+  String get searchApiKeysPageDescription =>
+      '列表中的 Key 按顺序轮询使用，第一个为主 Key；不查额度，以防触发服务商风控。';
+
+  @override
+  String get searchApiKeysPagePrimaryBadge => '主';
+
+  @override
+  String get searchApiKeysPageBatchHint => '可一次粘贴多个 Key：每行一个，或用逗号分隔';
+
+  @override
+  String searchApiKeysPageBatchResult(String added, String skipped) {
+    return '已添加 $added 个，跳过 $skipped 个重复';
+  }
+
+  @override
+  String get searchApiKeysPageAdd => '添加';
+
+  @override
+  String get searchApiKeysPageEmpty => '尚未配置任何 Key。';
+
+  @override
+  String searchServiceEditorMultiKeyCount(String count) {
+    return '共 $count 个 Key';
+  }
+
+  @override
+  String get searchServiceEditorUsageTitle => '账户用量';
+
+  @override
+  String get searchServiceEditorUsageNotQueried => '尚未查询用量。';
+
+  @override
+  String get searchServiceEditorUsageQuery => '查询用量';
+
+  @override
+  String get searchServiceEditorUsageQuerying => '查询中…';
+
+  @override
+  String searchServiceEditorUsageRemaining(String remaining) {
+    return '剩余 $remaining 额度';
+  }
+
+  @override
+  String searchServiceEditorUsageBalance(String balance) {
+    return '余额 $balance';
+  }
+
+  @override
+  String searchServiceEditorUsageUsed(String used, String limit) {
+    return '已使用 $used / $limit 额度';
+  }
+
+  @override
+  String searchServiceEditorUsageFailed(String message) {
+    return '用量查询失败：$message';
+  }
+
+  @override
+  String get searchServiceEditorTestTitle => '测试搜索';
+
+  @override
+  String get searchServiceEditorTestQueryHint => '输入测试关键词';
+
+  @override
+  String get searchServiceEditorTestRun => '运行测试搜索';
+
+  @override
+  String get searchServiceEditorTestRunning => '搜索中…';
+
+  @override
+  String get searchServiceEditorTestNoResults => '提供商未返回任何结果。';
+
+  @override
+  String searchServiceEditorTestFailed(String message) {
+    return '搜索失败：$message';
+  }
+
+  @override
+  String get searchServiceEditorResultOpenTooltip => '打开结果';
+
+  @override
+  String get searchServiceEditorDeleteTooltip => '删除搜索服务';
+
+  @override
+  String get searchServiceEditorDeleteTitle => '删除搜索服务？';
+
+  @override
+  String searchServiceEditorDeleteMessage(String provider) {
+    return '确定删除 $provider 吗？此操作无法撤销。';
+  }
+
+  @override
+  String get searchServiceEditorDeleteConfirm => '删除';
+
+  @override
+  String get searchServiceEditorDiscardTitle => '放弃更改？';
+
+  @override
+  String get searchServiceEditorDiscardMessage => '尚未保存的搜索服务设置将会丢失。';
+
+  @override
+  String get searchServiceEditorKeepEditing => '继续编辑';
+
+  @override
+  String get searchServiceEditorDiscard => '放弃';
+
+  @override
   String get searchSettingsSheetTitle => '搜索设置';
 
   @override
@@ -3619,13 +3977,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutPageEasterEggButton => '好的';
 
   @override
-  String get aboutPageAppName => 'JO-Kelivo';
+  String get aboutPageAppName => 'Kelivo';
 
   @override
-  String get aboutPageAppDescription => '基于 Kelivo 的开源 AI 助手';
-
-  @override
-  String get aboutPageKelivoSectionTitle => '关于 Kelivo';
+  String get aboutPageAppDescription => '开源AI 助手';
 
   @override
   String get aboutPageNoQQGroup => '暂无QQ群';
@@ -3680,7 +4035,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutPageJoinQQGroup => '加入QQ群';
 
   @override
-  String get aboutPageJoinDiscord => '加入 Discord';
+  String get aboutPageQQGroupOne => 'Kelivo 一群';
+
+  @override
+  String get aboutPageQQGroupTwo => 'Kelivo 二群';
+
+  @override
+  String get aboutPageJoinDiscord => '在 Discord 中加入我们';
 
   @override
   String get displaySettingsPageShowUserAvatarTitle => '显示用户头像';
@@ -3759,19 +4120,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get displaySettingsPageInsertSuggestionOnlyTitle => '点击建议时仅填入输入框';
-
-  @override
-  String get displaySettingsPageInsertNewAssistantAtTopTitle => '新建和复制助手放到顶部';
-
-  @override
-  String get displaySettingsPageLazyHistoryTitle => '懒加载聊天历史';
-
-  @override
-  String get displaySettingsPageDesktopWideChatLayoutTitle => '聊天区域拉宽';
-
-  @override
-  String get displaySettingsPageDesktopWideChatLayoutSubtitle =>
-      '在桌面端、平板或横屏宽屏布局中，让消息列表和输入栏尽量占满可用宽度。';
 
   @override
   String get displaySettingsPageShowToolResultSummarySubtitle =>
@@ -3930,6 +4278,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageChatBackgroundMaskTitle => '背景图片遮罩透明度';
 
   @override
+  String get displaySettingsPageChatInputBackgroundOpacityTitle => '输入框背景透明度';
+
+  @override
   String get displaySettingsPageThemeSettingsTitle => '主题设置';
 
   @override
@@ -4008,16 +4359,239 @@ class AppLocalizationsZh extends AppLocalizations {
   String get themeSettingsPageColorPalettesSection => '配色方案';
 
   @override
+  String get themeSettingsPageCustomPaletteName => '自定义';
+
+  @override
+  String get themeSettingsPageCustomColorReset => '重置';
+
+  @override
+  String get themeSettingsPageCustomThemesSection => '自定义主题';
+
+  @override
+  String get customThemeNewTheme => '新建主题';
+
+  @override
+  String get customThemeEditTheme => '编辑主题';
+
+  @override
+  String get customThemeImportTheme => '导入主题';
+
+  @override
+  String get customThemeNameLabel => '主题名称';
+
+  @override
+  String get customThemePrimaryColor => '主色';
+
+  @override
+  String get customThemeSecondaryColor => '辅色';
+
+  @override
+  String get customThemeTertiaryColor => '第三色';
+
+  @override
+  String get customThemeColorAuto => '自动';
+
+  @override
+  String get customThemeSave => '保存';
+
+  @override
+  String get customThemeCancel => '取消';
+
+  @override
+  String get customThemeDelete => '删除';
+
+  @override
+  String get customThemeDeleteConfirm => '删除该主题？';
+
+  @override
+  String get customThemeCopied => '主题 JSON 已复制到剪贴板';
+
+  @override
+  String get customThemeCopyAction => '复制';
+
+  @override
+  String get customThemeImportHint => '在此粘贴主题 JSON';
+
+  @override
+  String get customThemeImportInvalid => '无效的主题 JSON';
+
+  @override
+  String get customThemeHexLabel => '十六进制';
+
+  @override
   String get ttsServicesPageBackButton => '返回';
 
   @override
   String get ttsServicesPageTitle => '语音服务';
 
   @override
+  String get ttsServicesSectionTitle => '文字转语音';
+
+  @override
   String get ttsServicesPageSettingsTooltip => 'TTS 设置';
 
   @override
   String get ttsServicesPageAddTooltip => '新增';
+
+  @override
+  String get asrServicesSectionTitle => '语音识别';
+
+  @override
+  String get asrServicesSectionDescription => '使用本地、系统或云端服务将语音转换为文字。';
+
+  @override
+  String get asrServicesAddTooltip => '添加语音识别服务';
+
+  @override
+  String get asrServicesEmptyTitle => '尚未添加语音识别服务';
+
+  @override
+  String get asrServicesEmptySubtitle => '添加后，聊天输入框才会显示麦克风。';
+
+  @override
+  String get asrServicesOnDeviceGroup => '设备端';
+
+  @override
+  String get asrServicesCloudGroup => '云端';
+
+  @override
+  String get asrServicesSystemTitle => '系统';
+
+  @override
+  String get asrServicesSystemSubtitle => '使用设备内置能力';
+
+  @override
+  String get asrServicesLocalTitle => '本地模型';
+
+  @override
+  String get asrServicesLocalSubtitle => '下载后在设备上离线运行';
+
+  @override
+  String get asrServicesOpenAiTitle => 'OpenAI Realtime';
+
+  @override
+  String get asrServicesOpenAiSubtitle => '低延迟流式转写';
+
+  @override
+  String get asrServicesDashScopeTitle => 'DashScope';
+
+  @override
+  String get asrServicesDashScopeSubtitle => 'Qwen 实时转写';
+
+  @override
+  String get asrServicesVolcengineTitle => '火山引擎';
+
+  @override
+  String get asrServicesVolcengineSubtitle => '豆包语音流式转写';
+
+  @override
+  String get asrServicesMimoTitle => 'MiMo';
+
+  @override
+  String get asrServicesMimoSubtitle => '分段云端转写';
+
+  @override
+  String get asrServicesStepTitle => 'Step';
+
+  @override
+  String get asrServicesStepSubtitle => 'Step Audio 分段云端转写';
+
+  @override
+  String get asrServicesAddTitle => '添加语音识别';
+
+  @override
+  String get asrServicesEditTitle => '编辑语音识别';
+
+  @override
+  String get asrServicesSelectedLabel => '已选择';
+
+  @override
+  String get asrServicesUnavailableLabel => '不可用';
+
+  @override
+  String get asrServicesEditAction => '编辑';
+
+  @override
+  String get asrServicesDeleteAction => '删除';
+
+  @override
+  String get asrServicesCancelAction => '取消';
+
+  @override
+  String get asrServicesAddAction => '添加';
+
+  @override
+  String get asrServicesSaveAction => '保存';
+
+  @override
+  String get asrServicesNameLabel => '名称';
+
+  @override
+  String get asrServicesApiKeyLabel => 'API Key';
+
+  @override
+  String get asrServicesEndpointLabel => '服务地址';
+
+  @override
+  String get asrServicesModelLabel => '模型';
+
+  @override
+  String get asrServicesResourceIdLabel => '资源 ID';
+
+  @override
+  String get asrServicesLanguageLabel => '语言';
+
+  @override
+  String get asrServicesAutomaticLabel => '自动';
+
+  @override
+  String get asrServicesApiKeyRequired => '请输入 API Key 后再使用此服务。';
+
+  @override
+  String get asrServicesChooseModelTitle => '模型';
+
+  @override
+  String get asrServicesModelDownloadAction => '下载';
+
+  @override
+  String get asrServicesModelUseAction => '使用此模型';
+
+  @override
+  String get asrServicesModelDeleteAction => '删除下载';
+
+  @override
+  String get asrServicesModelDownloadedLabel => '已下载';
+
+  @override
+  String get asrServicesModelDownloadingLabel => '正在下载…';
+
+  @override
+  String get asrServicesModelNotDownloadedLabel => '未下载';
+
+  @override
+  String asrServicesDownloadFailed(String error) {
+    return '模型下载失败：$error';
+  }
+
+  @override
+  String get asrServicesSystemChecking => '正在检查…';
+
+  @override
+  String get asrServicesSystemAvailable => '可用';
+
+  @override
+  String get asrServicesSystemCheckFailed => '这台设备没有可用的系统语音识别服务。';
+
+  @override
+  String get asrServicesMicrophonePermissionDenied => '未获得麦克风权限。';
+
+  @override
+  String get asrServicesNoSpeechDetected => '没有识别到语音。';
+
+  @override
+  String asrServicesRecognitionFailed(String error) {
+    return '语音识别失败：$error';
+  }
 
   @override
   String get ttsServicesPageAddNotImplemented => '新增 TTS 服务暂未实现';
@@ -4130,7 +4704,81 @@ class AppLocalizationsZh extends AppLocalizations {
   String get ttsServicesFieldLanguageLabel => '语言';
 
   @override
+  String get ttsServicesFieldWorkspaceIdLabel => '业务空间 ID';
+
+  @override
+  String get ttsServicesFieldRegionLabel => '地域';
+
+  @override
+  String get ttsServicesFieldFormatLabel => '音频格式';
+
+  @override
+  String get ttsServicesFieldOutputFormatLabel => '输出格式';
+
+  @override
+  String get ttsServicesFieldSampleRateLabel => '采样率';
+
+  @override
+  String get ttsServicesFieldVolumeLabel => '音量';
+
+  @override
+  String get ttsServicesFieldPitchLabel => '音调';
+
+  @override
+  String get ttsServicesFieldLanguageBoostLabel => '语言增强';
+
+  @override
+  String get ttsServicesFieldBitrateLabel => '比特率';
+
+  @override
+  String get ttsServicesFieldChannelLabel => '声道数';
+
+  @override
+  String get ttsServicesFieldSubtitlesLabel => '生成字幕';
+
+  @override
+  String get ttsServicesFieldPronunciationDictionaryLabel => '发音词典（每行一项）';
+
+  @override
+  String get ttsServicesFieldInstructionLabel => '风格／音色描述';
+
+  @override
+  String get ttsServicesFieldStreamingLabel => '流式输出';
+
+  @override
+  String get ttsServicesFieldOptimizeTextPreviewLabel => '优化播报文本';
+
+  @override
+  String get ttsServicesFieldReferenceAudioLabel => '参考音频（WAV/MP3 数据 URI）';
+
+  @override
+  String get ttsServicesFieldChooseReferenceAudioButton => '选择参考音频';
+
+  @override
+  String get ttsServicesFieldTemperatureLabel => '随机度';
+
+  @override
+  String get ttsServicesFieldTopPLabel => 'Top P';
+
+  @override
+  String get ttsServicesFieldLatencyLabel => '延迟模式';
+
+  @override
+  String get ttsServicesEmotionAutoLabel => '自动匹配';
+
+  @override
   String get ttsServicesValidationApiKeyRequired => 'API Key 不能为空';
+
+  @override
+  String get ttsServicesValidationReferenceIdRequired => '音色／参考 ID 不能为空';
+
+  @override
+  String get ttsServicesValidationInstructionRequired => '音色描述不能为空';
+
+  @override
+  String ttsServicesValidationSampleRate(String format, String rates) {
+    return '$format 格式要求使用 $rates Hz。';
+  }
 
   @override
   String get ttsServicesViewDetailsButton => '查看详情';
@@ -4152,6 +4800,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get ttsSettingsAutoPlayDescription => '助手回复生成完成后自动开始 TTS 播放。';
+
+  @override
+  String get ttsSettingsCacheReplayTitle => '使用缓存复播';
+
+  @override
+  String get ttsSettingsCacheReplayDescription => '重新播放网络语音时使用已生成的音频，不再请求语音服务。';
 
   @override
   String get ttsSettingsTextSelectionSection => '文本选择';
@@ -4224,6 +4878,23 @@ class AppLocalizationsZh extends AppLocalizations {
   String get ttsFloatingCollapseTooltip => '收起播放控制';
 
   @override
+  String get ttsFloatingSaveTooltip => '保存音频';
+
+  @override
+  String get ttsSaveDialogTitle => '保存 TTS 音频';
+
+  @override
+  String get ttsSaveSuccess => '音频已保存';
+
+  @override
+  String get ttsSaveNothing => '暂无可保存的音频';
+
+  @override
+  String ttsSaveFailed(String message) {
+    return '保存音频失败：$message';
+  }
+
+  @override
   String imageViewerPageShareFailedOpenFile(String message) {
     return '无法分享，已尝试打开文件: $message';
   }
@@ -4294,7 +4965,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get settingsShare => 'JO-Kelivo - 开源 AI 助手';
+  String get settingsShare => 'Kelivo - 开源AI助手';
 
   @override
   String get searchProviderBingLocalDescription =>
@@ -4383,6 +5054,12 @@ class AppLocalizationsZh extends AppLocalizations {
       '博查 AI 全网网页搜索，支持时间范围与摘要，更适合 AI 使用。';
 
   @override
+  String get searchServiceNameDoubao => '豆包';
+
+  @override
+  String get searchProviderDoubaoDescription => '火山引擎豆包网页搜索 API。';
+
+  @override
   String get searchServiceNameSerper => 'Serper';
 
   @override
@@ -4402,6 +5079,27 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get searchProviderGrokDescription =>
       '通过 xAI Responses API 使用 Grok 搜索。调用网页和 X 搜索工具，并返回带引用的来源。';
+
+  @override
+  String get searchServiceNameStepFun => 'StepFun';
+
+  @override
+  String get searchProviderStepFunDescription =>
+      '通过 StepFun POST /v1/search 进行网页搜索。';
+
+  @override
+  String get searchServiceNameFirecrawl => 'Firecrawl';
+
+  @override
+  String get searchProviderFirecrawlDescription =>
+      'Firecrawl Search API v2。需要 Bearer API Key。此处不支持 Scrape。';
+
+  @override
+  String get searchServiceNameTinyFish => 'TinyFish';
+
+  @override
+  String get searchProviderTinyFishDescription =>
+      'TinyFish Search API，支持地区与语言参数。需要 API Key。此处不支持 Fetch/Scrape。';
 
   @override
   String get searchServicesDialogCountryOptional => '国家/地区（可选）';
@@ -4613,7 +5311,39 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditLocalToolAskUserSubtitle => '允许助手提出简短问题，并在你回答后继续生成。';
 
   @override
-  String get assistantEditMemorySwitchTitle => '记忆';
+  String get assistantEditLocalToolCalculateTitle => '计算器';
+
+  @override
+  String get assistantEditLocalToolCalculateSubtitle =>
+      '计算数学表达式，支持加减乘除幂运算 sqrt sin cos 等。';
+
+  @override
+  String get assistantEditLocalToolScreenTimeTitle => '屏幕使用时间';
+
+  @override
+  String get assistantEditLocalToolScreenTimeSubtitle =>
+      '查询本设备的应用使用时长，需要授予使用情况访问权限。';
+
+  @override
+  String get chatMessageWidgetScreenTimeTotal => '总屏幕时间';
+
+  @override
+  String get chatMessageWidgetScreenTimePermissionRequired =>
+      '未授予使用情况访问权限，请在系统设置中开启后重试。';
+
+  @override
+  String get assistantEditLocalToolCalendarQueryTitle => '查询日历';
+
+  @override
+  String get assistantEditLocalToolCalendarQuerySubtitle =>
+      '读取本设备上的日历日程，需要授予日历权限。';
+
+  @override
+  String get assistantEditLocalToolCalendarCreateTitle => '创建日程';
+
+  @override
+  String get assistantEditLocalToolCalendarCreateSubtitle =>
+      '在你确认后于本设备创建日历日程，需要授予日历权限。';
 
   @override
   String get assistantEditMemorySwitchDescription => '允许助手主动存储并在对话间引用用户相关信息';
@@ -4624,9 +5354,6 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get assistantEditRecentChatsSwitchDescription =>
       '在新对话中引用最近的对话标题以增强上下文';
-
-  @override
-  String get assistantEditManageMemoryTitle => '管理记忆';
 
   @override
   String get assistantEditAddMemoryButton => '添加记忆';
@@ -4864,6 +5591,17 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get providerDetailPageDeleteFailedDetectedModelsButton => '删除不可用';
+
+  @override
+  String get providerDetailPageDeleteFailedDetectedModelsTooltip => '删除检测失败的模型';
+
+  @override
+  String providerDetailPageDeleteFailedDetectedModelsConfirm(int count) {
+    return '确定删除检测失败的 $count 个模型吗？此操作不可撤回。';
+  }
+
+  @override
   String providerDetailPageSelectedModelsDeletedSnackbar(int count) {
     return '已删除 $count 个模型';
   }
@@ -5023,6 +5761,602 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsPageWorldBook => '世界书';
+
+  @override
+  String get settingsPageMemory => '记忆';
+
+  @override
+  String get memorySettingsPageTitle => '记忆';
+
+  @override
+  String get memorySettingsModelSection => '记忆模型';
+
+  @override
+  String get memorySettingsModelTitle => '处理模型';
+
+  @override
+  String get memorySettingsModelUnset => '未选择';
+
+  @override
+  String get memorySettingsModelTip => '开启「自动整理记忆」后，后台会频繁调用此模型，建议选择便宜且速度快的模型。';
+
+  @override
+  String get memorySettingsAboutTitle => '记忆说明';
+
+  @override
+  String get memorySettingsAboutSubtitle => '了解记忆如何运作与触发';
+
+  @override
+  String get memorySettingsAboutBody =>
+      '记忆如何运作\n记忆按「身份 / 工作流 / 语气 / 指令」分类，并区分全局与助手范围。对话时，相关记忆会注入模型上下文；条目较多时先展示摘要，模型可用工具继续查询更多内容。\n\n后台如何处理、如何触发\n处理模型用于后台整理管线：判断是否值得记忆、提取候选、去重合并，必要时再提炼用户画像。助手开启「自动整理」后，会按设定轮数在对话结束后自动触发；也可在助手「记忆」页手动整理。因此该模型会被较频繁调用。\n\n如何保持缓存良好\n尽量让注入对话的记忆前缀保持稳定，避免无意义的大批量改动或频繁重排，有助于 Prompt 缓存命中，从而降低费用与延迟。日常增删改单条记忆通常影响有限。';
+
+  @override
+  String get memorySettingsThinkingTitle => '启用思考';
+
+  @override
+  String get memorySettingsThinkingSubtitle => '在模型支持时允许记忆模型使用推理';
+
+  @override
+  String get memorySettingsPromptLangSection => '提示词语言';
+
+  @override
+  String get memorySettingsPromptLangAuto => '自动';
+
+  @override
+  String get memorySettingsPromptLangAutoSubtitle => '跟随界面语言（中文用 zh，否则用 en）';
+
+  @override
+  String get memorySettingsPromptLangZh => '中文';
+
+  @override
+  String get memorySettingsPromptLangZhSubtitle => '始终使用中文记忆提示词与工具描述';
+
+  @override
+  String get memorySettingsPromptLangEn => 'English';
+
+  @override
+  String get memorySettingsPromptLangEnSubtitle => '始终使用英文记忆提示词与工具描述';
+
+  @override
+  String get memorySettingsPromptsSection => '提示词模板';
+
+  @override
+  String get memoryPromptEditRulesTitle => '记忆规则';
+
+  @override
+  String get memoryPromptEditRulesSubtitle => '注入到主对话的系统提示中';
+
+  @override
+  String get memoryPromptEditGateTitle => 'Gatekeeper';
+
+  @override
+  String get memoryPromptEditGateSubtitle => '判断这一轮是否值得记忆';
+
+  @override
+  String get memoryPromptEditExtractTitle => 'Extract';
+
+  @override
+  String get memoryPromptEditExtractSubtitle => '从对话中提取候选记忆条目';
+
+  @override
+  String get memoryPromptEditSmartAddTitle => 'Smart Add';
+
+  @override
+  String get memoryPromptEditSmartAddSubtitle =>
+      'NEW / MERGE / CONFLICT / SKIP 去重判定';
+
+  @override
+  String get memoryPromptEditDistillTitle => 'Profile Distiller';
+
+  @override
+  String get memoryPromptEditDistillSubtitle => '从身份类记忆提炼画像字段';
+
+  @override
+  String get memoryPromptEditReset => '恢复默认';
+
+  @override
+  String get memoryPromptEditSave => '保存';
+
+  @override
+  String get memoryPromptEditSectionPerItem => '逐条提示词';
+
+  @override
+  String get memoryPromptEditSectionBatch => '合并提示词';
+
+  @override
+  String get memorySettingsEntriesSection => '全部记忆';
+
+  @override
+  String get memorySettingsEntriesTitle => '记忆列表';
+
+  @override
+  String get memorySettingsEntriesSubtitle => '浏览、编辑、归档与删除记忆';
+
+  @override
+  String get memorySettingsProfileTitle => '用户画像';
+
+  @override
+  String get memorySettingsProfileSubtitle => '供模型使用的结构化身份字段';
+
+  @override
+  String get memorySettingsLegacyTitle => '旧版记忆（只读）';
+
+  @override
+  String get memorySettingsLegacySubtitle => '来自旧版本的记忆';
+
+  @override
+  String get memoryEntryTypeIdentity => '身份';
+
+  @override
+  String get memoryEntryTypeWorkflow => '工作流';
+
+  @override
+  String get memoryEntryTypeVoice => '语气';
+
+  @override
+  String get memoryEntryTypeInstruction => '指令';
+
+  @override
+  String get memoryEntryScopeGlobal => '全局';
+
+  @override
+  String get memoryEntryScopeAssistant => '仅本助手';
+
+  @override
+  String memoryEntryScopeAssistantNamed(String name) {
+    return '$name';
+  }
+
+  @override
+  String get memoryEntrySourceManual => '手动';
+
+  @override
+  String get memoryEntrySourceTool => '工具';
+
+  @override
+  String get memoryEntrySourceExtracted => '提取';
+
+  @override
+  String get memoryEntrySourceDistilled => '蒸馏';
+
+  @override
+  String get memoryEntryStatusActive => '活跃';
+
+  @override
+  String get memoryEntryStatusArchived => '已归档';
+
+  @override
+  String memoryEntryUpdatedAt(String date) {
+    return '更新于 $date';
+  }
+
+  @override
+  String get memoryEntryActionEdit => '编辑';
+
+  @override
+  String get memoryEntryActionDelete => '删除';
+
+  @override
+  String get memoryEntryActionArchive => '归档';
+
+  @override
+  String get memoryEntryActionRestore => '恢复';
+
+  @override
+  String get memoryEntryActionSwitchScope => '切换范围';
+
+  @override
+  String get memoryEntryActionBatchDelete => '删除所选';
+
+  @override
+  String get memoryEntryActionAdd => '添加记忆';
+
+  @override
+  String get memoryEntryDeleteConfirmTitle => '删除这条记忆？';
+
+  @override
+  String get memoryEntryDeleteConfirmContent => '将永久删除该记忆，且无法撤销。';
+
+  @override
+  String memoryEntryBatchDeleteConfirmTitle(int count) {
+    return '删除 $count 条记忆？';
+  }
+
+  @override
+  String get memoryEntryBatchDeleteConfirmContent => '所选记忆将被永久删除。';
+
+  @override
+  String get memoryEntrySwitchScopeConfirmTitle => '更改记忆范围？';
+
+  @override
+  String get memoryEntrySwitchScopeToGlobal => '将这条记忆设为全局（所有助手可见）？';
+
+  @override
+  String get memoryEntrySwitchScopeToAssistant => '将这条记忆限制为仅本助手？';
+
+  @override
+  String get memoryEntryArchivedSection => '已归档';
+
+  @override
+  String get memoryEntryEmpty => '还没有记忆';
+
+  @override
+  String get memoryEntryEmptyDisabled => '该助手未启用长期记忆';
+
+  @override
+  String get memoryEntryEditTitle => '编辑记忆';
+
+  @override
+  String get memoryEntryCreateTitle => '新建记忆';
+
+  @override
+  String get memoryEntryContentHint => '输入记忆内容';
+
+  @override
+  String get memoryEntryTypeLabel => '类型';
+
+  @override
+  String get memoryEntryScopeLabel => '范围';
+
+  @override
+  String get memoryFilterScopeAll => '全部范围';
+
+  @override
+  String get memoryFilterScopeGlobal => '仅全局';
+
+  @override
+  String get memoryFilterScopeAssistant => '助手';
+
+  @override
+  String get memoryFilterTypeAll => '全部类型';
+
+  @override
+  String get memoryFilterStatusAll => '全部状态';
+
+  @override
+  String get memoryFilterStatusActive => '活跃';
+
+  @override
+  String get memoryFilterStatusArchived => '已归档';
+
+  @override
+  String get memorySearchHint => '搜索记忆';
+
+  @override
+  String get memorySearchEmpty => '没有匹配的记忆';
+
+  @override
+  String memoryOrphanBanner(int count) {
+    return '有 $count 条孤儿助手记忆（助手已删除）';
+  }
+
+  @override
+  String get memoryOrphanCleanupButton => '清理';
+
+  @override
+  String get memoryOrphanConfirmTitle => '清理孤儿记忆？';
+
+  @override
+  String memoryOrphanConfirmContent(int count) {
+    return '将永久删除 $count 条所属助手已不存在的记忆。';
+  }
+
+  @override
+  String get memoryOrganizeButton => '整理记忆';
+
+  @override
+  String get memoryOrganizeNeedsConversation => '需要在与该助手的对话中使用';
+
+  @override
+  String get memoryOrganizeNeedsModel => '请先在 设置 → 记忆 中选择记忆处理模型';
+
+  @override
+  String get memoryOrganizeStatusNever => '尚未整理';
+
+  @override
+  String memoryOrganizeStatusLast(String when) {
+    return '上次整理：$when';
+  }
+
+  @override
+  String memoryOrganizeStatusExtracted(int count) {
+    return '提取 $count 条';
+  }
+
+  @override
+  String get memoryOrganizeStatusSkipped => '无需记忆';
+
+  @override
+  String memoryOrganizeStatusFailed(String reason) {
+    return '失败：$reason';
+  }
+
+  @override
+  String get memoryOrganizeJustNow => '刚刚';
+
+  @override
+  String memoryOrganizeMinutesAgo(int n) {
+    return '$n 分钟前';
+  }
+
+  @override
+  String memoryOrganizeHoursAgo(int n) {
+    return '$n 小时前';
+  }
+
+  @override
+  String memoryOrganizeDaysAgo(int n) {
+    return '$n 天前';
+  }
+
+  @override
+  String get memoryModelMissingNotice => '需要先在 设置 → 记忆 中选择记忆处理模型。';
+
+  @override
+  String get memoryModelMissingGoSelect => '去选择';
+
+  @override
+  String get memoryEntriesPageTitle => '全部记忆';
+
+  @override
+  String get userProfilePageTitle => '用户画像';
+
+  @override
+  String get userProfilePreferredName => '希望怎么称呼我';
+
+  @override
+  String get userProfilePreferredNameHint => '这是希望模型怎么称呼你，与侧栏显示的用户名无关';
+
+  @override
+  String get userProfileGender => '性别';
+
+  @override
+  String get userProfilePronouns => '代词';
+
+  @override
+  String get userProfilePreferredLanguage => '偏好语言';
+
+  @override
+  String get userProfileTimezone => '时区';
+
+  @override
+  String get userProfileOccupation => '职业';
+
+  @override
+  String get userProfileLocation => '所在地';
+
+  @override
+  String get userProfileCustomSection => '自定义字段';
+
+  @override
+  String get userProfileAddCustom => '添加自定义字段';
+
+  @override
+  String get userProfileCustomKeyHint => '键名（custom.name）';
+
+  @override
+  String get userProfileCustomValueHint => '值';
+
+  @override
+  String get userProfileInvalidKey => '键名须为 custom. 后跟 1–32 位字母、数字、_ 或 -';
+
+  @override
+  String get userProfileClear => '清除';
+
+  @override
+  String get userProfileSave => '保存';
+
+  @override
+  String get userProfileEmptyValue => '未设置';
+
+  @override
+  String get legacyMemoryPageTitle => '旧版记忆';
+
+  @override
+  String get legacyMemoryBanner => '这些记忆来自旧版本，不会参与对话；你可以将它们迁移到当前记忆系统。';
+
+  @override
+  String get legacyMemoryEmpty => '没有旧版记忆';
+
+  @override
+  String get legacyMemoryCopy => '复制';
+
+  @override
+  String get legacyMemoryCopied => '已复制';
+
+  @override
+  String get legacyMemoryExport => '导出';
+
+  @override
+  String get legacyMemoryExportTitle => 'Kelivo 旧版记忆导出';
+
+  @override
+  String legacyMemoryAssistantHeader(String name) {
+    return '助手：$name';
+  }
+
+  @override
+  String get legacyMemorySearchHint => '搜索旧版记忆';
+
+  @override
+  String get legacyMemoryMigrate => '迁移';
+
+  @override
+  String get legacyMemoryMigrationTitle => '迁移旧版记忆';
+
+  @override
+  String legacyMemoryMigrationSubtitle(int count) {
+    return '使用模型整理并分类 $count 条旧版记忆，原数据不会改变。';
+  }
+
+  @override
+  String get legacyMemoryMigrationModel => '迁移模型';
+
+  @override
+  String get legacyMemoryMigrationChooseModel => '选择模型';
+
+  @override
+  String get legacyMemoryMigrationTarget => '保存到';
+
+  @override
+  String get legacyMemoryMigrationTargetGlobal => '全局';
+
+  @override
+  String get legacyMemoryMigrationTargetAssistant => '当前助手';
+
+  @override
+  String get legacyMemoryMigrationTargetOriginalAssistants => '原助手';
+
+  @override
+  String get legacyMemoryMigrationTargetGlobalDescription => '所有助手均可使用';
+
+  @override
+  String get legacyMemoryMigrationTargetAssistantDescription => '仅当前助手可使用';
+
+  @override
+  String get legacyMemoryMigrationTargetOriginalDescription => '每条记忆保留在原来的助手下';
+
+  @override
+  String get legacyMemoryMigrationStart => '开始迁移';
+
+  @override
+  String get legacyMemoryMigrationAnalyzing => '正在使用模型分析';
+
+  @override
+  String get legacyMemoryMigrationWriting => '正在写入记忆';
+
+  @override
+  String legacyMemoryMigrationProgress(int current, int total) {
+    return '$current / $total';
+  }
+
+  @override
+  String get legacyMemoryMigrationComplete => '迁移完成';
+
+  @override
+  String legacyMemoryMigrationResult(int created, int skipped) {
+    return '已迁移 $created 条 · 跳过已有 $skipped 条';
+  }
+
+  @override
+  String get legacyMemoryMigrationFailed => '迁移已停止。可以重试，已保存的记忆会自动跳过。';
+
+  @override
+  String get legacyMemoryMigrationRetry => '重试';
+
+  @override
+  String get legacyMemoryMigrationClose => '完成';
+
+  @override
+  String get memoryUiContentLabel => '内容';
+
+  @override
+  String get memoryUiValueLabel => '值';
+
+  @override
+  String get memoryUiCustomKeyLabel => '键名';
+
+  @override
+  String get memoryUiStatusLabel => '状态';
+
+  @override
+  String get memoryUiAssistantLabel => '助手';
+
+  @override
+  String get memoryUiAssistantAll => '全部助手';
+
+  @override
+  String get memoryUiSearchClear => '清除搜索';
+
+  @override
+  String get memoryUiAssistantLegacyTitle => '旧版记忆（只读）';
+
+  @override
+  String get memoryUiAssistantLegacySubtitle => '该助手来自旧版本的记忆';
+
+  @override
+  String get assistantEditMemorySwitchTitle => '使用长期记忆';
+
+  @override
+  String get assistantEditAutoOrganizeTitle => '自动整理记忆';
+
+  @override
+  String get assistantEditAutoOrganizeSubtitle => '对话后自动运行记忆管线';
+
+  @override
+  String get assistantEditAllowPastRecallTitle => '允许回忆过去对话';
+
+  @override
+  String get assistantEditAllowPastRecallSubtitle => '启用跨会话的对话搜索';
+
+  @override
+  String get assistantEditGenerateSummaryTitle => '生成会话摘要';
+
+  @override
+  String get assistantEditGenerateSummarySubtitle => '摘要仅供对话搜索使用';
+
+  @override
+  String get assistantEditManageMemoryTitle => '本助手可见的记忆';
+
+  @override
+  String get assistantEditWriteScopeTitle => '记忆写入范围';
+
+  @override
+  String get assistantEditWriteScopeSubtitle => '新记忆默认写入的位置';
+
+  @override
+  String get assistantEditWriteScopeAlwaysGlobal => '一律全局';
+
+  @override
+  String get assistantEditWriteScopeAlwaysAssistant => '一律本助手';
+
+  @override
+  String get assistantEditWriteScopeToolDefaultGlobal => '模型自选（默认全局）';
+
+  @override
+  String get assistantEditWriteScopeToolDefaultAssistant => '模型自选（默认本助手）';
+
+  @override
+  String get assistantEditDedupeModeTitle => '去重方式';
+
+  @override
+  String get assistantEditDedupeModeSubtitle => '候选记忆如何与已有条目比对';
+
+  @override
+  String get assistantEditDedupeModeBatched => '合并';
+
+  @override
+  String get assistantEditDedupeModePerItem => '逐条';
+
+  @override
+  String get assistantEditOrganizeFrequencyTitle => '整理频率';
+
+  @override
+  String get assistantEditOrganizeFrequencySubtitle => '每累积 N 轮助手回复触发一次自动整理';
+
+  @override
+  String assistantEditOrganizeFrequencyOption(int n) {
+    return '每 $n 轮';
+  }
+
+  @override
+  String get assistantEditOrganizeFrequencyCustomButton => '自定义';
+
+  @override
+  String get assistantEditOrganizeFrequencyCustomTitle => '自定义整理频率';
+
+  @override
+  String get assistantEditOrganizeFrequencyCustomDescription =>
+      '请输入 1 到 20 之间的整数。';
+
+  @override
+  String get assistantEditOrganizeFrequencyCustomLabel => '轮数';
+
+  @override
+  String get assistantEditOrganizeFrequencyCustomHint => '1–20';
+
+  @override
+  String get assistantEditOrganizeFrequencyCustomInvalid => '请输入 1 到 20 之间的整数';
 
   @override
   String get worldBookTitle => '世界书';
@@ -5332,6 +6666,446 @@ class AppLocalizationsZh extends AppLocalizations {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
+
+  @override
+  String get migrationIntroTitle => '升级聊天记录存储';
+
+  @override
+  String get migrationIntroSubtitle =>
+      'Kelivo 将聊天记录迁移到更快的 SQLite 数据库。升级会在应用打开前完成，避免新旧数据同时写入。';
+
+  @override
+  String get migrationBackupNote => '迁移开始前，会先导出包含设置、聊天记录和本地文件的 ZIP 备份。';
+
+  @override
+  String get migrationPerformanceNote =>
+      '迁移后，启动、历史加载和搜索都会使用 SQLite 索引，长对话会更流畅。';
+
+  @override
+  String get migrationSourceDatabaseLabel => 'Hive';
+
+  @override
+  String get migrationTargetDatabaseLabel => 'SQLite';
+
+  @override
+  String get migrationChooseFolderButton => '选择文件夹并备份';
+
+  @override
+  String get migrationSaveBackupButton => '保存备份 ZIP';
+
+  @override
+  String get migrationBackingUpTitle => '正在备份';
+
+  @override
+  String get migrationBackingUpSubtitle =>
+      '正在导出设置、聊天记录、上传文件、图片和字体。请保持 Kelivo 开启，等待备份完成。';
+
+  @override
+  String get migrationMigratingTitle => '正在迁移到 SQLite';
+
+  @override
+  String get migrationMigratingSubtitle =>
+      '正在分批写入会话和消息，避免超大聊天记录占满内存。请保持 Kelivo 在前台，等待迁移完成。';
+
+  @override
+  String migrationBackingUpDetail(String fileName) {
+    return '正在备份 $fileName';
+  }
+
+  @override
+  String migrationMigratingDetail(int count) {
+    return '已迁移 $count 条消息';
+  }
+
+  @override
+  String get migrationMigratingPrepareDetail => '正在准备 SQLite 数据库';
+
+  @override
+  String get migrationMigratingToolEventsDetail => '正在迁移工具调用记录';
+
+  @override
+  String get migrationMigratingValidateDetail => '正在校验迁移数据';
+
+  @override
+  String get migrationBackupReadyDetail => '备份 ZIP 已准备好';
+
+  @override
+  String get migrationSavingBackupZipDetail => '正在保存备份 ZIP';
+
+  @override
+  String get migrationBackupFileSavedTitle => '备份 ZIP 已保存';
+
+  @override
+  String get migrationChecklistBackupFiles => '导出 Hive 备份 ZIP';
+
+  @override
+  String get migrationChecklistPrepareSqlite => '准备 SQLite 数据库';
+
+  @override
+  String get migrationChecklistMigrateMessages => '迁移会话和消息';
+
+  @override
+  String get migrationChecklistMigrateToolEvents => '迁移工具调用记录';
+
+  @override
+  String get migrationChecklistValidate => '校验迁移数据';
+
+  @override
+  String get migrationStepBackup => '备份';
+
+  @override
+  String get migrationStepMigrate => '迁移';
+
+  @override
+  String get migrationStepComplete => '完成';
+
+  @override
+  String get migrationCompleteTitle => '升级完成';
+
+  @override
+  String get migrationCompleteSubtitle =>
+      '你的聊天记录已迁移到 SQLite。请重启 Kelivo 进入升级后的应用。';
+
+  @override
+  String get migrationConversationCount => '对话';
+
+  @override
+  String get migrationMessageCount => '消息';
+
+  @override
+  String get migrationConvertedCount => '已转换';
+
+  @override
+  String get migrationMalformedCount => '格式异常';
+
+  @override
+  String get migrationMissingFilesCount => '缺失文件';
+
+  @override
+  String get migrationRestartButton => '重启 Kelivo';
+
+  @override
+  String get migrationFailedTitle => '迁移失败';
+
+  @override
+  String get migrationFailedSubtitle => '原始 Hive 数据和备份都仍然保留。查看下方原因后可以重试。';
+
+  @override
+  String get migrationUnknownError => '未知迁移错误。';
+
+  @override
+  String get migrationFailureLogTitle => '失败日志';
+
+  @override
+  String get migrationRetryButton => '重试迁移';
+
+  @override
+  String get migrationSkipButton => '跳过迁移并全新开始';
+
+  @override
+  String get migrationSkipDialogTitle => '跳过迁移？';
+
+  @override
+  String get migrationSkipDialogMessage =>
+      'Kelivo 将以空的聊天数据库启动。旧的聊天记录会保留在磁盘上（重命名为 .retired 后缀），但不会被迁移，也不会在应用中显示。之后如需找回，请使用已保存的备份 ZIP。';
+
+  @override
+  String get migrationSkipDialogCancel => '取消';
+
+  @override
+  String get migrationSkipDialogConfirm => '跳过并全新开始';
+
+  @override
+  String get migrationChatsExportDegradedNote =>
+      'chats.json 导出因出错而被跳过。备份 ZIP 仍包含原始 Hive 文件，完整聊天记录未丢失。';
+
+  @override
+  String get timelineJumpToLatest => '跳到最新';
+
+  @override
+  String largeContentShowMore(int count) {
+    return '再显示 $count 项';
+  }
+
+  @override
+  String get largeContentCollapse => '收起';
+
+  @override
+  String get imageSettingsPageTitle => '图片处理';
+
+  @override
+  String get imageSettingsPageEditSectionTitle => '编辑';
+
+  @override
+  String get imageSettingsPageQualitySectionTitle => '上传图片质量';
+
+  @override
+  String get imageSettingsPageQualityOriginal => '原图';
+
+  @override
+  String get imageSettingsPageQualityOriginalSubtitle => '不压缩，原样上传';
+
+  @override
+  String get imageSettingsPageQualityHigh => '高质量';
+
+  @override
+  String get imageSettingsPageQualityHighSubtitle => '最长边 2048 像素 · 质量 90';
+
+  @override
+  String get imageSettingsPageQualityBalanced => '平衡';
+
+  @override
+  String get imageSettingsPageQualityBalancedSubtitle => '最长边 1568 像素 · 质量 85';
+
+  @override
+  String get imageSettingsPageQualitySaver => '节省流量';
+
+  @override
+  String get imageSettingsPageQualitySaverSubtitle => '最长边 1024 像素 · 质量 70';
+
+  @override
+  String get imageSettingsPageQualityCustom => '自定义';
+
+  @override
+  String get imageSettingsPageQualityCustomSubtitle => '自选压缩质量';
+
+  @override
+  String get imageSettingsPageCustomQualityTitle => '压缩质量';
+
+  @override
+  String get imageSettingsPageCompressTransparentTitle => '压缩透明及动态图片';
+
+  @override
+  String get imageSettingsPageCompressTransparentSubtitle =>
+      '开启后将压缩透明 PNG、GIF 等格式；透明区域填充为白色，动图仅保留第一帧。';
+
+  @override
+  String get imageSettingsPageFooter =>
+      '压缩在添加图片时进行，已保存或已发送的图片不受影响；压缩后图片以 JPEG 格式随消息发送。';
+
+  @override
+  String get memoryTraceSettingsTitle => '流程追踪';
+
+  @override
+  String get memoryTraceSettingsSubtitle => '逐步查看每次后台记忆处理的全过程';
+
+  @override
+  String get memoryTracePageTitle => '记忆流程追踪';
+
+  @override
+  String get memoryTraceRecordingSection => '记录';
+
+  @override
+  String get memoryTraceToggleTitle => '记录流程追踪';
+
+  @override
+  String get memoryTraceToggleSubtitle => '仅在内存中保留最近几次后台运行的提示词、模型回复与实际改动';
+
+  @override
+  String get memoryTraceRunsSection => '最近运行';
+
+  @override
+  String get memoryTraceEmptyTitle => '暂无追踪记录';
+
+  @override
+  String get memoryTraceEmptySubtitle => '后台记忆流程运行后，记录会显示在这里。';
+
+  @override
+  String get memoryTraceDisabledTitle => '记录已关闭';
+
+  @override
+  String get memoryTraceDisabledSubtitle => '开启记录后，下一次后台记忆运行才会被捕获。';
+
+  @override
+  String get memoryTraceClearAction => '清空';
+
+  @override
+  String get memoryTraceClearSheetTitle => '清空追踪记录';
+
+  @override
+  String get memoryTraceClearSheetMessage => '将删除所有已记录的追踪。追踪从不写入磁盘，因此不会影响其他数据。';
+
+  @override
+  String get memoryTraceClearConfirm => '清空记录';
+
+  @override
+  String get memoryTraceCancel => '取消';
+
+  @override
+  String get memoryTraceClearedToast => '追踪记录已清空';
+
+  @override
+  String get memoryTraceCopyAction => '复制';
+
+  @override
+  String get memoryTraceCopiedToast => '已复制到剪贴板';
+
+  @override
+  String get memoryTraceTriggerAuto => '自动';
+
+  @override
+  String get memoryTraceTriggerManual => '手动';
+
+  @override
+  String get memoryTraceTriggerTool => '工具调用';
+
+  @override
+  String get memoryTraceTriggerSummary => '对话摘要';
+
+  @override
+  String get memoryTraceScopeAssistant => '助手';
+
+  @override
+  String get memoryTraceScopeGlobal => '全局';
+
+  @override
+  String get memoryTraceStepGatekeeper => '守门判断';
+
+  @override
+  String get memoryTraceStepExtract => '记忆抽取';
+
+  @override
+  String get memoryTraceStepSmartAdd => '智能写入';
+
+  @override
+  String get memoryTraceStepDistiller => '用户画像提炼';
+
+  @override
+  String get memoryTraceStepSummary => '对话摘要生成';
+
+  @override
+  String get memoryTraceStepChatSearch => '历史对话检索';
+
+  @override
+  String get memoryTraceStepTool => '记忆工具';
+
+  @override
+  String get memoryTraceStatusSuccess => '成功';
+
+  @override
+  String get memoryTraceStatusFailed => '失败';
+
+  @override
+  String get memoryTraceStatusSkipped => '跳过';
+
+  @override
+  String get memoryTraceStatusRunning => '进行中';
+
+  @override
+  String get memoryTraceOutcomeAdvanced => '水位已推进';
+
+  @override
+  String get memoryTraceOutcomeHeld => '水位未推进';
+
+  @override
+  String get memoryTraceOutcomeForced => '强制推进';
+
+  @override
+  String get memoryTraceDetailTitle => '追踪详情';
+
+  @override
+  String get memoryTraceSectionOverview => '概览';
+
+  @override
+  String get memoryTraceSectionPrompt => '提示词';
+
+  @override
+  String get memoryTraceSectionResponse => '原始回复';
+
+  @override
+  String get memoryTraceSectionParsed => '解析结果';
+
+  @override
+  String get memoryTraceSectionMutations => '实际改动';
+
+  @override
+  String get memoryTraceFieldTime => '开始时间';
+
+  @override
+  String get memoryTraceFieldDuration => '耗时';
+
+  @override
+  String get memoryTraceFieldTrigger => '触发方式';
+
+  @override
+  String get memoryTraceFieldScope => '作用范围';
+
+  @override
+  String get memoryTraceFieldConversation => '对话';
+
+  @override
+  String get memoryTraceFieldAssistant => '助手';
+
+  @override
+  String get memoryTraceFieldWindow => '消息窗口';
+
+  @override
+  String get memoryTraceFieldWatermark => '水位';
+
+  @override
+  String get memoryTraceFieldOutcome => '结果';
+
+  @override
+  String get memoryTraceFieldError => '错误';
+
+  @override
+  String get memoryTraceMutationCreated => '新建';
+
+  @override
+  String get memoryTraceMutationMerged => '合并';
+
+  @override
+  String get memoryTraceMutationEdited => '修改';
+
+  @override
+  String get memoryTraceMutationArchived => '归档';
+
+  @override
+  String get memoryTraceMutationLinked => '关联';
+
+  @override
+  String get memoryTraceMutationProfileWritten => '写入画像字段';
+
+  @override
+  String get memoryTraceMutationProfileCleared => '清除画像字段';
+
+  @override
+  String get memoryTraceMutationSummary => '写入对话摘要';
+
+  @override
+  String get memoryTraceBefore => '改动前';
+
+  @override
+  String get memoryTraceAfter => '改动后';
+
+  @override
+  String get memoryTraceEmptyValue => '（空）';
+
+  @override
+  String memoryTraceStepsCount(int count) {
+    return '$count 个步骤';
+  }
+
+  @override
+  String memoryTraceMutationsCount(int count) {
+    return '$count 项改动';
+  }
+
+  @override
+  String memoryTraceRepeatCount(int count) {
+    return '重复 $count 次';
+  }
+
+  @override
+  String memoryTraceWindowValue(int size, int start, int end) {
+    return '$size 条消息 · #$start–#$end';
+  }
+
+  @override
+  String get memoryTraceShowMore => '展开全文';
+
+  @override
+  String get memoryTraceShowLess => '收起';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -5453,6 +7227,25 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceCategoryChatData => '聊天记录';
 
   @override
+  String get storageSpaceCategoryLegacyChatData => '聊天记录（旧）';
+
+  @override
+  String get storageSpaceCategoryRestoreTraces => '恢复痕迹';
+
+  @override
+  String get storageSpaceRestoreTracesHint => '恢复完成后保留的旧数据快照。清理不会影响当前应用数据。';
+
+  @override
+  String get storageSpaceClearRestoreTracesButton => '清理恢复痕迹';
+
+  @override
+  String get storageSpaceClearRestoreTracesConfirmMessage =>
+      '确定清理已完成恢复留下的旧数据快照吗？当前数据库、设置和文件不会受到影响。';
+
+  @override
+  String get storageSpaceSubCompletedRestoreRuns => '已完成的恢复快照';
+
+  @override
   String get storageSpaceCategoryAssistantData => '助手';
 
   @override
@@ -5473,6 +7266,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceSafeToClearHint => '可安全清理，不影响聊天记录。';
 
   @override
+  String get storageSpaceLegacyChatDataHint =>
+      '这是迁移到 SQLite 前保留的 Hive 旧文件。清理后不会删除当前聊天记录。';
+
+  @override
   String get storageSpaceNotSafeToClearHint => '可能影响聊天记录，请谨慎删除。';
 
   @override
@@ -5486,6 +7283,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get storageSpaceSubChatToolEvents => '工具事件';
+
+  @override
+  String get storageSpaceSubChatDatabase => '聊天数据库';
+
+  @override
+  String get storageSpaceSubChatWriteAheadLog => '写入日志';
+
+  @override
+  String get storageSpaceSubChatSharedMemory => '共享内存索引';
 
   @override
   String get storageSpaceSubAssistantAvatars => '头像';
@@ -5542,6 +7348,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceClearLogsButton => '清理日志';
 
   @override
+  String get storageSpaceClearLegacyChatDataButton => '清理旧聊天记录';
+
+  @override
+  String get storageSpaceClearLegacyChatDataConfirmMessage =>
+      '确定清理保留的旧聊天文件吗？当前 SQLite 聊天记录不会受到影响。';
+
+  @override
   String get storageSpaceViewLogsButton => '查看日志';
 
   @override
@@ -5577,6 +7390,33 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
+  String get storageSpaceSourceLabel => '来源';
+
+  @override
+  String get storageSpaceSourceAll => '全部';
+
+  @override
+  String get storageSpaceSourceUserUpload => '用户上传';
+
+  @override
+  String get storageSpaceSourceAssistant => '助手发出';
+
+  @override
+  String get storageSpaceSortLabel => '排序';
+
+  @override
+  String get storageSpaceSortNewest => '最新';
+
+  @override
+  String get storageSpaceSortOldest => '最旧';
+
+  @override
+  String get storageSpaceSortLargest => '最大';
+
+  @override
+  String get storageSpaceSortSmallest => '最小';
+
+  @override
   String get settingsPageAboutSection => '关于';
 
   @override
@@ -5592,7 +7432,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get settingsPageLogs => '日志';
 
   @override
-  String get settingsPageSponsor => '赞助kelivo';
+  String get settingsPageSponsor => '赞助';
 
   @override
   String get settingsPageShare => '分享';
@@ -5813,15 +7653,8 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantProviderNewAssistantName => '新助手';
 
   @override
-  String assistantProviderSampleAssistantSystemPrompt(
-    String model_name,
-    String cur_datetime,
-    String locale,
-    String timezone,
-    String device_info,
-    String system_version,
-  ) {
-    return '你是$model_name, 一个人工智能助手，乐意为用户提供准确，有益的帮助。现在时间是$cur_datetime，用户设备语言为$locale，时区为$timezone，用户正在使用$device_info，版本$system_version。如果用户没有明确说明，请使用用户设备语言进行回复。';
+  String assistantProviderSampleAssistantSystemPrompt(String model_name) {
+    return '你是$model_name，一位乐于助人的 AI 助手。请准确、简洁地回答问题；不确定时如实说明。需要时可使用清晰结构（短段落或列表）。默认使用用户的语言回复。';
   }
 
   @override
@@ -6301,7 +8134,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get iosBackgroundLimitNoticeBody =>
-      '这些选项使用 Apple 支持的后台时间、BackgroundTasks、通知和实时活动。它们能提升连续性，但不能强制 iOS 永久保持 JO-Kelivo 运行。';
+      '这些选项使用 Apple 支持的后台时间、BackgroundTasks、通知和实时活动。它们能提升连续性，但不能强制 iOS 永久保持 Kelivo 运行。';
 
   @override
   String get iosBackgroundUnsupportedLiveActivity =>
@@ -6326,7 +8159,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get iosBackgroundNotificationsNotAuthorized => '通知未允许';
 
   @override
-  String get iosBackgroundGenerationActiveTitle => 'JO-Kelivo 正在生成';
+  String get iosBackgroundGenerationActiveTitle => 'Kelivo 正在生成';
 
   @override
   String get iosBackgroundGenerationActiveDetail => '助手正在后台回复';
@@ -6379,7 +8212,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get notificationChatCompletedBody => '助手回复已生成';
 
   @override
-  String get androidBackgroundNotificationTitle => 'JO-Kelivo 正在运行';
+  String get androidBackgroundNotificationTitle => 'Kelivo 正在运行';
 
   @override
   String get androidBackgroundNotificationText => '后台保持聊天生成';
@@ -6598,6 +8431,42 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantEditPreviewTitle => '预览';
 
   @override
+  String get assistantEditPromptTimeVarWarning =>
+      '在系统提示词中使用时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中，费用和首字延迟都会上升。需要让模型知道当前时间时，请改用下方的「追加当前时间」开关。';
+
+  @override
+  String get assistantEditPromptAppendTimeTitle => '追加当前时间';
+
+  @override
+  String get assistantEditPromptAppendTimeSubtitle =>
+      '在每条用户消息末尾追加发送时刻。时间在请求末尾，不影响 Prompt 缓存。';
+
+  @override
+  String get assistantEditPromptAppendTimeInfoTitle => '追加时间格式';
+
+  @override
+  String assistantEditPromptAppendTimeInfoBody(String example) {
+    return '开启后，会在每条用户消息末尾先空一行，再追加如下标签：\n\n$example\n\n时间取该消息自己的发送时刻，重试时保持不变。';
+  }
+
+  @override
+  String get assistantEditPromptAppendTimeInfoClose => '知道了';
+
+  @override
+  String get assistantEditPromptTimeVarDialogTitle => '系统提示词中含时间变量';
+
+  @override
+  String assistantEditPromptTimeVarDialogBody(String variables) {
+    return '你的系统提示词里用了 $variables。系统提示词每次请求都会重新渲染，含时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中。建议移除这些变量，改用「追加当前时间」——它把时间放在请求末尾，不影响前缀。';
+  }
+
+  @override
+  String get assistantEditPromptTimeVarDialogRemove => '去移除';
+
+  @override
+  String get assistantEditPromptTimeVarDialogKeep => '仍然开启';
+
+  @override
   String get codeBlockPreviewButton => '预览';
 
   @override
@@ -6809,7 +8678,101 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageRestartRequired => '需要重启应用';
 
   @override
-  String get backupPageRestartContent => '恢复完成，需要重启以完全生效。';
+  String get backupPageRestartContent => '导入成功。重启 Kelivo 后将安全应用。';
+
+  @override
+  String backupPageRestartContentWithSkipped(int count) {
+    return '导入已完成，但已跳过 $count 个消息顺序非法的会话。重启 Kelivo 后将安全应用已导入的数据。';
+  }
+
+  @override
+  String get restartAppFailedMessage => 'Kelivo 无法自动重启，请完全关闭后重新打开。';
+
+  @override
+  String get backupRestoreRolledBackTitle => '恢复已回滚';
+
+  @override
+  String get backupRestoreRolledBackContent => '恢复未能完成。Kelivo 已验证并保留原有数据。';
+
+  @override
+  String get backupRestoreFailureTitle => '恢复需要处理';
+
+  @override
+  String get backupRestoreFailureContent =>
+      'Kelivo 无法验证完整的原有或新数据，因此未打开聊天数据。请关闭 Kelivo 后重试；若问题反复出现，请保留诊断码以便支持人员排查。';
+
+  @override
+  String get backupRestoreBusinessLeaseUnavailableTitle => 'Kelivo 已在运行';
+
+  @override
+  String get backupRestoreBusinessLeaseUnavailableContent =>
+      'Kelivo 的数据仍被另一个应用进程占用。请关闭其他 Kelivo 窗口后重新启动；当前进程尚未打开聊天数据。';
+
+  @override
+  String get backupRestoreFailureRestartButton => '重启 Kelivo';
+
+  @override
+  String get backupRestoreFailureCopyButton => '复制诊断码';
+
+  @override
+  String get backupRestoreFailureCopied => '已复制诊断码';
+
+  @override
+  String backupRestoreFailureDiagnostic(String code) {
+    return '诊断码：$code';
+  }
+
+  @override
+  String get startupRecoveryMoreOptions => '更多恢复选项';
+
+  @override
+  String get startupRecoveryRepairButton => '修复并重启';
+
+  @override
+  String get startupRecoveryExportButton => '导出我的数据副本';
+
+  @override
+  String get startupRecoveryResetButton => '重置数据';
+
+  @override
+  String get startupRecoveryBusy => '处理中…';
+
+  @override
+  String get startupRecoveryExportSucceeded => '已保存一份数据副本。';
+
+  @override
+  String get startupRecoveryExportFailed => '无法导出数据副本。';
+
+  @override
+  String get startupRecoveryRepairFailed => '修复未能解决问题。请先导出数据副本，然后重置。';
+
+  @override
+  String get startupRecoveryResetFailed => '重置失败。请彻底关闭 Kelivo 后重新打开。';
+
+  @override
+  String get startupRecoveryResetDialogTitle => '重置全部数据？';
+
+  @override
+  String get startupRecoveryResetDialogContent =>
+      '这将永久删除本设备上 Kelivo 的数据库并重新开始。如果之后可能还需要这些数据，请先导出一份副本。此操作无法撤销。';
+
+  @override
+  String get startupRecoveryResetDialogConfirm => '重置并重启';
+
+  @override
+  String get startupRecoveryResetDialogCancel => '取消';
+
+  @override
+  String get startupDatabaseUpdateRequiredTitle => '请更新 Kelivo 以继续';
+
+  @override
+  String get startupDatabaseUpdateRequiredContent =>
+      '本设备上的聊天数据库由更新版本的 Kelivo 创建，当前版本无法打开。数据未被改动。请安装最新版 Kelivo 后重新打开。';
+
+  @override
+  String backupPageRestoreFailedMessage(String error) {
+    return '恢复失败：$error';
+  }
 
   @override
   String get backupPageOK => '好的';
@@ -6821,19 +8784,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageSelectImportMode => '选择导入模式';
 
   @override
-  String get backupPageSelectImportModeDescription => '请选择如何导入备份数据：';
+  String get backupPageSelectImportModeDescription =>
+      '请选择恢复方式。聊天和文件开关决定本次恢复的组件。';
 
   @override
   String get backupPageOverwriteMode => '完全覆盖';
 
   @override
-  String get backupPageOverwriteModeDescription => '清空本地所有数据后恢复';
+  String get backupPageOverwriteModeDescription => '仅替换已选组件；保留未选组件及无关本地设置';
 
   @override
-  String get backupPageMergeMode => '智能合并';
+  String get backupPageMergeMode => '合并';
 
   @override
-  String get backupPageMergeModeDescription => '仅添加不存在的数据（智能去重）';
+  String get backupPageMergeModeDescription =>
+      '保留本地数据并加入备份数据；相同会话会跳过，冲突会话会重新分配 ID。';
 
   @override
   String get backupPageRestore => '恢复';
@@ -6854,29 +8819,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageExportToFileSubtitle => '导出APP数据为文件';
 
   @override
-  String get backupPageExportKelivoBackup => '导出为 Kelivo 备份';
-
-  @override
   String get backupPageImportBackupFile => '备份文件导入';
 
   @override
   String get backupPageImportBackupFileSubtitle => '导入本地备份文件';
-
-  @override
-  String get backupPageImportKelivoBackup => '从 Kelivo 备份导入';
-
-  @override
-  String get backupPageOpenUserDataDirectory => '打开用户数据目录';
-
-  @override
-  String get backupPageOpenUserDataFailed => '打开用户数据目录失败';
-
-  @override
-  String get backupPageUserDataDirectoryTitle => '用户数据目录';
-
-  @override
-  String get backupPageUserDataDirectoryDescription =>
-      '打开应用主数据目录，用于查看聊天数据、上传文件、图片、头像、缓存和日志。';
 
   @override
   String get backupPageImportFromOtherApps => '从其他APP导入';
@@ -6947,6 +8893,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageS3PathStyle => '路径风格（Path-style）';
 
   @override
+  String get backupPageUserAgent => 'User-Agent';
+
+  @override
+  String get backupPageUserAgentHint => '可选';
+
+  @override
   String get backupPageSave => '保存';
 
   @override
@@ -6959,10 +8911,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageImportFromCherryStudio => '从 Cherry Studio 导入';
 
   @override
-  String get backupPageImportFromChatbox => '从 Chatbox 导入';
+  String backupPageCherryStudioUnsupportedBackupVersion(String version) {
+    return '此备份使用 Cherry Studio 格式版本 $version，Kelivo 目前尚无法导入。请改用 Cherry Studio v1 导出备份，或等待后续版本支持 Cherry Studio v2。';
+  }
 
   @override
-  String get backupPageImportFromDeepSeek => '从 DeepSeek 网页版/App 导入';
+  String get backupPageImportFromChatbox => '从 Chatbox 导入';
 
   @override
   String get backupReminderSectionTitle => '备份提醒';
@@ -7097,37 +9051,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get messageEditPageHint => '输入消息内容…';
 
   @override
-  String get messageEditCloseConfirmTitle => '要保存修改吗？';
+  String get userMessageEditSaveOnly => '仅保存';
 
   @override
-  String get messageEditCloseConfirmContent => '关闭前要保存这次编辑吗？';
+  String get userMessageEditUnsupportedSnackbar => '该内容不支持编辑';
 
   @override
-  String get messageEditCloseConfirmCancel => '取消';
+  String get userMessageEditOverwriteTitle => '提示';
 
   @override
-  String get messageEditCloseConfirmDiscard => '不保存';
-
-  @override
-  String get messageEditCloseConfirmSave => '保存';
-
-  @override
-  String get messageEditAttachmentsTitle => '附件';
-
-  @override
-  String get messageEditAddImage => '添加图片';
-
-  @override
-  String get messageEditAddFile => '添加文件';
-
-  @override
-  String get messageEditNoAttachments => '暂无附件';
-
-  @override
-  String get messageEditReplaceImage => '替换图片';
-
-  @override
-  String get messageEditRemoveAttachment => '移除附件';
+  String get userMessageEditOverwriteContent => '修改将覆盖输入框已有内容，是否覆盖？';
 
   @override
   String get selectCopyPageTitle => '选择复制';
@@ -7253,12 +9186,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get messageMoreSheetCreateBranch => '创建分支';
 
   @override
-  String get messageMoreSheetSwitchToUser => '切换为用户';
-
-  @override
-  String get messageMoreSheetSwitchToAssistant => '切换为模型';
-
-  @override
   String get messageMoreSheetDelete => '删除本版本';
 
   @override
@@ -7281,6 +9208,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get reasoningBudgetSheetXhigh => '极限推理';
+
+  @override
+  String get reasoningBudgetSheetMax => '全力推理';
 
   @override
   String get reasoningBudgetSheetTitle => '思维链强度';
@@ -7359,6 +9289,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatMessageWidgetOpenLinkError => '打开链接失败';
 
   @override
+  String get chatMessageWidgetAttachmentUnavailable => '附件不可用';
+
+  @override
   String chatMessageWidgetCitationsTitle(int count) {
     return '引用（共$count条）';
   }
@@ -7405,15 +9338,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatMessageWidgetDeepThinking => '深度思考';
 
   @override
-  String get chatMessageWidgetCreateMemory => '创建记忆';
-
-  @override
-  String get chatMessageWidgetEditMemory => '编辑记忆';
-
-  @override
-  String get chatMessageWidgetDeleteMemory => '删除记忆';
-
-  @override
   String chatMessageWidgetWebSearch(String query) {
     return '联网检索: $query';
   }
@@ -7434,6 +9358,30 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String chatMessageWidgetSpeakText(String text) {
     return '正在朗读: $text';
   }
+
+  @override
+  String get chatMessageWidgetMemoryRead => '读取记忆';
+
+  @override
+  String get chatMessageWidgetMemoryUpdate => '更新记忆';
+
+  @override
+  String get chatMessageWidgetMemorySearchProfile => '检索记忆';
+
+  @override
+  String get chatMessageWidgetMemoryEdit => '编辑记忆';
+
+  @override
+  String get chatMessageWidgetMemoryDelete => '删除记忆';
+
+  @override
+  String get chatMessageWidgetUpdateUserProfile => '更新用户画像';
+
+  @override
+  String get chatMessageWidgetChatSearch => '搜索历史对话';
+
+  @override
+  String get chatMessageWidgetCreateMemory => '创建记忆';
 
   @override
   String chatMessageWidgetToolCall(String name) {
@@ -7623,6 +9571,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get sideDrawerMenuRegenerateTitle => '重新生成标题';
 
   @override
+  String get sideDrawerMenuCopy => '复制';
+
+  @override
   String get sideDrawerMenuMoveTo => '移动到';
 
   @override
@@ -7742,6 +9693,30 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get sideDrawerReset => '重置';
 
   @override
+  String get providerAvatarChooseBuiltInIcon => '选择内置图标';
+
+  @override
+  String get providerAvatarIconDialogTitle => '选择内置图标';
+
+  @override
+  String get providerAvatarIconSearchHint => '搜索图标';
+
+  @override
+  String get providerAvatarIconNoResults => '未找到图标';
+
+  @override
+  String get providerAvatarInputLobehubIcon => '输入 LobeHub 图标';
+
+  @override
+  String get providerAvatarChooseLobehubIcon => '输入 LobeHub 图标';
+
+  @override
+  String get providerAvatarLobehubDialogTitle => '输入 LobeHub 图标';
+
+  @override
+  String get providerAvatarLobehubDialogHint => '输入 LobeHub 图标名，如 openai';
+
+  @override
   String get sideDrawerEmojiDialogTitle => '选择表情';
 
   @override
@@ -7803,16 +9778,28 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatInputBarMoreTooltip => '更多';
 
   @override
+  String get chatInputBarVoiceInputTooltip => '语音输入';
+
+  @override
+  String get chatInputBarVoiceCancelTooltip => '取消录音';
+
+  @override
+  String get chatInputBarVoiceStopTooltip => '停止并转为文字';
+
+  @override
+  String get chatInputBarVoiceSendTooltip => '转文字并发送';
+
+  @override
+  String get chatInputBarVoiceTranscribing => '正在识别…';
+
+  @override
+  String get chatInputBarImageProcessing => '正在处理图片';
+
+  @override
   String get chatInputBarImageMode => '绘图模式';
 
   @override
   String get chatInputBarDisableImageModeTooltip => '关闭绘图模式';
-
-  @override
-  String get chatInputBarReplaceImageTooltip => '替换图片';
-
-  @override
-  String get chatInputBarRemoveImageTooltip => '移除图片';
 
   @override
   String get chatInputBarQueuedPending => '排队中';
@@ -7860,7 +9847,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get mcpPageStatusDisconnected => '未连接';
 
   @override
+  String get mcpPageStatusAuthorizationRequired => '需要授权';
+
+  @override
+  String get mcpPageStatusAuthorizing => '授权中…';
+
+  @override
   String get mcpPageStatusDisabled => '已禁用';
+
+  @override
+  String get mcpPageOAuthRequired => '需要 OAuth 登录';
+
+  @override
+  String get mcpPageOAuthSignIn => 'OAuth 登录';
 
   @override
   String mcpPageToolsCount(int enabled, int total) {
@@ -7996,6 +9995,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get defaultModelPageTitleModelSubtitle => '用于总结对话标题的模型，推荐使用快速且便宜的模型';
 
   @override
+  String get titleModelThinkingTitle => '是否开启思考';
+
+  @override
   String get defaultModelPageSummaryModelTitle => '摘要模型';
 
   @override
@@ -8050,6 +10052,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageOcrModelTitle => 'OCR 模型';
+
+  @override
+  String backgroundTaskFailed(String task, String error) {
+    return '$task失败：$error';
+  }
 
   @override
   String get defaultModelPageOcrModelSubtitle => '用于对图片执行文字识别的模型';
@@ -8342,6 +10349,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get providerDetailPageModelsTab => '模型';
 
   @override
+  String get providerDetailPageCustomRequestTitle => '自定义请求';
+
+  @override
+  String get providerDetailPageCustomRequestDescription =>
+      '应用于此供应商的所有模型。模型配置优先于此处，此处配置优先于助手配置。';
+
+  @override
   String get providerDetailPageNetworkTab => '网络代理';
 
   @override
@@ -8403,7 +10417,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get providerDetailPageBalanceInfo => '获取账户余额';
 
   @override
-  String get providerDetailPageBalanceApiPathLabel => '余额 API 地址或路径';
+  String get providerDetailPageBalanceApiPathLabel => '余额 API 路径';
 
   @override
   String get providerDetailPageBalanceResultPathLabel => '结果 JSON 路径';
@@ -8429,10 +10443,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String providerDetailPageBalanceError(String message) {
     return '余额查询失败：$message';
   }
-
-  @override
-  String get providerDetailPageBalanceFullUrlRequired =>
-      '主 API 端点不是 OpenAI 兼容格式，请填写完整的 OpenAI 兼容余额 API 地址。';
 
   @override
   String get providerDetailPageVertexAiTitle => 'Vertex AI';
@@ -8915,6 +10925,128 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get searchServicesEditDialogRegionOptional => '地区（可选，默认 us-en）';
 
   @override
+  String get searchServiceEditorProviderTypeTitle => '搜索提供商';
+
+  @override
+  String get searchServiceEditorConfigurationTitle => '服务配置';
+
+  @override
+  String get searchServiceEditorNoConfiguration => '此提供商无需额外配置。';
+
+  @override
+  String get searchServiceEditorMultiKeyTitle => '多 Key 轮询';
+
+  @override
+  String get searchServiceEditorMultiKeyNone => '未配置';
+
+  @override
+  String get searchApiKeysPageDescription =>
+      '列表中的 Key 按顺序轮询使用，第一个为主 Key；不查额度，以防触发服务商风控。';
+
+  @override
+  String get searchApiKeysPagePrimaryBadge => '主';
+
+  @override
+  String get searchApiKeysPageBatchHint => '可一次粘贴多个 Key：每行一个，或用逗号分隔';
+
+  @override
+  String searchApiKeysPageBatchResult(String added, String skipped) {
+    return '已添加 $added 个，跳过 $skipped 个重复';
+  }
+
+  @override
+  String get searchApiKeysPageAdd => '添加';
+
+  @override
+  String get searchApiKeysPageEmpty => '尚未配置任何 Key。';
+
+  @override
+  String searchServiceEditorMultiKeyCount(String count) {
+    return '共 $count 个 Key';
+  }
+
+  @override
+  String get searchServiceEditorUsageTitle => '账户用量';
+
+  @override
+  String get searchServiceEditorUsageNotQueried => '尚未查询用量。';
+
+  @override
+  String get searchServiceEditorUsageQuery => '查询用量';
+
+  @override
+  String get searchServiceEditorUsageQuerying => '查询中…';
+
+  @override
+  String searchServiceEditorUsageRemaining(String remaining) {
+    return '剩余 $remaining 额度';
+  }
+
+  @override
+  String searchServiceEditorUsageBalance(String balance) {
+    return '余额 $balance';
+  }
+
+  @override
+  String searchServiceEditorUsageUsed(String used, String limit) {
+    return '已使用 $used / $limit 额度';
+  }
+
+  @override
+  String searchServiceEditorUsageFailed(String message) {
+    return '用量查询失败：$message';
+  }
+
+  @override
+  String get searchServiceEditorTestTitle => '测试搜索';
+
+  @override
+  String get searchServiceEditorTestQueryHint => '输入测试关键词';
+
+  @override
+  String get searchServiceEditorTestRun => '运行测试搜索';
+
+  @override
+  String get searchServiceEditorTestRunning => '搜索中…';
+
+  @override
+  String get searchServiceEditorTestNoResults => '提供商未返回任何结果。';
+
+  @override
+  String searchServiceEditorTestFailed(String message) {
+    return '搜索失败：$message';
+  }
+
+  @override
+  String get searchServiceEditorResultOpenTooltip => '打开结果';
+
+  @override
+  String get searchServiceEditorDeleteTooltip => '删除搜索服务';
+
+  @override
+  String get searchServiceEditorDeleteTitle => '删除搜索服务？';
+
+  @override
+  String searchServiceEditorDeleteMessage(String provider) {
+    return '确定删除 $provider 吗？此操作无法撤销。';
+  }
+
+  @override
+  String get searchServiceEditorDeleteConfirm => '删除';
+
+  @override
+  String get searchServiceEditorDiscardTitle => '放弃更改？';
+
+  @override
+  String get searchServiceEditorDiscardMessage => '尚未保存的搜索服务设置将会丢失。';
+
+  @override
+  String get searchServiceEditorKeepEditing => '继续编辑';
+
+  @override
+  String get searchServiceEditorDiscard => '放弃';
+
+  @override
   String get searchSettingsSheetTitle => '搜索设置';
 
   @override
@@ -8949,13 +11081,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get aboutPageEasterEggButton => '好的';
 
   @override
-  String get aboutPageAppName => 'JO-Kelivo';
+  String get aboutPageAppName => 'Kelivo';
 
   @override
-  String get aboutPageAppDescription => '基于 Kelivo 的开源 AI 助手';
-
-  @override
-  String get aboutPageKelivoSectionTitle => '关于 Kelivo';
+  String get aboutPageAppDescription => '开源 AI 助手';
 
   @override
   String get aboutPageNoQQGroup => '暂无QQ群';
@@ -9010,7 +11139,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get aboutPageJoinQQGroup => '加入QQ群';
 
   @override
-  String get aboutPageJoinDiscord => '加入 Discord';
+  String get aboutPageQQGroupOne => 'Kelivo 一群';
+
+  @override
+  String get aboutPageQQGroupTwo => 'Kelivo 二群';
+
+  @override
+  String get aboutPageJoinDiscord => '在 Discord 中加入我们';
 
   @override
   String get displaySettingsPageShowUserAvatarTitle => '显示用户头像';
@@ -9089,19 +11224,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageInsertSuggestionOnlyTitle => '点击建议时仅填入输入框';
-
-  @override
-  String get displaySettingsPageInsertNewAssistantAtTopTitle => '新建和复制助手放到顶部';
-
-  @override
-  String get displaySettingsPageLazyHistoryTitle => '懒加载聊天历史';
-
-  @override
-  String get displaySettingsPageDesktopWideChatLayoutTitle => '聊天区域拉宽';
-
-  @override
-  String get displaySettingsPageDesktopWideChatLayoutSubtitle =>
-      '在桌面端、平板或横屏宽屏布局中，让消息列表和输入栏尽量占满可用宽度。';
 
   @override
   String get displaySettingsPageShowToolResultSummarySubtitle =>
@@ -9260,6 +11382,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageChatBackgroundMaskTitle => '背景图片遮罩透明度';
 
   @override
+  String get displaySettingsPageChatInputBackgroundOpacityTitle => '输入框背景透明度';
+
+  @override
   String get displaySettingsPageThemeSettingsTitle => '主题设置';
 
   @override
@@ -9338,16 +11463,239 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get themeSettingsPageColorPalettesSection => '配色方案';
 
   @override
+  String get themeSettingsPageCustomPaletteName => '自定义';
+
+  @override
+  String get themeSettingsPageCustomColorReset => '重置';
+
+  @override
+  String get themeSettingsPageCustomThemesSection => '自定义主题';
+
+  @override
+  String get customThemeNewTheme => '新建主题';
+
+  @override
+  String get customThemeEditTheme => '编辑主题';
+
+  @override
+  String get customThemeImportTheme => '导入主题';
+
+  @override
+  String get customThemeNameLabel => '主题名称';
+
+  @override
+  String get customThemePrimaryColor => '主色';
+
+  @override
+  String get customThemeSecondaryColor => '辅色';
+
+  @override
+  String get customThemeTertiaryColor => '第三色';
+
+  @override
+  String get customThemeColorAuto => '自动';
+
+  @override
+  String get customThemeSave => '保存';
+
+  @override
+  String get customThemeCancel => '取消';
+
+  @override
+  String get customThemeDelete => '删除';
+
+  @override
+  String get customThemeDeleteConfirm => '删除该主题？';
+
+  @override
+  String get customThemeCopied => '主题 JSON 已复制到剪贴板';
+
+  @override
+  String get customThemeCopyAction => '复制';
+
+  @override
+  String get customThemeImportHint => '在此粘贴主题 JSON';
+
+  @override
+  String get customThemeImportInvalid => '无效的主题 JSON';
+
+  @override
+  String get customThemeHexLabel => '十六进制';
+
+  @override
   String get ttsServicesPageBackButton => '返回';
 
   @override
   String get ttsServicesPageTitle => '语音服务';
 
   @override
+  String get ttsServicesSectionTitle => '文字转语音';
+
+  @override
   String get ttsServicesPageSettingsTooltip => 'TTS 设置';
 
   @override
   String get ttsServicesPageAddTooltip => '新增';
+
+  @override
+  String get asrServicesSectionTitle => '语音识别';
+
+  @override
+  String get asrServicesSectionDescription => '使用本地、系统或云端服务将语音转换为文字。';
+
+  @override
+  String get asrServicesAddTooltip => '添加语音识别服务';
+
+  @override
+  String get asrServicesEmptyTitle => '尚未添加语音识别服务';
+
+  @override
+  String get asrServicesEmptySubtitle => '添加后，聊天输入框才会显示麦克风。';
+
+  @override
+  String get asrServicesOnDeviceGroup => '设备端';
+
+  @override
+  String get asrServicesCloudGroup => '云端';
+
+  @override
+  String get asrServicesSystemTitle => '系统';
+
+  @override
+  String get asrServicesSystemSubtitle => '使用设备内置能力';
+
+  @override
+  String get asrServicesLocalTitle => '本地模型';
+
+  @override
+  String get asrServicesLocalSubtitle => '下载后在设备上离线运行';
+
+  @override
+  String get asrServicesOpenAiTitle => 'OpenAI Realtime';
+
+  @override
+  String get asrServicesOpenAiSubtitle => '低延迟流式转写';
+
+  @override
+  String get asrServicesDashScopeTitle => 'DashScope';
+
+  @override
+  String get asrServicesDashScopeSubtitle => 'Qwen 实时转写';
+
+  @override
+  String get asrServicesVolcengineTitle => '火山引擎';
+
+  @override
+  String get asrServicesVolcengineSubtitle => '豆包语音流式转写';
+
+  @override
+  String get asrServicesMimoTitle => 'MiMo';
+
+  @override
+  String get asrServicesMimoSubtitle => '分段云端转写';
+
+  @override
+  String get asrServicesStepTitle => 'Step';
+
+  @override
+  String get asrServicesStepSubtitle => 'Step Audio 分段云端转写';
+
+  @override
+  String get asrServicesAddTitle => '添加语音识别';
+
+  @override
+  String get asrServicesEditTitle => '编辑语音识别';
+
+  @override
+  String get asrServicesSelectedLabel => '已选择';
+
+  @override
+  String get asrServicesUnavailableLabel => '不可用';
+
+  @override
+  String get asrServicesEditAction => '编辑';
+
+  @override
+  String get asrServicesDeleteAction => '删除';
+
+  @override
+  String get asrServicesCancelAction => '取消';
+
+  @override
+  String get asrServicesAddAction => '添加';
+
+  @override
+  String get asrServicesSaveAction => '保存';
+
+  @override
+  String get asrServicesNameLabel => '名称';
+
+  @override
+  String get asrServicesApiKeyLabel => 'API Key';
+
+  @override
+  String get asrServicesEndpointLabel => '服务地址';
+
+  @override
+  String get asrServicesModelLabel => '模型';
+
+  @override
+  String get asrServicesResourceIdLabel => '资源 ID';
+
+  @override
+  String get asrServicesLanguageLabel => '语言';
+
+  @override
+  String get asrServicesAutomaticLabel => '自动';
+
+  @override
+  String get asrServicesApiKeyRequired => '请输入 API Key 后再使用此服务。';
+
+  @override
+  String get asrServicesChooseModelTitle => '模型';
+
+  @override
+  String get asrServicesModelDownloadAction => '下载';
+
+  @override
+  String get asrServicesModelUseAction => '使用此模型';
+
+  @override
+  String get asrServicesModelDeleteAction => '删除下载';
+
+  @override
+  String get asrServicesModelDownloadedLabel => '已下载';
+
+  @override
+  String get asrServicesModelDownloadingLabel => '正在下载…';
+
+  @override
+  String get asrServicesModelNotDownloadedLabel => '未下载';
+
+  @override
+  String asrServicesDownloadFailed(String error) {
+    return '模型下载失败：$error';
+  }
+
+  @override
+  String get asrServicesSystemChecking => '正在检查…';
+
+  @override
+  String get asrServicesSystemAvailable => '可用';
+
+  @override
+  String get asrServicesSystemCheckFailed => '这台设备没有可用的系统语音识别服务。';
+
+  @override
+  String get asrServicesMicrophonePermissionDenied => '未获得麦克风权限。';
+
+  @override
+  String get asrServicesNoSpeechDetected => '没有识别到语音。';
+
+  @override
+  String asrServicesRecognitionFailed(String error) {
+    return '语音识别失败：$error';
+  }
 
   @override
   String get ttsServicesPageAddNotImplemented => '新增 TTS 服务暂未实现';
@@ -9460,7 +11808,81 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get ttsServicesFieldLanguageLabel => '语言';
 
   @override
+  String get ttsServicesFieldWorkspaceIdLabel => '业务空间 ID';
+
+  @override
+  String get ttsServicesFieldRegionLabel => '地域';
+
+  @override
+  String get ttsServicesFieldFormatLabel => '音频格式';
+
+  @override
+  String get ttsServicesFieldOutputFormatLabel => '输出格式';
+
+  @override
+  String get ttsServicesFieldSampleRateLabel => '采样率';
+
+  @override
+  String get ttsServicesFieldVolumeLabel => '音量';
+
+  @override
+  String get ttsServicesFieldPitchLabel => '音调';
+
+  @override
+  String get ttsServicesFieldLanguageBoostLabel => '语言增强';
+
+  @override
+  String get ttsServicesFieldBitrateLabel => '比特率';
+
+  @override
+  String get ttsServicesFieldChannelLabel => '声道数';
+
+  @override
+  String get ttsServicesFieldSubtitlesLabel => '生成字幕';
+
+  @override
+  String get ttsServicesFieldPronunciationDictionaryLabel => '发音词典（每行一项）';
+
+  @override
+  String get ttsServicesFieldInstructionLabel => '风格／音色描述';
+
+  @override
+  String get ttsServicesFieldStreamingLabel => '流式输出';
+
+  @override
+  String get ttsServicesFieldOptimizeTextPreviewLabel => '优化播报文本';
+
+  @override
+  String get ttsServicesFieldReferenceAudioLabel => '参考音频（WAV/MP3 数据 URI）';
+
+  @override
+  String get ttsServicesFieldChooseReferenceAudioButton => '选择参考音频';
+
+  @override
+  String get ttsServicesFieldTemperatureLabel => '随机度';
+
+  @override
+  String get ttsServicesFieldTopPLabel => 'Top P';
+
+  @override
+  String get ttsServicesFieldLatencyLabel => '延迟模式';
+
+  @override
+  String get ttsServicesEmotionAutoLabel => '自动匹配';
+
+  @override
   String get ttsServicesValidationApiKeyRequired => 'API Key 不能为空';
+
+  @override
+  String get ttsServicesValidationReferenceIdRequired => '音色／参考 ID 不能为空';
+
+  @override
+  String get ttsServicesValidationInstructionRequired => '音色描述不能为空';
+
+  @override
+  String ttsServicesValidationSampleRate(String format, String rates) {
+    return '$format 格式要求使用 $rates Hz。';
+  }
 
   @override
   String get ttsServicesViewDetailsButton => '查看详情';
@@ -9482,6 +11904,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get ttsSettingsAutoPlayDescription => '助手回复生成完成后自动开始 TTS 播放。';
+
+  @override
+  String get ttsSettingsCacheReplayTitle => '使用缓存复播';
+
+  @override
+  String get ttsSettingsCacheReplayDescription => '重新播放网络语音时使用已生成的音频，不再请求语音服务。';
 
   @override
   String get ttsSettingsTextSelectionSection => '文本选择';
@@ -9554,6 +11982,23 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get ttsFloatingCollapseTooltip => '收起播放控制';
 
   @override
+  String get ttsFloatingSaveTooltip => '保存音频';
+
+  @override
+  String get ttsSaveDialogTitle => '保存 TTS 音频';
+
+  @override
+  String get ttsSaveSuccess => '音频已保存';
+
+  @override
+  String get ttsSaveNothing => '暂无可保存的音频';
+
+  @override
+  String ttsSaveFailed(String message) {
+    return '保存音频失败：$message';
+  }
+
+  @override
   String imageViewerPageShareFailedOpenFile(String message) {
     return '无法分享，已尝试打开文件: $message';
   }
@@ -9624,7 +12069,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
-  String get settingsShare => 'JO-Kelivo - 开源 AI 助手';
+  String get settingsShare => 'Kelivo - 开源AI助手';
 
   @override
   String get searchProviderBingLocalDescription =>
@@ -9713,6 +12158,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '博查 AI 全网网页搜索，支持时间范围与摘要，更适合 AI 使用。';
 
   @override
+  String get searchServiceNameDoubao => '豆包';
+
+  @override
+  String get searchProviderDoubaoDescription => '火山引擎豆包网页搜索 API。';
+
+  @override
   String get searchServiceNameSerper => 'Serper';
 
   @override
@@ -9732,6 +12183,27 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get searchProviderGrokDescription =>
       '通过 xAI Responses API 使用 Grok 搜索。调用网页和 X 搜索工具，并返回带引用的来源。';
+
+  @override
+  String get searchServiceNameStepFun => 'StepFun';
+
+  @override
+  String get searchProviderStepFunDescription =>
+      '通过 StepFun POST /v1/search 进行网页搜索。';
+
+  @override
+  String get searchServiceNameFirecrawl => 'Firecrawl';
+
+  @override
+  String get searchProviderFirecrawlDescription =>
+      'Firecrawl Search API v2。需要 Bearer API Key。此处不支持 Scrape。';
+
+  @override
+  String get searchServiceNameTinyFish => 'TinyFish';
+
+  @override
+  String get searchProviderTinyFishDescription =>
+      'TinyFish Search API，支持地区与语言参数。需要 API Key。此处不支持 Fetch/Scrape。';
 
   @override
   String get searchServicesDialogCountryOptional => '国家/地区（可选）';
@@ -9943,7 +12415,39 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantEditLocalToolAskUserSubtitle => '允许助手提出简短问题，并在你回答后继续生成。';
 
   @override
-  String get assistantEditMemorySwitchTitle => '记忆';
+  String get assistantEditLocalToolCalculateTitle => '计算器';
+
+  @override
+  String get assistantEditLocalToolCalculateSubtitle =>
+      '计算数学表达式，支持加减乘除幂运算 sqrt sin cos 等。';
+
+  @override
+  String get assistantEditLocalToolScreenTimeTitle => '屏幕使用时间';
+
+  @override
+  String get assistantEditLocalToolScreenTimeSubtitle =>
+      '查询本设备的应用使用时长，需要授予使用情况访问权限。';
+
+  @override
+  String get chatMessageWidgetScreenTimeTotal => '总屏幕时间';
+
+  @override
+  String get chatMessageWidgetScreenTimePermissionRequired =>
+      '未授予使用情况访问权限，请在系统设置中开启后重试。';
+
+  @override
+  String get assistantEditLocalToolCalendarQueryTitle => '查询日历';
+
+  @override
+  String get assistantEditLocalToolCalendarQuerySubtitle =>
+      '读取本设备上的日历日程，需要授予日历权限。';
+
+  @override
+  String get assistantEditLocalToolCalendarCreateTitle => '创建日程';
+
+  @override
+  String get assistantEditLocalToolCalendarCreateSubtitle =>
+      '在你确认后于本设备创建日历日程，需要授予日历权限。';
 
   @override
   String get assistantEditMemorySwitchDescription => '允许助手主动存储并在对话间引用用户相关信息';
@@ -9954,9 +12458,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get assistantEditRecentChatsSwitchDescription =>
       '在新对话中引用最近的对话标题以增强上下文';
-
-  @override
-  String get assistantEditManageMemoryTitle => '管理记忆';
 
   @override
   String get assistantEditAddMemoryButton => '添加记忆';
@@ -10194,6 +12695,17 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
+  String get providerDetailPageDeleteFailedDetectedModelsButton => '删除不可用';
+
+  @override
+  String get providerDetailPageDeleteFailedDetectedModelsTooltip => '删除检测失败的模型';
+
+  @override
+  String providerDetailPageDeleteFailedDetectedModelsConfirm(int count) {
+    return '确定删除检测失败的 $count 个模型吗？此操作不可撤回。';
+  }
+
+  @override
   String providerDetailPageSelectedModelsDeletedSnackbar(int count) {
     return '已删除 $count 个模型';
   }
@@ -10353,6 +12865,602 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get settingsPageWorldBook => '世界书';
+
+  @override
+  String get settingsPageMemory => '记忆';
+
+  @override
+  String get memorySettingsPageTitle => '记忆';
+
+  @override
+  String get memorySettingsModelSection => '记忆模型';
+
+  @override
+  String get memorySettingsModelTitle => '处理模型';
+
+  @override
+  String get memorySettingsModelUnset => '未选择';
+
+  @override
+  String get memorySettingsModelTip => '开启「自动整理记忆」后，后台会频繁调用此模型，建议选择便宜且速度快的模型。';
+
+  @override
+  String get memorySettingsAboutTitle => '记忆说明';
+
+  @override
+  String get memorySettingsAboutSubtitle => '了解记忆如何运作与触发';
+
+  @override
+  String get memorySettingsAboutBody =>
+      '记忆如何运作\n记忆按「身份 / 工作流 / 语气 / 指令」分类，并区分全局与助手范围。对话时，相关记忆会注入模型上下文；条目较多时先展示摘要，模型可用工具继续查询更多内容。\n\n后台如何处理、如何触发\n处理模型用于后台整理管线：判断是否值得记忆、提取候选、去重合并，必要时再提炼用户画像。助手开启「自动整理」后，会按设定轮数在对话结束后自动触发；也可在助手「记忆」页手动整理。因此该模型会被较频繁调用。\n\n如何保持缓存良好\n尽量让注入对话的记忆前缀保持稳定，避免无意义的大批量改动或频繁重排，有助于 Prompt 缓存命中，从而降低费用与延迟。日常增删改单条记忆通常影响有限。';
+
+  @override
+  String get memorySettingsThinkingTitle => '启用思考';
+
+  @override
+  String get memorySettingsThinkingSubtitle => '在模型支持时允许记忆模型使用推理';
+
+  @override
+  String get memorySettingsPromptLangSection => '提示词语言';
+
+  @override
+  String get memorySettingsPromptLangAuto => '自动';
+
+  @override
+  String get memorySettingsPromptLangAutoSubtitle => '跟随界面语言（中文用 zh，否则用 en）';
+
+  @override
+  String get memorySettingsPromptLangZh => '中文';
+
+  @override
+  String get memorySettingsPromptLangZhSubtitle => '始终使用中文记忆提示词与工具描述';
+
+  @override
+  String get memorySettingsPromptLangEn => 'English';
+
+  @override
+  String get memorySettingsPromptLangEnSubtitle => '始终使用英文记忆提示词与工具描述';
+
+  @override
+  String get memorySettingsPromptsSection => '提示词模板';
+
+  @override
+  String get memoryPromptEditRulesTitle => '记忆规则';
+
+  @override
+  String get memoryPromptEditRulesSubtitle => '注入到主对话的系统提示中';
+
+  @override
+  String get memoryPromptEditGateTitle => 'Gatekeeper';
+
+  @override
+  String get memoryPromptEditGateSubtitle => '判断这一轮是否值得记忆';
+
+  @override
+  String get memoryPromptEditExtractTitle => 'Extract';
+
+  @override
+  String get memoryPromptEditExtractSubtitle => '从对话中提取候选记忆条目';
+
+  @override
+  String get memoryPromptEditSmartAddTitle => 'Smart Add';
+
+  @override
+  String get memoryPromptEditSmartAddSubtitle =>
+      'NEW / MERGE / CONFLICT / SKIP 去重判定';
+
+  @override
+  String get memoryPromptEditDistillTitle => 'Profile Distiller';
+
+  @override
+  String get memoryPromptEditDistillSubtitle => '从身份类记忆提炼画像字段';
+
+  @override
+  String get memoryPromptEditReset => '恢复默认';
+
+  @override
+  String get memoryPromptEditSave => '保存';
+
+  @override
+  String get memoryPromptEditSectionPerItem => '逐条提示词';
+
+  @override
+  String get memoryPromptEditSectionBatch => '合并提示词';
+
+  @override
+  String get memorySettingsEntriesSection => '全部记忆';
+
+  @override
+  String get memorySettingsEntriesTitle => '记忆列表';
+
+  @override
+  String get memorySettingsEntriesSubtitle => '浏览、编辑、归档与删除记忆';
+
+  @override
+  String get memorySettingsProfileTitle => '用户画像';
+
+  @override
+  String get memorySettingsProfileSubtitle => '供模型使用的结构化身份字段';
+
+  @override
+  String get memorySettingsLegacyTitle => '旧版记忆（只读）';
+
+  @override
+  String get memorySettingsLegacySubtitle => '来自旧版本的记忆';
+
+  @override
+  String get memoryEntryTypeIdentity => '身份';
+
+  @override
+  String get memoryEntryTypeWorkflow => '工作流';
+
+  @override
+  String get memoryEntryTypeVoice => '语气';
+
+  @override
+  String get memoryEntryTypeInstruction => '指令';
+
+  @override
+  String get memoryEntryScopeGlobal => '全局';
+
+  @override
+  String get memoryEntryScopeAssistant => '仅本助手';
+
+  @override
+  String memoryEntryScopeAssistantNamed(String name) {
+    return '$name';
+  }
+
+  @override
+  String get memoryEntrySourceManual => '手动';
+
+  @override
+  String get memoryEntrySourceTool => '工具';
+
+  @override
+  String get memoryEntrySourceExtracted => '提取';
+
+  @override
+  String get memoryEntrySourceDistilled => '蒸馏';
+
+  @override
+  String get memoryEntryStatusActive => '活跃';
+
+  @override
+  String get memoryEntryStatusArchived => '已归档';
+
+  @override
+  String memoryEntryUpdatedAt(String date) {
+    return '更新于 $date';
+  }
+
+  @override
+  String get memoryEntryActionEdit => '编辑';
+
+  @override
+  String get memoryEntryActionDelete => '删除';
+
+  @override
+  String get memoryEntryActionArchive => '归档';
+
+  @override
+  String get memoryEntryActionRestore => '恢复';
+
+  @override
+  String get memoryEntryActionSwitchScope => '切换范围';
+
+  @override
+  String get memoryEntryActionBatchDelete => '删除所选';
+
+  @override
+  String get memoryEntryActionAdd => '添加记忆';
+
+  @override
+  String get memoryEntryDeleteConfirmTitle => '删除这条记忆？';
+
+  @override
+  String get memoryEntryDeleteConfirmContent => '将永久删除该记忆，且无法撤销。';
+
+  @override
+  String memoryEntryBatchDeleteConfirmTitle(int count) {
+    return '删除 $count 条记忆？';
+  }
+
+  @override
+  String get memoryEntryBatchDeleteConfirmContent => '所选记忆将被永久删除。';
+
+  @override
+  String get memoryEntrySwitchScopeConfirmTitle => '更改记忆范围？';
+
+  @override
+  String get memoryEntrySwitchScopeToGlobal => '将这条记忆设为全局（所有助手可见）？';
+
+  @override
+  String get memoryEntrySwitchScopeToAssistant => '将这条记忆限制为仅本助手？';
+
+  @override
+  String get memoryEntryArchivedSection => '已归档';
+
+  @override
+  String get memoryEntryEmpty => '还没有记忆';
+
+  @override
+  String get memoryEntryEmptyDisabled => '该助手未启用长期记忆';
+
+  @override
+  String get memoryEntryEditTitle => '编辑记忆';
+
+  @override
+  String get memoryEntryCreateTitle => '新建记忆';
+
+  @override
+  String get memoryEntryContentHint => '输入记忆内容';
+
+  @override
+  String get memoryEntryTypeLabel => '类型';
+
+  @override
+  String get memoryEntryScopeLabel => '范围';
+
+  @override
+  String get memoryFilterScopeAll => '全部范围';
+
+  @override
+  String get memoryFilterScopeGlobal => '仅全局';
+
+  @override
+  String get memoryFilterScopeAssistant => '助手';
+
+  @override
+  String get memoryFilterTypeAll => '全部类型';
+
+  @override
+  String get memoryFilterStatusAll => '全部状态';
+
+  @override
+  String get memoryFilterStatusActive => '活跃';
+
+  @override
+  String get memoryFilterStatusArchived => '已归档';
+
+  @override
+  String get memorySearchHint => '搜索记忆';
+
+  @override
+  String get memorySearchEmpty => '没有匹配的记忆';
+
+  @override
+  String memoryOrphanBanner(int count) {
+    return '有 $count 条孤儿助手记忆（助手已删除）';
+  }
+
+  @override
+  String get memoryOrphanCleanupButton => '清理';
+
+  @override
+  String get memoryOrphanConfirmTitle => '清理孤儿记忆？';
+
+  @override
+  String memoryOrphanConfirmContent(int count) {
+    return '将永久删除 $count 条所属助手已不存在的记忆。';
+  }
+
+  @override
+  String get memoryOrganizeButton => '整理记忆';
+
+  @override
+  String get memoryOrganizeNeedsConversation => '需要在与该助手的对话中使用';
+
+  @override
+  String get memoryOrganizeNeedsModel => '请先在 设置 → 记忆 中选择记忆处理模型';
+
+  @override
+  String get memoryOrganizeStatusNever => '尚未整理';
+
+  @override
+  String memoryOrganizeStatusLast(String when) {
+    return '上次整理：$when';
+  }
+
+  @override
+  String memoryOrganizeStatusExtracted(int count) {
+    return '提取 $count 条';
+  }
+
+  @override
+  String get memoryOrganizeStatusSkipped => '无需记忆';
+
+  @override
+  String memoryOrganizeStatusFailed(String reason) {
+    return '失败：$reason';
+  }
+
+  @override
+  String get memoryOrganizeJustNow => '刚刚';
+
+  @override
+  String memoryOrganizeMinutesAgo(int n) {
+    return '$n 分钟前';
+  }
+
+  @override
+  String memoryOrganizeHoursAgo(int n) {
+    return '$n 小时前';
+  }
+
+  @override
+  String memoryOrganizeDaysAgo(int n) {
+    return '$n 天前';
+  }
+
+  @override
+  String get memoryModelMissingNotice => '需要先在 设置 → 记忆 中选择记忆处理模型。';
+
+  @override
+  String get memoryModelMissingGoSelect => '去选择';
+
+  @override
+  String get memoryEntriesPageTitle => '全部记忆';
+
+  @override
+  String get userProfilePageTitle => '用户画像';
+
+  @override
+  String get userProfilePreferredName => '希望怎么称呼我';
+
+  @override
+  String get userProfilePreferredNameHint => '这是希望模型怎么称呼你，与侧栏显示的用户名无关';
+
+  @override
+  String get userProfileGender => '性别';
+
+  @override
+  String get userProfilePronouns => '代词';
+
+  @override
+  String get userProfilePreferredLanguage => '偏好语言';
+
+  @override
+  String get userProfileTimezone => '时区';
+
+  @override
+  String get userProfileOccupation => '职业';
+
+  @override
+  String get userProfileLocation => '所在地';
+
+  @override
+  String get userProfileCustomSection => '自定义字段';
+
+  @override
+  String get userProfileAddCustom => '添加自定义字段';
+
+  @override
+  String get userProfileCustomKeyHint => '键名（custom.name）';
+
+  @override
+  String get userProfileCustomValueHint => '值';
+
+  @override
+  String get userProfileInvalidKey => '键名须为 custom. 后跟 1–32 位字母、数字、_ 或 -';
+
+  @override
+  String get userProfileClear => '清除';
+
+  @override
+  String get userProfileSave => '保存';
+
+  @override
+  String get userProfileEmptyValue => '未设置';
+
+  @override
+  String get legacyMemoryPageTitle => '旧版记忆';
+
+  @override
+  String get legacyMemoryBanner => '这些记忆来自旧版本，不会参与对话；你可以将它们迁移到当前记忆系统。';
+
+  @override
+  String get legacyMemoryEmpty => '没有旧版记忆';
+
+  @override
+  String get legacyMemoryCopy => '复制';
+
+  @override
+  String get legacyMemoryCopied => '已复制';
+
+  @override
+  String get legacyMemoryExport => '导出';
+
+  @override
+  String get legacyMemoryExportTitle => 'Kelivo 旧版记忆导出';
+
+  @override
+  String legacyMemoryAssistantHeader(String name) {
+    return '助手：$name';
+  }
+
+  @override
+  String get legacyMemorySearchHint => '搜索旧版记忆';
+
+  @override
+  String get legacyMemoryMigrate => '迁移';
+
+  @override
+  String get legacyMemoryMigrationTitle => '迁移旧版记忆';
+
+  @override
+  String legacyMemoryMigrationSubtitle(int count) {
+    return '使用模型整理并分类 $count 条旧版记忆，原数据不会改变。';
+  }
+
+  @override
+  String get legacyMemoryMigrationModel => '迁移模型';
+
+  @override
+  String get legacyMemoryMigrationChooseModel => '选择模型';
+
+  @override
+  String get legacyMemoryMigrationTarget => '保存到';
+
+  @override
+  String get legacyMemoryMigrationTargetGlobal => '全局';
+
+  @override
+  String get legacyMemoryMigrationTargetAssistant => '当前助手';
+
+  @override
+  String get legacyMemoryMigrationTargetOriginalAssistants => '原助手';
+
+  @override
+  String get legacyMemoryMigrationTargetGlobalDescription => '所有助手均可使用';
+
+  @override
+  String get legacyMemoryMigrationTargetAssistantDescription => '仅当前助手可使用';
+
+  @override
+  String get legacyMemoryMigrationTargetOriginalDescription => '每条记忆保留在原来的助手下';
+
+  @override
+  String get legacyMemoryMigrationStart => '开始迁移';
+
+  @override
+  String get legacyMemoryMigrationAnalyzing => '正在使用模型分析';
+
+  @override
+  String get legacyMemoryMigrationWriting => '正在写入记忆';
+
+  @override
+  String legacyMemoryMigrationProgress(int current, int total) {
+    return '$current / $total';
+  }
+
+  @override
+  String get legacyMemoryMigrationComplete => '迁移完成';
+
+  @override
+  String legacyMemoryMigrationResult(int created, int skipped) {
+    return '已迁移 $created 条 · 跳过已有 $skipped 条';
+  }
+
+  @override
+  String get legacyMemoryMigrationFailed => '迁移已停止。可以重试，已保存的记忆会自动跳过。';
+
+  @override
+  String get legacyMemoryMigrationRetry => '重试';
+
+  @override
+  String get legacyMemoryMigrationClose => '完成';
+
+  @override
+  String get memoryUiContentLabel => '内容';
+
+  @override
+  String get memoryUiValueLabel => '值';
+
+  @override
+  String get memoryUiCustomKeyLabel => '键名';
+
+  @override
+  String get memoryUiStatusLabel => '状态';
+
+  @override
+  String get memoryUiAssistantLabel => '助手';
+
+  @override
+  String get memoryUiAssistantAll => '全部助手';
+
+  @override
+  String get memoryUiSearchClear => '清除搜索';
+
+  @override
+  String get memoryUiAssistantLegacyTitle => '旧版记忆（只读）';
+
+  @override
+  String get memoryUiAssistantLegacySubtitle => '该助手来自旧版本的记忆';
+
+  @override
+  String get assistantEditMemorySwitchTitle => '使用长期记忆';
+
+  @override
+  String get assistantEditAutoOrganizeTitle => '自动整理记忆';
+
+  @override
+  String get assistantEditAutoOrganizeSubtitle => '对话后自动运行记忆管线';
+
+  @override
+  String get assistantEditAllowPastRecallTitle => '允许回忆过去对话';
+
+  @override
+  String get assistantEditAllowPastRecallSubtitle => '启用跨会话的对话搜索';
+
+  @override
+  String get assistantEditGenerateSummaryTitle => '生成会话摘要';
+
+  @override
+  String get assistantEditGenerateSummarySubtitle => '摘要仅供对话搜索使用';
+
+  @override
+  String get assistantEditManageMemoryTitle => '本助手可见的记忆';
+
+  @override
+  String get assistantEditWriteScopeTitle => '记忆写入范围';
+
+  @override
+  String get assistantEditWriteScopeSubtitle => '新记忆默认写入的位置';
+
+  @override
+  String get assistantEditWriteScopeAlwaysGlobal => '一律全局';
+
+  @override
+  String get assistantEditWriteScopeAlwaysAssistant => '一律本助手';
+
+  @override
+  String get assistantEditWriteScopeToolDefaultGlobal => '模型自选（默认全局）';
+
+  @override
+  String get assistantEditWriteScopeToolDefaultAssistant => '模型自选（默认本助手）';
+
+  @override
+  String get assistantEditDedupeModeTitle => '去重方式';
+
+  @override
+  String get assistantEditDedupeModeSubtitle => '候选记忆如何与已有条目比对';
+
+  @override
+  String get assistantEditDedupeModeBatched => '合并';
+
+  @override
+  String get assistantEditDedupeModePerItem => '逐条';
+
+  @override
+  String get assistantEditOrganizeFrequencyTitle => '整理频率';
+
+  @override
+  String get assistantEditOrganizeFrequencySubtitle => '每累积 N 轮助手回复触发一次自动整理';
+
+  @override
+  String assistantEditOrganizeFrequencyOption(int n) {
+    return '每 $n 轮';
+  }
+
+  @override
+  String get assistantEditOrganizeFrequencyCustomButton => '自定义';
+
+  @override
+  String get assistantEditOrganizeFrequencyCustomTitle => '自定义整理频率';
+
+  @override
+  String get assistantEditOrganizeFrequencyCustomDescription =>
+      '请输入 1 到 20 之间的整数。';
+
+  @override
+  String get assistantEditOrganizeFrequencyCustomLabel => '轮数';
+
+  @override
+  String get assistantEditOrganizeFrequencyCustomHint => '1–20';
+
+  @override
+  String get assistantEditOrganizeFrequencyCustomInvalid => '请输入 1 到 20 之间的整数';
 
   @override
   String get worldBookTitle => '世界书';
@@ -10662,6 +13770,446 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
+
+  @override
+  String get migrationIntroTitle => '升级聊天记录存储';
+
+  @override
+  String get migrationIntroSubtitle =>
+      'Kelivo 将聊天记录迁移到更快的 SQLite 数据库。升级会在应用打开前完成，避免新旧数据同时写入。';
+
+  @override
+  String get migrationBackupNote => '迁移开始前，会先导出包含设置、聊天记录和本地文件的 ZIP 备份。';
+
+  @override
+  String get migrationPerformanceNote =>
+      '迁移后，启动、历史加载和搜索都会使用 SQLite 索引，长对话会更流畅。';
+
+  @override
+  String get migrationSourceDatabaseLabel => 'Hive';
+
+  @override
+  String get migrationTargetDatabaseLabel => 'SQLite';
+
+  @override
+  String get migrationChooseFolderButton => '选择文件夹并备份';
+
+  @override
+  String get migrationSaveBackupButton => '保存备份 ZIP';
+
+  @override
+  String get migrationBackingUpTitle => '正在备份';
+
+  @override
+  String get migrationBackingUpSubtitle =>
+      '正在导出设置、聊天记录、上传文件、图片和字体。请保持 Kelivo 开启，等待备份完成。';
+
+  @override
+  String get migrationMigratingTitle => '正在迁移到 SQLite';
+
+  @override
+  String get migrationMigratingSubtitle =>
+      '正在分批写入会话和消息，避免超大聊天记录占满内存。请保持 Kelivo 在前台，等待迁移完成。';
+
+  @override
+  String migrationBackingUpDetail(String fileName) {
+    return '正在备份 $fileName';
+  }
+
+  @override
+  String migrationMigratingDetail(int count) {
+    return '已迁移 $count 条消息';
+  }
+
+  @override
+  String get migrationMigratingPrepareDetail => '正在准备 SQLite 数据库';
+
+  @override
+  String get migrationMigratingToolEventsDetail => '正在迁移工具调用记录';
+
+  @override
+  String get migrationMigratingValidateDetail => '正在校验迁移数据';
+
+  @override
+  String get migrationBackupReadyDetail => '备份 ZIP 已准备好';
+
+  @override
+  String get migrationSavingBackupZipDetail => '正在保存备份 ZIP';
+
+  @override
+  String get migrationBackupFileSavedTitle => '备份 ZIP 已保存';
+
+  @override
+  String get migrationChecklistBackupFiles => '导出 Hive 备份 ZIP';
+
+  @override
+  String get migrationChecklistPrepareSqlite => '准备 SQLite 数据库';
+
+  @override
+  String get migrationChecklistMigrateMessages => '迁移会话和消息';
+
+  @override
+  String get migrationChecklistMigrateToolEvents => '迁移工具调用记录';
+
+  @override
+  String get migrationChecklistValidate => '校验迁移数据';
+
+  @override
+  String get migrationStepBackup => '备份';
+
+  @override
+  String get migrationStepMigrate => '迁移';
+
+  @override
+  String get migrationStepComplete => '完成';
+
+  @override
+  String get migrationCompleteTitle => '升级完成';
+
+  @override
+  String get migrationCompleteSubtitle =>
+      '你的聊天记录已迁移到 SQLite。请重启 Kelivo 进入升级后的应用。';
+
+  @override
+  String get migrationConversationCount => '对话';
+
+  @override
+  String get migrationMessageCount => '消息';
+
+  @override
+  String get migrationConvertedCount => '已转换';
+
+  @override
+  String get migrationMalformedCount => '格式异常';
+
+  @override
+  String get migrationMissingFilesCount => '缺失文件';
+
+  @override
+  String get migrationRestartButton => '重启 Kelivo';
+
+  @override
+  String get migrationFailedTitle => '迁移失败';
+
+  @override
+  String get migrationFailedSubtitle => '原始 Hive 数据和备份都仍然保留。查看下方原因后可以重试。';
+
+  @override
+  String get migrationUnknownError => '未知迁移错误。';
+
+  @override
+  String get migrationFailureLogTitle => '失败日志';
+
+  @override
+  String get migrationRetryButton => '重试迁移';
+
+  @override
+  String get migrationSkipButton => '跳过迁移并全新开始';
+
+  @override
+  String get migrationSkipDialogTitle => '跳过迁移？';
+
+  @override
+  String get migrationSkipDialogMessage =>
+      'Kelivo 将以空的聊天数据库启动。旧的聊天记录会保留在磁盘上（重命名为 .retired 后缀），但不会被迁移，也不会在应用中显示。之后如需找回，请使用已保存的备份 ZIP。';
+
+  @override
+  String get migrationSkipDialogCancel => '取消';
+
+  @override
+  String get migrationSkipDialogConfirm => '跳过并全新开始';
+
+  @override
+  String get migrationChatsExportDegradedNote =>
+      'chats.json 导出因出错而被跳过。备份 ZIP 仍包含原始 Hive 文件，完整聊天记录未丢失。';
+
+  @override
+  String get timelineJumpToLatest => '跳到最新';
+
+  @override
+  String largeContentShowMore(int count) {
+    return '再显示 $count 项';
+  }
+
+  @override
+  String get largeContentCollapse => '收起';
+
+  @override
+  String get imageSettingsPageTitle => '图片处理';
+
+  @override
+  String get imageSettingsPageEditSectionTitle => '编辑';
+
+  @override
+  String get imageSettingsPageQualitySectionTitle => '上传图片质量';
+
+  @override
+  String get imageSettingsPageQualityOriginal => '原图';
+
+  @override
+  String get imageSettingsPageQualityOriginalSubtitle => '不压缩，原样上传';
+
+  @override
+  String get imageSettingsPageQualityHigh => '高质量';
+
+  @override
+  String get imageSettingsPageQualityHighSubtitle => '最长边 2048 像素 · 质量 90';
+
+  @override
+  String get imageSettingsPageQualityBalanced => '平衡';
+
+  @override
+  String get imageSettingsPageQualityBalancedSubtitle => '最长边 1568 像素 · 质量 85';
+
+  @override
+  String get imageSettingsPageQualitySaver => '节省流量';
+
+  @override
+  String get imageSettingsPageQualitySaverSubtitle => '最长边 1024 像素 · 质量 70';
+
+  @override
+  String get imageSettingsPageQualityCustom => '自定义';
+
+  @override
+  String get imageSettingsPageQualityCustomSubtitle => '自选压缩质量';
+
+  @override
+  String get imageSettingsPageCustomQualityTitle => '压缩质量';
+
+  @override
+  String get imageSettingsPageCompressTransparentTitle => '压缩透明及动态图片';
+
+  @override
+  String get imageSettingsPageCompressTransparentSubtitle =>
+      '开启后将压缩透明 PNG、GIF 等格式；透明区域填充为白色，动图仅保留第一帧。';
+
+  @override
+  String get imageSettingsPageFooter =>
+      '压缩在添加图片时进行，已保存或已发送的图片不受影响；压缩后图片以 JPEG 格式随消息发送。';
+
+  @override
+  String get memoryTraceSettingsTitle => '流程追踪';
+
+  @override
+  String get memoryTraceSettingsSubtitle => '逐步查看每次后台记忆处理的全过程';
+
+  @override
+  String get memoryTracePageTitle => '记忆流程追踪';
+
+  @override
+  String get memoryTraceRecordingSection => '记录';
+
+  @override
+  String get memoryTraceToggleTitle => '记录流程追踪';
+
+  @override
+  String get memoryTraceToggleSubtitle => '仅在内存中保留最近几次后台运行的提示词、模型回复与实际改动';
+
+  @override
+  String get memoryTraceRunsSection => '最近运行';
+
+  @override
+  String get memoryTraceEmptyTitle => '暂无追踪记录';
+
+  @override
+  String get memoryTraceEmptySubtitle => '后台记忆流程运行后，记录会显示在这里。';
+
+  @override
+  String get memoryTraceDisabledTitle => '记录已关闭';
+
+  @override
+  String get memoryTraceDisabledSubtitle => '开启记录后，下一次后台记忆运行才会被捕获。';
+
+  @override
+  String get memoryTraceClearAction => '清空';
+
+  @override
+  String get memoryTraceClearSheetTitle => '清空追踪记录';
+
+  @override
+  String get memoryTraceClearSheetMessage => '将删除所有已记录的追踪。追踪从不写入磁盘，因此不会影响其他数据。';
+
+  @override
+  String get memoryTraceClearConfirm => '清空记录';
+
+  @override
+  String get memoryTraceCancel => '取消';
+
+  @override
+  String get memoryTraceClearedToast => '追踪记录已清空';
+
+  @override
+  String get memoryTraceCopyAction => '复制';
+
+  @override
+  String get memoryTraceCopiedToast => '已复制到剪贴板';
+
+  @override
+  String get memoryTraceTriggerAuto => '自动';
+
+  @override
+  String get memoryTraceTriggerManual => '手动';
+
+  @override
+  String get memoryTraceTriggerTool => '工具调用';
+
+  @override
+  String get memoryTraceTriggerSummary => '对话摘要';
+
+  @override
+  String get memoryTraceScopeAssistant => '助手';
+
+  @override
+  String get memoryTraceScopeGlobal => '全局';
+
+  @override
+  String get memoryTraceStepGatekeeper => '守门判断';
+
+  @override
+  String get memoryTraceStepExtract => '记忆抽取';
+
+  @override
+  String get memoryTraceStepSmartAdd => '智能写入';
+
+  @override
+  String get memoryTraceStepDistiller => '用户画像提炼';
+
+  @override
+  String get memoryTraceStepSummary => '对话摘要生成';
+
+  @override
+  String get memoryTraceStepChatSearch => '历史对话检索';
+
+  @override
+  String get memoryTraceStepTool => '记忆工具';
+
+  @override
+  String get memoryTraceStatusSuccess => '成功';
+
+  @override
+  String get memoryTraceStatusFailed => '失败';
+
+  @override
+  String get memoryTraceStatusSkipped => '跳过';
+
+  @override
+  String get memoryTraceStatusRunning => '进行中';
+
+  @override
+  String get memoryTraceOutcomeAdvanced => '水位已推进';
+
+  @override
+  String get memoryTraceOutcomeHeld => '水位未推进';
+
+  @override
+  String get memoryTraceOutcomeForced => '强制推进';
+
+  @override
+  String get memoryTraceDetailTitle => '追踪详情';
+
+  @override
+  String get memoryTraceSectionOverview => '概览';
+
+  @override
+  String get memoryTraceSectionPrompt => '提示词';
+
+  @override
+  String get memoryTraceSectionResponse => '原始回复';
+
+  @override
+  String get memoryTraceSectionParsed => '解析结果';
+
+  @override
+  String get memoryTraceSectionMutations => '实际改动';
+
+  @override
+  String get memoryTraceFieldTime => '开始时间';
+
+  @override
+  String get memoryTraceFieldDuration => '耗时';
+
+  @override
+  String get memoryTraceFieldTrigger => '触发方式';
+
+  @override
+  String get memoryTraceFieldScope => '作用范围';
+
+  @override
+  String get memoryTraceFieldConversation => '对话';
+
+  @override
+  String get memoryTraceFieldAssistant => '助手';
+
+  @override
+  String get memoryTraceFieldWindow => '消息窗口';
+
+  @override
+  String get memoryTraceFieldWatermark => '水位';
+
+  @override
+  String get memoryTraceFieldOutcome => '结果';
+
+  @override
+  String get memoryTraceFieldError => '错误';
+
+  @override
+  String get memoryTraceMutationCreated => '新建';
+
+  @override
+  String get memoryTraceMutationMerged => '合并';
+
+  @override
+  String get memoryTraceMutationEdited => '修改';
+
+  @override
+  String get memoryTraceMutationArchived => '归档';
+
+  @override
+  String get memoryTraceMutationLinked => '关联';
+
+  @override
+  String get memoryTraceMutationProfileWritten => '写入画像字段';
+
+  @override
+  String get memoryTraceMutationProfileCleared => '清除画像字段';
+
+  @override
+  String get memoryTraceMutationSummary => '写入对话摘要';
+
+  @override
+  String get memoryTraceBefore => '改动前';
+
+  @override
+  String get memoryTraceAfter => '改动后';
+
+  @override
+  String get memoryTraceEmptyValue => '（空）';
+
+  @override
+  String memoryTraceStepsCount(int count) {
+    return '$count 个步骤';
+  }
+
+  @override
+  String memoryTraceMutationsCount(int count) {
+    return '$count 项改动';
+  }
+
+  @override
+  String memoryTraceRepeatCount(int count) {
+    return '重复 $count 次';
+  }
+
+  @override
+  String memoryTraceWindowValue(int size, int start, int end) {
+    return '$size 条消息 · #$start–#$end';
+  }
+
+  @override
+  String get memoryTraceShowMore => '展开全文';
+
+  @override
+  String get memoryTraceShowLess => '收起';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -10783,6 +14331,25 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageSpaceCategoryChatData => '聊天記錄';
 
   @override
+  String get storageSpaceCategoryLegacyChatData => '聊天記錄（舊）';
+
+  @override
+  String get storageSpaceCategoryRestoreTraces => '還原痕跡';
+
+  @override
+  String get storageSpaceRestoreTracesHint => '還原完成後保留的舊資料快照。清理不會影響目前的應用程式資料。';
+
+  @override
+  String get storageSpaceClearRestoreTracesButton => '清理還原痕跡';
+
+  @override
+  String get storageSpaceClearRestoreTracesConfirmMessage =>
+      '確定清理已完成還原留下的舊資料快照嗎？目前的資料庫、設定和檔案不會受到影響。';
+
+  @override
+  String get storageSpaceSubCompletedRestoreRuns => '已完成的還原快照';
+
+  @override
   String get storageSpaceCategoryAssistantData => '助理';
 
   @override
@@ -10803,6 +14370,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageSpaceSafeToClearHint => '可安全清理，不影響聊天記錄。';
 
   @override
+  String get storageSpaceLegacyChatDataHint =>
+      '這是遷移到 SQLite 前保留的 Hive 舊檔案。清理後不會刪除目前的聊天記錄。';
+
+  @override
   String get storageSpaceNotSafeToClearHint => '可能影響聊天記錄，請謹慎刪除。';
 
   @override
@@ -10816,6 +14387,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceSubChatToolEvents => '工具事件';
+
+  @override
+  String get storageSpaceSubChatDatabase => '聊天資料庫';
+
+  @override
+  String get storageSpaceSubChatWriteAheadLog => '寫入日誌';
+
+  @override
+  String get storageSpaceSubChatSharedMemory => '共享記憶體索引';
 
   @override
   String get storageSpaceSubAssistantAvatars => '頭像';
@@ -10872,6 +14452,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageSpaceClearLogsButton => '清理日誌';
 
   @override
+  String get storageSpaceClearLegacyChatDataButton => '清理舊聊天記錄';
+
+  @override
+  String get storageSpaceClearLegacyChatDataConfirmMessage =>
+      '確定清理保留的舊聊天檔案嗎？目前的 SQLite 聊天記錄不會受到影響。';
+
+  @override
   String get storageSpaceViewLogsButton => '查看日誌';
 
   @override
@@ -10907,6 +14494,33 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
+  String get storageSpaceSourceLabel => '來源';
+
+  @override
+  String get storageSpaceSourceAll => '全部';
+
+  @override
+  String get storageSpaceSourceUserUpload => '使用者上傳';
+
+  @override
+  String get storageSpaceSourceAssistant => '助理傳送';
+
+  @override
+  String get storageSpaceSortLabel => '排序';
+
+  @override
+  String get storageSpaceSortNewest => '最新';
+
+  @override
+  String get storageSpaceSortOldest => '最舊';
+
+  @override
+  String get storageSpaceSortLargest => '最大';
+
+  @override
+  String get storageSpaceSortSmallest => '最小';
+
+  @override
   String get settingsPageAboutSection => '關於';
 
   @override
@@ -10922,7 +14536,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get settingsPageLogs => '日誌';
 
   @override
-  String get settingsPageSponsor => '贊助 Kelivo';
+  String get settingsPageSponsor => '贊助';
 
   @override
   String get settingsPageShare => '分享';
@@ -11143,15 +14757,8 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get assistantProviderNewAssistantName => '新助理';
 
   @override
-  String assistantProviderSampleAssistantSystemPrompt(
-    String model_name,
-    String cur_datetime,
-    String locale,
-    String timezone,
-    String device_info,
-    String system_version,
-  ) {
-    return '你是$model_name, 一個人工智慧助理，樂意為使用者提供準確，有益的幫助。現在時間是$cur_datetime，使用者裝置語言為$locale，時區為$timezone，使用者正在使用$device_info，版本$system_version。如果使用者沒有明確說明，請使用使用者裝置語言進行回覆。';
+  String assistantProviderSampleAssistantSystemPrompt(String model_name) {
+    return '你是$model_name，一位樂於助人的 AI 助理。請準確、簡潔地回答問題；不確定時如實說明。需要時可使用清晰結構（短段落或列表）。預設使用使用者的語言回覆。';
   }
 
   @override
@@ -11631,7 +15238,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get iosBackgroundLimitNoticeBody =>
-      '這些選項使用 Apple 支援的後台時間、BackgroundTasks、通知和即時活動。它們能提升連續性，但不能強制 iOS 永久保持 JO-Kelivo 運行。';
+      '這些選項使用 Apple 支援的後台時間、BackgroundTasks、通知和即時活動。它們能提升連續性，但不能強制 iOS 永久保持 Kelivo 運行。';
 
   @override
   String get iosBackgroundUnsupportedLiveActivity =>
@@ -11656,7 +15263,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get iosBackgroundNotificationsNotAuthorized => '通知未允許';
 
   @override
-  String get iosBackgroundGenerationActiveTitle => 'JO-Kelivo 正在生成';
+  String get iosBackgroundGenerationActiveTitle => 'Kelivo 正在生成';
 
   @override
   String get iosBackgroundGenerationActiveDetail => '助理正在後台回覆';
@@ -11709,7 +15316,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get notificationChatCompletedBody => '助手回覆已生成';
 
   @override
-  String get androidBackgroundNotificationTitle => 'JO-Kelivo 正在運行';
+  String get androidBackgroundNotificationTitle => 'Kelivo 正在運行';
 
   @override
   String get androidBackgroundNotificationText => '後台保持聊天生成';
@@ -11928,6 +15535,42 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get assistantEditPreviewTitle => '預覽';
 
   @override
+  String get assistantEditPromptTimeVarWarning =>
+      '在系統提示詞中使用時間變數會讓每一輪請求的開頭都不同，Prompt 快取無法命中，費用和首字延遲都會上升。需要讓模型知道當前時間時，請改用下方的「追加當前時間」開關。';
+
+  @override
+  String get assistantEditPromptAppendTimeTitle => '追加當前時間';
+
+  @override
+  String get assistantEditPromptAppendTimeSubtitle =>
+      '在每條使用者訊息末尾追加傳送時刻。時間在請求末尾，不影響 Prompt 快取。';
+
+  @override
+  String get assistantEditPromptAppendTimeInfoTitle => '追加時間格式';
+
+  @override
+  String assistantEditPromptAppendTimeInfoBody(String example) {
+    return '開啟後，會在每條使用者訊息末尾先空一行，再追加如下標籤：\n\n$example\n\n時間取該訊息自己的傳送時刻，重試時保持不變。';
+  }
+
+  @override
+  String get assistantEditPromptAppendTimeInfoClose => '知道了';
+
+  @override
+  String get assistantEditPromptTimeVarDialogTitle => '系統提示詞中含時間變數';
+
+  @override
+  String assistantEditPromptTimeVarDialogBody(String variables) {
+    return '你的系統提示詞裡用了 $variables。系統提示詞每次請求都會重新渲染，含時間變數會讓每一輪請求的開頭都不同，Prompt 快取無法命中。建議移除這些變數，改用「追加當前時間」——它把時間放在請求末尾，不影響前綴。';
+  }
+
+  @override
+  String get assistantEditPromptTimeVarDialogRemove => '去移除';
+
+  @override
+  String get assistantEditPromptTimeVarDialogKeep => '仍然開啟';
+
+  @override
   String get codeBlockPreviewButton => '預覽';
 
   @override
@@ -12139,7 +15782,101 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageRestartRequired => '需要重啟應用程式';
 
   @override
-  String get backupPageRestartContent => '還原完成，需要重啟以完全生效。';
+  String get backupPageRestartContent => '匯入成功。重新啟動 Kelivo 後將安全套用。';
+
+  @override
+  String backupPageRestartContentWithSkipped(int count) {
+    return '匯入已完成，但已略過 $count 個訊息順序無效的會話。重新啟動 Kelivo 後將安全套用已匯入的資料。';
+  }
+
+  @override
+  String get restartAppFailedMessage => 'Kelivo 無法自動重新啟動，請完全關閉後再重新開啟。';
+
+  @override
+  String get backupRestoreRolledBackTitle => '已保留原有資料';
+
+  @override
+  String get backupRestoreRolledBackContent => '還原未能完成。Kelivo 已驗證並保留先前的資料。';
+
+  @override
+  String get backupRestoreFailureTitle => '還原需要處理';
+
+  @override
+  String get backupRestoreFailureContent =>
+      'Kelivo 無法驗證完整的原有或新資料，因此未開啟聊天資料。請關閉 Kelivo 後重試；若問題持續發生，請保留診斷碼以供支援人員排查。';
+
+  @override
+  String get backupRestoreBusinessLeaseUnavailableTitle => 'Kelivo 已在執行';
+
+  @override
+  String get backupRestoreBusinessLeaseUnavailableContent =>
+      'Kelivo 的資料仍由另一個應用程式程序使用。請關閉其他 Kelivo 視窗後重新啟動；目前程序尚未開啟聊天資料。';
+
+  @override
+  String get backupRestoreFailureRestartButton => '重新啟動 Kelivo';
+
+  @override
+  String get backupRestoreFailureCopyButton => '複製診斷碼';
+
+  @override
+  String get backupRestoreFailureCopied => '已複製診斷碼';
+
+  @override
+  String backupRestoreFailureDiagnostic(String code) {
+    return '診斷碼：$code';
+  }
+
+  @override
+  String get startupRecoveryMoreOptions => '更多復原選項';
+
+  @override
+  String get startupRecoveryRepairButton => '修復並重新啟動';
+
+  @override
+  String get startupRecoveryExportButton => '匯出我的資料副本';
+
+  @override
+  String get startupRecoveryResetButton => '重設資料';
+
+  @override
+  String get startupRecoveryBusy => '處理中…';
+
+  @override
+  String get startupRecoveryExportSucceeded => '已儲存一份資料副本。';
+
+  @override
+  String get startupRecoveryExportFailed => '無法匯出資料副本。';
+
+  @override
+  String get startupRecoveryRepairFailed => '修復未能解決問題。請先匯出資料副本，然後重設。';
+
+  @override
+  String get startupRecoveryResetFailed => '重設失敗。請完全關閉 Kelivo 後再重新開啟。';
+
+  @override
+  String get startupRecoveryResetDialogTitle => '重設全部資料？';
+
+  @override
+  String get startupRecoveryResetDialogContent =>
+      '這會永久刪除本裝置上 Kelivo 的資料庫並重新開始。如果之後可能還需要這些資料，請先匯出一份副本。此操作無法復原。';
+
+  @override
+  String get startupRecoveryResetDialogConfirm => '重設並重新啟動';
+
+  @override
+  String get startupRecoveryResetDialogCancel => '取消';
+
+  @override
+  String get startupDatabaseUpdateRequiredTitle => '請更新 Kelivo 以繼續';
+
+  @override
+  String get startupDatabaseUpdateRequiredContent =>
+      '本裝置上的聊天資料庫由更新版本的 Kelivo 建立，目前版本無法開啟。資料未被改動。請安裝最新版 Kelivo 後重新開啟。';
+
+  @override
+  String backupPageRestoreFailedMessage(String error) {
+    return '還原失敗：$error';
+  }
 
   @override
   String get backupPageOK => '好的';
@@ -12151,19 +15888,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageSelectImportMode => '選擇匯入模式';
 
   @override
-  String get backupPageSelectImportModeDescription => '請選擇如何匯入備份資料：';
+  String get backupPageSelectImportModeDescription =>
+      '請選擇還原方式。聊天與檔案開關決定本次還原的元件。';
 
   @override
   String get backupPageOverwriteMode => '完全覆蓋';
 
   @override
-  String get backupPageOverwriteModeDescription => '清空本地所有資料後恢復';
+  String get backupPageOverwriteModeDescription => '僅替換已選元件；保留未選元件及無關的本機設定';
 
   @override
-  String get backupPageMergeMode => '智能合併';
+  String get backupPageMergeMode => '合併';
 
   @override
-  String get backupPageMergeModeDescription => '僅添加不存在的資料（智能去重）';
+  String get backupPageMergeModeDescription =>
+      '保留本機資料並加入備份資料；相同對話會略過，衝突對話會重新分配 ID。';
 
   @override
   String get backupPageRestore => '還原';
@@ -12184,29 +15923,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageExportToFileSubtitle => '匯出APP資料為檔案';
 
   @override
-  String get backupPageExportKelivoBackup => '匯出為 Kelivo 備份';
-
-  @override
   String get backupPageImportBackupFile => '備份檔案匯入';
 
   @override
   String get backupPageImportBackupFileSubtitle => '匯入本機備份檔案';
-
-  @override
-  String get backupPageImportKelivoBackup => '從 Kelivo 備份匯入';
-
-  @override
-  String get backupPageOpenUserDataDirectory => '開啟使用者資料目錄';
-
-  @override
-  String get backupPageOpenUserDataFailed => '開啟使用者資料目錄失敗';
-
-  @override
-  String get backupPageUserDataDirectoryTitle => '使用者資料目錄';
-
-  @override
-  String get backupPageUserDataDirectoryDescription =>
-      '開啟應用程式主資料目錄，用於查看聊天資料、上傳檔案、圖片、頭像、快取和日誌。';
 
   @override
   String get backupPageImportFromOtherApps => '從其他APP匯入';
@@ -12277,6 +15997,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageS3PathStyle => '路徑風格（Path-style）';
 
   @override
+  String get backupPageUserAgent => 'User-Agent';
+
+  @override
+  String get backupPageUserAgentHint => '可選';
+
+  @override
   String get backupPageSave => '儲存';
 
   @override
@@ -12289,10 +16015,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageImportFromCherryStudio => '從 Cherry Studio 匯入';
 
   @override
-  String get backupPageImportFromChatbox => '從 Chatbox 匯入';
+  String backupPageCherryStudioUnsupportedBackupVersion(String version) {
+    return '此備份使用 Cherry Studio 格式版本 $version，Kelivo 目前尚無法匯入。請改用 Cherry Studio v1 匯出備份，或等待後續版本支援 Cherry Studio v2。';
+  }
 
   @override
-  String get backupPageImportFromDeepSeek => '從 DeepSeek 網頁版/App 匯入';
+  String get backupPageImportFromChatbox => '從 Chatbox 匯入';
 
   @override
   String get backupReminderSectionTitle => '備份提醒';
@@ -12426,37 +16154,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get messageEditPageHint => '輸入訊息內容…';
 
   @override
-  String get messageEditCloseConfirmTitle => '要儲存修改嗎？';
+  String get userMessageEditSaveOnly => '僅儲存';
 
   @override
-  String get messageEditCloseConfirmContent => '關閉前要儲存這次編輯嗎？';
+  String get userMessageEditUnsupportedSnackbar => '該內容不支援編輯';
 
   @override
-  String get messageEditCloseConfirmCancel => '取消';
+  String get userMessageEditOverwriteTitle => '提示';
 
   @override
-  String get messageEditCloseConfirmDiscard => '不儲存';
-
-  @override
-  String get messageEditCloseConfirmSave => '儲存';
-
-  @override
-  String get messageEditAttachmentsTitle => '附件';
-
-  @override
-  String get messageEditAddImage => '新增圖片';
-
-  @override
-  String get messageEditAddFile => '新增檔案';
-
-  @override
-  String get messageEditNoAttachments => '暫無附件';
-
-  @override
-  String get messageEditReplaceImage => '替換圖片';
-
-  @override
-  String get messageEditRemoveAttachment => '移除附件';
+  String get userMessageEditOverwriteContent => '修改將覆蓋輸入框已有內容，是否覆蓋？';
 
   @override
   String get selectCopyPageTitle => '選擇複製';
@@ -12582,12 +16289,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get messageMoreSheetCreateBranch => '建立分支';
 
   @override
-  String get messageMoreSheetSwitchToUser => '切換為使用者';
-
-  @override
-  String get messageMoreSheetSwitchToAssistant => '切換為模型';
-
-  @override
   String get messageMoreSheetDelete => '刪除本版本';
 
   @override
@@ -12610,6 +16311,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get reasoningBudgetSheetXhigh => '極限推理';
+
+  @override
+  String get reasoningBudgetSheetMax => '全力推理';
 
   @override
   String get reasoningBudgetSheetTitle => '思維鏈強度';
@@ -12688,6 +16392,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get chatMessageWidgetOpenLinkError => '開啟連結失敗';
 
   @override
+  String get chatMessageWidgetAttachmentUnavailable => '附件不可用';
+
+  @override
   String chatMessageWidgetCitationsTitle(int count) {
     return '引用（共$count條）';
   }
@@ -12734,15 +16441,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get chatMessageWidgetDeepThinking => '深度思考';
 
   @override
-  String get chatMessageWidgetCreateMemory => '建立記憶';
-
-  @override
-  String get chatMessageWidgetEditMemory => '編輯記憶';
-
-  @override
-  String get chatMessageWidgetDeleteMemory => '刪除記憶';
-
-  @override
   String chatMessageWidgetWebSearch(String query) {
     return '聯網檢索: $query';
   }
@@ -12763,6 +16461,30 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String chatMessageWidgetSpeakText(String text) {
     return '正在朗讀: $text';
   }
+
+  @override
+  String get chatMessageWidgetMemoryRead => '讀取記憶';
+
+  @override
+  String get chatMessageWidgetMemoryUpdate => '更新記憶';
+
+  @override
+  String get chatMessageWidgetMemorySearchProfile => '檢索記憶';
+
+  @override
+  String get chatMessageWidgetMemoryEdit => '編輯記憶';
+
+  @override
+  String get chatMessageWidgetMemoryDelete => '刪除記憶';
+
+  @override
+  String get chatMessageWidgetUpdateUserProfile => '更新使用者畫像';
+
+  @override
+  String get chatMessageWidgetChatSearch => '搜尋歷史對話';
+
+  @override
+  String get chatMessageWidgetCreateMemory => '建立記憶';
 
   @override
   String chatMessageWidgetToolCall(String name) {
@@ -12952,6 +16674,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get sideDrawerMenuRegenerateTitle => '重新生成標題';
 
   @override
+  String get sideDrawerMenuCopy => '複製';
+
+  @override
   String get sideDrawerMenuMoveTo => '移動到';
 
   @override
@@ -13071,6 +16796,30 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get sideDrawerReset => '重設';
 
   @override
+  String get providerAvatarChooseBuiltInIcon => '選擇內建圖示';
+
+  @override
+  String get providerAvatarIconDialogTitle => '選擇內建圖示';
+
+  @override
+  String get providerAvatarIconSearchHint => '搜尋圖示';
+
+  @override
+  String get providerAvatarIconNoResults => '找不到圖示';
+
+  @override
+  String get providerAvatarInputLobehubIcon => '輸入 LobeHub 圖示';
+
+  @override
+  String get providerAvatarChooseLobehubIcon => '輸入 LobeHub 圖示';
+
+  @override
+  String get providerAvatarLobehubDialogTitle => '輸入 LobeHub 圖示';
+
+  @override
+  String get providerAvatarLobehubDialogHint => '輸入 LobeHub 圖示名稱，如 openai';
+
+  @override
   String get sideDrawerEmojiDialogTitle => '選擇表情';
 
   @override
@@ -13132,16 +16881,28 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get chatInputBarMoreTooltip => '更多';
 
   @override
+  String get chatInputBarVoiceInputTooltip => '語音輸入';
+
+  @override
+  String get chatInputBarVoiceCancelTooltip => '取消錄音';
+
+  @override
+  String get chatInputBarVoiceStopTooltip => '停止並轉為文字';
+
+  @override
+  String get chatInputBarVoiceSendTooltip => '轉文字並發送';
+
+  @override
+  String get chatInputBarVoiceTranscribing => '正在辨識…';
+
+  @override
+  String get chatInputBarImageProcessing => '正在處理圖片';
+
+  @override
   String get chatInputBarImageMode => '繪圖模式';
 
   @override
   String get chatInputBarDisableImageModeTooltip => '關閉繪圖模式';
-
-  @override
-  String get chatInputBarReplaceImageTooltip => '替換圖片';
-
-  @override
-  String get chatInputBarRemoveImageTooltip => '移除圖片';
 
   @override
   String get chatInputBarQueuedPending => '排隊中';
@@ -13189,7 +16950,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get mcpPageStatusDisconnected => '未連線';
 
   @override
+  String get mcpPageStatusAuthorizationRequired => '需要授權';
+
+  @override
+  String get mcpPageStatusAuthorizing => '授權中…';
+
+  @override
   String get mcpPageStatusDisabled => '已停用';
+
+  @override
+  String get mcpPageOAuthRequired => '需要 OAuth 登入';
+
+  @override
+  String get mcpPageOAuthSignIn => 'OAuth 登入';
 
   @override
   String mcpPageToolsCount(int enabled, int total) {
@@ -13325,6 +17098,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get defaultModelPageTitleModelSubtitle => '用於總結對話標題的模型，推薦使用快速且便宜的模型';
 
   @override
+  String get titleModelThinkingTitle => '是否開啟思考';
+
+  @override
   String get defaultModelPageSummaryModelTitle => '摘要模型';
 
   @override
@@ -13379,6 +17155,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageOcrModelTitle => 'OCR 模型';
+
+  @override
+  String backgroundTaskFailed(String task, String error) {
+    return '$task失敗：$error';
+  }
 
   @override
   String get defaultModelPageOcrModelSubtitle => '用於對圖片執行文字辨識的模型';
@@ -13671,6 +17452,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get providerDetailPageModelsTab => '模型';
 
   @override
+  String get providerDetailPageCustomRequestTitle => '自訂請求';
+
+  @override
+  String get providerDetailPageCustomRequestDescription =>
+      '套用於此供應商的所有模型。模型設定優先於此處，此處設定優先於助手設定。';
+
+  @override
   String get providerDetailPageNetworkTab => '網路代理';
 
   @override
@@ -13732,7 +17520,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get providerDetailPageBalanceInfo => '取得帳戶餘額';
 
   @override
-  String get providerDetailPageBalanceApiPathLabel => '餘額 API 位址或路徑';
+  String get providerDetailPageBalanceApiPathLabel => '餘額 API 路徑';
 
   @override
   String get providerDetailPageBalanceResultPathLabel => '結果 JSON 路徑';
@@ -13758,10 +17546,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String providerDetailPageBalanceError(String message) {
     return '餘額查詢失敗：$message';
   }
-
-  @override
-  String get providerDetailPageBalanceFullUrlRequired =>
-      '主 API 端點不是 OpenAI 相容格式，請填寫完整的 OpenAI 相容餘額 API 位址。';
 
   @override
   String get providerDetailPageVertexAiTitle => 'Vertex AI';
@@ -14243,6 +18027,128 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get searchServicesEditDialogRegionOptional => '地區（可選，預設 us-en）';
 
   @override
+  String get searchServiceEditorProviderTypeTitle => '搜尋提供商';
+
+  @override
+  String get searchServiceEditorConfigurationTitle => '服務設定';
+
+  @override
+  String get searchServiceEditorNoConfiguration => '此提供商無需額外設定。';
+
+  @override
+  String get searchServiceEditorMultiKeyTitle => '多 Key 輪詢';
+
+  @override
+  String get searchServiceEditorMultiKeyNone => '未設定';
+
+  @override
+  String get searchApiKeysPageDescription =>
+      '列表中的 Key 依序輪詢使用，第一個為主 Key；不查額度，以防觸發服務商風控。';
+
+  @override
+  String get searchApiKeysPagePrimaryBadge => '主';
+
+  @override
+  String get searchApiKeysPageBatchHint => '可一次貼上多個 Key：每行一個，或以逗號分隔';
+
+  @override
+  String searchApiKeysPageBatchResult(String added, String skipped) {
+    return '已新增 $added 個，略過 $skipped 個重複';
+  }
+
+  @override
+  String get searchApiKeysPageAdd => '新增';
+
+  @override
+  String get searchApiKeysPageEmpty => '尚未設定任何 Key。';
+
+  @override
+  String searchServiceEditorMultiKeyCount(String count) {
+    return '共 $count 個 Key';
+  }
+
+  @override
+  String get searchServiceEditorUsageTitle => '帳戶用量';
+
+  @override
+  String get searchServiceEditorUsageNotQueried => '尚未查詢用量。';
+
+  @override
+  String get searchServiceEditorUsageQuery => '查詢用量';
+
+  @override
+  String get searchServiceEditorUsageQuerying => '查詢中…';
+
+  @override
+  String searchServiceEditorUsageRemaining(String remaining) {
+    return '剩餘 $remaining 額度';
+  }
+
+  @override
+  String searchServiceEditorUsageBalance(String balance) {
+    return '餘額 $balance';
+  }
+
+  @override
+  String searchServiceEditorUsageUsed(String used, String limit) {
+    return '已使用 $used / $limit 額度';
+  }
+
+  @override
+  String searchServiceEditorUsageFailed(String message) {
+    return '用量查詢失敗：$message';
+  }
+
+  @override
+  String get searchServiceEditorTestTitle => '測試搜尋';
+
+  @override
+  String get searchServiceEditorTestQueryHint => '輸入測試關鍵字';
+
+  @override
+  String get searchServiceEditorTestRun => '執行測試搜尋';
+
+  @override
+  String get searchServiceEditorTestRunning => '搜尋中…';
+
+  @override
+  String get searchServiceEditorTestNoResults => '提供商未回傳任何結果。';
+
+  @override
+  String searchServiceEditorTestFailed(String message) {
+    return '搜尋失敗：$message';
+  }
+
+  @override
+  String get searchServiceEditorResultOpenTooltip => '開啟結果';
+
+  @override
+  String get searchServiceEditorDeleteTooltip => '刪除搜尋服務';
+
+  @override
+  String get searchServiceEditorDeleteTitle => '刪除搜尋服務？';
+
+  @override
+  String searchServiceEditorDeleteMessage(String provider) {
+    return '確定刪除 $provider 嗎？此操作無法復原。';
+  }
+
+  @override
+  String get searchServiceEditorDeleteConfirm => '刪除';
+
+  @override
+  String get searchServiceEditorDiscardTitle => '放棄變更？';
+
+  @override
+  String get searchServiceEditorDiscardMessage => '尚未儲存的搜尋服務設定將會遺失。';
+
+  @override
+  String get searchServiceEditorKeepEditing => '繼續編輯';
+
+  @override
+  String get searchServiceEditorDiscard => '放棄';
+
+  @override
   String get searchSettingsSheetTitle => '搜尋設定';
 
   @override
@@ -14277,13 +18183,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get aboutPageEasterEggButton => '好的';
 
   @override
-  String get aboutPageAppName => 'JO-Kelivo';
+  String get aboutPageAppName => 'Kelivo';
 
   @override
-  String get aboutPageAppDescription => '基於 Kelivo 的開源 AI 助理';
-
-  @override
-  String get aboutPageKelivoSectionTitle => '關於 Kelivo';
+  String get aboutPageAppDescription => '開源 AI 助理';
 
   @override
   String get aboutPageNoQQGroup => '暫無QQ群';
@@ -14338,7 +18241,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get aboutPageJoinQQGroup => '加入 QQ 群';
 
   @override
-  String get aboutPageJoinDiscord => '加入 Discord';
+  String get aboutPageQQGroupOne => 'Kelivo 一群';
+
+  @override
+  String get aboutPageQQGroupTwo => 'Kelivo 二群';
+
+  @override
+  String get aboutPageJoinDiscord => '加入我們的 Discord';
 
   @override
   String get displaySettingsPageShowUserAvatarTitle => '顯示使用者頭像';
@@ -14417,19 +18326,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageInsertSuggestionOnlyTitle => '點擊建議時僅填入輸入框';
-
-  @override
-  String get displaySettingsPageInsertNewAssistantAtTopTitle => '新建和複製助手放到頂部';
-
-  @override
-  String get displaySettingsPageLazyHistoryTitle => '懶載入聊天歷史';
-
-  @override
-  String get displaySettingsPageDesktopWideChatLayoutTitle => '聊天區域拉寬';
-
-  @override
-  String get displaySettingsPageDesktopWideChatLayoutSubtitle =>
-      '在桌面端、平板或橫向寬螢幕佈局中，讓訊息列表和輸入欄盡量佔滿可用寬度。';
 
   @override
   String get displaySettingsPageShowToolResultSummarySubtitle =>
@@ -14588,6 +18484,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get displaySettingsPageChatBackgroundMaskTitle => '聊天背景遮罩透明度';
 
   @override
+  String get displaySettingsPageChatInputBackgroundOpacityTitle => '輸入框背景透明度';
+
+  @override
   String get displaySettingsPageThemeSettingsTitle => '主題設定';
 
   @override
@@ -14666,16 +18565,239 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get themeSettingsPageColorPalettesSection => '配色方案';
 
   @override
+  String get themeSettingsPageCustomPaletteName => '自定義';
+
+  @override
+  String get themeSettingsPageCustomColorReset => '重置';
+
+  @override
+  String get themeSettingsPageCustomThemesSection => '自定義主題';
+
+  @override
+  String get customThemeNewTheme => '新增主題';
+
+  @override
+  String get customThemeEditTheme => '編輯主題';
+
+  @override
+  String get customThemeImportTheme => '匯入主題';
+
+  @override
+  String get customThemeNameLabel => '主題名稱';
+
+  @override
+  String get customThemePrimaryColor => '主色';
+
+  @override
+  String get customThemeSecondaryColor => '輔色';
+
+  @override
+  String get customThemeTertiaryColor => '第三色';
+
+  @override
+  String get customThemeColorAuto => '自動';
+
+  @override
+  String get customThemeSave => '儲存';
+
+  @override
+  String get customThemeCancel => '取消';
+
+  @override
+  String get customThemeDelete => '刪除';
+
+  @override
+  String get customThemeDeleteConfirm => '刪除該主題？';
+
+  @override
+  String get customThemeCopied => '主題 JSON 已複製到剪貼簿';
+
+  @override
+  String get customThemeCopyAction => '複製';
+
+  @override
+  String get customThemeImportHint => '在此貼上主題 JSON';
+
+  @override
+  String get customThemeImportInvalid => '無效的主題 JSON';
+
+  @override
+  String get customThemeHexLabel => '十六進制';
+
+  @override
   String get ttsServicesPageBackButton => '返回';
 
   @override
   String get ttsServicesPageTitle => '語音服務';
 
   @override
+  String get ttsServicesSectionTitle => '文字轉語音';
+
+  @override
   String get ttsServicesPageSettingsTooltip => 'TTS 設定';
 
   @override
   String get ttsServicesPageAddTooltip => '新增';
+
+  @override
+  String get asrServicesSectionTitle => '語音辨識';
+
+  @override
+  String get asrServicesSectionDescription => '使用本機、系統或雲端服務將語音轉換為文字。';
+
+  @override
+  String get asrServicesAddTooltip => '新增語音辨識服務';
+
+  @override
+  String get asrServicesEmptyTitle => '尚未新增語音辨識服務';
+
+  @override
+  String get asrServicesEmptySubtitle => '新增後，聊天輸入框才會顯示麥克風。';
+
+  @override
+  String get asrServicesOnDeviceGroup => '裝置端';
+
+  @override
+  String get asrServicesCloudGroup => '雲端';
+
+  @override
+  String get asrServicesSystemTitle => '系統';
+
+  @override
+  String get asrServicesSystemSubtitle => '使用裝置內建能力';
+
+  @override
+  String get asrServicesLocalTitle => '本機模型';
+
+  @override
+  String get asrServicesLocalSubtitle => '下載後在裝置上離線執行';
+
+  @override
+  String get asrServicesOpenAiTitle => 'OpenAI Realtime';
+
+  @override
+  String get asrServicesOpenAiSubtitle => '低延遲串流轉寫';
+
+  @override
+  String get asrServicesDashScopeTitle => 'DashScope';
+
+  @override
+  String get asrServicesDashScopeSubtitle => 'Qwen 即時轉寫';
+
+  @override
+  String get asrServicesVolcengineTitle => '火山引擎';
+
+  @override
+  String get asrServicesVolcengineSubtitle => '豆包語音串流轉寫';
+
+  @override
+  String get asrServicesMimoTitle => 'MiMo';
+
+  @override
+  String get asrServicesMimoSubtitle => '分段雲端轉寫';
+
+  @override
+  String get asrServicesStepTitle => 'Step';
+
+  @override
+  String get asrServicesStepSubtitle => 'Step Audio 分段雲端轉寫';
+
+  @override
+  String get asrServicesAddTitle => '新增語音辨識';
+
+  @override
+  String get asrServicesEditTitle => '編輯語音辨識';
+
+  @override
+  String get asrServicesSelectedLabel => '已選擇';
+
+  @override
+  String get asrServicesUnavailableLabel => '不可用';
+
+  @override
+  String get asrServicesEditAction => '編輯';
+
+  @override
+  String get asrServicesDeleteAction => '刪除';
+
+  @override
+  String get asrServicesCancelAction => '取消';
+
+  @override
+  String get asrServicesAddAction => '新增';
+
+  @override
+  String get asrServicesSaveAction => '儲存';
+
+  @override
+  String get asrServicesNameLabel => '名稱';
+
+  @override
+  String get asrServicesApiKeyLabel => 'API Key';
+
+  @override
+  String get asrServicesEndpointLabel => '服務位址';
+
+  @override
+  String get asrServicesModelLabel => '模型';
+
+  @override
+  String get asrServicesResourceIdLabel => '資源 ID';
+
+  @override
+  String get asrServicesLanguageLabel => '語言';
+
+  @override
+  String get asrServicesAutomaticLabel => '自動';
+
+  @override
+  String get asrServicesApiKeyRequired => '請輸入 API Key 後再使用此服務。';
+
+  @override
+  String get asrServicesChooseModelTitle => '模型';
+
+  @override
+  String get asrServicesModelDownloadAction => '下載';
+
+  @override
+  String get asrServicesModelUseAction => '使用此模型';
+
+  @override
+  String get asrServicesModelDeleteAction => '刪除下載';
+
+  @override
+  String get asrServicesModelDownloadedLabel => '已下載';
+
+  @override
+  String get asrServicesModelDownloadingLabel => '正在下載…';
+
+  @override
+  String get asrServicesModelNotDownloadedLabel => '未下載';
+
+  @override
+  String asrServicesDownloadFailed(String error) {
+    return '模型下載失敗：$error';
+  }
+
+  @override
+  String get asrServicesSystemChecking => '正在檢查…';
+
+  @override
+  String get asrServicesSystemAvailable => '可用';
+
+  @override
+  String get asrServicesSystemCheckFailed => '這台裝置沒有可用的系統語音辨識服務。';
+
+  @override
+  String get asrServicesMicrophonePermissionDenied => '未取得麥克風權限。';
+
+  @override
+  String get asrServicesNoSpeechDetected => '沒有辨識到語音。';
+
+  @override
+  String asrServicesRecognitionFailed(String error) {
+    return '語音辨識失敗：$error';
+  }
 
   @override
   String get ttsServicesPageAddNotImplemented => '新增 TTS 服務暫未實現';
@@ -14788,7 +18910,81 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get ttsServicesFieldLanguageLabel => '語言';
 
   @override
+  String get ttsServicesFieldWorkspaceIdLabel => '業務空間 ID';
+
+  @override
+  String get ttsServicesFieldRegionLabel => '地域';
+
+  @override
+  String get ttsServicesFieldFormatLabel => '音訊格式';
+
+  @override
+  String get ttsServicesFieldOutputFormatLabel => '輸出格式';
+
+  @override
+  String get ttsServicesFieldSampleRateLabel => '取樣率';
+
+  @override
+  String get ttsServicesFieldVolumeLabel => '音量';
+
+  @override
+  String get ttsServicesFieldPitchLabel => '音調';
+
+  @override
+  String get ttsServicesFieldLanguageBoostLabel => '語言增強';
+
+  @override
+  String get ttsServicesFieldBitrateLabel => '位元率';
+
+  @override
+  String get ttsServicesFieldChannelLabel => '聲道數';
+
+  @override
+  String get ttsServicesFieldSubtitlesLabel => '產生字幕';
+
+  @override
+  String get ttsServicesFieldPronunciationDictionaryLabel => '發音詞典（每行一項）';
+
+  @override
+  String get ttsServicesFieldInstructionLabel => '風格／音色描述';
+
+  @override
+  String get ttsServicesFieldStreamingLabel => '串流輸出';
+
+  @override
+  String get ttsServicesFieldOptimizeTextPreviewLabel => '最佳化播報文字';
+
+  @override
+  String get ttsServicesFieldReferenceAudioLabel => '參考音訊（WAV/MP3 資料 URI）';
+
+  @override
+  String get ttsServicesFieldChooseReferenceAudioButton => '選擇參考音訊';
+
+  @override
+  String get ttsServicesFieldTemperatureLabel => '隨機度';
+
+  @override
+  String get ttsServicesFieldTopPLabel => 'Top P';
+
+  @override
+  String get ttsServicesFieldLatencyLabel => '延遲模式';
+
+  @override
+  String get ttsServicesEmotionAutoLabel => '自動配對';
+
+  @override
   String get ttsServicesValidationApiKeyRequired => 'API Key 不能為空';
+
+  @override
+  String get ttsServicesValidationReferenceIdRequired => '音色／參考 ID 不能為空';
+
+  @override
+  String get ttsServicesValidationInstructionRequired => '音色描述不能為空';
+
+  @override
+  String ttsServicesValidationSampleRate(String format, String rates) {
+    return '$format 格式要求使用 $rates Hz。';
+  }
 
   @override
   String get ttsServicesViewDetailsButton => '檢視詳細';
@@ -14810,6 +19006,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get ttsSettingsAutoPlayDescription => '助理回覆產生完成後自動開始 TTS 播放。';
+
+  @override
+  String get ttsSettingsCacheReplayTitle => '使用快取重播';
+
+  @override
+  String get ttsSettingsCacheReplayDescription => '重新播放網路語音時使用已產生的音訊，不再請求語音服務。';
 
   @override
   String get ttsSettingsTextSelectionSection => '文字選擇';
@@ -14882,6 +19084,23 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get ttsFloatingCollapseTooltip => '收起播放控制';
 
   @override
+  String get ttsFloatingSaveTooltip => '儲存音訊';
+
+  @override
+  String get ttsSaveDialogTitle => '儲存 TTS 音訊';
+
+  @override
+  String get ttsSaveSuccess => '音訊已儲存';
+
+  @override
+  String get ttsSaveNothing => '暫無可儲存的音訊';
+
+  @override
+  String ttsSaveFailed(String message) {
+    return '儲存音訊失敗：$message';
+  }
+
+  @override
   String imageViewerPageShareFailedOpenFile(String message) {
     return '無法分享，已嘗試開啟檔案: $message';
   }
@@ -14952,7 +19171,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get settingsShare => 'JO-Kelivo - 開源 AI 助理';
+  String get settingsShare => 'Kelivo - 開源AI助理';
 
   @override
   String get searchProviderBingLocalDescription =>
@@ -15042,6 +19261,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '博查 AI 全網網頁搜尋，支援時間範圍與摘要，更適合 AI 使用。';
 
   @override
+  String get searchServiceNameDoubao => '豆包';
+
+  @override
+  String get searchProviderDoubaoDescription => '火山引擎豆包網頁搜尋 API。';
+
+  @override
   String get searchServiceNameSerper => 'Serper';
 
   @override
@@ -15061,6 +19286,27 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get searchProviderGrokDescription =>
       '透過 xAI Responses API 使用 Grok 搜尋。呼叫網頁和 X 搜尋工具，並返回帶引用的來源。';
+
+  @override
+  String get searchServiceNameStepFun => 'StepFun';
+
+  @override
+  String get searchProviderStepFunDescription =>
+      '透過 StepFun POST /v1/search 進行網頁搜尋。';
+
+  @override
+  String get searchServiceNameFirecrawl => 'Firecrawl';
+
+  @override
+  String get searchProviderFirecrawlDescription =>
+      'Firecrawl Search API v2。需要 Bearer API Key。此處不支援 Scrape。';
+
+  @override
+  String get searchServiceNameTinyFish => 'TinyFish';
+
+  @override
+  String get searchProviderTinyFishDescription =>
+      'TinyFish Search API，支援地區與語言參數。需要 API Key。此處不支援 Fetch/Scrape。';
 
   @override
   String get searchServicesDialogCountryOptional => '國家/地區（可選）';
@@ -15273,7 +19519,39 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get assistantEditLocalToolAskUserSubtitle => '允許助手提出簡短問題，並在你回答後繼續生成。';
 
   @override
-  String get assistantEditMemorySwitchTitle => '記憶';
+  String get assistantEditLocalToolCalculateTitle => '計算機';
+
+  @override
+  String get assistantEditLocalToolCalculateSubtitle =>
+      '計算數學表達式，支援加減乘除冪運算 sqrt sin cos 等。';
+
+  @override
+  String get assistantEditLocalToolScreenTimeTitle => '螢幕使用時間';
+
+  @override
+  String get assistantEditLocalToolScreenTimeSubtitle =>
+      '查詢本裝置的應用使用時長，需要授予使用情況存取權限。';
+
+  @override
+  String get chatMessageWidgetScreenTimeTotal => '總螢幕使用時間';
+
+  @override
+  String get chatMessageWidgetScreenTimePermissionRequired =>
+      '未授予使用記錄存取權限，請在系統設定中開啟後重試。';
+
+  @override
+  String get assistantEditLocalToolCalendarQueryTitle => '查詢日曆';
+
+  @override
+  String get assistantEditLocalToolCalendarQuerySubtitle =>
+      '讀取本裝置上的日曆行程，需要授予日曆權限。';
+
+  @override
+  String get assistantEditLocalToolCalendarCreateTitle => '建立行程';
+
+  @override
+  String get assistantEditLocalToolCalendarCreateSubtitle =>
+      '在你確認後於本裝置建立日曆行程，需要授予日曆權限。';
 
   @override
   String get assistantEditMemorySwitchDescription => '允許助理主動儲存並在對話間引用使用者相關資訊';
@@ -15284,9 +19562,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get assistantEditRecentChatsSwitchDescription =>
       '在新對話中引用最近的對話標題以增強上下文';
-
-  @override
-  String get assistantEditManageMemoryTitle => '管理記憶';
 
   @override
   String get assistantEditAddMemoryButton => '新增記憶';
@@ -15524,6 +19799,17 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
+  String get providerDetailPageDeleteFailedDetectedModelsButton => '刪除不可用';
+
+  @override
+  String get providerDetailPageDeleteFailedDetectedModelsTooltip => '刪除檢測失敗的模型';
+
+  @override
+  String providerDetailPageDeleteFailedDetectedModelsConfirm(int count) {
+    return '確定刪除檢測失敗的 $count 個模型嗎？此操作不可撤回。';
+  }
+
+  @override
   String providerDetailPageSelectedModelsDeletedSnackbar(int count) {
     return '已刪除 $count 個模型';
   }
@@ -15683,6 +19969,602 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get settingsPageWorldBook => '世界書';
+
+  @override
+  String get settingsPageMemory => '記憶';
+
+  @override
+  String get memorySettingsPageTitle => '記憶';
+
+  @override
+  String get memorySettingsModelSection => '記憶模型';
+
+  @override
+  String get memorySettingsModelTitle => '處理模型';
+
+  @override
+  String get memorySettingsModelUnset => '未選擇';
+
+  @override
+  String get memorySettingsModelTip => '開啟「自動整理記憶」後，後台會頻繁呼叫此模型，建議選擇便宜且速度快的模型。';
+
+  @override
+  String get memorySettingsAboutTitle => '記憶說明';
+
+  @override
+  String get memorySettingsAboutSubtitle => '瞭解記憶如何運作與觸發';
+
+  @override
+  String get memorySettingsAboutBody =>
+      '記憶如何運作\n記憶按「身分 / 工作流 / 語氣 / 指令」分類，並區分全域與助手範圍。對話時，相關記憶會注入模型上下文；條目較多時先展示摘要，模型可用工具繼續查詢更多內容。\n\n後台如何處理、如何觸發\n處理模型用於後台整理管線：判斷是否值得記憶、提取候選、去重合併，必要時再提煉使用者畫像。助手開啟「自動整理」後，會按設定輪數在對話結束後自動觸發；也可在助手「記憶」頁手動整理。因此該模型會被較頻繁呼叫。\n\n如何保持快取良好\n盡量讓注入對話的記憶前綴保持穩定，避免無意義的大批量改動或頻繁重排，有助於 Prompt 快取命中，從而降低費用與延遲。日常增刪改單條記憶通常影響有限。';
+
+  @override
+  String get memorySettingsThinkingTitle => '啟用思考';
+
+  @override
+  String get memorySettingsThinkingSubtitle => '在模型支援時允許記憶模型使用推理';
+
+  @override
+  String get memorySettingsPromptLangSection => '提示詞語言';
+
+  @override
+  String get memorySettingsPromptLangAuto => '自動';
+
+  @override
+  String get memorySettingsPromptLangAutoSubtitle => '跟隨介面語言（中文用 zh，否則用 en）';
+
+  @override
+  String get memorySettingsPromptLangZh => '中文';
+
+  @override
+  String get memorySettingsPromptLangZhSubtitle => '一律使用中文記憶提示詞與工具描述';
+
+  @override
+  String get memorySettingsPromptLangEn => 'English';
+
+  @override
+  String get memorySettingsPromptLangEnSubtitle => '一律使用英文記憶提示詞與工具描述';
+
+  @override
+  String get memorySettingsPromptsSection => '提示詞模板';
+
+  @override
+  String get memoryPromptEditRulesTitle => '記憶規則';
+
+  @override
+  String get memoryPromptEditRulesSubtitle => '注入到主對話的系統提示中';
+
+  @override
+  String get memoryPromptEditGateTitle => 'Gatekeeper';
+
+  @override
+  String get memoryPromptEditGateSubtitle => '判斷這一輪是否值得記憶';
+
+  @override
+  String get memoryPromptEditExtractTitle => 'Extract';
+
+  @override
+  String get memoryPromptEditExtractSubtitle => '從對話中提取候選記憶條目';
+
+  @override
+  String get memoryPromptEditSmartAddTitle => 'Smart Add';
+
+  @override
+  String get memoryPromptEditSmartAddSubtitle =>
+      'NEW / MERGE / CONFLICT / SKIP 去重判定';
+
+  @override
+  String get memoryPromptEditDistillTitle => 'Profile Distiller';
+
+  @override
+  String get memoryPromptEditDistillSubtitle => '從身分類記憶提煉畫像欄位';
+
+  @override
+  String get memoryPromptEditReset => '恢復預設';
+
+  @override
+  String get memoryPromptEditSave => '儲存';
+
+  @override
+  String get memoryPromptEditSectionPerItem => '逐條提示詞';
+
+  @override
+  String get memoryPromptEditSectionBatch => '合併提示詞';
+
+  @override
+  String get memorySettingsEntriesSection => '全部記憶';
+
+  @override
+  String get memorySettingsEntriesTitle => '記憶列表';
+
+  @override
+  String get memorySettingsEntriesSubtitle => '瀏覽、編輯、封存與刪除記憶';
+
+  @override
+  String get memorySettingsProfileTitle => '使用者畫像';
+
+  @override
+  String get memorySettingsProfileSubtitle => '供模型使用的結構化身分欄位';
+
+  @override
+  String get memorySettingsLegacyTitle => '舊版記憶（唯讀）';
+
+  @override
+  String get memorySettingsLegacySubtitle => '來自舊版本的記憶';
+
+  @override
+  String get memoryEntryTypeIdentity => '身分';
+
+  @override
+  String get memoryEntryTypeWorkflow => '工作流';
+
+  @override
+  String get memoryEntryTypeVoice => '語氣';
+
+  @override
+  String get memoryEntryTypeInstruction => '指令';
+
+  @override
+  String get memoryEntryScopeGlobal => '全域';
+
+  @override
+  String get memoryEntryScopeAssistant => '僅本助手';
+
+  @override
+  String memoryEntryScopeAssistantNamed(String name) {
+    return '$name';
+  }
+
+  @override
+  String get memoryEntrySourceManual => '手動';
+
+  @override
+  String get memoryEntrySourceTool => '工具';
+
+  @override
+  String get memoryEntrySourceExtracted => '擷取';
+
+  @override
+  String get memoryEntrySourceDistilled => '蒸餾';
+
+  @override
+  String get memoryEntryStatusActive => '作用中';
+
+  @override
+  String get memoryEntryStatusArchived => '已封存';
+
+  @override
+  String memoryEntryUpdatedAt(String date) {
+    return '更新於 $date';
+  }
+
+  @override
+  String get memoryEntryActionEdit => '編輯';
+
+  @override
+  String get memoryEntryActionDelete => '刪除';
+
+  @override
+  String get memoryEntryActionArchive => '封存';
+
+  @override
+  String get memoryEntryActionRestore => '還原';
+
+  @override
+  String get memoryEntryActionSwitchScope => '切換範圍';
+
+  @override
+  String get memoryEntryActionBatchDelete => '刪除所選';
+
+  @override
+  String get memoryEntryActionAdd => '新增記憶';
+
+  @override
+  String get memoryEntryDeleteConfirmTitle => '刪除這條記憶？';
+
+  @override
+  String get memoryEntryDeleteConfirmContent => '將永久刪除該記憶，且無法復原。';
+
+  @override
+  String memoryEntryBatchDeleteConfirmTitle(int count) {
+    return '刪除 $count 條記憶？';
+  }
+
+  @override
+  String get memoryEntryBatchDeleteConfirmContent => '所選記憶將被永久刪除。';
+
+  @override
+  String get memoryEntrySwitchScopeConfirmTitle => '更改記憶範圍？';
+
+  @override
+  String get memoryEntrySwitchScopeToGlobal => '將這條記憶設為全域（所有助手可見）？';
+
+  @override
+  String get memoryEntrySwitchScopeToAssistant => '將這條記憶限制為僅本助手？';
+
+  @override
+  String get memoryEntryArchivedSection => '已封存';
+
+  @override
+  String get memoryEntryEmpty => '還沒有記憶';
+
+  @override
+  String get memoryEntryEmptyDisabled => '該助手未啟用長期記憶';
+
+  @override
+  String get memoryEntryEditTitle => '編輯記憶';
+
+  @override
+  String get memoryEntryCreateTitle => '新建記憶';
+
+  @override
+  String get memoryEntryContentHint => '輸入記憶內容';
+
+  @override
+  String get memoryEntryTypeLabel => '類型';
+
+  @override
+  String get memoryEntryScopeLabel => '範圍';
+
+  @override
+  String get memoryFilterScopeAll => '全部範圍';
+
+  @override
+  String get memoryFilterScopeGlobal => '僅全域';
+
+  @override
+  String get memoryFilterScopeAssistant => '助手';
+
+  @override
+  String get memoryFilterTypeAll => '全部類型';
+
+  @override
+  String get memoryFilterStatusAll => '全部狀態';
+
+  @override
+  String get memoryFilterStatusActive => '作用中';
+
+  @override
+  String get memoryFilterStatusArchived => '已封存';
+
+  @override
+  String get memorySearchHint => '搜尋記憶';
+
+  @override
+  String get memorySearchEmpty => '沒有相符的記憶';
+
+  @override
+  String memoryOrphanBanner(int count) {
+    return '有 $count 條孤兒助手記憶（助手已刪除）';
+  }
+
+  @override
+  String get memoryOrphanCleanupButton => '清理';
+
+  @override
+  String get memoryOrphanConfirmTitle => '清理孤兒記憶？';
+
+  @override
+  String memoryOrphanConfirmContent(int count) {
+    return '將永久刪除 $count 條所屬助手已不存在的記憶。';
+  }
+
+  @override
+  String get memoryOrganizeButton => '整理記憶';
+
+  @override
+  String get memoryOrganizeNeedsConversation => '需要在與該助手的對話中使用';
+
+  @override
+  String get memoryOrganizeNeedsModel => '請先在 設定 → 記憶 中選擇記憶處理模型';
+
+  @override
+  String get memoryOrganizeStatusNever => '尚未整理';
+
+  @override
+  String memoryOrganizeStatusLast(String when) {
+    return '上次整理：$when';
+  }
+
+  @override
+  String memoryOrganizeStatusExtracted(int count) {
+    return '擷取 $count 條';
+  }
+
+  @override
+  String get memoryOrganizeStatusSkipped => '無需記憶';
+
+  @override
+  String memoryOrganizeStatusFailed(String reason) {
+    return '失敗：$reason';
+  }
+
+  @override
+  String get memoryOrganizeJustNow => '剛剛';
+
+  @override
+  String memoryOrganizeMinutesAgo(int n) {
+    return '$n 分鐘前';
+  }
+
+  @override
+  String memoryOrganizeHoursAgo(int n) {
+    return '$n 小時前';
+  }
+
+  @override
+  String memoryOrganizeDaysAgo(int n) {
+    return '$n 天前';
+  }
+
+  @override
+  String get memoryModelMissingNotice => '需要先在 設定 → 記憶 中選擇記憶處理模型。';
+
+  @override
+  String get memoryModelMissingGoSelect => '去選擇';
+
+  @override
+  String get memoryEntriesPageTitle => '全部記憶';
+
+  @override
+  String get userProfilePageTitle => '使用者畫像';
+
+  @override
+  String get userProfilePreferredName => '希望怎麼稱呼我';
+
+  @override
+  String get userProfilePreferredNameHint => '這是希望模型怎麼稱呼你，與側欄顯示的使用者名稱無關';
+
+  @override
+  String get userProfileGender => '性別';
+
+  @override
+  String get userProfilePronouns => '代詞';
+
+  @override
+  String get userProfilePreferredLanguage => '偏好語言';
+
+  @override
+  String get userProfileTimezone => '時區';
+
+  @override
+  String get userProfileOccupation => '職業';
+
+  @override
+  String get userProfileLocation => '所在地';
+
+  @override
+  String get userProfileCustomSection => '自訂欄位';
+
+  @override
+  String get userProfileAddCustom => '新增自訂欄位';
+
+  @override
+  String get userProfileCustomKeyHint => '鍵名（custom.name）';
+
+  @override
+  String get userProfileCustomValueHint => '值';
+
+  @override
+  String get userProfileInvalidKey => '鍵名須為 custom. 後接 1–32 位字母、數字、_ 或 -';
+
+  @override
+  String get userProfileClear => '清除';
+
+  @override
+  String get userProfileSave => '儲存';
+
+  @override
+  String get userProfileEmptyValue => '未設定';
+
+  @override
+  String get legacyMemoryPageTitle => '舊版記憶';
+
+  @override
+  String get legacyMemoryBanner => '這些記憶來自舊版本，不會參與對話；你可以將它們遷移到目前的記憶系統。';
+
+  @override
+  String get legacyMemoryEmpty => '沒有舊版記憶';
+
+  @override
+  String get legacyMemoryCopy => '複製';
+
+  @override
+  String get legacyMemoryCopied => '已複製';
+
+  @override
+  String get legacyMemoryExport => '匯出';
+
+  @override
+  String get legacyMemoryExportTitle => 'Kelivo 舊版記憶匯出';
+
+  @override
+  String legacyMemoryAssistantHeader(String name) {
+    return '助手：$name';
+  }
+
+  @override
+  String get legacyMemorySearchHint => '搜尋舊版記憶';
+
+  @override
+  String get legacyMemoryMigrate => '遷移';
+
+  @override
+  String get legacyMemoryMigrationTitle => '遷移舊版記憶';
+
+  @override
+  String legacyMemoryMigrationSubtitle(int count) {
+    return '使用模型整理並分類 $count 條舊版記憶，原資料不會改變。';
+  }
+
+  @override
+  String get legacyMemoryMigrationModel => '遷移模型';
+
+  @override
+  String get legacyMemoryMigrationChooseModel => '選擇模型';
+
+  @override
+  String get legacyMemoryMigrationTarget => '儲存到';
+
+  @override
+  String get legacyMemoryMigrationTargetGlobal => '全域';
+
+  @override
+  String get legacyMemoryMigrationTargetAssistant => '目前的助手';
+
+  @override
+  String get legacyMemoryMigrationTargetOriginalAssistants => '原助手';
+
+  @override
+  String get legacyMemoryMigrationTargetGlobalDescription => '所有助手均可使用';
+
+  @override
+  String get legacyMemoryMigrationTargetAssistantDescription => '僅目前的助手可使用';
+
+  @override
+  String get legacyMemoryMigrationTargetOriginalDescription => '每條記憶保留在原來的助手下';
+
+  @override
+  String get legacyMemoryMigrationStart => '開始遷移';
+
+  @override
+  String get legacyMemoryMigrationAnalyzing => '正在使用模型分析';
+
+  @override
+  String get legacyMemoryMigrationWriting => '正在寫入記憶';
+
+  @override
+  String legacyMemoryMigrationProgress(int current, int total) {
+    return '$current / $total';
+  }
+
+  @override
+  String get legacyMemoryMigrationComplete => '遷移完成';
+
+  @override
+  String legacyMemoryMigrationResult(int created, int skipped) {
+    return '已遷移 $created 條 · 略過已有 $skipped 條';
+  }
+
+  @override
+  String get legacyMemoryMigrationFailed => '遷移已停止。可以重試，已儲存的記憶會自動略過。';
+
+  @override
+  String get legacyMemoryMigrationRetry => '重試';
+
+  @override
+  String get legacyMemoryMigrationClose => '完成';
+
+  @override
+  String get memoryUiContentLabel => '內容';
+
+  @override
+  String get memoryUiValueLabel => '值';
+
+  @override
+  String get memoryUiCustomKeyLabel => '鍵名';
+
+  @override
+  String get memoryUiStatusLabel => '狀態';
+
+  @override
+  String get memoryUiAssistantLabel => '助手';
+
+  @override
+  String get memoryUiAssistantAll => '全部助手';
+
+  @override
+  String get memoryUiSearchClear => '清除搜尋';
+
+  @override
+  String get memoryUiAssistantLegacyTitle => '舊版記憶（唯讀）';
+
+  @override
+  String get memoryUiAssistantLegacySubtitle => '該助手來自舊版本的記憶';
+
+  @override
+  String get assistantEditMemorySwitchTitle => '使用長期記憶';
+
+  @override
+  String get assistantEditAutoOrganizeTitle => '自動整理記憶';
+
+  @override
+  String get assistantEditAutoOrganizeSubtitle => '對話後自動執行記憶管線';
+
+  @override
+  String get assistantEditAllowPastRecallTitle => '允許回憶過去對話';
+
+  @override
+  String get assistantEditAllowPastRecallSubtitle => '啟用跨會話的對話搜尋';
+
+  @override
+  String get assistantEditGenerateSummaryTitle => '產生會話摘要';
+
+  @override
+  String get assistantEditGenerateSummarySubtitle => '摘要僅供對話搜尋使用';
+
+  @override
+  String get assistantEditManageMemoryTitle => '本助手可見的記憶';
+
+  @override
+  String get assistantEditWriteScopeTitle => '記憶寫入範圍';
+
+  @override
+  String get assistantEditWriteScopeSubtitle => '新記憶預設寫入的位置';
+
+  @override
+  String get assistantEditWriteScopeAlwaysGlobal => '一律全域';
+
+  @override
+  String get assistantEditWriteScopeAlwaysAssistant => '一律本助手';
+
+  @override
+  String get assistantEditWriteScopeToolDefaultGlobal => '模型自選（預設全域）';
+
+  @override
+  String get assistantEditWriteScopeToolDefaultAssistant => '模型自選（預設本助手）';
+
+  @override
+  String get assistantEditDedupeModeTitle => '去重方式';
+
+  @override
+  String get assistantEditDedupeModeSubtitle => '候選記憶如何與既有條目比對';
+
+  @override
+  String get assistantEditDedupeModeBatched => '合併';
+
+  @override
+  String get assistantEditDedupeModePerItem => '逐條';
+
+  @override
+  String get assistantEditOrganizeFrequencyTitle => '整理頻率';
+
+  @override
+  String get assistantEditOrganizeFrequencySubtitle => '每累積 N 輪助手回覆觸發一次自動整理';
+
+  @override
+  String assistantEditOrganizeFrequencyOption(int n) {
+    return '每 $n 輪';
+  }
+
+  @override
+  String get assistantEditOrganizeFrequencyCustomButton => '自訂';
+
+  @override
+  String get assistantEditOrganizeFrequencyCustomTitle => '自訂整理頻率';
+
+  @override
+  String get assistantEditOrganizeFrequencyCustomDescription =>
+      '請輸入 1 到 20 之間的整數。';
+
+  @override
+  String get assistantEditOrganizeFrequencyCustomLabel => '輪數';
+
+  @override
+  String get assistantEditOrganizeFrequencyCustomHint => '1–20';
+
+  @override
+  String get assistantEditOrganizeFrequencyCustomInvalid => '請輸入 1 到 20 之間的整數';
 
   @override
   String get worldBookTitle => '世界書';
@@ -15992,4 +20874,444 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 訊息 #$index：快速隨機調試樣例，用於測試列表渲染、捲動穩定性、訊息分組和會話歷史效能。';
   }
+
+  @override
+  String get migrationIntroTitle => '升級聊天記錄儲存';
+
+  @override
+  String get migrationIntroSubtitle =>
+      'Kelivo 將聊天記錄遷移到更快的 SQLite 資料庫。升級會在應用程式開啟前完成，避免新舊資料同時寫入。';
+
+  @override
+  String get migrationBackupNote => '遷移開始前，會先匯出包含設定、聊天記錄和本地檔案的 ZIP 備份。';
+
+  @override
+  String get migrationPerformanceNote =>
+      '遷移後，啟動、歷史載入和搜尋都會使用 SQLite 索引，長對話會更流暢。';
+
+  @override
+  String get migrationSourceDatabaseLabel => 'Hive';
+
+  @override
+  String get migrationTargetDatabaseLabel => 'SQLite';
+
+  @override
+  String get migrationChooseFolderButton => '選擇資料夾並備份';
+
+  @override
+  String get migrationSaveBackupButton => '儲存備份 ZIP';
+
+  @override
+  String get migrationBackingUpTitle => '正在備份';
+
+  @override
+  String get migrationBackingUpSubtitle =>
+      '正在匯出設定、聊天記錄、上傳檔案、圖片和字體。請保持 Kelivo 開啟，等待備份完成。';
+
+  @override
+  String get migrationMigratingTitle => '正在遷移到 SQLite';
+
+  @override
+  String get migrationMigratingSubtitle =>
+      '正在分批寫入對話和訊息，避免超大聊天記錄占滿記憶體。請保持 Kelivo 在前台，等待遷移完成。';
+
+  @override
+  String migrationBackingUpDetail(String fileName) {
+    return '正在備份 $fileName';
+  }
+
+  @override
+  String migrationMigratingDetail(int count) {
+    return '已遷移 $count 條訊息';
+  }
+
+  @override
+  String get migrationMigratingPrepareDetail => '正在準備 SQLite 資料庫';
+
+  @override
+  String get migrationMigratingToolEventsDetail => '正在遷移工具呼叫記錄';
+
+  @override
+  String get migrationMigratingValidateDetail => '正在校驗遷移資料';
+
+  @override
+  String get migrationBackupReadyDetail => '備份 ZIP 已準備好';
+
+  @override
+  String get migrationSavingBackupZipDetail => '正在儲存備份 ZIP';
+
+  @override
+  String get migrationBackupFileSavedTitle => '備份 ZIP 已保存';
+
+  @override
+  String get migrationChecklistBackupFiles => '匯出 Hive 備份 ZIP';
+
+  @override
+  String get migrationChecklistPrepareSqlite => '準備 SQLite 資料庫';
+
+  @override
+  String get migrationChecklistMigrateMessages => '遷移對話和訊息';
+
+  @override
+  String get migrationChecklistMigrateToolEvents => '遷移工具呼叫記錄';
+
+  @override
+  String get migrationChecklistValidate => '校驗遷移資料';
+
+  @override
+  String get migrationStepBackup => '備份';
+
+  @override
+  String get migrationStepMigrate => '遷移';
+
+  @override
+  String get migrationStepComplete => '完成';
+
+  @override
+  String get migrationCompleteTitle => '升級完成';
+
+  @override
+  String get migrationCompleteSubtitle =>
+      '你的聊天記錄已遷移到 SQLite。請重啟 Kelivo 進入升級後的應用程式。';
+
+  @override
+  String get migrationConversationCount => '對話';
+
+  @override
+  String get migrationMessageCount => '訊息';
+
+  @override
+  String get migrationConvertedCount => '已轉換';
+
+  @override
+  String get migrationMalformedCount => '格式異常';
+
+  @override
+  String get migrationMissingFilesCount => '缺失檔案';
+
+  @override
+  String get migrationRestartButton => '重啟 Kelivo';
+
+  @override
+  String get migrationFailedTitle => '遷移失敗';
+
+  @override
+  String get migrationFailedSubtitle => '原始 Hive 資料和備份都仍然保留。查看下方原因後可以重試。';
+
+  @override
+  String get migrationUnknownError => '未知遷移錯誤。';
+
+  @override
+  String get migrationFailureLogTitle => '失敗日誌';
+
+  @override
+  String get migrationRetryButton => '重試遷移';
+
+  @override
+  String get migrationSkipButton => '跳過遷移並全新開始';
+
+  @override
+  String get migrationSkipDialogTitle => '跳過遷移？';
+
+  @override
+  String get migrationSkipDialogMessage =>
+      'Kelivo 將以空的聊天資料庫啟動。舊的聊天記錄會保留在磁碟上（重新命名為 .retired 後綴），但不會被遷移，也不會在應用程式中顯示。之後如需找回，請使用已儲存的備份 ZIP。';
+
+  @override
+  String get migrationSkipDialogCancel => '取消';
+
+  @override
+  String get migrationSkipDialogConfirm => '跳過並全新開始';
+
+  @override
+  String get migrationChatsExportDegradedNote =>
+      'chats.json 匯出因出錯而被跳過。備份 ZIP 仍包含原始 Hive 檔案，完整聊天記錄未遺失。';
+
+  @override
+  String get timelineJumpToLatest => '跳到最新';
+
+  @override
+  String largeContentShowMore(int count) {
+    return '再顯示 $count 項';
+  }
+
+  @override
+  String get largeContentCollapse => '收起';
+
+  @override
+  String get imageSettingsPageTitle => '圖片處理';
+
+  @override
+  String get imageSettingsPageEditSectionTitle => '編輯';
+
+  @override
+  String get imageSettingsPageQualitySectionTitle => '上傳圖片品質';
+
+  @override
+  String get imageSettingsPageQualityOriginal => '原圖';
+
+  @override
+  String get imageSettingsPageQualityOriginalSubtitle => '不壓縮，原樣上傳';
+
+  @override
+  String get imageSettingsPageQualityHigh => '高品質';
+
+  @override
+  String get imageSettingsPageQualityHighSubtitle => '最長邊 2048 像素 · 品質 90';
+
+  @override
+  String get imageSettingsPageQualityBalanced => '平衡';
+
+  @override
+  String get imageSettingsPageQualityBalancedSubtitle => '最長邊 1568 像素 · 品質 85';
+
+  @override
+  String get imageSettingsPageQualitySaver => '節省流量';
+
+  @override
+  String get imageSettingsPageQualitySaverSubtitle => '最長邊 1024 像素 · 品質 70';
+
+  @override
+  String get imageSettingsPageQualityCustom => '自訂';
+
+  @override
+  String get imageSettingsPageQualityCustomSubtitle => '自選壓縮品質';
+
+  @override
+  String get imageSettingsPageCustomQualityTitle => '壓縮品質';
+
+  @override
+  String get imageSettingsPageCompressTransparentTitle => '壓縮透明及動態圖片';
+
+  @override
+  String get imageSettingsPageCompressTransparentSubtitle =>
+      '開啟後將壓縮透明 PNG、GIF 等格式；透明區域填充為白色，動圖僅保留第一幀。';
+
+  @override
+  String get imageSettingsPageFooter =>
+      '壓縮會在加入圖片時進行，已儲存或已傳送的圖片不受影響；壓縮後圖片會以 JPEG 格式隨訊息傳送。';
+
+  @override
+  String get memoryTraceSettingsTitle => '流程追蹤';
+
+  @override
+  String get memoryTraceSettingsSubtitle => '逐步檢視每次背景記憶處理的完整過程';
+
+  @override
+  String get memoryTracePageTitle => '記憶流程追蹤';
+
+  @override
+  String get memoryTraceRecordingSection => '記錄';
+
+  @override
+  String get memoryTraceToggleTitle => '記錄流程追蹤';
+
+  @override
+  String get memoryTraceToggleSubtitle => '僅在記憶體中保留最近幾次背景執行的提示詞、模型回覆與實際變更';
+
+  @override
+  String get memoryTraceRunsSection => '最近執行';
+
+  @override
+  String get memoryTraceEmptyTitle => '尚無追蹤記錄';
+
+  @override
+  String get memoryTraceEmptySubtitle => '背景記憶流程執行後，記錄會顯示在這裡。';
+
+  @override
+  String get memoryTraceDisabledTitle => '記錄已關閉';
+
+  @override
+  String get memoryTraceDisabledSubtitle => '開啟記錄後，下一次背景記憶執行才會被擷取。';
+
+  @override
+  String get memoryTraceClearAction => '清空';
+
+  @override
+  String get memoryTraceClearSheetTitle => '清空追蹤記錄';
+
+  @override
+  String get memoryTraceClearSheetMessage => '將刪除所有已記錄的追蹤。追蹤從不寫入磁碟，因此不會影響其他資料。';
+
+  @override
+  String get memoryTraceClearConfirm => '清空記錄';
+
+  @override
+  String get memoryTraceCancel => '取消';
+
+  @override
+  String get memoryTraceClearedToast => '追蹤記錄已清空';
+
+  @override
+  String get memoryTraceCopyAction => '複製';
+
+  @override
+  String get memoryTraceCopiedToast => '已複製到剪貼簿';
+
+  @override
+  String get memoryTraceTriggerAuto => '自動';
+
+  @override
+  String get memoryTraceTriggerManual => '手動';
+
+  @override
+  String get memoryTraceTriggerTool => '工具呼叫';
+
+  @override
+  String get memoryTraceTriggerSummary => '對話摘要';
+
+  @override
+  String get memoryTraceScopeAssistant => '助手';
+
+  @override
+  String get memoryTraceScopeGlobal => '全域';
+
+  @override
+  String get memoryTraceStepGatekeeper => '守門判斷';
+
+  @override
+  String get memoryTraceStepExtract => '記憶擷取';
+
+  @override
+  String get memoryTraceStepSmartAdd => '智慧寫入';
+
+  @override
+  String get memoryTraceStepDistiller => '使用者輪廓提煉';
+
+  @override
+  String get memoryTraceStepSummary => '對話摘要生成';
+
+  @override
+  String get memoryTraceStepChatSearch => '歷史對話檢索';
+
+  @override
+  String get memoryTraceStepTool => '記憶工具';
+
+  @override
+  String get memoryTraceStatusSuccess => '成功';
+
+  @override
+  String get memoryTraceStatusFailed => '失敗';
+
+  @override
+  String get memoryTraceStatusSkipped => '略過';
+
+  @override
+  String get memoryTraceStatusRunning => '進行中';
+
+  @override
+  String get memoryTraceOutcomeAdvanced => '水位已推進';
+
+  @override
+  String get memoryTraceOutcomeHeld => '水位未推進';
+
+  @override
+  String get memoryTraceOutcomeForced => '強制推進';
+
+  @override
+  String get memoryTraceDetailTitle => '追蹤詳情';
+
+  @override
+  String get memoryTraceSectionOverview => '概覽';
+
+  @override
+  String get memoryTraceSectionPrompt => '提示詞';
+
+  @override
+  String get memoryTraceSectionResponse => '原始回覆';
+
+  @override
+  String get memoryTraceSectionParsed => '解析結果';
+
+  @override
+  String get memoryTraceSectionMutations => '實際變更';
+
+  @override
+  String get memoryTraceFieldTime => '開始時間';
+
+  @override
+  String get memoryTraceFieldDuration => '耗時';
+
+  @override
+  String get memoryTraceFieldTrigger => '觸發方式';
+
+  @override
+  String get memoryTraceFieldScope => '作用範圍';
+
+  @override
+  String get memoryTraceFieldConversation => '對話';
+
+  @override
+  String get memoryTraceFieldAssistant => '助手';
+
+  @override
+  String get memoryTraceFieldWindow => '訊息視窗';
+
+  @override
+  String get memoryTraceFieldWatermark => '水位';
+
+  @override
+  String get memoryTraceFieldOutcome => '結果';
+
+  @override
+  String get memoryTraceFieldError => '錯誤';
+
+  @override
+  String get memoryTraceMutationCreated => '新增';
+
+  @override
+  String get memoryTraceMutationMerged => '合併';
+
+  @override
+  String get memoryTraceMutationEdited => '修改';
+
+  @override
+  String get memoryTraceMutationArchived => '封存';
+
+  @override
+  String get memoryTraceMutationLinked => '關聯';
+
+  @override
+  String get memoryTraceMutationProfileWritten => '寫入輪廓欄位';
+
+  @override
+  String get memoryTraceMutationProfileCleared => '清除輪廓欄位';
+
+  @override
+  String get memoryTraceMutationSummary => '寫入對話摘要';
+
+  @override
+  String get memoryTraceBefore => '變更前';
+
+  @override
+  String get memoryTraceAfter => '變更後';
+
+  @override
+  String get memoryTraceEmptyValue => '（空）';
+
+  @override
+  String memoryTraceStepsCount(int count) {
+    return '$count 個步驟';
+  }
+
+  @override
+  String memoryTraceMutationsCount(int count) {
+    return '$count 項變更';
+  }
+
+  @override
+  String memoryTraceRepeatCount(int count) {
+    return '重複 $count 次';
+  }
+
+  @override
+  String memoryTraceWindowValue(int size, int start, int end) {
+    return '$size 則訊息 · #$start–#$end';
+  }
+
+  @override
+  String get memoryTraceShowMore => '展開全文';
+
+  @override
+  String get memoryTraceShowLess => '收合';
 }

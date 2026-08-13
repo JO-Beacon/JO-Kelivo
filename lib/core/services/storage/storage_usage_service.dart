@@ -2,6 +2,10 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import '../../database/app_database.dart';
+import '../hive_migration_marker.dart';
+import '../legacy_data_retirement_service.dart';
+import '../backup/restore_trace_service.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/avatar_cache.dart';
 import '../logging/flutter_logger.dart';
@@ -11,6 +15,8 @@ enum StorageUsageCategoryKey {
   images,
   files,
   chatData,
+  legacyChatData,
+  restoreTraces,
   assistantData,
   cache,
   logs,
@@ -65,16 +71,20 @@ class StorageUsageReport {
   });
 }
 
+enum StorageFileSource { userUpload, assistant }
+
 class StorageFileEntry {
   final String path;
   final String name;
   final int bytes;
   final DateTime modifiedAt;
+  final StorageFileSource source;
   const StorageFileEntry({
     required this.path,
     required this.name,
     required this.bytes,
     required this.modifiedAt,
+    required this.source,
   });
 }
 
@@ -94,24 +104,60 @@ abstract final class StorageUsageService {
         lower.endsWith('.ico');
   }
 
-  static String _basenameNoExt(String name) {
-    final base = p.basename(name);
-    final dot = base.lastIndexOf('.');
-    if (dot <= 0) return base;
-    return base.substring(0, dot);
+  static String? _chatDatabaseSubcategoryId(String name) {
+    switch (name.toLowerCase()) {
+      case AppDatabase.databaseFileName:
+        return 'sqlite_database';
+      case '${AppDatabase.databaseFileName}-wal':
+        return 'sqlite_wal';
+      case '${AppDatabase.databaseFileName}-shm':
+        return 'sqlite_shm';
+      default:
+        return null;
+    }
+  }
+
+  static String _chatDatabaseFileName(String subcategoryId) {
+    switch (subcategoryId) {
+      case 'sqlite_wal':
+        return '${AppDatabase.databaseFileName}-wal';
+      case 'sqlite_shm':
+        return '${AppDatabase.databaseFileName}-shm';
+      case 'sqlite_database':
+      default:
+        return AppDatabase.databaseFileName;
+    }
   }
 
   static Future<StorageUsageReport> computeReport() async {
     final root = await AppDirectories.getAppDataDirectory();
+    var migrationCompleted = false;
+    try {
+      migrationCompleted = HiveMigrationMarker.isMigrationComplete(
+        File(p.join(root.path, AppDatabase.databaseFileName)),
+      );
+    } catch (_) {
+      // An unreadable database must not make legacy files clearable.
+    }
+    var restoreTraces = RestoreTraceSnapshot.empty;
+    try {
+      restoreTraces = await RestoreTraceService(root).inspect();
+    } catch (_) {
+      // Malformed or active restore workspaces stay hidden and non-clearable.
+    }
 
     final byCat = <StorageUsageCategoryKey, _MutableStats>{
       for (final k in StorageUsageCategoryKey.values) k: _MutableStats(),
     };
 
     final chatSubs = <String, _MutableStats>{
-      'messages': _MutableStats(),
-      'conversations': _MutableStats(),
-      'tool_events_v1': _MutableStats(),
+      'sqlite_database': _MutableStats(),
+      'sqlite_wal': _MutableStats(),
+      'sqlite_shm': _MutableStats(),
+    };
+    final legacyChatSubs = <String, _MutableStats>{
+      for (final name in LegacyDataRetirementService.hiveArtifactNames)
+        name: _MutableStats(),
     };
 
     final assistantSubs = <String, _MutableStats>{'avatars': _MutableStats()};
@@ -165,16 +211,19 @@ abstract final class StorageUsageService {
           continue;
         }
 
-        // Root-level files are mostly Hive boxes / preferences.
+        // Root-level chat data is stored by Drift in the SQLite database file
+        // family. Legacy Hive boxes are migration inputs only and should not
+        // affect the steady-state chat records size.
         if (parts.length == 1) {
           final name = parts.first;
-          final lower = name.toLowerCase();
-          final isHive = lower.endsWith('.hive') || lower.endsWith('.lock');
-          if (isHive) {
+          final chatSubId = _chatDatabaseSubcategoryId(name);
+          if (chatSubId != null) {
             byCat[StorageUsageCategoryKey.chatData]!.add(bytes);
-            final box = _basenameNoExt(name);
-            final sub = chatSubs[box];
-            if (sub != null) sub.add(bytes);
+            chatSubs[chatSubId]!.add(bytes);
+          } else if (migrationCompleted &&
+              LegacyDataRetirementService.hiveArtifactNames.contains(name)) {
+            byCat[StorageUsageCategoryKey.legacyChatData]!.add(bytes);
+            legacyChatSubs[name]!.add(bytes);
           } else {
             byCat[StorageUsageCategoryKey.other]!.add(bytes);
           }
@@ -182,6 +231,14 @@ abstract final class StorageUsageService {
         }
 
         final top = parts.first.toLowerCase();
+        if (restoreTraces.visible &&
+            top == '.kelivo_restore' &&
+            parts.length >= 4 &&
+            parts[1] == 'completed' &&
+            RegExp(r'^run_[a-f0-9]{32}$').hasMatch(parts[2])) {
+          byCat[StorageUsageCategoryKey.restoreTraces]!.add(bytes);
+          continue;
+        }
         switch (top) {
           case 'upload':
             final name = parts.last;
@@ -259,10 +316,14 @@ abstract final class StorageUsageService {
     final clearable = StorageUsageStats(
       fileCount:
           byCat[StorageUsageCategoryKey.cache]!.fileCount +
-          byCat[StorageUsageCategoryKey.logs]!.fileCount,
+          byCat[StorageUsageCategoryKey.logs]!.fileCount +
+          byCat[StorageUsageCategoryKey.legacyChatData]!.fileCount +
+          byCat[StorageUsageCategoryKey.restoreTraces]!.fileCount,
       bytes:
           byCat[StorageUsageCategoryKey.cache]!.bytes +
-          byCat[StorageUsageCategoryKey.logs]!.bytes,
+          byCat[StorageUsageCategoryKey.logs]!.bytes +
+          byCat[StorageUsageCategoryKey.legacyChatData]!.bytes +
+          byCat[StorageUsageCategoryKey.restoreTraces]!.bytes,
     );
 
     final categories = <StorageUsageCategory>[
@@ -283,10 +344,36 @@ abstract final class StorageUsageService {
               StorageUsageSubcategory(
                 id: e.key,
                 stats: e.value.toStats(),
-                path: p.join(root.path, '${e.key}.hive'),
+                path: p.join(root.path, _chatDatabaseFileName(e.key)),
               ),
         ],
       ),
+      if (byCat[StorageUsageCategoryKey.legacyChatData]!.fileCount > 0)
+        StorageUsageCategory(
+          key: StorageUsageCategoryKey.legacyChatData,
+          stats: byCat[StorageUsageCategoryKey.legacyChatData]!.toStats(),
+          subcategories: [
+            for (final entry in legacyChatSubs.entries)
+              if (entry.value.fileCount > 0)
+                StorageUsageSubcategory(
+                  id: entry.key,
+                  stats: entry.value.toStats(),
+                  path: p.join(root.path, entry.key),
+                ),
+          ],
+        ),
+      if (byCat[StorageUsageCategoryKey.restoreTraces]!.fileCount > 0)
+        StorageUsageCategory(
+          key: StorageUsageCategoryKey.restoreTraces,
+          stats: byCat[StorageUsageCategoryKey.restoreTraces]!.toStats(),
+          subcategories: [
+            StorageUsageSubcategory(
+              id: 'completed_restore_runs',
+              stats: byCat[StorageUsageCategoryKey.restoreTraces]!.toStats(),
+              path: p.join(root.path, '.kelivo_restore', 'completed'),
+            ),
+          ],
+        ),
       StorageUsageCategory(
         key: StorageUsageCategoryKey.assistantData,
         stats: byCat[StorageUsageCategoryKey.assistantData]!.toStats(),
@@ -431,6 +518,20 @@ abstract final class StorageUsageService {
     }
   }
 
+  static Future<void> clearLegacyChatData() async {
+    final root = await AppDirectories.getAppDataDirectory();
+    final databaseFile = File(p.join(root.path, AppDatabase.databaseFileName));
+    if (!HiveMigrationMarker.isMigrationComplete(databaseFile)) {
+      throw StateError('legacy_retirement_untracked');
+    }
+    await LegacyDataRetirementService(root).retireHiveArtifacts();
+  }
+
+  static Future<void> clearRestoreTraces() async {
+    final root = await AppDirectories.getAppDataDirectory();
+    await RestoreTraceService(root).clear();
+  }
+
   static Future<List<StorageFileEntry>> listUploadEntries({
     required bool images,
   }) async {
@@ -441,6 +542,7 @@ abstract final class StorageUsageService {
       Directory d, {
       required bool includeImages,
       required bool includeNonImages,
+      required StorageFileSource source,
     }) async {
       if (!await d.exists()) return;
       try {
@@ -467,6 +569,7 @@ abstract final class StorageUsageService {
               name: name,
               bytes: bytes,
               modifiedAt: modifiedAt,
+              source: source,
             ),
           );
         }
@@ -476,9 +579,19 @@ abstract final class StorageUsageService {
     }
 
     // Chat attachments live under upload/. Inline/generated images live under images/.
-    await addFromDir(dir, includeImages: images, includeNonImages: !images);
+    await addFromDir(
+      dir,
+      includeImages: images,
+      includeNonImages: !images,
+      source: StorageFileSource.userUpload,
+    );
     if (images) {
-      await addFromDir(imagesDir, includeImages: true, includeNonImages: false);
+      await addFromDir(
+        imagesDir,
+        includeImages: true,
+        includeNonImages: false,
+        source: StorageFileSource.assistant,
+      );
     }
     out.sort((a, b) => b.modifiedAt.compareTo(a.modifiedAt));
     return out;
@@ -569,6 +682,8 @@ const List<StorageUsageCategoryKey> _categoryOrder = <StorageUsageCategoryKey>[
   StorageUsageCategoryKey.images,
   StorageUsageCategoryKey.files,
   StorageUsageCategoryKey.chatData,
+  StorageUsageCategoryKey.legacyChatData,
+  StorageUsageCategoryKey.restoreTraces,
   StorageUsageCategoryKey.assistantData,
   StorageUsageCategoryKey.cache,
   StorageUsageCategoryKey.logs,

@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
+import '../../core/database/business_repository.dart';
 import '../../core/models/backup.dart';
 import '../../core/providers/backup_provider.dart';
 import '../../core/providers/backup_reminder_provider.dart';
@@ -14,13 +15,16 @@ import '../../core/providers/settings_provider.dart';
 import '../../core/services/chat/chat_service.dart';
 import '../../core/services/backup/cherry_importer.dart';
 import '../../core/services/backup/chatbox_importer.dart';
-import '../../utils/app_directories.dart';
-import '../../utils/platform_utils.dart';
 import '../../shared/widgets/ios_switch.dart';
+import '../../shared/widgets/restart_app_action.dart';
 import '../../shared/widgets/snackbar.dart';
+import '../../features/backup/backup_restore_error_message.dart';
+import '../../features/backup/backup_restart_dialog.dart';
 import '../../features/backup/widgets/backup_reminder_helpers.dart';
+import '../../utils/platform_utils.dart';
 import '../widgets/desktop_select_dropdown.dart';
 import '../../theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 class DesktopBackupPane extends StatefulWidget {
   const DesktopBackupPane({super.key});
@@ -41,6 +45,8 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
   late TextEditingController _s3SecretAccessKey;
   late TextEditingController _s3SessionToken;
   late TextEditingController _s3Prefix;
+  late TextEditingController _webDavUserAgent;
+  late TextEditingController _s3UserAgent;
   bool _includeChats = true;
   bool _includeFiles = true;
   bool _s3PathStyle = true;
@@ -54,6 +60,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     _username = TextEditingController(text: cfg.username);
     _password = TextEditingController(text: cfg.password);
     _path = TextEditingController(text: cfg.path);
+    _webDavUserAgent = TextEditingController(text: cfg.userAgent);
     _includeChats = cfg.includeChats;
     _includeFiles = cfg.includeFiles;
 
@@ -65,6 +72,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     _s3SecretAccessKey = TextEditingController(text: s3.secretAccessKey);
     _s3SessionToken = TextEditingController(text: s3.sessionToken);
     _s3Prefix = TextEditingController(text: s3.prefix);
+    _s3UserAgent = TextEditingController(text: s3.userAgent);
     _s3PathStyle = s3.pathStyle;
   }
 
@@ -81,6 +89,8 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     _s3SecretAccessKey.dispose();
     _s3SessionToken.dispose();
     _s3Prefix.dispose();
+    _webDavUserAgent.dispose();
+    _s3UserAgent.dispose();
     super.dispose();
   }
 
@@ -90,6 +100,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
       username: _username.text.trim(),
       password: _password.text,
       path: _path.text.trim().isEmpty ? 'kelivo_backups' : _path.text.trim(),
+      userAgent: _webDavUserAgent.text.trim(),
       includeChats: _includeChats,
       includeFiles: _includeFiles,
     );
@@ -108,6 +119,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     String? username,
     String? password,
     String? path,
+    String? userAgent,
     bool? includeChats,
     bool? includeFiles,
   }) async {
@@ -120,6 +132,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
       path:
           path ??
           (_path.text.trim().isEmpty ? 'kelivo_backups' : _path.text.trim()),
+      userAgent: userAgent ?? _webDavUserAgent.text.trim(),
       includeChats: includeChats ?? _includeChats,
       includeFiles: includeFiles ?? _includeFiles,
     );
@@ -141,6 +154,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
           ? 'kelivo_backups'
           : _s3Prefix.text.trim(),
       pathStyle: _s3PathStyle,
+      userAgent: _s3UserAgent.text.trim(),
       includeChats: _includeChats,
       includeFiles: _includeFiles,
     );
@@ -154,28 +168,6 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     s3BackupProvider.updateConfig(cfg);
   }
 
-  Future<void> _openUserDataDirectory() async {
-    final l10n = AppLocalizations.of(context)!;
-    try {
-      final dir = await AppDirectories.getAppDataDirectory();
-      final ok = await AppDirectories.openDirectory(dir);
-      if (!ok && mounted) {
-        showAppSnackBar(
-          context,
-          message: l10n.backupPageOpenUserDataFailed,
-          type: NotificationType.error,
-        );
-      }
-    } catch (_) {
-      if (!mounted) return;
-      showAppSnackBar(
-        context,
-        message: l10n.backupPageOpenUserDataFailed,
-        type: NotificationType.error,
-      );
-    }
-  }
-
   Future<void> _applyS3Partial({
     String? endpoint,
     String? region,
@@ -185,6 +177,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     String? sessionToken,
     String? prefix,
     bool? pathStyle,
+    String? userAgent,
     bool? includeChats,
     bool? includeFiles,
   }) async {
@@ -205,6 +198,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
               ? 'kelivo_backups'
               : _s3Prefix.text.trim()),
       pathStyle: pathStyle ?? _s3PathStyle,
+      userAgent: userAgent ?? _s3UserAgent.text.trim(),
       includeChats: includeChats ?? _includeChats,
       includeFiles: includeFiles ?? _includeFiles,
     );
@@ -216,6 +210,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     Future<void> Function(RestoreMode) action,
   ) async {
     final rootCtx = Navigator.of(context, rootNavigator: true).context;
+    final backupProvider = context.read<BackupProvider>();
     final mode = await showDialog<RestoreMode>(
       context: context,
       builder: (ctx) => _RestoreModeDialog(),
@@ -227,32 +222,15 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
       if (!rootCtx.mounted) return;
       showAppSnackBar(
         rootCtx,
-        message: e.toString(),
+        message: backupRestoreErrorMessage(AppLocalizations.of(rootCtx)!, e),
         type: NotificationType.error,
       );
       return;
     }
     if (!rootCtx.mounted) return;
-    final l10n = AppLocalizations.of(rootCtx)!;
-    // Inform restart requirement
-    await showDialog(
-      context: rootCtx,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Theme.of(ctx).colorScheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(l10n.backupPageRestartRequired),
-        content: Text(l10n.backupPageRestartContent),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              Navigator.of(ctx).pop();
-              PlatformUtils.restartApp();
-            },
-            child: Text(l10n.backupPageOK),
-          ),
-        ],
-      ),
+    await showBackupRestartRequiredDialog(
+      rootCtx,
+      skippedConversations: backupProvider.skippedConversations,
     );
   }
 
@@ -367,46 +345,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
-              SliverToBoxAdapter(
-                child: _sectionCard(
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                l10n.backupPageUserDataDirectoryTitle,
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: AppFontWeights.semibold,
-                                  color: cs.onSurface.withValues(alpha: 0.95),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                l10n.backupPageUserDataDirectoryDescription,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: cs.onSurface.withValues(alpha: 0.65),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        _DeskIosButton(
-                          label: l10n.backupPageOpenUserDataDirectory,
-                          filled: false,
-                          dense: true,
-                          onTap: _openUserDataDirectory,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+              _buildLocalBackupSliver(context, l10n, cs),
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
@@ -498,6 +437,22 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                     ),
                     _rowDivider(context),
                     _ItemRow(
+                      label: l10n.backupPageUserAgent,
+                      trailing: SizedBox(
+                        width: 420,
+                        child: TextField(
+                          controller: _webDavUserAgent,
+                          enabled: !busy,
+                          style: const TextStyle(fontSize: 14),
+                          decoration: _deskInputDecoration(
+                            context,
+                          ).copyWith(hintText: l10n.backupPageUserAgentHint),
+                          onChanged: (v) => _applyPartial(userAgent: v),
+                        ),
+                      ),
+                    ),
+                    _rowDivider(context),
+                    _ItemRow(
                       label: l10n.backupPageWebDavBackup,
                       trailing: Wrap(
                         spacing: 8,
@@ -554,6 +509,8 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                           throw Exception(msg);
                                         }
                                       },
+                                      skippedConversations: () =>
+                                          backupProvider.skippedConversations,
                                       deleteAndReload:
                                           backupProvider.deleteAndReload,
                                     );
@@ -735,6 +692,22 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                     ),
                     _rowDivider(context),
                     _ItemRow(
+                      label: l10n.backupPageUserAgent,
+                      trailing: SizedBox(
+                        width: 420,
+                        child: TextField(
+                          controller: _s3UserAgent,
+                          enabled: !busy,
+                          style: const TextStyle(fontSize: 14),
+                          decoration: _deskInputDecoration(
+                            context,
+                          ).copyWith(hintText: l10n.backupPageUserAgentHint),
+                          onChanged: (v) => _applyS3Partial(userAgent: v),
+                        ),
+                      ),
+                    ),
+                    _rowDivider(context),
+                    _ItemRow(
                       label: l10n.backupPageS3PathStyle,
                       trailing: IosSwitch(
                         value: _s3PathStyle,
@@ -804,6 +777,8 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                           throw Exception(msg);
                                         }
                                       },
+                                      skippedConversations: () =>
+                                          s3BackupProvider.skippedConversations,
                                       deleteAndReload:
                                           s3BackupProvider.deleteAndReload,
                                     );
@@ -846,264 +821,288 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                   ],
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-              const SliverToBoxAdapter(child: SizedBox(height: 10)),
-
-              // Local import/export
-              SliverToBoxAdapter(
-                child: _sectionCard(
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            l10n.backupPageLocalBackup,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: AppFontWeights.semibold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        _DeskIosButton(
-                          label: l10n.backupPageExportKelivoBackup,
-                          filled: false,
-                          dense: true,
-                          onTap: () async {
-                            final backupProvider = context
-                                .read<BackupProvider>();
-                            await _saveConfig();
-                            final file = await backupProvider.exportToFile();
-                            String? savePath = await FilePicker.platform
-                                .saveFile(
-                                  dialogTitle:
-                                      l10n.backupPageExportKelivoBackup,
-                                  fileName: file.uri.pathSegments.last,
-                                  type: FileType.custom,
-                                  allowedExtensions: ['zip'],
-                                );
-                            if (savePath != null) {
-                              try {
-                                await File(
-                                  savePath,
-                                ).parent.create(recursive: true);
-                                await file.copy(savePath);
-                                if (context.mounted) {
-                                  await context
-                                      .read<BackupReminderProvider>()
-                                      .recordBackupCompleted();
-                                }
-                              } catch (_) {}
-                            }
-                          },
-                        ),
-                        _DeskIosButton(
-                          label: l10n.backupPageImportKelivoBackup,
-                          filled: false,
-                          dense: true,
-                          onTap: () async {
-                            final backupProvider = context
-                                .read<BackupProvider>();
-                            final result = await FilePicker.platform.pickFiles(
-                              type: FileType.any,
-                              allowMultiple: false,
-                            );
-                            final path = result?.files.single.path;
-                            if (path == null) return;
-                            final f = File(path);
-                            await _chooseRestoreModeAndRun((mode) async {
-                              await backupProvider.restoreFromLocalFile(
-                                f,
-                                mode: mode,
-                              );
-                            });
-                          },
-                        ),
-                        _DeskIosButton(
-                          label: l10n.backupPageImportFromCherryStudio,
-                          filled: false,
-                          dense: true,
-                          onTap: () async {
-                            final rootCtx = Navigator.of(
-                              context,
-                              rootNavigator: true,
-                            ).context;
-                            final result = await FilePicker.platform.pickFiles(
-                              type: FileType.any,
-                              allowMultiple: false,
-                            );
-                            final path = result?.files.single.path;
-                            if (path == null) return;
-                            final f = File(path);
-                            if (!context.mounted) return;
-                            final mode = await showDialog<RestoreMode>(
-                              context: context,
-                              builder: (_) => _RestoreModeDialog(),
-                            );
-                            if (mode == null) return;
-                            if (!context.mounted) return;
-                            final settings = context.read<SettingsProvider>();
-                            final chat = context.read<ChatService>();
-                            try {
-                              await CherryImporter.importFromCherryStudio(
-                                file: f,
-                                mode: mode,
-                                settings: settings,
-                                chatService: chat,
-                              );
-                              if (!rootCtx.mounted) return;
-                              await showDialog(
-                                context: rootCtx,
-                                builder: (dctx) => AlertDialog(
-                                  backgroundColor: cs.surface,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  title: Text(l10n.backupPageRestartRequired),
-                                  content: Text(l10n.backupPageRestartContent),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () async {
-                                        Navigator.of(rootCtx).pop();
-                                        PlatformUtils.restartApp();
-                                      },
-                                      child: Text(l10n.backupPageOK),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            } catch (e) {
-                              if (!rootCtx.mounted) return;
-                              await showDialog(
-                                context: rootCtx,
-                                builder: (dctx) => AlertDialog(
-                                  backgroundColor: cs.surface,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  title: Text('Error'),
-                                  content: Text(e.toString()),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.of(dctx).pop(),
-                                      child: Text(l10n.backupPageOK),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }
-                          },
-                        ),
-                        _DeskIosButton(
-                          label: l10n.backupPageImportFromChatbox,
-                          filled: false,
-                          dense: true,
-                          onTap: () async {
-                            final rootCtx = Navigator.of(
-                              context,
-                              rootNavigator: true,
-                            ).context;
-                            final result = await FilePicker.platform.pickFiles(
-                              type: FileType.custom,
-                              allowedExtensions: ['json'],
-                              allowMultiple: false,
-                            );
-                            final path = result?.files.single.path;
-                            if (path == null) return;
-                            final f = File(path);
-                            if (!context.mounted) return;
-                            final mode = await showDialog<RestoreMode>(
-                              context: context,
-                              builder: (_) => _RestoreModeDialog(),
-                            );
-                            if (mode == null) return;
-                            if (!context.mounted) return;
-                            final settings = context.read<SettingsProvider>();
-                            final chat = context.read<ChatService>();
-                            try {
-                              final res =
-                                  await ChatboxImporter.importFromChatbox(
-                                    file: f,
-                                    mode: mode,
-                                    settings: settings,
-                                    chatService: chat,
-                                  );
-                              if (!rootCtx.mounted) return;
-                              await showDialog(
-                                context: rootCtx,
-                                builder: (dctx) => AlertDialog(
-                                  backgroundColor: cs.surface,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  title: Text(l10n.backupPageRestartRequired),
-                                  content: Text(
-                                    '${l10n.backupPageImportFromChatbox}:\n'
-                                    ' • Providers: ${res.providers}\n'
-                                    ' • Assistants: ${res.assistants}\n'
-                                    ' • Conversations: ${res.conversations}\n'
-                                    ' • Messages: ${res.messages}\n\n'
-                                    '${l10n.backupPageRestartContent}',
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () async {
-                                        Navigator.of(rootCtx).pop();
-                                        PlatformUtils.restartApp();
-                                      },
-                                      child: Text(l10n.backupPageOK),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            } catch (e) {
-                              if (!rootCtx.mounted) return;
-                              await showDialog(
-                                context: rootCtx,
-                                builder: (dctx) => AlertDialog(
-                                  backgroundColor: cs.surface,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  title: Text('Error'),
-                                  content: Text(e.toString()),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.of(dctx).pop(),
-                                      child: Text(l10n.backupPageOK),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }
-                          },
-                        ),
-                        _DeskIosButton(
-                          label: l10n.backupPageImportFromDeepSeek,
-                          filled: false,
-                          dense: true,
-                          onTap: () {
-                            showAppSnackBar(
-                              context,
-                              message: l10n.backupPageNotSupportedYet,
-                              type: NotificationType.info,
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
+  Widget _buildLocalBackupSliver(
+    BuildContext context,
+    AppLocalizations l10n,
+    ColorScheme cs,
+  ) {
+    return SliverToBoxAdapter(
+      child: _sectionCard(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l10n.backupPageLocalBackup,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: AppFontWeights.semibold,
+                  ),
                 ),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _DeskIosButton(
+                label: l10n.backupPageExportToFile,
+                filled: false,
+                dense: true,
+                onTap: () async {
+                  final backupProvider = context.read<BackupProvider>();
+                  await _saveConfig();
+                  final file = await backupProvider.exportToFile();
+                  String? savePath = await FilePicker.platform.saveFile(
+                    dialogTitle: l10n.backupPageExportToFile,
+                    fileName: file.uri.pathSegments.last,
+                    type: FileType.custom,
+                    allowedExtensions: ['zip'],
+                  );
+                  if (savePath != null) {
+                    try {
+                      await File(savePath).parent.create(recursive: true);
+                      await file.copy(savePath);
+                      if (context.mounted) {
+                        await context
+                            .read<BackupReminderProvider>()
+                            .recordBackupCompleted();
+                      }
+                    } catch (e) {
+                      // A full disk or unwritable target must not look like
+                      // a successful export.
+                      if (!context.mounted) return;
+                      showAppSnackBar(
+                        context,
+                        message: e.toString(),
+                        type: NotificationType.error,
+                      );
+                    }
+                  }
+                },
+              ),
+              _DeskIosButton(
+                label: l10n.backupPageImportBackupFile,
+                filled: false,
+                dense: true,
+                onTap: () async {
+                  final backupProvider = context.read<BackupProvider>();
+                  final result = await FilePicker.platform.pickFiles(
+                    type: FileType.any,
+                    allowMultiple: false,
+                  );
+                  final path = result?.files.single.path;
+                  if (path == null) return;
+                  final f = File(path);
+                  await _chooseRestoreModeAndRun((mode) async {
+                    await backupProvider.restoreFromLocalFile(f, mode: mode);
+                  });
+                },
+              ),
+              _DeskIosButton(
+                label: l10n.backupPageImportFromCherryStudio,
+                filled: false,
+                dense: true,
+                onTap: () async {
+                  final rootCtx = Navigator.of(
+                    context,
+                    rootNavigator: true,
+                  ).context;
+                  final result = await FilePicker.platform.pickFiles(
+                    type: FileType.any,
+                    allowMultiple: false,
+                  );
+                  final path = result?.files.single.path;
+                  if (path == null) return;
+                  final f = File(path);
+                  if (!context.mounted) return;
+                  final mode = await showDialog<RestoreMode>(
+                    context: context,
+                    builder: (_) => _RestoreModeDialog(),
+                  );
+                  if (mode == null) return;
+                  if (!context.mounted) return;
+                  final chat = context.read<ChatService>();
+                  try {
+                    await CherryImporter.importFromCherryStudio(
+                      file: f,
+                      mode: mode,
+                      businessRepository: context.read<BusinessRepository>(),
+                      chatService: chat,
+                    );
+                    if (!rootCtx.mounted) return;
+                    await showDialog(
+                      context: rootCtx,
+                      barrierDismissible: false,
+                      builder: (dctx) => AlertDialog(
+                        backgroundColor: cs.surface,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        title: Text(l10n.backupPageRestartRequired),
+                        content: Text(l10n.backupPageRestartContent),
+                        actions: [
+                          TextButton(
+                            onPressed: () async {
+                              if (await requestAppRestart(
+                                    rootCtx,
+                                    PlatformUtils.restartApp,
+                                  ) &&
+                                  rootCtx.mounted) {
+                                Navigator.of(rootCtx).pop();
+                              }
+                            },
+                            child: Text(l10n.backupPageOK),
+                          ),
+                        ],
+                      ),
+                    );
+                  } on CherryUnsupportedBackupVersionException catch (e) {
+                    if (!rootCtx.mounted) return;
+                    await showDialog(
+                      context: rootCtx,
+                      barrierDismissible: false,
+                      builder: (dctx) => AlertDialog(
+                        backgroundColor: cs.surface,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        title: Text(l10n.backupPageImportFromCherryStudio),
+                        content: Text(
+                          l10n.backupPageCherryStudioUnsupportedBackupVersion(
+                            '${e.version}',
+                          ),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(dctx).pop(),
+                            child: Text(l10n.backupPageOK),
+                          ),
+                        ],
+                      ),
+                    );
+                  } catch (e) {
+                    if (!rootCtx.mounted) return;
+                    await showDialog(
+                      context: rootCtx,
+                      barrierDismissible: false,
+                      builder: (dctx) => AlertDialog(
+                        backgroundColor: cs.surface,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        title: Text(l10n.backupPageImportFromCherryStudio),
+                        content: Text(e.toString()),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(dctx).pop(),
+                            child: Text(l10n.backupPageOK),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                },
+              ),
+              _DeskIosButton(
+                label: l10n.backupPageImportFromChatbox,
+                filled: false,
+                dense: true,
+                onTap: () async {
+                  final rootCtx = Navigator.of(
+                    context,
+                    rootNavigator: true,
+                  ).context;
+                  final result = await FilePicker.platform.pickFiles(
+                    type: FileType.custom,
+                    allowedExtensions: ['json'],
+                    allowMultiple: false,
+                  );
+                  final path = result?.files.single.path;
+                  if (path == null) return;
+                  final f = File(path);
+                  if (!context.mounted) return;
+                  final mode = await showDialog<RestoreMode>(
+                    context: context,
+                    builder: (_) => _RestoreModeDialog(),
+                  );
+                  if (mode == null) return;
+                  if (!context.mounted) return;
+                  final chat = context.read<ChatService>();
+                  try {
+                    final res = await ChatboxImporter.importFromChatbox(
+                      file: f,
+                      mode: mode,
+                      businessRepository: context.read<BusinessRepository>(),
+                      chatService: chat,
+                    );
+                    if (!rootCtx.mounted) return;
+                    await showDialog(
+                      context: rootCtx,
+                      builder: (dctx) => AlertDialog(
+                        backgroundColor: cs.surface,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        title: Text(l10n.backupPageRestartRequired),
+                        content: Text(
+                          '${l10n.backupPageImportFromChatbox}:\n'
+                          ' • Providers: ${res.providers}\n'
+                          ' • Assistants: ${res.assistants}\n'
+                          ' • Conversations: ${res.conversations}\n'
+                          ' • Messages: ${res.messages}\n\n'
+                          '${l10n.backupPageRestartContent}',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () async {
+                              if (await requestAppRestart(
+                                    rootCtx,
+                                    PlatformUtils.restartApp,
+                                  ) &&
+                                  rootCtx.mounted) {
+                                Navigator.of(rootCtx).pop();
+                              }
+                            },
+                            child: Text(l10n.backupPageOK),
+                          ),
+                        ],
+                      ),
+                    );
+                  } catch (e) {
+                    if (!rootCtx.mounted) return;
+                    await showDialog(
+                      context: rootCtx,
+                      builder: (dctx) => AlertDialog(
+                        backgroundColor: cs.surface,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        title: Text(l10n.backupPageImportFromChatbox),
+                        content: Text(e.toString()),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(dctx).pop(),
+                            child: Text(l10n.backupPageOK),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -1294,9 +1293,7 @@ class _RemoteItemCardState extends State<_RemoteItemCard> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final baseBg = isDark
-        ? Colors.white10
-        : Colors.white.withValues(alpha: 0.96);
+    final baseBg = context.appColors.surfaceCard;
     final borderColor = _hover
         ? cs.primary.withValues(alpha: isDark ? 0.35 : 0.45)
         : cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08);
@@ -1383,6 +1380,7 @@ class _RemoteBackupsDialog extends StatefulWidget {
     required this.title,
     required this.listRemote,
     required this.restoreFromItem,
+    required this.skippedConversations,
     required this.deleteAndReload,
   });
 
@@ -1390,6 +1388,7 @@ class _RemoteBackupsDialog extends StatefulWidget {
   final Future<List<BackupFileItem>> Function() listRemote;
   final Future<void> Function(BackupFileItem item, RestoreMode mode)
   restoreFromItem;
+  final int Function() skippedConversations;
   final Future<List<BackupFileItem>> Function(BackupFileItem item)
   deleteAndReload;
 
@@ -1463,7 +1462,7 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
       if (!rootCtx.mounted) return;
       showAppSnackBar(
         rootCtx,
-        message: e.toString(),
+        message: backupRestoreErrorMessage(AppLocalizations.of(rootCtx)!, e),
         type: NotificationType.error,
       );
       return;
@@ -1471,26 +1470,9 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
       if (mounted) setState(() => _loading = false);
     }
     if (!rootCtx.mounted) return;
-    final l10n = AppLocalizations.of(rootCtx)!;
-    final cs = Theme.of(rootCtx).colorScheme;
-    await showDialog(
-      context: rootCtx,
-      barrierDismissible: false,
-      builder: (dctx) => AlertDialog(
-        backgroundColor: cs.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(l10n.backupPageRestartRequired),
-        content: Text(l10n.backupPageRestartContent),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              Navigator.of(dctx).pop();
-              PlatformUtils.restartApp();
-            },
-            child: Text(l10n.backupPageOK),
-          ),
-        ],
-      ),
+    await showBackupRestartRequiredDialog(
+      rootCtx,
+      skippedConversations: widget.skippedConversations(),
     );
   }
 
@@ -1646,6 +1628,7 @@ void _showRemoteBackupsDialog(
   required Future<List<BackupFileItem>> Function() listRemote,
   required Future<void> Function(BackupFileItem item, RestoreMode mode)
   restoreFromItem,
+  required int Function() skippedConversations,
   required Future<List<BackupFileItem>> Function(BackupFileItem item)
   deleteAndReload,
 }) {
@@ -1655,6 +1638,7 @@ void _showRemoteBackupsDialog(
       title: title,
       listRemote: listRemote,
       restoreFromItem: restoreFromItem,
+      skippedConversations: skippedConversations,
       deleteAndReload: deleteAndReload,
     ),
   );
@@ -1778,9 +1762,7 @@ class _RestoreModeTileState extends State<_RestoreModeTile> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.04))
+        ? (cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04))
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -1844,9 +1826,7 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.05))
+        ? (cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05))
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -1892,14 +1872,12 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = widget.filled
-        ? Colors.white
+        ? cs.onPrimary
         : cs.onSurface.withValues(alpha: 0.9);
     final bg = widget.filled
         ? (_hover ? cs.primary.withValues(alpha: 0.92) : cs.primary)
         : (_hover
-              ? (isDark
-                    ? Colors.white.withValues(alpha: 0.06)
-                    : Colors.black.withValues(alpha: 0.05))
+              ? (cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05))
               : Colors.transparent);
     final borderColor = widget.filled
         ? Colors.transparent
@@ -1949,9 +1927,7 @@ Widget _sectionCard({required List<Widget> children}) {
     builder: (context) {
       final cs = Theme.of(context).colorScheme;
       final isDark = Theme.of(context).brightness == Brightness.dark;
-      final baseBg = isDark
-          ? Colors.white10
-          : Colors.white.withValues(alpha: 0.96);
+      final baseBg = context.appColors.surfaceCard;
       return Container(
         decoration: BoxDecoration(
           color: baseBg,
@@ -1973,12 +1949,11 @@ Widget _sectionCard({required List<Widget> children}) {
 
 InputDecoration _deskInputDecoration(BuildContext context) {
   // Match provider dialog style (compact), but slightly shorter height and 14px font hint
-  final isDark = Theme.of(context).brightness == Brightness.dark;
   final cs = Theme.of(context).colorScheme;
   return InputDecoration(
     isDense: true,
     filled: true,
-    fillColor: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
+    fillColor: context.appColors.surfaceFill,
     hintStyle: TextStyle(
       fontSize: 14,
       color: cs.onSurface.withValues(alpha: 0.5),

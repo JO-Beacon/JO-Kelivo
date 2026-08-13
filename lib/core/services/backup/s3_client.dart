@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -263,6 +264,9 @@ class S3BackupClient {
     if (cfg.sessionToken.trim().isNotEmpty) {
       reqHeaders['x-amz-security-token'] = cfg.sessionToken.trim();
     }
+    if (cfg.userAgent.trim().isNotEmpty) {
+      reqHeaders['User-Agent'] = cfg.userAgent.trim();
+    }
 
     final canonHeaders = _canonicalHeaders(reqHeaders);
     final signedHeaders = _signedHeaders(reqHeaders);
@@ -341,6 +345,9 @@ class S3BackupClient {
     if (cfg.sessionToken.trim().isNotEmpty) {
       reqHeaders['x-amz-security-token'] = cfg.sessionToken.trim();
     }
+    if (cfg.userAgent.trim().isNotEmpty) {
+      reqHeaders['User-Agent'] = cfg.userAgent.trim();
+    }
 
     final canonHeaders = _canonicalHeaders(reqHeaders);
     final signedHeaders = _signedHeaders(reqHeaders);
@@ -371,11 +378,19 @@ class S3BackupClient {
 
     final req = http.StreamedRequest(method, uri);
     req.headers.addAll({...reqHeaders, 'Authorization': auth});
-    // Pipe file bytes into the request body.
-    bodyFile.openRead().listen(
-      req.sink.add,
-      onDone: req.sink.close,
-      onError: req.sink.addError,
+    // Pipe file bytes into the request body. addStream honors the sink's pause
+    // signal, so a slow network throttles disk reads instead of buffering the
+    // whole zip in RAM (which OOM-killed large mobile uploads).
+    unawaited(
+      req.sink
+          .addStream(bodyFile.openRead())
+          .then(
+            (_) => req.sink.close(),
+            onError: (Object error) {
+              req.sink.addError(error);
+              req.sink.close();
+            },
+          ),
     );
 
     final client = http.Client();
@@ -409,6 +424,9 @@ class S3BackupClient {
     };
     if (cfg.sessionToken.trim().isNotEmpty) {
       reqHeaders['x-amz-security-token'] = cfg.sessionToken.trim();
+    }
+    if (cfg.userAgent.trim().isNotEmpty) {
+      reqHeaders['User-Agent'] = cfg.userAgent.trim();
     }
 
     final canonHeaders = _canonicalHeaders(reqHeaders);

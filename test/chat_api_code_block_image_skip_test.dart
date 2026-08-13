@@ -94,8 +94,7 @@ String _extractTextContent(Map<String, dynamic> body) {
 void main() {
   group('Image refs inside code blocks are not extracted', () {
     test('fenced code block with backticks', () async {
-      const input =
-          'Check this:\n'
+      const input = 'Check this:\n'
           '```markdown\n'
           '![Join QQ](https://img.shields.io/badge/QQ)\n'
           '```\n'
@@ -118,8 +117,7 @@ void main() {
     });
 
     test('fenced code block with tildes', () async {
-      const input =
-          'Example:\n'
+      const input = 'Example:\n'
           '~~~\n'
           '![alt](https://example.com/img.png)\n'
           '~~~';
@@ -189,7 +187,7 @@ void main() {
       final file = File('${dir.path}/real.png');
       await file.writeAsBytes(const [1, 2, 3, 4]);
 
-      final input = '```\ncode\n```\n[image:${file.path}]';
+      final input = '```\ncode\n```\n![](${file.path})';
 
       final body = await _sendAndCaptureRequestBody((baseUrl) async {
         return ChatApiService.sendMessageStream(
@@ -228,7 +226,8 @@ void main() {
     });
 
     test('data URL inside code block is not extracted', () async {
-      const input = '```\n![img](data:image/png;base64,QUJD)\n```\nPlain text.';
+      const input =
+          '```\n![img](data:image/png;base64,QUJD)\n```\nPlain text.';
 
       final body = await _sendAndCaptureRequestBody((baseUrl) async {
         return ChatApiService.sendMessageStream(

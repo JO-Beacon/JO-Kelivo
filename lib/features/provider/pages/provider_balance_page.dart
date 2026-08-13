@@ -10,6 +10,7 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../widgets/provider_balance_badge.dart';
 import '../../../theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 class ProviderBalancePage extends StatefulWidget {
   const ProviderBalancePage({
@@ -263,13 +264,12 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
     } catch (e) {
       if (!pageContext.mounted) return;
       final l10n = AppLocalizations.of(pageContext)!;
-      final message = _balanceErrorMessage(l10n, e);
       setState(
-        () => _balanceError = l10n.providerDetailPageBalanceError(message),
+        () => _balanceError = l10n.providerDetailPageBalanceError(e.toString()),
       );
       showAppSnackBar(
         pageContext,
-        message: l10n.providerDetailPageBalanceError(message),
+        message: l10n.providerDetailPageBalanceError(e.toString()),
         type: NotificationType.error,
       );
     } finally {
@@ -293,21 +293,12 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
   }
 }
 
-String _balanceErrorMessage(AppLocalizations l10n, Object error) {
-  if (error is ProviderBalanceException &&
-      error.code == 'full_balance_api_url_required') {
-    return l10n.providerDetailPageBalanceFullUrlRequired;
-  }
-  return error.toString();
-}
-
 InputDecoration _balanceInputDecoration(BuildContext context) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
   final cs = Theme.of(context).colorScheme;
   return InputDecoration(
     isDense: true,
     filled: true,
-    fillColor: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
+    fillColor: context.appColors.surfaceFill,
     hintStyle: TextStyle(
       fontSize: 14,
       color: cs.onSurface.withValues(alpha: 0.5),

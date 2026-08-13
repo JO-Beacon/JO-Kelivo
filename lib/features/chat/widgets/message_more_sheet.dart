@@ -26,14 +26,13 @@ enum MessageMoreAction {
   deleteAllVersions,
   share,
   selectMessages,
-  switchToUser,
-  switchToAssistant,
 }
 
 Future<MessageMoreAction?> showMessageMoreSheet(
   BuildContext context,
   ChatMessage message, {
   required bool canDeleteAllVersions,
+  required bool canCreateBranch,
 }) async {
   final isDesktop =
       defaultTargetPlatform == TargetPlatform.macOS ||
@@ -52,6 +51,7 @@ Future<MessageMoreAction?> showMessageMoreSheet(
         message: message,
         parentContext: context,
         canDeleteAllVersions: canDeleteAllVersions,
+        canCreateBranch: canCreateBranch,
       ),
     );
   }
@@ -112,17 +112,6 @@ Future<MessageMoreAction?> showMessageMoreSheet(
           },
         ),
       DesktopContextMenuItem(
-        icon: message.role == 'user' ? Lucide.Bot : Lucide.User,
-        label: message.role == 'user'
-            ? l10n.messageMoreSheetSwitchToAssistant
-            : l10n.messageMoreSheetSwitchToUser,
-        onTap: () {
-          selected = message.role == 'user'
-              ? MessageMoreAction.switchToAssistant
-              : MessageMoreAction.switchToUser;
-        },
-      ),
-      DesktopContextMenuItem(
         icon: Lucide.Share,
         label: l10n.messageMoreSheetShare,
         onTap: () {
@@ -136,13 +125,14 @@ Future<MessageMoreAction?> showMessageMoreSheet(
           selected = MessageMoreAction.selectMessages;
         },
       ),
-      DesktopContextMenuItem(
-        icon: Lucide.GitFork,
-        label: l10n.messageMoreSheetCreateBranch,
-        onTap: () {
-          selected = MessageMoreAction.fork;
-        },
-      ),
+      if (canCreateBranch)
+        DesktopContextMenuItem(
+          icon: Lucide.GitFork,
+          label: l10n.messageMoreSheetCreateBranch,
+          onTap: () {
+            selected = MessageMoreAction.fork;
+          },
+        ),
       DesktopContextMenuItem(
         icon: Lucide.Trash2,
         label: l10n.messageMoreSheetDelete,
@@ -173,10 +163,12 @@ class _MessageMoreSheet extends StatefulWidget {
     required this.message,
     required this.parentContext,
     required this.canDeleteAllVersions,
+    required this.canCreateBranch,
   });
   final ChatMessage message;
   final BuildContext parentContext;
   final bool canDeleteAllVersions;
+  final bool canCreateBranch;
 
   @override
   State<_MessageMoreSheet> createState() => _MessageMoreSheetState();
@@ -193,7 +185,7 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
     VoidCallback? onTap,
   }) {
     final cs = Theme.of(context).colorScheme;
-    final fg = danger ? Colors.red.shade600 : cs.onSurface;
+    final fg = danger ? Theme.of(context).colorScheme.error : cs.onSurface;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: SizedBox(
@@ -330,21 +322,6 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                         },
                       ),
                     _actionItem(
-                      icon: widget.message.role == 'user'
-                          ? Lucide.Bot
-                          : Lucide.User,
-                      label: widget.message.role == 'user'
-                          ? l10n.messageMoreSheetSwitchToAssistant
-                          : l10n.messageMoreSheetSwitchToUser,
-                      onTap: () {
-                        Navigator.of(context).pop(
-                          widget.message.role == 'user'
-                              ? MessageMoreAction.switchToAssistant
-                              : MessageMoreAction.switchToUser,
-                        );
-                      },
-                    ),
-                    _actionItem(
                       icon: Lucide.Share,
                       label: l10n.messageMoreSheetShare,
                       onTap: () {
@@ -360,13 +337,14 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                         ).pop(MessageMoreAction.selectMessages);
                       },
                     ),
-                    _actionItem(
-                      icon: Lucide.GitFork,
-                      label: l10n.messageMoreSheetCreateBranch,
-                      onTap: () {
-                        Navigator.of(context).pop(MessageMoreAction.fork);
-                      },
-                    ),
+                    if (widget.canCreateBranch)
+                      _actionItem(
+                        icon: Lucide.GitFork,
+                        label: l10n.messageMoreSheetCreateBranch,
+                        onTap: () {
+                          Navigator.of(context).pop(MessageMoreAction.fork);
+                        },
+                      ),
                     _actionItem(
                       icon: Lucide.Trash2,
                       label: l10n.messageMoreSheetDelete,

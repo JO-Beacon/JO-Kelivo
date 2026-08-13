@@ -11,9 +11,11 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
+import '../../../shared/widgets/qq_group_join_sheet.dart';
 import '../../../core/services/haptics.dart';
 import 'debug_page.dart';
 import 'log_viewer_page.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 class AboutPage extends StatefulWidget {
   const AboutPage({super.key});
@@ -23,9 +25,6 @@ class AboutPage extends StatefulWidget {
 }
 
 class _AboutPageState extends State<AboutPage> {
-  static const String _upstreamKelivoVersion = '1.1.16';
-  static const String _upstreamKelivoBuildNumber = '60';
-
   String _version = '';
   String _buildNumber = '';
   String _systemInfo = '';
@@ -344,7 +343,7 @@ class _AboutPageState extends State<AboutPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            l10n.aboutPageAppName,
+                            'Kelivo',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: AppFontWeights.semibold,
@@ -397,49 +396,16 @@ class _AboutPageState extends State<AboutPage> {
                 onTap: null, // informational only
               ),
               _iosDivider(context),
-              _iosNavRowSvgLeading(
-                context,
-                svgAsset: 'assets/icons/github.svg',
-                label: l10n.aboutPageGithub,
-                onTap: () => _openUrl('https://github.com/JO-Beacon/JO-Kelivo'),
-              ),
-              _iosDivider(context),
-              _iosNavRow(
-                context,
-                icon: Lucide.FileText,
-                label: l10n.aboutPageLicense,
-                onTap: () => _openUrl(
-                  'https://github.com/JO-Beacon/JO-Kelivo/blob/main/LICENSE',
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          _iosSectionHeader(context, l10n.aboutPageKelivoSectionTitle),
-          const SizedBox(height: 8),
-
-          _iosSectionCard(
-            children: [
-              _iosNavRow(
-                context,
-                icon: Lucide.Code,
-                label: l10n.aboutPageVersion,
-                detailBuilder: (_) => Text(
-                  l10n.aboutPageVersionDetail(
-                    _upstreamKelivoVersion,
-                    _upstreamKelivoBuildNumber,
-                  ),
-                ),
-                onTap: _onVersionTap,
-              ),
-              _iosDivider(context),
               _iosNavRow(
                 context,
                 icon: Lucide.Earth,
                 label: l10n.aboutPageWebsite,
-                onTap: () => _openUrl('https://kelivo.psycheas.top/'),
+                onTap: () async {
+                  final uri = Uri.parse('https://kelivo.psycheas.top/');
+                  if (!await launchUrl(uri, mode: LaunchMode.platformDefault)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                },
               ),
               _iosDivider(context),
               _iosNavRowSvgLeading(
@@ -462,7 +428,7 @@ class _AboutPageState extends State<AboutPage> {
                 context,
                 svgAsset: 'assets/icons/tencent-qq.svg',
                 label: l10n.aboutPageJoinQQGroup,
-                onTap: () => _openUrl('https://qm.qq.com/q/OQaXetKssC'),
+                onTap: () => showQQGroupJoinSheet(context: context),
               ),
               _iosDivider(context),
               _iosNavRowSvgLeading(
@@ -489,9 +455,7 @@ Widget _iosSectionCard({required List<Widget> children}) {
       final theme = Theme.of(context);
       final cs = theme.colorScheme;
       final isDark = theme.brightness == Brightness.dark;
-      final Color bg = isDark
-          ? Colors.white10
-          : Colors.white.withValues(alpha: 0.96);
+      final Color bg = context.appColors.surfaceCard;
       return Container(
         decoration: BoxDecoration(
           color: bg,
@@ -508,21 +472,6 @@ Widget _iosSectionCard({required List<Widget> children}) {
         ),
       );
     },
-  );
-}
-
-Widget _iosSectionHeader(BuildContext context, String title) {
-  final cs = Theme.of(context).colorScheme;
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 6),
-    child: Text(
-      title,
-      style: TextStyle(
-        fontSize: 13,
-        fontWeight: AppFontWeights.semibold,
-        color: cs.onSurface.withValues(alpha: 0.62),
-      ),
-    ),
   );
 }
 
@@ -548,9 +497,9 @@ class _AnimatedPressColor extends StatelessWidget {
   final Widget Function(Color color) builder;
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cs = Theme.of(context).colorScheme;
     final target = pressed
-        ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ?? base)
+        ? (Color.lerp(base, cs.surface, 0.55) ?? base)
         : base;
     return TweenAnimationBuilder<Color?>(
       tween: ColorTween(end: target),

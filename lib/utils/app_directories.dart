@@ -1,9 +1,7 @@
-import 'dart:convert';
 import 'dart:io';
-
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 /// Platform-specific application data directory utilities.
 ///
@@ -30,39 +28,6 @@ class AppDirectories {
     }
   }
 
-  /// Opens a directory in the platform file manager.
-  static Future<bool> openDirectory(Directory directory) async {
-    if (!await directory.exists()) {
-      await directory.create(recursive: true);
-    }
-
-    if (Platform.isWindows) {
-      await Process.start('explorer.exe', [
-        directory.path,
-      ], mode: ProcessStartMode.detached);
-      return true;
-    }
-
-    if (Platform.isMacOS) {
-      await Process.start('open', [
-        directory.path,
-      ], mode: ProcessStartMode.detached);
-      return true;
-    }
-
-    if (Platform.isLinux) {
-      await Process.start('xdg-open', [
-        directory.path,
-      ], mode: ProcessStartMode.detached);
-      return true;
-    }
-
-    return launchUrl(
-      Uri.file(directory.path),
-      mode: LaunchMode.externalApplication,
-    );
-  }
-
   /// Gets the directory for uploaded files.
   static Future<Directory> getUploadDirectory() async {
     final root = await getAppDataDirectory();
@@ -79,6 +44,12 @@ class AppDirectories {
   static Future<Directory> getAvatarsDirectory() async {
     final root = await getAppDataDirectory();
     return Directory('${root.path}/avatars');
+  }
+
+  /// Gets the directory for user-imported font files.
+  static Future<Directory> getFontsDirectory() async {
+    final root = await getAppDataDirectory();
+    return Directory('${root.path}/fonts');
   }
 
   /// Gets the directory for cache files.

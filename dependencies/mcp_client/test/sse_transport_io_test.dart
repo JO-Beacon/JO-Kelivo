@@ -1,0 +1,134 @@
+@TestOn('vm')
+library;
+
+import 'dart:async';
+import 'dart:io';
+
+import 'package:mcp_client/mcp_client.dart';
+import 'package:mcp_client/src/transport/event_source.dart';
+import 'package:test/test.dart';
+
+void main() {
+  group('Native SSE transport', () {
+    test('shared parser preserves opaque IDs and rejects malformed retry', () {
+      final parser = SseParser();
+      final events = <SseEvent>[
+        ...parser.add(
+          'id:  opaque\t \r'
+          'retry:  0 \r'
+          'data: {}\r\r',
+        ),
+        ...parser.close(),
+      ];
+
+      expect(events, hasLength(1));
+      expect(events.single.id, ' opaque\t ');
+      expect(events.single.retry, isNull);
+
+      final invalidId = SseParser();
+      final nulEvents = <SseEvent>[
+        ...invalidId.add('id: bad\u0000id\rdata: {}\r\r'),
+        ...invalidId.close(),
+      ];
+      expect(nulEvents.single.hasId, isFalse);
+    });
+
+    test(
+      'keeps an event intact when its fields arrive in separate chunks',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        final eventSource = EventSource();
+        final endpoint = Completer<String?>();
+
+        addTearDown(() async {
+          eventSource.close();
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+          );
+          request.response.write('event: endpoint\r\n');
+          await request.response.flush();
+          await Future<void>.delayed(const Duration(milliseconds: 25));
+          request.response.write(
+            'data: /messages/?session_id=server-session\n',
+          );
+          await request.response.flush();
+          await Future<void>.delayed(const Duration(milliseconds: 25));
+          request.response.write('\r\n');
+          await request.response.close();
+        });
+
+        await eventSource.connect(
+          'http://${server.address.address}:${server.port}/sse',
+          onEndpoint: (value) {
+            if (!endpoint.isCompleted) {
+              endpoint.complete(value);
+            }
+          },
+        );
+
+        expect(
+          await endpoint.future.timeout(const Duration(seconds: 1)),
+          '/messages/?session_id=server-session',
+        );
+      },
+    );
+
+    test('sends legacy SSE messages as exact application/json', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final receivedContentType = Completer<String?>();
+      SseClientTransport? transport;
+      HttpResponse? sseResponse;
+
+      addTearDown(() async {
+        transport?.close();
+        await sseResponse?.close();
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        if (request.method == 'GET') {
+          sseResponse = request.response;
+          request.response.bufferOutput = false;
+          request.response.contentLength = -1;
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+          );
+          request.response.write(
+            'event: endpoint\r\n'
+            'data: /messages/?session_id=server-session\r\n\r\n',
+          );
+          await request.response.flush();
+          return;
+        }
+
+        receivedContentType.complete(
+          request.headers.value(HttpHeaders.contentTypeHeader),
+        );
+        await request.drain<void>();
+        request.response.statusCode = HttpStatus.accepted;
+        await request.response.close();
+      });
+
+      transport = await SseClientTransport.create(
+        serverUrl: 'http://${server.address.address}:${server.port}/sse',
+      );
+      final send = transport.send({
+        'jsonrpc': '2.0',
+        'id': 1,
+        'method': 'initialize',
+      });
+
+      expect(
+        await receivedContentType.future.timeout(const Duration(seconds: 1)),
+        'application/json',
+      );
+      await send.done;
+    });
+  });
+}

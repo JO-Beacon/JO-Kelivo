@@ -1,13 +1,30 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
-import 'dart:io' show Process, HttpClient, ContentType;
+import 'dart:io' show Process, HttpClient, HttpClientRequest;
 
 import '../../logger.dart';
 import '../models/models.dart';
 import 'event_source.dart';
+import 'stdio_launch.dart';
 
 final Logger _logger = Logger('mcp_client.transport');
+
+/// One transport send, with failure and cancellation scoped to that send.
+final class TransportSendOperation {
+  final Future<void> done;
+  final void Function() _cancel;
+
+  TransportSendOperation(this.done, {void Function()? cancel})
+    : _cancel = cancel ?? _noop;
+
+  factory TransportSendOperation.completed() =>
+      TransportSendOperation(Future<void>.value());
+
+  void cancel() => _cancel();
+
+  static void _noop() {}
+}
 
 /// Abstract base class for client transport implementations
 abstract class ClientTransport {
@@ -18,7 +35,7 @@ abstract class ClientTransport {
   Future<void> get onClose;
 
   /// Send a message through the transport
-  void send(dynamic message);
+  TransportSendOperation send(dynamic message);
 
   /// Close the transport
   void close();
@@ -48,9 +65,21 @@ class StdioClientTransport implements ClientTransport {
   }) async {
     _logger.debug('Starting process: $command ${arguments.join(' ')}');
 
-    final process = await Process.start(
+    final launchPlan = resolveStdioLaunch(
       command,
       arguments,
+      environment: environment,
+    );
+    final executableCommand = launchPlan.executableCommand;
+    final effectiveArgs = launchPlan.effectiveArgs;
+
+    _logger.debug(
+      'Effective command: $executableCommand ${effectiveArgs.join(' ')}',
+    );
+
+    final process = await Process.start(
+      executableCommand,
+      effectiveArgs,
       workingDirectory: workingDirectory,
       environment: environment,
     );
@@ -161,7 +190,7 @@ class StdioClientTransport implements ClientTransport {
 
   // Add message to queue and process it
   @override
-  void send(dynamic message) {
+  TransportSendOperation send(dynamic message) {
     try {
       final jsonMessage = jsonEncode(message);
       _logger.debug('Queueing message: $jsonMessage');
@@ -171,6 +200,7 @@ class StdioClientTransport implements ClientTransport {
 
       // Start processing queue if not already doing so
       _processMessageQueue();
+      return TransportSendOperation.completed();
     } catch (e) {
       _logger.debug('Error encoding message: $e');
       _logger.debug('Original message: $message');
@@ -228,6 +258,7 @@ class SseClientTransport implements ClientTransport {
   final _messageController = StreamController<dynamic>.broadcast();
   final _closeCompleter = Completer<void>();
   final EventSource _eventSource = EventSource();
+  final HttpClient _httpClient = HttpClient();
   String? _messageEndpoint;
   StreamSubscription? _subscription;
   bool _isClosed = false;
@@ -240,9 +271,24 @@ class SseClientTransport implements ClientTransport {
     required String serverUrl,
     Map<String, String>? headers,
   }) async {
+    final safeHeaders =
+        headers == null
+            ? null
+            : Map<String, String>.fromEntries(
+              headers.entries.where(
+                (entry) =>
+                    !const {
+                      'accept',
+                      'content-type',
+                      'last-event-id',
+                      'mcp-protocol-version',
+                      'mcp-session-id',
+                    }.contains(entry.key.toLowerCase()),
+              ),
+            );
     final transport = SseClientTransport._internal(
       serverUrl: serverUrl,
-      headers: headers,
+      headers: safeHeaders,
     );
 
     try {
@@ -260,7 +306,7 @@ class SseClientTransport implements ClientTransport {
 
       await transport._eventSource.connect(
         sseUrlWithSession,
-        headers: headers,
+        headers: safeHeaders,
         onMessage: (data) {
           // This is crucial - forward messages to the controller
           if (data is Map &&
@@ -285,6 +331,9 @@ class SseClientTransport implements ClientTransport {
           if (!endpointCompleter.isCompleted && endpoint != null) {
             endpointCompleter.complete(endpoint);
           }
+        },
+        onDone: () {
+          transport._handleClosure();
         },
       );
 
@@ -342,8 +391,27 @@ class SseClientTransport implements ClientTransport {
   }
 
   void _handleError(dynamic error) {
+    _closeResources();
     if (!_closeCompleter.isCompleted) {
       _closeCompleter.completeError(error);
+    }
+  }
+
+  void _handleClosure() {
+    _closeResources();
+    if (!_closeCompleter.isCompleted) {
+      _closeCompleter.complete();
+    }
+  }
+
+  void _closeResources() {
+    if (_isClosed) return;
+    _isClosed = true;
+    _subscription?.cancel();
+    _eventSource.close();
+    _httpClient.close(force: true);
+    if (!_messageController.isClosed) {
+      _messageController.close();
     }
   }
 
@@ -355,31 +423,42 @@ class SseClientTransport implements ClientTransport {
   Future<void> get onClose => _closeCompleter.future;
 
   @override
-  void send(dynamic message) async {
+  TransportSendOperation send(dynamic message) {
     if (_isClosed) {
-      _logger.debug('Attempted to send on closed transport');
-      return;
-    }
-
-    if (_messageEndpoint == null) {
-      throw McpError(
-        'Cannot send message: SSE connection not fully established',
+      return TransportSendOperation(
+        Future<void>.error(McpError('Transport is closed')),
       );
     }
 
-    try {
+    if (_messageEndpoint == null) {
+      return TransportSendOperation(
+        Future<void>.error(
+          McpError('Cannot send message: SSE connection not fully established'),
+        ),
+      );
+    }
+
+    HttpClientRequest? activeRequest;
+    var cancelled = false;
+    final done = Future<void>.sync(() async {
       final jsonMessage = jsonEncode(message);
       _logger.debug('Sending message: $jsonMessage');
 
       final url = Uri.parse(_messageEndpoint!);
-      final client = HttpClient();
-      final request = await client.postUrl(url);
+      final request = await _httpClient.postUrl(url);
+      activeRequest = request;
+      if (cancelled) {
+        request.abort();
+        return;
+      }
 
       // Set headers
-      request.headers.contentType = ContentType.json;
+      request.headers.set('Content-Type', 'application/json');
       if (headers != null) {
         headers!.forEach((name, value) {
-          request.headers.add(name, value);
+          if (name.toLowerCase() != 'mcp-session-id') {
+            request.headers.set(name, value);
+          }
         });
       }
 
@@ -397,29 +476,50 @@ class SseClientTransport implements ClientTransport {
       } else {
         final responseBody = await response.transform(utf8.decoder).join();
         _logger.debug('Error response: $responseBody');
-        throw McpError('Error sending message: ${response.statusCode}');
+        final sessionIdPresent = _endpointHasSessionId(url);
+        throw McpHttpError(
+          statusCode: response.statusCode,
+          message: 'HTTP ${response.statusCode}: $responseBody',
+          retryAfter: McpHttpError.parseRetryAfter(
+            response.headers.value('Retry-After'),
+          ),
+          body: responseBody,
+          wwwAuthenticate: response.headers['WWW-Authenticate'] ?? const [],
+          sessionIdPresent: sessionIdPresent,
+          canRetryRequest:
+              (response.statusCode == 404 && sessionIdPresent) ||
+              response.statusCode == 401,
+        );
       }
 
-      // Close the HTTP client
-      client.close();
       _logger.debug('Message sent successfully');
-    } catch (e) {
-      _logger.debug('Error sending message: $e');
-      rethrow;
+    });
+    return TransportSendOperation(
+      done,
+      cancel: () {
+        cancelled = true;
+        activeRequest?.abort();
+      },
+    );
+  }
+
+  bool _endpointHasSessionId(Uri endpoint) {
+    for (final entry in endpoint.queryParameters.entries) {
+      final key = entry.key.toLowerCase().replaceAll('-', '_');
+      if ((key == 'session_id' ||
+              key == 'sessionid' ||
+              key == 'mcp_session_id') &&
+          entry.value.trim().isNotEmpty) {
+        return true;
+      }
     }
+    return false;
   }
 
   @override
   void close() {
-    if (_isClosed) return;
-    _isClosed = true;
-
     _logger.debug('Closing SseClientTransport');
-    _subscription?.cancel();
-    _eventSource.close();
-    if (!_messageController.isClosed) {
-      _messageController.close();
-    }
+    _closeResources();
     if (!_closeCompleter.isCompleted) {
       _closeCompleter.complete();
     }

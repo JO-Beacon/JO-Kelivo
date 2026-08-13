@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
 import '../../features/settings/pages/debug_page.dart';
+import '../../shared/widgets/qq_group_join_sheet.dart';
 import '../../theme/app_font_weights.dart';
 
 class DesktopAboutPane extends StatefulWidget {
@@ -20,9 +21,6 @@ class DesktopAboutPane extends StatefulWidget {
 enum _InfoLoadState { loading, loaded, failed }
 
 class _DesktopAboutPaneState extends State<DesktopAboutPane> {
-  static const String _upstreamKelivoVersion = '1.1.16';
-  static const String _upstreamKelivoBuildNumber = '60';
-
   String _version = '';
   String _buildNumber = '';
   String _systemInfo = '';
@@ -149,7 +147,7 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
 
               const SizedBox(height: 16),
 
-              // JO-Kelivo info and links
+              // Info and links
               _DeskCard(
                 title: l10n.settingsPageAbout,
                 children: [
@@ -163,38 +161,6 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
                     icon: lucide.Lucide.Phone,
                     label: l10n.aboutPageSystem,
                     detail: systemDetail,
-                  ),
-                  const _DeskRowDivider(),
-                  _DeskNavRowSvg(
-                    svgAsset: 'assets/icons/github.svg',
-                    label: l10n.aboutPageGithub,
-                    onTap: () =>
-                        _openUrl('https://github.com/JO-Beacon/JO-Kelivo'),
-                  ),
-                  const _DeskRowDivider(),
-                  _DeskNavRow(
-                    icon: lucide.Lucide.FileText,
-                    label: l10n.aboutPageLicense,
-                    onTap: () => _openUrl(
-                      'https://github.com/JO-Beacon/JO-Kelivo/blob/main/LICENSE',
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-
-              // Original Kelivo info and links
-              _DeskCard(
-                title: l10n.aboutPageKelivoSectionTitle,
-                children: [
-                  _DeskInfoRow(
-                    icon: lucide.Lucide.Code,
-                    label: l10n.aboutPageVersion,
-                    detail: l10n.aboutPageVersionDetail(
-                      _upstreamKelivoVersion,
-                      _upstreamKelivoBuildNumber,
-                    ),
                   ),
                   const _DeskRowDivider(),
                   _DeskNavRow(
@@ -221,7 +187,7 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
                   _DeskNavRowSvg(
                     svgAsset: 'assets/icons/tencent-qq.svg',
                     label: l10n.aboutPageJoinQQGroup,
-                    onTap: () => _openUrl('https://qm.qq.com/q/OQaXetKssC'),
+                    onTap: () => showQQGroupJoinSheet(context: context),
                   ),
                   const _DeskRowDivider(),
                   _DeskNavRowSvg(
@@ -230,6 +196,7 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
                     onTap: () => _openUrl('https://discord.gg/Tb8DyvvV5T'),
                   ),
                   const _DeskRowDivider(),
+                  // Donation item (desktop): mirrors mobile "Sponsor"
                   _DeskNavRow(
                     icon: lucide.Lucide.Heart,
                     label: l10n.settingsPageSponsor,
@@ -264,10 +231,8 @@ class _AppHeaderCardState extends State<_AppHeaderCard> {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final baseBg = isDark ? const Color(0xFF1C1C1E) : Colors.white;
-    final hoverBg = isDark
-        ? Colors.white.withValues(alpha: 0.06)
-        : Colors.black.withValues(alpha: 0.04);
+    final baseBg = Theme.of(context).colorScheme.surfaceContainerHigh;
+    final hoverBg = cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04);
     final overlay = _hover ? hoverBg : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -290,7 +255,7 @@ class _AppHeaderCardState extends State<_AppHeaderCard> {
                 side: BorderSide(
                   width: 0.5,
                   color: isDark
-                      ? Colors.white.withValues(alpha: 0.06)
+                      ? cs.onSurface.withValues(alpha: 0.06)
                       : cs.outlineVariant.withValues(alpha: 0.12),
                 ),
               ),
@@ -360,13 +325,13 @@ class _DeskCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
-      color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+      color: Theme.of(context).colorScheme.surfaceContainerHigh,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
         side: BorderSide(
           width: 0.5,
           color: isDark
-              ? Colors.white.withValues(alpha: 0.06)
+              ? cs.onSurface.withValues(alpha: 0.06)
               : cs.outlineVariant.withValues(alpha: 0.12),
         ),
       ),
@@ -479,9 +444,7 @@ class _DeskNavRowState extends State<_DeskNavRow> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final hoverBg = isDark
-        ? Colors.white.withValues(alpha: 0.06)
-        : Colors.black.withValues(alpha: 0.05);
+    final hoverBg = cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05);
     final bg = _hover ? hoverBg : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -550,9 +513,7 @@ class _DeskNavRowSvgState extends State<_DeskNavRowSvg> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final hoverBg = isDark
-        ? Colors.white.withValues(alpha: 0.06)
-        : Colors.black.withValues(alpha: 0.05);
+    final hoverBg = cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05);
     final bg = _hover ? hoverBg : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
