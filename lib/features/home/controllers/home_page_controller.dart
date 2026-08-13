@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../core/models/message_part.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../core/models/assistant_regex.dart';
@@ -24,6 +25,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../chat/models/message_edit_result.dart';
+import '../../chat/models/message_parts_edit_draft.dart';
 import '../../chat/widgets/chat_message_widget.dart' show ToolUIPart;
 import '../../chat/widgets/message_edit_sheet.dart';
 import '../../chat/widgets/message_export_sheet.dart';
@@ -55,10 +57,12 @@ class UserMessageEditState {
   const UserMessageEditState({
     required this.messageId,
     required this.previewText,
+    required this.originalParts,
   });
 
   final String messageId;
   final String previewText;
+  final List<MessagePart> originalParts;
 }
 
 /// Controller that manages all state and service wiring for HomePage.
@@ -1264,7 +1268,7 @@ class HomePageController extends ChangeNotifier {
 
     final newMsg = await _chatService.appendMessageVersion(
       messageId: message.id,
-      content: result.content,
+      parts: result.parts,
     );
     if (newMsg == null) return;
 
@@ -1353,6 +1357,7 @@ class HomePageController extends ChangeNotifier {
     _userMessageEditState = UserMessageEditState(
       messageId: message.id,
       previewText: input.text.isNotEmpty ? input.text : message.content.trim(),
+      originalParts: message.parts,
     );
     notifyListeners();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1385,6 +1390,10 @@ class HomePageController extends ChangeNotifier {
       input,
       assistant: assistant,
     );
+    final mergedParts = MessagePartsEditDraft.mergeInputParts(
+      editState.originalParts,
+      parts,
+    );
 
     await _chatService.clearConversationSuggestions(conversation.id);
     _viewModel.updateCurrentConversation(
@@ -1393,7 +1402,7 @@ class HomePageController extends ChangeNotifier {
 
     final newMsg = await _chatService.appendMessageVersion(
       messageId: editState.messageId,
-      parts: parts,
+      parts: mergedParts,
     );
     if (newMsg == null) return null;
 

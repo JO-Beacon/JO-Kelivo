@@ -3832,6 +3832,60 @@ abstract class AppLocalizations {
   /// **'Enter message…'**
   String get messageEditPageHint;
 
+  /// No description provided for @messageEditAttachmentsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachments'**
+  String get messageEditAttachmentsTitle;
+
+  /// No description provided for @messageEditAddImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Add image'**
+  String get messageEditAddImage;
+
+  /// No description provided for @messageEditAddFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Add file'**
+  String get messageEditAddFile;
+
+  /// No description provided for @messageEditNoAttachments.
+  ///
+  /// In en, this message translates to:
+  /// **'No attachments'**
+  String get messageEditNoAttachments;
+
+  /// No description provided for @messageEditImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Image'**
+  String get messageEditImage;
+
+  /// No description provided for @messageEditReplaceAttachment.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace attachment'**
+  String get messageEditReplaceAttachment;
+
+  /// No description provided for @messageEditRemoveAttachment.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove attachment'**
+  String get messageEditRemoveAttachment;
+
+  /// No description provided for @messageEditAttachmentImportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not import attachment: {error}'**
+  String messageEditAttachmentImportFailed(String error);
+
+  /// No description provided for @messageEditAttachmentCopyFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not copy the selected attachment'**
+  String get messageEditAttachmentCopyFailed;
+
   /// No description provided for @userMessageEditSaveOnly.
   ///
   /// In en, this message translates to:

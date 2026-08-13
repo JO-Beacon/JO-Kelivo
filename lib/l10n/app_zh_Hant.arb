@@ -683,6 +683,22 @@
   "messageEditPageSave": "儲存",
   "messageEditPageSaveAndSend": "儲存並發送",
   "messageEditPageHint": "輸入訊息內容…",
+  "messageEditAttachmentsTitle": "附件",
+  "messageEditAddImage": "新增圖片",
+  "messageEditAddFile": "新增檔案",
+  "messageEditNoAttachments": "暫無附件",
+  "messageEditImage": "圖片",
+  "messageEditReplaceAttachment": "替換附件",
+  "messageEditRemoveAttachment": "移除附件",
+  "messageEditAttachmentImportFailed": "無法匯入附件：{error}",
+  "messageEditAttachmentCopyFailed": "無法複製所選附件",
+  "@messageEditAttachmentImportFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "userMessageEditSaveOnly": "僅儲存",
   "userMessageEditUnsupportedSnackbar": "該內容不支援編輯",
   "userMessageEditOverwriteTitle": "提示",

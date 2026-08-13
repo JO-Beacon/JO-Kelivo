@@ -2013,6 +2013,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageEditPageHint => 'Enter message…';
 
   @override
+  String get messageEditAttachmentsTitle => 'Attachments';
+
+  @override
+  String get messageEditAddImage => 'Add image';
+
+  @override
+  String get messageEditAddFile => 'Add file';
+
+  @override
+  String get messageEditNoAttachments => 'No attachments';
+
+  @override
+  String get messageEditImage => 'Image';
+
+  @override
+  String get messageEditReplaceAttachment => 'Replace attachment';
+
+  @override
+  String get messageEditRemoveAttachment => 'Remove attachment';
+
+  @override
+  String messageEditAttachmentImportFailed(String error) {
+    return 'Could not import attachment: $error';
+  }
+
+  @override
+  String get messageEditAttachmentCopyFailed =>
+      'Could not copy the selected attachment';
+
+  @override
   String get userMessageEditSaveOnly => 'Save Only';
 
   @override

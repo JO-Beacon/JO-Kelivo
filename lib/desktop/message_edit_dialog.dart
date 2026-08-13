@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../core/models/chat_message.dart';
 import '../features/chat/models/message_edit_result.dart';
+import '../features/chat/models/message_parts_edit_draft.dart';
+import '../features/chat/widgets/message_attachment_editor.dart';
 import '../l10n/app_localizations.dart';
 import '../icons/lucide_adapter.dart';
 import '../theme/app_font_weights.dart';
@@ -28,11 +30,13 @@ class _MessageEditDesktopDialog extends StatefulWidget {
 
 class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
   late final TextEditingController _controller;
+  late MessagePartsEditDraft _draft;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.message.content);
+    _draft = MessagePartsEditDraft(widget.message.parts);
   }
 
   @override
@@ -78,8 +82,13 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                       TextButton.icon(
                         onPressed: () {
                           final text = _controller.text.trim();
+                          _draft.replaceText(text);
                           Navigator.of(context).pop<MessageEditResult>(
-                            MessageEditResult(content: text, shouldSend: true),
+                            MessageEditResult(
+                              content: text,
+                              parts: _draft.parts,
+                              shouldSend: true,
+                            ),
                           );
                         },
                         icon: Icon(
@@ -99,8 +108,13 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                       TextButton.icon(
                         onPressed: () {
                           final text = _controller.text.trim();
+                          _draft.replaceText(text);
                           Navigator.of(context).pop<MessageEditResult>(
-                            MessageEditResult(content: text, shouldSend: false),
+                            MessageEditResult(
+                              content: text,
+                              parts: _draft.parts,
+                              shouldSend: false,
+                            ),
                           );
                         },
                         icon: Icon(Lucide.Check, size: 18, color: cs.primary),
@@ -129,43 +143,63 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    child: TextField(
-                      controller: _controller,
-                      autofocus: true,
-                      keyboardType: TextInputType.multiline,
-                      minLines: 10,
-                      maxLines: null,
-                      decoration: InputDecoration(
-                        hintText: l10n.messageEditPageHint,
-                        filled: true,
-                        fillColor: context.appColors.surfaceFill,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: cs.outlineVariant.withValues(alpha: 0.18),
-                            width: 0.6,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TextField(
+                            controller: _controller,
+                            autofocus: true,
+                            keyboardType: TextInputType.multiline,
+                            minLines: 10,
+                            maxLines: null,
+                            decoration: InputDecoration(
+                              hintText: l10n.messageEditPageHint,
+                              filled: true,
+                              fillColor: context.appColors.surfaceFill,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: cs.outlineVariant.withValues(
+                                    alpha: 0.18,
+                                  ),
+                                  width: 0.6,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: cs.outlineVariant.withValues(
+                                    alpha: 0.18,
+                                  ),
+                                  width: 0.6,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: cs.primary.withValues(alpha: 0.35),
+                                  width: 0.8,
+                                ),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                            ),
+                            style: const TextStyle(fontSize: 15, height: 1.5),
                           ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: cs.outlineVariant.withValues(alpha: 0.18),
-                            width: 0.6,
+                          const SizedBox(height: 12),
+                          MessageAttachmentEditor(
+                            parts: _draft.parts,
+                            onChanged: (parts) {
+                              setState(() {
+                                _draft = MessagePartsEditDraft(parts);
+                              });
+                            },
                           ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: cs.primary.withValues(alpha: 0.35),
-                            width: 0.8,
-                          ),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 12,
-                        ),
+                        ],
                       ),
-                      style: TextStyle(fontSize: 15, height: 1.5),
                     ),
                   ),
                 ),

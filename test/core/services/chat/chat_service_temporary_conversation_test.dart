@@ -505,6 +505,61 @@ void main() {
     },
   );
 
+  test(
+    'structured part edit persists as the next ordered revision losslessly',
+    () async {
+      final first = createService();
+      await first.init();
+      final conversation = await first.createDraftConversation(
+        title: 'Structured edit',
+      );
+      final original = await first.addMessage(
+        conversationId: conversation.id,
+        role: 'assistant',
+        parts: const <MessagePart>[
+          TextPart('before'),
+          ImagePart(uri: 'https://example.com/old.png'),
+          UnknownPart(rawKind: 'future', payload: '{"opaque":true}'),
+        ],
+      );
+      final edited = await first.appendMessageVersion(
+        messageId: original.id,
+        parts: const <MessagePart>[
+          TextPart('after'),
+          FilePart(
+            uri: 'https://example.com/new.pdf',
+            name: 'new.pdf',
+            mime: 'application/pdf',
+          ),
+          UnknownPart(rawKind: 'future', payload: '{"opaque":true}'),
+        ],
+      );
+
+      expect(edited, isNotNull);
+      expect(edited!.groupId, original.groupId ?? original.id);
+      expect(edited.version, original.version + 1);
+      expect(await first.getMessageIds(conversation.id), [
+        original.id,
+        edited.id,
+      ]);
+      await first.close();
+      services.remove(first);
+
+      final restarted = createService();
+      await restarted.init();
+      final messages = await restarted.loadMessages(conversation.id);
+      expect(messages.map((message) => message.id), [original.id, edited.id]);
+      final after = messages.last;
+      expect(after.parts.map((part) => part.kind), ['text', 'file', 'future']);
+      expect((after.parts[0] as TextPart).text, 'after');
+      expect((after.parts[1] as FilePart).name, 'new.pdf');
+      expect((after.parts[2] as UnknownPart).payload, '{"opaque":true}');
+      expect(restarted.getVersionSelections(conversation.id), {
+        original.groupId ?? original.id: edited.version,
+      });
+    },
+  );
+
   group('ChatService temporary conversations', () {
     test('ordinary draft persists when its first message is added', () async {
       final service = createService();

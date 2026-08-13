@@ -812,6 +812,22 @@
   "messageEditPageSave": "Save",
   "messageEditPageSaveAndSend": "Save & Send",
   "messageEditPageHint": "Enter message…",
+  "messageEditAttachmentsTitle": "Attachments",
+  "messageEditAddImage": "Add image",
+  "messageEditAddFile": "Add file",
+  "messageEditNoAttachments": "No attachments",
+  "messageEditImage": "Image",
+  "messageEditReplaceAttachment": "Replace attachment",
+  "messageEditRemoveAttachment": "Remove attachment",
+  "messageEditAttachmentImportFailed": "Could not import attachment: {error}",
+  "messageEditAttachmentCopyFailed": "Could not copy the selected attachment",
+  "@messageEditAttachmentImportFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "userMessageEditSaveOnly": "Save Only",
   "userMessageEditUnsupportedSnackbar": "This content does not support editing",
   "userMessageEditOverwriteTitle": "Notice",

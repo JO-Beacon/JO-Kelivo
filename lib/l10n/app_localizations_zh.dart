@@ -1947,6 +1947,35 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageEditPageHint => '输入消息内容…';
 
   @override
+  String get messageEditAttachmentsTitle => '附件';
+
+  @override
+  String get messageEditAddImage => '添加图片';
+
+  @override
+  String get messageEditAddFile => '添加文件';
+
+  @override
+  String get messageEditNoAttachments => '暂无附件';
+
+  @override
+  String get messageEditImage => '图片';
+
+  @override
+  String get messageEditReplaceAttachment => '替换附件';
+
+  @override
+  String get messageEditRemoveAttachment => '移除附件';
+
+  @override
+  String messageEditAttachmentImportFailed(String error) {
+    return '无法导入附件：$error';
+  }
+
+  @override
+  String get messageEditAttachmentCopyFailed => '无法复制所选附件';
+
+  @override
   String get userMessageEditSaveOnly => '仅保存';
 
   @override
@@ -9066,6 +9095,35 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get messageEditPageHint => '输入消息内容…';
 
   @override
+  String get messageEditAttachmentsTitle => '附件';
+
+  @override
+  String get messageEditAddImage => '添加图片';
+
+  @override
+  String get messageEditAddFile => '添加文件';
+
+  @override
+  String get messageEditNoAttachments => '暂无附件';
+
+  @override
+  String get messageEditImage => '图片';
+
+  @override
+  String get messageEditReplaceAttachment => '替换附件';
+
+  @override
+  String get messageEditRemoveAttachment => '移除附件';
+
+  @override
+  String messageEditAttachmentImportFailed(String error) {
+    return '无法导入附件：$error';
+  }
+
+  @override
+  String get messageEditAttachmentCopyFailed => '无法复制所选附件';
+
+  @override
   String get userMessageEditSaveOnly => '仅保存';
 
   @override
@@ -16182,6 +16240,35 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get messageEditPageHint => '輸入訊息內容…';
+
+  @override
+  String get messageEditAttachmentsTitle => '附件';
+
+  @override
+  String get messageEditAddImage => '新增圖片';
+
+  @override
+  String get messageEditAddFile => '新增檔案';
+
+  @override
+  String get messageEditNoAttachments => '暫無附件';
+
+  @override
+  String get messageEditImage => '圖片';
+
+  @override
+  String get messageEditReplaceAttachment => '替換附件';
+
+  @override
+  String get messageEditRemoveAttachment => '移除附件';
+
+  @override
+  String messageEditAttachmentImportFailed(String error) {
+    return '無法匯入附件：$error';
+  }
+
+  @override
+  String get messageEditAttachmentCopyFailed => '無法複製所選附件';
 
   @override
   String get userMessageEditSaveOnly => '僅儲存';
