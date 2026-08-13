@@ -141,6 +141,7 @@ class HomePageController extends ChangeNotifier {
   late scroll_ctrl.ChatScrollController _scrollCtrl;
 
   McpProvider? _mcpProvider;
+  SettingsProvider? _settingsProvider;
   StreamSubscription<ChatAction>? _chatActionSub;
 
   // ============================================================================
@@ -374,7 +375,10 @@ class HomePageController extends ChangeNotifier {
 
   void _initializeControllers() {
     _chatService = _context.read<ChatService>();
-    _chatController = ChatController(chatService: _chatService);
+    _chatController = ChatController(
+      chatService: _chatService,
+      lazyHistoryEnabled: _context.read<SettingsProvider>().lazyHistoryEnabled,
+    );
     _chatControllerReady = true;
     _streamController = stream_ctrl.StreamController(
       chatService: _chatService,
@@ -561,6 +565,8 @@ class HomePageController extends ChangeNotifier {
   }
 
   void _initializeProviders() {
+    _settingsProvider = _context.read<SettingsProvider>();
+    _settingsProvider!.addListener(_onSettingsChanged);
     try {
       final quickPhraseProvider = _context.read<QuickPhraseProvider>();
       Future.microtask(() async {
@@ -592,6 +598,44 @@ class HomePageController extends ChangeNotifier {
   }
 
   void _setupKeyboardListeners() {}
+
+  void _onSettingsChanged() {
+    final settings = _settingsProvider;
+    if (settings == null ||
+        settings.lazyHistoryEnabled == _chatController.lazyHistoryEnabled) {
+      return;
+    }
+    unawaited(
+      _chatController
+          .setLazyHistoryEnabled(settings.lazyHistoryEnabled)
+          .catchError((Object error, StackTrace stackTrace) async {
+            FlutterError.reportError(
+              FlutterErrorDetails(
+                exception: error,
+                stack: stackTrace,
+                context: ErrorDescription(
+                  'while applying the chat history loading preference',
+                ),
+              ),
+            );
+            final applied = _chatController.lazyHistoryEnabled;
+            if (settings.lazyHistoryEnabled == applied) return;
+            try {
+              await settings.setLazyHistoryEnabled(applied);
+            } catch (rollbackError, rollbackStackTrace) {
+              FlutterError.reportError(
+                FlutterErrorDetails(
+                  exception: rollbackError,
+                  stack: rollbackStackTrace,
+                  context: ErrorDescription(
+                    'while rolling back the chat history loading preference',
+                  ),
+                ),
+              );
+            }
+          }),
+    );
+  }
 
   void _setupDesktopFeatures() {
     if (isDesktopPlatform) {
@@ -2528,6 +2572,7 @@ class HomePageController extends ChangeNotifier {
     _convoFadeController.dispose();
     _messageJumpTransitionController.dispose();
     _mcpProvider?.removeListener(_onMcpChanged);
+    _settingsProvider?.removeListener(_onSettingsChanged);
     _scrollCtrl.dispose();
     try {
       _chatActionSub?.cancel();

@@ -23,9 +23,11 @@ class _FakeLazyChatService extends ChatService {
   int contextStartIndex = -1;
   bool temporary = false;
   int? timelineSelectedVersionOverride;
+  int? failTimelineCall;
   bool requireGroupLoad = false;
   bool groupsLoaded = false;
   Completer<void>? groupLoadGate;
+  final Map<int, Completer<void>> timelineCallGates = <int, Completer<void>>{};
   final List<Set<String>> groupLoadRequests = <Set<String>>[];
 
   @override
@@ -127,6 +129,10 @@ class _FakeLazyChatService extends ChatService {
     int limit = 40,
   }) async {
     timelinePageCalls++;
+    if (timelinePageCalls == failTimelineCall) {
+      throw StateError('timeline page failed');
+    }
+    await timelineCallGates[timelinePageCalls]?.future;
     rangeLoadCalls++;
     final grouped = <String, List<ChatMessage>>{};
     for (final message in _messages) {
@@ -506,6 +512,180 @@ void main() {
         expect(controller.hasMoreBefore, isTrue);
       },
     );
+
+    test(
+      'complete-history mode opens a 5000-message conversation in pages',
+      () async {
+        messages = List<ChatMessage>.generate(5000, _message);
+        conversation = Conversation(
+          id: 'conversation-1',
+          title: 'Very long complete chat',
+          messageIds: messages.map((message) => message.id).toList(),
+        );
+        chatService = _FakeLazyChatService(messages);
+        controller.dispose();
+        controller = ChatController(
+          chatService: chatService,
+          lazyHistoryEnabled: false,
+        );
+
+        await controller.setCurrentConversationAndLoad(conversation);
+
+        expect(chatService.fullLoadCalls, 0);
+        expect(chatService.timelinePageCalls, greaterThan(1));
+        expect(controller.messages, messages);
+        expect(controller.loadedStartIndex, 0);
+        expect(controller.totalMessageCount, 5000);
+        expect(controller.hasMoreBefore, isFalse);
+        expect(controller.hasMoreAfter, isFalse);
+        expect(controller.isLoadingWindow, isFalse);
+      },
+    );
+
+    test(
+      'switching history modes expands then restores the tail window',
+      () async {
+        messages = List<ChatMessage>.generate(1000, _message);
+        conversation = Conversation(
+          id: 'conversation-1',
+          title: 'Switchable history',
+          messageIds: messages.map((message) => message.id).toList(),
+        );
+        chatService = _FakeLazyChatService(messages);
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+        await controller.setCurrentConversationAndLoad(conversation);
+
+        await controller.setLazyHistoryEnabled(false);
+        expect(controller.lazyHistoryEnabled, isFalse);
+        expect(controller.messages, messages);
+
+        await controller.setLazyHistoryEnabled(true);
+        expect(controller.lazyHistoryEnabled, isTrue);
+        expect(controller.messages.length, ChatService.defaultLoadedWindowMax);
+        expect(controller.messages.first.id, 'message-640');
+        expect(controller.messages.last.id, 'message-999');
+        expect(controller.loadedStartIndex, 640);
+        expect(controller.hasMoreBefore, isTrue);
+      },
+    );
+
+    test('complete-history mode preserves logical version order', () async {
+      final anchors = List<ChatMessage>.generate(
+        500,
+        (index) => _versionedMessage(
+          id: 'slot-$index-v0',
+          role: index.isEven ? 'user' : 'assistant',
+          groupId: 'slot-$index',
+          version: 0,
+        ),
+      );
+      final revisions = List<ChatMessage>.generate(
+        500,
+        (index) => _versionedMessage(
+          id: 'slot-$index-v1',
+          role: index.isEven ? 'user' : 'assistant',
+          groupId: 'slot-$index',
+          version: 1,
+        ),
+      );
+      messages = <ChatMessage>[...anchors, ...revisions];
+      conversation = Conversation(
+        id: 'conversation-1',
+        title: 'Versioned complete history',
+        messageIds: messages.map((message) => message.id).toList(),
+      );
+      chatService = _FakeLazyChatService(messages)
+        ..versionSelections = {
+          for (var index = 0; index < 500; index++) 'slot-$index': 1,
+        };
+      controller.dispose();
+      controller = ChatController(
+        chatService: chatService,
+        lazyHistoryEnabled: false,
+      );
+
+      await controller.setCurrentConversationAndLoad(conversation);
+
+      expect(controller.collapsedMessages, hasLength(500));
+      expect(controller.collapsedMessages.first.id, 'slot-0-v1');
+      expect(controller.collapsedMessages.last.id, 'slot-499-v1');
+      expect(controller.collapsedMessages.map((message) => message.groupId), [
+        for (var index = 0; index < 500; index++) 'slot-$index',
+      ]);
+    });
+
+    test('complete-history page failure is visible and retryable', () async {
+      messages = List<ChatMessage>.generate(1000, _message);
+      conversation = Conversation(
+        id: 'conversation-1',
+        title: 'Recoverable complete history',
+        messageIds: messages.map((message) => message.id).toList(),
+      );
+      chatService = _FakeLazyChatService(messages)..failTimelineCall = 3;
+      controller.dispose();
+      controller = ChatController(chatService: chatService);
+      await controller.setCurrentConversationAndLoad(conversation);
+
+      await expectLater(
+        controller.setLazyHistoryEnabled(false),
+        throwsA(isA<StateError>()),
+      );
+      expect(controller.isLoadingWindow, isFalse);
+      expect(controller.lazyHistoryEnabled, isTrue);
+      expect(controller.messages, isNotEmpty);
+
+      chatService.failTimelineCall = null;
+      await controller.setLazyHistoryEnabled(false);
+      expect(controller.messages, messages);
+      expect(controller.hasMoreBefore, isFalse);
+    });
+
+    test('prefetched window records the mode used to query it', () async {
+      final gate = Completer<void>();
+      chatService.timelineCallGates[1] = gate;
+
+      final fetch = controller.fetchConversationWindow(conversation);
+      await Future<void>.delayed(Duration.zero);
+      await controller.setLazyHistoryEnabled(false);
+      gate.complete();
+
+      final fetched = await fetch;
+      expect(fetched.lazyHistoryEnabled, isTrue);
+      expect(fetched.page?.slots, hasLength(40));
+    });
+
+    test('conversation switch supersedes an in-flight complete load', () async {
+      messages = List<ChatMessage>.generate(1000, _message);
+      final firstConversation = Conversation(
+        id: 'conversation-1',
+        title: 'First',
+        messageIds: messages.map((message) => message.id).toList(),
+      );
+      final secondConversation = Conversation(
+        id: 'conversation-2',
+        title: 'Second',
+        messageIds: messages.map((message) => message.id).toList(),
+      );
+      chatService = _FakeLazyChatService(messages);
+      controller.dispose();
+      controller = ChatController(chatService: chatService);
+      await controller.setCurrentConversationAndLoad(firstConversation);
+
+      final gate = Completer<void>();
+      chatService.timelineCallGates[2] = gate;
+      final completeLoad = controller.setLazyHistoryEnabled(false);
+      await Future<void>.delayed(Duration.zero);
+
+      await controller.setCurrentConversationAndLoad(secondConversation);
+      gate.complete();
+      await completeLoad;
+
+      expect(controller.currentConversation?.id, secondConversation.id);
+      expect(controller.messages, hasLength(1000));
+      expect(controller.messages.first.id, 'message-0');
+      expect(controller.messages.last.id, 'message-999');
+    });
 
     test(
       'collapsed tail window excludes a version whose group anchor is older',
@@ -1587,8 +1767,8 @@ void main() {
         await controller.setCurrentConversationAndLoad(conversation);
         final rangeCallsBefore = chatService.rangeLoadCalls;
 
-        final collapsed =
-            controller.allCollapsedMessagesForCurrentConversation();
+        final collapsed = controller
+            .allCollapsedMessagesForCurrentConversation();
 
         expect(collapsed, controller.collapsedMessages);
         expect(collapsed.length, controller.messages.length);
@@ -1699,9 +1879,7 @@ void main() {
         ]);
         expect(chatService.groupLoadRequests, isNotEmpty);
         expect(
-          chatService.groupLoadRequests.any(
-            (ids) => ids.contains('assistant'),
-          ),
+          chatService.groupLoadRequests.any((ids) => ids.contains('assistant')),
           isTrue,
         );
         expect(chatService.fullLoadCalls, 0);
