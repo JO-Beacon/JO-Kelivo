@@ -738,7 +738,7 @@ void main() {
     test(
       'DeepSeek Claude-compatible built-in search uses old web search tool',
       () async {
-        final cfg = _deepSeekClaudeConfig(
+        final cfg = ProviderConfig.defaultsFor('DeepSeek').copyWith(
           modelOverrides: const <String, dynamic>{
             'deepseek-chat': <String, dynamic>{
               'builtInTools': <String>[BuiltInToolNames.search],
@@ -842,13 +842,14 @@ data: {"type":"message_stop"}
           await request.response.close();
         });
 
-        final cfg = _deepSeekClaudeConfig(
+        final cfg = ProviderConfig.defaultsFor('DeepSeek').copyWith(
           modelOverrides: const <String, dynamic>{
             'deepseek-v4-flash': <String, dynamic>{
               'builtInTools': <String>[BuiltInToolNames.search],
             },
           },
-        ).copyWith(baseUrl: 'http://${server.address.address}:${server.port}');
+          baseUrl: 'http://${server.address.address}:${server.port}',
+        );
 
         final chunks = await ChatApiService.sendMessageStream(
           config: cfg,

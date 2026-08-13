@@ -142,41 +142,82 @@ void main() {
         throwsA(isA<ProviderBalanceException>()),
       );
     });
+
+    test('keeps explicit DeepSeek OpenAI-compatible balance routing', () async {
+      final requests = <HttpRequest>[];
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        requests.add(request);
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'balance_infos': [
+              {'total_balance': 9.5},
+            ],
+          }),
+        );
+        await request.response.close();
+      });
+
+      final config = ProviderConfig(
+        id: 'deepseek-openai-explicit',
+        enabled: true,
+        name: 'DeepSeek OpenAI',
+        apiKey: 'explicit-key',
+        baseUrl: 'http://${server.address.address}:${server.port}/v1',
+        providerType: ProviderKind.openai,
+        balanceEnabled: true,
+        balanceApiPath: '/user/balance',
+        balanceResultPath: 'balance_infos[0].total_balance',
+      );
+
+      expect(
+        ProviderConfig.classify(config.id, explicitType: config.providerType),
+        ProviderKind.openai,
+      );
+      expect(await ProviderBalanceService.fetchBalance(config), '9.50');
+      expect(requests, hasLength(1));
+      expect(requests.single.uri.path, '/v1/user/balance');
+    });
   });
 
   group('ProviderConfig balance defaults', () {
-    test(
-      'uses provider specific balance endpoints for OpenAI compatible presets',
-      () {
-        final aihubmix = ProviderConfig.defaultsFor('AIhubmix');
-        final openRouter = ProviderConfig.defaultsFor('OpenRouter');
-        final siliconFlow = ProviderConfig.defaultsFor('SiliconFlow');
-        final vercel = ProviderConfig.defaultsFor('Vercel');
-        final deepSeek = ProviderConfig.defaultsFor('DeepSeek');
-        final moonshot = ProviderConfig.defaultsFor('Moonshot');
+    test('uses safe provider specific balance defaults', () {
+      final aihubmix = ProviderConfig.defaultsFor('AIhubmix');
+      final openRouter = ProviderConfig.defaultsFor('OpenRouter');
+      final siliconFlow = ProviderConfig.defaultsFor('SiliconFlow');
+      final vercel = ProviderConfig.defaultsFor('Vercel');
+      final deepSeek = ProviderConfig.defaultsFor('DeepSeek');
+      final moonshot = ProviderConfig.defaultsFor('Moonshot');
 
-        expect(aihubmix.balanceEnabled, isTrue);
-        expect(aihubmix.balanceApiPath, '/user/balance');
-        expect(aihubmix.balanceResultPath, 'balance_infos[0].total_balance');
-        expect(openRouter.balanceEnabled, isTrue);
-        expect(openRouter.balanceApiPath, '/credits');
-        expect(
-          openRouter.balanceResultPath,
-          'data.total_credits - data.total_usage',
-        );
-        expect(siliconFlow.balanceEnabled, isTrue);
-        expect(siliconFlow.balanceApiPath, '/user/info');
-        expect(siliconFlow.balanceResultPath, 'data.totalBalance');
-        expect(vercel.balanceEnabled, isTrue);
-        expect(vercel.balanceApiPath, '/credits');
-        expect(vercel.balanceResultPath, 'balance');
-        expect(deepSeek.balanceEnabled, isTrue);
-        expect(deepSeek.balanceApiPath, '/user/balance');
-        expect(deepSeek.balanceResultPath, 'balance_infos[0].total_balance');
-        expect(moonshot.balanceEnabled, isTrue);
-        expect(moonshot.balanceApiPath, '/users/me/balance');
-        expect(moonshot.balanceResultPath, 'data.available_balance');
-      },
-    );
+      expect(aihubmix.balanceEnabled, isTrue);
+      expect(aihubmix.balanceApiPath, '/user/balance');
+      expect(aihubmix.balanceResultPath, 'balance_infos[0].total_balance');
+      expect(openRouter.balanceEnabled, isTrue);
+      expect(openRouter.balanceApiPath, '/credits');
+      expect(
+        openRouter.balanceResultPath,
+        'data.total_credits - data.total_usage',
+      );
+      expect(siliconFlow.balanceEnabled, isTrue);
+      expect(siliconFlow.balanceApiPath, '/user/info');
+      expect(siliconFlow.balanceResultPath, 'data.totalBalance');
+      expect(vercel.balanceEnabled, isTrue);
+      expect(vercel.balanceApiPath, '/credits');
+      expect(vercel.balanceResultPath, 'balance');
+      expect(deepSeek.providerType, ProviderKind.claude);
+      expect(deepSeek.baseUrl, 'https://api.deepseek.com/anthropic');
+      expect(deepSeek.balanceEnabled, isFalse);
+      expect(deepSeek.balanceApiPath, isEmpty);
+      expect(deepSeek.balanceResultPath, 'balance_infos[0].total_balance');
+      expect(moonshot.balanceEnabled, isTrue);
+      expect(moonshot.balanceApiPath, '/users/me/balance');
+      expect(moonshot.balanceResultPath, 'data.available_balance');
+    });
   });
 }
