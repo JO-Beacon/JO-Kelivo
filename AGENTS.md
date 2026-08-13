@@ -158,6 +158,8 @@ flutter test
   - `.dart_tool/**`
   - `build/**`
   - Content maintained by `flutter gen-l10n` / `build_runner`
+- `plans/**` is permanently local-only migration/control material. Never newly track, stage, force-add, or commit any file under `plans/`, regardless of file type. Before every commit, confirm no `plans/**` path is staged.
+- Seven legacy `plans/**` paths are already tracked from before this rule. Leave those historical tracked files unchanged for now; their presence is not precedent for tracking additional plan files. Removing or untracking them requires a separate explicit cleanup task.
 - Do not modify unless required by the task:
   - `.idea/**`
   - Platform signing, certificates, personal environment files
@@ -299,6 +301,7 @@ flutter test
 - New UI does not introduce unnecessary Android ripple or Material default interaction feedback.
 - At least one round of self-review completed, checking maintainability, performance, security, style consistency, and compatibility boundary.
 - No real secrets, build artifacts, or unrelated files committed.
+- No new, previously untracked, or force-added `plans/**` path is staged or committed; pre-existing tracked plan files were not modified unless the task explicitly requested their cleanup.
 - If workflows / platform directories / path dependencies were touched, corresponding extra verification has been done.
 - External baseline work remained on JO-Kelivo history unless the user explicitly approved a history strategy change; source provenance, accepted/excluded paths, and replayed/replaced/retired JO patches are recorded.
 
