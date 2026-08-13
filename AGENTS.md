@@ -21,12 +21,13 @@
   - `lib/l10n/app_zh.arb`
   - `lib/l10n/app_zh_Hans.arb`
   - `lib/l10n/app_zh_Hant.arb`
-- The following are generated or build artifacts. Never hand-edit them:
+- The following are generated or build artifacts. Never hand-edit them unless an explicit repository-maintained compatibility exception below applies:
   - `lib/l10n/app_localizations*.dart`
   - `lib/core/models/*.g.dart`
   - All other generated logic must go through commands, not manual edits
   - `.dart_tool/**`
   - `build/**`
+- `lib/core/models/chat_message.g.dart` in the Kelivo 1.2.1 baseline is an explicit exception: upstream hand-maintains its legacy Hive field-2 reader so old `content` values can migrate into `MessagePart`. Treat it as a source-controlled compatibility adapter, not as an ordinary disposable generator output, until that migration contract is deliberately retired.
 - The package name is `Kelivo`. Existing imports use `package:Kelivo/...` everywhere. Do not "normalize" the package name.
 - Top-level platform entry is `_selectHome()` in `lib/main.dart`:
   - macOS / Windows / Linux -> `DesktopHomePage`
@@ -101,13 +102,20 @@ flutter gen-l10n
 
 ### 3.2 Generated Code Must Be Maintained Via Commands
 
-- After modifying Hive models, `@HiveType`, `@HiveField`, or `part '*.g.dart'` references, run:
+- After modifying Hive models, `@HiveType`, `@HiveField`, or `part '*.g.dart'` references, normally run:
 
 ```bash
 dart run build_runner build --delete-conflicting-outputs
 ```
 
-- Generated file changes must correspond strictly to source changes. Do not hand-craft `*.g.dart` files.
+- Generated file changes must correspond strictly to source changes. Do not hand-craft `*.g.dart` files except for an explicit source-controlled compatibility adapter documented in this file.
+- `lib/core/models/chat_message.g.dart` is such an adapter in the Kelivo 1.2.1 baseline. Its `ChatMessageAdapter.read` must continue reading legacy Hive field 2 and passing it to `ChatMessage(content: ...)`; blindly accepting the generator's replacement can silently discard old message text during migration.
+- Before running `build_runner` after the 1.2.1 baseline is accepted, inspect whether the task touches `ChatMessage` or can rewrite `chat_message.g.dart`. After generation, review the generated diff and verify the field-2-to-`content` mapping is still present. If the generator removed it, restore the documented compatibility behavior as an explicit adapter change and run the legacy Hive migration tests before proceeding.
+- Any intentional change to this adapter requires all of:
+  - A stated old-data compatibility reason
+  - Review of `ChatMessage` Hive field numbers and constructor semantics
+  - Focused tests proving legacy field 2 still becomes message text/`TextPart`
+  - Confirmation that the new SQLite/`MessagePart` runtime does not resume Hive writes
 
 ### 3.3 Format Code Before Finishing
 
@@ -135,7 +143,7 @@ flutter test
 | Change Type | Required Action |
 | --- | --- |
 | ARB / localization | `flutter gen-l10n`, check `desiredFileName.txt`, then `flutter analyze` |
-| Hive model / generated code | `dart run build_runner build --delete-conflicting-outputs`, then run related tests |
+| Hive model / generated code | Run `dart run build_runner build --delete-conflicting-outputs` when applicable, review generated diffs, preserve the documented `chat_message.g.dart` legacy field-2 adapter contract, then run related migration tests |
 | `pubspec.yaml` / dependencies | `flutter pub get`, then `flutter analyze` and related tests |
 | `.github/workflows/**` / build scripts | Check ALL similar workflow files, not just one |
 | Platform directories `android/ ios/ macos/ linux/ windows/` | At least one targeted platform verification; if impossible, state why explicitly |
@@ -184,11 +192,11 @@ flutter test
 - Treat external source under `参考文件/**` as read-only comparison input. Record the selected source repository or fork, version, tag or commit hash when available, and applicable license/attribution requirements, but do not treat the reference directory as a Git working tree or copy target wholesale.
 - Apply external baseline upgrades as a controlled source snapshot replacement:
   - Archive or tag the current JO-Kelivo state before replacement
-  - Classify paths as JO-owned, baseline-owned, generated, build artifacts, or explicitly excluded before copying anything
+  - Classify paths as JO-owned, baseline-owned, mixed, generated, source-controlled compatibility adapters, local migration-control material, build artifacts, or explicitly excluded before copying anything
   - Review and accept external files by functional scope; a baseline-only file enters JO-Kelivo only when its runtime, build, test, or dependency role is understood
   - Preserve JO-owned identity, data isolation, update source, release policy, workflows, maintenance records, and packaging rules unless the task explicitly changes them
   - Never copy `.git/**`, `.dart_tool/**`, `build/**`, external personal environment files, or unrelated external workflows and documentation
-  - Regenerate generated outputs with repository commands instead of copying or hand-editing them
+  - Regenerate ordinary generated outputs with repository commands instead of copying or hand-editing them; preserve any explicitly documented source-controlled compatibility adapter and verify its contract after generation
 - Restore and verify JO-Kelivo application identity and data-directory isolation before running the upgraded app or exercising any baseline-provided data migration. Such migration must operate on the JO-Kelivo data directory, never a baseline application's data directory.
 - Replay JO behavior by requirement against the new architecture, not by blindly restoring old files or patches. If the selected baseline changed storage, models, routing, or persistence, adapt the JO behavior to the new source of truth and explicitly decide whether the old patch is replayed, replaced, or retired.
 - Delivery notes for an external baseline replacement must state:
@@ -281,7 +289,7 @@ flutter test
 - All new user-visible text uses `AppLocalizations`.
 - All 4 ARB files have been updated in sync.
 - `flutter gen-l10n` has been executed and generated files match ARB content.
-- If Hive models were touched, `build_runner` has been executed.
+- If Hive models were touched, `build_runner` has been executed when applicable; generated diffs were reviewed, and the `chat_message.g.dart` legacy field-2 mapping was preserved and tested.
 - `dart format` has been executed.
 - `flutter analyze` has been executed.
 - Related `flutter test` has been executed. If no related tests exist, create and run them following official testing standards.
