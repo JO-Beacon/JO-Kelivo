@@ -169,6 +169,13 @@ class SettingsProvider extends ChangeNotifier {
   static const String _displayShowRegenerateConfirmDialogKey =
       'display_show_regenerate_confirm_dialog_v1';
   static const String _displayShowMessageNavKey = 'display_show_message_nav_v1';
+  static const String _displayLazyHistoryEnabledKey =
+      'display_lazy_history_enabled_v1';
+  static const String _displayInsertNewAssistantAtTopKey =
+      'display_insert_new_assistant_at_top_v1';
+  static const String _displayWideChatLayoutKey = 'display_wide_chat_layout_v1';
+  static const String _displayDesktopWideChatLayoutLegacyKey =
+      'display_desktop_wide_chat_layout_v1';
   static const String _displayDesktopMessageNavButtonsModeKey =
       'display_desktop_message_nav_buttons_mode_v1';
   static const String _displayMobileMessageNavButtonsModeKey =
@@ -978,6 +985,7 @@ class SettingsProvider extends ChangeNotifier {
     _showRegenerateConfirmDialog =
         prefs.getBool(_displayShowRegenerateConfirmDialogKey) ?? true;
     _showMessageNavButtons = prefs.getBool(_displayShowMessageNavKey) ?? true;
+    _lazyHistoryEnabled = prefs.getBool(_displayLazyHistoryEnabledKey) ?? true;
     _mobileMessageNavButtonsMode = _parseMobileMessageNavButtonsMode(
       prefs.getString(_displayMobileMessageNavButtonsModeKey),
       legacyEnabled: _showMessageNavButtons,
@@ -1028,6 +1036,12 @@ class SettingsProvider extends ChangeNotifier {
     _newChatOnLaunch = prefs.getBool(_displayNewChatOnLaunchKey) ?? true;
     _newChatOnAssistantSwitch =
         prefs.getBool(_displayNewChatOnAssistantSwitchKey) ?? false;
+    _insertNewAssistantAtTop =
+        prefs.getBool(_displayInsertNewAssistantAtTopKey) ?? false;
+    _wideChatLayout =
+        prefs.getBool(_displayWideChatLayoutKey) ??
+        prefs.getBool(_displayDesktopWideChatLayoutLegacyKey) ??
+        false;
     _newChatAfterDelete = prefs.getBool(_displayNewChatAfterDeleteKey) ?? false;
     // Enter to send on mobile: iOS defaults to true, Android defaults to false
     final enterToSendPref = prefs.getBool(_displayEnterToSendOnMobileKey);
@@ -4129,6 +4143,15 @@ Requirements:
     await prefs.setBool(_displayShowMessageNavKey, v);
   }
 
+  bool _lazyHistoryEnabled = true;
+  bool get lazyHistoryEnabled => _lazyHistoryEnabled;
+  Future<void> setLazyHistoryEnabled(bool v) async {
+    if (_lazyHistoryEnabled == v) return;
+    _lazyHistoryEnabled = v;
+    notifyListeners();
+    await _preferences.setBool(_displayLazyHistoryEnabledKey, v);
+  }
+
   // Display: use the new assistant avatar UX in app bars.
   bool _useNewAssistantAvatarUx = false;
   bool get useNewAssistantAvatarUx => _useNewAssistantAvatarUx;
@@ -4182,6 +4205,24 @@ Requirements:
     notifyListeners();
     final prefs = _preferences;
     await prefs.setBool(_displayNewChatOnAssistantSwitchKey, v);
+  }
+
+  bool _insertNewAssistantAtTop = false;
+  bool get insertNewAssistantAtTop => _insertNewAssistantAtTop;
+  Future<void> setInsertNewAssistantAtTop(bool v) async {
+    if (_insertNewAssistantAtTop == v) return;
+    _insertNewAssistantAtTop = v;
+    notifyListeners();
+    await _preferences.setBool(_displayInsertNewAssistantAtTopKey, v);
+  }
+
+  bool _wideChatLayout = false;
+  bool get wideChatLayout => _wideChatLayout;
+  Future<void> setWideChatLayout(bool v) async {
+    if (_wideChatLayout == v) return;
+    _wideChatLayout = v;
+    notifyListeners();
+    await _preferences.setBool(_displayWideChatLayoutKey, v);
   }
 
   // Display: create a new chat after deleting one
@@ -4980,6 +5021,7 @@ Requirements:
     copy._regenerateDeleteTrailingMessages = _regenerateDeleteTrailingMessages;
     copy._showRegenerateConfirmDialog = _showRegenerateConfirmDialog;
     copy._showMessageNavButtons = _showMessageNavButtons;
+    copy._lazyHistoryEnabled = _lazyHistoryEnabled;
     copy._mobileMessageNavButtonsMode = _mobileMessageNavButtonsMode;
     copy._useNewAssistantAvatarUx = _useNewAssistantAvatarUx;
     copy._showProviderInModelCapsule = _showProviderInModelCapsule;
@@ -5003,6 +5045,8 @@ Requirements:
     copy._appLaunchCount = _appLaunchCount;
     copy._newChatOnLaunch = _newChatOnLaunch;
     copy._newChatOnAssistantSwitch = _newChatOnAssistantSwitch;
+    copy._insertNewAssistantAtTop = _insertNewAssistantAtTop;
+    copy._wideChatLayout = _wideChatLayout;
     copy._newChatAfterDelete = _newChatAfterDelete;
     copy._iosBackgroundGenerationEnabled = _iosBackgroundGenerationEnabled;
     copy._iosBackgroundTaskRefreshEnabled = _iosBackgroundTaskRefreshEnabled;

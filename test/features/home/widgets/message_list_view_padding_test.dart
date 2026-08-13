@@ -195,6 +195,55 @@ void main() {
     isProcessingFiles.dispose();
   });
 
+  testWidgets('消息列表可解除宽屏最大内容宽度限制', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    Future<EdgeInsets> pumpList({double? maxContentWidth = 860}) async {
+      final scrollController = ScrollController();
+      final listController = ListController();
+      final isProcessingFiles = ValueNotifier<bool>(false);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 1200,
+              child: MessageListView(
+                scrollController: scrollController,
+                listController: listController,
+                messages: const [],
+                byGroup: const {},
+                versionSelections: const {},
+                reasoning: const {},
+                reasoningSegments: const {},
+                contentSplits: const {},
+                toolParts: const {},
+                translations: const {},
+                selecting: false,
+                selectedItems: const {},
+                dividerPadding: EdgeInsets.zero,
+                isProcessingFiles: isProcessingFiles,
+                maxContentWidth: maxContentWidth,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final padding = tester
+          .widget<SuperListView>(find.byType(SuperListView))
+          .padding;
+      scrollController.dispose();
+      listController.dispose();
+      isProcessingFiles.dispose();
+      return padding! as EdgeInsets;
+    }
+
+    expect((await pumpList()).horizontal, 340);
+    expect((await pumpList(maxContentWidth: null)).horizontal, 0);
+  });
+
   testWidgets('置顶流式指示器激活时保留额外底部空间', (tester) async {
     final scrollController = ScrollController();
     final listController = ListController();

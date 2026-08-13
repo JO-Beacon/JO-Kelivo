@@ -4413,6 +4413,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Show assistant avatar in chat title bar';
 
   @override
+  String get displaySettingsPageInsertNewAssistantAtTopTitle =>
+      'Place new and copied assistants at top';
+
+  @override
+  String get displaySettingsPageLazyHistoryTitle => 'Lazy-load chat history';
+
+  @override
+  String get displaySettingsPageDesktopWideChatLayoutTitle => 'Wide chat area';
+
+  @override
+  String get displaySettingsPageDesktopWideChatLayoutSubtitle =>
+      'Use all available width for messages and the input bar in desktop, tablet, or landscape wide-screen layouts.';
+
+  @override
   String get displaySettingsPageHapticsOnSidebarTitle => 'Haptics on Sidebar';
 
   @override

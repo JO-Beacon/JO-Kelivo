@@ -132,6 +132,9 @@ class _AddAssistantButtonState extends State<_AddAssistantButton> {
           await assistantProvider.addAssistant(
             name: name.trim(),
             context: context,
+            insertAtTop: context
+                .read<SettingsProvider>()
+                .insertNewAssistantAtTop,
           );
         },
         child: Container(
@@ -592,6 +595,9 @@ class _DesktopAssistantCardState extends State<_DesktopAssistantCard> {
                                   .duplicateAssistant(
                                     widget.item.id,
                                     l10n: l10n,
+                                    insertAtTop: context
+                                        .read<SettingsProvider>()
+                                        .insertNewAssistantAtTop,
                                   );
                               if (!context.mounted) return;
                               if (newId != null) {

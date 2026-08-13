@@ -177,6 +177,50 @@ void main() {
     },
   );
 
+  test('JO display preferences use their 0.1.5 defaults', () async {
+    final settings = SettingsProvider(BusinessPreferences(repository));
+    await settings.loaded;
+
+    expect(settings.lazyHistoryEnabled, isTrue);
+    expect(settings.insertNewAssistantAtTop, isFalse);
+    expect(settings.wideChatLayout, isFalse);
+  });
+
+  test('JO display preferences persist across a cold reload', () async {
+    final settings = SettingsProvider(BusinessPreferences(repository));
+    await settings.loaded;
+
+    await settings.setLazyHistoryEnabled(false);
+    await settings.setInsertNewAssistantAtTop(true);
+    await settings.setWideChatLayout(true);
+
+    final reloaded = SettingsProvider(BusinessPreferences(repository));
+    await reloaded.loaded;
+
+    expect(reloaded.lazyHistoryEnabled, isFalse);
+    expect(reloaded.insertNewAssistantAtTop, isTrue);
+    expect(reloaded.wideChatLayout, isTrue);
+  });
+
+  test('wide chat layout falls back to the legacy desktop key', () async {
+    await repository.setPreference('display_desktop_wide_chat_layout_v1', true);
+
+    final settings = SettingsProvider(BusinessPreferences(repository));
+    await settings.loaded;
+
+    expect(settings.wideChatLayout, isTrue);
+  });
+
+  test('wide chat layout primary key wins over the legacy key', () async {
+    await repository.setPreference('display_wide_chat_layout_v1', false);
+    await repository.setPreference('display_desktop_wide_chat_layout_v1', true);
+
+    final settings = SettingsProvider(BusinessPreferences(repository));
+    await settings.loaded;
+
+    expect(settings.wideChatLayout, isFalse);
+  });
+
   test('ASR is opt-in and persists services with a stable selection', () async {
     final settings = SettingsProvider(BusinessPreferences(repository));
     await settings.loaded;

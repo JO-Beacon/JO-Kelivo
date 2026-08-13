@@ -8149,6 +8149,30 @@ abstract class AppLocalizations {
   /// **'Show assistant avatar in chat title bar'**
   String get displaySettingsPageUseNewAssistantAvatarUxTitle;
 
+  /// No description provided for @displaySettingsPageInsertNewAssistantAtTopTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Place new and copied assistants at top'**
+  String get displaySettingsPageInsertNewAssistantAtTopTitle;
+
+  /// No description provided for @displaySettingsPageLazyHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Lazy-load chat history'**
+  String get displaySettingsPageLazyHistoryTitle;
+
+  /// No description provided for @displaySettingsPageDesktopWideChatLayoutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Wide chat area'**
+  String get displaySettingsPageDesktopWideChatLayoutTitle;
+
+  /// No description provided for @displaySettingsPageDesktopWideChatLayoutSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use all available width for messages and the input bar in desktop, tablet, or landscape wide-screen layouts.'**
+  String get displaySettingsPageDesktopWideChatLayoutSubtitle;
+
   /// No description provided for @displaySettingsPageHapticsOnSidebarTitle.
   ///
   /// In en, this message translates to:

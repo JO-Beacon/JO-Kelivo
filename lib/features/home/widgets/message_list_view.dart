@@ -106,6 +106,7 @@ class MessageListView extends StatefulWidget {
     required this.dividerPadding,
     this.topContentPadding = 8,
     this.bottomContentPadding = 16,
+    this.maxContentWidth = ChatLayoutConstants.maxContentWidth,
     this.pinnedStreamingMessageId,
     this.isPinnedIndicatorActive = false,
     required this.isProcessingFiles,
@@ -173,6 +174,7 @@ class MessageListView extends StatefulWidget {
   final EdgeInsetsGeometry dividerPadding;
   final double topContentPadding;
   final double bottomContentPadding;
+  final double? maxContentWidth;
   final String? pinnedStreamingMessageId;
   final bool isPinnedIndicatorActive;
   final ValueNotifier<bool> isProcessingFiles;
@@ -588,9 +590,12 @@ class _MessageListViewState extends State<MessageListView> {
     );
     return LayoutBuilder(
       builder: (context, constraints) {
-        final horizontalPad =
-            ((constraints.maxWidth - ChatLayoutConstants.maxContentWidth) / 2)
-                .clamp(0.0, double.infinity);
+        final horizontalPad = widget.maxContentWidth == null
+            ? 0.0
+            : ((constraints.maxWidth - widget.maxContentWidth!) / 2).clamp(
+                0.0,
+                double.infinity,
+              );
 
         return ValueListenableBuilder<bool>(
           valueListenable: widget.isProcessingFiles,

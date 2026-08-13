@@ -4241,6 +4241,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageUseNewAssistantAvatarUxTitle => '聊天标题栏显示助手头像';
 
   @override
+  String get displaySettingsPageInsertNewAssistantAtTopTitle => '新建和复制助手放到顶部';
+
+  @override
+  String get displaySettingsPageLazyHistoryTitle => '懒加载聊天历史';
+
+  @override
+  String get displaySettingsPageDesktopWideChatLayoutTitle => '聊天区域拉宽';
+
+  @override
+  String get displaySettingsPageDesktopWideChatLayoutSubtitle =>
+      '在桌面端、平板或横屏宽屏布局中，让消息列表和输入栏尽量占满可用宽度。';
+
+  @override
   String get displaySettingsPageHapticsOnSidebarTitle => '侧边栏触觉反馈';
 
   @override
@@ -11389,6 +11402,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageUseNewAssistantAvatarUxTitle => '聊天标题栏显示助手头像';
 
   @override
+  String get displaySettingsPageInsertNewAssistantAtTopTitle => '新建和复制助手放到顶部';
+
+  @override
+  String get displaySettingsPageLazyHistoryTitle => '懒加载聊天历史';
+
+  @override
+  String get displaySettingsPageDesktopWideChatLayoutTitle => '聊天区域拉宽';
+
+  @override
+  String get displaySettingsPageDesktopWideChatLayoutSubtitle =>
+      '在桌面端、平板或横屏宽屏布局中，让消息列表和输入栏尽量占满可用宽度。';
+
+  @override
   String get displaySettingsPageHapticsOnSidebarTitle => '侧边栏触觉反馈';
 
   @override
@@ -18533,6 +18559,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageUseNewAssistantAvatarUxTitle => '聊天標題欄顯示助手頭像';
+
+  @override
+  String get displaySettingsPageInsertNewAssistantAtTopTitle => '新建和複製助手放到頂部';
+
+  @override
+  String get displaySettingsPageLazyHistoryTitle => '延遲載入聊天記錄';
+
+  @override
+  String get displaySettingsPageDesktopWideChatLayoutTitle => '拉寬聊天區域';
+
+  @override
+  String get displaySettingsPageDesktopWideChatLayoutSubtitle =>
+      '在桌面端、平板或橫向寬螢幕版面中，讓訊息列表和輸入列盡量占滿可用寬度。';
 
   @override
   String get displaySettingsPageHapticsOnSidebarTitle => '側邊欄觸覺回饋';

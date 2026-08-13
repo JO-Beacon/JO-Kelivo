@@ -2150,6 +2150,35 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosSwitchRow(
                 context,
+                icon: Lucide.ArrowUp,
+                label: l10n.displaySettingsPageInsertNewAssistantAtTopTitle,
+                value: sp.insertNewAssistantAtTop,
+                onChanged: (v) => context
+                    .read<SettingsProvider>()
+                    .setInsertNewAssistantAtTop(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.Maximize,
+                label: l10n.displaySettingsPageDesktopWideChatLayoutTitle,
+                subtitle: l10n.displaySettingsPageDesktopWideChatLayoutSubtitle,
+                value: sp.wideChatLayout,
+                onChanged: (v) =>
+                    context.read<SettingsProvider>().setWideChatLayout(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.History,
+                label: l10n.displaySettingsPageLazyHistoryTitle,
+                value: sp.lazyHistoryEnabled,
+                onChanged: (v) =>
+                    context.read<SettingsProvider>().setLazyHistoryEnabled(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
                 icon: Lucide.RefreshCw,
                 label: l10n
                     .displaySettingsPageRegenerateDeleteTrailingMessagesTitle,

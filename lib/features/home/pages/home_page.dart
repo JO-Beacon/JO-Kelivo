@@ -894,6 +894,7 @@ class _HomePageState extends State<HomePage>
     final bottomContentPadding = _controller.inputBarHeight + 16;
     final topContentPadding = _chatTopOverlayInset(context) + 8;
     final backgroundImageActive = _assistantBackgroundActive(context);
+    final wideChatLayout = context.watch<SettingsProvider>().wideChatLayout;
 
     return ChatInputOverlayLayout(
       topInset: _chatTopOverlayInset(context),
@@ -922,8 +923,10 @@ class _HomePageState extends State<HomePage>
       ),
       bottomOverlay: _controller.selecting
           ? ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: ChatLayoutConstants.maxInputWidth,
+              constraints: BoxConstraints(
+                maxWidth: wideChatLayout
+                    ? double.infinity
+                    : ChatLayoutConstants.maxInputWidth,
               ),
               child: _buildSelectionActionBar(context),
             )
@@ -940,8 +943,10 @@ class _HomePageState extends State<HomePage>
                     Widget input = _buildChatInputBar(context, isTablet: true);
                     input = Center(
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(
-                          maxWidth: ChatLayoutConstants.maxInputWidth,
+                        constraints: BoxConstraints(
+                          maxWidth: wideChatLayout
+                              ? double.infinity
+                              : ChatLayoutConstants.maxInputWidth,
                         ),
                         child: input,
                       ),
@@ -1126,6 +1131,9 @@ class _HomePageState extends State<HomePage>
             : const <String>[],
         topContentPadding: topContentPadding,
         bottomContentPadding: bottomContentPadding,
+        maxContentWidth: settings.wideChatLayout
+            ? null
+            : ChatLayoutConstants.maxContentWidth,
         dividerPadding: dividerPadding,
         streamingContentNotifier: _controller.streamingContentNotifier,
         spotlightMessageId: _controller.spotlightMessageId,

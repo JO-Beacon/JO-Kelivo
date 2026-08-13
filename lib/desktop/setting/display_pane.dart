@@ -110,6 +110,12 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ToggleRowInsertSuggestionOnly(),
                   _RowDivider(),
+                  _ToggleRowInsertNewAssistantAtTop(),
+                  _RowDivider(),
+                  _ToggleRowWideChatLayout(),
+                  _RowDivider(),
+                  _ToggleRowLazyHistory(),
+                  _RowDivider(),
                   _ToggleRowRegenerateDeleteTrailingMessages(),
                   _RowDivider(),
                   _ToggleRowShowRegenerateConfirmDialog(),
@@ -508,7 +514,9 @@ class _ThemeModeSegmentedState extends State<_ThemeModeSegmented> {
                         );
                       }
                       if (_hover == i) {
-                        return cs.onSurface.withValues(alpha: isDark ? 0.10 : 0.06);
+                        return cs.onSurface.withValues(
+                          alpha: isDark ? 0.10 : 0.06,
+                        );
                       }
                       return Colors.transparent;
                     }(),
@@ -2054,8 +2062,7 @@ Future<String?> _showDesktopFontChooserDialog(
                         isDense: true,
                         filled: true,
                         hintText: l10n.desktopFontFilterHint,
-                        fillColor:
-                            context.appColors.surfaceFill,
+                        fillColor: context.appColors.surfaceFill,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                           borderSide: BorderSide(
@@ -2795,6 +2802,50 @@ class _ToggleRowNewChatOnAssistantSwitch extends StatelessWidget {
       value: sp.newChatOnAssistantSwitch,
       onChanged: (v) =>
           context.read<SettingsProvider>().setNewChatOnAssistantSwitch(v),
+    );
+  }
+}
+
+class _ToggleRowInsertNewAssistantAtTop extends StatelessWidget {
+  const _ToggleRowInsertNewAssistantAtTop();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageInsertNewAssistantAtTopTitle,
+      value: sp.insertNewAssistantAtTop,
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setInsertNewAssistantAtTop(v),
+    );
+  }
+}
+
+class _ToggleRowWideChatLayout extends StatelessWidget {
+  const _ToggleRowWideChatLayout();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageDesktopWideChatLayoutTitle,
+      value: sp.wideChatLayout,
+      onChanged: (v) => context.read<SettingsProvider>().setWideChatLayout(v),
+    );
+  }
+}
+
+class _ToggleRowLazyHistory extends StatelessWidget {
+  const _ToggleRowLazyHistory();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageLazyHistoryTitle,
+      value: sp.lazyHistoryEnabled,
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setLazyHistoryEnabled(v),
     );
   }
 }

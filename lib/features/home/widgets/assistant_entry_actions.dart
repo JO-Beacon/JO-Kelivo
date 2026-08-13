@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/models/assistant.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/providers/settings_provider.dart';
 import '../controllers/chat_actions.dart';
 import '../../../core/providers/tag_provider.dart';
 import '../../../desktop/desktop_context_menu.dart';
@@ -73,6 +74,7 @@ class AssistantEntryActions {
     final newId = await context.read<AssistantProvider>().duplicateAssistant(
       assistant.id,
       l10n: l10n,
+      insertAtTop: context.read<SettingsProvider>().insertNewAssistantAtTop,
     );
     if (!context.mounted || newId == null) return;
     showAppSnackBar(

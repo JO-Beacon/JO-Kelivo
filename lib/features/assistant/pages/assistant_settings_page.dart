@@ -53,6 +53,9 @@ class AssistantSettingsPage extends StatelessWidget {
                 final id = await assistantProvider.addAssistant(
                   name: name.trim(),
                   context: context,
+                  insertAtTop: context
+                      .read<SettingsProvider>()
+                      .insertNewAssistantAtTop,
                 );
                 if (!context.mounted) return;
                 await Navigator.of(context).push(
@@ -211,6 +214,9 @@ class _AssistantCard extends StatelessWidget {
               final newId = await assistantProvider.duplicateAssistant(
                 item.id,
                 l10n: l10n,
+                insertAtTop: context
+                    .read<SettingsProvider>()
+                    .insertNewAssistantAtTop,
               );
               if (!context.mounted) return;
               if (newId != null) {
@@ -391,7 +397,9 @@ class _TactileCardState extends State<_TactileCard> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final overlay = _pressed
-        ? (Theme.of(context).colorScheme.onSurface.withValues(alpha: isDark ? 0.06 : 0.04))
+        ? (Theme.of(
+            context,
+          ).colorScheme.onSurface.withValues(alpha: isDark ? 0.06 : 0.04))
         : Colors.transparent;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
