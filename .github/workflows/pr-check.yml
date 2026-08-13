@@ -28,6 +28,14 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
+      - name: Create empty fallback key
+        shell: bash
+        run: |
+          mkdir -p lib/secrets
+          cat > lib/secrets/fallback.dart <<'EOF'
+          const String siliconflowFallbackKey = '';
+          EOF
+
       - name: Dart format (changed files only)
         shell: bash
         run: |

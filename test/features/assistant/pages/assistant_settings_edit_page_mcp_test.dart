@@ -1,5 +1,6 @@
 import 'dart:io';
 import "../../../support/business_test_harness.dart";
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages
@@ -162,35 +163,91 @@ void main() {
     expect(find.text('MCP'), findsOneWidget);
   });
 
-  testWidgets('assistant local tools page uses clock icon for time info', (
+  testWidgets('assistant desktop local tools hide mobile device tools', (
     tester,
   ) async {
-    final bundle = await _createAssistantProvider(tester);
-    final assistantProvider = bundle.assistantProvider;
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    try {
+      final bundle = await _createAssistantProvider(tester);
 
-    await tester.pumpWidget(
-      _buildHarness(
-        assistantProvider: assistantProvider,
-        chatService: bundle.chatService,
-        memoryV2: bundle.memoryV2,
-        pipeline: bundle.pipeline,
-        child: const AssistantSettingsEditPage(assistantId: _assistantId),
-      ),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpWidget(
+        _buildHarness(
+          assistantProvider: bundle.assistantProvider,
+          chatService: bundle.chatService,
+          memoryV2: bundle.memoryV2,
+          pipeline: bundle.pipeline,
+          child: const AssistantSettingsEditPage(assistantId: _assistantId),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
-    await tester.tap(find.text('Local Tools'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.text('Local Tools'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('Time Info'), findsOneWidget);
-    expect(
-      find.byWidgetPredicate(
-        (widget) => widget is Icon && widget.icon == Lucide.clock,
-      ),
-      findsOneWidget,
-    );
+      expect(find.text('Time Info'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is Icon && widget.icon == Lucide.clock,
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Screen Time'), findsNothing);
+      expect(find.text('Query Calendar'), findsNothing);
+      expect(find.text('Create Event'), findsNothing);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('assistant local tools page shows Android device tools', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      final bundle = await _createAssistantProvider(tester);
+
+      await tester.pumpWidget(
+        _buildHarness(
+          assistantProvider: bundle.assistantProvider,
+          chatService: bundle.chatService,
+          memoryV2: bundle.memoryV2,
+          pipeline: bundle.pipeline,
+          child: const AssistantSettingsEditPage(assistantId: _assistantId),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      await tester.tap(find.text('Local Tools'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('Screen Time'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Create Event'),
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+
+      expect(find.text('Query Calendar'), findsOneWidget);
+      expect(find.text('Create Event'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is Icon && widget.icon == Lucide.Calendar,
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is Icon && widget.icon == Lucide.CalendarPlus,
+        ),
+        findsOneWidget,
+      );
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 
   testWidgets('assistant desktop dialog shows MCP menu item', (tester) async {

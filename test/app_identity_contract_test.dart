@@ -113,6 +113,23 @@ void main() {
         }
       },
     );
+
+    test('creates only an empty fallback key in PR checks', () {
+      final prWorkflow = _read('.github/workflows/pr-check.yml');
+      expect(prWorkflow, contains('lib/secrets/fallback.dart'));
+      expect(prWorkflow, contains("const String siliconflowFallbackKey = '';"));
+      expect(prWorkflow, isNot(contains('secrets.SILICONFLOW_KEY')));
+
+      for (final path in [
+        '.github/workflows/build-android.yml',
+        '.github/workflows/build-windows.yml',
+        '.github/workflows/build-linux.yml',
+      ]) {
+        final workflow = _read(path);
+        expect(workflow, contains('lib/secrets/fallback.dart'), reason: path);
+        expect(workflow, contains('secrets.SILICONFLOW_KEY'), reason: path);
+      }
+    });
   });
 }
 
