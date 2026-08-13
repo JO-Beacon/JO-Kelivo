@@ -29,6 +29,8 @@ import 'package:Kelivo/core/services/backup/restore_startup_gate.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/instruction_injection_store.dart';
 
+import '../../../support/jo_015_business_fixture.dart';
+
 bool _containsContiguousBytes(List<int> source, List<int> pattern) {
   for (var start = 0; start <= source.length - pattern.length; start++) {
     var matches = true;
@@ -807,6 +809,32 @@ void main() {
         );
       },
     );
+
+    test('restores JO 0.1.5 settings and explicit DeepSeek routes', () async {
+      final source = jo015BusinessSettingsFixture();
+      final settingsFile = File('${root.path}/jo_015_settings.json');
+      await settingsFile.writeAsString(jsonEncode(source));
+      final backupFile = File('${root.path}/jo_015_backup.zip');
+      final encoder = ZipFileEncoder();
+      encoder.create(backupFile.path);
+      encoder.addFileSync(settingsFile, 'settings.json');
+      encoder.closeSync();
+
+      await DataSync(
+        businessRepository: businessRepository,
+        chatService: ChatService(),
+      ).restoreFromLocalFile(
+        backupFile,
+        const WebDavConfig(includeChats: false, includeFiles: false),
+      );
+
+      expect(
+        jo015BusinessSettingsProjection(
+          await BusinessRestoreService(businessRepository).exportSettings(),
+        ),
+        jo015BusinessSettingsProjection(source),
+      );
+    });
 
     test('writes a consistent SQLite snapshot instead of chats.json', () async {
       final chatService = ChatService();

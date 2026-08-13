@@ -11,6 +11,8 @@ import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/database/business_settings_router.dart';
 import 'package:Kelivo/core/services/instruction_injection_store.dart';
 
+import '../../support/jo_015_business_fixture.dart';
+
 void main() {
   late AppDatabase database;
   late BusinessRepository repository;
@@ -64,6 +66,28 @@ void main() {
       });
     },
   );
+
+  test('preserves JO 0.1.5 settings and explicit DeepSeek routes', () async {
+    final source = jo015BusinessSettingsFixture();
+    final legacy = FakeLegacyBusinessPreferences(source);
+
+    expect(
+      await BusinessMigrationEngine(
+        repository: repository,
+        legacyPreferences: legacy,
+      ).run(),
+      BusinessMigrationResult.migrated,
+    );
+
+    final exported = BusinessSettingsRouter.exportSnapshot(
+      await repository.readSnapshot(),
+    );
+    expect(
+      jo015BusinessSettingsProjection(exported),
+      jo015BusinessSettingsProjection(source),
+    );
+    expect(legacy.values, isEmpty);
+  });
 
   test(
     'receipt makes a retry cleanup-only and never overwrites newer DB data',
