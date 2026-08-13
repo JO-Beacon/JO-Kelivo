@@ -6,8 +6,8 @@
  import ActivityKit
  import EventKit
 
-private let backgroundRefreshIdentifier = "psyche.kelivo.background-generation.refresh"
-private let backgroundProcessingIdentifier = "psyche.kelivo.background-generation.processing"
+private let backgroundRefreshIdentifier = "com.psyche.jokelivo.background-generation.refresh"
+private let backgroundProcessingIdentifier = "com.psyche.jokelivo.background-generation.processing"
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -85,7 +85,7 @@ private let backgroundProcessingIdentifier = "psyche.kelivo.background-generatio
     open url: URL,
     options: [UIApplication.OpenURLOptionsKey: Any] = [:]
   ) -> Bool {
-    if url.scheme == "kelivo" && url.host == "oauth-return" {
+    if url.scheme == "jo-kelivo" && url.host == "oauth-return" {
       return true
     }
     return super.application(app, open: url, options: options)
@@ -218,7 +218,7 @@ private final class IosBackgroundGenerationHandler {
     if refreshEnabled { scheduleBackgroundTasks() }
     if args["liveActivityEnabled"] as? Bool ?? false {
       startLiveActivity(
-        title: args["title"] as? String ?? "Kelivo",
+        title: args["title"] as? String ?? "JO-Kelivo",
         detail: args["detail"] as? String ?? "",
         tokenCount: args["tokenCount"] as? Int ?? 0,
         tokenLabel: args["tokenLabel"] as? String ?? ""
@@ -239,7 +239,7 @@ private final class IosBackgroundGenerationHandler {
 
   private func finish(arguments: Any?, result: @escaping FlutterResult) {
     let args = arguments as? [String: Any] ?? [:]
-    let title = args["title"] as? String ?? "Kelivo"
+    let title = args["title"] as? String ?? "JO-Kelivo"
     let detail = args["detail"] as? String ?? ""
     finishLiveActivity(title: title, detail: detail)
     if notificationsEnabled { showCompletionNotification(title: title, body: detail) }
@@ -251,7 +251,7 @@ private final class IosBackgroundGenerationHandler {
   private func cancel(arguments: Any?, result: @escaping FlutterResult) {
     let args = arguments as? [String: Any] ?? [:]
     finishLiveActivity(
-      title: liveActivityDisplayTitle.isEmpty ? "Kelivo" : liveActivityDisplayTitle,
+      title: liveActivityDisplayTitle.isEmpty ? "JO-Kelivo" : liveActivityDisplayTitle,
       detail: args["detail"] as? String ?? ""
     )
     endBackgroundTask()
@@ -315,7 +315,7 @@ private final class IosBackgroundGenerationHandler {
 
   private func beginBackgroundTask() {
     if backgroundTask != .invalid { return }
-    backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "KelivoBackgroundGeneration") { [weak self] in
+    backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "JOKelivoBackgroundGeneration") { [weak self] in
       self?.endBackgroundTask()
     }
   }
@@ -357,7 +357,7 @@ private final class IosBackgroundGenerationHandler {
     content.title = title
     content.body = body
     content.sound = .default
-    let request = UNNotificationRequest(identifier: "kelivo.background-generation.\(Date().timeIntervalSince1970)", content: content, trigger: nil)
+    let request = UNNotificationRequest(identifier: "jo-kelivo.background-generation.\(Date().timeIntervalSince1970)", content: content, trigger: nil)
     UNUserNotificationCenter.current().add(request)
   }
 

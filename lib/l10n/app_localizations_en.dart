@@ -334,7 +334,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPageLogs => 'Logs';
 
   @override
-  String get settingsPageSponsor => 'Sponsor';
+  String get settingsPageSponsor => 'Support Kelivo';
 
   @override
   String get settingsPageShare => 'Share';
@@ -1063,7 +1063,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get iosBackgroundLimitNoticeBody =>
-      'These options use Apple-supported background time, BackgroundTasks, notifications, and Live Activities. They improve continuity but cannot force iOS to keep Kelivo running forever.';
+      'These options use Apple-supported background time, BackgroundTasks, notifications, and Live Activities. They improve continuity but cannot force iOS to keep JO-Kelivo running forever.';
 
   @override
   String get iosBackgroundUnsupportedLiveActivity =>
@@ -1091,7 +1091,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Notifications not allowed';
 
   @override
-  String get iosBackgroundGenerationActiveTitle => 'Kelivo is generating';
+  String get iosBackgroundGenerationActiveTitle => 'JO-Kelivo is generating';
 
   @override
   String get iosBackgroundGenerationActiveDetail =>
@@ -1150,7 +1150,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Assistant reply has been generated';
 
   @override
-  String get androidBackgroundNotificationTitle => 'Kelivo is running';
+  String get androidBackgroundNotificationTitle => 'JO-Kelivo is running';
 
   @override
   String get androidBackgroundNotificationText =>
@@ -1628,41 +1628,41 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupPageRestartContent =>
-      'Import successful. Restart Kelivo to apply it safely.';
+      'Import successful. Restart JO-Kelivo to apply it safely.';
 
   @override
   String backupPageRestartContentWithSkipped(int count) {
-    return 'Import completed, but $count conversations with invalid message ordering were skipped. Restart Kelivo to apply the imported data safely.';
+    return 'Import completed, but $count conversations with invalid message ordering were skipped. Restart JO-Kelivo to apply the imported data safely.';
   }
 
   @override
   String get restartAppFailedMessage =>
-      'Kelivo could not restart automatically. Fully close it, then open it again.';
+      'JO-Kelivo could not restart automatically. Fully close it, then open it again.';
 
   @override
   String get backupRestoreRolledBackTitle => 'Restore was rolled back';
 
   @override
   String get backupRestoreRolledBackContent =>
-      'The restore could not be completed. Kelivo verified and kept your previous data.';
+      'The restore could not be completed. JO-Kelivo verified and kept your previous data.';
 
   @override
   String get backupRestoreFailureTitle => 'Restore requires attention';
 
   @override
   String get backupRestoreFailureContent =>
-      'Kelivo could not verify a complete old or new data set, so chat data was not opened. Close Kelivo and try again. If this repeats, keep the diagnostic code for support.';
+      'JO-Kelivo could not verify a complete old or new data set, so chat data was not opened. Close JO-Kelivo and try again. If this repeats, keep the diagnostic code for support.';
 
   @override
   String get backupRestoreBusinessLeaseUnavailableTitle =>
-      'Kelivo is already running';
+      'JO-Kelivo is already running';
 
   @override
   String get backupRestoreBusinessLeaseUnavailableContent =>
-      'Kelivo\'s data is still in use by another app process. Close any other Kelivo window, then restart. Your chat data has not been opened by this process.';
+      'JO-Kelivo\'s data is still in use by another app process. Close any other JO-Kelivo window, then restart. Your chat data has not been opened by this process.';
 
   @override
-  String get backupRestoreFailureRestartButton => 'Restart Kelivo';
+  String get backupRestoreFailureRestartButton => 'Restart JO-Kelivo';
 
   @override
   String get backupRestoreFailureCopyButton => 'Copy diagnostic code';
@@ -1703,14 +1703,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get startupRecoveryResetFailed =>
-      'Reset failed. Fully close Kelivo, then open it again.';
+      'Reset failed. Fully close JO-Kelivo, then open it again.';
 
   @override
   String get startupRecoveryResetDialogTitle => 'Reset all data?';
 
   @override
   String get startupRecoveryResetDialogContent =>
-      'This permanently deletes Kelivo\'s database on this device and starts fresh. If you might need this data, export a copy first. This cannot be undone.';
+      'This permanently deletes JO-Kelivo\'s database on this device and starts fresh. If you might need this data, export a copy first. This cannot be undone.';
 
   @override
   String get startupRecoveryResetDialogConfirm => 'Reset and restart';
@@ -1719,11 +1719,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get startupRecoveryResetDialogCancel => 'Cancel';
 
   @override
-  String get startupDatabaseUpdateRequiredTitle => 'Update Kelivo to continue';
+  String get startupDatabaseUpdateRequiredTitle =>
+      'Update JO-Kelivo to continue';
 
   @override
   String get startupDatabaseUpdateRequiredContent =>
-      'The chat database on this device was created by a newer version of Kelivo and cannot be opened by this version. Your data has not been changed. Install the latest version of Kelivo, then open it again.';
+      'The chat database on this device was created by a newer version of JO-Kelivo and cannot be opened by this version. Your data has not been changed. Install the latest version of JO-Kelivo, then open it again.';
 
   @override
   String backupPageRestoreFailedMessage(String error) {
@@ -1869,7 +1870,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String backupPageCherryStudioUnsupportedBackupVersion(String version) {
-    return 'This backup uses Cherry Studio format version $version, which Kelivo cannot import yet. Export from Cherry Studio v1 instead, or wait for a Kelivo update that supports Cherry Studio v2 backups.';
+    return 'This backup uses Cherry Studio format version $version, which JO-Kelivo cannot import yet. Export from Cherry Studio v1 instead, or wait for a JO-Kelivo update that supports Cherry Studio v2 backups.';
   }
 
   @override
@@ -4124,7 +4125,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutPageEasterEggButton => 'Nice!';
 
   @override
-  String get aboutPageAppName => 'Kelivo';
+  String get aboutPageAppName => 'JO-Kelivo';
+
+  @override
+  String get aboutPageKelivoSectionTitle => 'Kelivo base';
+
+  @override
+  String get mcpOAuthCallbackPageTitle => 'JO-Kelivo authorization';
+
+  @override
+  String get mcpOAuthCallbackPageMessage =>
+      'Authorization received. You may close this window and return to JO-Kelivo.';
 
   @override
   String get aboutPageAppDescription => 'Open-source AI Assistant';
@@ -5170,7 +5181,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get settingsShare => 'Kelivo - Open Source AI Assistant';
+  String get settingsShare => 'JO-Kelivo - Open Source AI Assistant';
 
   @override
   String get searchProviderBingLocalDescription =>
@@ -6424,7 +6435,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get legacyMemoryExport => 'Export';
 
   @override
-  String get legacyMemoryExportTitle => 'Kelivo legacy memory export';
+  String get legacyMemoryExportTitle => 'JO-Kelivo legacy memory export';
 
   @override
   String legacyMemoryAssistantHeader(String name) {
@@ -6956,11 +6967,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get migrationIntroSubtitle =>
-      'Kelivo is moving chat history to a faster SQLite database. The upgrade runs before the app opens so your data stays consistent.';
+      'JO-Kelivo is moving chat history to a faster SQLite database. The upgrade runs before the app opens so your data stays consistent.';
 
   @override
   String get migrationBackupNote =>
-      'Before migration starts, Kelivo exports a ZIP backup with settings, chat history, and local files.';
+      'Before migration starts, JO-Kelivo exports a ZIP backup with settings, chat history, and local files.';
 
   @override
   String get migrationPerformanceNote =>
@@ -6983,14 +6994,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get migrationBackingUpSubtitle =>
-      'Exporting settings, chat history, uploaded files, images, and fonts. Keep Kelivo open until this finishes.';
+      'Exporting settings, chat history, uploaded files, images, and fonts. Keep JO-Kelivo open until this finishes.';
 
   @override
   String get migrationMigratingTitle => 'Migrating to SQLite';
 
   @override
   String get migrationMigratingSubtitle =>
-      'Writing conversations and messages in batches so large histories do not overload memory. Keep Kelivo in the foreground until migration finishes.';
+      'Writing conversations and messages in batches so large histories do not overload memory. Keep JO-Kelivo in the foreground until migration finishes.';
 
   @override
   String migrationBackingUpDetail(String fileName) {
@@ -7050,7 +7061,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get migrationCompleteSubtitle =>
-      'Your chat history is now stored in SQLite. Restart Kelivo to enter the upgraded app.';
+      'Your chat history is now stored in SQLite. Restart JO-Kelivo to enter the upgraded app.';
 
   @override
   String get migrationConversationCount => 'Conversations';
@@ -7068,7 +7079,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get migrationMissingFilesCount => 'Missing files';
 
   @override
-  String get migrationRestartButton => 'Restart Kelivo';
+  String get migrationRestartButton => 'Restart JO-Kelivo';
 
   @override
   String get migrationFailedTitle => 'Migration Failed';
@@ -7094,7 +7105,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get migrationSkipDialogMessage =>
-      'Kelivo will start with an empty chat database. Your old chat history stays on disk (renamed with a .retired suffix) but will NOT be migrated and will not appear in the app. Use your backup ZIP if you need to recover it later.';
+      'JO-Kelivo will start with an empty chat database. Your old chat history stays on disk (renamed with a .retired suffix) but will NOT be migrated and will not appear in the app. Use your backup ZIP if you need to recover it later.';
 
   @override
   String get migrationSkipDialogCancel => 'Cancel';

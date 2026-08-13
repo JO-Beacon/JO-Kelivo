@@ -212,10 +212,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // Profile fields use the standard modal bottom sheet + form (not CustomBottomSheet).
-    Finder inSheet(Finder matching) => find.descendant(
-      of: find.byType(BottomSheet),
-      matching: matching,
-    );
+    Finder inSheet(Finder matching) =>
+        find.descendant(of: find.byType(BottomSheet), matching: matching);
 
     await tester.tap(find.text('Preferred name'));
     await tester.pumpAndSettle();
@@ -522,7 +520,7 @@ void main() {
       assistantName: (_) => 'Writer',
       now: DateTime(2026, 8, 8, 14, 3),
     );
-    expect(text, contains('# Kelivo legacy memory export'));
+    expect(text, contains('# JO-Kelivo legacy memory export'));
     expect(text, contains('# 2026-08-08 14:03'));
     expect(text, contains('## Assistant: Writer'));
     expect(text, contains('- One'));

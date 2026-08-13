@@ -328,7 +328,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPageLogs => '日志';
 
   @override
-  String get settingsPageSponsor => '赞助';
+  String get settingsPageSponsor => '支持 Kelivo';
 
   @override
   String get settingsPageShare => '分享';
@@ -1030,7 +1030,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get iosBackgroundLimitNoticeBody =>
-      '这些选项使用 Apple 支持的后台时间、BackgroundTasks、通知和实时活动。它们能提升连续性，但不能强制 iOS 永久保持 Kelivo 运行。';
+      '这些选项使用 Apple 支持的后台时间、BackgroundTasks、通知和实时活动。它们能提升连续性，但不能强制 iOS 永久保持 JO-Kelivo 运行。';
 
   @override
   String get iosBackgroundUnsupportedLiveActivity =>
@@ -1055,7 +1055,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get iosBackgroundNotificationsNotAuthorized => '通知未允许';
 
   @override
-  String get iosBackgroundGenerationActiveTitle => 'Kelivo 正在生成';
+  String get iosBackgroundGenerationActiveTitle => 'JO-Kelivo 正在生成';
 
   @override
   String get iosBackgroundGenerationActiveDetail => '助手正在后台回复';
@@ -1108,7 +1108,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get notificationChatCompletedBody => '助手回复已生成';
 
   @override
-  String get androidBackgroundNotificationTitle => 'Kelivo 正在运行';
+  String get androidBackgroundNotificationTitle => 'JO-Kelivo 正在运行';
 
   @override
   String get androidBackgroundNotificationText => '后台保持聊天生成';
@@ -1574,38 +1574,38 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageRestartRequired => '需要重启应用';
 
   @override
-  String get backupPageRestartContent => '导入成功。重启 Kelivo 后将安全应用。';
+  String get backupPageRestartContent => '导入成功。重启 JO-Kelivo 后将安全应用。';
 
   @override
   String backupPageRestartContentWithSkipped(int count) {
-    return '导入已完成，但已跳过 $count 个消息顺序非法的会话。重启 Kelivo 后将安全应用已导入的数据。';
+    return '导入已完成，但已跳过 $count 个消息顺序非法的会话。重启 JO-Kelivo 后将安全应用已导入的数据。';
   }
 
   @override
-  String get restartAppFailedMessage => 'Kelivo 无法自动重启，请完全关闭后重新打开。';
+  String get restartAppFailedMessage => 'JO-Kelivo 无法自动重启，请完全关闭后重新打开。';
 
   @override
   String get backupRestoreRolledBackTitle => '恢复已回滚';
 
   @override
-  String get backupRestoreRolledBackContent => '恢复未能完成。Kelivo 已验证并保留原有数据。';
+  String get backupRestoreRolledBackContent => '恢复未能完成。JO-Kelivo 已验证并保留原有数据。';
 
   @override
   String get backupRestoreFailureTitle => '恢复需要处理';
 
   @override
   String get backupRestoreFailureContent =>
-      'Kelivo 无法验证完整的原有或新数据，因此未打开聊天数据。请关闭 Kelivo 后重试；若问题反复出现，请保留诊断码以便支持人员排查。';
+      'JO-Kelivo 无法验证完整的原有或新数据，因此未打开聊天数据。请关闭 JO-Kelivo 后重试；若问题反复出现，请保留诊断码以便支持人员排查。';
 
   @override
-  String get backupRestoreBusinessLeaseUnavailableTitle => 'Kelivo 已在运行';
+  String get backupRestoreBusinessLeaseUnavailableTitle => 'JO-Kelivo 已在运行';
 
   @override
   String get backupRestoreBusinessLeaseUnavailableContent =>
-      'Kelivo 的数据仍被另一个应用进程占用。请关闭其他 Kelivo 窗口后重新启动；当前进程尚未打开聊天数据。';
+      'JO-Kelivo 的数据仍被另一个应用进程占用。请关闭其他 JO-Kelivo 窗口后重新启动；当前进程尚未打开聊天数据。';
 
   @override
-  String get backupRestoreFailureRestartButton => '重启 Kelivo';
+  String get backupRestoreFailureRestartButton => '重启 JO-Kelivo';
 
   @override
   String get backupRestoreFailureCopyButton => '复制诊断码';
@@ -1643,14 +1643,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get startupRecoveryRepairFailed => '修复未能解决问题。请先导出数据副本，然后重置。';
 
   @override
-  String get startupRecoveryResetFailed => '重置失败。请彻底关闭 Kelivo 后重新打开。';
+  String get startupRecoveryResetFailed => '重置失败。请彻底关闭 JO-Kelivo 后重新打开。';
 
   @override
   String get startupRecoveryResetDialogTitle => '重置全部数据？';
 
   @override
   String get startupRecoveryResetDialogContent =>
-      '这将永久删除本设备上 Kelivo 的数据库并重新开始。如果之后可能还需要这些数据，请先导出一份副本。此操作无法撤销。';
+      '这将永久删除本设备上 JO-Kelivo 的数据库并重新开始。如果之后可能还需要这些数据，请先导出一份副本。此操作无法撤销。';
 
   @override
   String get startupRecoveryResetDialogConfirm => '重置并重启';
@@ -1659,11 +1659,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get startupRecoveryResetDialogCancel => '取消';
 
   @override
-  String get startupDatabaseUpdateRequiredTitle => '请更新 Kelivo 以继续';
+  String get startupDatabaseUpdateRequiredTitle => '请更新 JO-Kelivo 以继续';
 
   @override
   String get startupDatabaseUpdateRequiredContent =>
-      '本设备上的聊天数据库由更新版本的 Kelivo 创建，当前版本无法打开。数据未被改动。请安装最新版 Kelivo 后重新打开。';
+      '本设备上的聊天数据库由更新版本的 JO-Kelivo 创建，当前版本无法打开。数据未被改动。请安装最新版 JO-Kelivo 后重新打开。';
 
   @override
   String backupPageRestoreFailedMessage(String error) {
@@ -1808,7 +1808,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String backupPageCherryStudioUnsupportedBackupVersion(String version) {
-    return '此备份使用 Cherry Studio 格式版本 $version，Kelivo 目前尚无法导入。请改用 Cherry Studio v1 导出备份，或等待后续版本支持 Cherry Studio v2。';
+    return '此备份使用 Cherry Studio 格式版本 $version，JO-Kelivo 目前尚无法导入。请改用 Cherry Studio v1 导出备份，或等待后续版本支持 Cherry Studio v2。';
   }
 
   @override
@@ -3977,7 +3977,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutPageEasterEggButton => '好的';
 
   @override
-  String get aboutPageAppName => 'Kelivo';
+  String get aboutPageAppName => 'JO-Kelivo';
+
+  @override
+  String get aboutPageKelivoSectionTitle => 'Kelivo 基座';
+
+  @override
+  String get mcpOAuthCallbackPageTitle => 'JO-Kelivo 授权';
+
+  @override
+  String get mcpOAuthCallbackPageMessage => '已收到授权。你可以关闭此窗口并返回 JO-Kelivo。';
 
   @override
   String get aboutPageAppDescription => '开源AI 助手';
@@ -4965,7 +4974,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get settingsShare => 'Kelivo - 开源AI助手';
+  String get settingsShare => 'JO-Kelivo - 开源AI助手';
 
   @override
   String get searchProviderBingLocalDescription =>
@@ -6168,7 +6177,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get legacyMemoryExport => '导出';
 
   @override
-  String get legacyMemoryExportTitle => 'Kelivo 旧版记忆导出';
+  String get legacyMemoryExportTitle => 'JO-Kelivo 旧版记忆导出';
 
   @override
   String legacyMemoryAssistantHeader(String name) {
@@ -6672,7 +6681,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get migrationIntroSubtitle =>
-      'Kelivo 将聊天记录迁移到更快的 SQLite 数据库。升级会在应用打开前完成，避免新旧数据同时写入。';
+      'JO-Kelivo 将聊天记录迁移到更快的 SQLite 数据库。升级会在应用打开前完成，避免新旧数据同时写入。';
 
   @override
   String get migrationBackupNote => '迁移开始前，会先导出包含设置、聊天记录和本地文件的 ZIP 备份。';
@@ -6698,14 +6707,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get migrationBackingUpSubtitle =>
-      '正在导出设置、聊天记录、上传文件、图片和字体。请保持 Kelivo 开启，等待备份完成。';
+      '正在导出设置、聊天记录、上传文件、图片和字体。请保持 JO-Kelivo 开启，等待备份完成。';
 
   @override
   String get migrationMigratingTitle => '正在迁移到 SQLite';
 
   @override
   String get migrationMigratingSubtitle =>
-      '正在分批写入会话和消息，避免超大聊天记录占满内存。请保持 Kelivo 在前台，等待迁移完成。';
+      '正在分批写入会话和消息，避免超大聊天记录占满内存。请保持 JO-Kelivo 在前台，等待迁移完成。';
 
   @override
   String migrationBackingUpDetail(String fileName) {
@@ -6764,7 +6773,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get migrationCompleteSubtitle =>
-      '你的聊天记录已迁移到 SQLite。请重启 Kelivo 进入升级后的应用。';
+      '你的聊天记录已迁移到 SQLite。请重启 JO-Kelivo 进入升级后的应用。';
 
   @override
   String get migrationConversationCount => '对话';
@@ -6782,7 +6791,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get migrationMissingFilesCount => '缺失文件';
 
   @override
-  String get migrationRestartButton => '重启 Kelivo';
+  String get migrationRestartButton => '重启 JO-Kelivo';
 
   @override
   String get migrationFailedTitle => '迁移失败';
@@ -6807,7 +6816,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get migrationSkipDialogMessage =>
-      'Kelivo 将以空的聊天数据库启动。旧的聊天记录会保留在磁盘上（重命名为 .retired 后缀），但不会被迁移，也不会在应用中显示。之后如需找回，请使用已保存的备份 ZIP。';
+      'JO-Kelivo 将以空的聊天数据库启动。旧的聊天记录会保留在磁盘上（重命名为 .retired 后缀），但不会被迁移，也不会在应用中显示。之后如需找回，请使用已保存的备份 ZIP。';
 
   @override
   String get migrationSkipDialogCancel => '取消';
@@ -7432,7 +7441,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get settingsPageLogs => '日志';
 
   @override
-  String get settingsPageSponsor => '赞助';
+  String get settingsPageSponsor => '支持 Kelivo';
 
   @override
   String get settingsPageShare => '分享';
@@ -8134,7 +8143,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get iosBackgroundLimitNoticeBody =>
-      '这些选项使用 Apple 支持的后台时间、BackgroundTasks、通知和实时活动。它们能提升连续性，但不能强制 iOS 永久保持 Kelivo 运行。';
+      '这些选项使用 Apple 支持的后台时间、BackgroundTasks、通知和实时活动。它们能提升连续性，但不能强制 iOS 永久保持 JO-Kelivo 运行。';
 
   @override
   String get iosBackgroundUnsupportedLiveActivity =>
@@ -8159,7 +8168,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get iosBackgroundNotificationsNotAuthorized => '通知未允许';
 
   @override
-  String get iosBackgroundGenerationActiveTitle => 'Kelivo 正在生成';
+  String get iosBackgroundGenerationActiveTitle => 'JO-Kelivo 正在生成';
 
   @override
   String get iosBackgroundGenerationActiveDetail => '助手正在后台回复';
@@ -8212,7 +8221,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get notificationChatCompletedBody => '助手回复已生成';
 
   @override
-  String get androidBackgroundNotificationTitle => 'Kelivo 正在运行';
+  String get androidBackgroundNotificationTitle => 'JO-Kelivo 正在运行';
 
   @override
   String get androidBackgroundNotificationText => '后台保持聊天生成';
@@ -8678,38 +8687,38 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageRestartRequired => '需要重启应用';
 
   @override
-  String get backupPageRestartContent => '导入成功。重启 Kelivo 后将安全应用。';
+  String get backupPageRestartContent => '导入成功。重启 JO-Kelivo 后将安全应用。';
 
   @override
   String backupPageRestartContentWithSkipped(int count) {
-    return '导入已完成，但已跳过 $count 个消息顺序非法的会话。重启 Kelivo 后将安全应用已导入的数据。';
+    return '导入已完成，但已跳过 $count 个消息顺序非法的会话。重启 JO-Kelivo 后将安全应用已导入的数据。';
   }
 
   @override
-  String get restartAppFailedMessage => 'Kelivo 无法自动重启，请完全关闭后重新打开。';
+  String get restartAppFailedMessage => 'JO-Kelivo 无法自动重启，请完全关闭后重新打开。';
 
   @override
   String get backupRestoreRolledBackTitle => '恢复已回滚';
 
   @override
-  String get backupRestoreRolledBackContent => '恢复未能完成。Kelivo 已验证并保留原有数据。';
+  String get backupRestoreRolledBackContent => '恢复未能完成。JO-Kelivo 已验证并保留原有数据。';
 
   @override
   String get backupRestoreFailureTitle => '恢复需要处理';
 
   @override
   String get backupRestoreFailureContent =>
-      'Kelivo 无法验证完整的原有或新数据，因此未打开聊天数据。请关闭 Kelivo 后重试；若问题反复出现，请保留诊断码以便支持人员排查。';
+      'JO-Kelivo 无法验证完整的原有或新数据，因此未打开聊天数据。请关闭 JO-Kelivo 后重试；若问题反复出现，请保留诊断码以便支持人员排查。';
 
   @override
-  String get backupRestoreBusinessLeaseUnavailableTitle => 'Kelivo 已在运行';
+  String get backupRestoreBusinessLeaseUnavailableTitle => 'JO-Kelivo 已在运行';
 
   @override
   String get backupRestoreBusinessLeaseUnavailableContent =>
-      'Kelivo 的数据仍被另一个应用进程占用。请关闭其他 Kelivo 窗口后重新启动；当前进程尚未打开聊天数据。';
+      'JO-Kelivo 的数据仍被另一个应用进程占用。请关闭其他 JO-Kelivo 窗口后重新启动；当前进程尚未打开聊天数据。';
 
   @override
-  String get backupRestoreFailureRestartButton => '重启 Kelivo';
+  String get backupRestoreFailureRestartButton => '重启 JO-Kelivo';
 
   @override
   String get backupRestoreFailureCopyButton => '复制诊断码';
@@ -8747,14 +8756,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get startupRecoveryRepairFailed => '修复未能解决问题。请先导出数据副本，然后重置。';
 
   @override
-  String get startupRecoveryResetFailed => '重置失败。请彻底关闭 Kelivo 后重新打开。';
+  String get startupRecoveryResetFailed => '重置失败。请彻底关闭 JO-Kelivo 后重新打开。';
 
   @override
   String get startupRecoveryResetDialogTitle => '重置全部数据？';
 
   @override
   String get startupRecoveryResetDialogContent =>
-      '这将永久删除本设备上 Kelivo 的数据库并重新开始。如果之后可能还需要这些数据，请先导出一份副本。此操作无法撤销。';
+      '这将永久删除本设备上 JO-Kelivo 的数据库并重新开始。如果之后可能还需要这些数据，请先导出一份副本。此操作无法撤销。';
 
   @override
   String get startupRecoveryResetDialogConfirm => '重置并重启';
@@ -8763,11 +8772,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get startupRecoveryResetDialogCancel => '取消';
 
   @override
-  String get startupDatabaseUpdateRequiredTitle => '请更新 Kelivo 以继续';
+  String get startupDatabaseUpdateRequiredTitle => '请更新 JO-Kelivo 以继续';
 
   @override
   String get startupDatabaseUpdateRequiredContent =>
-      '本设备上的聊天数据库由更新版本的 Kelivo 创建，当前版本无法打开。数据未被改动。请安装最新版 Kelivo 后重新打开。';
+      '本设备上的聊天数据库由更新版本的 JO-Kelivo 创建，当前版本无法打开。数据未被改动。请安装最新版 JO-Kelivo 后重新打开。';
 
   @override
   String backupPageRestoreFailedMessage(String error) {
@@ -8912,7 +8921,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String backupPageCherryStudioUnsupportedBackupVersion(String version) {
-    return '此备份使用 Cherry Studio 格式版本 $version，Kelivo 目前尚无法导入。请改用 Cherry Studio v1 导出备份，或等待后续版本支持 Cherry Studio v2。';
+    return '此备份使用 Cherry Studio 格式版本 $version，JO-Kelivo 目前尚无法导入。请改用 Cherry Studio v1 导出备份，或等待后续版本支持 Cherry Studio v2。';
   }
 
   @override
@@ -11081,7 +11090,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get aboutPageEasterEggButton => '好的';
 
   @override
-  String get aboutPageAppName => 'Kelivo';
+  String get aboutPageAppName => 'JO-Kelivo';
+
+  @override
+  String get aboutPageKelivoSectionTitle => 'Kelivo 基座';
+
+  @override
+  String get mcpOAuthCallbackPageTitle => 'JO-Kelivo 授权';
+
+  @override
+  String get mcpOAuthCallbackPageMessage => '已收到授权。你可以关闭此窗口并返回 JO-Kelivo。';
 
   @override
   String get aboutPageAppDescription => '开源 AI 助手';
@@ -12069,7 +12087,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
-  String get settingsShare => 'Kelivo - 开源AI助手';
+  String get settingsShare => 'JO-Kelivo - 开源AI助手';
 
   @override
   String get searchProviderBingLocalDescription =>
@@ -13272,7 +13290,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get legacyMemoryExport => '导出';
 
   @override
-  String get legacyMemoryExportTitle => 'Kelivo 旧版记忆导出';
+  String get legacyMemoryExportTitle => 'JO-Kelivo 旧版记忆导出';
 
   @override
   String legacyMemoryAssistantHeader(String name) {
@@ -13776,7 +13794,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get migrationIntroSubtitle =>
-      'Kelivo 将聊天记录迁移到更快的 SQLite 数据库。升级会在应用打开前完成，避免新旧数据同时写入。';
+      'JO-Kelivo 将聊天记录迁移到更快的 SQLite 数据库。升级会在应用打开前完成，避免新旧数据同时写入。';
 
   @override
   String get migrationBackupNote => '迁移开始前，会先导出包含设置、聊天记录和本地文件的 ZIP 备份。';
@@ -13802,14 +13820,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get migrationBackingUpSubtitle =>
-      '正在导出设置、聊天记录、上传文件、图片和字体。请保持 Kelivo 开启，等待备份完成。';
+      '正在导出设置、聊天记录、上传文件、图片和字体。请保持 JO-Kelivo 开启，等待备份完成。';
 
   @override
   String get migrationMigratingTitle => '正在迁移到 SQLite';
 
   @override
   String get migrationMigratingSubtitle =>
-      '正在分批写入会话和消息，避免超大聊天记录占满内存。请保持 Kelivo 在前台，等待迁移完成。';
+      '正在分批写入会话和消息，避免超大聊天记录占满内存。请保持 JO-Kelivo 在前台，等待迁移完成。';
 
   @override
   String migrationBackingUpDetail(String fileName) {
@@ -13868,7 +13886,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get migrationCompleteSubtitle =>
-      '你的聊天记录已迁移到 SQLite。请重启 Kelivo 进入升级后的应用。';
+      '你的聊天记录已迁移到 SQLite。请重启 JO-Kelivo 进入升级后的应用。';
 
   @override
   String get migrationConversationCount => '对话';
@@ -13886,7 +13904,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get migrationMissingFilesCount => '缺失文件';
 
   @override
-  String get migrationRestartButton => '重启 Kelivo';
+  String get migrationRestartButton => '重启 JO-Kelivo';
 
   @override
   String get migrationFailedTitle => '迁移失败';
@@ -13911,7 +13929,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get migrationSkipDialogMessage =>
-      'Kelivo 将以空的聊天数据库启动。旧的聊天记录会保留在磁盘上（重命名为 .retired 后缀），但不会被迁移，也不会在应用中显示。之后如需找回，请使用已保存的备份 ZIP。';
+      'JO-Kelivo 将以空的聊天数据库启动。旧的聊天记录会保留在磁盘上（重命名为 .retired 后缀），但不会被迁移，也不会在应用中显示。之后如需找回，请使用已保存的备份 ZIP。';
 
   @override
   String get migrationSkipDialogCancel => '取消';
@@ -14536,7 +14554,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get settingsPageLogs => '日誌';
 
   @override
-  String get settingsPageSponsor => '贊助';
+  String get settingsPageSponsor => '支持 Kelivo';
 
   @override
   String get settingsPageShare => '分享';
@@ -15238,7 +15256,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get iosBackgroundLimitNoticeBody =>
-      '這些選項使用 Apple 支援的後台時間、BackgroundTasks、通知和即時活動。它們能提升連續性，但不能強制 iOS 永久保持 Kelivo 運行。';
+      '這些選項使用 Apple 支援的後台時間、BackgroundTasks、通知和即時活動。它們能提升連續性，但不能強制 iOS 永久保持 JO-Kelivo 運行。';
 
   @override
   String get iosBackgroundUnsupportedLiveActivity =>
@@ -15263,7 +15281,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get iosBackgroundNotificationsNotAuthorized => '通知未允許';
 
   @override
-  String get iosBackgroundGenerationActiveTitle => 'Kelivo 正在生成';
+  String get iosBackgroundGenerationActiveTitle => 'JO-Kelivo 正在生成';
 
   @override
   String get iosBackgroundGenerationActiveDetail => '助理正在後台回覆';
@@ -15316,7 +15334,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get notificationChatCompletedBody => '助手回覆已生成';
 
   @override
-  String get androidBackgroundNotificationTitle => 'Kelivo 正在運行';
+  String get androidBackgroundNotificationTitle => 'JO-Kelivo 正在運行';
 
   @override
   String get androidBackgroundNotificationText => '後台保持聊天生成';
@@ -15782,38 +15800,38 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageRestartRequired => '需要重啟應用程式';
 
   @override
-  String get backupPageRestartContent => '匯入成功。重新啟動 Kelivo 後將安全套用。';
+  String get backupPageRestartContent => '匯入成功。重新啟動 JO-Kelivo 後將安全套用。';
 
   @override
   String backupPageRestartContentWithSkipped(int count) {
-    return '匯入已完成，但已略過 $count 個訊息順序無效的會話。重新啟動 Kelivo 後將安全套用已匯入的資料。';
+    return '匯入已完成，但已略過 $count 個訊息順序無效的會話。重新啟動 JO-Kelivo 後將安全套用已匯入的資料。';
   }
 
   @override
-  String get restartAppFailedMessage => 'Kelivo 無法自動重新啟動，請完全關閉後再重新開啟。';
+  String get restartAppFailedMessage => 'JO-Kelivo 無法自動重新啟動，請完全關閉後再重新開啟。';
 
   @override
   String get backupRestoreRolledBackTitle => '已保留原有資料';
 
   @override
-  String get backupRestoreRolledBackContent => '還原未能完成。Kelivo 已驗證並保留先前的資料。';
+  String get backupRestoreRolledBackContent => '還原未能完成。JO-Kelivo 已驗證並保留先前的資料。';
 
   @override
   String get backupRestoreFailureTitle => '還原需要處理';
 
   @override
   String get backupRestoreFailureContent =>
-      'Kelivo 無法驗證完整的原有或新資料，因此未開啟聊天資料。請關閉 Kelivo 後重試；若問題持續發生，請保留診斷碼以供支援人員排查。';
+      'JO-Kelivo 無法驗證完整的原有或新資料，因此未開啟聊天資料。請關閉 JO-Kelivo 後重試；若問題持續發生，請保留診斷碼以供支援人員排查。';
 
   @override
-  String get backupRestoreBusinessLeaseUnavailableTitle => 'Kelivo 已在執行';
+  String get backupRestoreBusinessLeaseUnavailableTitle => 'JO-Kelivo 已在執行';
 
   @override
   String get backupRestoreBusinessLeaseUnavailableContent =>
-      'Kelivo 的資料仍由另一個應用程式程序使用。請關閉其他 Kelivo 視窗後重新啟動；目前程序尚未開啟聊天資料。';
+      'JO-Kelivo 的資料仍由另一個應用程式程序使用。請關閉其他 JO-Kelivo 視窗後重新啟動；目前程序尚未開啟聊天資料。';
 
   @override
-  String get backupRestoreFailureRestartButton => '重新啟動 Kelivo';
+  String get backupRestoreFailureRestartButton => '重新啟動 JO-Kelivo';
 
   @override
   String get backupRestoreFailureCopyButton => '複製診斷碼';
@@ -15851,14 +15869,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get startupRecoveryRepairFailed => '修復未能解決問題。請先匯出資料副本，然後重設。';
 
   @override
-  String get startupRecoveryResetFailed => '重設失敗。請完全關閉 Kelivo 後再重新開啟。';
+  String get startupRecoveryResetFailed => '重設失敗。請完全關閉 JO-Kelivo 後再重新開啟。';
 
   @override
   String get startupRecoveryResetDialogTitle => '重設全部資料？';
 
   @override
   String get startupRecoveryResetDialogContent =>
-      '這會永久刪除本裝置上 Kelivo 的資料庫並重新開始。如果之後可能還需要這些資料，請先匯出一份副本。此操作無法復原。';
+      '這會永久刪除本裝置上 JO-Kelivo 的資料庫並重新開始。如果之後可能還需要這些資料，請先匯出一份副本。此操作無法復原。';
 
   @override
   String get startupRecoveryResetDialogConfirm => '重設並重新啟動';
@@ -15867,11 +15885,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get startupRecoveryResetDialogCancel => '取消';
 
   @override
-  String get startupDatabaseUpdateRequiredTitle => '請更新 Kelivo 以繼續';
+  String get startupDatabaseUpdateRequiredTitle => '請更新 JO-Kelivo 以繼續';
 
   @override
   String get startupDatabaseUpdateRequiredContent =>
-      '本裝置上的聊天資料庫由更新版本的 Kelivo 建立，目前版本無法開啟。資料未被改動。請安裝最新版 Kelivo 後重新開啟。';
+      '本裝置上的聊天資料庫由更新版本的 JO-Kelivo 建立，目前版本無法開啟。資料未被改動。請安裝最新版 JO-Kelivo 後重新開啟。';
 
   @override
   String backupPageRestoreFailedMessage(String error) {
@@ -16016,7 +16034,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String backupPageCherryStudioUnsupportedBackupVersion(String version) {
-    return '此備份使用 Cherry Studio 格式版本 $version，Kelivo 目前尚無法匯入。請改用 Cherry Studio v1 匯出備份，或等待後續版本支援 Cherry Studio v2。';
+    return '此備份使用 Cherry Studio 格式版本 $version，JO-Kelivo 目前尚無法匯入。請改用 Cherry Studio v1 匯出備份，或等待後續版本支援 Cherry Studio v2。';
   }
 
   @override
@@ -18183,7 +18201,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get aboutPageEasterEggButton => '好的';
 
   @override
-  String get aboutPageAppName => 'Kelivo';
+  String get aboutPageAppName => 'JO-Kelivo';
+
+  @override
+  String get aboutPageKelivoSectionTitle => 'Kelivo 基座';
+
+  @override
+  String get mcpOAuthCallbackPageTitle => 'JO-Kelivo 授權';
+
+  @override
+  String get mcpOAuthCallbackPageMessage => '已收到授權。你可以關閉此視窗並返回 JO-Kelivo。';
 
   @override
   String get aboutPageAppDescription => '開源 AI 助理';
@@ -19171,7 +19198,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get settingsShare => 'Kelivo - 開源AI助理';
+  String get settingsShare => 'JO-Kelivo - 開源AI助理';
 
   @override
   String get searchProviderBingLocalDescription =>
@@ -20376,7 +20403,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get legacyMemoryExport => '匯出';
 
   @override
-  String get legacyMemoryExportTitle => 'Kelivo 舊版記憶匯出';
+  String get legacyMemoryExportTitle => 'JO-Kelivo 舊版記憶匯出';
 
   @override
   String legacyMemoryAssistantHeader(String name) {
@@ -20880,7 +20907,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get migrationIntroSubtitle =>
-      'Kelivo 將聊天記錄遷移到更快的 SQLite 資料庫。升級會在應用程式開啟前完成，避免新舊資料同時寫入。';
+      'JO-Kelivo 將聊天記錄遷移到更快的 SQLite 資料庫。升級會在應用程式開啟前完成，避免新舊資料同時寫入。';
 
   @override
   String get migrationBackupNote => '遷移開始前，會先匯出包含設定、聊天記錄和本地檔案的 ZIP 備份。';
@@ -20906,14 +20933,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get migrationBackingUpSubtitle =>
-      '正在匯出設定、聊天記錄、上傳檔案、圖片和字體。請保持 Kelivo 開啟，等待備份完成。';
+      '正在匯出設定、聊天記錄、上傳檔案、圖片和字體。請保持 JO-Kelivo 開啟，等待備份完成。';
 
   @override
   String get migrationMigratingTitle => '正在遷移到 SQLite';
 
   @override
   String get migrationMigratingSubtitle =>
-      '正在分批寫入對話和訊息，避免超大聊天記錄占滿記憶體。請保持 Kelivo 在前台，等待遷移完成。';
+      '正在分批寫入對話和訊息，避免超大聊天記錄占滿記憶體。請保持 JO-Kelivo 在前台，等待遷移完成。';
 
   @override
   String migrationBackingUpDetail(String fileName) {
@@ -20972,7 +20999,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get migrationCompleteSubtitle =>
-      '你的聊天記錄已遷移到 SQLite。請重啟 Kelivo 進入升級後的應用程式。';
+      '你的聊天記錄已遷移到 SQLite。請重啟 JO-Kelivo 進入升級後的應用程式。';
 
   @override
   String get migrationConversationCount => '對話';
@@ -20990,7 +21017,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get migrationMissingFilesCount => '缺失檔案';
 
   @override
-  String get migrationRestartButton => '重啟 Kelivo';
+  String get migrationRestartButton => '重啟 JO-Kelivo';
 
   @override
   String get migrationFailedTitle => '遷移失敗';
@@ -21015,7 +21042,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get migrationSkipDialogMessage =>
-      'Kelivo 將以空的聊天資料庫啟動。舊的聊天記錄會保留在磁碟上（重新命名為 .retired 後綴），但不會被遷移，也不會在應用程式中顯示。之後如需找回，請使用已儲存的備份 ZIP。';
+      'JO-Kelivo 將以空的聊天資料庫啟動。舊的聊天記錄會保留在磁碟上（重新命名為 .retired 後綴），但不會被遷移，也不會在應用程式中顯示。之後如需找回，請使用已儲存的備份 ZIP。';
 
   @override
   String get migrationSkipDialogCancel => '取消';

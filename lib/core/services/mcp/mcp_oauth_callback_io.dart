@@ -6,6 +6,10 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../../../l10n/app_localizations.dart';
+import '../../../l10n/app_localizations_en.dart';
+import '../../../l10n/app_localizations_zh.dart';
+
 import 'mcp_oauth_callback_types.dart';
 
 const _mobileOAuthChannel = MethodChannel('app.mcp_oauth');
@@ -33,7 +37,7 @@ String _authorizationServerHash(Uri authorizationServer) => base64UrlEncode(
 final class _AndroidMcpOAuthCallback implements McpOAuthCallback {
   _AndroidMcpOAuthCallback(Uri authorizationServer)
     : redirectUri = Uri(
-        scheme: 'psyche.kelivo',
+        scheme: 'psyche.jokelivo',
         host: 'mcp-oauth-callback',
         path: '/${_authorizationServerHash(authorizationServer)}',
       );
@@ -83,7 +87,7 @@ final class _AndroidMcpOAuthCallback implements McpOAuthCallback {
 final class _IosMcpOAuthCallback implements McpOAuthCallback {
   _IosMcpOAuthCallback(Uri authorizationServer)
     : redirectUri = Uri(
-        scheme: 'psyche.kelivo',
+        scheme: 'com.psyche.jokelivo',
         path:
             '/oauth/callback/${_authorizationServerHash(authorizationServer)}',
       );
@@ -198,7 +202,23 @@ final class _IoMcpOAuthCallback implements McpOAuthCallback {
   }
 }
 
-String _callbackPage() => '''<!doctype html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Kelivo</title></head>
-<body><p>Authorization received. You may close this window and return to Kelivo.</p>
+String _callbackPage() {
+  final l10n = _callbackLocalizations(Platform.localeName);
+  return '''<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${htmlEscape.convert(l10n.mcpOAuthCallbackPageTitle)}</title></head>
+<body><p>${htmlEscape.convert(l10n.mcpOAuthCallbackPageMessage)}</p>
 </body></html>''';
+}
+
+AppLocalizations _callbackLocalizations(String localeName) {
+  final normalized = localeName.replaceAll('-', '_').toLowerCase();
+  if (normalized.startsWith('zh_hant') ||
+      normalized.startsWith('zh_tw') ||
+      normalized.startsWith('zh_hk')) {
+    return AppLocalizationsZh('zh_Hant');
+  }
+  if (normalized.startsWith('zh')) {
+    return AppLocalizationsZh('zh_Hans');
+  }
+  return AppLocalizationsEn();
+}

@@ -1,4 +1,4 @@
-package com.psyche.kelivo
+package com.psyche.jokelivo
 
 import android.Manifest
 import android.app.Activity

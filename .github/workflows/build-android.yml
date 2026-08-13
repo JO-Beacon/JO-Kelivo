@@ -1,0 +1,161 @@
+name: Build Android
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: '发布到 GitHub Release'
+        required: false
+        default: false
+        type: boolean
+      release_tag:
+        description: 'Release 标签，例如 v0.1.6'
+        required: false
+        default: ''
+        type: string
+      prerelease:
+        description: '标记为预发布版本'
+        required: false
+        default: false
+        type: boolean
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: '3.44.1'
+
+jobs:
+  build-android:
+    name: Build Android APKs
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Inject fallback secrets
+        shell: bash
+        run: |
+          mkdir -p lib/secrets
+          cat > lib/secrets/fallback.dart <<'EOF'
+          const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';
+          EOF
+
+      - name: Resolve version
+        shell: bash
+        env:
+          PUBLISH_RELEASE: ${{ inputs.publish_release || false }}
+          RELEASE_TAG: ${{ inputs.release_tag || '' }}
+        run: |
+          set -euo pipefail
+          raw_version="$(awk '/^version:/ {print $2; exit}' pubspec.yaml)"
+          version="$raw_version"
+          release_version="${raw_version%%+*}"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            test "${GITHUB_REF_NAME}" = "v${release_version}" || {
+              echo "Tag ${GITHUB_REF_NAME} does not match pubspec version ${release_version}." >&2
+              exit 1
+            }
+          elif [ "$PUBLISH_RELEASE" = "true" ]; then
+            test "$RELEASE_TAG" = "v${release_version}" || {
+              echo "Release tag must be v${release_version}." >&2
+              exit 1
+            }
+          else
+            short_sha="$(git rev-parse --short HEAD)"
+            version="${version}_${short_sha}"
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "Resolved version: $version"
+
+      - name: Configure Android signing
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          PUBLISH_RELEASE: ${{ inputs.publish_release || false }}
+        run: |
+          set -euo pipefail
+          publishing=false
+          if [ "${GITHUB_REF_TYPE}" = "tag" ] || [ "$PUBLISH_RELEASE" = "true" ]; then
+            publishing=true
+          fi
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_STORE_PASSWORD" ] || [ -z "$ANDROID_KEY_ALIAS" ] || [ -z "$ANDROID_KEY_PASSWORD" ]; then
+            if [ "$publishing" = true ]; then
+              echo "Android signing secrets are required for Release publication." >&2
+              exit 1
+            fi
+            echo "Signing secrets are absent; producing non-publishable test artifacts."
+            exit 0
+          fi
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/release.jks
+          cat > android/key.properties <<EOF
+          storeFile=release.jks
+          storePassword=$ANDROID_STORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
+          EOF
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build split APKs
+        run: flutter build apk --release --split-per-abi
+
+      - name: Name release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            cp "build/app/outputs/flutter-apk/app-${abi}-release.apk" \
+              "JO-Kelivo-v${VERSION}-android-${abi}-release.apk"
+          done
+
+      - name: Generate SHA-256 checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in JO-Kelivo-v${VERSION}-android-*-release.apk; do
+            sha256sum "$file" > "$file.sha256"
+          done
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-APKs
+          path: |
+            JO-Kelivo-v*-android-*-release.apk
+            JO-Kelivo-v*-android-*-release.apk.sha256
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: ${{ github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && inputs.publish_release && inputs.release_tag != '') }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || inputs.release_tag }}
+          name: ${{ github.ref_type == 'tag' && github.ref_name || inputs.release_tag }}
+          prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || false }}
+          files: |
+            JO-Kelivo-v*-android-*-release.apk
+            JO-Kelivo-v*-android-*-release.apk.sha256

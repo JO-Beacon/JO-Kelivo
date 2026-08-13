@@ -25,6 +25,9 @@ class AboutPage extends StatefulWidget {
 }
 
 class _AboutPageState extends State<AboutPage> {
+  static const String _upstreamKelivoVersion = '1.2.1';
+  static const String _upstreamKelivoBuildNumber = '64';
+
   String _version = '';
   String _buildNumber = '';
   String _systemInfo = '';
@@ -343,7 +346,7 @@ class _AboutPageState extends State<AboutPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Kelivo',
+                            l10n.aboutPageAppName,
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: AppFontWeights.semibold,
@@ -396,16 +399,47 @@ class _AboutPageState extends State<AboutPage> {
                 onTap: null, // informational only
               ),
               _iosDivider(context),
+              _iosNavRowSvgLeading(
+                context,
+                svgAsset: 'assets/icons/github.svg',
+                label: l10n.aboutPageGithub,
+                onTap: () => _openUrl('https://github.com/JO-Beacon/JO-Kelivo'),
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.FileText,
+                label: l10n.aboutPageLicense,
+                onTap: () => _openUrl(
+                  'https://github.com/JO-Beacon/JO-Kelivo/blob/main/LICENSE',
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+          _iosSectionHeader(context, l10n.aboutPageKelivoSectionTitle),
+          const SizedBox(height: 8),
+          _iosSectionCard(
+            children: [
+              _iosNavRow(
+                context,
+                icon: Lucide.Code,
+                label: l10n.aboutPageVersion,
+                detailBuilder: (_) => Text(
+                  l10n.aboutPageVersionDetail(
+                    _upstreamKelivoVersion,
+                    _upstreamKelivoBuildNumber,
+                  ),
+                ),
+                onTap: null,
+              ),
+              _iosDivider(context),
               _iosNavRow(
                 context,
                 icon: Lucide.Earth,
                 label: l10n.aboutPageWebsite,
-                onTap: () async {
-                  final uri = Uri.parse('https://kelivo.psycheas.top/');
-                  if (!await launchUrl(uri, mode: LaunchMode.platformDefault)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  }
-                },
+                onTap: () => _openUrl('https://kelivo.psycheas.top/'),
               ),
               _iosDivider(context),
               _iosNavRowSvgLeading(
@@ -472,6 +506,17 @@ Widget _iosSectionCard({required List<Widget> children}) {
         ),
       );
     },
+  );
+}
+
+Widget _iosSectionHeader(BuildContext context, String title) {
+  final cs = Theme.of(context).colorScheme;
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+    child: Text(
+      title,
+      style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+    ),
   );
 }
 

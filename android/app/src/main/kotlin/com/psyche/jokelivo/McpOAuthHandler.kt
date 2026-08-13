@@ -1,4 +1,4 @@
-package com.psyche.kelivo
+package com.psyche.jokelivo
 
 import android.app.Activity
 import android.content.ActivityNotFoundException
@@ -11,7 +11,7 @@ import io.flutter.plugin.common.MethodChannel
 
 internal object McpOAuthHandler {
     private const val CHANNEL_NAME = "app.mcp_oauth"
-    private const val CALLBACK_SCHEME = "psyche.kelivo"
+    private const val CALLBACK_SCHEME = "psyche.jokelivo"
     private const val CALLBACK_HOST = "mcp-oauth-callback"
 
     private var pendingResult: MethodChannel.Result? = null
@@ -64,7 +64,7 @@ internal object McpOAuthHandler {
         ) {
             result.error(
                 "invalid_arguments",
-                "A valid HTTPS authorization URL, state, and Kelivo callback URI are required.",
+                "A valid HTTPS authorization URL, state, and JO-Kelivo callback URI are required.",
                 null,
             )
             return

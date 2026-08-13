@@ -74,18 +74,30 @@ jobs:
 
       - name: Resolve version
         shell: bash
+        env:
+          PUBLISH_RELEASE: ${{ inputs.publish_release || false }}
+          RELEASE_TAG: ${{ inputs.release_tag || '' }}
         run: |
           set -euo pipefail
           raw_version="$(awk '/^version:/ {print $2; exit}' pubspec.yaml)"
           version="$raw_version"
+          release_version="${raw_version%%+*}"
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-            version="${GITHUB_REF_NAME#v}"
-          elif [ "${{ inputs.publish_release || false }}" != "true" ]; then
+            test "${GITHUB_REF_NAME}" = "v${release_version}" || {
+              echo "Tag ${GITHUB_REF_NAME} does not match pubspec version ${release_version}." >&2
+              exit 1
+            }
+          elif [ "$PUBLISH_RELEASE" = "true" ]; then
+            test "$RELEASE_TAG" = "v${release_version}" || {
+              echo "Release tag must be v${release_version}." >&2
+              exit 1
+            }
+          else
             short_sha="$(git rev-parse --short HEAD)"
             version="${version}_${short_sha}"
           fi
           echo "VERSION=$version" >> "$GITHUB_ENV"
-          echo "VERSION_NUMBER=${version%%+*}" >> "$GITHUB_ENV"
+          echo "VERSION_NUMBER=$release_version" >> "$GITHUB_ENV"
           echo "Resolved version: $version"
 
       - name: Flutter pub get
@@ -172,14 +184,25 @@ jobs:
 
           dpkg-deb --build deb "JO-Kelivo-v${VERSION}-linux-x64-deb.deb"
 
+      - name: Generate SHA-256 checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in JO-Kelivo-v${VERSION}-linux-x64-*; do
+            sha256sum "$file" > "$file.sha256"
+          done
+
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Linux-x64
           path: |
             JO-Kelivo-v*-linux-x64-archive.tar.gz
+            JO-Kelivo-v*-linux-x64-archive.tar.gz.sha256
             JO-Kelivo-v*-linux-x64-appimage.AppImage
+            JO-Kelivo-v*-linux-x64-appimage.AppImage.sha256
             JO-Kelivo-v*-linux-x64-deb.deb
+            JO-Kelivo-v*-linux-x64-deb.deb.sha256
           if-no-files-found: error
 
       - name: Publish GitHub Release
@@ -191,5 +214,8 @@ jobs:
           prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || false }}
           files: |
             JO-Kelivo-v*-linux-x64-archive.tar.gz
+            JO-Kelivo-v*-linux-x64-archive.tar.gz.sha256
             JO-Kelivo-v*-linux-x64-appimage.AppImage
+            JO-Kelivo-v*-linux-x64-appimage.AppImage.sha256
             JO-Kelivo-v*-linux-x64-deb.deb
+            JO-Kelivo-v*-linux-x64-deb.deb.sha256

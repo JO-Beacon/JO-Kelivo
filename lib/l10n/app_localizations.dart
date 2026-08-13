@@ -691,7 +691,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsPageSponsor.
   ///
   /// In en, this message translates to:
-  /// **'Sponsor'**
+  /// **'Support Kelivo'**
   String get settingsPageSponsor;
 
   /// No description provided for @settingsPageShare.
@@ -2071,7 +2071,7 @@ abstract class AppLocalizations {
   /// No description provided for @iosBackgroundLimitNoticeBody.
   ///
   /// In en, this message translates to:
-  /// **'These options use Apple-supported background time, BackgroundTasks, notifications, and Live Activities. They improve continuity but cannot force iOS to keep Kelivo running forever.'**
+  /// **'These options use Apple-supported background time, BackgroundTasks, notifications, and Live Activities. They improve continuity but cannot force iOS to keep JO-Kelivo running forever.'**
   String get iosBackgroundLimitNoticeBody;
 
   /// No description provided for @iosBackgroundUnsupportedLiveActivity.
@@ -2119,7 +2119,7 @@ abstract class AppLocalizations {
   /// No description provided for @iosBackgroundGenerationActiveTitle.
   ///
   /// In en, this message translates to:
-  /// **'Kelivo is generating'**
+  /// **'JO-Kelivo is generating'**
   String get iosBackgroundGenerationActiveTitle;
 
   /// No description provided for @iosBackgroundGenerationActiveDetail.
@@ -2221,7 +2221,7 @@ abstract class AppLocalizations {
   /// No description provided for @androidBackgroundNotificationTitle.
   ///
   /// In en, this message translates to:
-  /// **'Kelivo is running'**
+  /// **'JO-Kelivo is running'**
   String get androidBackgroundNotificationTitle;
 
   /// No description provided for @androidBackgroundNotificationText.
@@ -3127,19 +3127,19 @@ abstract class AppLocalizations {
   /// No description provided for @backupPageRestartContent.
   ///
   /// In en, this message translates to:
-  /// **'Import successful. Restart Kelivo to apply it safely.'**
+  /// **'Import successful. Restart JO-Kelivo to apply it safely.'**
   String get backupPageRestartContent;
 
   /// No description provided for @backupPageRestartContentWithSkipped.
   ///
   /// In en, this message translates to:
-  /// **'Import completed, but {count} conversations with invalid message ordering were skipped. Restart Kelivo to apply the imported data safely.'**
+  /// **'Import completed, but {count} conversations with invalid message ordering were skipped. Restart JO-Kelivo to apply the imported data safely.'**
   String backupPageRestartContentWithSkipped(int count);
 
   /// No description provided for @restartAppFailedMessage.
   ///
   /// In en, this message translates to:
-  /// **'Kelivo could not restart automatically. Fully close it, then open it again.'**
+  /// **'JO-Kelivo could not restart automatically. Fully close it, then open it again.'**
   String get restartAppFailedMessage;
 
   /// No description provided for @backupRestoreRolledBackTitle.
@@ -3151,7 +3151,7 @@ abstract class AppLocalizations {
   /// No description provided for @backupRestoreRolledBackContent.
   ///
   /// In en, this message translates to:
-  /// **'The restore could not be completed. Kelivo verified and kept your previous data.'**
+  /// **'The restore could not be completed. JO-Kelivo verified and kept your previous data.'**
   String get backupRestoreRolledBackContent;
 
   /// No description provided for @backupRestoreFailureTitle.
@@ -3163,25 +3163,25 @@ abstract class AppLocalizations {
   /// No description provided for @backupRestoreFailureContent.
   ///
   /// In en, this message translates to:
-  /// **'Kelivo could not verify a complete old or new data set, so chat data was not opened. Close Kelivo and try again. If this repeats, keep the diagnostic code for support.'**
+  /// **'JO-Kelivo could not verify a complete old or new data set, so chat data was not opened. Close JO-Kelivo and try again. If this repeats, keep the diagnostic code for support.'**
   String get backupRestoreFailureContent;
 
   /// No description provided for @backupRestoreBusinessLeaseUnavailableTitle.
   ///
   /// In en, this message translates to:
-  /// **'Kelivo is already running'**
+  /// **'JO-Kelivo is already running'**
   String get backupRestoreBusinessLeaseUnavailableTitle;
 
   /// No description provided for @backupRestoreBusinessLeaseUnavailableContent.
   ///
   /// In en, this message translates to:
-  /// **'Kelivo\'s data is still in use by another app process. Close any other Kelivo window, then restart. Your chat data has not been opened by this process.'**
+  /// **'JO-Kelivo\'s data is still in use by another app process. Close any other JO-Kelivo window, then restart. Your chat data has not been opened by this process.'**
   String get backupRestoreBusinessLeaseUnavailableContent;
 
   /// No description provided for @backupRestoreFailureRestartButton.
   ///
   /// In en, this message translates to:
-  /// **'Restart Kelivo'**
+  /// **'Restart JO-Kelivo'**
   String get backupRestoreFailureRestartButton;
 
   /// No description provided for @backupRestoreFailureCopyButton.
@@ -3253,7 +3253,7 @@ abstract class AppLocalizations {
   /// No description provided for @startupRecoveryResetFailed.
   ///
   /// In en, this message translates to:
-  /// **'Reset failed. Fully close Kelivo, then open it again.'**
+  /// **'Reset failed. Fully close JO-Kelivo, then open it again.'**
   String get startupRecoveryResetFailed;
 
   /// No description provided for @startupRecoveryResetDialogTitle.
@@ -3265,7 +3265,7 @@ abstract class AppLocalizations {
   /// No description provided for @startupRecoveryResetDialogContent.
   ///
   /// In en, this message translates to:
-  /// **'This permanently deletes Kelivo\'s database on this device and starts fresh. If you might need this data, export a copy first. This cannot be undone.'**
+  /// **'This permanently deletes JO-Kelivo\'s database on this device and starts fresh. If you might need this data, export a copy first. This cannot be undone.'**
   String get startupRecoveryResetDialogContent;
 
   /// No description provided for @startupRecoveryResetDialogConfirm.
@@ -3283,13 +3283,13 @@ abstract class AppLocalizations {
   /// No description provided for @startupDatabaseUpdateRequiredTitle.
   ///
   /// In en, this message translates to:
-  /// **'Update Kelivo to continue'**
+  /// **'Update JO-Kelivo to continue'**
   String get startupDatabaseUpdateRequiredTitle;
 
   /// No description provided for @startupDatabaseUpdateRequiredContent.
   ///
   /// In en, this message translates to:
-  /// **'The chat database on this device was created by a newer version of Kelivo and cannot be opened by this version. Your data has not been changed. Install the latest version of Kelivo, then open it again.'**
+  /// **'The chat database on this device was created by a newer version of JO-Kelivo and cannot be opened by this version. Your data has not been changed. Install the latest version of JO-Kelivo, then open it again.'**
   String get startupDatabaseUpdateRequiredContent;
 
   /// No description provided for @backupPageRestoreFailedMessage.
@@ -3565,7 +3565,7 @@ abstract class AppLocalizations {
   /// No description provided for @backupPageCherryStudioUnsupportedBackupVersion.
   ///
   /// In en, this message translates to:
-  /// **'This backup uses Cherry Studio format version {version}, which Kelivo cannot import yet. Export from Cherry Studio v1 instead, or wait for a Kelivo update that supports Cherry Studio v2 backups.'**
+  /// **'This backup uses Cherry Studio format version {version}, which JO-Kelivo cannot import yet. Export from Cherry Studio v1 instead, or wait for a JO-Kelivo update that supports Cherry Studio v2 backups.'**
   String backupPageCherryStudioUnsupportedBackupVersion(String version);
 
   /// No description provided for @backupPageImportFromChatbox.
@@ -7666,8 +7666,26 @@ abstract class AppLocalizations {
   /// No description provided for @aboutPageAppName.
   ///
   /// In en, this message translates to:
-  /// **'Kelivo'**
+  /// **'JO-Kelivo'**
   String get aboutPageAppName;
+
+  /// No description provided for @aboutPageKelivoSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo base'**
+  String get aboutPageKelivoSectionTitle;
+
+  /// No description provided for @mcpOAuthCallbackPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'JO-Kelivo authorization'**
+  String get mcpOAuthCallbackPageTitle;
+
+  /// No description provided for @mcpOAuthCallbackPageMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorization received. You may close this window and return to JO-Kelivo.'**
+  String get mcpOAuthCallbackPageMessage;
 
   /// No description provided for @aboutPageAppDescription.
   ///
@@ -9556,7 +9574,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsShare.
   ///
   /// In en, this message translates to:
-  /// **'Kelivo - Open Source AI Assistant'**
+  /// **'JO-Kelivo - Open Source AI Assistant'**
   String get settingsShare;
 
   /// No description provided for @searchProviderBingLocalDescription.
@@ -11818,7 +11836,7 @@ abstract class AppLocalizations {
   /// No description provided for @legacyMemoryExportTitle.
   ///
   /// In en, this message translates to:
-  /// **'Kelivo legacy memory export'**
+  /// **'JO-Kelivo legacy memory export'**
   String get legacyMemoryExportTitle;
 
   /// No description provided for @legacyMemoryAssistantHeader.
@@ -12712,13 +12730,13 @@ abstract class AppLocalizations {
   /// No description provided for @migrationIntroSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Kelivo is moving chat history to a faster SQLite database. The upgrade runs before the app opens so your data stays consistent.'**
+  /// **'JO-Kelivo is moving chat history to a faster SQLite database. The upgrade runs before the app opens so your data stays consistent.'**
   String get migrationIntroSubtitle;
 
   /// No description provided for @migrationBackupNote.
   ///
   /// In en, this message translates to:
-  /// **'Before migration starts, Kelivo exports a ZIP backup with settings, chat history, and local files.'**
+  /// **'Before migration starts, JO-Kelivo exports a ZIP backup with settings, chat history, and local files.'**
   String get migrationBackupNote;
 
   /// No description provided for @migrationPerformanceNote.
@@ -12760,7 +12778,7 @@ abstract class AppLocalizations {
   /// No description provided for @migrationBackingUpSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Exporting settings, chat history, uploaded files, images, and fonts. Keep Kelivo open until this finishes.'**
+  /// **'Exporting settings, chat history, uploaded files, images, and fonts. Keep JO-Kelivo open until this finishes.'**
   String get migrationBackingUpSubtitle;
 
   /// No description provided for @migrationMigratingTitle.
@@ -12772,7 +12790,7 @@ abstract class AppLocalizations {
   /// No description provided for @migrationMigratingSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Writing conversations and messages in batches so large histories do not overload memory. Keep Kelivo in the foreground until migration finishes.'**
+  /// **'Writing conversations and messages in batches so large histories do not overload memory. Keep JO-Kelivo in the foreground until migration finishes.'**
   String get migrationMigratingSubtitle;
 
   /// No description provided for @migrationBackingUpDetail.
@@ -12880,7 +12898,7 @@ abstract class AppLocalizations {
   /// No description provided for @migrationCompleteSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Your chat history is now stored in SQLite. Restart Kelivo to enter the upgraded app.'**
+  /// **'Your chat history is now stored in SQLite. Restart JO-Kelivo to enter the upgraded app.'**
   String get migrationCompleteSubtitle;
 
   /// No description provided for @migrationConversationCount.
@@ -12916,7 +12934,7 @@ abstract class AppLocalizations {
   /// No description provided for @migrationRestartButton.
   ///
   /// In en, this message translates to:
-  /// **'Restart Kelivo'**
+  /// **'Restart JO-Kelivo'**
   String get migrationRestartButton;
 
   /// No description provided for @migrationFailedTitle.
@@ -12964,7 +12982,7 @@ abstract class AppLocalizations {
   /// No description provided for @migrationSkipDialogMessage.
   ///
   /// In en, this message translates to:
-  /// **'Kelivo will start with an empty chat database. Your old chat history stays on disk (renamed with a .retired suffix) but will NOT be migrated and will not appear in the app. Use your backup ZIP if you need to recover it later.'**
+  /// **'JO-Kelivo will start with an empty chat database. Your old chat history stays on disk (renamed with a .retired suffix) but will NOT be migrated and will not appear in the app. Use your backup ZIP if you need to recover it later.'**
   String get migrationSkipDialogMessage;
 
   /// No description provided for @migrationSkipDialogCancel.

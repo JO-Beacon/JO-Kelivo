@@ -21,6 +21,9 @@ class DesktopAboutPane extends StatefulWidget {
 enum _InfoLoadState { loading, loaded, failed }
 
 class _DesktopAboutPaneState extends State<DesktopAboutPane> {
+  static const String _upstreamKelivoVersion = '1.2.1';
+  static const String _upstreamKelivoBuildNumber = '64';
+
   String _version = '';
   String _buildNumber = '';
   String _systemInfo = '';
@@ -147,7 +150,7 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
 
               const SizedBox(height: 16),
 
-              // Info and links
+              // JO-Kelivo info and links
               _DeskCard(
                 title: l10n.settingsPageAbout,
                 children: [
@@ -161,6 +164,36 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
                     icon: lucide.Lucide.Phone,
                     label: l10n.aboutPageSystem,
                     detail: systemDetail,
+                  ),
+                  const _DeskRowDivider(),
+                  _DeskNavRowSvg(
+                    svgAsset: 'assets/icons/github.svg',
+                    label: l10n.aboutPageGithub,
+                    onTap: () =>
+                        _openUrl('https://github.com/JO-Beacon/JO-Kelivo'),
+                  ),
+                  const _DeskRowDivider(),
+                  _DeskNavRow(
+                    icon: lucide.Lucide.FileText,
+                    label: l10n.aboutPageLicense,
+                    onTap: () => _openUrl(
+                      'https://github.com/JO-Beacon/JO-Kelivo/blob/main/LICENSE',
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 16),
+              _DeskCard(
+                title: l10n.aboutPageKelivoSectionTitle,
+                children: [
+                  _DeskInfoRow(
+                    icon: lucide.Lucide.Code,
+                    label: l10n.aboutPageVersion,
+                    detail: l10n.aboutPageVersionDetail(
+                      _upstreamKelivoVersion,
+                      _upstreamKelivoBuildNumber,
+                    ),
                   ),
                   const _DeskRowDivider(),
                   _DeskNavRow(
