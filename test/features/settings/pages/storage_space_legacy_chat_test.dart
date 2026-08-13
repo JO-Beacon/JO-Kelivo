@@ -120,4 +120,28 @@ void main() {
       debugDefaultTargetPlatformOverride = null;
     }
   });
+
+  testWidgets('storage page exposes the JO user data directory entry', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      await tester.pumpWidget(
+        ChangeNotifierProvider(
+          create: (_) => SettingsProvider(createBusinessTestPreferences()),
+          child: const MaterialApp(
+            locale: Locale('en'),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            home: StorageSpacePage(),
+          ),
+        ),
+      );
+      await _pumpUntilFound(tester, find.text('Open User Data Directory'));
+
+      expect(find.text('Open User Data Directory'), findsOneWidget);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
 }

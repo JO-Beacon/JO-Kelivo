@@ -3412,6 +3412,30 @@ abstract class AppLocalizations {
   /// **'Not supported yet'**
   String get backupPageNotSupportedYet;
 
+  /// No description provided for @backupPageOpenUserDataDirectory.
+  ///
+  /// In en, this message translates to:
+  /// **'Open User Data Directory'**
+  String get backupPageOpenUserDataDirectory;
+
+  /// No description provided for @backupPageOpenUserDataFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to open user data directory'**
+  String get backupPageOpenUserDataFailed;
+
+  /// No description provided for @backupPageUserDataDirectoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'User Data Directory'**
+  String get backupPageUserDataDirectoryTitle;
+
+  /// No description provided for @backupPageUserDataDirectoryDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the main app data folder for chat data, uploads, images, avatars, cache, and logs.'**
+  String get backupPageUserDataDirectoryDescription;
+
   /// No description provided for @backupPageRemoteBackups.
   ///
   /// In en, this message translates to:
@@ -3573,6 +3597,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Import from Chatbox'**
   String get backupPageImportFromChatbox;
+
+  /// No description provided for @backupPageImportFromDeepSeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from DeepSeek Web/App'**
+  String get backupPageImportFromDeepSeek;
 
   /// No description provided for @backupReminderSectionTitle.
   ///

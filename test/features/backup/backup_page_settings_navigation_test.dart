@@ -14,6 +14,7 @@ import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/desktop/setting/backup_pane.dart';
 import 'package:Kelivo/features/backup/pages/backup_page.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/snackbar.dart';
 
 Future<BackupReminderProvider> _createReminderProvider(
   BusinessPreferences preferences,
@@ -146,6 +147,9 @@ void _expectAbove(WidgetTester tester, String upper, String lower) {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  setUp(AppSnackBarManager().dismissAll);
+  tearDown(AppSnackBarManager().dismissAll);
+
   group('BackupPage mobile backup settings navigation', () {
     testWidgets('opens WebDAV settings as a full page and saves config', (
       tester,
@@ -198,6 +202,36 @@ void main() {
       _expectAbove(tester, 'WebDAV Backup', 'S3 Backup');
     });
 
+    testWidgets('DeepSeek import remains a non-importing placeholder', (
+      tester,
+    ) async {
+      final business = await createBusinessTestHarness();
+      final settings = SettingsProvider(business.preferences);
+      await settings.loaded;
+
+      await _pumpBackupPage(tester, settings: settings, business: business);
+      final entry = find.text('Import from DeepSeek Web/App');
+      await tester.scrollUntilVisible(
+        entry,
+        120,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(entry);
+      await tester.pump();
+
+      expect(
+        AppSnackBarManager().activeToasts.single.notification.message,
+        'Not supported yet',
+      );
+      expect(
+        AppSnackBarManager().activeToasts.single.notification.type,
+        NotificationType.info,
+      );
+      expect(find.byType(AlertDialog), findsNothing);
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+    });
+
     testWidgets('opens S3 settings as a full page and saves config', (
       tester,
     ) async {
@@ -248,6 +282,47 @@ void main() {
       _expectAbove(tester, 'Backup Reminder', 'Local Backup');
       _expectAbove(tester, 'Local Backup', 'WebDAV Server Settings');
       _expectAbove(tester, 'WebDAV Server Settings', 'S3 Settings');
+    });
+
+    testWidgets('desktop exposes JO data directory and DeepSeek placeholder', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(1100, 1300));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final business = await createBusinessTestHarness();
+      final settings = SettingsProvider(business.preferences);
+      await settings.loaded;
+
+      await _pumpDesktopBackupPane(
+        tester,
+        settings: settings,
+        business: business,
+      );
+
+      expect(find.text('User Data Directory'), findsOneWidget);
+      expect(find.text('Open User Data Directory'), findsOneWidget);
+
+      final deepSeek = find.text('Import from DeepSeek Web/App');
+      await tester.scrollUntilVisible(
+        deepSeek,
+        120,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(deepSeek);
+      await tester.pump();
+
+      expect(
+        AppSnackBarManager().activeToasts.single.notification.message,
+        'Not supported yet',
+      );
+      expect(
+        AppSnackBarManager().activeToasts.single.notification.type,
+        NotificationType.info,
+      );
+      expect(find.byType(AlertDialog), findsNothing);
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
     });
   });
 }

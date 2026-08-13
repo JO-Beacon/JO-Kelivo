@@ -22,6 +22,7 @@ import '../../features/backup/backup_restore_error_message.dart';
 import '../../features/backup/backup_restart_dialog.dart';
 import '../../features/backup/widgets/backup_reminder_helpers.dart';
 import '../../utils/platform_utils.dart';
+import '../../utils/app_directories.dart';
 import '../widgets/desktop_select_dropdown.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
@@ -234,6 +235,22 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     );
   }
 
+  Future<void> _openUserDataDirectory() async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final directory = await AppDirectories.getAppDataDirectory();
+      final opened = await AppDirectories.openDirectory(directory);
+      if (opened || !mounted) return;
+    } catch (_) {
+      if (!mounted) return;
+    }
+    showAppSnackBar(
+      context,
+      message: l10n.backupPageOpenUserDataFailed,
+      type: NotificationType.error,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -346,6 +363,49 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
               _buildLocalBackupSliver(context, l10n, cs),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 10)),
+
+              SliverToBoxAdapter(
+                child: _sectionCard(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                l10n.backupPageUserDataDirectoryTitle,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: AppFontWeights.semibold,
+                                  color: cs.onSurface.withValues(alpha: 0.95),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                l10n.backupPageUserDataDirectoryDescription,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: cs.onSurface.withValues(alpha: 0.65),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        _DeskIosButton(
+                          label: l10n.backupPageOpenUserDataDirectory,
+                          filled: false,
+                          dense: true,
+                          onTap: _openUserDataDirectory,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
@@ -1098,6 +1158,18 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                       ),
                     );
                   }
+                },
+              ),
+              _DeskIosButton(
+                label: l10n.backupPageImportFromDeepSeek,
+                filled: false,
+                dense: true,
+                onTap: () {
+                  showAppSnackBar(
+                    context,
+                    message: l10n.backupPageNotSupportedYet,
+                    type: NotificationType.info,
+                  );
                 },
               ),
             ],

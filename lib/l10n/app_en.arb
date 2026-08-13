@@ -728,6 +728,10 @@
   "backupPageImportFromOtherApps": "Import from Other Apps",
   "backupPageImportFromRikkaHub": "Import from RikkaHub",
   "backupPageNotSupportedYet": "Not supported yet",
+  "backupPageOpenUserDataDirectory": "Open User Data Directory",
+  "backupPageOpenUserDataFailed": "Failed to open user data directory",
+  "backupPageUserDataDirectoryTitle": "User Data Directory",
+  "backupPageUserDataDirectoryDescription": "Open the main app data folder for chat data, uploads, images, avatars, cache, and logs.",
   "backupPageRemoteBackups": "Remote Backups",
   "backupPageNoBackups": "No backups",
   "backupPageRestoreTooltip": "Restore",
@@ -762,6 +766,7 @@
     }
   },
   "backupPageImportFromChatbox": "Import from Chatbox",
+  "backupPageImportFromDeepSeek": "Import from DeepSeek Web/App",
   "backupReminderSectionTitle": "Backup Reminder",
   "backupReminderEnableTitle": "Remind me to back up",
   "backupReminderFrequencyTitle": "Frequency",

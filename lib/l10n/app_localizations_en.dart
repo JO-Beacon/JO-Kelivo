@@ -1792,6 +1792,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageNotSupportedYet => 'Not supported yet';
 
   @override
+  String get backupPageOpenUserDataDirectory => 'Open User Data Directory';
+
+  @override
+  String get backupPageOpenUserDataFailed =>
+      'Failed to open user data directory';
+
+  @override
+  String get backupPageUserDataDirectoryTitle => 'User Data Directory';
+
+  @override
+  String get backupPageUserDataDirectoryDescription =>
+      'Open the main app data folder for chat data, uploads, images, avatars, cache, and logs.';
+
+  @override
   String get backupPageRemoteBackups => 'Remote Backups';
 
   @override
@@ -1875,6 +1889,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupPageImportFromChatbox => 'Import from Chatbox';
+
+  @override
+  String get backupPageImportFromDeepSeek => 'Import from DeepSeek Web/App';
 
   @override
   String get backupReminderSectionTitle => 'Backup Reminder';

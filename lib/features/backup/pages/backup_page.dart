@@ -1349,6 +1349,19 @@ class _BackupPageState extends State<BackupPage> {
               });
             },
           ),
+          _iosDivider(context),
+          _iosNavRow(
+            context,
+            icon: Lucide.Box,
+            label: l10n.backupPageImportFromDeepSeek,
+            onTap: () {
+              showAppSnackBar(
+                context,
+                message: l10n.backupPageNotSupportedYet,
+                type: NotificationType.info,
+              );
+            },
+          ),
         ],
       ),
     ];

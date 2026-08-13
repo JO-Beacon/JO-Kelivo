@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Platform-specific application data directory utilities.
 ///
@@ -26,6 +27,17 @@ class AppDirectories {
       case TargetPlatform.fuchsia:
         return await getApplicationDocumentsDirectory();
     }
+  }
+
+  /// Opens a directory in the platform file manager.
+  static Future<bool> openDirectory(Directory directory) async {
+    if (!await directory.exists()) {
+      await directory.create(recursive: true);
+    }
+    return launchUrl(
+      Uri.file(directory.path),
+      mode: LaunchMode.externalApplication,
+    );
   }
 
   /// Gets the directory for uploaded files.

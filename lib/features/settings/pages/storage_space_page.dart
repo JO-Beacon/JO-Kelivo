@@ -11,6 +11,7 @@ import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../utils/app_directories.dart';
 import '../../../utils/platform_utils.dart';
 import '../../chat/pages/image_viewer_page.dart';
 import 'log_viewer_page.dart';
@@ -429,6 +430,22 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     );
   }
 
+  Future<void> _openUserDataDirectory() async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final directory = await AppDirectories.getAppDataDirectory();
+      final opened = await AppDirectories.openDirectory(directory);
+      if (opened || !mounted) return;
+    } catch (_) {
+      if (!mounted) return;
+    }
+    showAppSnackBar(
+      context,
+      message: l10n.backupPageOpenUserDataFailed,
+      type: NotificationType.error,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -609,6 +626,15 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                   ],
                 ),
               ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: IosTileButton(
+                  label: l10n.backupPageOpenUserDataDirectory,
+                  icon: Lucide.FolderOpen,
+                  onTap: _openUserDataDirectory,
+                ),
+              ),
             ],
           ),
         ),
@@ -704,6 +730,12 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
               ],
             ],
           ),
+        ),
+        const SizedBox(height: 12),
+        IosTileButton(
+          label: l10n.backupPageOpenUserDataDirectory,
+          icon: Lucide.FolderOpen,
+          onTap: _openUserDataDirectory,
         ),
       ],
     );

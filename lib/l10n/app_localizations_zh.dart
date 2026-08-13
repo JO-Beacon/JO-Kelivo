@@ -1730,6 +1730,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageNotSupportedYet => '暂不支持';
 
   @override
+  String get backupPageOpenUserDataDirectory => '打开用户数据目录';
+
+  @override
+  String get backupPageOpenUserDataFailed => '打开用户数据目录失败';
+
+  @override
+  String get backupPageUserDataDirectoryTitle => '用户数据目录';
+
+  @override
+  String get backupPageUserDataDirectoryDescription =>
+      '打开应用主数据目录，用于查看聊天数据、上传文件、图片、头像、缓存和日志。';
+
+  @override
   String get backupPageRemoteBackups => '远端备份';
 
   @override
@@ -1813,6 +1826,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get backupPageImportFromChatbox => '从 Chatbox 导入';
+
+  @override
+  String get backupPageImportFromDeepSeek => '从 DeepSeek 网页版/App 导入';
 
   @override
   String get backupReminderSectionTitle => '备份提醒';
@@ -8891,6 +8907,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageNotSupportedYet => '暂不支持';
 
   @override
+  String get backupPageOpenUserDataDirectory => '打开用户数据目录';
+
+  @override
+  String get backupPageOpenUserDataFailed => '打开用户数据目录失败';
+
+  @override
+  String get backupPageUserDataDirectoryTitle => '用户数据目录';
+
+  @override
+  String get backupPageUserDataDirectoryDescription =>
+      '打开应用主数据目录，用于查看聊天数据、上传文件、图片、头像、缓存和日志。';
+
+  @override
   String get backupPageRemoteBackups => '远端备份';
 
   @override
@@ -8974,6 +9003,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get backupPageImportFromChatbox => '从 Chatbox 导入';
+
+  @override
+  String get backupPageImportFromDeepSeek => '从 DeepSeek 网页版/App 导入';
 
   @override
   String get backupReminderSectionTitle => '备份提醒';
@@ -16052,6 +16084,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageNotSupportedYet => '暫不支援';
 
   @override
+  String get backupPageOpenUserDataDirectory => '開啟使用者資料目錄';
+
+  @override
+  String get backupPageOpenUserDataFailed => '開啟使用者資料目錄失敗';
+
+  @override
+  String get backupPageUserDataDirectoryTitle => '使用者資料目錄';
+
+  @override
+  String get backupPageUserDataDirectoryDescription =>
+      '開啟應用程式主資料目錄，用於查看聊天資料、上傳檔案、圖片、頭像、快取和日誌。';
+
+  @override
   String get backupPageRemoteBackups => '遠端備份';
 
   @override
@@ -16135,6 +16180,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupPageImportFromChatbox => '從 Chatbox 匯入';
+
+  @override
+  String get backupPageImportFromDeepSeek => '從 DeepSeek 網頁版/App 匯入';
 
   @override
   String get backupReminderSectionTitle => '備份提醒';
