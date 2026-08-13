@@ -1,7 +1,9 @@
 import 'dart:convert';
 
 import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/business_data.dart';
@@ -9,15 +11,19 @@ import 'package:Kelivo/core/database/business_migration_engine.dart';
 import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/database/business_settings_router.dart';
+import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/instruction_injection_store.dart';
 
 import '../../support/jo_015_business_fixture.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   late AppDatabase database;
   late BusinessRepository repository;
 
   setUp(() async {
+    SharedPreferences.setMockInitialValues({});
     database = AppDatabase(NativeDatabase.memory());
     repository = BusinessRepository(database);
     await database.customSelect('SELECT 1;').getSingle();
@@ -88,6 +94,31 @@ void main() {
     );
     expect(legacy.values, isEmpty);
   });
+
+  for (final retiredValue in <Object?>[true, 'invalid-retired-value']) {
+    test(
+      'retired user-image placement value $retiredValue remains inert',
+      () async {
+        final legacy = FakeLegacyBusinessPreferences({
+          'display_separate_user_message_image_attachments_v1': retiredValue,
+          'theme_mode_v1': 'dark',
+        });
+
+        expect(
+          await BusinessMigrationEngine(
+            repository: repository,
+            legacyPreferences: legacy,
+          ).run(),
+          BusinessMigrationResult.migrated,
+        );
+        expect(await repository.getPreference('theme_mode_v1'), 'dark');
+        final settings = SettingsProvider(BusinessPreferences(repository));
+        await settings.loaded;
+        expect(settings.themeMode, ThemeMode.dark);
+        expect(legacy.values, isEmpty);
+      },
+    );
+  }
 
   test(
     'receipt makes a retry cleanup-only and never overwrites newer DB data',
