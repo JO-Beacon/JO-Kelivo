@@ -1044,6 +1044,10 @@ void main() {
           () => provider.statusFor(id) == McpStatus.connected,
           label: 'resources-only connection',
         );
+        await _waitUntil(
+          () => server.count('notifications/initialized') == 1,
+          label: 'initialized notification',
+        );
 
         expect(provider.getById(id)?.tools, isEmpty);
         expect(provider.errorFor(id), isNull);
