@@ -27,6 +27,8 @@ typedef OnRegenerateMessage = void Function(ChatMessage message);
 typedef OnResendMessage = void Function(ChatMessage message);
 typedef OnTranslateMessage = void Function(ChatMessage message);
 typedef OnEditMessage = void Function(ChatMessage message);
+typedef OnSwitchMessageRole =
+    Future<void> Function(ChatMessage message, String role);
 typedef OnDeleteMessage =
     Future<void> Function(
       ChatMessage message,
@@ -115,6 +117,7 @@ class MessageListView extends StatefulWidget {
     this.onResendMessage,
     this.onTranslateMessage,
     this.onEditMessage,
+    this.onSwitchMessageRole,
     this.onDeleteMessage,
     this.onDeleteAllVersions,
     this.onForkConversation,
@@ -192,6 +195,7 @@ class MessageListView extends StatefulWidget {
   final OnResendMessage? onResendMessage;
   final OnTranslateMessage? onTranslateMessage;
   final OnEditMessage? onEditMessage;
+  final OnSwitchMessageRole? onSwitchMessageRole;
   final OnDeleteMessage? onDeleteMessage;
   final OnDeleteAllVersions? onDeleteAllVersions;
   final OnForkConversation? onForkConversation;
@@ -1207,6 +1211,10 @@ class _MessageListViewState extends State<MessageListView> {
           await widget.onDeleteAllVersions?.call(message, widget.byGroup);
         } else if (action == MessageMoreAction.edit) {
           widget.onEditMessage?.call(message);
+        } else if (action == MessageMoreAction.switchToUser) {
+          await widget.onSwitchMessageRole?.call(message, 'user');
+        } else if (action == MessageMoreAction.switchToAssistant) {
+          await widget.onSwitchMessageRole?.call(message, 'assistant');
         } else if (action == MessageMoreAction.fork) {
           await widget.onForkConversation?.call(message);
         } else if (action == MessageMoreAction.share) {

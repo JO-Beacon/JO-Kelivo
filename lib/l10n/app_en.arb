@@ -854,6 +854,8 @@
   "messageMoreSheetRenderWebView": "Render Web View",
   "messageMoreSheetNotImplemented": "Not yet implemented",
   "messageMoreSheetEdit": "Edit",
+  "messageMoreSheetSwitchToUser": "Switch to User",
+  "messageMoreSheetSwitchToAssistant": "Switch to Assistant",
   "messageMoreSheetShare": "Share",
   "messageMoreSheetSelectMessages": "Select Messages",
   "messageMoreSheetCreateBranch": "Create Branch",

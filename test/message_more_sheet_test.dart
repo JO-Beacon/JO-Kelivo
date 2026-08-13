@@ -1,48 +1,58 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:provider/provider.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/chat/widgets/message_more_sheet.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 
-ChatMessage _message() {
+import 'support/business_test_harness.dart';
+
+ChatMessage _message({String role = 'assistant'}) {
   return ChatMessage(
     id: 'message-1',
-    role: 'assistant',
+    role: role,
     content: 'hello',
     conversationId: 'conversation-1',
   );
 }
 
-Future<void> _openMoreSheet(
+Future<MessageMoreAction?> _openMoreSheet(
   WidgetTester tester, {
   required bool canDeleteAllVersions,
   bool canCreateBranch = true,
+  String role = 'assistant',
+  String? tapLabel,
 }) async {
+  MessageMoreAction? selectedAction;
   await tester.pumpWidget(
-    MaterialApp(
-      localizationsDelegates: const [
-        AppLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: AppLocalizations.supportedLocales,
-      home: Scaffold(
-        body: Builder(
-          builder: (context) {
-            return TextButton(
-              onPressed: () {
-                showMessageMoreSheet(
-                  context,
-                  _message(),
-                  canDeleteAllVersions: canDeleteAllVersions,
-                  canCreateBranch: canCreateBranch,
-                );
-              },
-              child: const Text('open'),
-            );
-          },
+    ChangeNotifierProvider(
+      create: (_) => SettingsProvider(createBusinessTestPreferences()),
+      child: MaterialApp(
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: Builder(
+            builder: (context) {
+              return TextButton(
+                onPressed: () async {
+                  selectedAction = await showMessageMoreSheet(
+                    context,
+                    _message(role: role),
+                    canDeleteAllVersions: canDeleteAllVersions,
+                    canCreateBranch: canCreateBranch,
+                  );
+                },
+                child: const Text('open'),
+              );
+            },
+          ),
         ),
       ),
     ),
@@ -50,6 +60,11 @@ Future<void> _openMoreSheet(
 
   await tester.tap(find.text('open'));
   await tester.pumpAndSettle();
+  if (tapLabel != null) {
+    await tester.tap(find.text(tapLabel));
+    await tester.pumpAndSettle();
+  }
+  return selectedAction;
 }
 
 void main() {
@@ -78,5 +93,26 @@ void main() {
     );
 
     expect(find.text('Create Branch'), findsNothing);
+  });
+
+  testWidgets('助手消息菜单可以切换为用户', (tester) async {
+    final action = await _openMoreSheet(
+      tester,
+      canDeleteAllVersions: false,
+      tapLabel: 'Switch to User',
+    );
+
+    expect(action, MessageMoreAction.switchToUser);
+  });
+
+  testWidgets('用户消息菜单可以切换为助手', (tester) async {
+    final action = await _openMoreSheet(
+      tester,
+      canDeleteAllVersions: false,
+      role: 'user',
+      tapLabel: 'Switch to Assistant',
+    );
+
+    expect(action, MessageMoreAction.switchToAssistant);
   });
 }

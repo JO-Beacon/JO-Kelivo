@@ -5185,6 +5185,7 @@ class ChatDatabaseRepository {
   /// or null when no row matches [messageId].
   Future<ChatMessage?> updateMessageFields(
     String messageId, {
+    String? role,
     String? content,
     int? totalTokens,
     bool? isStreaming,
@@ -5199,6 +5200,7 @@ class ChatDatabaseRepository {
     int? durationMs,
   }) {
     final companion = MessageRowsCompanion(
+      role: role != null ? Value(role) : const Value.absent(),
       totalTokens: totalTokens != null
           ? Value(totalTokens)
           : const Value.absent(),

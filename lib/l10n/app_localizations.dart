@@ -4084,6 +4084,18 @@ abstract class AppLocalizations {
   /// **'Edit'**
   String get messageMoreSheetEdit;
 
+  /// No description provided for @messageMoreSheetSwitchToUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to User'**
+  String get messageMoreSheetSwitchToUser;
+
+  /// No description provided for @messageMoreSheetSwitchToAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to Assistant'**
+  String get messageMoreSheetSwitchToAssistant;
+
   /// No description provided for @messageMoreSheetShare.
   ///
   /// In en, this message translates to:

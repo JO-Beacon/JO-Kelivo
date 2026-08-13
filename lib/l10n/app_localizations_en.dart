@@ -2144,6 +2144,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageMoreSheetEdit => 'Edit';
 
   @override
+  String get messageMoreSheetSwitchToUser => 'Switch to User';
+
+  @override
+  String get messageMoreSheetSwitchToAssistant => 'Switch to Assistant';
+
+  @override
   String get messageMoreSheetShare => 'Share';
 
   @override

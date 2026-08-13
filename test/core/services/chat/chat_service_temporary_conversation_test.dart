@@ -469,6 +469,42 @@ void main() {
     },
   );
 
+  test(
+    'message role switch persists without changing revision identity or parts',
+    () async {
+      final first = createService();
+      await first.init();
+      final conversation = await first.createDraftConversation(
+        title: 'Role switch',
+      );
+      final before = await first.addMessage(
+        conversationId: conversation.id,
+        role: 'assistant',
+        parts: const [
+          TextPart('answer'),
+          ImagePart(uri: 'https://example.com/image.png'),
+          UnknownPart(rawKind: 'future', payload: '{"opaque":true}'),
+        ],
+      );
+
+      expect(await first.switchMessageRole(before.id, 'user'), isTrue);
+      expect(await first.switchMessageRole(before.id, 'user'), isFalse);
+      expect(await first.switchMessageRole('missing', 'assistant'), isFalse);
+      await first.close();
+      services.remove(first);
+
+      final restarted = createService();
+      await restarted.init();
+      final after = (await restarted.loadMessages(conversation.id)).single;
+      expect(after.id, before.id);
+      expect(after.role, 'user');
+      expect(after.groupId, before.groupId ?? before.id);
+      expect(after.version, before.version);
+      expect(after.parts.map((part) => part.kind), ['text', 'image', 'future']);
+      expect(await restarted.getMessageIds(conversation.id), [before.id]);
+    },
+  );
+
   group('ChatService temporary conversations', () {
     test('ordinary draft persists when its first message is added', () async {
       final service = createService();

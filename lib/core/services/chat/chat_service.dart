@@ -300,8 +300,9 @@ class ChatService extends ChangeNotifier {
       if (!abort.isCompleted) abort.complete();
     }
     _messageOrderBackfillAbort.clear();
-    final orderBackfills =
-        List<Future<void>>.of(_messageOrderBackfillFutures.values);
+    final orderBackfills = List<Future<void>>.of(
+      _messageOrderBackfillFutures.values,
+    );
     _messageOrderBackfillFutures.clear();
     for (final backfill in orderBackfills) {
       try {
@@ -2885,6 +2886,29 @@ class ChatService extends ChangeNotifier {
       cachedTokens: cachedTokens,
       durationMs: durationMs,
     );
+  }
+
+  Future<bool> switchMessageRole(String messageId, String role) async {
+    if (role != 'user' && role != 'assistant') {
+      throw ArgumentError.value(role, 'role', 'must be user or assistant');
+    }
+    if (!_initialized) await init();
+
+    final temporaryMessage = _cachedTemporaryMessage(messageId);
+    if (temporaryMessage != null) {
+      if (temporaryMessage.role == role) return false;
+      _replaceCachedMessage(temporaryMessage.copyWith(role: role));
+      notifyListeners();
+      return true;
+    }
+
+    final current = await _repo.getMessage(messageId);
+    if (current == null || current.role == role) return false;
+    final updated = await _repo.updateMessageFields(messageId, role: role);
+    if (updated == null) return false;
+    _replaceCachedMessage(updated);
+    notifyListeners();
+    return true;
   }
 
   /// Update message content during streaming without triggering notifyListeners.
