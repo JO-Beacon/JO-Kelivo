@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="assets/app_icon.png" alt="Kelivo Icon" width="100" />
+  <img src="assets/app_icon.png" alt="JO-Kelivo Icon" width="100" />
   <h1>JO-Kelivo，一个AI聊天助手</h1>
 
   <h2>⚠️ JO-Kelivo 是基于 Kelivo 的非官方改版，按 GNU AGPL-3.0 发布 ⚠️</h2>
@@ -23,7 +23,7 @@
 
 [Release日志](Release日志.md)
 
-# 已继承的 [原版Kelivo](https://github.com/Chevey339/kelivo) 功能特性
+# 已继承的 [原版 Kelivo](https://github.com/Chevey339/kelivo) 功能特性
 
 - 🎨 **现代化设计** - Material You 设计语言，支持动态主题色(Android12+)
 - 🌙 **深色模式** - 完美适配深色主题，保护您的眼睛
@@ -32,55 +32,55 @@
 - 🤖 **自定义助手** - 创建和管理个性化 AI 助手
 - 🖼️ **多模态输入** - 支持图片、文本文档、PDF、Word 文档等多种格式
 - 📝 **Markdown 渲染** - 完整支持代码高亮、LaTeX 公式、表格等
-- 🎙️ **语音服务** - 内置系统 TTS，同时支持 OpenAI / Google Gemini / ElevenLabs 语音服务器
-- 🛠️ **MCP 支持** - Model Context Protocol 工具集成
+- 🎙️ **语音服务** - 支持系统语音、网络 TTS 与语音识别
+- 🛠️ **MCP 支持** - 支持 Model Context Protocol 工具与 OAuth
 - 🧰 **内置 MCP 工具** - 内置 fetch MCP 工具
-- 🔍 **网络搜索** - 集成多种搜索引擎（Exa、Tavily、智谱、LinkUp、Brave、Bing、Metaso、SearXNG、Ollama、Jina, Perplexity, Bocha）
+- 🔍 **网络搜索** - 集成多种搜索服务，并支持部分供应商的内置搜索
 - 🧩 **提示词变量** - 支持模型名称、时间等动态变量
 - 📤 **二维码分享** - 通过二维码导出和导入供应商配置
 - 💾 **数据备份** - 支持聊天记录备份和恢复
 - 🌐 **自定义请求** - 支持自定义 HTTP 请求头和请求体
 - 🔡 **自定义字体** - 支持自定义字体（系统字体 / Google Fonts）
 - ⚙️ **Android 后台生成对话** - 可在后台持续生成消息（可在设置中开启）。
+- 🗃️ **SQLite 聊天数据库** - 聊天、消息版本和结构化附件使用 SQLite / Drift 持久化
+- 🧠 **记忆系统** - 支持记忆提取、管理和上下文注入
 
-# JO-Kelivo功能特性
+# JO-Kelivo 功能特性
 
 - **单条消息身份切换** - 可在聊天消息菜单中把单条消息在“用户”和“模型”之间切换，便于整理或修正对话上下文。
 - **新建 / 复制助手置顶选项** - 可选择让新建或复制的助手自动出现在助手列表顶部，移动端和桌面端均支持。
 - **长会话懒加载开关** - 可按需启用或关闭长会话懒加载；开启时减少一次性渲染大量历史消息带来的压力，关闭时便于完整查看和整理会话；默认开启。
-- **DeepSeek Anthropic 通道与搜索强化适配与余额查询兼容** - 调整 DeepSeek 默认接入方式，并优化内置搜索相关的连续请求问题；非 OpenAI-compatible 通道查询余额时需要用户手动填写完整的余额 API URL。
-- **历史消息附件可视化编辑** - 编辑历史消息时，图片和文件会以附件形式展示，支持删除、替换和继续添加。（上游 [原版Kelivo](https://github.com/Chevey339/kelivo) 在1.1.16已添加，但该功能依旧由JO-Kelivo坚持接管，因为 JO-Kelivo 的操作逻辑需要保持统一）
-- ~~用户消息图片分离显示 - 可选择将用户消息中的图片显示在气泡下方独立区域，消息内容格式保持兼容~~（上游 [原版Kelivo](https://github.com/Chevey339/kelivo) 在1.1.16已添加，后续由上游接管）
-- **应用身份独立化** - JO-Kelivo 与 [原版Kelivo](https://github.com/Chevey339/kelivo) 使用不同应用标识和数据目录，可并存安装；数据通过导入导出迁移。
+- **DeepSeek 默认 Anthropic-compatible 通道与内置搜索** - 新建 DeepSeek 配置默认使用 `https://api.deepseek.com/anthropic`，可直接走兼容的内置搜索协议；显式配置的 OpenAI-compatible `/v1` 路线仍可使用。
+- **历史消息结构化附件编辑** - 编辑历史消息时可查看、删除、替换或继续添加图片和文件；日常存储使用 1.2.1 的结构化消息部件，不再把附件写回正文标记字符串。
+- **应用身份独立化** - JO-Kelivo 与 [原版 Kelivo](https://github.com/Chevey339/kelivo) 使用不同应用标识和数据目录，可并存安装和使用。
 - **宽屏聊天区域拉宽** - 可在平板、桌面或手机横屏等宽屏布局中让消息列表和输入栏尽量占满可用宽度；默认关闭。
 - **JO-Kelivo 更新检测** - 新版本检查固定使用 JO-Kelivo 自己的 GitHub Releases，并按当前平台匹配可下载安装包。
 - **用户数据目录入口** - 桌面端备份与恢复、存储空间页面提供打开用户数据目录入口，方便定位聊天数据和文件操作。
-- ~~DeepSeek 搜索适配 - DeepSeek 现已支持内置搜索，走 Anthropic 通道。~~（上游 [原版Kelivo](https://github.com/Chevey339/kelivo) 在1.1.16已添加，后续由上游接管）
-- ~~用户消息图片分离显示 - 可选择将用户消息中的图片显示在气泡下方独立区域，消息内容格式保持兼容~~（上游 [原版Kelivo](https://github.com/Chevey339/kelivo) 在1.1.16已添加，后续由上游接管）
-# JO-Kelivo修复项
+- **旧存档优化工具** - 独立的 [Python 工具](optimize_chat_archive/README.md) 只处理 JO-Kelivo `0.1.5` 及更早版本导出的旧 `chats.json`，不会接触当前 SQLite 数据库。
 
-- **长会话版本消息顺序写入层修复** - 改善含编辑、重新生成、分支版本的长会话显示顺序，减少旧上下文被误插入当前视图的问题。（上游 [原版Kelivo](https://github.com/Chevey339/kelivo) 在1.1.16已修复的是显示层，写入层修复依旧由JO-Kelivo坚持接管，因为这会让存档本身更健康。同时，JO-Kelivo提供了python驱动的独立 [存档优化工具](optimize_chat_archive/README.md)）
-- ~~长会话版本消息顺序显示层修复 - 改善含编辑、重新生成、分支版本的长会话显示顺序，减少旧上下文被误插入当前视图的问题。~~（上游 [原版Kelivo](https://github.com/Chevey339/kelivo) 在1.1.16已修复，后续由上游接管）
+# JO-Kelivo 修复项
 
-# JO-Kelivo改版概述
+- **长会话完整读取与版本顺序** - 在 1.2.1 的数据库分页和版本模型上补充受控完整读取路径，并保护编辑、重新生成和分支后的稳定顺序。
 
-JO-Kelivo 是基于 [原版 Kelivo](https://github.com/Chevey339/kelivo) （以下简称“[原版](https://github.com/Chevey339/kelivo)”）的改版 fork。[原版](https://github.com/Chevey339/kelivo) 采用 GNU AGPL-3.0 许可证，本项目依规定继续按 GNU AGPL-3.0 发布。
+# JO-Kelivo 改版概述
+
+当前源码版本为 JO-Kelivo `0.1.6+6`，采用原版 Kelivo `1.2.1+64`（tag `v1.2.1`，commit `dae00af67681242f820ddfb9c7ea9ead35dcab5b`）作为实现基座。JO-Kelivo 保持独立 Git 历史；外部基座是可替换的实现输入，不代表重新连接或依赖原版提交祖先。
 
 感谢 [原版 Kelivo](https://github.com/Chevey339/kelivo) 作者及贡献者的开源工作。原项目版权归原作者及贡献者所有。JO-Kelivo 是基于原版 Kelivo 的**非官方**修改版本，不代表原版作者发布、维护或背书。
 
 本项目作为 [原版 Kelivo](https://github.com/Chevey339/kelivo) 的修改版本，继续按 GNU AGPL-3.0 发布。分发二进制文件时，会（且必须）同时提供对应源代码。
 
-本项目已经与 [原版](https://github.com/Chevey339/kelivo) 做应用身份独立化处理：应用名称、平台包名、安装器标识、运行时数据目录和构建产物名等均改为 JO-Kelivo 相关标识。因此，JO-Kelivo 可以与 [原版](https://github.com/Chevey339/kelivo) 并存安装和使用。
+本项目已经与 [原版](https://github.com/Chevey339/kelivo) 做应用身份独立化处理：应用名称、平台包名、安装器标识、运行时数据目录、更新源和构建产物名均使用 JO-Kelivo 身份。因此，JO-Kelivo 可以与原版并存安装和使用，双方不会自动读取彼此的运行时数据。
 
-**数据兼容策略**：运行时数据与 [原版](https://github.com/Chevey339/kelivo) 分离，但导入导出格式尽可能保持**双向兼容**。也就是说，JO-Kelivo 不会自动读取 [原版](https://github.com/Chevey339/kelivo) 的本地数据；如需迁移聊天记录、设置或备份，需要先从 [原版](https://github.com/Chevey339/kelivo) 导出，再在 JO-Kelivo 中手动导入。
+**数据兼容策略**：JO-Kelivo `0.1.6` 支持从 JO-Kelivo `0.1.5` 原数据目录升级，也支持把 JO-Kelivo `0.1.5` 备份导入干净安装的 `0.1.6`。升级前会保留恢复备份；无法解码的损坏记录按 1.2.1 的容错规则跳过并报告。
 
-如果想迁移回 [原版](https://github.com/Chevey339/kelivo) ，通常数据是保持兼容的，从 JO-Kelivo 中导出，再回到 [原版](https://github.com/Chevey339/kelivo) 手动导入即可。
+本项目不承诺 JO-Kelivo `0.1.6` 导出的备份能被 JO-Kelivo `0.1.5` 或原版 Kelivo 完整反向导入。跨产品迁移前请先保留双方各自的完整备份，并只使用目标版本明确支持的导入入口。
 
 # JO-Kelivo详细维护者改版记录（普通用户可跳过）
 
 [查看维护者改版记录](维护者改版记录.md)
 
-后续同步 [原版](https://github.com/Chevey339/kelivo) 代码、合并新版源码、做重构或批量覆盖文件时，必须先阅读本文件的改版说明与改版规范，确认改版说明与改版规范不能被误删、误改或回退。
+后续替换基座、同步外部实现、重构或批量修改前，必须先阅读 [AGENTS.md](AGENTS.md) 和维护者记录，保护 JO 身份、数据隔离、更新发布规则及已确认产品能力。
 
 # 致谢
 

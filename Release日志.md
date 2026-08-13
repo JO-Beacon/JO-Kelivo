@@ -1,3 +1,93 @@
+# 0.1.6+6（发布候选）
+
+## Release notes draft
+
+```markdown
+# JO-Kelivo 0.1.6+6
+
+候选验证日期：2026-08-14
+前一实现基座：原版 Kelivo 1.1.16+60
+当前实现基座：原版 Kelivo 1.2.1+64（tag `v1.2.1`，commit `dae00af67681242f820ddfb9c7ea9ead35dcab5b`）
+计划 Release tag：`v0.1.6`
+
+## 说明
+
+JO-Kelivo 是基于原版 Kelivo 的非官方修改版本，不代表原版作者发布、维护或背书。感谢原版 Kelivo 作者及贡献者的开源工作；原项目版权归原作者及贡献者所有。
+
+JO-Kelivo 保持独立 Git 历史、应用身份、数据目录、更新源和发布流程。本版本把实现基座替换为 Kelivo 1.2.1，但没有重新连接或改写为原版 Git 历史。
+
+本项目继续按 GNU AGPL-3.0 发布。若 Release 分发二进制产物，对应源码必须通过同一 Release 页面附带的 Source code 压缩包或清晰链接提供；许可证全文见仓库根目录 LICENSE。
+
+## 升级前提示
+
+- 从 JO-Kelivo 0.1.5 升级前，请先导出一份备份并保留迁移过程生成的恢复备份。
+- JO-Kelivo 与原版 Kelivo 使用不同运行时数据目录，不会自动读取对方的本地数据。
+- 本版本支持 JO-Kelivo 0.1.5 原地升级和旧备份导入；不承诺 0.1.6 新备份能被 JO-Kelivo 0.1.5 或原版 Kelivo 完整反向导入。
+- 旧数据中的损坏记录按 Kelivo 1.2.1 容错规则跳过并报告；迁移失败时保留原始恢复数据，不把部分迁移伪装成成功。
+
+## 本版本变更
+
+- 聊天运行时基座升级到 SQLite/Drift；旧 Hive 仅用于首次迁移，不再作为运行时双写数据库。
+- 消息正文与附件升级为结构化 `MessagePart`；旧 `[image:]` / `[file:]` 仅用于旧数据解码，0.1.6 正常运行和新备份不再写回 marker。
+- 采用 Kelivo 1.2.1 的数据库备份恢复、迁移加固、记忆、语音、MCP OAuth、本地设备工具和 provider 修复。
+- 在新 repository 架构上恢复单条消息用户/模型身份切换，保证角色和附件 parts 一起持久化。
+- 恢复历史消息结构化附件编辑，支持图片和文件的新增、替换与删除，同时保留未知 part。
+- 恢复新建/复制助手置顶、宽屏聊天区域拉宽、长会话懒加载设置和受控完整历史读取。
+- 恢复桌面备份页与存储空间页的两个用户数据目录入口，目标均为 JO 主数据目录。
+- DeepSeek 新建默认配置使用 Anthropic-compatible 通道 `https://api.deepseek.com/anthropic`，接通 1.2.1 内置搜索协议；用户显式配置的 OpenAI-compatible `/v1` 路线继续保留。
+- 保留 DeepSeek Web/App 导入占位入口及“暂不支持”行为；本版本不实现实际导入。
+- 旧存档优化工具收窄为仅处理 JO-Kelivo 0.1.5 及更早导出的旧 `chats.json`，明确拒绝 Hive、SQLite、其他备份和非目标 JSON。
+- 退役用户消息图片显示位置开关，采用 1.2.1 固定显示规则；遗留设置不会重新暴露无效 UI。
+- 更新 JO About 基座归属、平台身份、数据隔离、GitHub Releases 更新源及 Android/Windows/Linux 发布 workflow。
+
+## 验证结果
+
+- `flutter analyze` 通过。
+- 完整 `flutter test`：2317 passed，6 skipped，0 failed。
+- 数据库、迁移和恢复专项：576 passed，5 skipped，0 failed。
+- MCP path dependency：VM 测试 98 passed；downsize dependency：3 tests passed。
+- Windows x64 release 构建、portable ZIP、setup EXE、两个 `.sha256`、内部 EXE 名称和 `0.1.6+6` 版本信息均已验证。
+- Windows 主 EXE 和 setup EXE 当前均未做 Authenticode 签名；现有 workflow 没有代码签名步骤。
+- Android 构建已进入 Gradle 配置，但在下载 Google Maven 依赖时因 `dl.google.com:443` 网络超时中断；本轮尚未产出三个候选 APK，不能记为构建通过。
+- 当前 Windows 环境没有 Linux 发行版或 Docker；本轮尚未真实构建 AppImage、tar.gz 和 deb。
+- Actions workflow 已通过语法检查和本地发布契约测试。由于迁移分支尚未推送到远端可执行 ref，本轮未触发非发布 `workflow_dispatch` artifact 上传；推送后仍需补验。
+- 未使用真实 DeepSeek key 做在线冒烟；协议和搜索自动化测试使用本地模拟服务完成。
+- iOS、macOS、Web 不在本轮发布候选矩阵内，未做 release 构建。
+
+## 发布状态
+
+当前记录是发布候选草案，不代表完整跨平台发布矩阵已经通过。Windows 候选可供审查；Android、Linux 真实 release 资产和 GitHub Actions 非发布上传验证完成前，不应创建正式 Release。
+
+## Windows 候选 SHA-256
+
+1a63ddf20120c6dc53f755a97723c2eac1944ebafdc1ece36c787303f6e003aa  JO-Kelivo-v0.1.6+6-windows-x64-portable.zip
+6f0a2fc935d5f30eadcc2aa353267c15b2cec059ad5ca67bb62e40e63d749a1c  JO-Kelivo-v0.1.6+6-windows-x64-setup.exe
+```
+
+## 已生成候选文件（不含源码）
+
+JO-Kelivo-v0.1.6+6-windows-x64-portable.zip
+JO-Kelivo-v0.1.6+6-windows-x64-portable.zip.sha256
+JO-Kelivo-v0.1.6+6-windows-x64-setup.exe
+JO-Kelivo-v0.1.6+6-windows-x64-setup.exe.sha256
+
+## 尚待生成和验证的候选文件
+
+JO-Kelivo-v0.1.6+6-android-arm64-v8a-release.apk
+JO-Kelivo-v0.1.6+6-android-arm64-v8a-release.apk.sha256
+JO-Kelivo-v0.1.6+6-android-armeabi-v7a-release.apk
+JO-Kelivo-v0.1.6+6-android-armeabi-v7a-release.apk.sha256
+JO-Kelivo-v0.1.6+6-android-x86_64-release.apk
+JO-Kelivo-v0.1.6+6-android-x86_64-release.apk.sha256
+JO-Kelivo-v0.1.6+6-linux-x64-appimage.AppImage
+JO-Kelivo-v0.1.6+6-linux-x64-appimage.AppImage.sha256
+JO-Kelivo-v0.1.6+6-linux-x64-archive.tar.gz
+JO-Kelivo-v0.1.6+6-linux-x64-archive.tar.gz.sha256
+JO-Kelivo-v0.1.6+6-linux-x64-deb.deb
+JO-Kelivo-v0.1.6+6-linux-x64-deb.deb.sha256
+
+---
+
 # 0.1.0+0
 
 ## Release notes

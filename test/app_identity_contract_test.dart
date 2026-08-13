@@ -64,35 +64,51 @@ void main() {
 
   group('JO release workflow contract', () {
     test('covers every release asset and checksum', () {
-      final expectedTokens = <String, List<String>>{
+      final expectedTokens = <String, List<({String token, int count})>>{
         '.github/workflows/build-android.yml': [
-          'arm64-v8a armeabi-v7a x86_64',
-          r'android-${abi}-release.apk',
-          'android-*-release.apk.sha256',
+          (token: 'arm64-v8a armeabi-v7a x86_64', count: 1),
+          (token: r'android-${abi}-release.apk', count: 1),
+          (token: 'android-*-release.apk.sha256', count: 2),
         ],
         '.github/workflows/build-windows.yml': [
-          'windows-x64-portable.zip',
-          'windows-x64-portable.zip.sha256',
-          'windows-x64-setup.exe',
-          'windows-x64-setup.exe.sha256',
+          (token: 'windows-x64-portable.zip', count: 2),
+          (token: 'windows-x64-portable.zip.sha256', count: 2),
+          (token: 'windows-x64-setup.exe', count: 2),
+          (token: 'windows-x64-setup.exe.sha256', count: 2),
         ],
         '.github/workflows/build-linux.yml': [
-          'linux-x64-archive.tar.gz',
-          'linux-x64-archive.tar.gz.sha256',
-          'linux-x64-appimage.AppImage',
-          'linux-x64-appimage.AppImage.sha256',
-          'linux-x64-deb.deb',
-          'linux-x64-deb.deb.sha256',
+          (token: 'linux-x64-archive.tar.gz', count: 2),
+          (token: 'linux-x64-archive.tar.gz.sha256', count: 2),
+          (token: 'linux-x64-appimage.AppImage', count: 2),
+          (token: 'linux-x64-appimage.AppImage.sha256', count: 2),
+          (token: 'linux-x64-deb.deb', count: 2),
+          (token: 'linux-x64-deb.deb.sha256', count: 2),
         ],
       };
 
-      for (final MapEntry(key: path, value: tokens) in expectedTokens.entries) {
+      for (final MapEntry(key: path, value: expectations)
+          in expectedTokens.entries) {
         final workflow = _read(path);
         expect(workflow, contains("FLUTTER_VERSION: '3.44.1'"));
+        expect(workflow, contains('workflow_dispatch:'));
         expect(workflow, contains('actions/upload-artifact@v4'));
+        expect(workflow, contains('if-no-files-found: error'));
         expect(workflow, contains('softprops/action-gh-release@v2'));
-        for (final token in tokens) {
-          expect(workflow, contains(token), reason: path);
+        expect(
+          workflow,
+          contains(
+            "github.ref_type == 'tag' || "
+            "(github.event_name == 'workflow_dispatch' && "
+            "inputs.publish_release && inputs.release_tag != '')",
+          ),
+          reason: path,
+        );
+        for (final expectation in expectations) {
+          expect(
+            expectation.token.allMatches(workflow).length,
+            greaterThanOrEqualTo(expectation.count),
+            reason: '$path must cover ${expectation.token}',
+          );
         }
       }
     });
@@ -100,19 +116,55 @@ void main() {
     test(
       'keeps release tags on product version while assets include build',
       () {
-        for (final path in [
-          '.github/workflows/build-android.yml',
-          '.github/workflows/build-windows.yml',
-          '.github/workflows/build-linux.yml',
-        ]) {
+        final workflowShellTokens = <String, List<String>>{
+          '.github/workflows/build-android.yml': [
+            r'v${release_version}',
+            'short_sha',
+            r'version="${version}_${short_sha}"',
+          ],
+          '.github/workflows/build-windows.yml': [
+            r'v$releaseVersion',
+            'shortSha',
+            r'version = "${version}_${shortSha}"',
+          ],
+          '.github/workflows/build-linux.yml': [
+            r'v${release_version}',
+            'short_sha',
+            r'version="${version}_${short_sha}"',
+          ],
+        };
+        for (final MapEntry(key: path, value: tokens)
+            in workflowShellTokens.entries) {
           final workflow = _read(path);
           expect(workflow, contains('pubspec.yaml'));
           expect(workflow, contains('GITHUB_REF_TYPE'));
           expect(workflow, contains('GITHUB_REF_NAME'));
           expect(workflow, contains('VERSION='));
+          for (final token in tokens) {
+            expect(workflow, contains(token), reason: path);
+          }
         }
       },
     );
+
+    test('requires signing secrets before Android release publication', () {
+      final workflow = _read('.github/workflows/build-android.yml');
+      for (final secret in [
+        'ANDROID_KEYSTORE_BASE64',
+        'ANDROID_STORE_PASSWORD',
+        'ANDROID_KEY_ALIAS',
+        'ANDROID_KEY_PASSWORD',
+      ]) {
+        expect(workflow, contains('secrets.$secret'));
+      }
+      expect(
+        workflow,
+        contains(
+          'Android signing secrets are required for Release publication.',
+        ),
+      );
+      expect(workflow, contains('flutter build apk --release --split-per-abi'));
+    });
 
     test('creates only an empty fallback key in PR checks', () {
       final prWorkflow = _read('.github/workflows/pr-check.yml');
