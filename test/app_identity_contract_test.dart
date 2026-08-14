@@ -306,6 +306,22 @@ void main() {
         expect(workflow, contains('secrets.SILICONFLOW_KEY'), reason: path);
       }
     });
+
+    test('requires the official simplified Chinese installer messages', () {
+      final installerScript = _read('scripts/windows/build_installer.ps1');
+      _expectContains(
+        'scripts/windows/build_installer.ps1',
+        'Files/Languages/ChineseSimplified.isl',
+      );
+      expect(
+        installerScript,
+        isNot(contains('Files/Languages/Unofficial/ChineseSimplified.isl')),
+      );
+      expect(
+        installerScript,
+        isNot(contains('Falling back to English installer messages')),
+      );
+    });
   });
 }
 
