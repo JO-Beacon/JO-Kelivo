@@ -22,7 +22,8 @@ JO-Kelivo 保持独立 Git 历史、应用身份、数据目录、更新源和�
 
 - 从 JO-Kelivo 0.1.5 升级前，请先导出一份备份并保留迁移过程生成的恢复备份。
 - JO-Kelivo 与原版 Kelivo 使用不同运行时数据目录，不会自动读取对方的本地数据。
-- 本版本支持 JO-Kelivo 0.1.5 原地升级和旧备份导入；不承诺 0.1.6 新备份能被 JO-Kelivo 0.1.5 或原版 Kelivo 完整反向导入。
+- 本版本支持 JO-Kelivo 0.1.5 原地升级和旧备份导入；JO-Kelivo 与同代原版 Kelivo 在双方共同支持的数据范围内保持双向导入导出兼容。
+- JO-Kelivo 0.1.6 不要求向旧 JO-Kelivo 0.1.5 降级兼容；这不影响 JO 与同代原版之间的双向兼容目标。
 - 旧数据中的损坏记录按 Kelivo 1.2.1 容错规则跳过并报告；迁移失败时保留原始恢复数据，不把部分迁移伪装成成功。
 
 ## 本版本变更
@@ -43,20 +44,21 @@ JO-Kelivo 保持独立 Git 历史、应用身份、数据目录、更新源和�
 ## 验证结果
 
 - `flutter analyze` 通过。
-- 完整 `flutter test`：2317 passed，6 skipped，0 failed。
-- 数据库、迁移和恢复专项：576 passed，5 skipped，0 failed。
+- 完整 `flutter test`：2319 passed，6 skipped，0 failed。
+- 备份文件专项：59 passed，1 skipped，0 failed。
 - MCP path dependency：VM 测试 98 passed；downsize dependency：3 tests passed。
 - Windows x64 release 构建、portable ZIP、setup EXE、两个 `.sha256`、内部 EXE 名称和 `0.1.6+6` 版本信息均已验证。
 - Windows 主 EXE 和 setup EXE 当前均未做 Authenticode 签名；现有 workflow 没有代码签名步骤。
-- Android 构建已进入 Gradle 配置，但在下载 Google Maven 依赖时因 `dl.google.com:443` 网络超时中断；本轮尚未产出三个候选 APK，不能记为构建通过。
-- 当前 Windows 环境没有 Linux 发行版或 Docker；本轮尚未真实构建 AppImage、tar.gz 和 deb。
+- Android 本地构建已进入 Gradle 配置，但在下载 Google Maven 依赖时因 `dl.google.com:443` 网络超时中断；本轮尚未产出三个候选 APK，待本机网络恢复后重试。
+- Linux 正式候选由 GitHub Actions 的 Ubuntu runner 构建。迁移分支尚未推送到远端可执行 ref，因此本轮 workflow 尚未生成 AppImage、tar.gz 和 deb；本机缺少 Linux 工具链只影响本地复现。
 - Actions workflow 已通过语法检查和本地发布契约测试。由于迁移分支尚未推送到远端可执行 ref，本轮未触发非发布 `workflow_dispatch` artifact 上传；推送后仍需补验。
+- JO 0.1.6 与原版 Kelivo 1.2.1 的备份核心实现保持同源；备份编排、备份模型、业务恢复和业务设置路由文件已逐项通过 SHA-256 一致性核对。两个方向的合成契约测试均已通过，覆盖共享会话、消息、版本关系、结构化附件、助手、供应商和附件文件；JO 本地专属显示设置不会进入共享备份。
 - 未使用真实 DeepSeek key 做在线冒烟；协议和搜索自动化测试使用本地模拟服务完成。
 - iOS、macOS、Web 不在本轮发布候选矩阵内，未做 release 构建。
 
 ## 发布状态
 
-当前记录是发布候选草案，不代表完整跨平台发布矩阵已经通过。Windows 候选可供审查；Android、Linux 真实 release 资产和 GitHub Actions 非发布上传验证完成前，不应创建正式 Release。
+当前记录是发布候选草案，不代表完整发布门禁已经通过。Windows 候选可供审查；Android 本地 release 构建、Linux GitHub Actions 产物和非发布 artifact 上传验证完成前，不应创建正式 Release。
 
 ## Windows 候选 SHA-256
 
