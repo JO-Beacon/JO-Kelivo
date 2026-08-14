@@ -1,7 +1,9 @@
 import importlib.util
 import json
+import sqlite3
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -25,10 +27,11 @@ def message(message_id, group_id=None, version=0):
         "id": message_id,
         "role": "user",
         "content": message_id,
+        "timestamp": "2026-01-01T00:00:00.000Z",
+        "conversationId": "conversation-1",
+        "groupId": group_id or message_id,
         "version": version,
     }
-    if group_id is not None:
-        data["groupId"] = group_id
     return data
 
 
@@ -155,6 +158,29 @@ def test_rejects_invalid_backup_shape():
         optimize_archive_data({"conversations": []})
 
 
+def test_accepts_empty_legacy_archive_as_no_op():
+    optimized, report = optimize_archive_data(
+        {
+            "version": 1,
+            "conversations": [],
+            "messages": [],
+            "toolEvents": {},
+            "geminiThoughtSigs": {},
+        }
+    )
+
+    assert optimized["conversations"] == []
+    assert report.conversations_seen == 0
+
+
+def test_rejects_structured_parts_archive():
+    data = archive(["a"], [message("a")])
+    data["messages"][0]["parts"] = [{"kind": "text", "payload": "a"}]
+
+    with pytest.raises(ValueError, match="structured message parts"):
+        optimize_archive_data(data)
+
+
 def test_default_paths():
     path = Path("C:/tmp/chats.json")
 
@@ -188,5 +214,92 @@ def test_cli_writes_output_and_backup(tmp_path):
     ] == ["a", "a-v1", "b"]
     assert json.loads(backup_path.read_text(encoding="utf-8")) == data
     assert "messages moved: 1" in result.stdout
+
+
+@pytest.mark.parametrize("kind", ["hive", "sqlite", "zip", "other_json", "modern_json"])
+def test_cli_rejects_non_target_input_without_modifying_any_file(tmp_path, kind):
+    input_path = tmp_path / "chats.json"
+    if kind == "hive":
+        input_path.write_bytes(b"HIVE\x00\x01not-json")
+    elif kind == "sqlite":
+        connection = sqlite3.connect(input_path)
+        connection.execute("CREATE TABLE messages (id TEXT PRIMARY KEY)")
+        connection.commit()
+        connection.close()
+    elif kind == "zip":
+        with zipfile.ZipFile(input_path, "w") as archive_file:
+            archive_file.writestr("chats.json", "{}")
+    elif kind == "other_json":
+        input_path.write_text(
+            json.dumps({"version": 1, "conversations": [], "messages": []}),
+            encoding="utf-8",
+        )
+    else:
+        data = archive(["a"], [message("a")])
+        data["messages"][0]["parts"] = [{"kind": "text", "payload": "a"}]
+        input_path.write_text(json.dumps(data), encoding="utf-8")
+
+    output_path = tmp_path / "chats.optimized.json"
+    backup_path = tmp_path / "chats.backup.json"
+    output_path.write_bytes(b"existing-output")
+    backup_path.write_bytes(b"existing-backup")
+    before = input_path.read_bytes()
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "optimize_chat_archive.py"),
+            str(input_path),
+            "--overwrite-output",
+            "--overwrite-backup",
+        ],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "Optimization failed" in result.stderr
+    assert input_path.read_bytes() == before
+    assert output_path.read_bytes() == b"existing-output"
+    assert backup_path.read_bytes() == b"existing-backup"
+
+
+@pytest.mark.parametrize("collision", ["output_input", "backup_input", "output_backup"])
+def test_cli_rejects_overlapping_paths_without_modifying_input(tmp_path, collision):
+    input_path = tmp_path / "chats.json"
+    input_path.write_text(
+        json.dumps(archive(["a"], [message("a")])),
+        encoding="utf-8",
+    )
+    shared_path = tmp_path / "shared.json"
+    before = input_path.read_bytes()
+
+    args = [
+        sys.executable,
+        str(ROOT / "optimize_chat_archive.py"),
+        str(input_path),
+        "--overwrite-output",
+        "--overwrite-backup",
+    ]
+    if collision == "output_input":
+        args.extend(["--output", str(input_path)])
+    elif collision == "backup_input":
+        args.extend(["--backup", str(input_path)])
+    else:
+        args.extend(["--output", str(shared_path), "--backup", str(shared_path)])
+
+    result = subprocess.run(
+        args,
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert input_path.read_bytes() == before
+    assert not shared_path.exists()
 
 

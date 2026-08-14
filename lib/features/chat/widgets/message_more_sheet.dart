@@ -21,19 +21,20 @@ import 'package:Kelivo/theme/app_font_weights.dart';
 
 enum MessageMoreAction {
   edit,
+  switchToUser,
+  switchToAssistant,
   fork,
   deleteCurrentVersion,
   deleteAllVersions,
   share,
   selectMessages,
-  switchToUser,
-  switchToAssistant,
 }
 
 Future<MessageMoreAction?> showMessageMoreSheet(
   BuildContext context,
   ChatMessage message, {
   required bool canDeleteAllVersions,
+  required bool canCreateBranch,
 }) async {
   final isDesktop =
       defaultTargetPlatform == TargetPlatform.macOS ||
@@ -52,6 +53,7 @@ Future<MessageMoreAction?> showMessageMoreSheet(
         message: message,
         parentContext: context,
         canDeleteAllVersions: canDeleteAllVersions,
+        canCreateBranch: canCreateBranch,
       ),
     );
   }
@@ -136,13 +138,14 @@ Future<MessageMoreAction?> showMessageMoreSheet(
           selected = MessageMoreAction.selectMessages;
         },
       ),
-      DesktopContextMenuItem(
-        icon: Lucide.GitFork,
-        label: l10n.messageMoreSheetCreateBranch,
-        onTap: () {
-          selected = MessageMoreAction.fork;
-        },
-      ),
+      if (canCreateBranch)
+        DesktopContextMenuItem(
+          icon: Lucide.GitFork,
+          label: l10n.messageMoreSheetCreateBranch,
+          onTap: () {
+            selected = MessageMoreAction.fork;
+          },
+        ),
       DesktopContextMenuItem(
         icon: Lucide.Trash2,
         label: l10n.messageMoreSheetDelete,
@@ -173,10 +176,12 @@ class _MessageMoreSheet extends StatefulWidget {
     required this.message,
     required this.parentContext,
     required this.canDeleteAllVersions,
+    required this.canCreateBranch,
   });
   final ChatMessage message;
   final BuildContext parentContext;
   final bool canDeleteAllVersions;
+  final bool canCreateBranch;
 
   @override
   State<_MessageMoreSheet> createState() => _MessageMoreSheetState();
@@ -193,7 +198,7 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
     VoidCallback? onTap,
   }) {
     final cs = Theme.of(context).colorScheme;
-    final fg = danger ? Colors.red.shade600 : cs.onSurface;
+    final fg = danger ? Theme.of(context).colorScheme.error : cs.onSurface;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: SizedBox(
@@ -360,13 +365,14 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                         ).pop(MessageMoreAction.selectMessages);
                       },
                     ),
-                    _actionItem(
-                      icon: Lucide.GitFork,
-                      label: l10n.messageMoreSheetCreateBranch,
-                      onTap: () {
-                        Navigator.of(context).pop(MessageMoreAction.fork);
-                      },
-                    ),
+                    if (widget.canCreateBranch)
+                      _actionItem(
+                        icon: Lucide.GitFork,
+                        label: l10n.messageMoreSheetCreateBranch,
+                        onTap: () {
+                          Navigator.of(context).pop(MessageMoreAction.fork);
+                        },
+                      ),
                     _actionItem(
                       icon: Lucide.Trash2,
                       label: l10n.messageMoreSheetDelete,

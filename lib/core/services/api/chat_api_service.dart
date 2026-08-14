@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
@@ -17,10 +18,12 @@ import 'package:Kelivo/secrets/fallback.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
 import '../../../utils/unicode_sanitizer.dart';
 import 'builtin_tools.dart';
+import 'kimi_formula_search.dart';
 import 'gemini_tool_config.dart';
 import '../logging/flutter_logger.dart';
 import '../model_override_resolver.dart';
 import '../model_override_payload_parser.dart';
+import '../custom_request_merger.dart';
 import 'provider_request_headers.dart';
 import '../../utils/multimodal_input_utils.dart';
 
@@ -55,6 +58,21 @@ class ChatApiService {
   static const String _aihubmixAppCode = 'ZKRT3588';
   static final Map<String, CancelToken> _activeCancelTokens =
       <String, CancelToken>{};
+
+  @visibleForTesting
+  static bool shouldAttachVertexMediaAuthForTest(Uri uri) =>
+      _shouldAttachVertexMediaAuth(uri);
+
+  @visibleForTesting
+  static String normalizeClaudeImageMimeForTest(String mime) =>
+      _normalizeClaudeImageMime(mime);
+
+  @visibleForTesting
+  static bool isLongCatHostForTest(String baseUrl) => _isLongCatHost(baseUrl);
+
+  @visibleForTesting
+  static bool shouldIncludeStreamingUsageOptionsForTest(String host) =>
+      _shouldIncludeStreamingUsageOptions(host);
 
   static bool supportsOpenAIImagesApiRouting(
     ProviderConfig config,
@@ -138,27 +156,38 @@ class ChatApiService {
 
   static Map<String, String> _customHeaders(
     ProviderConfig cfg,
-    String modelId,
-  ) {
+    String modelId, {
+    Map<String, String> baseHeaders = const <String, String>{},
+    Map<String, String>? assistantHeaders,
+  }) {
     final ov = _modelOverride(cfg, modelId);
-    final out = <String, String>{
-      ...providerDefaultHeaders(cfg),
-      ...ModelOverridePayloadParser.customHeaders(ov),
-    };
+    final automatic = <String, String>{...providerDefaultHeaders(cfg)};
     // AIhubmix promo header (opt-in per-provider)
     if (_isAihubmix(cfg) && cfg.aihubmixAppCodeEnabled == true) {
-      out.putIfAbsent('APP-Code', () => _aihubmixAppCode);
+      automatic.putIfAbsent('APP-Code', () => _aihubmixAppCode);
     }
-    return out;
+    return CustomRequestMerger.mergeHeaders(
+      base: baseHeaders,
+      assistant: assistantHeaders,
+      providerAutomatic: automatic,
+      provider: ModelOverridePayloadParser.customHeadersFromRows(
+        cfg.customHeaders,
+      ),
+      model: ModelOverridePayloadParser.customHeaders(ov),
+    );
   }
 
-  static dynamic _parseOverrideValue(String v) {
-    return ModelOverridePayloadParser.parseOverrideValue(v);
-  }
-
-  static Map<String, dynamic> _customBody(ProviderConfig cfg, String modelId) {
+  static Map<String, dynamic> _customBody(
+    ProviderConfig cfg,
+    String modelId, {
+    Map<String, dynamic>? assistantBody,
+  }) {
     final ov = _modelOverride(cfg, modelId);
-    return ModelOverridePayloadParser.customBody(ov);
+    return CustomRequestMerger.mergeBody(
+      assistant: assistantBody,
+      providerRows: cfg.customBody,
+      model: ModelOverridePayloadParser.customBody(ov),
+    );
   }
 
   static bool _isAihubmix(ProviderConfig cfg) {
@@ -236,9 +265,8 @@ class ChatApiService {
   }) async {
     if (raw.isEmpty) return const _ParsedTextAndImages('', <_ImageRef>[]);
     final mdImg = RegExp(r'!\[[^\]]*\]\(([^)]+)\)');
-    // Match custom inline image markers like: [image:/absolute/path.png]
-    // Use a single backslash in a raw string to escape '[' and ']' in regex.
-    final customImg = RegExp(r"\[image:(.+?)\]");
+    // Custom attachment markers are intentionally not recognized here.
+    // Attachments arrive via structured parts / media-path keys.
     final images = <_ImageRef>[];
     final buf = StringBuffer();
     int i = 0;
@@ -310,7 +338,6 @@ class ChatApiService {
       }
 
       final m1 = mdImg.matchAsPrefix(raw, i);
-      final m2 = customImg.matchAsPrefix(raw, i);
       if (m1 != null) {
         final full = raw.substring(m1.start, m1.end);
         final url = (m1.group(1) ?? '').trim();
@@ -361,8 +388,13 @@ class ChatApiService {
           continue;
         }
         try {
-          final fixed = SandboxPathResolver.fix(url);
-          final file = File(fixed);
+          final resolved = SandboxPathResolver.resolveForIo(url);
+          if (resolved == null) {
+            buf.write(full);
+            i = m1.end;
+            continue;
+          }
+          final file = File(resolved);
           if (!file.existsSync()) {
             // Missing local file: do NOT treat as image; keep original markdown.
             buf.write(full);
@@ -380,55 +412,6 @@ class ChatApiService {
         i = m1.end;
         continue;
       }
-      if (m2 != null) {
-        final full = raw.substring(m2.start, m2.end);
-        final p = (m2.group(1) ?? '').trim();
-        if (p.isEmpty) {
-          buf.write(full);
-          i = m2.end;
-          continue;
-        }
-        if (p.startsWith('data:')) {
-          if (allowDataImages) {
-            images.add(_ImageRef('data', p));
-          } else if (keepDisallowedImageText) {
-            buf.write(full);
-          }
-          i = m2.end;
-          continue;
-        }
-        if (p.startsWith('http://') || p.startsWith('https://')) {
-          if (!allowRemoteImages) {
-            if (keepDisallowedImageText) buf.write(full);
-            i = m2.end;
-            continue;
-          }
-          images.add(_ImageRef('url', p));
-          i = m2.end;
-          continue;
-        }
-        if (!allowLocalImages) {
-          if (keepDisallowedImageText) buf.write(full);
-          i = m2.end;
-          continue;
-        }
-        try {
-          final fixed = SandboxPathResolver.fix(p);
-          final file = File(fixed);
-          if (!file.existsSync()) {
-            buf.write(full);
-            i = m2.end;
-            continue;
-          }
-        } catch (_) {
-          buf.write(full);
-          i = m2.end;
-          continue;
-        }
-        images.add(_ImageRef('path', p));
-        i = m2.end;
-        continue;
-      }
       buf.write(raw[i]);
       i++;
     }
@@ -439,15 +422,35 @@ class ChatApiService {
     String path, {
     bool withPrefix = false,
   }) async {
-    final fixed = SandboxPathResolver.fix(path);
-    final file = File(fixed);
+    final resolved = SandboxPathResolver.resolveForIo(path);
+    if (resolved == null) {
+      throw FileSystemException('rejected local path', path);
+    }
+    final file = File(resolved);
     final bytes = await file.readAsBytes();
     final b64 = base64Encode(bytes);
     if (withPrefix) {
-      final mime = _mimeFromPath(fixed);
+      final mime = _mimeFromPath(resolved);
       return 'data:$mime;base64,$b64';
     }
     return b64;
+  }
+
+  /// Like [_encodeBase64File], but returns null for missing/unreadable files
+  /// so provider request builders can skip unavailable attachments.
+  static Future<String?> _tryEncodeBase64File(
+    String path, {
+    bool withPrefix = false,
+  }) async {
+    try {
+      final resolved = SandboxPathResolver.resolveForIo(path);
+      if (resolved == null) return null;
+      final file = File(resolved);
+      if (!await file.exists()) return null;
+      return _encodeBase64File(resolved, withPrefix: withPrefix);
+    } catch (_) {
+      return null;
+    }
   }
 
   static String _textFromContentParts(dynamic content) {
@@ -506,6 +509,7 @@ class ChatApiService {
     for (final message in messages) {
       final copy = Map<String, dynamic>.from(message);
       copy.remove(multimodalInternalMediaPathsKey);
+      copy.remove(multimodalInternalRevisionIdKey);
       if (copy.containsKey('content')) {
         copy['content'] = await _stripImageInputsFromContent(copy['content']);
       }
@@ -753,12 +757,11 @@ class ChatApiService {
           ModelAbility.reasoning,
         );
         final effort = _openAIEffortForBudget(thinkingBudget, upstreamModelId);
-        final host = Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '';
-        final modelLower = upstreamModelId.toLowerCase();
-        final bool isMimo =
-            host.contains('xiaomimimo') ||
-            modelLower.startsWith('mimo-') ||
-            modelLower.contains('/mimo-');
+        final info = _OpenAIProviderInfo(
+          host: Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '',
+          providerId: config.id.toLowerCase(),
+          upstreamModelId: upstreamModelId,
+        );
         if (config.useResponseApi == true) {
           // Inject built-in web_search tool when enabled and supported
           final toolsList = <Map<String, dynamic>>[];
@@ -773,13 +776,19 @@ class ChatApiService {
                 id,
               );
             }
+            if (BuiltInToolsHelper.isArkProvider(config)) {
+              return BuiltInToolsHelper.isDoubaoResponsesBuiltInSearchSupportedModel(
+                id,
+              );
+            }
             return false;
           }
 
           if (isResponsesWebSearchSupported(upstreamModelId)) {
             final builtIns = _builtInTools(config, modelId);
             if (builtIns.contains(BuiltInToolNames.search)) {
-              if (BuiltInToolsHelper.isDashScopeProvider(config)) {
+              if (BuiltInToolsHelper.isDashScopeProvider(config) ||
+                  BuiltInToolsHelper.isArkProvider(config)) {
                 toolsList.add({'type': 'web_search'});
               } else {
                 Map<String, dynamic> ws = const <String, dynamic>{};
@@ -834,7 +843,6 @@ class ChatApiService {
             'messages': [
               {'role': 'user', 'content': safePrompt},
             ],
-            'temperature': 0.3,
             if (isReasoning && effort != 'off' && effort != 'auto')
               'reasoning_effort': effort,
           };
@@ -858,35 +866,26 @@ class ChatApiService {
           isReasoning: isReasoning,
           thinkingBudget: thinkingBudget,
         );
-        final headers = <String, String>{
-          'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
-          'Content-Type': 'application/json',
-        };
-        headers.addAll(_customHeaders(config, modelId));
-        if (extraHeaders != null && extraHeaders.isNotEmpty) {
-          headers.addAll(extraHeaders);
-        }
-        final extra = _customBody(config, modelId);
+        final headers = _customHeaders(
+          config,
+          modelId,
+          baseHeaders: <String, String>{
+            'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
+            'Content-Type': 'application/json',
+          },
+          assistantHeaders: extraHeaders,
+        );
+        final extra = _customBody(config, modelId, assistantBody: extraBody);
         if (extra.isNotEmpty) body.addAll(extra);
-        if (extraBody != null && extraBody.isNotEmpty) {
-          (extraBody).forEach((k, v) {
-            body[k] = (v is String) ? _parseOverrideValue(v) : v;
-          });
-        }
         // Vendor-specific reasoning knobs for chat-completions compatible hosts (non-streaming)
         if (config.useResponseApi != true) {
-          final off = _isOff(thinkingBudget);
-          if (host.contains('open.bigmodel.cn') ||
-              host.contains('bigmodel') ||
-              isMimo) {
-            // Zhipu BigModel / Xiaomi MiMo: thinking: { type: enabled|disabled }
-            if (isReasoning) {
-              body['thinking'] = {'type': off ? 'disabled' : 'enabled'};
-            } else {
-              body.remove('thinking');
-            }
-            body.remove('reasoning_effort');
-          } else if (_isKimiThinkingModel(upstreamModelId)) {
+          _applyVendorReasoningKnobs(
+            body,
+            info: info,
+            isReasoning: isReasoning,
+            thinkingBudget: thinkingBudget,
+          );
+          if (info.isKimiThinkingModel) {
             _normalizeMoonshotKimiChatBody(
               body,
               upstreamModelId: upstreamModelId,
@@ -908,12 +907,7 @@ class ChatApiService {
           body,
           upstreamModelId,
           fallbackEffort: effort,
-        );
-        _normalizeMoonshotKimiChatBody(
-          body,
-          upstreamModelId: upstreamModelId,
-          isReasoning: isReasoning,
-          thinkingBudget: thinkingBudget,
+          isOpenRouter: info.isOpenRouter,
         );
         final resp = await client.post(
           url,
@@ -968,10 +962,6 @@ class ChatApiService {
         final isReasoning = effectiveInfo.abilities.contains(
           ModelAbility.reasoning,
         );
-        final omitSamplingParams = _claudeShouldOmitSamplingParams(
-          upstreamModelId,
-          thinkingBudget,
-        );
         final thinking = isReasoning
             ? _claudeThinkingConfig(
                 upstreamModelId,
@@ -989,30 +979,24 @@ class ChatApiService {
         final body = <String, dynamic>{
           'model': upstreamModelId,
           'max_tokens': 512,
-          if (!omitSamplingParams && !_isClaudeReasoningEnabled(thinkingBudget))
-            'temperature': 0.3,
           'messages': [
             {'role': 'user', 'content': safePrompt},
           ],
           if (thinking != null) 'thinking': thinking,
           if (outputConfig != null) 'output_config': outputConfig,
         };
-        final headers = <String, String>{
-          'x-api-key': _apiKeyForRequest(config, modelId),
-          'anthropic-version': '2023-06-01',
-          'Content-Type': 'application/json',
-        };
-        headers.addAll(_customHeaders(config, modelId));
-        if (extraHeaders != null && extraHeaders.isNotEmpty) {
-          headers.addAll(extraHeaders);
-        }
-        final extra = _customBody(config, modelId);
+        final headers = _customHeaders(
+          config,
+          modelId,
+          baseHeaders: <String, String>{
+            'x-api-key': _apiKeyForRequest(config, modelId),
+            'anthropic-version': '2023-06-01',
+            'Content-Type': 'application/json',
+          },
+          assistantHeaders: extraHeaders,
+        );
+        final extra = _customBody(config, modelId, assistantBody: extraBody);
         if (extra.isNotEmpty) body.addAll(extra);
-        if (extraBody != null && extraBody.isNotEmpty) {
-          (extraBody).forEach((k, v) {
-            body[k] = (v is String) ? _parseOverrideValue(v) : v;
-          });
-        }
         final resp = await client.post(
           url,
           headers: headers,
@@ -1083,7 +1067,6 @@ class ChatApiService {
               ],
             },
           ],
-          'generationConfig': {'temperature': 0.3},
         };
 
         // Inject Gemini built-in tools with version-aware mutual exclusion.
@@ -1102,34 +1085,33 @@ class ChatApiService {
             body['tools'] = toolsArr;
           }
         }
-        final headers = <String, String>{'Content-Type': 'application/json'};
+        final baseHeaders = <String, String>{
+          'Content-Type': 'application/json',
+        };
         // Add API Key header for non-Vertex
         if (!(config.vertexAI == true)) {
           final apiKey = _apiKeyForRequest(config, modelId);
           if (apiKey.isNotEmpty) {
-            headers['x-goog-api-key'] = apiKey;
+            baseHeaders['x-goog-api-key'] = apiKey;
           }
         }
         // Add Bearer for Vertex via service account JSON
         if (config.vertexAI == true) {
           final token = await _maybeVertexAccessToken(config);
           if (token != null && token.isNotEmpty) {
-            headers['Authorization'] = 'Bearer $token';
+            baseHeaders['Authorization'] = 'Bearer $token';
           }
           final proj = (config.projectId ?? '').trim();
-          if (proj.isNotEmpty) headers['X-Goog-User-Project'] = proj;
+          if (proj.isNotEmpty) baseHeaders['X-Goog-User-Project'] = proj;
         }
-        headers.addAll(_customHeaders(config, modelId));
-        if (extraHeaders != null && extraHeaders.isNotEmpty) {
-          headers.addAll(extraHeaders);
-        }
-        final extra = _customBody(config, modelId);
+        final headers = _customHeaders(
+          config,
+          modelId,
+          baseHeaders: baseHeaders,
+          assistantHeaders: extraHeaders,
+        );
+        final extra = _customBody(config, modelId, assistantBody: extraBody);
         if (extra.isNotEmpty) body.addAll(extra);
-        if (extraBody != null && extraBody.isNotEmpty) {
-          (extraBody).forEach((k, v) {
-            body[k] = (v is String) ? _parseOverrideValue(v) : v;
-          });
-        }
         final resp = await client.post(
           Uri.parse(url),
           headers: headers,
@@ -1206,11 +1188,20 @@ class ChatApiService {
         providerName.contains('deepseek');
   }
 
+  static bool _isClaude5AdaptiveThinkingModel(String modelId) {
+    return RegExp(
+      r'claude-(?:opus|sonnet)-5(?:$|[._:@/-])',
+      caseSensitive: false,
+    ).hasMatch(modelId.trim());
+  }
+
   static bool _supportsClaudeAdaptiveThinking(String modelId) {
     final lower = modelId.trim().toLowerCase();
     if (!lower.contains('claude-')) return false;
+    if (lower.contains('fable') || lower.contains('mythos')) return true;
+    if (_isClaude5AdaptiveThinkingModel(lower)) return true;
     final m = RegExp(
-      r'claude-(opus|sonnet)-(\d+)-(\d+)',
+      r'claude-(opus|sonnet)-(\d+)[-.](\d+)',
       caseSensitive: false,
     ).firstMatch(lower);
     if (m != null) {
@@ -1226,12 +1217,18 @@ class ChatApiService {
   static bool _isClaudeAdaptiveOnlyThinkingModel(String modelId) {
     final lower = modelId.trim().toLowerCase();
     if (!lower.contains('claude-')) return false;
-    if (lower.contains('mythos')) return true;
+    if (lower.contains('fable') || lower.contains('mythos')) return true;
+    if (_isClaude5AdaptiveThinkingModel(lower)) return true;
     final m = RegExp(
-      r'claude-(opus|sonnet)-(\d+)-(\d+)',
+      r'claude-(opus|sonnet)-(\d+)[-.](\d+)',
       caseSensitive: false,
     ).firstMatch(lower);
-    if (m == null) return lower.contains('4-7') || lower.contains('4.7');
+    if (m == null) {
+      return lower.contains('4-7') ||
+          lower.contains('4.7') ||
+          lower.contains('4-8') ||
+          lower.contains('4.8');
+    }
     final family = (m.group(1) ?? '').toLowerCase();
     final major = int.tryParse(m.group(2) ?? '');
     final minor = int.tryParse(m.group(3) ?? '');
@@ -1240,6 +1237,11 @@ class ChatApiService {
     if (major < 4) return false;
     if (family == 'opus' && minor >= 7) return true;
     return false;
+  }
+
+  static bool _isClaudeThinkingAlwaysOnModel(String modelId) {
+    final lower = modelId.trim().toLowerCase();
+    return lower.contains('claude-fable') || lower.contains('claude-mythos');
   }
 
   static String _claudeEffortForBudget(int? budget) {
@@ -1260,11 +1262,20 @@ class ChatApiService {
     }
 
     final lower = modelId.trim().toLowerCase();
-    final supportsXhigh = lower.startsWith('claude-opus-4-7');
+    final supportsXhigh =
+        _isClaude5AdaptiveThinkingModel(lower) ||
+        lower.contains('claude-opus-4-7') ||
+        lower.contains('claude-opus-4.7') ||
+        lower.contains('claude-opus-4-8') ||
+        lower.contains('claude-opus-4.8') ||
+        lower.contains('claude-fable') ||
+        lower.contains('claude-mythos');
     final supportsMax =
         supportsXhigh ||
-        lower.startsWith('claude-opus-4-6') ||
-        lower.startsWith('claude-sonnet-4-6') ||
+        lower.contains('claude-opus-4-6') ||
+        lower.contains('claude-opus-4.6') ||
+        lower.contains('claude-sonnet-4-6') ||
+        lower.contains('claude-sonnet-4.6') ||
         lower.contains('mythos');
 
     switch (normalizedEffort) {
@@ -1289,6 +1300,10 @@ class ChatApiService {
     int? budget, {
     ProviderConfig? config,
   }) {
+    if (_isClaudeThinkingAlwaysOnModel(modelId)) {
+      if (!_isClaudeReasoningEnabled(budget)) return null;
+      return <String, dynamic>{'type': 'adaptive', 'display': 'summarized'};
+    }
     if (!_isClaudeReasoningEnabled(budget)) {
       return <String, dynamic>{'type': 'disabled'};
     }
@@ -1309,6 +1324,14 @@ class ChatApiService {
     int? budget, {
     ProviderConfig? config,
   }) {
+    if (_isClaudeThinkingAlwaysOnModel(modelId)) {
+      final effort = _normalizeClaudeEffort(
+        _claudeEffortForBudget(budget),
+        modelId,
+      );
+      if (effort == 'auto' || effort == 'off') return null;
+      return <String, dynamic>{'effort': effort};
+    }
     if (_isDeepSeekClaudeCompatible(modelId, config: config)) {
       if (!_isClaudeReasoningEnabled(budget)) return null;
       final effort = _claudeEffortForBudget(budget);
@@ -1330,6 +1353,13 @@ class ChatApiService {
   }
 
   static bool _claudeShouldOmitSamplingParams(String modelId, int? budget) {
+    if (_isClaudeThinkingAlwaysOnModel(modelId)) return true;
+    final lower = modelId.trim().toLowerCase();
+    if (_isClaude5AdaptiveThinkingModel(lower) ||
+        lower.contains('claude-opus-4-8') ||
+        lower.contains('claude-opus-4.8')) {
+      return true;
+    }
     return _isClaudeAdaptiveOnlyThinkingModel(modelId) &&
         _isClaudeReasoningEnabled(budget);
   }
@@ -1421,7 +1451,8 @@ class ChatApiService {
 class _ImageRef {
   final String kind; // 'data' | 'path' | 'url'
   final String src;
-  const _ImageRef(this.kind, this.src);
+  final String? mime;
+  const _ImageRef(this.kind, this.src, {this.mime});
 }
 
 class _ParsedTextAndImages {
@@ -1458,6 +1489,10 @@ class ChatStreamChunk {
   final String content;
   // Optional reasoning delta (when model supports reasoning)
   final String? reasoning;
+  // Optional vendor reasoning details (OpenRouter-style `reasoning_details`
+  // array, may carry thinking signatures). Emitted as a cumulative snapshot so
+  // it can be persisted and echoed back on later requests.
+  final dynamic reasoningDetails;
   final bool isDone;
   final int totalTokens;
   final TokenUsage? usage;
@@ -1467,6 +1502,7 @@ class ChatStreamChunk {
   ChatStreamChunk({
     required this.content,
     this.reasoning,
+    this.reasoningDetails,
     required this.isDone,
     required this.totalTokens,
     this.usage,

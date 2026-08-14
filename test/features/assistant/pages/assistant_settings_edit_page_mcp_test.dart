@@ -1,46 +1,137 @@
+import 'dart:io';
+import "../../../support/business_test_harness.dart";
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+// ignore: depend_on_referenced_packages
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/memory_provider.dart';
+import 'package:Kelivo/core/providers/memory_provider_v2.dart';
 import 'package:Kelivo/core/providers/quick_phrase_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/memory/memory_pipeline.dart';
+import 'package:Kelivo/core/services/memory/memory_repository.dart';
 import 'package:Kelivo/features/assistant/pages/assistant_settings_edit_page.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 
-const _assistantId = 'assistant-mcp-test';
+class _FakePathProviderPlatform extends PathProviderPlatform {
+  _FakePathProviderPlatform(this.path);
 
-void _seedPreferences() {
-  SharedPreferences.setMockInitialValues({
-    'assistants_v1': Assistant.encodeList(const [
-      Assistant(id: _assistantId, name: 'Test Assistant', temperature: 0.6),
-    ]),
-  });
+  final String path;
+
+  @override
+  Future<String?> getApplicationDocumentsPath() async => path;
+
+  @override
+  Future<String?> getApplicationSupportPath() async => path;
+
+  @override
+  Future<String?> getApplicationCachePath() async => '$path/cache';
+
+  @override
+  Future<String?> getTemporaryPath() async => '$path/tmp';
 }
 
-Future<AssistantProvider> _createAssistantProvider(WidgetTester tester) async {
-  final provider = AssistantProvider();
+const _assistantId = 'assistant-mcp-test';
+
+Future<
+  ({
+    AssistantProvider assistantProvider,
+    ChatService chatService,
+    MemoryProviderV2 memoryV2,
+    MemoryPipelineService pipeline,
+  })
+>
+_createAssistantProvider(WidgetTester tester) async {
+  final tempDir = await tester.runAsync(
+    () => Directory.systemTemp.createTemp('kelivo_asst_edit_'),
+  );
+  final previousPathProvider = PathProviderPlatform.instance;
+  PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir!.path);
+  addTearDown(() async {
+    PathProviderPlatform.instance = previousPathProvider;
+    if (await tempDir.exists()) {
+      await tempDir.delete(recursive: true);
+    }
+  });
+
+  final harness = await createBusinessTestHarness(
+    initial: {
+      'assistants_v1': Assistant.encodeList(const [
+        Assistant(id: _assistantId, name: 'Test Assistant', temperature: 0.6),
+      ]),
+    },
+  );
+  final chatRepository = ChatDatabaseRepository(harness.database);
+  await chatRepository.ensureReady();
+  final chatService = ChatService(existingRepository: chatRepository);
+  final provider = AssistantProvider(
+    preferences: harness.preferences,
+    chatService: chatService,
+  );
   for (var i = 0; i < 25; i++) {
-    if (provider.getById(_assistantId) != null) return provider;
+    if (provider.getById(_assistantId) != null) break;
     await tester.pump(const Duration(milliseconds: 10));
   }
-  return provider;
+  final memoryV2 = MemoryProviderV2(
+    repository: MemoryRepository(harness.preferences),
+    chatRepository: chatRepository,
+  );
+  final settings = SettingsProvider(harness.preferences);
+  final pipeline = MemoryPipelineService(
+    chatService: chatService,
+    repository: memoryV2.repository,
+    chatRepository: chatRepository,
+    settings: () => settings,
+    assistants: () => provider,
+    memoryV2: () => memoryV2,
+    generateText:
+        ({
+          required config,
+          required modelId,
+          required prompt,
+          int? thinkingBudget,
+        }) async => '<user_memory>false</user_memory>',
+  );
+  return (
+    assistantProvider: provider,
+    chatService: chatService,
+    memoryV2: memoryV2,
+    pipeline: pipeline,
+  );
 }
 
 Widget _buildHarness({
   required AssistantProvider assistantProvider,
+  required ChatService chatService,
+  required MemoryProviderV2 memoryV2,
+  required MemoryPipelineService pipeline,
   required Widget child,
 }) {
   return MultiProvider(
     providers: [
-      ChangeNotifierProvider(create: (_) => SettingsProvider()),
+      ChangeNotifierProvider(
+        create: (_) => SettingsProvider(assistantProvider.preferences),
+      ),
       ChangeNotifierProvider.value(value: assistantProvider),
-      ChangeNotifierProvider(create: (_) => MemoryProvider()),
-      ChangeNotifierProvider(create: (_) => QuickPhraseProvider()),
+      ChangeNotifierProvider.value(value: chatService),
+      ChangeNotifierProvider(
+        create: (_) =>
+            MemoryProvider(preferences: assistantProvider.preferences),
+      ),
+      ChangeNotifierProvider.value(value: memoryV2),
+      Provider.value(value: pipeline),
+      ChangeNotifierProvider(
+        create: (_) =>
+            QuickPhraseProvider(preferences: assistantProvider.preferences),
+      ),
     ],
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -54,12 +145,15 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('assistant edit page shows MCP tab on mobile', (tester) async {
-    _seedPreferences();
-    final assistantProvider = await _createAssistantProvider(tester);
+    final bundle = await _createAssistantProvider(tester);
+    final assistantProvider = bundle.assistantProvider;
 
     await tester.pumpWidget(
       _buildHarness(
         assistantProvider: assistantProvider,
+        chatService: bundle.chatService,
+        memoryV2: bundle.memoryV2,
+        pipeline: bundle.pipeline,
         child: const AssistantSettingsEditPage(assistantId: _assistantId),
       ),
     );
@@ -69,47 +163,103 @@ void main() {
     expect(find.text('MCP'), findsOneWidget);
   });
 
-  testWidgets('assistant local tools page uses clock icon for time info', (
+  testWidgets('assistant desktop local tools hide mobile device tools', (
     tester,
   ) async {
-    _seedPreferences();
-    final assistantProvider = await _createAssistantProvider(tester);
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    try {
+      final bundle = await _createAssistantProvider(tester);
 
-    await tester.pumpWidget(
-      _buildHarness(
-        assistantProvider: assistantProvider,
-        child: const AssistantSettingsEditPage(assistantId: _assistantId),
-      ),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpWidget(
+        _buildHarness(
+          assistantProvider: bundle.assistantProvider,
+          chatService: bundle.chatService,
+          memoryV2: bundle.memoryV2,
+          pipeline: bundle.pipeline,
+          child: const AssistantSettingsEditPage(assistantId: _assistantId),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
-    await tester.tap(find.text('Local Tools'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.text('Local Tools'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('Time Info'), findsOneWidget);
-    expect(
-      find.byWidgetPredicate(
-        (widget) => widget is Icon && widget.icon == Lucide.clock,
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.byWidgetPredicate(
-        (widget) => widget is Icon && widget.icon == Lucide.Calendar,
-      ),
-      findsNothing,
-    );
+      expect(find.text('Time Info'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is Icon && widget.icon == Lucide.clock,
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Screen Time'), findsNothing);
+      expect(find.text('Query Calendar'), findsNothing);
+      expect(find.text('Create Event'), findsNothing);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('assistant local tools page shows Android device tools', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      final bundle = await _createAssistantProvider(tester);
+
+      await tester.pumpWidget(
+        _buildHarness(
+          assistantProvider: bundle.assistantProvider,
+          chatService: bundle.chatService,
+          memoryV2: bundle.memoryV2,
+          pipeline: bundle.pipeline,
+          child: const AssistantSettingsEditPage(assistantId: _assistantId),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      await tester.tap(find.text('Local Tools'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('Screen Time'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Create Event'),
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+
+      expect(find.text('Query Calendar'), findsOneWidget);
+      expect(find.text('Create Event'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is Icon && widget.icon == Lucide.Calendar,
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is Icon && widget.icon == Lucide.CalendarPlus,
+        ),
+        findsOneWidget,
+      );
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 
   testWidgets('assistant desktop dialog shows MCP menu item', (tester) async {
-    _seedPreferences();
-    final assistantProvider = await _createAssistantProvider(tester);
+    final bundle = await _createAssistantProvider(tester);
+    final assistantProvider = bundle.assistantProvider;
 
     await tester.pumpWidget(
       _buildHarness(
         assistantProvider: assistantProvider,
+        chatService: bundle.chatService,
+        memoryV2: bundle.memoryV2,
+        pipeline: bundle.pipeline,
         child: Scaffold(
           body: Builder(
             builder: (context) {

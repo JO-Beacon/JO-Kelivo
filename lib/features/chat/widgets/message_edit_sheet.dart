@@ -1,14 +1,16 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
-import '../../../core/models/chat_input_data.dart';
+import 'package:flutter/material.dart';
 import '../../../core/models/chat_message.dart';
-import '../../../core/services/haptics.dart';
+import '../models/message_edit_result.dart';
+import '../models/message_parts_edit_draft.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../core/services/haptics.dart';
 import '../../../theme/app_font_weights.dart';
-import '../models/message_edit_result.dart';
-import '../utils/message_attachment_parser.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'message_attachment_editor.dart';
+import 'message_edit_close_confirmation.dart';
 
 Future<MessageEditResult?> showMessageEditSheet(
   BuildContext context, {
@@ -18,6 +20,7 @@ Future<MessageEditResult?> showMessageEditSheet(
   return showModalBottomSheet<MessageEditResult?>(
     context: context,
     isScrollControlled: true,
+    enableDrag: false,
     backgroundColor: cs.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -29,28 +32,23 @@ Future<MessageEditResult?> showMessageEditSheet(
 
 class _MessageEditSheet extends StatefulWidget {
   const _MessageEditSheet({required this.message});
-
   final ChatMessage message;
-
   @override
   State<_MessageEditSheet> createState() => _MessageEditSheetState();
 }
 
 class _MessageEditSheetState extends State<_MessageEditSheet> {
   late final TextEditingController _controller;
-  late List<String> _imagePaths;
-  late List<DocumentAttachment> _documents;
-
+  late MessagePartsEditDraft _draft;
   bool _allowClose = false;
   bool _confirmingClose = false;
+  double _headerDragDistance = 0;
 
   @override
   void initState() {
     super.initState();
-    final parsed = MessageAttachmentParser.parse(widget.message.content);
-    _controller = TextEditingController(text: parsed.text);
-    _imagePaths = List<String>.of(parsed.imagePaths);
-    _documents = List<DocumentAttachment>.of(parsed.documents);
+    _controller = TextEditingController(text: widget.message.content);
+    _draft = MessagePartsEditDraft(widget.message.parts);
   }
 
   @override
@@ -60,20 +58,13 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
   }
 
   MessageEditResult _result({required bool shouldSend}) {
+    final text = _controller.text.trim();
+    _draft.replaceText(text);
     return MessageEditResult(
-      text: _controller.text.trim(),
-      imagePaths: _imagePaths,
-      documents: _documents,
+      content: text,
+      parts: _draft.parts,
       shouldSend: shouldSend,
     );
-  }
-
-  void _updateAttachments(
-    List<String> imagePaths,
-    List<DocumentAttachment> documents,
-  ) {
-    _imagePaths = imagePaths;
-    _documents = documents;
   }
 
   void _closeWithResult(MessageEditResult? result) {
@@ -88,43 +79,35 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
   Future<void> _confirmClose() async {
     if (_confirmingClose || _allowClose) return;
     _confirmingClose = true;
-    final l10n = AppLocalizations.of(context)!;
-    final action = await showDialog<_MessageEditCloseAction>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.messageEditCloseConfirmTitle),
-        content: Text(l10n.messageEditCloseConfirmContent),
-        actions: [
-          TextButton(
-            onPressed: () =>
-                Navigator.of(dialogContext).pop(_MessageEditCloseAction.cancel),
-            child: Text(l10n.messageEditCloseConfirmCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(
-              dialogContext,
-            ).pop(_MessageEditCloseAction.discard),
-            child: Text(l10n.messageEditCloseConfirmDiscard),
-          ),
-          TextButton(
-            onPressed: () =>
-                Navigator.of(dialogContext).pop(_MessageEditCloseAction.save),
-            child: Text(l10n.messageEditCloseConfirmSave),
-          ),
-        ],
-      ),
-    );
+    final action = await showMessageEditCloseConfirmation(context);
     _confirmingClose = false;
     if (!mounted) return;
     switch (action) {
-      case _MessageEditCloseAction.save:
+      case MessageEditCloseAction.save:
         _closeWithResult(_result(shouldSend: false));
-      case _MessageEditCloseAction.discard:
+      case MessageEditCloseAction.discard:
         _closeWithResult(null);
-      case _MessageEditCloseAction.cancel:
+      case MessageEditCloseAction.cancel:
       case null:
         break;
     }
+  }
+
+  void _handleHeaderDragStart(DragStartDetails _) {
+    _headerDragDistance = 0;
+  }
+
+  void _handleHeaderDragUpdate(DragUpdateDetails details) {
+    _headerDragDistance = (_headerDragDistance + (details.primaryDelta ?? 0))
+        .clamp(0, 160);
+  }
+
+  void _handleHeaderDragEnd(DragEndDetails details) {
+    final shouldConfirm =
+        _headerDragDistance >= 48 ||
+        details.primaryVelocity != null && details.primaryVelocity! >= 700;
+    _headerDragDistance = 0;
+    if (shouldConfirm) unawaited(_confirmClose());
   }
 
   @override
@@ -133,11 +116,12 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
     final cs = Theme.of(context).colorScheme;
     return PopScope(
       canPop: _allowClose,
-      onPopInvokedWithResult: (didPop, _) {
+      onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
-        _confirmClose();
+        await _confirmClose();
       },
       child: Padding(
+        // Ensure keyboard-safe bottom inset for the sheet
         padding: EdgeInsets.only(
           bottom: MediaQuery.viewInsetsOf(context).bottom,
         ),
@@ -150,82 +134,94 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: Column(
               children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: cs.onSurface.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 32,
-                  child: Stack(
-                    alignment: Alignment.center,
+                GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onVerticalDragStart: _handleHeaderDragStart,
+                  onVerticalDragUpdate: _handleHeaderDragUpdate,
+                  onVerticalDragEnd: _handleHeaderDragEnd,
+                  child: Column(
                     children: [
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: IosCardPress(
-                          onTap: () {
-                            Haptics.light();
-                            _closeWithResult(_result(shouldSend: true));
-                          },
-                          borderRadius: BorderRadius.circular(20),
-                          baseColor: Colors.transparent,
-                          pressedBlendStrength:
-                              Theme.of(context).brightness == Brightness.dark
-                              ? 0.10
-                              : 0.06,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 6,
-                          ),
-                          child: Text(
-                            l10n.messageEditPageSaveAndSend,
-                            style: TextStyle(
-                              color: cs.primary,
-                              fontWeight: AppFontWeights.emphasis,
-                            ),
-                          ),
-                        ),
-                      ),
                       Center(
-                        child: Text(
-                          l10n.messageEditPageTitle,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: AppFontWeights.semibold,
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: cs.onSurface.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(999),
                           ),
-                          textAlign: TextAlign.center,
                         ),
                       ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: IosCardPress(
-                          onTap: () {
-                            Haptics.light();
-                            _closeWithResult(_result(shouldSend: false));
-                          },
-                          borderRadius: BorderRadius.circular(20),
-                          baseColor: Colors.transparent,
-                          pressedBlendStrength:
-                              Theme.of(context).brightness == Brightness.dark
-                              ? 0.10
-                              : 0.06,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 6,
-                          ),
-                          child: Text(
-                            l10n.messageEditPageSave,
-                            style: TextStyle(
-                              color: cs.primary,
-                              fontWeight: AppFontWeights.emphasis,
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        height: 32,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: IosCardPress(
+                                onTap: () {
+                                  Haptics.light();
+                                  _closeWithResult(_result(shouldSend: true));
+                                },
+                                borderRadius: BorderRadius.circular(20),
+                                baseColor: Colors.transparent,
+                                pressedBlendStrength:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? 0.10
+                                    : 0.06,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 6,
+                                ),
+                                child: Text(
+                                  l10n.messageEditPageSaveAndSend,
+                                  style: TextStyle(
+                                    color: cs.primary,
+                                    fontWeight: AppFontWeights.emphasis,
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
+                            Center(
+                              child: Text(
+                                l10n.messageEditPageTitle,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: AppFontWeights.semibold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: IosCardPress(
+                                onTap: () {
+                                  Haptics.light();
+                                  _closeWithResult(_result(shouldSend: false));
+                                },
+                                borderRadius: BorderRadius.circular(20),
+                                baseColor: Colors.transparent,
+                                pressedBlendStrength:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? 0.10
+                                    : 0.06,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 6,
+                                ),
+                                child: Text(
+                                  l10n.messageEditPageSave,
+                                  style: TextStyle(
+                                    color: cs.primary,
+                                    fontWeight: AppFontWeights.emphasis,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -236,7 +232,6 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
                   child: SingleChildScrollView(
                     controller: sc,
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         TextField(
                           controller: _controller,
@@ -247,10 +242,7 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
                           decoration: InputDecoration(
                             hintText: l10n.messageEditPageHint,
                             filled: true,
-                            fillColor:
-                                Theme.of(context).brightness == Brightness.dark
-                                ? Colors.white10
-                                : const Color(0xFFF2F3F5),
+                            fillColor: context.appColors.surfaceFill,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(20),
                               borderSide: const BorderSide(
@@ -271,11 +263,14 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 12),
                         MessageAttachmentEditor(
-                          imagePaths: _imagePaths,
-                          documents: _documents,
-                          onChanged: _updateAttachments,
+                          parts: _draft.parts,
+                          onChanged: (parts) {
+                            setState(() {
+                              _draft = MessagePartsEditDraft(parts);
+                            });
+                          },
                         ),
                       ],
                     ),
@@ -289,5 +284,3 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
     );
   }
 }
-
-enum _MessageEditCloseAction { cancel, discard, save }

@@ -49,14 +49,10 @@ class UpdateInfo {
   }
 
   factory UpdateInfo.fromGitHubRelease(Map<String, dynamic> json) {
-    DateTime? released;
-    final releasedRaw = json['published_at']?.toString();
-    if (releasedRaw != null && releasedRaw.isNotEmpty) {
-      try {
-        released = DateTime.parse(releasedRaw);
-      } catch (_) {}
-    }
-
+    final tagName = json['tag_name']?.toString() ?? '';
+    final version = tagName.startsWith('v') || tagName.startsWith('V')
+        ? tagName.substring(1)
+        : tagName;
     final assets = (json['assets'] as List?) ?? const [];
     final candidates = <String, ({int priority, String url})>{};
     for (final asset in assets.whereType<Map>()) {
@@ -65,64 +61,69 @@ class UpdateInfo {
       if (name == null || name.isEmpty || url == null || url.isEmpty) {
         continue;
       }
-      final match = _assetPlatformMatch(name);
+      final match = assetPlatformMatch(name, expectedVersion: version);
       if (match == null) continue;
       final current = candidates[match.platform];
       if (current == null || match.priority < current.priority) {
         candidates[match.platform] = (priority: match.priority, url: url);
       }
     }
-    final downloads = candidates.map(
-      (platform, candidate) => MapEntry(platform, candidate.url),
-    );
-
-    final tagName = json['tag_name']?.toString() ?? '';
-    final version = tagName.startsWith('v') || tagName.startsWith('V')
-        ? tagName.substring(1)
-        : tagName;
-
+    DateTime? released;
+    final releasedRaw = json['published_at']?.toString();
+    if (releasedRaw != null && releasedRaw.isNotEmpty) {
+      try {
+        released = DateTime.parse(releasedRaw);
+      } catch (_) {}
+    }
     return UpdateInfo(
       app: 'JO-Kelivo',
       version: version,
       releasedAt: released,
       notes: json['body']?.toString(),
-      downloads: downloads,
+      downloads: candidates.map(
+        (platform, candidate) => MapEntry(platform, candidate.url),
+      ),
     );
   }
 
-  static ({String platform, int priority})? _assetPlatformMatch(
-    String assetName,
-  ) {
+  @visibleForTesting
+  static ({String platform, int priority})? assetPlatformMatch(
+    String assetName, {
+    String? expectedVersion,
+  }) {
     final name = assetName.toLowerCase();
-    if (!name.contains('jo-kelivo')) return null;
-    if (name.endsWith('.sha1') || name.endsWith('.sha256')) return null;
-    if (name.contains('android') && name.endsWith('.apk')) {
-      final priority = name.contains('arm64-v8a') ? 0 : 1;
-      return (platform: 'android', priority: priority);
+    const prefix = r'jo-kelivo-v\d+\.\d+\.\d+(?:\+\d+)?';
+    if (expectedVersion != null) {
+      final match = RegExp(
+        r'^jo-kelivo-v(\d+\.\d+\.\d+)(?:\+\d+)?-',
+      ).firstMatch(name);
+      if (match == null || match.group(1) != expectedVersion.toLowerCase()) {
+        return null;
+      }
     }
-    if (name.contains('ios') && name.endsWith('.ipa')) {
-      return (platform: 'ios', priority: 0);
+    if (RegExp('^$prefix-android-arm64-v8a-release\\.apk\$').hasMatch(name)) {
+      return (platform: 'android', priority: 0);
     }
-    if (name.contains('macos') && name.endsWith('.dmg')) {
-      return (platform: 'macos', priority: 0);
+    if (RegExp('^$prefix-android-armeabi-v7a-release\\.apk\$').hasMatch(name)) {
+      return (platform: 'android', priority: 1);
     }
-    if (name.contains('windows') && name.endsWith('.exe')) {
+    if (RegExp('^$prefix-android-x86_64-release\\.apk\$').hasMatch(name)) {
+      return (platform: 'android', priority: 2);
+    }
+    if (RegExp('^$prefix-windows-x64-setup\\.exe\$').hasMatch(name)) {
       return (platform: 'windows', priority: 0);
     }
-    if (name.contains('windows') && name.endsWith('.zip')) {
+    if (RegExp('^$prefix-windows-x64-portable\\.zip\$').hasMatch(name)) {
       return (platform: 'windows', priority: 1);
     }
-    if (name.contains('linux') && name.endsWith('.appimage')) {
+    if (RegExp('^$prefix-linux-x64-appimage\\.appimage\$').hasMatch(name)) {
       return (platform: 'linux', priority: 0);
     }
-    if (name.contains('linux') && name.endsWith('.deb')) {
+    if (RegExp('^$prefix-linux-x64-deb\\.deb\$').hasMatch(name)) {
       return (platform: 'linux', priority: 1);
     }
-    if (name.contains('linux') && name.endsWith('.rpm')) {
+    if (RegExp('^$prefix-linux-x64-archive\\.tar\\.gz\$').hasMatch(name)) {
       return (platform: 'linux', priority: 2);
-    }
-    if (name.contains('linux') && name.endsWith('.tar.gz')) {
-      return (platform: 'linux', priority: 3);
     }
     return null;
   }
@@ -163,7 +164,7 @@ class UpdateProvider extends ChangeNotifier {
       final currentVer = pkg.version; // e.g., 1.0.0
 
       // Compare by version only; ignore build numbers
-      final hasNew = _isRemoteNewer(
+      final hasNew = isRemoteNewerForTest(
         remoteVersion: info.version,
         currentVersion: currentVer,
       );
@@ -181,31 +182,22 @@ class UpdateProvider extends ChangeNotifier {
     required String remoteVersion,
     required String currentVersion,
   }) {
-    return _isRemoteNewer(
-      remoteVersion: remoteVersion,
-      currentVersion: currentVersion,
-    );
-  }
-
-  static bool _isRemoteNewer({
-    required String remoteVersion,
-    required String currentVersion,
-  }) {
     final a = _parseVersion(remoteVersion);
     final b = _parseVersion(currentVersion);
-    for (var i = 0; i < a.length; i++) {
-      if (a[i] != b[i]) return a[i] > b[i];
-    }
+    if (a == null || b == null) return false;
+    if (a[0] != b[0]) return a[0] > b[0];
+    if (a[1] != b[1]) return a[1] > b[1];
+    if (a[2] != b[2]) return a[2] > b[2];
     return false;
   }
 
-  static List<int> _parseVersion(String version) {
-    final normalized = version.trim().replaceFirst(RegExp(r'^[vV]'), '');
-    final versionPart = normalized.split('+').first.split('-').first;
-    final parts = versionPart.split('.');
-    return List<int>.generate(
-      3,
-      (index) => index < parts.length ? int.tryParse(parts[index]) ?? 0 : 0,
-    );
+  static List<int>? _parseVersion(String value) {
+    final match = RegExp(r'^(\d+)\.(\d+)\.(\d+)(?:\+\d+)?$').firstMatch(value);
+    if (match == null) return null;
+    return [
+      int.parse(match.group(1)!),
+      int.parse(match.group(2)!),
+      int.parse(match.group(3)!),
+    ];
   }
 }

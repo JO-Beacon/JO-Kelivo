@@ -1,5 +1,16 @@
 part of '../chat_api_service.dart';
 
+int _defaultClaudeMaxOutputTokens(String modelId) {
+  final lower = modelId.trim().toLowerCase();
+  if (RegExp(
+    r'claude-(?:fable-5|mythos-5|opus-(?:5|4-8)|sonnet-5)(?:$|[._:@/-])',
+    caseSensitive: false,
+  ).hasMatch(lower)) {
+    return 128000;
+  }
+  return 64000;
+}
+
 int _readClaudeUsageInt(dynamic value) {
   if (value is num) return value.toInt();
   if (value is String) return int.tryParse(value) ?? 0;
@@ -18,6 +29,24 @@ TokenUsage _claudeUsageFromMap(Map<String, dynamic> usage) {
     cachedTokens: cached,
     totalTokens: inTok + outTok,
   );
+}
+
+String _normalizeClaudeImageMime(String mime) {
+  final normalized = mime.trim().toLowerCase();
+  if (normalized == 'image/jpg') return 'image/jpeg';
+  return normalized;
+}
+
+bool _isClaudeSupportedImageMime(String mime) {
+  switch (_normalizeClaudeImageMime(mime)) {
+    case 'image/jpeg':
+    case 'image/png':
+    case 'image/gif':
+    case 'image/webp':
+      return true;
+    default:
+      return false;
+  }
 }
 
 Stream<ChatStreamChunk> _sendClaudeStream(
@@ -63,8 +92,12 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       }
       continue;
     }
+    // Keep media-paths through transform; they are not forwarded in the
+    // final Anthropic request body (we rebuild role/content below).
     nonSystemMessages.add(
-      Map<String, dynamic>.from(m)..['role'] = role.isEmpty ? 'user' : role,
+      Map<String, dynamic>.from(m)
+        ..remove(multimodalInternalRevisionIdKey)
+        ..['role'] = role.isEmpty ? 'user' : role,
     );
   }
 
@@ -213,30 +246,117 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       }
       continue;
     }
-    if (isLast &&
-        (userImagePaths?.isNotEmpty == true) &&
-        (m['role'] == 'user')) {
+    final raw = (m['content'] ?? '').toString();
+    // Semantic media detection only - custom attachment markers are not
+    // recognized. Attachments arrive via structured media-path keys /
+    // userImagePaths, plus Markdown ![](...).
+    final hasMarkdownImages = raw.contains('![') && raw.contains('](');
+    final internalMediaRefs = parseInternalMediaRefs(
+      m[multimodalInternalMediaPathsKey],
+    );
+    // Consume injected media refs for user and assistant history turns.
+    final hasInternalMedia = internalMediaRefs.isNotEmpty;
+    final hasAttachedImages =
+        isLast && role == 'user' && (userImagePaths?.isNotEmpty == true);
+
+    if ((role == 'user' || role == 'assistant') &&
+        (hasMarkdownImages || hasInternalMedia || hasAttachedImages)) {
       final parts = <Map<String, dynamic>>[];
-      final text = (m['content'] ?? '').toString();
-      if (text.isNotEmpty) parts.add({'type': 'text', 'text': text});
-      for (final p in userImagePaths!) {
-        if (p.startsWith('http') || p.startsWith('data:')) {
-          parts.add({'type': 'text', 'text': p});
-        } else {
-          final mime = _mimeFromPath(p);
-          final b64 = await _encodeBase64File(p, withPrefix: false);
-          parts.add({
-            'type': 'image',
-            'source': {'type': 'base64', 'media_type': mime, 'data': b64},
-          });
+      final seenSources = <String>{};
+      String normalizeSrc(String src) {
+        if (src.startsWith('http') || src.startsWith('data:')) return src;
+        try {
+          return SandboxPathResolver.fix(src);
+        } catch (_) {
+          return src;
         }
       }
-      initialMessages.add({'role': 'user', 'content': parts});
-    } else {
+
+      Future<void> addClaudeImage(String source, {String? explicitMime}) async {
+        final normalized = normalizeSrc(source);
+        if (!seenSources.add(normalized)) return;
+        if (source.startsWith('http://') || source.startsWith('https://')) {
+          // Preserve prior official-Claude behavior for remote URLs.
+          parts.add({'type': 'text', 'text': source});
+          return;
+        }
+        if (source.startsWith('data:')) {
+          final mime = _normalizeClaudeImageMime(
+            (explicitMime != null && explicitMime.trim().isNotEmpty)
+                ? explicitMime.trim()
+                : _mimeFromDataUrl(source),
+          );
+          final idx = source.indexOf('base64,');
+          if (idx > 0) {
+            parts.add({
+              'type': 'image',
+              'source': {
+                'type': 'base64',
+                'media_type': mime,
+                'data': source.substring(idx + 7),
+              },
+            });
+          }
+          return;
+        }
+        final mime = _normalizeClaudeImageMime(
+          (explicitMime != null && explicitMime.trim().isNotEmpty)
+              ? explicitMime.trim()
+              : _mimeFromPath(source),
+        );
+        final b64 = await _tryEncodeBase64File(source, withPrefix: false);
+        if (b64 == null) return;
+        parts.add({
+          'type': 'image',
+          'source': {'type': 'base64', 'media_type': mime, 'data': b64},
+        });
+      }
+
+      final parsed = await _parseTextAndImages(
+        raw,
+        allowRemoteImages: true,
+        allowLocalImages: true,
+        keepRemoteMarkdownText: true,
+      );
+      if (parsed.text.isNotEmpty) {
+        parts.add({'type': 'text', 'text': parsed.text});
+      }
+      for (final ref in parsed.images) {
+        if (ref.kind == 'data' || ref.kind == 'path' || ref.kind == 'url') {
+          await addClaudeImage(ref.src);
+        }
+      }
+      final supplementalRefs = _supplementalMediaRefs(
+        internalRaw: m[multimodalInternalMediaPathsKey],
+        userPaths: userImagePaths,
+        includeUserPaths: hasAttachedImages,
+      );
+      for (final mediaRef in supplementalRefs) {
+        final mime = _mimeForInternalMediaRef(mediaRef);
+        // Never emit Anthropic image blocks for video/audio or other
+        // non-Claude image MIME types (e.g. video/mp4).
+        if (isVideoMime(mime) ||
+            isAudioMime(mime) ||
+            !_isClaudeSupportedImageMime(mime)) {
+          final uri = mediaRef.uri;
+          final isRemote =
+              uri.startsWith('http://') || uri.startsWith('https://');
+          if (isRemote) {
+            final normalized = normalizeSrc(uri);
+            if (seenSources.add(normalized)) {
+              parts.add({'type': 'text', 'text': uri});
+            }
+          }
+          continue;
+        }
+        await addClaudeImage(mediaRef.uri, explicitMime: mediaRef.mime);
+      }
       initialMessages.add({
-        'role': m['role'] ?? 'user',
-        'content': m['content'] ?? '',
+        'role': role,
+        'content': parts.isEmpty ? raw : parts,
       });
+    } else {
+      initialMessages.add({'role': role, 'content': raw});
     }
   }
   flushPendingToolResults();
@@ -319,16 +439,17 @@ Stream<ChatStreamChunk> _sendClaudeStream(
   }
 
   // Headers (constant across rounds)
-  final baseHeaders = <String, String>{
-    'x-api-key': _effectiveApiKey(config),
-    'anthropic-version': '2023-06-01',
-    'Content-Type': 'application/json',
-    'Accept': stream ? 'text/event-stream' : 'application/json',
-  };
-  baseHeaders.addAll(_customHeaders(config, modelId));
-  if (extraHeaders != null && extraHeaders.isNotEmpty) {
-    baseHeaders.addAll(extraHeaders);
-  }
+  final baseHeaders = _customHeaders(
+    config,
+    modelId,
+    baseHeaders: <String, String>{
+      'x-api-key': _effectiveApiKey(config),
+      'anthropic-version': '2023-06-01',
+      'Content-Type': 'application/json',
+      'Accept': stream ? 'text/event-stream' : 'application/json',
+    },
+    assistantHeaders: extraHeaders,
+  );
 
   // Running conversation across rounds
   List<Map<String, dynamic>> convo = List<Map<String, dynamic>>.from(
@@ -356,7 +477,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
     // Prepare request body per round
     final body = <String, dynamic>{
       'model': upstreamModelId,
-      'max_tokens': maxTokens ?? 64000,
+      'max_tokens': maxTokens ?? _defaultClaudeMaxOutputTokens(upstreamModelId),
       'messages': convo,
       'stream': stream,
       if (systemPrompt.isNotEmpty) 'system': systemPrompt,
@@ -374,14 +495,9 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       if (thinking != null) 'thinking': thinking,
       if (outputConfig != null) 'output_config': outputConfig,
     };
-    final extraClaude = _customBody(config, modelId);
+    final extraClaude = _customBody(config, modelId, assistantBody: extraBody);
     if (extraClaude.isNotEmpty) {
       body.addAll(extraClaude);
-    }
-    if (extraBody != null && extraBody.isNotEmpty) {
-      extraBody.forEach((k, v) {
-        body[k] = (v is String) ? _parseOverrideValue(v) : v;
-      });
     }
 
     final request = http.Request('POST', url);
@@ -573,6 +689,10 @@ Stream<ChatStreamChunk> _sendClaudeStream(
         if (line.isEmpty || !line.startsWith('data:')) continue;
 
         final data = line.substring(5).trimLeft();
+        // Anthropic reports failures in-band as `event: error` with
+        // {type:"error", error:{type,message}}; raise before the
+        // malformed-chunk guard below can swallow it.
+        _throwIfInBandStreamError(data);
         try {
           final obj = jsonDecode(data);
           final type = obj['type'];

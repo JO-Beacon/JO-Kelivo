@@ -1,6 +1,7 @@
 import '../../providers/settings_provider.dart';
 
-const String _openRouterAppReferer = 'https://github.com/JO-Beacon/JO-Kelivo';
+const String _openRouterAppReferer =
+    'https://github.com/JO-Beacon/JO-Kelivo';
 const String _openRouterAppTitle = 'JO-Kelivo';
 const String _openRouterAppCategories = 'general-chat';
 

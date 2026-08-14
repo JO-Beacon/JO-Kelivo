@@ -2,119 +2,95 @@ import 'package:Kelivo/core/providers/update_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('UpdateInfo.fromGitHubRelease', () {
-    test(
-      'parses GitHub latest release and maps JO-Kelivo assets by platform',
-      () {
-        final info = UpdateInfo.fromGitHubRelease({
-          'tag_name': 'v0.2.0',
-          'published_at': '2026-01-02T03:04:05Z',
-          'body': 'Release notes',
-          'assets': [
-            {
-              'name': 'JO-Kelivo-v0.2.0+3-android-armeabi-v7a-release.apk',
-              'browser_download_url': 'https://example.com/android-v7a.apk',
-            },
-            {
-              'name': 'JO-Kelivo-v0.2.0+3-android-arm64-v8a-release.apk',
-              'browser_download_url': 'https://example.com/android-arm64.apk',
-            },
-            {
-              'name': 'JO-Kelivo-v0.2.0+3-windows-x64-portable.zip',
-              'browser_download_url': 'https://example.com/windows.zip',
-            },
-            {
-              'name': 'JO-Kelivo-v0.2.0+3-windows-x64-setup.exe',
-              'browser_download_url': 'https://example.com/windows.exe',
-            },
-            {
-              'name': 'JO-Kelivo-v0.2.0+3-macos-universal-dmg.dmg',
-              'browser_download_url': 'https://example.com/macos.dmg',
-            },
-            {
-              'name': 'JO-Kelivo-v0.2.0+3-linux-x64-tar.gz',
-              'browser_download_url': 'https://example.com/linux.tar.gz',
-            },
-            {
-              'name': 'JO-Kelivo-v0.2.0+3-linux-x64-appimage.AppImage',
-              'browser_download_url': 'https://example.com/linux.AppImage',
-            },
-            {
-              'name': 'JO-Kelivo-v0.2.0+3-android-arm64-v8a-release.apk.sha256',
-              'browser_download_url': 'https://example.com/android.sha256',
-            },
-            {
-              'name': 'kelivo-upstream.apk',
-              'browser_download_url': 'https://example.com/upstream.apk',
-            },
-          ],
-        });
+  test('JO GitHub release parser keeps only supported JO assets', () {
+    final info = UpdateInfo.fromGitHubRelease({
+      'tag_name': 'v0.1.6',
+      'published_at': '2026-08-13T00:00:00Z',
+      'body': 'notes',
+      'assets': [
+        _asset('JO-Kelivo-v0.1.6+6-android-x86_64-release.apk'),
+        _asset('JO-Kelivo-v0.1.6+6-android-arm64-v8a-release.apk'),
+        _asset('JO-Kelivo-v0.1.6-windows-x64-portable.zip'),
+        _asset('JO-Kelivo-v0.1.6-windows-x64-setup.exe'),
+        _asset('JO-Kelivo-v0.1.6-linux-x64-deb.deb'),
+        _asset('JO-Kelivo-v0.1.6-linux-x64-appimage.AppImage'),
+        _asset('JO-Kelivo-v0.1.5+5-windows-x64-setup.exe'),
+        _asset('kelivo-v9.9.9-windows-x64-setup.exe'),
+        _asset('JO-Kelivo-v0.1.6-windows-x64-setup.exe.sha256'),
+      ],
+    });
 
-        expect(info.app, 'JO-Kelivo');
-        expect(info.version, '0.2.0');
-        expect(info.releasedAt, DateTime.utc(2026, 1, 2, 3, 4, 5));
-        expect(info.notes, 'Release notes');
-        expect(
-          info.downloads['android'],
-          'https://example.com/android-arm64.apk',
-        );
-        expect(info.downloads['windows'], 'https://example.com/windows.exe');
-        expect(info.downloads['macos'], 'https://example.com/macos.dmg');
-        expect(info.downloads['linux'], 'https://example.com/linux.AppImage');
-        expect(
-          info.downloads.containsValue('https://example.com/android.sha256'),
-          isFalse,
-        );
-        expect(
-          info.downloads.containsValue('https://example.com/upstream.apk'),
-          isFalse,
-        );
-      },
-    );
-
-    test('accepts release tags without v prefix', () {
-      final info = UpdateInfo.fromGitHubRelease({
-        'tag_name': '0.3.0',
-        'assets': const [],
-      });
-
-      expect(info.version, '0.3.0');
-      expect(info.downloads, isEmpty);
+    expect(info.app, 'JO-Kelivo');
+    expect(info.version, '0.1.6');
+    expect(info.downloads, {
+      'android': _url('JO-Kelivo-v0.1.6+6-android-arm64-v8a-release.apk'),
+      'windows': _url('JO-Kelivo-v0.1.6-windows-x64-setup.exe'),
+      'linux': _url('JO-Kelivo-v0.1.6-linux-x64-appimage.AppImage'),
     });
   });
 
-  group('UpdateProvider version comparison', () {
-    test('treats remote version with build metadata as newer', () {
-      expect(
-        UpdateProvider.isRemoteNewerForTest(
-          remoteVersion: '0.1.4+4',
-          currentVersion: '0.1.3',
-        ),
-        isTrue,
-      );
-    });
-
-    test(
-      'does not treat same semantic version with build metadata as newer',
-      () {
-        expect(
-          UpdateProvider.isRemoteNewerForTest(
-            remoteVersion: '0.1.4+4',
-            currentVersion: '0.1.4',
-          ),
-          isFalse,
-        );
-      },
+  test('release asset matcher rejects unsupported and checksum files', () {
+    expect(
+      UpdateInfo.assetPlatformMatch('kelivo-v1.2.1-linux.AppImage'),
+      isNull,
     );
+    expect(
+      UpdateInfo.assetPlatformMatch(
+        'JO-Kelivo-v0.1.6-windows-x64-setup.exe.sha256',
+      ),
+      isNull,
+    );
+    expect(UpdateInfo.assetPlatformMatch('JO-Kelivo-v0.1.6-macos.dmg'), isNull);
+    expect(
+      UpdateInfo.assetPlatformMatch(
+        'JO-Kelivo-v0.1.6-evil-windows-x64-setup.exe',
+      ),
+      isNull,
+    );
+    expect(
+      UpdateInfo.assetPlatformMatch(
+        'JO-Kelivo-v0.1.5+5-windows-x64-setup.exe',
+        expectedVersion: '0.1.6',
+      ),
+      isNull,
+    );
+  });
 
-    test('accepts v-prefixed remote versions with build metadata', () {
-      expect(
-        UpdateProvider.isRemoteNewerForTest(
-          remoteVersion: 'v0.1.4+4',
-          currentVersion: '0.1.3',
-        ),
-        isTrue,
-      );
-    });
+  test('version comparison ignores build number and handles boundaries', () {
+    expect(
+      UpdateProvider.isRemoteNewerForTest(
+        remoteVersion: '0.1.6',
+        currentVersion: '0.1.5+5',
+      ),
+      isTrue,
+    );
+    expect(
+      UpdateProvider.isRemoteNewerForTest(
+        remoteVersion: '0.1.6+7',
+        currentVersion: '0.1.6+6',
+      ),
+      isFalse,
+    );
+    expect(
+      UpdateProvider.isRemoteNewerForTest(
+        remoteVersion: 'invalid',
+        currentVersion: '0.1.6',
+      ),
+      isFalse,
+    );
+    expect(
+      UpdateProvider.isRemoteNewerForTest(
+        remoteVersion: '0.2',
+        currentVersion: '0.1.6',
+      ),
+      isFalse,
+    );
   });
 }
+
+Map<String, String> _asset(String name) => {
+  'name': name,
+  'browser_download_url': _url(name),
+};
+
+String _url(String name) => 'https://example.invalid/$name';

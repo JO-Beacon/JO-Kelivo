@@ -501,8 +501,12 @@ class _BrandBadge extends StatelessWidget {
     if (s is JinaOptions) return 'jina';
     if (s is PerplexityOptions) return 'perplexity';
     if (s is BochaOptions) return 'bocha';
+    if (s is DoubaoOptions) return 'doubao';
     if (s is SerperOptions) return 'serper';
     if (s is GrokOptions) return 'grok';
+    if (s is StepFunOptions) return 'stepfun';
+    if (s is FirecrawlOptions) return 'firecrawl';
+    if (s is TinyFishOptions) return 'tinyfish';
     return 'search';
   }
 
@@ -512,12 +516,12 @@ class _BrandBadge extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     // Use BrandAssets to get the icon path
     final asset = BrandAssets.assetForName(name);
-    final bg = isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.1);
+    final bg = cs.primary.withValues(alpha: isDark ? 0.18 : 0.1);
     if (asset != null) {
       if (asset.endsWith('.svg')) {
-        final isColorful = asset.contains('color');
-        final ColorFilter? tint = (isDark && !isColorful)
-            ? const ColorFilter.mode(Colors.white, BlendMode.srcIn)
+        final ColorFilter? tint =
+            (isDark && BrandAssets.assetNeedsDarkInvert(asset))
+            ? ColorFilter.mode(cs.onSurface, BlendMode.srcIn)
             : null;
         return Container(
           width: size,

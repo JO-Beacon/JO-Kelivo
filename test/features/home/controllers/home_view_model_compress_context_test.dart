@@ -117,122 +117,36 @@ void main() {
   });
 
   group('HomeViewModel.computeClearContextRemainingMessageCount', () {
-    test('长会话计数使用完整历史而不是当前懒加载窗口', () {
-      final completeHistory = <ChatMessage>[
-        for (var i = 0; i < 100; i++)
-          _message(
-            id: 'm$i',
-            role: i.isEven ? 'user' : 'assistant',
-            content: 'message $i',
-          ),
-      ];
-      final loadedTailWindow = completeHistory.sublist(80);
-
+    test('计数来自持久化总数，与窗口缓存无关', () {
       final count = HomeViewModel.computeClearContextRemainingMessageCount(
-        completeMessages: completeHistory,
-        collapsedMessages: completeHistory,
+        totalMessages: 100,
         truncateIndex: -1,
       );
 
-      expect(loadedTailWindow.length, 20);
       expect(count, 100);
     });
 
-    test('已有清空点时从完整历史的持久化截断位置开始计数', () {
-      final completeHistory = <ChatMessage>[
-        for (var i = 0; i < 100; i++)
-          _message(
-            id: 'm$i',
-            role: i.isEven ? 'user' : 'assistant',
-            content: 'message $i',
-          ),
-      ];
-
+    test('已有清空点时从持久化截断位置开始计数', () {
       final count = HomeViewModel.computeClearContextRemainingMessageCount(
-        completeMessages: completeHistory,
-        collapsedMessages: completeHistory,
+        totalMessages: 100,
         truncateIndex: 90,
       );
 
       expect(count, 10);
     });
 
-    test('截断点之前消息组的尾部新版本不会被算入剩余上下文', () {
-      final completeHistory = <ChatMessage>[
-        _message(id: 'u1-v0', role: 'user', content: 'old', groupId: 'u1'),
-        _message(id: 'a1', role: 'assistant', content: 'answer'),
-        _message(
-          id: 'u1-v1',
-          role: 'user',
-          content: 'edited old',
-          groupId: 'u1',
-          version: 1,
-        ),
-      ];
-      final collapsed = <ChatMessage>[completeHistory[2], completeHistory[1]];
-
-      final count = HomeViewModel.computeClearContextRemainingMessageCount(
-        completeMessages: completeHistory,
-        collapsedMessages: collapsed,
-        truncateIndex: 2,
+    test('截断位置越界时按未清空处理', () {
+      final beyond = HomeViewModel.computeClearContextRemainingMessageCount(
+        totalMessages: 100,
+        truncateIndex: 101,
+      );
+      final atEnd = HomeViewModel.computeClearContextRemainingMessageCount(
+        totalMessages: 100,
+        truncateIndex: 100,
       );
 
-      expect(count, 0);
-    });
-  });
-
-  group('selectForkConversationMessages', () {
-    test('Fork 可包含当前可见窗口之前的完整历史', () {
-      final messages = <ChatMessage>[
-        _message(id: 'u0', role: 'user', content: 'earliest user'),
-        _message(id: 'a1', role: 'assistant', content: 'earliest assistant'),
-        _message(id: 'u80', role: 'user', content: 'visible user'),
-        _message(id: 'a81', role: 'assistant', content: 'visible assistant'),
-      ];
-
-      final selected = selectForkConversationMessages(
-        messages: messages,
-        targetMessage: messages.last,
-      );
-
-      expect(selected.map((message) => message.id).toList(), [
-        'u0',
-        'a1',
-        'u80',
-        'a81',
-      ]);
-    });
-
-    test('Fork 到旧版本消息时保留同一分组的所有版本', () {
-      final messages = <ChatMessage>[
-        _message(id: 'u1', role: 'user', content: 'question'),
-        _message(
-          id: 'a1-v0',
-          role: 'assistant',
-          content: 'answer v0',
-          groupId: 'a1',
-        ),
-        _message(id: 'u2', role: 'user', content: 'later question'),
-        _message(id: 'a2', role: 'assistant', content: 'later answer'),
-        _message(
-          id: 'a1-v1',
-          role: 'assistant',
-          content: 'answer v1',
-          groupId: 'a1',
-          version: 1,
-        ),
-      ];
-
-      final selected = selectForkConversationMessages(
-        messages: messages,
-        targetMessage: messages[1],
-      );
-
-      expect(selected.map((message) => message.id).toList(), [
-        'u1',
-        'a1-v0',
-        'a1-v1',
-      ]);
+      expect(beyond, 100);
+      expect(atEnd, 0);
     });
   });
 }

@@ -1,13 +1,21 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../database/business_data.dart';
+import '../../database/business_repository.dart';
+import '../../database/business_settings_router.dart';
+import '../../database/chat_database_repository.dart'
+    show ParsedChatImportBatch;
 import '../../models/backup.dart';
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
-import '../../providers/settings_provider.dart';
+import '../../models/message_part.dart';
+import '../../utils/multimodal_input_utils.dart';
+import '../../../utils/sandbox_path_resolver.dart';
+import '../../providers/settings_provider.dart'
+    show ProviderConfig, ProviderKind;
 import '../chat/chat_service.dart';
 
 class ChatboxImportException implements Exception {
@@ -33,7 +41,7 @@ class ChatboxImportResult {
 class ChatboxImporter {
   ChatboxImporter._();
 
-  // Persisted keys used by SettingsProvider/AssistantProvider/TagProvider
+  // Published backup keys used by the business settings router.
   static const String _providersKey = 'provider_configs_v1';
   static const String _providersOrderKey = 'providers_order_v1';
   static const String _assistantsKey = 'assistants_v1';
@@ -46,7 +54,7 @@ class ChatboxImporter {
   static Future<ChatboxImportResult> importFromChatbox({
     required File file,
     required RestoreMode mode,
-    required SettingsProvider settings,
+    required BusinessRepository businessRepository,
     required ChatService chatService,
   }) async {
     final root = await _readChatboxBackupFile(file);
@@ -76,16 +84,28 @@ class ChatboxImporter {
       }
     }
 
-    final importedProviders = await _importProviders(root, mode);
-    final assistantConvRes = await _importAssistantsAndConversations(
+    final importedProviders = _parseProviders(root);
+    final assistantConvRes = await _parseAssistantsAndConversations(
       root,
       mode,
       chatService,
     );
-    await _tagImportedAssistants(assistantConvRes.assistantIds, mode);
+    await chatService.commitParsedImport(
+      businessRepository: businessRepository,
+      overwrite: mode == RestoreMode.overwrite,
+      conversationBatches: assistantConvRes.conversationBatches,
+      messagesToAppend: assistantConvRes.messagesToAppend,
+      transformBusiness: (current) => _transformBusinessData(
+        current: current,
+        mode: mode,
+        providers: importedProviders,
+        assistants: assistantConvRes.assistantPayloads,
+        assistantIds: assistantConvRes.assistantIds,
+      ),
+    );
 
     return ChatboxImportResult(
-      providers: importedProviders,
+      providers: importedProviders.length,
       assistants: assistantConvRes.assistants,
       conversations: assistantConvRes.conversations,
       messages: assistantConvRes.messages,
@@ -138,14 +158,13 @@ class ChatboxImporter {
 
   // ---------- providers ----------
 
-  static Future<int> _importProviders(
+  static Map<String, Map<String, dynamic>> _parseProviders(
     Map<String, dynamic> root,
-    RestoreMode mode,
-  ) async {
+  ) {
     final rawSettings = root['settings'];
-    if (rawSettings is! Map) return 0;
+    if (rawSettings is! Map) return const {};
     final providers = rawSettings['providers'];
-    if (providers is! Map) return 0;
+    if (providers is! Map) return const {};
 
     final imported = <String, Map<String, dynamic>>{};
     for (final entry in providers.entries) {
@@ -206,67 +225,13 @@ class ChatboxImporter {
       };
     }
 
-    final prefs = await SharedPreferences.getInstance();
-
-    if (mode == RestoreMode.overwrite) {
-      // If the export does not include provider configs, don't wipe existing local providers.
-      if (imported.isEmpty) return 0;
-      await prefs.setString(_providersKey, jsonEncode(imported));
-      await prefs.setStringList(_providersOrderKey, imported.keys.toList());
-      return imported.length;
-    }
-
-    Map<String, dynamic> current = const <String, dynamic>{};
-    try {
-      final raw = prefs.getString(_providersKey);
-      if (raw != null && raw.isNotEmpty) {
-        current = jsonDecode(raw) as Map<String, dynamic>;
-      }
-    } catch (_) {}
-
-    final merged = <String, dynamic>{}..addAll(current);
-    for (final entry in imported.entries) {
-      if (!merged.containsKey(entry.key)) {
-        merged[entry.key] = entry.value;
-      } else {
-        // Update non-empty fields (keep user's local name/avatar/proxy etc if present)
-        final cur = (merged[entry.key] as Map).map(
-          (k, v) => MapEntry(k.toString(), v),
-        );
-        final inc = entry.value;
-        final next = Map<String, dynamic>.from(cur);
-        void putIfNotEmpty(String k) {
-          final v = inc[k];
-          if (v == null) return;
-          if (v is String && v.trim().isEmpty) return;
-          next[k] = v;
-        }
-
-        for (final k in inc.keys) {
-          // avoid overwriting non-empty local display name
-          if (k == 'name') continue;
-          putIfNotEmpty(k);
-        }
-        merged[entry.key] = next;
-      }
-    }
-    await prefs.setString(_providersKey, jsonEncode(merged));
-
-    final existedOrder =
-        prefs.getStringList(_providersOrderKey) ?? const <String>[];
-    final order = existedOrder.toList();
-    for (final id in imported.keys) {
-      if (!order.contains(id)) order.add(id);
-    }
-    await prefs.setStringList(_providersOrderKey, order);
-
-    return imported.length;
+    return imported;
   }
 
   // ---------- assistants + conversations ----------
 
   static Future<_AssistantsConversationsResult>
-  _importAssistantsAndConversations(
+  _parseAssistantsAndConversations(
     Map<String, dynamic> root,
     RestoreMode mode,
     ChatService chatService,
@@ -279,41 +244,19 @@ class ChatboxImporter {
     // Collect all session ids first so we can tag them later.
     final importedAssistants = <Map<String, dynamic>>[];
     final importedAssistantIds = <String>[];
+    final conversationBatches = <ParsedChatImportBatch>[];
+    final messagesToAppend = <String, List<ChatMessage>>{};
 
-    // For merge mode, we need to know what already exists.
-    final prefs = await SharedPreferences.getInstance();
-    final existingAssistantsById = <String, Map<String, dynamic>>{};
-    if (mode == RestoreMode.merge) {
-      try {
-        final raw = prefs.getString(_assistantsKey);
-        if (raw != null && raw.isNotEmpty) {
-          final arr = jsonDecode(raw) as List<dynamic>;
-          for (final e in arr) {
-            if (e is Map && e['id'] != null) {
-              existingAssistantsById[e['id'].toString()] = e.map(
-                (k, v) => MapEntry(k.toString(), v),
-              );
-            }
-          }
-        }
-      } catch (_) {}
-    }
-
-    // Prepare chat service for conversation restore.
+    // Existing state is read-only while the complete import plan is built.
     if (!chatService.initialized) await chatService.init();
-    if (mode == RestoreMode.overwrite) {
-      await chatService.clearAllData();
-    }
 
-    final existingConvs = chatService.getAllConversations();
+    final existingConvs = chatService.getAllCompleteConversations();
     final existingConvIds = existingConvs.map((c) => c.id).toSet();
     final existingMsgIds = <String>{};
     if (mode == RestoreMode.merge) {
+      // Ids only: full message loads would flush the LRU cache for no gain.
       for (final c in existingConvs) {
-        final msgs = chatService.getMessages(c.id);
-        for (final m in msgs) {
-          existingMsgIds.add(m.id);
-        }
+        existingMsgIds.addAll(await chatService.getMessageIds(c.id));
       }
     }
 
@@ -387,43 +330,13 @@ class ChatboxImporter {
         'customHeaders': const <Map<String, String>>[],
         'customBody': const <Map<String, String>>[],
         'enableMemory': false,
-        'enableRecentChatsReference': false,
+        'allowPastConversationRecall': false,
         'presetMessages': const <dynamic>[],
         'regexRules': const <dynamic>[],
       };
 
-      final exists = existingAssistantsById.containsKey(id);
-      if (mode == RestoreMode.overwrite || !exists) {
-        importedAssistants.add(assistantJson);
-        importedAssistantIds.add(id);
-      } else {
-        // Merge: keep local assistant unless incoming contains non-empty system prompt / model fields.
-        final local = existingAssistantsById[id]!;
-        final incPrompt =
-            (assistantJson['systemPrompt'] as String?)?.trim() ?? '';
-        if (incPrompt.isNotEmpty) local['systemPrompt'] = incPrompt;
-        if (assistantJson['chatModelProvider'] != null) {
-          local['chatModelProvider'] = assistantJson['chatModelProvider'];
-        }
-        if (assistantJson['chatModelId'] != null) {
-          local['chatModelId'] = assistantJson['chatModelId'];
-        }
-        if (assistantJson['temperature'] != null) {
-          local['temperature'] = assistantJson['temperature'];
-        }
-        if (assistantJson['topP'] != null) {
-          local['topP'] = assistantJson['topP'];
-        }
-        if (assistantJson['maxTokens'] != null) {
-          local['maxTokens'] = assistantJson['maxTokens'];
-        }
-        if (assistantJson['thinkingBudget'] != null) {
-          local['thinkingBudget'] = assistantJson['thinkingBudget'];
-        }
-        // Do not overwrite local avatar/background in merge mode.
-        existingAssistantsById[id] = local;
-        importedAssistantIds.add(id); // still tag it as chatbox source
-      }
+      importedAssistants.add(assistantJson);
+      importedAssistantIds.add(id);
 
       // Conversations (topics)
       final threadsRaw = session['threads'];
@@ -524,7 +437,8 @@ class ChatboxImporter {
           }
 
           final roleRaw = (msg['role'] ?? '').toString();
-          final content = _extractMessageContent(msg, roleHint: roleRaw);
+          final parts = _extractMessageParts(msg, roleHint: roleRaw);
+          final content = _textFromParts(parts);
 
           // System message: first one becomes assistant prompt, others become assistant-visible note.
           if (roleRaw == 'system') {
@@ -545,11 +459,20 @@ class ChatboxImporter {
               exportedAt.add(Duration(milliseconds: fallbackIndex++));
 
           if (role == 'tool') {
+            // Keep tool-result JSON in a TextPart for tool semantics, but do not
+            // drop ImagePart/FilePart attachments extracted from contentParts.
+            final toolPayload = _buildToolMessagePayload(
+              msg,
+              fallbackText: content,
+            );
+            final attachmentParts = parts
+                .where((part) => part is ImagePart || part is FilePart)
+                .toList(growable: false);
             messages.add(
               ChatMessage(
                 id: msgId,
                 role: 'tool',
-                content: _buildToolMessagePayload(msg, fallbackText: content),
+                parts: <MessagePart>[TextPart(toolPayload), ...attachmentParts],
                 timestamp: ts,
                 modelId: null,
                 providerId: null,
@@ -563,16 +486,35 @@ class ChatboxImporter {
             final totalTokens =
                 (msg['tokenCount'] as num?)?.toInt() ??
                 (msg['tokensUsed'] as num?)?.toInt();
+            final messageParts = roleRaw == 'system'
+                ? <MessagePart>[
+                    TextPart(
+                      content.isEmpty ? '[System]' : '[System]\n$content',
+                    ),
+                    ...parts.where((part) => part is! TextPart),
+                  ]
+                : parts;
+            final reasoningTexts = messageParts
+                .whereType<ReasoningPart>()
+                .map((part) => part.text)
+                .where((text) => text.trim().isNotEmpty)
+                .toList(growable: false);
+            final reasoningText = reasoningTexts.isEmpty
+                ? null
+                : reasoningTexts.join('\n');
             messages.add(
               ChatMessage(
                 id: msgId,
                 role: roleRaw == 'system' ? 'assistant' : role,
-                content: roleRaw == 'system' ? '[System]\n$content' : content,
+                parts: messageParts.isEmpty
+                    ? const <MessagePart>[TextPart('')]
+                    : messageParts,
                 timestamp: ts,
                 modelId: inferredModel.isNotEmpty ? inferredModel : null,
                 providerId: providerId.isNotEmpty ? providerId : null,
                 totalTokens: totalTokens,
                 conversationId: tid,
+                reasoningText: reasoningText,
               ),
             );
           }
@@ -605,33 +547,14 @@ class ChatboxImporter {
         );
 
         if (mode == RestoreMode.merge && existingConvIds.contains(tid)) {
-          for (final m in messages) {
-            await chatService.addMessageDirectly(tid, m);
-            msgCount += 1;
-          }
+          messagesToAppend.putIfAbsent(tid, () => []).addAll(messages);
+          msgCount += messages.length;
         } else {
-          await chatService.restoreConversation(conv, messages);
+          conversationBatches.add((conversation: conv, messages: messages));
           convCount += 1;
           msgCount += messages.length;
         }
       }
-    }
-
-    if (mode == RestoreMode.overwrite) {
-      await prefs.setString(_assistantsKey, jsonEncode(importedAssistants));
-    } else {
-      // merge: preserve existing and add/update imported ones
-      final mergedById = <String, Map<String, dynamic>>{}
-        ..addAll(existingAssistantsById);
-      for (final a in importedAssistants) {
-        final id = (a['id'] ?? '').toString();
-        if (id.isEmpty) continue;
-        mergedById[id] = a;
-      }
-      await prefs.setString(
-        _assistantsKey,
-        jsonEncode(mergedById.values.toList()),
-      );
     }
 
     return _AssistantsConversationsResult(
@@ -639,89 +562,183 @@ class ChatboxImporter {
       conversations: convCount,
       messages: msgCount,
       assistantIds: importedAssistantIds,
+      assistantPayloads: importedAssistants,
+      conversationBatches: conversationBatches,
+      messagesToAppend: messagesToAppend,
     );
   }
 
-  // ---------- tags ----------
+  // ---------- atomic business patch ----------
 
-  static Future<void> _tagImportedAssistants(
-    List<String> assistantIds,
-    RestoreMode mode,
-  ) async {
-    if (assistantIds.isEmpty) return;
-    final prefs = await SharedPreferences.getInstance();
+  static BusinessSnapshot _transformBusinessData({
+    required BusinessSnapshot current,
+    required RestoreMode mode,
+    required Map<String, Map<String, dynamic>> providers,
+    required List<Map<String, dynamic>> assistants,
+    required List<String> assistantIds,
+  }) {
+    final settings = BusinessSettingsRouter.exportSnapshot(current);
+    final overwrite = mode == RestoreMode.overwrite;
 
-    List<dynamic> tags = const <dynamic>[];
-    Map<String, dynamic> assignment = const <String, dynamic>{};
-    Map<String, dynamic> collapsed = const <String, dynamic>{};
+    if (overwrite) {
+      // Chatbox exports without providers historically left local providers
+      // intact, so preserve that importer-specific behavior.
+      if (providers.isNotEmpty) {
+        settings[_providersKey] = jsonEncode(providers);
+        settings[_providersOrderKey] = providers.keys.toList();
+      }
+      settings[_assistantsKey] = jsonEncode(assistants);
+    } else {
+      final currentProviders = _jsonObjectMap(
+        settings[_providersKey],
+        _providersKey,
+      );
+      for (final entry in providers.entries) {
+        final local = currentProviders[entry.key];
+        if (local is! Map) {
+          currentProviders[entry.key] = entry.value;
+          continue;
+        }
+        final next = local.map((key, value) => MapEntry(key.toString(), value));
+        for (final importedField in entry.value.entries) {
+          if (importedField.key == 'name') continue;
+          final value = importedField.value;
+          if (value == null || (value is String && value.trim().isEmpty)) {
+            continue;
+          }
+          next[importedField.key] = value;
+        }
+        currentProviders[entry.key] = next;
+      }
+      settings[_providersKey] = jsonEncode(currentProviders);
 
-    if (mode == RestoreMode.merge) {
-      try {
-        final rawTags = prefs.getString(_tagsKey);
-        if (rawTags != null && rawTags.isNotEmpty) {
-          tags = jsonDecode(rawTags) as List<dynamic>;
+      final order = List<String>.from(
+        (settings[_providersOrderKey] as List).cast<String>(),
+      );
+      for (final providerId in providers.keys) {
+        if (!order.contains(providerId)) order.add(providerId);
+      }
+      settings[_providersOrderKey] = order;
+
+      final currentAssistants = _jsonObjectList(
+        settings[_assistantsKey],
+        _assistantsKey,
+      );
+      final assistantsById = <String, Map<String, dynamic>>{
+        for (final assistant in currentAssistants)
+          if (assistant['id'] != null) assistant['id'].toString(): assistant,
+      };
+      for (final assistant in assistants) {
+        final id = (assistant['id'] ?? '').toString();
+        if (id.isEmpty) continue;
+        final local = assistantsById[id];
+        if (local == null) {
+          assistantsById[id] = assistant;
+          continue;
         }
-      } catch (_) {}
-      try {
-        final rawAssign = prefs.getString(_assignKey);
-        if (rawAssign != null && rawAssign.isNotEmpty) {
-          assignment = jsonDecode(rawAssign) as Map<String, dynamic>;
+        final prompt = (assistant['systemPrompt'] as String?)?.trim() ?? '';
+        if (prompt.isNotEmpty) local['systemPrompt'] = prompt;
+        for (final key in const [
+          'chatModelProvider',
+          'chatModelId',
+          'temperature',
+          'topP',
+          'maxTokens',
+          'thinkingBudget',
+        ]) {
+          final value = assistant[key];
+          if (value != null) local[key] = value;
         }
-      } catch (_) {}
-      try {
-        final rawCol = prefs.getString(_collapsedKey);
-        if (rawCol != null && rawCol.isNotEmpty) {
-          collapsed = jsonDecode(rawCol) as Map<String, dynamic>;
-        }
-      } catch (_) {}
+      }
+      settings[_assistantsKey] = jsonEncode(assistantsById.values.toList());
     }
 
-    final normalizedTags = <Map<String, dynamic>>[
-      for (final t in tags)
-        if (t is Map) t.map((k, v) => MapEntry(k.toString(), v)),
-    ];
+    if (assistantIds.isNotEmpty) {
+      final tags = overwrite
+          ? <Map<String, dynamic>>[]
+          : _jsonObjectList(settings[_tagsKey], _tagsKey);
+      final assignment = overwrite
+          ? <String, dynamic>{}
+          : _jsonMap(settings[_assignKey], _assignKey);
+      final collapsed = overwrite
+          ? <String, dynamic>{}
+          : _jsonMap(settings[_collapsedKey], _collapsedKey);
 
-    String? chatboxTagId;
-    for (final t in normalizedTags) {
-      final name = (t['name'] ?? '').toString().trim().toLowerCase();
-      if (name == 'chatbox') {
-        final id = (t['id'] ?? '').toString().trim();
+      String? chatboxTagId;
+      for (final tag in tags) {
+        if ((tag['name'] ?? '').toString().trim().toLowerCase() != 'chatbox') {
+          continue;
+        }
+        final id = (tag['id'] ?? '').toString().trim();
         if (id.isNotEmpty) {
           chatboxTagId = id;
           break;
         }
       }
-    }
-
-    final tagId = chatboxTagId ?? const Uuid().v4();
-    if (!normalizedTags.any((t) => (t['id'] ?? '').toString() == tagId)) {
-      normalizedTags.add(<String, dynamic>{'id': tagId, 'name': 'Chatbox'});
-    }
-
-    final nextAssign = <String, String>{
-      for (final e in assignment.entries) e.key: e.value.toString(),
-    };
-    for (final id in assistantIds) {
-      final aid = id.trim();
-      if (aid.isEmpty) continue;
-      if (mode == RestoreMode.overwrite) {
-        nextAssign[aid] = tagId;
-      } else {
-        nextAssign.putIfAbsent(aid, () => tagId);
+      final tagId = chatboxTagId ?? const Uuid().v4();
+      if (!tags.any((tag) => (tag['id'] ?? '').toString() == tagId)) {
+        tags.add(<String, dynamic>{'id': tagId, 'name': 'Chatbox'});
       }
+
+      final nextAssignment = <String, String>{
+        for (final entry in assignment.entries)
+          entry.key: entry.value.toString(),
+      };
+      for (final assistantId in assistantIds) {
+        final id = assistantId.trim();
+        if (id.isEmpty) continue;
+        if (overwrite) {
+          nextAssignment[id] = tagId;
+        } else {
+          nextAssignment.putIfAbsent(id, () => tagId);
+        }
+      }
+      final nextCollapsed = <String, bool>{
+        for (final entry in collapsed.entries)
+          entry.key: entry.value is bool
+              ? entry.value as bool
+              : entry.value.toString() == 'true',
+      };
+      nextCollapsed.putIfAbsent(tagId, () => false);
+
+      settings[_tagsKey] = jsonEncode(tags);
+      settings[_assignKey] = jsonEncode(nextAssignment);
+      settings[_collapsedKey] = jsonEncode(nextCollapsed);
     }
 
-    final nextCollapsed = <String, bool>{
-      for (final e in collapsed.entries)
-        e.key: (e.value is bool)
-            ? (e.value as bool)
-            : (e.value.toString() == 'true'),
-    };
-    nextCollapsed.putIfAbsent(tagId, () => false);
+    return BusinessSettingsRouter.normalizeAndRoute(settings);
+  }
 
-    await prefs.setString(_tagsKey, jsonEncode(normalizedTags));
-    await prefs.setString(_assignKey, jsonEncode(nextAssign));
-    await prefs.setString(_collapsedKey, jsonEncode(nextCollapsed));
+  static Map<String, dynamic> _jsonObjectMap(Object? raw, String key) {
+    final decoded = _jsonMap(raw, key);
+    if (decoded.values.any((value) => value is! Map)) {
+      throw FormatException(key);
+    }
+    return decoded;
+  }
+
+  static List<Map<String, dynamic>> _jsonObjectList(Object? raw, String key) {
+    if (raw is! String) throw FormatException(key);
+    final decoded = jsonDecode(raw);
+    if (decoded is! List || decoded.any((value) => value is! Map)) {
+      throw FormatException(key);
+    }
+    return decoded
+        .cast<Map>()
+        .map(
+          (value) => value.map(
+            (field, fieldValue) => MapEntry(field.toString(), fieldValue),
+          ),
+        )
+        .toList();
+  }
+
+  static Map<String, dynamic> _jsonMap(Object? raw, String key) {
+    if (raw == null || raw == '') return <String, dynamic>{};
+    if (raw is! String) throw FormatException(key);
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) throw FormatException(key);
+    return decoded.map((field, value) => MapEntry(field.toString(), value));
   }
 
   // ---------- content helpers ----------
@@ -745,7 +762,9 @@ class ChatboxImporter {
         if (raw is! Map) continue;
         final m = raw.map((k, v) => MapEntry(k.toString(), v));
         if ((m['role'] ?? '').toString() != 'system') continue;
-        final content = _extractMessageContent(m, roleHint: 'system');
+        final content = _textFromParts(
+          _extractMessageParts(m, roleHint: 'system'),
+        );
         if (content.trim().isNotEmpty) return content;
       }
     }
@@ -804,17 +823,54 @@ class ChatboxImporter {
     return _parseEpochMillis(raw);
   }
 
-  static String _extractMessageContent(
+  static String _textFromParts(List<MessagePart> parts) {
+    return parts
+        .whereType<TextPart>()
+        .map((part) => part.text)
+        .join('\n')
+        .trim();
+  }
+
+  static List<MessagePart> _extractMessageParts(
     Map<String, dynamic> msg, {
     required String roleHint,
   }) {
-    final role = roleHint;
+    // roleHint retained for call-site clarity; attachment encoding is role-agnostic.
+    final _ = roleHint;
     final partsRaw = msg['contentParts'];
-    final out = <String>[];
+    final out = <MessagePart>[];
+    final textChunks = <String>[];
+    // When an attachment splits text runs, keep one newline so joining TextPart
+    // payloads (no separator) yields `before\nafter` rather than `beforeafter`.
+    var pendingContentNewline = false;
+
+    void flushText() {
+      if (textChunks.isEmpty) return;
+      out.add(TextPart(textChunks.join('\n')));
+      textChunks.clear();
+    }
+
+    void flushTextForAttachment() {
+      flushText();
+      pendingContentNewline = out.any((part) => part is TextPart);
+    }
 
     void addText(String s) {
       final t = s.replaceAll('\r\n', '\n');
-      if (t.trim().isNotEmpty) out.add(t);
+      if (t.trim().isEmpty) return;
+      if (pendingContentNewline && textChunks.isEmpty) {
+        textChunks.add('');
+      }
+      pendingContentNewline = false;
+      textChunks.add(t);
+    }
+
+    String? mimeFor(String uri, {String? explicit, String? fileName}) {
+      final e = explicit?.trim();
+      if (e != null && e.isNotEmpty) return e;
+      final source = (fileName != null && fileName.isNotEmpty) ? fileName : uri;
+      final inferred = inferMediaMimeFromSource(source);
+      return inferred.isNotEmpty ? inferred : null;
     }
 
     if (partsRaw is List) {
@@ -831,16 +887,25 @@ class ChatboxImporter {
             final storageKey = (part['storageKey'] ?? '').toString().trim();
             final ref = url.isNotEmpty ? url : storageKey;
             if (ref.isEmpty) break;
-            if (url.startsWith('http://') ||
+            final isResolvable =
+                url.startsWith('http://') ||
                 url.startsWith('https://') ||
-                url.startsWith('data:image')) {
-              if (role == 'user') {
-                out.add('[image:$url]');
-              } else {
-                out.add('![]($url)');
-              }
+                url.startsWith('data:image') ||
+                storageKey.isNotEmpty;
+            if (isResolvable) {
+              flushTextForAttachment();
+              out.add(
+                ImagePart(
+                  uri: SandboxPathResolver.canonicalize(ref),
+                  mime: mimeFor(ref),
+                  unavailable:
+                      !(url.startsWith('http://') ||
+                          url.startsWith('https://') ||
+                          url.startsWith('data:image')),
+                ),
+              );
             } else {
-              out.add('[Chatbox image: $ref]');
+              addText('[Chatbox image: $ref]');
             }
             break;
           case 'info':
@@ -849,7 +914,11 @@ class ChatboxImporter {
           case 'reasoning':
             final t = (part['text'] ?? '').toString();
             if (t.trim().isNotEmpty) {
-              out.add('<think>\n$t\n</think>');
+              flushText();
+              out.add(ReasoningPart(t));
+              // Same bridging newline as attachments so before/reasoning/after
+              // yields derived content `before\nafter`.
+              pendingContentNewline = out.any((p) => p is TextPart);
             }
             break;
           case 'tool-call':
@@ -857,7 +926,7 @@ class ChatboxImporter {
             final toolName = (part['toolName'] ?? '').toString();
             final args = part['args'];
             if (state.isNotEmpty) {
-              out.add(
+              addText(
                 '[tool:$state] ${toolName.isNotEmpty ? toolName : 'tool'} ${args == null ? '' : jsonEncode(args)}'
                     .trim(),
               );
@@ -870,7 +939,7 @@ class ChatboxImporter {
     }
 
     // Fallback to legacy `content`
-    if (out.isEmpty) {
+    if (out.isEmpty && textChunks.isEmpty) {
       final legacy = (msg['content'] ?? '').toString();
       if (legacy.trim().isNotEmpty) addText(legacy);
     }
@@ -884,14 +953,14 @@ class ChatboxImporter {
         if (url.isEmpty) continue;
         final title = (l['title'] ?? '').toString().trim();
         if (title.isNotEmpty) {
-          out.add('[$title]($url)');
+          addText('[$title]($url)');
         } else {
-          out.add(url);
+          addText(url);
         }
       }
     }
 
-    // Files
+    // Files — known attachment objects become FilePart directly
     final files = msg['files'];
     if (files is List) {
       for (final f in files) {
@@ -900,13 +969,16 @@ class ChatboxImporter {
         if (url.isEmpty) continue;
         final name = (f['name'] ?? 'file').toString();
         final type = (f['fileType'] ?? '').toString();
-        if (role == 'user') {
-          out.add(
-            '[file:$url|$name|${type.isEmpty ? 'application/octet-stream' : type}]',
-          );
-        } else {
-          out.add('[$name]($url)');
-        }
+        flushTextForAttachment();
+        out.add(
+          FilePart(
+            uri: SandboxPathResolver.canonicalize(url),
+            name: name.isNotEmpty ? name : 'file',
+            mime:
+                mimeFor(url, explicit: type, fileName: name) ??
+                'application/octet-stream',
+          ),
+        );
       }
     }
 
@@ -917,21 +989,24 @@ class ChatboxImporter {
         if (p is! Map) continue;
         final url = (p['url'] ?? '').toString().trim();
         if (url.isEmpty) continue;
-        if (role == 'user') {
-          out.add('[image:$url]');
-        } else {
-          out.add('![]($url)');
-        }
+        flushTextForAttachment();
+        out.add(
+          ImagePart(
+            uri: SandboxPathResolver.canonicalize(url),
+            mime: mimeFor(url),
+          ),
+        );
       }
     }
 
     // Error info
     final err = (msg['error'] ?? '').toString();
     if (err.trim().isNotEmpty) {
-      out.add('[Error] $err');
+      addText('[Error] $err');
     }
 
-    return out.join('\n').trim();
+    flushText();
+    return out;
   }
 
   static String _inferModelIdFromChatboxMessage(Map<String, dynamic> msg) {
@@ -1074,10 +1149,16 @@ class _AssistantsConversationsResult {
   final int conversations;
   final int messages;
   final List<String> assistantIds;
+  final List<Map<String, dynamic>> assistantPayloads;
+  final List<ParsedChatImportBatch> conversationBatches;
+  final Map<String, List<ChatMessage>> messagesToAppend;
   const _AssistantsConversationsResult({
     required this.assistants,
     required this.conversations,
     required this.messages,
     required this.assistantIds,
+    required this.assistantPayloads,
+    required this.conversationBatches,
+    required this.messagesToAppend,
   });
 }

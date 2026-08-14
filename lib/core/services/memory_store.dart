@@ -1,98 +1,81 @@
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/assistant_memory.dart';
+import 'json_blob_store.dart';
 
-class MemoryStore {
+class MemoryStore extends JsonBlobStore<AssistantMemory> {
+  MemoryStore(super._preferences);
+
   static const String _memoriesKey = 'assistant_memories_v1';
 
-  static List<AssistantMemory>? _cache;
+  @override
+  String get storageKey => _memoriesKey;
 
-  static Future<List<AssistantMemory>> _loadAllInternal() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_memoriesKey);
-    if (raw == null || raw.isEmpty) return <AssistantMemory>[];
-    try {
-      final arr = jsonDecode(raw) as List<dynamic>;
-      return [
-        for (final e in arr)
-          if (e is Map<String, dynamic>)
-            AssistantMemory.fromJson(e)
-          else
-            AssistantMemory.fromJson((e as Map).cast<String, dynamic>()),
-      ];
-    } catch (_) {
-      return <AssistantMemory>[];
-    }
-  }
+  @override
+  AssistantMemory decodeItem(Map<String, dynamic> json) =>
+      AssistantMemory.fromJson(json);
 
-  static Future<List<AssistantMemory>> getAll() async {
-    _cache ??= await _loadAllInternal();
-    return List<AssistantMemory>.of(_cache!);
-  }
+  @override
+  Map<String, dynamic> encodeItem(AssistantMemory item) => item.toJson();
 
-  static Future<void> _saveAll(List<AssistantMemory> list) async {
-    _cache = List<AssistantMemory>.of(list);
-    final prefs = await SharedPreferences.getInstance();
-    final json = jsonEncode(list.map((e) => e.toJson()).toList());
-    await prefs.setString(_memoriesKey, json);
-  }
+  Future<List<AssistantMemory>> getAll() => readAll();
 
-  static Future<List<AssistantMemory>> getForAssistant(
-    String assistantId,
-  ) async {
+  Future<List<AssistantMemory>> getForAssistant(String assistantId) async {
     final all = await getAll();
-    return all.where((m) => m.assistantId == assistantId).toList();
+    return all.where((memory) => memory.assistantId == assistantId).toList();
   }
 
-  static int _nextId(List<AssistantMemory> list) {
-    int maxId = 0;
-    for (final m in list) {
-      if (m.id > maxId) maxId = m.id;
+  static int _nextId(List<AssistantMemory> memories) {
+    var maxId = 0;
+    for (final memory in memories) {
+      if (memory.id > maxId) maxId = memory.id;
     }
     return maxId + 1;
   }
 
-  static Future<AssistantMemory> add({
+  Future<AssistantMemory> add({
     required String assistantId,
     required String content,
-  }) async {
-    final all = await getAll();
-    final id = _nextId(all);
-    final mem = AssistantMemory(
-      id: id,
-      assistantId: assistantId,
-      content: content,
-    );
-    all.add(mem);
-    await _saveAll(all);
-    return mem;
+  }) {
+    return runExclusive(() async {
+      final all = await readAll();
+      final memory = AssistantMemory(
+        id: _nextId(all),
+        assistantId: assistantId,
+        content: content,
+      );
+      all.add(memory);
+      await writeAll(all);
+      return memory;
+    });
   }
 
-  static Future<AssistantMemory?> update({
-    required int id,
-    required String content,
-  }) async {
-    final all = await getAll();
-    final idx = all.indexWhere((m) => m.id == id);
-    if (idx == -1) return null;
-    final updated = all[idx].copyWith(content: content);
-    all[idx] = updated;
-    await _saveAll(all);
-    return updated;
+  Future<AssistantMemory?> update({required int id, required String content}) {
+    return runExclusive(() async {
+      final all = await readAll();
+      final index = all.indexWhere((memory) => memory.id == id);
+      if (index == -1) return null;
+      final updated = all[index].copyWith(content: content);
+      all[index] = updated;
+      await writeAll(all);
+      return updated;
+    });
   }
 
-  static Future<bool> delete({required int id}) async {
-    final all = await getAll();
-    final before = all.length;
-    all.removeWhere((m) => m.id == id);
-    final changed = all.length != before;
-    if (changed) await _saveAll(all);
-    return changed;
+  Future<bool> delete({required int id}) {
+    return runExclusive(() async {
+      final all = await readAll();
+      final before = all.length;
+      all.removeWhere((memory) => memory.id == id);
+      if (all.length == before) return false;
+      await writeAll(all);
+      return true;
+    });
   }
 
-  static Future<void> deleteForAssistant(String assistantId) async {
-    final all = await getAll();
-    all.removeWhere((m) => m.assistantId == assistantId);
-    await _saveAll(all);
+  Future<void> deleteForAssistant(String assistantId) {
+    return runExclusive(() async {
+      final all = await readAll();
+      all.removeWhere((memory) => memory.assistantId == assistantId);
+      await writeAll(all);
+    });
   }
 }

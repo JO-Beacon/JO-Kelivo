@@ -60,20 +60,14 @@ if (Test-Path $zhLangCompiler) {
 } else {
   Write-Host "Chinese language file is missing from Inno Setup. Downloading a local copy..."
   New-Item -ItemType Directory -Force -Path $zhLangLocalDir | Out-Null
-  $uri = "https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/Unofficial/ChineseSimplified.isl"
+  $uri = "https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/ChineseSimplified.isl"
+  Invoke-WebRequest -Uri $uri -OutFile $zhLangLocal -UseBasicParsing -TimeoutSec 60
 
-  try {
-    Invoke-WebRequest -Uri $uri -OutFile $zhLangLocal -UseBasicParsing -TimeoutSec 60
-  } catch {
-    Write-Host "Failed to download Chinese language file: $($_.Exception.Message)"
+  if (-not (Test-Path $zhLangLocal)) {
+    throw "Chinese language file download did not create: $zhLangLocal"
   }
-
-  if (Test-Path $zhLangLocal) {
-    Write-Host "Downloaded Chinese language file: $zhLangLocal"
-    $chineseMessagesFile = $zhLangLocal
-  } else {
-    Write-Host "Chinese language file unavailable. Falling back to English installer messages."
-  }
+  Write-Host "Downloaded Chinese language file: $zhLangLocal"
+  $chineseMessagesFile = $zhLangLocal
 }
 
 New-Item -ItemType Directory -Force -Path $outputDirResolved | Out-Null
