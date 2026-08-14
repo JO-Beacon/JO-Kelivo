@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       publish_release:
-        description: '发布到 GitHub Release'
+        description: '上传到 GitHub Release 草稿'
         required: false
         default: false
         type: boolean
@@ -205,12 +205,14 @@ jobs:
             JO-Kelivo-v*-linux-x64-deb.deb.sha256
           if-no-files-found: error
 
-      - name: Publish GitHub Release
+      - name: Upload assets to draft GitHub Release
         if: ${{ github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && inputs.publish_release && inputs.release_tag != '') }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_type == 'tag' && github.ref_name || inputs.release_tag }}
           name: ${{ github.ref_type == 'tag' && github.ref_name || inputs.release_tag }}
+          body_path: .github/release-notes/${{ github.ref_type == 'tag' && github.ref_name || inputs.release_tag }}.md
+          draft: true
           prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || false }}
           files: |
             JO-Kelivo-v*-linux-x64-archive.tar.gz

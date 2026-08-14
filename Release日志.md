@@ -55,7 +55,7 @@ JO-Kelivo 保持独立 Git 历史、应用身份、数据目录、更新源和�
 - Windows 实机已验证本地备份导入/导出处理提示，以及导入完成、自动重启、恢复提交和正常进入应用的完整流程。
 - Windows 主 EXE 和 setup EXE 当前均未做 Authenticode 签名；现有 workflow 没有代码签名步骤。
 - Android Actions run `31822982165` 通过，生成 arm64-v8a、armeabi-v7a、x86_64 三个拆分 APK 及对应 `.sha256`；包名为 `com.psyche.jokelivo`，应用名为 `JO-Kelivo`，版本为 `0.1.6`，三个 APK 各自只包含目标 ABI。
-- Android 本轮使用非发布模式且仓库未配置发布签名 secrets，因此三个 APK 按设计未签名，只用于候选验证；正式发布模式会在缺少完整签名 secrets 时拒绝发布。
+- Android 签名验证 Actions run `31827894964` 通过；三个 APK 均使用与 JO-Kelivo 0.1.5 相同的发布证书，证书 SHA-256 为 `81902bff0923c1202f1a29648e25ba87e3a24499ee3f613545750a4a06353c7d`，可覆盖升级旧版。仓库已配置完整发布签名 secrets，正式发布模式仍会在任一签名项缺失时拒绝发布。
 - Linux Actions run `31812698493` 通过，生成 AppImage、tar.gz、deb 及对应 `.sha256`；deb 已核对为 `Package: jo-kelivo`、`Version: 0.1.6`、`Architecture: amd64`，入口、desktop 文件和图标均存在。
 - Android、Windows、Linux 三套非发布 workflow 均成功上传 artifact，且 `Publish GitHub Release` 步骤均明确为 `skipped`。
 - JO 0.1.6 与原版 Kelivo 1.2.1 的备份核心实现保持同源；备份编排、备份模型、业务恢复和业务设置路由文件已逐项通过 SHA-256 一致性核对。两个方向的合成契约测试均已通过，覆盖共享会话、消息、版本关系、结构化附件、助手、供应商和附件文件；JO 本地专属显示设置不会进入共享备份。
@@ -64,7 +64,7 @@ JO-Kelivo 保持独立 Git 历史、应用身份、数据目录、更新源和�
 
 ## 发布状态
 
-本轮基座替换的发布候选门禁已经通过：三平台完整资产矩阵、校验文件、命名、artifact 上传和 Release 跳过门控均已验证。当前未创建正式 tag 或 GitHub Release；这些非发布产物不是对外发布件。正式 Android Release 仍必须注入发布签名 secrets，Windows 产物则继续明确为未做 Authenticode 签名。
+本轮基座替换的发布候选门禁已经通过：三平台完整资产矩阵、校验文件、命名、artifact 上传和 Release 跳过门控均已验证，Android 发布签名链路也已完成非发布验证。当前未创建正式 tag 或 GitHub Release；这些非发布产物不是对外发布件。正式 Release 由三个平台 workflow 共同写入草稿，全部资产核验后再人工公开；Windows 产物继续明确为未做 Authenticode 签名。
 
 ## 候选验证 SHA-256
 
@@ -78,6 +78,9 @@ af0144361247446e850857211c008231728722d7b929c83f867544064b488023  JO-Kelivo-v0.1
 7e9f420738afff0bed41641d15230bd40a607bbad3818c3e8117209447c504bf  JO-Kelivo-v0.1.6+6_d3a9d50-linux-x64-deb.deb
 143574250f2b129f280b7b475940f63aa04d2c99602dd498d47706fc8d629ccc  JO-Kelivo-v0.1.6+6_79f4645-windows-x64-portable.zip
 1dcf8c74a9db67c088da43a5697609ea5439d04bda28acf39ca56dae36172f45  JO-Kelivo-v0.1.6+6_79f4645-windows-x64-setup.exe
+6da1edd559ba25b51409a76d240a862a2ba74d5be413a549af7196a03a5abfe7  JO-Kelivo-v0.1.6+6_0c70caa-android-arm64-v8a-release.apk
+c36cca78c1c6f536aeee39bb36353cef89431ff789a09d839ffdaab4a29c9111  JO-Kelivo-v0.1.6+6_0c70caa-android-armeabi-v7a-release.apk
+048d9108d21f2b328e6a61d1c48800a12443750fc334ea16658b6e293fe5d5c1  JO-Kelivo-v0.1.6+6_0c70caa-android-x86_64-release.apk
 ```
 
 ## 已生成并核验的本地候选文件（不含源码）
@@ -97,6 +100,9 @@ JO-Kelivo-v0.1.6+6_d3a9d50-linux-x64-archive.tar.gz（及 `.sha256`）
 JO-Kelivo-v0.1.6+6_d3a9d50-linux-x64-deb.deb（及 `.sha256`）
 JO-Kelivo-v0.1.6+6_79f4645-windows-x64-portable.zip（及 `.sha256`）
 JO-Kelivo-v0.1.6+6_79f4645-windows-x64-setup.exe（及 `.sha256`）
+JO-Kelivo-v0.1.6+6_0c70caa-android-arm64-v8a-release.apk（及 `.sha256`，发布签名验证）
+JO-Kelivo-v0.1.6+6_0c70caa-android-armeabi-v7a-release.apk（及 `.sha256`，发布签名验证）
+JO-Kelivo-v0.1.6+6_0c70caa-android-x86_64-release.apk（及 `.sha256`，发布签名验证）
 
 正式发布时由 tag/发布模式重新生成不带短 commit 后缀的资产；本轮不创建正式 tag 或 GitHub Release。
 
