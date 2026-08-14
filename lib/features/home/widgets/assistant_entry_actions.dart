@@ -5,11 +5,12 @@ import 'package:provider/provider.dart';
 
 import '../../../core/models/assistant.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/providers/settings_provider.dart';
+import '../controllers/chat_actions.dart';
 import '../../../core/providers/tag_provider.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../core/providers/settings_provider.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../assistant/pages/assistant_settings_edit_page.dart';
@@ -70,13 +71,10 @@ class AssistantEntryActions {
     Assistant assistant,
   ) async {
     final l10n = AppLocalizations.of(context)!;
-    final insertAtTop = context
-        .read<SettingsProvider>()
-        .insertNewAssistantAtTop;
     final newId = await context.read<AssistantProvider>().duplicateAssistant(
       assistant.id,
       l10n: l10n,
-      insertAtTop: insertAtTop,
+      insertAtTop: context.read<SettingsProvider>().insertNewAssistantAtTop,
     );
     if (!context.mounted || newId == null) return;
     showAppSnackBar(
@@ -291,6 +289,8 @@ class AssistantEntryActions {
     );
 
     if (!context.mounted || confirmed != true) return;
+    await ChatActions.cancelActiveGenerationsForAssistant(assistant.id);
+    if (!context.mounted) return;
     final ok = await assistantProvider.deleteAssistant(assistant.id);
     if (!context.mounted) return;
 

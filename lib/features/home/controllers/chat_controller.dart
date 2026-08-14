@@ -1,8 +1,29 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/services/chat/chat_service.dart';
+import 'message_render_model.dart';
+
+/// Initial window for a conversation switch, loaded by
+/// [ChatController.fetchConversationWindow] and installed atomically by
+/// [ChatController.commitConversationWindow].
+class FetchedConversationWindow {
+  const FetchedConversationWindow({
+    required this.conversation,
+    required this.page,
+    required this.versionSelections,
+    required this.needsVisibleGroupPreloadRetry,
+    required this.lazyHistoryEnabled,
+  });
+
+  final Conversation conversation;
+  final LoadedTimelinePage? page;
+  final Map<String, int> versionSelections;
+  final bool needsVisibleGroupPreloadRetry;
+  final bool lazyHistoryEnabled;
+}
 
 /// Controller for managing conversation state in the home page.
 ///
@@ -15,9 +36,9 @@ import '../../../core/services/chat/chat_service.dart';
 class ChatController extends ChangeNotifier {
   factory ChatController({
     required ChatService chatService,
-    bool Function()? lazyHistoryEnabled,
+    bool lazyHistoryEnabled = true,
   }) {
-    return ChatController._(chatService, lazyHistoryEnabled ?? (() => true));
+    return ChatController._(chatService, lazyHistoryEnabled);
   }
 
   ChatController._(this._chatService, this._lazyHistoryEnabled) {
@@ -25,9 +46,6 @@ class ChatController extends ChangeNotifier {
   }
 
   final ChatService _chatService;
-  final bool Function() _lazyHistoryEnabled;
-
-  bool get _isLazyHistoryEnabled => _lazyHistoryEnabled();
 
   // ============================================================================
   // State Fields
@@ -49,9 +67,26 @@ class ChatController extends ChangeNotifier {
   int _totalMessageCount = 0;
   int get totalMessageCount => _totalMessageCount;
 
+  /// versionCount from the latest loaded timeline window, keyed by groupId.
+  Map<String, int> _windowVersionCounts = <String, int>{};
   bool get hasMoreBefore => _loadedStartIndex > 0;
   bool get hasMoreAfter =>
       _loadedStartIndex + _messages.length < _totalMessageCount;
+
+  /// Whether an initial/around-message window load is in flight.
+  bool _isLoadingWindow = false;
+  bool get isLoadingWindow => _isLoadingWindow;
+
+  /// Serial of the latest window load; only it may clear [_isLoadingWindow].
+  int _windowLoadSerial = 0;
+
+  bool _lazyHistoryEnabled;
+  bool get lazyHistoryEnabled => _lazyHistoryEnabled;
+
+  /// Slot budget for the idle cache backfill: the current conversation's
+  /// cache ceiling is its full history or this threshold, whichever is lower.
+  @visibleForTesting
+  static const int idleCacheBackfillSlotLimit = 5000;
 
   /// Selected version per message group (groupId -> selected version index).
   Map<String, int> _versionSelections = <String, int>{};
@@ -62,6 +97,7 @@ class ChatController extends ChangeNotifier {
   Map<String, int>? _collapsedIdToIndex;
   Map<String, List<ChatMessage>>? _groupCache;
   List<ChatMessage>? _messagesWithVisibleGroupsCache;
+  List<MessageRenderModel>? _renderModelsCache;
 
   /// Conversation IDs that are currently generating (streaming).
   final Set<String> _loadingConversationIds = <String>{};
@@ -99,19 +135,125 @@ class ChatController extends ChangeNotifier {
   // Conversation Management
   // ============================================================================
 
-  /// Set the current conversation and load its messages.
-  void setCurrentConversation(Conversation? conversation) {
+  /// Sets a newly created empty draft without opening a persisted window.
+  void setDraftConversation(Conversation conversation) {
+    // Unknown count (-1) is not "has messages"; only reject when known non-zero.
+    if (_chatService.isMessageCountKnown(conversation.id) &&
+        _chatService.getMessageCount(conversation.id) != 0) {
+      throw StateError('persisted_conversation_requires_async_open');
+    }
     _currentConversation = conversation;
+    _messages = [];
+    _loadedStartIndex = 0;
+    _totalMessageCount = 0;
+    _windowVersionCounts = <String, int>{};
+    _versionSelections = <String, int>{};
+    notifyListeners();
+  }
+
+  Future<void> setCurrentConversationAndLoad(Conversation? conversation) async {
+    _currentConversation = conversation;
+    _messages = [];
+    _loadedStartIndex = 0;
+    _totalMessageCount = 0;
+    _windowVersionCounts = <String, int>{};
+    _versionSelections = <String, int>{};
     if (conversation != null) {
-      _loadInitialMessageWindow(conversation.id);
       _loadVersionSelections();
-    } else {
-      _messages = [];
-      _loadedStartIndex = 0;
-      _totalMessageCount = 0;
-      _versionSelections = <String, int>{};
+      await _loadInitialMessageWindow(conversation.id);
+      if (_currentConversation?.id != conversation.id) return;
     }
     notifyListeners();
+  }
+
+  /// Fetch phase of a conversation switch: loads the initial window for
+  /// [conversation] without mutating any current state. Install the result
+  /// with [commitConversationWindow].
+  Future<FetchedConversationWindow> fetchConversationWindow(
+    Conversation conversation,
+  ) async {
+    final lazyHistoryEnabled = _lazyHistoryEnabled;
+    final page = lazyHistoryEnabled
+        ? await _chatService.loadTimelinePage(
+            conversation.id,
+            limit: ChatService.defaultTimelineInitialSlots,
+          )
+        : await _fetchCompleteTimeline(conversation.id);
+    Map<String, int> versionSelections;
+    try {
+      versionSelections = _chatService.getVersionSelections(conversation.id);
+    } catch (_) {
+      versionSelections = <String, int>{};
+    }
+    final groupIds = <String>{
+      for (final slot in page?.slots ?? const <LoadedTimelineSlot>[])
+        if (slot.identity.versionCount > 1 ||
+            slot.message.version > 0 ||
+            versionSelections.containsKey(
+              slot.message.groupId ?? slot.message.id,
+            ))
+          slot.message.groupId ?? slot.message.id,
+    };
+    var needsVisibleGroupPreloadRetry = false;
+    if (groupIds.isNotEmpty) {
+      try {
+        await _preloadGroupIds(conversation.id, groupIds);
+      } catch (_) {
+        needsVisibleGroupPreloadRetry = true;
+      }
+    }
+    return FetchedConversationWindow(
+      conversation: conversation,
+      page: page,
+      versionSelections: versionSelections,
+      needsVisibleGroupPreloadRetry: needsVisibleGroupPreloadRetry,
+      lazyHistoryEnabled: lazyHistoryEnabled,
+    );
+  }
+
+  /// Commit phase of a conversation switch: installs a window previously
+  /// fetched by [fetchConversationWindow]. Supersedes any in-flight window
+  /// load, so its late page and loading-flag clear both lose.
+  void commitConversationWindow(
+    FetchedConversationWindow fetched, {
+    VoidCallback? onDeferredGroupDataLoaded,
+  }) {
+    _windowLoadSerial++;
+    _isLoadingWindow = false;
+    _currentConversation = fetched.conversation;
+    _replaceWindow(fetched.page);
+    _versionSelections = fetched.versionSelections;
+    notifyListeners();
+    if (fetched.needsVisibleGroupPreloadRetry) {
+      unawaited(
+        _preloadVisibleGroupData()
+            .then((_) {
+              if (_currentConversation?.id != fetched.conversation.id) return;
+              notifyListeners();
+              onDeferredGroupDataLoaded?.call();
+            })
+            .catchError((Object _) {}),
+      );
+    }
+    _scheduleIdleCacheBackfill(fetched.conversation.id);
+    if (fetched.lazyHistoryEnabled != _lazyHistoryEnabled) {
+      unawaited(
+        setLazyHistoryEnabled(
+          _lazyHistoryEnabled,
+          forceReload: true,
+        ).catchError((Object error, StackTrace stackTrace) {
+          FlutterError.reportError(
+            FlutterErrorDetails(
+              exception: error,
+              stack: stackTrace,
+              context: ErrorDescription(
+                'while reconciling a prefetched chat history window',
+              ),
+            ),
+          );
+        }),
+      );
+    }
   }
 
   /// Update the current conversation reference (e.g., after title change).
@@ -153,23 +295,10 @@ class ChatController extends ChangeNotifier {
     _messages = [];
     _loadedStartIndex = 0;
     _totalMessageCount = 0;
+    _windowVersionCounts = <String, int>{};
     _versionSelections = <String, int>{};
     notifyListeners();
     return conversation;
-  }
-
-  /// Switch to an existing conversation.
-  Future<void> switchConversation(String id) async {
-    if (_currentConversation?.id == id) return;
-
-    _chatService.setCurrentConversation(id);
-    final convo = _chatService.getConversation(id);
-    if (convo != null) {
-      _currentConversation = convo;
-      _loadInitialMessageWindow(id);
-      _loadVersionSelections();
-      notifyListeners();
-    }
   }
 
   /// Clear the current conversation state.
@@ -183,156 +312,377 @@ class ChatController extends ChangeNotifier {
     _messages = [];
     _loadedStartIndex = 0;
     _totalMessageCount = 0;
+    _windowVersionCounts = <String, int>{};
     _versionSelections = <String, int>{};
   }
 
-  void _loadInitialMessageWindow(String conversationId) {
-    _totalMessageCount = _chatService.getMessageCount(conversationId);
-    if (!_isLazyHistoryEnabled) {
-      _messages = List.of(_chatService.getMessages(conversationId));
-      _loadedStartIndex = 0;
-      return;
+  Future<void> _loadInitialMessageWindow(String conversationId) async {
+    final serial = ++_windowLoadSerial;
+    final lazyHistoryEnabled = _lazyHistoryEnabled;
+    _isLoadingWindow = true;
+    try {
+      final page = lazyHistoryEnabled
+          ? await _chatService.loadTimelinePage(
+              conversationId,
+              limit: ChatService.defaultTimelineInitialSlots,
+            )
+          : await _fetchCompleteTimeline(conversationId);
+      // Discard the page if the conversation changed while loading.
+      if (serial != _windowLoadSerial ||
+          _currentConversation?.id != conversationId ||
+          _lazyHistoryEnabled != lazyHistoryEnabled) {
+        return;
+      }
+      _replaceWindow(page);
+    } finally {
+      if (serial == _windowLoadSerial) _isLoadingWindow = false;
     }
-
-    _messages = List.of(_chatService.getRecentMessages(conversationId));
-    _loadedStartIndex = (_totalMessageCount - _messages.length)
-        .clamp(0, _totalMessageCount)
-        .toInt();
+    invalidateCache();
+    await _preloadVisibleGroupData();
+    _scheduleIdleCacheBackfill(conversationId);
   }
 
-  void refreshLoadedMessageCount() {
+  Future<void> setLazyHistoryEnabled(
+    bool enabled, {
+    bool forceReload = false,
+  }) async {
+    if (_lazyHistoryEnabled == enabled && !forceReload) return;
+    final previousEnabled = _lazyHistoryEnabled;
+    _lazyHistoryEnabled = enabled;
     final conversation = _currentConversation;
     if (conversation == null) {
-      _totalMessageCount = 0;
-      _loadedStartIndex = 0;
+      notifyListeners();
       return;
     }
-    _totalMessageCount = _chatService.getMessageCount(conversation.id);
-    _loadedStartIndex = _loadedStartIndex.clamp(0, _totalMessageCount).toInt();
-  }
 
-  bool loadMoreBefore({int limit = ChatService.defaultHistoryPageSize}) {
-    final conversation = _currentConversation;
-    if (!_isLazyHistoryEnabled ||
-        conversation == null ||
-        _loadedStartIndex <= 0 ||
-        limit <= 0) {
-      return false;
-    }
-
-    final newStart = (_loadedStartIndex - limit)
-        .clamp(0, _loadedStartIndex)
-        .toInt();
-    final older = _chatService.getMessagesRange(
-      conversation.id,
-      start: newStart,
-      limit: _loadedStartIndex - newStart,
-    );
-    if (older.isEmpty) {
-      _loadedStartIndex = 0;
-      return false;
-    }
-
-    final merged = <ChatMessage>[...older, ..._messages];
-    _messages = _trimWindowEnd(merged);
-    _loadedStartIndex = newStart;
+    final serial = ++_windowLoadSerial;
+    _isLoadingWindow = true;
     notifyListeners();
-    return true;
+    try {
+      final page = enabled
+          ? await _chatService.loadTimelinePage(
+              conversation.id,
+              limit: ChatService.defaultLoadedWindowMax,
+            )
+          : await _fetchCompleteTimeline(conversation.id);
+      if (serial != _windowLoadSerial ||
+          _currentConversation?.id != conversation.id ||
+          _lazyHistoryEnabled != enabled) {
+        return;
+      }
+      _replaceWindow(page);
+      await _preloadVisibleGroupData();
+      if (serial != _windowLoadSerial ||
+          _currentConversation?.id != conversation.id ||
+          _lazyHistoryEnabled != enabled) {
+        return;
+      }
+      notifyListeners();
+    } catch (_) {
+      if (serial == _windowLoadSerial && _lazyHistoryEnabled == enabled) {
+        _lazyHistoryEnabled = previousEnabled;
+      }
+      rethrow;
+    } finally {
+      if (serial == _windowLoadSerial) {
+        _isLoadingWindow = false;
+        notifyListeners();
+      }
+    }
   }
 
-  bool loadMoreAfter({int limit = ChatService.defaultHistoryPageSize}) {
+  Future<LoadedTimelinePage?> _fetchCompleteTimeline(
+    String conversationId,
+  ) async {
+    const pageSize = ChatService.defaultLoadedWindowMax;
+    final first = await _chatService.loadTimelinePage(
+      conversationId,
+      fromStart: true,
+      limit: pageSize,
+    );
+    if (first == null || !first.hasMoreAfter) return first;
+
+    final slots = <LoadedTimelineSlot>[...first.slots];
+    var page = first;
+    while (page.hasMoreAfter) {
+      if (page.slots.isEmpty) {
+        throw StateError('complete_history_empty_page:$conversationId');
+      }
+      final next = await _chatService.loadTimelinePage(
+        conversationId,
+        afterRevisionId: page.slots.last.message.id,
+        limit: pageSize,
+      );
+      if (next == null || next.slots.isEmpty) {
+        throw StateError('complete_history_incomplete:$conversationId');
+      }
+      if (next.stateRevision != first.stateRevision ||
+          next.totalSlotCount != first.totalSlotCount) {
+        throw StateError('complete_history_changed:$conversationId');
+      }
+      slots.addAll(next.slots);
+      page = next;
+    }
+    if (slots.length != first.totalSlotCount) {
+      throw StateError('complete_history_count:$conversationId');
+    }
+    return LoadedTimelinePage(
+      conversationId: first.conversationId,
+      stateRevision: first.stateRevision,
+      contextStartRevisionId: first.contextStartRevisionId,
+      slots: slots,
+      hasMoreBefore: false,
+      hasMoreAfter: false,
+      totalSlotCount: first.totalSlotCount,
+    );
+  }
+
+  /// Queues a silent full-cache backfill for [conversationId] to run once the
+  /// UI is idle (i.e. after the first frame of a freshly opened window).
+  void _scheduleIdleCacheBackfill(String conversationId) {
+    final Future<void> task;
+    try {
+      task = SchedulerBinding.instance.scheduleTask(
+        () => backfillCurrentConversationCache(conversationId),
+        Priority.idle,
+        debugLabel: 'chat.idleCacheBackfill',
+      );
+    } catch (_) {
+      // No scheduler binding (bare unit tests): warm-up is optional.
+      return;
+    }
+    unawaited(task.catchError((Object _) {}));
+  }
+
+  /// Silently warms the full message cache for the current conversation.
+  ///
+  /// Cache warm-up only: no listeners are notified and every guard failure
+  /// just skips the load. Guards: the conversation must still be current, its
+  /// slot count must fit [idleCacheBackfillSlotLimit], and it must not be
+  /// generating (a streaming write owns the single connection queue). The
+  /// current conversation is exempt from cache eviction; if a backfill pushes
+  /// the cache over budget, tail truncation (cache plan measure 13) keeps the
+  /// newest entries.
+  @visibleForTesting
+  Future<void> backfillCurrentConversationCache(String conversationId) async {
+    if (_currentConversation?.id != conversationId) return;
+    if (_totalMessageCount > idleCacheBackfillSlotLimit) return;
+    if (isConversationLoading(conversationId)) return;
+    if (_chatService.isConversationFullyCached(conversationId)) return;
+    try {
+      await _chatService.loadMessages(conversationId);
+    } catch (_) {
+      // Warm-up failures lose nothing user-visible.
+    }
+  }
+
+  void _replaceWindow(LoadedTimelinePage? page) {
+    if (page == null) {
+      _messages = <ChatMessage>[];
+      _loadedStartIndex = 0;
+      _totalMessageCount = 0;
+      _windowVersionCounts = <String, int>{};
+      return;
+    }
+    _messages = page.slots.map((slot) => slot.message).toList(growable: true);
+    _loadedStartIndex = page.slots.isEmpty
+        ? 0
+        : page.slots.first.identity.logicalIndex;
+    _totalMessageCount = page.totalSlotCount;
+    _windowVersionCounts = {
+      for (final slot in page.slots)
+        slot.identity.slotId: slot.identity.versionCount,
+    };
+    invalidateCache();
+  }
+
+  void _mergeWindowVersionCounts(LoadedTimelinePage page) {
+    final next = Map<String, int>.of(_windowVersionCounts);
+    for (final slot in page.slots) {
+      next[slot.identity.slotId] = slot.identity.versionCount;
+    }
+    _windowVersionCounts = next;
+  }
+
+  Future<bool> loadMoreBefore({
+    int limit = ChatService.defaultHistoryPageSize,
+  }) async {
+    if (limit <= 0) return false;
     final conversation = _currentConversation;
-    if (!_isLazyHistoryEnabled ||
-        conversation == null ||
-        !hasMoreAfter ||
-        limit <= 0) {
+    if (conversation == null || _messages.isEmpty || !hasMoreBefore) {
       return false;
     }
-
-    final currentEnd = _loadedStartIndex + _messages.length;
-    final newer = _chatService.getMessagesRange(
+    final page = await _chatService.loadTimelinePage(
       conversation.id,
-      start: currentEnd,
+      beforeRevisionId: _messages.first.id,
       limit: limit,
     );
-    if (newer.isEmpty) return false;
-
-    final merged = <ChatMessage>[..._messages, ...newer];
-    final overflow = merged.length - ChatService.defaultLoadedWindowMax;
-    if (overflow > 0) {
-      _messages = merged.sublist(overflow);
-      _loadedStartIndex += overflow;
-    } else {
-      _messages = merged;
+    if (_currentConversation?.id != conversation.id) return false;
+    if (page == null || page.slots.isEmpty) return false;
+    final existing = {for (final message in _messages) message.id};
+    _messages.insertAll(0, [
+      for (final slot in page.slots)
+        if (existing.add(slot.message.id)) slot.message,
+    ]);
+    _loadedStartIndex = page.slots.first.identity.logicalIndex;
+    _totalMessageCount = page.totalSlotCount;
+    _mergeWindowVersionCounts(page);
+    if (_lazyHistoryEnabled &&
+        _messages.length > ChatService.defaultLoadedWindowMax) {
+      _messages.removeRange(
+        ChatService.defaultLoadedWindowMax,
+        _messages.length,
+      );
     }
+    invalidateCache();
+    await _preloadVisibleGroupData();
     notifyListeners();
     return true;
   }
 
-  bool loadStartWindow() {
-    if (!_isLazyHistoryEnabled) return false;
-    return _loadWindow(start: 0, limit: ChatService.defaultLoadedWindowMax);
+  Future<bool> loadMoreAfter({
+    int limit = ChatService.defaultHistoryPageSize,
+  }) async {
+    if (limit <= 0) return false;
+    final conversation = _currentConversation;
+    if (conversation == null || _messages.isEmpty || !hasMoreAfter) {
+      return false;
+    }
+    final page = await _chatService.loadTimelinePage(
+      conversation.id,
+      afterRevisionId: _messages.last.id,
+      limit: limit,
+    );
+    if (_currentConversation?.id != conversation.id) return false;
+    if (page == null || page.slots.isEmpty) return false;
+    final existing = {for (final message in _messages) message.id};
+    _messages.addAll([
+      for (final slot in page.slots)
+        if (existing.add(slot.message.id)) slot.message,
+    ]);
+    _totalMessageCount = page.totalSlotCount;
+    _mergeWindowVersionCounts(page);
+    if (_lazyHistoryEnabled &&
+        _messages.length > ChatService.defaultLoadedWindowMax) {
+      final removeCount = _messages.length - ChatService.defaultLoadedWindowMax;
+      _messages.removeRange(0, removeCount);
+      _loadedStartIndex += removeCount;
+    }
+    invalidateCache();
+    await _preloadVisibleGroupData();
+    notifyListeners();
+    return true;
   }
 
-  bool loadEndWindow() {
-    if (!_isLazyHistoryEnabled) return false;
+  Future<bool> loadStartWindow() async {
     final conversation = _currentConversation;
     if (conversation == null) return false;
-    _totalMessageCount = _chatService.getMessageCount(conversation.id);
-    if (_totalMessageCount == 0) return false;
-
-    final start = (_totalMessageCount - ChatService.defaultLoadedWindowMax)
-        .clamp(0, _totalMessageCount)
-        .toInt();
-    return _loadWindow(start: start, limit: ChatService.defaultLoadedWindowMax);
+    if (!_lazyHistoryEnabled) return _messages.isNotEmpty;
+    final page = await _chatService.loadTimelinePage(
+      conversation.id,
+      fromStart: true,
+      limit: ChatService.defaultLoadedWindowMax,
+    );
+    // Discard the page if the conversation changed while loading.
+    if (_currentConversation?.id != conversation.id) return false;
+    _replaceWindow(page);
+    await _preloadVisibleGroupData();
+    notifyListeners();
+    return _messages.isNotEmpty;
   }
 
-  bool loadUntilMessageVisible(
+  Future<bool> loadEndWindow() async {
+    final conversation = _currentConversation;
+    if (conversation == null) return false;
+    if (!_lazyHistoryEnabled) return _messages.isNotEmpty;
+    final page = await _chatService.loadTimelinePage(
+      conversation.id,
+      limit: ChatService.defaultLoadedWindowMax,
+    );
+    // Discard the page if the conversation changed while loading.
+    if (_currentConversation?.id != conversation.id) return false;
+    _replaceWindow(page);
+    await _preloadVisibleGroupData();
+    notifyListeners();
+    return _messages.isNotEmpty;
+  }
+
+  Future<bool> loadUntilMessageVisible(
     String messageId, {
     int pageSize = ChatService.defaultHistoryPageSize,
     int maxPages = 256,
-  }) {
+  }) async {
     if (_messages.any((message) => message.id == messageId)) return true;
 
-    final loaded = loadWindowAroundMessage(messageId, leadingContext: pageSize);
+    final loaded = await loadWindowAroundMessage(
+      messageId,
+      leadingContext: pageSize,
+    );
     return loaded && _messages.any((message) => message.id == messageId);
   }
 
-  bool loadWindowAroundMessage(
+  Future<bool> loadWindowAroundMessage(
     String messageId, {
     int leadingContext = ChatService.defaultHistoryPageSize,
-  }) {
-    if (!_isLazyHistoryEnabled) return false;
+  }) async {
     final conversation = _currentConversation;
     if (conversation == null) return false;
-
-    final targetIndex = _chatService.getMessageIndex(
-      conversation.id,
-      messageId,
-    );
-    if (targetIndex < 0) return false;
-
-    return _loadWindowAroundIndex(targetIndex, leadingContext: leadingContext);
+    if (!_lazyHistoryEnabled) {
+      await setLazyHistoryEnabled(false, forceReload: true);
+      return _messages.any((message) => message.id == messageId);
+    }
+    final requested = leadingContext * 2 + 1;
+    final limit = requested
+        .clamp(
+          ChatService.defaultTimelineInitialSlots,
+          ChatService.defaultLoadedWindowMax,
+        )
+        .toInt();
+    final serial = ++_windowLoadSerial;
+    _isLoadingWindow = true;
+    try {
+      final page = await _chatService.loadTimelinePage(
+        conversation.id,
+        aroundRevisionId: messageId,
+        limit: limit,
+      );
+      // Discard the page if the conversation changed while loading.
+      if (_currentConversation?.id != conversation.id) return false;
+      if (page == null || page.slots.isEmpty) return false;
+      _replaceWindow(page);
+    } finally {
+      if (serial == _windowLoadSerial) _isLoadingWindow = false;
+    }
+    await _preloadVisibleGroupData();
+    notifyListeners();
+    return _messages.any((message) => message.id == messageId);
   }
 
-  bool _loadWindowAroundIndex(
-    int targetIndex, {
-    int leadingContext = ChatService.defaultHistoryPageSize,
-  }) {
+  Future<bool> refreshTimelineAfterMutation({
+    Set<String> removedRevisionIds = const <String>{},
+  }) async {
     final conversation = _currentConversation;
-    if (conversation == null || targetIndex < 0) return false;
-
-    _totalMessageCount = _chatService.getMessageCount(conversation.id);
-    if (_totalMessageCount == 0) return false;
-
-    final safeLeading = leadingContext
-        .clamp(0, ChatService.defaultLoadedWindowMax - 1)
-        .toInt();
-    final maxStart = (_totalMessageCount - ChatService.defaultLoadedWindowMax)
-        .clamp(0, _totalMessageCount)
-        .toInt();
-    final start = (targetIndex - safeLeading).clamp(0, maxStart).toInt();
-    return _loadWindow(start: start, limit: ChatService.defaultLoadedWindowMax);
+    if (conversation == null) return false;
+    String? anchorId;
+    if (hasMoreAfter) {
+      for (final message in _messages) {
+        if (removedRevisionIds.contains(message.id)) continue;
+        anchorId = message.id;
+        break;
+      }
+    }
+    final page = _lazyHistoryEnabled
+        ? await _chatService.loadTimelinePage(
+            conversation.id,
+            aroundRevisionId: anchorId,
+            limit: ChatService.defaultLoadedWindowMax,
+          )
+        : await _fetchCompleteTimeline(conversation.id);
+    if (_currentConversation?.id != conversation.id) return false;
+    _replaceWindow(page);
+    await _preloadVisibleGroupData();
+    notifyListeners();
+    return page != null;
   }
 
   int loadedWindowTruncateIndex() {
@@ -348,76 +698,94 @@ class ChatController extends ChangeNotifier {
   Conversation conversationForLoadedWindow(Conversation conversation) {
     if (_currentConversation?.id != conversation.id) return conversation;
     final localTruncateIndex = loadedWindowTruncateIndex();
-    if (localTruncateIndex == conversation.truncateIndex) return conversation;
     return conversation.copyWith(truncateIndex: localTruncateIndex);
   }
 
+  /// Current loaded-window collapsed projection only — never walks the full
+  /// conversation via [ChatService.getMessagesRange] / full order skeleton.
   List<ChatMessage> allCollapsedMessagesForCurrentConversation() {
-    final conversation = _currentConversation;
-    if (conversation == null) return const <ChatMessage>[];
-    return collapseVersions(
-      _chatService.getMessagesRange(
-        conversation.id,
-        start: 0,
-        limit: _chatService.getMessageCount(conversation.id),
-      ),
-    );
+    if (_currentConversation == null) return const <ChatMessage>[];
+    return collapsedMessages;
   }
 
-  List<ChatMessage> allMessagesForCurrentConversationContext() {
+  Future<List<ChatMessage>>
+  loadAllCollapsedMessagesForCurrentConversation() async {
+    final conversation = _currentConversation;
+    if (conversation == null) return const <ChatMessage>[];
+    return _chatService.loadSelectedMessageProjections(conversation.id);
+  }
+
+  Future<List<ChatMessage>> allMessagesForCurrentConversationContext() async {
     final conversation = _currentConversation;
     if (conversation == null) return const <ChatMessage>[];
     return messagesForCompleteHistoryContext(conversation);
   }
 
-  List<ChatMessage> messagesForCompleteHistoryContext(
+  Future<List<ChatMessage>> messagesForCompleteHistoryContext(
     Conversation conversation,
   ) {
-    return _chatService.getMessagesRange(
+    return _chatService.loadMessages(conversation.id);
+  }
+
+  Future<List<ChatMessage>> messagesForGenerationContext(
+    Conversation conversation, {
+    required int maxMessages,
+    String? throughRevisionId,
+    bool includeFollowingAssistant = false,
+  }) {
+    return _chatService.loadSelectedContextMessages(
       conversation.id,
-      start: 0,
-      limit: _chatService.getMessageCount(conversation.id),
+      truncateIndex: conversation.truncateIndex,
+      limit: maxMessages,
+      throughRevisionId: throughRevisionId,
+      includeFollowingAssistant: includeFollowingAssistant,
     );
   }
 
   Conversation conversationForCompleteHistoryContext(
     Conversation conversation,
   ) {
-    return _chatService.getConversation(conversation.id) ?? conversation;
+    final current =
+        _chatService.getConversation(conversation.id) ?? conversation;
+    return current;
   }
 
-  List<ChatMessage> _trimWindowEnd(List<ChatMessage> messages) {
-    if (!_isLazyHistoryEnabled ||
-        messages.length <= ChatService.defaultLoadedWindowMax) {
-      return messages;
-    }
-    return messages.sublist(0, ChatService.defaultLoadedWindowMax);
-  }
-
-  bool _loadWindow({required int start, required int limit}) {
+  Future<void> _preloadVisibleGroupData() async {
     final conversation = _currentConversation;
-    if (conversation == null || limit <= 0) return false;
+    if (conversation == null || _messages.isEmpty) return;
+    final groupIds = <String>{
+      for (final message in _messages)
+        if ((_windowVersionCounts[message.groupId ?? message.id] ?? 1) > 1 ||
+            message.version > 0 ||
+            _versionSelections.containsKey(message.groupId ?? message.id))
+          message.groupId ?? message.id,
+    };
+    if (groupIds.isEmpty) return;
+    await _preloadGroupIds(conversation.id, groupIds);
+    if (_currentConversation?.id != conversation.id) return;
+    invalidateCache();
+  }
 
-    _totalMessageCount = _chatService.getMessageCount(conversation.id);
-    final safeStart = start.clamp(0, _totalMessageCount).toInt();
-    final range = _chatService.getMessagesRange(
-      conversation.id,
-      start: safeStart,
-      limit: limit,
-    );
-    if (range.isEmpty) return false;
-
-    _messages = List.of(range);
-    _loadedStartIndex = safeStart;
-    notifyListeners();
-    return true;
+  Future<void> _preloadGroupIds(
+    String conversationId,
+    Iterable<String> groupIds,
+  ) async {
+    const batchSize = 400;
+    final ids = groupIds.toList(growable: false);
+    for (var start = 0; start < ids.length; start += batchSize) {
+      final end = (start + batchSize).clamp(0, ids.length);
+      final batch = ids.sublist(start, end);
+      await Future.wait([
+        _chatService.loadMessagesForGroups(conversationId, batch),
+        _chatService.loadFirstMessageIndicesForGroups(conversationId, batch),
+      ]);
+    }
   }
 
   // ============================================================================
   // Message Management
   // ============================================================================
 
-  /// Add a message to the current conversation.
   Future<ChatMessage> addMessage({
     required String role,
     required String content,
@@ -427,21 +795,15 @@ class ChatController extends ChangeNotifier {
     String? groupId,
     int? version,
   }) async {
-    if (_currentConversation == null) {
-      throw StateError('No current conversation');
-    }
-    if (_chatService.getConversation(_currentConversation!.id) == null) {
+    final conversation = _currentConversation;
+    if (conversation == null ||
+        _chatService.getConversation(conversation.id) == null) {
       _clearCurrentConversationState();
       notifyListeners();
       throw StateError('No current conversation');
     }
-
-    if (hasMoreAfter) {
-      loadEndWindow();
-    }
-
     final message = await _chatService.addMessage(
-      conversationId: _currentConversation!.id,
+      conversationId: conversation.id,
       role: role,
       content: content,
       modelId: modelId,
@@ -450,15 +812,7 @@ class ChatController extends ChangeNotifier {
       groupId: groupId,
       version: version,
     );
-
-    _messages.add(message);
-    _totalMessageCount += 1;
-    final overflow = _messages.length - ChatService.defaultLoadedWindowMax;
-    if (_isLazyHistoryEnabled && overflow > 0) {
-      _messages = _messages.sublist(overflow);
-      _loadedStartIndex += overflow;
-    }
-    notifyListeners();
+    await appendPersistedTailMessage(message);
     return message;
   }
 
@@ -468,158 +822,281 @@ class ChatController extends ChangeNotifier {
   /// persisted conversation before callers update UI state. This method keeps
   /// [_messages] as a real contiguous persisted range instead of mixing a tail
   /// message into an older loaded window.
-  bool appendPersistedTailMessage(ChatMessage message) {
+  Future<bool> appendPersistedTailMessage(ChatMessage message) async {
+    return appendPersistedTailMessages([message]);
+  }
+
+  /// Opens the logical window around an already-persisted revision mutation.
+  ///
+  /// Editing or selecting a version can target a slot far outside the tail
+  /// window, so it must not reuse the append-to-tail navigation path. Set
+  /// [truncateFollowingSlots] when persistence removed every logical slot
+  /// after the target.
+  Future<bool> openAroundPersistedMessage(
+    ChatMessage message, {
+    bool truncateFollowingSlots = false,
+  }) async {
     final conversation = _currentConversation;
     if (conversation == null || message.conversationId != conversation.id) {
       return false;
     }
 
-    final wasAtTail =
-        _loadedStartIndex + _messages.length >= _totalMessageCount;
-    _totalMessageCount = _chatService.getMessageCount(conversation.id);
-
-    if (!wasAtTail) {
-      final groupId = message.groupId ?? message.id;
-      final firstIndices = _chatService.getFirstMessageIndicesForGroups(
-        conversation.id,
-        <String>{groupId},
+    final groupId = message.groupId ?? message.id;
+    final visibleIndex = _messages.indexWhere(
+      (candidate) => (candidate.groupId ?? candidate.id) == groupId,
+    );
+    if (visibleIndex >= 0) {
+      // An edited revision belongs to the same logical timeline slot. Keep the
+      // current bounded window intact so the list can preserve its visible
+      // anchor while only this slot remeasures its extent. Preserve the current
+      // visible-group snapshot until its asynchronous refresh completes so
+      // unrelated version switchers do not briefly disappear.
+      final visibleSnapshot = List<ChatMessage>.of(
+        _messagesWithVisibleGroups(),
       );
-      final anchorIndex = firstIndices[groupId];
-      if (anchorIndex != null) {
-        final loadedEnd = _loadedStartIndex + _messages.length;
-        if (anchorIndex >= _loadedStartIndex && anchorIndex < loadedEnd) {
-          notifyListeners();
-          return false;
-        }
-        if (_loadWindowAroundIndex(anchorIndex)) {
-          return true;
-        }
+      final groupInsertIndex = visibleSnapshot.indexWhere(
+        (candidate) => (candidate.groupId ?? candidate.id) == groupId,
+      );
+      final groupMessages =
+          visibleSnapshot
+              .where(
+                (candidate) => (candidate.groupId ?? candidate.id) == groupId,
+              )
+              .where((candidate) => candidate.id != message.id)
+              .toList()
+            ..add(message)
+            ..sort((left, right) => left.version.compareTo(right.version));
+
+      _messages[visibleIndex] = message;
+      if (truncateFollowingSlots) {
+        _messages.removeRange(visibleIndex + 1, _messages.length);
+        _totalMessageCount = _loadedStartIndex + _messages.length;
       }
-      return loadEndWindow();
+      invalidateCache();
+      if (groupInsertIndex >= 0) {
+        visibleSnapshot.removeWhere(
+          (candidate) => (candidate.groupId ?? candidate.id) == groupId,
+        );
+        visibleSnapshot.insertAll(groupInsertIndex, groupMessages);
+        if (truncateFollowingSlots) {
+          visibleSnapshot.removeRange(
+            groupInsertIndex + groupMessages.length,
+            visibleSnapshot.length,
+          );
+        }
+        _messagesWithVisibleGroupsCache = visibleSnapshot;
+      }
+      _loadVersionSelections();
+      await _preloadVisibleGroupData();
+      if (_currentConversation?.id != conversation.id) return false;
+      notifyListeners();
+      return true;
     }
 
-    final existingIndex = _messages.indexWhere((m) => m.id == message.id);
-    if (existingIndex >= 0) {
-      _messages[existingIndex] = message;
-    } else {
-      _messages.add(message);
+    final opened = await loadWindowAroundMessage(
+      message.id,
+      leadingContext: ChatService.defaultHistoryPageSize,
+    );
+    return opened;
+  }
+
+  /// Publishes one atomic persistence result to the loaded tail as one UI
+  /// mutation. A send begins with a user/assistant pair, so refreshing the
+  /// persisted count between those two messages would briefly create a false
+  /// gap and trigger an unnecessary window reload.
+  ///
+  /// Normal path appends the already-persisted messages straight into the
+  /// loaded window with no timeline query; only a detected count gap falls
+  /// back to the full window reload.
+  Future<bool> appendPersistedTailMessages(List<ChatMessage> messages) async {
+    if (messages.isEmpty) return false;
+    final conversation = _currentConversation;
+    if (conversation == null ||
+        messages.any((message) => message.conversationId != conversation.id)) {
+      return false;
     }
 
-    final overflow = _messages.length - ChatService.defaultLoadedWindowMax;
-    if (_isLazyHistoryEnabled && overflow > 0) {
-      _messages = _messages.sublist(overflow);
-      _loadedStartIndex += overflow;
+    if (_tryAppendPersistedTail(conversation.id, messages)) {
+      invalidateCache();
+      await _preloadVisibleGroupData();
+      notifyListeners();
+      return true;
     }
+
+    // Fallback: the window does not provably cover the persisted tail, so
+    // reload the whole tail window instead of appending blindly.
+    final page = _lazyHistoryEnabled
+        ? await _chatService.loadTimelinePage(
+            conversation.id,
+            limit: ChatService.defaultLoadedWindowMax,
+          )
+        : await _fetchCompleteTimeline(conversation.id);
+    if (_currentConversation?.id != conversation.id) return false;
+    _replaceWindow(page);
+    await _preloadVisibleGroupData();
     notifyListeners();
-    return false;
+    return true;
+  }
+
+  /// Folds persisted tail messages into the loaded window without a timeline
+  /// query. Returns false when contiguity cannot be proven, so the caller
+  /// falls back to the full window reload.
+  bool _tryAppendPersistedTail(
+    String conversationId,
+    List<ChatMessage> messages,
+  ) {
+    // The loaded window must currently reach the persisted tail.
+    if (_loadedStartIndex + _messages.length != _totalMessageCount) {
+      return false;
+    }
+
+    // Every incoming message must open a new slot. A new version of a loaded
+    // group would change that slot's selection, which only a reload resolves.
+    final knownGroups = <String>{
+      for (final loaded in _messages) loaded.groupId ?? loaded.id,
+    };
+    final batchGroups = <String>{};
+    for (final message in messages) {
+      final groupId = message.groupId ?? message.id;
+      if (knownGroups.contains(groupId) || !batchGroups.add(groupId)) {
+        return false;
+      }
+    }
+
+    // Gap detection compares persisted row (revision) indices only — never
+    // the collapsed slot count, which multi-version conversations make
+    // diverge from the row count. The batch must occupy the final rows
+    // directly after the loaded tail; anything else means an unseen mutation
+    // landed in between.
+    // Unknown count (-1) fails `rowCount < messages.length` and conservatively
+    // skips the fast append path (falls back to a full reload).
+    final rowCount = _chatService.getMessageCount(conversationId);
+    if (rowCount < messages.length) return false;
+    final firstRowIndex = _chatService.getMessageIndex(
+      conversationId,
+      messages.first.id,
+    );
+    final lastRowIndex = _chatService.getMessageIndex(
+      conversationId,
+      messages.last.id,
+    );
+    if (firstRowIndex != rowCount - messages.length ||
+        lastRowIndex != rowCount - 1) {
+      return false;
+    }
+    if (_messages.isNotEmpty) {
+      final tailRowIndex = _chatService.getMessageIndex(
+        conversationId,
+        _messages.last.id,
+      );
+      if (tailRowIndex != firstRowIndex - 1) return false;
+    } else if (firstRowIndex != 0) {
+      return false;
+    }
+
+    _messages.addAll(messages);
+    _totalMessageCount += messages.length;
+    if (_lazyHistoryEnabled &&
+        _messages.length > ChatService.defaultLoadedWindowMax) {
+      final removeCount = _messages.length - ChatService.defaultLoadedWindowMax;
+      _messages.removeRange(0, removeCount);
+      _loadedStartIndex += removeCount;
+    }
+    return true;
   }
 
   /// Update a message in the list.
   void updateMessageInList(String messageId, ChatMessage updatedMessage) {
-    final index = _messages.indexWhere((m) => m.id == messageId);
-    if (index != -1) {
-      _messages[index] = updatedMessage;
-      notifyListeners();
+    if (!replaceMessageSnapshot(updatedMessage)) return;
+    publishGenerationState(
+      updatedMessage.conversationId,
+      isGenerating: updatedMessage.isStreaming,
+    );
+    notifyListeners();
+  }
+
+  /// Mirrors an in-memory message snapshot into the timeline window without
+  /// publishing a full-window change. Streaming UI has its own narrow notifier.
+  bool replaceMessageSnapshot(ChatMessage updatedMessage) {
+    if (_currentConversation?.id != updatedMessage.conversationId) {
+      return false;
     }
+    final index = _messages.indexWhere(
+      (message) => message.id == updatedMessage.id,
+    );
+    if (index < 0) return false;
+    _messages[index] = updatedMessage;
+    invalidateCache();
+    return true;
+  }
+
+  bool publishGenerationStarted(ChatMessage message) {
+    final streamingMessage = message.isStreaming
+        ? message
+        : message.copyWith(isStreaming: true);
+    final replaced = replaceMessageSnapshot(streamingMessage);
+    publishGenerationState(message.conversationId, isGenerating: true);
+    return replaced;
+  }
+
+  bool publishGenerationState(
+    String conversationId, {
+    required bool isGenerating,
+  }) {
+    return _currentConversation?.id == conversationId;
+  }
+
+  /// Publishes a terminal generation snapshot and always closes the timeline's
+  /// generation lifecycle, even when the message is outside the loaded window.
+  bool publishTerminalMessage(ChatMessage message) {
+    final terminalMessage = message.isStreaming
+        ? message.copyWith(isStreaming: false)
+        : message;
+    final replaced = replaceMessageSnapshot(terminalMessage);
+    publishGenerationState(message.conversationId, isGenerating: false);
+    return replaced;
   }
 
   /// Update a message by ID with optional new values.
   Future<void> updateMessage(
     String messageId, {
     String? content,
-    String? role,
     int? totalTokens,
     bool? isStreaming,
   }) async {
     await _chatService.updateMessage(
       messageId,
       content: content,
-      role: role,
       totalTokens: totalTokens,
       isStreaming: isStreaming,
     );
 
-    // Update in local list
     final index = _messages.indexWhere((m) => m.id == messageId);
     if (index != -1) {
-      _messages[index] = _messages[index].copyWith(
+      final updatedMessage = _messages[index].copyWith(
         content: content ?? _messages[index].content,
-        role: role ?? _messages[index].role,
         totalTokens: totalTokens ?? _messages[index].totalTokens,
         isStreaming: isStreaming ?? _messages[index].isStreaming,
       );
+      replaceMessageSnapshot(updatedMessage);
+      publishGenerationState(
+        updatedMessage.conversationId,
+        isGenerating: updatedMessage.isStreaming,
+      );
       notifyListeners();
     }
-  }
-
-  /// Remove messages after a given index.
-  void removeMessagesAfter(int index) {
-    if (index < _messages.length - 1) {
-      _messages = _messages.sublist(0, index + 1);
-      _totalMessageCount = _loadedStartIndex + _messages.length;
-      notifyListeners();
-    }
-  }
-
-  /// Remove specific message IDs from the list.
-  void removeMessageIds(List<String> ids) {
-    _messages.removeWhere((m) => ids.contains(m.id));
-    _totalMessageCount = (_totalMessageCount - ids.length)
-        .clamp(0, 1 << 31)
-        .toInt();
-    _loadedStartIndex = _loadedStartIndex.clamp(0, _totalMessageCount).toInt();
-    notifyListeners();
-  }
-
-  /// Reload messages from storage.
-  void reloadMessages() {
-    if (_currentConversation == null) return;
-    final conversationId = _currentConversation!.id;
-    _totalMessageCount = _chatService.getMessageCount(conversationId);
-    if (_totalMessageCount == 0) {
-      _messages = [];
-      _loadedStartIndex = 0;
-      notifyListeners();
-      return;
-    }
-
-    if (!_isLazyHistoryEnabled) {
-      _messages = List.of(_chatService.getMessages(conversationId));
-      _loadedStartIndex = 0;
-      _totalMessageCount = _messages.length;
-      notifyListeners();
-      return;
-    }
-
-    final visibleCount = _messages.isEmpty
-        ? ChatService.defaultInitialMessageMin
-        : _messages.length.clamp(1, ChatService.defaultLoadedWindowMax).toInt();
-    final start = _loadedStartIndex.clamp(0, _totalMessageCount).toInt();
-    final maxStart = (_totalMessageCount - visibleCount)
-        .clamp(0, _totalMessageCount)
-        .toInt();
-    final safeStart = start > maxStart ? maxStart : start;
-    _messages = List.of(
-      _chatService.getMessagesRange(
-        conversationId,
-        start: safeStart,
-        limit: visibleCount,
-      ),
-    );
-    _loadedStartIndex = safeStart;
-    notifyListeners();
   }
 
   // ============================================================================
   // Version Selection
   // ============================================================================
 
-  /// Get the selected version index for a message group.
+  /// Get the selected real version number for a message group.
   int getSelectedVersion(String groupId) {
     return _versionSelections[groupId] ?? -1;
   }
 
-  /// Set the selected version for a message group.
+  /// Set the selected real version number for a message group.
   Future<void> setSelectedVersion(String groupId, int version) async {
     _versionSelections[groupId] = version;
     if (_currentConversation != null) {
@@ -657,6 +1134,12 @@ class ChatController extends ChangeNotifier {
     }
     if (prev != loading) {
       notifyListeners();
+      if (!loading &&
+          _currentConversation?.id == conversationId &&
+          !_chatService.isConversationFullyCached(conversationId)) {
+        // Resume an idle backfill that generation paused.
+        _scheduleIdleCacheBackfill(conversationId);
+      }
     }
   }
 
@@ -723,10 +1206,16 @@ class ChatController extends ChangeNotifier {
     for (final gid in order) {
       final vers = byGroup[gid]!;
       final sel = _versionSelections[gid];
-      final idx = (sel != null && sel >= 0 && sel < vers.length)
-          ? sel
-          : (vers.length - 1);
-      out.add(vers[idx]);
+      ChatMessage? selected;
+      if (sel != null) {
+        for (final candidate in vers) {
+          if (candidate.version == sel) {
+            selected = candidate;
+            break;
+          }
+        }
+      }
+      out.add(selected ?? vers.last);
     }
 
     return out;
@@ -777,9 +1266,13 @@ class ChatController extends ChangeNotifier {
       return _messagesWithVisibleGroupsCache = _messages;
     }
 
-    final visibleIds = {for (final message in _messages) message.id};
+    final windowMessagesById = {
+      for (final message in _messages) message.id: message,
+    };
+    final visibleIds = windowMessagesById.keys;
     final byGroup = <String, List<ChatMessage>>{};
-    for (final message in visibleVersions) {
+    for (final cachedMessage in visibleVersions) {
+      final message = windowMessagesById[cachedMessage.id] ?? cachedMessage;
       final groupId = message.groupId ?? message.id;
       byGroup.putIfAbsent(groupId, () => <ChatMessage>[]).add(message);
     }
@@ -866,6 +1359,33 @@ class ChatController extends ChangeNotifier {
     return _groupCache ??= groupMessagesByGroup();
   }
 
+  /// Complete renderer projection for the current bounded timeline window.
+  /// Computed once per message snapshot, never once per visible row.
+  List<MessageRenderModel> get messageRenderModels {
+    return _renderModelsCache ??= MessageRenderModelProjector.project(
+      messages: collapsedMessages,
+      byGroup: groupedMessages,
+      versionSelections: _versionSelections,
+      versionCounts: {
+        for (final entry in groupedMessages.entries)
+          entry.key: entry.value.length,
+      },
+      contextDividerIndex: _collapsedContextDividerIndex(),
+    );
+  }
+
+  int _collapsedContextDividerIndex() {
+    final raw = loadedWindowTruncateIndex();
+    if (raw <= 0) return -1;
+    final seen = <String>{};
+    final limit = raw.clamp(0, _messages.length);
+    var count = 0;
+    for (var index = 0; index < limit; index++) {
+      if (seen.add(_messages[index].groupId ?? _messages[index].id)) count++;
+    }
+    return count - 1;
+  }
+
   /// Group all messages by their groupId.
   Map<String, List<ChatMessage>> groupMessagesByGroup() {
     final Map<String, List<ChatMessage>> byGroup =
@@ -890,6 +1410,7 @@ class ChatController extends ChangeNotifier {
     _collapsedIdToIndex = null;
     _groupCache = null;
     _messagesWithVisibleGroupsCache = null;
+    _renderModelsCache = null;
   }
 
   @override

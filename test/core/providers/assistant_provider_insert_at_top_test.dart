@@ -1,81 +1,90 @@
-import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
-import 'package:Kelivo/core/models/assistant.dart';
+import 'package:flutter_test/flutter_test.dart';
+
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 
-Future<AssistantProvider> _createLoadedProvider() async {
-  SharedPreferences.setMockInitialValues({
-    'assistants_v1': Assistant.encodeList(const [
-      Assistant(id: 'assistant-a', name: 'A'),
-      Assistant(id: 'assistant-b', name: 'B'),
-    ]),
-    'current_assistant_id_v1': 'assistant-a',
-  });
+import '../../support/business_preferences_test_harness.dart';
 
-  final provider = AssistantProvider();
-  for (var i = 0; i < 25; i++) {
-    if (provider.assistants.length == 2) return provider;
-    await Future<void>.delayed(const Duration(milliseconds: 10));
-  }
+Future<AssistantProvider> _loadProvider(
+  BusinessPreferencesTestSession session,
+) async {
+  final provider = AssistantProvider(preferences: session.preferences);
+  await provider.loaded;
   return provider;
 }
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  group('AssistantProvider insert at top', () {
-    test('addAssistant appends by default', () async {
-      final provider = await _createLoadedProvider();
+  late BusinessPreferencesTestHarness harness;
+  late BusinessPreferencesTestSession session;
 
-      final id = await provider.addAssistant(name: 'C');
+  setUp(() async {
+    harness = await BusinessPreferencesTestHarness.create();
+    session = await harness.open();
+    await session.preferences.setString(
+      'assistants_v1',
+      jsonEncode(const [
+        {'id': 'assistant-a', 'name': 'A'},
+        {'id': 'assistant-b', 'name': 'B'},
+      ]),
+    );
+  });
 
-      expect(provider.assistants.map((assistant) => assistant.id), [
-        'assistant-a',
-        'assistant-b',
-        id,
-      ]);
-    });
+  tearDown(() => harness.dispose());
 
-    test('addAssistant inserts at top when requested', () async {
-      final provider = await _createLoadedProvider();
+  test('default creation and duplication preserve upstream ordering', () async {
+    final provider = await _loadProvider(session);
 
-      final id = await provider.addAssistant(name: 'C', insertAtTop: true);
+    final addedId = await provider.addAssistant(name: 'C');
+    final copiedId = await provider.duplicateAssistant('assistant-a');
 
-      expect(provider.assistants.map((assistant) => assistant.id), [
-        id,
-        'assistant-a',
-        'assistant-b',
-      ]);
-    });
+    expect(provider.assistants.map((assistant) => assistant.id), [
+      'assistant-a',
+      copiedId,
+      'assistant-b',
+      addedId,
+    ]);
+  });
 
-    test('duplicateAssistant inserts copy after source by default', () async {
-      final provider = await _createLoadedProvider();
+  test('creation and duplication can place the result at the top', () async {
+    final provider = await _loadProvider(session);
 
-      final id = await provider.duplicateAssistant('assistant-b');
+    final addedId = await provider.addAssistant(name: 'C', insertAtTop: true);
+    final copiedId = await provider.duplicateAssistant(
+      'assistant-b',
+      insertAtTop: true,
+    );
 
-      expect(id, isNotNull);
-      expect(provider.assistants.map((assistant) => assistant.id), [
-        'assistant-a',
-        'assistant-b',
-        id,
-      ]);
-    });
+    expect(provider.assistants.map((assistant) => assistant.id), [
+      copiedId,
+      addedId,
+      'assistant-a',
+      'assistant-b',
+    ]);
 
-    test('duplicateAssistant inserts copy at top when requested', () async {
-      final provider = await _createLoadedProvider();
+    final reloaded = await _loadProvider(session);
+    expect(reloaded.assistants.map((assistant) => assistant.id), [
+      copiedId,
+      addedId,
+      'assistant-a',
+      'assistant-b',
+    ]);
+  });
 
-      final id = await provider.duplicateAssistant(
-        'assistant-b',
-        insertAtTop: true,
-      );
+  test('missing source does not change ordering in top mode', () async {
+    final provider = await _loadProvider(session);
 
-      expect(id, isNotNull);
-      expect(provider.assistants.map((assistant) => assistant.id), [
-        id,
-        'assistant-a',
-        'assistant-b',
-      ]);
-    });
+    final copiedId = await provider.duplicateAssistant(
+      'missing',
+      insertAtTop: true,
+    );
+
+    expect(copiedId, isNull);
+    expect(provider.assistants.map((assistant) => assistant.id), [
+      'assistant-a',
+      'assistant-b',
+    ]);
   });
 }

@@ -1,6 +1,5 @@
-import 'dart:convert';
 import 'dart:io';
-
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -36,25 +35,26 @@ class AppDirectories {
       await directory.create(recursive: true);
     }
 
-    if (Platform.isWindows) {
-      await Process.start('explorer.exe', [
-        directory.path,
-      ], mode: ProcessStartMode.detached);
-      return true;
-    }
-
-    if (Platform.isMacOS) {
-      await Process.start('open', [
-        directory.path,
-      ], mode: ProcessStartMode.detached);
-      return true;
-    }
-
-    if (Platform.isLinux) {
-      await Process.start('xdg-open', [
-        directory.path,
-      ], mode: ProcessStartMode.detached);
-      return true;
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.windows:
+        await Process.start('explorer.exe', [
+          directory.path,
+        ], mode: ProcessStartMode.detached);
+        return true;
+      case TargetPlatform.macOS:
+        await Process.start('open', [
+          directory.path,
+        ], mode: ProcessStartMode.detached);
+        return true;
+      case TargetPlatform.linux:
+        await Process.start('xdg-open', [
+          directory.path,
+        ], mode: ProcessStartMode.detached);
+        return true;
+      case TargetPlatform.android:
+      case TargetPlatform.iOS:
+      case TargetPlatform.fuchsia:
+        break;
     }
 
     return launchUrl(
@@ -79,6 +79,12 @@ class AppDirectories {
   static Future<Directory> getAvatarsDirectory() async {
     final root = await getAppDataDirectory();
     return Directory('${root.path}/avatars');
+  }
+
+  /// Gets the directory for user-imported font files.
+  static Future<Directory> getFontsDirectory() async {
+    final root = await getAppDataDirectory();
+    return Directory('${root.path}/fonts');
   }
 
   /// Gets the directory for cache files.

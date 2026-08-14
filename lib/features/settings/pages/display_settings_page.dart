@@ -9,6 +9,7 @@ import '../../../icons/lucide_adapter.dart';
 import 'package:syncfusion_flutter_sliders/sliders.dart';
 import 'package:syncfusion_flutter_core/theme.dart';
 import '../../../core/providers/settings_provider.dart';
+import 'image_settings_page.dart';
 import 'theme_settings_page.dart';
 import '../../../theme/palettes.dart';
 import '../../../l10n/app_localizations.dart';
@@ -17,6 +18,7 @@ import '../../../core/services/haptics.dart';
 import 'package:file_picker/file_picker.dart';
 import 'google_fonts_picker_page.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 enum _FontTarget { app, code }
 
@@ -133,6 +135,15 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                   MaterialPageRoute(
                     builder: (_) => const BehaviorStartupSettingsPage(),
                   ),
+                ),
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.Image,
+                label: l10n.imageSettingsPageTitle,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ImageSettingsPage()),
                 ),
               ),
               _iosDivider(context),
@@ -372,6 +383,27 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                   );
                 },
                 onTap: () => _showChatBackgroundMaskSheet(context),
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.RectangleHorizontal,
+                label: l10n.displaySettingsPageChatInputBackgroundOpacityTitle,
+                detailBuilder: (ctx) {
+                  final brightness = Theme.of(ctx).brightness;
+                  final settings = ctx.watch<SettingsProvider>();
+                  final opacity = settings.chatInputBackgroundOpacityFor(
+                    brightness,
+                  );
+                  return Text(
+                    '${(opacity * 100).round()}%',
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.6),
+                      fontSize: 13,
+                    ),
+                  );
+                },
+                onTap: () => _showChatInputBackgroundOpacitySheet(context),
               ),
             ],
           ),
@@ -755,7 +787,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                                       ? []
                                       : [
                                           BoxShadow(
-                                            color: Colors.black.withValues(
+                                            color: cs.shadow.withValues(
                                               alpha: 0.08,
                                             ),
                                             blurRadius: 8,
@@ -784,9 +816,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Colors.white12
-                            : const Color(0xFFF2F3F5),
+                        color: context.appColors.surfaceFill,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
@@ -912,7 +942,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                                       ? []
                                       : [
                                           BoxShadow(
-                                            color: Colors.black.withValues(
+                                            color: cs.shadow.withValues(
                                               alpha: 0.08,
                                             ),
                                             blurRadius: 8,
@@ -1050,7 +1080,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                                       ? []
                                       : [
                                           BoxShadow(
-                                            color: Colors.black.withValues(
+                                            color: cs.shadow.withValues(
                                               alpha: 0.08,
                                             ),
                                             blurRadius: 8,
@@ -1083,6 +1113,165 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
       },
     );
   }
+
+  Future<void> _showChatInputBackgroundOpacitySheet(
+    BuildContext context,
+  ) async {
+    final cs = Theme.of(context).colorScheme;
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      isScrollControlled: false,
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+            child: Builder(
+              builder: (context) {
+                final theme = Theme.of(context);
+                final isDark = theme.brightness == Brightness.dark;
+                final l10n = AppLocalizations.of(context)!;
+                final settings = context.watch<SettingsProvider>();
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _chatInputOpacitySlider(
+                      context,
+                      label: l10n.settingsPageLightMode,
+                      brightness: Brightness.light,
+                      opacity: settings.chatInputBackgroundOpacityLight,
+                      isDark: isDark,
+                    ),
+                    const SizedBox(height: 18),
+                    _chatInputOpacitySlider(
+                      context,
+                      label: l10n.settingsPageDarkMode,
+                      brightness: Brightness.dark,
+                      opacity: settings.chatInputBackgroundOpacityDark,
+                      isDark: isDark,
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _chatInputOpacitySlider(
+    BuildContext context, {
+    required String label,
+    required Brightness brightness,
+    required double opacity,
+    required bool isDark,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: cs.onSurface,
+            fontSize: 13,
+            fontWeight: AppFontWeights.semibold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Text(
+              '0%',
+              style: TextStyle(
+                color: cs.onSurface.withValues(alpha: 0.7),
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: SfSliderTheme(
+                data: SfSliderThemeData(
+                  activeTrackHeight: 8,
+                  inactiveTrackHeight: 8,
+                  overlayRadius: 14,
+                  activeTrackColor: cs.primary,
+                  inactiveTrackColor: cs.onSurface.withValues(
+                    alpha: isDark ? 0.25 : 0.20,
+                  ),
+                  tooltipBackgroundColor: cs.primary,
+                  tooltipTextStyle: TextStyle(
+                    color: cs.onPrimary,
+                    fontWeight: AppFontWeights.semibold,
+                  ),
+                  activeTickColor: cs.onSurface.withValues(
+                    alpha: isDark ? 0.45 : 0.35,
+                  ),
+                  inactiveTickColor: cs.onSurface.withValues(
+                    alpha: isDark ? 0.30 : 0.25,
+                  ),
+                  activeMinorTickColor: cs.onSurface.withValues(
+                    alpha: isDark ? 0.34 : 0.28,
+                  ),
+                  inactiveMinorTickColor: cs.onSurface.withValues(
+                    alpha: isDark ? 0.24 : 0.20,
+                  ),
+                ),
+                child: SfSlider(
+                  value: (opacity * 100).roundToDouble(),
+                  min: 0.0,
+                  max: 100.0001,
+                  stepSize: 5.0,
+                  showTicks: true,
+                  showLabels: true,
+                  interval: 25,
+                  minorTicksPerInterval: 1,
+                  enableTooltip: true,
+                  shouldAlwaysShowTooltip: false,
+                  tooltipShape: const SfPaddleTooltipShape(),
+                  labelFormatterCallback: (value, text) =>
+                      '${(value as double).round()}%',
+                  thumbIcon: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: cs.primary,
+                      shape: BoxShape.circle,
+                      boxShadow: isDark
+                          ? []
+                          : [
+                              BoxShadow(
+                                color: cs.shadow.withValues(alpha: 0.08),
+                                blurRadius: 8,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                    ),
+                  ),
+                  onChanged: (v) => context
+                      .read<SettingsProvider>()
+                      .setChatInputBackgroundOpacity(
+                        brightness,
+                        ((v as double) / 100.0).clamp(0.0, 1.0),
+                      ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '${(opacity * 100).round()}%',
+              style: TextStyle(color: cs.onSurface, fontSize: 12),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 }
 
 // --- iOS-style helpers ---
@@ -1093,9 +1282,7 @@ Widget _iosSectionCard({required List<Widget> children}) {
       final theme = Theme.of(context);
       final cs = theme.colorScheme;
       final isDark = theme.brightness == Brightness.dark;
-      final Color bg = isDark
-          ? Colors.white10
-          : Colors.white.withValues(alpha: 0.96);
+      final Color bg = context.appColors.surfaceCard;
       return Container(
         decoration: BoxDecoration(
           color: bg,
@@ -1200,9 +1387,9 @@ class _AnimatedPressColor extends StatelessWidget {
   final Widget Function(Color color) builder;
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cs = Theme.of(context).colorScheme;
     final target = pressed
-        ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ?? base)
+        ? (Color.lerp(base, cs.surface, 0.55) ?? base)
         : base;
     return TweenAnimationBuilder<Color?>(
       tween: ColorTween(end: target),
@@ -1447,13 +1634,10 @@ Widget _sheetOption(
     builder: (pressed) {
       final base = cs.onSurface;
       final target = pressed
-          ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ??
-                base)
+          ? (Color.lerp(base, cs.surface, 0.55) ?? base)
           : base;
       final bgTarget = pressed
-          ? (isDark
-                ? Colors.white.withValues(alpha: 0.06)
-                : Colors.black.withValues(alpha: 0.05))
+          ? (cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05))
           : Colors.transparent;
       return TweenAnimationBuilder<Color?>(
         tween: ColorTween(end: target),
@@ -1493,6 +1677,51 @@ Widget _sheetDividerNoIcon(BuildContext context) {
     endIndent: 16,
     color: cs.outlineVariant.withValues(alpha: 0.18),
   );
+}
+
+Future<void> _showMobileMessageNavModeSheet(BuildContext context) async {
+  final cs = Theme.of(context).colorScheme;
+  final l10n = AppLocalizations.of(context)!;
+  final choice = await showModalBottomSheet<MobileMessageNavButtonsMode>(
+    context: context,
+    backgroundColor: cs.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _sheetOption(
+              ctx,
+              label: l10n.displaySettingsPageMessageNavButtonsModeAlways,
+              onTap: () =>
+                  Navigator.of(ctx).pop(MobileMessageNavButtonsMode.always),
+            ),
+            _sheetDividerNoIcon(ctx),
+            _sheetOption(
+              ctx,
+              label: l10n.displaySettingsPageMessageNavButtonsModeScroll,
+              onTap: () =>
+                  Navigator.of(ctx).pop(MobileMessageNavButtonsMode.scroll),
+            ),
+            _sheetDividerNoIcon(ctx),
+            _sheetOption(
+              ctx,
+              label: l10n.displaySettingsPageMessageNavButtonsModeNever,
+              onTap: () =>
+                  Navigator.of(ctx).pop(MobileMessageNavButtonsMode.never),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+  if (choice == null) return;
+  if (!context.mounted) return;
+  await context.read<SettingsProvider>().setMobileMessageNavButtonsMode(choice);
 }
 
 // --- Subpages ---
@@ -1778,7 +2007,6 @@ class _AutoCollapseCodeBlockLinesRowState
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final sp = context.watch<SettingsProvider>();
 
     // Keep controller in sync when not editing
@@ -1829,7 +2057,7 @@ class _AutoCollapseCodeBlockLinesRowState
                 decoration: InputDecoration(
                   isDense: true,
                   filled: true,
-                  fillColor: isDark ? Colors.white10 : Colors.white,
+                  fillColor: context.appColors.surfaceCard,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 8,
                     vertical: 8,
@@ -1942,15 +2170,6 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosSwitchRow(
                 context,
-                icon: Lucide.History,
-                label: l10n.displaySettingsPageLazyHistoryTitle,
-                value: sp.lazyHistoryEnabled,
-                onChanged: (v) =>
-                    context.read<SettingsProvider>().setLazyHistoryEnabled(v),
-              ),
-              _iosDivider(context),
-              _iosSwitchRow(
-                context,
                 icon: Lucide.RefreshCw,
                 label: l10n
                     .displaySettingsPageRegenerateDeleteTrailingMessagesTitle,
@@ -1979,14 +2198,20 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                     context.read<SettingsProvider>().setShowAppUpdates(v),
               ),
               _iosDivider(context),
-              _iosSwitchRow(
+              _iosNavRow(
                 context,
                 icon: Lucide.ChevronRight,
                 label: l10n.displaySettingsPageMessageNavButtonsTitle,
-                value: sp.showMessageNavButtons,
-                onChanged: (v) => context
-                    .read<SettingsProvider>()
-                    .setShowMessageNavButtons(v),
+                detailBuilder: (_) =>
+                    Text(switch (sp.mobileMessageNavButtonsMode) {
+                      MobileMessageNavButtonsMode.always =>
+                        l10n.displaySettingsPageMessageNavButtonsModeAlways,
+                      MobileMessageNavButtonsMode.scroll =>
+                        l10n.displaySettingsPageMessageNavButtonsModeScroll,
+                      MobileMessageNavButtonsMode.never =>
+                        l10n.displaySettingsPageMessageNavButtonsModeNever,
+                    }),
+                onTap: () => _showMobileMessageNavModeSheet(context),
               ),
               _iosDivider(context),
               _iosSwitchRow(
@@ -1996,16 +2221,6 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                 value: sp.showChatListDate,
                 onChanged: (v) =>
                     context.read<SettingsProvider>().setShowChatListDate(v),
-              ),
-              _iosDivider(context),
-              _iosSwitchRow(
-                context,
-                icon: Lucide.Crop,
-                label: l10n.displaySettingsPageEnableImageCropperTitle,
-                subtitle: l10n.displaySettingsPageEnableImageCropperSubtitle,
-                value: sp.imageCropperEnabled,
-                onChanged: (v) =>
-                    context.read<SettingsProvider>().setImageCropperEnabled(v),
               ),
               _iosDivider(context),
               _iosSwitchRow(

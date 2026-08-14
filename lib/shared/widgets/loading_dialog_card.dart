@@ -19,11 +19,7 @@ class LoadingDialogCard extends StatelessWidget {
         duration: kAnimSlow,
         curve: Curves.easeOutCubic,
         builder: (context, value, child) {
-          final opacity = ((value - 0.96) / 0.04).clamp(0.0, 1.0).toDouble();
-          return Opacity(
-            opacity: opacity,
-            child: Transform.scale(scale: value, child: child),
-          );
+          return Transform.scale(scale: value, child: child);
         },
         child: Material(
           color: Colors.transparent,

@@ -14,6 +14,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../core/services/haptics.dart';
 import 'debug_page.dart';
 import 'log_viewer_page.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 class AboutPage extends StatefulWidget {
   const AboutPage({super.key});
@@ -23,8 +24,8 @@ class AboutPage extends StatefulWidget {
 }
 
 class _AboutPageState extends State<AboutPage> {
-  static const String _upstreamKelivoVersion = '1.1.16';
-  static const String _upstreamKelivoBuildNumber = '60';
+  static const String _upstreamKelivoVersion = '1.2.1';
+  static const String _upstreamKelivoBuildNumber = '64';
 
   String _version = '';
   String _buildNumber = '';
@@ -416,10 +417,8 @@ class _AboutPageState extends State<AboutPage> {
           ),
 
           const SizedBox(height: 12),
-
           _iosSectionHeader(context, l10n.aboutPageKelivoSectionTitle),
           const SizedBox(height: 8),
-
           _iosSectionCard(
             children: [
               _iosNavRow(
@@ -432,7 +431,7 @@ class _AboutPageState extends State<AboutPage> {
                     _upstreamKelivoBuildNumber,
                   ),
                 ),
-                onTap: _onVersionTap,
+                onTap: null,
               ),
               _iosDivider(context),
               _iosNavRow(
@@ -457,20 +456,6 @@ class _AboutPageState extends State<AboutPage> {
                   'https://github.com/Chevey339/kelivo/blob/master/LICENSE',
                 ),
               ),
-              _iosDivider(context),
-              _iosNavRowSvgLeading(
-                context,
-                svgAsset: 'assets/icons/tencent-qq.svg',
-                label: l10n.aboutPageJoinQQGroup,
-                onTap: () => _openUrl('https://qm.qq.com/q/OQaXetKssC'),
-              ),
-              _iosDivider(context),
-              _iosNavRowSvgLeading(
-                context,
-                svgAsset: 'assets/icons/discord.svg',
-                label: l10n.aboutPageJoinDiscord,
-                onTap: () => _openUrl('https://discord.gg/Tb8DyvvV5T'),
-              ),
             ],
           ),
 
@@ -489,9 +474,7 @@ Widget _iosSectionCard({required List<Widget> children}) {
       final theme = Theme.of(context);
       final cs = theme.colorScheme;
       final isDark = theme.brightness == Brightness.dark;
-      final Color bg = isDark
-          ? Colors.white10
-          : Colors.white.withValues(alpha: 0.96);
+      final Color bg = context.appColors.surfaceCard;
       return Container(
         decoration: BoxDecoration(
           color: bg,
@@ -514,14 +497,10 @@ Widget _iosSectionCard({required List<Widget> children}) {
 Widget _iosSectionHeader(BuildContext context, String title) {
   final cs = Theme.of(context).colorScheme;
   return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 6),
+    padding: const EdgeInsets.symmetric(horizontal: 12),
     child: Text(
       title,
-      style: TextStyle(
-        fontSize: 13,
-        fontWeight: AppFontWeights.semibold,
-        color: cs.onSurface.withValues(alpha: 0.62),
-      ),
+      style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
     ),
   );
 }
@@ -548,9 +527,9 @@ class _AnimatedPressColor extends StatelessWidget {
   final Widget Function(Color color) builder;
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cs = Theme.of(context).colorScheme;
     final target = pressed
-        ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ?? base)
+        ? (Color.lerp(base, cs.surface, 0.55) ?? base)
         : base;
     return TweenAnimationBuilder<Color?>(
       tween: ColorTween(end: target),

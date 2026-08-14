@@ -195,6 +195,7 @@ class _GlassPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cs = Theme.of(context).colorScheme;
     return ClipRRect(
       borderRadius: borderRadius ?? BorderRadius.circular(14),
       child: BackdropFilter(
@@ -202,20 +203,20 @@ class _GlassPanel extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             // Match the preferred grey smudge style
-            color: (isDark ? Colors.black : Colors.white).withValues(
+            color: cs.surface.withValues(
               alpha: isDark ? 0.28 : 0.56,
             ),
             border: Border(
               top: BorderSide(
-                color: Colors.white.withValues(alpha: isDark ? 0.06 : 0.18),
+                color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.18),
                 width: 0.7,
               ),
               left: BorderSide(
-                color: Colors.white.withValues(alpha: isDark ? 0.04 : 0.12),
+                color: cs.onSurface.withValues(alpha: isDark ? 0.04 : 0.12),
                 width: 0.6,
               ),
               right: BorderSide(
-                color: Colors.white.withValues(alpha: isDark ? 0.04 : 0.12),
+                color: cs.onSurface.withValues(alpha: isDark ? 0.04 : 0.12),
                 width: 0.6,
               ),
             ),
@@ -239,9 +240,21 @@ class _ReasoningContent extends StatelessWidget {
   final String? modelProvider;
   final String? modelId;
 
-  bool _isCustomSelected(int? budget, {required bool showXhigh}) {
+  bool _isCustomSelected(
+    int? budget, {
+    required bool showXhigh,
+    required bool showMax,
+  }) {
     final v = budget ?? -1;
-    final presets = <int>{-1, 0, 1024, 16000, 32000, if (showXhigh) 64000};
+    final presets = <int>{
+      -1,
+      0,
+      1024,
+      16000,
+      32000,
+      if (showXhigh) 64000,
+      if (showMax) 128000,
+    };
     return !presets.contains(v);
   }
 
@@ -257,15 +270,29 @@ class _ReasoningContent extends StatelessWidget {
     return settings.supportsXhighReasoning(currentProvider, currentModelId);
   }
 
+  bool _showMaxOption(BuildContext context, SettingsProvider settings) {
+    final assistant = context.read<AssistantProvider>().currentAssistant;
+    final currentProvider =
+        modelProvider ??
+        assistant?.chatModelProvider ??
+        settings.currentModelProvider;
+    final currentModelId =
+        modelId ?? assistant?.chatModelId ?? settings.currentModelId;
+    if (currentProvider == null || currentModelId == null) return false;
+    return settings.supportsMaxReasoning(currentProvider, currentModelId);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final sp = context.watch<SettingsProvider>();
     final showXhigh = _showXhighOption(context, sp);
+    final showMax = _showMaxOption(context, sp);
     final selected = sp.thinkingBudget ?? -1;
     final customActive = _isCustomSelected(
       sp.thinkingBudget,
       showXhigh: showXhigh,
+      showMax: showMax,
     );
 
     Widget tile({
@@ -364,6 +391,16 @@ class _ReasoningContent extends StatelessWidget {
                 label: l10n.reasoningBudgetSheetXhigh,
                 value: 64000,
               ),
+            if (showMax)
+              tile(
+                leadingBuilder: (c) => ReasoningIcons.budgetIcon(
+                  ReasoningIcons.maxBudget,
+                  size: 16,
+                  color: c,
+                ),
+                label: l10n.reasoningBudgetSheetMax,
+                value: 128000,
+              ),
             tile(
               leadingBuilder: (c) => Icon(Lucide.Hash, size: 16, color: c),
               label: l10n.reasoningBudgetSheetCustomLabel,
@@ -387,7 +424,7 @@ class _ReasoningContent extends StatelessWidget {
                       ).colorScheme.onSurface.withValues(alpha: 0.45),
                     ),
               onTap: () async {
-                final initialValue = selected >= 1024 ? selected : 2048;
+                final initialValue = customActive ? selected : 2048;
                 onSuspendedChanged(true);
                 var restore = true;
                 try {
@@ -444,7 +481,7 @@ class _HoverRowState extends State<_HoverRow> {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final baseBg = Colors.transparent;
-    final hoverBg = (isDark ? Colors.white : Colors.black).withValues(
+    final hoverBg = cs.onSurface.withValues(
       alpha: isDark ? 0.12 : 0.10,
     );
 

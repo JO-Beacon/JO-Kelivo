@@ -1,22 +1,13 @@
-import '../../../core/models/chat_input_data.dart';
-import '../utils/message_attachment_parser.dart';
+import '../../../core/models/message_part.dart';
 
 class MessageEditResult {
-  final String text;
-  final List<String> imagePaths;
-  final List<DocumentAttachment> documents;
+  final String content;
+  final List<MessagePart> parts;
   final bool shouldSend;
 
-  const MessageEditResult({
-    required this.text,
-    this.imagePaths = const [],
-    this.documents = const [],
+  MessageEditResult({
+    required this.content,
+    required List<MessagePart> parts,
     this.shouldSend = false,
-  });
-
-  String get content => MessageAttachmentParser.buildContent(
-    text: text,
-    imagePaths: imagePaths,
-    documents: documents,
-  );
+  }) : parts = List<MessagePart>.unmodifiable(parts);
 }

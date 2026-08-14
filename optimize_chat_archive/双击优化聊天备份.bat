@@ -24,11 +24,9 @@ if errorlevel 1 (
   exit /b 3
 )
 
-if exist "BUG\chats.backup.json" del /f /q "BUG\chats.backup.json"
-
 echo Optimizing BUG\\chats.json ...
 echo.
-uv run python optimize_chat_archive.py BUG\chats.json --overwrite-output
+uv run python optimize_chat_archive.py BUG\chats.json --overwrite-output --overwrite-backup
 set "exit_code=%ERRORLEVEL%"
 echo.
 

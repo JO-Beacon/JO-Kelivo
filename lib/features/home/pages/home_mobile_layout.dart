@@ -116,12 +116,22 @@ class HomeMobileScaffold extends StatelessWidget {
           if (closeDrawer) drawerController.close();
         },
       ),
-      child: Scaffold(
-        key: scaffoldKey,
-        resizeToAvoidBottomInset: true,
-        extendBodyBehindAppBar: true,
-        appBar: appBarOverride ?? _buildAppBar(context, cs),
-        body: body,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Keep the chat artwork at the full window size while Scaffold
+          // resizes only its body around the keyboard. Transparent IMEs can
+          // then reveal the artwork instead of Scaffold's surface color.
+          const MobileBackgroundLayer(),
+          Scaffold(
+            key: scaffoldKey,
+            resizeToAvoidBottomInset: true,
+            extendBodyBehindAppBar: true,
+            backgroundColor: Colors.transparent,
+            appBar: appBarOverride ?? _buildAppBar(context, cs),
+            body: body,
+          ),
+        ],
       ),
     );
   }
@@ -360,7 +370,7 @@ class MobileBackgroundLayer extends StatelessWidget {
                   image: provider,
                   fit: BoxFit.cover,
                   colorFilter: ColorFilter.mode(
-                    Colors.black.withValues(alpha: 0.04),
+                    cs.shadow.withValues(alpha: 0.04),
                     BlendMode.srcATop,
                   ),
                 ),
@@ -393,7 +403,7 @@ class MobileBackgroundLayer extends StatelessWidget {
   }
 }
 
-/// Scroll navigation buttons (scroll to bottom + scroll to previous question)
+/// Scroll navigation buttons (scroll to bottom + scroll to previous message)
 class ScrollNavigationButtons extends StatelessWidget {
   const ScrollNavigationButtons({
     super.key,
@@ -449,7 +459,7 @@ class ScrollNavigationButtons extends StatelessWidget {
             ),
           ),
         ),
-        // Scroll to previous question button
+        // Scroll to previous message button
         Align(
           alignment: Alignment.bottomRight,
           child: SafeArea(
@@ -499,21 +509,20 @@ class _ScrollButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return ClipOval(
       child: BackdropFilter(
         filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
         child: Container(
           decoration: BoxDecoration(
             color: isDark
-                ? Colors.white.withValues(alpha: 0.06)
-                : Colors.white.withValues(alpha: 0.07),
+                ? cs.onSurface.withValues(alpha: 0.06)
+                : cs.surface.withValues(alpha: 0.07),
             shape: BoxShape.circle,
             border: Border.all(
               color: isDark
-                  ? Colors.white.withValues(alpha: 0.10)
-                  : Theme.of(
-                      context,
-                    ).colorScheme.outline.withValues(alpha: 0.20),
+                  ? cs.onSurface.withValues(alpha: 0.10)
+                  : cs.outline.withValues(alpha: 0.20),
               width: 1,
             ),
           ),
@@ -528,7 +537,7 @@ class _ScrollButton extends StatelessWidget {
                 child: Icon(
                   icon,
                   size: 16,
-                  color: isDark ? Colors.white : Colors.black87,
+                  color: cs.onSurface.withValues(alpha: isDark ? 1.0 : 0.87),
                 ),
               ),
             ),
@@ -625,12 +634,8 @@ class _GlassCircleButtonState extends State<_GlassCircleButton> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final glassBase = isDark
-        ? Colors.black.withValues(alpha: 0.06)
-        : Colors.white.withValues(alpha: 0.06);
-    final overlay = isDark
-        ? Colors.white.withValues(alpha: 0.06)
-        : Colors.black.withValues(alpha: 0.05);
+    final glassBase = cs.surface.withValues(alpha: 0.06);
+    final overlay = cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05);
     final tileColor = _pressed
         ? Color.alphaBlend(overlay, glassBase)
         : glassBase;

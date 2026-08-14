@@ -5,11 +5,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/search/services/global_session_search_service.dart';
+
+import '../../support/business_preferences_test_harness.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);
@@ -30,6 +31,7 @@ class _FakePathProviderPlatform extends PathProviderPlatform {
 }
 
 Future<AssistantProvider> _createLoadedAssistantProvider({
+  required BusinessPreferencesTestSession session,
   required ChatService chatService,
   List<Map<String, Object?>> assistants = const [
     {'id': 'assistant-delete', 'name': 'Delete Me'},
@@ -37,12 +39,16 @@ Future<AssistantProvider> _createLoadedAssistantProvider({
   ],
   String currentAssistantId = 'assistant-delete',
 }) async {
-  SharedPreferences.setMockInitialValues({
-    'assistants_v1': jsonEncode(assistants),
-    'current_assistant_id_v1': currentAssistantId,
-  });
+  await session.preferences.setString('assistants_v1', jsonEncode(assistants));
+  await session.preferences.setString(
+    'current_assistant_id_v1',
+    currentAssistantId,
+  );
 
-  final provider = AssistantProvider(chatService: chatService);
+  final provider = AssistantProvider(
+    preferences: session.preferences,
+    chatService: chatService,
+  );
   for (var i = 0; i < 25; i++) {
     if (provider.assistants.length == assistants.length) return provider;
     await Future<void>.delayed(const Duration(milliseconds: 10));
@@ -54,28 +60,45 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Directory tempDir;
+  late BusinessPreferencesTestHarness harness;
+  late BusinessPreferencesTestSession session;
+  final services = <ChatService>[];
 
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp(
       'kelivo_assistant_cascade_test_',
     );
     PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
+    harness = await BusinessPreferencesTestHarness.create();
+    session = await harness.open();
   });
 
   tearDown(() async {
+    for (final service in services) {
+      await service.close();
+    }
+    services.clear();
     await Hive.close();
+    await harness.dispose();
     if (await tempDir.exists()) {
       await tempDir.delete(recursive: true);
     }
   });
 
+  ChatService createService() {
+    final service = ChatService();
+    services.add(service);
+    return service;
+  }
+
   group('AssistantProvider cascade delete', () {
     test(
       'deletes conversations and messages owned by the deleted assistant',
       () async {
-        final chatService = ChatService();
+        final chatService = createService();
         await chatService.init();
         final provider = await _createLoadedAssistantProvider(
+          session: session,
           chatService: chatService,
         );
 
@@ -100,7 +123,7 @@ void main() {
         );
 
         expect(
-          GlobalSessionSearchService.search(
+          await GlobalSessionSearchService.search(
             chatService: chatService,
             query: 'unique-test-keyword-123',
           ),
@@ -112,14 +135,14 @@ void main() {
         expect(chatService.getConversation(deletedConversation.id), isNull);
         expect(chatService.getMessages(deletedConversation.id), isEmpty);
         expect(
-          GlobalSessionSearchService.search(
+          await GlobalSessionSearchService.search(
             chatService: chatService,
             query: 'unique-test-keyword-123',
           ),
           isEmpty,
         );
         expect(
-          GlobalSessionSearchService.search(
+          await GlobalSessionSearchService.search(
             chatService: chatService,
             query: 'keep-assistant-keyword-456',
           ),
@@ -131,9 +154,10 @@ void main() {
     test(
       'deletes draft conversations owned by the deleted assistant',
       () async {
-        final chatService = ChatService();
+        final chatService = createService();
         await chatService.init();
         final provider = await _createLoadedAssistantProvider(
+          session: session,
           chatService: chatService,
         );
 
@@ -158,7 +182,7 @@ void main() {
     test(
       'notifies once when deleting multiple assistant conversations',
       () async {
-        final chatService = ChatService();
+        final chatService = createService();
         await chatService.init();
 
         final first = await chatService.createConversation(
@@ -201,9 +225,10 @@ void main() {
     test(
       'keeps conversations when deleting the last assistant is rejected',
       () async {
-        final chatService = ChatService();
+        final chatService = createService();
         await chatService.init();
         final provider = await _createLoadedAssistantProvider(
+          session: session,
           chatService: chatService,
           assistants: const [
             {'id': 'only-assistant', 'name': 'Only Assistant'},
@@ -225,7 +250,7 @@ void main() {
 
         expect(chatService.getConversation(conversation.id), isNotNull);
         expect(
-          GlobalSessionSearchService.search(
+          await GlobalSessionSearchService.search(
             chatService: chatService,
             query: 'last-assistant-keyword-789',
           ),

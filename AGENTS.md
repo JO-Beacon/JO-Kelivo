@@ -21,12 +21,13 @@
   - `lib/l10n/app_zh.arb`
   - `lib/l10n/app_zh_Hans.arb`
   - `lib/l10n/app_zh_Hant.arb`
-- The following are generated or build artifacts. Never hand-edit them:
+- The following are generated or build artifacts. Never hand-edit them unless an explicit repository-maintained compatibility exception below applies:
   - `lib/l10n/app_localizations*.dart`
   - `lib/core/models/*.g.dart`
   - All other generated logic must go through commands, not manual edits
   - `.dart_tool/**`
   - `build/**`
+- `lib/core/models/chat_message.g.dart` in the Kelivo 1.2.1 baseline is an explicit exception: upstream hand-maintains its legacy Hive field-2 reader so old `content` values can migrate into `MessagePart`. Treat it as a source-controlled compatibility adapter, not as an ordinary disposable generator output, until that migration contract is deliberately retired.
 - The package name is `Kelivo`. Existing imports use `package:Kelivo/...` everywhere. Do not "normalize" the package name.
 - Top-level platform entry is `_selectHome()` in `lib/main.dart`:
   - macOS / Windows / Linux -> `DesktopHomePage`
@@ -101,13 +102,20 @@ flutter gen-l10n
 
 ### 3.2 Generated Code Must Be Maintained Via Commands
 
-- After modifying Hive models, `@HiveType`, `@HiveField`, or `part '*.g.dart'` references, run:
+- After modifying Hive models, `@HiveType`, `@HiveField`, or `part '*.g.dart'` references, normally run:
 
 ```bash
 dart run build_runner build --delete-conflicting-outputs
 ```
 
-- Generated file changes must correspond strictly to source changes. Do not hand-craft `*.g.dart` files.
+- Generated file changes must correspond strictly to source changes. Do not hand-craft `*.g.dart` files except for an explicit source-controlled compatibility adapter documented in this file.
+- `lib/core/models/chat_message.g.dart` is such an adapter in the Kelivo 1.2.1 baseline. Its `ChatMessageAdapter.read` must continue reading legacy Hive field 2 and passing it to `ChatMessage(content: ...)`; blindly accepting the generator's replacement can silently discard old message text during migration.
+- Before running `build_runner` after the 1.2.1 baseline is accepted, inspect whether the task touches `ChatMessage` or can rewrite `chat_message.g.dart`. After generation, review the generated diff and verify the field-2-to-`content` mapping is still present. If the generator removed it, restore the documented compatibility behavior as an explicit adapter change and run the legacy Hive migration tests before proceeding.
+- Any intentional change to this adapter requires all of:
+  - A stated old-data compatibility reason
+  - Review of `ChatMessage` Hive field numbers and constructor semantics
+  - Focused tests proving legacy field 2 still becomes message text/`TextPart`
+  - Confirmation that the new SQLite/`MessagePart` runtime does not resume Hive writes
 
 ### 3.3 Format Code Before Finishing
 
@@ -135,7 +143,7 @@ flutter test
 | Change Type | Required Action |
 | --- | --- |
 | ARB / localization | `flutter gen-l10n`, check `desiredFileName.txt`, then `flutter analyze` |
-| Hive model / generated code | `dart run build_runner build --delete-conflicting-outputs`, then run related tests |
+| Hive model / generated code | Run `dart run build_runner build --delete-conflicting-outputs` when applicable, review generated diffs, preserve the documented `chat_message.g.dart` legacy field-2 adapter contract, then run related migration tests |
 | `pubspec.yaml` / dependencies | `flutter pub get`, then `flutter analyze` and related tests |
 | `.github/workflows/**` / build scripts | Check ALL similar workflow files, not just one |
 | Platform directories `android/ ios/ macos/ linux/ windows/` | At least one targeted platform verification; if impossible, state why explicitly |
@@ -150,6 +158,8 @@ flutter test
   - `.dart_tool/**`
   - `build/**`
   - Content maintained by `flutter gen-l10n` / `build_runner`
+- `plans/**` is permanently local-only migration/control material. Never newly track, stage, force-add, or commit any file under `plans/`, regardless of file type. Before every commit, confirm no `plans/**` path is staged.
+- Seven legacy `plans/**` paths are already tracked from before this rule. Leave those historical tracked files unchanged for now; their presence is not precedent for tracking additional plan files. Removing or untracking them requires a separate explicit cleanup task.
 - Do not modify unless required by the task:
   - `.idea/**`
   - Platform signing, certificates, personal environment files
@@ -171,6 +181,31 @@ flutter test
 - This repo has multiple similar GitHub Actions workflow files, especially for builds. When touching build, versioning, or injection logic, check ALL similar workflows for sync.
 - Do not expand scope just because you spotted something that "could be unified". Finish the current task first, then decide whether to open a separate refactoring task.
 - When touching a path dependency, treat it as an independent module. Do not only patch the surface at the root repo level.
+
+#### 3.7.1 External Baseline Replacement and Git History Boundary
+
+- JO-Kelivo intentionally maintains Git history independent from any external baseline source. The baseline is replaceable implementation input, not part of JO-Kelivo's repository identity; it may come from official Kelivo, another Kelivo fork, or another explicitly selected compatible codebase.
+- Replacing the baseline does NOT mean reconnecting commit ancestry to the selected source. Do not assume official Kelivo must remain the permanent or only possible baseline.
+- Unless the user explicitly requests a Git-history strategy change, external baseline work must start from the current JO-Kelivo branch and preserve its linear history. Do not:
+  - Create the replacement branch from an external baseline tag or branch
+  - Rebase JO-Kelivo onto external baseline history
+  - Merge unrelated external baseline history with `--allow-unrelated-histories`, including `-s ours` history-bridge merges
+  - Replace `origin`, add an upstream remote, or otherwise change Git remotes as an implicit part of a source upgrade
+- Treat external source under `参考文件/**` as read-only comparison input. Record the selected source repository or fork, version, tag or commit hash when available, and applicable license/attribution requirements, but do not treat the reference directory as a Git working tree or copy target wholesale.
+- Apply external baseline upgrades as a controlled source snapshot replacement:
+  - Before replacement, ensure the intended pre-replacement JO-Kelivo state is committed, record its exact commit hash, and create the replacement branch from that commit. A tag or separate archive may be added as an optional human-readable reference, but is not mandatory and does not substitute for committing the intended state or maintaining a real backup when one is needed
+  - Classify paths as JO-owned, baseline-owned, mixed, generated, source-controlled compatibility adapters, local migration-control material, build artifacts, or explicitly excluded before copying anything
+  - Review and accept external files by functional scope; a baseline-only file enters JO-Kelivo only when its runtime, build, test, or dependency role is understood
+  - Preserve JO-owned identity, data isolation, update source, release policy, workflows, maintenance records, and packaging rules unless the task explicitly changes them
+  - Never copy `.git/**`, `.dart_tool/**`, `build/**`, external personal environment files, or unrelated external workflows and documentation
+  - Regenerate ordinary generated outputs with repository commands instead of copying or hand-editing them; preserve any explicitly documented source-controlled compatibility adapter and verify its contract after generation
+- Restore and verify JO-Kelivo application identity and data-directory isolation before running the upgraded app or exercising any baseline-provided data migration. Such migration must operate on the JO-Kelivo data directory, never a baseline application's data directory.
+- Replay JO behavior by requirement against the new architecture, not by blindly restoring old files or patches. If the selected baseline changed storage, models, routing, or persistence, adapt the JO behavior to the new source of truth and explicitly decide whether the old patch is replayed, replaced, or retired.
+- Delivery notes for an external baseline replacement must state:
+  - Previous and new baseline sources and versions
+  - Accepted and intentionally excluded top-level path groups
+  - JO patches replayed, replaced, or retired
+  - Data, import/export, platform identity, and release compatibility results
 
 ### 3.8 Desktop Tasks: Determine Entry Layer First
 
@@ -240,7 +275,7 @@ flutter test
 ## 4. Recommended Execution Order
 
 1. `git status --short` -- confirm workspace baseline.
-2. Read relevant code and config. Write clear acceptance criteria. For desktop tasks, confirm entry topology first: `main.dart` -> `lib/desktop/**` -> shared chat layout.
+2. Read relevant code and config. Write clear acceptance criteria. For desktop tasks, confirm entry topology first: `main.dart` -> `lib/desktop/**` -> shared chat layout. For external baseline work, confirm the independent-history rule and classify path ownership before replacement.
 3. Batch all independent context reads, searches, and status checks in parallel, then decide the minimal change landing point.
 4. List requirement scenarios and verification methods first, then make minimal changes. Do not mix in unrelated refactoring.
 5. Run the generation, formatting, analysis, and test commands relevant to this task.
@@ -256,7 +291,7 @@ flutter test
 - All new user-visible text uses `AppLocalizations`.
 - All 4 ARB files have been updated in sync.
 - `flutter gen-l10n` has been executed and generated files match ARB content.
-- If Hive models were touched, `build_runner` has been executed.
+- If Hive models were touched, `build_runner` has been executed when applicable; generated diffs were reviewed, and the `chat_message.g.dart` legacy field-2 mapping was preserved and tested.
 - `dart format` has been executed.
 - `flutter analyze` has been executed.
 - Related `flutter test` has been executed. If no related tests exist, create and run them following official testing standards.
@@ -266,7 +301,9 @@ flutter test
 - New UI does not introduce unnecessary Android ripple or Material default interaction feedback.
 - At least one round of self-review completed, checking maintainability, performance, security, style consistency, and compatibility boundary.
 - No real secrets, build artifacts, or unrelated files committed.
+- No new, previously untracked, or force-added `plans/**` path is staged or committed; pre-existing tracked plan files were not modified unless the task explicitly requested their cleanup.
 - If workflows / platform directories / path dependencies were touched, corresponding extra verification has been done.
+- External baseline work remained on JO-Kelivo history unless the user explicitly approved a history strategy change; the exact pre-replacement JO commit and replacement branch point, source provenance, accepted/excluded paths, and replayed/replaced/retired JO patches are recorded.
 
 ## 6. External Best Practices
 

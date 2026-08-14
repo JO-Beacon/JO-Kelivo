@@ -4,6 +4,7 @@ import '../../../icons/lucide_adapter.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../home/controllers/chat_actions.dart';
 import '../../../core/models/assistant.dart';
 import 'dart:io' show File;
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -14,6 +15,7 @@ import '../../../core/services/haptics.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 class AssistantSettingsPage extends StatelessWidget {
   const AssistantSettingsPage({super.key});
@@ -48,13 +50,12 @@ class AssistantSettingsPage extends StatelessWidget {
                 final assistantProvider = context.read<AssistantProvider>();
                 final name = await _showAddAssistantSheet(context);
                 if (!context.mounted || name == null) return;
-                final insertAtTop = context
-                    .read<SettingsProvider>()
-                    .insertNewAssistantAtTop;
                 final id = await assistantProvider.addAssistant(
                   name: name.trim(),
                   context: context,
-                  insertAtTop: insertAtTop,
+                  insertAtTop: context
+                      .read<SettingsProvider>()
+                      .insertNewAssistantAtTop,
                 );
                 if (!context.mounted) return;
                 await Navigator.of(context).push(
@@ -122,9 +123,7 @@ class _AssistantCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final baseBg = isDark
-        ? Colors.white10
-        : Colors.white.withValues(alpha: 0.96);
+    final baseBg = context.appColors.surfaceCard;
     final content = _TactileCard(
       onTap: () {
         Navigator.of(context).push(
@@ -212,13 +211,12 @@ class _AssistantCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 4),
             onPressed: (_) async {
               final assistantProvider = context.read<AssistantProvider>();
-              final insertAtTop = context
-                  .read<SettingsProvider>()
-                  .insertNewAssistantAtTop;
               final newId = await assistantProvider.duplicateAssistant(
                 item.id,
                 l10n: l10n,
-                insertAtTop: insertAtTop,
+                insertAtTop: context
+                    .read<SettingsProvider>()
+                    .insertNewAssistantAtTop,
               );
               if (!context.mounted) return;
               if (newId != null) {
@@ -280,6 +278,8 @@ class _AssistantCard extends StatelessWidget {
               }
               final ok = await _confirmDelete(context, l10n);
               if (!context.mounted || ok != true) return;
+              await ChatActions.cancelActiveGenerationsForAssistant(item.id);
+              if (!context.mounted) return;
               final success = await assistantProvider.deleteAssistant(item.id);
               if (!context.mounted) return;
               if (success != true) {
@@ -397,9 +397,9 @@ class _TactileCardState extends State<_TactileCard> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final overlay = _pressed
-        ? (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.black.withValues(alpha: 0.04))
+        ? (Theme.of(
+            context,
+          ).colorScheme.onSurface.withValues(alpha: isDark ? 0.06 : 0.04))
         : Colors.transparent;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -441,7 +441,6 @@ Future<String?> _showAddAssistantSheet(BuildContext context) async {
     ),
     builder: (ctx) {
       final cs = Theme.of(ctx).colorScheme;
-      final isDark = Theme.of(ctx).brightness == Brightness.dark;
       final bottomInset = MediaQuery.of(ctx).viewInsets.bottom;
       return SafeArea(
         top: false,
@@ -483,7 +482,7 @@ Future<String?> _showAddAssistantSheet(BuildContext context) async {
                 decoration: InputDecoration(
                   hintText: l10n.assistantSettingsAddSheetHint,
                   filled: true,
-                  fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
+                  fillColor: context.appColors.surfaceFill,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(

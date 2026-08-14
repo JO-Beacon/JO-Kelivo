@@ -13,6 +13,7 @@ void main() {
 
       expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
       expect(find.byType(Text), findsNothing);
+      expect(find.byType(Opacity), findsNothing);
     });
 
     testWidgets('renders optional label text', (tester) async {

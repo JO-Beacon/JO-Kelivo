@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Standalone Kelivo chats.json version-order optimization tool.
+"""Standalone JO-Kelivo legacy chats.json version-order optimization tool.
 
-This tool only reads and writes JSON backup files. It does not import Kelivo app
-code, does not touch Hive databases, and does not change message content.
+Only JO-Kelivo 0.1.5 and earlier legacy chats.json exports are accepted. The
+tool does not import app code, touch Hive/SQLite databases, or change messages.
 """
 
 from __future__ import annotations
@@ -16,6 +16,24 @@ from pathlib import Path
 from typing import Any
 
 JsonObject = dict[str, Any]
+
+_LEGACY_ROOT_FIELDS = {
+    "version",
+    "conversations",
+    "messages",
+    "toolEvents",
+    "geminiThoughtSigs",
+}
+_LEGACY_CONVERSATION_FIELDS = {"id", "messageIds", "versionSelections"}
+_LEGACY_MESSAGE_FIELDS = {
+    "id",
+    "role",
+    "content",
+    "timestamp",
+    "conversationId",
+    "groupId",
+    "version",
+}
 
 
 @dataclass
@@ -191,13 +209,88 @@ def _optimize_message_ids(
     return optimized_ids, report
 
 
-def optimize_archive_data(data: JsonObject) -> tuple[JsonObject, OptimizationReport]:
+def validate_legacy_archive_data(data: JsonObject) -> None:
+    """Reject anything other than the legacy JO chats.json export shape."""
+    missing_root = _LEGACY_ROOT_FIELDS.difference(data)
+    if missing_root:
+        raise ValueError(
+            "not a JO 0.1.5-or-earlier chats.json: missing root field(s): "
+            + ", ".join(sorted(missing_root))
+        )
+    if data.get("version") != 1:
+        raise ValueError(
+            "not a JO 0.1.5-or-earlier chats.json: version must be 1"
+        )
+
     conversations = data.get("conversations")
     messages = data.get("messages")
     if not isinstance(conversations, list):
         raise ValueError("backup JSON field 'conversations' must be a list")
     if not isinstance(messages, list):
         raise ValueError("backup JSON field 'messages' must be a list")
+    if not isinstance(data.get("toolEvents"), dict):
+        raise ValueError("backup JSON field 'toolEvents' must be an object")
+    if not isinstance(data.get("geminiThoughtSigs"), dict):
+        raise ValueError("backup JSON field 'geminiThoughtSigs' must be an object")
+
+    for index, conversation in enumerate(conversations):
+        if not isinstance(conversation, dict):
+            raise ValueError(f"conversation #{index} must be an object")
+        missing = _LEGACY_CONVERSATION_FIELDS.difference(conversation)
+        if missing:
+            raise ValueError(
+                f"conversation #{index} is not a legacy conversation: missing "
+                + ", ".join(sorted(missing))
+            )
+        if not isinstance(conversation.get("id"), str) or not conversation["id"]:
+            raise ValueError(f"conversation #{index} field 'id' must be a string")
+        message_ids = conversation.get("messageIds")
+        if not isinstance(message_ids, list) or not all(
+            isinstance(item, str) for item in message_ids
+        ):
+            raise ValueError(
+                f"conversation {conversation['id']} field 'messageIds' "
+                "must be a list of strings"
+            )
+        if not isinstance(conversation.get("versionSelections"), dict):
+            raise ValueError(
+                f"conversation {conversation['id']} field 'versionSelections' "
+                "must be an object"
+            )
+
+    for index, message in enumerate(messages):
+        if not isinstance(message, dict):
+            raise ValueError(f"message #{index} must be an object")
+        if "parts" in message:
+            raise ValueError(
+                "structured message parts belong to JO 0.1.6/Kelivo 1.2.x; "
+                "this tool only accepts JO 0.1.5-or-earlier chats.json"
+            )
+        missing = _LEGACY_MESSAGE_FIELDS.difference(message)
+        if missing:
+            raise ValueError(
+                f"message #{index} is not a legacy message: missing "
+                + ", ".join(sorted(missing))
+            )
+        for field_name in ("id", "role", "content", "timestamp", "conversationId"):
+            if not isinstance(message.get(field_name), str):
+                raise ValueError(
+                    f"message #{index} field '{field_name}' must be a string"
+                )
+        if message.get("groupId") is not None and not isinstance(
+            message.get("groupId"), str
+        ):
+            raise ValueError(f"message #{index} field 'groupId' must be a string or null")
+        if not isinstance(message.get("version"), int):
+            raise ValueError(f"message #{index} field 'version' must be an integer")
+
+
+def optimize_archive_data(data: JsonObject) -> tuple[JsonObject, OptimizationReport]:
+    validate_legacy_archive_data(data)
+    conversations = data.get("conversations")
+    messages = data.get("messages")
+    assert isinstance(conversations, list)
+    assert isinstance(messages, list)
 
     messages_by_id: dict[str, JsonObject] = {}
     duplicate_message_ids: list[str] = []
@@ -324,6 +417,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Allow overwriting an existing output file.",
     )
+    parser.add_argument(
+        "--overwrite-backup",
+        action="store_true",
+        help="Allow overwriting an existing backup file after input validation.",
+    )
     return parser.parse_args(argv)
 
 
@@ -332,6 +430,19 @@ def main(argv: list[str] | None = None) -> int:
     input_path = args.input
     output_path = args.output or default_output_path(input_path)
     backup_path = args.backup or default_backup_path(input_path)
+
+    resolved_input = input_path.resolve()
+    resolved_output = output_path.resolve()
+    resolved_backup = backup_path.resolve()
+    if resolved_input == resolved_output:
+        print("Output path must differ from the input path.", file=sys.stderr)
+        return 2
+    if not args.no_backup and resolved_input == resolved_backup:
+        print("Backup path must differ from the input path.", file=sys.stderr)
+        return 2
+    if not args.no_backup and resolved_output == resolved_backup:
+        print("Output path must differ from the backup path.", file=sys.stderr)
+        return 2
 
     if not input_path.is_file():
         print(f"Input file does not exist: {input_path}", file=sys.stderr)
@@ -343,7 +454,7 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 2
-    if not args.no_backup and backup_path.exists():
+    if not args.no_backup and backup_path.exists() and not args.overwrite_backup:
         print(f"Backup file already exists: {backup_path}", file=sys.stderr)
         return 2
 

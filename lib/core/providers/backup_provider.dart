@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../database/business_preferences.dart';
+import '../database/business_repository.dart';
 import '../models/backup.dart';
 import '../services/chat/chat_service.dart';
 import '../services/backup/data_sync.dart';
@@ -15,13 +17,21 @@ class BackupProvider extends ChangeNotifier {
 
   BackupProvider({
     required ChatService chatService,
+    required BusinessRepository businessRepository,
+    required BusinessPreferences businessPreferences,
     WebDavConfig? initialConfig,
-  }) : _dataSync = DataSync(chatService: chatService),
+  }) : _dataSync = DataSync(
+         chatService: chatService,
+         businessRepository: businessRepository,
+         businessPreferences: businessPreferences,
+       ),
        _cfg = initialConfig ?? const WebDavConfig();
 
   WebDavConfig get config => _cfg;
   bool get busy => _busy;
   String? get message => _message;
+  int get skippedConversations =>
+      _dataSync.lastMergeReport?.skippedConversations ?? 0;
 
   void updateConfig(WebDavConfig cfg) {
     _cfg = cfg;
@@ -72,6 +82,7 @@ class BackupProvider extends ChangeNotifier {
       _message = 'Restored';
     } catch (e) {
       _message = e.toString();
+      rethrow;
     } finally {
       _busy = false;
       notifyListeners();

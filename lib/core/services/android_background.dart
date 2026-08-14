@@ -8,16 +8,15 @@ class AndroidBackgroundManager {
 
   /// Initialize the plugin once and request needed permissions.
   static Future<bool> ensureInitialized({
-    String? notificationTitle,
-    String? notificationText,
+    required String notificationTitle,
+    required String notificationText,
   }) async {
     if (!Platform.isAndroid) return false;
     if (_initialized) return true;
     try {
       final androidConfig = FlutterBackgroundAndroidConfig(
-        notificationTitle: notificationTitle ?? 'JO-Kelivo is running',
-        notificationText:
-            notificationText ?? 'Keeping chat generation alive in background',
+        notificationTitle: notificationTitle,
+        notificationText: notificationText,
         notificationImportance: AndroidNotificationImportance.normal,
         // Explicitly use app launcher icon from mipmap to avoid resource resolution issues
         notificationIcon: const AndroidResource(
@@ -47,8 +46,7 @@ class AndroidBackgroundManager {
 
       if (enable) {
         if (!_initialized) {
-          // Initialize only when enabling, since this may trigger permission dialogs
-          await ensureInitialized();
+          throw StateError('Android background execution is not initialized.');
         }
         await FlutterBackground.enableBackgroundExecution();
       } else {

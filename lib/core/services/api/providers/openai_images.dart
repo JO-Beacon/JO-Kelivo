@@ -9,6 +9,7 @@ bool _supportsOpenAIImageGenerations(String modelId) {
   final normalized = modelId.toLowerCase();
   return normalized.startsWith('gpt-image-') ||
       normalized.startsWith('chatgpt-image-') ||
+      normalized.startsWith('agnes-image-') ||
       normalized == 'sensenova-u1-fast' ||
       normalized == 'dall-e-2' ||
       normalized == 'dall-e-3';
@@ -155,7 +156,8 @@ Future<Map<String, dynamic>> _sendOpenAIImageEdit(
     request.fields[entry.key] = entry.value.toString();
   }
   for (final ref in imageRefs) {
-    request.files.add(await _openAIImageMultipartFile(ref));
+    final file = await _tryOpenAIImageMultipartFile(ref);
+    if (file != null) request.files.add(file);
   }
   final streamed = await client.send(request);
   final response = await http.Response.fromStream(streamed);
@@ -206,6 +208,30 @@ Future<_OpenAIImagesInput> _openAIImagesInput(
       .map((path) => path.trim())
       .where((path) => path.isNotEmpty)
       .toList(growable: false);
+
+  // Prefer structured multimodal refs (with mime) from the last user message
+  // even when bare userImagePaths are also provided.
+  for (int i = messages.length - 1; i >= 0; i--) {
+    if ((messages[i]['role'] ?? '').toString() != 'user') continue;
+    final message = messages[i];
+    final internalMediaRefs = parseInternalMediaRefs(
+      message[multimodalInternalMediaPathsKey],
+    );
+    if (internalMediaRefs.isNotEmpty) {
+      // /images/edits only accepts image/* inputs; skip audio/video/octet-stream.
+      return _OpenAIImagesInput(
+        prompt: prompt,
+        imageRefs: [
+          for (final mediaRef in internalMediaRefs)
+            if (isImageMime(_mimeForInternalMediaRef(mediaRef)))
+              _imageRefFromSource(mediaRef.uri, mime: mediaRef.mime),
+        ],
+      );
+    }
+    break;
+  }
+
+  // Bare userImagePaths only (no structured refs on the last user turn).
   if (explicitPaths.isNotEmpty) {
     return _OpenAIImagesInput(
       prompt: prompt,
@@ -215,7 +241,10 @@ Future<_OpenAIImagesInput> _openAIImagesInput(
 
   for (int i = messages.length - 1; i >= 0; i--) {
     if ((messages[i]['role'] ?? '').toString() != 'user') continue;
-    final content = messages[i]['content'];
+    final message = messages[i];
+    // Structured media paths were already handled above; continue with
+    // content-list / markdown / prior-assistant fallbacks.
+    final content = message['content'];
     if (content is List) {
       final structuredImages = _extractOpenAIImageRefs(content);
       if (structuredImages.isNotEmpty) {
@@ -277,13 +306,10 @@ List<_ImageRef> _extractOpenAIImageRefs(dynamic content) {
   final raw = (content ?? '').toString();
   if (raw.isEmpty) return const <_ImageRef>[];
   final refs = <_ImageRef>[];
+  // Markdown images only. Custom attachment markers are not recognized;
+  // attachments arrive via userImagePaths / multimodalInternalMediaPathsKey.
   final markdownImage = RegExp(r'!\[[^\]]*\]\(([^)]+)\)');
-  final customImage = RegExp(r'\[image:(.+?)\]');
   for (final match in markdownImage.allMatches(raw)) {
-    final source = (match.group(1) ?? '').trim();
-    if (source.isNotEmpty) refs.add(_imageRefFromSource(source));
-  }
-  for (final match in customImage.allMatches(raw)) {
     final source = (match.group(1) ?? '').trim();
     if (source.isNotEmpty) refs.add(_imageRefFromSource(source));
   }
@@ -339,17 +365,21 @@ void _addOpenAIStructuredImageData(
   refs.add(_imageRefFromSource(source));
 }
 
-_ImageRef _imageRefFromSource(String source) {
-  if (source.startsWith('data:')) return _ImageRef('data', source);
-  if (source.startsWith('http://') || source.startsWith('https://')) {
-    return _ImageRef('url', source);
+_ImageRef _imageRefFromSource(String source, {String? mime}) {
+  if (source.startsWith('data:')) {
+    return _ImageRef('data', source, mime: mime);
   }
-  return _ImageRef('path', source);
+  if (source.startsWith('http://') || source.startsWith('https://')) {
+    return _ImageRef('url', source, mime: mime);
+  }
+  return _ImageRef('path', source, mime: mime);
 }
 
-Future<http.MultipartFile> _openAIImageMultipartFile(_ImageRef ref) async {
+Future<http.MultipartFile?> _tryOpenAIImageMultipartFile(_ImageRef ref) async {
   if (ref.kind == 'data') {
-    final mime = _mimeFromDataUrl(ref.src);
+    final mime = (ref.mime != null && ref.mime!.trim().isNotEmpty)
+        ? ref.mime!.trim()
+        : _mimeFromDataUrl(ref.src);
     final commaIndex = ref.src.indexOf(',');
     final payload = commaIndex >= 0
         ? ref.src.substring(commaIndex + 1)
@@ -361,13 +391,21 @@ Future<http.MultipartFile> _openAIImageMultipartFile(_ImageRef ref) async {
       contentType: _openAIImageMediaType(mime),
     );
   }
-  final fixed = SandboxPathResolver.fix(ref.src);
-  final mime = _mimeFromPath(fixed);
-  return http.MultipartFile.fromPath(
-    'image[]',
-    fixed,
-    contentType: _openAIImageMediaType(mime),
-  );
+  try {
+    final fixed = SandboxPathResolver.fix(ref.src);
+    final file = File(fixed);
+    if (!await file.exists()) return null;
+    final mime = (ref.mime != null && ref.mime!.trim().isNotEmpty)
+        ? ref.mime!.trim()
+        : _mimeFromPath(fixed);
+    return http.MultipartFile.fromPath(
+      'image[]',
+      fixed,
+      contentType: _openAIImageMediaType(mime),
+    );
+  } catch (_) {
+    return null;
+  }
 }
 
 MediaType _openAIImageMediaType(String mime) {
@@ -387,12 +425,15 @@ Map<String, String> _openAIImagesJsonHeaders(
   String modelId, {
   Map<String, String>? extraHeaders,
 }) {
-  return <String, String>{
-    'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
-    'Content-Type': 'application/json',
-    ..._customHeaders(config, modelId),
-    if (extraHeaders != null) ...extraHeaders,
-  };
+  return _customHeaders(
+    config,
+    modelId,
+    baseHeaders: <String, String>{
+      'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
+      'Content-Type': 'application/json',
+    },
+    assistantHeaders: extraHeaders,
+  );
 }
 
 Map<String, String> _openAIImagesMultipartHeaders(
@@ -400,11 +441,14 @@ Map<String, String> _openAIImagesMultipartHeaders(
   String modelId, {
   Map<String, String>? extraHeaders,
 }) {
-  final headers = <String, String>{
-    'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
-    ..._customHeaders(config, modelId),
-    if (extraHeaders != null) ...extraHeaders,
-  };
+  final headers = _customHeaders(
+    config,
+    modelId,
+    baseHeaders: <String, String>{
+      'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
+    },
+    assistantHeaders: extraHeaders,
+  );
   headers.removeWhere((key, _) => key.toLowerCase() == 'content-type');
   return headers;
 }
@@ -415,13 +459,8 @@ void _applyOpenAIImagesExtraBody(
   String modelId,
   Map<String, dynamic>? extraBody,
 ) {
-  final custom = _customBody(config, modelId);
+  final custom = _customBody(config, modelId, assistantBody: extraBody);
   if (custom.isNotEmpty) body.addAll(custom);
-  if (extraBody != null && extraBody.isNotEmpty) {
-    extraBody.forEach((key, value) {
-      body[key] = value is String ? _parseOverrideValue(value) : value;
-    });
-  }
 }
 
 String _openAIImagesOutputMime(
@@ -483,7 +522,8 @@ Future<String> _openAIImagesResponseToMarkdown(
         'Failed to save OpenAI Images API base64 image.',
       );
     }
-    lines.add('![image]($path)');
+    final uri = SandboxPathResolver.canonicalize(path);
+    lines.add('![image]($uri)');
   }
   return lines.join('\n\n');
 }

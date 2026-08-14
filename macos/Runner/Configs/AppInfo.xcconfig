@@ -1,4 +1,4 @@
-﻿// Application-level settings for the Runner target.
+// Application-level settings for the Runner target.
 //
 // This may be replaced with something auto-generated from metadata (e.g., pubspec.yaml) in the
 // future. If not, the values below would default to using the project name when this becomes a
@@ -11,4 +11,4 @@ PRODUCT_NAME = JO-Kelivo
 PRODUCT_BUNDLE_IDENTIFIER = com.psyche.jokelivo
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright 漏 2025 com.psyche. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2025 com.psyche. All rights reserved.

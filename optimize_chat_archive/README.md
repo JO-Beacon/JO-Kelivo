@@ -1,8 +1,8 @@
 # Kelivo 聊天存档优化工具
 
-这是一个完全独立的 Python 命令行工具，用来优化 Kelivo 旧 `chats.json` 备份里“版本消息被放到会话尾部”的顺序问题。
+这是一个完全独立的 Python 命令行工具，只用来优化 JO-Kelivo `0.1.5` 及更早版本导出的旧 `chats.json` 中“版本消息被放到会话尾部”的顺序问题。
 
-它不依赖 Flutter、Dart 或 Kelivo 的 `lib/` 代码，只处理 JSON 文件。
+它不依赖 Flutter、Dart 或 JO-Kelivo 的 `lib/` 代码。工具会在写入任何输出或备份前验证旧 `chats.json` 结构；不是目标格式就明确拒绝。
 
 ## 它会做什么
 
@@ -16,11 +16,14 @@
 
 ## 它不会做什么
 
-- 不修改 Kelivo 本地数据库。
+- 不读取或修改 Hive、SQLite 等本地数据库。
+- 不接受 ZIP 等完整备份包、JO `0.1.6` / Kelivo `1.2.x` 带结构化 `parts` 的 `chats.json`，或其他碰巧是 JSON 的文件。
 - 不导入 Kelivo 的模型类。
 - 不修改消息正文、时间戳、角色、版本号、会话 ID 或备份 schema。
 - 不自动导入优化后的文件。
 - 遇到重复 `messageIds`、缺失消息、没有锚点的异常组时，不强行优化，会跳过并报告。
+
+空的旧 `chats.json` 可以正常通过并产生 no-op 输出。由于空存档没有消息可供识别，这也是旧格式与新格式在内容层面的唯一不可区分边界。
 
 ## 运行
 
@@ -66,6 +69,8 @@ uv run python optimize_chat_archive.py BUG/chats.json --no-backup
 ```bash
 uv run python optimize_chat_archive.py BUG/chats.json --overwrite-output
 ```
+
+已有备份文件也默认拒绝覆盖；确认输入文件另有安全副本后，可使用 `--overwrite-backup`。输入格式验证失败时，即使指定覆盖参数也不会改动已有输出或备份。
 
 ## 测试
 
