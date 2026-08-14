@@ -13,8 +13,10 @@ import '../../core/providers/backup_reminder_provider.dart';
 import '../../core/providers/s3_backup_provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/services/chat/chat_service.dart';
+import '../../core/services/backup/data_sync.dart';
 import '../../core/services/backup/cherry_importer.dart';
 import '../../core/services/backup/chatbox_importer.dart';
+import '../../shared/dialogs/loading_task_dialog.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../shared/widgets/restart_app_action.dart';
 import '../../shared/widgets/snackbar.dart';
@@ -233,6 +235,50 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
       rootCtx,
       skippedConversations: backupProvider.skippedConversations,
     );
+  }
+
+  Future<void> _exportLocalBackup(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    final backupProvider = context.read<BackupProvider>();
+    File? file;
+
+    try {
+      await _saveConfig();
+      if (!context.mounted) return;
+      await runWithLoadingTaskDialog<void>(
+        context: context,
+        label: l10n.backupPageExporting,
+        task: () async {
+          file = await backupProvider.exportToFile();
+          if (!context.mounted) return;
+          final exportFile = file!;
+          final savePath = await FilePicker.platform.saveFile(
+            dialogTitle: l10n.backupPageExportKelivoBackup,
+            fileName: exportFile.uri.pathSegments.last,
+            type: FileType.custom,
+            allowedExtensions: ['zip'],
+          );
+          if (savePath == null) return;
+
+          await File(savePath).parent.create(recursive: true);
+          await exportFile.copy(savePath);
+          if (context.mounted) {
+            await context
+                .read<BackupReminderProvider>()
+                .recordBackupCompleted();
+          }
+        },
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: e.toString(),
+        type: NotificationType.error,
+      );
+    } finally {
+      await DataSync.cleanupTemporaryBackupFile(file);
+    }
   }
 
   Future<void> _openUserDataDirectory() async {
@@ -915,43 +961,13 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
             runSpacing: 6,
             children: [
               _DeskIosButton(
-                label: l10n.backupPageExportToFile,
+                label: l10n.backupPageExportKelivoBackup,
                 filled: false,
                 dense: true,
-                onTap: () async {
-                  final backupProvider = context.read<BackupProvider>();
-                  await _saveConfig();
-                  final file = await backupProvider.exportToFile();
-                  String? savePath = await FilePicker.platform.saveFile(
-                    dialogTitle: l10n.backupPageExportToFile,
-                    fileName: file.uri.pathSegments.last,
-                    type: FileType.custom,
-                    allowedExtensions: ['zip'],
-                  );
-                  if (savePath != null) {
-                    try {
-                      await File(savePath).parent.create(recursive: true);
-                      await file.copy(savePath);
-                      if (context.mounted) {
-                        await context
-                            .read<BackupReminderProvider>()
-                            .recordBackupCompleted();
-                      }
-                    } catch (e) {
-                      // A full disk or unwritable target must not look like
-                      // a successful export.
-                      if (!context.mounted) return;
-                      showAppSnackBar(
-                        context,
-                        message: e.toString(),
-                        type: NotificationType.error,
-                      );
-                    }
-                  }
-                },
+                onTap: () => _exportLocalBackup(context),
               ),
               _DeskIosButton(
-                label: l10n.backupPageImportBackupFile,
+                label: l10n.backupPageImportKelivoBackup,
                 filled: false,
                 dense: true,
                 onTap: () async {
@@ -964,7 +980,11 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                   if (path == null) return;
                   final f = File(path);
                   await _chooseRestoreModeAndRun((mode) async {
-                    await backupProvider.restoreFromLocalFile(f, mode: mode);
+                    await runWithLoadingTaskDialog<void>(
+                      context: context,
+                      task: () =>
+                          backupProvider.restoreFromLocalFile(f, mode: mode),
+                    );
                   });
                 },
               ),

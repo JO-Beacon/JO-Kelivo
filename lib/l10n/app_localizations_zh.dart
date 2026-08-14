@@ -328,9 +328,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPageLogs => '日志';
 
   @override
-  String get settingsPageSponsor => '支持 Kelivo';
-
-  @override
   String get settingsPageShare => '分享';
 
   @override
@@ -443,30 +440,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get statsPageCustomRangeApply => '应用';
-
-  @override
-  String get sponsorPageMethodsSectionTitle => '赞助方式';
-
-  @override
-  String get sponsorPageSponsorsSectionTitle => '赞助用户';
-
-  @override
-  String get sponsorPageEmpty => '暂无赞助者';
-
-  @override
-  String get sponsorPageAfdianTitle => '爱发电';
-
-  @override
-  String get sponsorPageAfdianSubtitle => 'afdian.com/a/kelivo';
-
-  @override
-  String get sponsorPageWeChatTitle => '微信赞助';
-
-  @override
-  String get sponsorPageWeChatSubtitle => '微信赞助码';
-
-  @override
-  String get sponsorPageScanQrHint => '扫描二维码赞助';
 
   @override
   String get languageDisplaySimplifiedChinese => '简体中文';
@@ -1715,10 +1688,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageExportToFileSubtitle => '导出APP数据为文件';
 
   @override
+  String get backupPageExportKelivoBackup => '导出为 Kelivo 备份';
+
+  @override
   String get backupPageImportBackupFile => '备份文件导入';
 
   @override
   String get backupPageImportBackupFileSubtitle => '导入本地备份文件';
+
+  @override
+  String get backupPageImportKelivoBackup => '从 Kelivo 备份导入';
 
   @override
   String get backupPageImportFromOtherApps => '从其他APP导入';
@@ -1992,16 +1971,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageEditAttachmentCopyFailed => '无法复制所选附件';
 
   @override
-  String get userMessageEditSaveOnly => '仅保存';
+  String get messageEditCloseConfirmTitle => '要保存修改吗？';
 
   @override
-  String get userMessageEditUnsupportedSnackbar => '该内容不支持编辑';
+  String get messageEditCloseConfirmContent => '关闭前要保存这次编辑吗？';
 
   @override
-  String get userMessageEditOverwriteTitle => '提示';
+  String get messageEditCloseConfirmCancel => '取消';
 
   @override
-  String get userMessageEditOverwriteContent => '修改将覆盖输入框已有内容，是否覆盖？';
+  String get messageEditCloseConfirmDiscard => '不保存';
+
+  @override
+  String get messageEditCloseConfirmSave => '保存';
 
   @override
   String get selectCopyPageTitle => '选择复制';
@@ -3364,7 +3346,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerDetailPageBalanceInfo => '获取账户余额';
 
   @override
-  String get providerDetailPageBalanceApiPathLabel => '余额 API 路径';
+  String get providerDetailPageBalanceApiPathLabel => '余额 API 地址或路径';
 
   @override
   String get providerDetailPageBalanceResultPathLabel => '结果 JSON 路径';
@@ -3390,6 +3372,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String providerDetailPageBalanceError(String message) {
     return '余额查询失败：$message';
   }
+
+  @override
+  String get providerDetailPageBalanceFullUrlRequired =>
+      '主 API 端点不是 OpenAI 兼容格式，请填写完整的 OpenAI 兼容余额 API 地址。';
 
   @override
   String get providerDetailPageVertexAiTitle => 'Vertex AI';
@@ -4031,7 +4017,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutPageAppName => 'JO-Kelivo';
 
   @override
-  String get aboutPageKelivoSectionTitle => 'Kelivo 基座';
+  String get aboutPageKelivoSectionTitle => '关于 Kelivo';
 
   @override
   String get mcpOAuthCallbackPageTitle => 'JO-Kelivo 授权';
@@ -4040,10 +4026,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mcpOAuthCallbackPageMessage => '已收到授权。你可以关闭此窗口并返回 JO-Kelivo。';
 
   @override
-  String get aboutPageAppDescription => '开源AI 助手';
-
-  @override
-  String get aboutPageNoQQGroup => '暂无QQ群';
+  String get aboutPageAppDescription => '基于 Kelivo 的开源 AI 助手';
 
   @override
   String get aboutPageVersion => '版本';
@@ -4090,18 +4073,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get aboutPageLicense => '许可证';
-
-  @override
-  String get aboutPageJoinQQGroup => '加入QQ群';
-
-  @override
-  String get aboutPageQQGroupOne => 'Kelivo 一群';
-
-  @override
-  String get aboutPageQQGroupTwo => 'Kelivo 二群';
-
-  @override
-  String get aboutPageJoinDiscord => '在 Discord 中加入我们';
 
   @override
   String get displaySettingsPageShowUserAvatarTitle => '显示用户头像';
@@ -4258,9 +4229,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get displaySettingsPageInsertNewAssistantAtTopTitle => '新建和复制助手放到顶部';
-
-  @override
-  String get displaySettingsPageLazyHistoryTitle => '懒加载聊天历史';
 
   @override
   String get displaySettingsPageDesktopWideChatLayoutTitle => '聊天区域拉宽';
@@ -5038,7 +5006,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get settingsShare => 'JO-Kelivo - 开源AI助手';
+  String get settingsShare => 'JO-Kelivo - 开源 AI 助手';
 
   @override
   String get searchProviderBingLocalDescription =>
@@ -7505,9 +7473,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get settingsPageLogs => '日志';
 
   @override
-  String get settingsPageSponsor => '支持 Kelivo';
-
-  @override
   String get settingsPageShare => '分享';
 
   @override
@@ -7620,30 +7585,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get statsPageCustomRangeApply => '应用';
-
-  @override
-  String get sponsorPageMethodsSectionTitle => '赞助方式';
-
-  @override
-  String get sponsorPageSponsorsSectionTitle => '赞助用户';
-
-  @override
-  String get sponsorPageEmpty => '暂无赞助者';
-
-  @override
-  String get sponsorPageAfdianTitle => '爱发电';
-
-  @override
-  String get sponsorPageAfdianSubtitle => 'afdian.com/a/kelivo';
-
-  @override
-  String get sponsorPageWeChatTitle => '微信赞助';
-
-  @override
-  String get sponsorPageWeChatSubtitle => '微信赞助码';
-
-  @override
-  String get sponsorPageScanQrHint => '扫描二维码赞助';
 
   @override
   String get languageDisplaySimplifiedChinese => '简体中文';
@@ -8892,10 +8833,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageExportToFileSubtitle => '导出APP数据为文件';
 
   @override
+  String get backupPageExportKelivoBackup => '导出为 Kelivo 备份';
+
+  @override
   String get backupPageImportBackupFile => '备份文件导入';
 
   @override
   String get backupPageImportBackupFileSubtitle => '导入本地备份文件';
+
+  @override
+  String get backupPageImportKelivoBackup => '从 Kelivo 备份导入';
 
   @override
   String get backupPageImportFromOtherApps => '从其他APP导入';
@@ -9169,16 +9116,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get messageEditAttachmentCopyFailed => '无法复制所选附件';
 
   @override
-  String get userMessageEditSaveOnly => '仅保存';
+  String get messageEditCloseConfirmTitle => '要保存修改吗？';
 
   @override
-  String get userMessageEditUnsupportedSnackbar => '该内容不支持编辑';
+  String get messageEditCloseConfirmContent => '关闭前要保存这次编辑吗？';
 
   @override
-  String get userMessageEditOverwriteTitle => '提示';
+  String get messageEditCloseConfirmCancel => '取消';
 
   @override
-  String get userMessageEditOverwriteContent => '修改将覆盖输入框已有内容，是否覆盖？';
+  String get messageEditCloseConfirmDiscard => '不保存';
+
+  @override
+  String get messageEditCloseConfirmSave => '保存';
 
   @override
   String get selectCopyPageTitle => '选择复制';
@@ -10541,7 +10491,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get providerDetailPageBalanceInfo => '获取账户余额';
 
   @override
-  String get providerDetailPageBalanceApiPathLabel => '余额 API 路径';
+  String get providerDetailPageBalanceApiPathLabel => '余额 API 地址或路径';
 
   @override
   String get providerDetailPageBalanceResultPathLabel => '结果 JSON 路径';
@@ -10567,6 +10517,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String providerDetailPageBalanceError(String message) {
     return '余额查询失败：$message';
   }
+
+  @override
+  String get providerDetailPageBalanceFullUrlRequired =>
+      '主 API 端点不是 OpenAI 兼容格式，请填写完整的 OpenAI 兼容余额 API 地址。';
 
   @override
   String get providerDetailPageVertexAiTitle => 'Vertex AI';
@@ -11208,7 +11162,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get aboutPageAppName => 'JO-Kelivo';
 
   @override
-  String get aboutPageKelivoSectionTitle => 'Kelivo 基座';
+  String get aboutPageKelivoSectionTitle => '关于 Kelivo';
 
   @override
   String get mcpOAuthCallbackPageTitle => 'JO-Kelivo 授权';
@@ -11217,10 +11171,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get mcpOAuthCallbackPageMessage => '已收到授权。你可以关闭此窗口并返回 JO-Kelivo。';
 
   @override
-  String get aboutPageAppDescription => '开源 AI 助手';
-
-  @override
-  String get aboutPageNoQQGroup => '暂无QQ群';
+  String get aboutPageAppDescription => '基于 Kelivo 的开源 AI 助手';
 
   @override
   String get aboutPageVersion => '版本';
@@ -11267,18 +11218,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get aboutPageLicense => '许可证';
-
-  @override
-  String get aboutPageJoinQQGroup => '加入QQ群';
-
-  @override
-  String get aboutPageQQGroupOne => 'Kelivo 一群';
-
-  @override
-  String get aboutPageQQGroupTwo => 'Kelivo 二群';
-
-  @override
-  String get aboutPageJoinDiscord => '在 Discord 中加入我们';
 
   @override
   String get displaySettingsPageShowUserAvatarTitle => '显示用户头像';
@@ -11435,9 +11374,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageInsertNewAssistantAtTopTitle => '新建和复制助手放到顶部';
-
-  @override
-  String get displaySettingsPageLazyHistoryTitle => '懒加载聊天历史';
 
   @override
   String get displaySettingsPageDesktopWideChatLayoutTitle => '聊天区域拉宽';
@@ -12215,7 +12151,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
-  String get settingsShare => 'JO-Kelivo - 开源AI助手';
+  String get settingsShare => 'JO-Kelivo - 开源 AI 助手';
 
   @override
   String get searchProviderBingLocalDescription =>
@@ -14682,9 +14618,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get settingsPageLogs => '日誌';
 
   @override
-  String get settingsPageSponsor => '支持 Kelivo';
-
-  @override
   String get settingsPageShare => '分享';
 
   @override
@@ -14797,30 +14730,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get statsPageCustomRangeApply => '套用';
-
-  @override
-  String get sponsorPageMethodsSectionTitle => '贊助方式';
-
-  @override
-  String get sponsorPageSponsorsSectionTitle => '贊助用戶';
-
-  @override
-  String get sponsorPageEmpty => '暫無贊助者';
-
-  @override
-  String get sponsorPageAfdianTitle => '愛發電';
-
-  @override
-  String get sponsorPageAfdianSubtitle => 'afdian.com/a/kelivo';
-
-  @override
-  String get sponsorPageWeChatTitle => '微信贊助';
-
-  @override
-  String get sponsorPageWeChatSubtitle => '微信贊助碼';
-
-  @override
-  String get sponsorPageScanQrHint => '掃描二維碼贊助';
 
   @override
   String get languageDisplaySimplifiedChinese => '简体中文';
@@ -16069,10 +15978,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageExportToFileSubtitle => '匯出APP資料為檔案';
 
   @override
+  String get backupPageExportKelivoBackup => '匯出為 Kelivo 備份';
+
+  @override
   String get backupPageImportBackupFile => '備份檔案匯入';
 
   @override
   String get backupPageImportBackupFileSubtitle => '匯入本機備份檔案';
+
+  @override
+  String get backupPageImportKelivoBackup => '從 Kelivo 備份匯入';
 
   @override
   String get backupPageImportFromOtherApps => '從其他APP匯入';
@@ -16345,16 +16260,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get messageEditAttachmentCopyFailed => '無法複製所選附件';
 
   @override
-  String get userMessageEditSaveOnly => '僅儲存';
+  String get messageEditCloseConfirmTitle => '要儲存修改嗎？';
 
   @override
-  String get userMessageEditUnsupportedSnackbar => '該內容不支援編輯';
+  String get messageEditCloseConfirmContent => '關閉前要儲存這次編輯嗎？';
 
   @override
-  String get userMessageEditOverwriteTitle => '提示';
+  String get messageEditCloseConfirmCancel => '取消';
 
   @override
-  String get userMessageEditOverwriteContent => '修改將覆蓋輸入框已有內容，是否覆蓋？';
+  String get messageEditCloseConfirmDiscard => '不儲存';
+
+  @override
+  String get messageEditCloseConfirmSave => '儲存';
 
   @override
   String get selectCopyPageTitle => '選擇複製';
@@ -17717,7 +17635,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get providerDetailPageBalanceInfo => '取得帳戶餘額';
 
   @override
-  String get providerDetailPageBalanceApiPathLabel => '餘額 API 路徑';
+  String get providerDetailPageBalanceApiPathLabel => '餘額 API 位址或路徑';
 
   @override
   String get providerDetailPageBalanceResultPathLabel => '結果 JSON 路徑';
@@ -17743,6 +17661,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String providerDetailPageBalanceError(String message) {
     return '餘額查詢失敗：$message';
   }
+
+  @override
+  String get providerDetailPageBalanceFullUrlRequired =>
+      '主 API 端點不是 OpenAI 相容格式，請填寫完整的 OpenAI 相容餘額 API 位址。';
 
   @override
   String get providerDetailPageVertexAiTitle => 'Vertex AI';
@@ -18383,7 +18305,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get aboutPageAppName => 'JO-Kelivo';
 
   @override
-  String get aboutPageKelivoSectionTitle => 'Kelivo 基座';
+  String get aboutPageKelivoSectionTitle => '關於 Kelivo';
 
   @override
   String get mcpOAuthCallbackPageTitle => 'JO-Kelivo 授權';
@@ -18392,10 +18314,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get mcpOAuthCallbackPageMessage => '已收到授權。你可以關閉此視窗並返回 JO-Kelivo。';
 
   @override
-  String get aboutPageAppDescription => '開源 AI 助理';
-
-  @override
-  String get aboutPageNoQQGroup => '暫無QQ群';
+  String get aboutPageAppDescription => '基於 Kelivo 的開源 AI 助理';
 
   @override
   String get aboutPageVersion => '版本';
@@ -18442,18 +18361,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get aboutPageLicense => '授權';
-
-  @override
-  String get aboutPageJoinQQGroup => '加入 QQ 群';
-
-  @override
-  String get aboutPageQQGroupOne => 'Kelivo 一群';
-
-  @override
-  String get aboutPageQQGroupTwo => 'Kelivo 二群';
-
-  @override
-  String get aboutPageJoinDiscord => '加入我們的 Discord';
 
   @override
   String get displaySettingsPageShowUserAvatarTitle => '顯示使用者頭像';
@@ -18610,9 +18517,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageInsertNewAssistantAtTopTitle => '新建和複製助手放到頂部';
-
-  @override
-  String get displaySettingsPageLazyHistoryTitle => '延遲載入聊天記錄';
 
   @override
   String get displaySettingsPageDesktopWideChatLayoutTitle => '拉寬聊天區域';
@@ -19390,7 +19294,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get settingsShare => 'JO-Kelivo - 開源AI助理';
+  String get settingsShare => 'JO-Kelivo - 開源 AI 助理';
 
   @override
   String get searchProviderBingLocalDescription =>

@@ -2170,15 +2170,6 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosSwitchRow(
                 context,
-                icon: Lucide.History,
-                label: l10n.displaySettingsPageLazyHistoryTitle,
-                value: sp.lazyHistoryEnabled,
-                onChanged: (v) =>
-                    context.read<SettingsProvider>().setLazyHistoryEnabled(v),
-              ),
-              _iosDivider(context),
-              _iosSwitchRow(
-                context,
                 icon: Lucide.RefreshCw,
                 label: l10n
                     .displaySettingsPageRegenerateDeleteTrailingMessagesTitle,

@@ -71,7 +71,7 @@ void main() {
     expect(identical(result!.parts.last, opaque), isTrue);
   });
 
-  testWidgets('dismissing sheet returns null', (tester) async {
+  testWidgets('dismissing sheet asks whether to save changes', (tester) async {
     MessageEditResult? result;
     var completed = false;
     await tester.pumpWidget(
@@ -90,10 +90,87 @@ void main() {
 
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'edited draft');
     await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Save changes?'), findsOneWidget);
+    expect(completed, isFalse);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit Message'), findsOneWidget);
+    expect(completed, isFalse);
+
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text("Don't Save"));
     await tester.pumpAndSettle();
 
     expect(completed, isTrue);
     expect(result, isNull);
+  });
+
+  testWidgets('dismiss confirmation can save the current structured draft', (
+    tester,
+  ) async {
+    const opaque = UnknownPart(rawKind: 'future', payload: '{"v":1}');
+    MessageEditResult? result;
+    await tester.pumpWidget(
+      harness(
+        message: ChatMessage(
+          role: 'user',
+          conversationId: 'conversation',
+          parts: const <MessagePart>[
+            TextPart('before'),
+            opaque,
+            FilePart(uri: 'keep.pdf', name: 'keep.pdf', unavailable: true),
+          ],
+        ),
+        onResult: (value) => result = value,
+      ),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'after');
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save').last);
+    await tester.pumpAndSettle();
+
+    expect(result, isNotNull);
+    expect(result!.content, 'after');
+    expect(result!.shouldSend, isFalse);
+    expect(result!.parts.map((part) => part.kind), <String>[
+      'text',
+      'future',
+      'file',
+    ]);
+    expect(identical(result!.parts[1], opaque), isTrue);
+    expect((result!.parts[2] as FilePart).unavailable, isTrue);
+  });
+
+  testWidgets('dragging the sheet down asks before discarding', (tester) async {
+    var completed = false;
+    await tester.pumpWidget(
+      harness(
+        message: ChatMessage(
+          role: 'user',
+          content: 'before',
+          conversationId: 'conversation',
+        ),
+        onResult: (_) => completed = true,
+      ),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'edited draft');
+    await tester.fling(find.text('Edit Message'), const Offset(0, 500), 2400);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Save changes?'), findsOneWidget);
+    expect(completed, isFalse);
   });
 }

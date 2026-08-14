@@ -9,9 +9,10 @@ import 'api_key_manager.dart';
 import 'network/dio_http_client.dart';
 
 class ProviderBalanceException implements Exception {
-  const ProviderBalanceException(this.message);
+  const ProviderBalanceException(this.message, {this.code});
 
   final String message;
+  final String? code;
 
   @override
   String toString() => message;
@@ -100,20 +101,22 @@ class ProviderBalanceService {
   const ProviderBalanceService._();
 
   static Future<String> fetchBalance(ProviderConfig config) async {
-    final kind = ProviderConfig.classify(
-      config.id,
-      explicitType: config.providerType,
-    );
-    if (kind != ProviderKind.openai) {
-      throw const ProviderBalanceException(
-        'Balance is only supported for OpenAI-compatible providers',
-      );
-    }
     if (config.balanceEnabled != true) {
       throw const ProviderBalanceException('Balance query is disabled');
     }
 
     final apiPath = (config.balanceApiPath ?? '/credits').trim();
+    final kind = ProviderConfig.classify(
+      config.id,
+      explicitType: config.providerType,
+    );
+    if (kind != ProviderKind.openai && !_isAbsoluteUrl(apiPath)) {
+      throw const ProviderBalanceException(
+        'Non-OpenAI-compatible providers require a full balance API URL',
+        code: 'full_balance_api_url_required',
+      );
+    }
+
     final resultPath = (config.balanceResultPath ?? 'data.total_usage').trim();
     final uri = _balanceUri(config.baseUrl, apiPath);
     final client = _clientFor(config);
@@ -156,6 +159,11 @@ class ProviderBalanceService {
         : baseUrl;
     final path = apiPath.startsWith('/') ? apiPath : '/$apiPath';
     return Uri.parse('$base$path');
+  }
+
+  static bool _isAbsoluteUrl(String value) {
+    final uri = Uri.tryParse(value);
+    return uri != null && uri.hasScheme && uri.host.isNotEmpty;
   }
 
   static http.Client _clientFor(ProviderConfig config) {

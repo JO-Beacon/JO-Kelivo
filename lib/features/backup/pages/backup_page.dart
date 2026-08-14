@@ -4,6 +4,7 @@ import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/dialogs/loading_task_dialog.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/loading_dialog_card.dart';
 import 'package:provider/provider.dart';
@@ -190,37 +191,17 @@ class _BackupPageState extends State<BackupPage> {
     Future<T> Function() task,
   ) async {
     final l10n = AppLocalizations.of(context)!;
-    return _runWithLoadingOverlay(
-      context,
-      task,
+    return runWithLoadingTaskDialog(
+      context: context,
+      task: task,
       label: l10n.backupPageExporting,
     );
-  }
-
-  Future<T> _runWithLoadingOverlay<T>(
-    BuildContext context,
-    Future<T> Function() task, {
-    String? label,
-  }) async {
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => LoadingDialogCard(label: label),
-    );
-    try {
-      final res = await task();
-      return res;
-    } finally {
-      if (context.mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
-      }
-    }
   }
 
   Future<T> _runWithImportingOverlay<T>(
     BuildContext context,
     Future<T> Function() task,
-  ) => _runWithLoadingOverlay(context, task);
+  ) => runWithLoadingTaskDialog(context: context, task: task);
 
   @override
   Widget build(BuildContext context) {
@@ -1176,14 +1157,14 @@ class _BackupPageState extends State<BackupPage> {
           _iosNavRow(
             context,
             icon: Lucide.Export,
-            label: l10n.backupPageExportToFile,
+            label: l10n.backupPageExportKelivoBackup,
             onTap: () => _doExport(context, vm),
           ),
           _iosDivider(context),
           _iosNavRow(
             context,
             icon: Lucide.Import2,
-            label: l10n.backupPageImportBackupFile,
+            label: l10n.backupPageImportKelivoBackup,
             onTap: () => _doImportLocal(context, vm),
           ),
           _iosDivider(context),
@@ -1369,61 +1350,49 @@ class _BackupPageState extends State<BackupPage> {
 
   Future<void> _doExport(BuildContext context, BackupProvider vm) async {
     final l10n = AppLocalizations.of(context)!;
-    final file = await _runWithExportingOverlay(
-      context,
-      () => vm.exportToFile(),
-    );
-
+    File? file;
     try {
-      if (!context.mounted) return;
-      final isMobile = Platform.isAndroid || Platform.isIOS;
-      if (isMobile) {
-        try {
+      await _runWithExportingOverlay(context, () async {
+        file = await vm.exportToFile();
+        if (!context.mounted) return;
+        final exportFile = file!;
+        final isMobile = Platform.isAndroid || Platform.isIOS;
+        if (isMobile) {
           final saved = await NativeFileSave.saveFileFromPath(
-            sourcePath: file.path,
-            fileName: file.uri.pathSegments.last,
+            sourcePath: exportFile.path,
+            fileName: exportFile.uri.pathSegments.last,
           );
           if (saved && context.mounted) {
             await context
                 .read<BackupReminderProvider>()
                 .recordBackupCompleted();
           }
-        } catch (e) {
-          if (!context.mounted) return;
-          showAppSnackBar(
-            context,
-            message: e.toString(),
-            type: NotificationType.error,
+        } else {
+          final savePath = await FilePicker.platform.saveFile(
+            dialogTitle: l10n.backupPageExportKelivoBackup,
+            fileName: exportFile.uri.pathSegments.last,
+            type: FileType.custom,
+            allowedExtensions: ['zip'],
           );
-        }
-      } else {
-        final savePath = await FilePicker.platform.saveFile(
-          dialogTitle: l10n.backupPageExportToFile,
-          fileName: file.uri.pathSegments.last,
-          type: FileType.custom,
-          allowedExtensions: ['zip'],
-        );
-        if (savePath != null) {
-          try {
+          if (savePath != null) {
             await File(savePath).parent.create(recursive: true);
-            await file.copy(savePath);
+            await exportFile.copy(savePath);
             if (context.mounted) {
               await context
                   .read<BackupReminderProvider>()
                   .recordBackupCompleted();
             }
-          } catch (e) {
-            // A full disk or unwritable target must not look like a
-            // successful export.
-            if (!context.mounted) return;
-            showAppSnackBar(
-              context,
-              message: e.toString(),
-              type: NotificationType.error,
-            );
           }
         }
-      }
+      });
+    } catch (e) {
+      // A failed archive or an unwritable target must not look successful.
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: e.toString(),
+        type: NotificationType.error,
+      );
     } finally {
       await DataSync.cleanupTemporaryBackupFile(file);
     }

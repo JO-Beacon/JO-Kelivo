@@ -119,4 +119,30 @@ void main() {
     expect(changeCount, 0);
     expect(find.text('No attachments'), findsOneWidget);
   });
+
+  testWidgets('image attachments render thumbnails and unavailable fallback', (
+    tester,
+  ) async {
+    const dataUri =
+        'data:image/png;base64,'
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    await tester.pumpWidget(
+      harness(
+        parts: const <MessagePart>[
+          ImagePart(uri: dataUri, mime: 'image/png'),
+          ImagePart(uri: 'missing.png', unavailable: true),
+        ],
+        onChanged: (_) {},
+        picker: (_, {required imagesOnly, required single}) async =>
+            const <MessagePart>[],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final image = tester.widget<Image>(find.byType(Image));
+    expect(image.image, isA<MemoryImage>());
+    expect(find.byIcon(Lucide.ImageOff), findsOneWidget);
+    expect(find.byIcon(Lucide.RefreshCw), findsNWidgets(2));
+    expect(find.byIcon(Lucide.X), findsNWidgets(2));
+  });
 }

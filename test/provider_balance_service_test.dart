@@ -126,7 +126,21 @@ void main() {
       );
     });
 
-    test('rejects non OpenAI compatible providers', () {
+    test('accepts a full balance URL for non OpenAI providers', () async {
+      final requests = <HttpRequest>[];
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        requests.add(request);
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(jsonEncode({'balance': 18.5}));
+        await request.response.close();
+      });
+
       final config = ProviderConfig(
         id: 'Gemini',
         enabled: true,
@@ -135,11 +149,43 @@ void main() {
         baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
         providerType: ProviderKind.google,
         balanceEnabled: true,
+        balanceApiPath:
+            'http://${server.address.address}:${server.port}/account/balance',
+        balanceResultPath: 'balance',
+      );
+
+      expect(await ProviderBalanceService.fetchBalance(config), '18.50');
+      expect(requests, hasLength(1));
+      expect(requests.single.uri.path, '/account/balance');
+    });
+
+    test('requires a full balance URL for non OpenAI providers', () async {
+      final config = ProviderConfig(
+        id: 'Gemini',
+        enabled: true,
+        name: 'Gemini',
+        apiKey: 'key',
+        baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+        providerType: ProviderKind.google,
+        balanceEnabled: true,
+        balanceApiPath: '/account/balance',
       );
 
       expect(
         () => ProviderBalanceService.fetchBalance(config),
-        throwsA(isA<ProviderBalanceException>()),
+        throwsA(
+          isA<ProviderBalanceException>()
+              .having(
+                (error) => error.code,
+                'code',
+                'full_balance_api_url_required',
+              )
+              .having(
+                (error) => error.message,
+                'message',
+                contains('full balance API URL'),
+              ),
+        ),
       );
     });
 

@@ -60,6 +60,7 @@ import 'utils/app_directories.dart';
 import 'utils/platform_utils.dart';
 import 'utils/sandbox_path_resolver.dart';
 import 'shared/widgets/app_overlays.dart';
+import 'shared/widgets/loading_dialog_card.dart';
 import 'shared/widgets/snackbar.dart';
 import 'shared/widgets/restore_failure_screen.dart';
 import 'shared/widgets/restore_outcome_notice.dart';
@@ -85,7 +86,15 @@ Future<void> main() async {
   await runZoned(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+      // Render a persistence-free shell before restore/database admission.
+      // Restore cutover validates and moves potentially large bundles before
+      // the real app can be constructed; the native desktop window must not
+      // look like an unresponsive white screen during that work.
+      runApp(const _StartupApp());
       FlutterLogger.installGlobalHandlers();
+      // Configure and show the desktop window before the potentially lengthy
+      // restore/database admission path starts.
+      await _initDesktopWindow();
       final appDataDirectory = await AppDirectories.getAppDataDirectory();
       final RestoreReceipt? restoreOutcome;
       try {
@@ -121,8 +130,6 @@ Future<void> main() async {
         PaintingBinding.instance.imageCache.maximumSizeBytes =
             48 << 20; // ~48MB
       } catch (_) {}
-      // Desktop (Windows) window setup: hide native title bar for custom Flutter bar
-      await _initDesktopWindow();
       // Avoid preloading all system fonts at launch (huge memory on desktop)
       // Debug logging and global error handlers were enabled previously for diagnosis.
       // They are commented out now per request to reduce log noise.
@@ -335,7 +342,8 @@ class _RestoreFailureApp extends StatelessWidget {
     final palette = ThemePalettes.defaultPalette;
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'JO-Kelivo',
+      onGenerateTitle: (context) =>
+          AppLocalizations.of(context)!.aboutPageAppName,
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: buildLightThemeForScheme(palette.light),
@@ -348,6 +356,36 @@ class _RestoreFailureApp extends StatelessWidget {
               appDataDirectory: appDataDirectory,
             ),
     );
+  }
+}
+
+/// Persistence-free shell shown while startup restore and database admission
+/// are running. It intentionally owns no providers or business state.
+class _StartupApp extends StatelessWidget {
+  const _StartupApp();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = ThemePalettes.defaultPalette;
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'JO-Kelivo',
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      theme: buildLightThemeForScheme(palette.light),
+      darkTheme: buildDarkThemeForScheme(palette.dark),
+      home: const _StartupScreen(),
+    );
+  }
+}
+
+class _StartupScreen extends StatelessWidget {
+  const _StartupScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Scaffold(body: LoadingDialogCard(label: l10n.startupRecoveryBusy));
   }
 }
 

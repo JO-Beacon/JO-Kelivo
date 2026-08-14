@@ -181,7 +181,6 @@ void main() {
     final settings = SettingsProvider(BusinessPreferences(repository));
     await settings.loaded;
 
-    expect(settings.lazyHistoryEnabled, isTrue);
     expect(settings.insertNewAssistantAtTop, isFalse);
     expect(settings.wideChatLayout, isFalse);
   });
@@ -190,14 +189,12 @@ void main() {
     final settings = SettingsProvider(BusinessPreferences(repository));
     await settings.loaded;
 
-    await settings.setLazyHistoryEnabled(false);
     await settings.setInsertNewAssistantAtTop(true);
     await settings.setWideChatLayout(true);
 
     final reloaded = SettingsProvider(BusinessPreferences(repository));
     await reloaded.loaded;
 
-    expect(reloaded.lazyHistoryEnabled, isFalse);
     expect(reloaded.insertNewAssistantAtTop, isTrue);
     expect(reloaded.wideChatLayout, isTrue);
   });

@@ -33,13 +33,16 @@ JO-Kelivo 保持独立 Git 历史、应用身份、数据目录、更新源和�
 - 采用 Kelivo 1.2.1 的数据库备份恢复、迁移加固、记忆、语音、MCP OAuth、本地设备工具和 provider 修复。
 - 在新 repository 架构上恢复单条消息用户/模型身份切换，保证角色和附件 parts 一起持久化。
 - 恢复历史消息结构化附件编辑，支持图片和文件的新增、替换与删除，同时保留未知 part。
-- 恢复新建/复制助手置顶、宽屏聊天区域拉宽、长会话懒加载设置和受控完整历史读取。
+- 恢复新建/复制助手置顶和宽屏聊天区域拉宽；不恢复旧 JO 的“懒加载聊天历史”开关，聊天界面固定使用 1.2.1 的数据库分页懒加载，完整历史读取代码和测试仅作为内部受控能力保留。
 - 恢复桌面备份页与存储空间页的两个用户数据目录入口，目标均为 JO 主数据目录。
+- 新增桌面端 Kelivo 本地备份导入/导出处理提示，并统一移动端和桌面端的不可误触关闭、完成或失败后自动退出行为。
 - DeepSeek 新建默认配置使用 Anthropic-compatible 通道 `https://api.deepseek.com/anthropic`，接通 1.2.1 内置搜索协议；用户显式配置的 OpenAI-compatible `/v1` 路线继续保留。
 - 保留 DeepSeek Web/App 导入占位入口及“暂不支持”行为；本版本不实现实际导入。
 - 旧存档优化工具收窄为仅处理 JO-Kelivo 0.1.5 及更早导出的旧 `chats.json`，明确拒绝 Hive、SQLite、其他备份和非目标 JSON。
 - 退役用户消息图片显示位置开关，采用 1.2.1 固定显示规则；遗留设置不会重新暴露无效 UI。
 - 更新 JO About 基座归属、平台身份、数据隔离、GitHub Releases 更新源及 Android/Windows/Linux 发布 workflow。
+- 修复移动端本地备份导出虽然调用加载弹窗、但任务早于首帧启动且首帧透明，导致处理提示实际不可见的问题。
+- 修复 Windows 导入备份并自动重启后，恢复校验期间持续白屏以及 `restart_app` 新旧进程与 JO 单实例锁交接竞争的问题；恢复任务现在先显示处理中界面，单实例交接使用有界等待。
 
 ## 验证结果
 
@@ -48,6 +51,7 @@ JO-Kelivo 保持独立 Git 历史、应用身份、数据目录、更新源和�
 - 备份文件专项：59 passed，1 skipped，0 failed。
 - MCP path dependency：VM 测试 98 passed；downsize dependency：3 tests passed。
 - Windows x64 release 构建、portable ZIP、setup EXE、两个 `.sha256`、内部 EXE 名称和 `0.1.6+6` 版本信息均已验证。
+- Windows 实机已验证本地备份导入/导出处理提示，以及导入完成、自动重启、恢复提交和正常进入应用的完整流程。
 - Windows 主 EXE 和 setup EXE 当前均未做 Authenticode 签名；现有 workflow 没有代码签名步骤。
 - Android 本地构建已进入 Gradle 配置，但在下载 Google Maven 依赖时因 `dl.google.com:443` 网络超时中断；本轮尚未产出三个候选 APK，待本机网络恢复后重试。
 - Linux 正式候选由 GitHub Actions 的 Ubuntu runner 构建。迁移分支尚未推送到远端可执行 ref，因此本轮 workflow 尚未生成 AppImage、tar.gz 和 deb；本机缺少 Linux 工具链只影响本地复现。

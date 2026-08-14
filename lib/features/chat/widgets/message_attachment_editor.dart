@@ -13,6 +13,7 @@ import '../../../utils/app_directories.dart';
 import '../../../utils/file_import_helper.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../models/message_parts_edit_draft.dart';
+import 'resolved_attachment_image.dart';
 
 typedef MessageAttachmentPicker =
     Future<List<MessagePart>> Function(
@@ -135,12 +136,19 @@ class _MessageAttachmentEditorState extends State<MessageAttachmentEditor> {
               runSpacing: 8,
               children: [
                 for (final partIndex in indexes)
-                  _AttachmentItem(
-                    part: _draft.parts[partIndex],
-                    onReplace: () =>
-                        _replace(partIndex, _draft.parts[partIndex]),
-                    onRemove: () => _remove(partIndex),
-                  ),
+                  switch (_draft.parts[partIndex]) {
+                    final ImagePart part => _ImageAttachmentItem(
+                      part: part,
+                      onReplace: () => _replace(partIndex, part),
+                      onRemove: () => _remove(partIndex),
+                    ),
+                    final FilePart part => _FileAttachmentItem(
+                      part: part,
+                      onReplace: () => _replace(partIndex, part),
+                      onRemove: () => _remove(partIndex),
+                    ),
+                    _ => const SizedBox.shrink(),
+                  },
               ],
             ),
           ),
@@ -180,14 +188,14 @@ class _AddAttachmentButton extends StatelessWidget {
   }
 }
 
-class _AttachmentItem extends StatelessWidget {
-  const _AttachmentItem({
+class _ImageAttachmentItem extends StatelessWidget {
+  const _ImageAttachmentItem({
     required this.part,
     required this.onReplace,
     required this.onRemove,
   });
 
-  final MessagePart part;
+  final ImagePart part;
   final VoidCallback onReplace;
   final VoidCallback onRemove;
 
@@ -195,11 +203,107 @@ class _AttachmentItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final name = switch (part) {
-      FilePart(:final name) => name,
-      ImagePart(:final uri) => _attachmentName(uri, l10n.messageEditImage),
-      _ => '',
-    };
+    Widget placeholder(BuildContext _) => Container(
+      width: 78,
+      height: 78,
+      color: cs.surfaceContainerHighest.withValues(alpha: 0.55),
+      alignment: Alignment.center,
+      child: Icon(
+        Lucide.ImageOff,
+        size: 22,
+        color: cs.onSurface.withValues(alpha: 0.55),
+      ),
+    );
+    return SizedBox(
+      width: 78,
+      height: 78,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: part.unavailable
+                  ? placeholder(context)
+                  : ResolvedAttachmentImage(
+                      uri: part.uri,
+                      fit: BoxFit.cover,
+                      localIoOnly: true,
+                      placeholder: placeholder,
+                    ),
+            ),
+          ),
+          PositionedDirectional(
+            start: 4,
+            bottom: 4,
+            child: _ImageActionButton(
+              icon: Lucide.RefreshCw,
+              semanticLabel: l10n.messageEditReplaceAttachment,
+              onTap: onReplace,
+            ),
+          ),
+          PositionedDirectional(
+            end: 4,
+            top: 4,
+            child: _ImageActionButton(
+              icon: Lucide.X,
+              semanticLabel: l10n.messageEditRemoveAttachment,
+              onTap: onRemove,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ImageActionButton extends StatelessWidget {
+  const _ImageActionButton({
+    required this.icon,
+    required this.semanticLabel,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String semanticLabel;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: semanticLabel,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.58),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: IosIconButton(
+          icon: icon,
+          size: 13,
+          padding: const EdgeInsets.all(5),
+          color: Colors.white,
+          semanticLabel: semanticLabel,
+          onTap: onTap,
+        ),
+      ),
+    );
+  }
+}
+
+class _FileAttachmentItem extends StatelessWidget {
+  const _FileAttachmentItem({
+    required this.part,
+    required this.onReplace,
+    required this.onRemove,
+  });
+
+  final FilePart part;
+  final VoidCallback onReplace;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
     return Container(
       constraints: const BoxConstraints(maxWidth: 280),
       padding: const EdgeInsetsDirectional.fromSTEB(9, 5, 3, 5),
@@ -212,14 +316,14 @@ class _AttachmentItem extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            part is ImagePart ? Lucide.Image : Lucide.FileText,
+            Lucide.FileText,
             size: 16,
             color: cs.onSurface.withValues(alpha: 0.72),
           ),
           const SizedBox(width: 6),
           Flexible(
             child: Text(
-              name,
+              part.name,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 13),
             ),
@@ -242,12 +346,6 @@ class _AttachmentItem extends StatelessWidget {
       ),
     );
   }
-}
-
-String _attachmentName(String uri, String fallback) {
-  final resolved = SandboxPathResolver.resolveForIo(uri) ?? uri;
-  final name = p.basename(resolved);
-  return name.isEmpty ? fallback : name;
 }
 
 Future<List<MessagePart>> _pickAndImportAttachments(

@@ -17,10 +17,16 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   HANDLE instance_mutex =
       ::CreateMutexW(nullptr, TRUE, L"JOKelivoMutex");
   if (instance_mutex != nullptr && ::GetLastError() == ERROR_ALREADY_EXISTS) {
-    // Another instance is already running; try to bring its window to front
-    // instead of creating a new one.
-    Win32Window::SendAppLinkToInstance(L"JO-Kelivo");
-    return 0;
+    // restart_app launches the replacement process before terminating the
+    // current one. Give that short handoff a chance to acquire the mutex;
+    // ordinary duplicate launches still fall back to the existing focus path
+    // after the bounded wait.
+    const DWORD wait_result = ::WaitForSingleObject(instance_mutex, 2000);
+    if (wait_result != WAIT_OBJECT_0 && wait_result != WAIT_ABANDONED) {
+      Win32Window::SendAppLinkToInstance(L"JO-Kelivo");
+      ::CloseHandle(instance_mutex);
+      return 0;
+    }
   }
 
   // Initialize COM, so that it is available for use in the library and/or

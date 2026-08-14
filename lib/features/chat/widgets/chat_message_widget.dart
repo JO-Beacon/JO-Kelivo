@@ -30,6 +30,7 @@ import '../../../core/models/assistant.dart';
 import '../../../core/providers/tts_provider.dart';
 import '../../../shared/widgets/markdown_with_highlight.dart';
 import '../../../shared/widgets/snackbar.dart';
+import 'resolved_attachment_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -144,47 +145,6 @@ String _resolveAttachmentImageUri(String uri) {
   return SandboxPathResolver.fix(path);
 }
 
-/// Decoded `data:` image bytes, keyed by the full data URI.
-///
-/// Reusing the same [Uint8List] keeps [MemoryImage] cache keys stable across
-/// rebuilds, so the image is decoded once instead of on every frame. Entries
-/// are evicted least-recently-used first, bounded by both entry count and
-/// total decoded bytes so a few large images cannot pin unbounded memory.
-final Map<String, Uint8List?> _dataUriBytesCache = <String, Uint8List?>{};
-const int _dataUriBytesCacheLimit = 24;
-const int _dataUriBytesCacheMaxBytes = 16 << 20;
-int _dataUriBytesCacheBytes = 0;
-
-Uint8List? _decodeDataUriBytes(String path) {
-  if (_dataUriBytesCache.containsKey(path)) {
-    // Re-insert to mark as most recently used (LinkedHashMap keeps order).
-    final cached = _dataUriBytesCache.remove(path);
-    _dataUriBytesCache[path] = cached;
-    return cached;
-  }
-
-  Uint8List? bytes;
-  try {
-    const marker = 'base64,';
-    final idx = path.indexOf(marker);
-    if (idx != -1) bytes = base64Decode(path.substring(idx + marker.length));
-  } catch (_) {
-    bytes = null;
-  }
-
-  _dataUriBytesCache[path] = bytes;
-  _dataUriBytesCacheBytes += bytes?.length ?? 0;
-  // Evict oldest entries first. The entry just added is always kept (even if
-  // it alone exceeds the byte budget) so its MemoryImage key stays stable.
-  while (_dataUriBytesCache.length > 1 &&
-      (_dataUriBytesCache.length > _dataUriBytesCacheLimit ||
-          _dataUriBytesCacheBytes > _dataUriBytesCacheMaxBytes)) {
-    final evicted = _dataUriBytesCache.remove(_dataUriBytesCache.keys.first);
-    _dataUriBytesCacheBytes -= evicted?.length ?? 0;
-  }
-  return bytes;
-}
-
 /// Shared image widget for tool thumbnails and message attachment previews.
 ///
 /// `http(s)` → [Image.network], `data:` → [Image.memory], otherwise local
@@ -197,53 +157,12 @@ Widget _buildResolvedImage(
   BoxFit fit = BoxFit.contain,
   Widget Function()? placeholder,
 }) {
-  final cs = Theme.of(context).colorScheme;
-  Widget errorWidget() =>
-      placeholder?.call() ??
-      Container(
-        width: width ?? (height != null ? height * 0.67 : 120),
-        height: height ?? 180,
-        color: cs.surfaceContainerHighest,
-        alignment: Alignment.center,
-        child: Icon(
-          Lucide.ImageOff,
-          size: 24,
-          color: cs.onSurface.withValues(alpha: 0.5),
-        ),
-      );
-
-  final path = rawPath.trim();
-  if (path.isEmpty) return errorWidget();
-
-  if (path.startsWith('http://') || path.startsWith('https://')) {
-    return Image.network(
-      path,
-      width: width,
-      height: height,
-      fit: fit,
-      errorBuilder: (_, __, ___) => errorWidget(),
-    );
-  }
-
-  if (path.startsWith('data:')) {
-    final bytes = _decodeDataUriBytes(path);
-    if (bytes == null) return errorWidget();
-    return Image.memory(
-      bytes,
-      width: width,
-      height: height,
-      fit: fit,
-      errorBuilder: (_, __, ___) => errorWidget(),
-    );
-  }
-
-  final fixed = SandboxPathResolver.fix(path);
-  return Image.file(
-    File(fixed),
+  return ResolvedAttachmentImage(
+    uri: rawPath,
     width: width,
     height: height,
     fit: fit,
-    errorBuilder: (_, __, ___) => errorWidget(),
+    placeholder: placeholder == null ? null : (_) => placeholder(),
   );
 }
 
@@ -284,11 +203,11 @@ IconData? _localToolIconFor(String name, Map<String, dynamic> args) {
       'write' => Lucide.ClipboardPen,
       _ => Lucide.Clipboard,
     },
-     LocalToolNames.textToSpeech => Lucide.Volume2,
-     LocalToolNames.calculate => Lucide.Calculator,
-     LocalToolNames.screenTime => Lucide.Smartphone,
-     LocalToolNames.calendarQuery => Lucide.Calendar,
-     LocalToolNames.calendarCreate => Lucide.CalendarPlus,
+    LocalToolNames.textToSpeech => Lucide.Volume2,
+    LocalToolNames.calculate => Lucide.Calculator,
+    LocalToolNames.screenTime => Lucide.Smartphone,
+    LocalToolNames.calendarQuery => Lucide.Calendar,
+    LocalToolNames.calendarCreate => Lucide.CalendarPlus,
     _ => null,
   };
 }
@@ -308,13 +227,13 @@ String? _localToolTitleFor(
       'write' => l10n.chatMessageWidgetWriteClipboard,
       _ => l10n.assistantEditLocalToolClipboardTitle,
     },
-     LocalToolNames.textToSpeech => l10n.chatMessageWidgetSpeakingTitle,
-     LocalToolNames.calculate => l10n.assistantEditLocalToolCalculateTitle,
-     LocalToolNames.screenTime => l10n.assistantEditLocalToolScreenTimeTitle,
-     LocalToolNames.calendarQuery =>
-       l10n.assistantEditLocalToolCalendarQueryTitle,
-     LocalToolNames.calendarCreate =>
-       l10n.assistantEditLocalToolCalendarCreateTitle,
+    LocalToolNames.textToSpeech => l10n.chatMessageWidgetSpeakingTitle,
+    LocalToolNames.calculate => l10n.assistantEditLocalToolCalculateTitle,
+    LocalToolNames.screenTime => l10n.assistantEditLocalToolScreenTimeTitle,
+    LocalToolNames.calendarQuery =>
+      l10n.assistantEditLocalToolCalendarQueryTitle,
+    LocalToolNames.calendarCreate =>
+      l10n.assistantEditLocalToolCalendarCreateTitle,
     _ => null,
   };
 }
@@ -456,12 +375,7 @@ Widget _buildToolImageFromPath(
   double? height,
   BoxFit fit = BoxFit.contain,
 }) {
-  return _buildResolvedImage(
-    context,
-    path,
-    height: height,
-    fit: fit,
-  );
+  return _buildResolvedImage(context, path, height: height, fit: fit);
 }
 
 void _showToolFullImage(BuildContext context, String path) {
@@ -1810,10 +1724,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       height: 112,
       color: cs.onSurface.withValues(alpha: isDark ? 0.08 : 0.06),
       alignment: Alignment.center,
-      child: Icon(
-        Lucide.ImageOff,
-        color: cs.onSurface.withValues(alpha: 0.45),
-      ),
+      child: Icon(Lucide.ImageOff, color: cs.onSurface.withValues(alpha: 0.45)),
     );
 
     final viewablePaths = <String>[
@@ -1934,7 +1845,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: Hero(
-                tag: 'img:${fixed.isNotEmpty ? fixed : 'unavailable-$partIndex'}',
+                tag:
+                    'img:${fixed.isNotEmpty ? fixed : 'unavailable-$partIndex'}',
                 child: part.unavailable || fixed.isEmpty
                     ? unavailableImagePlaceholder()
                     : _buildResolvedImage(
@@ -4413,11 +4325,7 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
                   onTap: () => _showToolFullImage(context, path),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: _buildToolImageFromPath(
-                      context,
-                      path,
-                      height: 120,
-                    ),
+                    child: _buildToolImageFromPath(context, path, height: 120),
                   ),
                 );
               },
@@ -4520,12 +4428,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
     double? height,
     BoxFit fit = BoxFit.contain,
   }) {
-    return _buildResolvedImage(
-      context,
-      path,
-      height: height,
-      fit: fit,
-    );
+    return _buildResolvedImage(context, path, height: height, fit: fit);
   }
 
   @override

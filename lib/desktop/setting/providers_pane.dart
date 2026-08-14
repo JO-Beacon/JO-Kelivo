@@ -2283,9 +2283,14 @@ class _DesktopProviderDetailPaneState
     } catch (e) {
       if (!mounted) return;
       if (context.mounted) {
+        final message =
+            e is ProviderBalanceException &&
+                e.code == 'full_balance_api_url_required'
+            ? l10n.providerDetailPageBalanceFullUrlRequired
+            : e.toString();
         showAppSnackBar(
           context,
-          message: l10n.providerDetailPageBalanceError(e.toString()),
+          message: l10n.providerDetailPageBalanceError(message),
           type: NotificationType.error,
         );
       }

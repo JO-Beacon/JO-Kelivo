@@ -114,8 +114,6 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ToggleRowWideChatLayout(),
                   _RowDivider(),
-                  _ToggleRowLazyHistory(),
-                  _RowDivider(),
                   _ToggleRowRegenerateDeleteTrailingMessages(),
                   _RowDivider(),
                   _ToggleRowShowRegenerateConfirmDialog(),
@@ -2831,21 +2829,6 @@ class _ToggleRowWideChatLayout extends StatelessWidget {
       label: l10n.displaySettingsPageDesktopWideChatLayoutTitle,
       value: sp.wideChatLayout,
       onChanged: (v) => context.read<SettingsProvider>().setWideChatLayout(v),
-    );
-  }
-}
-
-class _ToggleRowLazyHistory extends StatelessWidget {
-  const _ToggleRowLazyHistory();
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final sp = context.watch<SettingsProvider>();
-    return _ToggleRow(
-      label: l10n.displaySettingsPageLazyHistoryTitle,
-      value: sp.lazyHistoryEnabled,
-      onChanged: (v) =>
-          context.read<SettingsProvider>().setLazyHistoryEnabled(v),
     );
   }
 }

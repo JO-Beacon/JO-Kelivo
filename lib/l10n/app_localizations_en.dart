@@ -334,9 +334,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPageLogs => 'Logs';
 
   @override
-  String get settingsPageSponsor => 'Support Kelivo';
-
-  @override
   String get settingsPageShare => 'Share';
 
   @override
@@ -449,30 +446,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statsPageCustomRangeApply => 'Apply';
-
-  @override
-  String get sponsorPageMethodsSectionTitle => 'Sponsorship Methods';
-
-  @override
-  String get sponsorPageSponsorsSectionTitle => 'Sponsors';
-
-  @override
-  String get sponsorPageEmpty => 'No sponsors yet';
-
-  @override
-  String get sponsorPageAfdianTitle => 'Afdian';
-
-  @override
-  String get sponsorPageAfdianSubtitle => 'afdian.com/a/kelivo';
-
-  @override
-  String get sponsorPageWeChatTitle => 'WeChat Sponsor';
-
-  @override
-  String get sponsorPageWeChatSubtitle => 'WeChat sponsor code';
-
-  @override
-  String get sponsorPageScanQrHint => 'Scan the QR code to sponsor';
 
   @override
   String get languageDisplaySimplifiedChinese => 'Simplified Chinese';
@@ -1777,10 +1750,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageExportToFileSubtitle => 'Export app data to a file';
 
   @override
+  String get backupPageExportKelivoBackup => 'Export as Kelivo Backup';
+
+  @override
   String get backupPageImportBackupFile => 'Import Backup File';
 
   @override
   String get backupPageImportBackupFileSubtitle => 'Import a local backup file';
+
+  @override
+  String get backupPageImportKelivoBackup => 'Import from Kelivo Backup';
 
   @override
   String get backupPageImportFromOtherApps => 'Import from Other Apps';
@@ -2060,18 +2039,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not copy the selected attachment';
 
   @override
-  String get userMessageEditSaveOnly => 'Save Only';
+  String get messageEditCloseConfirmTitle => 'Save changes?';
 
   @override
-  String get userMessageEditUnsupportedSnackbar =>
-      'This content does not support editing';
+  String get messageEditCloseConfirmContent =>
+      'Do you want to save your edits before closing?';
 
   @override
-  String get userMessageEditOverwriteTitle => 'Notice';
+  String get messageEditCloseConfirmCancel => 'Cancel';
 
   @override
-  String get userMessageEditOverwriteContent =>
-      'Editing will overwrite the existing input. Overwrite it?';
+  String get messageEditCloseConfirmDiscard => 'Don\'t Save';
+
+  @override
+  String get messageEditCloseConfirmSave => 'Save';
 
   @override
   String get selectCopyPageTitle => 'Select & Copy';
@@ -3491,7 +3472,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providerDetailPageBalanceInfo => 'Get account balance';
 
   @override
-  String get providerDetailPageBalanceApiPathLabel => 'Balance API Path';
+  String get providerDetailPageBalanceApiPathLabel => 'Balance API URL or path';
 
   @override
   String get providerDetailPageBalanceResultPathLabel => 'Result JSON Path';
@@ -3518,6 +3499,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String providerDetailPageBalanceError(String message) {
     return 'Balance query failed: $message';
   }
+
+  @override
+  String get providerDetailPageBalanceFullUrlRequired =>
+      'The main API endpoint is not OpenAI-compatible. Enter a full OpenAI-compatible balance API URL.';
 
   @override
   String get providerDetailPageVertexAiTitle => 'Vertex AI';
@@ -4181,7 +4166,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutPageAppName => 'JO-Kelivo';
 
   @override
-  String get aboutPageKelivoSectionTitle => 'Kelivo base';
+  String get aboutPageKelivoSectionTitle => 'About Kelivo';
 
   @override
   String get mcpOAuthCallbackPageTitle => 'JO-Kelivo authorization';
@@ -4191,10 +4176,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Authorization received. You may close this window and return to JO-Kelivo.';
 
   @override
-  String get aboutPageAppDescription => 'Open-source AI Assistant';
-
-  @override
-  String get aboutPageNoQQGroup => 'No QQ group yet';
+  String get aboutPageAppDescription =>
+      'Open-source AI assistant based on Kelivo';
 
   @override
   String get aboutPageVersion => 'Version';
@@ -4241,18 +4224,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutPageLicense => 'License';
-
-  @override
-  String get aboutPageJoinQQGroup => 'Join our QQ Group';
-
-  @override
-  String get aboutPageQQGroupOne => 'Kelivo Group 1';
-
-  @override
-  String get aboutPageQQGroupTwo => 'Kelivo Group 2';
-
-  @override
-  String get aboutPageJoinDiscord => 'Join us on Discord';
 
   @override
   String get displaySettingsPageShowUserAvatarTitle => 'Show User Avatar';
@@ -4432,9 +4403,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get displaySettingsPageInsertNewAssistantAtTopTitle =>
       'Place new and copied assistants at top';
-
-  @override
-  String get displaySettingsPageLazyHistoryTitle => 'Lazy-load chat history';
 
   @override
   String get displaySettingsPageDesktopWideChatLayoutTitle => 'Wide chat area';

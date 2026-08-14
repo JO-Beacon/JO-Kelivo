@@ -54,7 +54,6 @@ import '../widgets/chat_input_overlay_layout.dart';
 import '../widgets/chat_selection_app_bar.dart';
 import '../widgets/chat_selection_delete_bar.dart';
 import '../widgets/chat_selection_export_bar.dart';
-import '../widgets/user_message_edit_overlay.dart';
 import '../utils/model_display_helper.dart';
 import '../utils/chat_layout_constants.dart';
 import '../controllers/home_page_controller.dart';
@@ -1210,9 +1209,6 @@ class _HomePageState extends State<HomePage>
       isReasoningModel: _controller.isReasoningModel,
       isReasoningEnabled: _controller.isReasoningEnabled,
       conversationId: _controller.currentConversation?.id,
-      sendButtonTooltip: _controller.isUserMessageEditActive
-          ? AppLocalizations.of(context)!.messageEditPageSaveAndSend
-          : null,
       onMore: _toggleTools,
       onSelectModel: () => showModelSelectSheet(context),
       onLongPressSelectModel: () {
@@ -1354,24 +1350,7 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildForegroundOverlay(BuildContext context) {
-    final editState = _controller.userMessageEditState;
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        _buildScrollButtons(),
-        UserMessageEditOverlay(
-          visible: editState != null && !_controller.selecting,
-          previewText: editState?.previewText ?? '',
-          topInset: _chatTopOverlayInset(context),
-          bottomInset: _controller.inputBarHeight,
-          onCancel: _controller.cancelUserMessageEdit,
-          onSaveOnly: () {
-            unawaited(_controller.saveUserMessageEditOnly());
-          },
-          onPreviewTap: _controller.focusUserMessageEditInput,
-        ),
-      ],
-    );
+    return _buildScrollButtons();
   }
 
   Future<void> _openMiniMap() async {

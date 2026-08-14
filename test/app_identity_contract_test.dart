@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -50,6 +51,74 @@ void main() {
       }
     });
 
+    test('keeps JO About copy without community or sponsorship actions', () {
+      final expectedCopy =
+          <String, ({String description, String share, String title})>{
+            'lib/l10n/app_en.arb': (
+              description: 'Open-source AI assistant based on Kelivo',
+              share: 'JO-Kelivo - Open Source AI Assistant',
+              title: 'About Kelivo',
+            ),
+            'lib/l10n/app_zh.arb': (
+              description: '基于 Kelivo 的开源 AI 助手',
+              share: 'JO-Kelivo - 开源 AI 助手',
+              title: '关于 Kelivo',
+            ),
+            'lib/l10n/app_zh_Hans.arb': (
+              description: '基于 Kelivo 的开源 AI 助手',
+              share: 'JO-Kelivo - 开源 AI 助手',
+              title: '关于 Kelivo',
+            ),
+            'lib/l10n/app_zh_Hant.arb': (
+              description: '基於 Kelivo 的開源 AI 助理',
+              share: 'JO-Kelivo - 開源 AI 助理',
+              title: '關於 Kelivo',
+            ),
+          };
+      const retiredKeys = [
+        'settingsPageSponsor',
+        'aboutPageNoQQGroup',
+        'aboutPageJoinQQGroup',
+        'aboutPageQQGroupOne',
+        'aboutPageQQGroupTwo',
+        'aboutPageJoinDiscord',
+      ];
+
+      for (final MapEntry(key: path, value: copy) in expectedCopy.entries) {
+        final arb = jsonDecode(_read(path)) as Map<String, dynamic>;
+        expect(arb['aboutPageAppDescription'], copy.description, reason: path);
+        expect(arb['aboutPageKelivoSectionTitle'], copy.title, reason: path);
+        expect(arb['settingsShare'], copy.share, reason: path);
+        for (final key in retiredKeys) {
+          expect(arb, isNot(contains(key)), reason: '$path must omit $key');
+        }
+        expect(
+          arb.keys.where((key) => key.startsWith('sponsorPage')),
+          isEmpty,
+          reason: path,
+        );
+      }
+
+      for (final path in [
+        'lib/features/settings/pages/settings_page.dart',
+        'lib/features/settings/pages/about_page.dart',
+        'lib/desktop/setting/about_pane.dart',
+      ]) {
+        final source = _read(path);
+        expect(source, isNot(contains('settingsPageSponsor')), reason: path);
+        expect(source, isNot(contains('aboutPageJoinQQGroup')), reason: path);
+        expect(source, isNot(contains('aboutPageJoinDiscord')), reason: path);
+      }
+      expect(
+        File('lib/features/settings/pages/sponsor_page.dart').existsSync(),
+        isFalse,
+      );
+      expect(
+        File('lib/shared/widgets/qq_group_join_sheet.dart').existsSync(),
+        isFalse,
+      );
+    });
+
     test('uses JO OAuth schemes without changing compatibility URI data', () {
       final callback = _read(
         'lib/core/services/mcp/mcp_oauth_callback_io.dart',
@@ -59,6 +128,61 @@ void main() {
       expect(callback, isNot(contains("scheme: 'psyche.kelivo'")));
 
       _expectContains('lib/utils/kelivo_file_uri.dart', "'com.psyche.kelivo'");
+    });
+
+    test('keeps JO-specific labels for local Kelivo backups', () {
+      final expectedCopy = <String, ({String export, String import})>{
+        'lib/l10n/app_en.arb': (
+          export: 'Export as Kelivo Backup',
+          import: 'Import from Kelivo Backup',
+        ),
+        'lib/l10n/app_zh.arb': (
+          export: '导出为 Kelivo 备份',
+          import: '从 Kelivo 备份导入',
+        ),
+        'lib/l10n/app_zh_Hans.arb': (
+          export: '导出为 Kelivo 备份',
+          import: '从 Kelivo 备份导入',
+        ),
+        'lib/l10n/app_zh_Hant.arb': (
+          export: '匯出為 Kelivo 備份',
+          import: '從 Kelivo 備份匯入',
+        ),
+      };
+
+      for (final MapEntry(key: path, value: copy) in expectedCopy.entries) {
+        final arb = jsonDecode(_read(path)) as Map<String, dynamic>;
+        expect(arb['backupPageExportKelivoBackup'], copy.export, reason: path);
+        expect(arb['backupPageImportKelivoBackup'], copy.import, reason: path);
+      }
+
+      for (final path in [
+        'lib/features/backup/pages/backup_page.dart',
+        'lib/desktop/setting/backup_pane.dart',
+      ]) {
+        final source = _read(path);
+        expect(
+          source,
+          contains('l10n.backupPageExportKelivoBackup'),
+          reason: path,
+        );
+        expect(
+          source,
+          contains('l10n.backupPageImportKelivoBackup'),
+          reason: path,
+        );
+      }
+    });
+
+    test('opens desktop user-data directories without blocking the app', () {
+      final source = _read('lib/utils/app_directories.dart');
+      expect(source, contains("Process.start('explorer.exe'"));
+      expect(source, contains("Process.start('open'"));
+      expect(source, contains("Process.start('xdg-open'"));
+      expect(
+        'mode: ProcessStartMode.detached'.allMatches(source),
+        hasLength(3),
+      );
     });
   });
 

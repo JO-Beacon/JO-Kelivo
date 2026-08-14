@@ -34,6 +34,29 @@ class AppDirectories {
     if (!await directory.exists()) {
       await directory.create(recursive: true);
     }
+
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.windows:
+        await Process.start('explorer.exe', [
+          directory.path,
+        ], mode: ProcessStartMode.detached);
+        return true;
+      case TargetPlatform.macOS:
+        await Process.start('open', [
+          directory.path,
+        ], mode: ProcessStartMode.detached);
+        return true;
+      case TargetPlatform.linux:
+        await Process.start('xdg-open', [
+          directory.path,
+        ], mode: ProcessStartMode.detached);
+        return true;
+      case TargetPlatform.android:
+      case TargetPlatform.iOS:
+      case TargetPlatform.fuchsia:
+        break;
+    }
+
     return launchUrl(
       Uri.file(directory.path),
       mode: LaunchMode.externalApplication,

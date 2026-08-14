@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
-import '../../../core/models/message_part.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../core/models/assistant_regex.dart';
@@ -25,7 +24,6 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../chat/models/message_edit_result.dart';
-import '../../chat/models/message_parts_edit_draft.dart';
 import '../../chat/widgets/chat_message_widget.dart' show ToolUIPart;
 import '../../chat/widgets/message_edit_sheet.dart';
 import '../../chat/widgets/message_export_sheet.dart';
@@ -51,18 +49,6 @@ enum ChatSelectionMode { share, delete }
 /// Translation data for UI state (expanded/collapsed).
 class TranslationData {
   bool expanded = true; // default to expanded when translation is added
-}
-
-class UserMessageEditState {
-  const UserMessageEditState({
-    required this.messageId,
-    required this.previewText,
-    required this.originalParts,
-  });
-
-  final String messageId;
-  final String previewText;
-  final List<MessagePart> originalParts;
 }
 
 /// Controller that manages all state and service wiring for HomePage.
@@ -141,7 +127,6 @@ class HomePageController extends ChangeNotifier {
   late scroll_ctrl.ChatScrollController _scrollCtrl;
 
   McpProvider? _mcpProvider;
-  SettingsProvider? _settingsProvider;
   StreamSubscription<ChatAction>? _chatActionSub;
 
   // ============================================================================
@@ -229,8 +214,6 @@ class HomePageController extends ChangeNotifier {
   // Input bar measurement
   double _inputBarHeight = 72;
 
-  UserMessageEditState? _userMessageEditState;
-
   // Animation tuning
   static const Duration _postSwitchScrollDelay = Duration(milliseconds: 220);
   static const double _sidebarMinWidth = 200;
@@ -269,9 +252,6 @@ class HomePageController extends ChangeNotifier {
   String get globalSearchQuery => _globalSearchQuery;
   String? get spotlightMessageId => _spotlightMessageId;
   int get spotlightToken => _spotlightToken;
-  UserMessageEditState? get userMessageEditState => _userMessageEditState;
-  bool get isUserMessageEditActive => _userMessageEditState != null;
-
   static double get sidebarMinWidth => _sidebarMinWidth;
   static double get sidebarMaxWidth => _sidebarMaxWidth;
 
@@ -375,10 +355,7 @@ class HomePageController extends ChangeNotifier {
 
   void _initializeControllers() {
     _chatService = _context.read<ChatService>();
-    _chatController = ChatController(
-      chatService: _chatService,
-      lazyHistoryEnabled: _context.read<SettingsProvider>().lazyHistoryEnabled,
-    );
+    _chatController = ChatController(chatService: _chatService);
     _chatControllerReady = true;
     _streamController = stream_ctrl.StreamController(
       chatService: _chatService,
@@ -565,8 +542,6 @@ class HomePageController extends ChangeNotifier {
   }
 
   void _initializeProviders() {
-    _settingsProvider = _context.read<SettingsProvider>();
-    _settingsProvider!.addListener(_onSettingsChanged);
     try {
       final quickPhraseProvider = _context.read<QuickPhraseProvider>();
       Future.microtask(() async {
@@ -598,44 +573,6 @@ class HomePageController extends ChangeNotifier {
   }
 
   void _setupKeyboardListeners() {}
-
-  void _onSettingsChanged() {
-    final settings = _settingsProvider;
-    if (settings == null ||
-        settings.lazyHistoryEnabled == _chatController.lazyHistoryEnabled) {
-      return;
-    }
-    unawaited(
-      _chatController
-          .setLazyHistoryEnabled(settings.lazyHistoryEnabled)
-          .catchError((Object error, StackTrace stackTrace) async {
-            FlutterError.reportError(
-              FlutterErrorDetails(
-                exception: error,
-                stack: stackTrace,
-                context: ErrorDescription(
-                  'while applying the chat history loading preference',
-                ),
-              ),
-            );
-            final applied = _chatController.lazyHistoryEnabled;
-            if (settings.lazyHistoryEnabled == applied) return;
-            try {
-              await settings.setLazyHistoryEnabled(applied);
-            } catch (rollbackError, rollbackStackTrace) {
-              FlutterError.reportError(
-                FlutterErrorDetails(
-                  exception: rollbackError,
-                  stack: rollbackStackTrace,
-                  context: ErrorDescription(
-                    'while rolling back the chat history loading preference',
-                  ),
-                ),
-              );
-            }
-          }),
-    );
-  }
 
   void _setupDesktopFeatures() {
     if (isDesktopPlatform) {
@@ -862,14 +799,6 @@ class HomePageController extends ChangeNotifier {
       return ChatInputSubmissionResult.rejected;
     }
     _warmupSerial++;
-    final editState = _userMessageEditState;
-    if (editState != null) {
-      final newMsg = await _saveEditedUserMessageVersion(input, editState);
-      if (newMsg == null) return ChatInputSubmissionResult.rejected;
-      _exitUserMessageEdit(clearDraft: false);
-      await regenerateAtMessage(newMsg);
-      return ChatInputSubmissionResult.sent;
-    }
     if (currentConversation == null) {
       await _createNewConversation();
     }
@@ -1038,8 +967,6 @@ class HomePageController extends ChangeNotifier {
     }
     // Invalidate in-flight select-all / toggle / invert for the prior chat.
     _selectionEpoch++;
-    _exitUserMessageEdit(clearDraft: true);
-
     if (!isDesktopPlatform) {
       // Fetch-then-commit: fade-out, progress flush, and the DB fetch run
       // concurrently, but the fetched window is committed only after the
@@ -1129,7 +1056,6 @@ class HomePageController extends ChangeNotifier {
     try {
       await _viewModel.flushCurrentConversationProgress();
     } catch (_) {}
-    _exitUserMessageEdit(clearDraft: true);
     if (!isDesktopPlatform) {
       try {
         await _convoFadeController.reverse();
@@ -1150,7 +1076,6 @@ class HomePageController extends ChangeNotifier {
   }
 
   Future<void> _createNewConversation() async {
-    _exitUserMessageEdit(clearDraft: true);
     _translations.clear();
     final previousId = currentConversation?.id;
     await _viewModel.createNewConversation();
@@ -1289,11 +1214,6 @@ class HomePageController extends ChangeNotifier {
   }
 
   Future<void> editMessage(ChatMessage message) async {
-    if (message.role == 'user') {
-      await startUserMessageEdit(message);
-      return;
-    }
-
     final ctx = _context;
     if (!ctx.mounted) return;
     final isDesktop = isDesktopPlatform;
@@ -1326,6 +1246,8 @@ class HomePageController extends ChangeNotifier {
     if (!result.shouldSend) return;
     if (message.role == 'assistant') {
       await regenerateAtMessage(newMsg, assistantAsNewReply: true);
+    } else if (message.role == 'user') {
+      await regenerateAtMessage(newMsg);
     }
   }
 
@@ -1333,151 +1255,6 @@ class HomePageController extends ChangeNotifier {
     if (!await _chatService.switchMessageRole(message.id, role)) return;
     await _chatController.refreshTimelineAfterMutation();
     notifyListeners();
-  }
-
-  Future<void> startUserMessageEdit(ChatMessage message) async {
-    final ctx = _context;
-    if (!ctx.mounted) return;
-    if (message.role != 'user') {
-      final l10n = AppLocalizations.of(ctx)!;
-      showAppSnackBar(
-        ctx,
-        message: l10n.userMessageEditUnsupportedSnackbar,
-        type: NotificationType.warning,
-      );
-      return;
-    }
-
-    final hasDraft =
-        _inputController.text.trim().isNotEmpty ||
-        _mediaController.hasDraftMedia;
-    if (hasDraft) {
-      final overwrite = await _confirmOverwriteInputDraft(ctx);
-      if (overwrite != true) return;
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-      if (!ctx.mounted) return;
-    }
-
-    _enterUserMessageEdit(message);
-  }
-
-  void cancelUserMessageEdit() {
-    _exitUserMessageEdit(clearDraft: true);
-  }
-
-  void focusUserMessageEditInput() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_context.mounted) return;
-      _inputFocus.requestFocus();
-    });
-  }
-
-  Future<void> saveUserMessageEditOnly() async {
-    final editState = _userMessageEditState;
-    if (editState == null || _mediaController.hasUnreadyImages) return;
-    final input = _mediaController.snapshotInput(_inputController.text);
-    if (input.text.trim().isEmpty &&
-        input.imagePaths.isEmpty &&
-        input.documents.isEmpty) {
-      return;
-    }
-    final newMsg = await _saveEditedUserMessageVersion(input, editState);
-    if (newMsg == null) return;
-    _exitUserMessageEdit(clearDraft: true);
-  }
-
-  void _enterUserMessageEdit(ChatMessage message) {
-    final input = _messageBuilderService.parseInputFromMessage(
-      message,
-      includeMediaFilePathsAsImages: false,
-    );
-    final messageId = message.id;
-    _inputController.value = TextEditingValue(
-      text: input.text,
-      selection: TextSelection.collapsed(offset: input.text.length),
-      composing: TextRange.empty,
-    );
-    _mediaController.restoreInput(input);
-    _userMessageEditState = UserMessageEditState(
-      messageId: message.id,
-      previewText: input.text.isNotEmpty ? input.text : message.content.trim(),
-      originalParts: message.parts,
-    );
-    notifyListeners();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_context.mounted) return;
-      if (_userMessageEditState?.messageId != messageId) return;
-      _inputFocus.requestFocus();
-    });
-  }
-
-  void _exitUserMessageEdit({required bool clearDraft}) {
-    if (_userMessageEditState == null) return;
-    _userMessageEditState = null;
-    if (clearDraft) {
-      _mediaController.clearDraft();
-    }
-    notifyListeners();
-    if (PlatformUtils.isMobileTarget) {
-      dismissKeyboard();
-    }
-  }
-
-  Future<ChatMessage?> _saveEditedUserMessageVersion(
-    ChatInputData input,
-    UserMessageEditState editState,
-  ) async {
-    final conversation = currentConversation;
-    if (conversation == null) return null;
-    final assistant = _context.read<AssistantProvider>().currentAssistant;
-    final parts = await MessageGenerationService.buildPersistedUserMessageParts(
-      input,
-      assistant: assistant,
-    );
-    final mergedParts = MessagePartsEditDraft.mergeInputParts(
-      editState.originalParts,
-      parts,
-    );
-
-    await _chatService.clearConversationSuggestions(conversation.id);
-    _viewModel.updateCurrentConversation(
-      _chatService.getConversation(conversation.id),
-    );
-
-    final newMsg = await _chatService.appendMessageVersion(
-      messageId: editState.messageId,
-      parts: mergedParts,
-    );
-    if (newMsg == null) return null;
-
-    if (await _chatController.openAroundPersistedMessage(newMsg)) {
-      _viewModel.restoreMessageUiState();
-    }
-    final gid = newMsg.groupId ?? newMsg.id;
-    versionSelections[gid] = newMsg.version;
-    notifyListeners();
-    return newMsg;
-  }
-
-  Future<bool?> _confirmOverwriteInputDraft(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.userMessageEditOverwriteTitle),
-        content: Text(l10n.userMessageEditOverwriteContent),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l10n.homePageCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l10n.modelDetailSheetConfirmButton),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> translateMessage(ChatMessage message) async {
@@ -2572,7 +2349,6 @@ class HomePageController extends ChangeNotifier {
     _convoFadeController.dispose();
     _messageJumpTransitionController.dispose();
     _mcpProvider?.removeListener(_onMcpChanged);
-    _settingsProvider?.removeListener(_onSettingsChanged);
     _scrollCtrl.dispose();
     try {
       _chatActionSub?.cancel();

@@ -688,12 +688,6 @@ abstract class AppLocalizations {
   /// **'Logs'**
   String get settingsPageLogs;
 
-  /// No description provided for @settingsPageSponsor.
-  ///
-  /// In en, this message translates to:
-  /// **'Support Kelivo'**
-  String get settingsPageSponsor;
-
   /// No description provided for @settingsPageShare.
   ///
   /// In en, this message translates to:
@@ -921,54 +915,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Apply'**
   String get statsPageCustomRangeApply;
-
-  /// No description provided for @sponsorPageMethodsSectionTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Sponsorship Methods'**
-  String get sponsorPageMethodsSectionTitle;
-
-  /// No description provided for @sponsorPageSponsorsSectionTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Sponsors'**
-  String get sponsorPageSponsorsSectionTitle;
-
-  /// No description provided for @sponsorPageEmpty.
-  ///
-  /// In en, this message translates to:
-  /// **'No sponsors yet'**
-  String get sponsorPageEmpty;
-
-  /// No description provided for @sponsorPageAfdianTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Afdian'**
-  String get sponsorPageAfdianTitle;
-
-  /// No description provided for @sponsorPageAfdianSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'afdian.com/a/kelivo'**
-  String get sponsorPageAfdianSubtitle;
-
-  /// No description provided for @sponsorPageWeChatTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'WeChat Sponsor'**
-  String get sponsorPageWeChatTitle;
-
-  /// No description provided for @sponsorPageWeChatSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'WeChat sponsor code'**
-  String get sponsorPageWeChatSubtitle;
-
-  /// No description provided for @sponsorPageScanQrHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Scan the QR code to sponsor'**
-  String get sponsorPageScanQrHint;
 
   /// No description provided for @languageDisplaySimplifiedChinese.
   ///
@@ -3382,6 +3328,12 @@ abstract class AppLocalizations {
   /// **'Export app data to a file'**
   String get backupPageExportToFileSubtitle;
 
+  /// No description provided for @backupPageExportKelivoBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Export as Kelivo Backup'**
+  String get backupPageExportKelivoBackup;
+
   /// No description provided for @backupPageImportBackupFile.
   ///
   /// In en, this message translates to:
@@ -3393,6 +3345,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Import a local backup file'**
   String get backupPageImportBackupFileSubtitle;
+
+  /// No description provided for @backupPageImportKelivoBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from Kelivo Backup'**
+  String get backupPageImportKelivoBackup;
 
   /// No description provided for @backupPageImportFromOtherApps.
   ///
@@ -3916,29 +3874,35 @@ abstract class AppLocalizations {
   /// **'Could not copy the selected attachment'**
   String get messageEditAttachmentCopyFailed;
 
-  /// No description provided for @userMessageEditSaveOnly.
+  /// No description provided for @messageEditCloseConfirmTitle.
   ///
   /// In en, this message translates to:
-  /// **'Save Only'**
-  String get userMessageEditSaveOnly;
+  /// **'Save changes?'**
+  String get messageEditCloseConfirmTitle;
 
-  /// No description provided for @userMessageEditUnsupportedSnackbar.
+  /// No description provided for @messageEditCloseConfirmContent.
   ///
   /// In en, this message translates to:
-  /// **'This content does not support editing'**
-  String get userMessageEditUnsupportedSnackbar;
+  /// **'Do you want to save your edits before closing?'**
+  String get messageEditCloseConfirmContent;
 
-  /// No description provided for @userMessageEditOverwriteTitle.
+  /// No description provided for @messageEditCloseConfirmCancel.
   ///
   /// In en, this message translates to:
-  /// **'Notice'**
-  String get userMessageEditOverwriteTitle;
+  /// **'Cancel'**
+  String get messageEditCloseConfirmCancel;
 
-  /// No description provided for @userMessageEditOverwriteContent.
+  /// No description provided for @messageEditCloseConfirmDiscard.
   ///
   /// In en, this message translates to:
-  /// **'Editing will overwrite the existing input. Overwrite it?'**
-  String get userMessageEditOverwriteContent;
+  /// **'Don\'t Save'**
+  String get messageEditCloseConfirmDiscard;
+
+  /// No description provided for @messageEditCloseConfirmSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get messageEditCloseConfirmSave;
 
   /// No description provided for @selectCopyPageTitle.
   ///
@@ -6490,7 +6454,7 @@ abstract class AppLocalizations {
   /// No description provided for @providerDetailPageBalanceApiPathLabel.
   ///
   /// In en, this message translates to:
-  /// **'Balance API Path'**
+  /// **'Balance API URL or path'**
   String get providerDetailPageBalanceApiPathLabel;
 
   /// No description provided for @providerDetailPageBalanceResultPathLabel.
@@ -6534,6 +6498,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Balance query failed: {message}'**
   String providerDetailPageBalanceError(String message);
+
+  /// No description provided for @providerDetailPageBalanceFullUrlRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'The main API endpoint is not OpenAI-compatible. Enter a full OpenAI-compatible balance API URL.'**
+  String get providerDetailPageBalanceFullUrlRequired;
 
   /// No description provided for @providerDetailPageVertexAiTitle.
   ///
@@ -7768,7 +7738,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutPageKelivoSectionTitle.
   ///
   /// In en, this message translates to:
-  /// **'Kelivo base'**
+  /// **'About Kelivo'**
   String get aboutPageKelivoSectionTitle;
 
   /// No description provided for @mcpOAuthCallbackPageTitle.
@@ -7786,14 +7756,8 @@ abstract class AppLocalizations {
   /// No description provided for @aboutPageAppDescription.
   ///
   /// In en, this message translates to:
-  /// **'Open-source AI Assistant'**
+  /// **'Open-source AI assistant based on Kelivo'**
   String get aboutPageAppDescription;
-
-  /// No description provided for @aboutPageNoQQGroup.
-  ///
-  /// In en, this message translates to:
-  /// **'No QQ group yet'**
-  String get aboutPageNoQQGroup;
 
   /// No description provided for @aboutPageVersion.
   ///
@@ -7878,30 +7842,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'License'**
   String get aboutPageLicense;
-
-  /// No description provided for @aboutPageJoinQQGroup.
-  ///
-  /// In en, this message translates to:
-  /// **'Join our QQ Group'**
-  String get aboutPageJoinQQGroup;
-
-  /// No description provided for @aboutPageQQGroupOne.
-  ///
-  /// In en, this message translates to:
-  /// **'Kelivo Group 1'**
-  String get aboutPageQQGroupOne;
-
-  /// No description provided for @aboutPageQQGroupTwo.
-  ///
-  /// In en, this message translates to:
-  /// **'Kelivo Group 2'**
-  String get aboutPageQQGroupTwo;
-
-  /// No description provided for @aboutPageJoinDiscord.
-  ///
-  /// In en, this message translates to:
-  /// **'Join us on Discord'**
-  String get aboutPageJoinDiscord;
 
   /// No description provided for @displaySettingsPageShowUserAvatarTitle.
   ///
@@ -8184,12 +8124,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Place new and copied assistants at top'**
   String get displaySettingsPageInsertNewAssistantAtTopTitle;
-
-  /// No description provided for @displaySettingsPageLazyHistoryTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Lazy-load chat history'**
-  String get displaySettingsPageLazyHistoryTitle;
 
   /// No description provided for @displaySettingsPageDesktopWideChatLayoutTitle.
   ///

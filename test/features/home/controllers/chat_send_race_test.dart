@@ -440,8 +440,10 @@ void main() {
     tester,
   ) async {
     final controller = await pumpHarness(tester);
+    late Conversation convo;
+    late ChatMessage original;
     await tester.runAsync(() async {
-      final convo = await service.createDraftConversation(
+      convo = await service.createDraftConversation(
         title: 'Temporary Chat',
         temporary: true,
       );
@@ -451,28 +453,33 @@ void main() {
         () => !controller.chatController.isConversationLoading(convo.id),
         'initial temporary streaming to finish',
       );
-      final original = service
+      original = service
           .getMessages(convo.id)
           .firstWhere((message) => message.role == 'user');
+      unawaited(controller.editMessage(original));
+    });
 
-      await controller.startUserMessageEdit(original);
-      final result = await controller.sendMessage(
-        ChatInputData(text: 'edited question'),
-      );
+    await tester.pumpAndSettle();
+    expect(find.text('Edit Message'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'edited question');
+    await tester.tap(find.text('Save & Send'));
+    await tester.pump();
 
-      expect(result, ChatInputSubmissionResult.sent);
+    await tester.runAsync(() async {
       await waitFor(() => streamRequestCount == 2, 'edited stream to fire');
       await waitFor(
         () => !controller.chatController.isConversationLoading(convo.id),
         'edited temporary streaming to finish',
       );
-      final edited = service.getMessages(convo.id).firstWhere(
-        (message) =>
-            message.role == 'user' &&
-            (message.groupId ?? message.id) ==
-                (original.groupId ?? original.id) &&
-            message.version == 1,
-      );
+      final edited = service
+          .getMessages(convo.id)
+          .firstWhere(
+            (message) =>
+                message.role == 'user' &&
+                (message.groupId ?? message.id) ==
+                    (original.groupId ?? original.id) &&
+                message.version == 1,
+          );
       expect(edited.content, 'edited question');
       expect(
         service.getVersionSelections(convo.id),
@@ -480,6 +487,61 @@ void main() {
       );
       expect(service.isTemporaryConversation(convo.id), isTrue);
       expect(service.getAllConversations(), isEmpty);
+    });
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('user edit save only appends a version without generating', (
+    tester,
+  ) async {
+    final controller = await pumpHarness(tester);
+    late Conversation convo;
+    late ChatMessage original;
+    await tester.runAsync(() async {
+      convo = await openConversation(controller);
+      await controller.sendMessage(ChatInputData(text: 'original question'));
+      await waitFor(
+        () => !controller.chatController.isConversationLoading(convo.id),
+        'initial streaming to finish',
+      );
+      original = (await service.loadMessages(
+        convo.id,
+      )).firstWhere((message) => message.role == 'user');
+      unawaited(controller.editMessage(original));
+    });
+
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'edited without sending');
+    await tester.tap(find.text('Save'));
+    await tester.pump();
+
+    await tester.runAsync(() async {
+      await waitFor(
+        () => service
+            .getMessages(convo.id)
+            .any(
+              (message) =>
+                  message.role == 'user' &&
+                  (message.groupId ?? message.id) ==
+                      (original.groupId ?? original.id) &&
+                  message.version == 1,
+            ),
+        'saved user version to appear',
+      );
+      final messages = service.getMessages(convo.id);
+      final edited = messages.firstWhere(
+        (message) =>
+            message.role == 'user' &&
+            (message.groupId ?? message.id) ==
+                (original.groupId ?? original.id) &&
+            message.version == 1,
+      );
+      expect(edited.content, 'edited without sending');
+      expect(streamRequestCount, 1);
+      expect(
+        messages.where((message) => message.role == 'assistant'),
+        hasLength(1),
+      );
     });
     expect(tester.takeException(), isNull);
   });

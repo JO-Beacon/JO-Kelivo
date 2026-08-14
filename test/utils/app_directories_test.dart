@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -12,12 +13,14 @@ void main() {
   late Directory temporaryRoot;
 
   setUp(() async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
     temporaryRoot = await Directory.systemTemp.createTemp(
       'jo_app_directories_',
     );
   });
 
   tearDown(() async {
+    debugDefaultTargetPlatformOverride = null;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(launcherChannel, null);
     if (await temporaryRoot.exists()) {

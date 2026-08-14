@@ -51,40 +51,6 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     replacement.dispose();
   });
-
-  testWidgets('syncs the persisted history loading mode at runtime', (
-    tester,
-  ) async {
-    final business = await createBusinessTestHarness(
-      initial: const {'display_lazy_history_enabled_v1': false},
-    );
-    final settings = SettingsProvider(business.preferences);
-    HomePageController? controller;
-
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider.value(value: settings),
-          ChangeNotifierProvider(create: (_) => ChatService()),
-        ],
-        child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: _ControllerHarness(onCreated: (value) => controller = value),
-        ),
-      ),
-    );
-
-    await settings.loaded;
-    await tester.pump();
-    expect(controller!.chatController.lazyHistoryEnabled, isFalse);
-
-    await settings.setLazyHistoryEnabled(true);
-    await tester.pump();
-    expect(controller!.chatController.lazyHistoryEnabled, isTrue);
-
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
 }
 
 class _ControllerHarness extends StatefulWidget {

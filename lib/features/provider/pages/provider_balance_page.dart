@@ -264,12 +264,13 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
     } catch (e) {
       if (!pageContext.mounted) return;
       final l10n = AppLocalizations.of(pageContext)!;
+      final message = _balanceErrorMessage(l10n, e);
       setState(
-        () => _balanceError = l10n.providerDetailPageBalanceError(e.toString()),
+        () => _balanceError = l10n.providerDetailPageBalanceError(message),
       );
       showAppSnackBar(
         pageContext,
-        message: l10n.providerDetailPageBalanceError(e.toString()),
+        message: l10n.providerDetailPageBalanceError(message),
         type: NotificationType.error,
       );
     } finally {
@@ -291,6 +292,14 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
     });
     _saveBalance();
   }
+}
+
+String _balanceErrorMessage(AppLocalizations l10n, Object error) {
+  if (error is ProviderBalanceException &&
+      error.code == 'full_balance_api_url_required') {
+    return l10n.providerDetailPageBalanceFullUrlRequired;
+  }
+  return error.toString();
 }
 
 InputDecoration _balanceInputDecoration(BuildContext context) {

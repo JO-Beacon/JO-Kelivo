@@ -11,7 +11,6 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
-import '../../../shared/widgets/qq_group_join_sheet.dart';
 import '../../../core/services/haptics.dart';
 import 'debug_page.dart';
 import 'log_viewer_page.dart';
@@ -456,20 +455,6 @@ class _AboutPageState extends State<AboutPage> {
                 onTap: () => _openUrl(
                   'https://github.com/Chevey339/kelivo/blob/master/LICENSE',
                 ),
-              ),
-              _iosDivider(context),
-              _iosNavRowSvgLeading(
-                context,
-                svgAsset: 'assets/icons/tencent-qq.svg',
-                label: l10n.aboutPageJoinQQGroup,
-                onTap: () => showQQGroupJoinSheet(context: context),
-              ),
-              _iosDivider(context),
-              _iosNavRowSvgLeading(
-                context,
-                svgAsset: 'assets/icons/discord.svg',
-                label: l10n.aboutPageJoinDiscord,
-                onTap: () => _openUrl('https://discord.gg/Tb8DyvvV5T'),
               ),
             ],
           ),

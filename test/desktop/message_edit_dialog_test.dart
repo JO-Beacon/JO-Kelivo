@@ -67,4 +67,65 @@ void main() {
     expect(result!.parts.map((part) => part.kind), <String>['text', 'future']);
     expect(identical(result!.parts.last, opaque), isTrue);
   });
+
+  testWidgets('desktop outside click and close button ask before discarding', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1100, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    MessageEditResult? result;
+    var completed = false;
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create: (_) => SettingsProvider(createBusinessTestPreferences()),
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () async {
+                  result = await showMessageEditDesktopDialog(
+                    context,
+                    message: ChatMessage(
+                      role: 'user',
+                      content: 'before',
+                      conversationId: 'conversation',
+                    ),
+                  );
+                  completed = true;
+                },
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'edited draft');
+    await tester.tapAt(const Offset(8, 8));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Save changes?'), findsOneWidget);
+    expect(completed, isFalse);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Lucide.X));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Save changes?'), findsOneWidget);
+    expect(completed, isFalse);
+
+    await tester.tap(find.text("Don't Save"));
+    await tester.pumpAndSettle();
+    expect(completed, isTrue);
+    expect(result, isNull);
+  });
 }

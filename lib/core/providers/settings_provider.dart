@@ -169,8 +169,6 @@ class SettingsProvider extends ChangeNotifier {
   static const String _displayShowRegenerateConfirmDialogKey =
       'display_show_regenerate_confirm_dialog_v1';
   static const String _displayShowMessageNavKey = 'display_show_message_nav_v1';
-  static const String _displayLazyHistoryEnabledKey =
-      'display_lazy_history_enabled_v1';
   static const String _displayInsertNewAssistantAtTopKey =
       'display_insert_new_assistant_at_top_v1';
   static const String _displayWideChatLayoutKey = 'display_wide_chat_layout_v1';
@@ -985,7 +983,6 @@ class SettingsProvider extends ChangeNotifier {
     _showRegenerateConfirmDialog =
         prefs.getBool(_displayShowRegenerateConfirmDialogKey) ?? true;
     _showMessageNavButtons = prefs.getBool(_displayShowMessageNavKey) ?? true;
-    _lazyHistoryEnabled = prefs.getBool(_displayLazyHistoryEnabledKey) ?? true;
     _mobileMessageNavButtonsMode = _parseMobileMessageNavButtonsMode(
       prefs.getString(_displayMobileMessageNavButtonsModeKey),
       legacyEnabled: _showMessageNavButtons,
@@ -4143,15 +4140,6 @@ Requirements:
     await prefs.setBool(_displayShowMessageNavKey, v);
   }
 
-  bool _lazyHistoryEnabled = true;
-  bool get lazyHistoryEnabled => _lazyHistoryEnabled;
-  Future<void> setLazyHistoryEnabled(bool v) async {
-    if (_lazyHistoryEnabled == v) return;
-    _lazyHistoryEnabled = v;
-    notifyListeners();
-    await _preferences.setBool(_displayLazyHistoryEnabledKey, v);
-  }
-
   // Display: use the new assistant avatar UX in app bars.
   bool _useNewAssistantAvatarUx = false;
   bool get useNewAssistantAvatarUx => _useNewAssistantAvatarUx;
@@ -5021,7 +5009,6 @@ Requirements:
     copy._regenerateDeleteTrailingMessages = _regenerateDeleteTrailingMessages;
     copy._showRegenerateConfirmDialog = _showRegenerateConfirmDialog;
     copy._showMessageNavButtons = _showMessageNavButtons;
-    copy._lazyHistoryEnabled = _lazyHistoryEnabled;
     copy._mobileMessageNavButtonsMode = _mobileMessageNavButtonsMode;
     copy._useNewAssistantAvatarUx = _useNewAssistantAvatarUx;
     copy._showProviderInModelCapsule = _showProviderInModelCapsule;
