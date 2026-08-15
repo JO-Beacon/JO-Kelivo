@@ -9,7 +9,7 @@ on:
         default: false
         type: boolean
       release_tag:
-        description: 'Release 标签，例如 v0.1.6'
+        description: 'Release 标签，例如 0.1.6+6'
         required: false
         default: ''
         type: string
@@ -65,12 +65,12 @@ jobs:
           $releaseVersion = $rawVersion.Split('+')[0]
           $version = $rawVersion
           if ($env:GITHUB_REF_TYPE -eq 'tag') {
-            if ($env:GITHUB_REF_NAME -ne "v$releaseVersion") {
+            if ($env:GITHUB_REF_NAME -ne $rawVersion) {
               throw "Tag $env:GITHUB_REF_NAME does not match pubspec version $releaseVersion."
             }
           } elseif ($env:PUBLISH_RELEASE -eq 'true') {
-            if ($env:RELEASE_TAG -ne "v$releaseVersion") {
-              throw "Release tag must be v$releaseVersion."
+            if ($env:RELEASE_TAG -ne $rawVersion) {
+              throw "Release tag must be $rawVersion."
             }
           } else {
             $shortSha = (git rev-parse --short HEAD).Trim()

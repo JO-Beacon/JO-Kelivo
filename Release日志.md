@@ -8,7 +8,7 @@
 候选验证日期：2026-08-15
 前一实现基座：原版 Kelivo 1.1.16+60
 当前实现基座：原版 Kelivo 1.2.1+64（tag `v1.2.1`，commit `dae00af67681242f820ddfb9c7ea9ead35dcab5b`）
-计划 Release tag：`v0.1.6`
+Release tag：`0.1.6+6`
 
 ## 说明
 

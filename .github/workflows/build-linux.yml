@@ -9,7 +9,7 @@ on:
         default: false
         type: boolean
       release_tag:
-        description: 'Release 标签，例如 v0.1.6'
+        description: 'Release 标签，例如 0.1.6+6'
         required: false
         default: ''
         type: string
@@ -83,13 +83,13 @@ jobs:
           version="$raw_version"
           release_version="${raw_version%%+*}"
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-            test "${GITHUB_REF_NAME}" = "v${release_version}" || {
+            test "${GITHUB_REF_NAME}" = "$raw_version" || {
               echo "Tag ${GITHUB_REF_NAME} does not match pubspec version ${release_version}." >&2
               exit 1
             }
           elif [ "$PUBLISH_RELEASE" = "true" ]; then
-            test "$RELEASE_TAG" = "v${release_version}" || {
-              echo "Release tag must be v${release_version}." >&2
+            test "$RELEASE_TAG" = "$raw_version" || {
+              echo "Release tag must be ${raw_version}." >&2
               exit 1
             }
           else
