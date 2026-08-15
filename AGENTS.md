@@ -53,6 +53,7 @@
 ## 2. Working Style
 
 - Communicate in Chinese throughout. Stay focused on the current task. No vague suggestions.
+- Future Git commit messages must be written in Chinese, including the subject and body. Technical identifiers, paths, version numbers, command names, and quoted external text may remain in their original form when necessary.
 - Facts first. All conclusions must be based on current code, config, tests, build scripts, or git state. No guessing.
 - Debug-first. Never add silent degradation, swallowed errors, hidden fallback paths, or fake success branches just to "make it run".
 - Default to KISS / YAGNI:
