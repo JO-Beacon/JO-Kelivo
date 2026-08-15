@@ -42,6 +42,17 @@ JO-Kelivo 是基于原版 Kelivo 的非官方修改版本，不代表原版作�
 - 第三方依赖仍遵循其各自许可证；本项目不改变第三方依赖原有许可证条款。
 - JO-Kelivo 是原版 Kelivo 的非官方改版，不代表原版作者发布、维护或背书；原项目版权归原作者及贡献者所有。
 - Android 产物仅发布 APK；本版本发布 Android 3 个 ABI 拆分 APK、Windows x64 产物与 Linux x64 桌面产物。
+
+## SHA-256
+
+f283ccc818ffa31cc7632ad450d9f528c137fb5be777b3a67ff786bea7dc5f9a  JO-Kelivo-v0.1.7+7-android-arm64-v8a-release.apk
+537fc40f9692c27b3ccdd6c23865adc55af31444678bc48b527489c2167671a5  JO-Kelivo-v0.1.7+7-android-armeabi-v7a-release.apk
+04bd7c49aedd61b485c5ee075d0f15d3e563379f74b15f15de515ce99091b0d2  JO-Kelivo-v0.1.7+7-android-x86_64-release.apk
+48bacdbb273feffed7f57d76bd3ef4ca7920dc7aeb308996c8645ab6bcb962d5  JO-Kelivo-v0.1.7+7-linux-x64-appimage.AppImage
+347bcea549cca7d7944ba271a4c88bb1e5c4eb701b9f051239140e6f2eb43eda  JO-Kelivo-v0.1.7+7-linux-x64-archive.tar.gz
+c6d4b1d624df4272154a8d4def93a078c4f9286bd916f0d4e4cba6a5ad1e5b32  JO-Kelivo-v0.1.7+7-linux-x64-deb.deb
+d07be59706670c3652e4f2323cec10749b8ce152cbc00736bfce33aac2218f0b  JO-Kelivo-v0.1.7+7-windows-x64-portable.zip
+0acbe1cc11a55b1cf2ea2f0f1d7514a8b4a3f87c9775d364337e2e7092bbbebe  JO-Kelivo-v0.1.7+7-windows-x64-setup.exe
 ```
 
 ## 0.1.7+7 候选验证记录（不属于 Release 正文）
