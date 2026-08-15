@@ -3,56 +3,29 @@
 ## Release notes
 
 ```markdown
-# JO-Kelivo 0.1.7+7
+JO-Kelivo 0.1.7+7
+基于原版 Kelivo 1.2.2+66
 
-发布时间：2026-08-15
-基于原版 Kelivo 版本：1.2.2+66
-源码获取：本 Release 页面附带的 Source code 压缩包；也可从本仓库对应 tag 获取完整源码。
-
-## 说明
-
-JO-Kelivo 是基于原版 Kelivo 的非官方修改版本，不代表原版作者发布、维护或背书。
-
-感谢原版 Kelivo 作者及贡献者的开源工作。原项目版权归原作者及贡献者所有。
-
-本项目继续按 GNU AGPL-3.0 发布。若本 Release 分发 Android APK、Windows 安装包、Windows 便携包或 Linux 桌面包等二进制产物，对应源代码可通过本 Release 页面附带的 Source code 压缩包或本仓库对应 tag 获取。GNU AGPL-3.0 许可证全文见仓库根目录 LICENSE。
-
-## 升级与兼容提示
+升级提示：
 
 - 从旧版本升级前，建议先导出一份本地备份，并保留升级时自动生成的恢复备份。
 - JO-Kelivo 与原版 Kelivo 使用不同的数据目录，不会自动读取或覆盖对方的本地数据。
 - JO-Kelivo 与同代原版 Kelivo 在双方共同支持的数据范围内保持双向备份兼容；不承诺将 0.1.7+7 的新格式备份降级导入 JO-Kelivo 0.1.5。
 
-## 本版本变更
+主要变化：
 
-- 实现基座升级至 Kelivo 1.2.2+66，并保留 JO-Kelivo 的独立应用身份、数据目录、更新源和发布流程。
 - 新增全局“旧版记忆模式”开关，默认关闭；开启后可继续使用旧版记忆页面和数据路径。
-- 请求日志和上下文日志对新安装默认开启；日志写入前会脱敏密钥并省略大型内联载荷，流式响应分块不进入请求日志。
 - Firecrawl 搜索现在可在未填写 API Key 时使用无密钥通道，搜索结果支持按 ID 显示引用。
-- 优化流式聊天、推理更新和增量 Markdown 渲染，降低长回复期间的重复计算与界面重建。
-- 修复删除消息时版本组锚点和时间线位置异常、生成结束后自动滚动失效，以及版本全部删除后无法继续回复的问题。
-- 修复供应商分组重排索引、Claude thinking 签名兼容及工具性文本错误使用流式请求的问题。
-- 保留单条消息身份切换、历史附件编辑、助手置顶、宽屏布局、两个用户数据目录入口、DeepSeek Anthropic-compatible 默认通道和内置搜索等既有功能。
-- DeepSeek Web/App 导入入口继续保留，但本版本仍显示“暂不支持”，不会创建或修改会话数据。
+- 请求日志和上下文日志对新安装默认开启，并加强敏感信息保护。
+- 改善长回复期间的响应速度与稳定性，并修复多项聊天、消息管理和模型兼容问题。
 
-## 许可证合规提示
+已知限制：
 
-- 本项目整体继续按 GNU AGPL-3.0 发布；许可证全文见仓库根目录 LICENSE。
-- 本 Release 若附带 Android APK、Windows 安装包、Windows 便携包或 Linux 桌面包等二进制产物，对应源代码会（且必须）在同一 Release 页面通过 Source code 压缩包或清晰链接提供。
-- 第三方依赖仍遵循其各自许可证；本项目不改变第三方依赖原有许可证条款。
-- JO-Kelivo 是原版 Kelivo 的非官方改版，不代表原版作者发布、维护或背书；原项目版权归原作者及贡献者所有。
-- Android 产物仅发布 APK；本版本发布 Android 3 个 ABI 拆分 APK、Windows x64 产物与 Linux x64 桌面产物。
+- DeepSeek 网页版/App 数据导入仍暂不支持。
 
-## SHA-256
+JO-Kelivo 是基于原版 Kelivo 的非官方修改版本，不代表原版作者发布、维护或背书。感谢原版 Kelivo 作者及贡献者的开源工作。
 
-f283ccc818ffa31cc7632ad450d9f528c137fb5be777b3a67ff786bea7dc5f9a  JO-Kelivo-v0.1.7+7-android-arm64-v8a-release.apk
-537fc40f9692c27b3ccdd6c23865adc55af31444678bc48b527489c2167671a5  JO-Kelivo-v0.1.7+7-android-armeabi-v7a-release.apk
-04bd7c49aedd61b485c5ee075d0f15d3e563379f74b15f15de515ce99091b0d2  JO-Kelivo-v0.1.7+7-android-x86_64-release.apk
-48bacdbb273feffed7f57d76bd3ef4ca7920dc7aeb308996c8645ab6bcb962d5  JO-Kelivo-v0.1.7+7-linux-x64-appimage.AppImage
-347bcea549cca7d7944ba271a4c88bb1e5c4eb701b9f051239140e6f2eb43eda  JO-Kelivo-v0.1.7+7-linux-x64-archive.tar.gz
-c6d4b1d624df4272154a8d4def93a078c4f9286bd916f0d4e4cba6a5ad1e5b32  JO-Kelivo-v0.1.7+7-linux-x64-deb.deb
-d07be59706670c3652e4f2323cec10749b8ce152cbc00736bfce33aac2218f0b  JO-Kelivo-v0.1.7+7-windows-x64-portable.zip
-0acbe1cc11a55b1cf2ea2f0f1d7514a8b4a3f87c9775d364337e2e7092bbbebe  JO-Kelivo-v0.1.7+7-windows-x64-setup.exe
+本项目继续按 GNU AGPL-3.0 发布。完整源码和许可证可通过本 Release 页面或仓库对应 tag 获取。
 ```
 
 ## 0.1.7+7 候选验证记录（不属于 Release 正文）
