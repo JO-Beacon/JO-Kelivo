@@ -44,6 +44,24 @@ JO-Kelivo 是基于原版 Kelivo 的非官方修改版本，不代表原版作�
 - Android 产物仅发布 APK；本版本发布 Android 3 个 ABI 拆分 APK、Windows x64 产物与 Linux x64 桌面产物。
 ```
 
+## 0.1.7+7 候选验证记录（不属于 Release 正文）
+
+- 候选提交：`f1ed58e104ee5cabd1e9a6bb4ebba5870593a8e5`。
+- Android Actions run `31864613635`、Linux Actions run `31864613435`、Windows Actions run `31864613474` 均通过；三套 workflow 的 Release 上传步骤均为 `skipped`。
+- 用户下载的 Android、Linux、Windows artifact ZIP 已与 GitHub artifact 元数据逐项核对 SHA-256；解包后的 8 个候选二进制已完成文件名、哈希、平台身份、Android 签名连续性和 Windows 未做 Authenticode 签名边界核验。
+- 下列文件带候选提交后缀 `_f1ed58e`。正式 tag workflow 会重新生成不带该后缀的发布资产，其 SHA-256 预计不同，因此这些哈希不进入上方正式 Release 正文。
+
+```text
+47f0f88f7d2be61882de1f2bdf5b2c7ab12f128a2aa5df5323eb760fff884994  JO-Kelivo-v0.1.7+7_f1ed58e-android-arm64-v8a-release.apk
+095bfee076420e73b80d208c0a2ac34e72e61b03ed0fd59b1a3951f10f563465  JO-Kelivo-v0.1.7+7_f1ed58e-android-armeabi-v7a-release.apk
+a5da2ad0e5fa847220e6a19a726bb9064603d8a6f6086895536e73762fec9c6b  JO-Kelivo-v0.1.7+7_f1ed58e-android-x86_64-release.apk
+7837fcaea9268ac74b02145aa7af1734545e743cea2172ea7dc6fb1d31a49b1c  JO-Kelivo-v0.1.7+7_f1ed58e-linux-x64-appimage.AppImage
+676ad6718a8fd886978ad2a2a5b12bf84f73f6123f050621f84347ef52b832d1  JO-Kelivo-v0.1.7+7_f1ed58e-linux-x64-archive.tar.gz
+227b741dde6d60bcfe318f9a9b13c6d18813d52280b0d0558b78f963858b98f3  JO-Kelivo-v0.1.7+7_f1ed58e-linux-x64-deb.deb
+ba3ebdf2764fdb43d7bed88ee25db7f779b35d71d4d148b5424c7427d830b56f  JO-Kelivo-v0.1.7+7_f1ed58e-windows-x64-portable.zip
+6052d3c1a3ae7a2a70ac57abe990b2c560407787f5ed26bd44827553ee2ce90b  JO-Kelivo-v0.1.7+7_f1ed58e-windows-x64-setup.exe
+```
+
 ---
 
 # 0.1.6+6（发布候选）
