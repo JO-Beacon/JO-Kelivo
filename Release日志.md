@@ -1,6 +1,6 @@
-# 0.1.7+7（发布候选）
+# 0.1.7+7
 
-## Release notes draft
+## Release notes
 
 ```markdown
 # JO-Kelivo 0.1.7+7
