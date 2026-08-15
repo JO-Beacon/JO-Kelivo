@@ -1817,6 +1817,17 @@
   "aboutPageWebsite": "Website",
   "aboutPageGithub": "GitHub",
   "aboutPageLicense": "License",
+  "aboutPageCheckForUpdates": "Check for Updates",
+  "aboutPageCheckingForUpdates": "Checking for updates...",
+  "aboutPageAlreadyLatest": "You're up to date",
+  "aboutPageUpdateCheckFailed": "Failed to check for updates: {error}",
+  "@aboutPageUpdateCheckFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "displaySettingsPageShowUserAvatarTitle": "Show User Avatar",
   "displaySettingsPageShowUserAvatarSubtitle": "Display user avatar in chat messages",
   "displaySettingsPageShowUserNameTimestampTitle": "Show User Name & Timestamp",

@@ -54,27 +54,64 @@ void main() {
       },
     );
 
+    test('offers manual update checks on mobile and desktop About pages', () {
+      for (final path in [
+        'lib/features/settings/pages/about_page.dart',
+        'lib/desktop/setting/about_pane.dart',
+      ]) {
+        final source = _read(path);
+        expect(source, contains('l10n.aboutPageCheckForUpdates'), reason: path);
+        expect(source, contains('checkForUpdates()'), reason: path);
+        expect(source, contains('updateProvider.checking'), reason: path);
+      }
+    });
+
+    test('places the user data directory before local backups on desktop', () {
+      final source = _read('lib/desktop/setting/backup_pane.dart');
+      final userDataDirectory = source.indexOf(
+        'l10n.backupPageUserDataDirectoryTitle',
+      );
+      final localBackup = source.indexOf(
+        '_buildLocalBackupSliver(context, l10n, cs)',
+      );
+
+      expect(userDataDirectory, greaterThanOrEqualTo(0));
+      expect(localBackup, greaterThan(userDataDirectory));
+    });
+
     test(
       'keeps JO-Kelivo About copy without community or sponsorship actions',
       () {
         final expectedCopy =
-            <String, ({String description, String share, String title})>{
+            <
+              String,
+              ({
+                String checkUpdates,
+                String description,
+                String share,
+                String title,
+              })
+            >{
               'lib/l10n/app_en.arb': (
+                checkUpdates: 'Check for Updates',
                 description: 'Open-source AI assistant based on Kelivo',
                 share: 'JO-Kelivo - Open Source AI Assistant',
                 title: 'About Kelivo',
               ),
               'lib/l10n/app_zh.arb': (
+                checkUpdates: '检查更新',
                 description: '基于 Kelivo 的开源 AI 助手',
                 share: 'JO-Kelivo - 开源 AI 助手',
                 title: '关于 Kelivo',
               ),
               'lib/l10n/app_zh_Hans.arb': (
+                checkUpdates: '检查更新',
                 description: '基于 Kelivo 的开源 AI 助手',
                 share: 'JO-Kelivo - 开源 AI 助手',
                 title: '关于 Kelivo',
               ),
               'lib/l10n/app_zh_Hant.arb': (
+                checkUpdates: '檢查更新',
                 description: '基於 Kelivo 的開源 AI 助理',
                 share: 'JO-Kelivo - 開源 AI 助理',
                 title: '關於 Kelivo',
@@ -96,6 +133,19 @@ void main() {
             copy.description,
             reason: path,
           );
+          expect(
+            arb['aboutPageCheckForUpdates'],
+            copy.checkUpdates,
+            reason: path,
+          );
+          for (final key in [
+            'aboutPageCheckingForUpdates',
+            'aboutPageAlreadyLatest',
+            'aboutPageUpdateCheckFailed',
+            '@aboutPageUpdateCheckFailed',
+          ]) {
+            expect(arb, contains(key), reason: '$path must define $key');
+          }
           expect(arb['aboutPageKelivoSectionTitle'], copy.title, reason: path);
           expect(arb['settingsShare'], copy.share, reason: path);
           for (final key in retiredKeys) {

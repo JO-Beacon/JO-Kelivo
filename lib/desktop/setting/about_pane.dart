@@ -3,11 +3,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/providers/update_provider.dart';
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
 import '../../features/settings/pages/debug_page.dart';
+import '../../shared/widgets/ios_tile_button.dart';
+import '../../shared/widgets/snackbar.dart';
 import '../../theme/app_font_weights.dart';
 
 class DesktopAboutPane extends StatefulWidget {
@@ -76,10 +80,39 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
     }
   }
 
+  Future<void> _checkForUpdates() async {
+    final updateProvider = context.read<UpdateProvider>();
+    await updateProvider.checkForUpdates();
+    if (!mounted) return;
+
+    final l10n = AppLocalizations.of(context)!;
+    final error = updateProvider.error;
+    if (error != null) {
+      showAppSnackBar(
+        context,
+        message: l10n.aboutPageUpdateCheckFailed(error),
+        type: NotificationType.error,
+      );
+      return;
+    }
+
+    final available = updateProvider.available;
+    showAppSnackBar(
+      context,
+      message: available == null
+          ? l10n.aboutPageAlreadyLatest
+          : l10n.sideDrawerUpdateTitle(available.version),
+      type: available == null
+          ? NotificationType.success
+          : NotificationType.info,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
+    final updateProvider = context.watch<UpdateProvider>();
 
     String localizeSystem(String systemId) {
       switch (systemId) {
@@ -216,6 +249,23 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 16),
+              Align(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 320),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: IosTileButton(
+                      label: updateProvider.checking
+                          ? l10n.aboutPageCheckingForUpdates
+                          : l10n.aboutPageCheckForUpdates,
+                      icon: lucide.Lucide.RefreshCw,
+                      enabled: !updateProvider.checking,
+                      onTap: _checkForUpdates,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),

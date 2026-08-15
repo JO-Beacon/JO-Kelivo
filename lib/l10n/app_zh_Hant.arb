@@ -1431,6 +1431,17 @@
   "aboutPageWebsite": "官網",
   "aboutPageGithub": "GitHub",
   "aboutPageLicense": "授權",
+  "aboutPageCheckForUpdates": "檢查更新",
+  "aboutPageCheckingForUpdates": "正在檢查更新...",
+  "aboutPageAlreadyLatest": "目前已是最新版本",
+  "aboutPageUpdateCheckFailed": "檢查更新失敗：{error}",
+  "@aboutPageUpdateCheckFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "displaySettingsPageShowUserAvatarTitle": "顯示使用者頭像",
   "displaySettingsPageShowUserAvatarSubtitle": "是否在聊天訊息中顯示使用者頭像",
   "displaySettingsPageShowUserNameTimestampTitle": "顯示使用者名稱與時間戳",

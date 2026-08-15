@@ -7849,6 +7849,30 @@ abstract class AppLocalizations {
   /// **'License'**
   String get aboutPageLicense;
 
+  /// No description provided for @aboutPageCheckForUpdates.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for Updates'**
+  String get aboutPageCheckForUpdates;
+
+  /// No description provided for @aboutPageCheckingForUpdates.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking for updates...'**
+  String get aboutPageCheckingForUpdates;
+
+  /// No description provided for @aboutPageAlreadyLatest.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re up to date'**
+  String get aboutPageAlreadyLatest;
+
+  /// No description provided for @aboutPageUpdateCheckFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to check for updates: {error}'**
+  String aboutPageUpdateCheckFailed(String error);
+
   /// No description provided for @displaySettingsPageShowUserAvatarTitle.
   ///
   /// In en, this message translates to:

@@ -4229,6 +4229,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutPageLicense => 'License';
 
   @override
+  String get aboutPageCheckForUpdates => 'Check for Updates';
+
+  @override
+  String get aboutPageCheckingForUpdates => 'Checking for updates...';
+
+  @override
+  String get aboutPageAlreadyLatest => 'You\'re up to date';
+
+  @override
+  String aboutPageUpdateCheckFailed(String error) {
+    return 'Failed to check for updates: $error';
+  }
+
+  @override
   String get displaySettingsPageShowUserAvatarTitle => 'Show User Avatar';
 
   @override

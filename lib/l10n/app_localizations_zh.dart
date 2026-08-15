@@ -4078,6 +4078,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutPageLicense => '许可证';
 
   @override
+  String get aboutPageCheckForUpdates => '检查更新';
+
+  @override
+  String get aboutPageCheckingForUpdates => '正在检查更新...';
+
+  @override
+  String get aboutPageAlreadyLatest => '当前已是最新版本';
+
+  @override
+  String aboutPageUpdateCheckFailed(String error) {
+    return '检查更新失败：$error';
+  }
+
+  @override
   String get displaySettingsPageShowUserAvatarTitle => '显示用户头像';
 
   @override
@@ -11327,6 +11341,20 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get aboutPageLicense => '许可证';
 
   @override
+  String get aboutPageCheckForUpdates => '检查更新';
+
+  @override
+  String get aboutPageCheckingForUpdates => '正在检查更新...';
+
+  @override
+  String get aboutPageAlreadyLatest => '当前已是最新版本';
+
+  @override
+  String aboutPageUpdateCheckFailed(String error) {
+    return '检查更新失败：$error';
+  }
+
+  @override
   String get displaySettingsPageShowUserAvatarTitle => '显示用户头像';
 
   @override
@@ -18572,6 +18600,20 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get aboutPageLicense => '授權';
+
+  @override
+  String get aboutPageCheckForUpdates => '檢查更新';
+
+  @override
+  String get aboutPageCheckingForUpdates => '正在檢查更新...';
+
+  @override
+  String get aboutPageAlreadyLatest => '目前已是最新版本';
+
+  @override
+  String aboutPageUpdateCheckFailed(String error) {
+    return '檢查更新失敗：$error';
+  }
 
   @override
   String get displaySettingsPageShowUserAvatarTitle => '顯示使用者頭像';

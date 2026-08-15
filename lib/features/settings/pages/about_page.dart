@@ -9,8 +9,11 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../icons/lucide_adapter.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/providers/update_provider.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/ios_switch.dart';
+import '../../../shared/widgets/snackbar.dart';
 import '../../../core/services/haptics.dart';
 import 'debug_page.dart';
 import 'log_viewer_page.dart';
@@ -68,6 +71,34 @@ class _AboutPageState extends State<AboutPage> {
       // Fallback: try in-app web view
       await launchUrl(uri, mode: LaunchMode.platformDefault);
     }
+  }
+
+  Future<void> _checkForUpdates() async {
+    final updateProvider = context.read<UpdateProvider>();
+    await updateProvider.checkForUpdates();
+    if (!mounted) return;
+
+    final l10n = AppLocalizations.of(context)!;
+    final error = updateProvider.error;
+    if (error != null) {
+      showAppSnackBar(
+        context,
+        message: l10n.aboutPageUpdateCheckFailed(error),
+        type: NotificationType.error,
+      );
+      return;
+    }
+
+    final available = updateProvider.available;
+    showAppSnackBar(
+      context,
+      message: available == null
+          ? l10n.aboutPageAlreadyLatest
+          : l10n.sideDrawerUpdateTitle(available.version),
+      type: available == null
+          ? NotificationType.success
+          : NotificationType.info,
+    );
   }
 
   void _onVersionTap() {
@@ -369,6 +400,7 @@ class _AboutPageState extends State<AboutPage> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
+    final updateProvider = context.watch<UpdateProvider>();
 
     return Scaffold(
       appBar: AppBar(
@@ -530,6 +562,16 @@ class _AboutPageState extends State<AboutPage> {
                 ),
               ),
             ],
+          ),
+
+          const SizedBox(height: 16),
+          IosTileButton(
+            label: updateProvider.checking
+                ? l10n.aboutPageCheckingForUpdates
+                : l10n.aboutPageCheckForUpdates,
+            icon: Lucide.RefreshCw,
+            enabled: !updateProvider.checking,
+            onTap: _checkForUpdates,
           ),
 
           const SizedBox(height: 24),

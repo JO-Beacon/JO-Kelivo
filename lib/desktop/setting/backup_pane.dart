@@ -408,10 +408,6 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
-              _buildLocalBackupSliver(context, l10n, cs),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 10)),
-
               SliverToBoxAdapter(
                 child: _sectionCard(
                   children: [
@@ -452,6 +448,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                   ],
                 ),
               ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 10)),
+
+              _buildLocalBackupSliver(context, l10n, cs),
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 

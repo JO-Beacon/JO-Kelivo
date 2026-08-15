@@ -1473,6 +1473,17 @@
   "aboutPageWebsite": "官网",
   "aboutPageGithub": "GitHub",
   "aboutPageLicense": "许可证",
+  "aboutPageCheckForUpdates": "检查更新",
+  "aboutPageCheckingForUpdates": "正在检查更新...",
+  "aboutPageAlreadyLatest": "当前已是最新版本",
+  "aboutPageUpdateCheckFailed": "检查更新失败：{error}",
+  "@aboutPageUpdateCheckFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "displaySettingsPageShowUserAvatarTitle": "显示用户头像",
   "displaySettingsPageShowUserAvatarSubtitle": "是否在聊天消息中显示用户头像",
   "displaySettingsPageShowUserNameTimestampTitle": "显示用户名称和时间戳",
