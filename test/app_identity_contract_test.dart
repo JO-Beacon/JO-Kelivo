@@ -231,6 +231,12 @@ void main() {
         final workflow = _read(path);
         expect(workflow, contains("FLUTTER_VERSION: '3.44.1'"));
         expect(workflow, contains('workflow_dispatch:'));
+        expect(
+          workflow,
+          contains(r"- '[0-9]+.[0-9]+.[0-9]+\+[0-9]+'"),
+          reason: '$path must trigger for full version tags without a v prefix',
+        );
+        expect(workflow, isNot(contains("- 'v*'")), reason: path);
         expect(workflow, contains('actions/upload-artifact@v4'));
         expect(workflow, contains('if-no-files-found: error'));
         expect(workflow, contains('softprops/action-gh-release@v2'));
