@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../../../utils/app_directories.dart';
+import '../logging/log_payload_elider.dart';
 
 class RequestLogger {
   RequestLogger._();
@@ -11,7 +12,14 @@ class RequestLogger {
   static bool get enabled => _enabled;
   static bool _writeErrorReported = false;
 
-  static bool saveOutput = true;
+  static bool saveOutput = false;
+
+  /// Replace inline base64 images/files with a placeholder before writing.
+  static bool elideLargePayloads = true;
+
+  /// Backstop for anything the elider misses; a single log line never grows
+  /// past this, so the viewer can always open the file.
+  static const int maxLineChars = 1024 * 1024;
 
   static int _nextRequestId = 0;
   static int nextRequestId() => ++_nextRequestId;
@@ -20,6 +28,7 @@ class RequestLogger {
     if (_enabled == v) return;
     _enabled = v;
     if (!v) {
+      await _writeQueue;
       try {
         await _sink?.flush();
       } catch (_) {}
@@ -91,12 +100,23 @@ class RequestLogger {
     return _sink!;
   }
 
+  /// Strips inline base64 payloads when [elideLargePayloads] is on.
+  static String elidePayloads(String text) {
+    if (!elideLargePayloads) return text;
+    return LogPayloadElider.elide(text);
+  }
+
+  static String capLine(String line) {
+    if (line.length <= maxLineChars) return line;
+    final dropped = line.length - maxLineChars;
+    return '${line.substring(0, maxLineChars)}…<truncated $dropped chars>';
+  }
+
   static void logLine(String line) {
     if (!_enabled) return;
     final now = DateTime.now();
-    final text = '[${_formatTs(now)}] $line\n';
+    final text = '[${_formatTs(now)}] ${capLine(line)}\n';
     _writeQueue = _writeQueue.then((_) async {
-      if (!_enabled) return;
       try {
         final sink = await _ensureSink();
         sink.write(text);
@@ -146,6 +166,21 @@ class RequestLogger {
         .replaceAll('\t', r'\t');
   }
 
+  /// Files currently held open by RequestLogger / FlutterLogger / ContextLogger.
+  /// Deleting them unlinks the inode on Unix (writes vanish) or fails on Windows.
+  static const Set<String> activeLogFileNames = {
+    'logs.txt',
+    'flutter_logs.txt',
+    'context_logs.txt',
+  };
+
+  static String _logFileName(String path) {
+    final normalized = path.replaceAll('\\', '/');
+    final slash = normalized.lastIndexOf('/');
+    final name = slash < 0 ? normalized : normalized.substring(slash + 1);
+    return name.toLowerCase();
+  }
+
   static Future<void> cleanupLogs({
     required int autoDeleteDays,
     required int maxSizeMB,
@@ -157,7 +192,12 @@ class RequestLogger {
 
       final files = await logsDir
           .list()
-          .where((e) => e is File && e.path.toLowerCase().endsWith('.txt'))
+          .where(
+            (e) =>
+                e is File &&
+                e.path.toLowerCase().endsWith('.txt') &&
+                !activeLogFileNames.contains(_logFileName(e.path)),
+          )
           .cast<File>()
           .toList();
       if (files.isEmpty) return;

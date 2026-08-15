@@ -205,6 +205,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceSubCacheSystem => '系统缓存';
 
   @override
+  String get storageSpaceSubLogsContext => '上下文日志';
+
+  @override
   String get storageSpaceSubLogsFlutter => '运行日志';
 
   @override
@@ -5133,7 +5136,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get searchProviderFirecrawlDescription =>
-      'Firecrawl Search API v2。需要 Bearer API Key。此处不支持 Scrape。';
+      'Firecrawl Search API v2。API Key 可选。此处不支持 Scrape。';
 
   @override
   String get searchServiceNameTinyFish => 'TinyFish';
@@ -5667,6 +5670,79 @@ class AppLocalizationsZh extends AppLocalizations {
       '开启后会将 Flutter 错误与 print 输出写入 logs/flutter_logs.txt';
 
   @override
+  String get contextLogSettingTitle => '上下文日志';
+
+  @override
+  String get contextLogSettingSubtitle =>
+      '开启后会将每次实际发送给模型的完整上下文写入 logs/context_logs.txt';
+
+  @override
+  String get contextLogViewerTitle => '上下文';
+
+  @override
+  String contextLogSnapshotMessages(int count) {
+    return '$count 条消息';
+  }
+
+  @override
+  String contextLogSnapshotTokens(int count) {
+    return '$count tokens';
+  }
+
+  @override
+  String get contextLogSourceSystemPrompt => '系统提示词';
+
+  @override
+  String get contextLogSourceMemoryRules => '记忆规则';
+
+  @override
+  String get contextLogSourceSearchPrompt => '搜索提示';
+
+  @override
+  String get contextLogSourceInstructionInjection => '指令注入';
+
+  @override
+  String get contextLogSourceWorldBook => '世界书';
+
+  @override
+  String get contextLogSourceMemorySnapshot => '记忆快照';
+
+  @override
+  String get contextLogSourceChatHistory => '聊天历史';
+
+  @override
+  String get contextLogSourceToolCall => '工具调用';
+
+  @override
+  String get contextLogSourceToolResult => '工具结果';
+
+  @override
+  String contextLogSnapshotsCount(int count) {
+    return '$count 条快照';
+  }
+
+  @override
+  String get contextLogSnapshotFallbackTitle => '快照';
+
+  @override
+  String get contextLogKindFull => '全量快照';
+
+  @override
+  String get contextLogKindUpdate => '增量更新';
+
+  @override
+  String get contextLogSectionComposition => '构成';
+
+  @override
+  String get contextLogLoadOlder => '加载更早的日志';
+
+  @override
+  String get contextLogLoading => '加载中…';
+
+  @override
+  String get contextLogAllLoaded => '已加载全部日志';
+
+  @override
   String get logViewerTitle => '请求日志';
 
   @override
@@ -5734,13 +5810,30 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get logViewerSectionAttachments => '附件';
+
+  @override
+  String get logViewerPayloadOmitted => '已省略';
+
+  @override
+  String get logViewerShowMore => '显示更多';
+
+  @override
   String get logSettingsTitle => '日志设置';
 
   @override
   String get logSettingsSaveOutput => '保存响应输出';
 
   @override
-  String get logSettingsSaveOutputSubtitle => '记录响应体内容（可能占用较多存储空间）';
+  String get logSettingsSaveOutputSubtitle =>
+      '记录流式输出的每个分片（可能影响生成性能）。HTTP 报错响应仍会写入。';
+
+  @override
+  String get logSettingsElidePayloads => '省略大载荷';
+
+  @override
+  String get logSettingsElidePayloadsSubtitle =>
+      '把内联的 base64 图片和文件替换成占位符，日志更小、查看器更快。';
 
   @override
   String get logSettingsAutoDelete => '自动删除';
@@ -6287,6 +6380,17 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get legacyMemoryMigrationClose => '完成';
+
+  @override
+  String get legacyMemoryModeTitle => '使用旧版记忆';
+
+  @override
+  String get legacyMemoryModeSubtitle =>
+      '全局设置，影响所有助手。两套数据各自保留，可随时切回。旧版记忆仅按助手隔离，没有全局记忆、用户画像、后台整理、记忆追踪和历史对话搜索。';
+
+  @override
+  String get legacyMemoryModeCacheWarning =>
+      '旧版会把全部记忆内容与当前时间写进系统提示词，每轮都在变，无法命中 prompt cache，长对话成本更高。';
 
   @override
   String get memoryUiContentLabel => '内容';
@@ -7348,6 +7452,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get storageSpaceSubCacheSystem => '系统缓存';
+
+  @override
+  String get storageSpaceSubLogsContext => '上下文日志';
 
   @override
   String get storageSpaceSubLogsFlutter => '运行日志';
@@ -12278,7 +12385,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get searchProviderFirecrawlDescription =>
-      'Firecrawl Search API v2。需要 Bearer API Key。此处不支持 Scrape。';
+      'Firecrawl Search API v2。API Key 可选。此处不支持 Scrape。';
 
   @override
   String get searchServiceNameTinyFish => 'TinyFish';
@@ -12812,6 +12919,79 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '开启后会将 Flutter 错误与 print 输出写入 logs/flutter_logs.txt';
 
   @override
+  String get contextLogSettingTitle => '上下文日志';
+
+  @override
+  String get contextLogSettingSubtitle =>
+      '开启后会将每次实际发送给模型的完整上下文写入 logs/context_logs.txt';
+
+  @override
+  String get contextLogViewerTitle => '上下文';
+
+  @override
+  String contextLogSnapshotMessages(int count) {
+    return '$count 条消息';
+  }
+
+  @override
+  String contextLogSnapshotTokens(int count) {
+    return '$count tokens';
+  }
+
+  @override
+  String get contextLogSourceSystemPrompt => '系统提示词';
+
+  @override
+  String get contextLogSourceMemoryRules => '记忆规则';
+
+  @override
+  String get contextLogSourceSearchPrompt => '搜索提示';
+
+  @override
+  String get contextLogSourceInstructionInjection => '指令注入';
+
+  @override
+  String get contextLogSourceWorldBook => '世界书';
+
+  @override
+  String get contextLogSourceMemorySnapshot => '记忆快照';
+
+  @override
+  String get contextLogSourceChatHistory => '聊天历史';
+
+  @override
+  String get contextLogSourceToolCall => '工具调用';
+
+  @override
+  String get contextLogSourceToolResult => '工具结果';
+
+  @override
+  String contextLogSnapshotsCount(int count) {
+    return '$count 条快照';
+  }
+
+  @override
+  String get contextLogSnapshotFallbackTitle => '快照';
+
+  @override
+  String get contextLogKindFull => '全量快照';
+
+  @override
+  String get contextLogKindUpdate => '增量更新';
+
+  @override
+  String get contextLogSectionComposition => '构成';
+
+  @override
+  String get contextLogLoadOlder => '加载更早的日志';
+
+  @override
+  String get contextLogLoading => '加载中…';
+
+  @override
+  String get contextLogAllLoaded => '已加载全部日志';
+
+  @override
   String get logViewerTitle => '请求日志';
 
   @override
@@ -12879,13 +13059,30 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
+  String get logViewerSectionAttachments => '附件';
+
+  @override
+  String get logViewerPayloadOmitted => '已省略';
+
+  @override
+  String get logViewerShowMore => '显示更多';
+
+  @override
   String get logSettingsTitle => '日志设置';
 
   @override
   String get logSettingsSaveOutput => '保存响应输出';
 
   @override
-  String get logSettingsSaveOutputSubtitle => '记录响应体内容（可能占用较多存储空间）';
+  String get logSettingsSaveOutputSubtitle =>
+      '记录流式输出的每个分片（可能影响生成性能）。HTTP 报错响应仍会写入。';
+
+  @override
+  String get logSettingsElidePayloads => '省略大载荷';
+
+  @override
+  String get logSettingsElidePayloadsSubtitle =>
+      '把内联的 base64 图片和文件替换成占位符，日志更小、查看器更快。';
 
   @override
   String get logSettingsAutoDelete => '自动删除';
@@ -13432,6 +13629,17 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get legacyMemoryMigrationClose => '完成';
+
+  @override
+  String get legacyMemoryModeTitle => '使用旧版记忆';
+
+  @override
+  String get legacyMemoryModeSubtitle =>
+      '全局设置，影响所有助手。两套数据各自保留，可随时切回。旧版记忆仅按助手隔离，没有全局记忆、用户画像、后台整理、记忆追踪和历史对话搜索。';
+
+  @override
+  String get legacyMemoryModeCacheWarning =>
+      '旧版会把全部记忆内容与当前时间写进系统提示词，每轮都在变，无法命中 prompt cache，长对话成本更高。';
 
   @override
   String get memoryUiContentLabel => '内容';
@@ -14493,6 +14701,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceSubCacheSystem => '系統快取';
+
+  @override
+  String get storageSpaceSubLogsContext => '上下文日誌';
 
   @override
   String get storageSpaceSubLogsFlutter => '執行日誌';
@@ -19422,7 +19633,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get searchProviderFirecrawlDescription =>
-      'Firecrawl Search API v2。需要 Bearer API Key。此處不支援 Scrape。';
+      'Firecrawl Search API v2。API Key 可選。此處不支援 Scrape。';
 
   @override
   String get searchServiceNameTinyFish => 'TinyFish';
@@ -19957,6 +20168,79 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '開啟後會將 Flutter 錯誤與 print 輸出寫入 logs/flutter_logs.txt';
 
   @override
+  String get contextLogSettingTitle => '上下文日誌';
+
+  @override
+  String get contextLogSettingSubtitle =>
+      '開啟後會將每次實際傳送給模型的完整上下文寫入 logs/context_logs.txt';
+
+  @override
+  String get contextLogViewerTitle => '上下文';
+
+  @override
+  String contextLogSnapshotMessages(int count) {
+    return '$count 則訊息';
+  }
+
+  @override
+  String contextLogSnapshotTokens(int count) {
+    return '$count tokens';
+  }
+
+  @override
+  String get contextLogSourceSystemPrompt => '系統提示詞';
+
+  @override
+  String get contextLogSourceMemoryRules => '記憶規則';
+
+  @override
+  String get contextLogSourceSearchPrompt => '搜尋提示';
+
+  @override
+  String get contextLogSourceInstructionInjection => '指令注入';
+
+  @override
+  String get contextLogSourceWorldBook => '世界書';
+
+  @override
+  String get contextLogSourceMemorySnapshot => '記憶快照';
+
+  @override
+  String get contextLogSourceChatHistory => '聊天歷史';
+
+  @override
+  String get contextLogSourceToolCall => '工具呼叫';
+
+  @override
+  String get contextLogSourceToolResult => '工具結果';
+
+  @override
+  String contextLogSnapshotsCount(int count) {
+    return '$count 則快照';
+  }
+
+  @override
+  String get contextLogSnapshotFallbackTitle => '快照';
+
+  @override
+  String get contextLogKindFull => '全量快照';
+
+  @override
+  String get contextLogKindUpdate => '增量更新';
+
+  @override
+  String get contextLogSectionComposition => '構成';
+
+  @override
+  String get contextLogLoadOlder => '載入更早的日誌';
+
+  @override
+  String get contextLogLoading => '載入中…';
+
+  @override
+  String get contextLogAllLoaded => '已載入全部日誌';
+
+  @override
   String get logViewerTitle => '請求日誌';
 
   @override
@@ -20024,13 +20308,30 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
+  String get logViewerSectionAttachments => '附件';
+
+  @override
+  String get logViewerPayloadOmitted => '已省略';
+
+  @override
+  String get logViewerShowMore => '顯示更多';
+
+  @override
   String get logSettingsTitle => '日誌設定';
 
   @override
   String get logSettingsSaveOutput => '保存回應輸出';
 
   @override
-  String get logSettingsSaveOutputSubtitle => '記錄回應本文內容（可能佔用較多儲存空間）';
+  String get logSettingsSaveOutputSubtitle =>
+      '記錄串流輸出的每個分片（可能影響生成效能）。HTTP 報錯回應仍會寫入。';
+
+  @override
+  String get logSettingsElidePayloads => '省略大載荷';
+
+  @override
+  String get logSettingsElidePayloadsSubtitle =>
+      '把內聯的 base64 圖片和檔案替換成佔位符，日誌更小、檢視器更快。';
 
   @override
   String get logSettingsAutoDelete => '自動刪除';
@@ -20577,6 +20878,17 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get legacyMemoryMigrationClose => '完成';
+
+  @override
+  String get legacyMemoryModeTitle => '使用舊版記憶';
+
+  @override
+  String get legacyMemoryModeSubtitle =>
+      '全域設定，影響所有助手。兩套資料各自保留，可隨時切回。舊版記憶僅按助手隔離，沒有全域記憶、使用者畫像、背景整理、記憶追蹤和歷史對話搜尋。';
+
+  @override
+  String get legacyMemoryModeCacheWarning =>
+      '舊版會把全部記憶內容與目前時間寫進系統提示詞，每輪都在變，無法命中 prompt cache，長對話成本更高。';
 
   @override
   String get memoryUiContentLabel => '內容';

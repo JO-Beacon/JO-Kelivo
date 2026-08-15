@@ -17,7 +17,7 @@
 ## 它不会做什么
 
 - 不读取或修改 Hive、SQLite 等本地数据库。
-- 不接受 ZIP 等完整备份包、JO `0.1.6` / Kelivo `1.2.x` 带结构化 `parts` 的 `chats.json`，或其他碰巧是 JSON 的文件。
+- 不接受 ZIP 等完整备份包、JO-Kelivo `0.1.6` 及更高版本 / Kelivo `1.2.x` 带结构化 `parts` 的 `chats.json`，或其他碰巧是 JSON 的文件。
 - 不导入 Kelivo 的模型类。
 - 不修改消息正文、时间戳、角色、版本号、会话 ID 或备份 schema。
 - 不自动导入优化后的文件。

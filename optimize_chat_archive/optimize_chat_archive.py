@@ -210,16 +210,16 @@ def _optimize_message_ids(
 
 
 def validate_legacy_archive_data(data: JsonObject) -> None:
-    """Reject anything other than the legacy JO chats.json export shape."""
+    """Reject anything other than the legacy JO-Kelivo chats.json export shape."""
     missing_root = _LEGACY_ROOT_FIELDS.difference(data)
     if missing_root:
         raise ValueError(
-            "not a JO 0.1.5-or-earlier chats.json: missing root field(s): "
+            "not a JO-Kelivo 0.1.5-or-earlier chats.json: missing root field(s): "
             + ", ".join(sorted(missing_root))
         )
     if data.get("version") != 1:
         raise ValueError(
-            "not a JO 0.1.5-or-earlier chats.json: version must be 1"
+            "not a JO-Kelivo 0.1.5-or-earlier chats.json: version must be 1"
         )
 
     conversations = data.get("conversations")
@@ -263,8 +263,8 @@ def validate_legacy_archive_data(data: JsonObject) -> None:
             raise ValueError(f"message #{index} must be an object")
         if "parts" in message:
             raise ValueError(
-                "structured message parts belong to JO 0.1.6/Kelivo 1.2.x; "
-                "this tool only accepts JO 0.1.5-or-earlier chats.json"
+                "structured message parts belong to JO-Kelivo 0.1.6/Kelivo 1.2.x; "
+                "this tool only accepts JO-Kelivo 0.1.5-or-earlier chats.json"
             )
         missing = _LEGACY_MESSAGE_FIELDS.difference(message)
         if missing:

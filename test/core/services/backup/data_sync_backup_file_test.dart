@@ -818,44 +818,47 @@ void main() {
       },
     );
 
-    test('restores JO 0.1.5 settings and explicit DeepSeek routes', () async {
-      final source = jo015BusinessSettingsFixture();
-      final settingsFile = File('${root.path}/jo_015_settings.json');
-      await settingsFile.writeAsString(jsonEncode(source));
-      final backupFile = File('${root.path}/jo_015_backup.zip');
-      final encoder = ZipFileEncoder();
-      encoder.create(backupFile.path);
-      encoder.addFileSync(settingsFile, 'settings.json');
-      encoder.closeSync();
+    test(
+      'restores JO-Kelivo 0.1.5 settings and explicit DeepSeek routes',
+      () async {
+        final source = jo015BusinessSettingsFixture();
+        final settingsFile = File('${root.path}/jo_015_settings.json');
+        await settingsFile.writeAsString(jsonEncode(source));
+        final backupFile = File('${root.path}/jo_015_backup.zip');
+        final encoder = ZipFileEncoder();
+        encoder.create(backupFile.path);
+        encoder.addFileSync(settingsFile, 'settings.json');
+        encoder.closeSync();
 
-      await DataSync(
-        businessRepository: businessRepository,
-        chatService: ChatService(),
-      ).restoreFromLocalFile(
-        backupFile,
-        const WebDavConfig(includeChats: false, includeFiles: false),
-      );
+        await DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        ).restoreFromLocalFile(
+          backupFile,
+          const WebDavConfig(includeChats: false, includeFiles: false),
+        );
 
-      expect(
-        jo015BusinessSettingsProjection(
-          await BusinessRestoreService(businessRepository).exportSettings(),
-        ),
-        jo015BusinessSettingsProjection(source),
-      );
-    });
+        expect(
+          jo015BusinessSettingsProjection(
+            await BusinessRestoreService(businessRepository).exportSettings(),
+          ),
+          jo015BusinessSettingsProjection(source),
+        );
+      },
+    );
 
     test(
-      'imports a Kelivo 1.2.1 contract backup with shared data intact',
+      'imports a Kelivo 1.2.2 contract backup with shared data intact',
       () async {
-        const upstreamAssistantId = 'kelivo-121-assistant';
-        const upstreamProviderId = 'kelivo-121-provider';
-        const conversationId = 'kelivo-121-conversation';
+        const upstreamAssistantId = 'kelivo-122-assistant';
+        const upstreamProviderId = 'kelivo-122-provider';
+        const conversationId = 'kelivo-122-conversation';
         const attachmentUri = 'kelivo-file:///upload/fixture.txt';
         final upstreamSettings = <String, dynamic>{
           'assistants_v1': jsonEncode([
             {
               'id': upstreamAssistantId,
-              'name': 'Kelivo 1.2.1 Assistant',
+              'name': 'Kelivo 1.2.2 Assistant',
               'chatModelProvider': upstreamProviderId,
               'chatModelId': 'deepseek-chat',
             },
@@ -863,7 +866,7 @@ void main() {
           'provider_configs_v1': jsonEncode({
             upstreamProviderId: {
               'id': upstreamProviderId,
-              'name': 'Kelivo 1.2.1 Provider',
+              'name': 'Kelivo 1.2.2 Provider',
               'enabled': true,
               'apiKey': 'fixture-key',
               'baseUrl': 'https://example.invalid/v1',
@@ -875,48 +878,48 @@ void main() {
         };
         final backupFile = await _createSqliteBackupFixture(
           root: root,
-          prefix: 'kelivo_121_contract',
-          appVersion: '1.2.1+64',
+          prefix: 'kelivo_122_contract',
+          appVersion: '1.2.2+66',
           settings: upstreamSettings,
           conversations: [
             Conversation(
               id: conversationId,
-              title: 'Kelivo 1.2.1 conversation',
+              title: 'Kelivo 1.2.2 conversation',
               messageIds: const [
-                'kelivo-121-user',
-                'kelivo-121-answer-v0',
-                'kelivo-121-answer-v1',
+                'kelivo-122-user',
+                'kelivo-122-answer-v0',
+                'kelivo-122-answer-v1',
               ],
               assistantId: upstreamAssistantId,
-              versionSelections: const {'kelivo-121-answer': 1},
+              versionSelections: const {'kelivo-122-answer': 1},
             ),
           ],
           messages: [
             (
               message: ChatMessage(
-                id: 'kelivo-121-user',
+                id: 'kelivo-122-user',
                 role: 'user',
-                content: 'Question from Kelivo 1.2.1',
+                content: 'Question from Kelivo 1.2.2',
                 conversationId: conversationId,
               ),
               messageOrder: 0,
             ),
             (
               message: ChatMessage(
-                id: 'kelivo-121-answer-v0',
+                id: 'kelivo-122-answer-v0',
                 role: 'assistant',
                 content: 'First answer',
                 conversationId: conversationId,
                 modelId: 'deepseek-chat',
                 providerId: upstreamProviderId,
-                groupId: 'kelivo-121-answer',
+                groupId: 'kelivo-122-answer',
                 version: 0,
               ),
               messageOrder: 1,
             ),
             (
               message: ChatMessage(
-                id: 'kelivo-121-answer-v1',
+                id: 'kelivo-122-answer-v1',
                 role: 'assistant',
                 parts: const [
                   TextPart('Revised answer'),
@@ -930,14 +933,14 @@ void main() {
                 conversationId: conversationId,
                 modelId: 'deepseek-chat',
                 providerId: upstreamProviderId,
-                groupId: 'kelivo-121-answer',
+                groupId: 'kelivo-122-answer',
                 version: 1,
               ),
               messageOrder: 2,
             ),
           ],
           includeFiles: true,
-          assetContent: 'Kelivo 1.2.1 attachment',
+          assetContent: 'Kelivo 1.2.2 attachment',
           businessEntityRowIds: const {
             'assistants_v1': <String>[upstreamAssistantId],
           },
@@ -984,13 +987,13 @@ void main() {
         );
         expect(restoredConversation?.assistantId, upstreamAssistantId);
         expect(restoredConversation?.versionSelections, const {
-          'kelivo-121-answer': 1,
+          'kelivo-122-answer': 1,
         });
         final restoredMessages = await chatService.loadMessages(conversationId);
         expect(restoredMessages.map((message) => message.id), const [
-          'kelivo-121-user',
-          'kelivo-121-answer-v0',
-          'kelivo-121-answer-v1',
+          'kelivo-122-user',
+          'kelivo-122-answer-v0',
+          'kelivo-122-answer-v1',
         ]);
         final revised = restoredMessages.last;
         expect(revised.content, 'Revised answer');
@@ -998,13 +1001,13 @@ void main() {
         expect(revised.parts.whereType<FilePart>().single.name, 'fixture.txt');
         expect(
           await File(p.join(root.path, 'upload', 'fixture.txt')).readAsString(),
-          'Kelivo 1.2.1 attachment',
+          'Kelivo 1.2.2 attachment',
         );
       },
     );
 
     test(
-      'exports a backup accepted by the Kelivo 1.2.1 shared contract',
+      'exports a backup accepted by the Kelivo 1.2.2 shared contract',
       () async {
         const assistantId = 'jo-shared-assistant';
         const providerId = 'jo-shared-provider';
@@ -1013,8 +1016,8 @@ void main() {
         PackageInfo.setMockInitialValues(
           appName: 'JO-Kelivo',
           packageName: 'com.jo.kelivo',
-          version: '0.1.6',
-          buildNumber: '6',
+          version: '0.1.7',
+          buildNumber: '7',
           buildSignature: 'test',
         );
         SharedPreferences.setMockInitialValues({
@@ -1047,7 +1050,7 @@ void main() {
         await uploadDirectory.create(recursive: true);
         await File(
           p.join(uploadDirectory.path, 'shared.txt'),
-        ).writeAsString('JO shared attachment');
+        ).writeAsString('JO-Kelivo shared attachment');
 
         final chatService = ChatService();
         await chatService.init();
@@ -1055,7 +1058,7 @@ void main() {
         await chatService.restoreConversation(
           Conversation(
             id: conversationId,
-            title: 'JO shared conversation',
+            title: 'JO-Kelivo shared conversation',
             messageIds: const ['jo-answer-v0', 'jo-answer-v1'],
             assistantId: assistantId,
             versionSelections: const {'jo-answer': 1},
@@ -1064,7 +1067,7 @@ void main() {
             ChatMessage(
               id: 'jo-answer-v0',
               role: 'assistant',
-              content: 'First JO answer',
+              content: 'First JO-Kelivo answer',
               conversationId: conversationId,
               modelId: 'deepseek-chat',
               providerId: providerId,
@@ -1075,7 +1078,7 @@ void main() {
               id: 'jo-answer-v1',
               role: 'assistant',
               parts: const [
-                TextPart('Revised JO answer'),
+                TextPart('Revised JO-Kelivo answer'),
                 FilePart(
                   uri: attachmentUri,
                   name: 'shared.txt',
@@ -1121,7 +1124,7 @@ void main() {
           expect(manifest['format'], 'kelivo-backup');
           expect(manifest['formatVersion'], 2);
           expect(manifest['payloadKind'], 'sqlite');
-          expect(manifest['appVersion'], '0.1.6+6');
+          expect(manifest['appVersion'], '0.1.7+7');
           expect(manifest['includeChats'], isTrue);
           expect(manifest['includeFiles'], isTrue);
           expect(manifest['secretsIncluded'], isTrue);
@@ -1197,7 +1200,7 @@ void main() {
               ['jo-answer-v1'],
             );
             expect(parts.map((row) => row['kind']), ['text', 'file']);
-            expect(parts.first['payload'], 'Revised JO answer');
+            expect(parts.first['payload'], 'Revised JO-Kelivo answer');
             expect(
               jsonDecode(parts.last['payload'] as String),
               containsPair('uri', attachmentUri),
@@ -1207,7 +1210,7 @@ void main() {
           }
           expect(
             utf8.decode(archivedBytes['upload/shared.txt']!),
-            'JO shared attachment',
+            'JO-Kelivo shared attachment',
           );
         } finally {
           archive?.clearSync();

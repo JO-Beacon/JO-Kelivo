@@ -18,7 +18,9 @@ import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/logging/context_logger.dart';
 import 'package:Kelivo/core/services/mcp/mcp_tool_service.dart';
+import 'package:Kelivo/core/services/network/request_logger.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart'
     show ToolUIPart;
 import 'package:Kelivo/features/home/controllers/home_page_controller.dart';
@@ -122,6 +124,8 @@ void main() {
   });
 
   tearDown(() async {
+    await ContextLogger.setEnabled(false);
+    await RequestLogger.setEnabled(false);
     PathProviderPlatform.instance = previousPathProvider;
     try {
       await server.close(force: true);

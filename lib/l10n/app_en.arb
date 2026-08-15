@@ -92,6 +92,7 @@
   "storageSpaceSubCacheAvatars": "Avatar cache",
   "storageSpaceSubCacheOther": "Other cache",
   "storageSpaceSubCacheSystem": "System cache",
+  "storageSpaceSubLogsContext": "Context logs",
   "storageSpaceSubLogsFlutter": "Flutter logs",
   "storageSpaceSubLogsRequests": "Network logs",
   "storageSpaceSubLogsOther": "Other logs",
@@ -2221,7 +2222,7 @@
   "searchServiceNameStepFun": "StepFun",
   "searchProviderStepFunDescription": "StepFun web search via POST /v1/search.",
   "searchServiceNameFirecrawl": "Firecrawl",
-  "searchProviderFirecrawlDescription": "Firecrawl Search API v2. Requires a Bearer API key. Scrape is not supported here.",
+  "searchProviderFirecrawlDescription": "Firecrawl Search API v2. API key is optional. Scrape is not supported here.",
   "searchServiceNameTinyFish": "TinyFish",
   "searchProviderTinyFishDescription": "TinyFish Search API with region/language filters. Requires an API key. Fetch/Scrape is not supported here.",
   "searchServicesDialogCountryOptional": "Country/region (optional)",
@@ -2439,6 +2440,49 @@
   "requestLogSettingSubtitle": "When enabled, request/response details are written to logs/logs.txt (rotated daily).",
   "flutterLogSettingTitle": "Flutter Logging",
   "flutterLogSettingSubtitle": "When enabled, Flutter errors and print output are written to logs/flutter_logs.txt (rotated daily).",
+  "contextLogSettingTitle": "Context Logging",
+  "contextLogSettingSubtitle": "When enabled, the exact messages sent to the model are written to logs/context_logs.txt (rotated daily).",
+  "contextLogViewerTitle": "Context",
+  "contextLogSnapshotMessages": "{count} messages",
+  "@contextLogSnapshotMessages": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "contextLogSnapshotTokens": "{count} tokens",
+  "@contextLogSnapshotTokens": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "contextLogSourceSystemPrompt": "System prompt",
+  "contextLogSourceMemoryRules": "Memory rules",
+  "contextLogSourceSearchPrompt": "Search prompt",
+  "contextLogSourceInstructionInjection": "Instruction",
+  "contextLogSourceWorldBook": "World book",
+  "contextLogSourceMemorySnapshot": "Memory snapshot",
+  "contextLogSourceChatHistory": "Chat history",
+  "contextLogSourceToolCall": "Tool call",
+  "contextLogSourceToolResult": "Tool result",
+  "contextLogSnapshotsCount": "{count} snapshots",
+  "@contextLogSnapshotsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "contextLogSnapshotFallbackTitle": "Snapshot",
+  "contextLogKindFull": "Full snapshot",
+  "contextLogKindUpdate": "Incremental update",
+  "contextLogSectionComposition": "Composition",
+  "contextLogLoadOlder": "Load earlier logs",
+  "contextLogLoading": "Loading...",
+  "contextLogAllLoaded": "All logs loaded",
   "logViewerTitle": "Request Logs",
   "logViewerEmpty": "No logs yet",
   "logViewerCurrentLog": "Current Log",
@@ -2474,9 +2518,14 @@
       }
     }
   },
+  "logViewerSectionAttachments": "Attachments",
+  "logViewerPayloadOmitted": "omitted",
+  "logViewerShowMore": "Show more",
   "logSettingsTitle": "Log Settings",
   "logSettingsSaveOutput": "Save Response Output",
-  "logSettingsSaveOutputSubtitle": "Log response body content (may use significant storage)",
+  "logSettingsSaveOutputSubtitle": "Log every streaming chunk (can slow generation). HTTP error bodies are always recorded.",
+  "logSettingsElidePayloads": "Omit Large Payloads",
+  "logSettingsElidePayloadsSubtitle": "Replace inline base64 images and files with a placeholder. Keeps logs small and the viewer fast.",
   "logSettingsAutoDelete": "Auto-delete",
   "logSettingsAutoDeleteSubtitle": "Delete logs older than specified days",
   "logSettingsAutoDeleteDisabled": "Disabled",
@@ -2738,6 +2787,9 @@
   "legacyMemoryMigrationFailed": "Migration stopped. You can retry; memories already saved will be skipped.",
   "legacyMemoryMigrationRetry": "Retry",
   "legacyMemoryMigrationClose": "Done",
+  "legacyMemoryModeTitle": "Use legacy memory",
+  "legacyMemoryModeSubtitle": "Global setting for all assistants. Both datasets are kept; you can switch back anytime. Legacy memory is per-assistant only — no global memory, user profile, background organize, traces, or past-conversation search.",
+  "legacyMemoryModeCacheWarning": "Legacy mode writes all memories and the current time into the system prompt every turn, so prompt cache cannot hit and long chats cost more.",
   "memoryUiContentLabel": "Content",
   "memoryUiValueLabel": "Value",
   "memoryUiCustomKeyLabel": "Key",

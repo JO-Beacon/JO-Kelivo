@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/foundation.dart';
@@ -12,6 +13,7 @@ import '../../../core/models/assistant.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../chat/widgets/chat_message_widget.dart';
+import '../../chat/utils/thinking_tag_parser.dart';
 import '../../chat/widgets/message_more_sheet.dart';
 import '../controllers/stream_controller.dart' as stream_ctrl;
 import '../controllers/streaming_content_notifier.dart';
@@ -113,6 +115,7 @@ class MessageListView extends StatefulWidget {
     this.streamingContentNotifier,
     this.spotlightMessageId,
     this.spotlightToken = 0,
+    this.removingSlotIds = const <String>{},
     this.onVersionChange,
     this.onRegenerateMessage,
     this.onResendMessage,
@@ -140,6 +143,9 @@ class MessageListView extends StatefulWidget {
     this.onLoadMoreAfter,
     this.onUserScrollIntent,
     this.chatFontScale = 1,
+    this.collapseThinking = true,
+    this.collapsedCodeLines,
+    this.wrapCodeBlocks = false,
     this.showModelIcon = true,
     this.showUserAvatar = true,
     this.showTokenStats = false,
@@ -191,6 +197,10 @@ class MessageListView extends StatefulWidget {
   /// so re-selecting the same message re-triggers the pulse.
   final int spotlightToken;
 
+  /// Slots currently fading out ahead of their deletion. The slot data stays
+  /// in [messages] until the removal animation completes.
+  final Set<String> removingSlotIds;
+
   // Callbacks
   final OnVersionChange? onVersionChange;
   final OnRegenerateMessage? onRegenerateMessage;
@@ -223,6 +233,17 @@ class MessageListView extends StatefulWidget {
   final Future<bool> Function()? onLoadMoreAfter;
   final VoidCallback? onUserScrollIntent;
   final double chatFontScale;
+
+  /// Whether finished thinking blocks render collapsed (display setting).
+  final bool collapseThinking;
+
+  /// Lines a long code block collapses to, or null when it stays expanded.
+  final int? collapsedCodeLines;
+
+  /// Whether code blocks wrap (desktop, or the mobile wrap setting) instead of
+  /// scrolling horizontally.
+  final bool wrapCodeBlocks;
+
   final bool showModelIcon;
   final bool showUserAvatar;
   final bool showTokenStats;
@@ -287,6 +308,349 @@ class _MessageListViewState extends State<MessageListView> {
     };
   }
 
+  /// Header row + action bar + vertical margins around a bubble.
+  static const double _estimateChrome = 96.0;
+
+  /// Height of a collapsed inline thinking card.
+  static const double _estimateCollapsedCard = 44.0;
+
+  /// Characters scanned before a message's line density is extrapolated.
+  static const int _estimateScanLimit = 8000;
+
+  /// Font size fenced code renders at, before scaling.
+  static const double _estimateCodeFontSize = 13.0;
+
+  /// Longest message the thinking parser is run over.
+  static const int _estimateParseLimit = 64000;
+
+  /// Cached estimates kept before the memo is dropped wholesale.
+  static const int _extentEstimateCacheLimit = 512;
+
+  final Map<String, _ExtentEstimate> _extentEstimateCache = {};
+
+  /// System accessibility text scale, which multiplies the chat font scale.
+  double _systemTextScale = 1.0;
+
+  /// Display settings the estimate depends on, refreshed in [build].
+  _EstimateSettings _estimateSettings = const _EstimateSettings(
+    collapseThinking: true,
+    collapsedCodeLines: null,
+    wrapCodeBlocks: false,
+  );
+
+  /// Font scale the currently stored extents were estimated at.
+  double? _estimatedFontScale;
+
+  /// Drops stored extents after the system text scale changed.
+  ///
+  /// Only the widget-driven inputs go through [_synchronizeExtentCache]; a
+  /// system accessibility change arrives through MediaQuery without touching
+  /// the item count, so SuperSliverList would otherwise keep off-screen
+  /// estimates made at the old scale until each of them is scrolled into view.
+  void _invalidateEstimatesIfScaleChanged() {
+    final scale = widget.chatFontScale * _systemTextScale;
+    if (_estimatedFontScale == scale) return;
+    final hadEstimates = _estimatedFontScale != null;
+    _estimatedFontScale = scale;
+    if (!hadEstimates) return;
+    final controller = widget.listController;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !controller.isAttached || controller.isLocked) return;
+      controller.invalidateAllExtents();
+    });
+  }
+
+  /// Rough height of a message bubble, used for items that never got laid out.
+  ///
+  /// SuperSliverList's default estimate is a flat 100px. In a long chat a real
+  /// bubble is one to two orders of magnitude taller than that, so every time
+  /// layout replaces an estimate with a measurement the total extent — and with
+  /// it the bottom-pinned scroll offset — moves by tens of thousands of pixels.
+  /// When that lands across two frames the timeline visibly flicks away from
+  /// the bottom and back. A content-derived estimate keeps those corrections
+  /// small; it does not need to be exact, only the right order of magnitude.
+  double _estimateItemExtent(int? index, double crossAxisExtent) {
+    // A null index asks whether one extent fits every item. Answering with a
+    // positive number makes SuperSliverList apply it to the whole list without
+    // ever consulting the per-item branch below, so this has to be 0.
+    if (index == null) return 0;
+    final models = _effectiveRenderModels;
+    if (index < 0 || index >= models.length) return _estimateChrome;
+
+    final message = models[index].message;
+    final text = message.content;
+    final reasoning = message.role == 'assistant'
+        ? widget.reasoning[message.id]
+        : null;
+    final reasoningSegments = message.role == 'assistant'
+        ? widget.reasoningSegments[message.id]
+        : null;
+    final hasReasoning =
+        (reasoning?.text.isNotEmpty ?? false) ||
+        (reasoningSegments?.isNotEmpty ?? false);
+    if (text.isEmpty && !hasReasoning) return _estimateChrome;
+
+    // Layout asks for the same item repeatedly (every resize, every window
+    // change), and the scan below is linear in the message length, so a memo
+    // keyed by everything the result depends on keeps the layout phase cheap.
+    // The content is compared by identity: an edited or streamed message always
+    // carries a new string, and equal-length rewrites must not hit the memo.
+    final fontScale = widget.chatFontScale * _systemTextScale;
+    final settings = _estimateSettings;
+    final reasoningSignature = _reasoningEstimateSignature(
+      reasoning,
+      reasoningSegments,
+    );
+    final cached = _extentEstimateCache[message.id];
+    if (cached != null &&
+        identical(cached.content, text) &&
+        cached.crossAxisExtent == crossAxisExtent &&
+        cached.fontScale == fontScale &&
+        cached.settings == settings &&
+        cached.reasoningSignature == reasoningSignature) {
+      return cached.extent;
+    }
+
+    // Inline thinking renders as its own card. When it is collapsed only the
+    // visible remainder takes space, so parse it out with the same parser the
+    // renderer uses instead of guessing at the tag syntax.
+    var body = text;
+    var collapsedCards = 0;
+    if (settings.collapseThinking &&
+        message.role != 'user' &&
+        text.length <= _estimateParseLimit &&
+        text.contains('<')) {
+      final parsed = ThinkingTagParser.parseLegacyInlineBlocks(text);
+      if (parsed.hasThinking) {
+        body = parsed.visibleContent;
+        collapsedCards = parsed.thinkingTexts.length;
+      }
+    }
+
+    final fontSize = 15.6 * fontScale;
+    final lineHeight = fontSize * 1.5;
+    // User bubbles are inset and never span the full width.
+    final bubbleWidth = crossAxisExtent * (message.role == 'user' ? 0.85 : 1.0);
+    final textWidth = math.max(80.0, bubbleWidth - 28);
+    // Wide (CJK) glyphs are about twice as wide as Latin ones, so the mix
+    // decides how many characters fit on a line.
+    final charWidth = fontSize * (0.5 + 0.55 * _wideCharRatio(body));
+    final charsPerLine = math.max(1.0, textWidth / charWidth);
+    // Code renders in a fixed 13px monospace face, so it wraps at a different
+    // column and stacks at a different row height than the body text.
+    final codeFontSize = _estimateCodeFontSize * fontScale;
+    final codeCharsPerLine = math.max(1.0, textWidth / (codeFontSize * 0.6));
+    final extent =
+        _wrappedLineCount(
+              body,
+              charsPerLine: charsPerLine,
+              codeCharsPerLine: settings.wrapCodeBlocks
+                  ? codeCharsPerLine
+                  : null,
+              codeLineRatio: codeFontSize / fontSize,
+              collapsedCodeLines: settings.collapsedCodeLines,
+            ) *
+            lineHeight +
+        _estimateChrome +
+        collapsedCards * _estimateCollapsedCard +
+        _estimateReasoningExtent(
+          reasoning,
+          reasoningSegments,
+          textWidth: textWidth,
+          fontScale: fontScale,
+        );
+
+    if (_extentEstimateCache.length > _extentEstimateCacheLimit) {
+      _extentEstimateCache.clear();
+    }
+    _extentEstimateCache[message.id] = _ExtentEstimate(
+      content: text,
+      crossAxisExtent: crossAxisExtent,
+      fontScale: fontScale,
+      settings: settings,
+      reasoningSignature: reasoningSignature,
+      extent: extent,
+    );
+    return extent;
+  }
+
+  /// Estimated height of the reasoning card(s) rendered above the answer.
+  ///
+  /// Reasoning lives outside [ChatMessage.content], so the content-only
+  /// estimate misses it entirely: a reasoning-heavy message gets estimated an
+  /// order of magnitude too short, and every scroll or anchor computation
+  /// across the unmeasured region is off by the same amount. Mirrors the
+  /// renderer's choice of showing the segments when present and otherwise the
+  /// single reasoning block.
+  double _estimateReasoningExtent(
+    stream_ctrl.ReasoningData? reasoning,
+    List<stream_ctrl.ReasoningSegmentData>? segments, {
+    required double textWidth,
+    required double fontScale,
+  }) {
+    var extent = 0.0;
+    void addCard(String reasoningText, bool expanded) {
+      if (reasoningText.isEmpty) return;
+      extent += _estimateCollapsedCard;
+      if (!expanded) return;
+      final fontSize = 13.0 * fontScale;
+      final charWidth = fontSize * (0.5 + 0.55 * _wideCharRatio(reasoningText));
+      final charsPerLine = math.max(1.0, textWidth / charWidth);
+      extent +=
+          _wrappedLineCount(
+            reasoningText,
+            charsPerLine: charsPerLine,
+            codeCharsPerLine: null,
+            codeLineRatio: 1.0,
+            collapsedCodeLines: null,
+          ) *
+          (fontSize * 1.5);
+    }
+
+    if (segments != null && segments.isNotEmpty) {
+      for (final segment in segments) {
+        addCard(segment.text, segment.expanded);
+      }
+    } else if (reasoning != null) {
+      addCard(reasoning.text, reasoning.expanded);
+    }
+    return extent;
+  }
+
+  /// Identity of the reasoning inputs an estimate was computed from.
+  ///
+  /// Reasoning state objects mutate in place, but their text is replaced with
+  /// a new string on every change, so text identity plus the expanded flags
+  /// distinguishes every state the estimate depends on.
+  int _reasoningEstimateSignature(
+    stream_ctrl.ReasoningData? reasoning,
+    List<stream_ctrl.ReasoningSegmentData>? segments,
+  ) {
+    if (reasoning == null && (segments == null || segments.isEmpty)) return 0;
+    return Object.hashAll([
+      if (reasoning != null) ...[
+        identityHashCode(reasoning.text),
+        reasoning.expanded,
+      ],
+      if (segments != null)
+        for (final segment in segments) ...[
+          identityHashCode(segment.text),
+          segment.expanded,
+        ],
+    ]);
+  }
+
+  /// Rendered height in body lines, wrapping each hard line separately.
+  ///
+  /// Dividing the whole length by [charsPerLine] would collapse blank lines and
+  /// short lines, which is exactly the shape chat messages tend to have. Two
+  /// constructs would otherwise be counted wrong: a Markdown link hides its
+  /// target, and a fenced code block renders in its own font — wrapping at
+  /// [codeCharsPerLine] when the renderer wraps, or staying one row per source
+  /// line when it scrolls horizontally instead ([codeCharsPerLine] null), each
+  /// row [codeLineRatio] of a body line tall. A block may also be collapsed to
+  /// [collapsedCodeLines] source lines.
+  double _wrappedLineCount(
+    String text, {
+    required double charsPerLine,
+    required double? codeCharsPerLine,
+    required double codeLineRatio,
+    required int? collapsedCodeLines,
+  }) {
+    var lines = 0.0;
+    var visible = 0; // rendered characters on the current line
+    var fenceRows = 0.0; // rendered rows inside the open code fence
+    var fenceSourceLines = 0; // hard lines inside the open code fence
+    var inFence = false;
+    var index = 0;
+
+    void endLine() {
+      if (inFence) {
+        fenceSourceLines++;
+        fenceRows += visible == 0 || codeCharsPerLine == null
+            ? 1.0 // one row per source line: code scrolls sideways
+            : (visible / codeCharsPerLine).ceilToDouble();
+      } else {
+        lines += visible == 0 ? 1.0 : (visible / charsPerLine).ceilToDouble();
+      }
+      visible = 0;
+    }
+
+    void endFence() {
+      // Collapsing hides source lines, so the wrapped rows shrink with them.
+      final shown = collapsedCodeLines == null || fenceSourceLines == 0
+          ? fenceRows
+          : fenceRows * math.min(1.0, collapsedCodeLines / fenceSourceLines);
+      lines += shown * codeLineRatio;
+      fenceRows = 0;
+      fenceSourceLines = 0;
+    }
+
+    // Very long messages only need the right order of magnitude, so the scan is
+    // budgeted per character — a single-line megabyte of JSON must not walk the
+    // whole string — and the tail is extrapolated at the observed density.
+    while (index < text.length && index < _estimateScanLimit) {
+      final unit = text.codeUnitAt(index);
+      if (unit == 0x0A) {
+        endLine();
+        index++;
+        continue;
+      }
+      if (unit == 0x60 && _isFenceMarker(text, index)) {
+        if (inFence) {
+          endLine();
+          endFence();
+          inFence = false;
+        } else {
+          endLine();
+          inFence = true;
+        }
+        index += 3;
+        continue;
+      }
+      if (unit == 0x5D && index + 1 < text.length) {
+        // A Markdown link renders its label, never its target.
+        if (text.codeUnitAt(index + 1) == 0x28) {
+          final close = text.indexOf(')', index + 2);
+          if (close > 0) {
+            visible++;
+            index = close + 1;
+            continue;
+          }
+        }
+      }
+      visible++;
+      index++;
+    }
+    endLine();
+    if (inFence) endFence();
+    if (index >= text.length) return lines;
+    return lines * (text.length / math.max(1, index));
+  }
+
+  /// Whether a ``` fence marker starts at [index].
+  bool _isFenceMarker(String text, int index) {
+    if (index + 2 >= text.length) return false;
+    if (text.codeUnitAt(index + 1) != 0x60 ||
+        text.codeUnitAt(index + 2) != 0x60) {
+      return false;
+    }
+    return index == 0 || text.codeUnitAt(index - 1) == 0x0A;
+  }
+
+  /// Fraction of wide glyphs, sampled so the cost stays flat for huge messages.
+  double _wideCharRatio(String text) {
+    const samples = 256;
+    final step = math.max(1, text.length ~/ samples);
+    var wide = 0;
+    var seen = 0;
+    for (var index = 0; index < text.length; index += step) {
+      if (text.codeUnitAt(index) >= 0x2E80) wide++;
+      seen++;
+    }
+    return seen == 0 ? 0 : wide / seen;
+  }
+
   int? _findMessageIndexByKey(Key key) {
     if (key is! ValueKey<String>) return null;
     return _slotIndexById[key.value];
@@ -317,6 +681,9 @@ class _MessageListViewState extends State<MessageListView> {
         oldWidget.showModelIcon != widget.showModelIcon ||
         oldWidget.showUserAvatar != widget.showUserAvatar ||
         oldWidget.showTokenStats != widget.showTokenStats ||
+        oldWidget.collapseThinking != widget.collapseThinking ||
+        oldWidget.collapsedCodeLines != widget.collapsedCodeLines ||
+        oldWidget.wrapCodeBlocks != widget.wrapCodeBlocks ||
         !identical(oldWidget.assistant, widget.assistant);
     if (metricInputsChanged) {
       controller.invalidateAllExtents();
@@ -347,21 +714,29 @@ class _MessageListViewState extends State<MessageListView> {
         _isPrefix(newModels, oldModels)) {
       return;
     }
-    if (newModels.length < oldModels.length &&
-        _isSuffix(newModels, oldModels)) {
-      final anchor = _captureVisibleAnchor(controller);
-      final removed = oldModels.length - newModels.length;
-      for (var index = 0; index < removed; index++) {
-        controller.removeItem(0);
-      }
-      if (anchor != null && anchor.index >= removed) {
-        _restoreVisibleAnchorAfterLayout(
+    if (newModels.length < oldModels.length) {
+      final removedOldIndices = _removedOldIndices(oldModels, newModels);
+      if (removedOldIndices != null) {
+        // Removing the extents at the deleted indices keeps every surviving
+        // slot's measured height attached to its new index; the fallback
+        // below would instead drop all measurements and let the list drift
+        // while it re-measures the whole window over several frames.
+        final anchor = _captureVisibleAnchorForRemoval(
           controller,
-          index: anchor.index - removed,
-          alignment: anchor.alignment,
+          removedOldIndices,
         );
+        for (var index = removedOldIndices.length - 1; index >= 0; index--) {
+          controller.removeItem(removedOldIndices[index]);
+        }
+        if (anchor != null) {
+          _restoreVisibleAnchorAfterLayout(
+            controller,
+            index: anchor.index,
+            alignment: anchor.alignment,
+          );
+        }
+        return;
       }
-      return;
     }
 
     if (oldModels.length == newModels.length) {
@@ -425,24 +800,145 @@ class _MessageListViewState extends State<MessageListView> {
     controller.invalidateAllExtents();
   }
 
+  /// Whether a layout-phase positioning request (bottom pin, preserved
+  /// distance, streaming auto-follow) owns the scroll position this frame.
+  /// Anchor restoration must stand down instead of fighting it.
+  bool get _layoutPositionOwnedElsewhere {
+    final scrollController = widget.scrollController;
+    return scrollController is scroll_ctrl.ChatAutoFollowScrollController &&
+        (scrollController.hasActiveLayoutPositioningRequest ||
+            scrollController.shouldAutoFollow());
+  }
+
   ({int index, double alignment})? _captureVisibleAnchor(
     ListController controller,
   ) {
     if (!widget.scrollController.hasClients) return null;
+    if (_layoutPositionOwnedElsewhere) return null;
     final visible = controller.visibleRange;
     if (visible == null) return null;
-    final index = visible.$1;
+    return _anchorAtIndex(controller, visible.$1);
+  }
+
+  /// Captures the topmost visible slot that survives a removal, as an anchor
+  /// expressed in post-removal index space.
+  ///
+  /// When every visible slot is being removed, the anchor falls to the
+  /// nearest surviving slot below, whose content slides up into the vacated
+  /// viewport; failing that, the nearest surviving slot above.
+  ({int index, double alignment})? _captureVisibleAnchorForRemoval(
+    ListController controller,
+    List<int> removedOldIndices,
+  ) {
+    if (!widget.scrollController.hasClients) return null;
+    if (_layoutPositionOwnedElsewhere) return null;
+    final visible = controller.visibleRange;
+    if (visible == null) return null;
+    final removed = removedOldIndices.toSet();
+    final itemCount = controller.numberOfItems;
+    int? anchorOldIndex;
+    for (var index = visible.$1; index < itemCount; index++) {
+      if (!removed.contains(index)) {
+        anchorOldIndex = index;
+        break;
+      }
+    }
+    if (anchorOldIndex == null) {
+      for (var index = visible.$1 - 1; index >= 0; index--) {
+        if (!removed.contains(index)) {
+          anchorOldIndex = index;
+          break;
+        }
+      }
+    }
+    if (anchorOldIndex == null) return null;
+    final anchor = _anchorAtIndex(controller, anchorOldIndex);
+    var anchorNewIndex = anchorOldIndex;
+    for (final removedIndex in removedOldIndices) {
+      if (removedIndex < anchorOldIndex) anchorNewIndex--;
+    }
+    return (index: anchorNewIndex, alignment: anchor.alignment);
+  }
+
+  ({int index, double alignment}) _anchorAtIndex(
+    ListController controller,
+    int index,
+  ) {
     final position = widget.scrollController.position;
     final itemExtent = controller.extentForIndex(index).$1;
-    // This is the same offset query used by jumpToItem. It is safe here,
-    // before the new child list enters layout.
-    // ignore: invalid_use_of_visible_for_testing_member
-    final itemLeading = controller.getOffsetToReveal(index, 0);
+    // The scroll position is defined by where children were actually painted,
+    // while the extent list's offsets partly derive from estimated heights of
+    // rows that never entered layout. Mixing the two frames would bake their
+    // accumulated difference into the alignment, and the restore jump would
+    // land the anchor shifted by exactly that error — with estimate-heavy
+    // histories (long reasoning payloads, huge messages) that reads as the
+    // viewport jumping to a random place. Anchor on the painted offset and
+    // only fall back to the estimated one when the child is not built.
+    final itemLeading =
+        _paintedLeadingOffset(index) ??
+        // This is the same offset query used by jumpToItem. It is safe here,
+        // before the new child list enters layout.
+        // ignore: invalid_use_of_visible_for_testing_member
+        controller.getOffsetToReveal(index, 0);
     final availableAlignmentExtent = position.viewportDimension - itemExtent;
     final alignment = availableAlignmentExtent.abs() < 0.5
         ? 0.0
         : (itemLeading - position.pixels) / availableAlignmentExtent;
     return (index: index, alignment: alignment);
+  }
+
+  /// The scroll offset at which the child for [index] was actually laid out,
+  /// or null when that child is not currently built.
+  double? _paintedLeadingOffset(int index) {
+    final root = context.findRenderObject();
+    if (root == null) return null;
+    RenderSliverMultiBoxAdaptor? sliver;
+    void visit(RenderObject node) {
+      if (sliver != null) return;
+      if (node is RenderSliverMultiBoxAdaptor) {
+        sliver = node;
+        return;
+      }
+      node.visitChildren(visit);
+    }
+
+    visit(root);
+    final list = sliver;
+    if (list == null || list.geometry == null) return null;
+    for (
+      var child = list.firstChild;
+      child != null;
+      child = list.childAfter(child)
+    ) {
+      final parentData = child.parentData;
+      if (parentData is! SliverMultiBoxAdaptorParentData) continue;
+      if (parentData.index != index) continue;
+      if (parentData.keptAlive) return null;
+      final layoutOffset = parentData.layoutOffset;
+      if (layoutOffset == null) return null;
+      return layoutOffset + list.constraints.precedingScrollExtent;
+    }
+    return null;
+  }
+
+  /// Old-list indices whose slots are absent from the new list, or null when
+  /// the new list is not simply the old list with some slots removed.
+  List<int>? _removedOldIndices(
+    List<MessageRenderModel> oldModels,
+    List<MessageRenderModel> newModels,
+  ) {
+    final removed = <int>[];
+    var newIndex = 0;
+    for (var oldIndex = 0; oldIndex < oldModels.length; oldIndex++) {
+      if (newIndex < newModels.length &&
+          oldModels[oldIndex].slotId == newModels[newIndex].slotId) {
+        newIndex++;
+      } else {
+        removed.add(oldIndex);
+      }
+    }
+    if (newIndex != newModels.length || removed.isEmpty) return null;
+    return removed;
   }
 
   void _restoreVisibleAnchorAfterLayout(
@@ -581,6 +1077,15 @@ class _MessageListViewState extends State<MessageListView> {
 
   @override
   Widget build(BuildContext context) {
+    // Items render at the system scale times the chat scale (see the MediaQuery
+    // override in _buildMessageItem), so the estimate has to use both.
+    _systemTextScale = MediaQuery.textScalerOf(context).scale(1);
+    _estimateSettings = _EstimateSettings(
+      collapseThinking: widget.collapseThinking,
+      collapsedCodeLines: widget.collapsedCodeLines,
+      wrapCodeBlocks: widget.wrapCodeBlocks,
+    );
+    _invalidateEstimatesIfScaleChanged();
     final presentation = _MessagePresentation(
       chatFontScale: widget.chatFontScale,
       showModelIcon: widget.showModelIcon,
@@ -607,6 +1112,7 @@ class _MessageListViewState extends State<MessageListView> {
               delayPopulatingCacheArea: false,
               addRepaintBoundaries: false,
               findChildIndexCallback: _findMessageIndexByKey,
+              extentEstimation: _estimateItemExtent,
               padding: EdgeInsets.fromLTRB(
                 horizontalPad,
                 widget.topContentPadding,
@@ -983,42 +1489,45 @@ class _MessageListViewState extends State<MessageListView> {
     final isSpotlight =
         widget.spotlightMessageId != null &&
         message.id == widget.spotlightMessageId;
-    if (!isSpotlight) {
-      return RepaintBoundary(
-        key: ValueKey<String>(model.slotId),
-        child: messageColumn,
-      );
-    }
-
-    return RepaintBoundary(
-      key: ValueKey<String>(model.slotId),
-      child: TweenAnimationBuilder<double>(
-        key: ValueKey('spotlight-${widget.spotlightToken}'),
-        tween: Tween<double>(begin: 1.0, end: 0.0),
-        duration: const Duration(milliseconds: 1200),
-        curve: Curves.easeOut,
-        builder: (context, opacity, child) {
-          return Stack(
-            children: [
-              child!,
-              if (opacity > 0.0)
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(
-                          0xFFFFA726,
-                        ).withValues(alpha: opacity * 0.30),
-                        borderRadius: BorderRadius.circular(4),
+    final Widget item = isSpotlight
+        ? RepaintBoundary(
+            child: TweenAnimationBuilder<double>(
+              key: ValueKey('spotlight-${widget.spotlightToken}'),
+              tween: Tween<double>(begin: 1.0, end: 0.0),
+              duration: const Duration(milliseconds: 1200),
+              curve: Curves.easeOut,
+              builder: (context, opacity, child) {
+                return Stack(
+                  children: [
+                    child!,
+                    if (opacity > 0.0)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: const Color(
+                                0xFFFFA726,
+                              ).withValues(alpha: opacity * 0.30),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                ),
-            ],
-          );
-        },
-        child: messageColumn,
-      ),
+                  ],
+                );
+              },
+              child: messageColumn,
+            ),
+          )
+        : RepaintBoundary(child: messageColumn);
+
+    // The animator wraps the item's RepaintBoundary so the fade only
+    // re-composites the boundary's cached layer instead of repainting the
+    // message subtree every animation frame.
+    return _SlotRemovalAnimator(
+      key: ValueKey<String>(model.slotId),
+      removing: widget.removingSlotIds.contains(model.slotId),
+      child: item,
     );
   }
 
@@ -1278,6 +1787,54 @@ class _MessageListViewState extends State<MessageListView> {
   }
 }
 
+/// Display settings that change how tall a message renders.
+final class _EstimateSettings {
+  const _EstimateSettings({
+    required this.collapseThinking,
+    required this.collapsedCodeLines,
+    required this.wrapCodeBlocks,
+  });
+
+  /// Whether finished thinking blocks render as a collapsed card.
+  final bool collapseThinking;
+
+  /// Lines a long code block collapses to, or null when it stays expanded.
+  final int? collapsedCodeLines;
+
+  /// Whether code blocks wrap instead of scrolling horizontally.
+  final bool wrapCodeBlocks;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _EstimateSettings &&
+      other.collapseThinking == collapseThinking &&
+      other.collapsedCodeLines == collapsedCodeLines &&
+      other.wrapCodeBlocks == wrapCodeBlocks;
+
+  @override
+  int get hashCode =>
+      Object.hash(collapseThinking, collapsedCodeLines, wrapCodeBlocks);
+}
+
+/// A memoized extent estimate together with everything it was derived from.
+final class _ExtentEstimate {
+  const _ExtentEstimate({
+    required this.content,
+    required this.crossAxisExtent,
+    required this.fontScale,
+    required this.settings,
+    required this.reasoningSignature,
+    required this.extent,
+  });
+
+  final String content;
+  final double crossAxisExtent;
+  final double fontScale;
+  final _EstimateSettings settings;
+  final int reasoningSignature;
+  final double extent;
+}
+
 final class _MessagePresentation {
   const _MessagePresentation({
     required this.chatFontScale,
@@ -1292,6 +1849,98 @@ final class _MessagePresentation {
   final bool showUserAvatar;
   final bool showTokenStats;
   final Assistant? assistant;
+}
+
+/// Fades out and collapses a timeline slot ahead of its deletion.
+///
+/// The fade runs first so the message visually disappears, then the height
+/// collapses so the neighbouring messages splice together. The slot's data is
+/// removed only after [ChatLayoutConstants.slotRemovalAnimationDuration], at
+/// which point the slot is already zero-height and its removal is invisible.
+class _SlotRemovalAnimator extends StatefulWidget {
+  const _SlotRemovalAnimator({
+    super.key,
+    required this.removing,
+    required this.child,
+  });
+
+  final bool removing;
+  final Widget child;
+
+  @override
+  State<_SlotRemovalAnimator> createState() => _SlotRemovalAnimatorState();
+}
+
+class _SlotRemovalAnimatorState extends State<_SlotRemovalAnimator>
+    with SingleTickerProviderStateMixin {
+  AnimationController? _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.removing) _startRemoval();
+  }
+
+  @override
+  void didUpdateWidget(covariant _SlotRemovalAnimator oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.removing && !oldWidget.removing) {
+      _startRemoval();
+    } else if (!widget.removing && oldWidget.removing) {
+      // The deletion was aborted (the slot usually unmounts instead of ever
+      // reaching this), so restore the message. A rebuild of this element is
+      // already in progress, so no setState is needed.
+      _controller?.dispose();
+      _controller = null;
+    }
+  }
+
+  void _startRemoval() {
+    final controller = AnimationController(
+      vsync: this,
+      duration: ChatLayoutConstants.slotRemovalAnimationDuration,
+    );
+    controller.addListener(() => setState(() {}));
+    _controller = controller;
+    controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = _controller;
+    final removing = controller != null;
+    final progress = controller?.value ?? 0.0;
+    final opacity = removing
+        ? 1.0 - Curves.easeOut.transform(math.min(1.0, progress / 0.6))
+        : 1.0;
+    final heightFactor = removing
+        ? 1.0 -
+              Curves.easeInOutCubic.transform(
+                math.max(0.0, (progress - 0.2) / 0.8),
+              )
+        : 1.0;
+    // The wrapper chain is present even when idle: swapping widget types when
+    // the animation starts would reparent — and therefore rebuild — the whole
+    // message subtree, which for a huge message is a visible hitch. All
+    // wrappers are pass-throughs at their idle values.
+    return ClipRect(
+      clipBehavior: removing ? Clip.hardEdge : Clip.none,
+      child: Align(
+        alignment: Alignment.topCenter,
+        heightFactor: heightFactor.clamp(0.0, 1.0),
+        child: Opacity(
+          opacity: opacity.clamp(0.0, 1.0),
+          child: IgnorePointer(ignoring: removing, child: widget.child),
+        ),
+      ),
+    );
+  }
 }
 
 class _StreamingMessageDataGate extends StatefulWidget {

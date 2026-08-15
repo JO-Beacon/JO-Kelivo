@@ -73,27 +73,30 @@ void main() {
     },
   );
 
-  test('preserves JO 0.1.5 settings and explicit DeepSeek routes', () async {
-    final source = jo015BusinessSettingsFixture();
-    final legacy = FakeLegacyBusinessPreferences(source);
+  test(
+    'preserves JO-Kelivo 0.1.5 settings and explicit DeepSeek routes',
+    () async {
+      final source = jo015BusinessSettingsFixture();
+      final legacy = FakeLegacyBusinessPreferences(source);
 
-    expect(
-      await BusinessMigrationEngine(
-        repository: repository,
-        legacyPreferences: legacy,
-      ).run(),
-      BusinessMigrationResult.migrated,
-    );
+      expect(
+        await BusinessMigrationEngine(
+          repository: repository,
+          legacyPreferences: legacy,
+        ).run(),
+        BusinessMigrationResult.migrated,
+      );
 
-    final exported = BusinessSettingsRouter.exportSnapshot(
-      await repository.readSnapshot(),
-    );
-    expect(
-      jo015BusinessSettingsProjection(exported),
-      jo015BusinessSettingsProjection(source),
-    );
-    expect(legacy.values, isEmpty);
-  });
+      final exported = BusinessSettingsRouter.exportSnapshot(
+        await repository.readSnapshot(),
+      );
+      expect(
+        jo015BusinessSettingsProjection(exported),
+        jo015BusinessSettingsProjection(source),
+      );
+      expect(legacy.values, isEmpty);
+    },
+  );
 
   for (final retiredValue in <Object?>[true, 'invalid-retired-value']) {
     test(

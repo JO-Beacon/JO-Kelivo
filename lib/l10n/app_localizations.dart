@@ -472,6 +472,12 @@ abstract class AppLocalizations {
   /// **'System cache'**
   String get storageSpaceSubCacheSystem;
 
+  /// No description provided for @storageSpaceSubLogsContext.
+  ///
+  /// In en, this message translates to:
+  /// **'Context logs'**
+  String get storageSpaceSubLogsContext;
+
   /// No description provided for @storageSpaceSubLogsFlutter.
   ///
   /// In en, this message translates to:
@@ -9856,7 +9862,7 @@ abstract class AppLocalizations {
   /// No description provided for @searchProviderFirecrawlDescription.
   ///
   /// In en, this message translates to:
-  /// **'Firecrawl Search API v2. Requires a Bearer API key. Scrape is not supported here.'**
+  /// **'Firecrawl Search API v2. API key is optional. Scrape is not supported here.'**
   String get searchProviderFirecrawlDescription;
 
   /// No description provided for @searchServiceNameTinyFish.
@@ -10867,6 +10873,138 @@ abstract class AppLocalizations {
   /// **'When enabled, Flutter errors and print output are written to logs/flutter_logs.txt (rotated daily).'**
   String get flutterLogSettingSubtitle;
 
+  /// No description provided for @contextLogSettingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Context Logging'**
+  String get contextLogSettingTitle;
+
+  /// No description provided for @contextLogSettingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When enabled, the exact messages sent to the model are written to logs/context_logs.txt (rotated daily).'**
+  String get contextLogSettingSubtitle;
+
+  /// No description provided for @contextLogViewerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Context'**
+  String get contextLogViewerTitle;
+
+  /// No description provided for @contextLogSnapshotMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} messages'**
+  String contextLogSnapshotMessages(int count);
+
+  /// No description provided for @contextLogSnapshotTokens.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} tokens'**
+  String contextLogSnapshotTokens(int count);
+
+  /// No description provided for @contextLogSourceSystemPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'System prompt'**
+  String get contextLogSourceSystemPrompt;
+
+  /// No description provided for @contextLogSourceMemoryRules.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory rules'**
+  String get contextLogSourceMemoryRules;
+
+  /// No description provided for @contextLogSourceSearchPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Search prompt'**
+  String get contextLogSourceSearchPrompt;
+
+  /// No description provided for @contextLogSourceInstructionInjection.
+  ///
+  /// In en, this message translates to:
+  /// **'Instruction'**
+  String get contextLogSourceInstructionInjection;
+
+  /// No description provided for @contextLogSourceWorldBook.
+  ///
+  /// In en, this message translates to:
+  /// **'World book'**
+  String get contextLogSourceWorldBook;
+
+  /// No description provided for @contextLogSourceMemorySnapshot.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory snapshot'**
+  String get contextLogSourceMemorySnapshot;
+
+  /// No description provided for @contextLogSourceChatHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat history'**
+  String get contextLogSourceChatHistory;
+
+  /// No description provided for @contextLogSourceToolCall.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool call'**
+  String get contextLogSourceToolCall;
+
+  /// No description provided for @contextLogSourceToolResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool result'**
+  String get contextLogSourceToolResult;
+
+  /// No description provided for @contextLogSnapshotsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} snapshots'**
+  String contextLogSnapshotsCount(int count);
+
+  /// No description provided for @contextLogSnapshotFallbackTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Snapshot'**
+  String get contextLogSnapshotFallbackTitle;
+
+  /// No description provided for @contextLogKindFull.
+  ///
+  /// In en, this message translates to:
+  /// **'Full snapshot'**
+  String get contextLogKindFull;
+
+  /// No description provided for @contextLogKindUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Incremental update'**
+  String get contextLogKindUpdate;
+
+  /// No description provided for @contextLogSectionComposition.
+  ///
+  /// In en, this message translates to:
+  /// **'Composition'**
+  String get contextLogSectionComposition;
+
+  /// No description provided for @contextLogLoadOlder.
+  ///
+  /// In en, this message translates to:
+  /// **'Load earlier logs'**
+  String get contextLogLoadOlder;
+
+  /// No description provided for @contextLogLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading...'**
+  String get contextLogLoading;
+
+  /// No description provided for @contextLogAllLoaded.
+  ///
+  /// In en, this message translates to:
+  /// **'All logs loaded'**
+  String get contextLogAllLoaded;
+
   /// No description provided for @logViewerTitle.
   ///
   /// In en, this message translates to:
@@ -10993,6 +11131,24 @@ abstract class AppLocalizations {
   /// **'+{count} more'**
   String logViewerMoreCount(int count);
 
+  /// No description provided for @logViewerSectionAttachments.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachments'**
+  String get logViewerSectionAttachments;
+
+  /// No description provided for @logViewerPayloadOmitted.
+  ///
+  /// In en, this message translates to:
+  /// **'omitted'**
+  String get logViewerPayloadOmitted;
+
+  /// No description provided for @logViewerShowMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Show more'**
+  String get logViewerShowMore;
+
   /// No description provided for @logSettingsTitle.
   ///
   /// In en, this message translates to:
@@ -11008,8 +11164,20 @@ abstract class AppLocalizations {
   /// No description provided for @logSettingsSaveOutputSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Log response body content (may use significant storage)'**
+  /// **'Log every streaming chunk (can slow generation). HTTP error bodies are always recorded.'**
   String get logSettingsSaveOutputSubtitle;
+
+  /// No description provided for @logSettingsElidePayloads.
+  ///
+  /// In en, this message translates to:
+  /// **'Omit Large Payloads'**
+  String get logSettingsElidePayloads;
+
+  /// No description provided for @logSettingsElidePayloadsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace inline base64 images and files with a placeholder. Keeps logs small and the viewer fast.'**
+  String get logSettingsElidePayloadsSubtitle;
 
   /// No description provided for @logSettingsAutoDelete.
   ///
@@ -12030,6 +12198,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Done'**
   String get legacyMemoryMigrationClose;
+
+  /// No description provided for @legacyMemoryModeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use legacy memory'**
+  String get legacyMemoryModeTitle;
+
+  /// No description provided for @legacyMemoryModeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Global setting for all assistants. Both datasets are kept; you can switch back anytime. Legacy memory is per-assistant only — no global memory, user profile, background organize, traces, or past-conversation search.'**
+  String get legacyMemoryModeSubtitle;
+
+  /// No description provided for @legacyMemoryModeCacheWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Legacy mode writes all memories and the current time into the system prompt every turn, so prompt cache cannot hit and long chats cost more.'**
+  String get legacyMemoryModeCacheWarning;
 
   /// No description provided for @memoryUiContentLabel.
   ///

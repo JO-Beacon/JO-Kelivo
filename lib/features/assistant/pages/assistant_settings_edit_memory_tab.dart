@@ -1,5 +1,131 @@
 part of 'assistant_settings_edit_page.dart';
 
+class _LegacyMemoryModeToggleCard extends StatelessWidget {
+  const _LegacyMemoryModeToggleCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final settings = context.watch<SettingsProvider>();
+    final tip =
+        '${l10n.legacyMemoryModeSubtitle}\n\n${l10n.legacyMemoryModeCacheWarning}';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Container(
+        decoration: BoxDecoration(
+          color: context.appColors.surfaceCard,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
+            width: 0.6,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            children: [
+              Expanded(
+                child: _TactileRow(
+                  onTap: () {
+                    context.read<SettingsProvider>().setLegacyMemoryMode(
+                      !settings.legacyMemoryMode,
+                    );
+                  },
+                  builder: (pressed) {
+                    final baseColor = cs.onSurface.withValues(alpha: 0.9);
+                    return _AnimatedPressColor(
+                      pressed: pressed,
+                      base: baseColor,
+                      builder: (c) {
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 4, 0, 4),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 36,
+                                child: Icon(Lucide.Globe, size: 20, color: c),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  l10n.legacyMemoryModeTitle,
+                                  style: TextStyle(fontSize: 15, color: c),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+              _LegacyMemoryModeTipIcon(message: tip),
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: IosSwitch(
+                  value: settings.legacyMemoryMode,
+                  onChanged: (v) {
+                    context.read<SettingsProvider>().setLegacyMemoryMode(v);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LegacyMemoryModeTipIcon extends StatefulWidget {
+  const _LegacyMemoryModeTipIcon({required this.message});
+
+  final String message;
+
+  @override
+  State<_LegacyMemoryModeTipIcon> createState() =>
+      _LegacyMemoryModeTipIconState();
+}
+
+class _LegacyMemoryModeTipIconState extends State<_LegacyMemoryModeTipIcon> {
+  final _tooltipKey = GlobalKey<TooltipState>();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Tooltip(
+      key: _tooltipKey,
+      message: widget.message,
+      triggerMode: TooltipTriggerMode.tap,
+      waitDuration: const Duration(milliseconds: 250),
+      showDuration: const Duration(seconds: 8),
+      preferBelow: true,
+      constraints: const BoxConstraints(maxWidth: 280),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onLongPress: () => _tooltipKey.currentState?.ensureTooltipVisible(),
+        child: SizedBox(
+          width: 28,
+          height: 28,
+          child: Center(
+            child: Icon(
+              Lucide.BadgeInfo,
+              size: 16,
+              color: cs.onSurface.withValues(alpha: 0.45),
+              semanticLabel: widget.message,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _MemoryTab extends StatefulWidget {
   const _MemoryTab({required this.assistantId});
   final String assistantId;
@@ -135,12 +261,20 @@ class _MemoryTabState extends State<_MemoryTab> {
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
+    const toggleCard = _LegacyMemoryModeToggleCard();
+    if (settings.legacyMemoryMode) {
+      return _LegacyMemoryTabBody(
+        assistantId: widget.assistantId,
+        header: toggleCard,
+      );
+    }
+
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final ap = context.watch<AssistantProvider>();
     final a = ap.getById(widget.assistantId)!;
-    final settings = context.watch<SettingsProvider>();
     final mp = context.watch<MemoryProviderV2>();
     final pipeline = context.read<MemoryPipelineService>();
     final modelMissing =
@@ -179,6 +313,7 @@ class _MemoryTabState extends State<_MemoryTab> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(0, 8, 0, 16),
       children: [
+        toggleCard,
         sectionCard(
           child: Column(
             children: [
@@ -910,9 +1045,7 @@ Future<T?> _showMemoryChoiceSheet<T>(
         child: AnimatedPadding(
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOutCubic,
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.viewInsetsOf(ctx).bottom,
-          ),
+          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
           child: ConstrainedBox(
             constraints: BoxConstraints(maxHeight: maxHeight),
             child: SingleChildScrollView(
@@ -947,8 +1080,7 @@ Future<T?> _showMemoryChoiceSheet<T>(
                         label: trailingAction.$2,
                         isSelected: false,
                         trailingIcon: Lucide.Pencil,
-                        onTap: () =>
-                            Navigator.of(ctx).pop(trailingAction.$1),
+                        onTap: () => Navigator.of(ctx).pop(trailingAction.$1),
                       ),
                   ],
                 ),

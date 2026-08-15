@@ -14,7 +14,9 @@ import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/logging/context_logger.dart';
 import 'package:Kelivo/core/services/mcp/mcp_tool_service.dart';
+import 'package:Kelivo/core/services/network/request_logger.dart';
 import 'package:Kelivo/features/home/controllers/home_page_controller.dart';
 import 'package:Kelivo/features/home/controllers/scroll_controller.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
@@ -89,6 +91,8 @@ void main() {
   });
 
   tearDown(() async {
+    await ContextLogger.setEnabled(false);
+    await RequestLogger.setEnabled(false);
     PathProviderPlatform.instance = previousPathProvider;
     try {
       await server.close(force: true);
@@ -233,6 +237,36 @@ void main() {
     });
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'legacy mode generates summary when only allowPastConversationRecall is on',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      await tester.runAsync(() async {
+        await settings.setLegacyMemoryMode(true);
+        await assistantProvider.updateAssistant(
+          assistantProvider.currentAssistant!.copyWith(
+            allowPastConversationRecall: true,
+            generateConversationSummary: false,
+            recentChatsSummaryMessageCount: 1,
+          ),
+        );
+        final convo = await chatService.createConversation(
+          title: 'Ordinary Chat',
+          assistantId: assistantProvider.currentAssistantId,
+        );
+        await seedTwoTurnConversation(convo.id);
+
+        await controller.debugViewModel.debugMaybeGenerateSummaryFor(convo.id);
+
+        expect(generateTextRequestCount, 1);
+        final after = chatService.getConversation(convo.id)!;
+        expect(after.summary, 'User prefers dark mode.');
+        expect(after.lastSummarizedMessageCount, greaterThan(0));
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('clear-context label counts logical messages, not revisions', (
     tester,

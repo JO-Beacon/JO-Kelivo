@@ -20,8 +20,8 @@ class DesktopAboutPane extends StatefulWidget {
 enum _InfoLoadState { loading, loaded, failed }
 
 class _DesktopAboutPaneState extends State<DesktopAboutPane> {
-  static const String _upstreamKelivoVersion = '1.2.1';
-  static const String _upstreamKelivoBuildNumber = '64';
+  static const String _upstreamKelivoVersion = '1.2.2';
+  static const String _upstreamKelivoBuildNumber = '66';
 
   String _version = '';
   String _buildNumber = '';

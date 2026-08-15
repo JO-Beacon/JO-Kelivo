@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io' show File;
+import 'dart:io' show File, Platform;
 import 'package:flutter/material.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:provider/provider.dart';
@@ -1137,6 +1137,7 @@ class _HomePageState extends State<HomePage>
         streamingContentNotifier: _controller.streamingContentNotifier,
         spotlightMessageId: _controller.spotlightMessageId,
         spotlightToken: _controller.spotlightToken,
+        removingSlotIds: _controller.removingSlotIds,
         hasMoreBefore: _controller.chatController.hasMoreBefore,
         isLoadingWindow: _controller.isLoadingWindow,
         onLoadMoreBefore: _controller.loadMoreBefore,
@@ -1144,6 +1145,16 @@ class _HomePageState extends State<HomePage>
         onLoadMoreAfter: _controller.loadMoreAfter,
         onUserScrollIntent: _controller.scrollCtrl.handleUserScrollIntent,
         chatFontScale: settings.chatFontScale,
+        collapseThinking: settings.autoCollapseThinking,
+        collapsedCodeLines: settings.autoCollapseCodeBlock
+            ? settings.autoCollapseCodeBlockLines
+            : null,
+        // Mirrors the wrap decision in the code block renderer.
+        wrapCodeBlocks:
+            Platform.isMacOS ||
+            Platform.isWindows ||
+            Platform.isLinux ||
+            settings.mobileCodeBlockWrap,
         showModelIcon: settings.showModelIcon,
         showUserAvatar: settings.showUserAvatar,
         showTokenStats: settings.showTokenStats,

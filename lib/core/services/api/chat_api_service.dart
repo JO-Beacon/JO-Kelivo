@@ -20,6 +20,7 @@ import '../../../utils/unicode_sanitizer.dart';
 import 'builtin_tools.dart';
 import 'kimi_formula_search.dart';
 import 'gemini_tool_config.dart';
+import '../logging/context_log_models.dart';
 import '../logging/flutter_logger.dart';
 import '../model_override_resolver.dart';
 import '../model_override_payload_parser.dart';
@@ -510,6 +511,7 @@ class ChatApiService {
       final copy = Map<String, dynamic>.from(message);
       copy.remove(multimodalInternalMediaPathsKey);
       copy.remove(multimodalInternalRevisionIdKey);
+      copy.remove(kelivoContextSegmentsKey);
       if (copy.containsKey('content')) {
         copy['content'] = await _stripImageInputsFromContent(copy['content']);
       }
@@ -825,6 +827,7 @@ class ChatApiService {
           }
           body = {
             'model': upstreamModelId,
+            'stream': false,
             'input': [
               {'role': 'user', 'content': safePrompt},
             ],
@@ -840,6 +843,7 @@ class ChatApiService {
         } else {
           body = {
             'model': upstreamModelId,
+            'stream': false,
             'messages': [
               {'role': 'user', 'content': safePrompt},
             ],
@@ -978,6 +982,7 @@ class ChatApiService {
             : null;
         final body = <String, dynamic>{
           'model': upstreamModelId,
+          'stream': false,
           'max_tokens': 512,
           'messages': [
             {'role': 'user', 'content': safePrompt},

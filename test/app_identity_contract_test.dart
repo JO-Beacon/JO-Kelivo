@@ -4,9 +4,9 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('JO application identity', () {
-    test('uses the published JO version and platform namespaces', () {
-      _expectContains('pubspec.yaml', 'version: 0.1.6+6');
+  group('JO-Kelivo application identity', () {
+    test('uses the published JO-Kelivo version and platform namespaces', () {
+      _expectContains('pubspec.yaml', 'version: 0.1.7+7');
 
       _expectContains(
         'android/app/build.gradle.kts',
@@ -35,102 +35,118 @@ void main() {
       _expectContains('windows/runner/main.cpp', 'L"JOKelivoMutex"');
     });
 
-    test('keeps JO update and About metadata separate from the base', () {
-      _expectContains(
-        'lib/core/providers/update_provider.dart',
-        'https://api.github.com/repos/JO-Beacon/JO-Kelivo/releases/latest',
-      );
-      for (final path in [
-        'lib/features/settings/pages/about_page.dart',
-        'lib/desktop/setting/about_pane.dart',
-      ]) {
-        _expectContains(path, "_upstreamKelivoVersion = '1.2.1'");
-        _expectContains(path, "_upstreamKelivoBuildNumber = '64'");
-        _expectContains(path, 'https://github.com/JO-Beacon/JO-Kelivo');
-        _expectContains(path, 'https://github.com/Chevey339/kelivo');
-      }
-    });
+    test(
+      'keeps JO-Kelivo update and About metadata separate from the base',
+      () {
+        _expectContains(
+          'lib/core/providers/update_provider.dart',
+          'https://api.github.com/repos/JO-Beacon/JO-Kelivo/releases/latest',
+        );
+        for (final path in [
+          'lib/features/settings/pages/about_page.dart',
+          'lib/desktop/setting/about_pane.dart',
+        ]) {
+          _expectContains(path, "_upstreamKelivoVersion = '1.2.2'");
+          _expectContains(path, "_upstreamKelivoBuildNumber = '66'");
+          _expectContains(path, 'https://github.com/JO-Beacon/JO-Kelivo');
+          _expectContains(path, 'https://github.com/Chevey339/kelivo');
+        }
+      },
+    );
 
-    test('keeps JO About copy without community or sponsorship actions', () {
-      final expectedCopy =
-          <String, ({String description, String share, String title})>{
-            'lib/l10n/app_en.arb': (
-              description: 'Open-source AI assistant based on Kelivo',
-              share: 'JO-Kelivo - Open Source AI Assistant',
-              title: 'About Kelivo',
-            ),
-            'lib/l10n/app_zh.arb': (
-              description: '基于 Kelivo 的开源 AI 助手',
-              share: 'JO-Kelivo - 开源 AI 助手',
-              title: '关于 Kelivo',
-            ),
-            'lib/l10n/app_zh_Hans.arb': (
-              description: '基于 Kelivo 的开源 AI 助手',
-              share: 'JO-Kelivo - 开源 AI 助手',
-              title: '关于 Kelivo',
-            ),
-            'lib/l10n/app_zh_Hant.arb': (
-              description: '基於 Kelivo 的開源 AI 助理',
-              share: 'JO-Kelivo - 開源 AI 助理',
-              title: '關於 Kelivo',
-            ),
-          };
-      const retiredKeys = [
-        'settingsPageSponsor',
-        'aboutPageNoQQGroup',
-        'aboutPageJoinQQGroup',
-        'aboutPageQQGroupOne',
-        'aboutPageQQGroupTwo',
-        'aboutPageJoinDiscord',
-      ];
+    test(
+      'keeps JO-Kelivo About copy without community or sponsorship actions',
+      () {
+        final expectedCopy =
+            <String, ({String description, String share, String title})>{
+              'lib/l10n/app_en.arb': (
+                description: 'Open-source AI assistant based on Kelivo',
+                share: 'JO-Kelivo - Open Source AI Assistant',
+                title: 'About Kelivo',
+              ),
+              'lib/l10n/app_zh.arb': (
+                description: '基于 Kelivo 的开源 AI 助手',
+                share: 'JO-Kelivo - 开源 AI 助手',
+                title: '关于 Kelivo',
+              ),
+              'lib/l10n/app_zh_Hans.arb': (
+                description: '基于 Kelivo 的开源 AI 助手',
+                share: 'JO-Kelivo - 开源 AI 助手',
+                title: '关于 Kelivo',
+              ),
+              'lib/l10n/app_zh_Hant.arb': (
+                description: '基於 Kelivo 的開源 AI 助理',
+                share: 'JO-Kelivo - 開源 AI 助理',
+                title: '關於 Kelivo',
+              ),
+            };
+        const retiredKeys = [
+          'settingsPageSponsor',
+          'aboutPageNoQQGroup',
+          'aboutPageJoinQQGroup',
+          'aboutPageQQGroupOne',
+          'aboutPageQQGroupTwo',
+          'aboutPageJoinDiscord',
+        ];
 
-      for (final MapEntry(key: path, value: copy) in expectedCopy.entries) {
-        final arb = jsonDecode(_read(path)) as Map<String, dynamic>;
-        expect(arb['aboutPageAppDescription'], copy.description, reason: path);
-        expect(arb['aboutPageKelivoSectionTitle'], copy.title, reason: path);
-        expect(arb['settingsShare'], copy.share, reason: path);
-        for (final key in retiredKeys) {
-          expect(arb, isNot(contains(key)), reason: '$path must omit $key');
+        for (final MapEntry(key: path, value: copy) in expectedCopy.entries) {
+          final arb = jsonDecode(_read(path)) as Map<String, dynamic>;
+          expect(
+            arb['aboutPageAppDescription'],
+            copy.description,
+            reason: path,
+          );
+          expect(arb['aboutPageKelivoSectionTitle'], copy.title, reason: path);
+          expect(arb['settingsShare'], copy.share, reason: path);
+          for (final key in retiredKeys) {
+            expect(arb, isNot(contains(key)), reason: '$path must omit $key');
+          }
+          expect(
+            arb.keys.where((key) => key.startsWith('sponsorPage')),
+            isEmpty,
+            reason: path,
+          );
+        }
+
+        for (final path in [
+          'lib/features/settings/pages/settings_page.dart',
+          'lib/features/settings/pages/about_page.dart',
+          'lib/desktop/setting/about_pane.dart',
+        ]) {
+          final source = _read(path);
+          expect(source, isNot(contains('settingsPageSponsor')), reason: path);
+          expect(source, isNot(contains('aboutPageJoinQQGroup')), reason: path);
+          expect(source, isNot(contains('aboutPageJoinDiscord')), reason: path);
         }
         expect(
-          arb.keys.where((key) => key.startsWith('sponsorPage')),
-          isEmpty,
-          reason: path,
+          File('lib/features/settings/pages/sponsor_page.dart').existsSync(),
+          isFalse,
         );
-      }
+        expect(
+          File('lib/shared/widgets/qq_group_join_sheet.dart').existsSync(),
+          isFalse,
+        );
+      },
+    );
 
-      for (final path in [
-        'lib/features/settings/pages/settings_page.dart',
-        'lib/features/settings/pages/about_page.dart',
-        'lib/desktop/setting/about_pane.dart',
-      ]) {
-        final source = _read(path);
-        expect(source, isNot(contains('settingsPageSponsor')), reason: path);
-        expect(source, isNot(contains('aboutPageJoinQQGroup')), reason: path);
-        expect(source, isNot(contains('aboutPageJoinDiscord')), reason: path);
-      }
-      expect(
-        File('lib/features/settings/pages/sponsor_page.dart').existsSync(),
-        isFalse,
-      );
-      expect(
-        File('lib/shared/widgets/qq_group_join_sheet.dart').existsSync(),
-        isFalse,
-      );
-    });
+    test(
+      'uses JO-Kelivo OAuth schemes without changing compatibility URI data',
+      () {
+        final callback = _read(
+          'lib/core/services/mcp/mcp_oauth_callback_io.dart',
+        );
+        expect(callback, contains("scheme: 'psyche.jokelivo'"));
+        expect(callback, contains("scheme: 'com.psyche.jokelivo'"));
+        expect(callback, isNot(contains("scheme: 'psyche.kelivo'")));
 
-    test('uses JO OAuth schemes without changing compatibility URI data', () {
-      final callback = _read(
-        'lib/core/services/mcp/mcp_oauth_callback_io.dart',
-      );
-      expect(callback, contains("scheme: 'psyche.jokelivo'"));
-      expect(callback, contains("scheme: 'com.psyche.jokelivo'"));
-      expect(callback, isNot(contains("scheme: 'psyche.kelivo'")));
+        _expectContains(
+          'lib/utils/kelivo_file_uri.dart',
+          "'com.psyche.kelivo'",
+        );
+      },
+    );
 
-      _expectContains('lib/utils/kelivo_file_uri.dart', "'com.psyche.kelivo'");
-    });
-
-    test('keeps JO-specific labels for local Kelivo backups', () {
+    test('keeps JO-Kelivo-specific labels for local Kelivo backups', () {
       final expectedCopy = <String, ({String export, String import})>{
         'lib/l10n/app_en.arb': (
           export: 'Export as Kelivo Backup',
@@ -186,7 +202,7 @@ void main() {
     });
   });
 
-  group('JO release workflow contract', () {
+  group('JO-Kelivo release workflow contract', () {
     test('covers every release asset and checksum', () {
       final expectedTokens = <String, List<({String token, int count})>>{
         '.github/workflows/build-android.yml': [
@@ -237,39 +253,36 @@ void main() {
       }
     });
 
-    test(
-      'keeps release tags on product version while assets include build',
-      () {
-        final workflowShellTokens = <String, List<String>>{
-          '.github/workflows/build-android.yml': [
-            r'v${release_version}',
-            'short_sha',
-            r'version="${version}_${short_sha}"',
-          ],
-          '.github/workflows/build-windows.yml': [
-            r'v$releaseVersion',
-            'shortSha',
-            r'version = "${version}_${shortSha}"',
-          ],
-          '.github/workflows/build-linux.yml': [
-            r'v${release_version}',
-            'short_sha',
-            r'version="${version}_${short_sha}"',
-          ],
-        };
-        for (final MapEntry(key: path, value: tokens)
-            in workflowShellTokens.entries) {
-          final workflow = _read(path);
-          expect(workflow, contains('pubspec.yaml'));
-          expect(workflow, contains('GITHUB_REF_TYPE'));
-          expect(workflow, contains('GITHUB_REF_NAME'));
-          expect(workflow, contains('VERSION='));
-          for (final token in tokens) {
-            expect(workflow, contains(token), reason: path);
-          }
+    test('keeps release tags on the full application version', () {
+      final workflowShellTokens = <String, List<String>>{
+        '.github/workflows/build-android.yml': [
+          r'test "${GITHUB_REF_NAME}" = "$raw_version"',
+          'short_sha',
+          r'version="${version}_${short_sha}"',
+        ],
+        '.github/workflows/build-windows.yml': [
+          r'$env:GITHUB_REF_NAME -ne $rawVersion',
+          'shortSha',
+          r'version = "${version}_${shortSha}"',
+        ],
+        '.github/workflows/build-linux.yml': [
+          r'test "${GITHUB_REF_NAME}" = "$raw_version"',
+          'short_sha',
+          r'version="${version}_${short_sha}"',
+        ],
+      };
+      for (final MapEntry(key: path, value: tokens)
+          in workflowShellTokens.entries) {
+        final workflow = _read(path);
+        expect(workflow, contains('pubspec.yaml'));
+        expect(workflow, contains('GITHUB_REF_TYPE'));
+        expect(workflow, contains('GITHUB_REF_NAME'));
+        expect(workflow, contains('VERSION='));
+        for (final token in tokens) {
+          expect(workflow, contains(token), reason: path);
         }
-      },
-    );
+      }
+    });
 
     test('requires signing secrets before Android release publication', () {
       final workflow = _read('.github/workflows/build-android.yml');

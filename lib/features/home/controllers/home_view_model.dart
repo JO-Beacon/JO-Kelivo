@@ -195,7 +195,7 @@ class HomeViewModel extends ChangeNotifier {
   void Function(String warning)? onWarning;
 
   /// Called when streaming finishes (UI may show notification).
-  VoidCallback? onStreamFinished;
+  void Function(String conversationId)? onStreamFinished;
 
   /// Called when a successful assistant reply is finalized.
   void Function(ChatMessage message)? onAssistantMessageFinished;
@@ -326,8 +326,8 @@ class HomeViewModel extends ChangeNotifier {
     );
   }
 
-  void _onStreamFinished() {
-    onStreamFinished?.call();
+  void _onStreamFinished(String conversationId) {
+    onStreamFinished?.call(conversationId);
   }
 
   void _onAssistantMessageFinished(ChatMessage message) {
@@ -339,6 +339,8 @@ class HomeViewModel extends ChangeNotifier {
   /// Never awaited; failures must not surface as chat errors.
   void _onMaybeOrganizeMemory(String conversationId) {
     try {
+      final settings = _contextProvider.read<SettingsProvider>();
+      if (settings.legacyMemoryMode) return;
       final convo = _chatService.getConversation(conversationId);
       if (convo == null) return;
       final assistantProvider = _contextProvider.read<AssistantProvider>();
@@ -715,25 +717,39 @@ class HomeViewModel extends ChangeNotifier {
     required Set<String> messageIds,
     bool deleteAllVersions = false,
   }) async {
-    final conversation = currentConversation;
-    if (conversation == null || messageIds.isEmpty) return;
+    if (messageIds.isEmpty) return;
 
     // Only the selected groups matter for the plan; resolve their group ids
     // from the selected revisions, then load just those groups' versions.
     final selected = await _chatService.loadMessagesByIds(
       messageIds.toList(growable: false),
     );
+    if (selected.isEmpty) return;
+    // The confirmation dialog and the projection loads run before this, so
+    // the user may have switched conversations since selecting. The loaded
+    // revisions know which conversation they belong to; deleting against the
+    // current one would silently no-op.
+    final conversationId = selected.first.conversationId;
+    bool isCurrentConversation() => currentConversation?.id == conversationId;
     final groupIds = selected
         .map((message) => message.groupId ?? message.id)
         .toSet();
     final scopedMessages = await _chatService.loadMessagesForGroups(
-      conversation.id,
+      conversationId,
       groupIds,
     );
+    Map<String, int> selections = const <String, int>{};
+    if (isCurrentConversation()) {
+      selections = _chatController.versionSelections;
+    } else {
+      try {
+        selections = _chatService.getVersionSelections(conversationId);
+      } catch (_) {}
+    }
     final plan = buildBatchDeletePlan(
       messages: scopedMessages,
       selectedMessageIds: messageIds,
-      versionSelections: _chatController.versionSelections,
+      versionSelections: selections,
       deleteAllVersions: deleteAllVersions,
     );
     if (plan.isEmpty) return;
@@ -742,15 +758,17 @@ class HomeViewModel extends ChangeNotifier {
     // next streaming write hit a foreign key on deleted messages; stop the
     // generation first.
     final streamingMessageId = _chatActions.activeStreamingMessageId(
-      conversation.id,
+      conversationId,
     );
     if (streamingMessageId != null &&
         plan.deletedMessageIds.contains(streamingMessageId)) {
-      await _chatActions.cancelStreaming(conversation);
+      await _chatActions.cancelStreaming(
+        _chatService.getConversation(conversationId),
+      );
     }
 
     final deletedMessageIds = await _chatService.deleteMessages(
-      conversationId: conversation.id,
+      conversationId: conversationId,
       messageIds: plan.deletedMessageIds,
       versionSelectionChanges: {
         for (final groupId in plan.clearedVersionSelectionGroupIds)
@@ -761,14 +779,28 @@ class HomeViewModel extends ChangeNotifier {
     for (final id in deletedMessageIds) {
       _streamController.clearMessageState(id);
     }
-    _chatController.loadVersionSelections();
-    _chatController.updateCurrentConversation(
-      _chatService.getConversation(conversation.id),
-    );
+    if (isCurrentConversation()) {
+      _chatController.loadVersionSelections();
+      _chatController.updateCurrentConversation(
+        _chatService.getConversation(conversationId),
+      );
 
-    await _chatController.refreshTimelineAfterMutation(
-      removedRevisionIds: deletedMessageIds,
-    );
+      // scopedMessages holds every pre-deletion version of every affected
+      // group, so the per-group survivors are complete.
+      final survivingVersionsByGroup = <String, List<ChatMessage>>{};
+      for (final message in scopedMessages) {
+        final groupId = message.groupId ?? message.id;
+        final survivors = survivingVersionsByGroup.putIfAbsent(
+          groupId,
+          () => <ChatMessage>[],
+        );
+        if (!deletedMessageIds.contains(message.id)) survivors.add(message);
+      }
+      await _chatController.refreshTimelineAfterMutation(
+        removedRevisionIds: deletedMessageIds,
+        survivingVersionsByGroup: survivingVersionsByGroup,
+      );
+    }
     notifyListeners();
   }
 
@@ -779,8 +811,33 @@ class HomeViewModel extends ChangeNotifier {
   }) async {
     if (deletedMessageIds.isEmpty) return;
 
+    // The animated delete flow awaits the removal animation before calling
+    // this, so the user may have switched conversations in the meantime.
+    // Deleting against whichever conversation is current would silently
+    // no-op (the ids belong to another conversation), so target the
+    // conversation the revisions belong to and only touch the loaded
+    // timeline while it is still the current one.
+    final targetConversationId = versionsBefore.isNotEmpty
+        ? versionsBefore.first.conversationId
+        : currentConversation?.id;
+    final conversation = targetConversationId == currentConversation?.id
+        ? currentConversation
+        : (targetConversationId == null
+              ? null
+              : _chatService.getConversation(targetConversationId));
+    bool isCurrentConversation() =>
+        conversation != null && conversation.id == currentConversation?.id;
+
+    Map<String, int> selections = const <String, int>{};
+    if (isCurrentConversation()) {
+      selections = versionSelections;
+    } else if (conversation != null) {
+      try {
+        selections = _chatService.getVersionSelections(conversation.id);
+      } catch (_) {}
+    }
     final oldSel =
-        versionSelections[gid] ??
+        selections[gid] ??
         (versionsBefore.isNotEmpty ? versionsBefore.last.version : 0);
     final newSel = computeNextVersionSelection(
       versionsBefore: versionsBefore,
@@ -788,7 +845,6 @@ class HomeViewModel extends ChangeNotifier {
       oldSelection: oldSel,
     );
 
-    final conversation = currentConversation;
     var removedRevisionIds = deletedMessageIds;
     if (conversation != null) {
       // Deleting the row an active generation checkpoints into would make the
@@ -806,18 +862,27 @@ class HomeViewModel extends ChangeNotifier {
         messageIds: deletedMessageIds,
         versionSelectionChanges: {gid: newSel},
       );
-      _chatController.updateCurrentConversation(
-        _chatService.getConversation(conversation.id),
-      );
+      if (isCurrentConversation()) {
+        _chatController.updateCurrentConversation(
+          _chatService.getConversation(conversation.id),
+        );
+      }
     }
     for (final id in removedRevisionIds) {
       _streamController.clearMessageState(id);
     }
-    _chatController.loadVersionSelections();
-
-    await _chatController.refreshTimelineAfterMutation(
-      removedRevisionIds: removedRevisionIds,
-    );
+    if (isCurrentConversation()) {
+      _chatController.loadVersionSelections();
+      await _chatController.refreshTimelineAfterMutation(
+        removedRevisionIds: removedRevisionIds,
+        survivingVersionsByGroup: {
+          gid: [
+            for (final candidate in versionsBefore)
+              if (!removedRevisionIds.contains(candidate.id)) candidate,
+          ],
+        },
+      );
+    }
     notifyListeners();
   }
 
@@ -1345,10 +1410,7 @@ class HomeViewModel extends ChangeNotifier {
           notifyListeners();
         }
       } else {
-        onBackgroundTaskError?.call(
-          BackgroundTaskKind.title,
-          'empty_response',
-        );
+        onBackgroundTaskError?.call(BackgroundTaskKind.title, 'empty_response');
       }
     } catch (e) {
       FlutterLogger.log(
@@ -1393,8 +1455,10 @@ class HomeViewModel extends ChangeNotifier {
       assistant?.thinkingBudget,
     );
 
-    // §12.10 / D-27: both switches must be on.
-    if (!MemoryPipelineService.shouldGenerateConversationSummary(
+    final legacy = settings.legacyMemoryMode;
+    if (legacy) {
+      if (assistant?.allowPastConversationRecall != true) return;
+    } else if (!MemoryPipelineService.shouldGenerateConversationSummary(
       allowPastConversationRecall:
           assistant?.allowPastConversationRecall == true,
       generateConversationSummary:
@@ -1464,7 +1528,7 @@ class HomeViewModel extends ChangeNotifier {
         .replaceAll('{previous_summary}', previousSummary)
         .replaceAll('{user_messages}', content);
 
-    final traceHandle = _beginSummaryTrace(convo, assistant);
+    final traceHandle = legacy ? null : _beginSummaryTrace(convo, assistant);
     final traceStep = traceHandle?.beginStep(
       MemoryTraceStepKind.conversationSummary,
     );

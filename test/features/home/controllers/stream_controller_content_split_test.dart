@@ -186,6 +186,7 @@ void main() {
     await settings.loaded;
     final controller = buildController(settings: settings);
     final state = buildStreamingState(settings);
+    addTearDown(() => controller.cleanupTimers(state.messageId));
 
     await controller.handleReasoningChunk(
       ChatStreamChunk(
@@ -195,13 +196,6 @@ void main() {
         totalTokens: 0,
       ),
       state,
-      updateReasoningInDb:
-          (
-            messageId, {
-            String? reasoningText,
-            DateTime? reasoningStartAt,
-            String? reasoningSegmentsJson,
-          }) async {},
     );
 
     expect(
@@ -520,7 +514,7 @@ void main() {
     smoothController.scheduleThrottledUpdate(
       'assistant-message',
       'conversation-1',
-      'abcdefghijklmnopqrstuvwxyz',
+      () => 'abcdefghijklmnopqrstuvwxyz',
       totalTokens: 26,
       updateMessageInList: (_, __, ___) => listUpdateCount++,
     );
@@ -565,7 +559,7 @@ void main() {
     smoothController.scheduleThrottledUpdate(
       'assistant-message',
       'conversation-1',
-      'a' * 320,
+      () => 'a' * 320,
       totalTokens: 320,
       updateMessageInList: (_, __, ___) {},
     );
@@ -605,7 +599,7 @@ void main() {
     smoothController.scheduleThrottledUpdate(
       'assistant-message',
       'conversation-1',
-      'ok',
+      () => 'ok',
       totalTokens: 2,
       updateMessageInList: (_, __, ___) {},
     );
@@ -644,7 +638,7 @@ void main() {
     smoothController.scheduleThrottledUpdate(
       'assistant-message',
       'conversation-1',
-      'abc',
+      () => 'abc',
       totalTokens: 3,
       updateMessageInList: (_, __, ___) {},
     );
@@ -686,7 +680,7 @@ void main() {
     smoothController.scheduleThrottledUpdate(
       'assistant-message',
       'conversation-1',
-      'final answer',
+      () => 'final answer',
       totalTokens: 11,
       updateMessageInList: (_, __, ___) => listUpdateCount++,
     );
@@ -716,7 +710,7 @@ void main() {
     smoothController.scheduleThrottledUpdate(
       'assistant-message',
       'conversation-1',
-      'visible after cancel',
+      () => 'visible after cancel',
       totalTokens: 18,
       updateMessageInList: (_, content, ___) => listContent = content,
     );

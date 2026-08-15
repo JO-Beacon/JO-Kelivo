@@ -187,11 +187,26 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('Time Info'), findsOneWidget);
+      final timeInfoRow = find
+          .ancestor(of: find.text('Time Info'), matching: find.byType(Row))
+          .first;
       expect(
-        find.byWidgetPredicate(
-          (widget) => widget is Icon && widget.icon == Lucide.clock,
+        find.descendant(
+          of: timeInfoRow,
+          matching: find.byWidgetPredicate(
+            (widget) => widget is Icon && widget.icon == Lucide.clock,
+          ),
         ),
         findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: timeInfoRow,
+          matching: find.byWidgetPredicate(
+            (widget) => widget is Icon && widget.icon == Lucide.Calendar,
+          ),
+        ),
+        findsNothing,
       );
       expect(find.text('Screen Time'), findsNothing);
       expect(find.text('Query Calendar'), findsNothing);

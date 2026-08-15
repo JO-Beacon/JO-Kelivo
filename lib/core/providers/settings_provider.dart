@@ -14,6 +14,7 @@ import '../services/tts/network_tts.dart';
 import '../services/tts/tts_text_selection.dart';
 import '../services/asr/asr_service_options.dart';
 import '../services/network/request_logger.dart';
+import '../services/logging/context_logger.dart';
 import '../services/logging/flutter_logger.dart';
 import '../services/learning_mode_store.dart';
 import '../models/api_keys.dart';
@@ -125,6 +126,7 @@ class SettingsProvider extends ChangeNotifier {
       'memory_model_thinking_enabled_v1';
   static const String _memoryPromptLangKey = 'memory_prompt_lang_v1';
   static const String _memoryTraceEnabledKey = 'memory_trace_enabled_v1';
+  static const String _legacyMemoryModeKey = 'memory_legacy_mode_v1';
   static const String _memoryRulesPromptZhKey = 'memory_rules_prompt_zh_v1';
   static const String _memoryRulesPromptEnKey = 'memory_rules_prompt_en_v1';
   static const String _memoryGatePromptZhKey = 'memory_gate_prompt_zh_v1';
@@ -265,10 +267,12 @@ class SettingsProvider extends ChangeNotifier {
       'mobile_assistant_detail_outline_enabled_v1';
   // Network request logging (debug)
   static const String _requestLogEnabledKey = 'request_log_enabled_v1';
+  static const String _contextLogEnabledKey = 'context_log_enabled_v1';
   // Flutter runtime logging (debug)
   static const String _flutterLogEnabledKey = 'flutter_log_enabled_v1';
   // Log settings: save response output, auto-delete, max size
   static const String _logSaveOutputKey = 'log_save_output_v1';
+  static const String _logElideLargePayloadsKey = 'log_elide_large_payloads_v1';
   static const String _logAutoDeleteDaysKey = 'log_auto_delete_days_v1';
   static const String _logMaxSizeMBKey = 'log_max_size_mb_v1';
   static const String _appLaunchCountKey = 'app_launch_count_v1';
@@ -903,6 +907,7 @@ class SettingsProvider extends ChangeNotifier {
         : 'auto';
     _memoryTraceEnabled = prefs.getBool(_memoryTraceEnabledKey) ?? true;
     MemoryTraceRecorder.instance.setEnabled(_memoryTraceEnabled);
+    _legacyMemoryMode = prefs.getBool(_legacyMemoryModeKey) ?? false;
     _memoryRulesPromptZh = _nonEmptyOr(
       prefs.getString(_memoryRulesPromptZhKey),
       MemoryPrompts.rulesZh,
@@ -1015,15 +1020,19 @@ class SettingsProvider extends ChangeNotifier {
     _keepAssistantListExpandedOnSidebarClose =
         prefs.getBool(_displayKeepAssistantListExpandedOnSidebarCloseKey) ??
         false;
-    _requestLogEnabled = prefs.getBool(_requestLogEnabledKey) ?? false;
+    _requestLogEnabled = prefs.getBool(_requestLogEnabledKey) ?? true;
     await RequestLogger.setEnabled(_requestLogEnabled);
+    _contextLogEnabled = prefs.getBool(_contextLogEnabledKey) ?? true;
+    await ContextLogger.setEnabled(_contextLogEnabled);
     _flutterLogEnabled =
         localPreferences.getBool(_flutterLogEnabledKey) ?? false;
     await FlutterLogger.setEnabled(_flutterLogEnabled);
-    _logSaveOutput = prefs.getBool(_logSaveOutputKey) ?? true;
+    _logSaveOutput = prefs.getBool(_logSaveOutputKey) ?? false;
     RequestLogger.saveOutput = _logSaveOutput;
+    _logElideLargePayloads = prefs.getBool(_logElideLargePayloadsKey) ?? true;
+    RequestLogger.elideLargePayloads = _logElideLargePayloads;
     _logAutoDeleteDays = prefs.getInt(_logAutoDeleteDaysKey) ?? 0;
-    _logMaxSizeMB = prefs.getInt(_logMaxSizeMBKey) ?? 0;
+    _logMaxSizeMB = prefs.getInt(_logMaxSizeMBKey) ?? 50;
     _appLaunchCount = prefs.getInt(_appLaunchCountKey) ?? 0;
     // Run log cleanup based on current settings
     RequestLogger.cleanupLogs(
@@ -3696,6 +3705,9 @@ Requirements:
   bool _memoryTraceEnabled = true;
   bool get memoryTraceEnabled => _memoryTraceEnabled;
 
+  bool _legacyMemoryMode = false;
+  bool get legacyMemoryMode => _legacyMemoryMode;
+
   /// The locale the interface is actually rendered in.
   ///
   /// [appLocale] parses the stored tag, and the `system` tag has no locale to
@@ -3775,6 +3787,13 @@ Requirements:
     MemoryTraceRecorder.instance.setEnabled(enabled);
     notifyListeners();
     await _preferences.setBool(_memoryTraceEnabledKey, enabled);
+  }
+
+  Future<void> setLegacyMemoryMode(bool enabled) async {
+    if (_legacyMemoryMode == enabled) return;
+    _legacyMemoryMode = enabled;
+    notifyListeners();
+    await _preferences.setBool(_legacyMemoryModeKey, enabled);
   }
 
   Future<void> setMemoryPromptLang(String lang) async {
@@ -4779,7 +4798,7 @@ Requirements:
   }
 
   // Network: request logging (debug)
-  bool _requestLogEnabled = false;
+  bool _requestLogEnabled = true;
   bool get requestLogEnabled => _requestLogEnabled;
   Future<void> setRequestLogEnabled(bool v) async {
     if (_requestLogEnabled == v) return;
@@ -4788,6 +4807,17 @@ Requirements:
     final prefs = _preferences;
     await prefs.setBool(_requestLogEnabledKey, v);
     await RequestLogger.setEnabled(v);
+  }
+
+  bool _contextLogEnabled = true;
+  bool get contextLogEnabled => _contextLogEnabled;
+  Future<void> setContextLogEnabled(bool v) async {
+    if (_contextLogEnabled == v) return;
+    _contextLogEnabled = v;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.setBool(_contextLogEnabledKey, v);
+    await ContextLogger.setEnabled(v);
   }
 
   // Flutter: runtime logging (debug)
@@ -4811,7 +4841,7 @@ Requirements:
   }
 
   // Log settings: save output
-  bool _logSaveOutput = true;
+  bool _logSaveOutput = false;
   bool get logSaveOutput => _logSaveOutput;
   Future<void> setLogSaveOutput(bool v) async {
     if (_logSaveOutput == v) return;
@@ -4820,6 +4850,18 @@ Requirements:
     notifyListeners();
     final prefs = _preferences;
     await prefs.setBool(_logSaveOutputKey, v);
+  }
+
+  // Log settings: omit inline base64 images/files
+  bool _logElideLargePayloads = true;
+  bool get logElideLargePayloads => _logElideLargePayloads;
+  Future<void> setLogElideLargePayloads(bool v) async {
+    if (_logElideLargePayloads == v) return;
+    _logElideLargePayloads = v;
+    RequestLogger.elideLargePayloads = v;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.setBool(_logElideLargePayloadsKey, v);
   }
 
   // Log settings: auto-delete (days)
@@ -4835,7 +4877,7 @@ Requirements:
   }
 
   // Log settings: max log size (MB)
-  int _logMaxSizeMB = 0;
+  int _logMaxSizeMB = 50;
   int get logMaxSizeMB => _logMaxSizeMB;
   Future<void> setLogMaxSizeMB(int v) async {
     if (_logMaxSizeMB == v) return;
@@ -4981,6 +5023,7 @@ Requirements:
     copy._memoryModelThinkingEnabled = _memoryModelThinkingEnabled;
     copy._memoryPromptLang = _memoryPromptLang;
     copy._memoryTraceEnabled = _memoryTraceEnabled;
+    copy._legacyMemoryMode = _legacyMemoryMode;
     copy._memoryRulesPromptZh = _memoryRulesPromptZh;
     copy._memoryRulesPromptEn = _memoryRulesPromptEn;
     copy._memoryGatePromptZh = _memoryGatePromptZh;
@@ -5025,8 +5068,10 @@ Requirements:
     copy._keepAssistantListExpandedOnSidebarClose =
         _keepAssistantListExpandedOnSidebarClose;
     copy._requestLogEnabled = _requestLogEnabled;
+    copy._contextLogEnabled = _contextLogEnabled;
     copy._flutterLogEnabled = _flutterLogEnabled;
     copy._logSaveOutput = _logSaveOutput;
+    copy._logElideLargePayloads = _logElideLargePayloads;
     copy._logAutoDeleteDays = _logAutoDeleteDays;
     copy._logMaxSizeMB = _logMaxSizeMB;
     copy._appLaunchCount = _appLaunchCount;

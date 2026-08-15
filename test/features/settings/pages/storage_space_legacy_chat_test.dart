@@ -121,7 +121,7 @@ void main() {
     }
   });
 
-  testWidgets('storage page exposes the JO user data directory entry', (
+  testWidgets('storage page exposes the JO-Kelivo user data directory entry', (
     tester,
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;

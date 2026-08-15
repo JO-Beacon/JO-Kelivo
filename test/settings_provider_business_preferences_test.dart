@@ -177,7 +177,7 @@ void main() {
     },
   );
 
-  test('JO display preferences use their 0.1.5 defaults', () async {
+  test('JO-Kelivo display preferences use their 0.1.5 defaults', () async {
     final settings = SettingsProvider(BusinessPreferences(repository));
     await settings.loaded;
 
@@ -185,7 +185,7 @@ void main() {
     expect(settings.wideChatLayout, isFalse);
   });
 
-  test('JO display preferences persist across a cold reload', () async {
+  test('JO-Kelivo display preferences persist across a cold reload', () async {
     final settings = SettingsProvider(BusinessPreferences(repository));
     await settings.loaded;
 

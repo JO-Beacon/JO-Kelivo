@@ -1676,6 +1676,187 @@ void main() {
       expect(controller.hasMoreAfter, isFalse);
     });
 
+    test('mutation refresh does not backfill the window head', () async {
+      messages = List<ChatMessage>.generate(1000, _message);
+      conversation = Conversation(
+        id: 'conversation-1',
+        title: 'Long chat',
+        messageIds: messages.map((message) => message.id).toList(),
+      );
+      chatService = _FakeLazyChatService(messages);
+      controller.dispose();
+      controller = ChatController(chatService: chatService);
+      await controller.setCurrentConversationAndLoad(conversation);
+      await controller.loadEndWindow();
+      final headBefore = controller.messages.first.id;
+      final countBefore = controller.messages.length;
+      messages.removeLast();
+
+      await controller.refreshTimelineAfterMutation(
+        removedRevisionIds: const {'message-999'},
+      );
+
+      // The refreshed window has to stay a prefix of the old one: pulling an
+      // older message in at the head instead would keep the list length
+      // unchanged and shift every slot by one, which leaves SuperSliverList
+      // reusing its children with stale layout offsets and the viewport stuck
+      // above the real bottom.
+      expect(controller.messages.first.id, headBefore);
+      expect(controller.messages.length, countBefore - 1);
+      expect(controller.hasMoreBefore, isTrue);
+      expect(controller.hasMoreAfter, isFalse);
+    });
+
+    test('mutation refresh keeps a full window after a batch delete', () async {
+      messages = List<ChatMessage>.generate(1000, _message);
+      conversation = Conversation(
+        id: 'conversation-1',
+        title: 'Long chat',
+        messageIds: messages.map((message) => message.id).toList(),
+      );
+      chatService = _FakeLazyChatService(messages);
+      controller.dispose();
+      controller = ChatController(chatService: chatService);
+      await controller.setCurrentConversationAndLoad(conversation);
+      await controller.loadEndWindow();
+      final removed = <String>{
+        for (var index = 640; index < 999; index++) 'message-$index',
+      };
+      messages.removeRange(640, 999);
+
+      await controller.refreshTimelineAfterMutation(
+        removedRevisionIds: removed,
+      );
+
+      // Almost the whole window is gone, so trimming to the surviving slots
+      // would leave a near-empty list that only refills on scroll. Keeping the
+      // reloaded window is worth losing the child reuse here.
+      expect(controller.messages.length, ChatService.defaultLoadedWindowMax);
+      expect(controller.messages.last.id, 'message-999');
+      // The window has to be the reloaded one, not the pre-delete window: it
+      // starts at the new tail-anchored head and holds no deleted revision.
+      expect(controller.messages.first.id, 'message-281');
+      expect(
+        controller.messages.every((message) => !removed.contains(message.id)),
+        isTrue,
+      );
+    });
+
+    test(
+      'mutation refresh with survivor data edits the window in place',
+      () async {
+        await controller.setCurrentConversationAndLoad(conversation);
+        final callsBefore = chatService.timelinePageCalls;
+        messages.removeWhere((message) => message.id == 'message-80');
+
+        expect(
+          await controller.refreshTimelineAfterMutation(
+            removedRevisionIds: const {'message-80'},
+            survivingVersionsByGroup: const {'message-80': <ChatMessage>[]},
+          ),
+          isTrue,
+        );
+
+        // The surviving slots keep their identity and order: the list widget
+        // then sees a pure removal instead of a reshaped window that would
+        // drop every measured row height and make the viewport drift.
+        expect(controller.messages.map((message) => message.id), [
+          for (var index = 60; index < 100; index++)
+            if (index != 80) 'message-$index',
+        ]);
+        expect(controller.totalMessageCount, 99);
+        expect(controller.hasMoreBefore, isTrue);
+        expect(controller.hasMoreAfter, isFalse);
+        expect(chatService.timelinePageCalls, callsBefore);
+      },
+    );
+
+    test(
+      'mutation refresh swaps the surviving version into its slot in place',
+      () async {
+        final survivor = _versionedMessage(
+          id: 'answer-v0',
+          role: 'assistant',
+          groupId: 'answer',
+          version: 0,
+        );
+        messages = [
+          ...List<ChatMessage>.generate(10, _message),
+          survivor,
+          _versionedMessage(
+            id: 'answer-v1',
+            role: 'assistant',
+            groupId: 'answer',
+            version: 1,
+          ),
+        ];
+        conversation = Conversation(
+          id: 'conversation-1',
+          title: 'Versioned chat',
+          messageIds: messages.map((message) => message.id).toList(),
+        );
+        chatService = _FakeLazyChatService(messages)
+          ..versionSelections = const {'answer': 1};
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+        await controller.setCurrentConversationAndLoad(conversation);
+        expect(controller.messages.last.id, 'answer-v1');
+        final callsBefore = chatService.timelinePageCalls;
+
+        // The service applies the deletion and the new selection before the
+        // timeline refresh runs, mirroring the view-model delete flow.
+        messages.removeWhere((message) => message.id == 'answer-v1');
+        chatService.versionSelections = const {'answer': 0};
+        controller.loadVersionSelections();
+
+        expect(
+          await controller.refreshTimelineAfterMutation(
+            removedRevisionIds: const {'answer-v1'},
+            survivingVersionsByGroup: {
+              'answer': [survivor],
+            },
+          ),
+          isTrue,
+        );
+
+        expect(controller.messages.last.id, 'answer-v0');
+        expect(controller.messages.length, 11);
+        expect(controller.totalMessageCount, 11);
+        expect(chatService.timelinePageCalls, callsBefore);
+      },
+    );
+
+    test(
+      'mutation refresh reloads when a deleted slot is outside the window',
+      () async {
+        messages = List<ChatMessage>.generate(1000, _message);
+        conversation = Conversation(
+          id: 'conversation-1',
+          title: 'Long chat',
+          messageIds: messages.map((message) => message.id).toList(),
+        );
+        chatService = _FakeLazyChatService(messages);
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+        await controller.setCurrentConversationAndLoad(conversation);
+        final callsBefore = chatService.timelinePageCalls;
+        messages.removeWhere((message) => message.id == 'message-100');
+
+        expect(
+          await controller.refreshTimelineAfterMutation(
+            removedRevisionIds: const {'message-100'},
+            survivingVersionsByGroup: const {'message-100': <ChatMessage>[]},
+          ),
+          isTrue,
+        );
+
+        // An in-place edit cannot track slot counts outside the window, so
+        // this must fall back to the full reload.
+        expect(chatService.timelinePageCalls, greaterThan(callsBefore));
+        expect(controller.totalMessageCount, 999);
+      },
+    );
+
     test('temporary sends append directly to the linear window', () async {
       messages = <ChatMessage>[];
       conversation = Conversation(

@@ -284,45 +284,46 @@ void main() {
       _expectAbove(tester, 'WebDAV Server Settings', 'S3 Settings');
     });
 
-    testWidgets('desktop exposes JO data directory and DeepSeek placeholder', (
-      tester,
-    ) async {
-      await tester.binding.setSurfaceSize(const Size(1100, 1300));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
+    testWidgets(
+      'desktop exposes JO-Kelivo data directory and DeepSeek placeholder',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(1100, 1300));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
 
-      final business = await createBusinessTestHarness();
-      final settings = SettingsProvider(business.preferences);
-      await settings.loaded;
+        final business = await createBusinessTestHarness();
+        final settings = SettingsProvider(business.preferences);
+        await settings.loaded;
 
-      await _pumpDesktopBackupPane(
-        tester,
-        settings: settings,
-        business: business,
-      );
+        await _pumpDesktopBackupPane(
+          tester,
+          settings: settings,
+          business: business,
+        );
 
-      expect(find.text('User Data Directory'), findsOneWidget);
-      expect(find.text('Open User Data Directory'), findsOneWidget);
+        expect(find.text('User Data Directory'), findsOneWidget);
+        expect(find.text('Open User Data Directory'), findsOneWidget);
 
-      final deepSeek = find.text('Import from DeepSeek Web/App');
-      await tester.scrollUntilVisible(
-        deepSeek,
-        120,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.tap(deepSeek);
-      await tester.pump();
+        final deepSeek = find.text('Import from DeepSeek Web/App');
+        await tester.scrollUntilVisible(
+          deepSeek,
+          120,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.tap(deepSeek);
+        await tester.pump();
 
-      expect(
-        AppSnackBarManager().activeToasts.single.notification.message,
-        'Not supported yet',
-      );
-      expect(
-        AppSnackBarManager().activeToasts.single.notification.type,
-        NotificationType.info,
-      );
-      expect(find.byType(AlertDialog), findsNothing);
-      await tester.pump(const Duration(seconds: 4));
-      await tester.pumpAndSettle();
-    });
+        expect(
+          AppSnackBarManager().activeToasts.single.notification.message,
+          'Not supported yet',
+        );
+        expect(
+          AppSnackBarManager().activeToasts.single.notification.type,
+          NotificationType.info,
+        );
+        expect(find.byType(AlertDialog), findsNothing);
+        await tester.pump(const Duration(seconds: 4));
+        await tester.pumpAndSettle();
+      },
+    );
   });
 }

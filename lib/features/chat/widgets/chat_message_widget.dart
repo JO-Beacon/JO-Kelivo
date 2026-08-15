@@ -6,7 +6,6 @@ import 'dart:ui' as ui;
 import 'dart:math' as math;
 import 'package:flutter/services.dart';
 import '../../../core/services/haptics.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 import 'package:open_filex/open_filex.dart';
@@ -798,11 +797,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   final GlobalKey _translateBtnKey2 = GlobalKey();
   // ValueNotifier for reasoning animation tick - avoids full widget rebuild
   final ValueNotifier<int> _reasoningTick = ValueNotifier<int>(0);
-  late final Ticker _ticker = Ticker((_) {
-    if (mounted && _tickActive) {
-      _reasoningTick.value++; // Only notify reasoning section, not full rebuild
-    }
-  });
+  Timer? _reasoningTimer;
   // Memoized think-tag parse, keyed by source string equality. The parser is
   // a pure function of message content, so a single slot is enough.
   String? _inlineThinkMemoSource;
@@ -900,9 +895,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         widget.reasoningFinishedAt == null;
     _tickActive = loading;
     if (loading) {
-      if (!_ticker.isActive) _ticker.start();
+      _reasoningTimer ??= Timer.periodic(const Duration(milliseconds: 100), (
+        _,
+      ) {
+        if (mounted && _tickActive) _reasoningTick.value++;
+      });
     } else {
-      if (_ticker.isActive) _ticker.stop();
+      _reasoningTimer?.cancel();
+      _reasoningTimer = null;
     }
   }
 
@@ -1085,7 +1085,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       _userMenuOverlay?.remove();
     } catch (_) {}
     _userMenuOverlay = null;
-    _ticker.dispose();
+    _reasoningTimer?.cancel();
+    _reasoningTimer = null;
     _reasoningTick.dispose();
     _reasoningScroll.dispose();
     super.dispose();
@@ -1259,25 +1260,27 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     });
   }
 
-  Widget _buildUserAvatar(UserProvider userProvider, ColorScheme cs) {
+  Widget _buildUserAvatar(
+    String? avatarType,
+    String? avatarValue,
+    ColorScheme cs,
+  ) {
     Widget avatarContent;
 
-    if (userProvider.avatarType == 'emoji' &&
-        userProvider.avatarValue != null) {
+    if (avatarType == 'emoji' && avatarValue != null) {
       final bool isIOS = defaultTargetPlatform == TargetPlatform.iOS;
       final double fs = 18;
       final Offset? nudge = isIOS ? Offset(fs * 0.065, fs * -0.05) : null;
       avatarContent = Center(
         child: EmojiText(
-          userProvider.avatarValue!,
+          avatarValue,
           fontSize: fs,
           optimizeEmojiAlign: true,
           nudge: nudge,
         ),
       );
-    } else if (userProvider.avatarType == 'url' &&
-        userProvider.avatarValue != null) {
-      final url = userProvider.avatarValue!;
+    } else if (avatarType == 'url' && avatarValue != null) {
+      final url = avatarValue;
       avatarContent = FutureBuilder<String?>(
         future: AvatarCache.getPath(url),
         builder: (ctx, snap) {
@@ -1304,9 +1307,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           );
         },
       );
-    } else if (userProvider.avatarType == 'file' &&
-        userProvider.avatarValue != null) {
-      final fixed = SandboxPathResolver.fix(userProvider.avatarValue!);
+    } else if (avatarType == 'file' && avatarValue != null) {
+      final fixed = SandboxPathResolver.fix(avatarValue);
       final f = File(fixed);
       if (f.existsSync()) {
         avatarContent = ClipOval(
@@ -1362,9 +1364,31 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   Widget _buildUserMessage() {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final userProvider = context.watch<UserProvider>();
+    final userName = context.select<UserProvider, String>((u) => u.name);
+    final userAvatarType = context.select<UserProvider, String?>(
+      (u) => u.avatarType,
+    );
+    final userAvatarValue = context.select<UserProvider, String?>(
+      (u) => u.avatarValue,
+    );
     final l10n = AppLocalizations.of(context)!;
-    final settings = context.watch<SettingsProvider>();
+    final userMessageSettings = context
+        .select<
+          SettingsProvider,
+          ({
+            bool showActions,
+            bool showName,
+            bool showTimestamp,
+            bool enableMarkdown,
+          })
+        >(
+          (s) => (
+            showActions: s.showUserMessageActions,
+            showName: s.showUserName,
+            showTimestamp: s.showUserTimestamp,
+            enableMarkdown: s.enableUserMarkdown,
+          ),
+        );
     // Attachments come from structured parts only. Literal marker-like text
     // inside TextPart stays plain text and is never re-parsed.
     final assistant = _assistantForMessage();
@@ -1373,7 +1397,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       assistant: assistant,
       scope: AssistantRegexScope.user,
     );
-    final showUserActions = settings.showUserMessageActions;
+    final showUserActions = userMessageSettings.showActions;
     final showVersionSwitcher = (widget.versionCount ?? 1) > 1;
     final mediaPreview = _buildAttachmentPreview(
       context,
@@ -1387,7 +1411,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             child: _buildBubbleContainer(
               context: context,
               isUser: true,
-              child: _buildUserTextContent(context, visualText, settings, cs),
+              child: _buildUserTextContent(
+                context,
+                visualText,
+                userMessageSettings.enableMarkdown,
+                cs,
+              ),
             ),
           )
         : null;
@@ -1401,22 +1430,24 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              if (settings.showUserName || settings.showUserTimestamp)
+              if (userMessageSettings.showName ||
+                  userMessageSettings.showTimestamp)
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    if (settings.showUserName)
+                    if (userMessageSettings.showName)
                       Text(
-                        userProvider.name,
+                        userName,
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: AppFontWeights.medium,
                           color: cs.onSurface.withValues(alpha: 0.7),
                         ),
                       ),
-                    if (settings.showUserName && settings.showUserTimestamp)
+                    if (userMessageSettings.showName &&
+                        userMessageSettings.showTimestamp)
                       const SizedBox(height: 2),
-                    if (settings.showUserTimestamp)
+                    if (userMessageSettings.showTimestamp)
                       Text(
                         _dateFormat.format(widget.message.timestamp),
                         style: TextStyle(
@@ -1429,7 +1460,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               if (widget.showUserAvatar) ...[
                 const SizedBox(width: 8),
                 // User avatar
-                _buildUserAvatar(userProvider, cs),
+                _buildUserAvatar(userAvatarType, userAvatarValue, cs),
               ],
             ],
           ),
@@ -1663,7 +1694,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   Widget _buildUserTextContent(
     BuildContext context,
     String visualText,
-    SettingsProvider settings,
+    bool enableUserMarkdown,
     ColorScheme cs,
   ) {
     final bool isDesktop =
@@ -1673,7 +1704,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final double baseUser = isDesktop ? 14.0 : 15.5;
 
     Widget content;
-    if (settings.enableUserMarkdown) {
+    if (enableUserMarkdown) {
       content = DefaultTextStyle.merge(
         style: TextStyle(fontSize: baseUser, height: 1.45),
         child: MarkdownWithCodeHighlight(
@@ -2036,6 +2067,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     BuildContext context,
     String visualContent,
     SettingsProvider settings,
+    Map<String, String> citationIndexLookup,
   ) {
     final cs = Theme.of(context).colorScheme;
     final bool isDesktop =
@@ -2049,6 +2081,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       assistantContent = MarkdownWithCodeHighlight(
         text: visualContent,
         onCitationTap: (id) => _handleCitationTap(id),
+        citationIndexResolver: (id) =>
+            _resolveCitationIndex(id, citationIndexLookup),
         baseStyle: TextStyle(fontSize: baseAssistant, height: 1.5),
         streaming: widget.message.isStreaming,
       );
@@ -2091,12 +2125,18 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     BuildContext context,
     String visualContent,
     SettingsProvider settings,
+    Map<String, String> citationIndexLookup,
   ) {
     return SizedBox(
       width: double.infinity,
       child: _buildAssistantBubbleContainer(
         context: context,
-        child: _buildAssistantTextContent(context, visualContent, settings),
+        child: _buildAssistantTextContent(
+          context,
+          visualContent,
+          settings,
+          citationIndexLookup,
+        ),
       ),
     );
   }
@@ -2280,6 +2320,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final bool isTranslating =
         translationText == l10n.chatMessageWidgetTranslating;
     final searchItems = _allSearchItems();
+    final citationIndexLookup = _buildCitationIndexLookup(searchItems);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final mediaPreview = _buildAttachmentPreview(
       context,
@@ -2444,7 +2485,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               final block = renderBlocks[i];
               if (block.type == _RenderBlockType.text && block.text != null) {
                 widgets.add(
-                  _buildAssistantTextBlock(context, block.text!, settings),
+                  _buildAssistantTextBlock(
+                    context,
+                    block.text!,
+                    settings,
+                    citationIndexLookup,
+                  ),
                 );
               } else if (block.steps.isNotEmpty) {
                 widgets.add(
@@ -2584,6 +2630,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                             text: translationText,
                                             onCitationTap: (id) =>
                                                 _handleCitationTap(id),
+                                            citationIndexResolver: (id) =>
+                                                _resolveCitationIndex(
+                                                  id,
+                                                  citationIndexLookup,
+                                                ),
                                             baseStyle: TextStyle(
                                               fontSize: baseTranslation,
                                               height: 1.4,
@@ -2857,6 +2908,36 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         ],
       ),
     );
+  }
+
+  // Build once per message so each citation marker only performs a map lookup.
+  // Insert IDs first so an exact ID match wins over a legacy numeric index.
+  Map<String, String> _buildCitationIndexLookup(
+    List<Map<String, dynamic>> items,
+  ) {
+    final lookup = <String, String>{};
+    for (final item in items) {
+      final id = item['id']?.toString() ?? '';
+      final index = item['index']?.toString() ?? '';
+      if (id.isNotEmpty && index.isNotEmpty) lookup[id] ??= index;
+    }
+    for (final item in items) {
+      final index = item['index']?.toString() ?? '';
+      if (index.isNotEmpty) lookup[index] ??= index;
+    }
+    return lookup;
+  }
+
+  String? _resolveCitationIndex(
+    String id,
+    Map<String, String> citationIndexLookup,
+  ) {
+    final key = id.trim();
+    if (key.isEmpty) return null;
+    final direct = citationIndexLookup[key];
+    if (direct != null) return direct;
+    final asIndex = int.tryParse(key);
+    return asIndex == null ? null : citationIndexLookup[asIndex.toString()];
   }
 
   // Try resolve citation id -> url from the latest search_web tool results of this assistant message
@@ -3146,7 +3227,9 @@ Widget _buildSharedChatSurface(
 }) {
   final theme = Theme.of(context);
   final cs = theme.colorScheme;
-  final style = context.watch<SettingsProvider>().chatMessageBackgroundStyle;
+  final style = context.select<SettingsProvider, ChatMessageBackgroundStyle>(
+    (s) => s.chatMessageBackgroundStyle,
+  );
   final paddedChild = Padding(padding: padding, child: child);
 
   switch (style) {
@@ -3220,7 +3303,9 @@ _ChatSurfaceForegroundPalette _chatSurfaceForegroundPalette(
 ) {
   final theme = Theme.of(context);
   final cs = theme.colorScheme;
-  final style = context.watch<SettingsProvider>().chatMessageBackgroundStyle;
+  final style = context.select<SettingsProvider, ChatMessageBackgroundStyle>(
+    (s) => s.chatMessageBackgroundStyle,
+  );
   if (style == ChatMessageBackgroundStyle.defaultStyle) {
     return _ChatSurfaceForegroundPalette(
       strong: cs.secondary,
@@ -3408,47 +3493,61 @@ class _LoadingIndicatorState extends State<LoadingIndicator>
     super.dispose();
   }
 
-  double _dotValue(int index) {
-    final phase = (_controller.value - index * 0.22) * 2 * math.pi;
-    return (math.sin(phase) + 1) / 2; // 0 -> 1 wave
-  }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final base = widget.color ?? cs.primary;
 
-    return SizedBox(
-      height: widget.height,
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, child) {
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: List.generate(3, (i) {
-              final wave = _dotValue(i);
-              final double scale = 0.85 + 0.15 * wave; // subtle breathing
-              final double opacity = 0.45 + 0.45 * wave;
-              return Padding(
-                padding: EdgeInsets.only(right: i == 2 ? 0 : widget.spacing),
-                child: Transform.scale(
-                  scale: scale,
-                  child: Container(
-                    width: widget.dotSize,
-                    height: widget.dotSize,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: base.withValues(alpha: opacity),
-                    ),
-                  ),
-                ),
-              );
-            }),
-          );
-        },
+    return RepaintBoundary(
+      child: CustomPaint(
+        size: Size(widget.dotSize * 3 + widget.spacing * 2, widget.height),
+        painter: _LoadingDotsPainter(
+          animation: _controller,
+          color: base,
+          dotSize: widget.dotSize,
+          spacing: widget.spacing,
+        ),
       ),
     );
   }
+}
+
+class _LoadingDotsPainter extends CustomPainter {
+  _LoadingDotsPainter({
+    required this.animation,
+    required this.color,
+    required this.dotSize,
+    required this.spacing,
+  }) : super(repaint: animation);
+
+  final Animation<double> animation;
+  final Color color;
+  final double dotSize;
+  final double spacing;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (var i = 0; i < 3; i++) {
+      final phase = (animation.value - i * 0.22) * 2 * math.pi;
+      final wave = (math.sin(phase) + 1) / 2;
+      final scale = 0.85 + 0.15 * wave;
+      final opacity = 0.45 + 0.45 * wave;
+      final cx = i * (dotSize + spacing) + dotSize / 2;
+      final cy = size.height / 2;
+      canvas.save();
+      canvas.translate(cx, cy);
+      canvas.scale(scale);
+      canvas.drawCircle(
+        Offset.zero,
+        dotSize / 2,
+        Paint()..color = color.withValues(alpha: opacity),
+      );
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
 /// Streaming visual wrapper for assistant message content.
@@ -3585,14 +3684,15 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final fg = _chatSurfaceForegroundPalette(context);
-    final settings = context.watch<SettingsProvider>();
+    final collapseThinkingSteps = context.select<SettingsProvider, bool>(
+      (s) => s.collapseThinkingSteps,
+    );
     final l10n = AppLocalizations.of(context)!;
     final enableAdaptiveWidth =
         widget.steps.isNotEmpty &&
         widget.steps.every((step) => step.isReasoning) &&
         !widget.steps.any((step) => step.isReasoning && step.loading);
-    final canCollapse =
-        settings.collapseThinkingSteps && widget.steps.length > 2;
+    final canCollapse = collapseThinkingSteps && widget.steps.length > 2;
     final visibleSteps = canCollapse && !_showAllSteps
         ? widget.steps.sublist(widget.steps.length - 2)
         : widget.steps;
@@ -3870,9 +3970,7 @@ class _ChainOfThoughtReasoningStep extends StatefulWidget {
 class _ChainOfThoughtReasoningStepState
     extends State<_ChainOfThoughtReasoningStep> {
   final ValueNotifier<int> _elapsedTick = ValueNotifier<int>(0);
-  late final Ticker _ticker = Ticker((_) {
-    if (mounted) _elapsedTick.value++;
-  });
+  Timer? _elapsedTimer;
   final ScrollController _scroll = ScrollController();
   bool _hasOverflow = false;
 
@@ -3901,10 +3999,21 @@ class _ChainOfThoughtReasoningStepState
     return '(${(ms / 1000).toStringAsFixed(1)}s)';
   }
 
+  void _syncElapsedTimer() {
+    if (widget.step.loading) {
+      _elapsedTimer ??= Timer.periodic(const Duration(milliseconds: 100), (_) {
+        if (mounted) _elapsedTick.value++;
+      });
+    } else {
+      _elapsedTimer?.cancel();
+      _elapsedTimer = null;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    if (widget.step.loading) _ticker.start();
+    _syncElapsedTimer();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkOverflow();
       if (widget.step.loading && _scroll.hasClients) {
@@ -3916,22 +4025,20 @@ class _ChainOfThoughtReasoningStepState
   @override
   void didUpdateWidget(covariant _ChainOfThoughtReasoningStep oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _syncElapsedTimer();
     if (widget.step.loading) {
-      if (!_ticker.isActive) _ticker.start();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scroll.hasClients) {
           _scroll.jumpTo(_scroll.position.maxScrollExtent);
         }
       });
-    } else if (_ticker.isActive) {
-      _ticker.stop();
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkOverflow());
   }
 
   @override
   void dispose() {
-    _ticker.dispose();
+    _elapsedTimer?.cancel();
     _elapsedTick.dispose();
     _scroll.dispose();
     super.dispose();
@@ -3949,7 +4056,9 @@ class _ChainOfThoughtReasoningStepState
   Widget build(BuildContext context) {
     final fg = _chatSurfaceForegroundPalette(context);
     final l10n = AppLocalizations.of(context)!;
-    final settings = context.watch<SettingsProvider>();
+    final enableReasoningMarkdown = context.select<SettingsProvider, bool>(
+      (s) => s.enableReasoningMarkdown,
+    );
     final state = _stepState;
     final display = _sanitize(widget.step.text);
     final label = Row(
@@ -3993,7 +4102,7 @@ class _ChainOfThoughtReasoningStepState
     );
 
     Widget reasoningContent(String text) {
-      if (settings.enableReasoningMarkdown) {
+      if (enableReasoningMarkdown) {
         return RepaintBoundary(
           child: MarkdownWithCodeHighlight(
             text: text.isNotEmpty ? text : '…',
@@ -4207,7 +4316,9 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final fg = _chatSurfaceForegroundPalette(context);
-    final settings = context.watch<SettingsProvider>();
+    final showToolResultSummary = context.select<SettingsProvider, bool>(
+      (s) => s.showToolResultSummary,
+    );
     final approvalService = context.watch<ToolApprovalService>();
     ToolApprovalRequest? pendingRequest;
     if (widget.part.id.isNotEmpty &&
@@ -4272,7 +4383,7 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
                       widget.part.arguments['text']) ??
                   '')
               .toString();
-    final bool shouldShowSummary = settings.showToolResultSummary;
+    final bool shouldShowSummary = showToolResultSummary;
     final askUserExpanded = _askUserExpanded ?? true;
     final ttsText = widget.part.toolName == LocalToolNames.textToSpeech
         ? _textToSpeechToolText(widget.part.arguments)
@@ -5765,13 +5876,10 @@ class _ReasoningSection extends StatefulWidget {
   State<_ReasoningSection> createState() => _ReasoningSectionState();
 }
 
-class _ReasoningSectionState extends State<_ReasoningSection>
-    with SingleTickerProviderStateMixin {
+class _ReasoningSectionState extends State<_ReasoningSection> {
   // Use ValueNotifier to only update elapsed time display, not rebuild entire widget
   final ValueNotifier<int> _elapsedTick = ValueNotifier<int>(0);
-  late final Ticker _ticker = Ticker((_) {
-    if (mounted) _elapsedTick.value++;
-  });
+  Timer? _elapsedTimer;
   final ScrollController _scroll = ScrollController();
   bool _hasOverflow = false;
 
@@ -5787,10 +5895,21 @@ class _ReasoningSectionState extends State<_ReasoningSection>
     return '(${(ms / 1000).toStringAsFixed(1)}s)';
   }
 
+  void _syncElapsedTimer() {
+    if (widget.loading && widget.finishedAt == null) {
+      _elapsedTimer ??= Timer.periodic(const Duration(milliseconds: 100), (_) {
+        if (mounted) _elapsedTick.value++;
+      });
+    } else {
+      _elapsedTimer?.cancel();
+      _elapsedTimer = null;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    if (widget.loading) _ticker.start();
+    if (widget.loading) _syncElapsedTimer();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkOverflow();
       if (widget.loading && _scroll.hasClients) {
@@ -5802,11 +5921,7 @@ class _ReasoningSectionState extends State<_ReasoningSection>
   @override
   void didUpdateWidget(covariant _ReasoningSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.loading && widget.finishedAt == null) {
-      if (!_ticker.isActive) _ticker.start();
-    } else {
-      if (_ticker.isActive) _ticker.stop();
-    }
+    _syncElapsedTimer();
     if (widget.loading) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scroll.hasClients) {
@@ -5819,7 +5934,7 @@ class _ReasoningSectionState extends State<_ReasoningSection>
 
   @override
   void dispose() {
-    _ticker.dispose();
+    _elapsedTimer?.cancel();
     _elapsedTick.dispose();
     _scroll.dispose();
     super.dispose();
@@ -5837,7 +5952,9 @@ class _ReasoningSectionState extends State<_ReasoningSection>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final fg = _chatSurfaceForegroundPalette(context);
     final l10n = AppLocalizations.of(context)!;
-    final settings = context.watch<SettingsProvider>();
+    final enableReasoningMarkdown = context.select<SettingsProvider, bool>(
+      (s) => s.enableReasoningMarkdown,
+    );
     final loading = widget.loading;
 
     // Android-like surface style
@@ -5916,7 +6033,7 @@ class _ReasoningSectionState extends State<_ReasoningSection>
 
     // 未加载：不要再指定 color: fg，让它继承和"加载中"相同的颜色
     Widget reasoningContent(String text) {
-      if (settings.enableReasoningMarkdown) {
+      if (enableReasoningMarkdown) {
         return RepaintBoundary(
           child: MarkdownWithCodeHighlight(
             text: text.isNotEmpty ? text : '…',
@@ -6060,43 +6177,45 @@ class _ShimmerState extends State<_Shimmer> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     if (!widget.enabled) return widget.child;
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (context, child) {
-        final t = _c.value; // 0..1
-        return ShaderMask(
-          shaderCallback: (rect) {
-            final width = rect.width;
-            final gradientWidth = width * 0.4;
-            final dx = (width + gradientWidth) * t - gradientWidth;
-            final shaderRect = Rect.fromLTWH(
-              -dx,
-              0,
-              width + gradientWidth * 2,
-              rect.height,
-            );
-            return LinearGradient(
-              colors: [
-                Colors.white.withValues(
-                  alpha: 0.0,
-                ), // color-gate: ignore (shimmer effect)
-                Colors.white.withValues(
-                  alpha: 0.35,
-                ), // color-gate: ignore (shimmer effect)
-                Colors.white.withValues(
-                  alpha: 0.0,
-                ), // color-gate: ignore (shimmer effect)
-              ],
-              stops: const [0.0, 0.5, 1.0],
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-            ).createShader(shaderRect);
-          },
-          blendMode: BlendMode.srcATop,
-          child: child,
-        );
-      },
-      child: widget.child,
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (context, child) {
+          final t = _c.value; // 0..1
+          return ShaderMask(
+            shaderCallback: (rect) {
+              final width = rect.width;
+              final gradientWidth = width * 0.4;
+              final dx = (width + gradientWidth) * t - gradientWidth;
+              final shaderRect = Rect.fromLTWH(
+                -dx,
+                0,
+                width + gradientWidth * 2,
+                rect.height,
+              );
+              return LinearGradient(
+                colors: [
+                  Colors.white.withValues(
+                    alpha: 0.0,
+                  ), // color-gate: ignore (shimmer effect)
+                  Colors.white.withValues(
+                    alpha: 0.35,
+                  ), // color-gate: ignore (shimmer effect)
+                  Colors.white.withValues(
+                    alpha: 0.0,
+                  ), // color-gate: ignore (shimmer effect)
+                ],
+                stops: const [0.0, 0.5, 1.0],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ).createShader(shaderRect);
+            },
+            blendMode: BlendMode.srcATop,
+            child: child,
+          );
+        },
+        child: widget.child,
+      ),
     );
   }
 }

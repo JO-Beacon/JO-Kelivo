@@ -211,6 +211,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageSpaceSubCacheSystem => 'System cache';
 
   @override
+  String get storageSpaceSubLogsContext => 'Context logs';
+
+  @override
   String get storageSpaceSubLogsFlutter => 'Flutter logs';
 
   @override
@@ -5349,7 +5352,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchProviderFirecrawlDescription =>
-      'Firecrawl Search API v2. Requires a Bearer API key. Scrape is not supported here.';
+      'Firecrawl Search API v2. API key is optional. Scrape is not supported here.';
 
   @override
   String get searchServiceNameTinyFish => 'TinyFish';
@@ -5902,6 +5905,79 @@ class AppLocalizationsEn extends AppLocalizations {
       'When enabled, Flutter errors and print output are written to logs/flutter_logs.txt (rotated daily).';
 
   @override
+  String get contextLogSettingTitle => 'Context Logging';
+
+  @override
+  String get contextLogSettingSubtitle =>
+      'When enabled, the exact messages sent to the model are written to logs/context_logs.txt (rotated daily).';
+
+  @override
+  String get contextLogViewerTitle => 'Context';
+
+  @override
+  String contextLogSnapshotMessages(int count) {
+    return '$count messages';
+  }
+
+  @override
+  String contextLogSnapshotTokens(int count) {
+    return '$count tokens';
+  }
+
+  @override
+  String get contextLogSourceSystemPrompt => 'System prompt';
+
+  @override
+  String get contextLogSourceMemoryRules => 'Memory rules';
+
+  @override
+  String get contextLogSourceSearchPrompt => 'Search prompt';
+
+  @override
+  String get contextLogSourceInstructionInjection => 'Instruction';
+
+  @override
+  String get contextLogSourceWorldBook => 'World book';
+
+  @override
+  String get contextLogSourceMemorySnapshot => 'Memory snapshot';
+
+  @override
+  String get contextLogSourceChatHistory => 'Chat history';
+
+  @override
+  String get contextLogSourceToolCall => 'Tool call';
+
+  @override
+  String get contextLogSourceToolResult => 'Tool result';
+
+  @override
+  String contextLogSnapshotsCount(int count) {
+    return '$count snapshots';
+  }
+
+  @override
+  String get contextLogSnapshotFallbackTitle => 'Snapshot';
+
+  @override
+  String get contextLogKindFull => 'Full snapshot';
+
+  @override
+  String get contextLogKindUpdate => 'Incremental update';
+
+  @override
+  String get contextLogSectionComposition => 'Composition';
+
+  @override
+  String get contextLogLoadOlder => 'Load earlier logs';
+
+  @override
+  String get contextLogLoading => 'Loading...';
+
+  @override
+  String get contextLogAllLoaded => 'All logs loaded';
+
+  @override
   String get logViewerTitle => 'Request Logs';
 
   @override
@@ -5969,6 +6045,15 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get logViewerSectionAttachments => 'Attachments';
+
+  @override
+  String get logViewerPayloadOmitted => 'omitted';
+
+  @override
+  String get logViewerShowMore => 'Show more';
+
+  @override
   String get logSettingsTitle => 'Log Settings';
 
   @override
@@ -5976,7 +6061,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get logSettingsSaveOutputSubtitle =>
-      'Log response body content (may use significant storage)';
+      'Log every streaming chunk (can slow generation). HTTP error bodies are always recorded.';
+
+  @override
+  String get logSettingsElidePayloads => 'Omit Large Payloads';
+
+  @override
+  String get logSettingsElidePayloadsSubtitle =>
+      'Replace inline base64 images and files with a placeholder. Keeps logs small and the viewer fast.';
 
   @override
   String get logSettingsAutoDelete => 'Auto-delete';
@@ -6553,6 +6645,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get legacyMemoryMigrationClose => 'Done';
+
+  @override
+  String get legacyMemoryModeTitle => 'Use legacy memory';
+
+  @override
+  String get legacyMemoryModeSubtitle =>
+      'Global setting for all assistants. Both datasets are kept; you can switch back anytime. Legacy memory is per-assistant only — no global memory, user profile, background organize, traces, or past-conversation search.';
+
+  @override
+  String get legacyMemoryModeCacheWarning =>
+      'Legacy mode writes all memories and the current time into the system prompt every turn, so prompt cache cannot hit and long chats cost more.';
 
   @override
   String get memoryUiContentLabel => 'Content';

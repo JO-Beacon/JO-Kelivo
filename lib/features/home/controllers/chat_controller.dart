@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import '../../../core/models/chat_message.dart';
@@ -660,9 +661,20 @@ class ChatController extends ChangeNotifier {
 
   Future<bool> refreshTimelineAfterMutation({
     Set<String> removedRevisionIds = const <String>{},
+    Map<String, List<ChatMessage>>? survivingVersionsByGroup,
   }) async {
     final conversation = _currentConversation;
     if (conversation == null) return false;
+    if (survivingVersionsByGroup != null &&
+        _removeRevisionsFromWindow(
+          removedRevisionIds,
+          survivingVersionsByGroup,
+        )) {
+      await _preloadVisibleGroupData();
+      if (_currentConversation?.id != conversation.id) return false;
+      notifyListeners();
+      return true;
+    }
     String? anchorId;
     if (hasMoreAfter) {
       for (final message in _messages) {
@@ -671,6 +683,9 @@ class ChatController extends ChangeNotifier {
         break;
       }
     }
+    final previousSlotIds = <String>{
+      for (final message in _messages) message.groupId ?? message.id,
+    };
     final page = _lazyHistoryEnabled
         ? await _chatService.loadTimelinePage(
             conversation.id,
@@ -679,10 +694,132 @@ class ChatController extends ChangeNotifier {
           )
         : await _fetchCompleteTimeline(conversation.id);
     if (_currentConversation?.id != conversation.id) return false;
-    _replaceWindow(page);
+    _replaceWindow(_withoutBackfilledHead(page, previousSlotIds));
     await _preloadVisibleGroupData();
     notifyListeners();
     return page != null;
+  }
+
+  /// Applies a deletion to the loaded window in place instead of reloading it.
+  ///
+  /// A full reload rebuilds the window around a database anchor, which can
+  /// reshape it (backfilled head, shifted indices); the list widget then loses
+  /// track of which rows survived and has to drop every measured row height,
+  /// making the viewport drift while everything is re-measured. Removing the
+  /// deleted revisions from the loaded window directly keeps every surviving
+  /// slot identity stable, so the list only sees "these slots disappeared".
+  ///
+  /// [survivingVersionsByGroup] must contain an entry for every group that
+  /// lost at least one revision, holding the versions that remain (empty when
+  /// the whole slot is gone). Returns false when the mutation cannot be
+  /// expressed as an in-window edit — deleted revisions belonging to slots
+  /// outside the loaded window, missing survivor data, or a window that would
+  /// empty out — in which case the caller falls back to the full reload.
+  bool _removeRevisionsFromWindow(
+    Set<String> removedRevisionIds,
+    Map<String, List<ChatMessage>> survivingVersionsByGroup,
+  ) {
+    if (removedRevisionIds.isEmpty || _messages.isEmpty) return false;
+    final windowSlotIds = <String>{
+      for (final message in _messages) message.groupId ?? message.id,
+    };
+    // A group outside the window changes slot counts in a region this method
+    // does not track, so only a reload can resolve it.
+    for (final groupId in survivingVersionsByGroup.keys) {
+      if (!windowSlotIds.contains(groupId)) return false;
+    }
+
+    final next = <ChatMessage>[];
+    final nextVersionCounts = Map<String, int>.of(_windowVersionCounts);
+    var removedSlotCount = 0;
+    for (final message in _messages) {
+      final groupId = message.groupId ?? message.id;
+      final survivors = survivingVersionsByGroup[groupId];
+      if (survivors != null && survivors.isNotEmpty) {
+        nextVersionCounts[groupId] = survivors.length;
+      }
+      if (!removedRevisionIds.contains(message.id)) {
+        next.add(message);
+        continue;
+      }
+      if (survivors == null) return false;
+      if (survivors.isEmpty) {
+        removedSlotCount++;
+        nextVersionCounts.remove(groupId);
+        continue;
+      }
+      final sorted = List<ChatMessage>.of(survivors)
+        ..sort((left, right) => left.version.compareTo(right.version));
+      final selection = _versionSelections[groupId];
+      ChatMessage? selected;
+      if (selection != null) {
+        for (final candidate in sorted) {
+          if (candidate.version == selection) {
+            selected = candidate;
+            break;
+          }
+        }
+      }
+      next.add(selected ?? sorted.last);
+    }
+    if (next.isEmpty) return false;
+
+    _messages = next;
+    _totalMessageCount = math.max(
+      _loadedStartIndex + next.length,
+      _totalMessageCount - removedSlotCount,
+    );
+    _windowVersionCounts = nextVersionCounts;
+    invalidateCache();
+    return true;
+  }
+
+  /// Drops slots a tail-anchored reload backfilled ahead of the old window.
+  ///
+  /// A reload without an anchor always fills a full-size window, so deleting
+  /// the last message pulls one extra older message in at the head. The
+  /// refreshed list then has the same length as before with every slot shifted
+  /// by one; SuperSliverList reuses its children under the new indices and
+  /// keeps their stale layout offsets, which parks the viewport above the real
+  /// bottom with no way to scroll back down. Cutting the backfilled head makes
+  /// the new window a prefix of the old one, so the list just loses its
+  /// trailing child. The dropped history is paged back in by [loadMoreBefore].
+  LoadedTimelinePage? _withoutBackfilledHead(
+    LoadedTimelinePage? page,
+    Set<String> previousSlotIds,
+  ) {
+    if (page == null || page.hasMoreAfter || previousSlotIds.isEmpty) {
+      return page;
+    }
+    var cut = 0;
+    while (cut < page.slots.length &&
+        !previousSlotIds.contains(page.slots[cut].identity.slotId)) {
+      cut++;
+    }
+    // cut == 0: nothing backfilled. cut == length: the window moved entirely
+    // off the old one, so there is no shared head to preserve.
+    if (cut == 0 || cut >= page.slots.length) return page;
+    // A batch deletion leaves only a handful of the old slots in the reloaded
+    // window, and trimming down to those would show a near-empty list that only
+    // refills once the user scrolls. Reusing children is not worth that, so
+    // below a screenful of survivors keep the full window instead.
+    final remaining = page.slots.length - cut;
+    if (remaining <
+        math.min(
+          ChatService.defaultTimelineInitialSlots,
+          previousSlotIds.length,
+        )) {
+      return page;
+    }
+    return LoadedTimelinePage(
+      conversationId: page.conversationId,
+      stateRevision: page.stateRevision,
+      contextStartRevisionId: page.contextStartRevisionId,
+      slots: page.slots.sublist(cut),
+      hasMoreBefore: true,
+      hasMoreAfter: page.hasMoreAfter,
+      totalSlotCount: page.totalSlotCount,
+    );
   }
 
   int loadedWindowTruncateIndex() {
