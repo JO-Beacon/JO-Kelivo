@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../features/home/widgets/side_drawer.dart';
+import '../features/home/widgets/sidebar_presentation.dart';
 
 /// Desktop sidebar wrapper. Phase 1: reuse tablet embedded SideDrawer to ensure parity.
 /// Later we can evolve this to a dedicated desktop-only sidebar with right-click menus.
@@ -30,7 +31,6 @@ class DesktopSidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SideDrawer(
-      embedded: true,
       embeddedWidth: 300,
       userName: userName,
       assistantName: assistantName,
@@ -40,6 +40,12 @@ class DesktopSidebar extends StatelessWidget {
       onEnterGlobalSearch: () {},
       onExitGlobalSearch: () {},
       showBottomBar: false,
+      presentation: SidebarPresentation.docked,
+      capabilities: const SidebarCapabilities(
+        showTabs: true,
+        pointerInteractions: true,
+        assistantReorder: true,
+      ),
     );
   }
 }

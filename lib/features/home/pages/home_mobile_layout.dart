@@ -10,6 +10,7 @@ import 'dart:ui' as ui;
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/interactive_drawer.dart';
 import '../widgets/side_drawer.dart';
+import '../widgets/sidebar_presentation.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -98,6 +99,12 @@ class HomeMobileScaffold extends StatelessWidget {
         assistantName: _getAssistantName(context),
         closePickerTicker: assistantPickerCloseTick,
         loadingConversationIds: loadingConversationIds,
+        presentation: SidebarPresentation.overlay,
+        capabilities: const SidebarCapabilities(
+          showTabs: true,
+          pointerInteractions: false,
+          assistantReorder: false,
+        ),
         globalSearchMode: globalSearchMode,
         globalSearchQuery: globalSearchQuery,
         onGlobalSearchQueryChanged: onGlobalSearchQueryChanged,

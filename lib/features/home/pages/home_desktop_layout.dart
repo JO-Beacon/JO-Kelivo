@@ -9,6 +9,7 @@ import 'dart:ui' as ui;
 
 import '../../../l10n/app_localizations.dart';
 import '../widgets/side_drawer.dart';
+import '../widgets/sidebar_presentation.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/providers/user_provider.dart';
@@ -174,14 +175,18 @@ class HomeDesktopScaffold extends StatelessWidget {
     bool topicsOnRight,
   ) {
     final sidebar = SideDrawer(
-      embedded: true,
       embeddedWidth: embeddedSidebarWidth,
       userName: context.watch<UserProvider>().name,
       assistantName: _getAssistantName(context),
       closePickerTicker: assistantPickerCloseTick,
       loadingConversationIds: loadingConversationIds,
-      useDesktopTabs: _isDesktop && !topicsOnRight,
-      desktopAssistantsOnly: _isDesktop && topicsOnRight,
+      presentation: SidebarPresentation.docked,
+      capabilities: SidebarCapabilities(
+        showTabs: !(_isDesktop && topicsOnRight),
+        assistantsOnly: _isDesktop && topicsOnRight,
+        pointerInteractions: _isDesktop,
+        assistantReorder: _isDesktop,
+      ),
       globalSearchMode: globalSearchMode,
       globalSearchQuery: globalSearchQuery,
       onGlobalSearchQueryChanged: onGlobalSearchQueryChanged,
@@ -240,14 +245,16 @@ class HomeDesktopScaffold extends StatelessWidget {
               child: SizedBox(
                 width: rightSidebarWidth,
                 child: SideDrawer(
-                  embedded: true,
                   embeddedWidth: rightSidebarWidth,
                   userName: context.watch<UserProvider>().name,
                   assistantName: _getAssistantName(context),
                   closePickerTicker: assistantPickerCloseTick,
                   loadingConversationIds: loadingConversationIds,
-                  useDesktopTabs: false,
-                  desktopTopicsOnly: true,
+                  presentation: SidebarPresentation.docked,
+                  capabilities: const SidebarCapabilities(
+                    topicsOnly: true,
+                    pointerInteractions: true,
+                  ),
                   globalSearchMode: false,
                   globalSearchQuery: '',
                   onGlobalSearchQueryChanged: (_) {},

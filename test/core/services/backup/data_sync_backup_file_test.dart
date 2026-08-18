@@ -1016,8 +1016,8 @@ void main() {
         PackageInfo.setMockInitialValues(
           appName: 'JO-Kelivo',
           packageName: 'com.jo.kelivo',
-          version: '0.1.7',
-          buildNumber: '7',
+          version: '0.1.8',
+          buildNumber: '8',
           buildSignature: 'test',
         );
         SharedPreferences.setMockInitialValues({
@@ -1124,7 +1124,7 @@ void main() {
           expect(manifest['format'], 'kelivo-backup');
           expect(manifest['formatVersion'], 2);
           expect(manifest['payloadKind'], 'sqlite');
-          expect(manifest['appVersion'], '0.1.7+7');
+          expect(manifest['appVersion'], '0.1.8+8');
           expect(manifest['includeChats'], isTrue);
           expect(manifest['includeFiles'], isTrue);
           expect(manifest['secretsIncluded'], isTrue);

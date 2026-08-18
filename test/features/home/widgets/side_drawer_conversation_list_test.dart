@@ -10,6 +10,7 @@ import 'package:Kelivo/core/providers/tag_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/features/home/widgets/side_drawer.dart';
+import 'package:Kelivo/features/home/widgets/sidebar_presentation.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -160,6 +161,8 @@ void main() {
   Future<void> pumpDrawer(
     WidgetTester tester,
     ChatService service, {
+    SidebarPresentation presentation = SidebarPresentation.docked,
+    SidebarCapabilities? capabilities,
     bool desktopTopicsOnly = true,
     bool desktopAssistantsOnly = false,
     bool globalSearchMode = false,
@@ -168,7 +171,7 @@ void main() {
     ValueNotifier<Locale>? localeListenable,
     bool showChatListDate = false,
     FutureOr<void> Function(String id, {bool closeDrawer})?
-        onSelectConversation,
+    onSelectConversation,
   }) async {
     tester.view.physicalSize = const Size(1200, 900);
     tester.view.devicePixelRatio = 1.0;
@@ -180,22 +183,35 @@ void main() {
     final tagPrefs = createBusinessTestPreferences();
     final settings = SettingsProvider(settingsPrefs);
     Widget materialFor(Locale currentLocale) {
+      final sideDrawer = SideDrawer(
+        userName: 'User',
+        assistantName: 'Assistant',
+        presentation: presentation,
+        capabilities:
+            capabilities ??
+            SidebarCapabilities(
+              showTabs: !desktopAssistantsOnly && !desktopTopicsOnly,
+              assistantsOnly: desktopAssistantsOnly,
+              topicsOnly: desktopTopicsOnly,
+              pointerInteractions: true,
+              assistantReorder: true,
+            ),
+        globalSearchMode: globalSearchMode,
+        globalSearchQuery: globalSearchQuery,
+        showBottomBar: false,
+        onSelectConversation: onSelectConversation,
+      );
       return MaterialApp(
         locale: currentLocale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
-          body: SideDrawer(
-            userName: 'User',
-            assistantName: 'Assistant',
-            embedded: true,
-            desktopTopicsOnly: desktopTopicsOnly,
-            desktopAssistantsOnly: desktopAssistantsOnly,
-            globalSearchMode: globalSearchMode,
-            globalSearchQuery: globalSearchQuery,
-            showBottomBar: false,
-            onSelectConversation: onSelectConversation,
-          ),
+          drawer: presentation == SidebarPresentation.overlay
+              ? sideDrawer
+              : null,
+          body: presentation == SidebarPresentation.docked
+              ? sideDrawer
+              : const SizedBox.shrink(),
         ),
       );
     }
@@ -455,10 +471,7 @@ void main() {
         await tester.runAsync(() => service.togglePinConversation(alpha.id));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 400));
-        expect(
-          SideDrawer.debugSidebarRowsComputeCount,
-          greaterThan(computes),
-        );
+        expect(SideDrawer.debugSidebarRowsComputeCount, greaterThan(computes));
       });
     },
   );
@@ -578,62 +591,64 @@ void main() {
     );
   });
 
-  testWidgets(
-    'scroll to end keeps last tile tappable with correct id',
-    (tester) async {
-      await asDesktop(() async {
-        final service = createService();
-        await tester.runAsync(() => service.init());
-        final now = DateTime.now();
-        const total = 2000;
-        String? selectedId;
-        service.seedConversationsForTest([
-          for (var i = 0; i < total; i++)
-            Conversation(
-              id: 'c-$i',
-              title: 'Chat $i',
-              updatedAt: now.subtract(Duration(seconds: i)),
-              createdAt: now.subtract(Duration(seconds: i)),
-            ),
-        ]);
-        await pumpDrawer(
-          tester,
-          service,
-          onSelectConversation: (id, {closeDrawer = true}) async {
-            selectedId = id;
-          },
-        );
+  testWidgets('scroll to end keeps last tile tappable with correct id', (
+    tester,
+  ) async {
+    await asDesktop(() async {
+      final service = createService();
+      await tester.runAsync(() => service.init());
+      final now = DateTime.now();
+      const total = 2000;
+      String? selectedId;
+      service.seedConversationsForTest([
+        for (var i = 0; i < total; i++)
+          Conversation(
+            id: 'c-$i',
+            title: 'Chat $i',
+            updatedAt: now.subtract(Duration(seconds: i)),
+            createdAt: now.subtract(Duration(seconds: i)),
+          ),
+      ]);
+      await pumpDrawer(
+        tester,
+        service,
+        onSelectConversation: (id, {closeDrawer = true}) async {
+          selectedId = id;
+        },
+      );
 
-        expect(find.text('Chat 0'), findsOneWidget);
-        // Tap near the top first to prove selection wiring, then scroll away.
-        await tester.tap(find.text('Chat 0'));
-        await tester.pump();
-        expect(selectedId, 'c-0');
+      expect(find.text('Chat 0'), findsOneWidget);
+      // Tap near the top first to prove selection wiring, then scroll away.
+      await tester.tap(find.text('Chat 0'));
+      await tester.pump();
+      expect(selectedId, 'c-0');
 
-        final scrollable = drawerScrollable(tester);
-        final position = tester.state<ScrollableState>(scrollable).position;
-        expect(position.maxScrollExtent, greaterThan(0));
-        position.jumpTo(position.maxScrollExtent);
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 400));
+      final scrollable = drawerScrollable(tester);
+      final position = tester.state<ScrollableState>(scrollable).position;
+      expect(position.maxScrollExtent, greaterThan(0));
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
 
-        // Top item is gone; a far chat title remains in the built viewport.
-        expect(find.text('Chat 0'), findsNothing);
-        final farIndexes = find
-            .byType(Text)
-            .evaluate()
-            .map((e) => (e.widget as Text).data)
-            .whereType<String>()
-            .map((t) => RegExp(r'^Chat (\d+)$').firstMatch(t))
-            .whereType<RegExpMatch>()
-            .map((m) => int.parse(m.group(1)!))
-            .toList();
-        expect(farIndexes, isNotEmpty);
-        expect(farIndexes.reduce((a, b) => a > b ? a : b), greaterThan(total ~/ 2));
-        expect(find.byType(SideDrawer.debugChatTileType), findsWidgets);
-      });
-    },
-  );
+      // Top item is gone; a far chat title remains in the built viewport.
+      expect(find.text('Chat 0'), findsNothing);
+      final farIndexes = find
+          .byType(Text)
+          .evaluate()
+          .map((e) => (e.widget as Text).data)
+          .whereType<String>()
+          .map((t) => RegExp(r'^Chat (\d+)$').firstMatch(t))
+          .whereType<RegExpMatch>()
+          .map((m) => int.parse(m.group(1)!))
+          .toList();
+      expect(farIndexes, isNotEmpty);
+      expect(
+        farIndexes.reduce((a, b) => a > b ? a : b),
+        greaterThan(total ~/ 2),
+      );
+      expect(find.byType(SideDrawer.debugChatTileType), findsWidgets);
+    });
+  });
 
   testWidgets(
     'locale switch relocalizes headers without recomputing rows or jumping scroll',
@@ -667,11 +682,7 @@ void main() {
         addTearDown(localeListenable.dispose);
         // Pinned header is enough to prove locale is resolved at render time
         // (not memoized into row labels). Avoid showChatListDate prefs I/O.
-        await pumpDrawer(
-          tester,
-          service,
-          localeListenable: localeListenable,
-        );
+        await pumpDrawer(tester, service, localeListenable: localeListenable);
 
         final en = await AppLocalizations.delegate.load(const Locale('en'));
         final zh = await AppLocalizations.delegate.load(const Locale('zh'));
@@ -684,8 +695,10 @@ void main() {
             .state<ScrollableState>(drawerScrollable(tester))
             .position
             .pixels;
-        final tileCountBefore =
-            find.byType(SideDrawer.debugChatTileType).evaluate().length;
+        final tileCountBefore = find
+            .byType(SideDrawer.debugChatTileType)
+            .evaluate()
+            .length;
 
         localeListenable.value = const Locale('zh');
         await tester.pump();
@@ -702,7 +715,10 @@ void main() {
         expect(find.text('Today Chat'), findsOneWidget);
         expect(find.text('Today Chat 2'), findsOneWidget);
         expect(
-          tester.state<ScrollableState>(drawerScrollable(tester)).position.pixels,
+          tester
+              .state<ScrollableState>(drawerScrollable(tester))
+              .position
+              .pixels,
           offsetBefore,
         );
 
@@ -714,7 +730,10 @@ void main() {
         expect(find.text(zh.sideDrawerPinnedLabel), findsNothing);
         expect(SideDrawer.debugSidebarRowsComputeCount, computesBefore);
         expect(
-          tester.state<ScrollableState>(drawerScrollable(tester)).position.pixels,
+          tester
+              .state<ScrollableState>(drawerScrollable(tester))
+              .position
+              .pixels,
           offsetBefore,
         );
       });
@@ -781,4 +800,36 @@ void main() {
     },
   );
 
+  testWidgets('overlay presentation renders assistant/topic tabs', (
+    tester,
+  ) async {
+    final service = createService();
+    await tester.runAsync(() async {
+      await service.init();
+      await service.createConversation(title: 'Topic A');
+    });
+    await pumpDrawer(
+      tester,
+      service,
+      presentation: SidebarPresentation.overlay,
+      capabilities: const SidebarCapabilities(
+        showTabs: true,
+        pointerInteractions: false,
+      ),
+      desktopTopicsOnly: false,
+    );
+
+    final scaffoldState = tester.state<ScaffoldState>(find.byType(Scaffold));
+    scaffoldState.openDrawer();
+    await tester.pumpAndSettle();
+
+    final l10n = AppLocalizations.of(tester.element(find.byType(SideDrawer)))!;
+    expect(find.text(l10n.desktopSidebarTabAssistants), findsOneWidget);
+    expect(find.text(l10n.desktopSidebarTabTopics), findsOneWidget);
+    expect(find.byType(SideDrawer.debugChatTileType), findsNothing);
+
+    await tester.tap(find.text(l10n.desktopSidebarTabTopics));
+    await tester.pumpAndSettle();
+    expect(find.text('Topic A'), findsOneWidget);
+  });
 }

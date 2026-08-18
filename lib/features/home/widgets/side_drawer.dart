@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, TargetPlatform;
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import '../../../icons/lucide_adapter.dart';
@@ -48,6 +46,7 @@ import '../../../features/search/services/global_session_search_service.dart';
 import '../controllers/chat_actions.dart';
 import 'assistant_avatar.dart';
 import 'assistant_entry_actions.dart';
+import 'sidebar_presentation.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 class SideDrawer extends StatefulWidget {
@@ -59,12 +58,10 @@ class SideDrawer extends StatefulWidget {
     this.onNewConversation,
     this.closePickerTicker,
     this.loadingConversationIds = const <String>{},
-    this.embedded = false,
     this.embeddedWidth,
     this.showBottomBar = true,
-    this.useDesktopTabs = false,
-    this.desktopAssistantsOnly = false,
-    this.desktopTopicsOnly = false,
+    this.presentation = SidebarPresentation.overlay,
+    this.capabilities = const SidebarCapabilities(),
     this.globalSearchMode = false,
     this.globalSearchQuery = '',
     this.onGlobalSearchQueryChanged,
@@ -80,13 +77,10 @@ class SideDrawer extends StatefulWidget {
   final FutureOr<void> Function({bool closeDrawer})? onNewConversation;
   final ValueNotifier<int>? closePickerTicker;
   final Set<String> loadingConversationIds;
-  final bool
-  embedded; // when true, render as a fixed side panel instead of a Drawer
-  final double? embeddedWidth; // optional explicit width for embedded mode
+  final double? embeddedWidth; // optional explicit width for docked mode
   final bool showBottomBar; // desktop can hide this bottom area
-  final bool useDesktopTabs; // desktop-only: show tabs (Assistants/Topics)
-  final bool desktopAssistantsOnly; // desktop-only: show only assistants list
-  final bool desktopTopicsOnly; // desktop-only: show only topics list
+  final SidebarPresentation presentation;
+  final SidebarCapabilities capabilities;
 
   // Global search mode
   final bool globalSearchMode;
@@ -138,10 +132,12 @@ class SideDrawer extends StatefulWidget {
 }
 
 class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
-  bool get _isDesktop =>
-      defaultTargetPlatform == TargetPlatform.macOS ||
-      defaultTargetPlatform == TargetPlatform.windows ||
-      defaultTargetPlatform == TargetPlatform.linux;
+  bool get _docked => widget.presentation == SidebarPresentation.docked;
+  bool get _pointerInteractions => widget.capabilities.pointerInteractions;
+  bool get _showTabs => widget.capabilities.showTabs;
+  bool get _assistantsOnly => widget.capabilities.assistantsOnly;
+  bool get _topicsOnly => widget.capabilities.topicsOnly;
+  bool get _assistantReorder => widget.capabilities.assistantReorder;
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
   final GlobalKey _assistantTileKey = GlobalKey();
@@ -182,7 +178,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
         _debugRequestConversationListHostRebuild;
     _attachCloseTicker(widget.closePickerTicker);
     _mobileSearchFocusNode.addListener(() {
-      if (_isDesktop) return;
+      if (_pointerInteractions) return;
       final visible = _mobileSearchFocusNode.hasFocus;
       if (_showMobileSearchTip != visible) {
         setState(() => _showMobileSearchTip = visible);
@@ -194,7 +190,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       setState(() => _query = next);
       if (widget.globalSearchMode) {
         widget.onGlobalSearchQueryChanged?.call(next);
-        if (!_isDesktop) {
+        if (!_pointerInteractions) {
           if (next.trim().isEmpty) {
             _clearGlobalSearchState(clearText: false);
           } else {
@@ -212,13 +208,13 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       _query = widget.globalSearchQuery;
     }
     // Update check moved to app startup (main.dart)
-    // Prepare desktop tabs controller (available when useDesktopTabs)
+    // Prepare the assistant/topics tab controller when the host requests tabs.
     _tabController = TabController(length: 2, vsync: this, initialIndex: 0);
     _tabController!.addListener(_onDesktopTabChanged);
     // Reflect current index to bus and listen for external switches
     DesktopSidebarTabBus.instance.setCurrentIndex(_tabController!.index);
     _tabBusSub = DesktopSidebarTabBus.instance.stream.listen((idx) {
-      if (widget.useDesktopTabs && mounted) {
+      if (_showTabs && mounted) {
         try {
           _tabController!.animateTo(
             idx,
@@ -244,12 +240,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     final l10n = AppLocalizations.of(context)!;
     final chatService = context.read<ChatService>();
     final isPinned = chat.isPinned;
-    final isDesktop =
-        defaultTargetPlatform == TargetPlatform.macOS ||
-        defaultTargetPlatform == TargetPlatform.windows ||
-        defaultTargetPlatform == TargetPlatform.linux;
 
-    if (isDesktop) {
+    if (_pointerInteractions) {
       // Desktop: glass anchored menu near cursor/button
       Offset pos = anchor ?? DesktopMenuAnchor.positionOrCenter(context);
       await showDesktopContextMenuAt(
@@ -1003,7 +995,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     }
 
     if (!_globalSearchHasRun) {
-      if (!_isDesktop) {
+      if (!_pointerInteractions) {
         return const SizedBox.shrink();
       }
       // Pre-search: top-aligned hint
@@ -1311,7 +1303,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
 
   void _openBackupSettings() {
     Haptics.light();
-    if (_isDesktop) {
+    if (_pointerInteractions) {
       DesktopSettingsNavigationBus.instance.openBackup();
       return;
     }
@@ -1369,7 +1361,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: _isDesktop ? 13.5 : 14.5,
+                          fontSize: _pointerInteractions ? 13.5 : 14.5,
                           fontWeight: AppFontWeights.emphasis,
                           color: textBase.withValues(alpha: 0.92),
                         ),
@@ -1380,7 +1372,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: _isDesktop ? 12 : 12.5,
+                          fontSize: _pointerInteractions ? 12 : 12.5,
                           height: 1.25,
                           color: textBase.withValues(alpha: 0.68),
                         ),
@@ -1389,7 +1381,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                       Text(
                         l10n.backupReminderSidebarAction,
                         style: TextStyle(
-                          fontSize: _isDesktop ? 12.5 : 13,
+                          fontSize: _pointerInteractions ? 12.5 : 13,
                           fontWeight: AppFontWeights.emphasis,
                           color: cs.primary,
                         ),
@@ -1524,17 +1516,9 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       );
     }
 
-    // Desktop-only: enable tabs for embedded sidebar when requested
-    final bool assistOnly =
-        widget.desktopAssistantsOnly && _isDesktop && widget.embedded;
-    final bool topicsOnly =
-        widget.desktopTopicsOnly && _isDesktop && widget.embedded;
-    final bool useTabs =
-        widget.useDesktopTabs &&
-        _isDesktop &&
-        widget.embedded &&
-        !assistOnly &&
-        !topicsOnly;
+    final bool assistOnly = _assistantsOnly;
+    final bool topicsOnly = _topicsOnly;
+    final bool useTabs = _showTabs && !assistOnly && !topicsOnly;
 
     final inner = SafeArea(
       child: Stack(
@@ -1544,7 +1528,12 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
             children: [
               // Fixed header + search
               Padding(
-                padding: EdgeInsets.fromLTRB(16, _isDesktop ? 10 : 4, 16, 0),
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  _pointerInteractions ? 10 : 4,
+                  16,
+                  0,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -1554,7 +1543,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                       topicsOnly: topicsOnly,
                     ),
                     // 1. 搜索框 + 历史按钮（固定头部）
-                    if (_isDesktop)
+                    if (_pointerInteractions)
                       // 桌面端
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -1568,8 +1557,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                             key: ValueKey<String>(
                               (() {
                                 final l10n = AppLocalizations.of(context)!;
-                                if (widget.globalSearchMode &&
-                                    widget.embedded) {
+                                if (widget.globalSearchMode && _docked) {
                                   return l10n.sideDrawerGlobalSearchHint;
                                 }
                                 String hint;
@@ -1590,7 +1578,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                 child: TextField(
                                   controller: _searchController,
                                   onSubmitted:
-                                      widget.globalSearchMode && widget.embedded
+                                      widget.globalSearchMode && _docked
                                       ? (_) => _runGlobalSearch()
                                       : null,
                                   decoration: InputDecoration(
@@ -1598,8 +1586,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                       final l10n = AppLocalizations.of(
                                         context,
                                       )!;
-                                      if (widget.globalSearchMode &&
-                                          widget.embedded) {
+                                      if (widget.globalSearchMode && _docked) {
                                         return l10n.sideDrawerGlobalSearchHint;
                                       }
                                       if (useTabs) {
@@ -1634,8 +1621,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                       minHeight: 0,
                                     ),
                                     suffixIcon:
-                                        widget.globalSearchMode &&
-                                            widget.embedded
+                                        widget.globalSearchMode && _docked
                                         // Global search mode: search (submit), history, cancel
                                         ? Padding(
                                             padding: const EdgeInsets.only(
@@ -1865,10 +1851,10 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                                   ? ''
                                                   : _mobileSearchHint(),
                                               filled: true,
-                                              fillColor: context.appColors.surfaceFill
-                                                        .withValues(
-                                                          alpha: 0.80,
-                                                        ),
+                                              fillColor: context
+                                                  .appColors
+                                                  .surfaceFill
+                                                  .withValues(alpha: 0.80),
                                               isDense: true,
                                               isCollapsed: true,
                                               prefixIcon: Padding(
@@ -2108,13 +2094,14 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                       ),
 
                     if (!widget.globalSearchMode) ...[
-                      SizedBox(height: _isDesktop ? 8 : 12),
+                      SizedBox(height: _pointerInteractions ? 8 : 12),
 
                       // 桌面端：替换为 Tab（助手 / 话题）
                       if (useTabs)
                         _DesktopSidebarTabs(
                           textColor: textBase,
                           controller: _tabController!,
+                          pointerInteractions: _pointerInteractions,
                         )
                       else if (!assistOnly && !topicsOnly)
                         // 当前助手区域（固定）
@@ -2124,30 +2111,31 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                             key: _assistantTileKey,
                             child: MouseRegion(
                               onEnter: (_) {
-                                if (_isDesktop) {
+                                if (_pointerInteractions) {
                                   setState(
                                     () => _assistantHeaderHovered = true,
                                   );
                                 }
                               },
                               onExit: (_) {
-                                if (_isDesktop) {
+                                if (_pointerInteractions) {
                                   setState(
                                     () => _assistantHeaderHovered = false,
                                   );
                                 }
                               },
-                              cursor: _isDesktop
+                              cursor: _pointerInteractions
                                   ? SystemMouseCursors.click
                                   : SystemMouseCursors.basic,
                               child: IosCardPress(
                                 baseColor: (() {
-                                  final embedded = widget.embedded;
-                                  final base = embedded
+                                  final docked = _docked;
+                                  final base = docked
                                       ? Colors.transparent
                                       : cs.surface;
-                                  if (_isDesktop && _assistantHeaderHovered) {
-                                    return embedded
+                                  if (_pointerInteractions &&
+                                      _assistantHeaderHovered) {
+                                    return docked
                                         ? cs.primary.withValues(alpha: 0.08)
                                         : cs.surface.withValues(alpha: 0.9);
                                   }
@@ -2155,7 +2143,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                 })(),
                                 borderRadius: BorderRadius.circular(16),
                                 onTap: _toggleAssistantPicker,
-                                onLongPress: _isDesktop
+                                onLongPress: _pointerInteractions
                                     ? null
                                     : () {
                                         final id = context
@@ -2181,7 +2169,9 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
-                                          fontSize: _isDesktop ? 14 : 15,
+                                          fontSize: _pointerInteractions
+                                              ? 14
+                                              : 15,
                                           fontWeight: AppFontWeights.medium,
                                           color: textBase,
                                         ),
@@ -2258,7 +2248,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                         chatService: chatService,
                       );
                       if (useTabs) {
-                        final isDesktop = _isDesktop;
+                        final isDesktop = _pointerInteractions;
                         final topPad =
                             context.watch<SettingsProvider>().showChatListDate
                             ? (isDesktop ? 2.0 : 4.0)
@@ -2279,7 +2269,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                         );
                       }
                       if (topicsOnly) {
-                        final isDesktop = _isDesktop;
+                        final isDesktop = _pointerInteractions;
                         final topPad =
                             context.watch<SettingsProvider>().showChatListDate
                             ? (isDesktop ? 2.0 : 4.0)
@@ -2296,7 +2286,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                         );
                       }
                       return _LegacyListArea(
-                        isDesktop: _isDesktop,
+                        isDesktop: _pointerInteractions,
                         assistantsExpanded: _assistantsExpanded,
                         buildAssistants: () =>
                             _buildAssistantsList(context, inlineMode: true),
@@ -2318,11 +2308,11 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                 }(),
               ),
 
-              if (widget.showBottomBar && (!widget.embedded || !_isDesktop))
+              if (widget.showBottomBar && (!_docked || !_pointerInteractions))
                 Container(
                   padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
                   decoration: BoxDecoration(
-                    color: widget.embedded ? Colors.transparent : cs.surface,
+                    color: _docked ? Colors.transparent : cs.surface,
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -2359,7 +2349,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      fontSize: _isDesktop ? 14 : 16,
+                                      fontSize: _pointerInteractions ? 14 : 16,
                                       fontWeight: AppFontWeights.emphasis,
                                       color: textBase,
                                     ),
@@ -2419,7 +2409,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
           ),
 
           // iOS-style blur/fade effect above user area
-          if (!widget.embedded)
+          if (!_docked)
             Positioned(
               left: 0,
               right: 0,
@@ -2446,7 +2436,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       ),
     );
 
-    if (widget.embedded) {
+    if (_docked) {
       return ClipRect(
         child: BackdropFilter(
           filter: ui.ImageFilter.blur(sigmaX: 6, sigmaY: 6),
@@ -2503,9 +2493,9 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     await ap.setCurrentAssistant(assistant.id);
     // Desktop: optionally switch to Topics tab per user preference
     try {
-      if (_isDesktop &&
-          widget.embedded &&
-          widget.useDesktopTabs &&
+      if (_pointerInteractions &&
+          _docked &&
+          _showTabs &&
           sp.desktopAutoSwitchTopics) {
         _tabController?.animateTo(
           1,
@@ -3331,8 +3321,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     // Apply search filter when:
     // - Desktop tab mode (inlineMode == false), OR
     // - Desktop assistants-only mode (left sidebar when topics are on right)
-    final shouldFilterAssistants =
-        (!inlineMode) || (widget.desktopAssistantsOnly && _isDesktop);
+    final shouldFilterAssistants = (!inlineMode) || _assistantsOnly;
     if (shouldFilterAssistants && _query.trim().isNotEmpty) {
       final q = _query.toLowerCase();
       assistants = assistants
@@ -3356,10 +3345,14 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         child: _AssistantInlineTile(
-          avatar: AssistantAvatar(assistant: a, size: _isDesktop ? 28 : 32),
+          avatar: AssistantAvatar(
+            assistant: a,
+            size: _pointerInteractions ? 28 : 32,
+          ),
           name: a.name,
           textColor: textBase2,
-          embedded: widget.embedded,
+          docked: _docked,
+          pointerInteractions: _pointerInteractions,
           selected: ap2.currentAssistantId == a.id,
           onTap: () => _handleSelectAssistant(a),
           onEditTap: () => _openAssistantSettings(a.id),
@@ -3369,8 +3362,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       );
     }
 
-    // Desktop: enable drag-reorder within each group; Mobile/tablet: keep static list
-    final bool enableReorder = _isDesktop;
+    // Drag reorder is a pointer-only capability owned by the host shell.
+    final bool enableReorder = _assistantReorder;
 
     Widget buildReorderable(
       List<Assistant> list, {
@@ -3597,10 +3590,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       reverse: false,
       transitionBuilder: (child, primary, secondary) => FadeThroughTransition(
         fillColor: Colors.transparent,
-        animation: CurvedAnimation(
-          parent: primary,
-          curve: Curves.easeOutCubic,
-        ),
+        animation: CurvedAnimation(parent: primary, curve: Curves.easeOutCubic),
         secondaryAnimation: CurvedAnimation(
           parent: secondary,
           curve: Curves.easeInCubic,
@@ -3619,8 +3609,9 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
           final row = visibleRows[rowIndex];
           if (row is _SidebarHeaderRow) {
             final headerLabel = switch (row.kind) {
-              _SidebarHeaderKind.pinned =>
-                AppLocalizations.of(context)!.sideDrawerPinnedLabel,
+              _SidebarHeaderKind.pinned => AppLocalizations.of(
+                context,
+              )!.sideDrawerPinnedLabel,
               _SidebarHeaderKind.date => _dateLabel(context, row.dateBucket!),
             };
             return Padding(
@@ -3658,6 +3649,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
               _ChatTile(
                     chat: tile.chat,
                     textColor: textBase,
+                    docked: _docked,
+                    pointerInteractions: _pointerInteractions,
                     loading: widget.loadingConversationIds.contains(
                       tile.chat.id,
                     ),
@@ -3682,10 +3675,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                           : 'grp-${_sidebarDateBucketKey(tile.dateBucket)}-${tile.chat.id}',
                     ),
                   )
-                  .fadeIn(
-                    duration: 220.ms,
-                    delay: staggerDelay,
-                  )
+                  .fadeIn(duration: 220.ms, delay: staggerDelay)
                   .moveY(
                     begin: isPinnedSection ? 8 : 6,
                     end: 0,
@@ -3708,7 +3698,6 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       ),
     );
   }
-
 }
 
 /// Max absolute index that still contributes to tile enter stagger.
@@ -3765,11 +3754,12 @@ class _SidebarTileRow extends _SidebarRow {
   final DateTime? dateBucket;
 }
 
-
 class _ChatTile extends StatefulWidget {
   const _ChatTile({
     required this.chat,
     required this.textColor,
+    required this.docked,
+    required this.pointerInteractions,
     this.onTap,
     this.onLongPress,
     this.onSecondaryTap,
@@ -3778,6 +3768,8 @@ class _ChatTile extends StatefulWidget {
 
   final ChatItem chat;
   final Color textColor;
+  final bool docked;
+  final bool pointerInteractions;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final void Function(Offset globalPosition)? onSecondaryTap;
@@ -3790,10 +3782,6 @@ class _ChatTile extends StatefulWidget {
 class _ChatTileState extends State<_ChatTile> {
   bool _hovered = false;
   bool _prefetchTriggered = false;
-  bool get _isDesktop =>
-      defaultTargetPlatform == TargetPlatform.macOS ||
-      defaultTargetPlatform == TargetPlatform.windows ||
-      defaultTargetPlatform == TargetPlatform.linux;
 
   /// Desktop hover warm-up (cache plan measure 14): fills the service cache
   /// so a subsequent tap hits the in-memory fast path. Cache-only;
@@ -3824,8 +3812,7 @@ class _ChatTileState extends State<_ChatTile> {
     final selected = context.select<ChatService, bool>(
       (service) => service.currentConversationId == widget.chat.id,
     );
-    final embedded =
-        context.findAncestorWidgetOfExactType<SideDrawer>()?.embedded ?? false;
+    final embedded = widget.docked;
     final Color tileColor;
     if (embedded) {
       // In tablet embedded mode, keep selected highlight, others transparent
@@ -3835,35 +3822,35 @@ class _ChatTileState extends State<_ChatTile> {
     } else {
       tileColor = selected ? cs.primary.withValues(alpha: 0.12) : cs.surface;
     }
-    final base = _isDesktop && !selected && _hovered
+    final base = widget.pointerInteractions && !selected && _hovered
         ? (embedded
               ? cs.primary.withValues(alpha: 0.08)
               : cs.surface.withValues(alpha: 0.9))
         : tileColor;
-    final double vGap = _isDesktop ? 4 : 4;
+    final double vGap = widget.pointerInteractions ? 4 : 4;
     return Padding(
       padding: EdgeInsets.only(bottom: vGap),
       child: GestureDetector(
         onSecondaryTapDown: (details) {
-          if (_isDesktop) {
+          if (widget.pointerInteractions) {
             widget.onSecondaryTap?.call(details.globalPosition);
           }
         },
         onLongPress: () {
-          if (_isDesktop) return;
+          if (widget.pointerInteractions) return;
           widget.onLongPress?.call();
         },
         child: MouseRegion(
           onEnter: (_) {
-            if (_isDesktop) {
+            if (widget.pointerInteractions) {
               setState(() => _hovered = true);
               _prefetchOnHover();
             }
           },
           onExit: (_) {
-            if (_isDesktop) setState(() => _hovered = false);
+            if (widget.pointerInteractions) setState(() => _hovered = false);
           },
-          cursor: _isDesktop
+          cursor: widget.pointerInteractions
               ? SystemMouseCursors.click
               : SystemMouseCursors.basic,
           child: IosCardPress(
@@ -3871,12 +3858,12 @@ class _ChatTileState extends State<_ChatTile> {
             borderRadius: BorderRadius.circular(16),
             haptics: false,
             onTap: widget.onTap,
-            onLongPress: _isDesktop ? null : widget.onLongPress,
+            onLongPress: widget.pointerInteractions ? null : widget.onLongPress,
             padding: EdgeInsets.fromLTRB(
-              _isDesktop ? 14 : 14,
-              _isDesktop ? 9 : 10,
+              widget.pointerInteractions ? 14 : 14,
+              widget.pointerInteractions ? 9 : 10,
               8,
-              _isDesktop ? 9 : 10,
+              widget.pointerInteractions ? 9 : 10,
             ),
             child: Row(
               children: [
@@ -3886,7 +3873,7 @@ class _ChatTileState extends State<_ChatTile> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: _isDesktop ? 14 : 15,
+                      fontSize: widget.pointerInteractions ? 14 : 15,
                       color: widget.textColor,
                       fontWeight: AppFontWeights.regular,
                     ),
@@ -4001,9 +3988,11 @@ class _DesktopSidebarTabs extends StatefulWidget {
   const _DesktopSidebarTabs({
     required this.textColor,
     required this.controller,
+    required this.pointerInteractions,
   });
   final Color textColor;
   final TabController controller;
+  final bool pointerInteractions;
   @override
   State<_DesktopSidebarTabs> createState() => _DesktopSidebarTabsState();
 }
@@ -4074,9 +4063,15 @@ class _DesktopSidebarTabsState extends State<_DesktopSidebarTabs> {
                     children: [
                       Expanded(
                         child: MouseRegion(
-                          onEnter: (_) => setState(() => _hoverLeft = true),
-                          onExit: (_) => setState(() => _hoverLeft = false),
-                          cursor: SystemMouseCursors.click,
+                          onEnter: widget.pointerInteractions
+                              ? (_) => setState(() => _hoverLeft = true)
+                              : null,
+                          onExit: widget.pointerInteractions
+                              ? (_) => setState(() => _hoverLeft = false)
+                              : null,
+                          cursor: widget.pointerInteractions
+                              ? SystemMouseCursors.click
+                              : SystemMouseCursors.basic,
                           child: GestureDetector(
                             behavior: HitTestBehavior.opaque,
                             onTap: () => widget.controller.animateTo(
@@ -4133,9 +4128,15 @@ class _DesktopSidebarTabsState extends State<_DesktopSidebarTabs> {
                       ),
                       Expanded(
                         child: MouseRegion(
-                          onEnter: (_) => setState(() => _hoverRight = true),
-                          onExit: (_) => setState(() => _hoverRight = false),
-                          cursor: SystemMouseCursors.click,
+                          onEnter: widget.pointerInteractions
+                              ? (_) => setState(() => _hoverRight = true)
+                              : null,
+                          onExit: widget.pointerInteractions
+                              ? (_) => setState(() => _hoverRight = false)
+                              : null,
+                          cursor: widget.pointerInteractions
+                              ? SystemMouseCursors.click
+                              : SystemMouseCursors.basic,
                           child: GestureDetector(
                             behavior: HitTestBehavior.opaque,
                             onTap: () => widget.controller.animateTo(
@@ -4209,6 +4210,7 @@ class _DesktopTabViews extends StatelessWidget {
   });
   final TabController controller;
   final Widget Function() buildAssistants;
+
   /// Conversations pane owns its own virtualized scroll view (and controller).
   final Widget Function() buildConversations;
 
@@ -4241,6 +4243,7 @@ class _LegacyListArea extends StatelessWidget {
   final bool isDesktop;
   final bool assistantsExpanded;
   final Widget Function() buildAssistants;
+
   /// Builds the virtualized conversations list that owns scrolling, with the
   /// inline assistants [leading] widget and shared [padding].
   final Widget Function(Widget leading, EdgeInsets padding) buildConversations;
@@ -4282,7 +4285,8 @@ class _AssistantInlineTile extends StatefulWidget {
     required this.avatar,
     required this.name,
     required this.textColor,
-    required this.embedded,
+    required this.docked,
+    required this.pointerInteractions,
     required this.onTap,
     required this.onEditTap,
     this.onLongPress,
@@ -4293,7 +4297,8 @@ class _AssistantInlineTile extends StatefulWidget {
   final Widget avatar;
   final String name;
   final Color textColor;
-  final bool embedded;
+  final bool docked;
+  final bool pointerInteractions;
   final VoidCallback onTap;
   final VoidCallback onEditTap;
   final VoidCallback? onLongPress;
@@ -4306,16 +4311,12 @@ class _AssistantInlineTile extends StatefulWidget {
 
 class _AssistantInlineTileState extends State<_AssistantInlineTile> {
   bool _hovered = false;
-  bool get _isDesktop =>
-      defaultTargetPlatform == TargetPlatform.macOS ||
-      defaultTargetPlatform == TargetPlatform.windows ||
-      defaultTargetPlatform == TargetPlatform.linux;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final embedded = widget.embedded;
-    final Color tileColor = _isDesktop
+    final embedded = widget.docked;
+    final Color tileColor = widget.pointerInteractions
         ? (embedded
               ? (widget.selected
                     ? cs.primary.withValues(alpha: 0.16)
@@ -4324,26 +4325,33 @@ class _AssistantInlineTileState extends State<_AssistantInlineTile> {
                     ? cs.primary.withValues(alpha: 0.12)
                     : cs.surface))
         : (embedded ? Colors.transparent : cs.surface);
-    final Color bg = _isDesktop && !widget.selected && _hovered
+    final Color bg = widget.pointerInteractions && !widget.selected && _hovered
         ? (embedded
               ? cs.primary.withValues(alpha: 0.08)
               : cs.surface.withValues(alpha: 0.9))
         : tileColor;
     final content = MouseRegion(
       onEnter: (_) {
-        if (_isDesktop) setState(() => _hovered = true);
+        if (widget.pointerInteractions) setState(() => _hovered = true);
       },
       onExit: (_) {
-        if (_isDesktop) setState(() => _hovered = false);
+        if (widget.pointerInteractions) setState(() => _hovered = false);
       },
-      cursor: _isDesktop ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      cursor: widget.pointerInteractions
+          ? SystemMouseCursors.click
+          : SystemMouseCursors.basic,
       child: IosCardPress(
         baseColor: bg,
         borderRadius: BorderRadius.circular(16),
         haptics: false,
         onTap: widget.onTap,
         onLongPress: widget.onLongPress,
-        padding: EdgeInsets.fromLTRB(_isDesktop ? 12 : 4, 6, 12, 6),
+        padding: EdgeInsets.fromLTRB(
+          widget.pointerInteractions ? 12 : 4,
+          6,
+          12,
+          6,
+        ),
         child: Row(
           children: [
             widget.avatar,
@@ -4354,13 +4362,13 @@ class _AssistantInlineTileState extends State<_AssistantInlineTile> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: _isDesktop ? 14 : 15,
+                  fontSize: widget.pointerInteractions ? 14 : 15,
                   fontWeight: AppFontWeights.medium,
                   color: widget.textColor,
                 ),
               ),
             ),
-            if (!_isDesktop) ...[
+            if (!widget.pointerInteractions) ...[
               const SizedBox(width: 8),
               IosIconButton(
                 icon: Lucide.Pencil,
