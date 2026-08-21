@@ -7,16 +7,15 @@ import '../services/backup/restore_durability.dart';
 import 'app_database.dart';
 import 'database_installation_gate.dart';
 
-/// User-initiated recovery actions for the pre-initialization failure screen.
+/// 用户为预初始化失败屏幕发起的恢复操作。
 ///
-/// These run before any app services exist, so every operation works purely at
-/// the file level. They exist to guarantee that a fail-closed startup can never
-/// become a permanent lockout: the user can always salvage a copy of their
-/// data, repair recoverable metadata damage, or (as a last resort) reset.
+/// 这些方法在任何应用服务存在之前运行，因此每个操作都只工作在文件层面。
+/// 它们的存在是为了保证失败关闭的启动永远不会变成永久锁死：用户总能挽救一份
+/// 数据副本、修复可恢复的元数据损坏，或者（作为最后手段）重置。
 final class StartupRecoveryService {
   StartupRecoveryService._();
 
-  // Inert OS metadata files that must never block startup validation.
+  // 绝不能阻塞启动验证的惰性操作系统元数据文件。
   static const _junkFileNames = <String>{
     '.DS_Store',
     'Thumbs.db',
@@ -30,9 +29,9 @@ final class StartupRecoveryService {
   static const _temporarySuffix = '.tmp';
   static const _restoreWorkspaceName = '.kelivo_restore';
 
-  /// Copies the entire app data directory into a timestamped folder under
-  /// [destinationParent] so the user can salvage their data before attempting
-  /// any repair or reset. Returns the created directory. Non-destructive.
+  /// 将整个应用数据目录复制到 [destinationParent] 下带时间戳的文件夹，
+  /// 以便用户在尝试任何修复或重置之前抢救其数据。
+  /// 返回创建的目录。非破坏性操作。
   static Future<Directory> exportDataCopy({
     required Directory appDataDirectory,
     required Directory destinationParent,
@@ -41,8 +40,7 @@ final class StartupRecoveryService {
     if (!await appDataDirectory.exists()) {
       throw StateError('startup_recovery_source_missing');
     }
-    // A destination inside the data directory would make the copy recurse
-    // into itself (the target shows up while the source is being listed).
+    // 目标位于数据目录内会导致复制递归到自身（列出源时目标会出现）。
     final sourcePath = p.normalize(appDataDirectory.absolute.path);
     final destinationPath = p.normalize(destinationParent.absolute.path);
     if (destinationPath == sourcePath ||
@@ -65,14 +63,12 @@ final class StartupRecoveryService {
     return target;
   }
 
-  /// Repairs recoverable metadata damage that fails startup closed without any
-  /// real data loss: leftover publish temp files, inert OS junk inside the
-  /// restore workspace, and unparseable installation receipts. It then
-  /// re-runs admission, adopting the current database's identity so a corrupt
-  /// or swapped receipt is rewritten from the authoritative on-disk database.
+  /// 修复会导致启动关闭且没有真实数据丢失的可恢复元数据损坏：残留的发布临时文件、
+  /// 恢复工作区中的惰性 OS 垃圾文件，以及无法解析的安装回执。随后重新运行准入流程，
+  /// 采用当前数据库的身份，让损坏或被替换的回执依据权威的磁盘数据库重写。
   ///
-  /// Rethrows when the database itself is missing or corrupt: those cannot be
-  /// repaired at the file level and the caller should offer a reset instead.
+  /// 当数据库本身缺失或损坏时会重新抛出：这些情况无法
+  /// 在文件层面修复，调用方应改为提供重置选项。
   static Future<void> repair({
     required Directory appDataDirectory,
     RestoreDurability? durability,
@@ -83,9 +79,8 @@ final class StartupRecoveryService {
     await _sweepReceiptTemporaries(appDataDirectory);
     await _sweepRestoreWorkspaceJunk(appDataDirectory);
     await _deleteUnparseableReceipts(appDataDirectory);
-    // Adopting the identity lets a receipt that was deleted (because it was
-    // unparseable) or that mismatches be rewritten from the live database. A
-    // user electing to repair is implicitly trusting the database on disk.
+    // 采用该身份后，因无法解析而被删除或内容不匹配的回执，可以从当前活动数据库重写；
+    // 用户选择修复即隐式信任磁盘上的数据库。
     await DatabaseInstallationGate.ensureReady(
       appDataDirectory: appDataDirectory,
       allowDatabaseIdentityChange: true,
@@ -93,18 +88,15 @@ final class StartupRecoveryService {
     );
   }
 
-  /// Deletes the installed database family and installation receipts and
-  /// re-runs first-launch setup. Destructive: the current database is lost.
-  /// Callers must confirm with the user and should offer [exportDataCopy]
-  /// first.
+  /// 删除已安装的数据库族和安装回执，并重新运行首次启动设置。破坏性操作：当前数据库会丢失；
+  /// 调用方必须与用户确认，并应优先提供 [exportDataCopy]。
   static Future<void> reset({
     required Directory appDataDirectory,
     RestoreDurability? durability,
   }) async {
-    // Remove installation receipts (and any temps) first: rebuildFresh only
-    // recreates the database family, and admission rejects a receipt whose
-    // database has been rebuilt. Clearing them lets a fresh identity issue
-    // cleanly.
+    // 先移除安装回执（以及所有临时文件）：rebuildFresh 只会重建数据库族，
+    // 而准入会拒绝数据库已被重建的回执。清除这些回执后，
+    // 新身份才能干净地签发。
     await _sweepReceiptTemporaries(appDataDirectory);
     await for (final entity in appDataDirectory.list(followLinks: false)) {
       final name = p.basename(entity.path);
@@ -129,7 +121,7 @@ final class StartupRecoveryService {
       } else if (entity is File) {
         await entity.copy(destinationPath);
       }
-      // Links and other special entities are intentionally skipped.
+      // 链接和其他特殊实体会被有意跳过。
     }
   }
 
@@ -189,12 +181,11 @@ final class StartupRecoveryService {
         await File(path).delete();
       }
     } catch (_) {
-      // Best-effort: an undeletable junk/temp file does not block admission,
-      // which uses unique temp names and adopts the database identity.
+      // 尽力而为：无法删除的垃圾/临时文件不会阻止准入检查，
+      // 因为准入检查使用唯一临时名称并采用数据库身份。
     }
   }
 
-  /// The installed database file name, exposed so the failure screen can note
-  /// what a reset will remove.
+  /// 已安装数据库文件名，暴露出来是为了让失败页面能够提示重置会移除哪些内容。
   static String get databaseFileName => AppDatabase.databaseFileName;
 }

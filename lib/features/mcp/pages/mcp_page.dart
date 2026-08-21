@@ -104,8 +104,7 @@ class McpPage extends StatelessWidget {
                           ),
                           style: OutlinedButton.styleFrom(
                             minimumSize: const Size.fromHeight(44),
-                            backgroundColor:
-                                context.appColors.surfaceFill,
+                            backgroundColor: context.appColors.surfaceFill,
                             side: BorderSide(
                               color: cs.outlineVariant.withValues(alpha: 0.35),
                             ),
@@ -261,14 +260,12 @@ class McpPage extends StatelessWidget {
                       base: base,
                       builder: (c) {
                         final overlay = pressed
-                            ? cs.surface.withValues(
-                                alpha: isDark ? 0.06 : 0.05,
-                              )
+                            ? cs.surface.withValues(alpha: isDark ? 0.06 : 0.05)
                             : Colors.transparent;
                         return Container(
                           decoration: BoxDecoration(
                             color: context.appColors.surfaceCard,
-                            // Soften the list card corners a bit
+                            // 稍微柔化列表卡片圆角
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
                               color: cs.outlineVariant.withValues(
@@ -408,7 +405,9 @@ class McpPage extends StatelessWidget {
                                             Icon(
                                               Lucide.MessageCircleWarning,
                                               size: 14,
-                                              color: Theme.of(context).colorScheme.error,
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.error,
                                             ),
                                             const SizedBox(width: 6),
                                             Expanded(
@@ -416,7 +415,9 @@ class McpPage extends StatelessWidget {
                                                 l10n.mcpPageConnectionFailed,
                                                 style: TextStyle(
                                                   fontSize: 12,
-                                                  color: Theme.of(context).colorScheme.error,
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).colorScheme.error,
                                                 ),
                                               ),
                                             ),
@@ -447,7 +448,8 @@ class McpPage extends StatelessWidget {
                                                 l10n.mcpPageOAuthRequired,
                                                 style: TextStyle(
                                                   fontSize: 12,
-                                                  color: context.appColors.warning,
+                                                  color:
+                                                      context.appColors.warning,
                                                 ),
                                               ),
                                             ),
@@ -496,7 +498,7 @@ class McpPage extends StatelessWidget {
                                       Brightness.dark
                                   ? cs.error.withValues(alpha: 0.22)
                                   : cs.error.withValues(alpha: 0.14),
-                              // Match list card radius for consistency
+                              // 为保持一致，匹配列表卡片圆角
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
                                 color: cs.error.withValues(alpha: 0.35),
@@ -572,7 +574,7 @@ class McpPage extends StatelessWidget {
                                     oauth: prev.oauth,
                                     oauthClient: prev.oauthClient,
                                   );
-                                  // Try to refresh tools when back online
+                                  // 恢复在线时尝试刷新工具
                                   try {
                                     await prov.refreshTools(newId);
                                   } catch (_) {}
@@ -592,7 +594,7 @@ class McpPage extends StatelessWidget {
   }
 }
 
-// --- iOS-style tactile helpers ---
+// --- iOS 风格触感辅助函数 ---
 
 class _TactileIconButton extends StatefulWidget {
   const _TactileIconButton({

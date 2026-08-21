@@ -15,8 +15,8 @@ import 'hotkeys/hotkey_event_bus.dart';
 import 'hotkeys/chat_action_bus.dart';
 import 'desktop_settings_navigation_bus.dart';
 
-/// Desktop home screen: left compact rail + main content.
-/// Phase 1 focuses on structure and platform-appropriate interactions/hover.
+/// 桌面首页：左侧紧凑导航栏加主内容。
+/// 第一阶段关注结构以及适合平台端的交互和悬停效果。
 class DesktopHomePage extends StatefulWidget {
   const DesktopHomePage({
     super.key,
@@ -52,7 +52,7 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
         ChatActionBus.instance.fire(ChatAction.focusInput);
       });
     }
-    // Listen to global hotkey actions affecting the main tabs/window
+    // 监听会影响主标签页和窗口的全局快捷键动作
     _hotkeySub = HotkeyEventBus.instance.stream.listen((action) async {
       switch (action) {
         case HotkeyAction.openSettings:
@@ -156,7 +156,7 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    // Ensure a reasonable min size to avoid overflow on aggressive resize.
+    // 确保合理的最小尺寸，避免在剧烈调整大小时发生溢出。
     const minWidth = 960.0;
     const minHeight = 640.0;
 
@@ -212,14 +212,14 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
               },
             ),
             Expanded(
-              // Keep all pages alive so ongoing chat streams are not canceled
-              // when switching tabs (Chat/Translate/Settings) on desktop.
+              // 保持所有页面存活，使桌面端切换标签（聊天、翻译、设置）时
+              // 正在进行的聊天流不会被取消。
               child: IndexedStack(
                 index: _tabIndex,
                 children: [
-                  // Chat page remains mounted
+                  // 聊天页保持挂载
                   const DesktopChatPage(),
-                  // Translate page remains mounted
+                  // 翻译页保持挂载
                   const DesktopTranslatePage(key: ValueKey('translate_page')),
                   _storageVisited
                       ? const StorageSpacePage(
@@ -237,7 +237,7 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
           ],
         );
 
-        // Wrap with Windows custom title bar when on Windows platform.
+        // 在 Windows 平台上包裹自定义 Windows 标题栏。
         final content = isWindows
             ? Column(
                 children: [
@@ -251,8 +251,8 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
                     child: Stack(
                       children: [
                         body,
-                        // Inject the lazily-built settings page into the IndexedStack when needed
-                        // to pass initialProviderKey without dropping chat state.
+                        // 需要时将延迟构建的设置页注入 IndexedStack，
+                        // 以便传入 initialProviderKey 而不丢弃聊天状态。
                         if (_tabIndex == 3) const SizedBox.shrink(),
                       ],
                     ),
@@ -263,7 +263,7 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
 
         // if (!needsWidthPad && !needsHeightPad) return content;
 
-        // Center a constrained area if window is smaller than our minimum
+        // 如果窗口小于最小尺寸，则将受限区域居中
         return Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(
@@ -296,7 +296,7 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
   }
 }
 
-// No extra router/shim; we import DesktopSettingsPage directly above.
+// 没有额外路由或垫片；我们直接在上方导入 DesktopSettingsPage。
 
 class _TitleBarLeading extends StatelessWidget {
   const _TitleBarLeading();
@@ -308,7 +308,7 @@ class _TitleBarLeading extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // App icon
+        // 应用图标
         Image.asset(
           'assets/icons/kelivo.png',
           width: 16,
@@ -316,14 +316,14 @@ class _TitleBarLeading extends StatelessWidget {
           filterQuality: FilterQuality.medium,
         ),
         const SizedBox(width: 8),
-        // App name
+        // 应用名称
         Text(
           l10n.aboutPageAppName,
           style: TextStyle(
             fontSize: 13,
             fontWeight: AppFontWeights.semibold,
             color: cs.onSurface.withValues(alpha: 0.8),
-            // Avoid accidental underline when not under a Material ancestor in edge cases
+            // 避免在边界情况下缺少 Material 祖先时意外出现下划线
             decoration: TextDecoration.none,
           ),
         ),

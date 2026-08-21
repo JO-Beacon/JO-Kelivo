@@ -4,7 +4,7 @@ import '../../features/settings/pages/memory_entries_page.dart';
 import '../../l10n/app_localizations.dart';
 import '../../theme/app_font_weights.dart';
 
-/// Desktop right-side pane for the global memory list (§14.4).
+/// 桌面右侧全局记忆列表面板（§14.4）。
 class DesktopMemoryEntriesPane extends StatelessWidget {
   const DesktopMemoryEntriesPane({super.key});
 

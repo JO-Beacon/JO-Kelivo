@@ -3,20 +3,20 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' as system;
 import 'package:haptic_feedback/haptic_feedback.dart' as hfp;
 
-/// Centralized gentle haptics using the `haptic_feedback` plugin.
+/// 使用 `haptic_feedback` 插件的集中式轻柔触感。
 ///
-/// These helpers intentionally keep calls fire-and-forget (no await) and
-/// are safe on platforms without plugin support (errors are swallowed).
+/// 这些辅助方法有意保持调用即发即忘（不 await），并且
+/// 在不支持插件的平台上也是安全的（错误会被吞掉）。
 class Haptics {
   Haptics._();
-  // Global master switch controlled by settings. When false, all haptics are disabled.
+  // 由设置控制的全局总开关。为 false 时，所有触感都被禁用。
   static bool _enabled = true;
   static bool get enabled => _enabled;
   static void setEnabled(bool v) {
     _enabled = v;
   }
 
-  /// Very light tap feedback (e.g., small UI taps or success tick).
+  /// 非常轻的点击反馈（例如较小的 UI 点击或成功勾选）。
   static void light() {
     if (!enabled) return;
     if (_isIOS) {
@@ -26,7 +26,7 @@ class Haptics {
     }
   }
 
-  /// Medium tap feedback (e.g., opening/closing drawer, toggles).
+  /// 中等点击反馈（例如打开/关闭抽屉、开关）。
   static void medium() {
     if (!enabled) return;
     if (_isIOS) {
@@ -41,12 +41,12 @@ class Haptics {
     if (_isIOS) {
       _safe(() => hfp.Haptics.vibrate(hfp.HapticsType.soft));
     } else if (_isAndroid) {
-      // Closest built-in equivalent to a very gentle tap
+      // 最接近的内置等效项，用于非常轻柔的点击
       _safe(() => system.HapticFeedback.selectionClick());
     }
   }
 
-  /// Drawer-specific pulse; tuned to feel present but not harsh.
+  /// 抽屉专用脉冲；调校为有存在感但不生硬。
   static void drawerPulse() {
     if (!enabled) return;
     if (_isIOS) {
@@ -56,20 +56,20 @@ class Haptics {
     }
   }
 
-  /// Cancel any ongoing vibration (rarely needed in our use cases).
+  /// 取消任何正在进行的振动（在我们的用例中很少需要）。
   static void cancel() {
-    /* no-op */
+    /* 无操作 */
   }
 
-  // Fire-and-forget wrapper to avoid exceptions on unsupported platforms.
+  // 即发即忘包装器，用于避免在不支持的平台上抛出异常。
   static void _safe(Future<void> Function() action) {
-    if (kIsWeb) return; // Skip on web targets
+    if (kIsWeb) return; // 在 Web 目标上跳过
     try {
-      // Don't await; haptic should not block UI.
+      // 不要 await；触感不应阻塞 UI。
       // ignore: discarded_futures
       action();
     } catch (_) {
-      // Swallow any MissingPluginException or platform channel errors.
+      // 吞掉任何 MissingPluginException 或平台通道错误。
     }
   }
 

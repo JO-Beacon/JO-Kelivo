@@ -195,8 +195,7 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
     );
   }
 
-  /// Builds the sheet panel once per layout pass; the drag/settle animation only
-  /// rebuilds the [Transform] wrapper around it.
+  /// 每次布局过程只构建一次面板；拖动和回弹动画只重建包围它的 [Transform]。
   Widget _buildPanel(
     BuildContext context, {
     required Color surface,

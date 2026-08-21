@@ -8,7 +8,7 @@ import 'package:syncfusion_flutter_pdf/pdf.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/unicode_sanitizer.dart';
 
-/// Data passed to the background isolate for document extraction.
+/// 传递给后台 isolate 用于文档提取的数据。
 class _ExtractorParams {
   final String path;
   final String mime;
@@ -16,11 +16,11 @@ class _ExtractorParams {
 }
 
 class DocumentTextExtractor {
-  /// Extracts text from a document file at [path] with [mime] type.
+  /// 从位于 [path] 且类型为 [mime] 的文档文件中提取文本。
   ///
-  /// Resolves via [SandboxPathResolver.resolveForIo] once, then delegates to
-  /// [extractResolved]. Prefer [extractResolved] when the caller already
-  /// resolved the path (avoid a second pass).
+  /// 通过 [SandboxPathResolver.resolveForIo] 解析一次，然后委托给
+  /// [extractResolved]。当调用方已经解析过路径时，优先使用 [extractResolved]
+  /// （避免第二次解析）。
   static Future<String> extract({
     required String path,
     required String mime,
@@ -30,17 +30,17 @@ class DocumentTextExtractor {
     return extractResolved(path: resolved, mime: mime);
   }
 
-  /// Extract using an already-resolved absolute filesystem path.
-  /// Does **not** call [SandboxPathResolver.fix] / [resolveForIo].
+  /// 使用已经解析好的绝对文件系统路径进行提取。
+  /// **不会**调用 [SandboxPathResolver.fix] / [resolveForIo]。
   static Future<String> extractResolved({
     required String path,
     required String mime,
   }) {
-    // Offload the heavy work to a separate isolate using compute.
+    // 使用 compute 将繁重工作转移到单独的 isolate。
     return compute(_extractTask, _ExtractorParams(path, mime));
   }
 
-  /// The heavy extraction logic that runs in a background isolate.
+  /// 在后台 isolate 中运行的繁重提取逻辑。
   static String _extractTask(_ExtractorParams params) {
     final path = params.path;
     final mime = params.mime;
@@ -52,7 +52,7 @@ class DocumentTextExtractor {
           if (!file.existsSync()) return '[[File not found: $path]]';
 
           final bytes = file.readAsBytesSync();
-          // Heavy synchronous PDF parsing happens here, in the sub-thread.
+          // 繁重的同步 PDF 解析在此处、在子线程中进行。
           final document = PdfDocument(inputBytes: bytes);
           final extractor = PdfTextExtractor(document);
           final extracted = extractor.extractText();
@@ -76,7 +76,7 @@ class DocumentTextExtractor {
         return _extractDocxSync(path);
       }
 
-      // Fallback: read as plain text
+      // 回退：按纯文本读取
       final file = File(path);
       if (!file.existsSync()) return '[[File not found: $path]]';
       final bytes = file.readAsBytesSync();
@@ -88,7 +88,7 @@ class DocumentTextExtractor {
     }
   }
 
-  /// Synchronous DOCX extraction for isolate use.
+  /// 供 isolate 使用的同步 DOCX 提取。
   static String _extractDocxSync(String path) {
     try {
       final file = File(path);

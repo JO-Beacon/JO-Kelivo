@@ -65,7 +65,7 @@ class TranslationService {
     required void Function(String translation) onTranslationUpdate,
     required void Function() onTranslationCleared,
   }) async {
-    // Resolve a fresh context per call to avoid holding on to a stale BuildContext.
+    // 每次调用都解析新的 context，避免持有过期的 BuildContext。
     final context = _getContext();
     final settings = context.read<SettingsProvider>();
     final assistant = context.read<AssistantProvider>().currentAssistant;
@@ -126,8 +126,8 @@ class TranslationService {
       final buffer = StringBuffer();
 
       await for (final chunk in translationStream) {
-        // Reasoning/usage chunks carry no visible text. Keep the loading card
-        // until translated text arrives instead of replacing it with empty.
+        // 推理/用量块不携带可见文本。在翻译文本到达前保持加载卡片，
+        // 而不是将其替换为空内容。
         if (chunk.content.isEmpty && !chunk.isDone) continue;
         buffer.write(chunk.content);
         // 实时更新翻译

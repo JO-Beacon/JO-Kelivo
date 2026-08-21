@@ -34,9 +34,9 @@ class JinaSearchService extends SearchService<JinaOptions> {
                     'Bearer ${serviceOptions.effectiveApiKey(serviceOptions.apiKey)}',
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                // Speed up and reduce payload: omit page content in response
+                // 加速并减小负载：在响应中省略页面内容
                 // 'X-Respond-With': 'no-content',
-                // Some gateways behave better with a standard UA
+                // 部分网关在标准 UA 下表现更好
                 // 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
               },
               body: body,
@@ -55,7 +55,7 @@ class JinaSearchService extends SearchService<JinaOptions> {
       }
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
-      // Jina typically returns { data: [...] }. Be permissive in case of variant shapes.
+      // Jina 通常返回 { data: [...] }。为应对变体结构，这里保持宽松解析。
       final listRaw =
           (data['data'] ?? data['results'] ?? const <dynamic>[]) as List;
       final list = listRaw;

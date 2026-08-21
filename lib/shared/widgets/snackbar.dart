@@ -16,6 +16,8 @@ class AppNotification {
   final VoidCallback? onTap;
   final String? actionLabel;
   final VoidCallback? onAction;
+  final IconData? actionIcon;
+  final String? actionTooltip;
 
   AppNotification({
     required this.message,
@@ -24,6 +26,8 @@ class AppNotification {
     this.onTap,
     this.actionLabel,
     this.onAction,
+    this.actionIcon,
+    this.actionTooltip,
   });
 }
 
@@ -56,7 +60,7 @@ class AppSnackBarManager extends ChangeNotifier {
       fadeAnimation: null,
     );
 
-    // Setup smooth entrance animations
+    // 设置平滑的入场动画
     entry.slideAnimation =
         Tween<Offset>(begin: const Offset(0, -1), end: Offset.zero).animate(
           CurvedAnimation(
@@ -74,7 +78,7 @@ class AppSnackBarManager extends ChangeNotifier {
 
     entry.animationController.forward();
 
-    // Auto dismiss
+    // 自动关闭
     Timer(notification.duration, () {
       _dismiss(entry);
     });
@@ -83,7 +87,7 @@ class AppSnackBarManager extends ChangeNotifier {
   void _dismiss(NotificationEntry entry) async {
     if (!_activeToasts.contains(entry)) return;
 
-    // Start exit animation
+    // 开始退场动画
     await entry.animationController.reverse();
 
     _activeToasts.remove(entry);
@@ -190,18 +194,18 @@ class _AppSnackBarOverlayState extends State<AppSnackBarOverlay> {
     return AnimatedBuilder(
       animation: entry.animationController,
       builder: (context, child) {
-        // Calculate positioning - 统一间距
+        // 计算位置 - 统一间距
         final baseOffset = visualIndex * 8.0; // 每个Toast固定间距8px
 
-        // Calculate scale - 统一缩放
+        // 计算缩放 - 统一缩放
         final scaleValue = 1.0 - (visualIndex * 0.03);
 
-        // Calculate opacity - 统一透明度
+        // 计算透明度 - 统一透明度
         final fadeValue = entry.fadeAnimation?.value ?? 1.0;
         final baseOpacity = isVisible ? 1.0 - (visualIndex * 0.2) : 0.0;
         final opacity = fadeValue * baseOpacity;
 
-        // Apply slide animation
+        // 应用滑动动画
         final slideValue = entry.slideAnimation?.value ?? Offset.zero;
 
         return Transform.translate(
@@ -287,11 +291,11 @@ class _NotificationWidgetState extends State<NotificationWidget>
     if (!widget.isTop || _isDismissing) return;
 
     final velocity = details.velocity.pixelsPerSecond.dy;
-    // Dismiss if dragged up sufficiently or with enough velocity
+    // 当向上拖动足够距离或速度足够快时关闭
     if (_dragOffset < -40 || velocity < -300) {
       _isDismissing = true;
 
-      // Animate off screen smoothly
+      // 平滑地移出屏幕
       _dragAnimation = Tween<double>(begin: _dragOffset, end: -150.0).animate(
         CurvedAnimation(parent: _dragController, curve: Curves.easeOut),
       );
@@ -302,7 +306,7 @@ class _NotificationWidgetState extends State<NotificationWidget>
         }
       });
     } else {
-      // Smoothly return to position
+      // 平滑返回原位
       _dragAnimation = Tween<double>(begin: _dragOffset, end: 0.0).animate(
         CurvedAnimation(parent: _dragController, curve: Curves.easeOutCubic),
       );
@@ -349,7 +353,7 @@ class _NotificationWidgetState extends State<NotificationWidget>
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Apply interactive feedback scale
+    // 应用交互反馈缩放
     final interactiveScale = _isDismissing ? 0.98 : 1.0;
 
     return GestureDetector(
@@ -395,7 +399,11 @@ class _NotificationWidgetState extends State<NotificationWidget>
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
-                  Icon(_getIcon(), size: 22, color: _getIconColor(cs, context.appColors)),
+                  Icon(
+                    _getIcon(),
+                    size: 22,
+                    color: _getIconColor(cs, context.appColors),
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -412,7 +420,25 @@ class _NotificationWidgetState extends State<NotificationWidget>
                               ),
                     ),
                   ),
-                  if (widget.notification.actionLabel != null) ...[
+                  if (widget.notification.actionIcon
+                      case final actionIcon?) ...[
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: () {
+                        Haptics.light();
+                        widget.notification.onAction?.call();
+                        widget.onDismiss();
+                      },
+                      tooltip: widget.notification.actionTooltip,
+                      icon: Icon(actionIcon, size: 18),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
+                      ),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ] else if (widget.notification.actionLabel != null) ...[
                     const SizedBox(width: 12),
                     TextButton(
                       onPressed: () {
@@ -451,7 +477,7 @@ class _NotificationWidgetState extends State<NotificationWidget>
   }
 }
 
-// Helper function for easy use
+// 便于使用的辅助函数
 void showAppSnackBar(
   BuildContext context, {
   required String message,
@@ -460,6 +486,8 @@ void showAppSnackBar(
   VoidCallback? onTap,
   String? actionLabel,
   VoidCallback? onAction,
+  IconData? actionIcon,
+  String? actionTooltip,
 }) {
   AppSnackBarManager().show(
     context,
@@ -470,6 +498,8 @@ void showAppSnackBar(
       onTap: onTap,
       actionLabel: actionLabel,
       onAction: onAction,
+      actionIcon: actionIcon,
+      actionTooltip: actionTooltip,
     ),
   );
 }

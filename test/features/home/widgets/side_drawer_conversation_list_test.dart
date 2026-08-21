@@ -395,23 +395,27 @@ void main() {
     tester,
   ) async {
     await asDesktop(() async {
-      final service = createService();
+      final writer = createService();
       late final String alphaId;
       await tester.runAsync(() async {
-        await service.init();
-        final alpha = await service.createConversation(title: 'Alpha');
+        await writer.init();
+        final alpha = await writer.createConversation(title: 'Alpha');
         alphaId = alpha.id;
         for (var i = 0; i < 3; i++) {
-          await service.addMessage(
+          await writer.addMessage(
             conversationId: alpha.id,
             role: i.isEven ? 'user' : 'assistant',
             content: 'message $i',
           );
         }
-        // The most recently created conversation becomes the current one, so
-        // Alpha is a non-current hover target.
-        await service.createConversation(title: 'Beta');
+        await writer.createConversation(title: 'Beta');
+        await writer.close();
+        services.remove(writer);
       });
+
+      // Reopen cold so Alpha has no message bodies cached before hover.
+      final service = createService();
+      await tester.runAsync(service.init);
       await pumpDrawer(tester, service);
       expect(service.isConversationFullyCached(alphaId), isFalse);
 

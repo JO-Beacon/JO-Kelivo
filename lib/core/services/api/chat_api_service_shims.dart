@@ -1,7 +1,7 @@
 part of 'chat_api_service.dart';
 
-// Top-level shims so provider-specific implementations (split into parts)
-// can keep calling the existing helper names without qualifying `ChatApiService.`.
+// 顶层 shim，使按部分拆分的提供商特定实现
+// 可以继续调用现有辅助函数名称，而无需加上 `ChatApiService.` 限定。
 
 String _apiModelId(ProviderConfig cfg, String modelId) =>
     ChatApiService._apiModelId(cfg, modelId);
@@ -60,7 +60,7 @@ Future<_ParsedTextAndImages> _parseTextAndImages(
 Future<String?> _tryEncodeBase64File(String path, {bool withPrefix = false}) =>
     ChatApiService._tryEncodeBase64File(path, withPrefix: withPrefix);
 
-/// Prefer explicit MIME from a media-ref map; fall back to path/data-URL inference.
+/// 优先使用 media-ref map 中的显式 MIME；否则回退到 path/data-URL 推断。
 String _mimeForInternalMediaRef(InternalMediaRef ref) {
   final explicit = ref.mime?.trim() ?? '';
   if (explicit.isNotEmpty) return explicit;
@@ -69,7 +69,7 @@ String _mimeForInternalMediaRef(InternalMediaRef ref) {
   return _mimeFromPath(path);
 }
 
-/// Merge `_kelivo_media_paths` (String|Map) with optional plain-string user paths.
+/// 将 `_kelivo_media_paths`（String|Map）与可选的纯字符串用户路径合并。
 List<InternalMediaRef> _supplementalMediaRefs({
   required dynamic internalRaw,
   List<String>? userPaths,
@@ -88,8 +88,8 @@ List<InternalMediaRef> _supplementalMediaRefs({
   return refs;
 }
 
-/// Encode a local file as a data URL, preferring [explicitMime] when present.
-/// Returns null when the file is missing/unreadable.
+/// 将本地文件编码为 data URL，若存在 [explicitMime] 则优先使用。
+/// 文件缺失或不可读时返回 null。
 Future<String?> _tryEncodeBase64DataUrl(
   String path, {
   String? explicitMime,

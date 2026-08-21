@@ -20,8 +20,8 @@ class MermaidViewHandle {
 
 final Map<String, html.DivElement> _containers = {};
 
-/// Web-only Mermaid renderer using JS injection (no extra Dart packages).
-/// Returns a handle with the widget and an export-to-PNG action.
+/// 仅 Web 端使用的 Mermaid 渲染器，通过 JS 注入实现（无需额外 Dart 包）。
+/// 返回包含 widget 和导出 PNG 操作的句柄。
 MermaidViewHandle? createMermaidView(
   String code,
   bool dark, {
@@ -35,16 +35,16 @@ MermaidViewHandle? createMermaidView(
           final cached = MermaidHeightCache.get(code);
           if (cached != null) return '${cached.ceil()}px';
           return '120px';
-        })() // initial height from cache if available
+        })() // 如果缓存可用，使用初始高度
     ..style.display = 'block';
 
   final mermaidDiv = html.DivElement()
     ..classes.add('mermaid')
     ..style.width = '100%'
     ..style.display = 'block'
-    ..text = code; // keep content escaped/safe
+    ..text = code; // 保持内容转义/安全
 
-  // Center and margin similar to preview styles
+  // 居中和边距与预览样式保持一致
   final style = html.StyleElement()
     ..text = '.mermaid{ text-align:center; margin: 12px 0; }';
 
@@ -58,7 +58,7 @@ MermaidViewHandle? createMermaidView(
   ui.platformViewRegistry.registerViewFactory(viewType, (int id) => container);
   _containers[viewType] = container;
 
-  // Ensure Mermaid script is present, then initialize and render this node.
+  // 确保 Mermaid 脚本存在，然后初始化并渲染此节点。
   _ensureMermaidLoaded().then((_) async {
     try {
       final theme = dark ? 'dark' : 'default';
@@ -74,7 +74,7 @@ MermaidViewHandle? createMermaidView(
       }
       js_util.callMethod(mermaid, 'initialize', [js_util.jsify(init)]);
 
-      // Render only this node and set explicit height to fit content
+      // 只渲染此节点，并设置显式高度以适配内容
       await js_util.promiseToFuture(
         js_util.callMethod(mermaid, 'run', [
           js_util.jsify({
@@ -83,7 +83,7 @@ MermaidViewHandle? createMermaidView(
         ]),
       );
 
-      // After rendering, set container height to the SVG bbox height
+      // 渲染后，将容器高度设置为 SVG bbox 高度
       final svg = mermaidDiv.querySelector('svg');
       if (svg != null) {
         final rect = svg.getBoundingClientRect();
@@ -94,7 +94,7 @@ MermaidViewHandle? createMermaidView(
         } catch (_) {}
       }
     } catch (_) {
-      // ignore; caller will still see the code content
+      // 忽略；调用方仍会看到代码内容
     }
   });
 
@@ -145,7 +145,7 @@ MermaidViewHandle? createMermaidView(
   }
 
   Future<Uint8List?> exportBytes() async {
-    // Not implemented for web currently (Flutter web capture path likely not used)
+    // 目前 Web 端尚未实现（Flutter Web 的截图路径可能不会使用）
     return null;
   }
 
@@ -160,14 +160,14 @@ int _viewSeq = 0;
 Completer<void>? _loader;
 
 Future<void> _ensureMermaidLoaded() {
-  // If already available, return immediately.
+  // 如果已经可用，则立即返回。
   final has = js_util.hasProperty(html.window, 'mermaid');
   if (has) return Future.value();
 
   if (_loader != null) return _loader!.future;
   _loader = Completer<void>();
 
-  // Inject script tag to load local mermaid asset (offline)
+  // 注入 script 标签以加载本地 mermaid 资源（离线）
   final script = html.ScriptElement()
     ..src = 'assets/mermaid.min.js'
     ..defer = true

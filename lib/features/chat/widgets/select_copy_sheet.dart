@@ -68,7 +68,7 @@ class _SelectCopySheet extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Invisible left button to balance the right button's width
+                  // 左侧不可见按钮用于平衡右侧按钮宽度
                   Opacity(
                     opacity: 0,
                     child: IgnorePointer(

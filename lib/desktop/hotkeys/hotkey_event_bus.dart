@@ -1,6 +1,6 @@
 import 'dart:async';
 
-/// App-wide hotkey actions broadcast bus.
+/// 应用级热键操作广播总线。
 enum HotkeyAction {
   toggleAppVisibility,
   closeWindow,

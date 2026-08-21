@@ -24,12 +24,12 @@ class _HtmlPreviewPageState extends State<HtmlPreviewPage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Safe place to access Theme.of(context)
+    // 可以安全访问 Theme.of(context) 的位置
     if (!_didInit) {
       _didInit = true;
       _loadHtml();
     } else {
-      // Reload on theme changes
+      // 主题变化时重新加载
       _loadHtml();
     }
   }

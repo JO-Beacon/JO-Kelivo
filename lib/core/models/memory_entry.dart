@@ -99,12 +99,12 @@ class MemoryEntry {
     );
   }
 
-  /// Trim, collapse every whitespace run to a single space, then lowercase.
+  /// 去除首尾空白，将每个连续空白序列折叠为单个空格，然后转为小写。
   static String normalizeContent(String content) {
     return content.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
   }
 
-  /// Alphabet: `0123456789abcdef` (8 hex chars after `mem_`).
+  /// 字符集：`0123456789abcdef`（`mem_` 后为 8 个十六进制字符）。
   static String newId([Random? random]) {
     final rng = random ?? Random.secure();
     const alphabet = '0123456789abcdef';

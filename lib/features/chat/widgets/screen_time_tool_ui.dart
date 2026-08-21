@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_font_weights.dart';
 
-/// Parsed result of the `get_screen_time` local tool.
+/// `get_screen_time` 本地工具的解析结果。
 class ScreenTimeResult {
   const ScreenTimeResult({
     required this.totalMinutes,
@@ -37,8 +37,9 @@ class ScreenTimeResult {
         for (final item in appsRaw) {
           if (item is! Map) continue;
           final appMap = Map<String, dynamic>.from(item);
-          final name =
-              (appMap['app_name'] ?? appMap['package'] ?? '').toString().trim();
+          final name = (appMap['app_name'] ?? appMap['package'] ?? '')
+              .toString()
+              .trim();
           if (name.isEmpty) continue;
           final totalMs = _asInt(appMap['total_ms']);
           final totalMinutes =
@@ -78,7 +79,7 @@ class ScreenTimeAppUsage {
   final int totalMinutes;
 }
 
-/// Compact summary for the tool card / chain-of-thought step.
+/// 工具卡片 / 思维链步骤的紧凑摘要。
 class ScreenTimeToolSummary extends StatelessWidget {
   const ScreenTimeToolSummary({
     super.key,
@@ -100,8 +101,7 @@ class ScreenTimeToolSummary extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final primary = textColor ?? cs.onPrimaryContainer;
-    final secondary =
-        secondaryColor ?? primary.withValues(alpha: 0.8);
+    final secondary = secondaryColor ?? primary.withValues(alpha: 0.8);
     final err = errorColor ?? cs.error;
 
     if (result.isNoPermission) {
@@ -161,7 +161,7 @@ class ScreenTimeToolSummary extends StatelessWidget {
   }
 }
 
-/// Full detail body for the screen-time tool result sheet/dialog.
+/// screen-time 工具结果面板/对话框的完整详情主体。
 class ScreenTimeToolDetailBody extends StatelessWidget {
   const ScreenTimeToolDetailBody({
     super.key,
@@ -241,10 +241,7 @@ class ScreenTimeToolDetailBody extends StatelessWidget {
                         app.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: cs.onSurface,
-                        ),
+                        style: TextStyle(fontSize: 14, color: cs.onSurface),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -284,7 +281,7 @@ String formatScreenTimeMinutes(int minutes) {
   return '${m}m';
 }
 
-/// Formats an ISO-ish timestamp to `MM-dd HH:mm`, falling back to the raw value.
+/// 将近似 ISO 的时间戳格式化为 `MM-dd HH:mm`，无法解析时回退到原始值。
 String formatScreenTimeRange(String iso) {
   final parsed = DateTime.tryParse(iso);
   if (parsed == null) return iso;

@@ -17,8 +17,8 @@ final class RestoreWorkspaceLock {
   static const publishingRunFileName = '.active_run.publishing';
   static const discardingRunFileName = '.active_run.discarding';
   static const archivingRunFileName = '.active_run.archiving';
-  // Reserved only so diagnostics/tests can identify and reject artifacts from
-  // the unpublished markerless protocol. Production never creates it.
+  // 仅保留用于让诊断/测试能够识别并拒绝来自未发布的 markerless 协议的产物。
+  // 生产环境绝不会创建它。
   static const archivingRunTemporaryFileName = '$archivingRunFileName.tmp';
   static const completedRunsDirectoryName = 'completed';
   static const _markerFileNames = {
@@ -112,11 +112,10 @@ final class RestoreWorkspaceLock {
     }
   }
 
-  /// Converts the exact marker observed by a lock-held startup inspector into
-  /// the durable cutover claim, or resumes an interrupted publishing claim.
+  /// 将持锁的启动检查器观察到的确切 marker 转换为持久的 cutover claim，
+  /// 或恢复被中断的发布声明。
   ///
-  /// The caller must invoke this from one [synchronized] action after it has
-  /// validated the run and receipt chain under that same lock.
+  /// 调用方必须在同一把锁下验证 run 和 receipt 链之后，从同一个 [synchronized] 动作中调用此方法。
   Future<void> claimCutoverRunWhileWorkspaceLocked({
     required String runId,
     required String observedMarkerFileName,
@@ -145,13 +144,11 @@ final class RestoreWorkspaceLock {
     await _requireRunFile(publishing, runId);
   }
 
-  /// Moves a terminal run out of the single-active-run admission area while
-  /// retaining its receipt, candidate, and previous evidence.
+  /// 将已终结的 run 移出单活动 run 的准入区域，同时
+  /// 保留其 receipt、candidate 和先前证据。
   ///
-  /// The caller must hold this workspace lock and must already have verified a
-  /// terminal committed/rolledBack receipt for [runId]. The archiving marker
-  /// remains operation-ahead evidence until the run-directory rename and both
-  /// parent-directory barriers are complete.
+  /// 调用方必须持有此工作区锁，并且必须已经验证 [runId] 的最终 committed/rolledBack 回执。归档标记
+  /// 会保留为操作先行的证据，直到运行目录重命名和两个父目录屏障全部完成。
   Future<Directory> archiveTerminalRunWhileWorkspaceLocked({
     required String runId,
     required String observedMarkerFileName,
@@ -218,12 +215,11 @@ final class RestoreWorkspaceLock {
     return target;
   }
 
-  /// Durably removes a run that provably never published its first receipt.
+  /// 持久地删除一个可证明从未发布其首个 receipt 的运行。
   ///
-  /// The caller must hold this workspace lock. Only the exact staging and
-  /// initial-receipt publication topology is accepted. Any final receipt,
-  /// previous bundle, link, special filesystem entry, or unknown path leaves
-  /// the workspace untouched and fail-closed.
+  /// 调用方必须持有此工作区锁。仅接受完全匹配的暂存和初始回执发布拓扑。任何最终回执、
+  /// 先前 bundle、链接、特殊文件系统条目或未知路径都会使工作区保持不变，
+  /// 并以故障关闭方式处理。
   Future<bool> discardStrictlyUnpublishedRunWhileWorkspaceLocked() async {
     final observation = await _inspectWorkspaceForUnpublishedRun();
     final marker = observation.marker;

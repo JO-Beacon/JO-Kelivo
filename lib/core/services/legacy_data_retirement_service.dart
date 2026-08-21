@@ -30,14 +30,12 @@ final class LegacyRetirementReceipt {
   final List<LegacyHiveArtifact> deletedArtifacts;
 }
 
-/// Deletes only the frozen Hive artifact family after an explicit user action.
+/// 仅在用户明确操作后删除冻结的 Hive 工件族。
 ///
-/// Migration admission is handled before the storage UI is available. The UI
-/// decides whether to offer cleanup by combining the in-database migration
-/// receipt with [inspectHiveArtifacts]. Deletion stays crash-resumable through
-/// a single marker file: a `deleting` marker is published before the first
-/// unlink, so an interrupted cleanup resumes on the next request. A missing or
-/// malformed marker never blocks cleanup, because deletion is idempotent.
+/// 迁移准入在存储 UI 可用之前处理。UI 通过结合数据库内迁移回执和
+/// [inspectHiveArtifacts] 来决定是否提供清理。删除通过单个标记文件保持崩溃可恢复：
+/// 在第一次 unlink 之前发布 `deleting` 标记，因此中断的清理会在下次请求时继续。
+/// 缺失或格式错误的标记绝不会阻塞清理，因为删除是幂等的。
 final class LegacyDataRetirementService {
   LegacyDataRetirementService(
     this.appDataDirectory, {
@@ -112,9 +110,8 @@ final class LegacyDataRetirementService {
     );
   }
 
-  /// Returns the latest marker, or null when it is absent or malformed.
-  /// Malformed markers are intentionally not errors: the marker only carries
-  /// resume metadata, and cleanup must stay available without it.
+  /// 返回最新标记；标记缺失或格式错误时返回 null。
+  /// 格式错误的标记故意不作为错误：该标记仅携带恢复元数据，缺少它时清理仍必须可用。
   Future<LegacyRetirementReceipt?> readReceipt() async {
     if (await FileSystemEntity.type(_markerFile.path, followLinks: false) !=
         FileSystemEntityType.file) {
@@ -152,9 +149,9 @@ final class LegacyDataRetirementService {
       await durability.restrictFile(temporary);
       await temporary.writeAsString(jsonEncode(body), flush: true);
       await durability.syncFile(temporary, fullBarrier: true);
-      // renameAndSync refuses existing targets, so replace in two steps. A
-      // crash between delete and rename only loses resume metadata, which
-      // retireHiveArtifacts rebuilds from a fresh inspection.
+      // renameAndSync 会拒绝已存在的目标，因此分两步替换。
+      // 在删除和重命名之间发生崩溃只会丢失恢复元数据，
+      // retireHiveArtifacts 会通过一次全新检查重建该元数据。
       if (await _markerFile.exists()) {
         await _markerFile.delete();
       }

@@ -29,7 +29,7 @@ class ImageViewerPage extends StatefulWidget {
     this.imageProviders = const <String, ImageProvider>{},
   });
 
-  final List<String> images; // local paths, http urls, or data urls
+  final List<String> images; // 本地路径、http URL 或 data URL
   final int initialIndex;
   final Map<String, ImageProvider> imageProviders;
 
@@ -52,15 +52,15 @@ class _ImageViewerPageState extends State<ImageViewerPage>
   final Map<String, ImageStreamListener> _imageSizeListeners =
       <String, ImageStreamListener>{};
 
-  double _dragDy = 0.0; // current vertical drag offset
-  double _bgOpacity = 1.0; // background dim opacity (0..1)
-  bool _dragActive = false; // only when zoom ~ 1.0
-  double _animFrom = 0.0; // for restore animation
-  Offset? _lastDoubleTapPos; // focal point for double-tap zoom
-  Offset? _lastTapPos; // local tap point for desktop image/background split
-  bool _saving = false; // saving to gallery state
-  bool _sharing = false; // sharing state
-  bool _copying = false; // copying to clipboard state
+  double _dragDy = 0.0; // 当前垂直拖动偏移
+  double _bgOpacity = 1.0; // 背景变暗不透明度（0..1）
+  bool _dragActive = false; // 仅在缩放约 1.0 时
+  double _animFrom = 0.0; // 用于恢复动画
+  Offset? _lastDoubleTapPos; // 双击缩放的焦点
+  Offset? _lastTapPos; // 桌面端图片/背景分割的本地点击点
+  bool _saving = false; // 保存到相册的状态
+  bool _sharing = false; // 分享状态
+  bool _copying = false; // 复制到剪贴板的状态
   bool _chromeVisible = true;
   bool _currentImageZoomed = false;
   late final FocusNode _focusNode;
@@ -554,7 +554,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       } catch (_) {}
     }
     final fixed = SandboxPathResolver.fix(src);
-    // Use a FileImage with a unique key per path so Hero tags remain stable
+    // 为每个路径使用带唯一 key 的 FileImage，使 Hero 标签保持稳定
     return FileImage(File(fixed));
   }
 
@@ -562,7 +562,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     if (_index < 0 || _index >= _zoomCtrls.length) return true;
     final m = _zoomCtrls[_index].value;
     final s = m.getMaxScaleOnAxis();
-    // Only allow when scale ~ 1 (not zooming)
+    // 仅在缩放比例接近 1（未缩放）时允许
     return (s >= 0.98 && s <= 1.02);
   }
 
@@ -575,7 +575,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
   void _handleVerticalDragUpdate(DragUpdateDetails d) {
     if (!_dragActive) return;
     final dy = d.delta.dy;
-    if (dy <= 0 && _dragDy <= 0) return; // only handle downward
+    if (dy <= 0 && _dragDy <= 0) return; // 只处理向下拖动
     setState(() {
       _dragDy = math.max(0.0, _dragDy + dy);
       _bgOpacity = 1.0 - math.min(_dragDy / 300.0, 0.7);
@@ -585,14 +585,14 @@ class _ImageViewerPageState extends State<ImageViewerPage>
   void _handleVerticalDragEnd(DragEndDetails d) {
     if (!_dragActive) return;
     _dragActive = false;
-    final v = d.primaryVelocity ?? 0.0; // positive when swiping down
+    final v = d.primaryVelocity ?? 0.0; // 向下滑动时为正值
     const double dismissDistance = 140.0;
     const double dismissVelocity = 900.0;
     if (_dragDy > dismissDistance || v > dismissVelocity) {
       Navigator.of(context).maybePop();
       return;
     }
-    // animate back
+    // 动画返回
     _animFrom = _dragDy;
     _restoreCtrl
       ..reset()
@@ -701,7 +701,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     setState(() => _sharing = true);
     final l10n = AppLocalizations.of(context)!;
     try {
-      // iPad requires a non-zero popover source rect within overlay coordinates
+      // iPad 要求在 overlay 坐标内提供非零的 popover 源矩形
       Rect anchor;
       try {
         final overlay = Overlay.of(context);
@@ -744,7 +744,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
           pathToSave = temp.path;
         }
       } else if (src.startsWith('http')) {
-        // Try download and share
+        // 尝试下载并分享
         final resp = await http.get(Uri.parse(src));
         if (resp.statusCode >= 200 && resp.statusCode < 300) {
           final tmp = await getTemporaryDirectory();
@@ -759,7 +759,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
           pathToSave = temp.path;
         } else {
           if (!mounted) return;
-          // fallback to sharing url as text
+          // 回退为将 URL 作为文本分享
           await SharePlus.instance.share(
             ShareParams(text: src, sharePositionOrigin: anchor),
           );
@@ -786,7 +786,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
           ShareParams(files: [XFile(pathToSave)], sharePositionOrigin: anchor),
         );
       } on MissingPluginException catch (_) {
-        // Fallback: open system chooser by opening file
+        // 回退：打开文件以唤起系统选择器
         final res = await OpenFilex.open(pathToSave);
         if (!mounted) return;
         if (res.type != ResultType.done) {
@@ -1470,7 +1470,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     );
   }
 
-  // Desktop save: choose a location via file picker
+  // 桌面端保存：通过文件选择器选择位置
   Future<void> _saveCurrentDesktop() async {
     if (_saving) return;
     setState(() => _saving = true);
@@ -1551,7 +1551,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
         allowedExtensions: allowed,
       );
       if (savePath == null) {
-        // user cancelled
+        // 用户取消
         return;
       }
       try {

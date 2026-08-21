@@ -1,22 +1,22 @@
 import '../../providers/settings_provider.dart';
 
-/// Built-in tool name constants for API integrations.
-/// Use these constants instead of raw strings to ensure consistency.
+/// 用于 API 集成的内置工具名称常量。
+/// 请使用这些常量而不是原始字符串，以确保一致性。
 abstract class BuiltInToolNames {
-  // Common
+  // 通用
   static const search = 'search';
 
-  // Google/Gemini specific
+  // Google/Gemini 专用
   static const urlContext = 'url_context';
   static const codeExecution = 'code_execution';
   static const youtube = 'youtube';
 
-  // OpenAI specific
+  // OpenAI 专用
   static const codeInterpreter = 'code_interpreter';
   static const imageGeneration = 'image_generation';
 
-  /// Normalize a tool name to snake_case format.
-  /// Handles legacy camelCase formats for backward compatibility.
+  /// 将工具名称规范化为 snake_case 格式。
+  /// 为向后兼容处理旧版 camelCase 格式。
   static String normalize(String name) {
     final lower = name.trim().toLowerCase();
     switch (lower) {
@@ -33,10 +33,10 @@ abstract class BuiltInToolNames {
     }
   }
 
-  /// Parse tool names from persisted settings and normalize them.
+  /// 从持久化设置中解析工具名称并规范化。
   ///
-  /// Accepts legacy/unknown types defensively (e.g. null, non-iterables).
-  /// Returns a mutable Set even when empty to avoid read-only mutation crashes.
+  /// 防御性地接受旧版/未知类型（例如 null、非可迭代类型）。
+  /// 即使为空也返回可变的 Set，以避免只读修改导致崩溃。
   static Set<String> parseAndNormalize(Object? raw) {
     if (raw == null) return <String>{};
     if (raw is! Iterable) return <String>{};
@@ -48,12 +48,12 @@ abstract class BuiltInToolNames {
     return out;
   }
 
-  /// Parse built-in tools from a per-model override map.
+  /// 从每个模型的覆盖映射中解析内置工具。
   ///
-  /// Supports:
-  /// - `builtInTools`: `List<String>` (current format)
-  /// - `built_in_tools`: `List<String>` (legacy format)
-  /// - `tools`: `Map<String, bool>` (legacy boolean flags, e.g. `urlContext=true`)
+  /// 支持：
+  /// - `builtInTools`：`List<String>`（当前格式）
+  /// - `built_in_tools`：`List<String>`（旧版格式）
+  /// - `tools`：`Map<String, bool>`（旧版布尔标志，例如 `urlContext=true`）
   static Set<String> parseFromOverride(Object? rawOverride) {
     final ov = rawOverride is Map ? rawOverride : null;
     final builtInSet = parseAndNormalize(
@@ -72,7 +72,7 @@ abstract class BuiltInToolNames {
     return builtInSet;
   }
 
-  /// Stable ordering for persisting tool lists (keeps UI diffs minimal).
+  /// 为持久化工具列表提供稳定排序（使 UI 差异最小化）。
   static List<String> orderedForStorage(Iterable<String> tools) {
     final remaining = Set<String>.from(tools);
     const preferredOrder = <String>[
@@ -91,7 +91,7 @@ abstract class BuiltInToolNames {
     return out;
   }
 
-  /// Resolve the upstream model id that will actually be sent to the vendor.
+  /// 解析实际将发送给供应商的上游模型 id。
   static String effectiveModelId({
     required ProviderConfig? cfg,
     required String? modelId,
@@ -110,7 +110,7 @@ abstract class BuiltInToolNames {
   }
 }
 
-/// Utility class for checking provider-specific built-in tool support.
+/// 用于检查特定提供商内置工具支持的实用类。
 abstract class BuiltInToolsHelper {
   static const String _dashScopeHost = 'dashscope.aliyuncs.com';
 
@@ -296,8 +296,8 @@ abstract class BuiltInToolsHelper {
           alias: 'qwen3-max',
           minSnapshot: '2026-01-23',
         ) ||
-        // Official Responses web_search whitelist additions:
-        // Qwen3.7 Max / Plus. Do NOT guess-enable 3.7 Flash.
+        // 官方 Responses web_search 白名单新增：
+        // Qwen3.7 Max / Plus。请勿猜测式启用 3.7 Flash。
         _matchesExactOrSnapshot(
           m,
           alias: 'qwen3.7-max',
@@ -309,8 +309,8 @@ abstract class BuiltInToolsHelper {
           alias: 'qwen3.7-plus',
           minSnapshot: '2026-05-26',
         ) ||
-        // Token Plan / Responses only for the preview SKU. Plain
-        // `qwen3.8-max` is intentionally not opened without Key verification.
+        // Token Plan / Responses 仅用于预览 SKU。普通的
+        // `qwen3.8-max` 在未进行 Key 验证时有意不开放。
         m == 'qwen3.8-max-preview';
   }
 
@@ -560,12 +560,12 @@ abstract class BuiltInToolsHelper {
     return out;
   }
 
-  /// Check if a provider supports built-in tools configuration.
+  /// 检查提供商是否支持内置工具配置。
   static bool supportsBuiltInTools(ProviderKind kind) {
     return kind == ProviderKind.google || kind == ProviderKind.openai;
   }
 
-  /// Check if the provider/model combination supports search tool.
+  /// 检查提供商/模型组合是否支持搜索工具。
   static bool supportsSearch({
     required ProviderKind kind,
     required bool useResponseApi,
@@ -577,7 +577,7 @@ abstract class BuiltInToolsHelper {
       case ProviderKind.claude:
         return true;
       case ProviderKind.openai:
-        // OpenAI requires Responses API, or Grok models
+        // OpenAI 需要 Responses API，或 Grok 模型
         if (useResponseApi &&
             isOpenAIResponsesBuiltInSearchSupportedModel(modelId)) {
           return true;
@@ -599,7 +599,7 @@ abstract class BuiltInToolsHelper {
     }
   }
 
-  /// Get active built-in tools from model overrides.
+  /// 从模型覆盖中获取当前启用的内置工具。
   static BuiltInToolsState getActiveTools({
     required ProviderConfig? cfg,
     required String? modelId,
@@ -649,7 +649,7 @@ abstract class BuiltInToolsHelper {
   }
 }
 
-/// State class representing active built-in tools.
+/// 表示当前启用内置工具的状态类。
 class BuiltInToolsState {
   final bool searchActive;
   final bool codeExecutionActive;
@@ -667,7 +667,7 @@ class BuiltInToolsState {
     this.imageGenerationActive = false,
   });
 
-  /// Returns true if any Gemini-specific built-in tool is active.
+  /// 如果有任何 Gemini 专用内置工具处于启用状态，则返回 true。
   bool get anyGeminiToolActive =>
       codeExecutionActive || urlContextActive || youtubeActive;
 }

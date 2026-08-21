@@ -49,7 +49,7 @@ class _DesktopInstructionInjectionPaneState
   @override
   void initState() {
     super.initState();
-    // Ensure items are loaded on first open
+    // 首次打开时确保条目已加载
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<InstructionInjectionProvider>().initialize();
@@ -705,9 +705,7 @@ class _GroupHeaderState extends State<_GroupHeader> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final hoverBg = cs.onSurface.withValues(
-      alpha: isDark ? 0.08 : 0.05,
-    );
+    final hoverBg = cs.onSurface.withValues(alpha: isDark ? 0.08 : 0.05);
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -732,7 +730,7 @@ class _GroupHeaderState extends State<_GroupHeader> {
                   height: 20,
                   child: Center(
                     child: AnimatedRotation(
-                      turns: widget.collapsed ? 0.0 : 0.25, // right -> down
+                      turns: widget.collapsed ? 0.0 : 0.25, // 右箭头变为向下
                       duration: const Duration(milliseconds: 220),
                       curve: Curves.easeOutCubic,
                       child: Icon(

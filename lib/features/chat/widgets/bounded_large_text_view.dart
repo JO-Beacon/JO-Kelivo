@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../l10n/app_localizations.dart';
 
-/// Collapses large text by default and virtualizes the expanded representation
-/// into independently selectable chunks.
+/// 默认折叠大段文本，并对展开后的展示进行虚拟化
+/// 拆分为可独立选择的块。
 class BoundedLargeTextView extends StatefulWidget {
   const BoundedLargeTextView(
     this.text, {

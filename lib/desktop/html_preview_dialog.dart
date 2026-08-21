@@ -41,7 +41,7 @@ class _HtmlPreviewDialog extends StatefulWidget {
 }
 
 class _HtmlPreviewDialogState extends State<_HtmlPreviewDialog> {
-  // macOS uses webview_flutter; Windows uses webview_windows.
+  // macOS 使用 webview_flutter；Windows 使用 webview_windows。
   WebViewController? _flutterCtrl;
   winweb.WebviewController? _winCtrl;
   bool _ready = false;
@@ -64,7 +64,7 @@ class _HtmlPreviewDialogState extends State<_HtmlPreviewDialog> {
         await c.setBackgroundColor(Colors.transparent);
       } catch (_) {}
       _winCtrl = c;
-      // Listen to web messages (console bridge)
+      // 监听 Web 消息（控制台桥接）
       _msgSub = _winCtrl!.webMessage.listen((event) {
         try {
           String text;
@@ -137,7 +137,7 @@ class _HtmlPreviewDialogState extends State<_HtmlPreviewDialog> {
   Future<void> _loadWithTheme() async {
     if (!_ready) return;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    if (_loadedOnce && _lastDark == isDark) return; // no change
+    if (_loadedOnce && _lastDark == isDark) return; // 没有变化
     _lastDark = isDark;
     final html = _wrapWithTheme(widget.html, isDark: isDark);
     if (Platform.isWindows) {
@@ -176,7 +176,7 @@ class _HtmlPreviewDialogState extends State<_HtmlPreviewDialog> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    // Keep content updated with theme changes
+    // 主题变化时保持内容同步更新
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadWithTheme();
     });
@@ -201,7 +201,7 @@ class _HtmlPreviewDialogState extends State<_HtmlPreviewDialog> {
                   padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
                   child: Row(
                     children: [
-                      // Left title
+                      // 左侧标题
                       Text(
                         l10n.assistantEditPreviewTitle,
                         style: TextStyle(
@@ -210,7 +210,7 @@ class _HtmlPreviewDialogState extends State<_HtmlPreviewDialog> {
                         ),
                       ),
                       const Spacer(),
-                      // Right function buttons
+                      // 右侧功能按钮
                       IosIconButton(
                         icon: Lucide.Terminal,
                         size: 18,
@@ -219,7 +219,7 @@ class _HtmlPreviewDialogState extends State<_HtmlPreviewDialog> {
                         onTap: _openConsoleDialog,
                       ),
                       const SizedBox(width: 4),
-                      // Far right: close
+                      // 最右侧：关闭按钮
                       IosIconButton(
                         icon: Lucide.X,
                         size: 18,
@@ -406,4 +406,4 @@ class _ConsoleMessage {
   final int? line;
 }
 
-// (Bottom sheet version removed; desktop uses custom dialog.)
+// （已移除底部弹层版本；桌面端使用自定义对话框。）

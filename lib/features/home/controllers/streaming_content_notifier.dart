@@ -1,23 +1,23 @@
 import 'package:flutter/foundation.dart';
 
-/// Lightweight notifier for streaming message content updates.
+/// 用于流式消息内容更新的轻量 notifier。
 ///
-/// This class provides a way to update streaming message content without
-/// triggering a full page rebuild. Instead of using ChangeNotifier.notifyListeners()
-/// which causes the entire HomePage to rebuild, this uses ValueNotifier
-/// so only the specific message widget that's listening will rebuild.
+/// 本类提供一种更新流式消息内容而
+/// 不触发整页重建的方式。相比使用 ChangeNotifier.notifyListeners()
+/// 会导致整个 HomePage 重建，这里使用 ValueNotifier，
+/// 使只有正在监听的特定消息 widget 重建。
 ///
-/// Usage:
-/// 1. StreamController updates content via updateContent()
-/// 2. ChatMessageWidget uses ValueListenableBuilder to listen to contentNotifier
-/// 3. Only the streaming message widget rebuilds, not the entire page
+/// 用法：
+/// 1. StreamController 通过 updateContent() 更新内容
+/// 2. ChatMessageWidget 用 ValueListenableBuilder 监听 contentNotifier
+/// 3. 只有流式消息 widget 重建，而非整页
 class StreamingContentNotifier {
-  /// Map of message ID to its content notifier.
-  /// Each streaming message has its own `ValueNotifier<String>`.
+  /// 消息 ID 到其 content notifier 的映射。
+  /// 每条流式消息都有自己的 `ValueNotifier<String>`。
   final Map<String, ValueNotifier<StreamingContentData>> _notifiers =
       <String, ValueNotifier<StreamingContentData>>{};
 
-  /// Get or create a notifier for a message.
+  /// 获取或为消息创建 notifier。
   ValueNotifier<StreamingContentData> getNotifier(String messageId) {
     return _notifiers.putIfAbsent(
       messageId,
@@ -27,11 +27,11 @@ class StreamingContentNotifier {
     );
   }
 
-  /// Check if a notifier exists for a message.
+  /// 检查某消息是否存在 notifier。
   bool hasNotifier(String messageId) => _notifiers.containsKey(messageId);
 
-  /// Update content for a streaming message.
-  /// This will only notify the specific widget listening to this message's notifier.
+  /// 更新流式消息的内容。
+  /// 仅通知监听该消息 notifier 的特定 widget。
   void updateContent(
     String messageId,
     String content,
@@ -67,7 +67,7 @@ class StreamingContentNotifier {
     }
   }
 
-  /// Update reasoning content for a streaming message.
+  /// 更新流式消息的推理内容。
   void updateReasoning(
     String messageId, {
     String? reasoningText,
@@ -100,8 +100,8 @@ class StreamingContentNotifier {
     }
   }
 
-  /// Notify that tool parts have been updated.
-  /// Uses a version counter to trigger rebuild without copying tool data.
+  /// 通知工具 parts 已更新。
+  /// 使用版本计数触发重建而无需复制工具数据。
   void notifyToolPartsUpdated(
     String messageId, {
     List<int>? contentSplitOffsets,
@@ -131,8 +131,8 @@ class StreamingContentNotifier {
     }
   }
 
-  /// Force a rebuild of the streaming message widget.
-  /// Used when external state like reasoning expanded changes.
+  /// 强制重建流式消息 widget。
+  /// 在推理展开等外部状态变化时使用。
   void forceRebuild(String messageId) {
     final notifier = _notifiers[messageId];
     if (notifier != null) {
@@ -153,13 +153,13 @@ class StreamingContentNotifier {
     }
   }
 
-  /// Remove notifier when streaming is complete.
+  /// 流式完成时移除 notifier。
   void removeNotifier(String messageId) {
     final notifier = _notifiers.remove(messageId);
     notifier?.dispose();
   }
 
-  /// Clear all notifiers (e.g., when switching conversations).
+  /// 清除所有 notifier（例如切换会话时）。
   void clear() {
     for (final notifier in _notifiers.values) {
       notifier.dispose();
@@ -167,13 +167,13 @@ class StreamingContentNotifier {
     _notifiers.clear();
   }
 
-  /// Dispose all resources.
+  /// 释放所有资源。
   void dispose() {
     clear();
   }
 }
 
-/// Data class for streaming content.
+/// 流式内容的数据类。
 @immutable
 class StreamingContentData {
   const StreamingContentData({
@@ -202,13 +202,13 @@ class StreamingContentData {
   final List<int>? reasoningCountAtSplit;
   final List<int>? toolCountAtSplit;
 
-  /// Version counter for tool parts updates. Incrementing this triggers rebuild.
+  /// 工具 parts 更新的版本计数。递增即触发重建。
   final int toolPartsVersion;
 
-  /// Version counter for UI state changes (e.g., reasoning expanded toggle).
+  /// UI 状态变化的版本计数（例如推理展开切换）。
   final int uiVersion;
 
-  /// Detailed token usage fields.
+  /// 详细的 token 用量字段。
   final int? promptTokens;
   final int? completionTokens;
   final int? cachedTokens;

@@ -14,11 +14,11 @@ class RequestLogger {
 
   static bool saveOutput = false;
 
-  /// Replace inline base64 images/files with a placeholder before writing.
+  /// 写入前将内联 base64 图片/文件替换为占位符。
   static bool elideLargePayloads = true;
 
-  /// Backstop for anything the elider misses; a single log line never grows
-  /// past this, so the viewer can always open the file.
+  /// 作为 elider 遗漏内容的后备；单行日志永不增长
+  /// 超过此大小，以便查看器始终可以打开文件。
   static const int maxLineChars = 1024 * 1024;
 
   static int _nextRequestId = 0;
@@ -100,7 +100,7 @@ class RequestLogger {
     return _sink!;
   }
 
-  /// Strips inline base64 payloads when [elideLargePayloads] is on.
+  /// 当 [elideLargePayloads] 开启时，剥离内联 base64 负载。
   static String elidePayloads(String text) {
     if (!elideLargePayloads) return text;
     return LogPayloadElider.elide(text);
@@ -166,8 +166,8 @@ class RequestLogger {
         .replaceAll('\t', r'\t');
   }
 
-  /// Files currently held open by RequestLogger / FlutterLogger / ContextLogger.
-  /// Deleting them unlinks the inode on Unix (writes vanish) or fails on Windows.
+  /// 当前由 RequestLogger / FlutterLogger / ContextLogger 保持打开的文件。
+  /// 删除这些文件会在 Unix 上解除 inode 链接（写入会消失），或在 Windows 上失败。
   static const Set<String> activeLogFileNames = {
     'logs.txt',
     'flutter_logs.txt',
@@ -202,7 +202,7 @@ class RequestLogger {
           .toList();
       if (files.isEmpty) return;
 
-      // Auto-delete old files
+      // 自动删除旧文件
       if (autoDeleteDays > 0) {
         final cutoff = DateTime.now().subtract(Duration(days: autoDeleteDays));
         for (final f in List<File>.from(files)) {
@@ -216,7 +216,7 @@ class RequestLogger {
         }
       }
 
-      // Enforce max size
+      // 强制执行最大大小
       if (maxSizeMB > 0 && files.isNotEmpty) {
         final maxBytes = maxSizeMB * 1024 * 1024;
         final statMap = <File, FileStat>{};
@@ -229,7 +229,7 @@ class RequestLogger {
           } catch (_) {}
         }
         if (totalSize > maxBytes) {
-          // Sort oldest first
+          // 按最旧优先排序
           final sorted = statMap.entries.toList()
             ..sort((a, b) => a.value.modified.compareTo(b.value.modified));
           for (final entry in sorted) {

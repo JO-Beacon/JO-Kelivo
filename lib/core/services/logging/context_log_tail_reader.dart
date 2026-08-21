@@ -4,12 +4,12 @@ import 'dart:typed_data';
 
 import 'context_log_models.dart';
 
-/// Resume point for backward JSONL reads.
+/// 向后读取 JSONL 时的续读点。
 class ContextLogTailCursor {
   const ContextLogTailCursor({this.position, this.pending = const <int>[]});
 
-  /// Next unread byte offset from the start of the file.
-  /// `null` means "start from the current end of the file".
+  /// 从文件开头算起的下一个未读字节偏移量。
+  /// `null` 表示“从文件当前末尾开始”。
   final int? position;
   final List<int> pending;
 
@@ -25,7 +25,7 @@ class ContextLogTailPage {
   bool get hasMore => !cursor.isExhausted;
 }
 
-/// Reads context-log JSONL from the tail without loading the whole file.
+/// 从尾部读取上下文日志 JSONL，而无需加载整个文件。
 class ContextLogTailReader {
   static const int defaultPageSize = 50;
   static const int defaultChunkSize = 128 * 1024;
@@ -101,7 +101,7 @@ class ContextLogTailReader {
 
     while (lines.length < maxLines) {
       var nl = -1;
-      // Scan the whole leftover, including newlines carried in `pending`.
+      // 扫描整个剩余部分，包括 `pending` 中携带的换行符。
       for (var i = end - 1; i >= 0; i--) {
         if (buffer[i] == 10) {
           nl = i;

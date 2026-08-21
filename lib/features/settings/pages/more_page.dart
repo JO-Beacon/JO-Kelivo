@@ -21,7 +21,7 @@ class MorePage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: true,
-        // Page intentionally has no title for now
+        // 页面当前刻意不显示标题
         title: null,
         elevation: 0,
         backgroundColor: theme.colorScheme.surface,
@@ -32,7 +32,7 @@ class MorePage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // LeaderBoard section
+              // 排行榜区块
               title('LLM排行榜'),
               Row(
                 children: const [

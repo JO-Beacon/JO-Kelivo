@@ -56,7 +56,7 @@ class ApiKeyConfig {
   final String key;
   final String? name;
   final bool isEnabled;
-  final int priority; // 1-10, smaller means higher priority
+  final int priority; // 1-10，数字越小优先级越高
   final int? maxRequestsPerMinute;
   final ApiKeyUsage usage;
   final ApiKeyStatus status;
@@ -141,13 +141,13 @@ class ApiKeyConfig {
     );
   }
 
-  // Ensure high probability of uniqueness even under fast batch inserts
+  // 即使在快速批量插入时也确保较高的唯一性概率
   static final Random _rng = Random();
   static int _ctr = 0;
   static String _generateKeyId() {
     final ts = DateTime.now().millisecondsSinceEpoch.toRadixString(36);
     final r = _rng.nextInt(0x7fffffff).toRadixString(36);
-    // Monotonic counter to guard against same-timestamp collisions
+    // 单调计数器，用于防止相同时间戳的冲突
     _ctr = (_ctr + 1) & 0x7fffffff;
     final c = _ctr.toRadixString(36);
     return 'key_${ts}_${r}_$c';
@@ -176,7 +176,7 @@ class KeyManagementConfig {
   final int maxFailuresBeforeDisable;
   final int failureRecoveryTimeMinutes;
   final bool enableAutoRecovery;
-  final int? roundRobinIndex; // optional persisted pointer
+  final int? roundRobinIndex; // 可选持久化指针
 
   const KeyManagementConfig({
     this.strategy = LoadBalanceStrategy.roundRobin,

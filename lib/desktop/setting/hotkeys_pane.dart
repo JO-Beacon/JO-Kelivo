@@ -87,7 +87,7 @@ class _DesktopHotkeysPaneState extends State<DesktopHotkeysPane> {
       decoration: BoxDecoration(
         color: cs.surface,
         borderRadius: BorderRadius.circular(16),
-        // Match TTS card's lighter border when unselected
+        // 未选中时匹配 TTS 卡片较浅的边框
         border: Border.all(
           color: cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08),
           width: 0.6,
@@ -132,7 +132,7 @@ class _HotkeyRowState extends State<_HotkeyRow> {
     final item = widget.item;
 
     String displayLabel() {
-      // Use l10n by key
+      // 按键使用本地化文本
       final loc = AppLocalizations.of(context)!;
       switch (item.l10nLabelKey) {
         case 'hotkeyToggleAppVisibility':
@@ -161,7 +161,7 @@ class _HotkeyRowState extends State<_HotkeyRow> {
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
       child: Row(
         children: [
-          // Left: label
+          // 左侧：标签
           Expanded(
             child: Text(
               displayLabel(),
@@ -173,7 +173,7 @@ class _HotkeyRowState extends State<_HotkeyRow> {
             ),
           ),
           const SizedBox(width: 12),
-          // Middle: shortcut editor
+          // 中间：快捷键编辑器
           SizedBox(
             width: 240,
             child: Stack(
@@ -188,7 +188,7 @@ class _HotkeyRowState extends State<_HotkeyRow> {
                   },
                   onCancel: () => setState(() => _recording = false),
                   onSubmit: (cmd) async {
-                    // Require at least one modifier; _ShortcutEditor guarantees
+                    // 至少需要一个修饰键；_ShortcutEditor 已保证此约束
                     await context.read<HotkeyProvider>().setCommand(
                       item.id,
                       cmd,
@@ -197,7 +197,7 @@ class _HotkeyRowState extends State<_HotkeyRow> {
                   },
                 ),
                 if (_recording)
-                  // Tap outside cancel overlay
+                  // 点击外部取消覆盖层
                   Positioned.fill(
                     child: GestureDetector(
                       behavior: HitTestBehavior.translucent,
@@ -208,7 +208,7 @@ class _HotkeyRowState extends State<_HotkeyRow> {
             ),
           ),
           const SizedBox(width: 12),
-          // Right actions: reset, clear, enable
+          // 右侧操作：重置、清空、启用
           Tooltip(
             message: l10n.hotkeysResetDefault,
             child: _SmallIconBtn(
@@ -259,7 +259,7 @@ class _ShortcutEditor extends StatefulWidget {
 }
 
 class _ShortcutEditorState extends State<_ShortcutEditor> {
-  // Track modifiers during capture
+  // 捕获期间跟踪修饰键
   bool _ctrl = false, _meta = false, _alt = false, _shift = false;
   String? _key;
 
@@ -274,16 +274,16 @@ class _ShortcutEditorState extends State<_ShortcutEditor> {
       onKeyEvent: (KeyEvent e) {
         if (!widget.recording) return;
         final isDown = e is KeyDownEvent;
-        // Modifiers cross-platform (Cmd on macOS = Meta)
+        // 跨平台修饰键（macOS 的 Cmd 对应 Meta）
         _ctrl = HardwareKeyboard.instance.isControlPressed;
         _meta = HardwareKeyboard.instance.isMetaPressed;
         _alt = HardwareKeyboard.instance.isAltPressed;
         _shift = HardwareKeyboard.instance.isShiftPressed;
 
-        // Identify non-modifier key on key down
+        // 在按键按下时识别非修饰键
         if (isDown) {
           final key = e.logicalKey;
-          // Ignore pure modifier keys
+          // 忽略纯修饰键
           if (key == LogicalKeyboardKey.controlLeft ||
               key == LogicalKeyboardKey.controlRight ||
               key == LogicalKeyboardKey.metaLeft ||
@@ -296,7 +296,7 @@ class _ShortcutEditorState extends State<_ShortcutEditor> {
             return;
           }
 
-          // Map some punctuation/letters
+          // 映射部分标点或字母
           String? keyToken;
           if (key == LogicalKeyboardKey.comma) {
             keyToken = 'comma';
@@ -310,14 +310,14 @@ class _ShortcutEditorState extends State<_ShortcutEditor> {
               if (RegExp(r'^[a-z]$').hasMatch(ch)) {
                 keyToken = 'key$ch';
               } else {
-                // digits: use raw label
+                // 数字：使用原始标签
                 keyToken = ch;
               }
             }
           }
           _key = keyToken;
 
-          // Save only when contains at least one modifier
+          // 只有包含至少一个修饰键时才保存
           if ((_ctrl || _meta || _alt || _shift) && _key != null) {
             final mods = <String>[];
             if (_ctrl) mods.add('ctrl');

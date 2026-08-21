@@ -23,8 +23,8 @@ class SearchServicesPage extends StatefulWidget {
 class _SearchServicesPageState extends State<SearchServicesPage> {
   List<SearchServiceOptions> _services = [];
   int _selectedIndex = 0;
-  final Map<String, bool> _testing = <String, bool>{}; // serviceId -> testing
-  // Use SettingsProvider for connection results; keep only local testing spinner state
+  final Map<String, bool> _testing = <String, bool>{}; // serviceId -> 测试中
+  // 连接结果使用 SettingsProvider；本地只保留测试中的加载状态
 
   @override
   void initState() {
@@ -32,7 +32,7 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
     final settings = context.read<SettingsProvider>();
     _services = List.from(settings.searchServices);
     _selectedIndex = settings.searchServiceSelected;
-    // Do not auto test here; rely on app-start tests. Users can test manually.
+    // 此处不自动测试；依赖应用启动测试。用户可手动测试。
   }
 
   Future<void> _addService() async {
@@ -116,7 +116,7 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
     });
     try {
       final svc = SearchService.getService(s);
-      // Use a tiny search to validate connectivity
+      // 使用一次极小的搜索来验证连通性
       final common = SearchCommonOptions(
         resultSize: 1,
         timeout: settings.searchCommonOptions.timeout,
@@ -289,7 +289,7 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
         ),
         _iosDivider(context),
         _TactileRow(
-          onTap: null, // no navigation, so no chevron
+          onTap: null, // 无导航，因此无 chevron
           pressedScale: 1.00,
           haptics: false,
           builder: (pressed) {
@@ -421,7 +421,7 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
     final s = _services[index];
     final cs = Theme.of(context).colorScheme;
     final name = SearchService.getService(s).name;
-    // Connection/testing status for capsule
+    // capsule 的连接/测试状态
     final l10n = AppLocalizations.of(context)!;
     final testing = _testing[s.id] == true;
     final conn = context.watch<SettingsProvider>().searchConnection[s.id];
@@ -447,8 +447,8 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
     }
     return _TactileRow(
       onTap: () {
-        // Open the full editor page so in-progress input cannot be dismissed
-        // by tapping outside a transient surface.
+        // 打开完整编辑器页面，避免正在输入的内容
+        // 因点击临时面板外部而被关闭。
         _editService(index);
       },
       pressedScale: 1.00,
@@ -601,7 +601,7 @@ class _BrandBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    // Use BrandAssets to get the icon path
+    // 使用 BrandAssets 获取图标路径
     final asset = BrandAssets.assetForName(name);
     final bg = cs.primary.withValues(alpha: isDark ? 0.18 : 0.1);
     if (asset != null) {
@@ -654,7 +654,7 @@ class _BrandBadge extends StatelessWidget {
   }
 }
 
-// --- iOS-style tactile + section helpers (local copy to avoid ripple) ---
+// --- iOS 风格触感组件和分区辅助函数（本地副本，避免 Material 涟漪） ---
 
 class _TactileIconButton extends StatefulWidget {
   const _TactileIconButton({
@@ -805,7 +805,7 @@ Widget _iosDivider(BuildContext context) {
   );
 }
 
-// Sheet helpers (align with settings page)
+// 面板辅助函数（与设置页保持一致）
 Widget _sheetOption(
   BuildContext context, {
   required String label,
@@ -910,4 +910,4 @@ class _SmallTactileIconState extends State<_SmallTactileIcon> {
   }
 }
 
-// (removed: now implemented as instance method on state)
+// （已移除：现在实现为 state 的实例方法）

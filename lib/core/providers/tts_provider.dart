@@ -34,11 +34,11 @@ String ttsAudioFileExtensionForMime(String? mime) {
   }
 }
 
-/// System and network TTS coordinator.
+/// 系统 TTS 和网络 TTS 协调器。
 ///
-/// Long text is split into smaller chunks. Network TTS chunks are prefetched
-/// while the current chunk is playing; system TTS chunks are sequenced through
-/// flutter_tts with progress callbacks.
+/// 长文本会拆分为较小的块。网络 TTS 块会在当前块播放时预先获取；
+/// 系统 TTS 块通过 flutter_tts
+/// 配合进度回调依次播放。
 class TtsProvider extends ChangeNotifier {
   static const String _rateKey = 'tts_speech_rate_v1';
   static const String _pitchKey = 'tts_pitch_v1';
@@ -74,8 +74,8 @@ class TtsProvider extends ChangeNotifier {
   String? _lastReplayContent;
   TtsServiceOptions? _lastReplayNetworkService;
 
-  // Settings
-  double _speechRate = 0.5; // flutter_tts platform value, 0.5 is normal.
+  // 设置
+  double _speechRate = 0.5; // flutter_tts 平台值，0.5 表示正常语速。
   double _pitch = 1.0;
   bool _cacheNetworkAudioForReplay = false;
   String? _engineId;
@@ -1102,7 +1102,7 @@ class TtsProvider extends ChangeNotifier {
         return null;
       }
 
-      // Compatibility for profiles not yet loaded by SettingsProvider.
+      // 兼容尚未由 SettingsProvider 加载的配置文件。
       final legacyIndex = preferences.getInt('tts_selected_v1') ?? -1;
       if (legacyIndex < 0 || legacyIndex >= list.length) return null;
       final obj = list[legacyIndex];

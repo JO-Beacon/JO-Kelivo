@@ -5,8 +5,8 @@ import '../shared/widgets/ios_tactile.dart';
 import '../core/services/haptics.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
-/// Simple anchored context menu for desktop.
-/// Shows a Material menu near the cursor or an anchor widget with a subtle animation.
+/// 桌面端简单的锚定上下文菜单。
+/// 在光标或锚点 widget 附近显示带细微动画的 Material 菜单。
 class DesktopContextMenuItem {
   final IconData? icon;
   final String? svgAsset;
@@ -23,7 +23,7 @@ class DesktopContextMenuItem {
   });
 }
 
-/// Show a context menu at the given global offset (e.g. from a right-click pointer position).
+/// 在给定全局偏移处显示上下文菜单（例如右键点击位置）。
 Future<void> showDesktopContextMenuAt(
   BuildContext context, {
   required Offset globalPosition,
@@ -43,9 +43,9 @@ Future<void> showDesktopContextMenuAt(
     maxMenuWidth,
   );
   final screen = overlayBox.size;
-  final double menuMaxHeight = screen.height * 0.5; // scroll if exceeds
+  final double menuMaxHeight = screen.height * 0.5; // 超出时滚动
   final double estMenuHeight = (items.length * 44.0).clamp(44.0, menuMaxHeight);
-  const double gap = 8; // offset from cursor
+  const double gap = 8; // 与光标之间的偏移
   final cs = Theme.of(context).colorScheme;
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final padding = MediaQuery.of(context).padding;
@@ -56,7 +56,7 @@ Future<void> showDesktopContextMenuAt(
 
   final local = overlayBox.globalToLocal(globalPosition);
   double x = (local.dx + gap).clamp(minX, maxX);
-  // Decide above/below based on available space
+  // 根据可用空间决定显示在上方还是下方
   final availableBelow = screen.height - padding.bottom - local.dy - 8;
   final availableAbove = local.dy - padding.top - 8;
   final placeAbove =
@@ -149,7 +149,7 @@ double _estimateMenuWidth(
   double minW,
   double maxW,
 ) {
-  // Base paddings: 12 left/right; icon 18 + spacing 10 if present
+  // 基础内边距：左右 12；图标 18，若有则再加间距 10
   double maxText = 0;
   final textStyle = TextStyle(
     fontSize: 14.5,
@@ -172,7 +172,7 @@ double _estimateMenuWidth(
   return maxText.clamp(minW, maxW);
 }
 
-/// Show a menu anchored to a widget key (appears above/below the widget depending on space).
+/// 显示锚定到 widget key 的菜单（根据空间决定显示在 widget 上方或下方）。
 Future<void> showDesktopAnchoredMenu(
   BuildContext context, {
   required GlobalKey anchorKey,
@@ -183,10 +183,10 @@ Future<void> showDesktopAnchoredMenu(
   if (rb == null) return;
   final topLeft = rb.localToGlobal(Offset.zero);
   final size = rb.size;
-  // Center the menu horizontally under the avatar (neutralize internal gap)
+  // 将菜单水平居中到头像下方（抵消内部间隙）
   const double minMenuWidth = 160;
   const double maxMenuWidth = 360;
-  const double gap = 8; // should match showDesktopContextMenuAt gap
+  const double gap = 8; // 应与 showDesktopContextMenuAt 的 gap 保持一致
   final double menuWidth = _estimateMenuWidth(
     context,
     items,
@@ -255,7 +255,9 @@ class _GlassMenuItemState extends State<_GlassMenuItem> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final fg = widget.danger ? Theme.of(context).colorScheme.error : cs.onSurface;
+    final fg = widget.danger
+        ? Theme.of(context).colorScheme.error
+        : cs.onSurface;
     final ic = widget.danger
         ? Theme.of(context).colorScheme.error
         : cs.onSurface.withValues(alpha: 0.9);

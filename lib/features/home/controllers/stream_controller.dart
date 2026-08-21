@@ -12,17 +12,17 @@ import 'streaming_content_notifier.dart';
 
 export 'streaming_content_notifier.dart';
 
-/// Controller for managing streaming message generation.
+/// 管理流式消息生成的控制器。
 ///
-/// This controller handles:
-/// - Stream chunk processing (content, reasoning, tool calls, tool results)
-/// - Stream throttling to reduce UI rebuild frequency
-/// - Reasoning state management (including segments)
-/// - Tool UI state management
-/// - Inline image sanitization during streaming
+/// 此控制器负责：
+/// - 流式分块处理（内容、推理、工具调用、工具结果）
+/// - 流式节流，降低 UI 重建频率
+/// - 推理状态管理（包括片段）
+/// - 工具 UI 状态管理
+/// - 流式处理期间的行内图片清理
 ///
-/// The controller is designed to work alongside ChatController and be used
-/// by the home page to handle streaming generation without cluttering the UI code.
+/// 此控制器设计为与 ChatController 配合使用，
+/// 供主页处理流式生成，而不会使 UI 代码杂乱。
 class StreamController {
   StreamController({
     required this._chatService,
@@ -34,114 +34,113 @@ class StreamController {
 
   final ChatService _chatService;
 
-  /// Callback when state changes (trigger setState in the widget).
-  /// NOTE: This should only be used for non-streaming state changes.
-  /// For streaming content updates, use streamingContentNotifier instead.
+  /// 状态变化时的回调（在控件中触发 setState）。
+  /// 注意：此回调只应用于非流式状态变化。
+  /// 流式内容更新请改用 streamingContentNotifier。
   final VoidCallback onStateChanged;
 
-  /// Optional callback fired during streaming updates (e.g., auto-scroll).
+  /// 流式更新期间触发的可选回调（例如自动滚动）。
   final VoidCallback? onStreamTick;
 
-  /// Lightweight notifier for streaming content updates.
-  /// This avoids triggering full page rebuilds during streaming.
+  /// 流式内容更新的轻量通知器。
+  /// 这样可避免在流式处理期间触发整页重建。
   final StreamingContentNotifier streamingContentNotifier =
       StreamingContentNotifier();
 
-  /// Set of message IDs currently being streamed.
-  /// Used to suppress onStateChanged calls during streaming.
+  /// 当前正在流式处理的消息 ID 集合。
+  /// 用于在流式处理期间抑制 onStateChanged 调用。
   final Set<String> _activeStreamingIds = <String>{};
 
-  /// Check if any message is currently streaming.
+  /// 检查当前是否有消息正在流式处理。
   bool get isAnyMessageStreaming => _activeStreamingIds.isNotEmpty;
 
-  /// Mark a message as actively streaming.
-  /// Also creates the StreamingContentNotifier for this message so that
-  /// MessageListView can detect it and use ValueListenableBuilder.
+  /// 将消息标记为正在流式处理。
+  /// 同时为此消息创建 StreamingContentNotifier，使 MessageListView
+  /// 能检测到它并使用 ValueListenableBuilder。
   void markStreamingStarted(String messageId) {
     _activeStreamingIds.add(messageId);
-    // Pre-create notifier so MessageListView can detect streaming state
+    // 预先创建通知器，使 MessageListView 能检测到流式状态
     streamingContentNotifier.getNotifier(messageId);
   }
 
-  /// Mark a message as no longer streaming.
+  /// 将消息标记为不再流式处理。
   void markStreamingEnded(String messageId) {
     _activeStreamingIds.remove(messageId);
   }
 
-  /// Call onStateChanged only if no messages are actively streaming.
-  /// During streaming, UI updates are handled by ValueListenableBuilder.
+  /// 仅当没有消息正在流式处理时调用 onStateChanged。
+  /// 流式处理期间的 UI 更新由 ValueListenableBuilder 处理。
   void _safeNotifyStateChanged() {
     if (_activeStreamingIds.isEmpty) {
       onStateChanged();
     }
   }
 
-  /// Get current settings provider (for auto-collapse setting, etc.).
+  /// 获取当前设置提供器（用于自动折叠设置等）。
   final SettingsProvider Function() getSettingsProvider;
 
-  /// Get current conversation ID (for checking if we should update UI).
+  /// 获取当前会话 ID（用于检查是否应更新 UI）。
   final String? Function() getCurrentConversationId;
 
   // ============================================================================
-  // State Maps
+  // 状态映射
   // ============================================================================
 
-  /// Reasoning data per assistant message.
+  /// 每条助手消息的推理数据。
   final Map<String, ReasoningData> _reasoning = <String, ReasoningData>{};
   Map<String, ReasoningData> get reasoning => _reasoning;
 
-  /// Reasoning segments per assistant message (for interleaved tool/thinking).
+  /// 每条助手消息的推理片段（用于工具/思考交错显示）。
   final Map<String, List<ReasoningSegmentData>> _reasoningSegments =
       <String, List<ReasoningSegmentData>>{};
   Map<String, List<ReasoningSegmentData>> get reasoningSegments =>
       _reasoningSegments;
 
-  /// Content/text split metadata per assistant message.
+  /// 每条助手消息的内容/文本拆分元数据。
   final Map<String, ContentSplitData> _contentSplits =
       <String, ContentSplitData>{};
   Map<String, ContentSplitData> get contentSplits => _contentSplits;
 
-  /// Tool UI parts per assistant message.
+  /// 每条助手消息的工具 UI 部分。
   final Map<String, List<ToolUIPart>> _toolParts = <String, List<ToolUIPart>>{};
   Map<String, List<ToolUIPart>> get toolParts => _toolParts;
 
-  /// Gemini thought signatures per assistant message.
+  /// 每条助手消息的 Gemini 思考签名。
   final Map<String, String> _geminiThoughtSigs = <String, String>{};
   Map<String, String> get geminiThoughtSigs => _geminiThoughtSigs;
 
-  /// Vendor reasoning details (OpenRouter-style `reasoning_details`, may carry
-  /// thinking signatures) per assistant message. Persisted inside the
-  /// reasoningSegmentsJson payload so they can be echoed back on later turns.
+  /// 每条助手消息的供应商推理详情（OpenRouter 风格的 `reasoning_details`，
+  /// 可能携带思考签名）。持久化在 reasoningSegmentsJson 负载中，
+  /// 以便在后续轮次中回传。
   final Map<String, dynamic> _reasoningDetails = <String, dynamic>{};
   Map<String, dynamic> get reasoningDetails => _reasoningDetails;
 
-  /// Decoded reasoningSegmentsJson payloads memoized per message so repeated
-  /// restores share a single JSON decode.
+  /// 按消息记忆化已解码的 reasoningSegmentsJson 负载，
+  /// 使重复恢复共享一次 JSON 解码。
   final Map<String, _DecodedReasoningPayload> _decodedReasoningPayloads =
       <String, _DecodedReasoningPayload>{};
 
-  /// Assistant message IDs whose persisted UI state has already been restored;
-  /// repeat restores (e.g. paging re-walks the whole window) skip them until
-  /// their state is cleared.
+  /// 已恢复持久化 UI 状态的助手消息 ID；重复恢复
+  /// （例如分页重新遍历整个窗口）会跳过它们，直到其状态被清除。
   final Set<String> _restoredUiMessageIds = <String>{};
 
   int _reasoningPayloadDecodeCount = 0;
 
-  /// Number of reasoningSegmentsJson payload decodes actually performed.
+  /// 实际执行的 reasoningSegmentsJson 负载解码次数。
   @visibleForTesting
   int get reasoningPayloadDecodeCount => _reasoningPayloadDecodeCount;
 
-  /// Store the latest reasoning details snapshot for a message.
+  /// 存储消息的最新推理详情快照。
   void setReasoningDetails(String messageId, dynamic details) {
     if (details == null) return;
     _reasoningDetails[messageId] = details;
   }
 
   // ============================================================================
-  // Throttle State
+  // 节流状态
   // ============================================================================
 
-  /// UI output interval for streaming content.
+  /// 流式内容的 UI 输出间隔。
   static const Duration _streamThrottleInterval = Duration(milliseconds: 50);
   static const int _streamSmoothMinCount = 2;
   static const int _streamSmoothBaseCount = 40;
@@ -149,50 +148,50 @@ class StreamController {
   static const double _streamSmoothPickRate = 0.1;
   static const int _streamSmoothMoveAverageLength = 10;
 
-  /// Throttle timers per message ID.
+  /// 按消息 ID 的节流计时器。
   final Map<String, Timer?> _streamThrottleTimers = <String, Timer?>{};
 
-  /// Per-message smooth output state.
+  /// 按消息的平滑输出状态。
   final Map<String, _StreamSmoothState> _streamSmoothStates =
       <String, _StreamSmoothState>{};
 
-  /// Delay before sanitizing inline base64 images.
+  /// 清理行内 base64 图片前的延迟。
   static const Duration _inlineImageSanitizeDelay = Duration(milliseconds: 120);
 
-  /// Timers for inline image sanitization per message.
+  /// 按消息的行内图片清理计时器。
   final Map<String, Timer?> _inlineImageSanitizeTimers = <String, Timer?>{};
 
-  /// Set of message IDs currently being sanitized.
+  /// 当前正在清理的消息 ID 集合。
   final Set<String> _inlineImageSanitizing = <String>{};
 
-  /// Regex to capture Gemini thought signature comments.
+  /// 用于捕获 Gemini 思考签名注释的正则表达式。
   static final RegExp _geminiThoughtSigRe = RegExp(
     r'<!--\s*gemini_thought_signatures:.*?-->',
     dotAll: true,
   );
 
   // ============================================================================
-  // Public Methods - State Access
+  // 公共方法 - 状态访问
   // ============================================================================
 
-  /// Get reasoning data for a message.
+  /// 获取消息的推理数据。
   ReasoningData? getReasoningData(String messageId) => _reasoning[messageId];
 
-  /// Set reasoning data for a message.
+  /// 设置消息的推理数据。
   void setReasoningData(String messageId, ReasoningData data) {
     _reasoning[messageId] = data;
   }
 
-  /// Remove reasoning data for a message.
+  /// 移除消息的推理数据。
   void removeReasoningData(String messageId) {
     _reasoning.remove(messageId);
   }
 
-  /// Get reasoning segments for a message.
+  /// 获取消息的推理片段。
   List<ReasoningSegmentData>? getReasoningSegments(String messageId) =>
       _reasoningSegments[messageId];
 
-  /// Set reasoning segments for a message.
+  /// 设置消息的推理片段。
   void setReasoningSegments(
     String messageId,
     List<ReasoningSegmentData> segments,
@@ -200,21 +199,21 @@ class StreamController {
     _reasoningSegments[messageId] = segments;
   }
 
-  /// Remove reasoning segments for a message.
+  /// 移除消息的推理片段。
   void removeReasoningSegments(String messageId) {
     _reasoningSegments.remove(messageId);
   }
 
-  /// Get content split metadata for a message.
+  /// 获取消息的内容拆分元数据。
   ContentSplitData? getContentSplitData(String messageId) =>
       _contentSplits[messageId];
 
-  /// Set content split metadata for a message.
+  /// 设置消息的内容拆分元数据。
   void setContentSplitData(String messageId, ContentSplitData data) {
     _contentSplits[messageId] = data;
   }
 
-  /// Remove content split metadata for a message.
+  /// 移除消息的内容拆分元数据。
   void removeContentSplitData(String messageId) {
     _contentSplits.remove(messageId);
   }
@@ -224,20 +223,20 @@ class StreamController {
 
   int getToolPartsCount(String messageId) => _toolParts[messageId]?.length ?? 0;
 
-  /// Get tool parts for a message.
+  /// 获取消息的工具部分。
   List<ToolUIPart>? getToolParts(String messageId) => _toolParts[messageId];
 
-  /// Set tool parts for a message.
+  /// 设置消息的工具部分。
   void setToolParts(String messageId, List<ToolUIPart> parts) {
     _toolParts[messageId] = parts;
   }
 
-  /// Remove tool parts for a message.
+  /// 移除消息的工具部分。
   void removeToolParts(String messageId) {
     _toolParts.remove(messageId);
   }
 
-  /// Clear all state for a message (reasoning, segments, tools).
+  /// 清除消息的所有状态（推理、片段、工具）。
   void clearMessageState(String messageId) {
     _reasoning.remove(messageId);
     _reasoningSegments.remove(messageId);
@@ -250,7 +249,7 @@ class StreamController {
     _cleanupStreamTimers(messageId);
   }
 
-  /// Clear all state maps (for new conversation).
+  /// 清除所有状态映射（用于新会话）。
   void clearAllState() {
     _reasoning.clear();
     _reasoningSegments.clear();
@@ -265,10 +264,10 @@ class StreamController {
   }
 
   // ============================================================================
-  // Gemini Thought Signature Handling
+  // Gemini 思考签名处理
   // ============================================================================
 
-  /// Capture and strip Gemini thought signature from content.
+  /// 从内容中捕获并剥离 Gemini 思考签名。
   String captureGeminiThoughtSignature(String content, String messageId) {
     if (content.isEmpty) return content;
     final m = _geminiThoughtSigRe.firstMatch(content);
@@ -285,7 +284,7 @@ class StreamController {
     return content;
   }
 
-  /// Append Gemini thought signature for API calls (when sending history).
+  /// 在发送历史时，为 API 调用追加 Gemini 思考签名。
   String appendGeminiThoughtSignatureForApi(
     ChatMessage message,
     String content,
@@ -301,16 +300,16 @@ class StreamController {
     return content;
   }
 
-  /// Clear Gemini thought signatures map.
+  /// 清除 Gemini 思考签名映射。
   void clearGeminiThoughtSigs() {
     _geminiThoughtSigs.clear();
   }
 
   // ============================================================================
-  // Reasoning Serialization
+  // 推理序列化
   // ============================================================================
 
-  /// Serialize reasoning segments to JSON string.
+  /// 将推理片段序列化为 JSON 字符串。
   String serializeReasoningSegments(List<ReasoningSegmentData> segments) {
     final list = segments
         .map(
@@ -372,13 +371,13 @@ class StreamController {
     });
   }
 
-  /// Extract persisted vendor reasoning details (if any) from a serialized
-  /// reasoningSegmentsJson payload.
+  /// 从序列化的 reasoningSegmentsJson 负载中提取
+  /// 已持久化的供应商推理详情（如有）。
   dynamic deserializeReasoningDetails(String? json) {
     return _DecodedReasoningPayload.decode(json).reasoningDetails;
   }
 
-  /// Deserialize reasoning segments from JSON string.
+  /// 从 JSON 字符串反序列化推理片段。
   List<ReasoningSegmentData> deserializeReasoningSegments(String? json) {
     return _DecodedReasoningPayload.decode(json).segments;
   }
@@ -399,16 +398,16 @@ class StreamController {
     );
   }
 
-  // Simple JSON encode/decode to avoid importing dart:convert in this file
+  // 简单 JSON 编解码，避免在此文件导入 dart:convert
   String _encodeJson(dynamic obj) {
     return _jsonEncode(obj);
   }
 
   // ============================================================================
-  // Tool Parts Deduplication
+  // 工具部分去重
   // ============================================================================
 
-  /// Deduplicate tool UI parts by id or by name+args when id is empty.
+  /// 按 id 去重工具 UI 部分；id 为空时按 name+args 去重。
   List<ToolUIPart> dedupeToolPartsList(List<ToolUIPart> parts) {
     final completedIds = <String>{
       for (final p in parts)
@@ -448,7 +447,7 @@ class StreamController {
     return out;
   }
 
-  /// Deduplicate raw persisted tool events.
+  /// 去重原始持久化工具事件。
   List<Map<String, dynamic>> dedupeToolEvents(
     List<Map<String, dynamic>> events,
   ) {
@@ -522,13 +521,13 @@ class StreamController {
   }
 
   // ============================================================================
-  // Stream Throttling
+  // 流式节流
   // ============================================================================
 
-  /// Schedule a throttled UI update for streaming content.
+  /// 为流式内容调度节流的 UI 更新。
   ///
-  /// This method uses StreamingContentNotifier to update only the streaming
-  /// message widget, avoiding full page rebuilds that cause lag.
+  /// 此方法使用 StreamingContentNotifier 只更新流式消息控件，
+  /// 避免导致卡顿的整页重建。
   void scheduleThrottledUpdate(
     String messageId,
     String conversationId,
@@ -561,7 +560,7 @@ class StreamController {
       ..durationMs = durationMs
       ..updateMessageInList = updateMessageInList;
 
-    // Ensure notifier exists for this message
+    // 确保此消息存在通知器
     streamingContentNotifier.getNotifier(messageId);
 
     _ensureStreamTimer(messageId);
@@ -674,7 +673,7 @@ class StreamController {
     return content;
   }
 
-  /// Get pending stream content for a message.
+  /// 获取消息的待处理流内容。
   String? getPendingStreamContent(String messageId) {
     final state = _streamSmoothStates[messageId];
     if (state == null) return null;
@@ -682,7 +681,7 @@ class StreamController {
     return state.targetContent;
   }
 
-  /// Set pending stream content (used by inline image sanitizer).
+  /// 设置待处理流内容（由行内图片清理器使用）。
   void setPendingStreamContent(String messageId, String content) {
     final state = _streamSmoothStates.putIfAbsent(
       messageId,
@@ -693,7 +692,7 @@ class StreamController {
       ..contentBuilder = () => content;
   }
 
-  /// Clean up stream throttle timers for a message.
+  /// 清理消息的流式节流计时器。
   void _cleanupStreamTimers(String messageId) {
     _flushPendingStreamUpdate(messageId);
     _streamThrottleTimers[messageId]?.cancel();
@@ -704,22 +703,22 @@ class StreamController {
     _inlineImageSanitizing.remove(messageId);
   }
 
-  /// Clean up timers for a message (public API).
+  /// 清理消息的计时器（公共 API）。
   void cleanupTimers(String messageId) {
     _cleanupStreamTimers(messageId);
   }
 
-  /// Remove the streaming content notifier for a message.
+  /// 移除消息的流式内容通知器。
   ///
-  /// This must be called AFTER onMessagesChanged to avoid a race where
-  /// the UI rebuilds without the notifier and falls back to stale
-  /// message.content (which may still be empty).
-  /// Idempotent: safe to call multiple times.
+  /// 必须在 onMessagesChanged 之后调用，以避免竞态：
+  /// UI 在没有通知器时重建，并回退到过期的
+  /// message.content（可能仍为空）。
+  /// 幂等操作：可安全调用多次。
   void removeStreamingNotifier(String messageId) {
     streamingContentNotifier.removeNotifier(messageId);
   }
 
-  /// Cancel all throttle timers.
+  /// 取消所有节流计时器。
   void _cancelAllTimers() {
     for (final timer in _streamThrottleTimers.values) {
       timer?.cancel();
@@ -734,10 +733,10 @@ class StreamController {
   }
 
   // ============================================================================
-  // Inline Image Sanitization
+  // 行内图片清理
   // ============================================================================
 
-  /// Schedule inline base64 image sanitization.
+  /// 调度行内 base64 图片清理。
   void scheduleInlineImageSanitize(
     String messageId, {
     String? latestContent,
@@ -745,7 +744,7 @@ class StreamController {
     required Future<void> Function(String messageId, String sanitizedContent)
     onSanitized,
   }) {
-    // Quick pre-check to avoid needless timers
+    // 快速预检查，避免不必要的计时器
     final snapshot = latestContent ?? '';
     if (snapshot.isEmpty ||
         !snapshot.contains('data:image') ||
@@ -753,7 +752,7 @@ class StreamController {
       return;
     }
 
-    // Debounce per message
+    // 按消息防抖
     _inlineImageSanitizeTimers[messageId]?.cancel();
     _inlineImageSanitizeTimers[messageId] = Timer(
       immediate ? Duration.zero : _inlineImageSanitizeDelay,
@@ -772,11 +771,11 @@ class StreamController {
               await MarkdownMediaSanitizer.replaceInlineBase64Images(current);
           if (sanitized == current) return;
 
-          // Keep throttled UI updates in sync.
+          // 保持节流的 UI 更新同步。
           setPendingStreamContent(messageId, sanitized);
           await onSanitized(messageId, sanitized);
         } catch (_) {
-          // Swallow errors to avoid crashing streaming UI
+          // 吞掉错误，避免流式 UI 崩溃
         } finally {
           _inlineImageSanitizing.remove(messageId);
           _inlineImageSanitizeTimers.remove(messageId);
@@ -786,10 +785,10 @@ class StreamController {
   }
 
   // ============================================================================
-  // Stream Chunk Processing
+  // 流式分块处理
   // ============================================================================
 
-  /// Process a reasoning chunk from stream.
+  /// 处理流中的推理分块。
   Future<void> handleReasoningChunk(
     ChatStreamChunk chunk,
     StreamingState state,
@@ -813,13 +812,13 @@ class StreamController {
       final r = _reasoning[messageId] ?? ReasoningData();
       r.text += chunk.reasoning!;
       r.startAt ??= DateTime.now();
-      // NOTE: Do not reset r.expanded here - preserve user's toggle state during streaming
+      // 注意：此处不要重置 r.expanded，以保留用户在流式处理期间的展开状态
       if (isNewReasoning) {
         r.expanded = initialExpanded;
       }
       _reasoning[messageId] = r;
 
-      // Add to reasoning segments for mixed display
+      // 加入推理片段以进行混合显示
       final segments =
           _reasoningSegments[messageId] ?? <ReasoningSegmentData>[];
       if (segments.isEmpty) {
@@ -867,7 +866,7 @@ class StreamController {
     }
   }
 
-  /// Process tool calls chunk from stream.
+  /// 处理流中的工具调用分块。
   Future<void> handleToolCallsChunk(
     ChatStreamChunk chunk,
     StreamingState state, {
@@ -894,7 +893,7 @@ class StreamController {
       ),
     );
 
-    // Finish any unfinished reasoning segment when tools start
+    // 工具开始时结束所有未完成的推理片段
     final segments = _reasoningSegments[messageId] ?? <ReasoningSegmentData>[];
     if (segments.isNotEmpty && segments.last.finishedAt == null) {
       segments.last.finishedAt = DateTime.now();
@@ -916,7 +915,7 @@ class StreamController {
       );
     }
 
-    // Add tool call placeholders
+    // 添加工具调用占位项
     final existing = List<ToolUIPart>.of(_toolParts[messageId] ?? const []);
     for (final c in chunk.toolCalls!) {
       existing.add(
@@ -930,7 +929,7 @@ class StreamController {
     }
     if (getCurrentConversationId() == conversationId) {
       _toolParts[messageId] = dedupeToolPartsList(existing);
-      // Notify via StreamingContentNotifier for real-time UI updates
+      // 通过 StreamingContentNotifier 通知实时 UI 更新
       streamingContentNotifier.notifyToolPartsUpdated(
         messageId,
         contentSplitOffsets: state.contentSplitOffsets,
@@ -939,7 +938,7 @@ class StreamController {
       );
     }
 
-    // Persist tool events
+    // 持久化工具事件
     try {
       final prev = getToolEventsFromDb(messageId);
       final newEvents = <Map<String, dynamic>>[
@@ -958,7 +957,7 @@ class StreamController {
     } catch (_) {}
   }
 
-  /// Process tool results chunk from stream.
+  /// 处理流中的工具结果分块。
   Future<void> handleToolResultsChunk(
     ChatStreamChunk chunk,
     StreamingState state, {
@@ -1023,7 +1022,7 @@ class StreamController {
     }
     if (getCurrentConversationId() == conversationId) {
       _toolParts[messageId] = dedupeToolPartsList(parts);
-      // Notify via StreamingContentNotifier for real-time UI updates
+      // 通过 StreamingContentNotifier 通知实时 UI 更新
       final splits = _contentSplits[messageId];
       streamingContentNotifier.notifyToolPartsUpdated(
         messageId,
@@ -1034,7 +1033,7 @@ class StreamController {
     }
   }
 
-  /// Finish reasoning segment when content starts arriving.
+  /// 当内容开始到达时结束推理片段。
   Future<void> finishReasoningOnContent(
     StreamingState state, {
     required Future<void> Function(
@@ -1086,9 +1085,9 @@ class StreamController {
     }
   }
 
-  // NOTE: transformAssistantContent is kept in home_page.dart because it uses AssistantRegexScope
+  // 注意：transformAssistantContent 保留在 home_page.dart，因为它使用 AssistantRegexScope
 
-  /// Finalize streaming and finish reasoning state.
+  /// 完成流式处理并结束推理状态。
   Future<void> finalizeReasoningState(
     String messageId, {
     required Future<void> Function(
@@ -1099,7 +1098,7 @@ class StreamController {
     })
     updateReasoningInDb,
   }) async {
-    // Finish reasoning data
+    // 完成推理数据
     final r = _reasoning[messageId];
     if (r != null) {
       r.finishedAt ??= DateTime.now();
@@ -1111,7 +1110,7 @@ class StreamController {
       _safeNotifyStateChanged();
     }
 
-    // Also finish any unfinished reasoning segments
+    // 同时结束所有未完成的推理片段
     final segments = _reasoningSegments[messageId];
     if (segments != null &&
         segments.isNotEmpty &&
@@ -1125,7 +1124,7 @@ class StreamController {
       _safeNotifyStateChanged();
     }
 
-    // Save reasoning segments to database
+    // 将推理片段保存到数据库
     if (segments != null && segments.isNotEmpty) {
       await updateReasoningInDb(
         messageId,
@@ -1139,31 +1138,31 @@ class StreamController {
     }
   }
 
-  /// Check if there are any loading tool parts for a message.
+  /// 检查消息是否有任何仍在加载的工具部分。
   bool hasLoadingTools(String messageId) {
     return _toolParts[messageId]?.any((p) => p.loading) ?? false;
   }
 
   // ============================================================================
-  // Unified Reasoning Completion
+  // 统一推理完成
   // ============================================================================
 
-  /// Finishes reasoning for a message if not already finished.
+  /// 如果尚未完成，则完成消息的推理。
   ///
-  /// This is the unified method to handle reasoning completion logic that was
-  /// previously duplicated across multiple places in home_page.dart:
-  /// - _cancelStreaming (line 597-617)
-  /// - _finishReasoningOnContent (line 3738-3770)
-  /// - _finishStreaming (line 3886-3917)
-  /// - _handleStreamError (line 3954-3970)
+  /// 这是处理推理完成逻辑的统一方法，此前该逻辑重复出现在
+  /// home_page.dart 的多个位置：
+  /// - _cancelStreaming（597-617 行）
+  /// - _finishReasoningOnContent（3738-3770 行）
+  /// - _finishStreaming（3886-3917 行）
+  /// - _handleStreamError（3954-3970 行）
   ///
-  /// Returns true if any state was actually changed.
+  /// 如果确实改变了任何状态，返回 true。
   bool finishReasoningIfNeeded(String messageId, {bool forceCollapse = false}) {
     bool changed = false;
     final autoCollapse =
         forceCollapse || getSettingsProvider().autoCollapseThinking;
 
-    // Finish main reasoning data (only when it first finishes, not on subsequent calls)
+    // 完成主推理数据（仅在首次完成时执行，后续调用不执行）
     final r = _reasoning[messageId];
     if (r != null && r.finishedAt == null) {
       r.finishedAt = DateTime.now();
@@ -1173,11 +1172,10 @@ class StreamController {
       _reasoning[messageId] = r;
       changed = true;
     }
-    // NOTE: Removed the "else if" branch that would force collapse on every call.
-    // This allows users to expand reasoning during content streaming without it
-    // being immediately collapsed again.
+    // 注意：移除了会在每次调用时强制折叠的“else if”分支。
+    // 这样用户在内容流式处理期间展开推理后，不会被立即再次折叠。
 
-    // Finish last reasoning segment (only when it first finishes)
+    // 完成最后一个推理片段（仅在首次完成时执行）
     final segments = _reasoningSegments[messageId];
     if (segments != null && segments.isNotEmpty) {
       final lastSegment = segments.last;
@@ -1189,7 +1187,7 @@ class StreamController {
         _reasoningSegments[messageId] = segments;
         changed = true;
       }
-      // NOTE: Removed the "else if" branch that would force collapse on every call.
+      // 注意：移除了会在每次调用时强制折叠的“else if”分支。
     }
 
     if (changed) {
@@ -1198,10 +1196,10 @@ class StreamController {
     return changed;
   }
 
-  /// Finishes reasoning and persists to database.
+  /// 完成推理并持久化到数据库。
   ///
-  /// This is a convenience method that combines finishing reasoning state
-  /// and persisting it to the database in one call.
+  /// 这是一个便捷方法，将完成推理状态和持久化到数据库
+  /// 合并为一次调用。
   Future<void> finishReasoningAndPersist(
     String messageId, {
     bool forceCollapse = false,
@@ -1222,7 +1220,7 @@ class StreamController {
         _reasoningSegments[messageId] ?? const <ReasoningSegmentData>[];
     if (!changed && splits == null) return;
 
-    // Persist reasoning data
+    // 持久化推理数据
     final r = _reasoning[messageId];
     if (r != null) {
       await updateReasoningInDb(
@@ -1232,7 +1230,7 @@ class StreamController {
       );
     }
 
-    // Persist reasoning segments
+    // 持久化推理片段
     if (segments.isNotEmpty || splits != null) {
       await updateReasoningInDb(
         messageId,
@@ -1247,14 +1245,13 @@ class StreamController {
   }
 
   // ============================================================================
-  // Restoration from Database
+  // 从数据库恢复
   // ============================================================================
 
-  /// Restore UI state for a message from its persisted data.
+  /// 从消息的持久化数据恢复其 UI 状态。
   ///
-  /// Runs only on the first restore per message (until its state is cleared),
-  /// so paging passes that re-walk the whole window only process messages that
-  /// newly entered it.
+  /// 每条消息只在首次恢复时运行（直到其状态被清除），
+  /// 因此重新遍历整个窗口的分页过程只会处理新进入窗口的消息。
   void restoreMessageUiState(
     ChatMessage message, {
     required List<Map<String, dynamic>> Function(String messageId)
@@ -1266,13 +1263,13 @@ class StreamController {
 
     final messageId = message.id;
 
-    // Restore Gemini thought signature
+    // 恢复 Gemini 思考签名
     final storedSig = getGeminiThoughtSigFromDb(messageId);
     if (storedSig != null && storedSig.isNotEmpty) {
       _geminiThoughtSigs[messageId] = storedSig;
     }
 
-    // Restore reasoning state
+    // 恢复推理状态
     final txt = message.reasoningText ?? '';
     if (txt.isNotEmpty ||
         message.reasoningStartAt != null ||
@@ -1280,15 +1277,15 @@ class StreamController {
       final rd = ReasoningData();
       rd.text = txt;
       rd.startAt = message.reasoningStartAt;
-      // If finishedAt is null but startAt exists, the stream was interrupted
-      // (e.g. app force-quit mid-reasoning); treat reasoning as finished to
-      // avoid an infinite timer.
+      // 如果 finishedAt 为 null 但 startAt 存在，说明流被中断
+      // （例如应用在推理中强制退出）；将推理视为已完成，
+      // 避免无限计时器。
       rd.finishedAt = message.reasoningFinishedAt ?? message.reasoningStartAt;
       rd.expanded = false;
       _reasoning[messageId] = rd;
     }
 
-    // Restore tool events
+    // 恢复工具事件
     try {
       final events = dedupeToolEvents(getToolEventsFromDb(messageId));
       if (events.isNotEmpty) {
@@ -1310,14 +1307,13 @@ class StreamController {
       }
     } catch (_) {}
 
-    // Restore reasoning segments (single JSON decode shared by all views)
+    // 恢复推理片段（所有视图共享一次 JSON 解码）
     final payload = _decodedReasoningPayloadFor(
       messageId,
       message.reasoningSegmentsJson,
     );
     if (payload.segments.isNotEmpty) {
-      // Copy: stream handlers mutate the stored list in place, which must not
-      // leak back into the memoized payload.
+      // 复制：流处理器会原地修改存储列表，这不能泄漏回记忆化负载。
       _reasoningSegments[messageId] = List<ReasoningSegmentData>.of(
         payload.segments,
       );
@@ -1327,7 +1323,7 @@ class StreamController {
       _contentSplits[messageId] = contentSplits;
     }
 
-    // Restore vendor reasoning details (thinking signatures) for API replays
+    // 为 API 重放恢复供应商推理详情（思考签名）
     final details = payload.reasoningDetails;
     if (details != null) {
       _reasoningDetails[messageId] = details;
@@ -1347,10 +1343,10 @@ class StreamController {
   }
 
   // ============================================================================
-  // Disposal
+  // 释放
   // ============================================================================
 
-  /// Dispose of all resources.
+  /// 释放所有资源。
   void dispose() {
     _cancelAllTimers();
     streamingContentNotifier.dispose();
@@ -1358,10 +1354,10 @@ class StreamController {
 }
 
 // ============================================================================
-// Data Classes
+// 数据类
 // ============================================================================
 
-/// Context object for message generation.
+/// 消息生成的上下文对象。
 class GenerationContext {
   GenerationContext({
     required this.assistantMessage,
@@ -1406,7 +1402,7 @@ class GenerationContext {
   final String? generationRunId;
 }
 
-/// State object for streaming message generation.
+/// 流式消息生成的状态对象。
 class StreamingState {
   StreamingState(this.ctx) : fullContentRaw = ctx.assistantMessage.content;
 
@@ -1432,7 +1428,7 @@ class StreamingState {
   String get conversationId => ctx.assistantMessage.conversationId;
 }
 
-/// Reasoning data for an assistant message.
+/// 助手消息的推理数据。
 class ReasoningData {
   String text = '';
   DateTime? startAt;
@@ -1440,7 +1436,7 @@ class ReasoningData {
   bool expanded = false;
 }
 
-/// Reasoning segment data (for interleaved thinking/tool display).
+/// 推理片段数据（用于思考/工具交错显示）。
 class ReasoningSegmentData {
   String text = '';
   DateTime? startAt;
@@ -1461,8 +1457,8 @@ class ContentSplitData {
   final List<int> toolCounts;
 }
 
-/// All views over a persisted reasoningSegmentsJson payload, produced by a
-/// single JSON decode.
+/// 对持久化 reasoningSegmentsJson 负载的所有视图，
+/// 由一次 JSON 解码生成。
 class _DecodedReasoningPayload {
   const _DecodedReasoningPayload._(
     this.source,
@@ -1521,8 +1517,8 @@ class _DecodedReasoningPayload {
       final parsedFinished = item['finishedAt'] != null
           ? DateTime.parse(item['finishedAt'])
           : null;
-      // If finishedAt is null but startAt exists, the stream was interrupted;
-      // treat segment as finished to avoid an infinite timer on restore.
+      // 如果 finishedAt 为 null 但 startAt 存在，说明流被中断；
+      // 将片段视为已完成，避免恢复时出现无限计时器。
       s.finishedAt = parsedFinished ?? s.startAt;
       s.expanded = item['expanded'] ?? false;
       s.toolStartIndex = (item['toolStartIndex'] as int?) ?? 0;
@@ -1660,12 +1656,12 @@ class _StreamSmoothState {
 }
 
 // ============================================================================
-// JSON Helpers (to avoid circular imports)
+// JSON 辅助函数（避免循环导入）
 // ============================================================================
 
 String _jsonEncode(dynamic obj) {
-  // Simple implementation without importing dart:convert here
-  // The actual import is at the top level
+  // 此处不导入 dart:convert 的简单实现
+  // 实际导入位于文件顶部
   return _JsonEncoder.encode(obj);
 }
 
@@ -1723,7 +1719,7 @@ class _JsonDecoder {
   }
 
   static _ParseResult _parseObject(String json, _Position pos) {
-    pos.index++; // skip {
+    pos.index++; // 跳过 {
     final map = <String, dynamic>{};
     _skipWhitespace(json, pos);
     while (pos.index < json.length && json[pos.index] != '}') {
@@ -1738,12 +1734,12 @@ class _JsonDecoder {
       _skipWhitespace(json, pos);
       if (json[pos.index] == ',') pos.index++;
     }
-    if (pos.index < json.length) pos.index++; // skip }
+    if (pos.index < json.length) pos.index++; // 跳过 }
     return _ParseResult(map, pos.index);
   }
 
   static _ParseResult _parseArray(String json, _Position pos) {
-    pos.index++; // skip [
+    pos.index++; // 跳过 [
     final list = <dynamic>[];
     _skipWhitespace(json, pos);
     while (pos.index < json.length && json[pos.index] != ']') {
@@ -1752,12 +1748,12 @@ class _JsonDecoder {
       _skipWhitespace(json, pos);
       if (json[pos.index] == ',') pos.index++;
     }
-    if (pos.index < json.length) pos.index++; // skip ]
+    if (pos.index < json.length) pos.index++; // 跳过 ]
     return _ParseResult(list, pos.index);
   }
 
   static _ParseResult _parseString(String json, _Position pos) {
-    pos.index++; // skip opening "
+    pos.index++; // 跳过开头的 "
     final buffer = StringBuffer();
     while (pos.index < json.length) {
       final c = json[pos.index];

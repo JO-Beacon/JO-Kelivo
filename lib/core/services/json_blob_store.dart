@@ -2,19 +2,18 @@ import 'dart:convert';
 
 import '../database/business_preferences.dart';
 
-/// Base class for stores that persist a whole list as one JSON blob.
+/// 用于将整个列表作为一个 JSON blob 持久化的存储基类。
 ///
-/// Mutations run through a per-instance serialized queue so concurrent
-/// read-modify-write cycles cannot drop each other's records. A blob that
-/// fails to decode throws instead of reading as empty, so a truncated
-/// snapshot is never persisted over the surviving rows.
+/// 变更操作通过每个实例的串行队列执行，因此并发的读-改-写循环不会相互丢失记录。
+/// 解码失败的 blob 会抛出异常，而不是读取为空，因此截断的快照
+/// 永远不会覆盖仍存在的行而被持久化。
 abstract class JsonBlobStore<T> {
   JsonBlobStore(this._preferences);
 
   final BusinessPreferences _preferences;
   Future<void> _writeTail = Future<void>.value();
 
-  /// Exposed for subclasses that manage additional keys beyond the blob.
+  /// 暴露给除 blob 之外还需管理其他键的子类。
   BusinessPreferences get preferences => _preferences;
 
   String get storageKey;
@@ -23,7 +22,7 @@ abstract class JsonBlobStore<T> {
 
   Map<String, dynamic> encodeItem(T item);
 
-  /// Reads the whole blob. Throws [StateError] when decoding fails.
+  /// 读取整个 blob。解码失败时抛出 [StateError]。
   Future<List<T>> readAll() async {
     await _preferences.load();
     final raw = _preferences.getString(storageKey);
@@ -43,8 +42,8 @@ abstract class JsonBlobStore<T> {
     }
   }
 
-  /// Persists a complete list. Callers must pass their full intended
-  /// snapshot; partial reads must go through [readAll] first.
+  /// 持久化完整列表。调用方必须传入其完整的预期快照；
+  /// 部分读取必须先通过 [readAll] 完成。
   Future<void> writeAll(List<T> items) {
     return _preferences.setString(
       storageKey,
@@ -52,7 +51,7 @@ abstract class JsonBlobStore<T> {
     );
   }
 
-  /// Runs [operation] after all previously accepted operations drained.
+  /// 在所有先前接受的操作处理完后运行 [operation]。
   Future<R> runExclusive<R>(Future<R> Function() operation) {
     final result = _writeTail.then((_) => operation());
     _writeTail = result.then<void>(

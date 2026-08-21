@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-/// Shared parser for per-model override payloads (headers/body/api model mapping).
+/// 用于逐模型覆盖载荷（headers/body/api model mapping）的共享解析器。
 class ModelOverridePayloadParser {
   static Map<String, dynamic> modelOverride(
     Map<String, dynamic> modelOverrides,

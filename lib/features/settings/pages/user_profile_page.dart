@@ -15,7 +15,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/platform_utils.dart';
 import '../widgets/memory_ui.dart';
 
-/// Structured user profile fields (§14.4 / §5.7).
+/// 结构化用户资料字段（§14.4 / §5.7）。
 class UserProfilePage extends StatelessWidget {
   const UserProfilePage({super.key});
 

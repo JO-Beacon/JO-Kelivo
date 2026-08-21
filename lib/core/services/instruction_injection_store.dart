@@ -48,9 +48,8 @@ class InstructionInjectionStore extends JsonBlobStore<InstructionInjection> {
     };
   }
 
-  /// Reads may seed the default item, so they join the serialized queue
-  /// alongside writes. A blob that fails to decode throws [StateError]
-  /// instead of seeding over the surviving rows.
+  /// 读取操作可能填充默认项，因此它们与写入操作一起进入串行队列。
+  /// 解码失败的 blob 会抛出 [StateError]，而不是在仍存在的行之上继续填充。
   Future<List<InstructionInjection>> getAll() {
     return runExclusive(_getAllDirect);
   }

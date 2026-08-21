@@ -26,16 +26,16 @@ abstract interface class AsrWebSocketConnection {
 }
 
 abstract interface class CloudAsrSession {
-  /// Emits the complete transcript-so-far whenever the provider revises it.
+  /// 每当提供方修订结果时，发出到目前为止的完整转写文本。
   Stream<String> get partialTranscripts;
 
-  /// Adds raw little-endian PCM16 mono audio in the configured sample rate.
+  /// 以配置的采样率添加原始小端序 PCM16 单声道音频。
   Future<void> addPcm16(Uint8List chunk);
 
-  /// Commits buffered audio and resolves with the final transcript.
+  /// 提交缓冲的音频，并以最终转写文本作为结果完成解析。
   Future<String> finish();
 
-  /// Stops network work and releases session resources without committing.
+  /// 停止网络工作并释放会话资源，而不进行提交。
   Future<void> cancel();
 }
 
@@ -510,7 +510,7 @@ class _VolcengineAsrSession implements CloudAsrSession {
     try {
       await _socket.close(code, reason);
     } catch (_) {
-      // The session is already terminal; close failures cannot be recovered.
+      // 会话已处于终止状态；关闭失败无法恢复。
     }
     if (!_partialController.isClosed) await _partialController.close();
   }
@@ -800,7 +800,7 @@ class _RealtimeAsrSession implements CloudAsrSession {
     try {
       await _socket.close(code, reason);
     } catch (_) {
-      // The session is already terminal; close failures cannot be recovered.
+      // 会话已处于终止状态；关闭失败无法恢复。
     }
     if (!_partialController.isClosed) await _partialController.close();
   }
@@ -1191,8 +1191,8 @@ class _StepAsrSession implements CloudAsrSession {
   }
 }
 
-/// Qwen Audio 3.0 ASR via `/api-ws/v1/inference`:
-/// run-task → binary PCM → result-generated → finish-task.
+/// 通过 `/api-ws/v1/inference` 使用 Qwen Audio 3.0 ASR：
+/// run-task → binary PCM → result-generated → finish-task。
 class _QwenAudioAsrSession implements CloudAsrSession {
   _QwenAudioAsrSession({
     required this._options,
@@ -1241,9 +1241,11 @@ class _QwenAudioAsrSession implements CloudAsrSession {
   final Completer<void> _started = Completer<void>();
   Completer<String>? _finishCompleter;
   Future<String>? _finishFuture;
-  /// Finalized sentences accumulated across `result-generated` events.
+
+  /// 已最终化句子的数据来自 `result-generated` 事件。
   var _finalizedTranscript = '';
-  /// Full transcript shown to callers: finalized + current partial sentence.
+
+  /// 已最终化，并包含当前部分句子。
   var _transcript = '';
   var _cleanedUp = false;
   var _cancelled = false;
@@ -1296,7 +1298,9 @@ class _QwenAudioAsrSession implements CloudAsrSession {
   @override
   Future<void> cancel() async {
     _cancelled = true;
-    _terminalError ??= const AsrException('Qwen Audio ASR session was cancelled');
+    _terminalError ??= const AsrException(
+      'Qwen Audio ASR session was cancelled',
+    );
     final completer = _finishCompleter;
     if (completer != null && !completer.isCompleted) {
       completer.completeError(_terminalError!);
@@ -1325,8 +1329,8 @@ class _QwenAudioAsrSession implements CloudAsrSession {
           (output['sentence'] as Map?)?.cast<String, dynamic>() ?? {};
       final text = (sentence['text'] ?? '').toString();
       if (text.isEmpty) return;
-      // Official Fun-ASR / Qwen Audio protocol returns the *current* sentence
-      // only. Accumulate finalized sentences, then append the active partial.
+      // 官方 Fun-ASR / Qwen Audio 协议仅返回*当前*句子。
+      // 先累积已定稿的句子，再追加当前活动部分。
       if (_isQwenAudioSentenceEnd(sentence)) {
         _finalizedTranscript = combineQwenAudioTranscript(
           _finalizedTranscript,
@@ -1395,7 +1399,7 @@ class _QwenAudioAsrSession implements CloudAsrSession {
   }
 }
 
-/// Mirrors DashScope `RecognitionResult.is_sentence_end`.
+/// 镜像 DashScope `RecognitionResult.is_sentence_end`。
 bool _isQwenAudioSentenceEnd(Map<String, dynamic> sentence) {
   final flag = sentence['sentence_end'];
   if (flag is bool) return flag;
@@ -1407,11 +1411,10 @@ bool _isQwenAudioSentenceEnd(Map<String, dynamic> sentence) {
   return false;
 }
 
-/// Joins Qwen Audio finalized/partial segments.
+/// 拼接 Qwen Audio 的已定稿/部分片段。
 ///
-/// Inserts a space for Latin text boundaries (including when the previous
-/// segment ends with Latin punctuation) while leaving CJK sentence joins
-/// unspaced.
+/// 在拉丁文本边界处插入空格（包括前一段以拉丁标点结尾的情况），
+/// 同时保持 CJK 句子连接不加空格。
 @visibleForTesting
 String combineQwenAudioTranscript(String prefix, String next) {
   if (prefix.isEmpty) return next;
@@ -1761,7 +1764,7 @@ String _responseError(String body) {
       }
     }
   } catch (_) {
-    // Do not include arbitrary response bodies in errors; they may echo secrets.
+    // 不要在错误中包含任意响应体；它们可能回显机密信息。
   }
   return '';
 }

@@ -53,9 +53,9 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
   McpTransportType _transport = McpTransportType.http;
   final _urlCtrl = TextEditingController();
   final List<_HeaderEntry> _headers = [];
-  // STDIO fields (desktop only)
+  // STDIO 字段（仅桌面端）
   final _cmdCtrl = TextEditingController();
-  final _argsCtrl = TextEditingController(); // space-separated args
+  final _argsCtrl = TextEditingController(); // 空格分隔的参数
   final _cwdCtrl = TextEditingController();
   final List<_HeaderEntry> _env = [];
 
@@ -112,7 +112,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
   Future<void> _save() async {
     final l10n = AppLocalizations.of(context)!;
     final mcp = context.read<McpProvider>();
-    // Built-in server: only allow toggling enabled, no other changes
+    // 内置服务器：只允许切换启用状态，不允许其他修改
     if (isEdit && _transport == McpTransportType.inmemory) {
       final old = mcp.getById(widget.serverId!)!;
       await mcp.updateServerMetadata(old.copyWith(enabled: _enabled));
@@ -290,7 +290,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
           ),
         ),
         const SizedBox(height: 10),
-        // Name row: read-only text for builtin, editable for others
+        // 名称行：内置服务器为只读文本，其他可编辑
         if (isBuiltin) ...[
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 6),
@@ -461,7 +461,9 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
                           states,
                         ) {
                           if (states.contains(WidgetState.hovered)) {
-                            return cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05);
+                            return cs.onSurface.withValues(
+                              alpha: isDark ? 0.06 : 0.05,
+                            );
                           }
                           return Colors.transparent;
                         }),
@@ -541,7 +543,9 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
                           states,
                         ) {
                           if (states.contains(WidgetState.hovered)) {
-                            return cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05);
+                            return cs.onSurface.withValues(
+                              alpha: isDark ? 0.06 : 0.05,
+                            );
                           }
                           return Colors.transparent;
                         }),
@@ -657,7 +661,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
                     ),
                   ],
                 ),
-                // Approval toggle — compact row inside the card
+                // 审批开关，卡片内的紧凑行
                 if (tool.enabled) ...[
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
@@ -708,8 +712,8 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
 
   List<String> _parseArgs(String text) {
     if (text.isEmpty) return const <String>[];
-    // Simple whitespace split; users can provide quoted args as a single token for now.
-    // For advanced quoting, consider a shell-like parser later.
+    // 暂时使用简单的空白分割；用户可以把带引号参数作为单个 token 提供。
+    // 后续如需高级引号处理，可考虑类似 shell 的解析器。
     return text.split(RegExp(r"\s+")).where((e) => e.isNotEmpty).toList();
   }
 

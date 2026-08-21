@@ -1,13 +1,13 @@
 import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart'
-    show Theme; // for Material color scheme primary
+    show Theme; // 用于 Material color scheme primary
 import '../../core/services/haptics.dart';
 import 'package:provider/provider.dart';
 import '../../core/providers/settings_provider.dart';
 
-/// A refined, iOS‑inspired switch with subtle animations
-/// tailored to the app's visual style.
+/// 经过打磨、符合本应用视觉风格的 iOS 风格开关，
+/// 带有细微动画。
 class IosSwitch extends StatefulWidget {
   const IosSwitch({
     super.key,
@@ -29,22 +29,22 @@ class IosSwitch extends StatefulWidget {
   final bool value;
   final ValueChanged<bool>? onChanged;
 
-  // Sizing
+  // 尺寸
   final double width;
   final double height;
-  final double hitTestSize; // Minimum tap target extent for both width/height
+  final double hitTestSize; // 宽/高的最小点击目标尺寸
 
-  // Colors
-  final Color? activeColor; // track when ON
-  final Color? inactiveColor; // track when OFF
-  final Color? thumbColor; // thumb fill
-  final Color? shadowColor; // thumb shadow
+  // 颜色
+  final Color? activeColor; // ON 时的轨道颜色
+  final Color? inactiveColor; // OFF 时的轨道颜色
+  final Color? thumbColor; // 滑块填充
+  final Color? shadowColor; // 滑块阴影
 
-  // UX
+  // 交互体验
   final bool enableHaptics;
   final String? semanticLabel;
 
-  // Animation
+  // 动画
   final Duration animationDuration;
   final Curve animationCurve;
 
@@ -59,29 +59,29 @@ class _IosSwitchState extends State<IosSwitch> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    // Prefer Material color scheme primary to better match app theme; fall back to Cupertino default
+    // 优先使用 Material 配色方案的主色以更好地匹配应用主题；否则回退到 Cupertino 默认值。
     final primary = widget.activeColor ?? cs.primary;
 
     final bool isDark = theme.brightness == Brightness.dark;
     final bool isOn = widget.value;
 
-    // Track color when OFF; dark mode uses a deeper fill.
-    // Matches the original Cupertino look (light: black @ ~0.08,
-    // dark: systemGrey6 #1C1C1E) derived from the active scheme.
-    final Color offTrack = widget.inactiveColor ??
+    // 关闭状态下的轨道颜色；深色模式使用更深的填充。
+    // 根据当前 scheme 派生，以匹配原始 Cupertino 外观
+    // （浅色：black @ ~0.08，深色：systemGrey6 #1C1C1E）。
+    final Color offTrack =
+        widget.inactiveColor ??
         (isDark
-            ? Color.alphaBlend(
-                cs.onSurface.withValues(alpha: 0.02), cs.surface)
+            ? Color.alphaBlend(cs.onSurface.withValues(alpha: 0.02), cs.surface)
             : cs.onSurface.withValues(alpha: 0.08));
 
     final bool enabled = widget.onChanged != null;
     final double radius = widget.height / 2;
-    final double thumbSize = widget.height - 6; // visual margin
+    final double thumbSize = widget.height - 6; // 视觉边距
     final double tapW = math.max(widget.width, widget.hitTestSize);
     final double tapH = math.max(widget.height, widget.hitTestSize);
     final double pressScale = _pressed && enabled ? 0.98 : 1.0;
 
-    // Minimal solid active track, no glow/shadow
+    // 简洁的实心启用轨道，无光晕或阴影
     final Decoration onDecoration = BoxDecoration(
       borderRadius: BorderRadius.circular(radius),
       color: primary,
@@ -91,8 +91,8 @@ class _IosSwitchState extends State<IosSwitch> {
       color: offTrack,
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(
-        // systemGrey3/4 @ 0.65/0.35 in the original design; outlineVariant is
-        // pure black/white in some palettes, so derive from onSurface instead.
+        // 原始设计中为 systemGrey3/4 @ 0.65/0.35；部分调色板中的 outlineVariant
+        // 是纯黑或纯白，因此改为从 onSurface 派生。
         color: cs.onSurface.withValues(
           alpha: (isDark ? 0.24 : 0.20) * (enabled ? 0.65 : 0.35),
         ),
@@ -100,17 +100,22 @@ class _IosSwitchState extends State<IosSwitch> {
       ),
     );
 
-    // Thumb color (matches the original Cupertino greys):
-    // - Dark + OFF: medium grey (#636366)
-    // - Dark + ON: deep grey (#1C1C1E)
-    // - Light: white thumb
-    final Color thumb = widget.thumbColor ??
+    // 滑块颜色（匹配原始 Cupertino 灰色）：
+    // - 深色 + 关闭：中灰（#636366）
+    // - 深色 + 开启：深灰（#1C1C1E）
+    // - 浅色：白色滑块
+    final Color thumb =
+        widget.thumbColor ??
         (isDark
             ? (isOn
-                ? Color.alphaBlend(
-                    cs.onSurface.withValues(alpha: 0.02), cs.surface)
-                : Color.alphaBlend(
-                    cs.onSurface.withValues(alpha: 0.36), cs.surface))
+                  ? Color.alphaBlend(
+                      cs.onSurface.withValues(alpha: 0.02),
+                      cs.surface,
+                    )
+                  : Color.alphaBlend(
+                      cs.onSurface.withValues(alpha: 0.36),
+                      cs.surface,
+                    ))
             : cs.surfaceContainerLowest);
 
     return Semantics(
@@ -142,7 +147,7 @@ class _IosSwitchState extends State<IosSwitch> {
                 decoration: widget.value ? onDecoration : offDecoration,
                 child: Stack(
                   children: [
-                    // Thumb
+                    // 滑块
                     AnimatedAlign(
                       duration: widget.animationDuration,
                       curve: widget.animationCurve,
@@ -165,8 +170,8 @@ class _IosSwitchState extends State<IosSwitch> {
   }
 
   void _handleTap() {
-    // Only vibrate if both widget-level and settings-level toggles allow,
-    // global master switch is enforced within Haptics.* methods.
+    // 仅在 widget 级和设置级开关都允许时才振动；
+    // 全局总开关在 Haptics.* 方法内部执行。
     final sp = context.read<SettingsProvider>();
     if (widget.enableHaptics && sp.hapticsIosSwitch) Haptics.soft();
     widget.onChanged?.call(!widget.value);

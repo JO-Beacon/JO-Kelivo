@@ -11,10 +11,9 @@ import '../../../core/services/haptics.dart';
 import '../../../features/instruction_injection/pages/instruction_injection_page.dart';
 import '../../../theme/app_font_weights.dart';
 
-/// Bottom sheet for displaying instruction injection items on mobile/tablet.
+/// 用于在移动端/平板展示指令注入项的底部面板。
 ///
-/// This widget shows a list of instruction injection prompts that can be
-/// toggled on/off for the current assistant.
+/// 此组件展示可针对当前助手开启/关闭的指令注入提示词列表。
 class InstructionInjectionSheet extends StatelessWidget {
   const InstructionInjectionSheet({super.key, required this.assistantId});
 
@@ -288,7 +287,7 @@ class _GroupHeader extends StatelessWidget {
               height: 20,
               child: Center(
                 child: AnimatedRotation(
-                  turns: collapsed ? 0.0 : 0.25, // right -> down
+                  turns: collapsed ? 0.0 : 0.25, // 右箭头变为向下
                   duration: const Duration(milliseconds: 260),
                   curve: Curves.easeOutCubic,
                   child: Icon(
@@ -373,9 +372,9 @@ class _InstructionInjectionRow extends StatelessWidget {
   }
 }
 
-/// Shows the instruction injection bottom sheet.
+/// 显示指令注入底部面板。
 ///
-/// This is a convenience function to show the sheet with proper styling.
+/// 这是用于以合适样式展示面板的便捷函数。
 Future<void> showInstructionInjectionSheet(
   BuildContext context, {
   required String? assistantId,

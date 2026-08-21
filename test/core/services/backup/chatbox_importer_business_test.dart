@@ -68,10 +68,7 @@ Map<String, dynamic> _chatboxFixture() => {
         'timestamp': 1784332800000,
         'contentParts': [
           {'type': 'text', 'text': 'Hello'},
-          {
-            'type': 'image',
-            'url': 'https://example.com/pic.png',
-          },
+          {'type': 'image', 'url': 'https://example.com/pic.png'},
         ],
         'files': [
           {
@@ -157,6 +154,53 @@ void main() {
         expect(prefs.getString('assistant_tags_v1'), isNull);
       },
     );
+
+    test('imports Chatbox message forks as active-tree branches', () async {
+      final fixture = _chatboxFixture();
+      final session = Map<String, dynamic>.from(
+        fixture['session:assistant-1'] as Map,
+      );
+      session['messageForksHash'] = {
+        'message-1': {
+          'position': 0,
+          'lists': [
+            {
+              'id': 'alternative',
+              'messages': [
+                {
+                  'id': 'fork-answer',
+                  'role': 'assistant',
+                  'content': 'Alternative answer',
+                  'timestamp': 1784332801000,
+                },
+              ],
+            },
+          ],
+        },
+      };
+      fixture['session:assistant-1'] = session;
+      await backup.writeAsString(jsonEncode(fixture), flush: true);
+
+      final result = await ChatboxImporter.importFromChatbox(
+        file: backup,
+        mode: RestoreMode.overwrite,
+        businessRepository: businessRepository,
+        chatService: chatService,
+      );
+
+      expect(result.conversations, 1);
+      expect(result.messages, 2);
+      final tree = await chatService.loadConversationTree(
+        'chatbox_default_assistant-1',
+      );
+      expect(tree, isNotNull);
+      expect(tree!.activePath(), ['message-1']);
+      expect(tree.edges['fork-answer']?.parentMessageId, 'message-1');
+      final branchId = tree.branches.keys.singleWhere(
+        (id) => id == 'chatbox-fork-message-1-alternative',
+      );
+      expect(tree.branchPath(branchId), ['message-1', 'fork-answer']);
+    });
 
     test(
       'rolls back all business rows when a later table write fails',
@@ -359,7 +403,6 @@ void main() {
       }
     });
 
-
     test('Chatbox reasoning survives as reasoningText', () async {
       final reasoningBackup = await File('${root.path}/chatbox_reasoning.json')
           .writeAsString(
@@ -381,10 +424,7 @@ void main() {
                 {'id': 'assistant-r', 'name': 'Reasoning', 'starred': false},
               ],
               'session:assistant-r': {
-                'settings': {
-                  'provider': 'openai',
-                  'modelId': 'gpt-test',
-                },
+                'settings': {'provider': 'openai', 'modelId': 'gpt-test'},
                 'messages': [
                   {
                     'id': 'user-r',
@@ -433,35 +473,30 @@ void main() {
     });
 
     test('preserves newline across attachment boundary', () async {
-      final splitBackup = await File('${root.path}/chatbox_split.json').writeAsString(
-        jsonEncode({
-          ..._chatboxFixture(),
-          'session:assistant-1': {
-            'settings': {
-              'provider': 'openai',
-              'modelId': 'gpt-test',
-            },
-            'messages': [
-              {
-                'id': 'message-split',
-                'role': 'user',
-                'content': 'beforeafter',
-                'timestamp': 1784332800000,
-                'contentParts': [
-                  {'type': 'text', 'text': 'before'},
+      final splitBackup = await File('${root.path}/chatbox_split.json')
+          .writeAsString(
+            jsonEncode({
+              ..._chatboxFixture(),
+              'session:assistant-1': {
+                'settings': {'provider': 'openai', 'modelId': 'gpt-test'},
+                'messages': [
                   {
-                    'type': 'image',
-                    'url': 'https://example.com/mid.png',
+                    'id': 'message-split',
+                    'role': 'user',
+                    'content': 'beforeafter',
+                    'timestamp': 1784332800000,
+                    'contentParts': [
+                      {'type': 'text', 'text': 'before'},
+                      {'type': 'image', 'url': 'https://example.com/mid.png'},
+                      {'type': 'text', 'text': 'after'},
+                    ],
                   },
-                  {'type': 'text', 'text': 'after'},
                 ],
+                'threads': <dynamic>[],
               },
-            ],
-            'threads': <dynamic>[],
-          },
-        }),
-        flush: true,
-      );
+            }),
+            flush: true,
+          );
 
       await ChatboxImporter.importFromChatbox(
         file: splitBackup,
@@ -474,7 +509,10 @@ void main() {
         'chatbox_default_assistant-1',
       );
       final user = messages.singleWhere((m) => m.id == 'message-split');
-      expect(user.parts.whereType<ImagePart>().single.uri, 'https://example.com/mid.png');
+      expect(
+        user.parts.whereType<ImagePart>().single.uri,
+        'https://example.com/mid.png',
+      );
       expect(
         user.parts.whereType<TextPart>().map((part) => part.text).join(),
         'before\nafter',
@@ -482,71 +520,68 @@ void main() {
       expect(user.content, 'before\nafter');
     });
 
-    test('imports image/file attachments as structured parts without markers', () async {
-      final result = await ChatboxImporter.importFromChatbox(
-        file: backup,
-        mode: RestoreMode.overwrite,
-        businessRepository: businessRepository,
-        chatService: chatService,
-      );
-      expect(result.messages, 1);
-      final messages = await chatService.loadMessages(
-        'chatbox_default_assistant-1',
-      );
-      final user = messages.singleWhere((m) => m.id == 'message-1');
-      expect(user.content, 'Hello');
-      expect(user.content.contains('[image:'), isFalse);
-      expect(user.content.contains('[file:'), isFalse);
-      expect(user.parts.whereType<TextPart>().single.text, 'Hello');
-      final image = user.parts.whereType<ImagePart>().single;
-      expect(image.uri, 'https://example.com/pic.png');
-      final file = user.parts.whereType<FilePart>().single;
-      expect(file.uri, 'https://example.com/notes.pdf');
-      expect(file.name, 'notes.pdf');
-      expect(file.mime, 'application/pdf');
-      for (final part in user.parts) {
-        expect(part.encodePayload().contains('[image:'), isFalse);
-        expect(part.encodePayload().contains('[file:'), isFalse);
-      }
-    });
-
+    test(
+      'imports image/file attachments as structured parts without markers',
+      () async {
+        final result = await ChatboxImporter.importFromChatbox(
+          file: backup,
+          mode: RestoreMode.overwrite,
+          businessRepository: businessRepository,
+          chatService: chatService,
+        );
+        expect(result.messages, 1);
+        final messages = await chatService.loadMessages(
+          'chatbox_default_assistant-1',
+        );
+        final user = messages.singleWhere((m) => m.id == 'message-1');
+        expect(user.content, 'Hello');
+        expect(user.content.contains('[image:'), isFalse);
+        expect(user.content.contains('[file:'), isFalse);
+        expect(user.parts.whereType<TextPart>().single.text, 'Hello');
+        final image = user.parts.whereType<ImagePart>().single;
+        expect(image.uri, 'https://example.com/pic.png');
+        final file = user.parts.whereType<FilePart>().single;
+        expect(file.uri, 'https://example.com/notes.pdf');
+        expect(file.name, 'notes.pdf');
+        expect(file.mime, 'application/pdf');
+        for (final part in user.parts) {
+          expect(part.encodePayload().contains('[image:'), isFalse);
+          expect(part.encodePayload().contains('[file:'), isFalse);
+        }
+      },
+    );
 
     test('tool-role import keeps ImagePart attachments', () async {
-      final toolBackup = await File('${root.path}/chatbox_tool_image.json').writeAsString(
-        jsonEncode({
-          ..._chatboxFixture(),
-          'session:assistant-1': {
-            'settings': {
-              'provider': 'openai',
-              'modelId': 'gpt-test',
-            },
-            'messages': [
-              {
-                'id': 'tool-with-image',
-                'role': 'tool',
-                'name': 'screenshot',
-                'content': 'tool result',
-                'timestamp': 1784332800000,
-                'contentParts': [
+      final toolBackup = await File('${root.path}/chatbox_tool_image.json')
+          .writeAsString(
+            jsonEncode({
+              ..._chatboxFixture(),
+              'session:assistant-1': {
+                'settings': {'provider': 'openai', 'modelId': 'gpt-test'},
+                'messages': [
                   {
-                    'type': 'tool-call',
-                    'state': 'result',
-                    'toolName': 'screenshot',
-                    'args': {'x': 1},
-                    'result': 'captured',
-                  },
-                  {
-                    'type': 'image',
-                    'url': 'https://example.com/tool.png',
+                    'id': 'tool-with-image',
+                    'role': 'tool',
+                    'name': 'screenshot',
+                    'content': 'tool result',
+                    'timestamp': 1784332800000,
+                    'contentParts': [
+                      {
+                        'type': 'tool-call',
+                        'state': 'result',
+                        'toolName': 'screenshot',
+                        'args': {'x': 1},
+                        'result': 'captured',
+                      },
+                      {'type': 'image', 'url': 'https://example.com/tool.png'},
+                    ],
                   },
                 ],
+                'threads': <dynamic>[],
               },
-            ],
-            'threads': <dynamic>[],
-          },
-        }),
-        flush: true,
-      );
+            }),
+            flush: true,
+          );
 
       await ChatboxImporter.importFromChatbox(
         file: toolBackup,
@@ -568,33 +603,30 @@ void main() {
     });
 
     test('preserves newline across reasoning boundary', () async {
-      final reasoningSplit = await File('${root.path}/chatbox_reasoning_split.json')
-          .writeAsString(
-        jsonEncode({
-          ..._chatboxFixture(),
-          'session:assistant-1': {
-            'settings': {
-              'provider': 'openai',
-              'modelId': 'gpt-test',
-            },
-            'messages': [
-              {
-                'id': 'assistant-reasoning-split',
-                'role': 'assistant',
-                'content': 'beforeafter',
-                'timestamp': 1784332800000,
-                'contentParts': [
-                  {'type': 'text', 'text': 'before'},
-                  {'type': 'reasoning', 'text': 'think'},
-                  {'type': 'text', 'text': 'after'},
+      final reasoningSplit =
+          await File('${root.path}/chatbox_reasoning_split.json').writeAsString(
+            jsonEncode({
+              ..._chatboxFixture(),
+              'session:assistant-1': {
+                'settings': {'provider': 'openai', 'modelId': 'gpt-test'},
+                'messages': [
+                  {
+                    'id': 'assistant-reasoning-split',
+                    'role': 'assistant',
+                    'content': 'beforeafter',
+                    'timestamp': 1784332800000,
+                    'contentParts': [
+                      {'type': 'text', 'text': 'before'},
+                      {'type': 'reasoning', 'text': 'think'},
+                      {'type': 'text', 'text': 'after'},
+                    ],
+                  },
                 ],
+                'threads': <dynamic>[],
               },
-            ],
-            'threads': <dynamic>[],
-          },
-        }),
-        flush: true,
-      );
+            }),
+            flush: true,
+          );
 
       await ChatboxImporter.importFromChatbox(
         file: reasoningSplit,
@@ -606,8 +638,9 @@ void main() {
       final messages = await chatService.loadMessages(
         'chatbox_default_assistant-1',
       );
-      final assistant =
-          messages.singleWhere((m) => m.id == 'assistant-reasoning-split');
+      final assistant = messages.singleWhere(
+        (m) => m.id == 'assistant-reasoning-split',
+      );
       expect(assistant.reasoningText, 'think');
       expect(
         assistant.parts.whereType<TextPart>().map((part) => part.text).join(),
@@ -615,6 +648,5 @@ void main() {
       );
       expect(assistant.content, 'before\nafter');
     });
-
   });
 }

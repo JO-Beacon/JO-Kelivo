@@ -1,13 +1,17 @@
 import 'dart:io';
 
+import 'package:drift/isolate.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../core/database/startup_recovery_service.dart';
 import '../../l10n/app_localizations.dart';
 
 String restoreFailureDiagnosticCode(Object error) {
+  final nestedCode = _nestedDiagnosticCode(error);
+  if (nestedCode != null) return nestedCode;
   if (error is FileSystemException) {
     final osCode = error.osError?.errorCode;
     return osCode == null ? 'filesystem' : 'filesystem_$osCode';
@@ -24,7 +28,28 @@ String restoreFailureDiagnosticCode(Object error) {
   return error.runtimeType.toString();
 }
 
-/// A persistence-free shell used when the startup restore gate fails closed.
+String? _nestedDiagnosticCode(Object error, {int depth = 0}) {
+  if (depth > 2) return null;
+  if (error is DriftRemoteException) {
+    final nested = _nestedDiagnosticCode(error.remoteCause, depth: depth + 1);
+    return nested == null ? 'drift_remote_error' : 'drift_remote_$nested';
+  }
+  if (error is sqlite.SqliteException) {
+    return 'sqlite_${error.extendedResultCode}';
+  }
+  final message = switch (error) {
+    StateError() => error.message,
+    FormatException() => error.message,
+    _ => null,
+  };
+  final raw = message?.toString();
+  if (raw != null && RegExp(r'^[a-zA-Z0-9_.:-]{1,160}$').hasMatch(raw)) {
+    return raw;
+  }
+  return null;
+}
+
+/// 当启动恢复闸门关闭失败时使用的不依赖持久化数据的外壳。
 class RestoreFailureScreen extends StatefulWidget {
   const RestoreFailureScreen({
     super.key,
@@ -36,9 +61,8 @@ class RestoreFailureScreen extends StatefulWidget {
   final String diagnosticCode;
   final Future<void> Function() restart;
 
-  /// When provided (and the failure is not a lease conflict), the screen
-  /// offers file-level recovery actions so a fail-closed startup can never be
-  /// a permanent lockout.
+  /// 当提供该参数且失败不是租约冲突时，屏幕会提供文件级恢复操作，
+  /// 确保失败关闭的启动不会变成永久性锁死。
   final Directory? appDataDirectory;
 
   @override
@@ -278,14 +302,31 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
                           color: colors.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: SelectableText(
-                          l10n.backupRestoreFailureDiagnostic(
-                            widget.diagnosticCode,
-                          ),
-                          style: textTheme.bodySmall?.copyWith(
-                            color: colors.onSurfaceVariant,
-                            fontFamily: 'monospace',
-                          ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: SelectableText(
+                                l10n.backupRestoreFailureDiagnostic(
+                                  widget.diagnosticCode,
+                                ),
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: colors.onSurfaceVariant,
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: _copyDiagnostic,
+                              tooltip: l10n.backupRestoreFailureCopyButton,
+                              icon: Icon(
+                                _copied
+                                    ? Icons.check_rounded
+                                    : Icons.copy_rounded,
+                                size: 18,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       if (_copied) ...[
@@ -323,17 +364,6 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
                                 )
                               : const Icon(Icons.restart_alt_rounded),
                           label: Text(l10n.backupRestoreFailureRestartButton),
-                        ),
-                      ),
-                      Align(
-                        alignment: Alignment.center,
-                        child: TextButton.icon(
-                          onPressed: _copyDiagnostic,
-                          icon: Icon(
-                            _copied ? Icons.check_rounded : Icons.copy_rounded,
-                            size: 18,
-                          ),
-                          label: Text(l10n.backupRestoreFailureCopyButton),
                         ),
                       ),
                       if (widget.appDataDirectory != null &&

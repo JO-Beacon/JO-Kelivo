@@ -192,7 +192,7 @@ class _ProviderNetworkPageState extends State<ProviderNetworkPage> {
       proxyPassword: _proxyPassCtrl.text.trim(),
     );
     await settings.setProviderConfig(widget.providerKey, cfg);
-    // Silent auto-save (no snackbar) to match immediate-save UX
+    // 静默自动保存（无 Snackbar），匹配立即保存体验
     if (!mounted) return;
   }
 }

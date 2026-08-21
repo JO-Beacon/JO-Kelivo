@@ -120,7 +120,7 @@ class _SearchSettingsSheet extends StatelessWidget {
     );
     final enabled = ap.currentSearchEnabled;
 
-    // Determine if current selected model supports built-in search
+    // 判断当前选中的模型是否支持内置搜索
     final providerKey = a?.chatModelProvider ?? settings.currentModelProvider;
     final modelId = a?.chatModelId ?? settings.currentModelId;
     final cfg = (providerKey != null)
@@ -137,7 +137,7 @@ class _SearchSettingsSheet extends StatelessWidget {
           modelId: modelId,
         );
 
-    // Read current built-in search toggle from modelOverrides
+    // 从 modelOverrides 读取当前内置搜索开关
     final hasBuiltInSearch = BuiltInToolsHelper.isBuiltInSearchEnabled(
       cfg: cfg,
       modelId: modelId,
@@ -161,7 +161,7 @@ class _SearchSettingsSheet extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Drag handle
+                // 拖动把手
                 Center(
                   child: Container(
                     width: 40,
@@ -184,7 +184,7 @@ class _SearchSettingsSheet extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                // Built-in search toggle
+                // 内置搜索开关
                 if (cfg != null &&
                     supportsBuiltInSearch &&
                     (providerKey != null) &&
@@ -346,7 +346,7 @@ class _SearchSettingsSheet extends StatelessWidget {
                     ),
                 ],
 
-                // Toggle card
+                // 开关卡片
                 if (!builtInMode) ...[
                   IosCardPress(
                     borderRadius: BorderRadius.circular(14),
@@ -407,7 +407,7 @@ class _SearchSettingsSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
                 ],
-                // Services list (iOS-style rows like learning mode)
+                // 服务列表（类似学习模式的 iOS 风格行）
                 if (!builtInMode && services.isNotEmpty) ...[
                   ...List.generate(services.length, (i) {
                     final s = services[i];
@@ -433,7 +433,7 @@ class _SearchSettingsSheet extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           child: Row(
                             children: [
-                              // Brand icon
+                              // 品牌图标
                               _BrandBadge.forService(s, size: 22),
                               const SizedBox(width: 10),
                               Expanded(
@@ -476,7 +476,7 @@ class _SearchSettingsSheet extends StatelessWidget {
   }
 }
 
-// Brand badge for known services using assets/icons; falls back to letter if unknown
+// 已知服务的品牌徽章，使用 assets/icons；未知时回退到字母
 class _BrandBadge extends StatelessWidget {
   const _BrandBadge({required this.name, this.size = 20});
   final String name;
@@ -514,7 +514,7 @@ class _BrandBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    // Use BrandAssets to get the icon path
+    // 使用 BrandAssets 获取图标路径
     final asset = BrandAssets.assetForName(name);
     final bg = cs.primary.withValues(alpha: isDark ? 0.18 : 0.1);
     if (asset != null) {

@@ -117,8 +117,8 @@ Future<void> showShareProviderSheet(
                         child: Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            // Always use white background to ensure visibility in dark mode
-                            color: Colors.white, // color-gate: ignore (QR scannability)
+                            // 始终使用白色背景，确保深色模式下可见
+                            color: Colors.white, // color-gate: ignore（QR 可扫描性）
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                               color: cs.outlineVariant.withValues(alpha: 0.2),
@@ -137,7 +137,7 @@ Future<void> showShareProviderSheet(
                         ),
                       ),
                       const SizedBox(height: 14),
-                      // Show non-selectable text; use the copy button to copy
+                      // 显示不可选中的文本；使用复制按钮复制
                       Text(
                         code,
                         style: TextStyle(fontSize: 13.5, height: 1.35),

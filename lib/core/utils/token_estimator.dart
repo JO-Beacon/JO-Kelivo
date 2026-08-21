@@ -1,6 +1,6 @@
-/// Heuristic token estimate for UI (`~N tokens`).
+/// 用于 UI 的启发式 token 估算（`~N tokens`）。
 ///
-/// CJK characters count as 1 token each; remaining characters use 4 chars/token.
+/// CJK 字符每个按 1 个 token 计算；其余字符按 4 个字符折合 1 个 token。
 int estimateTokens(String text) {
   if (text.isEmpty) return 0;
   var cjk = 0;

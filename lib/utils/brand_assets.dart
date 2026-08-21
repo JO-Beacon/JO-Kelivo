@@ -1,14 +1,14 @@
-/// Centralized brand icon resolver.
-/// Returns an asset path like `assets/icons/openai.svg` for a given name/model.
+/// 集中式的品牌图标解析器。
+/// 根据给定名称或模型返回类似 `assets/icons/openai.svg` 的资源路径。
 class BrandAssets {
   BrandAssets._();
 
-  /// Resolve an icon asset path for a provider/model name.
-  /// Returns null if no known mapping matches.
+  /// 根据供应商或模型名称解析图标资源路径。
+  /// 如果没有已知映射匹配，则返回 null。
   static String? assetForName(String name) {
     final key = name.trim().toLowerCase();
     if (key.isEmpty) return null;
-    // Recompute if previously cached as null so newly added mappings take effect without restart.
+    // 如果之前缓存为 null，则重新计算，使新增映射无需重启即可生效。
     if (_cache.containsKey(key) && _cache[key] != null) return _cache[key];
     String? result;
     for (final e in _mapping) {
@@ -21,12 +21,12 @@ class BrandAssets {
     return result;
   }
 
-  /// Clear the in-memory cache (useful after changing mappings at runtime).
+  /// 清空内存缓存（在运行时修改映射后很有用）。
   static void clearCache() => _cache.clear();
 
   static final Map<String, String?> _cache = <String, String?>{};
 
-  // Keep order-specific matching using a list of entries.
+  // 使用条目列表保持按顺序匹配。
   static final List<MapEntry<RegExp, String>> _mapping =
       <MapEntry<RegExp, String>>[
         MapEntry(RegExp(r'openai|gpt|o\d'), 'openai.svg'),
@@ -383,7 +383,7 @@ class BrandAssets {
     'fish-audio.svg',
   };
 
-  // Build the LobeHub static SVG CDN URL from an icon name (e.g. 'openai').
+  // 根据图标名称（例如 'openai'）构建 LobeHub 静态 SVG CDN URL。
   static String lobehubIconUrl(String name) {
     final n = name.trim().toLowerCase();
     return 'https://unpkg.com/@lobehub/icons-static-svg@latest/icons/$n.svg';
@@ -398,5 +398,5 @@ class BrandIconOption {
   });
   final String id;
   final String label;
-  final String asset; // e.g. 'assets/icons/openai.svg'
+  final String asset; // 例如 'assets/icons/openai.svg'
 }

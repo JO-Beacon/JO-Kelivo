@@ -351,7 +351,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('double regenerate tap creates a single new version', (
+  testWidgets('double regenerate tap creates a single new assistant branch', (
     tester,
   ) async {
     final controller = await pumpHarness(tester);
@@ -377,12 +377,10 @@ void main() {
       );
 
       final messages = await service.loadMessages(convo.id);
-      // user + original assistant revision + exactly one regenerated revision
-      expect(messages, hasLength(3));
-      expect(
-        messages.where((m) => m.role == 'assistant' && m.version == 1),
-        hasLength(1),
-      );
+      // The active tree path contains the user and the selected regenerated
+      // reply. The original reply remains available through the branch map.
+      expect(messages, hasLength(2));
+      expect(messages.where((m) => m.role == 'assistant'), hasLength(1));
       expect(streamRequestCount, 2);
       expect(
         controller.chatController.isConversationLoading(convo.id),
@@ -391,6 +389,109 @@ void main() {
     });
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'send on branched conversation refreshes active path projection',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      await tester.runAsync(() async {
+        final convo = await openConversation(controller);
+        await controller.sendMessage(ChatInputData(text: 'root question'));
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(convo.id),
+          'initial streaming to finish',
+        );
+
+        final initialMessages = await service.loadMessages(convo.id);
+        final rootUser = initialMessages.firstWhere((m) => m.role == 'user');
+        final forkTree = await service.createConversationBranch(
+          conversationId: convo.id,
+          fromMessageId: rootUser.id,
+        );
+        await controller.switchConversationBranch(forkTree.activeBranchId);
+
+        await controller.sendMessage(ChatInputData(text: 'child question'));
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(convo.id),
+          'child streaming to finish',
+        );
+
+        final finalMessages = await service.loadMessages(convo.id);
+        final childAssistant = finalMessages
+            .where((message) => message.role == 'assistant')
+            .last;
+        expect(
+          controller.visibleMessages.map((message) => message.id),
+          contains(childAssistant.id),
+        );
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'deleting one branched reply falls back to the surviving branch',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      await tester.runAsync(() async {
+        final convo = await openConversation(controller);
+        await controller.sendMessage(ChatInputData(text: 'root question'));
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(convo.id),
+          'root streaming to finish',
+        );
+
+        final rootMessages = await service.loadMessages(convo.id);
+        final rootUser = rootMessages.firstWhere((m) => m.role == 'user');
+        final rootAssistant = rootMessages.firstWhere(
+          (m) => m.role == 'assistant',
+        );
+        final childTree = await service.createConversationBranch(
+          conversationId: convo.id,
+          fromMessageId: rootUser.id,
+        );
+        await controller.switchConversationBranch(childTree.activeBranchId);
+
+        await controller.sendMessage(ChatInputData(text: 'child question'));
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(convo.id),
+          'child streaming to finish',
+        );
+
+        final branchedMessages = await service.loadMessages(convo.id);
+        final childUser = branchedMessages.firstWhere(
+          (m) => m.role == 'user' && m.id != rootUser.id,
+        );
+        final childAssistant = branchedMessages.firstWhere(
+          (m) => m.role == 'assistant' && m.id != rootAssistant.id,
+        );
+
+        final rootBranchId = childTree.branches.keys.firstWhere(
+          (branchId) => branchId != childTree.activeBranchId,
+        );
+        await controller.switchConversationBranch(rootBranchId);
+        expect(
+          controller.visibleMessages.map((message) => message.id),
+          contains(rootAssistant.id),
+        );
+
+        await controller.deleteMessage(
+          message: rootAssistant,
+          byGroup: controller.visibleGroupedMessages,
+        );
+
+        expect(
+          controller.visibleMessages.map((message) => message.id),
+          isNot(contains(rootAssistant.id)),
+        );
+        expect(
+          controller.visibleMessages.map((message) => message.id),
+          containsAll(<String>[rootUser.id, childUser.id, childAssistant.id]),
+        );
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('assistant edit save and send creates a new reply slot', (
     tester,
@@ -427,7 +528,7 @@ void main() {
       );
       expect(
         messages.where((message) => message.role == 'assistant'),
-        hasLength(3),
+        hasLength(2),
       );
       expect(newReplies, hasLength(1));
       expect(
@@ -436,6 +537,279 @@ void main() {
       );
       expect(newReplies.single.version, 0);
       expect(newReplies.single.isStreaming, isFalse);
+      expect(
+        controller.visibleMessages.map((message) => message.id),
+        contains(newReplies.single.id),
+      );
+    });
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'persistent assistant edit save and send keeps the new branch visible',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      late Conversation convo;
+      late ChatMessage original;
+      await tester.runAsync(() async {
+        convo = await openConversation(controller);
+        await controller.sendMessage(ChatInputData(text: 'hello'));
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(convo.id),
+          'initial streaming to finish',
+        );
+        original = (await service.loadMessages(
+          convo.id,
+        )).firstWhere((message) => message.role == 'assistant');
+        unawaited(controller.editMessage(original));
+      });
+
+      await tester.pumpAndSettle();
+      expect(find.text('Edit Message'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'edited answer');
+      await tester.tap(find.text('Save & Send'));
+      await tester.pump();
+
+      await tester.runAsync(() async {
+        await waitFor(() => streamRequestCount == 2, 'edited stream to fire');
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(convo.id),
+          'edited streaming to finish',
+        );
+        final messages = await service.loadMessages(convo.id);
+        final originalGroupId = original.groupId ?? original.id;
+        final newReplies = messages.where(
+          (message) =>
+              message.role == 'assistant' &&
+              (message.groupId ?? message.id) != originalGroupId,
+        );
+        expect(newReplies, hasLength(1));
+        expect(
+          controller.visibleMessages.map((message) => message.id),
+          contains(newReplies.single.id),
+        );
+        final persistedTree = await service.loadConversationTree(convo.id);
+        expect(persistedTree, isNotNull);
+        expect(persistedTree!.branches, hasLength(2));
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'persistent user edit save and send keeps the new branch visible',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      late Conversation convo;
+      late ChatMessage originalUser;
+      await tester.runAsync(() async {
+        convo = await openConversation(controller);
+        await controller.sendMessage(ChatInputData(text: 'hello'));
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(convo.id),
+          'initial streaming to finish',
+        );
+        originalUser = (await service.loadMessages(
+          convo.id,
+        )).firstWhere((message) => message.role == 'user');
+        unawaited(controller.editMessage(originalUser));
+      });
+
+      await tester.pumpAndSettle();
+      expect(find.text('Edit Message'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'edited question');
+      await tester.tap(find.text('Save & Send'));
+      await tester.pump();
+
+      await tester.runAsync(() async {
+        await waitFor(() => streamRequestCount == 2, 'edited stream to fire');
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(convo.id),
+          'edited streaming to finish',
+        );
+        final messages = await service.loadMessages(convo.id);
+        final editedUser = messages.firstWhere(
+          (message) =>
+              message.role == 'user' &&
+              message.id != originalUser.id &&
+              message.content == 'edited question',
+        );
+        final newAssistant = messages
+            .where((message) => message.role == 'assistant')
+            .last;
+        expect(
+          controller.visibleMessages.map((message) => message.id),
+          containsAll(<String>[editedUser.id, newAssistant.id]),
+        );
+        final persistedTree = await service.loadConversationTree(convo.id);
+        expect(persistedTree, isNotNull);
+        expect(persistedTree!.branches, hasLength(2));
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'editing a branched assistant reply keeps the new branch visible',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      late Conversation convo;
+      late ChatMessage rootAssistant;
+      late ChatMessage childAssistant;
+      await tester.runAsync(() async {
+        convo = await openConversation(controller);
+        await controller.sendMessage(ChatInputData(text: 'root question'));
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(convo.id),
+          'root streaming to finish',
+        );
+
+        final rootMessages = await service.loadMessages(convo.id);
+        final rootUser = rootMessages.firstWhere((m) => m.role == 'user');
+        rootAssistant = rootMessages.firstWhere((m) => m.role == 'assistant');
+        final childTree = await service.createConversationBranch(
+          conversationId: convo.id,
+          fromMessageId: rootUser.id,
+        );
+        await controller.switchConversationBranch(childTree.activeBranchId);
+        await controller.sendMessage(ChatInputData(text: 'child question'));
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(convo.id),
+          'child streaming to finish',
+        );
+
+        final branchedMessages = await service.loadMessages(convo.id);
+        childAssistant = branchedMessages.firstWhere(
+          (m) => m.role == 'assistant' && m.id != rootAssistant.id,
+        );
+        final rootBranchId = childTree.branches.keys.firstWhere(
+          (branchId) => branchId != childTree.activeBranchId,
+        );
+        await controller.switchConversationBranch(rootBranchId);
+        unawaited(controller.editMessage(rootAssistant));
+      });
+
+      await tester.pumpAndSettle();
+      expect(find.text('Edit Message'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'edited branch answer');
+      await tester.tap(find.text('Save & Send'));
+      await tester.pump();
+
+      await tester.runAsync(() async {
+        await waitFor(() => streamRequestCount == 3, 'edited stream to fire');
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(convo.id),
+          'edited streaming to finish',
+        );
+        final messages = await service.loadMessages(convo.id);
+        final rootGroupId = rootAssistant.groupId ?? rootAssistant.id;
+        final editedRoot = messages.firstWhere(
+          (message) =>
+              message.role == 'assistant' &&
+              (message.groupId ?? message.id) == rootGroupId &&
+              message.version == 1,
+        );
+        final newAssistant = messages.firstWhere(
+          (message) =>
+              message.role == 'assistant' &&
+              message.id != rootAssistant.id &&
+              message.id != childAssistant.id &&
+              message.id != editedRoot.id,
+        );
+        final persistedTree = await service.loadConversationTree(convo.id);
+        expect(persistedTree, isNotNull);
+        expect(
+          controller.conversationTree?.branches.keys,
+          contains(persistedTree!.activeBranchId),
+        );
+        expect(
+          controller.siblingBranchIdsByMessageId[editedRoot.id],
+          isNotNull,
+        );
+        expect(
+          controller.siblingBranchIdsByMessageId[editedRoot.id]!.length,
+          greaterThan(1),
+        );
+        expect(
+          controller.visibleMessages.map((message) => message.id),
+          containsAll(<String>[editedRoot.id, newAssistant.id]),
+        );
+        expect(persistedTree.branches, hasLength(3));
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('editing a branched user message keeps the new branch visible', (
+    tester,
+  ) async {
+    final controller = await pumpHarness(tester);
+    late Conversation convo;
+    late ChatMessage rootUser;
+    late ChatMessage rootAssistant;
+    late ChatMessage childAssistant;
+    await tester.runAsync(() async {
+      convo = await openConversation(controller);
+      await controller.sendMessage(ChatInputData(text: 'root question'));
+      await waitFor(
+        () => !controller.chatController.isConversationLoading(convo.id),
+        'root streaming to finish',
+      );
+
+      final rootMessages = await service.loadMessages(convo.id);
+      rootUser = rootMessages.firstWhere((m) => m.role == 'user');
+      rootAssistant = rootMessages.firstWhere((m) => m.role == 'assistant');
+      final childTree = await service.createConversationBranch(
+        conversationId: convo.id,
+        fromMessageId: rootUser.id,
+      );
+      await controller.switchConversationBranch(childTree.activeBranchId);
+      await controller.sendMessage(ChatInputData(text: 'child question'));
+      await waitFor(
+        () => !controller.chatController.isConversationLoading(convo.id),
+        'child streaming to finish',
+      );
+
+      final branchedMessages = await service.loadMessages(convo.id);
+      childAssistant = branchedMessages.firstWhere(
+        (m) => m.role == 'assistant' && m.id != rootAssistant.id,
+      );
+      final rootBranchId = childTree.branches.keys.firstWhere(
+        (branchId) => branchId != childTree.activeBranchId,
+      );
+      await controller.switchConversationBranch(rootBranchId);
+      unawaited(controller.editMessage(rootUser));
+    });
+
+    await tester.pumpAndSettle();
+    expect(find.text('Edit Message'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'edited root question');
+    await tester.tap(find.text('Save & Send'));
+    await tester.pump();
+
+    await tester.runAsync(() async {
+      await waitFor(() => streamRequestCount == 3, 'edited stream to fire');
+      await waitFor(
+        () => !controller.chatController.isConversationLoading(convo.id),
+        'edited streaming to finish',
+      );
+      final messages = await service.loadMessages(convo.id);
+      final editedUser = messages.firstWhere(
+        (message) =>
+            message.role == 'user' &&
+            message.id != rootUser.id &&
+            message.content == 'edited root question',
+      );
+      final newAssistant = messages.firstWhere(
+        (message) =>
+            message.role == 'assistant' &&
+            message.id != childAssistant.id &&
+            message.id != rootAssistant.id,
+      );
+      expect(
+        controller.visibleMessages.map((message) => message.id),
+        containsAll(<String>[editedUser.id, newAssistant.id]),
+      );
     });
     expect(tester.takeException(), isNull);
   });
@@ -501,6 +875,7 @@ void main() {
     final controller = await pumpHarness(tester);
     late Conversation convo;
     late ChatMessage original;
+    late Future<void> editFuture;
     await tester.runAsync(() async {
       convo = await openConversation(controller);
       await controller.sendMessage(ChatInputData(text: 'original question'));
@@ -511,7 +886,7 @@ void main() {
       original = (await service.loadMessages(
         convo.id,
       )).firstWhere((message) => message.role == 'user');
-      unawaited(controller.editMessage(original));
+      editFuture = controller.editMessage(original);
     });
 
     await tester.pumpAndSettle();
@@ -520,6 +895,7 @@ void main() {
     await tester.pump();
 
     await tester.runAsync(() async {
+      await editFuture;
       await waitFor(
         () => service
             .getMessages(convo.id)
@@ -542,10 +918,7 @@ void main() {
       );
       expect(edited.content, 'edited without sending');
       expect(streamRequestCount, 1);
-      expect(
-        messages.where((message) => message.role == 'assistant'),
-        hasLength(1),
-      );
+      expect(messages.where((message) => message.role == 'assistant'), isEmpty);
     });
     expect(tester.takeException(), isNull);
   });
@@ -571,7 +944,7 @@ void main() {
         () => !controller.chatController.isConversationLoading(convo.id),
         'regeneration streaming to finish',
       );
-      expect(await service.loadMessages(convo.id), hasLength(3));
+      expect(await service.loadMessages(convo.id), hasLength(2));
 
       await waitFor(
         () =>

@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Manages desktop window size/position persistence and defaults.
+/// 管理桌面窗口尺寸和位置的持久化及默认值。
 class WindowSizeManager {
-  // Constraints
+  // 尺寸约束
   static const double minWindowWidth = 960.0;
   static const double minWindowHeight = 640.0;
   static const double maxWindowWidth = 8192.0;
   static const double maxWindowHeight = 8192.0;
 
-  // Default (first launch)
+  // 默认值（首次启动）
   static const double defaultWindowWidth = 1280.0;
   static const double defaultWindowHeight = 860.0;
 
-  // Keys
+  // 键名
   static const String _kWidth = 'window_width_v1';
   static const String _kHeight = 'window_height_v1';
   static const String _kPosX = 'window_pos_x_v1';
@@ -47,13 +47,11 @@ class WindowSizeManager {
     final x = prefs.getDouble(_kPosX);
     final y = prefs.getDouble(_kPosY);
     if (x == null || y == null) return null;
-    // Simple sanity: avoid infinities
+    // 简单校验：避免无穷值
     if (!x.isFinite || !y.isFinite) return null;
 
-    // Additional guard: if the stored coordinates are extremely far
-    // from the origin, treat them as invalid instead of restoring
-    // the window completely off-screen (which makes the app appear
-    // "unopenable" until the prefs are manually deleted).
+    // 额外保护：如果存储坐标离原点极远，则视为无效，而不是把窗口恢复到
+    // 完全不可见的屏幕外（否则应用会看似“无法打开”，直到手动删除偏好）。
     const maxAbsCoord = 10000.0;
     if (x < -maxAbsCoord ||
         x > maxAbsCoord ||

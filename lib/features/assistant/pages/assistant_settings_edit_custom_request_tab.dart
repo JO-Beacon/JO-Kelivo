@@ -13,12 +13,7 @@ class _CustomRequestTab extends StatelessWidget {
     final a = ap.getById(assistantId)!;
 
     Widget card({required Widget child}) => Padding(
-      padding: const EdgeInsets.fromLTRB(
-        16,
-        8,
-        20,
-        8,
-      ), // Increased right padding
+      padding: const EdgeInsets.fromLTRB(16, 8, 20, 8), // 增加右侧内边距
       child: Container(
         decoration: BoxDecoration(
           color: context.appColors.surfaceCard,
@@ -93,9 +88,9 @@ class _CustomRequestTab extends StatelessWidget {
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(0, 8, 0, 16), // Reduced top padding
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 16), // 减少顶部内边距
       children: [
-        // Headers
+        // 请求头
         card(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -162,7 +157,7 @@ class _CustomRequestTab extends StatelessWidget {
           ),
         ),
 
-        // Body
+        // 请求体
         card(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -269,7 +264,7 @@ class _HeaderRowState extends State<_HeaderRow> {
   @override
   void didUpdateWidget(covariant _HeaderRow oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Avoid resetting controller text while the field is focused to prevent cursor jump.
+    // 字段聚焦时避免重置控制器文本，防止光标跳动。
     if (oldWidget.name != widget.name && !_nameFocus.hasFocus) {
       _nameCtrl.text = widget.name;
     }
@@ -382,7 +377,7 @@ class _BodyRowState extends State<_BodyRow> {
   @override
   void didUpdateWidget(covariant _BodyRow oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Avoid resetting controller text while the field is focused to prevent cursor jump.
+    // 字段聚焦时避免重置控制器文本，防止光标跳动。
     if (oldWidget.keyName != widget.keyName && !_keyFocus.hasFocus) {
       _keyCtrl.text = widget.keyName;
     }

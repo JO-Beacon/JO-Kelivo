@@ -136,7 +136,7 @@ void main() {
   });
 
   test(
-    'default regeneration adds a selected version and preserves the future',
+    'default regeneration creates a sibling branch and preserves the future',
     () async {
       final first = await beginFirstSend();
       final withFuture = await appendFuture(first.conversation);
@@ -153,49 +153,53 @@ void main() {
 
       expect(result.userMessage, isNull);
       expect(result.run.targetRevisionId, 'assistant-2');
-      final window = await repository.loadLinearMessageWindow(
-        conversationId: conversation.id,
-        fromStart: true,
+      final tree = await repository.loadConversationTree(conversation.id);
+      expect(tree!.activePath(), ['user-1', 'assistant-2']);
+      expect(
+        tree.branches.values.map(
+          (branch) => tree.branchPath(branch.id).join('|'),
+        ),
+        contains('user-1|assistant-1|user-2|assistant-tail'),
       );
-      expect(window.slots.map((slot) => slot.revisionId), [
-        'user-1',
-        'assistant-2',
-        'user-2',
-        'assistant-tail',
-      ]);
       expect(await repository.getMessageCount(conversation.id), 5);
       expect(result.conversation.versionSelections['assistant-1'], 1);
     },
   );
 
-  test('truncate regeneration physically deletes only later groups', () async {
+  test('truncate regeneration is rejected without changing storage', () async {
     final first = await beginFirstSend();
     final withFuture = await appendFuture(first.conversation);
 
-    final result = await repository.beginRegeneration(
-      conversation: withFuture,
-      assistantMessage: assistant(
-        'assistant-2',
-        groupId: 'assistant-1',
-        version: 1,
+    await expectLater(
+      repository.beginRegeneration(
+        conversation: withFuture,
+        assistantMessage: assistant(
+          'assistant-2',
+          groupId: 'assistant-1',
+          version: 1,
+        ),
+        runId: 'run-2',
+        truncateFuture: true,
       ),
-      runId: 'run-2',
-      truncateFuture: true,
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'tree_regeneration_cannot_truncate_future',
+        ),
+      ),
     );
 
-    final window = await repository.loadLinearMessageWindow(
-      conversationId: conversation.id,
-      fromStart: true,
-    );
-    expect(window.slots.map((slot) => slot.revisionId), [
+    final tree = await repository.loadConversationTree(conversation.id);
+    expect(tree!.activePath(), [
       'user-1',
-      'assistant-2',
+      'assistant-1',
+      'user-2',
+      'assistant-tail',
     ]);
     expect(await repository.getMessage('assistant-1'), isNotNull);
-    expect(await repository.getMessage('user-2'), isNull);
-    expect(await repository.getMessage('assistant-tail'), isNull);
-    expect(result.run.targetRevisionId, 'assistant-2');
-    expect(await repository.getMessageCount(conversation.id), 3);
+    expect(await repository.getMessage('assistant-2'), isNull);
+    expect(await repository.getMessageCount(conversation.id), 4);
   });
 
   test('invalid begin input is rejected before any database write', () async {

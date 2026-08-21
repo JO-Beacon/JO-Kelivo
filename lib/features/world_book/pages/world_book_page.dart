@@ -405,7 +405,7 @@ class _WorldBookPageState extends State<WorldBookPage> {
               itemCount: books.length,
               buildDefaultDragHandles: false,
               proxyDecorator: (child, index, animation) {
-                // No elevation/shadow; just subtle scale.
+                // 无海拔或阴影；只有细微缩放。
                 return AnimatedBuilder(
                   animation: animation,
                   builder: (context, _) {
@@ -794,7 +794,7 @@ class _WorldBookSection extends StatelessWidget {
           itemCount: entries.length,
           buildDefaultDragHandles: false,
           proxyDecorator: (child, index, animation) {
-            // No shadow; slight scale and higher opacity.
+            // 无阴影；轻微缩放并提高不透明度。
             return AnimatedBuilder(
               animation: animation,
               builder: (context, _) {
@@ -1863,7 +1863,8 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                                       message:
                                           l10n.worldBookEntryKeywordAddTooltip,
                                       child: IosCardPress(
-                                        baseColor: context.appColors.surfaceFill,
+                                        baseColor:
+                                            context.appColors.surfaceFill,
                                         borderRadius: BorderRadius.circular(12),
                                         pressedScale: 0.98,
                                         haptics: false,

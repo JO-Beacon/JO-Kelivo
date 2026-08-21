@@ -84,7 +84,7 @@ class _DesktopMcpJsonEditDialogState extends State<_DesktopMcpJsonEditDialog> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    // Resolve user-preferred code font family (Google/local/system)
+    // 解析用户首选的代码字体（Google、本地或系统）
     final settings = context.watch<SettingsProvider>();
     String resolveCodeFont() {
       final fam = settings.codeFontFamily;
@@ -108,7 +108,7 @@ class _DesktopMcpJsonEditDialogState extends State<_DesktopMcpJsonEditDialog> {
         height: 720,
         child: Column(
           children: [
-            // Header bar
+            // 标题栏
             SizedBox(
               height: 52,
               child: Padding(
@@ -173,7 +173,10 @@ class _DesktopMcpJsonEditDialogState extends State<_DesktopMcpJsonEditDialog> {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     _error!,
-                    style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
               ),

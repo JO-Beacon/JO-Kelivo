@@ -115,9 +115,9 @@ abstract class AsrServiceOptions {
             json['websocketUrl'],
             'wss://openspeech.bytedance.com/api/v3/sauc/bigmodel',
           ),
-          // Keep Seed-ASR 2.0 default. Docs also list bigasr (1.0).
-          // See VolcengineAsrOptions.resourceId comment — needs Key verification
-          // before changing user defaults.
+          // 保持 Seed-ASR 2.0 默认值。文档中还列出了 bigasr（1.0）。
+          // 参见 VolcengineAsrOptions.resourceId 注释，需要先验证 Key
+          // 才能更改用户默认值。
           resourceId: _string(json['resourceId'], 'volc.seedasr.sauc.duration'),
           language: _string(json['language']),
         );
@@ -358,11 +358,11 @@ class DashScopeAsrOptions extends AsrServiceOptions {
 }
 
 class VolcengineAsrOptions extends AsrServiceOptions {
-  /// Compatible resource ids (official docs):
-  /// - ASR 2.0 (Seed-ASR) duration: `volc.seedasr.sauc.duration` (current default)
-  /// - ASR 1.0 (BigASR) duration: `volc.bigasr.sauc.duration`
-  /// Do not auto-migrate existing user configs; wrong id → 403 not-granted.
-  /// Needs real Key verification before changing the app default.
+  /// 兼容的资源 ID（官方文档）：
+  /// - ASR 2.0（Seed-ASR）时长：`volc.seedasr.sauc.duration`（当前默认值）
+  /// - ASR 1.0（BigASR）时长：`volc.bigasr.sauc.duration`
+  /// 不要自动迁移现有用户配置；错误的 ID → 403 not-granted。
+  /// 在更改应用默认值之前，需要实际验证 Key。
   static const String seedAsrDurationResourceId = 'volc.seedasr.sauc.duration';
   static const String bigAsrDurationResourceId = 'volc.bigasr.sauc.duration';
   static const List<String> knownDurationResourceIds = <String>[
@@ -500,8 +500,7 @@ class QwenAudioAsrOptions extends AsrServiceOptions {
   }
 
   @override
-  bool get isConfigured =>
-      apiKey.trim().isNotEmpty && model.trim().isNotEmpty;
+  bool get isConfigured => apiKey.trim().isNotEmpty && model.trim().isNotEmpty;
 
   QwenAudioAsrOptions copyWith({
     String? id,

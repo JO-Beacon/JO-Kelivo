@@ -14,16 +14,16 @@ import '../services/api/google_service_account_auth.dart';
 import '../models/model_types.dart';
 
 class ModelRegistry {
-  // Updated model groups to reflect new series
-  // Vision-capable models (text + image input).
-  // Qwen vision is intentional and precise (see [_isQwenVisionModel]): not
-  // every Qwen 3.7 Max id is multimodal.
+  // 更新模型分组以反映新系列
+  // 支持视觉的模型（文本 + 图像输入）。
+  // Qwen 视觉判断是有意且精确的（见 [_isQwenVisionModel]）：并非
+  // 每个 Qwen 3.7 Max id 都是多模态。
   static final RegExp vision = RegExp(
-    // GPT family incl. 4o, 4.1, 5 (exclude gpt-5-chat), and OpenAI o* series
+    // GPT 系列，包括 4o、4.1、5（排除 gpt-5-chat），以及 OpenAI o* 系列
     r'(gpt-4o|gpt-4\.1|gpt-5(?!-chat)|o\d|gemini|claude|kimi-k2([-.])(?:5|6|7)|kimi-k3(?:$|[/_:@.-])|muse-spark-1\.1(?:$|[/_:@.-])|doubao.+(?:1([-.])(?:6|8)|seed-2|seed-evolving)|grok-4|step-3|intern-s1|minimax-m3(?:$|[/_:@])|mimo-v2(?:-omni(?:$|[/_:@])|\.5(?:$|[/_:@]))|sensenova-6\.7-flash-lite)',
     caseSensitive: false,
   );
-  // Tool-using models
+  // 可使用工具的模型
   static final RegExp tool = RegExp(
     (r'(gpt-4o|gpt-4\.1|gpt-oss|gpt-5(?!-chat)|o\d|'
             r'gemini|claude|'
@@ -55,12 +55,12 @@ class ModelRegistry {
     caseSensitive: false,
   );
 
-  /// Precise Qwen vision matrix:
+  /// 精确的 Qwen 视觉矩阵：
   /// - `qwen3.5*` (existing)
-  /// - `qwen3.7-plus` / `qwen3.7-flash` (+ snapshots)
-  /// - vision Max snapshot `qwen3.7-max-2026-06-08` and later only
-  /// - `qwen3.8-max` (+ snapshots)
-  /// Plain / earlier `qwen3.7-max` text-only SKUs are intentionally excluded.
+  /// - `qwen3.7-plus` / `qwen3.7-flash`（+ 快照）
+  /// - 仅限 vision Max 快照 `qwen3.7-max-2026-06-08` 及之后
+  /// - `qwen3.8-max`（+ 快照）
+  /// 纯文本 / 更早的 `qwen3.7-max` 文本型 SKU 被有意排除。
   static bool _isQwenVisionModel(String id) {
     final lower = id.toLowerCase();
     if (RegExp(r'qwen-?3([-.])5').hasMatch(lower)) return true;
@@ -109,9 +109,9 @@ class ModelRegistry {
         abilities: ab,
       );
     }
-    // If model id contains 'image', treat it as an image model:
-    // - Input and output both include image
-    // - No tool or reasoning abilities
+    // 如果模型 id 包含 'image'，则将其视为图像模型：
+    // - 输入和输出都包含图像
+    // - 不具备工具或推理能力
     if (id.contains('image')) {
       if (!inMods.contains(Modality.image)) inMods.add(Modality.image);
       if (!outMods.contains(Modality.image)) outMods.add(Modality.image);
@@ -270,7 +270,7 @@ class GoogleProvider extends BaseProvider {
         } else {
           final key = ProviderManager._effectiveApiKey(cfg);
           if (key.isNotEmpty) {
-            // Fallback: treat apiKey as a bearer token if user pasted one
+            // 回退：如果用户粘贴了 apiKey，则将其视为 bearer token
             headers['Authorization'] = 'Bearer $key';
           }
         }
@@ -318,9 +318,9 @@ class GoogleProvider extends BaseProvider {
         }
       } catch (_) {}
 
-      // If this is Vertex AI, augment with known Anthropic models
-      // Since Google listModels API often only returns Gemini models under publishers/google,
-      // we manually inject known supported Claude models for convenience.
+      // 如果是 Vertex AI，则补充已知的 Anthropic 模型
+      // 由于 Google listModels API 在 publishers/google 下通常只返回 Gemini 模型，
+      // 为方便起见，我们手动注入已知受支持的 Claude 模型。
       if (cfg.vertexAI == true) {
         final knownClaude = [
           'claude-fable-5',
@@ -367,7 +367,7 @@ class ProviderManager {
     return cfg.apiKey;
   }
 
-  // Per-model override helpers (duplicated logic from ChatApiService)
+  // 每模型覆盖辅助方法（逻辑与 ChatApiService 重复）
   static Map<String, dynamic> _modelOverride(
     ProviderConfig cfg,
     String modelId,
@@ -461,11 +461,11 @@ class ProviderManager {
                 ],
                 if (useStream) 'stream': true,
               };
-        // Merge custom body overrides
+        // 合并自定义 body 覆盖项
         final extra = _customBody(cfg, modelId);
         if (extra.isNotEmpty) body.addAll(extra);
-        // Merge custom headers overrides
-        // SiliconFlow fallback key for built-in free models when no API key provided
+        // 合并自定义 headers 覆盖项
+        // 未提供 API key 时，用于内置免费模型的 SiliconFlow 回退 key
         String apiKey = _effectiveApiKey(cfg);
         try {
           if ((cfg.id) == 'SiliconFlow') {
@@ -492,7 +492,7 @@ class ProviderManager {
         if (res.statusCode < 200 || res.statusCode >= 300) {
           throw HttpException('HTTP ${res.statusCode}: ${res.body}');
         }
-        // For streaming, verify the response contains SSE data
+        // 对于流式请求，验证响应包含 SSE 数据
         if (useStream) {
           final contentType = res.headers['content-type'] ?? '';
           if (!contentType.contains('text/event-stream') && res.body.isEmpty) {
@@ -537,7 +537,7 @@ class ProviderManager {
         if (res.statusCode < 200 || res.statusCode >= 300) {
           throw HttpException('HTTP ${res.statusCode}: ${res.body}');
         }
-        // For streaming, verify the response contains SSE data
+        // 对于流式请求，验证响应包含 SSE 数据
         if (useStream) {
           final contentType = res.headers['content-type'] ?? '';
           if (!contentType.contains('text/event-stream') && res.body.isEmpty) {
@@ -546,9 +546,9 @@ class ProviderManager {
         }
         return;
       } else if (kind == ProviderKind.google) {
-        // Generative Language API (default) or Vertex AI when vertexAI == true
+        // Generative Language API（默认）或当 vertexAI == true 时使用 Vertex AI
         final ov = _modelOverride(cfg, modelId);
-        // Resolve upstream/api model id for this logical key when present.
+        // 当存在时，为此逻辑 key 解析上游/API 模型 id。
         String upstreamId = modelId;
         try {
           final raw = (ov['apiModelId'] ?? ov['api_model_id'])
@@ -584,7 +584,7 @@ class ProviderManager {
               : cfg.baseUrl;
           url = '$base/models/$upstreamId:$endpoint';
         }
-        // Determine if model outputs images (override wins; otherwise inference)
+        // 确定模型是否输出图像（覆盖项优先；否则推断）
         bool wantsImageOutput = false;
         if (ov['output'] is List) {
           final outList = (ov['output'] as List)
@@ -650,7 +650,7 @@ class ProviderManager {
         if (res.statusCode < 200 || res.statusCode >= 300) {
           throw HttpException('HTTP ${res.statusCode}: ${res.body}');
         }
-        // For streaming, verify the response is not empty
+        // 对于流式请求，验证响应不为空
         if (useStream && res.body.isEmpty) {
           throw HttpException('Stream response expected but not received');
         }

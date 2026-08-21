@@ -23,39 +23,39 @@ class Conversation extends HiveObject {
   @HiveField(5)
   bool isPinned;
 
-  // Per-conversation enabled MCP servers (by server id)
+  // 每个会话启用的 MCP 服务器（按服务器 id）
   @HiveField(6)
   List<String> mcpServerIds;
 
-  // Owner assistant id; null for global/default
+  // 所属助手 id；全局/默认时为 null
   @HiveField(7)
   String? assistantId;
 
-  // Truncate context starting at this index (-1 means no truncation)
+  // 从此索引开始截断上下文（-1 表示不截断）
   @HiveField(8)
   int truncateIndex;
 
-  // Selected version per message group (groupId -> selected version index)
+  // 每个消息组选定的版本（groupId -> 选定的版本索引）
   @HiveField(9)
   Map<String, int> versionSelections;
 
-  // LLM-generated conversation summary
+  // LLM 生成的会话摘要
   @HiveField(10)
   String? summary;
 
-  // Message count when summary was last generated (to avoid redundant updates)
+  // 上次生成摘要时的消息数量（以避免冗余更新）
   @HiveField(11)
   int lastSummarizedMessageCount;
 
-  // LLM-generated quick follow-up suggestions for the latest assistant reply.
+  // 由 LLM 生成的针对最新助手回复的快捷追问建议。
   @HiveField(12)
   List<String> chatSuggestions;
 
-  // Hash of the last injected memory block; null means never injected.
+  // 上次注入的记忆块的哈希；null 表示从未注入。
   @HiveField(13)
   String? injectedMemoryHash;
 
-  // Highest message_order processed by background memory extraction; -1 = never.
+  // 后台记忆提取已处理的最高 message_order；-1 表示从未处理。
   @HiveField(14)
   int lastMemoryExtractedOrder;
 

@@ -7,13 +7,13 @@ Map<String, dynamic> _copyChatCompletionMessage(Map<String, dynamic> m) {
     'content': m.containsKey('content') ? (m['content'] ?? '') : '',
   };
 
-  // Preserve optional name (some providers support it on non-tool roles).
+  // 保留可选的 name（部分供应商支持在非 tool 角色上使用它）。
   final name = m['name'];
   if (role != 'tool' && name != null && name.toString().isNotEmpty) {
     out['name'] = name;
   }
 
-  // Preserve assistant tool_calls + vendor reasoning echoes (when present).
+  // 保留 assistant tool_calls 和供应商推理回显（存在时）。
   if (role == 'assistant') {
     final toolCalls = m['tool_calls'];
     if (toolCalls is List && toolCalls.isNotEmpty) {
@@ -37,7 +37,7 @@ Map<String, dynamic> _copyChatCompletionMessage(Map<String, dynamic> m) {
     }
   }
 
-  // Preserve tool linkage fields.
+  // 保留工具关联字段。
   if (role == 'tool') {
     final toolCallId = m['tool_call_id'];
     if (toolCallId != null && toolCallId.toString().isNotEmpty) {
@@ -48,21 +48,19 @@ Map<String, dynamic> _copyChatCompletionMessage(Map<String, dynamic> m) {
     }
   }
 
-  // Keep structured media refs across tool-followup rebuilds so later
-  // Chat Completions builders can still emit image_url / multimodal parts.
+  // 在工具后续重建时保留结构化媒体引用，以便后续
+  // Chat Completions 构建器仍可发出 image_url / 多模态部分。
   final mediaPaths = m[multimodalInternalMediaPathsKey];
   if (mediaPaths != null) {
     if (mediaPaths is List) {
       out[multimodalInternalMediaPathsKey] = [
         for (final item in mediaPaths)
-          if (item is Map)
-            Map<String, dynamic>.from(item)
-          else
-            item,
+          if (item is Map) Map<String, dynamic>.from(item) else item,
       ];
     } else if (mediaPaths is Map) {
-      out[multimodalInternalMediaPathsKey] =
-          Map<String, dynamic>.from(mediaPaths);
+      out[multimodalInternalMediaPathsKey] = Map<String, dynamic>.from(
+        mediaPaths,
+      );
     } else {
       out[multimodalInternalMediaPathsKey] = mediaPaths;
     }

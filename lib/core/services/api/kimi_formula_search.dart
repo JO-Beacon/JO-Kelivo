@@ -4,8 +4,8 @@ import 'package:http/http.dart' as http;
 
 import '../../providers/settings_provider.dart';
 
-/// Kimi Formula official tools helper (web-search).
-/// Flow: GET tools → chat function call → POST fibers → tool result.
+/// Kimi Formula 官方工具辅助类（web-search）。
+/// 流程：GET tools → chat function call → POST fibers → tool result。
 class KimiFormulaSearch {
   static const String defaultFormulaUri = 'moonshot/web-search:latest';
 
@@ -80,10 +80,10 @@ class KimiFormulaSearch {
     return jsonEncode(error);
   }
 
-  /// Inserts Formula tool decls that do not collide with existing tool names.
+  /// 插入不会与现有工具名称冲突的 Formula 工具声明。
   ///
-  /// Returns the names that were actually inserted after duplicate resolution.
-  /// Call sites must dispatch fibers only for these exact names.
+  /// 返回去重后实际插入的工具名称。
+  /// 调用方必须仅为这些确切名称分派 fiber。
   static Set<String> mergeTools(
     Map<String, dynamic> body,
     List<Map<String, dynamic>> formulaTools,

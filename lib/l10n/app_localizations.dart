@@ -991,13 +991,13 @@ abstract class AppLocalizations {
   /// No description provided for @homePageClearContext.
   ///
   /// In en, this message translates to:
-  /// **'Clear Context'**
+  /// **'Temporarily Mask Context'**
   String get homePageClearContext;
 
   /// No description provided for @homePageClearContextWithCount.
   ///
   /// In en, this message translates to:
-  /// **'Clear Context ({actual}/{configured})'**
+  /// **'Temporarily Mask Context ({actual}/{configured})'**
   String homePageClearContextWithCount(String actual, String configured);
 
   /// No description provided for @homePageDefaultAssistant.
@@ -1345,25 +1345,25 @@ abstract class AppLocalizations {
   /// No description provided for @homePageDeleteMessage.
   ///
   /// In en, this message translates to:
-  /// **'Delete This Version'**
+  /// **'Delete Message'**
   String get homePageDeleteMessage;
 
   /// No description provided for @homePageDeleteMessageConfirm.
   ///
   /// In en, this message translates to:
-  /// **'Are you sure you want to delete this version? This cannot be undone.'**
+  /// **'Are you sure you want to delete this message and its following branch? This cannot be undone.'**
   String get homePageDeleteMessageConfirm;
 
   /// No description provided for @homePageDeleteAllVersions.
   ///
   /// In en, this message translates to:
-  /// **'Delete All Versions'**
+  /// **'Delete Branch'**
   String get homePageDeleteAllVersions;
 
   /// No description provided for @homePageDeleteAllVersionsConfirm.
   ///
   /// In en, this message translates to:
-  /// **'Are you sure you want to delete all versions of this message? This cannot be undone.'**
+  /// **'Are you sure you want to delete this branch and its descendants? Other branches will remain.'**
   String get homePageDeleteAllVersionsConfirm;
 
   /// No description provided for @homePageCancel.
@@ -3106,6 +3106,18 @@ abstract class AppLocalizations {
   /// **'The restore could not be completed. JO-Kelivo verified and kept your previous data.'**
   String get backupRestoreRolledBackContent;
 
+  /// No description provided for @contextTreeMigrationWarningsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Legacy chat migration repaired'**
+  String get contextTreeMigrationWarningsTitle;
+
+  /// No description provided for @contextTreeMigrationWarningsContent.
+  ///
+  /// In en, this message translates to:
+  /// **'JO-Kelivo repaired {count} missing selected-version records while converting legacy chat branches. The repaired choices were written to the warning log. No message text was opened or changed.'**
+  String contextTreeMigrationWarningsContent(int count);
+
   /// No description provided for @backupRestoreFailureTitle.
   ///
   /// In en, this message translates to:
@@ -3153,6 +3165,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Diagnostic code: {code}'**
   String backupRestoreFailureDiagnostic(String code);
+
+  /// No description provided for @backupRestoreCorruptArchiveMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected JO-Kelivo backup is damaged or incomplete, so it was not restored. Your current data was not modified. Diagnostic code: {code}'**
+  String backupRestoreCorruptArchiveMessage(String code);
 
   /// No description provided for @startupRecoveryMoreOptions.
   ///
@@ -3316,6 +3334,12 @@ abstract class AppLocalizations {
   /// **'Backup'**
   String get backupPageBackup;
 
+  /// No description provided for @backupPageLocalBackupAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup'**
+  String get backupPageLocalBackupAction;
+
   /// No description provided for @backupPageExporting.
   ///
   /// In en, this message translates to:
@@ -3355,7 +3379,7 @@ abstract class AppLocalizations {
   /// No description provided for @backupPageImportKelivoBackup.
   ///
   /// In en, this message translates to:
-  /// **'Import from Kelivo Backup'**
+  /// **'Import from Kelivo'**
   String get backupPageImportKelivoBackup;
 
   /// No description provided for @backupPageImportFromOtherApps.
@@ -3949,8 +3973,20 @@ abstract class AppLocalizations {
   /// No description provided for @bottomToolsSheetClearContext.
   ///
   /// In en, this message translates to:
-  /// **'Clear Context'**
+  /// **'Temporarily Mask Context'**
   String get bottomToolsSheetClearContext;
+
+  /// No description provided for @contextManagementMaskContext.
+  ///
+  /// In en, this message translates to:
+  /// **'Temporarily Mask Context'**
+  String get contextManagementMaskContext;
+
+  /// No description provided for @contextManagementRestoreContext.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore Context'**
+  String get contextManagementRestoreContext;
 
   /// No description provided for @compressContext.
   ///
@@ -3967,7 +4003,7 @@ abstract class AppLocalizations {
   /// No description provided for @clearContextDesc.
   ///
   /// In en, this message translates to:
-  /// **'Mark a context boundary'**
+  /// **'Temporarily mask earlier messages and only send messages after the boundary to the model.'**
   String get clearContextDesc;
 
   /// No description provided for @contextManagement.
@@ -4171,13 +4207,13 @@ abstract class AppLocalizations {
   /// No description provided for @messageMoreSheetDelete.
   ///
   /// In en, this message translates to:
-  /// **'Delete This Version'**
+  /// **'Delete Message'**
   String get messageMoreSheetDelete;
 
   /// No description provided for @messageMoreSheetDeleteAllVersions.
   ///
   /// In en, this message translates to:
-  /// **'Delete All Versions'**
+  /// **'Delete Branch'**
   String get messageMoreSheetDeleteAllVersions;
 
   /// No description provided for @reasoningBudgetSheetOff.
@@ -4621,13 +4657,13 @@ abstract class AppLocalizations {
   /// No description provided for @chatSelectionDeleteSelectedConfirm.
   ///
   /// In en, this message translates to:
-  /// **'Delete {count} selected version(s)? This cannot be undone.'**
+  /// **'Delete {count} selected message(s)? This cannot be undone.'**
   String chatSelectionDeleteSelectedConfirm(int count);
 
   /// No description provided for @chatSelectionDeleteSelectedAllVersionsConfirm.
   ///
   /// In en, this message translates to:
-  /// **'Delete all versions of {count} selected message(s)? This cannot be undone.'**
+  /// **'Delete the branches and descendants of {count} selected message(s)? This cannot be undone.'**
   String chatSelectionDeleteSelectedAllVersionsConfirm(int count);
 
   /// No description provided for @messageExportSheetAssistant.
@@ -7272,6 +7308,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Scroll to bottom'**
   String get miniMapScrollToBottomTooltip;
+
+  /// No description provided for @treeBranchPanelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Context branches'**
+  String get treeBranchPanelTitle;
+
+  /// No description provided for @treeBranchRootLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Main branch'**
+  String get treeBranchRootLabel;
+
+  /// No description provided for @treeBranchDefaultLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch'**
+  String get treeBranchDefaultLabel;
+
+  /// No description provided for @treeMapUserLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'User'**
+  String get treeMapUserLabel;
+
+  /// No description provided for @treeMapAssistantLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant'**
+  String get treeMapAssistantLabel;
 
   /// No description provided for @searchServicesPageApiKeyRequiredStatus.
   ///
@@ -13818,6 +13884,168 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Collapse'**
   String get memoryTraceShowLess;
+
+  /// No description provided for @sqliteMigrationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepare storage migration'**
+  String get sqliteMigrationTitle;
+
+  /// No description provided for @sqliteMigrationSourceDatabaseLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Linear SQLite'**
+  String get sqliteMigrationSourceDatabaseLabel;
+
+  /// No description provided for @sqliteMigrationTargetDatabaseLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Tree SQLite'**
+  String get sqliteMigrationTargetDatabaseLabel;
+
+  /// No description provided for @sqliteMigrationSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'JO-Kelivo needs to migrate this older SQLite archive before it can start.'**
+  String get sqliteMigrationSubtitle;
+
+  /// No description provided for @sqliteMigrationBackupNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Before migration, JO-Kelivo saves and verifies a ZIP backup containing settings, chat history, and local files.'**
+  String get sqliteMigrationBackupNote;
+
+  /// No description provided for @sqliteMigrationChooseFileButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Save migration backup'**
+  String get sqliteMigrationChooseFileButton;
+
+  /// No description provided for @sqliteMigrationCreateSnapshotDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating database snapshot'**
+  String get sqliteMigrationCreateSnapshotDetail;
+
+  /// No description provided for @sqliteMigrationPackageBackupDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Packaging migration backup'**
+  String get sqliteMigrationPackageBackupDetail;
+
+  /// No description provided for @sqliteMigrationValidateBackupDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Validating backup'**
+  String get sqliteMigrationValidateBackupDetail;
+
+  /// No description provided for @sqliteMigrationBackupReadyDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup verified'**
+  String get sqliteMigrationBackupReadyDetail;
+
+  /// No description provided for @sqliteMigrationUpgradeSchemaDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Upgrading database schema'**
+  String get sqliteMigrationUpgradeSchemaDetail;
+
+  /// No description provided for @sqliteMigrationValidateDatabaseDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Validating migrated database'**
+  String get sqliteMigrationValidateDatabaseDetail;
+
+  /// No description provided for @sqliteMigrationChecklistSnapshot.
+  ///
+  /// In en, this message translates to:
+  /// **'Create database snapshot'**
+  String get sqliteMigrationChecklistSnapshot;
+
+  /// No description provided for @sqliteMigrationChecklistPackage.
+  ///
+  /// In en, this message translates to:
+  /// **'Package settings and local files'**
+  String get sqliteMigrationChecklistPackage;
+
+  /// No description provided for @sqliteMigrationChecklistValidateBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Validate backup'**
+  String get sqliteMigrationChecklistValidateBackup;
+
+  /// No description provided for @sqliteMigrationChecklistUpgradeSchema.
+  ///
+  /// In en, this message translates to:
+  /// **'Upgrade database schema'**
+  String get sqliteMigrationChecklistUpgradeSchema;
+
+  /// No description provided for @sqliteMigrationChecklistValidateDatabase.
+  ///
+  /// In en, this message translates to:
+  /// **'Validate migrated database'**
+  String get sqliteMigrationChecklistValidateDatabase;
+
+  /// No description provided for @sqliteMigrationBackingUpTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Backing up original storage'**
+  String get sqliteMigrationBackingUpTitle;
+
+  /// No description provided for @sqliteMigrationBackingUpSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Copying and verifying the original files. Do not close JO-Kelivo.'**
+  String get sqliteMigrationBackingUpSubtitle;
+
+  /// No description provided for @sqliteMigrationMigratingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Migrating storage'**
+  String get sqliteMigrationMigratingTitle;
+
+  /// No description provided for @sqliteMigrationMigratingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The verified original backup is retained while the database is upgraded.'**
+  String get sqliteMigrationMigratingSubtitle;
+
+  /// No description provided for @sqliteMigrationCompleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage migration complete'**
+  String get sqliteMigrationCompleteTitle;
+
+  /// No description provided for @sqliteMigrationCompleteSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart JO-Kelivo to open the migrated storage.'**
+  String get sqliteMigrationCompleteSubtitle;
+
+  /// No description provided for @sqliteMigrationFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage migration failed'**
+  String get sqliteMigrationFailedTitle;
+
+  /// No description provided for @sqliteMigrationFailedSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The migration was stopped. Review the error and retry only after the cause is resolved.'**
+  String get sqliteMigrationFailedSubtitle;
+
+  /// No description provided for @sqliteMigrationRetryButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry migration'**
+  String get sqliteMigrationRetryButton;
+
+  /// No description provided for @sqliteMigrationRestartButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart JO-Kelivo'**
+  String get sqliteMigrationRestartButton;
 }
 
 class _AppLocalizationsDelegate

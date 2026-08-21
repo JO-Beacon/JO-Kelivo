@@ -4,14 +4,14 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'restore_durability.dart';
 
-/// Makes a closed live SQLite database self-contained before it is described
-/// or renamed into the previous bundle.
+/// 在将已关闭的实时 SQLite 数据库描述或重命名到 previous bundle 之前，
+/// 使其成为自包含的。
 final class RestoreLiveDatabase {
   RestoreLiveDatabase._();
 
   static const _sidecarSuffixes = ['-wal', '-shm', '-journal'];
 
-  /// Returns false when the complete database family is absent.
+  /// 当完整数据库族缺失时返回 false。
   static Future<bool> normalize({
     required File databaseFile,
     RestoreDurability? durability,

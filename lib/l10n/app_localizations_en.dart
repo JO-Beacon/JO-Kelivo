@@ -484,11 +484,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get languageSelectSheetClearButton => 'Clear Translation';
 
   @override
-  String get homePageClearContext => 'Clear Context';
+  String get homePageClearContext => 'Temporarily Mask Context';
 
   @override
   String homePageClearContextWithCount(String actual, String configured) {
-    return 'Clear Context ($actual/$configured)';
+    return 'Temporarily Mask Context ($actual/$configured)';
   }
 
   @override
@@ -674,18 +674,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get userProviderDefaultUserName => 'User';
 
   @override
-  String get homePageDeleteMessage => 'Delete This Version';
+  String get homePageDeleteMessage => 'Delete Message';
 
   @override
   String get homePageDeleteMessageConfirm =>
-      'Are you sure you want to delete this version? This cannot be undone.';
+      'Are you sure you want to delete this message and its following branch? This cannot be undone.';
 
   @override
-  String get homePageDeleteAllVersions => 'Delete All Versions';
+  String get homePageDeleteAllVersions => 'Delete Branch';
 
   @override
   String get homePageDeleteAllVersionsConfirm =>
-      'Are you sure you want to delete all versions of this message? This cannot be undone.';
+      'Are you sure you want to delete this branch and its descendants? Other branches will remain.';
 
   @override
   String get homePageCancel => 'Cancel';
@@ -1623,6 +1623,15 @@ class AppLocalizationsEn extends AppLocalizations {
       'The restore could not be completed. JO-Kelivo verified and kept your previous data.';
 
   @override
+  String get contextTreeMigrationWarningsTitle =>
+      'Legacy chat migration repaired';
+
+  @override
+  String contextTreeMigrationWarningsContent(int count) {
+    return 'JO-Kelivo repaired $count missing selected-version records while converting legacy chat branches. The repaired choices were written to the warning log. No message text was opened or changed.';
+  }
+
+  @override
   String get backupRestoreFailureTitle => 'Restore requires attention';
 
   @override
@@ -1649,6 +1658,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String backupRestoreFailureDiagnostic(String code) {
     return 'Diagnostic code: $code';
+  }
+
+  @override
+  String backupRestoreCorruptArchiveMessage(String code) {
+    return 'The selected JO-Kelivo backup is damaged or incomplete, so it was not restored. Your current data was not modified. Diagnostic code: $code';
   }
 
   @override
@@ -1744,6 +1758,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageBackup => 'Backup';
 
   @override
+  String get backupPageLocalBackupAction => 'Backup';
+
+  @override
   String get backupPageExporting => 'Exporting...';
 
   @override
@@ -1762,7 +1779,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageImportBackupFileSubtitle => 'Import a local backup file';
 
   @override
-  String get backupPageImportKelivoBackup => 'Import from Kelivo Backup';
+  String get backupPageImportKelivoBackup => 'Import from Kelivo';
 
   @override
   String get backupPageImportFromOtherApps => 'Import from Other Apps';
@@ -2076,7 +2093,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bottomToolsSheetUpload => 'Upload';
 
   @override
-  String get bottomToolsSheetClearContext => 'Clear Context';
+  String get bottomToolsSheetClearContext => 'Temporarily Mask Context';
+
+  @override
+  String get contextManagementMaskContext => 'Temporarily Mask Context';
+
+  @override
+  String get contextManagementRestoreContext => 'Restore Context';
 
   @override
   String get compressContext => 'Compress Context';
@@ -2085,7 +2108,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get compressContextDesc => 'Summarize and start a new chat';
 
   @override
-  String get clearContextDesc => 'Mark a context boundary';
+  String get clearContextDesc =>
+      'Temporarily mask earlier messages and only send messages after the boundary to the model.';
 
   @override
   String get contextManagement => 'Context Management';
@@ -2190,10 +2214,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageMoreSheetCreateBranch => 'Create Branch';
 
   @override
-  String get messageMoreSheetDelete => 'Delete This Version';
+  String get messageMoreSheetDelete => 'Delete Message';
 
   @override
-  String get messageMoreSheetDeleteAllVersions => 'Delete All Versions';
+  String get messageMoreSheetDeleteAllVersions => 'Delete Branch';
 
   @override
   String get reasoningBudgetSheetOff => 'Off';
@@ -2450,12 +2474,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String chatSelectionDeleteSelectedConfirm(int count) {
-    return 'Delete $count selected version(s)? This cannot be undone.';
+    return 'Delete $count selected message(s)? This cannot be undone.';
   }
 
   @override
   String chatSelectionDeleteSelectedAllVersionsConfirm(int count) {
-    return 'Delete all versions of $count selected message(s)? This cannot be undone.';
+    return 'Delete the branches and descendants of $count selected message(s)? This cannot be undone.';
   }
 
   @override
@@ -3901,6 +3925,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get miniMapScrollToBottomTooltip => 'Scroll to bottom';
+
+  @override
+  String get treeBranchPanelTitle => 'Context branches';
+
+  @override
+  String get treeBranchRootLabel => 'Main branch';
+
+  @override
+  String get treeBranchDefaultLabel => 'Branch';
+
+  @override
+  String get treeMapUserLabel => 'User';
+
+  @override
+  String get treeMapAssistantLabel => 'Assistant';
 
   @override
   String get searchServicesPageApiKeyRequiredStatus => 'API Key Required';
@@ -7567,4 +7606,95 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get memoryTraceShowLess => 'Collapse';
+
+  @override
+  String get sqliteMigrationTitle => 'Prepare storage migration';
+
+  @override
+  String get sqliteMigrationSourceDatabaseLabel => 'Linear SQLite';
+
+  @override
+  String get sqliteMigrationTargetDatabaseLabel => 'Tree SQLite';
+
+  @override
+  String get sqliteMigrationSubtitle =>
+      'JO-Kelivo needs to migrate this older SQLite archive before it can start.';
+
+  @override
+  String get sqliteMigrationBackupNote =>
+      'Before migration, JO-Kelivo saves and verifies a ZIP backup containing settings, chat history, and local files.';
+
+  @override
+  String get sqliteMigrationChooseFileButton => 'Save migration backup';
+
+  @override
+  String get sqliteMigrationCreateSnapshotDetail =>
+      'Creating database snapshot';
+
+  @override
+  String get sqliteMigrationPackageBackupDetail => 'Packaging migration backup';
+
+  @override
+  String get sqliteMigrationValidateBackupDetail => 'Validating backup';
+
+  @override
+  String get sqliteMigrationBackupReadyDetail => 'Backup verified';
+
+  @override
+  String get sqliteMigrationUpgradeSchemaDetail => 'Upgrading database schema';
+
+  @override
+  String get sqliteMigrationValidateDatabaseDetail =>
+      'Validating migrated database';
+
+  @override
+  String get sqliteMigrationChecklistSnapshot => 'Create database snapshot';
+
+  @override
+  String get sqliteMigrationChecklistPackage =>
+      'Package settings and local files';
+
+  @override
+  String get sqliteMigrationChecklistValidateBackup => 'Validate backup';
+
+  @override
+  String get sqliteMigrationChecklistUpgradeSchema => 'Upgrade database schema';
+
+  @override
+  String get sqliteMigrationChecklistValidateDatabase =>
+      'Validate migrated database';
+
+  @override
+  String get sqliteMigrationBackingUpTitle => 'Backing up original storage';
+
+  @override
+  String get sqliteMigrationBackingUpSubtitle =>
+      'Copying and verifying the original files. Do not close JO-Kelivo.';
+
+  @override
+  String get sqliteMigrationMigratingTitle => 'Migrating storage';
+
+  @override
+  String get sqliteMigrationMigratingSubtitle =>
+      'The verified original backup is retained while the database is upgraded.';
+
+  @override
+  String get sqliteMigrationCompleteTitle => 'Storage migration complete';
+
+  @override
+  String get sqliteMigrationCompleteSubtitle =>
+      'Restart JO-Kelivo to open the migrated storage.';
+
+  @override
+  String get sqliteMigrationFailedTitle => 'Storage migration failed';
+
+  @override
+  String get sqliteMigrationFailedSubtitle =>
+      'The migration was stopped. Review the error and retry only after the cause is resolved.';
+
+  @override
+  String get sqliteMigrationRetryButton => 'Retry migration';
+
+  @override
+  String get sqliteMigrationRestartButton => 'Restart JO-Kelivo';
 }

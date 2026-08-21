@@ -50,7 +50,7 @@ class _McpJsonEditSheetState extends State<_McpJsonEditSheet> {
   Future<void> _save() async {
     final l10n = AppLocalizations.of(context)!;
     try {
-      // Quick JSON check before provider import for immediate feedback
+      // 在供应商导入前快速检查 JSON，以立即反馈
       jsonDecode(_controller.text);
     } catch (e) {
       setState(() => _error = e.toString());
@@ -80,7 +80,7 @@ class _McpJsonEditSheetState extends State<_McpJsonEditSheet> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    // Resolve user-preferred code font family (Google/local/system)
+    // 解析用户首选的代码字体（Google、本地或系统）
     final settings = context.watch<SettingsProvider>();
     String resolveCodeFont() {
       final fam = settings.codeFontFamily;
@@ -106,7 +106,7 @@ class _McpJsonEditSheetState extends State<_McpJsonEditSheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Drag handle
+            // 拖动把手
             const SizedBox(height: 8),
             Center(
               child: Container(
@@ -119,7 +119,7 @@ class _McpJsonEditSheetState extends State<_McpJsonEditSheet> {
               ),
             ),
             // const SizedBox(height: 6),
-            // Header bar
+            // 标题栏
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 2, 8, 6),
               child: Row(
@@ -191,7 +191,10 @@ class _McpJsonEditSheetState extends State<_McpJsonEditSheet> {
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                 child: Text(
                   _error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ],

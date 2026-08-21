@@ -1,8 +1,8 @@
-/// Presentation and interaction capabilities for the home sidebar.
+/// 主侧边栏的展示与交互能力。
 ///
-/// The home shell owns these decisions. [SideDrawer] consumes them instead of
-/// reading the host platform itself, so the same sidebar can render as an
-/// off-canvas drawer on compact screens or a docked panel on wider surfaces.
+/// 主外壳负责这些决策。[SideDrawer] 使用这些值，而不自行读取宿主平台；
+/// 因此同一个侧边栏可以在紧凑屏幕上渲染为抽屉，
+/// 也可以在较宽屏幕上渲染为停靠面板。
 enum SidebarPresentation { overlay, docked }
 
 class SidebarCapabilities {
@@ -14,19 +14,19 @@ class SidebarCapabilities {
     this.assistantReorder = false,
   });
 
-  /// Render separate assistant and conversation tabs.
+  /// 分别渲染助手和对话标签页。
   final bool showTabs;
 
-  /// Render only the assistant list.
+  /// 只渲染助手列表。
   final bool assistantsOnly;
 
-  /// Render only the conversation list.
+  /// 只渲染对话列表。
   final bool topicsOnly;
 
-  /// Enable pointer-oriented interactions such as hover, context menus, and
-  /// desktop navigation entry points.
+  /// 启用面向指针的交互，例如悬停、上下文菜单和
+  /// 桌面导航入口。
   final bool pointerInteractions;
 
-  /// Allow reordering assistants in place.
+  /// 允许原地重排助手。
   final bool assistantReorder;
 }

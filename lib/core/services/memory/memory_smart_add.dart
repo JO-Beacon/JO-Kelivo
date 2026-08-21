@@ -9,10 +9,10 @@ import 'memory_tokenizer.dart';
 import 'memory_tools.dart';
 import 'memory_trace.dart';
 
-/// Smart Add action (§12.6).
+/// Smart Add 动作 (§12.6)。
 enum SmartAddAction { neu, merge, conflict, skip }
 
-/// Parsed / resolved decision for one candidate item.
+/// 单个候选项的已解析/已决策结果。
 class SmartAddDecision {
   const SmartAddDecision({
     required this.action,
@@ -29,7 +29,7 @@ class SmartAddDecision {
   final bool degraded;
 }
 
-/// Result of applying one Smart Add decision.
+/// 应用单个 Smart Add 决策的结果。
 class SmartAddResult {
   const SmartAddResult({
     required this.action,
@@ -66,7 +66,7 @@ class SmartAddResult {
   }
 }
 
-/// Input item for Smart Add (from Extract or `memory_update`).
+/// Smart Add 的输入项（来自 Extract 或 `memory_update`）。
 class SmartAddItem {
   const SmartAddItem({
     required this.type,
@@ -81,7 +81,7 @@ class SmartAddItem {
   final String? assistantId;
 }
 
-/// Smart Add: candidate retrieval, LLM judge, NEW/MERGE/CONFLICT/SKIP (§12.6).
+/// Smart Add：候选招回、LLM 裁决、NEW/MERGE/CONFLICT/SKIP (§12.6)。
 class MemorySmartAdd {
   MemorySmartAdd({required this.repository, required this.chatRepository});
 
@@ -183,7 +183,7 @@ class MemorySmartAdd {
     return buf.toString().trimRight();
   }
 
-  /// Candidate retrieval (§12.6): OR + hits, pad to 5 with recent same-type.
+  /// 候选招回 (§12.6)：OR + 命中，用同类型近期条目补足到 5 条。
   Future<List<MemoryEntry>> candidatesFor({
     required String? assistantId,
     required MemoryType type,
@@ -194,7 +194,7 @@ class MemorySmartAdd {
 
     var base = <MemoryEntry>[];
     if (escaped.isNotEmpty) {
-      // Copy: search may return an unmodifiable const empty list.
+      // 复制：search 可能返回不可修改的常量空列表。
       base = List<MemoryEntry>.of(
         await chatRepository.searchMemories(
           assistantId: assistantId,
@@ -276,7 +276,7 @@ class MemorySmartAdd {
     }
   }
 
-  /// Validate / degrade one decision against [candidateIds] (§12.6).
+  /// 依据 [candidateIds] 校验/降级单个决策 (§12.6)。
   static SmartAddDecision normalizeDecision(
     SmartAddDecision decision,
     Set<String> candidateIds,
@@ -314,7 +314,7 @@ class MemorySmartAdd {
     );
   }
 
-  /// Parse a per-item JSON response. Null → caller should degrade.
+  /// 解析单项 JSON 响应。返回 null 时由调用方降级。
   static SmartAddDecision? parsePerItem(String response) {
     final decoded = extractJson(response);
     if (decoded is! Map) return null;
@@ -340,7 +340,7 @@ class MemorySmartAdd {
     );
   }
 
-  /// Parse batched JSON. Missing indexes are left null for degrade.
+  /// 解析批量 JSON。缺失索引留 null 以供降级。
   static List<SmartAddDecision?>? parseBatch(String response, int count) {
     final decoded = extractJson(response);
     if (decoded is! Map) return null;
@@ -378,7 +378,7 @@ class MemorySmartAdd {
     return [for (var i = 1; i <= count; i++) byIndex[i]];
   }
 
-  /// Exact-duplicate → SKIP; else NEW (degraded path when no LLM / bad JSON).
+  /// 完全重复 → SKIP；否则 NEW（无 LLM / JSON 异常时的降级路径）。
   Future<SmartAddDecision> degradeDecision({
     required String? visibilityAssistantId,
     required MemoryType type,
@@ -399,7 +399,7 @@ class MemorySmartAdd {
     return const SmartAddDecision(action: SmartAddAction.neu, degraded: true);
   }
 
-  /// Read an entry's current content, for trace before/after values only.
+  /// 读取条目当前内容，仅用于 trace 的前后值。
   Future<String?> _contentBefore(String? id) async {
     if (id == null) return null;
     try {
@@ -526,7 +526,7 @@ class MemorySmartAdd {
     }
   }
 
-  /// Run Smart Add for a single item (`memory_update` / perItem mode).
+  /// 对单个项运行 Smart Add（`memory_update` / perItem 模式）。
   Future<SmartAddResult> addOne({
     required SmartAddItem item,
     required String visibilityAssistantId,
@@ -537,7 +537,7 @@ class MemorySmartAdd {
     String? overrideEn,
     MemoryTraceStep? traceStep,
   }) async {
-    // Fast path: exact duplicate (§12.6).
+    // 快速路径：完全重复 (§12.6)。
     final exact = await chatRepository.findExactMemory(
       assistantId: visibilityAssistantId,
       type: item.type,
@@ -605,10 +605,10 @@ class MemorySmartAdd {
     );
   }
 
-  /// Run Smart Add for multiple items (batched or perItem).
+  /// 对多项运行 Smart Add（批量或 perItem）。
   ///
-  /// Returns results in the same order as [items], plus whether any identity
-  /// NEW/MERGE/CONFLICT occurred (for Distiller).
+  /// 返回结果顺序与 [items] 一致，并附带是否发生过任何身份级
+  /// NEW/MERGE/CONFLICT（供 Distiller 使用）。
   Future<({List<SmartAddResult> results, bool identityChanged})> addMany({
     required List<SmartAddItem> items,
     required String visibilityAssistantId,
@@ -651,7 +651,7 @@ class MemorySmartAdd {
       return (results: results, identityChanged: identityChanged);
     }
 
-    // Batched path
+    // 批量路径
     final perItemCandidates = <List<MemoryEntry>>[];
     final union = <String, MemoryEntry>{};
     final decisions = <SmartAddDecision?>[];
@@ -678,7 +678,7 @@ class MemorySmartAdd {
       for (final e in cands) {
         union[e.id] = e;
       }
-      decisions.add(null); // to fill from LLM
+      decisions.add(null); // 由 LLM 填充
     }
 
     final needLlm = decisions.any((d) => d == null);
@@ -691,11 +691,10 @@ class MemorySmartAdd {
         pendingItems.add(items[i]);
         pendingIndexes.add(i);
       }
-      // Re-index for the batch prompt as 1..N of pending only would break
-      // the contract (index is over the full {{itemsText}}). Send all items
-      // that still need a decision, with their original 1-based indexes in
-      // a contiguous itemsText of just those — simpler: send ALL non-exact
-      // items as [1]..[k] and map back.
+      // 仅以待处理项重新编为 1..N 供批量 prompt 会破坏
+      // 约定（索引覆盖整个 {{itemsText}}）。把仍需决策的所有项
+      // 连同其原始 1 基索引发送，组成仅含这些项的连续 itemsText——
+      // 更简单的做法：把所有非完全重复的项作为 [1]..[k] 发送并反向映射。
       final prompt = buildBatchPrompt(
         lang: lang,
         itemsText: formatItemsText(pendingItems),
@@ -747,9 +746,9 @@ class MemorySmartAdd {
     for (var i = 0; i < items.length; i++) {
       final item = items[i];
       final candidateIds = {for (final e in perItemCandidates[i]) e.id};
-      // Also allow relatedIds / targetId from the union for batched mode
-      // (entriesText is the union). §12.6: relatedIds not in *candidate set*
-      // for that item — use per-item candidates.
+      // 批量模式下也允许来自并集的 relatedIds / targetId
+      // （entriesText 即并集）。§12.6：relatedIds 不在该项的*候选集*内
+      // ——使用该项的逐项候选。
       final decision =
           decisions[i] ??
           await degradeDecision(
@@ -775,7 +774,7 @@ class MemorySmartAdd {
     return (results: results, identityChanged: identityChanged);
   }
 
-  /// Resolve write scope for an Extract item under [policy].
+  /// 在 [policy] 下为 Extract 项解析写入作用域。
   static MemoryScope resolveScopeForExtracted({
     required MemoryWriteScope policy,
     required String? scopeAttr,

@@ -9,7 +9,7 @@ import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
-/// Shared model tag/capsule renderer used across model lists.
+/// 在多个模型列表中共享的模型标签或胶囊渲染器。
 class ModelTagWrap extends StatelessWidget {
   const ModelTagWrap({super.key, required this.model});
 
@@ -247,7 +247,7 @@ class ModelTagWrap extends StatelessWidget {
   }
 }
 
-/// Capsule row used by desktop model lists.
+/// 桌面模型列表使用的胶囊行。
 class ModelCapsulesRow extends StatelessWidget {
   const ModelCapsulesRow({
     super.key,

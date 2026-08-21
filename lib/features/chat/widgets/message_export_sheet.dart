@@ -40,7 +40,7 @@ import '../utils/thinking_tag_parser.dart';
 import 'chat_message_widget.dart'
     show ChatMessageWidget, ToolUIPart, ReasoningSegment;
 
-// Shared helpers
+// 共享辅助函数
 String _guessImageMime(String path) {
   final lower = path.toLowerCase();
   if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
@@ -76,7 +76,7 @@ String? _modelDisplayNameFromSettings(
         }
       }
     } catch (_) {
-      // ignore lookup issues; fall back to inference below.
+      // 忽略查找异常；回退到下方推断。
     }
   }
 
@@ -112,11 +112,11 @@ String _getRoleNameFromDependencies({
   return msg.role;
 }
 
-/// Build export payload from structured [MessagePart]s.
+/// 从结构化 [MessagePart] 构建导出载荷。
 ///
-/// Text comes from [textOverride] (e.g. thinking-stripped assistant body) or
-/// [ChatMessage.content] (TextPart join). Attachments are taken from ImagePart /
-/// FilePart only — never reconstructed as legacy marker strings.
+/// 文本取自 [textOverride]（例如去除 thinking 的助手正文）或
+/// [ChatMessage.content]（TextPart 拼接）。附件取自 ImagePart /
+/// FilePart——绝不还原为旧版标记字符串。
 _Parsed _exportPartsFromMessage(ChatMessage message, {String? textOverride}) {
   final images = <String>[];
   final docs = <_DocRef>[];
@@ -139,7 +139,7 @@ _Parsed _exportPartsFromMessage(ChatMessage message, {String? textOverride}) {
 }
 
 String _softBreakMd(String input) {
-  // Insert zero-width break in very long tokens outside fenced code blocks.
+  // 在围栏代码块之外的超长 token 中插入零宽断行符。
   final lines = input.split('\n');
   final out = StringBuffer();
   bool inFence = false;
@@ -147,7 +147,7 @@ String _softBreakMd(String input) {
     String l = line;
     final trimmed = l.trimLeft();
     if (trimmed.startsWith('```')) {
-      inFence = !inFence; // toggle on fence lines
+      inFence = !inFence; // 围栏行上切换
       out.writeln(l);
       continue;
     }
@@ -181,7 +181,7 @@ _ThinkingExportData _thinkingExportDataForMessage(ChatMessage message) {
   final thinkingTexts = <String>[];
   var cleanedContent = message.content.trim();
 
-  // Prefer structured reasoning segments (may include multiple blocks).
+  // 优先使用结构化推理段（可能含多个块）。
   final segJson = (message.reasoningSegmentsJson ?? '').trim();
   if (segJson.isNotEmpty) {
     try {
@@ -197,14 +197,14 @@ _ThinkingExportData _thinkingExportDataForMessage(ChatMessage message) {
     } catch (_) {}
   }
 
-  // Fall back to <think> tags if segments are not available.
+  // 若段不可用，则回退到 <think> 标签。
   if (thinkingTexts.isEmpty) {
     final parsed = ThinkingTagParser.parseLegacyInlineBlocks(message.content);
     cleanedContent = parsed.visibleContent;
     thinkingTexts.addAll(parsed.thinkingTexts);
   }
 
-  // Fall back to the legacy reasoningText field.
+  // 回退到旧版 reasoningText 字段。
   if (thinkingTexts.isEmpty) {
     final rt = (message.reasoningText ?? '').trim();
     if (rt.isNotEmpty) thinkingTexts.add(rt);
@@ -387,7 +387,7 @@ Future<void> _saveExportTextWithPicker(
       type: FileType.custom,
       allowedExtensions: allowedExtensions,
     );
-    if (savePath == null) return; // user cancelled
+    if (savePath == null) return; // 用户已取消
 
     try {
       await File(savePath).parent.create(recursive: true);
@@ -411,7 +411,7 @@ Future<void> _saveExportTextWithPicker(
     return;
   }
 
-  // Mobile: use FilePicker with bytes parameter (required on Android & iOS).
+  // 移动端：使用带 bytes 参数的 FilePicker（Android 与 iOS 必需）。
   final contentBytes = utf8.encode(content);
   final String? savePath = await FilePicker.platform.saveFile(
     dialogTitle: l10n.backupPageExportToFile,
@@ -683,7 +683,7 @@ Future<File?> _renderAndSaveMessageImage(
   final title =
       chatService.getConversation(message.conversationId)?.title ??
       l10n.messageExportSheetDefaultTitle;
-  // Pre-render mermaid diagrams to images for export
+  // 为导出预渲染 mermaid 图表为图片
   try {
     final codes = extractMermaidCodes(message.content);
     await preRenderMermaidCodesForExport(context, codes);
@@ -726,7 +726,7 @@ Future<File?> _renderAndSaveChatImage(
   final cs = theme.colorScheme;
   final settings = context.read<SettingsProvider>();
   final l10n = AppLocalizations.of(context)!;
-  // Pre-render all mermaid diagrams found in selected messages
+  // 预渲染选中消息中的所有 mermaid 图表
   try {
     final codes = messages
         .map((m) => extractMermaidCodes(m.content))
@@ -787,7 +787,7 @@ const int _exportImageBlankColorTolerance = 3;
   return _exportImageRenderConfig(isDesktop: isDesktop);
 }
 
-// New direct rendering approach without pagination
+// 不分页的直接渲染方案
 Future<File?> _renderWidgetDirectly(
   BuildContext context,
   Widget Function() buildContent, {
@@ -803,13 +803,13 @@ Future<File?> _renderWidgetDirectly(
   late OverlayEntry entry;
   entry = OverlayEntry(
     builder: (ctx) {
-      // Schedule the completion after multiple frames to ensure rendering
+      // 在多帧之后再触发完成回调，以确保渲染完成
       int frameCount = 0;
       void scheduleCompletion() {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           frameCount++;
           if (frameCount < 3) {
-            // Wait for 3 frames to ensure complete rendering
+            // 等待 3 帧以确保渲染完成
             scheduleCompletion();
           } else if (!completer.isCompleted) {
             completer.complete();
@@ -820,7 +820,7 @@ Future<File?> _renderWidgetDirectly(
       scheduleCompletion();
 
       return Positioned(
-        left: -10000, // Position far offscreen
+        left: -10000, // 放到屏幕外远处
         top: -10000,
         child: _ExportCaptureRoot(
           theme: theme,
@@ -836,9 +836,9 @@ Future<File?> _renderWidgetDirectly(
   var entryRemoved = false;
 
   try {
-    // Wait for the widget to be ready
+    // 等待 widget 就绪
     await completer.future;
-    // Additional delay to ensure everything is painted
+    // 额外延时以确保全部绘制完成
     await Future<void>.delayed(const Duration(milliseconds: 500));
 
     final boundary =
@@ -863,7 +863,7 @@ Future<File?> _renderWidgetDirectly(
     }
     if (data == null) return null;
 
-    // Save to file
+    // 保存到文件
     final dir = await getTemporaryDirectory();
     final file = File(
       '${dir.path}/chat-export-${DateTime.now().millisecondsSinceEpoch}.png',
@@ -990,8 +990,8 @@ class _ExportCaptureViewportRoot extends StatelessWidget {
   }
 }
 
-// Keep whole-image captures below the common 16384px GPU texture edge while
-// avoiding the slice compositor for exports that can still fit at >=2x.
+// 将整图截图控制在常见 16384px GPU 纹理上限以下，同时
+// 对仍能以 >=2x 适配的导出避免使用切片合成器。
 const double _maxExportFullCapturePhysicalDimension = 15360.0;
 const double _maxExportCaptureSlicePhysicalHeight = 4096.0;
 const double _minExportFullCapturePixelRatio = 2.0;
@@ -1506,7 +1506,7 @@ Future<void> showMessageExportSheet(
   final cs = Theme.of(context).colorScheme;
   try {
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      // Desktop: show centered dialog
+      // 桌面端：居中显示对话框
       await showDialog<void>(
         context: context,
         barrierDismissible: true,
@@ -1525,9 +1525,9 @@ Future<void> showMessageExportSheet(
       return;
     }
   } catch (_) {
-    // Fallback to bottom sheet below
+    // 回退到下方底部弹层
   }
-  // Mobile: keep bottom sheet
+  // 移动端：使用底部弹层
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -1552,7 +1552,7 @@ Future<void> showChatExportSheet(
   final cs = Theme.of(context).colorScheme;
   try {
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      // Desktop: show centered dialog
+      // 桌面端：居中显示对话框
       await showDialog<void>(
         context: context,
         barrierDismissible: true,
@@ -1575,7 +1575,7 @@ Future<void> showChatExportSheet(
       return;
     }
   } catch (_) {
-    // Fallback to bottom sheet below
+    // 回退到下方底部弹层
   }
   await showModalBottomSheet<void>(
     context: context,
@@ -1597,7 +1597,7 @@ Future<void> showChatExportSheet(
   );
 }
 
-// Desktop dialog: single message export
+// 桌面端对话框：单条消息导出
 class _ExportDialog extends StatefulWidget {
   const _ExportDialog({required this.message, required this.parentContext});
   final ChatMessage message;
@@ -1720,7 +1720,7 @@ class _ExportDialogState extends State<_ExportDialog> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Header
+              // 头部
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
                 child: Row(
@@ -1749,7 +1749,7 @@ class _ExportDialogState extends State<_ExportDialog> {
                 ),
               ),
               const SizedBox(height: 4),
-              // Body
+              // 正文
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
@@ -1853,7 +1853,7 @@ class _ExportDialogState extends State<_ExportDialog> {
   }
 }
 
-// Desktop dialog: batch export
+// 桌面端对话框：批量导出
 class _BatchExportDialog extends StatefulWidget {
   const _BatchExportDialog({
     required this.conversation,
@@ -1950,7 +1950,7 @@ class _BatchExportDialogState extends State<_BatchExportDialog> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Header
+              // 头部
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
                 child: Row(
@@ -1979,7 +1979,7 @@ class _BatchExportDialogState extends State<_BatchExportDialog> {
                 ),
               ),
               const SizedBox(height: 4),
-              // Body
+              // 正文
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
@@ -2121,7 +2121,7 @@ class _BatchExportSheetState extends State<_BatchExportSheet> {
   Future<void> _onExportMarkdown() async {
     if (_exporting) return;
 
-    // Dismiss dialog immediately
+    // 立即关闭对话框
     if (mounted) Navigator.of(context).maybePop();
 
     await exportChatMessagesMarkdown(
@@ -2136,7 +2136,7 @@ class _BatchExportSheetState extends State<_BatchExportSheet> {
   Future<void> _onExportTxt() async {
     if (_exporting) return;
 
-    // Dismiss dialog immediately
+    // 立即关闭对话框
     if (mounted) Navigator.of(context).maybePop();
 
     await exportChatMessagesTxt(
@@ -2164,11 +2164,11 @@ class _BatchExportSheetState extends State<_BatchExportSheet> {
         );
       });
       if (file == null) throw 'render error';
-      // After generation, close current sheet then open preview
+      // 生成完成后关闭当前弹层并打开预览
       if (mounted) await Navigator.of(context).maybePop();
       if (!pctx.mounted) return;
       await showImagePreviewSheet(pctx, file: file!);
-      return; // do not fall through to setState after pop
+      return; // pop 后不要继续执行到 setState
     } catch (e) {
       final pctx = widget.parentContext;
       if (!pctx.mounted) return;
@@ -2254,7 +2254,7 @@ class _BatchExportSheetState extends State<_BatchExportSheet> {
                           },
                   ),
                   const SizedBox(height: 8),
-                  // Image export options
+                  // 图片导出选项
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: Column(
@@ -2509,7 +2509,7 @@ class _ExportSheetState extends State<_ExportSheet> {
                           },
                   ),
                   const SizedBox(height: 8),
-                  // Image export options
+                  // 图片导出选项
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: Column(
@@ -2585,7 +2585,7 @@ class _ExportSheetState extends State<_ExportSheet> {
     );
   }
 
-  // shared widgets and helpers moved to top-level
+  // 共享 widget 与辅助函数已移至顶层
 }
 
 class _ExportedMessageCard extends StatelessWidget {
@@ -2612,10 +2612,10 @@ class _ExportedMessageCard extends StatelessWidget {
     final headerFg = cs.onSurface;
     final time = DateFormat('yyyy-MM-dd HH:mm').format(message.timestamp);
 
-    // Desktop uses smaller font sizes for better proportions
+    // 桌面端使用更小字号以获得更好的比例
     final double titleFontSize = isDesktop ? 15.0 : 18.0;
     final double timeFontSize = isDesktop ? 10.0 : 12.0;
-    // Desktop uses smaller margins and paddings
+    // 桌面端使用更小的间距与内边距
     final double containerMargin = isDesktop ? 12.0 : 16.0;
     final double containerPadding = isDesktop ? 12.0 : 16.0;
 
@@ -2638,7 +2638,7 @@ class _ExportedMessageCard extends StatelessWidget {
     final useAssistName = isAssistant && (assistant?.useAssistantName == true);
 
     return MediaQuery(
-      // Respect chat font scale for export rendering
+      // 导出渲染时遵循聊天字体缩放
       data: MediaQuery.of(context).copyWith(
         textScaler: TextScaler.linear(
           MediaQuery.textScalerOf(context).scale(1) * chatFontScale,
@@ -2650,13 +2650,13 @@ class _ExportedMessageCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: cs.surface,
           borderRadius: BorderRadius.circular(16),
-          // removed outer border per UX
+          // 按 UX 要求移除外边框
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Title (no icon, no bordered container)
+            // 标题（无图标、无边框容器）
             Text(
               title,
               style: TextStyle(
@@ -2668,7 +2668,7 @@ class _ExportedMessageCard extends StatelessWidget {
               maxLines: 1,
             ),
             const SizedBox(height: 2),
-            // Timestamp under title, aligned with title
+            // 标题下方的日期，与标题对齐
             Text(
               time,
               style: TextStyle(
@@ -2742,7 +2742,7 @@ class _ExportedChatImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Desktop uses smaller font sizes for better proportions
+    // 桌面端使用更小字号以获得更好的比例
     final double titleFontSize = isDesktop ? 15.0 : 18.0;
     final double timeFontSize = isDesktop ? 10.0 : 12.0;
     final double containerMargin = isDesktop ? 5.0 : 6.0;
@@ -2761,13 +2761,13 @@ class _ExportedChatImage extends StatelessWidget {
           decoration: BoxDecoration(
             color: cs.surface,
             borderRadius: BorderRadius.circular(isDesktop ? 12.0 : 16.0),
-            // removed outer border per UX
+            // 按 UX 要求移除外边框
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Title (no icon, no bordered container)
+              // 标题（无图标、无边框容器）
               Text(
                 conversationTitle,
                 style: TextStyle(
@@ -2779,7 +2779,7 @@ class _ExportedChatImage extends StatelessWidget {
                 maxLines: 1,
               ),
               const SizedBox(height: 2),
-              // Timestamp under title, aligned with title
+              // 标题下方的日期，与标题对齐
               Text(
                 DateFormat('yyyy-MM-dd HH:mm').format(timestamp),
                 style: TextStyle(
@@ -2828,7 +2828,7 @@ class _ExportedBubble extends StatelessWidget {
     final bubbleBg = cs.primary.withValues(alpha: 0.08);
     final bubbleFg = cs.onSurface;
 
-    // Desktop uses smaller font sizes for better proportions
+    // 桌面端使用更小字号以获得更好的比例
     final double contentFontSize = isDesktop ? 13.0 : 15.7;
 
     final exportThinkingData = _thinkingExportDataForMessage(message);
@@ -2849,8 +2849,8 @@ class _ExportedBubble extends StatelessWidget {
         isAssistant && (assistant?.useAssistantAvatar == true);
     final useAssistName = isAssistant && (assistant?.useAssistantName == true);
 
-    // Keep attachments from the original message parts. copyWith(content:)
-    // rewrites parts to a single TextPart and would drop ImagePart/FilePart.
+    // 保留原消息 parts 中的附件。copyWith(content:)
+    // 会把 parts 重写为单个 TextPart，从而丢失 ImagePart/FilePart。
     final parsed = _exportPartsFromMessage(
       message,
       textOverride: messageForExport.content,
@@ -2961,7 +2961,7 @@ Future<void> _runWithExportingOverlay(
   final cs = Theme.of(context).colorScheme;
   final l10n = AppLocalizations.of(context)!;
   final navigator = Navigator.of(context, rootNavigator: true);
-  // Show overlay first
+  // 先显示遮罩层
   showDialog<void>(
     context: context,
     barrierDismissible: false,
@@ -3010,8 +3010,8 @@ class _Parsed {
   _Parsed(this.text, this.images, this.docs);
 }
 
-/// Display-only document ref (fileName/MIME). If future code reads [path],
-/// resolve via [SandboxPathResolver.fix] first — it may be a kelivo-file URI.
+/// 仅用于展示的文档引用（fileName/MIME）。若后续代码读取 [path]，
+/// 须先经 [SandboxPathResolver.fix] 解析——它可能是 kelivo-file URI。
 class _DocRef {
   final String path;
   final String fileName;

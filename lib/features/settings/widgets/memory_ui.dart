@@ -186,7 +186,7 @@ Future<bool> confirmScopeSwitch(
   return result == true;
 }
 
-/// Soft info banner used for tips / about copy on memory surfaces.
+/// 记忆界面中用于提示/说明文案的柔和信息条。
 class MemoryInfoBanner extends StatelessWidget {
   const MemoryInfoBanner({
     super.key,
@@ -251,7 +251,7 @@ class MemoryInfoBanner extends StatelessWidget {
   }
 }
 
-/// Horizontal scroller with edge fades so overflow is discoverable.
+/// 带边缘渐隐的横向滚动器，使溢出可被发现。
 class MemoryFadingHorizontalScroll extends StatefulWidget {
   const MemoryFadingHorizontalScroll({
     super.key,
@@ -351,7 +351,7 @@ class _MemoryFadingHorizontalScrollState
   }
 }
 
-/// iOS-style grouped card used by every memory surface.
+/// 每个记忆界面都使用的 iOS 风格分组卡片。
 class MemorySectionCard extends StatelessWidget {
   const MemorySectionCard({
     super.key,
@@ -385,7 +385,7 @@ class MemorySectionCard extends StatelessWidget {
   }
 }
 
-/// Section header above a [MemorySectionCard].
+/// [MemorySectionCard] 上方的分节标题。
 class MemorySectionLabel extends StatelessWidget {
   const MemorySectionLabel({super.key, required this.text});
 
@@ -408,7 +408,7 @@ class MemorySectionLabel extends StatelessWidget {
   }
 }
 
-/// Tappable "title + subtitle + chevron" row, matching the settings pages.
+/// 可点的“标题 + 副标题 + 右箭头”行，与设置页一致。
 class MemoryNavRow extends StatelessWidget {
   const MemoryNavRow({
     super.key,
@@ -470,7 +470,7 @@ class MemoryNavRow extends StatelessWidget {
   }
 }
 
-/// Selectable pill used instead of Material's `ChoiceChip`.
+/// 可选胶囊，替代 Material 的 `ChoiceChip`。
 class MemorySelectChip extends StatelessWidget {
   const MemorySelectChip({
     super.key,
@@ -540,7 +540,7 @@ class MemorySelectChip extends StatelessWidget {
   }
 }
 
-/// Rounded search box matching the app's filled-field styling.
+/// 圆角搜索框，与应用的填充式输入框样式一致。
 class MemorySearchField extends StatelessWidget {
   const MemorySearchField({
     super.key,
@@ -558,7 +558,7 @@ class MemorySearchField extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    // Desktop: prefixIcon + symmetric contentPadding (providers search pattern).
+    // 桌面端：prefixIcon + 对称 contentPadding（providers 搜索样式）。
     if (PlatformUtils.isDesktopTarget) {
       return ValueListenableBuilder<TextEditingValue>(
         valueListenable: controller,
@@ -706,7 +706,7 @@ class MemoryPickerOption<T> {
   final String label;
 }
 
-/// Option picker: centered Dialog on desktop, bottom sheet on mobile.
+/// 选项选择器：桌面端居中 Dialog，移动端底部弹层。
 Future<T?> showMemoryOptionPicker<T>(
   BuildContext context, {
   required String title,
@@ -849,9 +849,7 @@ Future<T?> showMemoryOptionPicker<T>(
                   ),
                 ),
                 const SizedBox(height: 12),
-                Flexible(
-                  child: SingleChildScrollView(child: optionsCard(ctx)),
-                ),
+                Flexible(child: SingleChildScrollView(child: optionsCard(ctx))),
               ],
             ),
           ),
@@ -904,7 +902,7 @@ class _MemoryOptionRow<T> extends StatelessWidget {
   }
 }
 
-/// Cancel / confirm footer shared by the memory bottom sheets.
+/// 记忆底部弹层共享的取消/确认页脚。
 class MemorySheetActions extends StatelessWidget {
   const MemorySheetActions({
     super.key,
@@ -953,11 +951,11 @@ class MemorySheetActions extends StatelessWidget {
   }
 }
 
-/// Opens the add/edit memory editor.
+/// 打开新增/编辑记忆编辑器。
 ///
-/// Desktop: centered [Dialog]. Mobile: modal bottom sheet.
-/// The form owns its [TextEditingController] inside a [State], so the
-/// controller stays alive for the whole exit transition.
+/// 桌面端：居中 [Dialog]。移动端：模态底部弹层。
+/// 表单在 [State] 内持有自己的 [TextEditingController]，使
+/// 控制器在整个退出过渡期间保持存活。
 Future<void> showMemoryEntryEditor(
   BuildContext context, {
   MemoryEntry? existing,
@@ -1028,7 +1026,7 @@ class MemoryEntryEditForm extends StatefulWidget {
   final String? defaultAssistantId;
   final bool allowAssistantPicker;
 
-  /// When true, render a compact dialog body (no sheet drag handle / inset).
+  /// 为 true 时渲染紧凑对话框主体（无弹层拖拽手柄/内边距）。
   final bool desktop;
 
   @override
@@ -1097,15 +1095,12 @@ class _MemoryEntryEditFormState extends State<MemoryEntryEditForm> {
     navigator.maybePop();
   }
 
-  List<Widget> _formFields(
-    AppLocalizations l10n,
-    List<Assistant> assistants,
-  ) {
+  List<Widget> _formFields(AppLocalizations l10n, List<Assistant> assistants) {
     return [
       MemorySectionCard(
         children: [
           IosFormTextField(
-            // Title already names the sheet; omit redundant label.
+            // 标题已为弹层命名；省略冗余标签。
             label: '',
             controller: _content,
             hintText: l10n.memoryEntryContentHint,
@@ -1152,8 +1147,7 @@ class _MemoryEntryEditFormState extends State<MemoryEntryEditForm> {
             ),
           ],
         ),
-        if (widget.allowAssistantPicker &&
-            _scope == MemoryScope.assistant) ...[
+        if (widget.allowAssistantPicker && _scope == MemoryScope.assistant) ...[
           const SizedBox(height: 16),
           MemorySectionLabel(text: l10n.memoryUiAssistantLabel),
           Wrap(
@@ -1192,9 +1186,9 @@ class _MemoryEntryEditFormState extends State<MemoryEntryEditForm> {
     final assistants = context.watch<AssistantProvider>().assistants;
 
     if (widget.desktop) {
-      // Compact, height-hugging dialog body — stays visually centered.
-      // Cap the scroll area explicitly (avoid Flexible + mainAxisSize.min
-      // collapsing to zero height).
+      // 紧凑、贴合高度的对话框主体——保持视觉居中。
+      // 显式限制滚动区域高度（避免 Flexible + mainAxisSize.min
+      // 塌缩为零高度）。
       final maxBodyHeight = MediaQuery.sizeOf(context).height * 0.55;
       return Column(
         mainAxisSize: MainAxisSize.min,
@@ -1370,7 +1364,7 @@ class MemoryEntryCard extends StatelessWidget {
   final bool selected;
   final ValueChanged<bool>? onSelectedChanged;
 
-  /// When non-null, scope badge toggles between global and this assistant.
+  /// 非 null 时，作用域徽标在全局与本助手之间切换。
   final String? scopeToggleAssistantId;
   final VoidCallback? onEdit;
 

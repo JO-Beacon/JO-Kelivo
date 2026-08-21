@@ -19,8 +19,8 @@ typedef LocalAsrTranscriber =
     Future<String> Function(SherpaOnnxAsrOptions options, Uint8List pcm16);
 typedef LocalModelInstalledChecker = Future<bool> Function(String modelId);
 
-/// Coordinates microphone capture with the selected system, local, or cloud
-/// recognizer. Settings own configuration; this provider owns one live session.
+/// 协调麦克风采集与选定的系统、本地或云
+/// 识别器。设置负责配置；此 Provider 负责一个活动会话。
 class AsrProvider extends ChangeNotifier {
   AsrProvider({
     SettingsProvider? settingsProvider,
@@ -352,8 +352,8 @@ class AsrProvider extends ChangeNotifier {
         DateTime.now().isBefore(deadline)) {
       await Future<void>.delayed(const Duration(milliseconds: 40));
     }
-    // Never expose Provider idle while the native service still guards an
-    // active session. Some platforms omit the final done status after stop.
+    // 在原生服务仍在守护活动会话时，绝不要将 Provider 暴露为 idle。
+    // 某些平台在 stop 后可能省略最终的 done 状态。
     if (_isCurrent(generation) &&
         _systemService.state == SystemAsrState.stopping) {
       await _systemService.cancel();

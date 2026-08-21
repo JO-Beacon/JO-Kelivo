@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/services/backup/restore_receipt.dart';
 import '../../l10n/app_localizations.dart';
 
-/// Shows the one startup outcome that requires explicit user acknowledgement.
+/// 显示唯一需要用户明确确认的启动结果。
 class RestoreOutcomeNotice extends StatefulWidget {
   const RestoreOutcomeNotice({
     super.key,

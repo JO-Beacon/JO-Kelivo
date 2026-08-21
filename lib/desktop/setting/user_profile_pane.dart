@@ -4,7 +4,7 @@ import '../../features/settings/pages/user_profile_page.dart';
 import '../../l10n/app_localizations.dart';
 import '../../theme/app_font_weights.dart';
 
-/// Desktop right-side pane for user profile fields (§14.4).
+/// 桌面右侧用户资料字段面板（§14.4）。
 class DesktopUserProfilePane extends StatelessWidget {
   const DesktopUserProfilePane({super.key});
 

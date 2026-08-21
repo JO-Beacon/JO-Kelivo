@@ -21,7 +21,7 @@ class ModelTypeSwitchResult {
 }
 
 class ModelEditTypeSwitch {
-  /// Applies a model type switch and returns new sets (no in-place mutation).
+  /// 应用模型类型切换并返回新集合（不进行原地修改）。
   static ModelTypeSwitchResult apply({
     required ModelType prev,
     required ModelType next,

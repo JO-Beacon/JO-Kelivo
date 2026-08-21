@@ -25,11 +25,11 @@ import '../../../utils/platform_utils.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../widgets/memory_ui.dart';
 
-/// Read-only legacy memories from [MemoryProvider] (§14.5 / D-29).
+/// 来自 [MemoryProvider] 的只读旧记忆（§14.5 / D-29）。
 class LegacyMemoryPage extends StatelessWidget {
   const LegacyMemoryPage({super.key, this.assistantId});
 
-  /// When set, only legacy memories of that assistant are listed and exported.
+  /// 设置后，只列出并导出该助手的旧记忆。
   final String? assistantId;
 
   @override
@@ -91,7 +91,7 @@ class LegacyMemoryContent extends StatefulWidget {
 
   final EdgeInsetsGeometry? padding;
 
-  /// When set, only legacy memories of that assistant are listed.
+  /// 设置后，只列出该助手的旧记忆。
   final String? assistantId;
 
   static String buildExportText({

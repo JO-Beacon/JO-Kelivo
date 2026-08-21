@@ -41,7 +41,7 @@ Uint8List? _decodeDataUriBytes(String path) {
   return bytes;
 }
 
-/// Renders persisted attachment URIs consistently across chat and editing UI.
+/// 在聊天和编辑界面中一致地渲染已持久化的附件 URI。
 class ResolvedAttachmentImage extends StatelessWidget {
   const ResolvedAttachmentImage({
     super.key,
@@ -59,7 +59,7 @@ class ResolvedAttachmentImage extends StatelessWidget {
   final BoxFit fit;
   final WidgetBuilder? placeholder;
 
-  /// Avoids legacy basename fallback when the image is an editable attachment.
+  /// 当图片是可编辑附件时，避免旧的 basename 回退。
   final bool localIoOnly;
 
   @override

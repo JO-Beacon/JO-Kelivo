@@ -38,7 +38,7 @@ class UserProvider extends ChangeNotifier {
     _avatarValue = rawAvatar == null
         ? null
         : SandboxPathResolver.fix(rawAvatar);
-    // Persist the fixed path back if it changed (helps desktop after imports)
+    // 如果固定路径发生变化，将其写回持久化（便于桌面端导入后使用）
     if (rawAvatar != null &&
         _avatarValue != null &&
         rawAvatar != _avatarValue) {
@@ -46,13 +46,13 @@ class UserProvider extends ChangeNotifier {
         await preferences.setString(_prefsAvatarValueKey, _avatarValue!);
       } catch (_) {}
     }
-    // Only notify if avatar exists; otherwise rely on name notify above
+    // 仅在头像存在时通知；否则依赖上面的名称通知
     if (_avatarType != null && _avatarValue != null) {
       notifyListeners();
     }
   }
 
-  // Set localized default name if user hasn't saved a custom one
+  // 如果用户尚未保存自定义名称，则设置本地化默认名称
   void setDefaultNameIfUnset(String localizedDefaultName) {
     if (_hasSavedName) return;
     final v = localizedDefaultName.trim();
@@ -89,7 +89,7 @@ class UserProvider extends ChangeNotifier {
     notifyListeners();
     await preferences.setString(_prefsAvatarTypeKey, _avatarType!);
     await preferences.setString(_prefsAvatarValueKey, _avatarValue!);
-    // Prefetch to enable offline display later
+    // 预取，以便稍后离线显示
     try {
       await AvatarCache.getPath(u);
     } catch (_) {}
@@ -99,7 +99,7 @@ class UserProvider extends ChangeNotifier {
     final p = path.trim();
     if (p.isEmpty) return;
     final fixedInput = SandboxPathResolver.fix(p);
-    // Copy the picked image into app persistent storage so it survives reinstall/update
+    // 将所选图片复制到应用持久化存储中，以便重装或更新后仍能保留
     try {
       final src = File(fixedInput);
       if (!await src.exists()) return;
@@ -111,7 +111,7 @@ class UserProvider extends ChangeNotifier {
       final dot = fixedInput.lastIndexOf('.');
       if (dot != -1 && dot < p.length - 1) {
         ext = fixedInput.substring(dot + 1).toLowerCase();
-        // Basic sanitize
+        // 基本清理
         if (ext.length > 6) ext = 'jpg';
       } else {
         ext = 'jpg';
@@ -120,7 +120,7 @@ class UserProvider extends ChangeNotifier {
       final dest = File('${avatars.path}/$filename');
       await src.copy(dest.path);
 
-      // Optionally clean old local avatar if it was stored inside our avatars folder
+      // 如果旧本地头像存储在我们的 avatars 文件夹中，则视情况清理它
       if (_avatarType == 'file' && _avatarValue != null) {
         try {
           final old = File(_avatarValue!);
@@ -138,7 +138,7 @@ class UserProvider extends ChangeNotifier {
       await preferences.setString(_prefsAvatarTypeKey, _avatarType!);
       await preferences.setString(_prefsAvatarValueKey, _avatarValue!);
     } catch (_) {
-      // Fallback to original path if copy fails (may still be temporary)
+      // 如果复制失败，回退到原始路径（可能仍是临时路径）
       _avatarType = 'file';
       _avatarValue = fixedInput;
       notifyListeners();

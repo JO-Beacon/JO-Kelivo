@@ -19,10 +19,10 @@ import '../../../utils/brand_assets.dart';
 import 'voice_service_widgets.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
-/// The speech-recognition half of the Voice Services screen.
+/// 语音服务页面中的语音识别部分。
 ///
-/// This widget deliberately owns only short-lived discovery/download helpers.
-/// The selected provider and provider definitions stay in [SettingsProvider].
+/// 此 widget 刻意只持有短生命周期的发现或下载辅助逻辑。
+/// 所选供应商和供应商定义保留在 [SettingsProvider] 中。
 class AsrServicesSection extends StatefulWidget {
   const AsrServicesSection({
     super.key,
@@ -708,7 +708,7 @@ class _AsrEditorState extends State<_AsrEditor> {
         },
       );
     } on SherpaDownloadCancelledException {
-      // Cancellation is an expected user action.
+      // 取消是预期的用户操作。
     } catch (error) {
       if (mounted) {
         showAppSnackBar(
@@ -2205,8 +2205,8 @@ String _defaultModel(AsrServiceKind kind) {
 }
 
 String _defaultResourceId(AsrServiceKind kind) {
-  // Keep Seed-ASR 2.0 default. Compatible: volc.bigasr.sauc.duration (ASR 1.0).
-  // Needs real Key verification before changing the app default.
+  // 保持 Seed-ASR 2.0 默认值。兼容：volc.bigasr.sauc.duration（ASR 1.0）。
+  // 在修改应用默认值前，需要先验证真实 Key。
   return kind == AsrServiceKind.volcengine
       ? VolcengineAsrOptions.seedAsrDurationResourceId
       : '';

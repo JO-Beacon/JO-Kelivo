@@ -45,9 +45,8 @@ final class DatabaseInstallationReceipt {
   }
 }
 
-/// Recovery route for a failed startup admission. Only
-/// [rebuildAutomatically] may run without further user confirmation; every
-/// other route must be confirmed by the user first.
+/// 启动准入失败后的恢复路由。只有 [rebuildAutomatically] 可以在无需进一步
+/// 用户确认的情况下运行；其他所有路由都必须先经用户确认。
 enum DatabaseRecoveryAction {
   none,
   rebuildAutomatically,
@@ -60,11 +59,10 @@ final class DatabaseInstallationGate {
 
   static const _receiptPrefix = 'database_installation_receipt_';
   static const _receiptSuffix = '.json';
-  // A crash between creating the temp file and renaming it must not brick the
-  // next launch, so each publish uses a unique temp name and sweeps stale ones
-  // rather than reusing a single fixed name that a leftover could block. The
-  // prefix intentionally omits the trailing separator so the sweep also clears
-  // the legacy fixed-name temp ('.database_installation_receipt.tmp').
+  // 创建临时文件与重命名之间发生崩溃不能阻塞下次启动，因此每次发布都使用
+  // 唯一临时名并清理过期文件，而不是复用一个可能被残留文件阻塞的固定名。
+  // 前缀有意省略尾部路径分隔符，以便清理也能删除旧的固定名临时文件
+  // ('.database_installation_receipt.tmp')。
   static const _temporaryPrefix = '.database_installation_receipt';
   static const _temporarySuffix = '.tmp';
   static const _maximumReceiptBytes = 4096;
@@ -107,8 +105,8 @@ final class DatabaseInstallationGate {
 
       info = ChatDatabaseRepository.inspectInstalledDatabase(databaseFile);
     } on StateError catch (error) {
-      // migrateInstalledDatabase reports every schema mismatch with the same
-      // code; only a newer schema means the user must update the app.
+      // migrateInstalledDatabase 对所有 schema 不匹配都报告相同的
+      // 代码；只有较新的 schema 才意味着用户必须更新应用。
       if (error.message == 'database_schema_version') {
         final userVersion = _tryReadUserVersion(databaseFile);
         if (userVersion != null &&
@@ -171,11 +169,11 @@ final class DatabaseInstallationGate {
     return updated;
   }
 
-  /// Maps a startup admission failure to the strongest safe recovery route.
+  /// 将启动准入失败映射到最安全有效的恢复路径。
   ///
-  /// Automatic rebuild is only returned when no installation receipt and no
-  /// legacy Hive source exist and the installed file is half-created
-  /// (userVersion 0) or unreadable, so no reachable data can be lost.
+  /// 仅当不存在安装回执、不存在旧版 Hive 源，且已安装文件处于半创建
+  /// （userVersion 0）或不可读状态时，才会返回自动重建，因此不会丢失任何
+  /// 可达数据。
   static Future<DatabaseRecoveryAction> recoveryActionFor({
     required Directory appDataDirectory,
     required Object error,
@@ -192,8 +190,8 @@ final class DatabaseInstallationGate {
     if (!isSchemaOrCorrupt && !isRawSqliteFailure) {
       return DatabaseRecoveryAction.none;
     }
-    // A receipt that exists but cannot be parsed still proves a previous
-    // install, so it must block automatic rebuild like a valid one.
+    // 存在但无法解析的回执仍然证明之前安装过，
+    // 因此它必须像有效回执一样阻止自动重建。
     final bool hasReceipts;
     try {
       hasReceipts = (await _readReceipts(appDataDirectory)).isNotEmpty;
@@ -205,7 +203,7 @@ final class DatabaseInstallationGate {
       return DatabaseRecoveryAction.promptRemigration;
     }
     if (isRawSqliteFailure) {
-      // A raw sqlite error never justifies deleting data automatically.
+      // 原始 sqlite 错误绝不能成为自动删除数据的理由。
       return DatabaseRecoveryAction.none;
     }
     final databaseFile = File(
@@ -222,9 +220,8 @@ final class DatabaseInstallationGate {
     return DatabaseRecoveryAction.none;
   }
 
-  /// Deletes the installed database family and repeats first-launch setup.
-  /// Only safe where [recoveryActionFor] returned
-  /// [DatabaseRecoveryAction.rebuildAutomatically].
+  /// 删除已安装的数据库家族并重复首次启动设置。仅在 [recoveryActionFor]
+  /// 返回 [DatabaseRecoveryAction.rebuildAutomatically] 时安全。
   static Future<DatabaseInstallationReceipt> rebuildFresh({
     required Directory appDataDirectory,
     RestoreDurability? durability,
@@ -335,9 +332,8 @@ final class DatabaseInstallationGate {
     DatabaseInstallationReceipt receipt, {
     required RestoreDurability durability,
   }) async {
-    // Remove any temp files left by a crashed earlier publish; they carry no
-    // authoritative state (the database identity is the source of truth) and
-    // must never block a fresh publish.
+    // 删除早前发布崩溃留下的临时文件；它们不携带权威状态（数据库身份才是
+    // 事实来源），绝不能阻塞新的发布。
     await _sweepStaleTemporaries(target.parent);
     final temporary = File(
       p.join(
@@ -384,8 +380,8 @@ final class DatabaseInstallationGate {
         try {
           await File(entity.path).delete();
         } catch (_) {
-          // Best-effort: a temp we cannot delete still does not block publish,
-          // which now uses a unique name.
+          // 尽力而为：无法删除的临时文件仍然不会阻止发布，
+          // 因为现在发布使用唯一名称。
         }
       }
     }

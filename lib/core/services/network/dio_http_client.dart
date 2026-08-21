@@ -193,8 +193,8 @@ class DioHttpClient extends http.BaseClient {
       }
       if (bodyBytes.isNotEmpty) {
         final decoded = RequestLogger.safeDecodeUtf8(bodyBytes);
-        // Elide first: a multi-MB image request drops to a few KB, which
-        // brings it back under redactBody's JSON-parsing size limit.
+        // 先省略大负载：数 MB 的图片请求会缩减到几 KB，从而
+        // 使其重新回到 redactBody 的 JSON 解析大小限制内。
         final bodyText = decoded.isNotEmpty
             ? LogRedactor.redactBody(RequestLogger.elidePayloads(decoded))
             : 'base64:${base64Encode(bodyBytes)}';
@@ -241,8 +241,8 @@ class DioHttpClient extends http.BaseClient {
           : null;
       const maxErrorBodyBytes = 256 * 1024;
 
-      // Error payloads are small; read them now so the log does not depend
-      // on the caller consuming the stream (and the viewer can parse body=).
+      // 错误负载较小；现在就读取它们，使日志不依赖调用方消费流
+      // （并且查看器可以解析 body=）。
       if (RequestLogger.enabled && statusCode >= 400) {
         final bytes = await _readLimited(body.stream, maxErrorBodyBytes);
         final text = RequestLogger.safeDecodeUtf8(bytes);
@@ -272,8 +272,8 @@ class DioHttpClient extends http.BaseClient {
             if (logChunks) {
               final s = RequestLogger.safeDecodeUtf8(chunk);
               if (s.isNotEmpty) {
-                // Elided per chunk: a payload split across chunk boundaries
-                // is only partly caught, and capLine() bounds the rest.
+                // 逐块省略：跨块边界拆分的负载只会被部分捕获，
+                // capLine() 会限制其余部分。
                 RequestLogger.logLine(
                   '[RES $reqId] chunk=${RequestLogger.escape(LogRedactor.redactBody(RequestLogger.elidePayloads(s)))}',
                 );

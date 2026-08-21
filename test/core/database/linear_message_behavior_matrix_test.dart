@@ -65,11 +65,8 @@ void main() {
     );
   }
 
-  Future<List<String>> visibleIds() async =>
-      (await repository.loadLinearMessageWindow(
-        conversationId: conversation.id,
-        fromStart: true,
-      )).slots.map((slot) => slot.revisionId).toList(growable: false);
+  Future<List<String>> activeIds() async =>
+      (await repository.loadConversationTree(conversation.id))!.activePath();
 
   setUp(() async {
     database = AppDatabase(NativeDatabase.memory());
@@ -81,7 +78,7 @@ void main() {
   tearDown(() => repository.close());
 
   test(
-    'save-only appends and selects a version without changing the future',
+    'save-only creates a sibling branch and preserves the original future',
     () async {
       await seed();
 
@@ -89,63 +86,53 @@ void main() {
         messageId: 'assistant-v0',
         content: 'edited answer',
       );
-      final window = await repository.loadLinearMessageWindow(
-        conversationId: conversation.id,
-        fromStart: true,
-      );
+      final tree = await repository.loadConversationTree(conversation.id);
 
       expect(result, isNotNull);
-      expect(window.slots.map((slot) => slot.revisionId), [
-        'user-0',
-        result!.message.id,
-        'user-1',
-        'assistant-1',
-      ]);
-      expect(window.slots[1].versionCount, 2);
+      expect(tree!.activePath(), ['user-0', result!.message.id]);
+      expect(
+        tree.branches.values.map(
+          (branch) => tree.branchPath(branch.id).join('|'),
+        ),
+        contains('user-0|assistant-v0|user-1|assistant-1'),
+      );
       expect(await repository.getMessageIndex(conversation.id, 'user-1'), 2);
     },
   );
 
-  test(
-    'default assistant regeneration keeps the future and exposes n/m',
-    () async {
-      await seed();
+  test('default assistant regeneration creates a sibling branch', () async {
+    await seed();
 
-      final result = await repository.beginRegeneration(
-        conversation: conversation,
-        assistantMessage: message(
-          id: 'assistant-v1',
-          role: 'assistant',
-          content: '',
-          groupId: 'assistant-group',
-          version: 1,
-          isStreaming: true,
-        ),
-        runId: 'run-default',
-        truncateFuture: false,
-      );
-      final window = await repository.loadLinearMessageWindow(
-        conversationId: conversation.id,
-        fromStart: true,
-      );
+    final result = await repository.beginRegeneration(
+      conversation: conversation,
+      assistantMessage: message(
+        id: 'assistant-v1',
+        role: 'assistant',
+        content: '',
+        groupId: 'assistant-group',
+        version: 1,
+        isStreaming: true,
+      ),
+      runId: 'run-default',
+      truncateFuture: false,
+    );
+    final tree = await repository.loadConversationTree(conversation.id);
 
-      expect(window.slots.map((slot) => slot.revisionId), [
-        'user-0',
-        'assistant-v1',
-        'user-1',
-        'assistant-1',
-      ]);
-      expect(window.slots[1].versionCount, 2);
-      expect(result.conversation.versionSelections, {'assistant-group': 1});
-    },
-  );
+    expect(tree!.activePath(), ['user-0', 'assistant-v1']);
+    expect(
+      tree.branches.values.map(
+        (branch) => tree.branchPath(branch.id).join('|'),
+      ),
+      contains('user-0|assistant-v0|user-1|assistant-1'),
+    );
+    expect(result.conversation.versionSelections, {'assistant-group': 1});
+  });
 
-  test(
-    'truncate regeneration deletes later groups but keeps group siblings',
-    () async {
-      await seed();
+  test('truncate regeneration is rejected by the tree model', () async {
+    await seed();
 
-      await repository.beginRegeneration(
+    await expectLater(
+      repository.beginRegeneration(
         conversation: conversation,
         assistantMessage: message(
           id: 'assistant-v1',
@@ -157,17 +144,28 @@ void main() {
         ),
         runId: 'run-truncate',
         truncateFuture: true,
-      );
+      ),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'tree_regeneration_cannot_truncate_future',
+        ),
+      ),
+    );
 
-      expect(await visibleIds(), ['user-0', 'assistant-v1']);
-      expect(await repository.getMessage('assistant-v0'), isNotNull);
-      expect(await repository.getMessage('user-1'), isNull);
-      expect(await repository.getMessage('assistant-1'), isNull);
-    },
-  );
+    expect(await activeIds(), [
+      'user-0',
+      'assistant-v0',
+      'user-1',
+      'assistant-1',
+    ]);
+    expect(await repository.getMessage('assistant-v0'), isNotNull);
+    expect(await repository.getMessage('assistant-v1'), isNull);
+  });
 
   test(
-    'truncate regeneration keeps appended versions of earlier groups',
+    'truncate regeneration leaves an existing edited branch unchanged',
     () async {
       await seed();
       final editedUser = await repository.appendMessageVersion(
@@ -175,49 +173,56 @@ void main() {
         content: 'edited question',
       );
 
-      final result = await repository.beginRegeneration(
-        conversation: editedUser!.conversation,
-        assistantMessage: message(
-          id: 'assistant-v1',
-          role: 'assistant',
-          content: '',
-          groupId: 'assistant-group',
-          version: 1,
-          isStreaming: true,
+      await expectLater(
+        repository.beginRegeneration(
+          conversation: editedUser!.conversation,
+          assistantMessage: message(
+            id: 'assistant-v1',
+            role: 'assistant',
+            content: '',
+            groupId: 'assistant-group',
+            version: 1,
+            isStreaming: true,
+          ),
+          runId: 'run-truncate-after-edit',
+          truncateFuture: true,
         ),
-        runId: 'run-truncate-after-edit',
-        truncateFuture: true,
+        throwsStateError,
       );
 
-      expect(await visibleIds(), [editedUser.message.id, 'assistant-v1']);
+      expect(await activeIds(), [editedUser.message.id]);
       expect(await repository.getMessage(editedUser.message.id), isNotNull);
-      expect(result.conversation.versionSelections, {
-        'user-0': 1,
-        'assistant-group': 1,
-      });
+      expect(await repository.getMessage('assistant-v1'), isNull);
     },
   );
 
-  test('version switching changes only the selected row', () async {
-    await seed(includeAlternate: true);
+  test(
+    'repository selection metadata does not silently switch the tree',
+    () async {
+      await seed(includeAlternate: true);
 
-    await repository.setSelectedVersion(
-      conversationId: conversation.id,
-      groupId: 'assistant-group',
-      version: 0,
-    );
+      await repository.setSelectedVersion(
+        conversationId: conversation.id,
+        groupId: 'assistant-group',
+        version: 0,
+      );
 
-    expect(await visibleIds(), [
-      'user-0',
-      'assistant-v0',
-      'user-1',
-      'assistant-1',
-    ]);
-    expect(await repository.getMessageIndex(conversation.id, 'user-1'), 2);
-  });
+      expect(await activeIds(), [
+        'user-0',
+        'assistant-v1',
+        'user-1',
+        'assistant-1',
+      ]);
+      expect(
+        (await repository.getConversation(conversation.id))?.versionSelections,
+        {'assistant-group': 0},
+      );
+      expect(await repository.getMessageIndex(conversation.id, 'user-1'), 2);
+    },
+  );
 
   test(
-    'deleting one version or the complete group never deletes the future',
+    'deleting a branch deletes its descendants and preserves its sibling',
     () async {
       await seed(includeAlternate: true);
 
@@ -226,12 +231,7 @@ void main() {
         messageIds: const {'assistant-v1'},
         versionSelectionChanges: const {},
       );
-      expect(await visibleIds(), [
-        'user-0',
-        'assistant-v0',
-        'user-1',
-        'assistant-1',
-      ]);
+      expect(await activeIds(), ['user-0', 'assistant-v0']);
       expect(
         (await repository.getConversation(conversation.id))?.versionSelections,
         {'assistant-group': 0},
@@ -242,40 +242,35 @@ void main() {
         messageIds: const {'assistant-v0'},
         versionSelectionChanges: const {},
       );
-      expect(await visibleIds(), ['user-0', 'user-1', 'assistant-1']);
-      expect(await repository.getMessageIndex(conversation.id, 'user-1'), 2);
+      expect(await activeIds(), ['user-0']);
+      expect(await repository.getMessage('user-1'), isNull);
     },
   );
 
-  test(
-    'deleting the old version after a save-only edit keeps the group in place',
-    () async {
-      await seed();
+  test('deleting an old branch keeps the edited sibling active', () async {
+    await seed();
 
-      // Save-only edit: appends a new revision whose message_order lands at
-      // the end of the conversation.
-      final result = await repository.appendMessageVersion(
-        messageId: 'assistant-v0',
-        content: 'edited answer',
-      );
-      final editedId = result!.message.id;
+    // Save-only edit: appends a new revision whose message_order lands at
+    // the end of the conversation.
+    final result = await repository.appendMessageVersion(
+      messageId: 'assistant-v0',
+      content: 'edited answer',
+    );
+    final editedId = result!.message.id;
 
-      // Deleting the original (anchor) revision must not let the surviving
-      // revision drift to the appended end-of-conversation position.
-      await repository.deleteMessages(
-        conversationId: conversation.id,
-        messageIds: const {'assistant-v0'},
-        versionSelectionChanges: const {},
-      );
+    // Deleting the original (anchor) revision must not let the surviving
+    // revision drift to the appended end-of-conversation position.
+    await repository.deleteMessages(
+      conversationId: conversation.id,
+      messageIds: const {'assistant-v0'},
+      versionSelectionChanges: const {},
+    );
 
-      expect(await visibleIds(), ['user-0', editedId, 'user-1', 'assistant-1']);
-      expect(await repository.getMessageIndex(conversation.id, editedId), 1);
-      expect(await repository.getMessageIds(conversation.id), [
-        'user-0',
-        editedId,
-        'user-1',
-        'assistant-1',
-      ]);
-    },
-  );
+    expect(await activeIds(), ['user-0', editedId]);
+    expect(await repository.getMessageIndex(conversation.id, editedId), 1);
+    expect(await repository.getMessageIds(conversation.id), [
+      'user-0',
+      editedId,
+    ]);
+  });
 }

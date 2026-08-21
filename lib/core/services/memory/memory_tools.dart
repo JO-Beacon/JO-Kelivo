@@ -12,10 +12,10 @@ import 'memory_smart_add.dart';
 import 'memory_tokenizer.dart';
 import 'memory_trace.dart';
 
-/// Memory system V1 tool declarations + dispatch (§10).
+/// 记忆系统 V1 工具声明与分发 (§10)。
 ///
-/// Tool descriptions are model contracts (D-18 / §16.2): bilingual constants
-/// here, never ARB/l10n. Chosen by [MemoryPromptLang].
+/// 工具描述是模型契约 (D-18 / §16.2)：这里用双语常量，
+/// 绝不用 ARB/l10n。由 [MemoryPromptLang] 选择。
 abstract final class MemoryTools {
   MemoryTools._();
 
@@ -36,7 +36,7 @@ abstract final class MemoryTools {
     updateUserProfile,
   };
 
-  /// Tools that persist something beyond the current conversation.
+  /// 会将内容持久化到当前会话之外的工具。
   static const Set<String> writeToolNames = {
     memoryUpdate,
     memoryEdit,
@@ -55,14 +55,14 @@ abstract final class MemoryTools {
     'delete_memory',
   ];
 
-  /// Names of the removed legacy tools (§10.11). Exposed for tests.
+  /// 已移除的旧版工具名称 (§10.11)。暴露给测试。
   static List<String> get legacyToolNames =>
       List<String>.unmodifiable(_legacyToolNames);
 
-  // —— Definitions ——
+  // —— 定义 ——
 
-  /// Build tool definitions gated by [enableMemory] / [allowPastConversationRecall]
-  /// (§10.1). [writeScope] controls whether `scope` appears on `memory_update`
+  /// 构建受 [enableMemory] / [allowPastConversationRecall] 门控的工具定义
+  /// (§10.1)。[writeScope] 控制 `scope` 是否出现在 `memory_update` 上
   /// (§10.2 / §4.3).
   static List<Map<String, dynamic>> buildDefinitions({
     required MemoryPromptLang lang,
@@ -70,8 +70,8 @@ abstract final class MemoryTools {
     required bool enableMemory,
     required bool allowPastConversationRecall,
 
-    /// False in temporary conversations, where reads stay available but a
-    /// write would outlive the conversation the user asked to be throwaway.
+    /// 在临时会话中为 false：读取仍可用，但
+    /// 写入会超出用户要求一次性丢弃的会话生命周期。
     bool allowMemoryWrites = true,
   }) {
     final out = <Map<String, dynamic>>[];
@@ -91,12 +91,12 @@ abstract final class MemoryTools {
     return out;
   }
 
-  // —— Dispatch ——
+  // —— 分发 ——
 
-  /// Handle a memory / chat_search tool call.
+  /// 处理 memory / chat_search 工具调用。
   ///
-  /// Returns `null` when the tool is not applicable for this assistant's
-  /// gates (so the caller can fall through to other handlers).
+  /// 当工具不适用于该助手的门控时返回 `null`
+  /// （以便调用方回落到其他处理器）。
   static Future<String?> handle({
     required String name,
     required Map<String, dynamic> args,
@@ -107,19 +107,19 @@ abstract final class MemoryTools {
     String? conversationId,
     Future<void> Function()? onMutated,
 
-    /// When provided, `memory_update` goes through real Smart Add (§12.6).
+    /// 提供时，`memory_update` 走真正的 Smart Add (§12.6)。
     MemorySmartAdd? smartAdd,
     MemoryPromptLang? promptLang,
     Future<String> Function(String prompt)? memoryLlmCall,
     String? smartAddPromptZh,
     String? smartAddPromptEn,
 
-    /// When provided, the call is recorded as a one-step trace.
+    /// 提供时，该调用记录为单步 trace。
     MemoryTraceRecorder? traceRecorder,
     String? conversationTitle,
   }) async {
-    // Temporary chats are discarded on exit. Reads stay available, but a
-    // recorded trace (title, args, result) would outlive the conversation.
+    // 临时聊天在退出时丢弃。读取仍可用，但
+    // 记录的 trace（标题、参数、结果）会超出会话生命周期。
     final temporary =
         chatService?.isTemporaryConversation(conversationId) ?? false;
     final activeRecorder = temporary ? null : traceRecorder;
@@ -159,9 +159,8 @@ abstract final class MemoryTools {
     if (!assistant.enableMemory) return null;
     if (!enableMemoryToolNames.contains(name)) return null;
 
-    // A temporary conversation is discarded when the user leaves it. Reads stay
-    // available, but a write would outlive the conversation the user asked to
-    // be throwaway.
+    // 用户离开时临时会话被丢弃。读取仍可用，但写入会超出用户
+    // 要求一次性丢弃的会话生命周期。
     if (writeToolNames.contains(name) &&
         (chatService?.isTemporaryConversation(conversationId) ?? false)) {
       return toolError(
@@ -327,7 +326,7 @@ abstract final class MemoryTools {
     });
   }
 
-  /// Resolve write [MemoryScope] from assistant policy + optional tool arg.
+  /// 从助手策略 + 可选工具参数解析写入 [MemoryScope]。
   static MemoryScope resolveWriteScope(
     MemoryWriteScope policy,
     String? scopeArg,
@@ -346,7 +345,7 @@ abstract final class MemoryTools {
     }
   }
 
-  /// Whitespace-split, lowercase, then [MemoryTokenizer.escapeLike] (§5.9).
+  /// 按空白拆分、小写，再 [MemoryTokenizer.escapeLike] (§5.9)。
   static List<String> searchTokens(String query) {
     return query
         .trim()
@@ -357,7 +356,7 @@ abstract final class MemoryTools {
         .toList(growable: false);
   }
 
-  // —— Handlers ——
+  // —— 处理器 ——
 
   static Future<String> _handleMemoryRead({
     required Map<String, dynamic> args,
@@ -424,7 +423,7 @@ abstract final class MemoryTools {
     final scope = resolveWriteScope(assistant.memoryWriteScope, scopeArg);
     final assistantId = scope == MemoryScope.assistant ? assistant.id : null;
 
-    // Real Smart Add when wired (§12.6); else exact-duplicate → SKIP / NEW.
+    // 接入时走真正的 Smart Add (§12.6)；否则完全重复 → SKIP / NEW。
     final adder =
         smartAdd ??
         MemorySmartAdd(repository: repository, chatRepository: chatRepository);
@@ -487,7 +486,7 @@ abstract final class MemoryTools {
     );
 
     final matchedIds = {for (final e in matched) e.id};
-    // relatedId → first via matched id (matched order).
+    // relatedId → 优先取匹配到的 id（按匹配顺序取第一个）。
     final viaByRelated = <String, String>{};
     for (final m in matched) {
       for (final rid in m.relatedIds) {
@@ -666,7 +665,7 @@ abstract final class MemoryTools {
     final cleared = <String>[];
     final rejected = <Map<String, String>>[];
 
-    // Only read prior values when a trace needs before/after.
+    // 仅当 trace 需要前/后值时才读取旧值。
     final priorValues = <String, String>{};
     if (traceStep != null) {
       try {
@@ -784,7 +783,7 @@ abstract final class MemoryTools {
     return jsonEncode({'query': query, 'results': results});
   }
 
-  // —— Schema builders ——
+  // —— Schema 构建器 ——
 
   static Map<String, dynamic> _defMemoryRead(MemoryPromptLang lang) {
     final zh = lang == MemoryPromptLang.zh;
@@ -1048,7 +1047,7 @@ abstract final class MemoryTools {
     };
   }
 
-  // —— Helpers ——
+  // —— 辅助函数 ——
 
   static Map<String, dynamic> _entrySummary(
     MemoryEntry e, {

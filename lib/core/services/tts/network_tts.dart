@@ -58,7 +58,7 @@ bool isValidAzureTtsEndpoint(String value) {
       (uri.scheme == 'http' || uri.scheme == 'https');
 }
 
-/// Migrates retired MiMo TTS model ids. `mimo-v2-tts` is no longer served.
+/// 迁移已下线的 MiMo TTS model id。`mimo-v2-tts` 不再提供服务。
 String migrateMimoTtsModel(String? raw) {
   final model = (raw ?? '').trim();
   if (model.isEmpty || model == 'mimo-v2-tts') return 'mimo-v2.5-tts';
@@ -106,7 +106,7 @@ abstract class TtsServiceOptions {
               (json['baseUrl'] ??
                       'https://generativelanguage.googleapis.com/v1beta')
                   .toString(),
-          // New configs default to 3.1; existing persisted model strings are kept.
+          // 新配置默认 3.1；已持久化的 model 字符串保持不变。
           model: (json['model'] ?? 'gemini-3.1-flash-tts-preview').toString(),
           voiceName: (json['voiceName'] ?? 'Kore').toString(),
         );
@@ -128,7 +128,7 @@ abstract class TtsServiceOptions {
           apiKey: (json['apiKey'] ?? '').toString(),
           baseUrl: (json['baseUrl'] ?? 'https://api.minimaxi.com/v1')
               .toString(),
-          // New configs default to 2.8; existing persisted model strings are kept.
+          // 新配置默认 2.8；已持久化的 model 字符串保持不变。
           model: (json['model'] ?? 'speech-2.8-turbo').toString(),
           voiceId: (json['voiceId'] ?? 'female-shaonv').toString(),
           emotion: (json['emotion'] ?? '').toString(),
@@ -252,7 +252,7 @@ abstract class TtsServiceOptions {
           latency: (json['latency'] ?? 'normal').toString(),
         );
       default:
-        // Fallback to OpenAI shape to avoid crash if kind missing
+        // 若缺少 kind 则回退到 OpenAI 形态以避免崩溃
         return OpenAiTtsOptions(
           id: id.isEmpty ? null : id,
           enabled: enabled,
@@ -526,7 +526,7 @@ class ElevenLabsTtsOptions extends TtsServiceOptions {
   final String baseUrl;
   final String modelId;
   final String voiceId;
-  final String outputFormat; // e.g. mp3_44100_128
+  final String outputFormat; // 例如 mp3_44100_128
 
   ElevenLabsTtsOptions({
     super.id,
@@ -733,8 +733,8 @@ class FishAudioTtsOptions extends TtsServiceOptions {
 
 class NetworkTtsResult {
   final Uint8List bytes;
-  final String mime; // e.g. audio/mpeg or audio/wav
-  final int? sampleRate; // for PCM->WAV info
+  final String mime; // 例如 audio/mpeg 或 audio/wav
+  final int? sampleRate; // 用于 PCM -> WAV 信息
   NetworkTtsResult({required this.bytes, required this.mime, this.sampleRate});
 }
 
@@ -751,8 +751,8 @@ const List<String> miniMaxEmotionValues = <String>[
   'whipser',
 ];
 
-// FLAC remains accepted for existing profiles, but is not offered until the
-// app can safely merge multiple encoded FLAC responses.
+// FLAC 仍为已有 profile 接受，但在应用能安全合并
+// 多个编码后的 FLAC 响应之前不予提供。
 const List<String> miniMaxAudioFormats = <String>['mp3', 'pcm'];
 const Set<String> _miniMaxSupportedAudioFormats = <String>{
   'mp3',
@@ -983,7 +983,7 @@ class NetworkTtsService {
     final dataB64 = (inline['data'] ?? '').toString();
     if (dataB64.isEmpty) throw Exception('Gemini TTS: empty audio data');
     final pcm = base64Decode(dataB64);
-    // Convert PCM (24kHz 16-bit mono) to WAV
+    // 将 PCM（24kHz 16-bit 单声道）转为 WAV
     final wav = _pcmToWav(Uint8List.fromList(pcm), sampleRate: 24000);
     return NetworkTtsResult(bytes: wav, mime: 'audio/wav', sampleRate: 24000);
   }
@@ -1488,13 +1488,13 @@ class NetworkTtsService {
         'model': opt.model,
         'input': chunk,
         'voice': opt.voice,
-        // Official StepFun fields are snake_case (not RikkaHub camelCase).
+        // 官方 StepFun 字段为 snake_case（非 RikkaHub 的 camelCase）。
         'response_format': opt.responseFormat,
         'speed': opt.speed,
         'volume': opt.volume,
         'sample_rate': opt.sampleRate,
       };
-      // instruction is only valid for stepaudio-2.5-tts; other models error.
+      // instruction 仅对 stepaudio-2.5-tts 有效；其他模型会报错。
       if (opt.model.trim() == 'stepaudio-2.5-tts' &&
           opt.instruction.trim().isNotEmpty) {
         body['instruction'] = opt.instruction.trim();
@@ -1638,8 +1638,8 @@ class NetworkTtsService {
     final audio = BytesBuilder(copy: false);
     final started = Completer<void>();
     final finished = Completer<void>();
-    // Lifecycle failures can arrive before the corresponding await is
-    // attached. Keep a listener present while preserving errors for awaits.
+    // 生命周期失败可能在对应的 await 附加之前到达。
+    // 保持一个监听器存在，同时为 await 保留错误。
     unawaited(started.future.catchError((Object _) {}));
     unawaited(finished.future.catchError((Object _) {}));
     void fail(Object error, [StackTrace? stackTrace]) {
@@ -1679,7 +1679,7 @@ class NetworkTtsService {
         if (name == 'task-started' && !started.isCompleted) {
           started.complete();
         } else if (name == 'result-generated') {
-          // Sentence/timestamp metadata only. Audio arrives in binary frames.
+          // 仅句子/时间戳元数据。音频以二进制帧到达。
         } else if (name == 'task-finished' && !finished.isCompleted) {
           finished.complete();
         } else if (name == 'task-failed' || name == 'error') {
@@ -2075,8 +2075,8 @@ Uint8List _pcmToWav(
   writeInt32LE(totalLength);
   writeString('WAVE');
   writeString('fmt ');
-  writeInt32LE(16); // PCM chunk size
-  writeInt16LE(1); // audio format PCM
+  writeInt32LE(16); // PCM chunk 大小
+  writeInt16LE(1); // PCM 音频格式
   writeInt16LE(channels);
   writeInt32LE(sampleRate);
   writeInt32LE(byteRate);
@@ -2088,7 +2088,7 @@ Uint8List _pcmToWav(
   return out.toBytes();
 }
 
-/// Concatenates RIFF/WAVE files that use the same `fmt ` chunk.
+/// 拼接使用相同 `fmt ` chunk 的 RIFF/WAVE 文件。
 Uint8List combineWavAudio(List<Uint8List> wavFiles) {
   if (wavFiles.isEmpty) {
     throw ArgumentError.value(wavFiles, 'wavFiles', 'Must not be empty.');

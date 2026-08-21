@@ -175,14 +175,20 @@ void main() {
     }) async {
       final anchor = DateTime.utc(2026, 8, 7, 12);
       final messages = [
-        for (var index = 0; index < 3; index++)
-          ChatMessage(
-            id: '$messagePrefix-${String.fromCharCode(97 + index)}',
-            role: index.isEven ? 'user' : 'assistant',
-            content: String.fromCharCode(97 + index),
-            conversationId: conversationId,
-            timestamp: anchor.add(Duration(minutes: index)),
-          ),
+        ChatMessage(
+          id: '$messagePrefix-a',
+          role: 'user',
+          content: 'a',
+          conversationId: conversationId,
+          timestamp: anchor,
+        ),
+        ChatMessage(
+          id: '$messagePrefix-c',
+          role: 'user',
+          content: 'c',
+          conversationId: conversationId,
+          timestamp: anchor.add(const Duration(minutes: 2)),
+        ),
       ];
       await source.putMigrationBatch(
         conversations: [
@@ -193,16 +199,16 @@ void main() {
             updatedAt: anchor,
             messageIds: messages.map((message) => message.id).toList(),
             versionSelections: {for (final message in messages) message.id: 0},
+            lastMemoryExtractedOrder: 2,
           ),
         ],
         messages: [
-          for (var index = 0; index < messages.length; index++)
-            (message: messages[index], messageOrder: index),
+          (message: messages[0], messageOrder: 0),
+          (message: messages[1], messageOrder: 2),
         ],
         toolEventsByMessageId: const {},
         geminiSignaturesByMessageId: const {},
       );
-      await source.deleteMessage(messages[1].id);
     }
 
     Future<void> reopenLive() async {
@@ -625,7 +631,7 @@ void main() {
       expect(await live.getAllConversations(), hasLength(2));
     });
 
-    test('删除中间消息后的稀疏 order 可导入、稳定去重并保留水位', () async {
+    test('稀疏 order 可导入、稳定去重并保留水位', () async {
       await putSparseConversation(
         conversationId: 'sparse',
         messagePrefix: 'sparse',

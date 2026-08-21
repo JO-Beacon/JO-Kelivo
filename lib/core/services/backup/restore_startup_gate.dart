@@ -24,11 +24,10 @@ final class PendingRestoreRun {
   final bool runInCompletedDirectory;
 }
 
-/// Recovers restore state before any business persistence is opened.
+/// 在任何业务持久化打开之前，恢复 restore 状态。
 ///
-/// Nonterminal runs converge under one workspace lock to committed or
-/// rolledBack. Terminal evidence is then archived outside active admission;
-/// malformed or ambiguous state remains fail-closed.
+/// 非终态运行在同一个工作区锁下收敛为 committed 或 rolledBack。终态证据随后
+/// 被归档到活动准入之外；格式错误或含糊的状态保持失败关闭。
 final class RestoreStartupGate {
   RestoreStartupGate._();
 

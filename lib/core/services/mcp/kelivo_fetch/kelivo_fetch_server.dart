@@ -8,16 +8,14 @@ import 'package:html/dom.dart' as dom;
 import 'package:html2md/html2md.dart' as html2md;
 import 'package:mcp_client/mcp_client.dart' as mcp;
 
-/// @kelivo/fetch — In-memory MCP server engine and transport (Flutter/Dart)
+/// @kelivo/fetch —— 内存 MCP 服务器引擎与传输层（Flutter/Dart）
 ///
-/// Provides one token-conscious `fetch` tool. HTML is simplified to Markdown
-/// by default, while raw content requires an explicit opt-in. Responses are
-/// bounded and can be continued with `start_index`.
+/// 提供一个考虑 token 消耗的 `fetch` 工具。HTML 默认会简化为 Markdown，
+/// 原始内容需要显式选择加入；响应有上限，并可通过 `start_index` 继续获取。
 ///
-/// The server implements a minimal subset of MCP over JSON-RPC 2.0:
-/// initialize, tools/list, tools/call. It is intended to run in the same
-/// isolate as the Flutter app and connect to a standard mcp.Client via an
-/// in-memory ClientTransport.
+/// 该服务器在 JSON-RPC 2.0 上实现了最小化的 MCP 子集：initialize、
+/// tools/list、tools/call。它旨在与 Flutter 应用运行在同一 isolate 中，
+/// 并通过内存中的 ClientTransport 连接标准的 mcp.Client。
 
 class KelivoFetchRequestPayload {
   static const defaultMaxLength = 5000;
@@ -150,7 +148,7 @@ class KelivoFetcher {
       try {
         return jsonEncode(jsonDecode(body));
       } catch (_) {
-        // Preserve malformed or JSON-like responses instead of failing fetch.
+        // 保留格式错误或类似 JSON 的响应，而不是让 fetch 失败。
       }
     }
     return body.trim();
@@ -234,14 +232,14 @@ class KelivoFetcher {
   };
 }
 
-/// Minimal JSON-RPC server for MCP that serves @kelivo/fetch tools.
+/// 用于 MCP 的最小 JSON-RPC 服务器，提供 @kelivo/fetch 工具。
 class KelivoFetchMcpServerEngine {
   bool _closed = false;
 
   Future<dynamic> handleMessage(dynamic message) async {
     if (_closed) return null;
 
-    // Support batch arrays defensively (return array of responses)
+    // 防御性地支持批量数组（返回响应数组）
     if (message is List) {
       final out = <dynamic>[];
       for (final m in message) {
@@ -271,7 +269,7 @@ class KelivoFetchMcpServerEngine {
             result: {
               'serverInfo': {'name': '@kelivo/fetch', 'version': '0.2.0'},
               'protocolVersion': mcp.McpProtocol.defaultVersion,
-              // Only tools capability is advertised for this minimal server
+              // 此最小服务器仅声明 `tools` 能力
               'capabilities': {
                 'tools': {'listChanged': false},
               },
@@ -300,7 +298,7 @@ class KelivoFetchMcpServerEngine {
           return _error(id, code: -32101, message: 'Tool not found: $name');
 
         default:
-          // Ignore common notifications; respond error for unknown requests
+          // 忽略常见通知；对未知请求返回错误
           if (id == null) {
             return _noop();
           }
@@ -388,7 +386,7 @@ class KelivoFetchMcpServerEngine {
   }
 }
 
-/// In-memory ClientTransport that directly invokes the local server engine.
+/// 内存中的 ClientTransport，直接调用本地服务器引擎。
 class KelivoInMemoryClientTransport implements mcp.ClientTransport {
   final KelivoFetchMcpServerEngine _server;
   final _messageController = StreamController<dynamic>.broadcast();
@@ -406,7 +404,7 @@ class KelivoInMemoryClientTransport implements mcp.ClientTransport {
   @override
   mcp.TransportSendOperation send(dynamic message) {
     if (_closed) return mcp.TransportSendOperation.completed();
-    // Process asynchronously to mimic real transport
+    // 异步处理以模拟真实传输
     Future.microtask(() async {
       final resp = await _server.handleMessage(message);
       if (_closed) return;

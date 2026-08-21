@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'breakpoints.dart';
 
 class AdaptiveLayout extends StatelessWidget {
-  final Widget? navigationRail; // desktop only (not used for tablet)
-  final Widget? sidePanel; // tablet/desktop: conversation/history panel
-  final Widget body; // main content
+  final Widget? navigationRail; // 仅桌面（平板不使用）
+  final Widget? sidePanel; // 平板/桌面：对话/历史面板
+  final Widget body; // 主要内容
   final double tabletSideWidth;
   final double desktopNavWidth;
   final double desktopSideWidth;
@@ -37,7 +37,7 @@ class AdaptiveLayout extends StatelessWidget {
         );
       case ScreenType.desktop:
       case ScreenType.wide:
-        // Basic 3-column skeleton; desktop specific tuning can come later.
+        // 基础三列骨架；桌面端特定调整可后续补充。
         return Row(
           children: [
             if (navigationRail != null)

@@ -39,31 +39,31 @@ import 'package:Kelivo/desktop/html_preview_dialog.dart';
 import '../cache/byte_lru_cache.dart';
 import 'incremental_markdown_document.dart';
 
-// Inline math is parsed on the UI thread. Bound the lookahead window so a long
-// line with many unmatched openers cannot trigger repeated whole-line scans.
+// 行内数学公式在 UI 线程解析。限制前瞻窗口，避免包含大量未匹配开启符的
+// 长行触发反复整行扫描。
 const int _maxInlineMathBodyLength = 512;
 const String _codeDollarMask = '___CODE_DOLLAR_MASK___';
 const String _fencedHtmlTagStartMask = '\uE002';
 
-/// Global LRU of parsed highlight node trees, keyed by language + source.
-/// Node trees are theme-independent (the theme is applied while converting
-/// nodes to spans), so entries survive theme switches and widget disposal.
+/// 已解析高亮节点树的全局 LRU 缓存，按语言和源码作为键。
+/// 节点树与主题无关（主题在节点转换为 span 时应用），因此缓存可在主题切换
+/// 和 widget 销毁后继续存在。
 final ByteLruCache<String, List<Node>> _highlightNodeCache =
     ByteLruCache<String, List<Node>>(
       maxBytes: 8 << 20,
       sizeOf: (key, value) => key.length * 2 + value.length * 64,
     );
 
-/// Test hook: number of real `highlight.parse` executions.
+/// 测试钩子：实际执行 `highlight.parse` 的次数。
 int debugHighlightParseCount = 0;
 
-/// Test hook: clear the highlight node cache and reset the parse counter.
+/// 测试钩子：清空高亮节点缓存并重置解析计数。
 void debugResetHighlightNodeCache() {
   _highlightNodeCache.clear();
   debugHighlightParseCount = 0;
 }
 
-/// gpt_markdown with custom code block highlight and inline code styling.
+/// 带自定义代码块高亮和行内代码样式的 gpt_markdown。
 class MarkdownWithCodeHighlight extends StatefulWidget {
   const MarkdownWithCodeHighlight({
     super.key,
@@ -77,21 +77,20 @@ class MarkdownWithCodeHighlight extends StatefulWidget {
   final String text;
   final void Function(String id)? onCitationTap;
 
-  /// Resolves a citation id (from `[cite:id]` markers) to its display index
-  /// using the search tool results of the enclosing message. Returns null
-  /// when the id has no matching result.
+  /// 使用所在消息的搜索工具结果，将引用 id（来自 `[cite:id]` 标记）
+  /// 解析为显示序号。当 id 没有匹配结果时返回 null。
   final String? Function(String id)? citationIndexResolver;
-  final TextStyle? baseStyle; // optional override for base markdown text style
+  final TextStyle? baseStyle; // 可选的基础 Markdown 文本样式覆盖
   final bool streaming;
 
   static const int _streamingTableMaxRows = 30;
   static const int _streamingHighlightMaxLines = 300;
   static const int _streamingHighlightMaxChars = 12000;
 
-  // Tunable: list scaling compensation exponent.
-  // When chat scale s != 1.0, lists often feel slightly off compared to body.
-  // We apply s^(1-k) instead of s to the list rows to gently normalize.
-  // Increase k if lists still look larger at small scales; decrease if too small at large scales.
+  // 可调参数：列表缩放补偿指数。
+  // 当聊天缩放 s != 1.0 时，列表相比正文通常看起来略有偏差。
+  // 我们对列表行应用 s^(1-k) 而不是 s，以温和地归一化。
+  // 如果小缩放下列表仍偏大，就增大 k；大缩放下偏小时就减小 k。
   static const double kMarkdownListScaleCompensation = 0.84;
 
   @override
@@ -180,7 +179,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
         ? _incrementalDocument.update(sanitizedText)
         : const <IncrementalMarkdownBlock>[];
     final normalized = useIncrementalBlocks ? null : normalize(sanitizedText);
-    // Base text style (can be overridden by caller)
+    // 基础文本样式（可被调用方覆盖）
     final baseTextStyle =
         (widget.baseStyle ?? Theme.of(context).textTheme.bodyMedium)?.copyWith(
           fontSize: widget.baseStyle?.fontSize ?? 15.5,
@@ -190,7 +189,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
           color: null,
         );
 
-    // Replace default components and add our own where needed
+    // 替换默认组件，并在需要处添加自定义组件
     final components = List<MarkdownComponent>.from(
       MarkdownComponent.globalComponents,
     );
@@ -204,41 +203,40 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
     if (rbIdx != -1) components[rbIdx] = ModernRadioMd();
     final tableIdx = components.indexWhere((c) => c is TableMd);
     if (tableIdx != -1) components[tableIdx] = EscapeAwareTableMd();
-    // Prepend custom renderers in priority order.
-    // Temporarily disable custom bold label line transformer to avoid
-    // interfering with block parsing for complex documents.
+    // 按优先级顺序前置自定义渲染器。
+    // 暂时禁用自定义粗体标签行转换器，避免干扰复杂文档的块解析。
     // components.insert(0, LabelValueLineMd());
     components.removeWhere((c) => c is CodeBlockMd);
-    // Conditionally add LaTeX/math renderers
+    // 按条件添加 LaTeX 或数学公式渲染器
     if (settings.enableMathRendering) {
-      // Block-level LaTeX (e.g., $$...$$ or \[...\])
+      // 块级 LaTeX（例如 $$...$$ 或 \[...\]）
       components.insert(0, LatexBlockScrollableMd());
     }
     components.insert(0, AtxHeadingMd());
-    // Ensure fenced code blocks take precedence over headings and other blocks
-    // so lines like "# comment" inside code fences are not parsed as headings.
+    // 确保围栏代码块优先于标题和其他块，
+    // 避免代码围栏中的 "# comment" 之类内容被解析为标题。
     components.insert(0, ModernBlockQuote());
     components.insert(0, FencedCodeBlockMd(streaming: widget.streaming));
     components.insert(0, DetailsHtmlMd());
-    // Inline components: keep defaults but make link parsing line-scoped
+    // 行内组件：保留默认行为，但让链接解析限制在当前行内
     final inlineComponents = List<MarkdownComponent>.from(
       MarkdownComponent.inlineComponents,
     );
     inlineComponents.removeWhere(
       (c) => c is LatexMath || c is LatexMathMultiLine,
     );
-    // Add whitelist-based HTML tag renderer (e.g., <br>)
+    // 添加基于白名单的 HTML 标签渲染器（例如 <br>）
     inlineComponents.insert(0, HtmlAnchorMd());
     inlineComponents.insert(0, AllowedHtmlTagsMd());
 
-    // Conditionally add inline LaTeX/math renderers
+    // 按条件添加行内 LaTeX 或数学公式渲染器
     if (settings.enableMathRendering) {
-      // Inline LaTeX: $...$ and \(...\)
+      // 行内 LaTeX：$...$ 和 \(...\)
       if (settings.enableDollarLatex) {
         inlineComponents.insert(0, InlineLatexParenScrollableMd());
         inlineComponents.insert(0, InlineLatexDollarScrollableMd());
       } else {
-        // Only \(...\) inline
+        // 只处理 \(...\) 行内形式
         inlineComponents.insert(0, InlineLatexParenScrollableMd());
       }
     }
@@ -265,12 +263,11 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
     if (linkIdxInline != -1) {
       inlineComponents[linkIdxInline] = LineSafeLinkMd();
     }
-    // Keep escaped punctuation out of block parsing so it cannot split
-    // \( ... \) math containing \{...\}; inline math is registered ahead of it.
+    // 将转义标点排除在块解析之外，避免它们拆开包含 \{...\} 的 \( ... \) 数学公式；
+    // 行内数学公式注册在它之前。
     inlineComponents.add(BackslashEscapeMd());
-    // codeBuilder handles rendering. A custom BlockMd for fences can
-    // interfere with block segmentation in some cases.
-    // Resolve user preferred code font family (default to monospace)
+    // codeBuilder 负责渲染。自定义的围栏 BlockMd 在某些情况下会干扰块切分。
+    // 解析用户首选的代码字体（默认等宽字体）
     String resolveCodeFont() {
       final fam = settings.codeFontFamily;
       if (fam == null || fam.isEmpty) return 'monospace';
@@ -287,7 +284,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
 
     final codeFontFamily = resolveCodeFont();
 
-    // Resolve app font for all markdown text (headings, lists, etc.)
+    // 为所有 Markdown 文本（标题、列表等）解析应用字体
     String resolveAppFont() {
       final fam = settings.appFontFamily;
       if (fam == null || fam.isEmpty) return '';
@@ -304,9 +301,9 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
 
     final appFontFamily = resolveAppFont();
 
-    // Everything baked into the memoized markdown widget below must be part of
-    // this signature (theme colors, math flags, fonts, font metrics, streaming
-    // mode), otherwise a theme/settings change would keep stale rendering.
+    // 所有被记忆化 Markdown widget 使用的值都必须纳入此签名
+    // （主题颜色、数学公式开关、字体、字体度量、流式模式），
+    // 否则主题或设置变化后仍会保留过期渲染。
     final themeSignature =
         '${Theme.of(context).brightness.index}-${cs.surface.toARGB32()}-${cs.onSurface.toARGB32()}-${cs.primary.toARGB32()}-${cs.outlineVariant.toARGB32()}-${settings.enableMathRendering}-${settings.enableDollarLatex}-${widget.streaming}-${baseTextStyle?.fontSize}-${baseTextStyle?.height}-${baseTextStyle?.letterSpacing}-${baseTextStyle?.fontFamily}-$codeFontFamily-$appFontFamily';
 
@@ -315,7 +312,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
       markdown,
       style: baseTextStyle,
       followLinkColor: true,
-      // Disable built-in $...$ LaTeX so our custom scrollable handlers take over
+      // 禁用内置 $...$ LaTeX，以便自定义可滚动处理器接管
       useDollarSignsForLatex: false,
       onLinkTap: (url, title) => _handleLinkTap(context, url),
       components: components,
@@ -359,7 +356,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
                 borderRadius: BorderRadius.circular(8),
                 child: () {
                   if (provider == null) {
-                    // Missing or unsupported source: show a broken image indicator
+                    // 缺失或不支持的来源：显示损坏图片指示
                     return const Icon(Icons.broken_image);
                   }
                   final displayWidth = width ?? constraints.maxWidth;
@@ -393,29 +390,27 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
       },
       linkBuilder: (ctx, span, url, style) {
         final label = span.toPlainText().trim();
-        // Special handling: [citation](id) and legacy [citation](index:id)
+        // 特殊处理：[citation](id) 和旧式 [citation](index:id)
         if (label.toLowerCase() == 'citation') {
           final citation = _parseCitationRef(url);
           if (citation != null) {
             final cs = Theme.of(ctx).colorScheme;
-            // Prefer the index resolved from this message's search results;
-            // fall back to the inline index for legacy `index:id` markers.
+            // 优先使用从本消息搜索结果解析出的序号；
+            // 旧式 `index:id` 标记回退到行内序号。
             final resolved = widget.citationIndexResolver?.call(citation.id);
             final String display;
             if (resolved != null && resolved.isNotEmpty) {
               display = resolved;
             } else if (citation.indexText != citation.id) {
-              display = citation.indexText; // legacy index:id marker
+              display = citation.indexText; // 旧版 index:id 标记
             } else if (int.tryParse(citation.indexText) != null) {
-              display = citation.indexText; // legacy pure-index shorthand
+              display = citation.indexText; // 旧版纯索引简写
             } else {
-              display = '?'; // id-only marker with no matching result
+              display = '?'; // 仅有 id、无匹配结果的标记
             }
-            // gpt_markdown embeds this widget baseline-aligned. The capsule is
-            // taller than the text ascent, so without correction it hangs
-            // below the line. Translate it up (layout-neutral) so it looks
-            // vertically centered, and pad horizontally so adjacent capsules
-            // don't touch.
+            // gpt_markdown 会按基线对齐嵌入此 widget。胶囊比文本上伸部分更高，
+            // 若不校正就会悬挂在基线下方。向上平移（不影响布局）使其视觉居中，
+            // 并添加水平内边距，避免相邻胶囊贴在一起。
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 1.5),
               child: Transform.translate(
@@ -426,7 +421,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
                         citation.id.isNotEmpty) {
                       widget.onCitationTap!(citation.id);
                     } else {
-                      // Fallback: do nothing
+                      // 回退：不处理
                     }
                   },
                   child: Container(
@@ -450,7 +445,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
             );
           }
         }
-        // Default link appearance
+        // 默认链接外观
         final cs = Theme.of(ctx).colorScheme;
         return Text(
           span.toPlainText(),
@@ -465,8 +460,8 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
         final style = (cfg.style ?? TextStyle()).copyWith(
           fontWeight: AppFontWeights.regular,
         );
-        // Apply a soft compensation so when chat scale != 100%,
-        // list items don't visually feel larger/smaller than body text.
+        // 应用柔和补偿，使聊天缩放不等于 100% 时，
+        // 列表项不会明显比正文更大或更小。
         final double kListComp =
             MarkdownWithCodeHighlight.kMarkdownListScaleCompensation;
         final mediaQuery = MediaQuery.of(ctx);
@@ -486,16 +481,17 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
                   padding: const EdgeInsetsDirectional.only(start: 6, end: 6),
                   child: Text("$no.", style: style),
                 ),
-                // Keep child as-is so it inherits context MediaQuery scaling once
+                // 保持子组件原样，使其只继承一次上下文 MediaQuery 缩放
                 Flexible(child: child),
               ],
             ),
           ),
         );
       },
-      // Note: property name is unOrderedListBuilder (camel-cased with capital O)
-      // Signature in gpt_markdown 1.1.4: (BuildContext ctx, Widget child, GptMarkdownConfig cfg) -> Widget
-      // We compose the bullet + content here to control scaling/spacing.
+      // 注意：属性名是 unOrderedListBuilder（驼峰命名，O 大写）。
+      // gpt_markdown 1.1.4 中的签名：
+      // (BuildContext ctx, Widget child, GptMarkdownConfig cfg) -> Widget
+      // 这里组合项目符号和内容，以控制缩放和间距。
       unOrderedListBuilder: (ctx, child, cfg) {
         final style = (cfg.style ?? TextStyle()).copyWith(
           fontWeight: AppFontWeights.regular,
@@ -519,7 +515,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
                   padding: const EdgeInsetsDirectional.only(start: 6, end: 6),
                   child: Text('•', style: style),
                 ),
-                // Keep child untouched to follow context scaling exactly once
+                // 保持子组件不变，使其只精确跟随一次上下文缩放
                 Flexible(child: child),
               ],
             ),
@@ -539,9 +535,9 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
           appFontFamily: appFontFamily.isEmpty ? null : appFontFamily,
         );
       },
-      // Inline `code` styling via highlightBuilder in gpt_markdown
+      // 通过 gpt_markdown 的 highlightBuilder 设置行内 `code` 样式
       highlightBuilder: (ctx, inline, style) {
-        // Unmask dollar signs that were protected during preprocessing
+        // 还原在预处理期间被保护的美元符号
         String unmasked = inline.replaceAll(_codeDollarMask, r'$');
         String softened = _softBreakInline(unmasked);
         final bool isDarkCtx = Theme.of(ctx).brightness == Brightness.dark;
@@ -568,7 +564,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
           ),
         );
       },
-      // Fenced code block styling via codeBuilder (with collapse/expand)
+      // 通过 codeBuilder 设置围栏代码块样式（带折叠或展开）
       codeBuilder: (ctx, name, code, closed) {
         final lang = name.trim();
         final restoredCode = _unmaskHtmlTagStartsInsideFencedCode(code);
@@ -789,7 +785,7 @@ String? _normalizeLanguage(String? lang) {
     case 'sql':
       return 'sql';
     default:
-      return l; // try as-is
+      return l; // 先尝试原样返回
   }
 }
 
@@ -799,27 +795,27 @@ String _preprocessFences(
   required bool enableDollarLatex,
   bool streaming = false,
 }) {
-  // Normalize newlines to simplify regex handling
+  // 规范化换行符，简化正则处理
   var out = input.replaceAll('\r\n', '\n');
   out = _maskBlockquoteFenceMarkers(out);
 
-  // Move fenced code from list lines to the next line before masking so list
-  // fences are protected from later inline math normalization.
+  // 在掩码前将列表行中的围栏代码移到下一行，
+  // 以免后续行内数学公式规范化破坏列表围栏。
   final bulletFence = RegExp(
     r"^(\s*(?:[*+-]|\d+\.)\s+)```([^\s`]*)\s*$",
     multiLine: true,
   );
   out = out.replaceAllMapped(bulletFence, (m) => "${m[1]}\n```${m[2]}");
 
-  // STEP 1: MASKING - Protect code blocks from LaTeX processing
-  // This prevents $...$ inside code from being converted to LaTeX
+  // 第 1 步：掩码，保护代码块免受 LaTeX 处理。
+  // 这样可避免代码内的 $...$ 被转换为 LaTeX。
   final Map<String, String> codeMap = {};
   int codeCount = 0;
 
-  // Match fenced code blocks and inline code (`...`)
-  // Fenced: CommonMark-style variable-length fences (>= 3 backticks or tildes)
-  // Group 1: entire fenced block, Group 2: opening fence, Group 3: fence char
-  // Closing fence must use same char and be >= opening length
+  // 匹配围栏代码块和行内代码（`...`）。
+  // 围栏：CommonMark 风格的可变长度围栏（至少 3 个反引号或波浪号）。
+  // 组 1：整个围栏块；组 2：开始围栏；组 3：围栏字符。
+  // 结束围栏必须使用相同字符且长度不短于开始围栏。
   final codeRegex = RegExp(
     r'(^[ \t]*(([`~])\3{2,})[ \t]*[^\n]*\n(?:[\s\S]*?^[ \t]*\2\3*[ \t]*$|[\s\S]*))'
     r'|(`[^`\n]+`)',
@@ -830,8 +826,8 @@ String _preprocessFences(
     final key = '__CODE_MASK_${codeCount++}__';
     var codeContent = match.group(0)!;
 
-    // For inline code (`...`), escape dollar signs to prevent LaTeX interpretation
-    // Inline code is single-line and delimited by single backticks (not fenced)
+    // 对行内代码（`...`）转义美元符号，避免被解释为 LaTeX。
+    // 行内代码是单行，且由单个反引号分隔（不是围栏）。
     final isInlineCode =
         !codeContent.contains('\n') &&
         codeContent.startsWith('`') &&
@@ -849,7 +845,7 @@ String _preprocessFences(
     return key;
   });
 
-  // STEP 2: PROCESSING (on masked string, code is now protected)
+  // 第 2 步：处理（在已掩码字符串上操作，代码现在已受保护）
   if (streaming) {
     out = _stabilizeStreamingTables(out);
     if (enableMath && enableDollarLatex) {
@@ -857,8 +853,8 @@ String _preprocessFences(
     }
   }
 
-  // Keep HTML paragraph breaks stable: </p> emits one line break, and
-  // one preserved source newline gives a single visual blank line.
+  // 保持 HTML 段落分隔稳定：</p> 产生一个换行，
+  // 一个保留的源换行则产生一个视觉空行。
   out = out.replaceAllMapped(
     RegExp(r"<\/p\s*>\s*\n\s*\n\s*", caseSensitive: false),
     (_) => '</p>\n',
@@ -868,10 +864,10 @@ String _preprocessFences(
     (_) => '</p>\n',
   );
 
-  // 2025-10-23 Fix: Remove title attributes from markdown links to work around gpt_markdown's
-  // link regex limitation. The package's regex `[^\s]*` stops at spaces, so
-  // [text](url "title") breaks. Strip titles while preserving the URL.
-  // Matches: [text](url "title") or [text](url 'title') or [text](url title)
+  // 2025-10-23 修复：移除 Markdown 链接中的 title 属性，规避 gpt_markdown 的
+  // 链接正则限制。该包的正则 `[^\s]*` 遇到空格即停止，因此
+  // [text](url "title") 会解析失败。移除 title，同时保留 URL。
+  // 匹配：[text](url "title")、[text](url 'title') 或 [text](url title)。
   final linkWithTitle = RegExp(r'\[([^\]]+)\]\(([^\s)]+)\s+[^)]*\)');
   out = out.replaceAllMapped(linkWithTitle, (match) {
     final text = match.group(1);
@@ -881,30 +877,29 @@ String _preprocessFences(
   out = _normalizeRawCitationMetadata(out);
   out = _normalizeCiteMarkers(out);
 
-  // Normalize inline $...$ math into \( ... \) so it always matches the LaTeX
-  // renderer (even when vendors emit single-dollar math mixed with prose).
-  // Skips $$...$$ blocks, which are handled separately.
-  // NOW SAFE: Code blocks are masked, so $variables in code won't be converted.
+  // 将行内 $...$ 数学公式规范化为 \( ... \)，使其始终匹配 LaTeX 渲染器
+  // （即使供应商把单美元公式混在正文中）。跳过 $$...$$ 块，它们会单独处理。
+  // 此时已安全：代码块已掩码，因此代码中的 $variables 不会被转换。
   if (enableMath && enableDollarLatex) {
     out = _replaceInlineDollarMath(out);
   }
 
-  // Ensure display-math blocks stay as standalone blocks even when generated inline.
-  // Some providers emit "$$...$$" inside list items or paragraphs; without extra
-  // newlines gpt_markdown may treat them as plain text. We normalize multi-line
-  // display math into its own block to guarantee rendering.
+  // 即使块级数学公式以内联方式生成，也要确保其保持独立块。
+  // 部分供应商会在列表项或段落中输出 "$$...$$"；没有额外换行时，
+  // gpt_markdown 可能把它们当普通文本。这里将多行块级公式规范化为独立块，
+  // 以保证渲染。
   final inlineDisplayMath = RegExp(r"\$\$([\s\S]*?)\$\$");
   out = out.replaceAllMapped(inlineDisplayMath, (m) {
     final body = (m.group(1) ?? '').trim();
-    // Only normalize true display math (multi-line or clearly not inline literals)
+    // 只规范化真正的块级公式（多行或明显不是行内字面量）
     if (body.isEmpty) {
       return m[0]!;
     }
     final hasNewline = body.contains('\n');
     if (!hasNewline && body.length < 12) {
-      return m[0]!; // looks like inline literal, leave intact
+      return m[0]!; // 看起来像内联字面量，保持原样
     }
-    // Surround with blank lines to force a block; keep existing body trimmed
+    // 用空行包围以强制成块，同时保持现有正文去除首尾空白
     final prefix = m.start == 0 || out.substring(0, m.start).endsWith('\n\n')
         ? ''
         : '\n';
@@ -915,46 +910,44 @@ String _preprocessFences(
     return '$prefix\$\$\n$body\n\$\$$suffix';
   });
 
-  // 2) Dedent opening fences: leading spaces before ```lang
+  // 2）去掉开始围栏前的缩进：```lang 之前的空格
   final dedentOpen = RegExp(r"^[ \t]+```([^\n`]*)\s*$", multiLine: true);
   out = out.replaceAllMapped(dedentOpen, (m) => "```${m[1]}");
 
-  // 3) Dedent closing fences: leading spaces before ```
+  // 3）去掉结束围栏前的缩进：``` 之前的空格
   final dedentClose = RegExp(r"^[ \t]+```\s*$", multiLine: true);
   out = out.replaceAllMapped(dedentClose, (m) => "```");
 
-  // 4) Ensure closing fences are on their own line: transform "} ```" or "}```" into "}\n```"
+  // 4）确保结束围栏独占一行：把 "} ```" 或 "}```" 转换为 "}\n```"
   final inlineClosing = RegExp(r"([^\r\n`])```(?=\s*(?:\r?\n|$))");
   out = out.replaceAllMapped(inlineClosing, (m) => "${m[1]}\n```");
 
-  // 5) Disambiguate Setext vs HR after label-value lines:
-  // If a line of only dashes follows a bold label line (e.g., "**作者:** 张三"),
-  // insert a blank line so it's treated as an HR, not a Setext heading underline.
+  // 5）消除标签值行后 Setext 标题和水平线的歧义：
+  // 如果只有短横线的一行紧跟粗体标签行（例如 "**作者:** 张三"），
+  // 插入空行，使其被当作水平线而不是 Setext 标题下划线。
   final labelThenDash = RegExp(
     r"^(\*\*[^\n*]+\*\*.*)\n(\s*-{3,}\s*$)",
     multiLine: true,
   );
   out = out.replaceAllMapped(labelThenDash, (m) => "${m[1]}\n\n${m[2]}");
 
-  // 6) Allow ATX headings starting with enumerations like "## 1.引言" or "## 1. 引言"
-  // Insert a zero-width non-joiner after the dot to prevent list parsing without changing visual text.
+  // 6）允许以编号开头的 ATX 标题，例如 "## 1.引言" 或 "## 1. 引言"。
+  // 在点号后插入零宽不连字符，避免被解析为列表，同时不改变视觉文本。
   final atxEnum = RegExp(r"^(\s{0,3}#{1,6}\s+\d+)\.(\s*)(\S)", multiLine: true);
   out = out.replaceAllMapped(atxEnum, (m) => "${m[1]}.\u200C${m[2]}${m[3]}");
 
-  // 7) Normalize double-bracket citation links: [[n]](url) → [n](url)
-  //    Many LLMs with built-in web search (DashScope, Perplexity, etc.) emit
-  //    citations as [[1]](url), where the inner [1] is the display text. The
-  //    link regex cannot match nested brackets, so flatten them first.
+  // 7）规范化双括号引用链接：[[n]](url) → [n](url)。
+  //    许多内置联网搜索的 LLM（DashScope、Perplexity 等）会把引用输出为
+  //    [[1]](url)，其中内层 [1] 是显示文本。链接正则无法匹配嵌套括号，
+  //    因此先将其展平。
   final doubleBracketLink = RegExp(r'\[\[([^\]]+)\]\]\(([^\s)]+)\)');
   out = out.replaceAllMapped(doubleBracketLink, (m) => '[${m[1]}](${m[2]})');
 
-  // 8) Fix: when multiple markdown links are placed on separate lines using
-  //    trailing double-spaces (hard line breaks), gpt_markdown may treat them
-  //    as a single paragraph and only render the first link correctly.
-  //    To avoid this, convert such lines into separate paragraphs by
-  //    inserting an extra blank line after lines that end with a markdown
-  //    link and have at least two trailing spaces.
-  //    Example affected pattern:
+  // 8）修复：当多个 Markdown 链接通过行尾双空格（硬换行）放在不同行时，
+  //    gpt_markdown 可能把它们当作同一段落，只正确渲染第一个链接。
+  //    为避免此问题，在行尾为 Markdown 链接且至少有两个尾随空格的行后
+  //    插入额外空行，使其成为独立段落。
+  //    受影响模式示例：
   //      Label：[text](url)  \nNext： [text](url)  \n
   final linkWithTrailingSpaces = RegExp(r"\[[^\]]+\]\([^\)]+\)\s{2,}$");
   final lines = out.split('\n');
@@ -965,17 +958,17 @@ String _preprocessFences(
       buf.write(line);
       if (i < lines.length - 1) buf.write('\n');
       if (linkWithTrailingSpaces.hasMatch(line)) {
-        // Ensure a blank line to break the paragraph for the next line
+        // 确保插入空行，为下一行断开段落
         buf.write('\n');
       }
     }
     out = buf.toString();
   }
 
-  // STEP 3: UNMASKING - Restore code blocks
-  // Replace all mask placeholders with their original content
-  // NOTE: We do NOT restore _codeDollarMask here because we want LaTeX components
-  // to never see dollar signs inside code. The unmask will happen later in highlightBuilder.
+  // 第 3 步：取消掩码，恢复代码块。
+  // 将所有掩码占位符替换为原始内容。
+  // 注意：这里不还原 _codeDollarMask，因为我们希望 LaTeX 组件
+  // 永远看不到代码内的美元符号。取消掩码会稍后在 highlightBuilder 中完成。
   out = out.replaceAllMapped(RegExp(r'__CODE_MASK_\d+__'), (match) {
     final key = match.group(0)!;
     return codeMap[key] ?? key;
@@ -1007,9 +1000,9 @@ String _normalizeRawCitationMetadata(String input) {
   });
 }
 
-/// Normalize Cherry-style `[cite:id]` markers (optionally comma-separated,
-/// e.g. `[cite:a1b2c3, d4e5f6]`) into `[citation](id)` markdown links so the
-/// linkBuilder renders them as numbered capsules.
+/// 将 Cherry 风格 `[cite:id]` 标记（可用逗号分隔，例如
+/// `[cite:a1b2c3, d4e5f6]`）规范化为 `[citation](id)` Markdown 链接，
+/// 以便 linkBuilder 将它们渲染为带编号的胶囊。
 String _normalizeCiteMarkers(String input) {
   final citeMarker = RegExp(
     r'\[cite:\s*([A-Za-z0-9_-]+(?:\s*,\s*[A-Za-z0-9_-]+)*)\s*\]',
@@ -1366,7 +1359,7 @@ bool _isValidStreamingDollarMathBody(String body) {
   return _isValidDollarMathBody(trimmed);
 }
 
-// Safe math renderer that falls back to plain text when parsing fails.
+// 解析失败时回退到纯文本的安全数学公式渲染器。
 Widget _renderMath(String tex, {TextStyle? style, bool displayMode = false}) {
   final resolved = style ?? TextStyle();
   final normalizedTex = _normalizeMathTex(tex);
@@ -1398,13 +1391,12 @@ WidgetSpan _inlineMathSpan(Widget math) {
   );
 }
 
-/// Horizontally scrollable inline math that preserves baseline alignment.
+/// 可水平滚动的行内数学公式，保持基线对齐。
 ///
-/// [SingleChildScrollView] breaks baseline forwarding because its internal
-/// [RenderViewport] does not implement [computeDistanceToActualBaseline].
-/// This widget uses a custom [RenderObject] that lays out the child
-/// unconstrained in width, reports correct baseline, and paints with a
-/// horizontal scroll offset driven by a [GestureDetector].
+/// [SingleChildScrollView] 会破坏基线转发，因为其内部 [RenderViewport]
+/// 没有实现 [computeDistanceToActualBaseline]。此 widget 使用自定义
+/// [RenderObject]，让子组件按宽度无约束布局、报告正确基线，并通过
+/// [GestureDetector] 驱动的水平滚动偏移进行绘制。
 class _InlineMathScrollable extends StatefulWidget {
   const _InlineMathScrollable({required this.child});
   final Widget child;
@@ -1425,7 +1417,7 @@ class _InlineMathScrollableState extends State<_InlineMathScrollable> {
 
   void _updateMaxScroll(double childWidth, double viewportWidth) {
     _maxScroll = (childWidth - viewportWidth).clamp(0.0, double.infinity);
-    // Ensure current offset stays valid after relayout.
+    // 重新布局后确保当前偏移仍然有效。
     if (_scrollOffset > _maxScroll) {
       _scrollOffset = _maxScroll;
     }
@@ -1500,7 +1492,7 @@ class _RenderInlineMathScrollable extends RenderProxyBox {
       parentUsesSize: true,
     );
     size = constraints.constrain(child.size);
-    // Notify stateful widget of the scrollable extent.
+    // 将有状态 widget 的可滚动范围通知出去。
     if (child.size.width > size.width) {
       onMetrics(child.size.width, size.width);
     }
@@ -2060,7 +2052,7 @@ int _findMatchingOpenBracket(String tex, int close) {
 }
 
 String _softBreakInline(String input) {
-  // Insert zero-width break for inline code segments with long tokens.
+  // 为包含长 token 的行内代码段插入零宽换行机会。
   if (input.length < 60) return input;
   final buf = StringBuffer();
   for (int i = 0; i < input.length; i++) {
@@ -2086,7 +2078,7 @@ String _sanitizeImageLinks(String input) {
     final inside = (m.group(2) ?? '').trim();
     if (inside.isEmpty) return m[0]!;
 
-    // Leave remote URLs and data URLs untouched.
+    // 保持远程 URL 和 data URL 不变。
     if (inside.startsWith('http://') ||
         inside.startsWith('https://') ||
         inside.startsWith('data:')) {
@@ -2112,11 +2104,11 @@ String _sanitizeImageLinks(String input) {
         final uri = Uri.parse(url);
         safeUrl = uri.toString();
       } else {
-        // Plain absolute file system path -> file:// URI.
+        // 普通绝对文件系统路径 -> file:// URI。
         safeUrl = Uri.file(url).toString();
       }
     } catch (_) {
-      // Fallback: minimally escape spaces.
+      // 回退：最低限度地转义空格。
       safeUrl = url.replaceAll(' ', '%20');
     }
 
@@ -2144,7 +2136,7 @@ ImageProvider? _imageProviderFor(String src) {
   if (f.existsSync()) {
     return FileImage(f);
   }
-  // Missing local file or unsupported scheme
+  // 本地文件缺失或 scheme 不受支持
   return null;
 }
 
@@ -2325,9 +2317,9 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
         color: bodyBg,
         borderRadius: BorderRadius.circular(16),
       ),
-      // Clip children to the same radius so they don't overpaint corners
+      // 将子组件裁剪到相同圆角，避免越界绘制角落
       clipBehavior: Clip.antiAlias,
-      // Draw the border on top so it remains visible at corners
+      // 在上层绘制边框，使其在角落处仍然可见
       foregroundDecoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: borderColor, width: 1),
@@ -2404,9 +2396,8 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
           Container(
             width: double.infinity,
             color: bodyBg,
-            // Keep the code's top and bottom insets equal: with the header
-            // now visually distinct from the body, a 0 top inset reads as
-            // lopsided against the 8px bottom inset.
+            // 保持代码顶部和底部内边距相等：由于标题现在与正文视觉分离，
+            // 0 的顶部内边距会与 8px 的底部内边距显得不均衡。
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Stack(
               children: [
@@ -2619,7 +2610,7 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
     return end;
   }
 
-  // Remove trailing newlines to avoid rendering an extra empty line at the bottom
+  // 移除尾部换行，避免在底部多渲染一个空行
   String _trimTrailingNewlines(String s) {
     if (s.isEmpty) return s;
     final end = _trimTrailingNewlinesEndIndex(s);
@@ -3869,7 +3860,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
 
     final mermaidColors = _MermaidBlockColors.resolve(isDark);
 
-    // Build theme variables mapping for Mermaid from Material ColorScheme
+    // 根据 Material ColorScheme 构建 Mermaid 的主题变量映射
     String hex(Color c) {
       final v = c.toARGB32();
       final r = (v >> 16) & 0xFF;
@@ -4388,7 +4379,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
         if (e is UnsupportedError) {
           return MermaidBitmapRenderResult.unsupported();
         }
-        // Mermaid/WebView can report readiness before pixel capture is available.
+        // Mermaid/WebView 可能在像素捕获可用前就报告就绪。
       }
       await Future<void>.delayed(const Duration(milliseconds: 120));
     }
@@ -4737,7 +4728,7 @@ class _MermaidErrorView extends StatelessWidget {
   }
 }
 
-// Full-width horizontal rule with softer color
+// 使用更柔和颜色的全宽水平分隔线
 class SoftHrLine extends BlockMd {
   @override
   String get expString => (r"^\s*(?:-{3,}|\*{3,}|_{3,}|⸻)\s*$");
@@ -4761,7 +4752,7 @@ class SoftHrLine extends BlockMd {
   }
 }
 
-// Robust fenced code block that takes precedence over other blocks
+// 优先于其他块的健壮围栏代码块
 class FencedCodeBlockMd extends BlockMd {
   FencedCodeBlockMd({required this.streaming});
 
@@ -4771,10 +4762,10 @@ class FencedCodeBlockMd extends BlockMd {
   RegExp get exp => RegExp(expString, dotAll: true, multiLine: true);
 
   @override
-  // CommonMark-style fences:
-  // - fence length is variable (>= 3)
-  // - closing fence must use the same marker and be >= opening length
-  // - supports both ``` and ~~~
+  // CommonMark 风格围栏：
+  // - 围栏长度可变（>= 3）
+  // - 关闭围栏必须使用相同标记且长度 >= 开启长度
+  // - 支持 ``` 和 ~~~
   String get expString =>
       (r"^[ \t]*(([`~])\2{2,})[ \t]*([^\n]*?)\n"
       r"(?:(?:([\s\S]*?)^[ \t]*\1\2*[ \t]*)|([\s\S]*))");
@@ -4804,10 +4795,10 @@ class FencedCodeBlockMd extends BlockMd {
   }
 }
 
-/// Scrollable LaTeX block to prevent overflow when equations are very wide
+/// 可滚动的 LaTeX 块，避免过宽公式溢出
 class LatexBlockScrollableMd extends BlockMd {
   @override
-  // Match either $$...$$ or \[...\] as standalone block
+  // 将 $$...$$ 或 \[...\] 作为独立块匹配
   String get expString =>
       (r"^(?:\s*\$\$([\s\S]*?)\$\$\s*|\s*\\\[([\s\S]*?)\\\]\s*)$");
 
@@ -4819,7 +4810,7 @@ class LatexBlockScrollableMd extends BlockMd {
     if (body.isEmpty) return const SizedBox.shrink();
 
     final math = _renderMath(body, style: config.style, displayMode: true);
-    // Wrap in horizontal scroll to avoid overflow and center within available width
+    // 包在水平滚动中以避免溢出，并在可用宽度内居中
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: LayoutBuilder(
@@ -4840,10 +4831,10 @@ class LatexBlockScrollableMd extends BlockMd {
   }
 }
 
-/// Inline LaTeX `$...$` rendered in the text flow.
+/// 在文本流中渲染的内联 LaTeX `$...$`。
 class InlineLatexScrollableMd extends InlineMd {
   @override
-  // Match single-dollar $...$ or \(...\) inline math (avoid $$ block)
+  // 匹配单美元 `$...$` 或 `\(...\)` 内联数学（避免 $$ 块）
   RegExp get exp => RegExp(
     r"(?:(?<!\$)\$([^\$\n]{1,"
     "$_maxInlineMathBodyLength"
@@ -4863,7 +4854,7 @@ class InlineLatexScrollableMd extends InlineMd {
   }
 }
 
-/// Inline LaTeX for dollar delimiters only: `$...$`
+/// 仅美元分隔符的内联 LaTeX：`$...$`
 class InlineLatexDollarScrollableMd extends InlineMd {
   @override
   RegExp get exp => RegExp(
@@ -4893,7 +4884,7 @@ class InlineLatexDollarScrollableMd extends InlineMd {
   }
 }
 
-/// Inline LaTeX for parenthesis delimiters only: `\(...\)`
+/// 仅圆括号分隔符的内联 LaTeX：`\(...\)`
 class InlineLatexParenScrollableMd extends InlineMd {
   @override
   RegExp get exp => RegExp(
@@ -4913,12 +4904,11 @@ class InlineLatexParenScrollableMd extends InlineMd {
   }
 }
 
-// Balanced ATX-style headings (#, ##, ###, …) with consistent spacing and typography
+// 平衡的 ATX 风格标题（#、##、###、…），间距和排版一致
 class AtxHeadingMd extends BlockMd {
   @override
-  // Restrict heading content to a single line to avoid swallowing
-  // subsequent blocks (e.g., fenced code) when the engine builds
-  // the regex with dotAll=true. Using [^\n]+ keeps it line-bound.
+  // 将标题内容限制为单行，避免引擎使用 dotAll=true 构建正则时吞掉
+  // 后续块（例如围栏代码）。使用 [^\n]+ 保持行内约束。
   String get expString => (r"^\s{0,3}(#{1,6})\s+([^\n]+?)(?:\s+#+\s*)?$");
 
   @override
@@ -4935,7 +4925,7 @@ class AtxHeadingMd extends BlockMd {
       children: MarkdownComponent.generate(context, raw, innerCfg, true),
     );
     final style = _headingTextStyle(context, config, level);
-    // Slightly tighter spacing between headings and body
+    // 标题与正文之间略微更紧凑的间距
     final top = switch (level) {
       1 => 2.0,
       2 => 2.0,
@@ -4951,7 +4941,7 @@ class AtxHeadingMd extends BlockMd {
     return Padding(
       padding: EdgeInsets.only(top: top, bottom: bottom),
       child: DefaultTextStyle.merge(
-        // Use selection-aware renderer from config so headings can be selected/copied
+        // 使用 config 中支持选择的渲染器，使标题可被选择/复制
         style: style,
         child: config.getRich(inner),
       ),
@@ -4976,9 +4966,9 @@ class AtxHeadingMd extends BlockMd {
         } catch (_) {}
       }
     }
-    // Start from Material styles but tighten sizes for balance with body text
+    // 从 Material 样式出发，但收紧字号以与正文保持平衡
     TextStyle base;
-    // Explicit sizes ensure visible contrast over the body (16.0)
+    // 显式字号确保相对于正文（16.0）有可见对比
     switch (level) {
       case 1:
         base = TextStyle(fontSize: 24);
@@ -5025,7 +5015,7 @@ class AtxHeadingMd extends BlockMd {
   }
 }
 
-// Setext-style headings (underlines with === or ---)
+// Setext 风格标题（使用 === 或 --- 下划线）
 class SetextHeadingMd extends BlockMd {
   @override
   String get expString => (r"^(.+?)\n(=+|-+)\s*$");
@@ -5043,14 +5033,14 @@ class SetextHeadingMd extends BlockMd {
       children: MarkdownComponent.generate(context, title, innerCfg, true),
     );
     final style = AtxHeadingMd()._headingTextStyle(context, config, level);
-    // Match the tighter spacing used in ATX headings
+    // 与 ATX 标题使用相同的更紧凑间距
     final top = level == 1 ? 10.0 : 9.0;
     final bottom = 6.0;
 
     return Padding(
       padding: EdgeInsets.only(top: top, bottom: bottom),
       child: DefaultTextStyle.merge(
-        // Use selection-aware renderer from config so headings can be selected/copied
+        // 使用 config 中支持选择的渲染器，使标题可被选择/复制
         style: style,
         child: config.getRich(inner),
       ),
@@ -5058,11 +5048,11 @@ class SetextHeadingMd extends BlockMd {
   }
 }
 
-// Label-value strong lines like "**作者:** 张三" should not render as heading-sized text
+// 标签-值强行（如 "**作者:** 张三"）不应渲染成标题大小
 class LabelValueLineMd extends InlineMd {
   @override
-  // Treat this as an inline transform so it only affects the matched
-  // line segment and does not interfere with block parsing.
+  // 将其作为内联变换，只影响匹配的
+  // 行片段，不干扰块解析。
   bool get inline => false;
 
   @override
@@ -5116,7 +5106,7 @@ class LabelValueLineMd extends InlineMd {
   }
 }
 
-// Minimal block quote with a neutral rounded leading line.
+// 带有中性圆角前导线的极简块引用。
 class ModernBlockQuote extends InlineMd {
   @override
   bool get inline => false;
@@ -5133,7 +5123,7 @@ class ModernBlockQuote extends InlineMd {
     for (final line in m.split('\n')) {
       if (RegExp(r'^[ \t]*>').hasMatch(line)) {
         var sub = line.trimLeft();
-        sub = sub.substring(1); // remove '>'
+        sub = sub.substring(1); // 移除 '>'
         if (sub.startsWith(' ')) sub = sub.substring(1);
         sb.writeln(sub);
       } else {
@@ -5307,7 +5297,7 @@ class _BlockquoteMarkdownContent extends StatelessWidget {
   }
 }
 
-// Modern task checkbox: square with subtle border, primary check on done
+// 现代任务复选框：方框带细微边框，完成时使用 primary 勾选
 class ModernCheckBoxMd extends BlockMd {
   @override
   String get expString => (r"\[((?:\x|\ ))\]\ (\S[^\n]*?)$");
@@ -5367,7 +5357,7 @@ class ModernCheckBoxMd extends BlockMd {
   }
 }
 
-// Modern radio (optional): circle with primary dot when selected
+// 现代单选按钮（可选）：选中时显示 primary 圆点
 class ModernRadioMd extends BlockMd {
   @override
   String get expString => (r"\(((?:\x|\ ))\)\ (\S[^\n]*)$");
@@ -5510,7 +5500,7 @@ class EscapeAwareTableMd extends TableMd {
   }
 }
 
-// Prevent link regex from spanning across lines (dotAll=true in engine).
+// 防止链接正则跨行（引擎中 dotAll=true）。
 class LineSafeLinkMd extends ATagMd {
   @override
   RegExp get exp =>
@@ -5561,17 +5551,17 @@ class EscapeAwareHighlightedTextMd extends HighlightedText {
   RegExp get exp => RegExp(r"(?<!\\)`(?!`)(.+?)(?<![\\`])`(?!`)");
 }
 
-/// Treat backslash-escaped punctuation as a literal character, so that
-/// sequences like `\*text\*`, `\`code\``, `\[label\]`, and `\# heading`
-/// do not trigger emphasis, inline code, links, or headings.
+/// 将反斜杠转义的标点视为字面字符，使
+/// 类似 `\*text\*`、`\`code\``、`\[label\]` 和 `\# heading` 的序列
+/// 不触发强调、内联代码、链接或标题。
 ///
-/// We intentionally DO NOT consume `\(` and `\)` here to avoid interfering
-/// with inline LaTeX parsing handled by InlineLatexParenScrollableMd.
+/// 我们有意不在这里消费 `\(` 和 `\)`，避免干扰
+/// 由 InlineLatexParenScrollableMd 处理的内联 LaTeX 解析。
 class BackslashEscapeMd extends InlineMd {
   @override
-  // CommonMark escape set (subset), excluding parentheses to keep LaTeX intact.
-  // Matches a backslash followed by one escapable punctuation character.
-  // Include $ so \$ in regular text renders as literal dollar sign.
+  // CommonMark 转义集（子集），排除圆括号以保持 LaTeX 完整。
+  // 匹配反斜杠后跟一个可转义标点字符。
+  // 包含 $，使普通文本中的 \$ 渲染为字面美元符号。
   RegExp get exp => RegExp(r"\\([\\`*_{}\[\]#+\-.!$|])");
 
   @override
@@ -5579,7 +5569,7 @@ class BackslashEscapeMd extends InlineMd {
     final m = exp.firstMatch(text);
     if (m == null) return TextSpan(text: text, style: config.style);
     final ch = m.group(1) ?? '';
-    // Render only the escaped character (drop the backslash)
+    // 只渲染转义后的字符（丢弃反斜杠）
     return TextSpan(text: ch, style: config.style);
   }
 }
@@ -5817,7 +5807,7 @@ class HtmlAnchorMd extends InlineMd {
       input.replaceAll(RegExp(r"<[^>]+>"), '').trim();
 }
 
-/// Whitelist-based HTML tag renderer.
+/// 基于白名单的 HTML 标签渲染器。
 class AllowedHtmlTagsMd extends InlineMd {
   @override
   RegExp get exp => RegExp(
@@ -5837,8 +5827,7 @@ class AllowedHtmlTagsMd extends InlineMd {
   }
 }
 
-/// A selectable version of HighlightView that allows users to select
-/// and copy portions of the code instead of just the entire block.
+/// HighlightView 的可选择版本，允许用户选择并复制部分代码，而不是只能整块复制。
 class SelectableHighlightView extends StatefulWidget {
   const SelectableHighlightView(
     this.source, {
@@ -5902,18 +5891,18 @@ class _SelectableHighlightViewState extends State<SelectableHighlightView> {
     }
   }
 
-  /// Converts a highlight Node tree to a TextSpan tree with appropriate styling
+  /// 将 highlight Node 树转换为具有适当样式的 TextSpan 树
   List<TextSpan> _convertNodes(List<Node> nodes) {
     final List<TextSpan> spans = [];
 
     for (final node in nodes) {
       if (node.value != null) {
-        // Leaf node with text content
+        // 带有文本内容的叶节点
         spans.add(
           TextSpan(text: node.value, style: widget.theme[node.className]),
         );
       } else if (node.children != null) {
-        // Node with children - recurse
+        // 有子节点时递归
         spans.add(
           TextSpan(
             children: _convertNodes(node.children!),

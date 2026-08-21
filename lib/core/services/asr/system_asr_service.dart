@@ -7,13 +7,12 @@ typedef SystemAsrTranscriptCallback =
 typedef SystemAsrSoundLevelCallback = void Function(double level);
 typedef SystemAsrErrorCallback = void Function(SystemAsrError error);
 
-/// macOS debug/profile builds are excluded from the plugin authorization path.
+/// macOS 的 debug/profile 构建不经过插件授权路径。
 ///
-/// Flutter currently starts desktop debug apps by executing the bundle binary
-/// directly. macOS TCC can then attribute speech authorization to the parent
-/// IDE instead of this app and terminates the process before Dart can handle
-/// the failure. Normal release bundles are launched through LaunchServices and
-/// keep native macOS system recognition available.
+/// Flutter 目前会直接执行 bundle 二进制文件来启动桌面调试应用。因此 macOS TCC
+/// 可能把语音授权归因到父级 IDE 而不是本应用，并在 Dart 能处理失败之前终止进程。
+/// 正常 release bundle 会通过 LaunchServices 启动，
+/// 从而保持原生 macOS 系统识别可用。
 bool canInitializeSystemAsrOnPlatform(
   TargetPlatform platform, {
   bool isReleaseMode = kReleaseMode,
@@ -51,8 +50,7 @@ class SystemAsrError {
   final bool isPermanent;
 }
 
-/// Small boundary around [SpeechToText] so the service can be tested without
-/// platform channels.
+/// 围绕 [SpeechToText] 的小型边界，使服务可以在没有平台通道的情况下进行测试。
 abstract interface class SystemAsrBackend {
   Future<bool> initialize({
     required SystemAsrErrorCallback onError,
@@ -206,8 +204,8 @@ class SystemAsrService {
     return _backend.systemLocale();
   }
 
-  /// Starts a recognition session. Returns false when the platform service is
-  /// unavailable; an already active session is a programming error.
+  /// 启动一个识别会话。平台服务不可用时返回 false；
+  /// 已有活动会话属于编程错误。
   Future<bool> start({
     String? localeId,
     required SystemAsrTranscriptCallback onTranscript,

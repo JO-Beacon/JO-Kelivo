@@ -29,10 +29,10 @@ class ModelSelection {
   ModelSelection(this.providerKey, this.modelId);
 }
 
-// Prevent re-entrant model selector dialogs
+// 防止模型选择对话框重入
 bool _modelSelectorOpen = false;
 
-// Data class for compute function
+// 供 compute 函数使用的数据类
 class _ModelProcessingData {
   final Map<String, dynamic> providerConfigs;
   final Set<String> pinnedModels;
@@ -63,7 +63,7 @@ class _ModelProcessingResult {
   });
 }
 
-// Lightweight brand asset resolver usable in isolates
+// 可在 isolate 中使用的轻量品牌资源解析器
 String? _assetForNameStatic(String n) {
   return BrandAssets.assetForName(n);
 }
@@ -87,7 +87,7 @@ List<String> _buildDisplayProvidersOrder(
   );
 }
 
-// Static function for compute - must be top-level
+// 供 compute 使用的静态函数，必须是顶层函数
 _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
   if (data.disableResolverPlatformLogging) {
     ModelOverrideResolver.setPlatformLoggingEnabled(false);
@@ -101,11 +101,11 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
                 data.providerConfigs[data.limitProviderKey]!,
         };
 
-  // Build data map: providerKey -> (displayName, models)
+  // 构建数据映射：providerKey -> (displayName, models)
   final Map<String, _ProviderGroup> groups = {};
 
   providers.forEach((key, cfg) {
-    // Skip disabled providers entirely so they can't be selected
+    // 完全跳过已禁用供应商，使其不可被选择
     if (!(cfg['enabled'] as bool)) return;
     final models = cfg['models'] as List<dynamic>? ?? [];
     if (models.isEmpty) return;
@@ -122,9 +122,8 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
           final Map<String, dynamic>? ov = rawOv is Map
               ? {for (final e in rawOv.entries) e.key.toString(): e.value}
               : null;
-          // Use upstream/api model id for inference when available so that
-          // brand assets and default capabilities stay accurate even when the
-          // logical key is a custom alias.
+          // 可用时使用上游或 API 模型 id 进行推理，
+          // 这样即使逻辑键是自定义别名，品牌资源和默认能力也能保持准确。
           String baseId = mid;
           if (ov != null) {
             final raw = (ov['apiModelId'] ?? ov['api_model_id'])
@@ -159,7 +158,7 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
     );
   });
 
-  // Build favorites group (duplicate items)
+  // 构建收藏分组（包含重复项）
   final favItems = <_ModelItem>[];
   for (final k in data.pinnedModels) {
     final parts = k.split('::');
@@ -182,7 +181,7 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
     favItems.add(found.copyWith(pinned: true));
   }
 
-  // Provider sections ordered by ProvidersPage order
+  // 按 ProvidersPage 顺序排列供应商分区
   final orderedKeys = <String>[];
   for (final k in data.providersOrder) {
     if (groups.containsKey(k)) orderedKeys.add(k);
@@ -207,7 +206,7 @@ Future<ModelSelection?> showModelSelector(
   if (_modelSelectorOpen) return null;
   _modelSelectorOpen = true;
   try {
-    // Desktop platforms use a custom dialog, mobile keeps the bottom sheet UX.
+    // 桌面平台使用自定义对话框，移动端保留底部弹层体验。
     final platform = defaultTargetPlatform;
     if (platform == TargetPlatform.macOS ||
         platform == TargetPlatform.windows ||
@@ -247,7 +246,7 @@ Future<void> showModelSelectSheet(
   final sel = await showModelSelector(context);
   if (sel != null) {
     if (updateAssistant) {
-      // Update assistant's model instead of global default
+      // 更新助手的模型，而不是全局默认模型
       final assistant = assistantProvider.currentAssistant;
       if (assistant != null) {
         await assistantProvider.updateAssistant(
@@ -258,7 +257,7 @@ Future<void> showModelSelectSheet(
         );
       }
     } else {
-      // Only update global default when explicitly requested (e.g., from settings)
+      // 只有明确要求时才更新全局默认模型（例如来自设置页）
       await settings.setCurrentModel(sel.providerKey, sel.modelId);
     }
   }
@@ -298,25 +297,25 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   int _stickySwitchDirection = 1;
   bool _activeProviderUpdateScheduled = false;
   double _listViewportHeight = 0;
-  // ScrollablePositionedList controllers
+  // ScrollablePositionedList 控制器
   final ItemScrollController _itemScrollController = ItemScrollController();
   final ItemPositionsListener _itemPositionsListener =
       ItemPositionsListener.create();
 
-  // Flattened rows + index maps for precise jumps
+  // 展平行和索引映射，用于精确定位
   final List<_ListRow> _rows = <_ListRow>[];
   final Map<String, int> _headerIndexMap =
-      <String, int>{}; // providerKey or '__fav__' -> index
+      <String, int>{}; // providerKey 或 '__fav__' -> index
   final Map<String, int> _modelIndexMap =
-      <String, int>{}; // 'pk::modelId' in provider sections -> index
+      <String, int>{}; // provider sections 中的 'pk::modelId' -> index
   final Map<String, int> _favModelIndexMap =
-      <String, int>{}; // 'pk::modelId' in favorites -> index
+      <String, int>{}; // favorites 中的 'pk::modelId' -> index
 
-  // Async loading state
+  // 异步加载状态
   bool _isLoading = true;
   Map<String, _ProviderGroup> _groups = {};
   List<String> _orderedKeys = [];
-  bool _autoScrolled = false; // ensure we only auto-scroll once per open
+  bool _autoScrolled = false; // 确保每次打开只自动滚动一次
 
   dynamic _sanitizeJsonValue(dynamic value) {
     if (value == null || value is num || value is bool || value is String) {
@@ -386,7 +385,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     _itemPositionsListener.itemPositions.addListener(
       _scheduleActiveProviderUpdate,
     );
-    // Delay loading to allow the sheet to open first
+    // 延迟加载，让弹层先打开
     Future.delayed(const Duration(milliseconds: 50), () {
       if (mounted) {
         _loadModelsAsync();
@@ -402,7 +401,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
 
       final currentKey = _currentModelKey(settings, assistantProvider);
 
-      // Prepare data for background processing
+      // 准备后台处理数据
       final processingData = _ModelProcessingData(
         providerConfigs: providerConfigs,
         pinnedModels: settings.pinnedModels,
@@ -415,7 +414,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         disableResolverPlatformLogging: true,
       );
 
-      // Process in background isolate
+      // 在后台 isolate 中处理
       final result = await compute(_processModelsInBackground, processingData);
 
       if (mounted) {
@@ -428,7 +427,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         _scheduleAutoScrollToCurrent();
       }
     } catch (e) {
-      // If compute fails (e.g., on web), fall back to synchronous processing
+      // 如果 compute 失败（例如在 Web 上），回退到同步处理
       if (mounted) {
         _loadModelsSynchronously();
       }
@@ -439,7 +438,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     double target, {
     Duration duration = const Duration(milliseconds: 300),
   }) async {
-    // Safely attempt to read size and animate; ignore if controller not yet attached
+    // 安全地尝试读取尺寸并执行动画；控制器尚未挂载时忽略
     try {
       final current = _sheetCtrl.size;
       if (current < target) {
@@ -448,7 +447,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
           duration: duration,
           curve: Curves.easeOutCubic,
         );
-        // allow a brief settle time after expansion
+        // 展开后允许短暂稳定
         await Future.delayed(const Duration(milliseconds: 100));
       }
     } catch (_) {}
@@ -486,7 +485,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
 
   void _scheduleAutoScrollToCurrent() {
     if (_autoScrolled) return;
-    // Wait until the content has been laid out and offsets computed in _buildContent
+    // 等待内容布局完成，并在 _buildContent 中计算偏移
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted || _autoScrolled) return;
       await _jumpToCurrentSelection();
@@ -494,23 +493,23 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   }
 
   Future<void> _jumpToCurrentSelection() async {
-    // If user has entered a search query, decouple from previous selection
-    // and jump to the first matching provider group instead.
+    // 如果用户已输入搜索词，则不再定位到之前的选中项，
+    // 改为跳到第一个匹配的供应商分组。
     final currentQuery = _search.text.trim();
     if (currentQuery.isNotEmpty) {
       await _scrollToFirstSearchGroup(initial: true);
       return;
     }
 
-    // Optionally expand a bit for better context
+    // 可选地稍微展开以获得更好上下文
     await _expandSheetIfNeeded(
       _initialSize.clamp(0.0, _maxSize),
       duration: const Duration(milliseconds: 200),
     );
 
-    // Ensure the list is attached before attempting to scroll
+    // 确保列表已挂载后再尝试滚动
     if (!_itemScrollController.isAttached) {
-      // Try again shortly after the list attaches
+      // 列表挂载后稍后重试
       Future.delayed(const Duration(milliseconds: 60), () {
         if (mounted && !_autoScrolled) {
           _jumpToCurrentSelection();
@@ -532,7 +531,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         );
         _autoScrolled = true;
       } catch (_) {
-        // If scroll fails for any reason, try again once.
+        // 如果因任何原因滚动失败，重试一次。
         Future.delayed(const Duration(milliseconds: 80), () async {
           if (!mounted || _autoScrolled) return;
           try {
@@ -601,9 +600,9 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     return extent;
   }
 
-  // Scroll to the first matching provider group when searching.
+  // 搜索时滚动到第一个匹配的供应商分组。
   Future<void> _scrollToFirstSearchGroup({bool initial = false}) async {
-    // Expand a bit for better context
+    // 稍微展开以获得更好上下文
     await _expandSheetIfNeeded(
       _initialSize.clamp(0.0, _maxSize),
       duration: const Duration(milliseconds: 200),
@@ -619,9 +618,9 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     }
 
     int? targetIndex;
-    // Prefer favorites section when it exists in current filtered rows
+    // 当前筛选结果中存在收藏分区时优先选择收藏分区
     targetIndex = _headerIndexMap['__fav__'];
-    // Otherwise, use the first provider section (per ordered keys) that exists in current rows
+    // 否则使用当前行中存在的第一个供应商分区（按顺序键）
     if (targetIndex == null) {
       for (final pk in _orderedKeys) {
         final idx = _headerIndexMap[pk];
@@ -655,7 +654,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     super.dispose();
   }
 
-  // Match model name/id only (avoid provider key causing false positives)
+  // 仅匹配模型名称或 id（避免供应商键导致误匹配）
   bool _matchesSearch(String query, _ModelItem item, String providerName) {
     if (query.isEmpty) return true;
     final q = query.toLowerCase();
@@ -663,7 +662,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         item.info.displayName.toLowerCase().contains(q);
   }
 
-  // Check if a provider should be shown based on search query (match display name only)
+  // 根据搜索词判断是否显示供应商（只匹配显示名称）
   bool _providerMatchesSearch(String query, String providerName) {
     if (query.isEmpty) return true;
     final lowerQuery = query.toLowerCase();
@@ -799,7 +798,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
           builder: (c, controller) {
             return Column(
               children: [
-                // Fixed header section with rounded corners
+                // 带圆角的固定标题区域
                 Container(
                   decoration: BoxDecoration(
                     color: cs.surface,
@@ -809,7 +808,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                   ),
                   child: Column(
                     children: [
-                      // Header drag indicator
+                      // 标题拖动指示器
                       Column(
                         children: [
                           const SizedBox(height: 8),
@@ -824,7 +823,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                           const SizedBox(height: 8),
                         ],
                       ),
-                      // Fixed search field (iOS-like input style)
+                      // 固定搜索框（类似 iOS 输入样式）
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                         child: TextField(
@@ -845,7 +844,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                             }
                             _lastQuery = q;
                           },
-                          // Ensure high-contrast input text in both themes
+                          // 确保两种主题下输入文本高对比度
                           style: TextStyle(color: cs.onSurface),
                           cursorColor: cs.primary,
                           decoration: InputDecoration(
@@ -857,7 +856,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                                 alpha: _isLoading ? 0.35 : 0.6,
                               ),
                             ),
-                            // Use IconButton for reliable alignment at the far right
+                            // 使用 IconButton 保证最右侧对齐
                             suffixIcon:
                                 (widget.limitProviderKey == null &&
                                     context
@@ -927,18 +926,18 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                     ],
                   ),
                 ),
-                // Scrollable content
+                // 可滚动内容
                 Expanded(
                   child: Container(
-                    color: cs.surface, // Ensure background color continuity
+                    color: cs.surface, // 确保背景颜色连续
                     child: _isLoading
                         ? const Center(child: CircularProgressIndicator())
                         : _buildContent(context),
                   ),
                 ),
-                // Fixed bottom tabs
+                // 固定底部标签
                 Container(
-                  color: cs.surface, // Ensure background color continuity
+                  color: cs.surface, // 确保背景颜色连续
                   child: _buildBottomTabs(context),
                 ),
               ],
@@ -952,7 +951,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   Widget _buildContent(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final query = _search.text.trim();
-    // Build flattened rows and index maps for precise positioning
+    // 构建展平行和索引映射，用于精确定位
     _rows.clear();
     _headerIndexMap.clear();
     _modelIndexMap.clear();
@@ -1081,11 +1080,11 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   }
 
   Widget _buildBottomTabs(BuildContext context) {
-    // Bottom provider tabs (ordered per ProvidersPage order)
+    // 底部供应商标签（按 ProvidersPage 顺序排列）
     final List<Widget> providerTabs = <Widget>[];
     if (widget.limitProviderKey == null && !_isLoading) {
       String? selectedProviderKey;
-      // Find which provider currently holds the selected model
+      // 查找当前持有所选模型的供应商
       _groups.forEach((pk, group) {
         if (selectedProviderKey == null && group.items.any((m) => m.selected)) {
           selectedProviderKey = pk;
@@ -1110,7 +1109,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     if (providerTabs.isEmpty) return const SizedBox.shrink();
 
     return Padding(
-      // SafeArea already applies bottom inset; avoid doubling it here.
+      // SafeArea 已应用底部内边距；避免在这里重复添加。
       padding: const EdgeInsets.only(left: 12, right: 12, top: 8, bottom: 10),
       child: SingleChildScrollView(
         key: _providerTabsViewportKey,
@@ -1388,14 +1387,14 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   }
 
   Future<void> _jumpToProvider(String pk) async {
-    // Expand sheet first if needed
+    // 需要时先展开弹层
     await _expandSheetIfNeeded(_maxSize);
 
-    // Use precise index jump via ScrollablePositionedList
+    // 通过 ScrollablePositionedList 精确跳转到索引
     final idx = _headerIndexMap[pk];
     if (idx != null) {
       if (!_itemScrollController.isAttached) {
-        // Retry shortly if list not yet attached
+        // 列表尚未挂载时稍后重试
         Future.delayed(const Duration(milliseconds: 60), () {
           if (mounted) {
             _jumpToProvider(pk);
@@ -1415,16 +1414,16 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
 
   Future<void> _jumpToFavorites() async {
     if (widget.limitProviderKey != null) return;
-    // Expand sheet first to reveal more content
+    // 先展开弹层以显示更多内容
     await _expandSheetIfNeeded(_maxSize);
 
-    // If search text hides favorites section, clear it to ensure favorites are visible
+    // 如果搜索文本隐藏了收藏分区，则清空搜索以确保收藏可见
     if (_search.text.isNotEmpty) {
       setState(() => _search.clear());
       await Future.delayed(const Duration(milliseconds: 150));
     }
 
-    // Jump to favorites header index if present
+    // 存在收藏标题时跳转到其索引
     final idx = _headerIndexMap['__fav__'];
     if (idx != null) {
       if (!_itemScrollController.isAttached) {
@@ -1472,7 +1471,7 @@ class _ProviderChipState extends State<_ProviderChip> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bool isSelected = widget.selected;
-    // Subtle background tint when selected (less conspicuous)
+    // 选中时使用细微背景着色（不太显眼）
     final Color baseBg = isSelected
         ? (isDark
               ? cs.primary.withValues(alpha: 0.08)
@@ -1480,7 +1479,7 @@ class _ProviderChipState extends State<_ProviderChip> {
         : cs.surface;
     final Color overlay = cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05);
     final Color bg = _pressed ? Color.alphaBlend(overlay, baseBg) : baseBg;
-    // Slightly stronger border when selected; keep label color unchanged for subtlety
+    // 选中时边框略强；保持标签颜色不变以保持克制
     final Color borderColor =
         widget.borderColor ?? cs.outlineVariant.withValues(alpha: 0.25);
     final Color labelColor = cs.onSurface;
@@ -1538,7 +1537,7 @@ class _ModelItem {
   final ModelInfo info;
   final bool pinned;
   final bool selected;
-  final String? asset; // pre-resolved avatar asset for performance
+  final String? asset; // 为性能预先解析的头像资源
   _ModelItem({
     required this.providerKey,
     required this.providerName,
@@ -1559,8 +1558,8 @@ class _ModelItem {
   );
 }
 
-// Virtualization entry: fixed height + lazy builder
-// Rows for flattened list
+// 虚拟化入口：固定高度加懒加载构建器
+// 展平列表的行
 abstract class _ListRow {}
 
 class _HeaderRow extends _ListRow {
@@ -1576,7 +1575,7 @@ class _ModelRow extends _ListRow {
   _ModelRow(this.item, {this.showProviderLabel = false});
 }
 
-// Reuse badges and avatars similar to provider detail
+// 复用与供应商详情相似的徽章和头像
 class _BrandAvatar extends StatelessWidget {
   const _BrandAvatar({required this.name, this.size = 20, this.assetOverride});
   final String name;
@@ -1633,7 +1632,7 @@ class _BrandAvatar extends StatelessWidget {
   }
 }
 
-// ===== Desktop dialog implementation =====
+// ===== 桌面对话框实现 =====
 
 Future<ModelSelection?> _showDesktopModelSelector(
   BuildContext context, {
@@ -1685,18 +1684,18 @@ class _DesktopModelSelectDialogBodyState
   bool _loading = true;
   Map<String, _ProviderGroup> _groups = const {};
   List<String> _orderedKeys = const [];
-  // Flattened rows and precise index mapping for jump
+  // 展平行和精确索引映射，用于跳转
   final ItemScrollController _itemScrollController = ItemScrollController();
   final ItemPositionsListener _itemPositionsListener =
       ItemPositionsListener.create();
   final List<_ListRow> _rows = <_ListRow>[];
   final Map<String, int> _headerIndexMap =
-      <String, int>{}; // providerKey or '__fav__' -> index
+      <String, int>{}; // providerKey 或 '__fav__' -> index
   final Map<String, int> _modelIndexMap =
-      <String, int>{}; // 'pk::modelId' in provider sections -> index
+      <String, int>{}; // provider sections 中的 'pk::modelId' -> index
   final Map<String, int> _favModelIndexMap =
-      <String, int>{}; // 'pk::modelId' in favorites -> index
-  bool _autoScrolled = false; // auto-scroll once when dialog opens
+      <String, int>{}; // favorites 中的 'pk::modelId' -> index
+  bool _autoScrolled = false; // 对话框打开时自动滚动一次
 
   @override
   void initState() {
@@ -1791,7 +1790,7 @@ class _DesktopModelSelectDialogBodyState
       limitProviderKey: widget.limitProviderKey,
       disableResolverPlatformLogging: false,
     );
-    // Synchronous processing is fast enough here
+    // 这里同步处理已经足够快
     final result = _processModelsInBackground(data);
     if (!mounted) return;
     setState(() {
@@ -1800,7 +1799,7 @@ class _DesktopModelSelectDialogBodyState
       _loading = false;
     });
     _focusSearchField(defer: true);
-    // Defer auto-scroll until list is built and attached
+    // 将自动滚动推迟到列表构建并挂载之后
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && !_autoScrolled) {
         _autoScrollToCurrent();
@@ -1910,7 +1909,7 @@ class _DesktopModelSelectDialogBodyState
         }
       }
       if (items.isEmpty) continue;
-      // When limiting to a single provider, hide the provider header (and its settings button)
+      // 限制为单个供应商时，隐藏供应商标题及其设置按钮
       if (widget.limitProviderKey == null) {
         _headerIndexMap[pk] = _rows.length;
         _rows.add(_HeaderRow(g.name, providerKey: pk));
@@ -1952,7 +1951,7 @@ class _DesktopModelSelectDialogBodyState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Body
+                // 内容区
                 Expanded(
                   child: Container(
                     color: cs.surface,
@@ -2041,12 +2040,11 @@ class _DesktopModelSelectDialogBodyState
   }
 
   Widget _buildList(BuildContext context) {
-    // Watch pinned models to keep the favorites section live when user toggles
-    // favorites from any item.
+    // 监听置顶模型，使用户从任意项切换收藏时收藏分区保持最新。
     final _ = context.watch<SettingsProvider>().pinnedModels.length;
-    // Build flattened rows based on current search and pinned state
+    // 根据当前搜索和置顶状态构建展平行
     _rebuildRows();
-    // After rows are rebuilt and rendered, perform initial auto-scroll
+    // 行重建并渲染后执行初始自动滚动
     if (!_autoScrolled) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !_autoScrolled) {
@@ -2080,7 +2078,7 @@ class _DesktopModelSelectDialogBodyState
   }
 
   Future<void> _autoScrollToCurrent() async {
-    // Ensure controller is attached to the list before scrolling
+    // 确保控制器已挂载到列表后再滚动
     if (!_itemScrollController.isAttached) {
       Future.delayed(const Duration(milliseconds: 60), () {
         if (mounted && !_autoScrolled) _autoScrollToCurrent();
@@ -2095,7 +2093,7 @@ class _DesktopModelSelectDialogBodyState
     );
     if (currentKey.isEmpty) return;
 
-    // Rebuild to ensure index maps are current
+    // 重建以确保索引映射最新
     _rebuildRows();
 
     final bool showFavorites =
@@ -2107,7 +2105,7 @@ class _DesktopModelSelectDialogBodyState
       targetIndex = _favModelIndexMap[currentKey];
     }
     targetIndex ??= _modelIndexMap[currentKey];
-    // If provider headers are visible, fall back to its section header
+    // 如果供应商标题可见，则回退到其分区标题
     if (widget.limitProviderKey == null) {
       final separator = currentKey.indexOf('::');
       final pk = separator == -1
@@ -2121,13 +2119,13 @@ class _DesktopModelSelectDialogBodyState
     try {
       await _itemScrollController.scrollTo(
         index: targetIndex,
-        alignment: 0.5, // try to center the current model
+        alignment: 0.5, // 尝试将当前模型居中
         duration: const Duration(milliseconds: 360),
         curve: Curves.easeOutCubic,
       );
       _autoScrolled = true;
     } catch (_) {
-      // Retry once shortly after if initial scroll fails
+      // 如果初始滚动失败，稍后重试一次
       Future.delayed(const Duration(milliseconds: 80), () async {
         if (!mounted || _autoScrolled) return;
         try {
@@ -2297,9 +2295,9 @@ class _DesktopModelSelectDialogBodyState
                 color: cs.onSurface.withValues(alpha: 0.8),
                 onTap: () async {
                   final nav = Navigator.of(context);
-                  // Close model dialog first
+                  // 先关闭模型对话框
                   nav.pop();
-                  // Then navigate to DesktopHomePage with Settings tab open and provider preselected
+                  // 然后导航到 DesktopHomePage，打开设置标签并预选供应商
                   Future.microtask(() {
                     nav.push(
                       PageRouteBuilder(
@@ -2331,7 +2329,7 @@ class _DesktopModelSelectDialogBodyState
   }
 
   Future<void> _jumpToFavorites() async {
-    // Ensure rows are current
+    // 确保行数据最新
     _rebuildRows();
     final idx = _headerIndexMap['__fav__'];
     if (idx == null) return;
@@ -2349,4 +2347,4 @@ class _DesktopModelSelectDialogBodyState
   }
 }
 
-// (desktop tactile row removed in favor of IosCardPress for consistency)
+// （为保持一致性，桌面触感行已移除，改用 IosCardPress）

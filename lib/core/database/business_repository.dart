@@ -13,8 +13,8 @@ final class BusinessRepository {
 
   final AppDatabase _database;
 
-  /// Used by cross-domain coordinators to fail closed unless both
-  /// repositories are backed by the exact same Drift database instance.
+  /// 供跨域协调器使用，除非两个 repository 都由完全相同的 Drift database 实例
+  /// 支撑，否则保持失败关闭。
   bool sharesDatabaseIdentity(Object identity) =>
       identical(_database, identity);
 
@@ -148,8 +148,8 @@ final class BusinessRepository {
     );
   }
 
-  /// Replaces business state, validates the persisted projection and only
-  /// then publishes the migration receipt, all within one SQLite transaction.
+  /// 替换业务状态，验证持久化的 projection，并且只有在这之后才
+  /// 发布迁移回执；所有这些都位于同一个 SQLite 事务中。
   Future<void> replaceSnapshotForMigration(
     BusinessSnapshot snapshot, {
     required void Function(BusinessSnapshot persisted) validatePersisted,
@@ -166,7 +166,7 @@ final class BusinessRepository {
     });
   }
 
-  /// Returns false when `PRAGMA wal_checkpoint(FULL)` reports `busy != 0`.
+  /// 当 `PRAGMA wal_checkpoint(FULL)` 报告 `busy != 0` 时返回 false。
   Future<bool> checkpoint() async {
     final row = await _database
         .customSelect('PRAGMA wal_checkpoint(FULL);')
@@ -391,12 +391,11 @@ final class BusinessRepository {
     );
   }
 
-  /// Treats the named conversations as already extracted through their current
-  /// max message_order and clears their injection hash (§6.7).
+  /// 将这些指定对话视为已按其当前的 max message_order 完成提取，
+  /// 并清除它们的 injection hash（§6.7）。
   ///
-  /// Scoped to the conversations a merge restore actually touched: bumping the
-  /// watermark of an untouched local conversation would silently skip one round
-  /// of background extraction for messages the user just sent.
+  /// 仅限合并恢复实际触及的会话：提升未触及本地会话的 watermark 会静默跳过
+  /// 用户刚发送消息的一轮后台提取。
   Future<void> applyPostMergeMemoryConversationState(
     Iterable<String> conversationIds,
   ) async {
@@ -416,8 +415,8 @@ WHERE id IN ($placeholders);
 ''', ids.toList(growable: false));
   }
 
-  /// The `content_normalized` projection must match the model's rule exactly,
-  /// or dedupe lookups silently miss rows that differ only in whitespace.
+  /// `content_normalized` projection 必须与模型的规则完全一致，
+  /// 否则 dedupe 查找会静默漏掉仅空白不同的行。
   static String normalizeMemoryContent(String content) =>
       MemoryEntry.normalizeContent(content);
 
@@ -477,9 +476,8 @@ WHERE id IN ($placeholders);
     }
   }
 
-  /// Refuses to drop an existing row whose payload no longer decodes: the
-  /// caller's snapshot may be missing the row precisely because it failed to
-  /// read it, and deleting it would physically erase the surviving data.
+  /// 拒绝删除 payload 已无法解码的现有行：调用方快照缺失该行，可能正是因为
+  /// 读取失败；删除它会在物理上抹掉仍存在的数据。
   static void _assertDecodablePayload(
     BusinessEntityKind kind,
     BusinessEntityValue row,

@@ -19,9 +19,9 @@ import 'model_fetch_dialog.dart' show showModelFetchDialog;
 import 'widgets/desktop_select_dropdown.dart';
 import '../shared/widgets/ios_switch.dart';
 import '../shared/widgets/ios_checkbox.dart';
-// Desktop assistants panel dependencies
+// 桌面助手面板依赖
 import '../features/assistant/pages/assistant_settings_edit_page.dart'
-    show showAssistantDesktopDialog; // dialog opener only
+    show showAssistantDesktopDialog; // 仅用于打开对话框
 import '../core/providers/assistant_provider.dart';
 import '../features/home/controllers/chat_actions.dart' show ChatActions;
 import '../core/models/assistant.dart';
@@ -32,7 +32,7 @@ import '../utils/app_directories.dart';
 import 'add_provider_dialog.dart' show showDesktopAddProviderDialog;
 import 'model_edit_dialog.dart'
     show showDesktopCreateModelDialog, showDesktopModelEditDialog;
-// Use the unified model selector (desktop dialog on desktop platforms)
+// 使用统一模型选择器（桌面平台使用桌面对话框）
 import '../features/model/widgets/model_select_sheet.dart'
     show showModelSelector;
 import '../utils/brand_assets.dart';
@@ -78,12 +78,12 @@ part 'setting/assistants_pane.dart';
 part 'setting/providers_pane.dart';
 part 'setting/display_pane.dart';
 
-/// Desktop settings layout: left menu + vertical divider + right content.
-/// For now, only the left menu and the Display Settings content are implemented.
+/// 桌面设置布局：左侧菜单加垂直分隔线加右侧内容。
+/// 目前只实现了左侧菜单和显示设置内容。
 class DesktopSettingsPage extends StatefulWidget {
   const DesktopSettingsPage({super.key, this.initialProviderKey});
 
-  // Optional: when provided, jump to Providers tab and preselect this provider
+  // 可选：传入时跳转到供应商标签并预选该供应商
   final String? initialProviderKey;
 
   @override
@@ -117,7 +117,7 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
   void initState() {
     super.initState();
     if (widget.initialProviderKey != null) {
-      // Deep link into Providers tab when a provider is specified
+      // 当指定供应商时，深链到供应商标签
       _selected = _SettingsMenuItem.providers;
     }
     _settingsNavSub = DesktopSettingsNavigationBus.instance.stream.listen((

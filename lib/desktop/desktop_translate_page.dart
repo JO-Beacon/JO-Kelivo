@@ -38,7 +38,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
   @override
   void initState() {
     super.initState();
-    // Defer initializing model defaults until first frame to ensure providers are ready
+    // 延迟到首帧再初始化默认模型，确保 provider 已就绪
     WidgetsBinding.instance.addPostFrameCallback((_) => _initDefaults());
   }
 
@@ -63,7 +63,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
       _targetLang = savedLang ?? localeLang ?? supportedLanguages.first;
     });
 
-    // Default model: translate model -> assistant's chat model -> global default
+    // 默认模型：翻译模型 -> 助手聊天模型 -> 全局默认模型
     final providerKey =
         settings.translateModelProvider ??
         assistant?.chatModelProvider ??
@@ -119,7 +119,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
   }
 
   Future<void> _pickModel() async {
-    if (_translating) return; // avoid switching mid-stream
+    if (_translating) return; // 避免在流式过程中切换
     final settings = context.read<SettingsProvider>();
     final sel = await showModelSelector(
       context,
@@ -133,7 +133,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
       _modelProviderKey = sel.providerKey;
       _modelId = sel.modelId;
     });
-    // Persist translate model selection so it’s remembered next time
+    // 持久化翻译模型选择，下次启动时继续使用
     await settings.setTranslateModel(sel.providerKey, sel.modelId);
   }
 
@@ -181,7 +181,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
 
       _subscription = stream.listen(
         (chunk) {
-          // live update; remove leading whitespace on first chunk to avoid top gap
+          // 实时更新；首个分块移除前导空白，避免顶部出现空隙
           final s = chunk.content;
           if (_output.text.isEmpty) {
             _output.text = s.replaceFirst(RegExp(r'^\s+'), '');
@@ -268,7 +268,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                         height: 40,
                         child: Row(
                           children: [
-                            // Language dropdown
+                            // 语言下拉框
                             _LanguageDropdown(
                               value: _targetLang,
                               onChanged: _translating
@@ -276,14 +276,14 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                                   : (v) => _onLanguageChanged(v),
                             ),
                             const SizedBox(width: 8),
-                            // Translate / Stop button with animation
+                            // 带动画的翻译或停止按钮
                             _TranslateButton(
                               translating: _translating,
                               onTranslate: _startTranslate,
                               onStop: _stopTranslate,
                             ),
                             const Spacer(),
-                            // Model picker button (brand icon)
+                            // 模型选择按钮（品牌图标）
                             _ModelPickerButton(
                               asset: brandAsset,
                               modelId: _modelId,
@@ -294,7 +294,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      // Two large rounded rectangles: input (left) and output (right)
+                      // 两个大圆角矩形：左侧输入，右侧输出
                       Expanded(
                         child: Row(
                           children: [
@@ -484,7 +484,7 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
     final cs = Theme.of(context).colorScheme;
 
     final baseBorder = cs.outlineVariant.withValues(alpha: 0.18);
-    final hoverBorder = cs.primary; // hover/focus border
+    final hoverBorder = cs.primary; // hover/focus 边框
     final borderColor = _open || _hover ? hoverBorder : baseBorder;
 
     final selected = widget.value ?? supportedLanguages.first;
@@ -644,7 +644,7 @@ class _LangDropdownOverlayState extends State<_LangDropdownOverlay>
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final borderColor = cs.outlineVariant.withValues(alpha: 0.12);
-    // divider removed
+    // 分隔线已移除
 
     final filtered = supportedLanguages;
 
@@ -675,7 +675,7 @@ class _LangDropdownOverlayState extends State<_LangDropdownOverlay>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Options
+                // 选项
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxHeight: 350),
                   child: Scrollbar(
@@ -706,7 +706,7 @@ class _LangDropdownOverlayState extends State<_LangDropdownOverlay>
   }
 }
 
-// (search removed as per requirement)
+// （按需求已移除搜索）
 
 class _LangOptionTile extends StatefulWidget {
   const _LangOptionTile({

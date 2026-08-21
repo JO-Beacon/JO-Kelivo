@@ -23,7 +23,7 @@ import '../services/ask_user_interaction_service.dart';
 import '../utils/chat_layout_constants.dart';
 import 'model_icon.dart';
 
-/// Callback types for message list view actions
+/// 消息列表视图动作的回调类型
 typedef OnVersionChange = Future<void> Function(String groupId, int version);
 typedef OnRegenerateMessage = void Function(ChatMessage message);
 typedef OnResendMessage = void Function(ChatMessage message);
@@ -55,7 +55,7 @@ typedef OnRecoveredAskUserAnswer =
       AskUserResult result,
     );
 
-/// Data class for reasoning UI state
+/// 推理 UI 状态的数据类
 class ReasoningUiState {
   final String? text;
   final bool expanded;
@@ -74,7 +74,7 @@ class ReasoningUiState {
   });
 }
 
-/// Data class for translation UI state
+/// 翻译 UI 状态的数据类
 class TranslationUiState {
   final bool expanded;
   final VoidCallback? onToggle;
@@ -82,12 +82,11 @@ class TranslationUiState {
   const TranslationUiState({this.expanded = true, this.onToggle});
 }
 
-/// Widget that displays the chat message list.
+/// 显示聊天消息列表的 widget。
 ///
-/// Accepts pre-collapsed messages and pre-computed byGroup from the controller
-/// to avoid redundant computation on every build. Uses a variable-extent lazy
-/// list so large histories can scroll and navigate by index without laying out
-/// every preceding message.
+/// 接受来自控制器的预折叠消息和预计算 byGroup，
+/// 避免每次构建重复计算。使用可变范围懒加载列表，使大型历史记录
+/// 无需布局每条前置消息即可滚动并按索引导航。
 class MessageListView extends StatefulWidget {
   const MessageListView({
     super.key,
@@ -116,6 +115,9 @@ class MessageListView extends StatefulWidget {
     this.spotlightMessageId,
     this.spotlightToken = 0,
     this.removingSlotIds = const <String>{},
+    this.siblingBranchIdsByMessageId = const <String, List<String>>{},
+    this.activeBranchId,
+    this.onBranchChange,
     this.onVersionChange,
     this.onRegenerateMessage,
     this.onResendMessage,
@@ -155,19 +157,19 @@ class MessageListView extends StatefulWidget {
   final ScrollController scrollController;
   final ListController listController;
 
-  /// Pre-collapsed messages (from ChatController.collapsedMessages).
+  /// 预折叠消息（来自 ChatController.collapsedMessages）。
   final List<ChatMessage> messages;
 
-  /// Precomputed one-per-slot renderer inputs. Must match [messages] order.
+  /// 为每个插槽预计算的渲染输入，必须与 [messages] 顺序一致。
   final List<MessageRenderModel>? renderModels;
 
-  /// All messages grouped by groupId (from ChatController.groupedMessages).
+  /// 按 groupId 分组的所有消息（来自 ChatController.groupedMessages）。
   final Map<String, List<ChatMessage>> byGroup;
 
-  /// Selected version per message group (for version navigation controls).
+  /// 每个消息分组选中的版本（用于版本导航控件）。
   final Map<String, int> versionSelections;
 
-  /// Pre-computed truncate index in collapsed message space (-1 = none).
+  /// 折叠消息空间中预计算的截断索引（-1 表示无截断）。
   final int truncCollapsedIndex;
 
   final Map<String, stream_ctrl.ReasoningData> reasoning;
@@ -185,23 +187,29 @@ class MessageListView extends StatefulWidget {
   final bool isPinnedIndicatorActive;
   final ValueNotifier<bool> isProcessingFiles;
 
-  /// Lightweight notifier for streaming content updates.
-  /// When provided, streaming messages will use ValueListenableBuilder
-  /// to avoid full page rebuilds.
+  /// 用于流式内容更新的轻量 notifier。
+  /// 提供后，流式消息会使用 ValueListenableBuilder，避免整页重建。
   final StreamingContentNotifier? streamingContentNotifier;
 
-  /// When set, the message with this ID will receive a spotlight pulse animation.
+  /// 设置后，此 ID 对应的消息会收到聚焦脉冲动画。
   final String? spotlightMessageId;
 
-  /// Incremented each time a new spotlight is triggered. Used as an animation key
-  /// so re-selecting the same message re-triggers the pulse.
+  /// 每次触发新的聚焦时递增。用作动画键，使重新选择同一条消息时重新触发脉冲。
   final int spotlightToken;
 
-  /// Slots currently fading out ahead of their deletion. The slot data stays
-  /// in [messages] until the removal animation completes.
+  /// 当前在删除前淡出的插槽。插槽数据会保留在 [messages] 中，
+  /// 直到移除动画完成。
   final Set<String> removingSlotIds;
 
-  // Callbacks
+  /// 将分叉边界上的消息映射到共享其前缀的分支 ID。
+  /// 存在时，旧版本选择器由兄弟分支而非消息版本驱动。
+  final Map<String, List<String>> siblingBranchIdsByMessageId;
+
+  final String? activeBranchId;
+
+  final ValueChanged<String>? onBranchChange;
+
+  // 回调
   final OnVersionChange? onVersionChange;
   final OnRegenerateMessage? onRegenerateMessage;
   final OnResendMessage? onResendMessage;
@@ -225,8 +233,8 @@ class MessageListView extends StatefulWidget {
   final Widget Function()? buildPinnedStreamingIndicator;
   final bool hasMoreBefore;
 
-  /// True only while a cold initial window load is in flight; fast-path cache
-  /// hits resolve within one frame batch and never surface the skeleton.
+  /// 仅在冷启动初始窗口加载期间为 true；快速路径缓存命中会在一帧批次内完成，
+  /// 不会显示骨架。
   final bool isLoadingWindow;
   final Future<bool> Function()? onLoadMoreBefore;
   final bool hasMoreAfter;
@@ -234,14 +242,13 @@ class MessageListView extends StatefulWidget {
   final VoidCallback? onUserScrollIntent;
   final double chatFontScale;
 
-  /// Whether finished thinking blocks render collapsed (display setting).
+  /// 已完成的思考块是否折叠显示（显示设置）。
   final bool collapseThinking;
 
-  /// Lines a long code block collapses to, or null when it stays expanded.
+  /// 长代码块折叠到的行数；为 null 时保持展开。
   final int? collapsedCodeLines;
 
-  /// Whether code blocks wrap (desktop, or the mobile wrap setting) instead of
-  /// scrolling horizontally.
+  /// 代码块是否换行（桌面端或移动端换行设置），而不是水平滚动。
   final bool wrapCodeBlocks;
 
   final bool showModelIcon;
@@ -308,45 +315,44 @@ class _MessageListViewState extends State<MessageListView> {
     };
   }
 
-  /// Header row + action bar + vertical margins around a bubble.
+  /// 消息气泡周围的标题行、操作栏和垂直边距。
   static const double _estimateChrome = 96.0;
 
-  /// Height of a collapsed inline thinking card.
+  /// 折叠行内思考卡片的高度。
   static const double _estimateCollapsedCard = 44.0;
 
-  /// Characters scanned before a message's line density is extrapolated.
+  /// 在按观察密度外推前扫描的字符数。
   static const int _estimateScanLimit = 8000;
 
-  /// Font size fenced code renders at, before scaling.
+  /// 围栏代码在缩放前渲染的字体大小。
   static const double _estimateCodeFontSize = 13.0;
 
-  /// Longest message the thinking parser is run over.
+  /// 思考解析器会处理的最长消息长度。
   static const int _estimateParseLimit = 64000;
 
-  /// Cached estimates kept before the memo is dropped wholesale.
+  /// 在整体丢弃 memo 前保留的缓存估算值。
   static const int _extentEstimateCacheLimit = 512;
 
   final Map<String, _ExtentEstimate> _extentEstimateCache = {};
 
-  /// System accessibility text scale, which multiplies the chat font scale.
+  /// 系统无障碍文本缩放，会乘以聊天字体缩放。
   double _systemTextScale = 1.0;
 
-  /// Display settings the estimate depends on, refreshed in [build].
+  /// 估算所依赖的显示设置，在 [build] 中刷新。
   _EstimateSettings _estimateSettings = const _EstimateSettings(
     collapseThinking: true,
     collapsedCodeLines: null,
     wrapCodeBlocks: false,
   );
 
-  /// Font scale the currently stored extents were estimated at.
+  /// 当前已存储范围估算时的字体缩放。
   double? _estimatedFontScale;
 
-  /// Drops stored extents after the system text scale changed.
+  /// 系统文本缩放变化后丢弃已存储范围。
   ///
-  /// Only the widget-driven inputs go through [_synchronizeExtentCache]; a
-  /// system accessibility change arrives through MediaQuery without touching
-  /// the item count, so SuperSliverList would otherwise keep off-screen
-  /// estimates made at the old scale until each of them is scrolled into view.
+  /// 只有 widget 驱动输入会经过 [_synchronizeExtentCache]；系统无障碍变化
+  /// 通过 MediaQuery 到达，不会改变条目数量，因此 SuperSliverList 否则会
+  /// 继续保留旧缩放下为屏幕外项目生成的估算值，直到每个项目滚入视野。
   void _invalidateEstimatesIfScaleChanged() {
     final scale = widget.chatFontScale * _systemTextScale;
     if (_estimatedFontScale == scale) return;
@@ -360,19 +366,15 @@ class _MessageListViewState extends State<MessageListView> {
     });
   }
 
-  /// Rough height of a message bubble, used for items that never got laid out.
+  /// 消息气泡的大致高度，用于从未实际布局的项目。
   ///
-  /// SuperSliverList's default estimate is a flat 100px. In a long chat a real
-  /// bubble is one to two orders of magnitude taller than that, so every time
-  /// layout replaces an estimate with a measurement the total extent — and with
-  /// it the bottom-pinned scroll offset — moves by tens of thousands of pixels.
-  /// When that lands across two frames the timeline visibly flicks away from
-  /// the bottom and back. A content-derived estimate keeps those corrections
-  /// small; it does not need to be exact, only the right order of magnitude.
+  /// SuperSliverList 默认估算值固定为 100px。长聊天中真实气泡比这高一到两个
+  /// 数量级，因此每次布局用实测替换估算时，总范围以及底部固定的滚动偏移
+  /// 都会移动数万像素。如果这发生在两帧之间，时间线会明显从底部闪开再回来。
+  /// 基于内容派生的估算可让这些修正变小；它不需要精确，只需数量级正确。
   double _estimateItemExtent(int? index, double crossAxisExtent) {
-    // A null index asks whether one extent fits every item. Answering with a
-    // positive number makes SuperSliverList apply it to the whole list without
-    // ever consulting the per-item branch below, so this has to be 0.
+    // null 索引询问一个范围是否适用于所有项目。返回正数会让 SuperSliverList
+    // 对整个列表使用该值，而不会查询下方按项目分支，因此这里必须返回 0。
     if (index == null) return 0;
     final models = _effectiveRenderModels;
     if (index < 0 || index >= models.length) return _estimateChrome;
@@ -390,11 +392,9 @@ class _MessageListViewState extends State<MessageListView> {
         (reasoningSegments?.isNotEmpty ?? false);
     if (text.isEmpty && !hasReasoning) return _estimateChrome;
 
-    // Layout asks for the same item repeatedly (every resize, every window
-    // change), and the scan below is linear in the message length, so a memo
-    // keyed by everything the result depends on keeps the layout phase cheap.
-    // The content is compared by identity: an edited or streamed message always
-    // carries a new string, and equal-length rewrites must not hit the memo.
+    // 布局会反复查询同一个项目（每次调整大小、窗口变化都会），而下方扫描
+    // 随消息长度线性增长，因此按结果依赖的全部因素缓存，可保持布局阶段廉价。
+    // 内容按对象身份比较：编辑或流式消息总会携带新字符串，等长重写不能命中缓存。
     final fontScale = widget.chatFontScale * _systemTextScale;
     final settings = _estimateSettings;
     final reasoningSignature = _reasoningEstimateSignature(
@@ -411,9 +411,8 @@ class _MessageListViewState extends State<MessageListView> {
       return cached.extent;
     }
 
-    // Inline thinking renders as its own card. When it is collapsed only the
-    // visible remainder takes space, so parse it out with the same parser the
-    // renderer uses instead of guessing at the tag syntax.
+    // 行内思考会作为独立卡片渲染。折叠时只有可见剩余内容占空间，
+    // 因此使用渲染器同样的解析器解析，而不是猜测标签语法。
     var body = text;
     var collapsedCards = 0;
     if (settings.collapseThinking &&
@@ -429,15 +428,13 @@ class _MessageListViewState extends State<MessageListView> {
 
     final fontSize = 15.6 * fontScale;
     final lineHeight = fontSize * 1.5;
-    // User bubbles are inset and never span the full width.
+    // 用户气泡有内缩，永远不会占满全宽。
     final bubbleWidth = crossAxisExtent * (message.role == 'user' ? 0.85 : 1.0);
     final textWidth = math.max(80.0, bubbleWidth - 28);
-    // Wide (CJK) glyphs are about twice as wide as Latin ones, so the mix
-    // decides how many characters fit on a line.
+    // 宽字符（CJK）大约两倍于拉丁字符宽度，因此混排决定每行可容纳多少字符。
     final charWidth = fontSize * (0.5 + 0.55 * _wideCharRatio(body));
     final charsPerLine = math.max(1.0, textWidth / charWidth);
-    // Code renders in a fixed 13px monospace face, so it wraps at a different
-    // column and stacks at a different row height than the body text.
+    // 代码使用固定 13px 等宽字体渲染，因此换行列数和行高与正文不同。
     final codeFontSize = _estimateCodeFontSize * fontScale;
     final codeCharsPerLine = math.max(1.0, textWidth / (codeFontSize * 0.6));
     final extent =
@@ -474,14 +471,12 @@ class _MessageListViewState extends State<MessageListView> {
     return extent;
   }
 
-  /// Estimated height of the reasoning card(s) rendered above the answer.
+  /// 渲染在答案上方的推理卡片估算高度。
   ///
-  /// Reasoning lives outside [ChatMessage.content], so the content-only
-  /// estimate misses it entirely: a reasoning-heavy message gets estimated an
-  /// order of magnitude too short, and every scroll or anchor computation
-  /// across the unmeasured region is off by the same amount. Mirrors the
-  /// renderer's choice of showing the segments when present and otherwise the
-  /// single reasoning block.
+  /// 推理内容不在 [ChatMessage.content] 中，仅按内容估算会完全遗漏它；
+  /// 推理较多的消息会被低估一个数量级，跨未测量区域的每次滚动或锚点计算
+  /// 也会产生相同偏差。这与渲染器在存在分段时显示分段、否则显示单个推理块的
+  /// 选择保持一致。
   double _estimateReasoningExtent(
     stream_ctrl.ReasoningData? reasoning,
     List<stream_ctrl.ReasoningSegmentData>? segments, {
@@ -517,11 +512,10 @@ class _MessageListViewState extends State<MessageListView> {
     return extent;
   }
 
-  /// Identity of the reasoning inputs an estimate was computed from.
+  /// 估算所依据的推理输入身份。
   ///
-  /// Reasoning state objects mutate in place, but their text is replaced with
-  /// a new string on every change, so text identity plus the expanded flags
-  /// distinguishes every state the estimate depends on.
+  /// 推理状态对象会原地变化，但其文本在每次变化时都会替换为新字符串，
+  /// 因此文本身份加上展开标志可以区分估算依赖的每个状态。
   int _reasoningEstimateSignature(
     stream_ctrl.ReasoningData? reasoning,
     List<stream_ctrl.ReasoningSegmentData>? segments,
@@ -540,16 +534,13 @@ class _MessageListViewState extends State<MessageListView> {
     ]);
   }
 
-  /// Rendered height in body lines, wrapping each hard line separately.
+  /// 按正文行数计算的渲染高度，逐硬换行分别换行。
   ///
-  /// Dividing the whole length by [charsPerLine] would collapse blank lines and
-  /// short lines, which is exactly the shape chat messages tend to have. Two
-  /// constructs would otherwise be counted wrong: a Markdown link hides its
-  /// target, and a fenced code block renders in its own font — wrapping at
-  /// [codeCharsPerLine] when the renderer wraps, or staying one row per source
-  /// line when it scrolls horizontally instead ([codeCharsPerLine] null), each
-  /// row [codeLineRatio] of a body line tall. A block may also be collapsed to
-  /// [collapsedCodeLines] source lines.
+  /// 将总长度除以 [charsPerLine] 会合并空行和短行，而这恰好是聊天消息常见形态。
+  /// 两种结构否则会计算错误：Markdown 链接隐藏目标，围栏代码块使用自己的字体，
+  /// 渲染器换行时按 [codeCharsPerLine] 换行；水平滚动时（[codeCharsPerLine] 为 null）
+  /// 每个源码行占一行，每行高度为正文行的 [codeLineRatio]。
+  /// 代码块还可能折叠到 [collapsedCodeLines] 个源码行。
   double _wrappedLineCount(
     String text, {
     required double charsPerLine,
@@ -558,9 +549,9 @@ class _MessageListViewState extends State<MessageListView> {
     required int? collapsedCodeLines,
   }) {
     var lines = 0.0;
-    var visible = 0; // rendered characters on the current line
-    var fenceRows = 0.0; // rendered rows inside the open code fence
-    var fenceSourceLines = 0; // hard lines inside the open code fence
+    var visible = 0; // 当前行已渲染的字符数
+    var fenceRows = 0.0; // 打开的代码围栏内已渲染的行数
+    var fenceSourceLines = 0; // 打开的代码围栏内硬行数
     var inFence = false;
     var index = 0;
 
@@ -568,7 +559,7 @@ class _MessageListViewState extends State<MessageListView> {
       if (inFence) {
         fenceSourceLines++;
         fenceRows += visible == 0 || codeCharsPerLine == null
-            ? 1.0 // one row per source line: code scrolls sideways
+            ? 1.0 // 每个源码行一行：代码横向滚动
             : (visible / codeCharsPerLine).ceilToDouble();
       } else {
         lines += visible == 0 ? 1.0 : (visible / charsPerLine).ceilToDouble();
@@ -577,7 +568,7 @@ class _MessageListViewState extends State<MessageListView> {
     }
 
     void endFence() {
-      // Collapsing hides source lines, so the wrapped rows shrink with them.
+      // 折叠会隐藏源码行，因此换行后的行数也随之减少。
       final shown = collapsedCodeLines == null || fenceSourceLines == 0
           ? fenceRows
           : fenceRows * math.min(1.0, collapsedCodeLines / fenceSourceLines);
@@ -586,9 +577,8 @@ class _MessageListViewState extends State<MessageListView> {
       fenceSourceLines = 0;
     }
 
-    // Very long messages only need the right order of magnitude, so the scan is
-    // budgeted per character — a single-line megabyte of JSON must not walk the
-    // whole string — and the tail is extrapolated at the observed density.
+    // 非常长的消息只需数量级正确，因此扫描按字符预算；单行兆字节 JSON
+    // 不能遍历整串，尾部按观察密度外推。
     while (index < text.length && index < _estimateScanLimit) {
       final unit = text.codeUnitAt(index);
       if (unit == 0x0A) {
@@ -609,7 +599,7 @@ class _MessageListViewState extends State<MessageListView> {
         continue;
       }
       if (unit == 0x5D && index + 1 < text.length) {
-        // A Markdown link renders its label, never its target.
+        // Markdown 链接只渲染标签，从不渲染目标。
         if (text.codeUnitAt(index + 1) == 0x28) {
           final close = text.indexOf(')', index + 2);
           if (close > 0) {
@@ -628,7 +618,7 @@ class _MessageListViewState extends State<MessageListView> {
     return lines * (text.length / math.max(1, index));
   }
 
-  /// Whether a ``` fence marker starts at [index].
+  /// 判断 ``` 围栏标记是否从 [index] 开始。
   bool _isFenceMarker(String text, int index) {
     if (index + 2 >= text.length) return false;
     if (text.codeUnitAt(index + 1) != 0x60 ||
@@ -638,7 +628,7 @@ class _MessageListViewState extends State<MessageListView> {
     return index == 0 || text.codeUnitAt(index - 1) == 0x0A;
   }
 
-  /// Fraction of wide glyphs, sampled so the cost stays flat for huge messages.
+  /// 宽字符占比，采样使超大消息的成本保持稳定。
   double _wideCharRatio(String text) {
     const samples = 256;
     final step = math.max(1, text.length ~/ samples);
@@ -717,10 +707,8 @@ class _MessageListViewState extends State<MessageListView> {
     if (newModels.length < oldModels.length) {
       final removedOldIndices = _removedOldIndices(oldModels, newModels);
       if (removedOldIndices != null) {
-        // Removing the extents at the deleted indices keeps every surviving
-        // slot's measured height attached to its new index; the fallback
-        // below would instead drop all measurements and let the list drift
-        // while it re-measures the whole window over several frames.
+        // 删除索引处范围后，每个幸存插槽的实测高度保持关联到新索引；
+        // 否则下方回退会丢弃所有测量，让列表在数帧内重新测量整个窗口时漂移。
         final anchor = _captureVisibleAnchorForRemoval(
           controller,
           removedOldIndices,
@@ -800,9 +788,8 @@ class _MessageListViewState extends State<MessageListView> {
     controller.invalidateAllExtents();
   }
 
-  /// Whether a layout-phase positioning request (bottom pin, preserved
-  /// distance, streaming auto-follow) owns the scroll position this frame.
-  /// Anchor restoration must stand down instead of fighting it.
+  /// 本帧是否由布局阶段定位请求（底部固定、保持距离、流式自动跟随）
+  /// 拥有滚动位置。锚点恢复必须让步，而不是与其争抢。
   bool get _layoutPositionOwnedElsewhere {
     final scrollController = widget.scrollController;
     return scrollController is scroll_ctrl.ChatAutoFollowScrollController &&
@@ -820,12 +807,10 @@ class _MessageListViewState extends State<MessageListView> {
     return _anchorAtIndex(controller, visible.$1);
   }
 
-  /// Captures the topmost visible slot that survives a removal, as an anchor
-  /// expressed in post-removal index space.
+  /// 捕获删除后仍存在的最上方可见插槽，作为以删除后索引空间表示的锚点。
   ///
-  /// When every visible slot is being removed, the anchor falls to the
-  /// nearest surviving slot below, whose content slides up into the vacated
-  /// viewport; failing that, the nearest surviving slot above.
+  /// 当所有可见插槽都被删除时，锚点落到下方最近的幸存插槽，其内容会上滑
+  /// 进入腾出的视口；若没有，则落到上方最近的幸存插槽。
   ({int index, double alignment})? _captureVisibleAnchorForRemoval(
     ListController controller,
     List<int> removedOldIndices,
@@ -866,18 +851,13 @@ class _MessageListViewState extends State<MessageListView> {
   ) {
     final position = widget.scrollController.position;
     final itemExtent = controller.extentForIndex(index).$1;
-    // The scroll position is defined by where children were actually painted,
-    // while the extent list's offsets partly derive from estimated heights of
-    // rows that never entered layout. Mixing the two frames would bake their
-    // accumulated difference into the alignment, and the restore jump would
-    // land the anchor shifted by exactly that error — with estimate-heavy
-    // histories (long reasoning payloads, huge messages) that reads as the
-    // viewport jumping to a random place. Anchor on the painted offset and
-    // only fall back to the estimated one when the child is not built.
+    // 滚动位置由子项实际绘制位置定义，而范围列表偏移部分来自从未进入布局的
+    // 行的估算高度。混用两种坐标会把累计误差烘焙进对齐，恢复跳转会准确
+    // 偏移该误差；对估算密集历史（长推理载荷、超大消息）会表现为视口跳到
+    // 随机位置。应锚定实际绘制偏移，仅当子项未构建时回退到估算偏移。
     final itemLeading =
         _paintedLeadingOffset(index) ??
-        // This is the same offset query used by jumpToItem. It is safe here,
-        // before the new child list enters layout.
+        // 这与 jumpToItem 使用的偏移查询相同。在新子列表进入布局前使用是安全的。
         // ignore: invalid_use_of_visible_for_testing_member
         controller.getOffsetToReveal(index, 0);
     final availableAlignmentExtent = position.viewportDimension - itemExtent;
@@ -887,8 +867,7 @@ class _MessageListViewState extends State<MessageListView> {
     return (index: index, alignment: alignment);
   }
 
-  /// The scroll offset at which the child for [index] was actually laid out,
-  /// or null when that child is not currently built.
+  /// [index] 对应子项实际布局时的滚动偏移；该子项当前未构建时返回 null。
   double? _paintedLeadingOffset(int index) {
     final root = context.findRenderObject();
     if (root == null) return null;
@@ -921,8 +900,7 @@ class _MessageListViewState extends State<MessageListView> {
     return null;
   }
 
-  /// Old-list indices whose slots are absent from the new list, or null when
-  /// the new list is not simply the old list with some slots removed.
+  /// 新列表中缺失的旧列表索引；如果新列表不只是旧列表移除部分插槽，则返回 null。
   List<int>? _removedOldIndices(
     List<MessageRenderModel> oldModels,
     List<MessageRenderModel> newModels,
@@ -1040,7 +1018,7 @@ class _MessageListViewState extends State<MessageListView> {
     super.dispose();
   }
 
-  /// Build the context divider widget shown at truncate position.
+  /// 构建显示在截断位置的上下文分隔 widget。
   Widget _buildContextDivider(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
@@ -1077,8 +1055,8 @@ class _MessageListViewState extends State<MessageListView> {
 
   @override
   Widget build(BuildContext context) {
-    // Items render at the system scale times the chat scale (see the MediaQuery
-    // override in _buildMessageItem), so the estimate has to use both.
+    // 项目以系统缩放乘聊天缩放渲染（参见 _buildMessageItem 中的 MediaQuery
+    // 覆盖），因此估算必须同时使用两者。
     _systemTextScale = MediaQuery.textScalerOf(context).scale(1);
     _estimateSettings = _EstimateSettings(
       collapseThinking: widget.collapseThinking,
@@ -1346,7 +1324,7 @@ class _MessageListViewState extends State<MessageListView> {
         return;
       }
 
-      // Keep pagination locked through the rebuild and anchor restoration.
+      // 在重建与锚点恢复期间保持分页锁定。
       await WidgetsBinding.instance.endOfFrame;
       if (!mounted) return;
       _historyLoadScheduled = false;
@@ -1371,6 +1349,13 @@ class _MessageListViewState extends State<MessageListView> {
     final selectedVersion = model.selectedVersion;
     final selectedIdx = model.selectedVersionIndex;
     final total = availableVersions.length;
+    final siblingBranchIds =
+        widget.siblingBranchIdsByMessageId[message.id] ?? const <String>[];
+    final useBranchSelector =
+        siblingBranchIds.length > 1 && widget.onBranchChange != null;
+    final selectedBranchIndex = useBranchSelector
+        ? siblingBranchIds.indexOf(widget.activeBranchId ?? '')
+        : selectedIdx;
     final messageSuggestions =
         !widget.selecting &&
             model.isLatestCompleteAssistant &&
@@ -1378,7 +1363,7 @@ class _MessageListViewState extends State<MessageListView> {
         ? widget.suggestions
         : const <String>[];
 
-    // Check if this is a streaming message that should use ValueListenableBuilder
+    // 检查是否为应使用 ValueListenableBuilder 的流式消息
     final isStreaming =
         message.isStreaming &&
         message.role == 'assistant' &&
@@ -1415,7 +1400,7 @@ class _MessageListViewState extends State<MessageListView> {
                     final data = baseData ?? MediaQuery.of(context);
                     final textScale = data.textScaler.scale(1);
                     return MediaQuery(
-                      // Keep chat font scaling without rebuilding on keyboard insets.
+                      // 保持聊天字体缩放，且不在键盘内边距变化时重建。
                       data: data.copyWith(
                         textScaler: TextScaler.linear(
                           textScale * presentation.chatFontScale,
@@ -1436,6 +1421,9 @@ class _MessageListViewState extends State<MessageListView> {
                               selectedVersion: selectedVersion,
                               selectedIdx: selectedIdx,
                               total: total,
+                              siblingBranchIds: siblingBranchIds,
+                              selectedBranchIndex: selectedBranchIndex,
+                              useBranchSelector: useBranchSelector,
                               isProcessingFiles: isProcessingFiles,
                               suggestions: messageSuggestions,
                               presentation: presentation,
@@ -1454,6 +1442,9 @@ class _MessageListViewState extends State<MessageListView> {
                               selectedVersion: selectedVersion,
                               selectedIdx: selectedIdx,
                               total: total,
+                              siblingBranchIds: siblingBranchIds,
+                              selectedBranchIndex: selectedBranchIndex,
+                              useBranchSelector: useBranchSelector,
                               isProcessingFiles: isProcessingFiles,
                               suggestions: messageSuggestions,
                               presentation: presentation,
@@ -1521,9 +1512,9 @@ class _MessageListViewState extends State<MessageListView> {
           )
         : RepaintBoundary(child: messageColumn);
 
-    // The animator wraps the item's RepaintBoundary so the fade only
-    // re-composites the boundary's cached layer instead of repainting the
-    // message subtree every animation frame.
+    // 动画器包裹 item 的 RepaintBoundary，使淡入淡出仅
+    // 重新合成该边界的缓存图层，而不是每个动画帧都重绘
+    // 整个消息子树。
     return _SlotRemovalAnimator(
       key: ValueKey<String>(model.slotId),
       removing: widget.removingSlotIds.contains(model.slotId),
@@ -1531,8 +1522,8 @@ class _MessageListViewState extends State<MessageListView> {
     );
   }
 
-  /// Build a streaming message widget that uses ValueListenableBuilder
-  /// to avoid full page rebuilds during streaming.
+  /// 使用 ValueListenableBuilder 构建流式消息 widget，
+  /// 以避免流式过程中整页重建。
   Widget _buildStreamingMessageWidget(
     BuildContext context, {
     required ChatMessage message,
@@ -1547,6 +1538,9 @@ class _MessageListViewState extends State<MessageListView> {
     required int selectedVersion,
     required int selectedIdx,
     required int total,
+    required List<String> siblingBranchIds,
+    required int selectedBranchIndex,
+    required bool useBranchSelector,
     required bool isProcessingFiles,
     required List<String> suggestions,
     required _MessagePresentation presentation,
@@ -1555,7 +1549,7 @@ class _MessageListViewState extends State<MessageListView> {
       notifier: widget.streamingContentNotifier!.getNotifier(message.id),
       deferUpdates: _deferStreamingMessageUpdates,
       builder: (context, data, deferUpdates) {
-        // Use streaming content if available, otherwise fall back to message content
+        // 优先使用流式内容，否则回退到消息内容
         final displayContent = data.content.isNotEmpty
             ? data.content
             : message.content;
@@ -1563,7 +1557,7 @@ class _MessageListViewState extends State<MessageListView> {
             ? data.totalTokens
             : message.totalTokens;
 
-        // Create a modified message with streaming content
+        // 用流式内容创建修改后的消息
         final streamingMessage = message.copyWith(
           content: displayContent,
           totalTokens: displayTokens,
@@ -1573,8 +1567,8 @@ class _MessageListViewState extends State<MessageListView> {
           durationMs: data.durationMs,
         );
 
-        // Update reasoning text from streaming data while preserving expanded state from r
-        // This allows user to toggle expanded state during streaming without it being reset
+        // 从流式数据更新推理文本，同时保留来自 r 的展开状态
+        // 这样用户可在流式过程中切换展开状态而不被重置
         stream_ctrl.ReasoningData? streamingReasoning = r;
         if (data.reasoningText != null && data.reasoningText!.isNotEmpty) {
           streamingReasoning = stream_ctrl.ReasoningData()
@@ -1584,7 +1578,7 @@ class _MessageListViewState extends State<MessageListView> {
             ..expanded = r?.expanded ?? false;
         }
 
-        // Wrap in RepaintBoundary to isolate repaints from affecting other widgets
+        // 用 RepaintBoundary 包裹，隔离重绘以免影响其他 widget
         return RepaintBoundary(
           child: _buildChatMessageWidget(
             context,
@@ -1600,6 +1594,9 @@ class _MessageListViewState extends State<MessageListView> {
             selectedVersion: selectedVersion,
             selectedIdx: selectedIdx,
             total: total,
+            siblingBranchIds: siblingBranchIds,
+            selectedBranchIndex: selectedBranchIndex,
+            useBranchSelector: useBranchSelector,
             isProcessingFiles: isProcessingFiles,
             suggestions: suggestions,
             presentation: presentation,
@@ -1610,7 +1607,7 @@ class _MessageListViewState extends State<MessageListView> {
     );
   }
 
-  /// Build the actual ChatMessageWidget with all its properties.
+  /// 用全部属性构建实际的 ChatMessageWidget。
   Widget _buildChatMessageWidget(
     BuildContext context, {
     required ChatMessage message,
@@ -1625,25 +1622,43 @@ class _MessageListViewState extends State<MessageListView> {
     required int selectedVersion,
     required int selectedIdx,
     required int total,
+    required List<String> siblingBranchIds,
+    required int selectedBranchIndex,
+    required bool useBranchSelector,
     required bool isProcessingFiles,
     required List<String> suggestions,
     required _MessagePresentation presentation,
     bool enableStreamingTextMotion = true,
   }) {
-    final currentIdx = availableVersions.indexOf(selectedVersion);
+    final currentIdx = useBranchSelector
+        ? selectedBranchIndex
+        : availableVersions.indexOf(selectedVersion);
     return ChatMessageWidget(
       message: message,
       enableStreamingTextMotion: enableStreamingTextMotion,
       versionIndex: currentIdx < 0 ? selectedIdx : currentIdx,
-      versionCount: total > 0 ? total : 1,
-      onPrevVersion: (currentIdx > 0)
+      versionCount: useBranchSelector
+          ? siblingBranchIds.length
+          : (total > 0 ? total : 1),
+      onPrevVersion: useBranchSelector
+          ? (currentIdx > 0)
+                ? () => widget.onBranchChange?.call(
+                    siblingBranchIds[currentIdx - 1],
+                  )
+                : null
+          : (currentIdx > 0)
           ? () => widget.onVersionChange?.call(
               gid,
               availableVersions[currentIdx - 1],
             )
           : null,
-      onNextVersion:
-          (currentIdx >= 0 && currentIdx < availableVersions.length - 1)
+      onNextVersion: useBranchSelector
+          ? (currentIdx >= 0 && currentIdx < siblingBranchIds.length - 1)
+                ? () => widget.onBranchChange?.call(
+                    siblingBranchIds[currentIdx + 1],
+                  )
+                : null
+          : (currentIdx >= 0 && currentIdx < availableVersions.length - 1)
           ? () => widget.onVersionChange?.call(
               gid,
               availableVersions[currentIdx + 1],
@@ -1716,7 +1731,7 @@ class _MessageListViewState extends State<MessageListView> {
         final action = await showMessageMoreSheet(
           context,
           message,
-          canDeleteAllVersions: total > 1,
+          canDeleteAllVersions: !useBranchSelector && total > 1,
           canCreateBranch: widget.onForkConversation != null,
         );
         if (action == MessageMoreAction.deleteCurrentVersion) {
@@ -1787,7 +1802,7 @@ class _MessageListViewState extends State<MessageListView> {
   }
 }
 
-/// Display settings that change how tall a message renders.
+/// 影响消息渲染高度的显示设置。
 final class _EstimateSettings {
   const _EstimateSettings({
     required this.collapseThinking,
@@ -1795,13 +1810,13 @@ final class _EstimateSettings {
     required this.wrapCodeBlocks,
   });
 
-  /// Whether finished thinking blocks render as a collapsed card.
+  /// 已完成的思考块是否折叠为卡片渲染。
   final bool collapseThinking;
 
-  /// Lines a long code block collapses to, or null when it stays expanded.
+  /// 长代码块折叠到的行数；保持展开时为 null。
   final int? collapsedCodeLines;
 
-  /// Whether code blocks wrap instead of scrolling horizontally.
+  /// 代码块是否换行而非水平滚动。
   final bool wrapCodeBlocks;
 
   @override
@@ -1816,7 +1831,7 @@ final class _EstimateSettings {
       Object.hash(collapseThinking, collapsedCodeLines, wrapCodeBlocks);
 }
 
-/// A memoized extent estimate together with everything it was derived from.
+/// 记忆化的范围估算及其全部推导依据。
 final class _ExtentEstimate {
   const _ExtentEstimate({
     required this.content,
@@ -1851,12 +1866,11 @@ final class _MessagePresentation {
   final Assistant? assistant;
 }
 
-/// Fades out and collapses a timeline slot ahead of its deletion.
+/// 在删除时间线插槽前先淡出再折叠。
 ///
-/// The fade runs first so the message visually disappears, then the height
-/// collapses so the neighbouring messages splice together. The slot's data is
-/// removed only after [ChatLayoutConstants.slotRemovalAnimationDuration], at
-/// which point the slot is already zero-height and its removal is invisible.
+/// 先执行淡出让消息视觉上消失，随后高度折叠使相邻消息拼接。插槽数据仅在
+/// [ChatLayoutConstants.slotRemovalAnimationDuration] 之后才移除；
+/// 此时插槽已为零高度，移除不可见。
 class _SlotRemovalAnimator extends StatefulWidget {
   const _SlotRemovalAnimator({
     super.key,
@@ -1887,9 +1901,9 @@ class _SlotRemovalAnimatorState extends State<_SlotRemovalAnimator>
     if (widget.removing && !oldWidget.removing) {
       _startRemoval();
     } else if (!widget.removing && oldWidget.removing) {
-      // The deletion was aborted (the slot usually unmounts instead of ever
-      // reaching this), so restore the message. A rebuild of this element is
-      // already in progress, so no setState is needed.
+      // 删除被中止（插槽通常直接卸载而不会
+      // 到达此处），因此恢复消息。该 element 的重建已经在进行，
+      // 无需 setState。
       _controller?.dispose();
       _controller = null;
     }
@@ -1925,10 +1939,9 @@ class _SlotRemovalAnimatorState extends State<_SlotRemovalAnimator>
                 math.max(0.0, (progress - 0.2) / 0.8),
               )
         : 1.0;
-    // The wrapper chain is present even when idle: swapping widget types when
-    // the animation starts would reparent — and therefore rebuild — the whole
-    // message subtree, which for a huge message is a visible hitch. All
-    // wrappers are pass-throughs at their idle values.
+    // 即使空闲时 wrapper 链也存在：动画开始时切换 widget 类型会导致重父级化
+    // ——从而重建——整个消息子树，对巨型消息会造成可见卡顿。所有
+    // wrapper 在空闲值下都是直通。
     return ClipRect(
       clipBehavior: removing ? Clip.hardEdge : Clip.none,
       child: Align(
@@ -2047,8 +2060,8 @@ class _StreamingMessageDataGateState extends State<_StreamingMessageDataGate> {
       widget.builder(context, _visibleData, _deferUpdates);
 }
 
-/// Bubble-shaped shimmer skeleton shown only while a cold initial window
-/// load is in flight and the list has no messages yet.
+/// 气泡形骨架屏，仅在冷启动初始窗口加载进行中
+/// 且列表尚无消息时显示。
 class _WindowLoadingSkeleton extends StatefulWidget {
   const _WindowLoadingSkeleton({
     super.key,

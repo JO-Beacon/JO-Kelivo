@@ -4,7 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../database/business_preferences.dart';
 import '../models/assistant_tag.dart';
 
-/// Manages assistant group tags, assignments, order and collapse state.
+/// 管理助手分组标签、分配、顺序和折叠状态。
 class TagProvider extends ChangeNotifier {
   static const String _tagsKey = 'assistant_tags_v1';
   static const String _assignKey =
@@ -93,7 +93,7 @@ class TagProvider extends ChangeNotifier {
     if (idx == -1) return;
     _tags.removeAt(idx);
     _collapsed.remove(tagId);
-    // Unassign assistants with this tag
+    // 取消分配使用此标签的助手
     _assignment.removeWhere((_, v) => v == tagId);
     await _persistTags();
     await _persistAssignment();

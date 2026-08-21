@@ -68,7 +68,7 @@ class _AboutPageState extends State<AboutPage> {
   Future<void> _openUrl(String url) async {
     final uri = Uri.parse(url);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      // Fallback: try in-app web view
+      // 回退：尝试应用内 WebView
       await launchUrl(uri, mode: LaunchMode.platformDefault);
     }
   }
@@ -103,7 +103,7 @@ class _AboutPageState extends State<AboutPage> {
 
   void _onVersionTap() {
     final now = DateTime.now();
-    // Reset the counter if taps are spaced too far apart
+    // 如果点击间隔过长，则重置计数器
     if (_lastVersionTap == null ||
         now.difference(_lastVersionTap!) > const Duration(seconds: 2)) {
       _versionTapCount = 0;
@@ -114,7 +114,7 @@ class _AboutPageState extends State<AboutPage> {
     const threshold = 7;
     if (_versionTapCount < threshold) return;
 
-    _versionTapCount = 0; // reset after unlock
+    _versionTapCount = 0; // 解锁后重置
     _showEasterEgg();
   }
 
@@ -419,7 +419,7 @@ class _AboutPageState extends State<AboutPage> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
         children: [
-          // Header card: left icon + right title/description
+          // 标题卡片：左侧图标，右侧标题或描述
           _iosSectionCard(
             children: [
               Padding(
@@ -449,14 +449,34 @@ class _AboutPageState extends State<AboutPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            l10n.aboutPageAppName,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: AppFontWeights.semibold,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  l10n.aboutPageAppName,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: AppFontWeights.semibold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              IosTileButton(
+                                label: updateProvider.checking
+                                    ? l10n.aboutPageCheckingForUpdates
+                                    : l10n.aboutPageCheckForUpdates,
+                                icon: Lucide.RefreshCw,
+                                enabled: !updateProvider.checking,
+                                fontSize: 12,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 9,
+                                  vertical: 7,
+                                ),
+                                onTap: _checkForUpdates,
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -480,10 +500,10 @@ class _AboutPageState extends State<AboutPage> {
 
           const SizedBox(height: 12),
 
-          // iOS-style list card
+          // iOS 风格列表卡片
           _iosSectionCard(
             children: [
-              // Version (tap 7x to unlock easter egg) — logic unchanged
+              // 版本（连点 7 次解锁彩蛋），逻辑保持不变
               _iosNavRow(
                 context,
                 icon: Lucide.Code,
@@ -500,7 +520,7 @@ class _AboutPageState extends State<AboutPage> {
                 label: l10n.aboutPageSystem,
                 detailBuilder: (_) =>
                     Text(_systemInfo.isEmpty ? '...' : _systemInfo),
-                onTap: null, // informational only
+                onTap: null, // 仅展示信息
               ),
               _iosDivider(context),
               _iosNavRowSvgLeading(
@@ -564,16 +584,6 @@ class _AboutPageState extends State<AboutPage> {
             ],
           ),
 
-          const SizedBox(height: 16),
-          IosTileButton(
-            label: updateProvider.checking
-                ? l10n.aboutPageCheckingForUpdates
-                : l10n.aboutPageCheckForUpdates,
-            icon: Lucide.RefreshCw,
-            enabled: !updateProvider.checking,
-            onTap: _checkForUpdates,
-          ),
-
           const SizedBox(height: 24),
         ],
       ),
@@ -581,7 +591,7 @@ class _AboutPageState extends State<AboutPage> {
   }
 }
 
-// --- iOS-style helpers (mirroring Settings/Display pages) ---
+// --- iOS 风格辅助函数（参照设置或显示页面） ---
 
 Widget _iosSectionCard({required List<Widget> children}) {
   return Builder(
@@ -719,7 +729,7 @@ Widget _iosNavRow(
   final interactive = onTap != null;
   return _TactileRow(
     onTap: onTap,
-    pressedScale: 1.00, // list rows: color shift only, no scale
+    pressedScale: 1.00, // 列表行：仅变色，不缩放
     haptics: false,
     builder: (pressed) {
       final baseColor = cs.onSurface.withValues(alpha: 0.9);
@@ -847,7 +857,7 @@ Widget _iosNavRowSvgLeading(
   );
 }
 
-// AppBar tactile icon button copied from provider detail page (with slight press scale)
+// 从供应商详情页复制的 AppBar 触感图标按钮（带轻微按压缩放）
 class _TactileIconButton extends StatefulWidget {
   const _TactileIconButton({
     required this.icon,
@@ -886,7 +896,7 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
         onTapUp: (_) => setState(() => _pressed = false),
         onTapCancel: () => setState(() => _pressed = false),
         onTap: () {
-          // Follow provider detail: no haptics on tap
+          // 与供应商详情页保持一致：点击无触感反馈
           widget.onTap();
         },
         child: AnimatedScale(

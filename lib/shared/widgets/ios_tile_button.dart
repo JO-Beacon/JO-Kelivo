@@ -41,13 +41,13 @@ class _IosTileButtonState extends State<IosTileButton> {
     final isDark = theme.brightness == Brightness.dark;
     final bool tinted = widget.backgroundColor != null;
     final Color tint = widget.backgroundColor ?? cs.primary;
-    // Use a light primary-tinted background when tinted; otherwise the neutral grey tile
+    // 着色时使用浅色主色背景；否则使用中性灰色磁贴
     final Color baseBg = tinted
         ? (isDark ? tint.withValues(alpha: 0.20) : tint.withValues(alpha: 0.12))
         : (context.appColors.surfaceFill);
     final overlay = cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05);
     final pressedBg = Color.alphaBlend(overlay, baseBg);
-    // Use primary (or provided foreground) for text/icon when tinted; otherwise neutral onSurface
+    // 着色时使用主色（或提供的前景色）渲染文本或图标；否则使用中性 onSurface
     final Color defaultFg =
         widget.foregroundColor ??
         (tinted
@@ -55,7 +55,7 @@ class _IosTileButtonState extends State<IosTileButton> {
             : cs.onSurface.withValues(alpha: 0.9));
     final iconColor = defaultFg;
     final textColor = defaultFg;
-    // Keep a subtle same-hue border when tinted; otherwise use neutral outline
+    // 着色时保留同色系的浅边框；否则使用中性 outline
     final Color effectiveBorder =
         widget.borderColor ??
         (tinted

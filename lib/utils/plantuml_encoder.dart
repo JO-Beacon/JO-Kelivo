@@ -1,14 +1,14 @@
 import 'dart:convert';
 import 'package:archive/archive.dart';
 
-// References https://plantuml.com/zh/text-encoding
+// 参考 https://plantuml.com/zh/text-encoding
 class PlantUmlEncoder {
   static const String _mapping =
       "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_";
 
   static String encode(String text) {
     List<int> bytes = utf8.encode(text);
-    // Use Deflate algorithm
+    // 使用 Deflate 算法
     List<int> compressed = Deflate(bytes).getBytes();
     return _encode64(compressed);
   }

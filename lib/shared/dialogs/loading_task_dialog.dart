@@ -1,32 +1,48 @@
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 
+import '../../core/models/progress_update.dart';
 import '../widgets/loading_dialog_card.dart';
 
-/// Runs [task] only after a non-dismissible loading dialog has been painted.
+/// 只有在不可关闭的加载对话框绘制完成后才运行 [task]。
 Future<T> runWithLoadingTaskDialog<T>({
   required BuildContext context,
-  required Future<T> Function() task,
+  required Future<T> Function(ProgressCallback onProgress) task,
   String? label,
 }) async {
-  final navigator = Navigator.of(context, rootNavigator: true);
-  final route = DialogRoute<void>(
-    context: context,
-    barrierDismissible: false,
-    builder: (_) =>
-        PopScope(canPop: false, child: LoadingDialogCard(label: label)),
+  final overlay = Overlay.of(context, rootOverlay: true);
+  final progress = ValueNotifier<ProgressUpdate?>(null);
+  late final OverlayEntry entry;
+  entry = OverlayEntry(
+    builder: (_) {
+      final loadingLayer = Stack(
+        fit: StackFit.expand,
+        children: [
+          const ModalBarrier(dismissible: false, color: Colors.black54),
+          ValueListenableBuilder<ProgressUpdate?>(
+            valueListenable: progress,
+            builder: (context, update, child) =>
+                LoadingDialogCard(label: label, progress: update?.fraction),
+          ),
+        ],
+      );
+      if (defaultTargetPlatform == TargetPlatform.windows) {
+        return Positioned.fill(top: 40, child: loadingLayer);
+      }
+      return loadingLayer;
+    },
   );
-  final dialogClosed = navigator.push<void>(route);
+  overlay.insert(entry);
 
-  // Route insertion and its first paint happen in the next frame. Starting a
-  // synchronous prefix before this point can leave the window visually blank.
+  // Overlay 的插入及其首次绘制发生在下一帧。如果在此之前开始同步前缀操作，
+  // 窗口可能会保持视觉空白。
   await WidgetsBinding.instance.endOfFrame;
 
   try {
-    return await task();
+    return await task((update) => progress.value = update);
   } finally {
-    if (route.isActive && navigator.mounted) {
-      navigator.removeRoute(route);
-    }
-    await dialogClosed;
+    if (entry.mounted) entry.remove();
+    progress.dispose();
   }
 }

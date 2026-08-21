@@ -1,7 +1,7 @@
 class DocumentAttachment {
-  final String path; // absolute file path
+  final String path; // 绝对文件路径
   final String fileName;
-  final String mime; // e.g. application/pdf, text/plain
+  final String mime; // 例如 application/pdf、text/plain
 
   const DocumentAttachment({
     required this.path,
@@ -12,8 +12,8 @@ class DocumentAttachment {
 
 class ChatInputData {
   final String text;
-  final List<String> imagePaths; // absolute file paths or data URLs
-  final List<DocumentAttachment> documents; // selected files
+  final List<String> imagePaths; // 绝对文件路径或 data URL
+  final List<DocumentAttachment> documents; // 已选文件
   final bool allowImagesApiRouting;
 
   const ChatInputData({

@@ -54,8 +54,8 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet> {
 
   bool _isCustomSelected({required bool showXhigh, required bool showMax}) {
     final presets = <int>{
-      -1, // auto
-      0, // off
+      -1, // 自动
+      0, // 关闭
       1024,
       16000,
       32000,
@@ -204,7 +204,7 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                // No title per iOS style; keep content close to handle
+                // 按 iOS 风格不显示标题；让内容紧贴拖拽把手
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Column(

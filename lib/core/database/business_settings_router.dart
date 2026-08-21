@@ -185,8 +185,8 @@ final class BusinessSettingsRouter {
   BusinessSettingsRouter._();
 
   static const _providerOrderKey = 'providers_order_v1';
-  // Storage-only row for an ordered key that has no persisted config. The
-  // invalid `enabled` type prevents collision with a routed Provider payload.
+  // 仅供存储使用的行，表示没有持久化配置的有序 key。
+  // 无效的 `enabled` 类型可避免与已路由的 Provider payload 冲突。
   static const _providerOrderOnlyPayload =
       '{"enabled":"__kelivo_provider_order_only__"}';
   static const _legacyPinnedModelsKey = 'pinned_models_v1';
@@ -206,9 +206,8 @@ final class BusinessSettingsRouter {
     'tools',
   };
 
-  /// Preserve an empty instruction list only at legacy input boundaries.
-  /// Canonical SQLite exports always contain every entity key, so their `[]`
-  /// cannot by itself distinguish an uninitialized table from a user clear.
+  /// 仅在旧版输入边界保留空指令列表。规范 SQLite 导出始终包含每个实体键，
+  /// 因此其中的 `[]` 本身无法区分未初始化表与用户清空。
   static BusinessSnapshot normalizeAndRoute(
     Map<String, Object?> source, {
     bool preserveExplicitEmptyInstructionList = false,
@@ -295,12 +294,10 @@ final class BusinessSettingsRouter {
     return (settings: exportSnapshot(snapshot), entityRowIds: entityRowIds);
   }
 
-  /// Builds the legacy key-value-compatible view consumed by runtime
-  /// providers. Stable row ids are projected into list payloads that came
-  /// from legacy data without an id; assistant memories use deterministic
-  /// negative ids so they stay outside the persisted positive-id space.
-  /// [exportSnapshot] deliberately preserves the published payload byte shape
-  /// used by backup validation.
+  /// 构建运行时 provider 使用的兼容旧版 key-value 的视图。稳定行 id 会被
+  /// 投影到来自旧版数据的列表 payload 中；助手记忆使用确定性的负 id，
+  /// 从而保持在持久化正 id 空间之外。[exportSnapshot] 有意保留备份校验
+  /// 所使用的已发布 payload 字节形状。
   static Map<String, Object> exportRuntimeSnapshot(BusinessSnapshot snapshot) {
     final result = exportSnapshot(snapshot);
     for (final kind in BusinessEntityKind.values) {
@@ -454,8 +451,8 @@ final class BusinessSettingsRouter {
     );
   }
 
-  // Mirror runtime decoder cast boundaries without canonicalizing payloads.
-  // Fields whose published decoders intentionally coerce values stay lenient.
+  // 镜像运行时 decoder 的转换边界，而不对 payload 做规范化。
+  // 其发布 decoder 有意强制转换值的字段保持宽松。
   static void _validateEntityPayload(
     BusinessEntityKind kind,
     Map<String, Object?> payload,
@@ -484,7 +481,7 @@ final class BusinessSettingsRouter {
             'streamOutput',
             'searchEnabled',
             'enableMemory',
-            // Read as a fallback for allowPastConversationRecall in old backups.
+            // 在旧备份中作为 allowPastConversationRecall 的回退进行读取。
             'enableRecentChatsReference',
             'autoOrganizeMemory',
             'allowPastConversationRecall',
@@ -1208,7 +1205,7 @@ final class BusinessSettingsRouter {
     final projected = <String, int>{};
     for (final row in missing) {
       final digest = sha256.convert(utf8.encode(row.id)).toString();
-      // Keep runtime-only identities outside MemoryStore's positive ID space.
+      // 将仅运行时的身份保留在 MemoryStore 的正 ID 空间之外。
       var candidate =
           -((int.parse(digest.substring(0, 8), radix: 16) & 0x3fffffff) + 1);
       while (!used.add(candidate)) {

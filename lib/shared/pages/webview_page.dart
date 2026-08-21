@@ -10,7 +10,7 @@ import '../../l10n/app_localizations.dart';
 class WebViewPage extends StatefulWidget {
   const WebViewPage({super.key, this.url, this.contentBase64});
   final String? url;
-  final String? contentBase64; // HTML string in Base64
+  final String? contentBase64; // Base64 编码的 HTML 字符串
 
   @override
   State<WebViewPage> createState() => _WebViewPageState();
@@ -64,13 +64,13 @@ class _WebViewPageState extends State<WebViewPage> {
           },
         ),
       );
-    // Initial load
+    // 初始加载
     scheduleMicrotask(_initialLoad);
   }
 
   Future<void> _initialLoad() async {
     if (defaultTargetPlatform == TargetPlatform.linux) {
-      // Keep parity with existing Linux limitation: no WebView support
+      // 与现有 Linux 限制保持一致：不支持 WebView
       final l10n = AppLocalizations.of(context)!;
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

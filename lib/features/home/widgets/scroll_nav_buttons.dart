@@ -3,16 +3,16 @@ import '../../../icons/lucide_adapter.dart';
 
 const scrollNavHoverRegionKey = ValueKey('scroll-nav-hover-region');
 
-/// Glassy scroll navigation buttons panel with 4 buttons arranged vertically.
+/// 玻璃质感的滚动导航按钮面板，纵向排列 4 个按钮。
 ///
-/// Buttons (from top to bottom):
-/// - Scroll to top (chevrons-up)
-/// - Previous message (chevron-up)
-/// - Next message (chevron-down)
-/// - Scroll to bottom (chevrons-down)
+/// 按钮（从上到下）：
+/// - 滚动到顶部（双向上箭头）
+/// - 上一条消息（上箭头）
+/// - 下一条消息（下箭头）
+/// - 滚动到底部（双向下箭头）
 ///
-/// Shows with slide-in animation from right when user scrolls,
-/// hides with slide-out animation after user stops scrolling.
+/// 用户滚动时从右侧滑入显示，
+/// 停止滚动后滑出隐藏。
 class ScrollNavButtonsPanel extends StatelessWidget {
   const ScrollNavButtonsPanel({
     super.key,
@@ -130,8 +130,8 @@ class ScrollNavButtonsPanel extends StatelessWidget {
   }
 }
 
-/// Single glassy circle button with semi-transparent background.
-/// Uses simple opacity instead of expensive BackdropFilter for better performance.
+/// 单个玻璃质感圆形按钮，背景半透明。
+/// 为获得更好性能，使用简单透明度而非昂贵的 BackdropFilter。
 class _GlassyCircleButton extends StatelessWidget {
   const _GlassyCircleButton({
     required this.icon,

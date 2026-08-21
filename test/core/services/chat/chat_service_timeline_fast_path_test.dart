@@ -175,9 +175,9 @@ void main() {
       expect(pageSignature(cachedPage), orderedEquals(pageSignature(dbPage)));
 
       final tailSlot = cachedPage!.slots.last;
-      expect(tailSlot.identity.slotId, groupId);
+      expect(tailSlot.identity.slotId, ids.last);
       expect(tailSlot.identity.revisionId, ids.last);
-      expect(tailSlot.identity.versionCount, 2);
+      expect(tailSlot.identity.versionCount, 1);
       expect(tailSlot.message.content, 'message 4');
       expect(cachedPage.totalSlotCount, ids.length);
       expect(newer.id, isNot(tailSlot.identity.revisionId));
@@ -197,8 +197,15 @@ void main() {
       selectVersion: true,
     );
 
-    // Cache only a head window so the selected revision of the multi-version
-    // group is not present; the fast path must refuse to judge and miss.
+    // Mutation paths intentionally rebuild the complete active-path cache.
+    // Reset it here so this test can explicitly exercise a partial window.
+    service.debugPrimeMessageCountState(
+      conversationId,
+      cachedMessages: const [],
+      clearCounts: true,
+    );
+    // Cache only a head window so the selected revision is not present; the
+    // fast path must refuse to judge and miss.
     await service.loadMessagesRange(conversationId, start: 0, limit: 3);
     expect(service.isConversationFullyCached(conversationId), isFalse);
 
@@ -207,7 +214,7 @@ void main() {
     expect(page, isNotNull);
     // The database path returns the selected (regenerated) revision.
     expect(page!.slots.last.message.content, 'regenerated');
-    expect(page.slots.last.identity.versionCount, 2);
+    expect(page.slots.last.identity.versionCount, 1);
     expect(page.totalSlotCount, ids.length);
   });
 

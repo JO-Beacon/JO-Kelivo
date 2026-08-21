@@ -13,7 +13,7 @@ class MarkdownMediaSanitizer {
   );
 
   static Future<String> replaceInlineBase64Images(String markdown) async {
-    // // Fast path: only proceed when it's clearly a base64 data image
+    // // 快速路径：仅当明确是 base64 数据图片时才继续处理
     // if (!(markdown.contains('data:image/') && markdown.contains(';base64,'))) {
     //   return markdown;
     // }
@@ -22,7 +22,7 @@ class MarkdownMediaSanitizer {
     final matches = _imgRe.allMatches(markdown).toList();
     if (matches.isEmpty) return markdown;
 
-    // Ensure target directory
+    // 确保目标目录存在
     final dir = await AppDirectories.getImagesDirectory();
     if (!await dir.exists()) {
       await dir.create(recursive: true);
@@ -35,7 +35,7 @@ class MarkdownMediaSanitizer {
       final dataUrl = m.group(1)!;
       String ext = AppDirectories.extFromMime(_mimeOf(dataUrl));
 
-      // Extract base64 payload
+      // 提取 base64 数据
       final b64Index = dataUrl.indexOf('base64,');
       if (b64Index < 0) {
         sb.write(markdown.substring(m.start, m.end));
@@ -44,34 +44,34 @@ class MarkdownMediaSanitizer {
       }
       final payload = dataUrl.substring(b64Index + 7);
 
-      // // Skip very small payloads to avoid overhead (likely tiny icons)
+      // // 跳过非常小的数据以避免额外开销（通常是微小图标）
       // if (payload.length < 4096) {
       //   sb.write(markdown.substring(m.start, m.end));
       //   last = m.end;
       //   continue;
       // }
 
-      // Decode in a background isolate (pure Dart decode)
+      // 在后台 isolate 中解码（纯 Dart 解码）
       final normalized = payload.replaceAll('\n', '');
       List<int> bytes;
       try {
         bytes = await compute(_decodeBase64, normalized);
       } catch (_) {
-        // Skip malformed base64 to avoid crashing streaming responses; keep original markup.
+        // 跳过格式错误的 base64，避免流式响应崩溃；保留原始标记。
         sb.write(markdown.substring(m.start, m.end));
         last = m.end;
         continue;
       }
 
-      // Deterministic filename by content hash to prevent duplicates
-      // Same base64 -> same filename across runs
+      // 根据内容哈希生成确定性文件名，避免重复。
+      // 相同的 base64 在不同运行中会得到相同文件名。
       final digest = _uuid.v5(Namespace.url.value, normalized);
       final file = File('${dir.path}/img_$digest.$ext');
       if (!await file.exists()) {
         await file.writeAsBytes(bytes, flush: true);
       }
 
-      // Replace only the URL part inside the parentheses
+      // 只替换括号内的 URL 部分
       final uri = SandboxPathResolver.canonicalize(file.path);
       final replaced = markdown
           .substring(m.start, m.end)
@@ -83,10 +83,10 @@ class MarkdownMediaSanitizer {
     return sb.toString();
   }
 
-  // Replace Markdown image links pointing to local file paths with inline base64 data URLs.
+  // 将指向本地文件路径的 Markdown 图片链接替换为内联 base64 数据 URL。
   // Example: "![image](/data/user/0/.../images/xxx.png)" -> "![image](data:image/png;base64,...)"
   static Future<String> inlineLocalImagesToBase64(String markdown) async {
-    // Quick check: contains a Markdown image and looks like a local path
+    // 快速检查：包含 Markdown 图片且看起来像本地路径
     if (!(markdown.contains('![') && markdown.contains(']('))) return markdown;
 
     final re = RegExp(r'!\[[^\]]*\]\(([^)]+)\)', multiLine: true);
@@ -98,7 +98,7 @@ class MarkdownMediaSanitizer {
     for (final m in matches) {
       sb.write(markdown.substring(last, m.start));
       final url = (m.group(1) ?? '').trim();
-      // Only convert local file paths; skip http(s) and existing data URLs
+      // 只转换本地文件路径；跳过 http(s) 和已有 data URL
       final isRemote = url.startsWith('http://') || url.startsWith('https://');
       final isData = url.startsWith('data:');
       final isFileUri = url.startsWith('file://');
@@ -107,15 +107,15 @@ class MarkdownMediaSanitizer {
           (isFileUri || url.startsWith('/') || url.contains(':'));
 
       if (!isLikelyLocalPath) {
-        // Keep original
+        // 保留原始内容
         sb.write(markdown.substring(m.start, m.end));
         last = m.end;
         continue;
       }
 
       try {
-        // Single I/O gate: resolveForIo rejects UNC/SMB and avoids fix()'s
-        // generic `/images/` aliasing. null ⇒ do not touch disk.
+        // 单一 I/O 入口：resolveForIo 会拒绝 UNC/SMB，并避免 fix()
+        // 的通用 `/images/` 路径别名。返回 null 时不访问磁盘。
         final resolved = SandboxPathResolver.resolveForIo(url);
         if (resolved == null) {
           sb.write(markdown.substring(m.start, m.end));
@@ -124,7 +124,7 @@ class MarkdownMediaSanitizer {
         }
         final f = File(resolved);
         if (!f.existsSync()) {
-          // Fallback to original if missing
+          // 文件不存在时回退到原始内容
           sb.write(markdown.substring(m.start, m.end));
           last = m.end;
           continue;
@@ -138,7 +138,7 @@ class MarkdownMediaSanitizer {
             .replaceFirst(url, dataUrl);
         sb.write(replaced);
       } catch (_) {
-        // On failure, keep original
+        // 失败时保留原始内容
         sb.write(markdown.substring(m.start, m.end));
       }
       last = m.end;

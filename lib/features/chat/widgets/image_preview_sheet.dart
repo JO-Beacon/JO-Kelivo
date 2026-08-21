@@ -32,7 +32,7 @@ Future<void> showImagePreviewSheet(
   BuildContext context, {
   required File file,
 }) async {
-  // On desktop platforms, show a custom dialog instead of bottom sheet
+  // 桌面平台显示自定义对话框而非底部弹层
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     await showDialog<void>(
       context: context,
@@ -158,7 +158,7 @@ class _ImagePreviewDesktopDialogState
       );
       if (!mounted) return;
       if (savePath == null) {
-        return; // cancelled
+        return; // 已取消
       }
 
       await File(savePath).parent.create(recursive: true);
@@ -184,7 +184,7 @@ class _ImagePreviewDesktopDialogState
   }
 
   Future<void> _onCopy() async {
-    // Prefer super_clipboard for robust cross-platform image copy
+    // 优先使用 super_clipboard 以获得稳健的跨平台图片复制
     bool ok = false;
     try {
       final clipboard = SystemClipboard.instance;
@@ -204,7 +204,7 @@ class _ImagePreviewDesktopDialogState
           } else if (ext == '.webp') {
             format = 'webp';
           } else {
-            // Convert unknown formats to PNG via image codec
+            // 通过图片编解码器将未知格式转为 PNG
             try {
               final codec = await ui.instantiateImageCodec(bytes);
               final frame = await codec.getNextFrame();
@@ -218,7 +218,7 @@ class _ImagePreviewDesktopDialogState
             } catch (_) {}
           }
 
-          // Build clipboard item with suggested name
+          // 构建带建议名称的剪贴板条目
           String suggestedName = p.basename(path);
           if (format == 'png' &&
               !suggestedName.toLowerCase().endsWith('.png')) {
@@ -246,7 +246,7 @@ class _ImagePreviewDesktopDialogState
     } catch (_) {
       ok = false;
     }
-    // Fallback to legacy platform channel if needed
+    // 需要时回退到旧版平台 channel
     if (!ok) {
       try {
         ok = await ClipboardImages.setImagePath(widget.file.path);
@@ -261,7 +261,7 @@ class _ImagePreviewDesktopDialogState
         type: NotificationType.success,
       );
     } else {
-      // Reuse export failed message to avoid adding new l10n
+      // 复用导出失败消息，避免新增 l10n
       showAppSnackBar(
         context,
         message: l10n.messageExportSheetExportFailed('copy-failed'),
@@ -297,7 +297,7 @@ class _ImagePreviewDesktopDialogState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Header
+                // 头部
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
                   child: Row(
@@ -343,7 +343,7 @@ class _ImagePreviewDesktopDialogState
                   ),
                 ),
 
-                // Content
+                // 内容
                 Expanded(
                   child: Scrollbar(
                     controller: _scrollCtrl,
@@ -1006,7 +1006,7 @@ class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
         ),
       );
       if (!mounted) return;
-      // Close only if sharing succeeds (when the platform reports it)
+      // 仅在分享成功时（平台报告成功）才关闭
       if (result.status == ShareResultStatus.success) {
         Navigator.of(context).pop();
       }
@@ -1041,7 +1041,7 @@ class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
           message: l10n.imagePreviewSheetSaveSuccess,
           type: NotificationType.success,
         );
-        // Auto-close the preview sheet after successful save
+        // 保存成功后自动关闭预览弹层
         if (!mounted) return;
         Navigator.of(context).pop();
       } else {
@@ -1077,7 +1077,7 @@ class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         child: Stack(
           children: [
-            // Scrollable image preview
+            // 可滚动的图片预览
             Positioned.fill(
               child: Column(
                 children: [
@@ -1119,9 +1119,7 @@ class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
                                     display: _display,
                                     maxWidth: constraints.maxWidth,
                                   ),
-                                const SizedBox(
-                                  height: 80,
-                                ), // leave space for action bar overlap, outside the card
+                                const SizedBox(height: 80), // 在卡片外为操作栏重叠留出空间
                               ],
                             ),
                           ),
@@ -1133,7 +1131,7 @@ class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
               ),
             ),
 
-            // Bottom action bar
+            // 底部操作栏
             Positioned(
               left: 0,
               right: 0,
@@ -1155,7 +1153,7 @@ class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
                   padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                   child: Row(
                     children: [
-                      // Left small square share button (no ripple)
+                      // 左侧方形小分享按钮（无涟漪）
                       Builder(
                         builder: (btnCtx) => SizedBox(
                           width: 48,
@@ -1186,7 +1184,7 @@ class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      // Right main save button (no ripple)
+                      // 右侧主保存按钮（无涟漪）
                       Expanded(
                         child: SizedBox(
                           height: 48,

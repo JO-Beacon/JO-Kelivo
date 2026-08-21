@@ -411,7 +411,7 @@ class _DialogActionButton extends StatelessWidget {
 class _HomePageState extends State<HomePage>
     with TickerProviderStateMixin, RouteAware, WidgetsBindingObserver {
   // ============================================================================
-  // UI Controllers (owned by State for lifecycle management)
+  // UI 控制器（由 State 持有以管理生命周期）
   // ============================================================================
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -433,13 +433,13 @@ class _HomePageState extends State<HomePage>
   StreamSubscription<String>? _processTextSub;
 
   // ============================================================================
-  // Page Controller (manages all business logic and state)
+  // 页面控制器（管理所有业务逻辑和状态）
   // ============================================================================
 
   late HomePageController _controller;
 
   // ============================================================================
-  // Lifecycle
+  // 生命周期
   // ============================================================================
 
   @override
@@ -541,7 +541,7 @@ class _HomePageState extends State<HomePage>
 
   void _onDrawerValueChanged() {
     _controller.onDrawerValueChanged(_drawerController.value);
-    // Close assistant picker when drawer closes
+    // 抽屉关闭时关闭助手选择器
     if (_drawerController.value < 0.95) {
       final sp = context.read<SettingsProvider>();
       if (!sp.keepAssistantListExpandedOnSidebarClose) {
@@ -590,7 +590,7 @@ class _HomePageState extends State<HomePage>
   }
 
   // ============================================================================
-  // Build Methods
+  // 构建方法
   // ============================================================================
 
   @override
@@ -823,8 +823,9 @@ class _HomePageState extends State<HomePage>
   }
 
   Future<void> _openSelectionMiniMap() async {
-    final collapsed = await _controller
-        .loadAllCollapsedMessagesForCurrentConversation();
+    final collapsed = _messagesOnActivePath(
+      await _controller.loadAllCollapsedMessagesForCurrentConversation(),
+    );
     if (!mounted) return;
     if (collapsed.isEmpty) return;
 
@@ -960,7 +961,7 @@ class _HomePageState extends State<HomePage>
   }
 
   // ============================================================================
-  // UI Component Builders
+  // UI 组件构建器
   // ============================================================================
 
   Widget _buildChatBackground(BuildContext context, ColorScheme cs) {
@@ -1095,7 +1096,7 @@ class _HomePageState extends State<HomePage>
     required EdgeInsetsGeometry dividerPadding,
   }) {
     if (_controller.isTemporaryConversation &&
-        _controller.chatController.collapsedMessages.isEmpty) {
+        _controller.visibleCollapsedMessages.isEmpty) {
       return _TemporaryConversationEmptyState(
         topContentPadding: topContentPadding,
         bottomContentPadding: bottomContentPadding,
@@ -1113,9 +1114,12 @@ class _HomePageState extends State<HomePage>
         isProcessingFiles: _controller.isProcessingFiles,
         scrollController: _scrollController,
         listController: _controller.scrollCtrl.messageListController,
-        messages: _controller.chatController.collapsedMessages,
-        renderModels: _controller.chatController.messageRenderModels,
-        byGroup: _controller.chatController.groupedMessages,
+        messages: _controller.visibleCollapsedMessages,
+        renderModels: _controller.visibleMessageRenderModels,
+        byGroup: _controller.visibleGroupedMessages,
+        siblingBranchIdsByMessageId: _controller.siblingBranchIdsByMessageId,
+        activeBranchId: _controller.activeBranchId,
+        onBranchChange: _controller.switchConversationBranch,
         versionSelections: _controller.versionSelections,
         reasoning: _controller.reasoning,
         reasoningSegments: _controller.reasoningSegments,
@@ -1149,7 +1153,7 @@ class _HomePageState extends State<HomePage>
         collapsedCodeLines: settings.autoCollapseCodeBlock
             ? settings.autoCollapseCodeBlockLines
             : null,
-        // Mirrors the wrap decision in the code block renderer.
+        // 与代码块渲染器中的换行决策保持一致。
         wrapCodeBlocks:
             Platform.isMacOS ||
             Platform.isWindows ||
@@ -1295,6 +1299,7 @@ class _HomePageState extends State<HomePage>
       onLongPressLearning: _showLearningPromptSheet,
       onClearContext: _controller.clearContext,
       onCompressContext: _handleDesktopCompressContext,
+      clearContextLabel: _controller.clearContextLabel(),
       backgroundImageActive: _assistantBackgroundActive(context),
     );
   }
@@ -1304,7 +1309,7 @@ class _HomePageState extends State<HomePage>
       builder: (context) {
         final settings = context.watch<SettingsProvider>();
         if (_controller.selecting) return const SizedBox.shrink();
-        if (_controller.messages.isEmpty) {
+        if (_controller.visibleMessages.isEmpty) {
           return const SizedBox.shrink();
         }
         var visible = _controller.scrollCtrl.showNavButtons;
@@ -1365,8 +1370,16 @@ class _HomePageState extends State<HomePage>
   }
 
   Future<void> _openMiniMap() async {
-    final collapsed = await _controller
-        .loadAllCollapsedMessagesForCurrentConversation();
+    var tree = _controller.conversationTree;
+    if (tree == null) {
+      await _controller.ensureConversationTreeForCurrentConversation();
+      tree = _controller.conversationTree;
+    }
+    final collapsed = tree == null
+        ? _messagesOnActivePath(
+            await _controller.loadAllCollapsedMessagesForCurrentConversation(),
+          )
+        : await _controller.loadAllConversationMessages();
     if (!mounted) return;
     if (collapsed.isEmpty) return;
 
@@ -1376,14 +1389,45 @@ class _HomePageState extends State<HomePage>
         context,
         anchorKey: _inputBarKey,
         messages: collapsed,
+        conversationTree: tree,
+        branches: _controller.conversationTree?.branches.values.toList(
+          growable: false,
+        ),
+        activeBranchId: _controller.activeBranchId,
+        onSelectBranch: _controller.switchConversationBranch,
       );
     } else {
-      selectedId = await showMiniMapSheet(context, collapsed);
+      selectedId = await showMiniMapSheet(
+        context,
+        collapsed,
+        conversationTree: tree,
+        branches: _controller.conversationTree?.branches.values.toList(
+          growable: false,
+        ),
+        activeBranchId: _controller.activeBranchId,
+        onSelectBranch: _controller.switchConversationBranch,
+      );
     }
     if (!mounted) return;
     if (selectedId != null && selectedId.isNotEmpty) {
+      final currentTree = _controller.conversationTree;
+      final targetBranchId = currentTree?.preferredBranchIdForMessage(
+        selectedId,
+      );
+      if (targetBranchId != null &&
+          targetBranchId != _controller.activeBranchId) {
+        await _controller.switchConversationBranch(targetBranchId);
+      }
       await _controller.scrollToMessageId(selectedId, useRikkaTransition: true);
     }
+  }
+
+  List<ChatMessage> _messagesOnActivePath(List<ChatMessage> messages) {
+    final activeIds = _controller.conversationTree?.activePath().toSet();
+    if (activeIds == null) return messages;
+    return messages
+        .where((message) => activeIds.contains(message.id))
+        .toList(growable: false);
   }
 
   Widget _wrapMessageJumpTransition(Widget child) {
@@ -1454,7 +1498,7 @@ class _HomePageState extends State<HomePage>
   }
 
   // ============================================================================
-  // Action Handlers (UI-specific, not in controller)
+  // 动作处理程序（UI 专属，不在控制器中）
   // ============================================================================
 
   void _openSearchSettings() {
@@ -1706,6 +1750,13 @@ class _HomePageState extends State<HomePage>
     if (confirm != true) return;
 
     if (deleteAllVersions) {
+      final siblingBranchIds =
+          _controller.siblingBranchIdsByMessageId[message.id] ??
+          const <String>[];
+      if (siblingBranchIds.length > 1) {
+        await _controller.deleteAllBranchSiblings(message);
+        return;
+      }
       await _controller.deleteAllMessageVersions(
         message: message,
         byGroup: byGroup,

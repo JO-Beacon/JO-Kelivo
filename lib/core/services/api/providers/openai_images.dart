@@ -209,8 +209,8 @@ Future<_OpenAIImagesInput> _openAIImagesInput(
       .where((path) => path.isNotEmpty)
       .toList(growable: false);
 
-  // Prefer structured multimodal refs (with mime) from the last user message
-  // even when bare userImagePaths are also provided.
+  // 优先使用最后一条用户消息中的结构化多模态引用（带 mime），
+  // 即使同时提供了裸 userImagePaths。
   for (int i = messages.length - 1; i >= 0; i--) {
     if ((messages[i]['role'] ?? '').toString() != 'user') continue;
     final message = messages[i];
@@ -218,7 +218,7 @@ Future<_OpenAIImagesInput> _openAIImagesInput(
       message[multimodalInternalMediaPathsKey],
     );
     if (internalMediaRefs.isNotEmpty) {
-      // /images/edits only accepts image/* inputs; skip audio/video/octet-stream.
+      // /images/edits 只接受 image/* 输入；跳过 audio/video/octet-stream。
       return _OpenAIImagesInput(
         prompt: prompt,
         imageRefs: [
@@ -231,7 +231,7 @@ Future<_OpenAIImagesInput> _openAIImagesInput(
     break;
   }
 
-  // Bare userImagePaths only (no structured refs on the last user turn).
+  // 只有裸 userImagePaths（最后一轮用户消息没有结构化引用）。
   if (explicitPaths.isNotEmpty) {
     return _OpenAIImagesInput(
       prompt: prompt,
@@ -242,8 +242,8 @@ Future<_OpenAIImagesInput> _openAIImagesInput(
   for (int i = messages.length - 1; i >= 0; i--) {
     if ((messages[i]['role'] ?? '').toString() != 'user') continue;
     final message = messages[i];
-    // Structured media paths were already handled above; continue with
-    // content-list / markdown / prior-assistant fallbacks.
+    // 结构化媒体路径已在上方处理；继续处理
+    // content-list / markdown / 先前 assistant 的回退。
     final content = message['content'];
     if (content is List) {
       final structuredImages = _extractOpenAIImageRefs(content);
@@ -306,8 +306,8 @@ List<_ImageRef> _extractOpenAIImageRefs(dynamic content) {
   final raw = (content ?? '').toString();
   if (raw.isEmpty) return const <_ImageRef>[];
   final refs = <_ImageRef>[];
-  // Markdown images only. Custom attachment markers are not recognized;
-  // attachments arrive via userImagePaths / multimodalInternalMediaPathsKey.
+  // 只处理 Markdown 图片。自定义附件标记不会被识别；
+  // 附件通过 userImagePaths / multimodalInternalMediaPathsKey 传入。
   final markdownImage = RegExp(r'!\[[^\]]*\]\(([^)]+)\)');
   for (final match in markdownImage.allMatches(raw)) {
     final source = (match.group(1) ?? '').trim();

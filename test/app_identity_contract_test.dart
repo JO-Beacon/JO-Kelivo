@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('JO-Kelivo application identity', () {
     test('uses the published JO-Kelivo version and platform namespaces', () {
-      _expectContains('pubspec.yaml', 'version: 0.1.8+8');
+      _expectContains('pubspec.yaml', 'version: 0.1.9+9');
 
       _expectContains(
         'android/app/build.gradle.kts',
@@ -200,19 +200,19 @@ void main() {
       final expectedCopy = <String, ({String export, String import})>{
         'lib/l10n/app_en.arb': (
           export: 'Export as Kelivo Backup',
-          import: 'Import from Kelivo Backup',
+          import: 'Import from Kelivo',
         ),
         'lib/l10n/app_zh.arb': (
           export: '导出为 Kelivo 备份',
-          import: '从 Kelivo 备份导入',
+          import: '从 Kelivo 导入',
         ),
         'lib/l10n/app_zh_Hans.arb': (
           export: '导出为 Kelivo 备份',
-          import: '从 Kelivo 备份导入',
+          import: '从 Kelivo 导入',
         ),
         'lib/l10n/app_zh_Hant.arb': (
           export: '匯出為 Kelivo 備份',
-          import: '從 Kelivo 備份匯入',
+          import: '從 Kelivo 匯入',
         ),
       };
 

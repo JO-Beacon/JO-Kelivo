@@ -359,15 +359,15 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
   }
 }
 
-/// Mobile/desktop (non-web) Mermaid renderer using webview_flutter.
-/// Returns a handle with the widget and an export-to-PNG action.
+/// 移动端或桌面端（非 Web）Mermaid 渲染器，使用 webview_flutter。
+/// 返回包含 widget 和导出 PNG 操作的句柄。
 MermaidViewHandle? createMermaidView(
   String code,
   bool dark, {
   Map<String, String>? themeVars,
   GlobalKey? viewKey,
 }) {
-  // Windows: use webview_windows with messaging for height + export.
+  // Windows：使用带消息通信的 webview_windows 处理高度和导出。
   if (Platform.isWindows) {
     final usedKey = viewKey ?? GlobalKey<_MermaidInlineWindowsViewState>();
     final widget = _MermaidInlineWindowsView(
@@ -390,7 +390,7 @@ MermaidViewHandle? createMermaidView(
             type: FileType.custom,
             allowedExtensions: const ['png'],
           );
-          if (savePath == null || savePath.isEmpty) return false; // cancelled
+          if (savePath == null || savePath.isEmpty) return false; // 已取消
           await File(savePath).parent.create(recursive: true);
           await File(savePath).writeAsBytes(bytes);
           return true;
@@ -416,12 +416,12 @@ MermaidViewHandle? createMermaidView(
     );
   }
 
-  // Linux: downgrade to plain code block (no WebView, no export)
+  // Linux：降级为普通代码块（无 WebView，无导出）
   if (Platform.isLinux) {
     return null;
   }
 
-  // Other platforms keep using webview_flutter (unchanged behavior).
+  // 其他平台继续使用 webview_flutter（行为不变）。
   final usedKey = viewKey ?? GlobalKey<_MermaidInlineWebViewState>();
   final widget = _MermaidInlineWebView(
     key: usedKey,
@@ -456,7 +456,7 @@ MermaidViewHandle? createMermaidView(
   );
 }
 
-// (Linux-only view removed; Linux now falls back to code block via null handle.)
+// （已移除仅 Linux 的视图；Linux 现在通过 null 句柄回退到代码块。）
 
 class _MermaidInlineWebView extends StatefulWidget {
   final String code;
@@ -483,7 +483,7 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
   @override
   void initState() {
     super.initState();
-    // Seed initial height from cache to reduce layout jumps
+    // 从缓存读取初始高度，减少布局跳动
     try {
       final cached = MermaidHeightCache.get(widget.code);
       if (cached != null) _height = cached;
@@ -495,7 +495,7 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
         onMessageReceived: (JavaScriptMessage msg) {
           final v = double.tryParse(msg.message);
           if (v != null && mounted) {
-            // Debounce rapid height updates to avoid jank
+            // 对频繁的高度更新做防抖，避免卡顿
             _heightDebounce?.cancel();
             _heightDebounce = Timer(const Duration(milliseconds: 60), () {
               if (!mounted) return;
@@ -531,7 +531,7 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
     if (codeChanged || darkChanged || themeChanged) {
       _loadHtml();
     } else {
-      // No content change; still re-measure to keep height in sync after rebuilds
+      // 内容没有变化；仍在重建后重新测量，以保持高度同步
       _safePostHeight();
     }
   }
@@ -551,7 +551,7 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
   }
 
   Future<void> _loadHtml() async {
-    // Load mermaid script from assets and inline it to avoid external requests.
+    // 从资源加载 mermaid 脚本并内联，避免外部请求。
     final mermaidJs = await rootBundle.loadString('assets/mermaid.min.js');
     final html = _buildHtml(
       widget.code,
@@ -560,7 +560,7 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
       widget.themeVars,
     );
     await _controller.loadHtmlString(html);
-    // Store latest theme signature for change detection
+    // 保存最新主题签名用于变化检测
     _lastThemeVarsSig = _themeVarsSignature(widget.themeVars);
   }
 
@@ -576,7 +576,7 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
         .replaceAll('&', '&amp;')
         .replaceAll('<', '&lt;')
         .replaceAll('>', '&gt;');
-    // Build themeVariables JSON
+    // 构建 themeVariables JSON
     String themeVarsJson = '{}';
     if (themeVars != null && themeVars.isNotEmpty) {
       final entries = themeVars.entries
@@ -715,7 +715,7 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
       );
       if (b64 == null || b64.isEmpty) return false;
       final bytes = base64Decode(b64);
-      // Desktop: Save As dialog (use existing file_picker, same as image viewer)
+      // 桌面端：使用“另存为”对话框（沿用现有 file_picker，与图片查看器一致）
       if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
         final suggested =
             'mermaid_${DateTime.now().millisecondsSinceEpoch}.png';
@@ -725,12 +725,12 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
           type: FileType.custom,
           allowedExtensions: const ['png'],
         );
-        if (savePath == null || savePath.isEmpty) return false; // cancelled
+        if (savePath == null || savePath.isEmpty) return false; // 已取消
         await File(savePath).parent.create(recursive: true);
         await File(savePath).writeAsBytes(bytes);
         return true;
       }
-      // Mobile: save directly to gallery
+      // 移动端：直接保存到相册
       final name = 'kelivo-mermaid-${DateTime.now().millisecondsSinceEpoch}';
       final result = await ImageGallerySaverPlus.saveImage(
         bytes,

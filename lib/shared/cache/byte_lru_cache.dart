@@ -2,7 +2,7 @@ import 'dart:collection';
 
 typedef CacheByteSize<K, V> = int Function(K key, V value);
 
-/// Least-recently-used cache bounded by decoded memory, not entry count.
+/// 按解码后内存大小而非条目数量限制的最近最少使用缓存。
 final class ByteLruCache<K, V> {
   ByteLruCache({required this.maxBytes, required this.sizeOf})
     : assert(maxBytes > 0);

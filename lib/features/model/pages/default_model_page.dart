@@ -845,10 +845,10 @@ class _ModelCard extends StatelessWidget {
     final settings = context.read<SettingsProvider>();
     final l10n = AppLocalizations.of(context)!;
 
-    // Check if using fallback (not explicitly set)
+    // 检查是否使用回退值（未显式设置）
     final usingFallback = modelProvider == null || modelId == null;
 
-    // Use fallback values if needed
+    // 需要时使用回退值
     final effectiveProvider = modelProvider ?? fallbackProvider;
     final effectiveModelId = modelId ?? fallbackModelId;
 
@@ -875,7 +875,7 @@ class _ModelCard extends StatelessWidget {
       }
     }
 
-    // Override display text if using fallback
+    // 使用回退值时覆盖显示文本
     if (usingFallback) {
       modelDisplay = disabledWhenUnset
           ? l10n.defaultModelPageNotEnabled
@@ -931,7 +931,7 @@ class _ModelCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 6),
-            // description under title
+            // 标题下方的描述
             Text(
               subtitle,
               style: TextStyle(
@@ -1189,7 +1189,7 @@ class _TactileRowState extends State<_TactileRow> {
       onTapUp: widget.onTap == null
           ? null
           : (_) async {
-              // Keep pressed state for a short moment to avoid flicker
+              // 短暂保持按压状态，避免闪烁
               await Future.delayed(const Duration(milliseconds: 60));
               if (mounted) _setPressed(false);
             },

@@ -468,9 +468,9 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         : _buildMobile(context, _report!);
 
     if (widget.embedded) {
-      // Desktop pages in the main IndexedStack are not wrapped by Scaffold/AppBar.
-      // Ensure a Material ancestor + correct background to avoid odd text artifacts
-      // (e.g., yellow underlines) and unreadable contrast in light mode.
+      // 主 IndexedStack 中的桌面页面不会由 Scaffold 或 AppBar 包裹。
+      // 确保存在 Material 祖先和正确背景，避免奇怪的文本伪影
+      // （例如黄色下划线）以及浅色模式下对比度不足。
       if (isDesktop) {
         return Material(
           color: Theme.of(context).scaffoldBackgroundColor,
@@ -1587,7 +1587,7 @@ class _UploadManagerState extends State<_UploadManager> {
   void didUpdateWidget(covariant _UploadManager oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.images != widget.images) {
-      // When switching between Images <-> Files on desktop, ensure we reload with the new filter.
+      // 桌面端在图片和文件之间切换时，确保按新筛选条件重新加载。
       setState(() {
         _selected.clear();
         _entries = const <StorageFileEntry>[];

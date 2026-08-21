@@ -264,8 +264,8 @@ final class McpOAuthService {
         wwwAuthenticate: wwwAuthenticate,
       );
     } catch (_) {
-      // Authorization remains available so a foreground attempt can report
-      // the current discovery error instead of hiding the login action.
+      // 授权仍保持可用，以便前台尝试可以报告
+      // 当前的 discovery 错误，而不是隐藏登录操作。
     }
   }
 
@@ -313,7 +313,7 @@ final class McpOAuthService {
           }
         }
       } catch (_) {
-        // Standard protected-resource metadata remains available.
+        // 标准受保护资源元数据仍保持可用。
       }
     }
 
@@ -377,7 +377,7 @@ final class McpOAuthService {
       } on McpOAuthException catch (error) {
         if (error.isTransient) transientFailure ??= error;
       } catch (_) {
-        // Try the next standard discovery location.
+        // 尝试下一个标准 discovery 位置。
       }
     }
     if (protectedResource == null || protectedResourceUri == null) {
@@ -442,7 +442,7 @@ final class McpOAuthService {
         } on McpOAuthException catch (error) {
           if (error.isTransient) transientFailure ??= error;
         } catch (_) {
-          // Try the next RFC 8414 / OIDC discovery location.
+          // 尝试下一个 RFC 8414 / OIDC discovery 位置。
         }
       }
       if (authorizationMetadata != null) break;
@@ -550,9 +550,7 @@ final class McpOAuthService {
       registration ??= await _cachedDynamicRegistration(
         discovery,
         redirectUri: callback.redirectUri,
-        clientName: serverName.trim().isEmpty
-            ? 'JO-Kelivo'
-            : serverName.trim(),
+        clientName: serverName.trim().isEmpty ? 'JO-Kelivo' : serverName.trim(),
         scopes: scopes,
       );
       _validateClientRegistration(registration);

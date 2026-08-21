@@ -4,35 +4,33 @@ import 'package:flutter/rendering.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 
 // ============================================================================
-// Auto-follow ScrollController / ScrollPosition
+// 自动跟随 ScrollController / ScrollPosition
 // ============================================================================
 
-/// ScrollController whose positions auto-pin to maxScrollExtent during layout.
+/// 在布局期间自动将位置固定到 maxScrollExtent 的 ScrollController。
 ///
-/// When [shouldAutoFollow] returns true, the created [ScrollPosition] corrects
-/// its pixel value to maxScrollExtent inside [applyContentDimensions] — i.e.
-/// BEFORE paint — so there is zero visual lag between content growth and scroll
-/// position update. This eliminates the 1-frame flicker that post-frame
-/// `jumpTo(max)` cannot avoid.
+/// 当 [shouldAutoFollow] 返回 true 时，创建的 [ScrollPosition] 会在
+/// [applyContentDimensions] 内，也就是在绘制之前，把像素值修正为
+/// maxScrollExtent，因此内容增长和滚动位置更新之间没有视觉延迟。
+/// 这消除了帧后 `jumpTo(max)` 无法避免的 1 帧闪烁。
 class ChatAutoFollowScrollController extends ScrollController {
-  /// Callback checked during layout to decide whether to auto-follow bottom.
+  /// 布局期间检查的回调，用于决定是否自动跟随底部。
   bool Function() shouldAutoFollow = () => false;
 
-  /// One-frame positioning request used when a conversation window is opened.
+  /// 打开会话窗口时使用的一帧定位请求。
   ///
-  /// Unlike a post-frame `jumpTo`, this is consumed by the scroll position
-  /// while the new list is being laid out, so an old conversation offset is
-  /// never painted for the new conversation.
+  /// 与帧后 `jumpTo` 不同，它在新列表布局期间由滚动位置消费，
+  /// 因此旧会话偏移绝不会为新会话绘制。
   bool _positionAtBottomDuringLayout = false;
   int _layoutBottomRequest = 0;
   bool _preserveDistanceFromEndDuringLayout = false;
   double _preservedDistanceFromEnd = 0;
   int _layoutDistanceRequest = 0;
 
-  /// Whether a one-frame layout positioning request is currently armed.
+  /// 当前是否已武装一帧布局定位请求。
   ///
-  /// While one is active it owns the scroll position for the upcoming layout,
-  /// so anchor-restoring jumps scheduled by the list must stand down.
+  /// 当它处于活动状态时，它拥有即将到来布局的滚动位置，
+  /// 因此列表调度的锚点恢复跳转必须让位。
   bool get hasActiveLayoutPositioningRequest =>
       _positionAtBottomDuringLayout || _preserveDistanceFromEndDuringLayout;
 
@@ -111,11 +109,10 @@ class _AutoFollowScrollPosition extends ScrollPositionWithSingleContext {
       minScrollExtent,
       maxScrollExtent,
     );
-    // Also guard on userScrollDirection here in the layout phase, because it
-    // updates immediately via the scroll activity — earlier than the scroll-
-    // controller listener that sets _isUserScrolling.  Without this check,
-    // correctPixels would override the user's drag for one frame, causing a
-    // "stuck / can't scroll up" feeling.
+    // 布局阶段也要用 userScrollDirection 保护，因为它通过滚动活动
+    // 立即更新，早于设置 _isUserScrolling 的滚动控制器监听器。
+    // 没有此检查，correctPixels 会在一帧内覆盖用户拖动，
+    // 产生“卡住/无法向上滚动”的感觉。
     final shouldPositionAtBottom =
         controller._positionAtBottomDuringLayout ||
         (controller.shouldAutoFollow() &&
@@ -124,7 +121,7 @@ class _AutoFollowScrollPosition extends ScrollPositionWithSingleContext {
       final gap = this.maxScrollExtent - pixels;
       if (gap > 0.5) {
         correctPixels(this.maxScrollExtent);
-        return false; // Force viewport re-layout with corrected position
+        return false; // 强制用修正后的位置重新布局视口
       }
     }
     if (controller._preserveDistanceFromEndDuringLayout &&
@@ -143,8 +140,8 @@ class _AutoFollowScrollPosition extends ScrollPositionWithSingleContext {
   }
 }
 
-/// A single continuous scroll activity for an indexed target whose measured
-/// offset can change while it enters SuperListView's cache area.
+/// 针对索引目标的单一连续滚动活动；当目标进入 SuperListView
+/// 的缓存区域时，其测量偏移可能变化。
 class _IndexedScrollActivity extends ScrollActivity {
   _IndexedScrollActivity(super.delegate, this._onCanceled);
 
@@ -177,14 +174,14 @@ class _IndexedScrollActivity extends ScrollActivity {
 // ChatScrollController
 // ============================================================================
 
-/// Controller for managing scroll behavior in the chat home page.
+/// 管理聊天主页滚动行为的控制器。
 ///
-/// This controller handles:
-/// - Auto-scroll to bottom during streaming (zero-lag via custom ScrollPosition)
-/// - Jump to adjacent-message navigation
-/// - Scroll to specific message by ID through a variable-extent index
-/// - Scroll state monitoring (user scrolling detection)
-/// - Visibility state for navigation buttons
+/// 此控制器负责：
+/// - 流式处理期间自动滚动到底部（通过自定义 ScrollPosition 实现零延迟）
+/// - 相邻消息导航跳转
+/// - 通过可变高度索引按 ID 滚动到指定消息
+/// - 滚动状态监控（检测用户滚动）
+/// - 导航按钮可见状态
 class ChatScrollController {
   ChatScrollController({
     required this._scrollController,
@@ -200,7 +197,7 @@ class ChatScrollController {
     );
     _scrollController.addListener(_onScrollControllerChanged);
 
-    // Wire auto-follow callback for zero-lag bottom pinning
+    // 连接自动跟随回调，实现零延迟底部固定
     if (scrollController is ChatAutoFollowScrollController) {
       scrollController.shouldAutoFollow = () =>
           _getAutoScrollEnabled() &&
@@ -218,41 +215,40 @@ class ChatScrollController {
   final double Function()? _getTopRevealInset;
   final bool Function()? isGenerating;
 
-  /// Index and extent state shared with the message list.
+  /// 与消息列表共享的索引和高度状态。
   late final ListController _messageListController;
 
   // ============================================================================
-  // State Fields
+  // 状态字段
   // ============================================================================
 
-  /// Whether to show the jump-to-bottom button.
+  /// 是否显示跳到底部按钮。
   bool _showJumpToBottom = false;
   bool get showJumpToBottom => _showJumpToBottom;
 
-  /// Whether the navigation buttons should be visible (based on scroll activity).
+  /// 导航按钮是否应可见（基于滚动活动）。
   bool _showNavButtons = false;
   bool get showNavButtons => _showNavButtons;
 
-  /// Timer for auto-hiding navigation buttons.
+  /// 自动隐藏导航按钮的计时器。
   Timer? _navButtonsHideTimer;
   static const int _navButtonsHideDelayMs = 2000;
 
-  /// Whether the user is actively scrolling.
+  /// 用户是否正在主动滚动。
   bool _isUserScrolling = false;
   bool get isUserScrolling => _isUserScrolling;
 
-  /// Whether auto-scroll should stick to bottom.
+  /// 自动滚动是否应保持在底部。
   bool _autoStickToBottom = true;
   bool get autoStickToBottom => _autoStickToBottom;
 
-  /// Timer for detecting end of user scroll.
+  /// 检测用户滚动结束的计时器。
   Timer? _userScrollTimer;
 
-  /// Request currently queued for the next-frame bottom scroll.
+  /// 当前为下一帧底部滚动排队的请求。
   int? _scheduledBottomScrollRequest;
 
-  /// A driven scroll and the layout-time tail pin must never own pixels in the
-  /// same frame.
+  /// 受驱动滚动和布局时的尾部固定绝不能在同一帧中拥有像素。
   bool _explicitBottomAnimationInProgress = false;
   bool get explicitBottomAnimationInProgress =>
       _explicitBottomAnimationInProgress;
@@ -262,57 +258,56 @@ class ChatScrollController {
   AnimationController? _indexedAnimationController;
   _IndexedScrollActivity? _indexedScrollActivity;
 
-  /// Anchor for chained adjacent-message navigation.
+  /// 链式相邻消息导航的锚点。
   String? _lastJumpUserMessageId;
   String? get lastJumpUserMessageId => _lastJumpUserMessageId;
 
-  /// Tolerance for "near bottom" detection.
+  /// “接近底部”检测的容差。
   static const double _autoScrollSnapTolerance = 56.0;
 
   // ============================================================================
-  // Public Getters
+  // 公共 Getter
   // ============================================================================
 
-  /// Get the underlying scroll controller.
+  /// 获取底层滚动控制器。
   ScrollController get scrollController => _scrollController;
 
-  /// Get the indexed controller attached to the message list.
+  /// 获取附着到消息列表的索引控制器。
   ListController get messageListController => _messageListController;
 
-  /// Check if scroll controller has clients attached.
+  /// 检查滚动控制器是否已附着客户端。
   bool get hasClients => _scrollController.hasClients;
 
   // ============================================================================
-  // Scroll State Detection
+  // 滚动状态检测
   // ============================================================================
 
-  /// Check if the scroll position is near the bottom.
+  /// 检查滚动位置是否接近底部。
   bool isNearBottom([double tolerance = _autoScrollSnapTolerance]) {
     if (!_scrollController.hasClients) return true;
     final pos = _scrollController.position;
     return (pos.maxScrollExtent - pos.pixels) <= tolerance;
   }
 
-  /// Keeps an already-bottom-aligned mobile timeline pinned while its viewport
-  /// shrinks, for example as the software keyboard opens.
+  /// 在视口缩小时（例如软键盘打开时），保持已对齐底部的移动时间线固定。
   ///
-  /// This must be requested before the new viewport dimensions are laid out;
-  /// otherwise the old pixel offset paints one frame above the new bottom.
+  /// 必须在新视口尺寸布局前请求；否则旧像素偏移会在新底部上方
+  /// 绘制一帧。
   bool pinBottomDuringViewportResizeIfNeeded() {
     if (!isNearBottom(24)) return false;
     positionAtBottomOnNextLayout();
     return true;
   }
 
-  /// Check if the scroll view has enough content to scroll.
+  /// 检查滚动视图是否有足够内容可滚动。
   ///
-  /// [minExtent] - Minimum scroll extent to consider scrollable (default: 56.0).
+  /// [minExtent] - 视为可滚动的最小滚动范围（默认：56.0）。
   bool hasEnoughContentToScroll([double minExtent = 56.0]) {
     if (!_scrollController.hasClients) return false;
     return _scrollController.position.maxScrollExtent >= minExtent;
   }
 
-  /// Refresh auto-stick-to-bottom state based on current position.
+  /// 根据当前位置刷新自动保持底部状态。
   void refreshAutoStickToBottom() {
     try {
       final nearBottom = isNearBottom();
@@ -327,20 +322,19 @@ class ChatScrollController {
     } catch (_) {}
   }
 
-  /// Handle scroll controller changes (called from scroll listener).
+  /// 处理滚动控制器变化（由滚动监听器调用）。
   void _onScrollControllerChanged() {
     try {
       if (!_scrollController.hasClients) return;
       final autoScrollEnabled = _getAutoScrollEnabled();
 
-      // Only show when not near bottom
+      // 仅在不在底部附近时显示
       final atBottom = isNearBottom(24);
       if (!atBottom) {
         _autoStickToBottom = false;
       } else if (_isUserScrolling) {
-        // User actively scrolled back to bottom → re-engage auto-follow
-        // immediately so streaming content keeps pinning without waiting
-        // for the idle timer.
+        // 用户主动滚动回底部时立即重新启用自动跟随，
+        // 使流式内容无需等待空闲计时器就能继续固定。
         _isUserScrolling = false;
         _userScrollTimer?.cancel();
         _autoStickToBottom = true;
@@ -355,8 +349,8 @@ class ChatScrollController {
     } catch (_) {}
   }
 
-  /// Records scroll intent from a real pointer, wheel, or keyboard input.
-  /// Programmatic position changes must never call this method.
+  /// 记录来自真实指针、滚轮或键盘输入的滚动意图。
+  /// 程序化位置变化绝不能调用此方法。
   void handleUserScrollIntent() {
     _cancelProgrammaticNavigation();
     _isUserScrolling = true;
@@ -376,7 +370,7 @@ class ChatScrollController {
     });
   }
 
-  /// Reset the auto-hide timer for navigation buttons.
+  /// 重置导航按钮的自动隐藏计时器。
   void _resetNavButtonsHideTimer() {
     _navButtonsHideTimer?.cancel();
     _navButtonsHideTimer = Timer(
@@ -390,7 +384,7 @@ class ChatScrollController {
     );
   }
 
-  /// Show navigation buttons manually (e.g., when user taps a button).
+  /// 手动显示导航按钮（例如用户点击按钮时）。
   void revealNavButtons() {
     if (!_showNavButtons) {
       _showNavButtons = true;
@@ -399,7 +393,7 @@ class ChatScrollController {
     _resetNavButtonsHideTimer();
   }
 
-  /// Hide navigation buttons immediately.
+  /// 立即隐藏导航按钮。
   void hideNavButtons() {
     _navButtonsHideTimer?.cancel();
     if (_showNavButtons) {
@@ -409,15 +403,14 @@ class ChatScrollController {
   }
 
   // ============================================================================
-  // Scroll To Bottom Methods
+  // 滚动到底部方法
   // ============================================================================
 
-  /// Position a newly opened conversation at its tail before the next paint.
+  /// 在下一次绘制前将新打开的会话定位到其尾部。
   ///
-  /// RikkaHub uses the equivalent `requestScrollToItem` operation: the initial
-  /// position participates in layout instead of correcting a visible frame
-  /// afterward. The flag remains active for the whole frame because a lazy
-  /// viewport may refine its max extent more than once during layout.
+  /// RikkaHub 使用等效的 `requestScrollToItem` 操作：初始位置参与布局，
+  /// 而不是在之后修正可见帧。该标志在整个帧期间保持活动，
+  /// 因为惰性视口可能在布局期间多次细化其最大范围。
   void positionAtBottomOnNextLayout() {
     _cancelProgrammaticNavigation(stopDrivenScroll: true);
     _lastJumpUserMessageId = null;
@@ -435,12 +428,11 @@ class ChatScrollController {
     });
   }
 
-  /// Resolve the actual indexed tail before a switched conversation is shown.
+  /// 在切换后的会话显示前解析真实索引尾部。
   ///
-  /// A lazy list's first maxScrollExtent can still be based on estimated item
-  /// heights. RikkaHub avoids treating that estimate as the destination by
-  /// requesting its last item directly; this performs the equivalent indexed
-  /// positioning and waits for the tail extent to become concrete.
+  /// 惰性列表的首个 maxScrollExtent 仍可能基于估算项高度。
+  /// RikkaHub 通过直接请求最后一项来避免把该估算值当作目标；
+  /// 此方法执行等效的索引定位，并等待尾部范围变为具体值。
   Future<void> settleAtBottomBeforeReveal() async {
     _cancelProgrammaticNavigation(stopDrivenScroll: true);
     _lastJumpUserMessageId = null;
@@ -460,16 +452,16 @@ class ChatScrollController {
     await _animateToBottom(animate: false, request: request);
   }
 
-  /// Scroll to the bottom of the list.
+  /// 滚动到列表底部。
   ///
-  /// [animate] - Whether to animate the scroll (default: true).
+  /// [animate] - 是否动画滚动（默认：true）。
   void scrollToBottom({bool animate = true}) {
     _autoStickToBottom = true;
     final generating = isGenerating?.call() ?? false;
     _scheduleExplicitScrollToBottom(animate: animate && !generating);
   }
 
-  /// Force scroll to bottom (used when user explicitly clicks the button).
+  /// 强制滚动到底部（用于用户显式点击按钮时）。
   void forceScrollToBottom({bool animate = true}) {
     _cancelProgrammaticNavigation(stopDrivenScroll: true);
     _isUserScrolling = false;
@@ -480,7 +472,7 @@ class ChatScrollController {
     _scheduleExplicitScrollToBottom(animate: animate);
   }
 
-  /// Force scroll after rebuilds when switching topics/conversations.
+  /// 切换主题/会话后在重建后强制滚动。
   void forceScrollToBottomSoon({
     bool animate = true,
     Duration postSwitchDelay = const Duration(milliseconds: 220),
@@ -500,19 +492,19 @@ class ChatScrollController {
     });
   }
 
-  /// After generation ends, pin to bottom if the user was still following.
+  /// 生成结束后，如果用户仍在跟随则固定到底部。
   ///
-  /// Layout-phase auto-follow requires [isGenerating], which is already false
-  /// when the terminal message widget is swapped in and typically grows.
+  /// 布局阶段的自动跟随需要 [isGenerating]，而最终消息控件
+  /// 被换入并通常增高时它已经为 false。
   void stickToBottomAfterGeneration() {
     if (!_getAutoScrollEnabled()) return;
     if (!_autoStickToBottom || _isUserScrolling) return;
-    // Animate: the user is watching this spot, so an instant jump reads as a
-    // flash while a short eased scroll reads as the reply settling in.
+    // 使用动画：用户正在看此位置，立即跳转会显得像闪烁，
+    // 而短暂缓动滚动会像回复正在就位。
     scrollToBottomSoon(animate: true);
   }
 
-  /// Ensure scroll reaches bottom even after widget tree transitions.
+  /// 确保在控件树切换后滚动仍到达底部。
   void scrollToBottomSoon({bool animate = true}) {
     final request = ++_deferredBottomRequest;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -521,9 +513,8 @@ class ChatScrollController {
       }
     });
     Future.delayed(const Duration(milliseconds: 120), () {
-      // The retry exists for widget-tree transitions that invalidate the
-      // post-frame attempt; restarting a live animation here would cause a
-      // visible velocity discontinuity instead.
+      // 重试用于使帧后尝试失效的控件树切换；此处重启正在进行的动画
+      // 会造成可见的速度不连续。
       if (request == _deferredBottomRequest &&
           !_explicitBottomAnimationInProgress) {
         scrollToBottom(animate: animate);
@@ -531,27 +522,27 @@ class ChatScrollController {
     });
   }
 
-  /// Auto-scroll to bottom if conditions are met (called from onStreamTick).
+  /// 条件满足时自动滚动到底部（从 onStreamTick 调用）。
   ///
-  /// With [ChatAutoFollowScrollController], the custom [ScrollPosition] handles
-  /// bottom-pinning during layout automatically. This method is kept as a
-  /// lightweight safety-net for edge cases (e.g. plain ScrollController).
+  /// 使用 [ChatAutoFollowScrollController] 时，自定义 [ScrollPosition]
+  /// 会在布局期间自动处理底部固定。此方法保留为边界情况的轻量兜底
+  /// （例如普通 ScrollController）。
   void autoScrollToBottomIfNeeded() {
     final enabled = _getAutoScrollEnabled();
     if (!enabled || !_autoStickToBottom) return;
-    // With the custom ScrollPosition, bottom-pinning happens inside
-    // applyContentDimensions (during layout, before paint). No post-frame
-    // callback needed for the streaming path.
-    // Only schedule an explicit jump as fallback for plain ScrollControllers.
+    // 使用自定义 ScrollPosition 时，底部固定发生在
+    // applyContentDimensions 中（布局期间、绘制之前）。
+    // 流式路径不需要帧后回调。
+    // 仅为普通 ScrollController 的兜底安排显式跳转。
     if (_scrollController is! ChatAutoFollowScrollController) {
       _scheduleExplicitScrollToBottom(animate: false);
     }
   }
 
-  /// Schedule an explicit scroll to bottom (batched via post-frame callback).
+  /// 调度显式滚动到底部（通过帧后回调批量处理）。
   ///
-  /// Used for user-triggered "go to bottom" and as fallback for streaming
-  /// auto-scroll when the custom [ScrollPosition] is not available.
+  /// 用于用户触发的“到底部”，并在自定义 [ScrollPosition] 不可用时
+  /// 作为流式自动滚动的兜底。
   void _scheduleExplicitScrollToBottom({bool animate = true}) {
     final request = ++_bottomScrollRequest;
     _scheduledBottomScrollRequest = request;
@@ -566,11 +557,10 @@ class ChatScrollController {
     });
   }
 
-  /// Animate or jump to the bottom of the scroll view.
+  /// 动画滚动或跳转到滚动视图底部。
   ///
-  /// Used for explicit scroll-to-bottom requests (user-triggered button,
-  /// conversation switch, etc.). Streaming auto-scroll is handled by the
-  /// custom [ScrollPosition] instead.
+  /// 用于显式滚动到底部请求（用户触发的按钮、会话切换等）。
+  /// 流式自动滚动改由自定义 [ScrollPosition] 处理。
   Future<void> _animateToBottom({
     bool animate = true,
     required int request,
@@ -581,8 +571,8 @@ class ChatScrollController {
       }
       _explicitBottomAnimationInProgress = false;
 
-      // Prevent using a controller while it is still attached to both the old
-      // and new conversation. Keep this awaitable for pre-reveal settling.
+      // 防止在控制器仍同时附着于旧会话和新会话时使用它。
+      // 保持此调用可等待，以便在显示前完成稳定。
       if (_scrollController.positions.length != 1) {
         await WidgetsBinding.instance.endOfFrame;
         if (request != _bottomScrollRequest ||
@@ -700,7 +690,7 @@ class ChatScrollController {
   }
 
   // ============================================================================
-  // Navigation Methods
+  // 导航方法
   // ============================================================================
 
   double _currentTopRevealInset() {
@@ -717,7 +707,7 @@ class ChatScrollController {
   }
 
   double _messageRevealOffset(int index, double alignment) {
-    // This is the same offset query used internally by jumpToItem.
+    // 这与 jumpToItem 内部使用的偏移查询相同。
     // ignore: invalid_use_of_visible_for_testing_member
     final rawOffset = _messageListController.getOffsetToReveal(
       index,
@@ -762,7 +752,7 @@ class ChatScrollController {
     return visible.$2;
   }
 
-  /// Scroll to the top of the list.
+  /// 滚动到列表顶部。
   void scrollToTop({bool animate = true}) {
     try {
       if (!_scrollController.hasClients) return;
@@ -789,7 +779,7 @@ class ChatScrollController {
     } catch (_) {}
   }
 
-  /// Jump to the message immediately before the current indexed anchor.
+  /// 跳转到当前索引锚点紧前一条消息。
   Future<bool> jumpToPreviousQuestion({
     required List<dynamic> messages,
     required int Function(String id) indexOfId,
@@ -823,7 +813,7 @@ class ChatScrollController {
     }
   }
 
-  /// Jump to the message immediately after the current indexed anchor.
+  /// 跳转到当前索引锚点紧后一条消息。
   Future<bool> jumpToNextQuestion({
     required List<dynamic> messages,
     required int Function(String id) indexOfId,
@@ -857,10 +847,10 @@ class ChatScrollController {
     }
   }
 
-  /// Scroll to a specific message by index (from mini map or search).
+  /// 按索引滚动到指定消息（从小地图或搜索）。
   ///
-  /// Direct index positioning mirrors RikkaHub's `scrollToItem`: distant
-  /// targets do not build or animate through every intermediate message.
+  /// 直接索引定位与 RikkaHub 的 `scrollToItem` 一致：
+  /// 远处目标不会构建或动画经过每一条中间消息。
   Future<void> scrollToMessageId({
     required String targetId,
     required int targetIndex,
@@ -965,10 +955,9 @@ class ChatScrollController {
         return;
       }
 
-      // SuperListView can replace an estimated extent with the real extent
-      // while the target enters its cache area. Re-read the indexed offset on
-      // every tick so that correction is absorbed by this one continuous
-      // animation instead of becoming a visible jump after it.
+      // 当目标进入其缓存区域时，SuperListView 可能用真实高度替换估算高度。
+      // 每个 tick 都重新读取索引偏移，使修正被这一段连续动画吸收，
+      // 而不是在动画后成为可见跳变。
       final target =
           (bottomRequest == null
                   ? _messageRevealOffset(index, alignment)
@@ -979,10 +968,9 @@ class ChatScrollController {
       final stepProgress = remainingProgress <= 0.0001
           ? 1.0
           : ((progress - previousProgress) / remainingProgress).clamp(0.0, 1.0);
-      // Interpolate from the current pixels through only the remaining
-      // progress. If a lazy extent changes, this spreads the correction over
-      // the rest of the animation instead of applying all elapsed progress to
-      // the new target in one frame.
+      // 从当前像素仅按剩余进度插值。如果惰性高度发生变化，
+      // 这样会把修正分散到动画剩余部分，而不是在一帧内
+      // 将所有已过进度应用到新目标。
       final next = position.pixels + (target - position.pixels) * stepProgress;
       previousProgress = progress;
       if ((next - position.pixels).abs() > 0.01) {
@@ -997,8 +985,8 @@ class ChatScrollController {
     try {
       await animationController.forward().orCancel;
     } on TickerCanceled {
-      // A new navigation request, user gesture, or detached timeline owns the
-      // next position. Cancellation is an expected terminal state.
+      // 新的导航请求、用户手势或已分离时间线拥有下一个位置。
+      // 取消是预期的终态。
     } finally {
       animation.removeListener(updatePosition);
       animation.dispose();
@@ -1032,9 +1020,8 @@ class ChatScrollController {
 
   void _cancelIndexedNavigationForDetach() {
     _indexedNavigationRequest++;
-    // ScrollPosition disposal owns the activity at this point. Calling
-    // goIdle from ListController.onDetached would dispatch a scroll-end
-    // notification through an already deactivated widget tree.
+    // 此时 ScrollPosition 的销毁拥有该活动。从 ListController.onDetached
+    // 调用 goIdle 会通过已停用的控件树派发滚动结束通知。
     _indexedScrollActivity = null;
     final animationController = _indexedAnimationController;
     _indexedAnimationController = null;
@@ -1076,31 +1063,31 @@ class ChatScrollController {
   }
 
   // ============================================================================
-  // State Modifiers
+  // 状态修改器
   // ============================================================================
 
-  /// Reset the last jump user message ID (e.g., when starting new navigation).
+  /// 重置上次跳转的用户消息 ID（例如开始新导航时）。
   void resetLastJumpUserMessageId() {
     _cancelIndexedNavigation();
     _lastJumpUserMessageId = null;
   }
 
-  /// Set auto-stick-to-bottom state.
+  /// 设置自动保持底部状态。
   void setAutoStickToBottom(bool value) {
     _autoStickToBottom = value;
   }
 
-  /// Reset user scrolling state (e.g., when force scrolling).
+  /// 重置用户滚动状态（例如强制滚动时）。
   void resetUserScrolling() {
     _isUserScrolling = false;
     _userScrollTimer?.cancel();
   }
 
   // ============================================================================
-  // Cleanup
+  // 清理
   // ============================================================================
 
-  /// Dispose of resources.
+  /// 释放资源。
   void dispose() {
     _scrollController.removeListener(_onScrollControllerChanged);
     _userScrollTimer?.cancel();

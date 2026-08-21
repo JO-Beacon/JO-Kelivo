@@ -73,7 +73,7 @@ class AssistantSettingsPage extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 100),
         itemCount: assistants.length,
         onReorderItem: (oldIndex, newIndex) async {
-          // Immediately update UI for smooth experience
+          // 立即更新 UI，使体验更流畅
           final assistantProvider = context.read<AssistantProvider>();
           await assistantProvider.reorderAssistants(oldIndex, newIndex);
         },
@@ -85,7 +85,7 @@ class AssistantSettingsPage extends StatelessWidget {
               return Transform.scale(
                 scale: 0.98 + 0.02 * t,
                 child: Material(
-                  elevation: 0, // remove drag shadow
+                  elevation: 0, // 移除拖动阴影
                   shadowColor: Colors.transparent,
                   color: Colors.transparent,
                   borderRadius: BorderRadius.circular(14),
@@ -331,7 +331,7 @@ class _AssistantCard extends StatelessWidget {
   }
 }
 
-// --- iOS-style tactile helpers ---
+// --- iOS 风格触感辅助函数 ---
 
 class _TactileIconButton extends StatefulWidget {
   const _TactileIconButton({

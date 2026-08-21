@@ -10,10 +10,10 @@ class OcrCacheEntry {
   final String text;
 }
 
-/// Per-prepare OCR state that is not bounded by the process LRU.
+/// 不受进程 LRU 约束的单次 prepare OCR 状态。
 ///
-/// Each concurrent conversation prepare owns its own session so snapshots cannot
-/// overwrite each other.
+/// 每个并发会话 prepare 拥有自己的 session，使快照不会
+/// 互相覆盖。
 class OcrPrepareSession {
   final Map<String, String> hashesByPath = <String, String>{};
   final Map<String, String> artifactTextsByHash = <String, String>{};
@@ -46,25 +46,25 @@ class OcrService {
   /// LRU 缓存最大条目数
   final int maxCacheEntries;
 
-  /// Resolve image path/data-URL → content SHA-256.
+  /// 解析图片路径/data-URL → 内容 SHA-256。
   final Future<Map<String, String>> Function(List<String> imagePaths)?
   resolveContentHashes;
 
-  /// Batch-load persisted OCR items by revision ID.
+  /// 按 revision ID 批量加载已持久化的 OCR 条目。
   final Future<Map<String, Map<String, String>>> Function(
     List<String> revisionIds,
   )?
   loadArtifacts;
 
-  /// Persist OCR items for a revision (merged upsert). Failures must not throw
-  /// to callers that already have OCR text for the current request.
+  /// 为某 revision 持久化 OCR 条目（合并 upsert）。失败不得向
+  /// 已持有当前请求 OCR 文本的调用方抛出。
   final Future<void> Function(String revisionId, Map<String, String> items)?
   persistArtifact;
 
-  /// Optional OCR backend override (tests). When null, uses ChatApiService.
+  /// 可选的 OCR 后端覆盖（测试用）。为 null 时使用 ChatApiService。
   final Future<String?> Function(List<String> imagePaths)? ocrExecutor;
 
-  /// Reports OCR model request failures without interrupting the chat request.
+  /// 上报 OCR 模型请求失败，但不中断聊天请求。
   void Function(Object error)? onError;
 
   /// OCR 缓存 (memoryKey -> cached OCR text)
@@ -181,7 +181,7 @@ class OcrService {
 
     final entry = _cache[key];
     if (entry != null) {
-      // bump to most-recent
+      // 提升为最近使用
       _cacheOrder.remove(key);
       _cacheOrder.add(key);
       return entry.text;
@@ -211,10 +211,10 @@ class OcrService {
     cacheOcrText(hash, trimmed);
   }
 
-  /// Prefetch hashes + SQLite OCR for one prepare/send pass.
+  /// 为单次 prepare/send 预取哈希与 SQLite OCR。
   ///
-  /// Returns an isolated session owned by the caller. Concurrent prepares must
-  /// not share this object.
+  /// 返回由调用方拥有的隔离 session。并发 prepare 不得
+  /// 共享此对象。
   Future<OcrPrepareSession> prefetchPersistedOcr({
     required List<String> revisionIds,
     required List<String> imagePaths,
@@ -271,7 +271,7 @@ class OcrService {
   /// [imagePaths] 图片路径列表
   /// [context] BuildContext 用于获取 SettingsProvider
   /// [revisionId] 带图 user 消息 revision，用于 SQLite 持久化
-  /// [session] optional per-prepare snapshot from [prefetchPersistedOcr]
+  /// [session] 是每次 prepare 的、来自 [prefetchPersistedOcr] 的可选快照
   ///
   /// 返回合并后的 OCR 文本，失败时返回 null
   Future<String?> getOcrTextForImages(
@@ -282,7 +282,7 @@ class OcrService {
   }) async {
     if (imagePaths.isEmpty) return null;
 
-    // Test doubles inject ocrExecutor and skip SettingsProvider wiring.
+    // 测试替身注入 ocrExecutor 并跳过 SettingsProvider 装配。
     if (ocrExecutor == null) {
       final settings = context.read<SettingsProvider>();
       if (!(settings.ocrEnabled &&
@@ -324,7 +324,7 @@ class OcrService {
     final hasRevision =
         normalizedRevisionId != null && normalizedRevisionId.isNotEmpty;
 
-    // Only hit SQLite here when this revision was not part of the batch prefetch.
+    // 仅当该 revision 不在批量预取范围内时才在此访问 SQLite。
     if (hasRevision &&
         loadArtifacts != null &&
         (session == null ||
@@ -399,7 +399,7 @@ class OcrService {
           };
         }
       } catch (_) {
-        // Persistence failure must not block the current chat turn.
+        // 持久化失败不得阻塞当前聊天轮次。
       }
     }
 

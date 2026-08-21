@@ -34,13 +34,13 @@ import '../services/memory/memory_trace.dart';
 import '../../theme/palettes.dart';
 import '../../theme/custom_theme.dart';
 
-// Desktop: topic list position
+// 桌面端：话题列表位置
 enum DesktopTopicPosition { left, right }
 
-// Desktop: send message shortcut
+// 桌面端：发送消息快捷键
 enum DesktopSendShortcut { enter, ctrlEnter }
 
-// Desktop: message navigation buttons visibility mode
+// 桌面端：消息导航按钮可见性模式
 enum DesktopMessageNavButtonsMode {
   always,
   scroll,
@@ -49,7 +49,7 @@ enum DesktopMessageNavButtonsMode {
   never,
 }
 
-// Mobile: message navigation buttons visibility mode
+// 移动端：消息导航按钮可见性模式
 enum MobileMessageNavButtonsMode { always, scroll, never }
 
 enum ImageUploadQuality { original, high, balanced, saver, custom }
@@ -63,7 +63,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String _providerGroupCollapsedKey =
       'provider_group_collapsed_v1'; // groupId|__ungrouped__ -> bool
   static const String _providerUngroupedPositionKey =
-      'provider_ungrouped_position_v1'; // display index among groups
+      'provider_ungrouped_position_v1'; // 分组之间的显示索引
   static const String providerUngroupedGroupKey = '__ungrouped__';
   static const List<String> _builtInProviderKeysInOrder = [
     'OpenAI',
@@ -104,7 +104,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String _useDynamicColorKey = 'use_dynamic_color_v1';
   static const String _customThemesKey = 'custom_themes_v1';
   static const String _customThemeSelectedKey = 'custom_theme_selected_v1';
-  // Legacy single-custom-palette keys (migrated into _customThemesKey on load)
+  // 旧版单个自定义调色板键（加载时迁移到 _customThemesKey）
   static const String _legacyCustomSeedColorKey = 'theme_custom_seed_v1';
   static const String _legacyCustomPrimaryOverrideKey =
       'theme_custom_primary_v1';
@@ -166,8 +166,6 @@ class SettingsProvider extends ChangeNotifier {
       'display_collapse_thinking_steps_v1';
   static const String _displayShowToolResultSummaryKey =
       'display_show_tool_result_summary_v1';
-  static const String _displayRegenerateDeleteTrailingMessagesKey =
-      'display_regenerate_delete_trailing_messages_v1';
   static const String _displayShowRegenerateConfirmDialogKey =
       'display_show_regenerate_confirm_dialog_v1';
   static const String _displayShowMessageNavKey = 'display_show_message_nav_v1';
@@ -265,25 +263,25 @@ class SettingsProvider extends ChangeNotifier {
       'mobile_assistant_edit_tab_hidden_v1';
   static const String _mobileAssistantDetailOutlineEnabledKey =
       'mobile_assistant_detail_outline_enabled_v1';
-  // Network request logging (debug)
+  // 网络请求日志（调试）
   static const String _requestLogEnabledKey = 'request_log_enabled_v1';
   static const String _contextLogEnabledKey = 'context_log_enabled_v1';
-  // Flutter runtime logging (debug)
+  // Flutter 运行时日志（调试）
   static const String _flutterLogEnabledKey = 'flutter_log_enabled_v1';
-  // Log settings: save response output, auto-delete, max size
+  // 日志设置：保存响应输出、自动删除、最大大小
   static const String _logSaveOutputKey = 'log_save_output_v1';
   static const String _logElideLargePayloadsKey = 'log_elide_large_payloads_v1';
   static const String _logAutoDeleteDaysKey = 'log_auto_delete_days_v1';
   static const String _logMaxSizeMBKey = 'log_max_size_mb_v1';
   static const String _appLaunchCountKey = 'app_launch_count_v1';
-  // Desktop topic panel placement + right sidebar open state
+  // 桌面端话题面板位置 + 右侧边栏展开状态
   static const String _desktopTopicPositionKey = 'desktop_topic_position_v1';
   static const String _desktopRightSidebarOpenKey =
       'desktop_right_sidebar_open_v1';
-  // Android background chat generation mode
+  // Android 后台聊天生成模式
   static const String _androidBackgroundChatModeKey =
       'android_background_chat_mode_v1';
-  // iOS background generation settings
+  // iOS 后台生成设置
   static const String _iosBackgroundGenerationEnabledKey =
       'ios_background_generation_enabled_v1';
   static const String _iosBackgroundTaskRefreshEnabledKey =
@@ -292,7 +290,7 @@ class SettingsProvider extends ChangeNotifier {
       'ios_live_activity_enabled_v1';
   static const String _iosBackgroundNotificationsEnabledKey =
       'ios_background_notifications_enabled_v1';
-  // Fonts
+  // 字体
   static const String _displayAppFontFamilyKey = 'display_app_font_family_v1';
   static const String _displayCodeFontFamilyKey = 'display_code_font_family_v1';
   static const String _displayAppFontIsGoogleKey =
@@ -322,7 +320,7 @@ class SettingsProvider extends ChangeNotifier {
       'search_auto_test_on_launch_v1';
   static const String _webDavConfigKey = 'webdav_config_v1';
   static const String _s3ConfigKey = 's3_config_v1';
-  // Global network proxy
+  // 全局网络代理
   static const String _globalProxyEnabledKey = 'global_proxy_enabled_v1';
   static const String _globalProxyTypeKey =
       'global_proxy_type_v1'; // http|https|socks5
@@ -333,25 +331,25 @@ class SettingsProvider extends ChangeNotifier {
   static const String _globalProxyBypassKey = 'global_proxy_bypass_v1';
   static const String _defaultGlobalProxyBypassRules =
       'localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,::1';
-  // TTS services (network)
+  // TTS 服务（网络）
   static const String _ttsServicesKey = 'tts_services_v1';
   static const String _ttsSelectedServiceIdKey = 'tts_selected_service_id_v1';
-  // Legacy index key, read once during migration.
+  // 旧版索引键，仅在迁移期间读取一次。
   static const String _ttsSelectedKey = 'tts_selected_v1';
   static const String _ttsAutoPlayAssistantRepliesKey =
       'tts_auto_play_assistant_replies_v1';
   static const String _ttsTextSelectionModeKey = 'tts_text_selection_mode_v1';
   static const String _asrServicesKey = 'asr_services_v1';
   static const String _asrSelectedServiceIdKey = 'asr_selected_service_id_v1';
-  // Desktop UI
+  // 桌面端 UI
   static const String _desktopSidebarWidthKey = 'desktop_sidebar_width_v1';
   static const String _desktopSidebarOpenKey = 'desktop_sidebar_open_v1';
   static const String _desktopRightSidebarWidthKey =
       'desktop_right_sidebar_width_v1';
 
-  // ===== Network TTS services =====
+  // ===== 网络 TTS 服务 =====
   List<TtsServiceOptions> _ttsServices = const <TtsServiceOptions>[];
-  String? _selectedTtsServiceId; // null => use System TTS
+  String? _selectedTtsServiceId; // null => 使用系统 TTS
   bool _ttsAutoPlayAssistantReplies = false;
   TtsTextSelectionMode _ttsTextSelectionMode = TtsTextSelectionMode.fullText;
   List<TtsServiceOptions> get ttsServices => _ttsServices;
@@ -374,7 +372,7 @@ class SettingsProvider extends ChangeNotifier {
     return null;
   }
 
-  // ASR is opt-in. An empty list intentionally keeps voice input hidden.
+  // ASR 是可选加入的。空列表会刻意保持语音输入隐藏。
   List<AsrServiceOptions> _asrServices = const <AsrServiceOptions>[];
   String? _selectedAsrServiceId;
   List<AsrServiceOptions> get asrServices => _asrServices;
@@ -391,7 +389,7 @@ class SettingsProvider extends ChangeNotifier {
   List<String> _providersOrder = const [];
   List<String> get providersOrder => _providersOrder;
 
-  // ===== Provider grouping =====
+  // ===== Provider 分组 =====
   List<ProviderGroup> _providerGroups = const <ProviderGroup>[];
   Map<String, String> _providerGroupMap =
       <String, String>{}; // providerKey -> groupId
@@ -429,15 +427,15 @@ class SettingsProvider extends ChangeNotifier {
 
   ThemeMode _themeMode = ThemeMode.system;
   ThemeMode get themeMode => _themeMode;
-  // Theme palette & dynamic color
+  // 主题调色板与动态颜色
   String _themePaletteId = 'default';
   String get themePaletteId => _themePaletteId;
-  bool _useDynamicColor = true; // when supported on Android
+  bool _useDynamicColor = true; // 在 Android 上受支持时
   bool get useDynamicColor => _useDynamicColor;
-  bool _dynamicColorSupported = false; // runtime capability, not persisted
+  bool _dynamicColorSupported = false; // 运行时能力，不持久化
   bool get dynamicColorSupported => _dynamicColorSupported;
 
-  // Custom user themes (RikkaHub-style: name + primary/secondary/tertiary)
+  // 自定义用户主题（RikkaHub 风格：名称 + 主色/次色/第三色）
   List<CustomTheme> _customThemes = const <CustomTheme>[];
   List<CustomTheme> get customThemes =>
       List<CustomTheme>.unmodifiable(_customThemes);
@@ -452,11 +450,11 @@ class SettingsProvider extends ChangeNotifier {
     return null;
   }
 
-  // When enabled, force pure white/black backgrounds regardless of theme color
+  // 启用后，无论主题颜色如何，都强制使用纯白/纯黑背景
   bool _usePureBackground = false;
   bool get usePureBackground => _usePureBackground;
 
-  // Desktop UI persisted state
+  // 桌面端 UI 持久化状态
   double _desktopSidebarWidth = 240;
   bool _desktopSidebarOpen = true;
   double get desktopSidebarWidth => _desktopSidebarWidth;
@@ -464,7 +462,7 @@ class SettingsProvider extends ChangeNotifier {
   double _desktopRightSidebarWidth = 300;
   double get desktopRightSidebarWidth => _desktopRightSidebarWidth;
 
-  // Desktop: topic list position (left or right) and right sidebar open state
+  // 桌面端：话题列表位置（左侧或右侧）和右侧边栏展开状态
   DesktopTopicPosition _desktopTopicPosition = DesktopTopicPosition.left;
   DesktopTopicPosition get desktopTopicPosition => _desktopTopicPosition;
   bool get desktopTopicsOnRight =>
@@ -477,12 +475,12 @@ class SettingsProvider extends ChangeNotifier {
       Map.unmodifiable(_providerConfigs);
   bool get hasAnyActiveModel =>
       _providerConfigs.values.any((c) => c.enabled && c.models.isNotEmpty);
-  // Returns a config for the given key without mutating internal state when missing.
-  // This avoids implicitly creating providers during read paths (e.g., rendering old chats).
+  // 在缺少配置时为给定键返回配置，而不改变内部状态。
+  // 这样可避免在读取路径（例如渲染旧聊天）期间隐式创建 provider。
   ProviderConfig getProviderConfig(String key, {String? defaultName}) {
     final existed = _providerConfigs[key];
     if (existed != null) return existed;
-    // Return a non-persisted, default-constructed config for read-only scenarios.
+    // 返回一个非持久化的默认构造配置，用于只读场景。
     return ProviderConfig.defaultsFor(key, displayName: defaultName);
   }
 
@@ -626,8 +624,8 @@ class SettingsProvider extends ChangeNotifier {
         providerName.contains('deepseek');
   }
 
-  // Explicitly ensure a provider config exists in memory (without persisting to storage).
-  // Useful for seeding first-run defaults.
+  // 显式确保内存中存在一个提供者配置（不持久化到存储）。
+  // 用于初始化首次运行的默认值。
   ProviderConfig ensureProviderConfig(String key, {String? defaultName}) {
     final existed = _providerConfigs[key];
     if (existed != null) return existed;
@@ -636,7 +634,7 @@ class SettingsProvider extends ChangeNotifier {
     return cfg;
   }
 
-  // Search service settings
+  // 搜索服务设置
   List<SearchServiceOptions> _searchServices = [
     SearchServiceOptions.defaultOption,
   ];
@@ -650,12 +648,12 @@ class SettingsProvider extends ChangeNotifier {
   bool get searchEnabled => _searchEnabled;
   bool _searchAutoTestOnLaunch = false;
   bool get searchAutoTestOnLaunch => _searchAutoTestOnLaunch;
-  // Ephemeral connection test results: serviceId -> connected (true), failed (false), or null (not tested)
+  // 临时连接测试结果：serviceId -> 已连接（true）、失败（false）或 null（未测试）
   final Map<String, bool?> _searchConnection = <String, bool?>{};
   Map<String, bool?> get searchConnection =>
       Map.unmodifiable(_searchConnection);
 
-  // ===== Global Proxy Settings =====
+  // ===== 全局代理设置 =====
   bool _globalProxyEnabled = false;
   String _globalProxyType = 'http';
   String _globalProxyHost = '';
@@ -722,7 +720,7 @@ class SettingsProvider extends ChangeNotifier {
       }
     }
 
-    // load provider grouping
+    // 加载提供者分组
     try {
       final groupsStr = prefs.getString(_providerGroupsKey) ?? '';
       _providerGroups = groupsStr.isEmpty
@@ -761,12 +759,12 @@ class SettingsProvider extends ChangeNotifier {
     }
     _providerUngroupedPosition =
         prefs.getInt(_providerUngroupedPositionKey) ?? _providerGroups.length;
-    // load pinned models
+    // 加载固定模型
     final pinned = prefs.getStringList(_pinnedModelsKey) ?? const <String>[];
     _pinnedModels
       ..clear()
       ..addAll(pinned);
-    // load selected model
+    // 加载选中的模型
     final sel = prefs.getString(_selectedModelKey);
     if (sel != null && sel.contains('::')) {
       final parts = sel.split('::');
@@ -775,7 +773,7 @@ class SettingsProvider extends ChangeNotifier {
         _currentModelId = parts.sublist(1).join('::');
       }
     }
-    // load title model
+    // 加载标题模型
     final titleSel = prefs.getString(_titleModelKey);
     if (titleSel != null && titleSel.contains('::')) {
       final parts = titleSel.split('::');
@@ -784,10 +782,10 @@ class SettingsProvider extends ChangeNotifier {
         _titleModelId = parts.sublist(1).join('::');
       }
     }
-    // load title prompt
+    // 加载标题提示词
     final tp = prefs.getString(_titlePromptKey);
     _titlePrompt = (tp == null || tp.trim().isEmpty) ? defaultTitlePrompt : tp;
-    // load translate model
+    // 加载翻译模型
     final translateSel = prefs.getString(_translateModelKey);
     if (translateSel != null && translateSel.contains('::')) {
       final parts = translateSel.split('::');
@@ -796,17 +794,17 @@ class SettingsProvider extends ChangeNotifier {
         _translateModelId = parts.sublist(1).join('::');
       }
     }
-    // load translate prompt
+    // 加载翻译提示词
     final transp = prefs.getString(_translatePromptKey);
     _translatePrompt = (transp == null || transp.trim().isEmpty)
         ? defaultTranslatePrompt
         : transp;
-    // load translate target language
+    // 加载翻译目标语言
     final targetLang = prefs.getString(_translateTargetLangKey);
     if (targetLang != null && targetLang.trim().isNotEmpty) {
       _translateTargetLang = targetLang.trim();
     }
-    // load OCR model
+    // 加载 OCR 模型
     final ocrSel = prefs.getString(_ocrModelKey);
     if (ocrSel != null && ocrSel.contains('::')) {
       final parts = ocrSel.split('::');
@@ -815,17 +813,17 @@ class SettingsProvider extends ChangeNotifier {
         _ocrModelId = parts.sublist(1).join('::');
       }
     }
-    // load OCR prompt
+    // 加载 OCR 提示词
     final ocrp = prefs.getString(_ocrPromptKey);
     _ocrPrompt = (ocrp == null || ocrp.trim().isEmpty)
         ? defaultOcrPrompt
         : ocrp;
-    // load OCR enabled (only effective when model is configured)
+    // 加载 OCR 启用状态（仅在已配置模型时生效）
     _ocrEnabled = prefs.getBool(_ocrEnabledKey) ?? false;
     if (_ocrModelProvider == null || _ocrModelId == null) {
       _ocrEnabled = false;
     }
-    // load summary model
+    // 加载摘要模型
     final summarySel = prefs.getString(_summaryModelKey);
     if (summarySel != null && summarySel.contains('::')) {
       final parts = summarySel.split('::');
@@ -834,12 +832,12 @@ class SettingsProvider extends ChangeNotifier {
         _summaryModelId = parts.sublist(1).join('::');
       }
     }
-    // load summary prompt
+    // 加载摘要提示词
     final summaryp = prefs.getString(_summaryPromptKey);
     _summaryPrompt = (summaryp == null || summaryp.trim().isEmpty)
         ? defaultSummaryPrompt
         : summaryp;
-    // load chat suggestion model
+    // 加载聊天建议模型
     final suggestionSel = prefs.getString(_suggestionModelKey);
     if (suggestionSel != null && suggestionSel.contains('::')) {
       final parts = suggestionSel.split('::');
@@ -848,14 +846,14 @@ class SettingsProvider extends ChangeNotifier {
         _suggestionModelId = parts.sublist(1).join('::');
       }
     }
-    // load chat suggestion prompt
+    // 加载聊天建议提示词
     final suggestionp = prefs.getString(_suggestionPromptKey);
     _suggestionPrompt = (suggestionp == null || suggestionp.trim().isEmpty)
         ? defaultSuggestionPrompt
         : suggestionp;
     _insertSuggestionOnTapOnly =
         prefs.getBool(_suggestionInsertOnTapOnlyKey) ?? false;
-    // load compress model
+    // 加载压缩模型
     final compressSel = prefs.getString(_compressModelKey);
     if (compressSel != null && compressSel.contains('::')) {
       final parts = compressSel.split('::');
@@ -864,18 +862,18 @@ class SettingsProvider extends ChangeNotifier {
         _compressModelId = parts.sublist(1).join('::');
       }
     }
-    // load compress prompt
+    // 加载压缩提示词
     final compressp = prefs.getString(_compressPromptKey);
     _compressPrompt = (compressp == null || compressp.trim().isEmpty)
         ? defaultCompressPrompt
         : compressp;
-    // learning mode
+    // 学习模式
     _learningModeEnabled = prefs.getBool(_learningModeEnabledKey) ?? false;
     final lmp = prefs.getString(_learningModePromptKey);
     _learningModePrompt = (lmp == null || lmp.trim().isEmpty)
         ? defaultLearningModePrompt
         : lmp;
-    // load thinking budget (reasoning strength)
+    // 加载思考预算（推理强度）
     _thinkingBudget = prefs.getInt(_thinkingBudgetKey);
     _titleGenerationThinkingEnabled =
         prefs.getBool(_titleGenerationThinkingEnabledKey) ?? false;
@@ -890,7 +888,7 @@ class SettingsProvider extends ChangeNotifier {
     _ocrGenerationThinkingEnabled =
         prefs.getBool(_ocrGenerationThinkingEnabledKey) ?? false;
 
-    // memory system v1 (§4.2)
+    // 记忆系统 v1（§4.2）
     final memorySel = prefs.getString(_memoryModelKey);
     if (memorySel != null && memorySel.contains('::')) {
       final parts = memorySel.split('::');
@@ -957,7 +955,7 @@ class SettingsProvider extends ChangeNotifier {
       MemoryPrompts.profileDistillEn,
     );
 
-    // display settings
+    // 显示设置
     _showUserAvatar = prefs.getBool(_displayShowUserAvatarKey) ?? true;
     _showModelIcon = prefs.getBool(_displayShowModelIconKey) ?? true;
     _showModelNameTimestamp =
@@ -965,7 +963,7 @@ class SettingsProvider extends ChangeNotifier {
     _showTokenStats = prefs.getBool(_displayShowTokenStatsKey) ?? true;
     _showUserNameTimestamp =
         prefs.getBool(_displayShowUserNameTimestampKey) ?? true;
-    // new split settings: default to the legacy combined setting value for backward compat
+    // 新的拆分设置：为向后兼容，默认使用旧版合并设置的值
     final legacyUserNameTs = _showUserNameTimestamp;
     _showUserName = prefs.getBool(_displayShowUserNameKey) ?? legacyUserNameTs;
     _showUserTimestamp =
@@ -983,8 +981,6 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayCollapseThinkingStepsKey) ?? false;
     _showToolResultSummary =
         prefs.getBool(_displayShowToolResultSummaryKey) ?? false;
-    _regenerateDeleteTrailingMessages =
-        prefs.getBool(_displayRegenerateDeleteTrailingMessagesKey) ?? false;
     _showRegenerateConfirmDialog =
         prefs.getBool(_displayShowRegenerateConfirmDialogKey) ?? true;
     _showMessageNavButtons = prefs.getBool(_displayShowMessageNavKey) ?? true;
@@ -1010,7 +1006,7 @@ class SettingsProvider extends ChangeNotifier {
     _hapticsOnListItemTap =
         prefs.getBool(_displayHapticsOnListItemTapKey) ?? true;
     _hapticsOnCardTap = prefs.getBool(_displayHapticsOnCardTapKey) ?? true;
-    // Apply global haptics to service layer
+    // 将全局触觉反馈应用到服务层
     Haptics.setEnabled(_hapticsGlobalEnabled);
     _showAppUpdates = prefs.getBool(_displayShowAppUpdatesKey) ?? true;
     _keepSidebarOpenOnAssistantTap =
@@ -1034,7 +1030,7 @@ class SettingsProvider extends ChangeNotifier {
     _logAutoDeleteDays = prefs.getInt(_logAutoDeleteDaysKey) ?? 0;
     _logMaxSizeMB = prefs.getInt(_logMaxSizeMBKey) ?? 50;
     _appLaunchCount = prefs.getInt(_appLaunchCountKey) ?? 0;
-    // Run log cleanup based on current settings
+    // 根据当前设置执行日志清理
     RequestLogger.cleanupLogs(
       autoDeleteDays: _logAutoDeleteDays,
       maxSizeMB: _logMaxSizeMB,
@@ -1049,7 +1045,7 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayDesktopWideChatLayoutLegacyKey) ??
         false;
     _newChatAfterDelete = prefs.getBool(_displayNewChatAfterDeleteKey) ?? false;
-    // Enter to send on mobile: iOS defaults to true, Android defaults to false
+    // 移动端按回车发送：iOS 默认开启，Android 默认关闭
     final enterToSendPref = prefs.getBool(_displayEnterToSendOnMobileKey);
     if (enterToSendPref == null) {
       _enterToSendOnMobile = Platform.isIOS;
@@ -1057,7 +1053,7 @@ class SettingsProvider extends ChangeNotifier {
     } else {
       _enterToSendOnMobile = enterToSendPref;
     }
-    // Desktop send shortcut: Enter (default) or Ctrl/Cmd+Enter
+    // 桌面发送快捷键：Enter（默认）或 Ctrl/Cmd+Enter
     final sendShortcutStr = prefs.getString(_desktopSendShortcutKey);
     switch (sendShortcutStr) {
       case 'ctrlEnter':
@@ -1091,7 +1087,7 @@ class SettingsProvider extends ChangeNotifier {
     } else {
       _usePureBackground = pureBgPref;
     }
-    // display: markdown/math rendering
+    // 显示：markdown/math 渲染
     _enableDollarLatex = prefs.getBool(_displayEnableDollarLatexKey) ?? true;
     _enableMathRendering =
         prefs.getBool(_displayEnableMathRenderingKey) ?? true;
@@ -1124,7 +1120,7 @@ class SettingsProvider extends ChangeNotifier {
         );
     _desktopAutoSwitchTopics =
         prefs.getBool(_displayDesktopAutoSwitchTopicsKey) ?? false;
-    // Desktop: tray settings (default enabled on desktop platforms)
+    // 桌面：托盘设置（桌面平台默认启用）
     final trayPref = prefs.getBool(_displayDesktopShowTrayKey);
     if (trayPref == null) {
       final isDesktop =
@@ -1144,7 +1140,7 @@ class SettingsProvider extends ChangeNotifier {
         _desktopMinimizeToTrayOnClose,
       );
     } else {
-      // Enforce invariant: cannot minimize to tray if tray is hidden.
+      // 强制不变量：托盘隐藏时不能最小化到托盘。
       _desktopMinimizeToTrayOnClose = minimizeTrayPref && _desktopShowTray;
       if (minimizeTrayPref && !_desktopShowTray) {
         await prefs.setBool(
@@ -1153,7 +1149,7 @@ class SettingsProvider extends ChangeNotifier {
         );
       }
     }
-    // desktop: topic panel placement + right sidebar open state
+    // 桌面：话题面板位置 + 右侧边栏打开状态
     final topicPos = prefs.getString(_desktopTopicPositionKey);
     switch (topicPos) {
       case 'right':
@@ -1165,7 +1161,7 @@ class SettingsProvider extends ChangeNotifier {
     }
     _desktopRightSidebarOpen =
         prefs.getBool(_desktopRightSidebarOpenKey) ?? true;
-    // Chat message background style (default | frosted | solid)
+    // 聊天消息背景样式（default | frosted | solid）
     final bgStyleStr =
         prefs.getString(_displayChatMessageBackgroundStyleKey) ?? 'default';
     switch (bgStyleStr) {
@@ -1186,23 +1182,23 @@ class SettingsProvider extends ChangeNotifier {
     );
     _mobileAssistantDetailOutlineEnabled =
         prefs.getBool(_mobileAssistantDetailOutlineEnabledKey) ?? false;
-    // desktop UI
+    // 桌面 UI
     _desktopSidebarWidth = prefs.getDouble(_desktopSidebarWidthKey) ?? 300;
     _desktopSidebarOpen = prefs.getBool(_desktopSidebarOpenKey) ?? true;
     _desktopRightSidebarWidth =
         prefs.getDouble(_desktopRightSidebarWidthKey) ?? 300;
-    // Load app locale; default to follow system on first launch
+    // 加载应用语言区域；首次启动默认跟随系统
     _appLocaleTag = prefs.getString(_appLocaleKey);
     if (_appLocaleTag == null || _appLocaleTag!.isEmpty) {
       _appLocaleTag = 'system';
       await prefs.setString(_appLocaleKey, 'system');
     }
 
-    // Android background chat mode (Android only; default ON on first run)
+    // Android 后台聊天模式（仅 Android；首次运行默认开启）
     try {
       final rawBg = prefs.getString(_androidBackgroundChatModeKey);
       if (rawBg == null) {
-        // Default to OFF to avoid permission prompts on first launch
+        // 默认关闭，避免首次启动时弹出权限提示
         _androidBackgroundChatMode = AndroidBackgroundChatMode.off;
         await prefs.setString(_androidBackgroundChatModeKey, 'off');
       } else {
@@ -1230,7 +1226,7 @@ class SettingsProvider extends ChangeNotifier {
     _iosBackgroundNotificationsEnabled =
         prefs.getBool(_iosBackgroundNotificationsEnabledKey) ?? false;
 
-    // load search settings
+    // 加载搜索设置
     final searchServicesStr = prefs.getString(_searchServicesKey);
     if (searchServicesStr != null && searchServicesStr.isNotEmpty) {
       try {
@@ -1256,7 +1252,7 @@ class SettingsProvider extends ChangeNotifier {
     _searchAutoTestOnLaunch =
         prefs.getBool(_searchAutoTestOnLaunchKey) ?? false;
 
-    // load global proxy
+    // 加载全局代理
     _globalProxyEnabled = prefs.getBool(_globalProxyEnabledKey) ?? false;
     _globalProxyType = prefs.getString(_globalProxyTypeKey) ?? 'http';
     _globalProxyHost = prefs.getString(_globalProxyHostKey) ?? '';
@@ -1271,7 +1267,7 @@ class SettingsProvider extends ChangeNotifier {
       _globalProxyBypass = bypass;
     }
 
-    // load network TTS services
+    // 加载网络 TTS 服务
     try {
       final ttsStr = prefs.getString(_ttsServicesKey) ?? '';
       if (ttsStr.isNotEmpty) {
@@ -1289,8 +1285,8 @@ class SettingsProvider extends ChangeNotifier {
               return map;
             }()),
         ];
-        // Legacy rows had no stable identifier. Persist generated IDs before
-        // migrating the selected index so the UUID remains valid next launch.
+        // 旧数据行没有稳定标识符。先持久化生成的 ID，
+        // 再迁移所选索引，以确保下次启动时 UUID 仍然有效。
         if (generatedMissingIds) {
           await prefs.setString(
             _ttsServicesKey,
@@ -1325,7 +1321,7 @@ class SettingsProvider extends ChangeNotifier {
     _ttsTextSelectionMode = TtsTextSelectionModeStorage.fromStorageValue(
       prefs.getString(_ttsTextSelectionModeKey),
     );
-    // ASR has no implicit system default: users explicitly add a provider.
+    // ASR 没有隐式系统默认值：用户需显式添加提供方。
     final decodedAsrServices = <AsrServiceOptions>[];
     try {
       final raw = prefs.getString(_asrServicesKey) ?? '';
@@ -1339,7 +1335,7 @@ class SettingsProvider extends ChangeNotifier {
               ),
             );
           } catch (_) {
-            // Preserve other valid services when one legacy row is malformed.
+            // 当某条旧数据行损坏时，保留其他有效服务。
           }
         }
       }
@@ -1357,7 +1353,7 @@ class SettingsProvider extends ChangeNotifier {
         await prefs.setString(_asrSelectedServiceIdKey, _selectedAsrServiceId!);
       }
     }
-    // webdav config
+    // webdav 配置
     final webdavStr = prefs.getString(_webDavConfigKey);
     if (webdavStr != null && webdavStr.isNotEmpty) {
       try {
@@ -1366,7 +1362,7 @@ class SettingsProvider extends ChangeNotifier {
         );
       } catch (_) {}
     }
-    // s3 config
+    // s3 配置
     final s3Str = prefs.getString(_s3ConfigKey);
     if (s3Str != null && s3Str.isNotEmpty) {
       try {
@@ -1376,8 +1372,8 @@ class SettingsProvider extends ChangeNotifier {
       } catch (_) {}
     }
     if (_providerConfigs.isEmpty) {
-      // Seed a couple of sensible defaults on first launch, but do not recreate
-      // providers implicitly during later reads (e.g., when switching chats).
+      // 首次启动时写入少量合理默认值，但后续读取（例如切换聊天时）
+      // 不隐式重建提供方。
       ensureProviderConfig('KelivoIN', defaultName: 'KelivoIN');
       ensureProviderConfig('Tensdaq', defaultName: 'Tensdaq');
       ensureProviderConfig('SiliconFlow', defaultName: 'SiliconFlow');
@@ -1388,15 +1384,15 @@ class SettingsProvider extends ChangeNotifier {
       await prefs.setString(_providerConfigsKey, jsonEncode(seededConfigs));
     }
 
-    // kick off a one-time connectivity test for services (exclude local Bing)
+    // 为服务启动一次连接性检测（排除本地 Bing）
     if (_searchAutoTestOnLaunch) {
       _initSearchConnectivityTests();
     }
 
-    // Attempt to reload any user-installed local fonts (mobile platforms)
+    // 尝试重新加载用户安装的本地字体（移动平台）
     await _reloadLocalFontsIfAny();
 
-    // Final cleanup pass for provider order + grouping state (best-effort).
+    // 对提供方顺序和分组状态做最终清理（尽力而为）。
     if (_cleanupProviderOrderAndGrouping()) {
       try {
         await prefs.setStringList(_providersOrderKey, _providersOrder);
@@ -1467,7 +1463,7 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setString(_globalProxyBypassKey, _globalProxyBypass);
   }
 
-  // Apply global proxy to Dart IO layer; provider-level proxies take precedence at call sites.
+  // 将全局代理应用到 Dart IO 层；提供方级代理在调用处优先。
   String _lastProxySignature = '';
   void applyGlobalProxyOverridesIfNeeded() {
     try {
@@ -1601,17 +1597,16 @@ class SettingsProvider extends ChangeNotifier {
     }
   }
 
-  // ===== User Font Settings =====
-  String? _appFontFamily; // system or Google font family to use globally
-  String?
-  _codeFontFamily; // system or Google font family to use for code blocks
-  // Whether the above family names refer to Google Fonts (as opposed to system fonts)
+  // ===== 用户字体设置 =====
+  String? _appFontFamily; // 全局使用的系统或 Google 字体族
+  String? _codeFontFamily; // 代码块使用的系统或 Google 字体族
+  // 上述字体族名称是否指 Google Fonts（而不是系统字体）
   bool _appFontIsGoogle = false;
   bool _codeFontIsGoogle = false;
-  // Local font file selections (mobile): persisted for reload
+  // 本地字体文件选择（移动端）：持久化以便重新加载
   String? _appFontLocalPath;
   String? _codeFontLocalPath;
-  // The alias family name registered via FontLoader for local fonts
+  // 通过 FontLoader 为本地字体注册的别名字体族名称
   String? _appFontLocalAlias;
   String? _codeFontLocalAlias;
 
@@ -1622,7 +1617,7 @@ class SettingsProvider extends ChangeNotifier {
   String? get appFontLocalAlias => _appFontLocalAlias;
   String? get codeFontLocalAlias => _codeFontLocalAlias;
 
-  // Use alias if a local font is set and successfully registered
+  // 如果设置了本地字体且注册成功，则使用别名
   String? get _effectiveAppFontAlias =>
       (_appFontLocalAlias?.isNotEmpty == true) ? _appFontLocalAlias : null;
   String? get _effectiveCodeFontAlias =>
@@ -1633,7 +1628,7 @@ class SettingsProvider extends ChangeNotifier {
     _appFontFamily = (family == null || family.trim().isEmpty)
         ? null
         : family.trim();
-    // Clear local alias for system/google switch
+    // 切换到系统/google 时清除本地别名
     _appFontLocalAlias = null;
     _appFontLocalPath = null;
     notifyListeners();
@@ -1773,7 +1768,7 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<void> _reloadLocalFontsIfAny() async {
     final prefs = _preferences;
-    // Load persisted values
+    // 加载持久化值
     _appFontFamily = _nonEmpty(prefs.getString(_displayAppFontFamilyKey));
     _codeFontFamily = _nonEmpty(prefs.getString(_displayCodeFontFamilyKey));
     _appFontIsGoogle = prefs.getBool(_displayAppFontIsGoogleKey) ?? false;
@@ -1791,7 +1786,7 @@ class SettingsProvider extends ChangeNotifier {
 
     var changed = false;
 
-    // Re-register local fonts if paths are available.
+    // 如果路径可用，则重新注册本地字体。
     if (_appFontLocalPath != null && _appFontLocalPath!.isNotEmpty) {
       final alias = _appFontLocalAlias ?? 'kelivo_local_app';
       final resolvedPath = SandboxPathResolver.fix(_appFontLocalPath!);
@@ -1932,7 +1927,7 @@ class SettingsProvider extends ChangeNotifier {
     required String aliasPrefix,
   }) async {
     try {
-      // Use a stable alias derived from file name to reduce duplicates
+      // 使用从文件名派生的稳定别名以减少重复
       final ts = DateTime.now().millisecondsSinceEpoch;
       final alias = '${aliasPrefix}_$ts';
       final file = File(path);
@@ -1959,7 +1954,7 @@ class SettingsProvider extends ChangeNotifier {
         bytes[3] == 0x00;
   }
 
-  // ===== Desktop UI setters =====
+  // ===== 桌面 UI 设置方法 =====
   Future<void> setDesktopSidebarWidth(double width) async {
     final w = width.clamp(200.0, 640.0).toDouble();
     if ((w - _desktopSidebarWidth).abs() < 0.5) return;
@@ -1988,7 +1983,7 @@ class SettingsProvider extends ChangeNotifier {
     );
   }
 
-  // Desktop: topic panel placement (left/right)
+  // 桌面端：话题面板位置（左/右）
   Future<void> setDesktopTopicPosition(DesktopTopicPosition pos) async {
     if (_desktopTopicPosition == pos) return;
     _desktopTopicPosition = pos;
@@ -1998,7 +1993,7 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setString(_desktopTopicPositionKey, v);
   }
 
-  // Desktop: right sidebar visible state
+  // 桌面端：右侧边栏可见状态
   Future<void> setDesktopRightSidebarOpen(bool open) async {
     if (_desktopRightSidebarOpen == open) return;
     _desktopRightSidebarOpen = open;
@@ -2007,7 +2002,7 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setBool(_desktopRightSidebarOpenKey, _desktopRightSidebarOpen);
   }
 
-  // ===== App locale (UI language) =====
+  // ===== 应用语言环境（UI 语言） =====
   String? _appLocaleTag; // 'system', 'zh_CN', 'zh_Hant', 'en_US'
   Locale get appLocale => _parseLocaleTag(_appLocaleTag ?? 'en_US');
   bool get isFollowingSystemLocale =>
@@ -2053,7 +2048,7 @@ class SettingsProvider extends ChangeNotifier {
     }
   }
 
-  // ===== Backup & WebDAV settings =====
+  // ===== 备份与 WebDAV 设置 =====
   WebDavConfig _webDavConfig = const WebDavConfig();
   WebDavConfig get webDavConfig => _webDavConfig;
   Future<void> setWebDavConfig(WebDavConfig cfg) async {
@@ -2077,10 +2072,10 @@ class SettingsProvider extends ChangeNotifier {
     final common = _searchCommonOptions;
     for (final s in services) {
       if (s is BingLocalOptions) {
-        _searchConnection[s.id] = null; // no label for local Bing
+        _searchConnection[s.id] = null; // 本地 Bing 不使用标签
         continue;
       }
-      // Run in background; don't await all
+      // 在后台运行；不要 await 全部
       unawaited(_testSingleSearchService(s, common));
     }
   }
@@ -2139,7 +2134,7 @@ class SettingsProvider extends ChangeNotifier {
     bool changed = false;
     final knownKeys = _knownProviderKeys();
 
-    // Clean providers order: remove non-existing and dedupe, append new at end.
+    // 清理 provider 顺序：移除不存在的项并去重，将新项追加到末尾。
     final nextOrder = <String>[];
     final seen = <String>{};
     for (final k in _providersOrder) {
@@ -2168,7 +2163,7 @@ class SettingsProvider extends ChangeNotifier {
       changed = true;
     }
 
-    // Clean group map: remove invalid groupIds or non-existing provider keys.
+    // 清理分组映射：移除无效的 groupIds 或不存在的 provider 键。
     final validGroupIds = {for (final g in _providerGroups) g.id};
     final nextMap = <String, String>{};
     for (final entry in _providerGroupMap.entries) {
@@ -2189,7 +2184,7 @@ class SettingsProvider extends ChangeNotifier {
       changed = true;
     }
 
-    // Clean collapsed state: remove unknown group ids (except ungrouped).
+    // 清理折叠状态：移除未知的分组 ID（未分组除外）。
     final nextCollapsed = <String, bool>{};
     for (final entry in _providerGroupCollapsed.entries) {
       final key = entry.key;
@@ -2376,7 +2371,7 @@ class SettingsProvider extends ChangeNotifier {
     final keysSet = providerKeys.where(known.contains).toSet();
     if (keysSet.isEmpty) return;
 
-    // Preserve current visible order when appending into the target group.
+    // 在追加到目标分组时，保留当前可见顺序。
     final orderedKeys = <String>[];
     for (final k in _providersOrder) {
       if (keysSet.remove(k)) orderedKeys.add(k);
@@ -2403,7 +2398,7 @@ class SettingsProvider extends ChangeNotifier {
         validGroupIds: validGroupIds,
         providerKey: key,
         targetGroupId: normalizedTargetGroupId,
-        targetPos: 1 << 30, // append
+        targetPos: 1 << 30, // 追加
       );
       order = res.providersOrder;
       groupMap = res.providerGroupMap;
@@ -2513,7 +2508,7 @@ class SettingsProvider extends ChangeNotifier {
         !_customThemes.any((t) => t.id == _selectedCustomThemeId)) {
       _selectedCustomThemeId = null;
     }
-    // One-time migration from the legacy single seed/primary palette.
+    // 从旧版单一种子/主调色板进行的一次性迁移。
     final legacyArgb =
         prefs.getInt(_legacyCustomPrimaryOverrideKey) ??
         prefs.getInt(_legacyCustomSeedColorKey);
@@ -2554,8 +2549,8 @@ class SettingsProvider extends ChangeNotifier {
     }
   }
 
-  /// Insert or update a custom theme. Returns the saved theme (with an id
-  /// assigned when [theme.id] is empty).
+  /// 插入或更新自定义主题。返回保存后的主题（如果
+  /// [theme.id] 为空，则会分配一个 id）。
   Future<CustomTheme> saveCustomTheme(CustomTheme theme) async {
     var t = theme;
     if (t.id.isEmpty) {
@@ -2593,7 +2588,7 @@ class SettingsProvider extends ChangeNotifier {
     await _persistCustomThemes();
   }
 
-  /// Select a custom theme and make it the active palette.
+  /// 选择自定义主题并将其设为当前调色板。
   Future<void> selectCustomTheme(String id) async {
     if (!_customThemes.any((t) => t.id == id)) return;
     final changed =
@@ -2608,8 +2603,8 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setString(_themePaletteKey, ThemePalettes.customPaletteId);
   }
 
-  /// Parse a shared custom-theme JSON string, save it and return the stored
-  /// theme (a fresh id is assigned when the id is missing or already taken).
+  /// 解析共享的自定义主题 JSON 字符串，保存并返回存储后的
+  /// 主题（当 id 缺失或已被占用时，会分配一个新的 id）。
   Future<CustomTheme> importCustomTheme(String source) {
     var t = CustomTheme.parse(source);
     if (t.id.isEmpty || _customThemes.any((e) => e.id == t.id)) {
@@ -2618,7 +2613,7 @@ class SettingsProvider extends ChangeNotifier {
     return saveCustomTheme(t);
   }
 
-  // Display: chat message background style (affects user/assistant bubbles)
+  // 显示：聊天消息背景样式（影响用户/助手气泡）
   ChatMessageBackgroundStyle _chatMessageBackgroundStyle =
       ChatMessageBackgroundStyle.defaultStyle;
   ChatMessageBackgroundStyle get chatMessageBackgroundStyle =>
@@ -2673,7 +2668,7 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setBool(_mobileAssistantDetailOutlineEnabledKey, enabled);
   }
 
-  // ===== Android background chat generation =====
+  // ===== Android 后台聊天生成 =====
   AndroidBackgroundChatMode _androidBackgroundChatMode =
       AndroidBackgroundChatMode.off;
   AndroidBackgroundChatMode get androidBackgroundChatMode =>
@@ -2691,19 +2686,19 @@ class SettingsProvider extends ChangeNotifier {
       AndroidBackgroundChatMode.off => 'off',
     };
     await prefs.setString(_androidBackgroundChatModeKey, v);
-    // Best-effort: update Android background execution state immediately
+    // 尽力而为：立即更新 Android 后台执行状态
     try {
       if (Platform.isAndroid) {
-        // Direct call; file is present in project and guards by Platform
+        // 直接调用；该文件已存在于项目中，并通过 Platform 进行平台判断
         // ignore: depend_on_referenced_packages
         // ignore_for_file: unnecessary_import
         // ignore: avoid_print
-        // Defer import here is not possible; rely on main.dart sync. This is a no-op placeholder.
+        // 此处无法延迟导入；依赖 main.dart 中的同步。这是一个 no-op 占位符。
       }
     } catch (_) {}
   }
 
-  // ===== iOS background chat generation =====
+  // ===== iOS 后台聊天生成 =====
   bool _iosBackgroundGenerationEnabled = false;
   bool get iosBackgroundGenerationEnabled => _iosBackgroundGenerationEnabled;
   Future<void> setIosBackgroundGenerationEnabled(bool v) async {
@@ -2828,7 +2823,7 @@ class SettingsProvider extends ChangeNotifier {
     return deletedCount;
   }
 
-  // ===== Provider Avatars =====
+  // ===== 服务商头像 =====
   Future<void> setProviderAvatarEmoji(String key, String emoji) async {
     final e = emoji.trim();
     if (e.isEmpty) return;
@@ -2847,7 +2842,7 @@ class SettingsProvider extends ChangeNotifier {
       key,
       old.copyWith(avatarType: 'url', avatarValue: u),
     );
-    // Prefetch for offline
+    // 为离线使用预取
     try {
       await AvatarCache.getPath(u);
     } catch (_) {}
@@ -2878,7 +2873,7 @@ class SettingsProvider extends ChangeNotifier {
       final dest = File('${avatarsDir.path}/$filename');
       await src.copy(dest.path);
 
-      // Clean old stored avatar file if under managed avatars folder
+      // 清理受管头像文件夹下的旧头像文件
       final old = getProviderConfig(key);
       if (old.avatarType == 'file' && (old.avatarValue ?? '').isNotEmpty) {
         try {
@@ -2896,7 +2891,7 @@ class SettingsProvider extends ChangeNotifier {
         old.copyWith(avatarType: 'file', avatarValue: dest.path),
       );
     } catch (_) {
-      // Fallback: still save original path
+      // 回退：仍然保存原始路径
       final old = getProviderConfig(key);
       await setProviderConfig(
         key,
@@ -2915,7 +2910,7 @@ class SettingsProvider extends ChangeNotifier {
     );
   }
 
-  // Store a LobeHub icon name (not the full URL); URL is built at render time.
+  // 存储 LobeHub 图标名称（不是完整 URL）；URL 在渲染时构建。
   Future<void> setProviderAvatarLobehub(String key, String name) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return;
@@ -2928,7 +2923,7 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<void> resetProviderAvatar(String key) async {
     final old = getProviderConfig(key);
-    // Attempt to remove old local file if we managed it
+    // 如果旧本地文件由我们管理，则尝试将其删除
     if (old.avatarType == 'file' && (old.avatarValue ?? '').isNotEmpty) {
       try {
         final f = File(old.avatarValue!);
@@ -2939,7 +2934,7 @@ class SettingsProvider extends ChangeNotifier {
         }
       } catch (_) {}
     }
-    // Best-effort: evict cached URL avatar
+    // 尽力而为：清除缓存的 URL 头像
     if (old.avatarType == 'url' && (old.avatarValue ?? '').isNotEmpty) {
       try {
         await AvatarCache.evict(old.avatarValue!);
@@ -2951,8 +2946,8 @@ class SettingsProvider extends ChangeNotifier {
     );
   }
 
-  /// Clears all global model selections (current, title, translate, OCR) that reference the given provider.
-  /// Used when a provider is disabled or deleted.
+  /// 清除所有引用给定服务商的全局模型选择（current、title、translate、OCR）。
+  /// 在服务商被禁用或删除时使用。
   Future<void> clearSelectionsForProvider(String providerKey) async {
     final prefs = _preferences;
     bool changed = false;
@@ -3009,8 +3004,8 @@ class SettingsProvider extends ChangeNotifier {
     if (changed) notifyListeners();
   }
 
-  /// Clears global model selections that reference a specific model.
-  /// Used when a model is deleted from a provider.
+  /// 清除引用特定模型的全局模型选择。
+  /// 在从提供程序删除模型时使用。
   Future<void> clearSelectionsForModel(
     String providerKey,
     String modelId,
@@ -3069,7 +3064,7 @@ class SettingsProvider extends ChangeNotifier {
       await prefs.remove(_memoryModelKey);
       changed = true;
     }
-    // Also remove from pinned if applicable
+    // 如果适用，也将其从置顶中移除
     final pinKey = '$providerKey::$modelId';
     if (_pinnedModels.contains(pinKey)) {
       _pinnedModels.remove(pinKey);
@@ -3082,13 +3077,13 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> removeProviderConfig(String key) async {
     if (!_providerConfigs.containsKey(key)) return;
     _providerConfigs.remove(key);
-    // Remove from order
+    // 从排序中移除
     _providersOrder = List<String>.from(_providersOrder.where((k) => k != key));
-    // Also remove from grouping map
+    // 同时从分组映射中移除
     _providerGroupMap.remove(key);
     _cleanupProviderOrderAndGrouping();
 
-    // Clear selections referencing this provider to avoid re-creating defaults
+    // 清除引用此提供程序的选择，以避免重新创建默认值
     final prefs = _preferences;
     if (_currentModelProvider == key) {
       _currentModelProvider = null;
@@ -3133,14 +3128,14 @@ class SettingsProvider extends ChangeNotifier {
       await prefs.remove(_memoryModelKey);
     }
 
-    // Remove pinned models for this provider
+    // 移除此提供程序的置顶模型
     final beforePinned = _pinnedModels.length;
     _pinnedModels.removeWhere((entry) => entry.startsWith('$key::'));
     if (_pinnedModels.length != beforePinned) {
       await prefs.setStringList(_pinnedModelsKey, _pinnedModels.toList());
     }
 
-    // Persist updates
+    // 持久化更新
     final map = _providerConfigs.map((k, v) => MapEntry(k, v.toJson()));
     await prefs.setString(_providerConfigsKey, jsonEncode(map));
     await prefs.setStringList(_providersOrderKey, _providersOrder);
@@ -3148,7 +3143,7 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Favorites (pinned models)
+  // 收藏（置顶模型）
   final Set<String> _pinnedModels = <String>{};
   Set<String> get pinnedModels => Set.unmodifiable(_pinnedModels);
   bool isModelPinned(String providerKey, String modelId) =>
@@ -3165,7 +3160,7 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setStringList(_pinnedModelsKey, _pinnedModels.toList());
   }
 
-  // Selected model for chat
+  // 用于聊天的所选模型
   String? _currentModelProvider;
   String? _currentModelId;
   String? get currentModelProvider => _currentModelProvider;
@@ -3190,7 +3185,7 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.remove(_selectedModelKey);
   }
 
-  // Title model and prompt
+  // 标题模型和提示词
   String? _titleModelProvider;
   String? _titleModelId;
   String? get titleModelProvider => _titleModelProvider;
@@ -3241,7 +3236,7 @@ You need to summarize the conversation between user and assistant into a short t
 
   Future<void> resetTitlePrompt() async => setTitlePrompt(defaultTitlePrompt);
 
-  // Translate model and prompt
+  // 翻译模型和提示词
   String? _translateModelProvider;
   String? _translateModelId;
   String? get translateModelProvider => _translateModelProvider;
@@ -3306,7 +3301,7 @@ Please translate the <source_text> section:
     await prefs.remove(_translateTargetLangKey);
   }
 
-  // OCR model, prompt and toggle
+  // OCR 模型、提示词和开关
   String? _ocrModelProvider;
   String? _ocrModelId;
   String? get ocrModelProvider => _ocrModelProvider;
@@ -3363,7 +3358,7 @@ Do not interpret or translate—only transcribe and describe what is visually pr
   Future<void> resetOcrPrompt() async => setOcrPrompt(defaultOcrPrompt);
 
   Future<void> setOcrEnabled(bool value) async {
-    // If there is no OCR model configured, force disable.
+    // 如果没有配置 OCR 模型，则强制禁用。
     if (_ocrModelProvider == null || _ocrModelId == null) {
       value = false;
     }
@@ -3374,7 +3369,7 @@ Do not interpret or translate—only transcribe and describe what is visually pr
     await prefs.setBool(_ocrEnabledKey, _ocrEnabled);
   }
 
-  // Summary model and prompt
+  // 摘要模型和提示词
   String? _summaryModelProvider;
   String? _summaryModelId;
   String? get summaryModelProvider => _summaryModelProvider;
@@ -3431,7 +3426,7 @@ Generate or update a brief summary of the user's questions and intentions.
   Future<void> resetSummaryPrompt() async =>
       setSummaryPrompt(defaultSummaryPrompt);
 
-  // Chat suggestion model and prompt. Null model means the feature is disabled.
+  // 聊天建议模型和提示词。模型为 null 表示该功能已禁用。
   String? _suggestionModelProvider;
   String? _suggestionModelId;
   String? get suggestionModelProvider => _suggestionModelProvider;
@@ -3498,7 +3493,7 @@ Rules:
     await prefs.setBool(_suggestionInsertOnTapOnlyKey, value);
   }
 
-  // Compress model and prompt
+  // 压缩模型和提示词
   String? _compressModelProvider;
   String? _compressModelId;
   String? get compressModelProvider => _compressModelProvider;
@@ -3559,7 +3554,7 @@ Requirements:
   Future<void> resetCompressPrompt() async =>
       setCompressPrompt(defaultCompressPrompt);
 
-  // Learning Mode
+  // 学习模式
   bool _learningModeEnabled = false;
   bool get learningModeEnabled => _learningModeEnabled;
   Future<void> setLearningModeEnabled(bool v) async {
@@ -3587,9 +3582,8 @@ Requirements:
   Future<void> resetLearningModePrompt() async =>
       setLearningModePrompt(defaultLearningModePrompt);
 
-  // Reasoning strength / thinking budget
-  int?
-  _thinkingBudget; // null = not set, use provider defaults; -1 = auto; 0 = off; >0 = budget tokens
+  // 推理强度 / 思考预算
+  int? _thinkingBudget; // null = 未设置，使用提供商默认值；-1 = 自动；0 = 关闭；>0 = 预算 token
   int? get thinkingBudget => _thinkingBudget;
   Future<void> setThinkingBudget(int? budget) async {
     _thinkingBudget = budget;
@@ -3602,8 +3596,8 @@ Requirements:
     }
   }
 
-  // Background model thinking toggles. All default to off to keep these
-  // latency-sensitive utility requests fast.
+  // 后台模型思考开关。默认全部关闭，以保持这些
+  // 对延迟敏感的实用请求快速响应。
   bool _titleGenerationThinkingEnabled = false;
   bool get titleGenerationThinkingEnabled => _titleGenerationThinkingEnabled;
   Future<void> setTitleGenerationThinkingEnabled(bool enabled) async {
@@ -3684,7 +3678,7 @@ Requirements:
   Future<void> resetOcrGenerationThinkingEnabled() async =>
       setOcrGenerationThinkingEnabled(false);
 
-  // Memory system v1 (§4.2)
+  // 记忆系统 v1 (§4.2)
   String? _memoryModelProvider;
   String? _memoryModelId;
   String? get memoryModelProvider => _memoryModelProvider;
@@ -3697,26 +3691,26 @@ Requirements:
   bool _memoryModelThinkingEnabled = false;
   bool get memoryModelThinkingEnabled => _memoryModelThinkingEnabled;
 
-  /// Stored value: `auto` / `zh` / `en`. Default `auto`.
+  /// 存储值：`auto` / `zh` / `en`。默认值为 `auto`。
   String _memoryPromptLang = 'auto';
   String get memoryPromptLang => _memoryPromptLang;
 
-  /// Records step-by-step traces of every background memory run. Default on.
+  /// 记录每次后台记忆运行的逐步跟踪。默认开启。
   bool _memoryTraceEnabled = true;
   bool get memoryTraceEnabled => _memoryTraceEnabled;
 
   bool _legacyMemoryMode = false;
   bool get legacyMemoryMode => _legacyMemoryMode;
 
-  /// The locale the interface is actually rendered in.
+  /// 界面实际渲染所使用的区域设置。
   ///
-  /// [appLocale] parses the stored tag, and the `system` tag has no locale to
-  /// parse, so it falls through to `en_US`. Anything deciding what language to
-  /// speak to the user in must ask the platform instead.
+  /// [appLocale] 会解析存储的标签，而 `system` 标签没有可解析的
+  /// 区域设置，因此会回退到 `en_US`。任何决定用什么语言
+  /// 与用户交流的逻辑都必须询问平台。
   Locale get effectiveLocale =>
       isFollowingSystemLocale ? PlatformDispatcher.instance.locale : appLocale;
 
-  /// Resolves `auto` → zh when the interface is Chinese, else en.
+  /// 将 `auto` 解析为：界面为中文时 → zh，否则 → en。
   MemoryPromptLang get resolvedMemoryPromptLang {
     switch (_memoryPromptLang) {
       case 'zh':
@@ -3780,7 +3774,7 @@ Requirements:
     await prefs.setBool(_memoryModelThinkingEnabledKey, enabled);
   }
 
-  /// Turning this off also drops every retained trace immediately.
+  /// 关闭此选项也会立即丢弃所有保留的跟踪记录。
   Future<void> setMemoryTraceEnabled(bool enabled) async {
     if (_memoryTraceEnabled == enabled) return;
     _memoryTraceEnabled = enabled;
@@ -3988,7 +3982,7 @@ Requirements:
     return assistantBudget ?? _thinkingBudget;
   }
 
-  // Display settings: user avatar and model icon visibility
+  // 显示设置：用户头像和模型图标的可见性
   bool _showUserAvatar = true;
   bool get showUserAvatar => _showUserAvatar;
   Future<void> setShowUserAvatar(bool v) async {
@@ -3999,7 +3993,7 @@ Requirements:
     await prefs.setBool(_displayShowUserAvatarKey, v);
   }
 
-  // Display: user name & timestamp (for user messages)
+  // 显示：用户名和时间戳（用于用户消息）
   bool _showUserNameTimestamp = true;
   bool get showUserNameTimestamp => _showUserNameTimestamp;
   Future<void> setShowUserNameTimestamp(bool v) async {
@@ -4010,7 +4004,7 @@ Requirements:
     await prefs.setBool(_displayShowUserNameTimestampKey, v);
   }
 
-  // Display: user name only (for user messages)
+  // 显示：仅用户名（用于用户消息）
   bool _showUserName = true;
   bool get showUserName => _showUserName;
   Future<void> setShowUserName(bool v) async {
@@ -4021,7 +4015,7 @@ Requirements:
     await prefs.setBool(_displayShowUserNameKey, v);
   }
 
-  // Display: user timestamp only (for user messages)
+  // 显示：仅时间戳（用于用户消息）
   bool _showUserTimestamp = true;
   bool get showUserTimestamp => _showUserTimestamp;
   Future<void> setShowUserTimestamp(bool v) async {
@@ -4052,7 +4046,7 @@ Requirements:
     await prefs.setBool(_displayShowModelIconKey, v);
   }
 
-  // Display: model name & timestamp (for assistant messages)
+  // 显示：模型名称和时间戳（用于助手消息）
   bool _showModelNameTimestamp = true;
   bool get showModelNameTimestamp => _showModelNameTimestamp;
   Future<void> setShowModelNameTimestamp(bool v) async {
@@ -4063,7 +4057,7 @@ Requirements:
     await prefs.setBool(_displayShowModelNameTimestampKey, v);
   }
 
-  // Display: model name only (for assistant messages)
+  // 显示：仅显示模型名称（用于助手消息）
   bool _showModelName = true;
   bool get showModelName => _showModelName;
   Future<void> setShowModelName(bool v) async {
@@ -4074,7 +4068,7 @@ Requirements:
     await prefs.setBool(_displayShowModelNameKey, v);
   }
 
-  // Display: model timestamp only (for assistant messages)
+  // 显示：仅显示模型时间戳（用于助手消息）
   bool _showModelTimestamp = true;
   bool get showModelTimestamp => _showModelTimestamp;
   Future<void> setShowModelTimestamp(bool v) async {
@@ -4085,7 +4079,7 @@ Requirements:
     await prefs.setBool(_displayShowModelTimestampKey, v);
   }
 
-  // Display: token/context stats
+  // 显示：token/上下文统计
   bool _showTokenStats = true;
   bool get showTokenStats => _showTokenStats;
   Future<void> setShowTokenStats(bool v) async {
@@ -4096,7 +4090,7 @@ Requirements:
     await prefs.setBool(_displayShowTokenStatsKey, v);
   }
 
-  // Display: auto-collapse reasoning/thinking section
+  // 显示：自动折叠推理/思考部分
   bool _autoCollapseThinking = true;
   bool get autoCollapseThinking => _autoCollapseThinking;
   Future<void> setAutoCollapseThinking(bool v) async {
@@ -4127,17 +4121,6 @@ Requirements:
     await prefs.setBool(_displayShowToolResultSummaryKey, v);
   }
 
-  bool _regenerateDeleteTrailingMessages = false;
-  bool get regenerateDeleteTrailingMessages =>
-      _regenerateDeleteTrailingMessages;
-  Future<void> setRegenerateDeleteTrailingMessages(bool v) async {
-    if (_regenerateDeleteTrailingMessages == v) return;
-    _regenerateDeleteTrailingMessages = v;
-    notifyListeners();
-    final prefs = _preferences;
-    await prefs.setBool(_displayRegenerateDeleteTrailingMessagesKey, v);
-  }
-
   bool _showRegenerateConfirmDialog = true;
   bool get showRegenerateConfirmDialog => _showRegenerateConfirmDialog;
   Future<void> setShowRegenerateConfirmDialog(bool v) async {
@@ -4148,7 +4131,7 @@ Requirements:
     await prefs.setBool(_displayShowRegenerateConfirmDialogKey, v);
   }
 
-  // Display: show message navigation button
+  // 显示：显示消息导航按钮
   bool _showMessageNavButtons = true;
   bool get showMessageNavButtons => _showMessageNavButtons;
   Future<void> setShowMessageNavButtons(bool v) async {
@@ -4159,7 +4142,7 @@ Requirements:
     await prefs.setBool(_displayShowMessageNavKey, v);
   }
 
-  // Display: use the new assistant avatar UX in app bars.
+  // 显示：在应用栏中使用新的助手头像交互。
   bool _useNewAssistantAvatarUx = false;
   bool get useNewAssistantAvatarUx => _useNewAssistantAvatarUx;
   Future<void> setUseNewAssistantAvatarUx(bool v) async {
@@ -4170,7 +4153,7 @@ Requirements:
     await prefs.setBool(_displayUseNewAssistantAvatarUxKey, v);
   }
 
-  // Display: show provider name in model capsule (desktop header)
+  // 显示：在模型胶囊中显示提供商名称（桌面端标题）
   bool _showProviderInModelCapsule = true;
   bool get showProviderInModelCapsule => _showProviderInModelCapsule;
   Future<void> setShowProviderInModelCapsule(bool v) async {
@@ -4181,7 +4164,7 @@ Requirements:
     await prefs.setBool(_displayShowProviderInModelCapsuleKey, v);
   }
 
-  // Display: show provider name after model ID in chat messages
+  // 显示：在聊天消息中的模型 ID 后显示提供商名称
   bool _showProviderInChatMessage = false;
   bool get showProviderInChatMessage => _showProviderInChatMessage;
   Future<void> setShowProviderInChatMessage(bool v) async {
@@ -4192,7 +4175,7 @@ Requirements:
     await prefs.setBool(_displayShowProviderInChatMessageKey, v);
   }
 
-  // Display: create a new chat on app launch
+  // 显示：应用启动时创建新聊天
   bool _newChatOnLaunch = true;
   bool get newChatOnLaunch => _newChatOnLaunch;
   Future<void> setNewChatOnLaunch(bool v) async {
@@ -4203,7 +4186,7 @@ Requirements:
     await prefs.setBool(_displayNewChatOnLaunchKey, v);
   }
 
-  // Display: create a new chat when switching assistants
+  // 显示：切换助手时创建新聊天
   bool _newChatOnAssistantSwitch = false;
   bool get newChatOnAssistantSwitch => _newChatOnAssistantSwitch;
   Future<void> setNewChatOnAssistantSwitch(bool v) async {
@@ -4232,7 +4215,7 @@ Requirements:
     await _preferences.setBool(_displayWideChatLayoutKey, v);
   }
 
-  // Display: create a new chat after deleting one
+  // 显示：删除一个聊天后创建新聊天
   bool _newChatAfterDelete = false;
   bool get newChatAfterDelete => _newChatAfterDelete;
   Future<void> setNewChatAfterDelete(bool v) async {
@@ -4243,7 +4226,7 @@ Requirements:
     await prefs.setBool(_displayNewChatAfterDeleteKey, v);
   }
 
-  // Display: enter key sends message on mobile (iOS defaults true, Android defaults false)
+  // 显示：移动端回车键发送消息（iOS 默认为 true，Android 默认为 false）
   bool _enterToSendOnMobile = false;
   bool get enterToSendOnMobile => _enterToSendOnMobile;
   Future<void> setEnterToSendOnMobile(bool v) async {
@@ -4254,7 +4237,7 @@ Requirements:
     await prefs.setBool(_displayEnterToSendOnMobileKey, v);
   }
 
-  // Desktop: send shortcut (Enter or Ctrl/Cmd+Enter)
+  // 桌面端：发送快捷键（Enter 或 Ctrl/Cmd+Enter）
   DesktopSendShortcut _desktopSendShortcut = DesktopSendShortcut.enter;
   DesktopSendShortcut get desktopSendShortcut => _desktopSendShortcut;
   Future<void> setDesktopSendShortcut(DesktopSendShortcut v) async {
@@ -4266,7 +4249,7 @@ Requirements:
     await prefs.setString(_desktopSendShortcutKey, str);
   }
 
-  // Desktop: message navigation buttons visibility mode
+  // 桌面端：消息导航按钮可见性模式
   DesktopMessageNavButtonsMode _desktopMessageNavButtonsMode =
       DesktopMessageNavButtonsMode.scroll;
   DesktopMessageNavButtonsMode get desktopMessageNavButtonsMode =>
@@ -4324,7 +4307,7 @@ Requirements:
     }
   }
 
-  // Mobile: message navigation buttons visibility mode
+  // 移动端：消息导航按钮可见性模式
   MobileMessageNavButtonsMode _mobileMessageNavButtonsMode =
       MobileMessageNavButtonsMode.scroll;
   MobileMessageNavButtonsMode get mobileMessageNavButtonsMode =>
@@ -4374,7 +4357,7 @@ Requirements:
     }
   }
 
-  // Display: chat font scale (0.5 - 1.5, default 1.0)
+  // 显示：聊天字体缩放（0.5 - 1.5，默认 1.0）
   double _chatFontScale = 1.0;
   double get chatFontScale => _chatFontScale;
   Future<void> setChatFontScale(double scale) async {
@@ -4386,7 +4369,7 @@ Requirements:
     await prefs.setDouble(_displayChatFontScaleKey, _chatFontScale);
   }
 
-  // Display: auto-scroll back to bottom toggle
+  // 显示：自动滚动回底部开关
   bool _autoScrollEnabled = true;
   bool get autoScrollEnabled => _autoScrollEnabled;
   Future<void> setAutoScrollEnabled(bool v) async {
@@ -4397,7 +4380,7 @@ Requirements:
     await prefs.setBool(_displayAutoScrollEnabledKey, v);
   }
 
-  // Display: auto-scroll back to bottom idle timeout (seconds)
+  // 显示：自动滚动回底部的空闲超时（秒）
   int _autoScrollIdleSeconds = 8;
   int get autoScrollIdleSeconds => _autoScrollIdleSeconds;
   Future<void> setAutoScrollIdleSeconds(int seconds) async {
@@ -4412,7 +4395,7 @@ Requirements:
     );
   }
 
-  // Display: chat background mask strength (0.0 - 2.0, default 1.0)
+  // 显示：聊天背景遮罩强度（0.0 - 2.0，默认 1.0）
   double _chatBackgroundMaskStrength = 1.0;
   double get chatBackgroundMaskStrength => _chatBackgroundMaskStrength;
   Future<void> setChatBackgroundMaskStrength(double strength) async {
@@ -4427,7 +4410,7 @@ Requirements:
     );
   }
 
-  // Display: chat input background opacity by theme brightness.
+  // 显示：聊天输入框背景不透明度按主题亮度设置。
   static const double defaultChatInputBackgroundOpacityLight = 0.8236;
   static const double defaultChatInputBackgroundOpacityDark = 0.7396;
   double _chatInputBackgroundOpacityLight =
@@ -4466,7 +4449,7 @@ Requirements:
     );
   }
 
-  // Display: inline $...$ LaTeX rendering
+  // 显示：内联 $...$ LaTeX 渲染
   bool _enableDollarLatex = true;
   bool get enableDollarLatex => _enableDollarLatex;
   Future<void> setEnableDollarLatex(bool v) async {
@@ -4477,7 +4460,7 @@ Requirements:
     await prefs.setBool(_displayEnableDollarLatexKey, v);
   }
 
-  // Display: LaTeX math rendering (inline/block)
+  // 显示：LaTeX 数学公式渲染（内联/块级）
   bool _enableMathRendering = true;
   bool get enableMathRendering => _enableMathRendering;
   Future<void> setEnableMathRendering(bool v) async {
@@ -4488,7 +4471,7 @@ Requirements:
     await prefs.setBool(_displayEnableMathRenderingKey, v);
   }
 
-  // Display: render user messages with Markdown
+  // 显示：使用 Markdown 渲染用户消息
   bool _enableUserMarkdown = true;
   bool get enableUserMarkdown => _enableUserMarkdown;
   Future<void> setEnableUserMarkdown(bool v) async {
@@ -4499,7 +4482,7 @@ Requirements:
     await prefs.setBool(_displayEnableUserMarkdownKey, v);
   }
 
-  // Display: render reasoning (thinking) content with Markdown
+  // 显示：使用 Markdown 渲染推理（思考）内容
   bool _enableReasoningMarkdown = true;
   bool get enableReasoningMarkdown => _enableReasoningMarkdown;
   Future<void> setEnableReasoningMarkdown(bool v) async {
@@ -4510,7 +4493,7 @@ Requirements:
     await prefs.setBool(_displayEnableReasoningMarkdownKey, v);
   }
 
-  // Display: render assistant messages with Markdown
+  // 显示：使用 Markdown 渲染助手消息
   bool _enableAssistantMarkdown = true;
   bool get enableAssistantMarkdown => _enableAssistantMarkdown;
   Future<void> setEnableAssistantMarkdown(bool v) async {
@@ -4521,7 +4504,7 @@ Requirements:
     await prefs.setBool(_displayEnableAssistantMarkdownKey, v);
   }
 
-  // Display: show chat list date
+  // 显示：显示聊天列表日期
   bool _showChatListDate = false;
   bool get showChatListDate => _showChatListDate;
   Future<void> setShowChatListDate(bool v) async {
@@ -4532,7 +4515,7 @@ Requirements:
     await prefs.setBool(_displayShowChatListDateKey, v);
   }
 
-  // Display: crop images after selecting from gallery or camera
+  // 显示：从相册或相机选择后裁剪图片
   bool _imageCropperEnabled = false;
   bool get imageCropperEnabled => _imageCropperEnabled;
   Future<void> setImageCropperEnabled(bool v) async {
@@ -4606,7 +4589,7 @@ Requirements:
     };
   }
 
-  // Display: mobile code block word wrap
+  // 显示：移动端代码块自动换行
   bool _mobileCodeBlockWrap = false;
   bool get mobileCodeBlockWrap => _mobileCodeBlockWrap;
   Future<void> setMobileCodeBlockWrap(bool v) async {
@@ -4617,7 +4600,7 @@ Requirements:
     await prefs.setBool(_displayMobileCodeBlockWrapKey, v);
   }
 
-  // Display: auto-collapse code blocks
+  // 显示：自动折叠代码块
   bool _autoCollapseCodeBlock = false;
   bool get autoCollapseCodeBlock => _autoCollapseCodeBlock;
   Future<void> setAutoCollapseCodeBlock(bool v) async {
@@ -4628,7 +4611,7 @@ Requirements:
     await prefs.setBool(_displayAutoCollapseCodeBlockKey, v);
   }
 
-  // Display: code block auto-collapse threshold (lines)
+  // 显示：代码块自动折叠阈值（行数）
   int _autoCollapseCodeBlockLines = 2;
   int get autoCollapseCodeBlockLines => _autoCollapseCodeBlockLines;
   Future<void> setAutoCollapseCodeBlockLines(int v) async {
@@ -4640,7 +4623,7 @@ Requirements:
     await prefs.setInt(_displayAutoCollapseCodeBlockLinesKey, next);
   }
 
-  // Desktop-only: auto switch to Topics tab when changing assistant
+  // 仅桌面端：切换助手时自动切到“话题”标签页
   bool _desktopAutoSwitchTopics = false;
   bool get desktopAutoSwitchTopics => _desktopAutoSwitchTopics;
   Future<void> setDesktopAutoSwitchTopics(bool v) async {
@@ -4651,7 +4634,7 @@ Requirements:
     await prefs.setBool(_displayDesktopAutoSwitchTopicsKey, v);
   }
 
-  // Desktop-only: show system tray icon
+  // 仅桌面端：显示系统托盘图标
   bool _desktopShowTray = false;
   bool get desktopShowTray => _desktopShowTray;
   Future<void> setDesktopShowTray(bool v) async {
@@ -4669,7 +4652,7 @@ Requirements:
     );
   }
 
-  // Desktop-only: minimize to tray when closing window
+  // 仅桌面端：关闭窗口时最小化到托盘
   bool _desktopMinimizeToTrayOnClose = false;
   bool get desktopMinimizeToTrayOnClose => _desktopMinimizeToTrayOnClose;
   Future<void> setDesktopMinimizeToTrayOnClose(bool v) async {
@@ -4684,7 +4667,7 @@ Requirements:
     );
   }
 
-  // Display: haptics on message generation
+  // 显示：消息生成时触发触感反馈
   bool _hapticsOnGenerate = false;
   bool get hapticsOnGenerate => _hapticsOnGenerate;
   Future<void> setHapticsOnGenerate(bool v) async {
@@ -4695,7 +4678,7 @@ Requirements:
     await prefs.setBool(_displayHapticsOnGenerateKey, v);
   }
 
-  // Display: haptics on drawer open/close
+  // 显示：抽屉打开/关闭时触发触感反馈
   bool _hapticsOnDrawer = true;
   bool get hapticsOnDrawer => _hapticsOnDrawer;
   Future<void> setHapticsOnDrawer(bool v) async {
@@ -4706,20 +4689,20 @@ Requirements:
     await prefs.setBool(_displayHapticsOnDrawerKey, v);
   }
 
-  // Display: global haptics master switch
+  // 显示：全局触感反馈总开关
   bool _hapticsGlobalEnabled = true;
   bool get hapticsGlobalEnabled => _hapticsGlobalEnabled;
   Future<void> setHapticsGlobalEnabled(bool v) async {
     if (_hapticsGlobalEnabled == v) return;
     _hapticsGlobalEnabled = v;
-    // Apply immediately to service
+    // 立即应用到服务
     Haptics.setEnabled(v);
     notifyListeners();
     final prefs = _preferences;
     await prefs.setBool(_displayHapticsGlobalEnabledKey, v);
   }
 
-  // Display: iOS-style switch haptics only
+  // 显示：仅 iOS 风格开关的触感反馈
   bool _hapticsIosSwitch = true;
   bool get hapticsIosSwitch => _hapticsIosSwitch;
   Future<void> setHapticsIosSwitch(bool v) async {
@@ -4730,7 +4713,7 @@ Requirements:
     await prefs.setBool(_displayHapticsIosSwitchKey, v);
   }
 
-  // Display: list item tap haptics (e.g., rows in settings pages)
+  // 显示：列表项点击触感反馈（例如设置页中的行）
   bool _hapticsOnListItemTap = true;
   bool get hapticsOnListItemTap => _hapticsOnListItemTap;
   Future<void> setHapticsOnListItemTap(bool v) async {
@@ -4741,7 +4724,7 @@ Requirements:
     await prefs.setBool(_displayHapticsOnListItemTapKey, v);
   }
 
-  // Display: card tap haptics (e.g., Assistant cards etc.)
+  // 显示：卡片点击触感反馈（例如助手卡片等）
   bool _hapticsOnCardTap = true;
   bool get hapticsOnCardTap => _hapticsOnCardTap;
   Future<void> setHapticsOnCardTap(bool v) async {
@@ -4752,7 +4735,7 @@ Requirements:
     await prefs.setBool(_displayHapticsOnCardTapKey, v);
   }
 
-  // Display: show app updates notification
+  // 显示：显示应用更新通知
   bool _showAppUpdates = true;
   bool get showAppUpdates => _showAppUpdates;
   Future<void> setShowAppUpdates(bool v) async {
@@ -4763,7 +4746,7 @@ Requirements:
     await prefs.setBool(_displayShowAppUpdatesKey, v);
   }
 
-  // Display: keep sidebar open when selecting assistant (mobile)
+  // 显示：选择助手时保持侧边栏打开（移动端）
   bool _keepSidebarOpenOnAssistantTap = false;
   bool get keepSidebarOpenOnAssistantTap => _keepSidebarOpenOnAssistantTap;
   Future<void> setKeepSidebarOpenOnAssistantTap(bool v) async {
@@ -4774,7 +4757,7 @@ Requirements:
     await prefs.setBool(_displayKeepSidebarOpenOnAssistantTapKey, v);
   }
 
-  // Display: keep sidebar open when switching topics (mobile)
+  // 显示：切换话题时保持侧边栏打开（移动端）
   bool _keepSidebarOpenOnTopicTap = false;
   bool get keepSidebarOpenOnTopicTap => _keepSidebarOpenOnTopicTap;
   Future<void> setKeepSidebarOpenOnTopicTap(bool v) async {
@@ -4785,7 +4768,7 @@ Requirements:
     await prefs.setBool(_displayKeepSidebarOpenOnTopicTapKey, v);
   }
 
-  // Display: keep assistant list expanded when closing sidebar (mobile)
+  // 显示：关闭侧边栏时保持助手列表展开（移动端）
   bool _keepAssistantListExpandedOnSidebarClose = false;
   bool get keepAssistantListExpandedOnSidebarClose =>
       _keepAssistantListExpandedOnSidebarClose;
@@ -4797,7 +4780,7 @@ Requirements:
     await prefs.setBool(_displayKeepAssistantListExpandedOnSidebarCloseKey, v);
   }
 
-  // Network: request logging (debug)
+  // 网络：请求日志记录（调试）
   bool _requestLogEnabled = true;
   bool get requestLogEnabled => _requestLogEnabled;
   Future<void> setRequestLogEnabled(bool v) async {
@@ -4820,7 +4803,7 @@ Requirements:
     await ContextLogger.setEnabled(v);
   }
 
-  // Flutter: runtime logging (debug)
+  // Flutter：运行时日志记录（调试）
   bool _flutterLogEnabled = false;
   bool get flutterLogEnabled => _flutterLogEnabled;
   Future<void> setFlutterLogEnabled(bool v) async {
@@ -4840,7 +4823,7 @@ Requirements:
     notifyListeners();
   }
 
-  // Log settings: save output
+  // 日志设置：保存输出
   bool _logSaveOutput = false;
   bool get logSaveOutput => _logSaveOutput;
   Future<void> setLogSaveOutput(bool v) async {
@@ -4852,7 +4835,7 @@ Requirements:
     await prefs.setBool(_logSaveOutputKey, v);
   }
 
-  // Log settings: omit inline base64 images/files
+  // 日志设置：省略内联 base64 图片/文件
   bool _logElideLargePayloads = true;
   bool get logElideLargePayloads => _logElideLargePayloads;
   Future<void> setLogElideLargePayloads(bool v) async {
@@ -4864,7 +4847,7 @@ Requirements:
     await prefs.setBool(_logElideLargePayloadsKey, v);
   }
 
-  // Log settings: auto-delete (days)
+  // 日志设置：自动删除（天）
   int _logAutoDeleteDays = 0;
   int get logAutoDeleteDays => _logAutoDeleteDays;
   Future<void> setLogAutoDeleteDays(int v) async {
@@ -4876,7 +4859,7 @@ Requirements:
     RequestLogger.cleanupLogs(autoDeleteDays: v, maxSizeMB: _logMaxSizeMB);
   }
 
-  // Log settings: max log size (MB)
+  // 日志设置：最大日志大小（MB）
   int _logMaxSizeMB = 50;
   int get logMaxSizeMB => _logMaxSizeMB;
   Future<void> setLogMaxSizeMB(int v) async {
@@ -4888,7 +4871,7 @@ Requirements:
     RequestLogger.cleanupLogs(autoDeleteDays: _logAutoDeleteDays, maxSizeMB: v);
   }
 
-  // Search service settings
+  // 搜索服务设置
   Future<void> setSearchServices(List<SearchServiceOptions> services) async {
     _searchServices = List.from(services);
     if (_searchServiceSelected >= _searchServices.length) {
@@ -4936,7 +4919,7 @@ Requirements:
     await prefs.setBool(_searchAutoTestOnLaunchKey, enabled);
   }
 
-  // Combined update for settings
+  // 用于设置的组合更新
   Future<void> updateSettings(SettingsProvider newSettings) async {
     if (!listEquals(_searchServices, newSettings._searchServices)) {
       await setSearchServices(newSettings._searchServices);
@@ -4976,7 +4959,7 @@ Requirements:
     copy._ttsTextSelectionMode = _ttsTextSelectionMode;
     copy._asrServices = _asrServices;
     copy._selectedAsrServiceId = _selectedAsrServiceId;
-    // Copy other fields
+    // 复制其他字段
     copy._providersOrder = _providersOrder;
     copy._themeMode = _themeMode;
     copy._themePaletteId = _themePaletteId;
@@ -5049,7 +5032,6 @@ Requirements:
     copy._autoCollapseThinking = _autoCollapseThinking;
     copy._collapseThinkingSteps = _collapseThinkingSteps;
     copy._showToolResultSummary = _showToolResultSummary;
-    copy._regenerateDeleteTrailingMessages = _regenerateDeleteTrailingMessages;
     copy._showRegenerateConfirmDialog = _showRegenerateConfirmDialog;
     copy._showMessageNavButtons = _showMessageNavButtons;
     copy._mobileMessageNavButtonsMode = _mobileMessageNavButtonsMode;
@@ -5283,7 +5265,7 @@ class _SocksProxyHttpOverrides extends HttpOverrides {
 
         final proxyAddr = await resolveProxyAddress();
         if (proxyAddr == null) {
-          // Preserve previous behavior: if proxy cannot be configured, fall back to direct.
+          // 保留先前的行为：如果代理无法配置，则回退为直连。
           return directConnection(uri);
         }
 
@@ -5324,7 +5306,7 @@ class _SocksProxyHttpOverrides extends HttpOverrides {
 
 enum ProviderKind { openai, google, claude }
 
-// Background rendering mode for chat message bubbles
+// 聊天消息气泡的后台渲染模式
 enum ChatMessageBackgroundStyle { defaultStyle, frosted, solid }
 
 enum AndroidBackgroundChatMode { off, on, onNotify }
@@ -5337,45 +5319,44 @@ class ProviderConfig {
   final String name;
   final String apiKey;
   final String baseUrl;
-  final ProviderKind?
-  providerType; // Explicit provider type to avoid misclassification
-  final String? chatPath; // openai only
-  final bool? useResponseApi; // openai only
-  final bool? vertexAI; // google only
-  final String? location; // google vertex ai only
-  final String? projectId; // google vertex ai only
-  // Google Vertex AI via service account JSON (paste or import)
-  final String? serviceAccountJson; // google vertex ai only
-  final List<String> models; // placeholder for future model management
-  // Per-model overrides (by logical model key).
-  // Each entry may point to an upstream/vendor model id via `apiModelId` so that
-  // multiple logical models can share the same backend model with different params.
-  // {'<key>': {'apiModelId': String?, 'name': String?, 'type': 'chat'|'embedding', 'input': ['text','image'], 'output': [...], 'abilities': ['tool','reasoning']}}
+  final ProviderKind? providerType; // 显式指定 provider 类型，避免误分类
+  final String? chatPath; // 仅 openai
+  final bool? useResponseApi; // 仅 openai
+  final bool? vertexAI; // 仅 google
+  final String? location; // 仅 google vertex ai
+  final String? projectId; // 仅 google vertex ai
+  // 通过服务账号 JSON 使用 Google Vertex AI（粘贴或导入）
+  final String? serviceAccountJson; // 仅 google vertex ai
+  final List<String> models; // 未来模型管理的占位字段
+  // 按逻辑模型键的逐模型覆盖配置。
+  // 每个条目可通过 `apiModelId` 指向上游/供应商模型 ID，
+  // 使多个逻辑模型以不同参数共享同一个后端模型。
+  // {'<key>': {'apiModelId': String?, 'name': String?, 'type': '聊天'|'嵌入', '输入': ['文本','图像'], '输出': [...], '能力': ['工具','推理']}}
   final Map<String, dynamic> modelOverrides;
-  // Per-provider custom request overrides.
+  // 按提供商自定义请求覆盖项。
   final List<Map<String, String>> customHeaders;
   final List<Map<String, String>> customBody;
-  // Per-provider proxy
+  // 按提供商代理
   final bool? proxyEnabled;
   final String? proxyType; // http|https|socks5
   final String? proxyHost;
   final String? proxyPort;
   final String? proxyUsername;
   final String? proxyPassword;
-  // Custom provider avatar (same scheme as user plus built-in icon: emoji | url | file | icon | lobehub)
+  // 自定义提供商头像（与用户相同的方案，加上内置图标：emoji | url | file | icon | lobehub）
   final String? avatarType; // 'emoji' | 'url' | 'file' | 'icon' | 'lobehub'
   final String? avatarValue;
-  // Multi-key mode
-  final bool? multiKeyEnabled; // default false
-  final List<ApiKeyConfig>? apiKeys; // when enabled
+  // 多密钥模式
+  final bool? multiKeyEnabled; // 默认 false
+  final List<ApiKeyConfig>? apiKeys; // 启用时使用
   final KeyManagementConfig? keyManagement;
-  // AIhubmix promo header opt-in
+  // AIhubmix 推广头部主动加入
   final bool? aihubmixAppCodeEnabled;
-  // OpenAI-compatible provider account balance query.
+  // OpenAI 兼容服务商的账户余额查询。
   final bool? balanceEnabled;
   final String? balanceApiPath;
   final String? balanceResultPath;
-  // Anthropic/OpenRouter Claude prompt caching for stable system prompts.
+  // Anthropic/OpenRouter Claude 针对稳定系统提示词的提示词缓存。
   final bool? claudePromptCachingEnabled;
   final String? claudePromptCachingTtl;
 
@@ -5446,7 +5427,7 @@ class ProviderConfig {
     this.claudePromptCachingTtl = claudePromptCachingTtl5m,
   });
 
-  // Sentinel for copyWith nullability control (allow explicit null set)
+  // copyWith 可空性控制的哨兵值（允许显式设置为 null）
   static const Object _sentinel = Object();
 
   ProviderConfig copyWith({
@@ -5653,10 +5634,10 @@ class ProviderConfig {
   }
 
   static ProviderKind classify(String key, {ProviderKind? explicitType}) {
-    // If an explicit type is provided, use it
+    // 如果提供了显式类型，则使用它
     if (explicitType != null) return explicitType;
 
-    // Otherwise, infer from the key
+    // 否则，根据 key 推断
     final k = key.toLowerCase();
     if (k.contains('gemini') || k.contains('google')) {
       return ProviderKind.google;
@@ -5713,7 +5694,7 @@ class ProviderConfig {
       if (s.contains('silicon')) return true;
       if (s.contains('openrouter')) return true;
       if (s.contains('kelivoin')) return true;
-      return false; // others disabled by default
+      return false; // 其他项默认禁用
     }
 
     final kind = classify(key);
@@ -5774,7 +5755,7 @@ class ProviderConfig {
           claudePromptCachingEnabled: false,
         );
       case ProviderKind.openai:
-        // Special-case KelivoIN default models and overrides
+        // 对 KelivoIN 的默认模型和覆盖项做特殊处理
         if (lowerKey.contains('kelivoin')) {
           return ProviderConfig(
             id: key,
@@ -5783,8 +5764,7 @@ class ProviderConfig {
             apiKey: _kelivoInPublicApiKey,
             baseUrl: _defaultBase(key),
             providerType: ProviderKind.openai,
-            chatPath:
-                null, // keep empty in UI; code uses default '/chat/completions'
+            chatPath: null, // UI 中保持为空；代码使用默认 '/chat/completions'
             useResponseApi: false,
             models: const [
               // 'openai-fast',
@@ -5826,7 +5806,7 @@ class ProviderConfig {
             claudePromptCachingEnabled: false,
           );
         }
-        // Special-case SiliconFlow: prefill two partnered models
+        // 对 SiliconFlow 做特殊处理：预填两个合作模型
         if (lowerKey.contains('silicon')) {
           return ProviderConfig(
             id: key,

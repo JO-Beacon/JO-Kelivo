@@ -4,6 +4,7 @@ import 'dart:isolate';
 
 import 'package:archive/archive_io.dart';
 import 'package:crypto/crypto.dart';
+import 'package:drift_dev/api/migrations_native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
@@ -25,12 +26,15 @@ import 'package:Kelivo/utils/kelivo_file_uri.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 import 'package:Kelivo/core/providers/backup_provider.dart';
 import 'package:Kelivo/core/services/backup/data_sync.dart';
+import 'package:Kelivo/core/services/backup/joaiclient_archive.dart';
 import 'package:Kelivo/core/services/backup/restore_receipt.dart';
 import 'package:Kelivo/core/services/backup/restore_startup_gate.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/instruction_injection_store.dart';
+import 'package:Kelivo/features/migration/sqlite_schema_migration_service.dart';
 
 import '../../../support/jo_015_business_fixture.dart';
+import '../../database/generated_schema/schema.dart';
 
 bool _containsContiguousBytes(List<int> source, List<int> pattern) {
   for (var start = 0; start <= source.length - pattern.length; start++) {
@@ -538,6 +542,106 @@ void main() {
       },
     );
 
+    test('external export uses a complete .joaiclient snapshot', () async {
+      final chatService = ChatService();
+      final sync = DataSync(
+        businessRepository: businessRepository,
+        chatService: chatService,
+      );
+      final backupFile = await sync.prepareJoaiclientFile(
+        const WebDavConfig(includeChats: false, includeFiles: false),
+      );
+      addTearDown(() => DataSync.cleanupTemporaryBackupFile(backupFile));
+      addTearDown(chatService.dispose);
+
+      expect(p.extension(backupFile.path), '.joaiclient');
+      expect(await backupFile.length(), greaterThan(56));
+      expect(await JoaiclientArchive.isJoaiclient(backupFile), isTrue);
+    });
+
+    test(
+      'restores a legacy linear SQLite backup after migrating its database',
+      () async {
+        final legacyAppData = Directory(p.join(root.path, 'legacy-app-data'))
+          ..createSync(recursive: true);
+        final legacyDatabase = File(
+          p.join(legacyAppData.path, AppDatabase.databaseFileName),
+        );
+        final verifier = SchemaVerifier(GeneratedHelper());
+        final schema = await verifier.schemaAt(1);
+        final raw = sqlite.sqlite3.open(legacyDatabase.path);
+        await schema.rawDatabase.backup(raw).drain<void>();
+        schema.close();
+        final timestamp = DateTime.utc(2026, 1, 1).microsecondsSinceEpoch;
+        raw.execute(
+          'INSERT INTO conversation_rows '
+          '(id, title, created_at, updated_at) '
+          "VALUES ('legacy-conversation', 'legacy', $timestamp, $timestamp);",
+        );
+        raw.execute(
+          'INSERT INTO message_rows '
+          '(id, conversation_id, role, timestamp, message_order) '
+          "VALUES ('legacy-message', 'legacy-conversation', 'user', "
+          '$timestamp, 0);',
+        );
+        raw.userVersion = 1;
+        raw.close();
+
+        final migrationService = SqliteSchemaMigrationService(
+          await SqliteSchemaMigrationService.check(legacyAppData),
+        );
+        final externalDirectory = Directory(p.join(root.path, 'external'))
+          ..createSync(recursive: true);
+        final legacyBackup = await migrationService.backupTo(externalDirectory);
+        await migrationService.dispose();
+
+        final chatService = ChatService();
+        addTearDown(chatService.dispose);
+        final sync = DataSync(
+          businessRepository: businessRepository,
+          chatService: chatService,
+        );
+
+        await sync.restoreFromLocalFile(
+          legacyBackup,
+          const WebDavConfig(includeChats: true, includeFiles: false),
+        );
+
+        final run = await _singleRestoreRunDirectory(root);
+        final candidate = File(
+          p.join(run.path, 'candidate', 'database', 'kelivo.db'),
+        );
+        final candidateDatabase = sqlite.sqlite3.open(
+          candidate.path,
+          mode: sqlite.OpenMode.readOnly,
+        );
+        try {
+          expect(
+            candidateDatabase.userVersion,
+            AppDatabase.currentSchemaVersion,
+          );
+          expect(
+            candidateDatabase.select(
+              "SELECT name FROM sqlite_master WHERE name = "
+              "'conversation_branch_rows';",
+            ),
+            hasLength(1),
+          );
+          expect(
+            candidateDatabase
+                .select(
+                  'SELECT COUNT(*) AS count FROM conversation_branch_rows '
+                  "WHERE conversation_id = 'legacy-conversation';",
+                )
+                .single['count'],
+            1,
+          );
+        } finally {
+          candidateDatabase.close();
+        }
+      },
+    );
+
     test(
       'settings-only overwrite restores saved secrets and replaces unrelated business settings',
       () async {
@@ -990,11 +1094,21 @@ void main() {
           'kelivo-122-answer': 1,
         });
         final restoredMessages = await chatService.loadMessages(conversationId);
+        // The active chat surface follows the selected tree path. The older
+        // answer remains persisted as a sibling branch rather than being
+        // flattened into the visible linear projection.
         expect(restoredMessages.map((message) => message.id), const [
           'kelivo-122-user',
-          'kelivo-122-answer-v0',
           'kelivo-122-answer-v1',
         ]);
+        expect(
+          await chatService.loadPersistedMessageIds(conversationId),
+          containsAll(<String>[
+            'kelivo-122-user',
+            'kelivo-122-answer-v0',
+            'kelivo-122-answer-v1',
+          ]),
+        );
         final revised = restoredMessages.last;
         expect(revised.content, 'Revised answer');
         expect(revised.parts.whereType<ImagePart>().single.uri, attachmentUri);

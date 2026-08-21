@@ -235,7 +235,7 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
     );
   }
 
-  // list height helper removed after switching to sliver-based list
+  // 切换到基于 sliver 的列表后，已移除列表高度辅助函数
 
   Future<void> _testConnection(
     BuildContext context,
@@ -292,7 +292,7 @@ class _ServiceCardState extends State<_ServiceCard> {
         ? cs.primary.withValues(alpha: isDark ? 0.35 : 0.45)
         : cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08);
 
-    // Connection/testing status capsule
+    // 连接或测试状态胶囊
     final l10n = AppLocalizations.of(context)!;
     final conn = context
         .watch<SettingsProvider>()
@@ -737,7 +737,7 @@ Widget _divider(BuildContext context) {
   );
 }
 
-// ===== Dialogs =====
+// ===== 对话框 =====
 
 Future<SearchServiceOptions?> _showAddServiceDialog(
   BuildContext context,
@@ -1269,7 +1269,7 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
     super.initState();
     _extraApiKeys = List<String>.of(widget.service.extraApiKeys);
     _initControllers();
-    // Keep the multi-key tile count in sync as the primary key is edited.
+    // 编辑主密钥时，保持多密钥磁贴数量同步。
     _controllers['apiKey']?.addListener(_onPrimaryKeyChanged);
   }
 
@@ -2325,7 +2325,7 @@ String _serviceTypeName(BuildContext context, String type) {
   }
 }
 
-// Custom dropdown for service type selection (desktop style)
+// 用于选择服务类型的自定义下拉框（桌面风格）
 class _ServiceTypeDropdown extends StatefulWidget {
   const _ServiceTypeDropdown({
     required this.selectedType,

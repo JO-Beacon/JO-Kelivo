@@ -182,10 +182,9 @@ class AskUserInteractionService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Cancel pending requests that belong to [conversationId]. Requests with
-  /// no recorded conversation are cancelled too (fail-safe against leaking a
-  /// blocked tool handler), but requests owned by other conversations keep
-  /// waiting so cancelling one conversation cannot break another's stream.
+  /// 取消属于 [conversationId] 的待处理请求。没有记录会话的请求
+  /// 也会被取消（防止泄漏被阻塞的工具处理器），但属于其他会话的请求会
+  /// 等待，因此取消一个会话不会破坏另一个会话的流。
   void cancelForConversation(String conversationId) {
     final toCancel = _pending.values
         .where(

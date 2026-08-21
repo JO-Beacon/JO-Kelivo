@@ -66,7 +66,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
   bool stream = true,
 }) async* {
   final upstreamModelId = _apiModelId(config, modelId);
-  // Endpoint and headers (constant across rounds)
+  // 端点与请求头（各轮次保持不变）
   final base = config.baseUrl.endsWith('/')
       ? config.baseUrl.substring(0, config.baseUrl.length - 1)
       : config.baseUrl;
@@ -80,7 +80,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
     config,
   );
 
-  // Extract system prompt (Anthropic uses top-level `system`)
+  // 提取 system prompt（Anthropic 使用顶层 `system`）
   String systemPrompt = '';
   final nonSystemMessages = <Map<String, dynamic>>[];
   for (final m in messages) {
@@ -92,8 +92,8 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       }
       continue;
     }
-    // Keep media-paths through transform; they are not forwarded in the
-    // final Anthropic request body (we rebuild role/content below).
+    // 在转换过程中保留 media-paths；它们不会被转发到
+    // 最终的 Anthropic 请求体中（下方会重建 role/content）。
     nonSystemMessages.add(
       Map<String, dynamic>.from(m)
         ..remove(multimodalInternalRevisionIdKey)
@@ -101,7 +101,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
     );
   }
 
-  // Transform last user message to include images per Anthropic schema
+  // 按 Anthropic 规范转换最后一条用户消息以包含图片
   final initialMessages = <Map<String, dynamic>>[];
   final pendingToolResults = <Map<String, dynamic>>[];
   void flushPendingToolResults() {
@@ -247,14 +247,14 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       continue;
     }
     final raw = (m['content'] ?? '').toString();
-    // Semantic media detection only - custom attachment markers are not
-    // recognized. Attachments arrive via structured media-path keys /
-    // userImagePaths, plus Markdown ![](...).
+    // 仅做语义媒体检测——不识别自定义附件标记。
+    // 附件通过结构化 media-path 键 /
+    // userImagePaths 以及 Markdown ![](...) 传入。
     final hasMarkdownImages = raw.contains('![') && raw.contains('](');
     final internalMediaRefs = parseInternalMediaRefs(
       m[multimodalInternalMediaPathsKey],
     );
-    // Consume injected media refs for user and assistant history turns.
+    // 消费注入的媒体引用（针对用户与助手的历史轮次）。
     final hasInternalMedia = internalMediaRefs.isNotEmpty;
     final hasAttachedImages =
         isLast && role == 'user' && (userImagePaths?.isNotEmpty == true);
@@ -276,7 +276,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
         final normalized = normalizeSrc(source);
         if (!seenSources.add(normalized)) return;
         if (source.startsWith('http://') || source.startsWith('https://')) {
-          // Preserve prior official-Claude behavior for remote URLs.
+          // 对远程 URL 保留先前官方 Claude 的行为。
           parts.add({'type': 'text', 'text': source});
           return;
         }
@@ -333,8 +333,8 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       );
       for (final mediaRef in supplementalRefs) {
         final mime = _mimeForInternalMediaRef(mediaRef);
-        // Never emit Anthropic image blocks for video/audio or other
-        // non-Claude image MIME types (e.g. video/mp4).
+        // 永远不要为视频/音频或其他
+        // 非 Claude 图片 MIME 类型（例如 video/mp4）生成 Anthropic 图片块。
         if (isVideoMime(mime) ||
             isAudioMime(mime) ||
             !_isClaudeSupportedImageMime(mime)) {
@@ -361,7 +361,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
   }
   flushPendingToolResults();
 
-  // Map OpenAI-style tools to Anthropic custom tools (client tools)
+  // 将 OpenAI 风格的工具映射为 Anthropic 自定义工具（client tools）
   List<Map<String, dynamic>>? anthropicTools;
   if (tools != null && tools.isNotEmpty) {
     anthropicTools = [];
@@ -382,7 +382,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
     }
   }
 
-  // Collect final tools list: client + server + built-in web_search
+  // 收集最终工具列表：client + server + 内置 web_search
   final List<Map<String, dynamic>> allTools = [];
   if (anthropicTools != null && anthropicTools.isNotEmpty) {
     allTools.addAll(anthropicTools);
@@ -438,7 +438,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
     allTools.add(entry);
   }
 
-  // Headers (constant across rounds)
+  // 请求头（各轮次保持不变）
   final baseHeaders = _customHeaders(
     config,
     modelId,
@@ -451,7 +451,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
     assistantHeaders: extraHeaders,
   );
 
-  // Running conversation across rounds
+  // 跨轮次的进行中对话
   List<Map<String, dynamic>> convo = List<Map<String, dynamic>>.from(
     initialMessages,
   );
@@ -474,7 +474,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
         ? _claudeOutputConfig(upstreamModelId, thinkingBudget, config: config)
         : null;
 
-    // Prepare request body per round
+    // 为每轮准备请求体
     final body = <String, dynamic>{
       'model': upstreamModelId,
       'max_tokens': maxTokens ?? _defaultClaudeMaxOutputTokens(upstreamModelId),
@@ -510,11 +510,11 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       throw HttpException('HTTP ${response.statusCode}: $errorBody');
     }
 
-    // Non-streaming path: parse full JSON, handle tool_use, then continue loop if needed.
+    // 非流式路径：解析完整 JSON，处理 tool_use，然后按需继续循环。
     if (!stream) {
       final txt = await response.stream.bytesToString();
       final obj = jsonDecode(txt) as Map;
-      // Usage
+      // 用量统计
       try {
         final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
         if (u != null) {
@@ -540,9 +540,9 @@ Stream<ChatStreamChunk> _sendClaudeStream(
           }
         } else if (type == 'thinking' ||
             (type == 'redacted_thinking' && !skipRedactedThinkingBlocks)) {
-          // Preserve thinking blocks unmodified for tool-use continuation.
-          // When thinking is enabled, the next request must include the last assistant
-          // message starting with a thinking/redacted_thinking block.
+          // 保留 thinking 块原样，用于 tool-use 续接。
+          // 启用 thinking 时，下一个请求必须包含上一条助手
+          // 消息，且以 thinking/redacted_thinking 块开头。
           try {
             assistantBlocks.add(
               Map<String, dynamic>.from(it.cast<String, dynamic>()),
@@ -618,13 +618,13 @@ Stream<ChatStreamChunk> _sendClaudeStream(
             toolResults: resultsInfo,
           );
         }
-        // Extend convo: assistant + user tool_result, loop
+        // 扩展对话：assistant + user tool_result，循环
         final assistantMsg = {'role': 'assistant', 'content': assistantBlocks};
         final userToolMsg = {'role': 'user', 'content': results};
         convo = [...convo, assistantMsg, userToolMsg];
-        continue; // next round
+        continue; // 下一轮
       }
-      // No tool use -> return final text
+      // 无工具调用 -> 返回最终文本
       yield ChatStreamChunk(
         content: buf.toString(),
         isDone: true,
@@ -640,17 +640,17 @@ Stream<ChatStreamChunk> _sendClaudeStream(
     TokenUsage? usage;
     String? lastStopReason;
 
-    // Per-round accumulation
+    // 每轮累加
     final Map<String, Map<String, dynamic>> anthToolUse =
         <String, Map<String, dynamic>>{}; // id -> {name, args}
     final Map<int, String> cliIndexToId =
-        <int, String>{}; // client tool: index -> id
+        <int, String>{}; // client tool：index -> id
     final Map<String, String> toolResultsContent =
-        <String, String>{}; // id -> result text
+        <String, String>{}; // id -> 结果文本
     final List<Map<String, dynamic>> assistantBlocks = <Map<String, dynamic>>[];
     final StringBuffer textBuf = StringBuffer();
 
-    // Track thinking blocks so they can be sent back for tool-use continuation.
+    // 跟踪 thinking 块，以便在 tool-use 续接时回传。
     final Map<int, int> thinkingIndexToAssistantBlock = <int, int>{};
     final Map<int, StringBuffer> thinkingText = <int, StringBuffer>{};
     final Map<int, StringBuffer> thinkingSig = <int, StringBuffer>{};
@@ -671,7 +671,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       }
     }
 
-    // Server tool helpers (web_search)
+    // 服务端工具辅助（web_search）
     final Map<int, String> srvIndexToId = <int, String>{};
     final Map<String, String> srvArgsStr = <String, String>{};
     final Map<String, Map<String, dynamic>> srvArgs =
@@ -689,9 +689,9 @@ Stream<ChatStreamChunk> _sendClaudeStream(
         if (line.isEmpty || !line.startsWith('data:')) continue;
 
         final data = line.substring(5).trimLeft();
-        // Anthropic reports failures in-band as `event: error` with
-        // {type:"error", error:{type,message}}; raise before the
-        // malformed-chunk guard below can swallow it.
+        // Anthropic 以带内 `event: error` 形式上报失败，
+        // 内容为 {type:"error", error:{type,message}}；抢在下方
+        // 格式错误分片兜底逻辑吞掉它之前抛出。
         _throwIfInBandStreamError(data);
         try {
           final obj = jsonDecode(data);
@@ -701,7 +701,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
             final cb = obj['content_block'];
             final idx = parseIndex(obj['index']);
             if (cb is Map && (cb['type'] == 'thinking')) {
-              // Preserve thinking blocks (with signature) for tool-use continuation.
+              // 保留 thinking 块（含签名）用于 tool-use 续接。
               flushTextBlock();
               if (idx != null) {
                 assistantBlocks.add({
@@ -722,7 +722,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
                 redactedThinkingData[idx] = StringBuffer();
               }
             } else if (cb is Map && (cb['type'] == 'tool_use')) {
-              // Flush text block before tool_use
+              // 在 tool_use 之前刷新文本块
               flushTextBlock();
               final id = (cb['id'] ?? '').toString();
               final name = (cb['name'] ?? '').toString();
@@ -736,7 +736,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
                   'input': {},
                 });
                 if (idx2 >= 0) cliIndexToId[idx2] = id;
-                // Emit placeholder tool-call card immediately
+                // 立即输出占位工具调用卡片
                 yield ChatStreamChunk(
                   content: '',
                   isDone: false,
@@ -762,7 +762,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
                 srvIndexToId[idx2] = id;
                 srvArgsStr[id] = '';
               }
-              // Emit placeholder for server tool to show card (e.g., built-in web_search)
+              // 为服务端工具输出占位以显示卡片（例如内置 web_search）
               if (id.isNotEmpty && name == 'web_search') {
                 yield ChatStreamChunk(
                   content: '',
@@ -782,7 +782,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
                 );
               }
             } else if (cb is Map && (cb['type'] == 'web_search_tool_result')) {
-              // Emit simplified search results to UI
+              // 向 UI 输出简化后的搜索结果
               final toolUseId = (cb['tool_use_id'] ?? '').toString();
               final contentBlock = cb['content'];
               final items = <Map<String, dynamic>>[];
@@ -873,7 +873,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
                   redactedThinkingData[idx]!.write(data);
                 }
               } else if (delta['type'] == 'tool_use_delta') {
-                // Client tool input fragments stream under the same content_block index
+                // client 工具输入片段在相同的 content_block 索引下流式传输
                 final idx = (obj['index'] is int)
                     ? obj['index'] as int
                     : int.tryParse((obj['index'] ?? '').toString());
@@ -918,7 +918,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
             }
           } else if (type == 'content_block_stop') {
             final idx = parseIndex(obj['index']);
-            // Finalize thinking blocks so they can be sent back unmodified.
+            // 收尾 thinking 块，使其能原样回传。
             if (idx != null && thinkingIndexToAssistantBlock.containsKey(idx)) {
               final pos = thinkingIndexToAssistantBlock.remove(idx)!;
               final t = thinkingText.remove(idx)?.toString() ?? '';
@@ -954,7 +954,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
               } catch (_) {
                 args = <String, dynamic>{};
               }
-              // Update last assistant tool_use block input
+              // 更新最后一条助手 tool_use 块的输入
               for (int k = assistantBlocks.length - 1; k >= 0; k--) {
                 final b = assistantBlocks[k];
                 if (b['type'] == 'tool_use' &&
@@ -968,7 +968,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
                   break;
                 }
               }
-              // Emit tool result to UI (placeholder was emitted at start)
+              // 向 UI 输出工具结果（开头已输出占位）
               if (onToolCall != null) {
                 final res = await onToolCall(name, args, toolCallId: id);
                 toolResultsContent[id] = res;
@@ -1028,7 +1028,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
               );
               roundTokens = usage.totalTokens;
             }
-            // Capture stop reason to handle pause_turn for server tools
+            // 捕获 stop reason 以处理服务端工具的 pause_turn
             try {
               final d = obj['delta'];
               final sr = (d is Map)
@@ -1039,7 +1039,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
               }
             } catch (_) {}
           } else if (type == 'message_stop') {
-            // Flush remaining text
+            // 刷新剩余文本
             final t = textBuf.toString();
             if (t.isNotEmpty) {
               assistantBlocks.add({'type': 'text', 'text': t});
@@ -1047,29 +1047,29 @@ Stream<ChatStreamChunk> _sendClaudeStream(
             messageStopped = true;
           }
         } catch (_) {
-          // ignore malformed chunk
+          // 忽略格式错误的分片
         }
       }
       if (messageStopped) {
-        break; // break await-for
+        break; // 跳出 await-for
       }
     }
 
-    // Merge usage across rounds for final token count
+    // 合并各轮用量以得到最终 token 计数
     if (usage != null) {
       totalUsage = (totalUsage ?? const TokenUsage()).merge(usage);
     }
 
-    // If no client tool calls, decide whether to continue (pause_turn/server tool) or finalize
+    // 若无 client 工具调用，决定是继续（pause_turn/服务端工具）还是结束
     if (anthToolUse.isEmpty) {
       final sr = lastStopReason ?? '';
       if (sr == 'pause_turn') {
-        // Continue this turn with assistant content only
+        // 仅用助手内容继续本轮
         convo = [
           ...convo,
           {'role': 'assistant', 'content': assistantBlocks},
         ];
-        // Loop to next round
+        // 进入下一轮
         continue;
       } else {
         yield ChatStreamChunk(
@@ -1082,7 +1082,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       }
     }
 
-    // Build tool_result blocks in a single user message (parallel-safe)
+    // 在单条用户消息中构建 tool_result 块（并行安全）
     final toolResultsBlocks = <Map<String, dynamic>>[];
     for (final entry in anthToolUse.entries) {
       final id = entry.key;
@@ -1105,12 +1105,12 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       });
     }
 
-    // Extend conversation: assistant content (with tool_use blocks) + user tool_results
+    // 扩展对话：助手内容（含 tool_use 块）+ user tool_results
     convo = [
       ...convo,
       {'role': 'assistant', 'content': assistantBlocks},
       {'role': 'user', 'content': toolResultsBlocks},
     ];
-    // Loop to next round; the next response will stream more assistant content
+    // 进入下一轮；下一次响应会流出更多助手内容
   }
 }

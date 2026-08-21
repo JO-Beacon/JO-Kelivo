@@ -88,9 +88,9 @@ class BottomToolsSheet extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: Theme.of(context).colorScheme.shadow.withValues(
-                alpha: 0.06,
-              ),
+              color: Theme.of(
+                context,
+              ).colorScheme.shadow.withValues(alpha: 0.06),
               blurRadius: 20,
               offset: const Offset(0, -6),
             ),
@@ -99,7 +99,7 @@ class BottomToolsSheet extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Drag handle
+            // 拖拽把手
             Container(
               width: 40,
               height: 4,

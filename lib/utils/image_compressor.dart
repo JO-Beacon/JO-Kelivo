@@ -21,10 +21,10 @@ class ImageCompressConfig {
 class ImageCompressor {
   static const int kMinBytesToCompress = 64 * 1024;
 
-  /// Compresses [srcPath] into [dir].
+  /// 将 [srcPath] 压缩到 [dir] 中。
   ///
-  /// Images that are skipped, fail to decode, or would grow are copied
-  /// unchanged. Returns `null` only when the source cannot be persisted.
+  /// 被跳过、解码失败或压缩后会变大的图片会原样复制。
+  /// 仅当源文件无法持久化时才返回 `null`。
   static Future<String?> compressToUploadDir(
     String srcPath,
     Directory dir,
@@ -61,7 +61,7 @@ class ImageCompressor {
     }
   }
 
-  /// Returns a smaller JPEG, or `null` when compression should be skipped.
+  /// 返回更小的 JPEG；当应跳过压缩时返回 `null`。
   static Future<Uint8List?> compressBytes(
     Uint8List bytes,
     ImageCompressConfig config,
@@ -232,10 +232,9 @@ bool _pngNeedsOptIn(Uint8List bytes) {
     return false;
   }
 
-  // This is intentionally conservative: color types 4/6 and tRNS mean the
-  // image can contain transparency. An all-opaque alpha channel is therefore
-  // skipped too; proving otherwise would require the full pixel scan avoided
-  // here.
+  // 这里刻意采用保守判断：颜色类型 4/6 和 tRNS 表示图片可能包含透明通道。
+  // 因此完全不透明的 alpha 通道也会被跳过；要证明相反情况需要做这里避免的
+  // 全像素扫描。
   final colorType = bytes[25];
   if (colorType == 4 || colorType == 6) return true;
 

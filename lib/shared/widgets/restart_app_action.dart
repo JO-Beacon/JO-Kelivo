@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import 'snackbar.dart';
 
-/// Requests a process restart and keeps the current retry surface visible when
-/// the platform cannot schedule it.
+/// 请求进程重启；当平台无法安排重启时，保持当前重试界面可见。
 Future<bool> requestAppRestart(
   BuildContext context,
   Future<void> Function() restart,

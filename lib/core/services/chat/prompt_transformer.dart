@@ -20,8 +20,7 @@ class PromptTransformer {
     final dt = '$date $time';
     final os = Platform.operatingSystem;
     final osv = Platform.operatingSystemVersion;
-    final device =
-        os; // Simple fallback; can be extended with device_info plugins
+    final device = os; // 简单回退；可扩展 device_info 插件
     final battery = 'unknown';
 
     return <String, String>{
@@ -48,11 +47,11 @@ class PromptTransformer {
     return out;
   }
 
-  // Very simple mustache-like replacement for message template variables
-  // Supported: {{ role }}, {{ message }}, {{ time }}, {{ date }}
+  // 对消息模板变量做非常简单的 mustache 式替换
+  // 支持：{{ role }}、{{ message }}、{{ time }}、{{ date }}
   //
-  // [now] defaults to DateTime.now() for backwards compatibility. The memory
-  // path passes the message's own timestamp (§8.3 / §9.4).
+  // [now] 默认使用 DateTime.now() 以保持向后兼容。memory
+  // path 传入消息自身的时间戳（§8.3 / §9.4）。
   static String applyMessageTemplate(
     String template, {
     required String role,

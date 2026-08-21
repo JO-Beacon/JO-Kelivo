@@ -2,9 +2,9 @@ part of '../chat_api_service.dart';
 
 const String _geminiThoughtSigTag = 'gemini_thought_signatures';
 
-/// Placeholder thought signature accepted by the Gemini API when the original
-/// signature is unavailable (e.g. legacy history persisted before signatures
-/// were captured). Same value used by Google's own Gemini CLI.
+/// Gemini API 在原始签名不可用时接受的占位思考签名
+/// （例如，在捕获签名之前持久化的旧历史记录）。
+/// 该值与 Google 自己的 Gemini CLI 使用的值相同。
 const String _geminiDummyThoughtSignature =
     'context_engineering_is_the_way_to_go';
 final RegExp _geminiThoughtSigComment = RegExp(
@@ -12,7 +12,7 @@ final RegExp _geminiThoughtSigComment = RegExp(
   dotAll: true,
 );
 
-// YouTube URL regex: watch, shorts, embed, youtu.be (with optional timestamps)
+// YouTube URL 正则：watch、shorts、embed、youtu.be（带可选时间戳）
 final RegExp _youtubeUrlRegex = RegExp(
   r'(https?://(?:www\.)?(?:youtube\.com/(?:watch\?v=|shorts/|embed/)|youtu\.be/)[a-zA-Z0-9_-]+(?:[?&][^\s<>()]*)?)',
   caseSensitive: false,
@@ -24,7 +24,7 @@ List<String> _extractYouTubeUrls(String text) {
   for (final m in _youtubeUrlRegex.allMatches(text)) {
     var url = (m.group(1) ?? '').trim();
     if (url.isEmpty) continue;
-    // Trim common trailing punctuation from markdown/parentheses
+    // 去除 markdown/括号中常见的尾部标点
     while (url.isNotEmpty && '.,;:!?)"]}'.contains(url[url.length - 1])) {
       url = url.substring(0, url.length - 1);
     }
@@ -185,7 +185,7 @@ String _collectThoughtSigCommentFromParts(List<dynamic> parts) {
   );
 }
 
-// Simple container for parsed text + image refs
+// 用于已解析文本 + 图片引用的简单容器
 
 Stream<ChatStreamChunk> _sendGoogleGeminiStream(
   http.Client client,

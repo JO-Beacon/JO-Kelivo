@@ -19,7 +19,7 @@ import 'memory_entries_page.dart';
 import 'memory_trace_page.dart';
 import 'user_profile_page.dart';
 
-/// Global memory settings (§4.2 / §14.4): model, thinking, prompt lang, templates.
+/// 全局记忆设置（§4.2 / §14.4）：模型、思考、提示语言、模板。
 class MemorySettingsPage extends StatelessWidget {
   const MemorySettingsPage({super.key});
 
@@ -308,15 +308,14 @@ class _MemoryPromptEditPage extends StatefulWidget {
 }
 
 class _MemoryPromptEditPageState extends State<_MemoryPromptEditPage> {
-  /// The prompt this editor writes.
+  /// 此编辑器写入的提示词。
   ///
-  /// Templates are stored per language, but only the one matching
-  /// [SettingsProvider.resolvedMemoryPromptLang] is ever sent to the model, so
-  /// editing the other one is busywork on a string the user will never see.
+  /// 模板按语言存储，但只有与 [SettingsProvider.resolvedMemoryPromptLang]
+  /// 匹配的那个才会发送给模型，因此编辑另一个只是修改用户永远看不到的字符串。
   late final MemoryPromptLang _lang;
   late final TextEditingController _main;
 
-  /// Smart Add runs a second, genuinely different prompt for batch candidates.
+  /// Smart Add 会为批量候选项运行第二个真正不同的提示词。
   TextEditingController? _batch;
 
   bool _hydrated = false;

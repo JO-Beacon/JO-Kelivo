@@ -4,7 +4,7 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 
-/// Full-screen "about memory" page (mobile). Desktop uses a dialog instead.
+/// 全屏“关于记忆”页面（移动端）。桌面端改用对话框。
 class MemoryAboutPage extends StatelessWidget {
   const MemoryAboutPage({super.key});
 
@@ -34,7 +34,7 @@ class MemoryAboutPage extends StatelessWidget {
   }
 }
 
-/// Shared body for the about page (mobile) and desktop dialog.
+/// 关于页面（移动端）和桌面对话框共用的主体。
 class MemoryAboutContent extends StatelessWidget {
   const MemoryAboutContent({super.key, this.padding});
 

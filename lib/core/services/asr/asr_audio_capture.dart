@@ -4,7 +4,7 @@ import 'dart:typed_data';
 
 import 'package:record/record.dart';
 
-/// Minimal PCM microphone boundary used by non-system ASR providers.
+/// 供非系统 ASR 提供方使用的最小 PCM 麦克风边界。
 abstract interface class AsrAudioCapture {
   Future<bool> hasPermission();
 
@@ -43,9 +43,8 @@ final class RecordAsrAudioCapture implements AsrAudioCapture {
         encoder: AudioEncoder.pcm16bits,
         sampleRate: sampleRate,
         numChannels: 1,
-        // Keep the signal raw. Voice processing (especially AGC) flattens the
-        // level meter on desktop and can distort the PCM expected by offline
-        // acoustic models.
+        // 保持信号为原始状态。语音处理（尤其是 AGC）会在桌面上压低电平表，
+        // 并可能扭曲离线声学模型所期望的 PCM。
         autoGain: false,
         echoCancel: false,
         noiseSuppress: false,
@@ -83,7 +82,7 @@ final class RecordAsrAudioCapture implements AsrAudioCapture {
   }
 }
 
-/// Converts little-endian mono PCM16 into a stable 0–1 waveform value.
+/// 将小端序单声道 PCM16 转换为稳定的 0–1 波形值。
 double normalizedPcm16Level(Uint8List bytes) {
   final sampleCount = bytes.length ~/ 2;
   if (sampleCount == 0) return 0;
@@ -94,6 +93,6 @@ double normalizedPcm16Level(Uint8List bytes) {
     sumSquares += normalized * normalized;
   }
   final rms = math.sqrt(sumSquares / sampleCount);
-  // Lift normal speech while keeping room noise visually quiet.
+  // 提升正常语音，同时让房间噪声在视觉上保持安静。
   return math.pow((rms * 3.2).clamp(0.0, 1.0), 0.72).toDouble();
 }

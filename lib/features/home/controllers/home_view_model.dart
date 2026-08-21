@@ -5,6 +5,7 @@ import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
+import '../../../core/models/conversation_tree.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
@@ -98,8 +99,8 @@ class BatchDeletePlan {
   };
 }
 
-/// Result of [HomeViewModel.prepareConversationSwitch]: everything needed to
-/// commit a conversation switch atomically once the caller is ready.
+/// [HomeViewModel.prepareConversationSwitch] 的结果：
+/// 调用方准备好后原子提交会话切换所需的一切。
 class PreparedConversationSwitch {
   const PreparedConversationSwitch({
     required this.conversation,
@@ -110,18 +111,18 @@ class PreparedConversationSwitch {
   final FetchedConversationWindow window;
 }
 
-/// ViewModel for the home page, combining actions + services.
+/// 主页 ViewModel，组合操作和服务。
 ///
-/// This ViewModel:
-/// - Holds all page state (conversation, messages, loading, etc.)
-/// - Calls ChatActions for business operations
-/// - Notifies UI of state changes via ChangeNotifier
-/// - Handles conversation switching/creation
+/// 此 ViewModel：
+/// - 保存所有页面状态（会话、消息、加载状态等）
+/// - 调用 ChatActions 执行业务操作
+/// - 通过 ChangeNotifier 通知 UI 状态变化
+/// - 处理会话切换/创建
 ///
-/// UI layer only needs to:
-/// - Listen to this ViewModel
-/// - Call simple methods like sendMessage(), regenerate(), etc.
-/// - Handle UI-specific concerns (snackbars, scrolling, animations)
+/// UI 层只需要：
+/// - 监听此 ViewModel
+/// - 调用 sendMessage()、regenerate() 等简单方法
+/// - 处理 UI 特定关注点（Snackbar、滚动、动画）
 class HomeViewModel extends ChangeNotifier {
   HomeViewModel({
     required this._chatService,
@@ -133,7 +134,7 @@ class HomeViewModel extends ChangeNotifier {
     required this._contextProvider,
     required this.getTitleForLocale,
   }) {
-    // Initialize ChatActions
+    // 初始化 ChatActions
     _chatActions = ChatActions(
       chatService: _chatService,
       chatController: _chatController,
@@ -144,7 +145,7 @@ class HomeViewModel extends ChangeNotifier {
       viewModel: this,
     );
 
-    // Wire up callbacks
+    // 连接回调
     _chatActions.onMessagesChanged = _onMessagesChanged;
     _chatActions.onSendPairAppended = () => onScrollToBottom?.call();
     _chatActions.onLoadingChanged = _onLoadingChanged;
@@ -160,7 +161,7 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Dependencies
+  // 依赖
   // ============================================================================
 
   final ChatService _chatService;
@@ -175,63 +176,77 @@ class HomeViewModel extends ChangeNotifier {
   final ChatSuggestionService _suggestionService =
       const ChatSuggestionService();
   late final ChatActions _chatActions;
+  ConversationTree? _conversationTree;
+  int _conversationTreeReloadSerial = 0;
+  bool _disposed = false;
   QueuedChatInput? _queuedInput;
   bool _isDrainingQueuedInput = false;
 
-  /// Function to get localized title
+  /// 获取本地化标题的函数
   final String Function(BuildContext context) getTitleForLocale;
 
   // ============================================================================
-  // Callbacks for UI (set by HomePage)
+  // UI 回调（由 HomePage 设置）
   // ============================================================================
 
-  /// Called when an error occurs (UI should show snackbar).
+  /// 发生错误时调用（UI 应显示 Snackbar）。
   void Function(String error)? onError;
 
-  /// Called when a non-blocking background model task fails.
+  /// 非阻塞后台模型任务失败时调用。
   void Function(BackgroundTaskKind task, Object error)? onBackgroundTaskError;
 
-  /// Called when a warning occurs (UI should show snackbar).
+  /// 发生警告时调用（UI 应显示 Snackbar）。
   void Function(String warning)? onWarning;
 
-  /// Called when streaming finishes (UI may show notification).
+  /// 流结束时调用（UI 可显示通知）。
   void Function(String conversationId)? onStreamFinished;
 
-  /// Called when a successful assistant reply is finalized.
+  /// 成功的助手回复最终化时调用。
   void Function(ChatMessage message)? onAssistantMessageFinished;
 
-  /// Called to schedule inline image sanitization.
+  /// 调用以安排行内图片清理。
   void Function(String messageId, String content, {bool immediate})?
   onScheduleImageSanitize;
 
-  /// Called when scrolling to bottom is needed.
+  /// 需要滚动到底部时调用。
   VoidCallback? onScrollToBottom;
 
-  /// Called for haptic feedback.
+  /// 需要触感反馈时调用。
   VoidCallback? onHapticFeedback;
 
-  /// Called when conversation is successfully switched (for animations).
+  /// 会话成功切换后调用（用于动画）。
   VoidCallback? onConversationSwitched;
 
   // ============================================================================
-  // State Getters (delegate to ChatController)
+  // 状态 Getter（委托给 ChatController）
   // ============================================================================
 
   Conversation? get currentConversation => _chatController.currentConversation;
-  List<ChatMessage> get messages => _chatController.messages;
+  ConversationTree? get conversationTree => _conversationTree;
+  String? get activeBranchId => _conversationTree?.activeBranchId;
+  List<ChatMessage> get messages {
+    final raw = _chatController.messages;
+    final tree = _conversationTree;
+    if (tree == null) return raw;
+    final activeIds = tree.activePath().toSet();
+    return raw
+        .where((message) => activeIds.contains(message.id))
+        .toList(growable: false);
+  }
+
   Map<String, int> get versionSelections => _chatController.versionSelections;
   Set<String> get loadingConversationIds => <String>{
     for (final id in _chatController.loadingConversationIds)
       if (!_chatActions.isStopping(id)) id,
   };
 
-  /// Whether send/regenerate or cancellation teardown owns [conversationId].
+  /// 当前拥有 [conversationId] 的是发送/重新生成还是取消清理流程。
   bool isConversationSendInFlight(String conversationId) =>
       _chatActions.isSendInFlight(conversationId);
   Map<String, StreamSubscription<dynamic>> get conversationStreams =>
       _chatController.conversationStreams;
 
-  /// StreamController state getters
+  /// StreamController 状态 Getter
   Map<String, stream_ctrl.ReasoningData> get reasoning =>
       _streamController.reasoning;
   Map<String, List<stream_ctrl.ReasoningSegmentData>> get reasoningSegments =>
@@ -240,7 +255,7 @@ class HomeViewModel extends ChangeNotifier {
       _streamController.contentSplits;
   Map<String, List<ToolUIPart>> get toolParts => _streamController.toolParts;
 
-  /// Whether the current conversation should show the generating state.
+  /// 当前会话是否应显示生成中状态。
   bool get isCurrentConversationLoading {
     final cid = currentConversation?.id;
     if (cid == null) return false;
@@ -260,12 +275,17 @@ class HomeViewModel extends ChangeNotifier {
   final ValueNotifier<bool> isProcessingFiles = ValueNotifier<bool>(false);
 
   // ============================================================================
-  // Internal Callbacks
+  // 内部回调
   // ============================================================================
 
   void _onMessagesChanged() {
+    if (_disposed) return;
     _chatController.invalidateCache();
     notifyListeners();
+    final conversationId = currentConversation?.id;
+    if (conversationId != null) {
+      unawaited(_reloadConversationTree(conversationId));
+    }
   }
 
   void _onLoadingChanged(String conversationId, bool loading) {
@@ -276,15 +296,16 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   void _onContentUpdated(String messageId, String content, int totalTokens) {
-    final index = messages.indexWhere((m) => m.id == messageId);
+    final rawMessages = _chatController.messages;
+    final index = rawMessages.indexWhere((m) => m.id == messageId);
     if (index != -1) {
       _chatController.replaceMessageSnapshot(
-        messages[index].copyWith(content: content, totalTokens: totalTokens),
+        rawMessages[index].copyWith(content: content, totalTokens: totalTokens),
       );
-      // NOTE: Do NOT call notifyListeners() here!
-      // Streaming content updates are now handled by StreamingContentNotifier
-      // via ValueListenableBuilder, which only rebuilds the streaming message widget.
-      // Calling notifyListeners() here would trigger a full page rebuild and cause lag.
+      // 注意：此处不要调用 notifyListeners()！
+      // 流式内容更新现在由 StreamingContentNotifier 通过
+      // ValueListenableBuilder 处理，只重建流式消息控件。
+      // 在此调用 notifyListeners() 会触发整页重建并导致卡顿。
     }
   }
 
@@ -335,8 +356,8 @@ class HomeViewModel extends ChangeNotifier {
     _onMaybeOrganizeMemory(message.conversationId);
   }
 
-  /// Schedule background memory organize after a successful finalize (§12.1).
-  /// Never awaited; failures must not surface as chat errors.
+  /// 成功最终化后安排后台记忆整理（§12.1）。
+  /// 从不等待；失败不得表现为聊天错误。
   void _onMaybeOrganizeMemory(String conversationId) {
     try {
       final settings = _contextProvider.read<SettingsProvider>();
@@ -373,10 +394,10 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Public Methods - Message Actions
+  // 公共方法 - 消息操作
   // ============================================================================
 
-  /// Send a new message or queue it if the current conversation is busy.
+  /// 发送新消息；如果当前会话忙则将其排队。
   Future<ChatInputSubmissionResult> sendMessage(ChatInputData input) async {
     final content = input.text.trim();
     if (content.isEmpty &&
@@ -387,7 +408,7 @@ class HomeViewModel extends ChangeNotifier {
 
     final conversation = currentConversation;
     if (conversation == null) {
-      // Create new conversation first
+      // 首先创建新会话
       await createNewConversation();
     }
 
@@ -450,14 +471,13 @@ class HomeViewModel extends ChangeNotifier {
     );
 
     if (!result.success) {
-      // Clear the flag this call raised before any early return; the
-      // concurrent winner only clears the indicator when it has files of its
-      // own, so a loser with documents would otherwise leak it.
+      // 在任何提前返回前清除本次调用设置的标志；并发胜者只会在自己
+      // 拥有文件时清除指示器，因此携带文档的失败方否则会泄漏它。
       if (input.documents.isNotEmpty) {
         isProcessingFiles.value = false;
       }
-      // A concurrent send already owns this conversation; it owns the UI
-      // state too, so the loser exits silently.
+      // 并发发送已拥有此会话；它也拥有 UI 状态，
+      // 因此失败方静默退出。
       if (result.errorMessage == 'in_flight') return false;
       if (result.errorMessage == 'no_model') {
         onWarning?.call('no_model');
@@ -504,10 +524,11 @@ class HomeViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Regenerate response at a specific message.
+  /// 在指定消息处重新生成回复。
   Future<bool> regenerateAtMessage(
     ChatMessage message, {
     bool assistantAsNewReply = false,
+    String? existingBranchId,
     bool allowImagesApiRouting = true,
   }) async {
     final conversation = currentConversation;
@@ -515,7 +536,7 @@ class HomeViewModel extends ChangeNotifier {
       return false;
     }
 
-    // Set up image sanitization callback before regenerating
+    // 在重新生成前设置图片清理回调
     _chatActions.onScheduleImageSanitize = onScheduleImageSanitize;
 
     onHapticFeedback?.call();
@@ -525,11 +546,12 @@ class HomeViewModel extends ChangeNotifier {
       message: message,
       conversation: conversation,
       assistantAsNewReply: assistantAsNewReply,
+      existingBranchId: existingBranchId,
       allowImagesApiRouting: allowImagesApiRouting,
     );
 
     if (!result.success) {
-      // A concurrent send/regenerate already owns this conversation.
+      // 并发发送/重新生成已拥有此会话。
       if (result.errorMessage == 'in_flight') return false;
       if (result.errorMessage == 'no_model') {
         onWarning?.call('no_model');
@@ -573,15 +595,15 @@ class HomeViewModel extends ChangeNotifier {
     return true;
   }
 
-  /// Cancel the active streaming.
+  /// 取消活动流式处理。
   Future<void> cancelStreaming() async {
     await _chatActions.cancelStreaming(currentConversation);
   }
 
-  /// Delete a message and adjust version selections.
+  /// 删除消息并调整版本选择。
   ///
-  /// Returns the list of message IDs to clean up UI state for.
-  /// The UI layer should handle confirmation dialog before calling this.
+  /// 返回需要清理 UI 状态的消息 ID 列表。
+  /// UI 层应在调用此方法前处理确认对话框。
   Future<void> deleteMessage({
     required ChatMessage message,
     required Map<String, List<ChatMessage>> byGroup,
@@ -602,14 +624,47 @@ class HomeViewModel extends ChangeNotifier {
     required Map<String, List<ChatMessage>> byGroup,
   }) async {
     final gid = (message.groupId ?? message.id);
-    final versBefore = List<ChatMessage>.of(
-      byGroup[gid] ?? const <ChatMessage>[],
-    )..sort((a, b) => a.version.compareTo(b.version));
+    final versBefore = <ChatMessage>[message];
     await _deleteMessageVersions(
       gid: gid,
       versionsBefore: versBefore,
       deletedMessageIds: versBefore.map((m) => m.id).toSet(),
     );
+  }
+
+  Future<Set<String>> deleteBranchSiblings(ChatMessage message) async {
+    final targetConversationId = message.conversationId;
+    final streamingMessageId = _chatActions.activeStreamingMessageId(
+      targetConversationId,
+    );
+    if (streamingMessageId != null) {
+      await _chatActions.cancelStreaming(
+        _chatService.getConversation(targetConversationId),
+      );
+    }
+    final deletedIds = await _chatService.deleteBranchSiblings(
+      conversationId: targetConversationId,
+      messageId: message.id,
+    );
+    for (final id in deletedIds) {
+      _streamController.clearMessageState(id);
+    }
+
+    if (targetConversationId == currentConversation?.id) {
+      _conversationTreeReloadSerial++;
+      _conversationTree = await _chatService.loadConversationTree(
+        targetConversationId,
+      );
+      _chatController.updateCurrentConversation(
+        _chatService.getConversation(targetConversationId),
+      );
+      await _chatController.refreshTimelineAfterMutation(
+        removedRevisionIds: deletedIds,
+        survivingVersionsByGroup: const <String, List<ChatMessage>>{},
+      );
+    }
+    notifyListeners();
+    return deletedIds;
   }
 
   @visibleForTesting
@@ -719,16 +774,15 @@ class HomeViewModel extends ChangeNotifier {
   }) async {
     if (messageIds.isEmpty) return;
 
-    // Only the selected groups matter for the plan; resolve their group ids
-    // from the selected revisions, then load just those groups' versions.
+    // 只有所选组对该计划重要；从所选修订中解析其组 ID，
+    // 然后仅加载这些组的版本。
     final selected = await _chatService.loadMessagesByIds(
       messageIds.toList(growable: false),
     );
     if (selected.isEmpty) return;
-    // The confirmation dialog and the projection loads run before this, so
-    // the user may have switched conversations since selecting. The loaded
-    // revisions know which conversation they belong to; deleting against the
-    // current one would silently no-op.
+    // 确认对话框和投影加载在此之前运行，因此用户在选择后
+    // 可能已切换会话。已加载修订知道自己属于哪个会话；
+    // 对当前会话执行删除会静默地不生效。
     final conversationId = selected.first.conversationId;
     bool isCurrentConversation() => currentConversation?.id == conversationId;
     final groupIds = selected
@@ -754,9 +808,8 @@ class HomeViewModel extends ChangeNotifier {
     );
     if (plan.isEmpty) return;
 
-    // Deleting the row an active generation checkpoints into would make the
-    // next streaming write hit a foreign key on deleted messages; stop the
-    // generation first.
+    // 删除活动生成写入检查点的行会使下一次流式写入命中
+    // 已删除消息上的外键；因此先停止生成。
     final streamingMessageId = _chatActions.activeStreamingMessageId(
       conversationId,
     );
@@ -785,8 +838,8 @@ class HomeViewModel extends ChangeNotifier {
         _chatService.getConversation(conversationId),
       );
 
-      // scopedMessages holds every pre-deletion version of every affected
-      // group, so the per-group survivors are complete.
+      // scopedMessages 保存每个受影响组的每个删除前版本，
+      // 因此各组的幸存者是完整的。
       final survivingVersionsByGroup = <String, List<ChatMessage>>{};
       for (final message in scopedMessages) {
         final groupId = message.groupId ?? message.id;
@@ -811,12 +864,10 @@ class HomeViewModel extends ChangeNotifier {
   }) async {
     if (deletedMessageIds.isEmpty) return;
 
-    // The animated delete flow awaits the removal animation before calling
-    // this, so the user may have switched conversations in the meantime.
-    // Deleting against whichever conversation is current would silently
-    // no-op (the ids belong to another conversation), so target the
-    // conversation the revisions belong to and only touch the loaded
-    // timeline while it is still the current one.
+    // 动画删除流程会在调用此方法前等待移除动画，因此用户可能
+    // 在此期间切换了会话。对当前会话执行删除会静默不生效
+    // （这些 ID 属于另一个会话），因此应针对修订所属的会话，
+    // 并且只在它仍是当前会话时修改已加载时间线。
     final targetConversationId = versionsBefore.isNotEmpty
         ? versionsBefore.first.conversationId
         : currentConversation?.id;
@@ -844,12 +895,13 @@ class HomeViewModel extends ChangeNotifier {
       deletedMessageIds: deletedMessageIds,
       oldSelection: oldSel,
     );
+    final treeBeforeDelete = isCurrentConversation() ? _conversationTree : null;
+    final forceBranchReload = treeBeforeDelete != null;
 
     var removedRevisionIds = deletedMessageIds;
     if (conversation != null) {
-      // Deleting the row an active generation checkpoints into would make the
-      // next streaming write hit a foreign key on deleted messages; stop the
-      // generation first.
+      // 删除活动生成写入检查点的行会使下一次流式写入命中
+      // 已删除消息上的外键；因此先停止生成。
       final streamingMessageId = _chatActions.activeStreamingMessageId(
         conversation.id,
       );
@@ -863,6 +915,10 @@ class HomeViewModel extends ChangeNotifier {
         versionSelectionChanges: {gid: newSel},
       );
       if (isCurrentConversation()) {
+        _conversationTreeReloadSerial++;
+        _conversationTree = await _chatService.loadConversationTree(
+          conversation.id,
+        );
         _chatController.updateCurrentConversation(
           _chatService.getConversation(conversation.id),
         );
@@ -875,29 +931,31 @@ class HomeViewModel extends ChangeNotifier {
       _chatController.loadVersionSelections();
       await _chatController.refreshTimelineAfterMutation(
         removedRevisionIds: removedRevisionIds,
-        survivingVersionsByGroup: {
-          gid: [
-            for (final candidate in versionsBefore)
-              if (!removedRevisionIds.contains(candidate.id)) candidate,
-          ],
-        },
+        survivingVersionsByGroup: forceBranchReload
+            ? const <String, List<ChatMessage>>{}
+            : {
+                gid: [
+                  for (final candidate in versionsBefore)
+                    if (!removedRevisionIds.contains(candidate.id)) candidate,
+                ],
+              },
       );
     }
     notifyListeners();
   }
 
   // ============================================================================
-  // Public Methods - Conversation Management
+  // 公共方法 - 会话管理
   // ============================================================================
 
-  /// Switch to an existing conversation.
+  /// 切换到已有会话。
   ///
-  /// The caller flushes the current conversation's progress before invoking
-  /// this; do not flush here again.
+  /// 调用方在调用此方法前会刷新当前会话进度；
+  /// 此处不要再次刷新。
   Future<void> switchConversation(String id) async {
     final assistantProvider = _contextProvider.read<AssistantProvider>();
 
-    // Reset processing state on switch
+    // 切换时重置处理状态
     isProcessingFiles.value = false;
 
     if (currentConversation?.id == id) return;
@@ -905,8 +963,8 @@ class HomeViewModel extends ChangeNotifier {
     _chatService.setCurrentConversation(id);
     final convo = _chatService.getConversation(id);
     if (convo != null) {
-      // Assistant preference persistence runs concurrently with the window
-      // load; setCurrentAssistant notifies before its disk write completes.
+      // 助手偏好持久化与窗口加载并发运行；
+      // setCurrentAssistant 会在磁盘写入完成前通知。
       final assistantSwitch = _assistantSwitchFor(
         assistantProvider,
         convo.assistantId,
@@ -915,24 +973,26 @@ class HomeViewModel extends ChangeNotifier {
         _chatController.setCurrentConversationAndLoad(convo),
         if (assistantSwitch != null) assistantSwitch,
       ]);
+      _conversationTreeReloadSerial++;
+      _conversationTree = null;
+      await _reloadConversationTree(id);
       _streamController.clearGeminiThoughtSigs();
-      // Arm the new list's initial position before listeners can paint it with
-      // the previous conversation's scroll offset.
+      // 在监听器用上一个会话的滚动偏移绘制前，
+      // 预先设定新列表的初始位置。
       onConversationSwitched?.call();
       notifyListeners();
       unawaited(_drainQueuedInputIfReady(id));
     }
   }
 
-  /// Fetch phase of an animated conversation switch: loads the target
-  /// conversation's initial window without committing any state, so the
-  /// caller can keep the previous list covered until it is ready to commit
-  /// via [commitConversationSwitch]. Returns null when the switch is a no-op
-  /// or the conversation is gone.
+  /// 动画会话切换的获取阶段：加载目标会话的初始窗口，
+  /// 但不提交任何状态，使调用方可以保持先前列表被覆盖，
+  /// 直到准备通过 [commitConversationSwitch] 提交。
+  /// 当切换为无操作或会话已不存在时返回 null。
   Future<PreparedConversationSwitch?> prepareConversationSwitch(
     String id,
   ) async {
-    // Reset processing state on switch
+    // 切换时重置处理状态
     isProcessingFiles.value = false;
 
     if (currentConversation?.id == id) return null;
@@ -940,16 +1000,15 @@ class HomeViewModel extends ChangeNotifier {
     final convo = _chatService.getConversation(id);
     if (convo == null) return null;
 
-    // The assistant switch is deferred to commitConversationSwitch: it
-    // notifies listeners and rewrites the global currentAssistantId, so
-    // running it here would leak the side effect when this preparation is
-    // superseded and discarded before commit.
+    // 助手切换被延迟到 commitConversationSwitch：它会通知监听器
+    // 并重写全局 currentAssistantId，因此在此运行会在准备被取代
+    // 并在提交前丢弃时泄漏副作用。
     final window = await _chatController.fetchConversationWindow(convo);
     return PreparedConversationSwitch(conversation: convo, window: window);
   }
 
-  /// Commit phase of an animated conversation switch: installs a snapshot
-  /// previously fetched by [prepareConversationSwitch].
+  /// 动画会话切换的提交阶段：安装此前由
+  /// [prepareConversationSwitch] 获取的快照。
   void commitConversationSwitch(PreparedConversationSwitch prepared) {
     final id = prepared.conversation.id;
     _chatService.setCurrentConversation(id);
@@ -957,8 +1016,8 @@ class HomeViewModel extends ChangeNotifier {
       prepared.window,
       onDeferredGroupDataLoaded: notifyListeners,
     );
-    // Same concurrency as switchConversation: the assistant change notifies
-    // before its disk write completes.
+    // 与 switchConversation 相同的并发情况：助手变化会在其磁盘写入
+    // 完成前通知。
     final assistantProvider = _contextProvider.read<AssistantProvider>();
     final assistantSwitch = _assistantSwitchFor(
       assistantProvider,
@@ -966,15 +1025,66 @@ class HomeViewModel extends ChangeNotifier {
     );
     if (assistantSwitch != null) unawaited(assistantSwitch);
     _streamController.clearGeminiThoughtSigs();
-    // Arm the new list's initial position before listeners can paint it with
-    // the previous conversation's scroll offset.
+    _conversationTreeReloadSerial++;
+    _conversationTree = null;
+    unawaited(_reloadConversationTree(id));
+    // 在监听器用上一个会话的滚动偏移绘制前，
+    // 预先设定新列表的初始位置。
     onConversationSwitched?.call();
     notifyListeners();
     unawaited(_drainQueuedInputIfReady(id));
   }
 
-  /// Starts persisting the assistant preference for a switch, or null when
-  /// the assistant does not change.
+  Future<void> _reloadConversationTree(String conversationId) async {
+    if (_disposed) return;
+    final serial = ++_conversationTreeReloadSerial;
+    try {
+      final tree = _chatService.isTemporaryConversation(conversationId)
+          ? await _chatService.loadConversationTree(conversationId)
+          : await (() async {
+              await _chatService.ensureConversationTree(conversationId);
+              return _chatService.loadConversationTree(conversationId);
+            })();
+      if (_disposed ||
+          serial != _conversationTreeReloadSerial ||
+          currentConversation?.id != conversationId) {
+        return;
+      }
+      _conversationTree = tree;
+      notifyListeners();
+    } catch (error, stackTrace) {
+      if (_disposed) return;
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+  }
+
+  void installConversationTree(ConversationTree tree) {
+    if (currentConversation?.id != tree.conversationId) return;
+    _conversationTreeReloadSerial++;
+    _conversationTree = tree;
+    _chatController.invalidateCache();
+    notifyListeners();
+  }
+
+  Future<void> refreshConversationTree(String conversationId) async {
+    if (_disposed) return;
+    final tree = await _chatService.loadConversationTree(conversationId);
+    if (tree != null) installConversationTree(tree);
+  }
+
+  Future<void> ensureConversationTreeForCurrentConversation() async {
+    if (_disposed) return;
+    final conversation = currentConversation;
+    if (conversation == null ||
+        _chatService.isTemporaryConversation(conversation.id)) {
+      return;
+    }
+    await _chatService.ensureConversationTree(conversation.id);
+    final tree = await _chatService.loadConversationTree(conversation.id);
+    if (tree != null) installConversationTree(tree);
+  }
+
+  /// 开始持久化切换所需的助手偏好；当助手不变时为 null。
   Future<void>? _assistantSwitchFor(
     AssistantProvider assistantProvider,
     String? convoAssistantId,
@@ -987,13 +1097,13 @@ class HomeViewModel extends ChangeNotifier {
     return assistantProvider.setCurrentAssistant(convoAssistantId);
   }
 
-  /// Create a new conversation.
+  /// 创建新会话。
   Future<void> createNewConversation() async {
-    // Flush current conversation progress before creating new
+    // 创建新会话前刷新当前会话进度
     await _chatActions.flushConversationProgress(currentConversation);
     if (!_contextProvider.mounted) return;
 
-    // Reset processing state on create
+    // 创建时重置处理状态
     isProcessingFiles.value = false;
 
     final ap = _contextProvider.read<AssistantProvider>();
@@ -1016,7 +1126,7 @@ class HomeViewModel extends ChangeNotifier {
     _streamController.clearAllState();
     notifyListeners();
 
-    // Inject assistant preset messages into new conversation (ordered)
+    // 将助手预设消息注入新会话（按顺序）
     try {
       final presets = ap.getPresetMessagesForAssistant(a?.id);
       if (presets.isNotEmpty && currentConversation != null) {
@@ -1033,8 +1143,8 @@ class HomeViewModel extends ChangeNotifier {
             ),
           );
         }
-        // One batch append publishes the whole preset block with a single
-        // notify instead of one per message.
+        // 一次批量追加会以单次 notify 发布整个预设块，
+        // 而不是逐条消息通知。
         if (injected.isNotEmpty) {
           await _chatController.appendPersistedTailMessages(injected);
         }
@@ -1078,27 +1188,45 @@ class HomeViewModel extends ChangeNotifier {
     onScrollToBottom?.call();
   }
 
-  /// Fork conversation at a specific message.
+  /// 在指定消息处分叉会话。
   Future<void> forkConversation(ChatMessage message) async {
-    final title = getTitleForLocale(_contextProvider);
     final sourceConversation = currentConversation;
     if (sourceConversation == null) return;
-    final newConvo = await _chatService.forkConversationAtRevision(
-      sourceConversationId: sourceConversation.id,
-      sourceRevisionId: message.id,
-      title: title,
+    final tree = await _chatService.createConversationBranch(
+      conversationId: sourceConversation.id,
+      fromMessageId: message.id,
     );
-
-    // Switch to the new conversation
-    _chatService.setCurrentConversation(newConvo.id);
-    await _chatController.setCurrentConversationAndLoad(newConvo);
-    _restoreMessageUiState();
-    onConversationSwitched?.call();
+    _conversationTreeReloadSerial++;
+    _conversationTree = tree;
+    _chatController.invalidateCache();
     notifyListeners();
     onScrollToBottom?.call();
   }
 
-  /// Clear context (toggle truncate at tail).
+  Future<void> switchConversationBranch(String branchId) async {
+    final sourceConversation = currentConversation;
+    if (sourceConversation == null) return;
+    final tree = await _chatService.switchConversationBranch(
+      conversationId: sourceConversation.id,
+      branchId: branchId,
+    );
+    if (tree == null) return;
+    _conversationTreeReloadSerial++;
+    _conversationTree = tree;
+    _chatController.invalidateCache();
+    final branch = tree.branches[branchId];
+    final tipMessageId = branch?.tipMessageId;
+    if (tipMessageId != null) {
+      await _chatController.loadWindowAroundMessage(tipMessageId);
+    } else {
+      await _chatController.loadStartWindow();
+    }
+    if (currentConversation?.id != sourceConversation.id) return;
+    notifyListeners();
+    onScrollToBottom?.call();
+  }
+
+  /// 清除上下文（在尾部切换截断）。
   Future<void> clearContext() async {
     final convo = currentConversation;
     if (convo == null) return;
@@ -1115,8 +1243,8 @@ class HomeViewModel extends ChangeNotifier {
     }
   }
 
-  /// Compress context: summarize messages via LLM, create new conversation with summary.
-  /// Returns null on success, or an error key string on failure.
+  /// 压缩上下文：通过 LLM 摘要消息，并使用摘要创建新会话。
+  /// 成功返回 null，失败返回错误键字符串。
   Future<String?> compressContext({
     required CompressContextOptions options,
   }) async {
@@ -1130,18 +1258,18 @@ class HomeViewModel extends ChangeNotifier {
         ? ap.getById(convo.assistantId!)
         : ap.currentAssistant;
 
-    // Get messages and collapse to selected versions
+    // 获取消息并折叠到已选版本
     final allMsgs = await _chatController
         .allMessagesForCurrentConversationContext();
     final collapsed = collapseVersions(allMsgs);
     if (collapsed.isEmpty) return 'no_messages';
 
-    // Build conversation text for compression
+    // 构建用于压缩的会话文本
     final joined = buildConversationTextForCompression(collapsed);
     if (joined.trim().isEmpty) return 'no_messages';
 
     final content = buildCompressContextContent(joined, options);
-    // Resolve model: compress model → summary model → title model → assistant model → global default
+    // 解析模型：压缩模型 → 摘要模型 → 标题模型 → 助手模型 → 全局默认
     final provKey =
         settings.compressModelProvider ??
         settings.summaryModelProvider ??
@@ -1161,7 +1289,7 @@ class HomeViewModel extends ChangeNotifier {
       assistant?.thinkingBudget,
     );
 
-    // Build compression prompt from settings template
+    // 根据设置模板构建压缩提示词
     final prompt = settings.compressPrompt
         .replaceAll('{content}', content)
         .replaceAll('{locale}', locale);
@@ -1176,7 +1304,7 @@ class HomeViewModel extends ChangeNotifier {
 
       if (summary.isEmpty) return 'empty_summary';
 
-      // Create new conversation with the summary as first user message
+      // 以摘要作为第一条用户消息创建新会话
       final newConvo = await _chatService.createDraftConversation(
         title: convo.title,
         assistantId: convo.assistantId,
@@ -1188,7 +1316,7 @@ class HomeViewModel extends ChangeNotifier {
         content: summary,
       );
 
-      // Switch to the new conversation
+      // 切换到新会话
       _chatService.setCurrentConversation(newConvo.id);
       await _chatController.setCurrentConversationAndLoad(
         _chatService.getConversation(newConvo.id) ?? newConvo,
@@ -1198,13 +1326,13 @@ class HomeViewModel extends ChangeNotifier {
       notifyListeners();
       onScrollToBottom?.call();
 
-      return null; // success
+      return null; // 成功
     } catch (e) {
       return e.toString();
     }
   }
 
-  /// Update current conversation reference.
+  /// 更新当前会话引用。
   void updateCurrentConversation(Conversation? conversation) {
     _chatController.updateCurrentConversation(conversation);
     notifyListeners();
@@ -1234,7 +1362,7 @@ class HomeViewModel extends ChangeNotifier {
     return true;
   }
 
-  /// Set selected version for a message group.
+  /// 设置消息组的已选版本。
   Future<void> setSelectedVersion(String groupId, int version) async {
     final cid = currentConversation?.id;
     if (cid != null) {
@@ -1245,10 +1373,10 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Public Methods - UI State
+  // 公共方法 - UI 状态
   // ============================================================================
 
-  /// Restore per-message UI states after switching conversations.
+  /// 切换会话后恢复逐消息 UI 状态。
   void restoreMessageUiState() {
     _restoreMessageUiState();
     notifyListeners();
@@ -1265,7 +1393,7 @@ class HomeViewModel extends ChangeNotifier {
               _chatService.getGeminiThoughtSignature(id),
         );
 
-        // Clean content from gemini thought signatures
+        // 从 Gemini 思考签名中清理内容
         final cleanedContent = _streamController.captureGeminiThoughtSignature(
           m.content,
           m.id,
@@ -1276,7 +1404,7 @@ class HomeViewModel extends ChangeNotifier {
           unawaited(_chatService.updateMessage(m.id, content: cleanedContent));
         }
 
-        // Clean up any inline base64 images persisted from earlier runs
+        // 清理此前运行中持久化的所有行内 base64 图片
         onScheduleImageSanitize?.call(
           m.id,
           messages[i].content,
@@ -1286,24 +1414,24 @@ class HomeViewModel extends ChangeNotifier {
     }
   }
 
-  /// Serialize reasoning segments to JSON string.
+  /// 将推理片段序列化为 JSON 字符串。
   String serializeReasoningSegments(
     List<stream_ctrl.ReasoningSegmentData> segments,
   ) {
     return _streamController.serializeReasoningSegments(segments);
   }
 
-  /// Collapse message versions to show only selected version per group.
+  /// 折叠消息版本，每组只显示已选版本。
   List<ChatMessage> collapseVersions(List<ChatMessage> items) {
     return _chatController.collapseVersions(items);
   }
 
-  /// Group messages by their groupId.
+  /// 按 groupId 对消息分组。
   Map<String, List<ChatMessage>> groupMessagesByGroup() {
     return _chatController.groupMessagesByGroup();
   }
 
-  /// Get clear context label based on current state.
+  /// 根据当前状态获取清除上下文标签。
   String getClearContextLabel(
     String Function(String, String) withCountFormatter,
     String defaultLabel,
@@ -1314,7 +1442,7 @@ class HomeViewModel extends ChangeNotifier {
     final configured = (assistant?.limitContextMessages ?? false)
         ? (assistant?.contextMessageSize ?? 0)
         : 0;
-    // Timeline totals and truncateIndex both use logical message slots.
+    // 时间线总数和 truncateIndex 都使用逻辑消息槽位。
     final remaining = computeClearContextRemainingMessageCount(
       totalMessages: _chatController.totalMessageCount,
       truncateIndex: currentConversation == null
@@ -1328,7 +1456,13 @@ class HomeViewModel extends ChangeNotifier {
     return defaultLabel;
   }
 
-  /// Test entry for [_maybeGenerateSummaryFor].
+  bool get isContextMasked {
+    final conversationId = currentConversation?.id;
+    if (conversationId == null) return false;
+    return _chatService.getContextStartIndex(conversationId) >= 0;
+  }
+
+  /// [_maybeGenerateSummaryFor] 的测试入口。
   @visibleForTesting
   Future<void> debugMaybeGenerateSummaryFor(String conversationId) =>
       _maybeGenerateSummaryFor(conversationId);
@@ -1346,10 +1480,10 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Title Generation
+  // 标题生成
   // ============================================================================
 
-  /// Generate title for a conversation if needed.
+  /// 需要时为会话生成标题。
   Future<void> _maybeGenerateTitleFor(
     String conversationId, {
     bool force = false,
@@ -1365,12 +1499,12 @@ class HomeViewModel extends ChangeNotifier {
     final settings = _contextProvider.read<SettingsProvider>();
     final assistantProvider = _contextProvider.read<AssistantProvider>();
 
-    // Get assistant for this conversation
+    // 获取此会话的助手
     final assistant = convo.assistantId != null
         ? assistantProvider.getById(convo.assistantId!)
         : assistantProvider.currentAssistant;
 
-    // Decide model: prefer title model, else fall back to assistant's model, then to global default
+    // 决定模型：优先标题模型，否则回退到助手模型，再到全局默认
     final provKey =
         settings.titleModelProvider ??
         assistant?.chatModelProvider ??
@@ -1386,8 +1520,8 @@ class HomeViewModel extends ChangeNotifier {
     );
     final locale = Localizations.localeOf(_contextProvider).toLanguageTag();
 
-    // Build content from messages (shared with the side drawer title path;
-    // both cache and paging paths collect the same ~3000-char tail window)
+    // 从消息构建内容（与侧边抽屉标题路径共享；
+    // 缓存和分页路径都收集相同的约 3000 字符尾部窗口）
     final content = await _chatService.generateTitleSource(convo.id);
 
     String prompt = settings.titlePrompt
@@ -1421,7 +1555,7 @@ class HomeViewModel extends ChangeNotifier {
     }
   }
 
-  /// Force generate title for the current conversation.
+  /// 强制为当前会话生成标题。
   Future<void> generateTitle({bool force = false}) async {
     final cid = currentConversation?.id;
     if (cid != null) {
@@ -1430,15 +1564,15 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Summary Generation
+  // 摘要生成
   // ============================================================================
 
-  /// Generate summary for a conversation if conditions are met.
-  /// Triggers after the configured number of new messages since last summary.
+  /// 满足条件时为会话生成摘要。
+  /// 自上次摘要以来的新消息达到配置数量后触发。
   Future<void> _maybeGenerateSummaryFor(String conversationId) async {
     final convo = _chatService.getConversation(conversationId);
     if (convo == null) return;
-    // Summaries only feed past-conversation search; temporary chats are never searchable.
+    // 摘要仅用于历史会话搜索；临时聊天永远不会被搜索。
     if (_chatService.isTemporaryConversation(convo.id)) return;
 
     final settings = _contextProvider.read<SettingsProvider>();
@@ -1446,7 +1580,7 @@ class HomeViewModel extends ChangeNotifier {
     final msgCount = _chatService.getMessageCount(conversationId);
     final assistantProvider = _contextProvider.read<AssistantProvider>();
 
-    // Get assistant for this conversation
+    // 获取此会话的助手
     final assistant = convo.assistantId != null
         ? assistantProvider.getById(convo.assistantId!)
         : assistantProvider.currentAssistant;
@@ -1475,7 +1609,7 @@ class HomeViewModel extends ChangeNotifier {
       return;
     }
 
-    // Use summary model if configured, else fall back to title model, then current model
+    // 如果配置了摘要模型则使用，否则回退到标题模型，再到当前模型
     final provKey =
         settings.summaryModelProvider ??
         settings.titleModelProvider ??
@@ -1490,7 +1624,7 @@ class HomeViewModel extends ChangeNotifier {
 
     final cfg = settings.getProviderConfig(provKey);
 
-    // Get all messages and filter user messages
+    // 获取所有消息并筛选用户消息
     final msgs = await _chatService.loadMessages(convo.id);
     final allUserMsgs = msgs
         .where((m) => m.role == 'user' && m.content.trim().isNotEmpty)
@@ -1498,11 +1632,11 @@ class HomeViewModel extends ChangeNotifier {
 
     if (allUserMsgs.isEmpty) return;
 
-    // Get previous summary (empty string if first time)
+    // 获取上次摘要（首次为空字符串）
     final previousSummary = (convo.summary ?? '').trim();
 
-    // Get only the recent user messages since last summarization
-    // Calculate how many user messages were in the last summarized state
+    // 仅获取上次摘要以来的近期用户消息
+    // 计算上次摘要状态中有多少条用户消息
     final lastSummarizedMsgCount = (convo.lastSummarizedMessageCount < 0)
         ? 0
         : convo.lastSummarizedMessageCount;
@@ -1511,7 +1645,7 @@ class HomeViewModel extends ChangeNotifier {
         .where((m) => m.role == 'user' && m.content.trim().isNotEmpty)
         .length;
 
-    // Get new user messages since last summary
+    // 获取上次摘要以来的新用户消息
     final newUserMsgs = allUserMsgs.skip(userMsgsAtLastSummary).toList();
     if (newUserMsgs.isEmpty) return;
 
@@ -1519,7 +1653,7 @@ class HomeViewModel extends ChangeNotifier {
         .map((m) => m.content.trim())
         .join('\n\n');
 
-    // Truncate if too long
+    // 过长则截断
     final content = recentMessages.length > 2000
         ? recentMessages.substring(0, 2000)
         : recentMessages;
@@ -1574,20 +1708,20 @@ class HomeViewModel extends ChangeNotifier {
         );
       }
     } catch (e) {
-      // Keep the old summary when background generation fails.
+      // 后台生成失败时保留旧摘要。
       traceStep?.finish(MemoryTraceStepStatus.failed, error: e.toString());
       traceHandle?.commit(error: e.toString());
       onBackgroundTaskError?.call(BackgroundTaskKind.summary, e);
     }
   }
 
-  /// Open a trace for background summary generation (feeds past-conversation
-  /// recall). Never throws.
+  /// 为后台摘要生成打开跟踪（用于历史会话召回）。
+  /// 从不抛出异常。
   MemoryTraceHandle? _beginSummaryTrace(
     Conversation convo,
     Assistant? assistant,
   ) {
-    // Temporary chats are discarded on exit; keep their traces out of the UI.
+    // 临时聊天在退出时被丢弃；不让其痕迹进入 UI。
     if (_chatService.isTemporaryConversation(convo.id)) {
       return null;
     }
@@ -1608,7 +1742,7 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Chat Suggestions
+  // 聊天建议
   // ============================================================================
 
   Future<void> _clearSuggestionsFor(String conversationId) async {
@@ -1632,7 +1766,7 @@ class HomeViewModel extends ChangeNotifier {
     final mdlId = settings.suggestionModelId;
     if (provKey == null || mdlId == null) return;
 
-    // Read context-dependent inputs before the async gap below.
+    // 在下方异步间隙前读取与上下文相关的输入。
     final assistantProvider = _contextProvider.read<AssistantProvider>();
     final assistant = convo.assistantId != null
         ? assistantProvider.getById(convo.assistantId!)
@@ -1643,8 +1777,8 @@ class HomeViewModel extends ChangeNotifier {
     );
 
     final loadedMessages = await _chatService.loadMessages(convo.id);
-    // Raw revision count snapshot for the post-generation freshness check:
-    // getMessageCount counts every revision, the collapsed list does not.
+    // 用于生成后新鲜度检查的原始修订计数快照：
+    // getMessageCount 统计每个修订，而折叠列表不是。
     final loadedMessageCount = loadedMessages.length;
     final msgs = collapseVersions(loadedMessages);
     final lastAssistant = msgs.cast<ChatMessage?>().lastWhere(
@@ -1677,8 +1811,8 @@ class HomeViewModel extends ChangeNotifier {
       }
 
       final latest = _chatService.getConversation(conversationId);
-      // loadMessages above populates the count; unknown (-1) ≠ loaded length
-      // and correctly aborts publishing stale suggestions.
+      // 上方 loadMessages 会填充数量；未知值（-1）不等于已加载长度，
+      // 因此正确中止发布过期建议。
       if (latest == null ||
           _chatService.getMessageCount(latest.id) != loadedMessageCount) {
         return;
@@ -1704,7 +1838,7 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Model Capability Checks
+  // 模型能力检查
   // ============================================================================
 
   bool isReasoningModel(String providerKey, String modelId) {
@@ -1720,18 +1854,26 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Cleanup
+  // 清理
   // ============================================================================
 
-  /// Flush current conversation progress (for switching/creating).
+  /// 刷新当前会话进度（用于切换/创建）。
   Future<void> flushCurrentConversationProgress() async {
     await _chatActions.flushConversationProgress(currentConversation);
   }
 
-  /// Clean up message state (reasoning, tools, etc.) for removed messages.
+  /// 清理已移除消息的状态（推理、工具等）。
   void cleanupMessageState(List<String> messageIds) {
     for (final id in messageIds) {
       _streamController.clearMessageState(id);
     }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _conversationTreeReloadSerial++;
+    isProcessingFiles.dispose();
+    super.dispose();
   }
 }

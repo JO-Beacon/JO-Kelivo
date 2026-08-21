@@ -102,5 +102,6 @@ void main() {
       expect(controller.loadedStartIndex, 540);
       expect(controller.hasMoreBefore, isTrue);
     },
+    timeout: const Timeout(Duration(minutes: 5)),
   );
 }

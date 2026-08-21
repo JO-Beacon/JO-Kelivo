@@ -33,17 +33,17 @@ Cite: append [cite:id] immediately after each statement a result supports, using
     var u = raw.trim();
     if (u.isEmpty) return u;
 
-    // Strip surrounding quotes if the backend returns a JSON-ish value.
+    // 如果后端返回类似 JSON 的值，则去除外层引号。
     if ((u.startsWith('"') && u.endsWith('"')) ||
         (u.startsWith("'") && u.endsWith("'"))) {
       u = u.substring(1, u.length - 1).trim();
     }
     if (u.isEmpty) return u;
 
-    // Protocol-relative URL (e.g. //example.com/path)
+    // 协议相对 URL（例如 //example.com/path）
     if (u.startsWith('//')) return 'https:$u';
 
-    // No scheme => default to https.
+    // 没有 scheme 时默认使用 https。
     if (!_schemeRe.hasMatch(u)) return 'https://$u';
     return u;
   }
@@ -73,7 +73,7 @@ Cite: append [cite:id] immediately after each statement a result supports, using
     SettingsProvider settings,
   ) async {
     try {
-      // Get selected search service
+      // 获取选中的搜索服务
       final services = settings.searchServices;
       if (services.isEmpty) {
         return jsonEncode({'error': 'No search services configured'});
@@ -85,14 +85,14 @@ Cite: append [cite:id] immediately after each statement a result supports, using
       );
       final service = SearchService.getService(services[selectedIndex]);
 
-      // Execute search
+      // 执行搜索
       final result = await service.search(
         query: query,
         commonOptions: settings.searchCommonOptions,
         serviceOptions: services[selectedIndex],
       );
 
-      // Add unique IDs to each result item
+      // 为每个结果项添加唯一 ID
       final itemsWithIds = result.items.asMap().entries.map((entry) {
         final item = entry.value;
         return SearchResultItem(
@@ -104,7 +104,7 @@ Cite: append [cite:id] immediately after each statement a result supports, using
         );
       }).toList();
 
-      // Return formatted result
+      // 返回格式化结果
       return jsonEncode({
         if (result.answer != null) 'answer': result.answer,
         'items': itemsWithIds.map((item) => item.toJson()).toList(),

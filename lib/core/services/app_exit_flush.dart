@@ -2,11 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-/// Process-exit flush registry (desktop only).
+/// 进程退出时刷新的注册表（仅桌面端）。
 ///
-/// Handlers run from AppLifecycleListener.onExitRequested so in-memory write
-/// queues reach durable storage before the process exits. Handlers must be
-/// fast and idempotent; a failing handler is skipped so later ones still run.
+/// 处理程序在 AppLifecycleListener.onExitRequested 中运行，以便内存写入队列在
+/// 进程退出前到达持久化存储。处理程序必须快速且幂等；失败的处理程序会被跳过，
+/// 使后续处理程序仍能继续运行。
 final class AppExitFlush {
   AppExitFlush._();
 

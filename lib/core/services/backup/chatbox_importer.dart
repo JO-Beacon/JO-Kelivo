@@ -11,6 +11,7 @@ import '../../database/chat_database_repository.dart'
 import '../../models/backup.dart';
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
+import '../../models/conversation_tree.dart';
 import '../../models/message_part.dart';
 import '../../utils/multimodal_input_utils.dart';
 import '../../../utils/sandbox_path_resolver.dart';
@@ -41,7 +42,7 @@ class ChatboxImportResult {
 class ChatboxImporter {
   ChatboxImporter._();
 
-  // Published backup keys used by the business settings router.
+  // 业务设置路由使用的已发布备份键。
   static const String _providersKey = 'provider_configs_v1';
   static const String _providersOrderKey = 'providers_order_v1';
   static const String _assistantsKey = 'assistants_v1';
@@ -59,7 +60,7 @@ class ChatboxImporter {
   }) async {
     final root = await _readChatboxBackupFile(file);
 
-    // Safety: avoid destructive overwrite when the export is incomplete.
+    // 安全考虑：导出未完成时避免破坏性覆盖。
     if (mode == RestoreMode.overwrite) {
       final sessionsList = root['chat-sessions-list'];
       if (sessionsList is! List || sessionsList.isEmpty) {
@@ -112,7 +113,7 @@ class ChatboxImporter {
     );
   }
 
-  // ---------- parsing ----------
+  // ---------- 解析 ----------
 
   static Future<Map<String, dynamic>> _readChatboxBackupFile(File file) async {
     if (!await file.exists()) {
@@ -143,7 +144,7 @@ class ChatboxImporter {
 
     final root = decoded.map((k, v) => MapEntry(k.toString(), v));
 
-    // Minimal shape validation: exported data usually has at least one of these.
+    // 最基本的结构校验：导出数据通常至少包含其中之一。
     final hasSessions = root['chat-sessions-list'] is List;
     final settings = root['settings'];
     final hasProviders = settings is Map && (settings['providers'] is Map);
@@ -156,7 +157,7 @@ class ChatboxImporter {
     return root.cast<String, dynamic>();
   }
 
-  // ---------- providers ----------
+  // ---------- 供应商 ----------
 
   static Map<String, Map<String, dynamic>> _parseProviders(
     Map<String, dynamic> root,
@@ -170,7 +171,7 @@ class ChatboxImporter {
     for (final entry in providers.entries) {
       final key = entry.key.toString().trim();
       if (key.isEmpty) continue;
-      if (key == 'chatbox-ai') continue; // not supported in this app
+      if (key == 'chatbox-ai') continue; // 本应用不支持
       final cfg = entry.value;
       if (cfg is! Map) continue;
 
@@ -228,7 +229,7 @@ class ChatboxImporter {
     return imported;
   }
 
-  // ---------- assistants + conversations ----------
+  // ---------- 助手与会话 ----------
 
   static Future<_AssistantsConversationsResult>
   _parseAssistantsAndConversations(
@@ -241,20 +242,20 @@ class ChatboxImporter {
         ? sessionsListRaw
         : const <dynamic>[];
 
-    // Collect all session ids first so we can tag them later.
+    // 先收集所有 session id，以便后续打标签。
     final importedAssistants = <Map<String, dynamic>>[];
     final importedAssistantIds = <String>[];
     final conversationBatches = <ParsedChatImportBatch>[];
     final messagesToAppend = <String, List<ChatMessage>>{};
 
-    // Existing state is read-only while the complete import plan is built.
+    // 在构建完整导入计划期间，现有状态只读。
     if (!chatService.initialized) await chatService.init();
 
     final existingConvs = chatService.getAllCompleteConversations();
     final existingConvIds = existingConvs.map((c) => c.id).toSet();
     final existingMsgIds = <String>{};
     if (mode == RestoreMode.merge) {
-      // Ids only: full message loads would flush the LRU cache for no gain.
+      // 仅取 id：完整加载消息会无意义地冲掉 LRU 缓存。
       for (final c in existingConvs) {
         existingMsgIds.addAll(await chatService.getMessageIds(c.id));
       }
@@ -263,7 +264,7 @@ class ChatboxImporter {
     int convCount = 0;
     int msgCount = 0;
 
-    // `__exported_at` is a good fallback timestamp base when message timestamps are missing.
+    // 当消息时间戳缺失时，`__exported_at` 是不错的回退时间戳基准。
     final exportedAt =
         _parseIsoDateTime((root['__exported_at'] ?? '').toString()) ??
         DateTime.now();
@@ -285,7 +286,7 @@ class ChatboxImporter {
           ? sessionSettingsRaw.map((k, v) => MapEntry(k.toString(), v))
           : const <String, dynamic>{};
 
-      // Derive assistant config fields.
+      // 推导助手配置字段。
       final provider = (sessionSettings['provider'] ?? '').toString().trim();
       final modelId = (sessionSettings['modelId'] ?? '').toString().trim();
       final temperature = (sessionSettings['temperature'] as num?)?.toDouble();
@@ -297,7 +298,7 @@ class ChatboxImporter {
 
       final thinkingBudget = _extractThinkingBudget(sessionSettings);
 
-      // Use first system message as assistant system prompt.
+      // 将第一条 system 消息作为助手 system prompt。
       final sysPrompt = _extractSystemPromptFromSession(
         session,
         fallback: _extractDefaultPrompt(root),
@@ -338,7 +339,7 @@ class ChatboxImporter {
       importedAssistants.add(assistantJson);
       importedAssistantIds.add(id);
 
-      // Conversations (topics)
+      // 会话（话题）
       final threadsRaw = session['threads'];
       final threads = threadsRaw is List ? threadsRaw : const <dynamic>[];
       final sessionMessages = (session['messages'] is List)
@@ -372,8 +373,8 @@ class ChatboxImporter {
       } else {
         effectiveThreads.addAll(parsedThreads);
 
-        // Chatbox stores current topic messages in `session.messages`, and previous topics in `session.threads`.
-        // Import both, but avoid duplicating if the current topic is already present in threads.
+        // Chatbox 将当前话题消息存于 `session.messages`，历史话题存于 `session.threads`。
+        // 两者都导入，但如果当前话题已存在于 threads 中，则避免重复。
         final currentIds = collectIds(sessionMessages);
         if (currentIds.isNotEmpty) {
           final currentSet = currentIds.toSet();
@@ -423,7 +424,7 @@ class ChatboxImporter {
             ? (t['messages'] as List)
             : const <dynamic>[];
 
-        // Convert messages
+        // 转换消息
         final messages = <ChatMessage>[];
         bool consumedSystem = false;
         int fallbackIndex = 0;
@@ -440,7 +441,7 @@ class ChatboxImporter {
           final parts = _extractMessageParts(msg, roleHint: roleRaw);
           final content = _textFromParts(parts);
 
-          // System message: first one becomes assistant prompt, others become assistant-visible note.
+          // System 消息：第一条作为助手 prompt，其余转为助手可见备注。
           if (roleRaw == 'system') {
             if (!consumedSystem && content.trim().isNotEmpty) {
               consumedSystem = true;
@@ -459,8 +460,8 @@ class ChatboxImporter {
               exportedAt.add(Duration(milliseconds: fallbackIndex++));
 
           if (role == 'tool') {
-            // Keep tool-result JSON in a TextPart for tool semantics, but do not
-            // drop ImagePart/FilePart attachments extracted from contentParts.
+            // 将 tool-result JSON 保留在 TextPart 中以维持工具语义，但不要
+            // 丢弃从 contentParts 中提取的 ImagePart/FilePart 附件。
             final toolPayload = _buildToolMessagePayload(
               msg,
               fallbackText: content,
@@ -520,7 +521,21 @@ class ChatboxImporter {
           }
         }
 
-        // Determine timestamps
+        ConversationTree? importedTree;
+        if (mode == RestoreMode.overwrite) {
+          final materialized = _materializeChatboxForks(
+            conversationId: tid,
+            rootMessages: messages,
+            forkHash: session['messageForksHash'],
+            fallbackTime: exportedAt,
+          );
+          messages
+            ..clear()
+            ..addAll(materialized.messages);
+          importedTree = materialized.tree;
+        }
+
+        // 确定时间戳
         DateTime createdAt = exportedAt;
         DateTime updatedAt = exportedAt;
         if (messages.isNotEmpty) {
@@ -528,7 +543,7 @@ class ChatboxImporter {
           createdAt = times.first;
           updatedAt = times.last;
         } else {
-          // Thread createdAt can be a number (ms)
+          // Thread 的 createdAt 可能是数字（毫秒）
           final createdRaw = t['createdAt'];
           final created = _parseEpochMillis(createdRaw);
           if (created != null) {
@@ -550,7 +565,11 @@ class ChatboxImporter {
           messagesToAppend.putIfAbsent(tid, () => []).addAll(messages);
           msgCount += messages.length;
         } else {
-          conversationBatches.add((conversation: conv, messages: messages));
+          conversationBatches.add((
+            conversation: conv,
+            messages: messages,
+            tree: importedTree,
+          ));
           convCount += 1;
           msgCount += messages.length;
         }
@@ -568,7 +587,160 @@ class ChatboxImporter {
     );
   }
 
-  // ---------- atomic business patch ----------
+  static ({List<ChatMessage> messages, ConversationTree tree})
+  _materializeChatboxForks({
+    required String conversationId,
+    required List<ChatMessage> rootMessages,
+    required dynamic forkHash,
+    required DateTime fallbackTime,
+  }) {
+    final rootIds = rootMessages.map((message) => message.id).toList();
+    var tree = ConversationTree.linear(
+      conversationId: conversationId,
+      messageIds: rootIds,
+      activeBranchId: 'root-$conversationId',
+      createdAt: rootMessages.isEmpty
+          ? fallbackTime
+          : rootMessages.first.timestamp,
+    );
+    final messages = List<ChatMessage>.of(rootMessages);
+    final byId = <String, ChatMessage>{
+      for (final message in messages) message.id: message,
+    };
+    if (forkHash is! Map) return (messages: messages, tree: tree);
+
+    final entries = <String, Map<String, dynamic>>{};
+    for (final rawEntry in forkHash.entries) {
+      if (rawEntry.value is! Map) continue;
+      entries[rawEntry.key.toString()] = rawEntry.value
+          .map((key, value) => MapEntry(key.toString(), value))
+          .cast<String, dynamic>();
+    }
+
+    final rootBranchId = tree.activeBranchId;
+    final handledPivots = <String>{};
+    var changed = true;
+    while (changed) {
+      changed = false;
+      for (final entry in entries.entries) {
+        final pivotId = entry.key;
+        if (handledPivots.contains(pivotId) || !byId.containsKey(pivotId)) {
+          continue;
+        }
+        final lists = entry.value['lists'];
+        if (lists is! List) {
+          handledPivots.add(pivotId);
+          continue;
+        }
+        final position = (entry.value['position'] as num?)?.toInt() ?? 0;
+        for (var listIndex = 0; listIndex < lists.length; listIndex++) {
+          final rawList = lists[listIndex];
+          if (rawList is! Map) continue;
+          final list = rawList.map(
+            (key, value) => MapEntry(key.toString(), value),
+          );
+          final rawMessages = list['messages'];
+          if (rawMessages is! List) continue;
+          final listId = (list['id'] ?? '$listIndex').toString();
+          final branchId = 'chatbox-fork-$pivotId-$listId';
+          if (tree.branches.containsKey(branchId)) continue;
+
+          tree = tree.forkBranchFromParent(
+            branchId: branchId,
+            fromMessageId: pivotId,
+            name: 'Chatbox fork ${position + 1}',
+          );
+          var parentId = pivotId;
+          for (final rawMessage in rawMessages) {
+            if (rawMessage is! Map) continue;
+            final messageMap = rawMessage.map(
+              (key, value) => MapEntry(key.toString(), value),
+            );
+            final messageId = (messageMap['id'] ?? '').toString().trim();
+            if (messageId.isEmpty) continue;
+            var message = byId[messageId];
+            if (message == null) {
+              message = _convertChatboxForkMessage(
+                messageMap,
+                conversationId: conversationId,
+                fallbackTime: fallbackTime,
+              );
+              if (message == null) continue;
+              byId[message.id] = message;
+              messages.add(message);
+            }
+            if (tree.edges.containsKey(message.id)) {
+              parentId = message.id;
+              continue;
+            }
+            tree = tree.appendToActiveBranch(
+              message.id,
+              parentMessageId: parentId,
+              branchId: branchId,
+              activate: false,
+            );
+            parentId = message.id;
+          }
+          tree = tree.switchBranch(rootBranchId);
+        }
+        handledPivots.add(pivotId);
+        changed = true;
+      }
+    }
+
+    return (messages: messages, tree: tree);
+  }
+
+  static ChatMessage? _convertChatboxForkMessage(
+    Map<String, dynamic> msg, {
+    required String conversationId,
+    required DateTime fallbackTime,
+  }) {
+    final messageId = (msg['id'] ?? '').toString().trim();
+    if (messageId.isEmpty) return null;
+    final roleRaw = (msg['role'] ?? '').toString();
+    final parts = _extractMessageParts(msg, roleHint: roleRaw);
+    final content = _textFromParts(parts);
+    final timestamp = _parseMessageTimestamp(msg['timestamp']) ?? fallbackTime;
+    if (roleRaw == 'tool') {
+      final toolPayload = _buildToolMessagePayload(msg, fallbackText: content);
+      return ChatMessage(
+        id: messageId,
+        role: 'tool',
+        parts: <MessagePart>[
+          TextPart(toolPayload),
+          ...parts.where((part) => part is ImagePart || part is FilePart),
+        ],
+        timestamp: timestamp,
+        conversationId: conversationId,
+      );
+    }
+    final role = roleRaw == 'user' ? 'user' : 'assistant';
+    final reasoningTexts = parts
+        .whereType<ReasoningPart>()
+        .map((part) => part.text)
+        .where((text) => text.trim().isNotEmpty)
+        .toList(growable: false);
+    return ChatMessage(
+      id: messageId,
+      role: role,
+      parts: parts.isEmpty ? const <MessagePart>[TextPart('')] : parts,
+      timestamp: timestamp,
+      modelId: _inferModelIdFromChatboxMessage(msg).trim().isEmpty
+          ? null
+          : _inferModelIdFromChatboxMessage(msg),
+      providerId: (msg['aiProvider'] ?? '').toString().trim().isEmpty
+          ? null
+          : (msg['aiProvider'] ?? '').toString().trim(),
+      totalTokens:
+          (msg['tokenCount'] as num?)?.toInt() ??
+          (msg['tokensUsed'] as num?)?.toInt(),
+      conversationId: conversationId,
+      reasoningText: reasoningTexts.isEmpty ? null : reasoningTexts.join('\n'),
+    );
+  }
+
+  // ---------- 原子业务补丁 ----------
 
   static BusinessSnapshot _transformBusinessData({
     required BusinessSnapshot current,
@@ -581,8 +753,8 @@ class ChatboxImporter {
     final overwrite = mode == RestoreMode.overwrite;
 
     if (overwrite) {
-      // Chatbox exports without providers historically left local providers
-      // intact, so preserve that importer-specific behavior.
+      // 历史上不含 providers 的 Chatbox 导出会保留本地 providers
+      // 完整，因此沿用该导入器专属行为。
       if (providers.isNotEmpty) {
         settings[_providersKey] = jsonEncode(providers);
         settings[_providersOrderKey] = providers.keys.toList();
@@ -741,7 +913,7 @@ class ChatboxImporter {
     return decoded.map((field, value) => MapEntry(field.toString(), value));
   }
 
-  // ---------- content helpers ----------
+  // ---------- 内容辅助 ----------
 
   static String _extractDefaultPrompt(Map<String, dynamic> root) {
     final settings = root['settings'];
@@ -835,13 +1007,13 @@ class ChatboxImporter {
     Map<String, dynamic> msg, {
     required String roleHint,
   }) {
-    // roleHint retained for call-site clarity; attachment encoding is role-agnostic.
+    // 保留 roleHint 以便调用方语义清晰；附件编码与角色无关。
     final _ = roleHint;
     final partsRaw = msg['contentParts'];
     final out = <MessagePart>[];
     final textChunks = <String>[];
-    // When an attachment splits text runs, keep one newline so joining TextPart
-    // payloads (no separator) yields `before\nafter` rather than `beforeafter`.
+    // 当附件分隔文本片段时保留一个换行符，使 TextPart
+    // 载荷拼接（无分隔符）得到的是 `before\nafter` 而非 `beforeafter`。
     var pendingContentNewline = false;
 
     void flushText() {
@@ -916,8 +1088,8 @@ class ChatboxImporter {
             if (t.trim().isNotEmpty) {
               flushText();
               out.add(ReasoningPart(t));
-              // Same bridging newline as attachments so before/reasoning/after
-              // yields derived content `before\nafter`.
+              // 与附件相同的桥接换行符，使 before/reasoning/after
+              // 推导出的内容为 `before\nafter`。
               pendingContentNewline = out.any((p) => p is TextPart);
             }
             break;
@@ -938,13 +1110,13 @@ class ChatboxImporter {
       }
     }
 
-    // Fallback to legacy `content`
+    // 回退到旧版 `content`
     if (out.isEmpty && textChunks.isEmpty) {
       final legacy = (msg['content'] ?? '').toString();
       if (legacy.trim().isNotEmpty) addText(legacy);
     }
 
-    // Links
+    // 链接
     final links = msg['links'];
     if (links is List) {
       for (final l in links) {
@@ -960,7 +1132,7 @@ class ChatboxImporter {
       }
     }
 
-    // Files — known attachment objects become FilePart directly
+    // 文件——已知附件对象直接转为 FilePart
     final files = msg['files'];
     if (files is List) {
       for (final f in files) {
@@ -982,7 +1154,7 @@ class ChatboxImporter {
       }
     }
 
-    // Pictures (legacy image list)
+    // 图片（旧版图片列表）
     final pics = msg['pictures'];
     if (pics is List) {
       for (final p in pics) {
@@ -999,7 +1171,7 @@ class ChatboxImporter {
       }
     }
 
-    // Error info
+    // 错误信息
     final err = (msg['error'] ?? '').toString();
     if (err.trim().isNotEmpty) {
       addText('[Error] $err');
@@ -1062,7 +1234,7 @@ class ChatboxImporter {
     String host = apiHost.trim();
     String path = apiPath.trim();
 
-    // Azure settings: prefer endpoint if present.
+    // Azure 设置：若存在 endpoint 则优先使用。
     if (host.isEmpty && endpoint.trim().isNotEmpty) {
       host = endpoint.trim();
     }
@@ -1071,7 +1243,7 @@ class ChatboxImporter {
       host = host.substring(0, host.length - 1);
     }
 
-    // Ensure scheme for host if user stored bare domain
+    // 若用户存的是裸域名，则补全 scheme
     if (host.isNotEmpty &&
         !(host.startsWith('http://') || host.startsWith('https://'))) {
       host = 'https://$host';
@@ -1079,12 +1251,12 @@ class ChatboxImporter {
 
     if (kind == ProviderKind.openai) {
       if (path.isNotEmpty && !path.startsWith('/')) path = '/$path';
-      // If host already includes the full path, split it out.
+      // 若 host 已包含完整路径，则拆分出来。
       if (host.toLowerCase().endsWith('/chat/completions')) {
         host = host.substring(0, host.length - '/chat/completions'.length);
         path = '/chat/completions';
       }
-      // Avoid appending '/v1' when host already contains a known version segment.
+      // 当 host 已包含已知版本段时，避免再追加 '/v1'。
       final lower = host.toLowerCase();
       final hasKnownVersionSuffix =
           lower.endsWith('/v1') ||
@@ -1098,7 +1270,7 @@ class ChatboxImporter {
       if (host.isNotEmpty && !hasKnownVersionSuffix && !path.contains('/v1')) {
         host = '$host/v1';
       }
-      // Special-case OpenAI and OpenRouter canonicalization (best-effort)
+      // 对 OpenAI 与 OpenRouter 做规范化特例处理（尽力而为）
       if (lower.endsWith('://api.openai.com') ||
           lower.endsWith('://api.openai.com/v1')) {
         host = 'https://api.openai.com/v1';
@@ -1113,7 +1285,7 @@ class ChatboxImporter {
     }
 
     if (kind == ProviderKind.claude) {
-      // Align with Anthropic: base should end with /v1
+      // 与 Anthropic 对齐：base 应以 /v1 结尾
       final lower = host.toLowerCase();
       if (host.isNotEmpty && lower == 'https://api.anthropic.com') {
         host = '$host/v1';
@@ -1126,7 +1298,7 @@ class ChatboxImporter {
     }
 
     if (kind == ProviderKind.google) {
-      // Chatbox uses /v1beta; keep if already present.
+      // Chatbox 使用 /v1beta；若已存在则保留。
       final lower = host.toLowerCase();
       if (host.isNotEmpty && !lower.endsWith('/v1beta')) {
         host = '$host/v1beta';

@@ -7,14 +7,14 @@ import 'window_size_manager.dart';
 import 'dart:async';
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 
-/// Handles desktop window initialization and persistence (size/position/maximized).
+/// 处理桌面窗口初始化和持久化（尺寸、位置、最大化状态）。
 class DesktopWindowController with WindowListener {
   DesktopWindowController._();
   static final DesktopWindowController instance = DesktopWindowController._();
 
   final WindowSizeManager _sizeMgr = const WindowSizeManager();
   bool _attached = false;
-  // Debounce timers to avoid frequent disk writes during drag/resize
+  // 防抖定时器，避免拖动或调整大小时频繁写盘
   Timer? _moveDebounce;
   Timer? _resizeDebounce;
   static const _debounceDuration = Duration(milliseconds: 400);
@@ -29,7 +29,7 @@ class DesktopWindowController with WindowListener {
 
     await windowManager.ensureInitialized();
     _attachListeners();
-    // Windows custom title bar is handled in main (TitleBarStyle.hidden)
+    // Windows 自定义标题栏在 main 中处理（TitleBarStyle.hidden）
 
     final initialSize = await _sizeMgr.getInitialSize();
     const minSize = Size(
@@ -43,9 +43,9 @@ class DesktopWindowController with WindowListener {
 
     final isMac = defaultTargetPlatform == TargetPlatform.macOS;
     final options = WindowOptions(
-      // On macOS, let Cocoa autosave restore the last frame to avoid jumps.
+      // 在 macOS 上让 Cocoa 自动保存恢复最后窗口框架（位置和尺寸），避免跳动。
       size: isMac ? null : initialSize,
-      // Avoid imposing min/max on macOS to prevent subtle size corrections.
+      // 避免在 macOS 上设置最小或最大尺寸，以防出现细微尺寸校正。
       minimumSize: isMac ? null : minSize,
       maximumSize: isMac ? null : maxSize,
       title: title,
@@ -54,7 +54,7 @@ class DesktopWindowController with WindowListener {
     final savedPos = await _sizeMgr.getPosition();
     final wasMax = await _sizeMgr.getWindowMaximized();
 
-    if (defaultTargetPlatform == TargetPlatform.windows){
+    if (defaultTargetPlatform == TargetPlatform.windows) {
       await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
       doWhenWindowReady(() async {
         appWindow.minSize = options.minimumSize;
@@ -65,29 +65,25 @@ class DesktopWindowController with WindowListener {
           appWindow.position = savedPos;
         }
 
-        /// on Windows we maximize the window if it was previously closed
-        /// from a maximized state.
+        /// 在 Windows 上，如果窗口上次是从最大化状态关闭的，则恢复为最大化。
         if (wasMax) {
           appWindow.maximize();
         }
       });
     } else {
       await windowManager.waitUntilReadyToShow(options, () async {
-        // Show first, then restore position to avoid macOS jump/flicker.
+        // 先显示窗口，再恢复位置，避免 macOS 上跳动或闪烁。
         await windowManager.show();
         await windowManager.focus();
-        // On macOS rely on native autosave. Do not set position from Dart.
+        // 在 macOS 上依赖原生自动保存，不从 Dart 设置位置。
         final shouldRestorePos = savedPos != null && !isMac;
         if (shouldRestorePos) {
           try {
             await windowManager.setPosition(savedPos);
           } catch (_) {}
         }
-      });      
+      });
     }
-
-
-    
   }
 
   void _attachListeners() {
@@ -98,7 +94,7 @@ class DesktopWindowController with WindowListener {
 
   @override
   void onWindowResize() async {
-    // Throttle saves while resizing to reduce jank
+    // 调整大小时节流保存，减少卡顿
     _resizeDebounce?.cancel();
     _resizeDebounce = Timer(_debounceDuration, () async {
       try {
@@ -113,7 +109,7 @@ class DesktopWindowController with WindowListener {
 
   @override
   void onWindowMove() async {
-    // Debounce position persistence during drag to avoid main-isolate IO on every move
+    // 拖动期间对位置持久化做防抖，避免每次移动都在主 isolate 执行 I/O
     _moveDebounce?.cancel();
     _moveDebounce = Timer(_debounceDuration, () async {
       try {
@@ -127,7 +123,7 @@ class DesktopWindowController with WindowListener {
   void onWindowMaximize() async {
     try {
       await _sizeMgr.setWindowMaximized(true);
-      // Mark position as origin placeholder to avoid stale restore when maximized.
+      // 将位置标记为原点占位符，避免最大化时恢复过期位置。
       await _sizeMgr.setPosition(const Offset(0, 0));
     } catch (_) {}
   }
@@ -136,14 +132,14 @@ class DesktopWindowController with WindowListener {
   void onWindowUnmaximize() async {
     try {
       await _sizeMgr.setWindowMaximized(false);
-      // Capture current position on restore from maximized.
+      // 从最大化恢复时捕获当前位置。
       final offset = await windowManager.getPosition();
       await _sizeMgr.setPosition(offset);
     } catch (_) {}
   }
 
-  // Persist fullscreen transitions similarly to maximize/unmaximize to
-  // keep state consistent across platforms and avoid position jumps.
+  // 像最大化或取消最大化一样持久化全屏状态转换，
+  // 保持跨平台状态一致并避免位置跳动。
   @override
   void onWindowEnterFullScreen() async {
     try {

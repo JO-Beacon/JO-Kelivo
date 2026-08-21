@@ -38,7 +38,7 @@ class CherryImportResult {
 class CherryImporter {
   CherryImporter._();
 
-  // Published backup keys used by the business settings router.
+  // 业务设置路由器使用的已发布备份键。
   static const String _providersKey = 'provider_configs_v1';
   static const String _providersOrderKey = 'providers_order_v1';
   static const String _assistantsKey = 'assistants_v1';
@@ -49,16 +49,16 @@ class CherryImporter {
     required BusinessRepository businessRepository,
     required ChatService chatService,
   }) async {
-    // 1) Load JSON from ZIP/BAK (best-effort)
+    // 1) 从 ZIP/BAK 加载 JSON（尽力而为）
     final Map<String, dynamic> root = await _readCherryBackupFile(file);
 
-    // 2) Basic validation
+    // 2) 基本校验
     final version = (root['version'] as num?)?.toInt() ?? 0;
     if (version < 2) {
       throw Exception('Unsupported Cherry backup version: $version');
     }
 
-    // 3) Parse localStorage persist:cherry-studio (Redux persist)
+    // 3) 解析 localStorage persist:cherry-studio（Redux persist）
     final localStorage =
         (root['localStorage'] as Map?)?.map(
           (k, v) => MapEntry(k.toString(), v),
@@ -75,7 +75,7 @@ class CherryImporter {
       throw Exception('Invalid persist:cherry-studio JSON');
     }
 
-    // slices in persist are also JSON-encoded strings
+    // persist 中的 slices 也是 JSON 编码的字符串
     Map<String, dynamic> assistantsSlice = const {};
     Map<String, dynamic> llmSlice = const {};
     try {
@@ -108,7 +108,7 @@ class CherryImporter {
     final List<dynamic> cherryMessageBlocks =
         (indexedDB['message_blocks'] as List?) ?? const <dynamic>[];
 
-    // Build a map of topic metadata from assistants[].topics[]
+    // 从 assistants[].topics[] 构建主题元数据映射
     final Map<String, Map<String, dynamic>> topicMeta =
         <String, Map<String, dynamic>>{};
     for (final a in cherryAssistants) {
@@ -121,8 +121,8 @@ class CherryImporter {
           final tm = topicMeta[id]!;
           final parentAssistantId = (a['id'] ?? '').toString();
           final topicAssistantId = (t['assistantId'] ?? '').toString();
-          // Cherry may keep a stale topic.assistantId; the parent assistant's
-          // topic list is the reliable ownership source.
+          // Cherry 可能保留过期的 topic.assistantId；父级 assistant 的
+          // topic 列表才是可靠的所有权来源。
           final ownerAssistantId = parentAssistantId.isNotEmpty
               ? parentAssistantId
               : topicAssistantId;
@@ -133,7 +133,7 @@ class CherryImporter {
       }
     }
 
-    // Build a map of topicId -> messages
+    // 构建 topicId -> messages 映射
     final Map<String, List<Map<String, dynamic>>> topicMessages =
         <String, List<Map<String, dynamic>>>{};
     for (final e in cherryTopicsWithMessages) {
@@ -147,14 +147,14 @@ class CherryImporter {
       ];
     }
 
-    // Build a map of messageId -> reconstructed text from message_blocks (for cases where message.content is empty)
+    // 构建 messageId -> 从 message_blocks 重建的文本映射（用于 message.content 为空的情况）
     final Map<String, String> blockTextByMessageId = <String, String>{};
     for (final b in cherryMessageBlocks) {
       if (b is! Map) continue;
       final type = (b['type'] ?? '').toString();
       final messageId = (b['messageId'] ?? '').toString();
       if (messageId.isEmpty) continue;
-      // Only include readable blocks
+      // 只包含可读的 blocks
       if (type == 'main_text') {
         final content = (b['content'] ?? '').toString();
         if (content.isNotEmpty) {
@@ -183,7 +183,7 @@ class CherryImporter {
               : '$prev\n$tagged';
         }
       } else if (type == 'thinking') {
-        // Optional: include as a collapsible-like section in plain text
+        // 可选：在纯文本中作为类似可折叠的部分包含
         final think = (b['content'] ?? '').toString();
         if (think.isNotEmpty) {
           final wrapped = '<think>\n$think\n</think>';
@@ -195,7 +195,7 @@ class CherryImporter {
       }
     }
 
-    // 5) Parse business data before opening the single write transaction.
+    // 5) 在打开单一写事务之前解析业务数据。
     final importedProviders = _parseProviders(cherryProviders);
     final importedAssistants = _parseAssistants(cherryAssistants);
     await _importBusinessData(
@@ -205,7 +205,7 @@ class CherryImporter {
       assistants: importedAssistants,
     );
 
-    // If overwrite, clear chats/files BEFORE writing any uploads to avoid deletion later
+    // 如果覆盖，则在写入任何上传内容之前先清除 chats/files，以免稍后被删除
     if (!chatService.initialized) {
       await chatService.init();
     }
@@ -213,14 +213,14 @@ class CherryImporter {
       await chatService.clearAllData();
     }
 
-    // 7) Prepare files (only if referenced by messages)
+    // 7) 准备文件（仅当消息引用了这些文件时）
     final filesById = <String, Map<String, dynamic>>{
       for (final f in cherryFiles)
         if (f is Map && f['id'] != null)
           f['id'].toString(): f.map((k, v) => MapEntry(k.toString(), v)),
     };
 
-    // Precompute used file ids
+    // 预计算已使用的文件 ID
     final usedFileIds = <String>{};
     for (final entry in topicMessages.entries) {
       for (final m in entry.value) {
@@ -233,7 +233,7 @@ class CherryImporter {
       }
     }
 
-    // Also include files referenced by message_blocks when a 'file' object is present
+    // 当存在 'file' 对象时，也纳入 message_blocks 引用的文件
     for (final b in cherryMessageBlocks) {
       if (b is! Map) continue;
       final fileObj = (b['file'] as Map?)?.map(
@@ -243,14 +243,14 @@ class CherryImporter {
       if (fid.isNotEmpty) usedFileIds.add(fid);
     }
 
-    // Write referenced files into Documents/upload and build path map
+    // 将引用的文件写入 Documents/upload 并构建路径映射
     final pathsByFileId = await _materializeFiles(
       filesById,
       usedFileIds,
       backupArchive: file,
     );
 
-    // Build mapping of extra attachments (images/files) in message_blocks (not represented in message.files)
+    // 构建 message_blocks 中额外附件（images/files）的映射（这些附件未出现在 message.files 中）
     final Map<String, List<_PendingAttachmentRef>> pendingAttachmentsByMessage =
         <String, List<_PendingAttachmentRef>>{};
     for (final b in cherryMessageBlocks) {
@@ -290,7 +290,7 @@ class CherryImporter {
       }
     }
 
-    // 8) Import topics & messages into ChatService
+    // 8) 将 topics 与 messages 导入 ChatService
     final convCountAndMsgCount = await _importConversations(
       topicMeta: topicMeta,
       topicMessages: topicMessages,
@@ -310,20 +310,20 @@ class CherryImporter {
     );
   }
 
-  // ---------- helpers ----------
+  // ---------- 辅助函数 ----------
 
-  /// Cap for *speculative* ZIP-entry probes only (unknown / non-`.json` names).
+  /// 仅用于*推测性* ZIP 条目探测的上限（未知 / 非 `.json` 名称）。
   static const int defaultSpeculativeJsonProbeBytes = 32 * 1024 * 1024;
 
-  /// Absolute ceiling for in-archive identified `.json` entries only.
-  /// Whole-file and gunzipped JSON remain uncapped.
+  /// 仅针对归档内已识别的 `.json` 条目的绝对上限。
+  /// 整个文件 JSON 和 gunzipped JSON 仍不受上限限制。
   static const int defaultIdentifiedArchiveJsonBytes = 256 * 1024 * 1024;
 
-  /// Test seam to shrink the speculative probe budget without large fixtures.
+  /// 测试接缝，用于在无需大型 fixture 的情况下缩小推测性探测预算。
   @visibleForTesting
   static int? debugSpeculativeJsonProbeBytes;
 
-  /// Test seam for the in-archive identified `.json` ceiling.
+  /// 测试接缝，用于归档内已识别的 `.json` 上限。
   @visibleForTesting
   static int? debugIdentifiedArchiveJsonBytes;
 
@@ -335,7 +335,7 @@ class CherryImporter {
   static int get identifiedArchiveJsonBytes =>
       debugIdentifiedArchiveJsonBytes ?? defaultIdentifiedArchiveJsonBytes;
 
-  /// Counts ZIP entry content accesses during JSON probe passes (not metadata).
+  /// 统计 JSON 探测过程中对 ZIP 条目内容的访问次数（不含元数据）。
   @visibleForTesting
   static int debugZipJsonProbeDecodeCount = 0;
 
@@ -375,13 +375,13 @@ class CherryImporter {
     return normalized.split('/').last;
   }
 
-  /// Archive entries ending in `.json` are treated as identified JSON targets.
+  /// 以 `.json` 结尾的归档条目会被视为已识别的 JSON 目标。
   @visibleForTesting
   static bool isIdentifiedJsonEntryName(String name) {
     return _entryBaseName(name).endsWith('.json');
   }
 
-  /// True when [name] has no directory component (archive-root entry).
+  /// 当 [name] 没有目录组成部分（归档根条目）时返回 true。
   @visibleForTesting
   static bool isArchiveRootEntryName(String name) {
     var normalized = name.replaceAll('\\', '/');
@@ -394,9 +394,9 @@ class CherryImporter {
     return normalized.isNotEmpty && !normalized.contains('/');
   }
 
-  /// Whether a non-`.json` ZIP entry may be decompressed as a speculative
-  /// JSON probe. Size is checked against [speculativeJsonProbeBytes] before
-  /// touching [ArchiveFile.content] (which would decompress and cache).
+  /// 判断非 `.json` ZIP 条目是否可以作为推测性 JSON 探测进行解压。
+  /// 在访问 [ArchiveFile.content]（该操作会解压并缓存）之前，
+  /// 会先依据 [speculativeJsonProbeBytes] 检查大小。
   @visibleForTesting
   static bool isSpeculativeJsonEntryCandidate(String name, int size) {
     if (size <= 0 || size > speculativeJsonProbeBytes) return false;
@@ -408,8 +408,8 @@ class CherryImporter {
     return true;
   }
 
-  /// Whether an in-archive `.json` entry may be decompressed. Bounded by
-  /// [identifiedArchiveJsonBytes] so nested attachment dumps cannot OOM.
+  /// 判断归档内 `.json` 条目是否可以解压。该操作受
+  /// [identifiedArchiveJsonBytes] 限制，以免嵌套附件转储导致 OOM。
   @visibleForTesting
   static bool isIdentifiedArchiveJsonEntryCandidate(String name, int size) {
     if (size <= 0 || size > identifiedArchiveJsonBytes) return false;
@@ -480,13 +480,13 @@ class CherryImporter {
   static Future<Map<String, dynamic>> _readCherryBackupFile(File file) async {
     final bytes = await file.readAsBytes();
 
-    // Whole-file JSON (not ZIP/GZIP): uncapped, allowMalformed.
+    // 整个文件 JSON（非 ZIP/GZIP）：不受上限限制，allowMalformed。
     if (!_looksLikeZip(bytes) && !_looksLikeGzip(bytes)) {
       final obj = _tryDecodeBackupJsonBytes(bytes, allowMalformed: true);
       if (obj != null) return obj;
     }
 
-    // ZIP: version-gate from metadata.json before any entry probe.
+    // ZIP：在任何条目探测之前，先通过 metadata.json 进行版本门控。
     try {
       final archive = ZipDecoder().decodeBytes(bytes);
       CherryDirectBackupReader.readMetadataOrThrowIfUnsupported(archive);
@@ -510,7 +510,7 @@ class CherryImporter {
       rethrow;
     } catch (_) {}
 
-    // GZIP JSON payload: uncapped, allowMalformed.
+    // GZIP JSON 载荷：不受上限限制，allowMalformed。
     if (_looksLikeGzip(bytes)) {
       try {
         final gunzipped = GZipDecoder().decodeBytes(bytes, verify: false);
@@ -525,7 +525,7 @@ class CherryImporter {
   static Map<String, Map<String, dynamic>> _parseProviders(
     List<dynamic> cherryProviders,
   ) {
-    // Build imported map id -> ProviderConfig JSON-like
+    // 构建导入的 id -> ProviderConfig 类 JSON 映射
     final imported = <String, Map<String, dynamic>>{};
 
     for (final p in cherryProviders) {
@@ -537,12 +537,12 @@ class CherryImporter {
       final apiKeyRaw = (p['apiKey'] ?? '').toString();
       final apiHostRaw = (p['apiHost'] ?? '').toString().trim();
 
-      // Parse comma-separated API keys (Cherry Studio stores multiple keys in one string)
+      // 解析逗号分隔的 API keys（Cherry Studio 将多个 key 存储在一个字符串中）
       final apiKeys = _splitApiKeyString(apiKeyRaw);
       final apiKey = apiKeys.isNotEmpty ? apiKeys.first : '';
       final multiKeyEnabled = apiKeys.length > 1;
 
-      // Determine provider kind mapping
+      // 确定 provider kind 映射
       String? kind;
       switch (type) {
         case 'openai':
@@ -555,28 +555,28 @@ class CherryImporter {
           kind = 'google';
           break;
         default:
-          // default to OpenAI-compatible
+          // 默认使用 OpenAI 兼容类型
           kind = 'openai';
       }
 
-      // models list (ids only)
+      // models 列表（仅包含 ids）
       final models = <String>[];
       final mlist = (p['models'] as List?) ?? const <dynamic>[];
       for (final m in mlist) {
         if (m is Map && m['id'] != null) models.add(m['id'].toString());
       }
 
-      // Normalize baseUrl following Cherry Studio semantics:
-      // - In Cherry, for OpenAI/Anthropic providers, if base_url DOES NOT end with '/', they default to appending '/v1'.
-      // - Our importer previously kept the base as-is, which could miss '/v1' and break requests.
-      // - Here we mirror Cherry's behavior on import for 'openai' and 'claude'.
+      // 按 Cherry Studio 语义规范化 baseUrl：
+      // - 在 Cherry 中，对于 OpenAI/Anthropic provider，如果 base_url 不以 '/' 结尾，它们会默认追加 '/v1'。
+      // - 我们的 importer 之前原样保留 base，这可能遗漏 '/v1' 并导致请求失败。
+      // - 这里在导入时对 'openai' 和 'claude' 复刻 Cherry 的行为。
       String base = apiHostRaw;
       if (base.isNotEmpty) {
         if (base.endsWith('/')) {
-          // Trim trailing slash for consistency; user is responsible for including version if needed.
+          // 为保持一致性去掉末尾斜杠；用户需负责在需要时自行包含版本号。
           base = base.substring(0, base.length - 1);
         } else {
-          // If it's OpenAI/Claude/Google and no trailing slash, append default version unless a suffix already exists.
+          // 如果是 OpenAI/Claude/Google 且没有末尾斜杠，则在不存在后缀时追加默认版本。
           final lower = base.toLowerCase();
           final hasVersionSuffix = RegExp(
             r'/v\d([a-z0-9._-]+)?$',
@@ -591,7 +591,7 @@ class CherryImporter {
         }
       }
 
-      // Compose ProviderConfig json
+      // 组装 ProviderConfig json
       final map = <String, dynamic>{
         'id': id,
         'enabled': (p['enabled'] as bool?) ?? apiKey.isNotEmpty,
@@ -637,7 +637,7 @@ class CherryImporter {
   static List<Map<String, dynamic>> _parseAssistants(
     List<dynamic> cherryAssistants,
   ) {
-    // Map to our Assistant JSON list (as stored by Assistant.encodeList)
+    // 映射到我们的 Assistant JSON 列表（与 Assistant.encodeList 存储的格式一致）
     final out = <Map<String, dynamic>>[];
     for (final a in cherryAssistants) {
       if (a is! Map) continue;
@@ -807,8 +807,8 @@ class CherryImporter {
     final uploadDirPath = uploadDir.path;
     final used = usedIds.toList(growable: false);
 
-    // ArchiveFile / InputFileStream are not sendable; keep the ZIP open only
-    // inside the isolate and exchange plain path maps across the boundary.
+    // ArchiveFile / InputFileStream 不可跨隔离区传递；仅在 isolate 内
+    // 保持 ZIP 打开，并在边界两侧交换纯路径映射。
     return Isolate.run(
       () => _materializeFilesSync(
         backupPath: backupPath,
@@ -819,7 +819,7 @@ class CherryImporter {
     );
   }
 
-  /// Synchronous attachment materialization — runs inside an [Isolate].
+  /// 同步附件物化 —— 在 [Isolate] 内运行。
   static Map<String, String> _materializeFilesSync({
     required String? backupPath,
     required String uploadDirPath,
@@ -868,7 +868,7 @@ class CherryImporter {
         if (byRel.isNotEmpty) filesIndexByRel = byRel;
         if (byId.isNotEmpty) filesIndexById = byId;
       } catch (_) {
-        // not a zip, ignore
+        // 不是 zip，忽略
         archive = null;
         try {
           inputStream?.closeSync();
@@ -928,16 +928,15 @@ class CherryImporter {
         final fn = safeName.isNotEmpty
             ? safeName
             : (ext.isNotEmpty ? 'file.$ext' : 'file');
-        // `id` comes straight from the imported archive's JSON. Sanitize it
-        // like the display name: an id such as `x/../../y` would otherwise
-        // escape the upload directory on Windows, whose Win32 path
-        // normalization resolves `..` lexically without requiring the
-        // intermediate directory to exist.
+        // `id` 直接来自导入归档的 JSON。要像显示名称一样对它进行清理：
+        // 诸如 `x/../../y` 这样的 id 在 Windows 上会逃逸上传目录，因为其
+        // Win32 路径规范化会按词法解析 `..`，而不要求中间目录
+        // 实际存在。
         final safeId = id.replaceAll(RegExp(r'[/\\\0]'), '_');
         final fileName = 'cherry_${safeId}_$fn';
         final outPath = p.join(uploadDirPath, fileName);
-        // Defense in depth: never write outside the upload directory even if
-        // a future refactor weakens the sanitization above.
+        // 纵深防御：即使未来的重构削弱了上面的清理逻辑，
+        // 也绝不要写出上传目录之外。
         if (!p.isWithin(p.normalize(uploadDirPath), p.normalize(outPath))) {
           continue;
         }
@@ -1093,7 +1092,7 @@ class CherryImporter {
     }
   }
 
-  /// ZIP entry names and on-disk paths may use `\` (Windows) or `/`.
+  /// ZIP 条目名称和磁盘路径可能使用 `\`（Windows）或 `/`。
   static String _normalizeZipEntryPath(String name) {
     return name.replaceAll('\\', '/');
   }
@@ -1109,7 +1108,7 @@ class CherryImporter {
       output.verifyComplete();
       written = true;
     } catch (_) {
-      // Partial writes are cleaned up below, once the stream is closed.
+      // 流关闭后，会在下方清理部分写入。
     } finally {
       output.closeSync();
     }
@@ -1119,7 +1118,7 @@ class CherryImporter {
       } catch (_) {}
       return false;
     }
-    // The disk-copy fallback preserves source timestamps; keep both in step.
+    // 磁盘复制回退会保留源时间戳；请让二者保持一致。
     final dt = _decodeDosDateTime(entry.lastModTime);
     if (dt != null) {
       try {
@@ -1129,8 +1128,8 @@ class CherryImporter {
     return true;
   }
 
-  /// Decode a DOS date/time packed value (from a ZIP entry's `lastModTime`)
-  /// into a [DateTime]. Returns null when the date portion is zero (unset).
+  /// 将 DOS 日期/时间压缩值（来自 ZIP 条目的 `lastModTime`）
+  /// 解码为 [DateTime]。日期部分为零（未设置）时返回 null。
   static DateTime? _decodeDosDateTime(int packed) {
     final dosDate = packed >> 16;
     final dosTime = packed & 0xFFFF;
@@ -1161,7 +1160,7 @@ class CherryImporter {
     }
   }
 
-  // Returns (conversations, messages, extraFilesSaved)
+  // 返回 (conversations, messages, extraFilesSaved)
   static Future<(int, int, int)> _importConversations({
     required Map<String, Map<String, dynamic>> topicMeta,
     required Map<String, List<Map<String, dynamic>>> topicMessages,
@@ -1174,12 +1173,12 @@ class CherryImporter {
   }) async {
     if (!chatService.initialized) await chatService.init();
 
-    // Build map of existing conv ids for merge
+    // 构建现有 conv id 映射，用于合并
     final existingConvs = chatService.getAllCompleteConversations();
     final existingConvIds = existingConvs.map((c) => c.id).toSet();
     final existingMsgIds = <String>{};
     if (mode == RestoreMode.merge) {
-      // Ids only: full message loads would flush the LRU cache for no gain.
+      // 只取 Id：完整消息加载会无谓地刷新 LRU 缓存。
       for (final c in existingConvs) {
         existingMsgIds.addAll(await chatService.getMessageIds(c.id));
       }
@@ -1187,7 +1186,7 @@ class CherryImporter {
 
     int convCount = 0;
     int msgCount = 0;
-    int extraSaved = 0; // number of files saved from base64/data urls
+    int extraSaved = 0; // 从 base64/data url 保存的文件数量
 
     final topicIds = <String>{...topicMeta.keys, ...topicMessages.keys};
     for (final topicId in topicIds) {
@@ -1198,7 +1197,7 @@ class CherryImporter {
       final assistantId = (meta['assistantId'] ?? '').toString().trim().isEmpty
           ? null
           : meta['assistantId'].toString();
-      // created/updated fallback from messages
+      // 从消息回退 created/updated
       DateTime createdAt;
       DateTime updatedAt;
       try {
@@ -1212,7 +1211,7 @@ class CherryImporter {
         updatedAt = createdAt;
       }
 
-      // Convert messages
+      // 转换消息
       final messages = <ChatMessage>[];
       for (final m in msgsRaw) {
         final msgId = (m['id'] ?? '').toString();
@@ -1223,8 +1222,8 @@ class CherryImporter {
         final roleRaw = (m['role'] ?? 'user').toString();
         final role = (roleRaw == 'system')
             ? 'assistant'
-            : roleRaw; // our schema only supports 'user'|'assistant'
-        // Prefer message.content; if empty, fallback to reconstructed blocks
+            : roleRaw; // 我们的模式只支持 'user'|'assistant'
+        // 优先使用 message.content；如果为空，则回退到重建的块
         String content = '';
         final rawContent = m['content'];
         if (rawContent is String) {
@@ -1256,7 +1255,7 @@ class CherryImporter {
         );
         final totalTokens = (usage?['total_tokens'] as num?)?.toInt();
 
-        // Attachments -> structured ImagePart/FilePart (no mid-pipeline markers)
+        // 附件 -> 结构化 ImagePart/FilePart（不含管线中间标记）
         final files = (m['files'] as List?) ?? const <dynamic>[];
         final attachmentParts = <MessagePart>[];
         for (final f in files) {
@@ -1282,10 +1281,10 @@ class CherryImporter {
               ),
             );
           } else {
-            // Fallback to URL if present (no download)
+            // 如果存在 URL，则回退到 URL（不下载）
             final url = (f['url'] ?? '').toString();
             if (url.isNotEmpty) {
-              // Trust known image MIME even on extensionless / presigned URLs.
+              // 即使是无扩展名或预签名 URL，也信任已知图片 MIME。
               final lowerUrl = url.toLowerCase();
               final isImage =
                   mime.toLowerCase().startsWith('image/') ||
@@ -1301,10 +1300,10 @@ class CherryImporter {
                 ),
               );
             } else {
-              // Archive file missing and no URL — keep an unavailable part so
-              // the attachment is not silently dropped from history.
-              // Prefer an archive-relative origin path when present; otherwise a
-              // stable non-empty placeholder (uri must not be empty).
+              // 归档文件缺失且没有 URL —— 保留一个不可用部分，
+              // 以免附件在历史记录中被静默丢弃。
+              // 存在归档相对原始路径时优先使用它；否则使用
+              // 稳定的非空占位符（uri 不能为空）。
               final originPath = (f['path'] ?? '').toString().trim();
               final placeholder = originPath.isNotEmpty
                   ? originPath
@@ -1322,7 +1321,7 @@ class CherryImporter {
           }
         }
 
-        // Add images referenced by message blocks (image) and message.metadata.generateImageResponse
+        // 添加由消息块（image）和 message.metadata.generateImageResponse 引用的图片
         final extraAtt =
             pendingAttachmentsByMessage[msgId] ??
             const <_PendingAttachmentRef>[];
@@ -1343,8 +1342,8 @@ class CherryImporter {
                 ),
               );
             } else {
-              // Same contract as m['files']: keep an unavailable placeholder
-              // when the archive file is missing.
+              // 与 m['files'] 的约定相同：归档文件缺失时，
+              // 保留不可用占位符。
               final originPath = (ref.originPath ?? '').trim();
               final placeholder = originPath.isNotEmpty
                   ? originPath
@@ -1400,7 +1399,7 @@ class CherryImporter {
           }
         }
 
-        // generateImageResponse in metadata
+        // metadata 中的 generateImageResponse
         final metadata = (m['metadata'] as Map?)?.map(
           (k, v) => MapEntry(k.toString(), v),
         );
@@ -1435,7 +1434,7 @@ class CherryImporter {
                 ),
               );
             } else {
-              // raw base64 without prefix
+              // 不带前缀的原始 base64
               final saved = await _saveDataUrlToUpload(
                 'data:image/png;base64,$s',
               );
@@ -1454,7 +1453,7 @@ class CherryImporter {
           }
         }
 
-        // Extract any inline data:image base64 URLs inside assistant content and convert to files
+        // 提取 assistant 内容中内联的 data:image base64 URL，并转换为文件
         if (role == 'assistant' && content.contains('data:image')) {
           final dataUrls = _extractDataImageUrls(content);
           if (dataUrls.isNotEmpty) {
@@ -1472,7 +1471,7 @@ class CherryImporter {
                 );
               }
             }
-            // Optionally strip the base64 blobs from content to avoid giant text blobs
+            // 可选地从内容中剥离 base64 数据块，避免出现巨大的文本块
             content = _stripDataImageUrls(content);
           }
         }
@@ -1492,16 +1491,16 @@ class CherryImporter {
         );
       }
 
-      // Derive timestamps if missing
+      // 缺少时间戳时进行推导
       if (messages.isNotEmpty) {
         final times = messages.map((m) => m.timestamp).toList()..sort();
         createdAt = times.first;
         updatedAt = times.last;
       }
 
-      // Persist
+      // 持久化
       if (mode == RestoreMode.merge && existingConvIds.contains(topicId)) {
-        // Only add new messages
+        // 仅添加新消息
         for (final m in messages) {
           await chatService.addMessageDirectly(topicId, m);
           msgCount += 1;
@@ -1565,7 +1564,7 @@ class CherryImporter {
     try {
       final upload = await AppDirectories.getUploadDirectory();
       if (!await upload.exists()) await upload.create(recursive: true);
-      // Extract mime and data
+      // 提取 mime 和 data
       String mime = 'image/png';
       String payload = dataUrl;
       final colon = dataUrl.indexOf(':');
@@ -1604,7 +1603,7 @@ class CherryImporter {
   }
 }
 
-/// Verifies an archive entry wrote exactly [expectedBytes].
+/// 验证归档条目恰好写入了 [expectedBytes]。
 class _ExactSizeOutputFileStream extends OutputFileStream {
   _ExactSizeOutputFileStream(String path, {required this.expectedBytes})
     : super.withFileHandle(FileHandle(path, mode: FileAccess.write));
@@ -1654,12 +1653,12 @@ class _ExactSizeOutputFileStream extends OutputFileStream {
 }
 
 class _PendingAttachmentRef {
-  final String? fileId; // if present, resolve via filePaths
-  final String? dataUrl; // if present, save as file
-  final String? url; // remote url
+  final String? fileId; // 如果存在，则通过 filePaths 解析
+  final String? dataUrl; // 如果存在，则保存为文件
+  final String? url; // 远程 URL
   final String? name;
   final String? mime;
-  final String? originPath; // archive-relative path when available
+  final String? originPath; // 可用时为压缩包内的相对路径
   final bool isImage;
   const _PendingAttachmentRef({
     this.fileId,
@@ -1672,20 +1671,19 @@ class _PendingAttachmentRef {
   });
 }
 
-/// Splits a comma-separated API key string into a list of keys.
-/// Handles escaped commas (\,) and trims whitespace.
-/// Mirrors Cherry Studio's splitApiKeyString behavior.
+/// 将逗号分隔的 API key 字符串拆分为 key 列表。处理转义逗号（\,）并去除空白。
+/// 与 Cherry Studio 的 splitApiKeyString 行为保持一致。
 List<String> _splitApiKeyString(String keyStr) {
   if (keyStr.trim().isEmpty) return const <String>[];
 
-  // Use placeholder to handle escaped commas (avoids regex lookbehind for web compatibility)
+  // 使用占位符处理转义逗号（避免正则后行断言以兼容 Web）
   const placeholder = '\x00';
   final escaped = keyStr.replaceAll(r'\,', placeholder);
   final parts = escaped.split(',');
 
   final result = <String>[];
   for (final part in parts) {
-    // Restore escaped commas and trim
+    // 还原转义逗号并去除空白
     final key = part.replaceAll(placeholder, ',').trim();
     if (key.isNotEmpty) {
       result.add(key);

@@ -98,6 +98,13 @@ void main() {
         groupId: 'assistant-slot',
         version: 0,
       );
+      final tree = await repository.loadConversationTree(conversation.id);
+      final originalBranch = tree!.branches.values.singleWhere(
+        (branch) => branch.tipMessageId == original.id,
+      );
+      await repository.saveConversationTree(
+        tree.switchBranch(originalBranch.id),
+      );
       final tail = ChatMessage(
         id: 'user-tail',
         role: 'user',

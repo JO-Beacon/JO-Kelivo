@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 import '../network/dio_http_client.dart';
 import 'search_api_key_rotator.dart';
-// Import statements for service implementations
+// 服务实现的 import 语句
 import 'providers/bing_search_service.dart';
 import 'providers/tavily_search_service.dart';
 import 'providers/exa_search_service.dart';
@@ -25,7 +25,7 @@ import 'providers/firecrawl_search_service.dart';
 import 'providers/tinyfish_search_service.dart';
 import 'providers/doubao_search_service.dart';
 
-// Base interface for all search services
+// 所有搜索服务的基类接口
 abstract class SearchService<T extends SearchServiceOptions> {
   SearchService({this.client});
 
@@ -41,8 +41,8 @@ abstract class SearchService<T extends SearchServiceOptions> {
     required T serviceOptions,
   });
 
-  /// Runs search traffic through the app's logged HTTP client by default.
-  /// Tests can inject a client without transferring ownership to the service.
+  /// 默认通过应用的带日志 HTTP 客户端运行搜索流量。
+  /// 测试可注入客户端而无需将所有权转移给服务。
   Future<R> withHttpClient<R>(
     Future<R> Function(http.Client client) request,
   ) async {
@@ -55,7 +55,7 @@ abstract class SearchService<T extends SearchServiceOptions> {
     }
   }
 
-  // Factory method to get service instance based on options type
+  // 根据选项类型获取服务实例的工厂方法
   static SearchService getService(SearchServiceOptions options) {
     switch (options) {
       case BingLocalOptions _:
@@ -104,7 +104,7 @@ abstract class SearchService<T extends SearchServiceOptions> {
   }
 }
 
-// Search result data structure
+// 搜索结果数据结构
 class SearchResult {
   final String? answer;
   final List<SearchResultItem> items;
@@ -157,7 +157,7 @@ class SearchResultItem {
       );
 }
 
-// Common search options
+// 通用搜索选项
 class SearchCommonOptions {
   final int resultSize;
   final int timeout;
@@ -176,19 +176,19 @@ class SearchCommonOptions {
       );
 }
 
-// Base class for service-specific options
+// 服务专属选项的基类
 abstract class SearchServiceOptions {
   final String id;
 
-  /// Additional API keys that join [apiKey] in the round-robin rotation
-  /// pool. Only meaningful for key-based services; stays empty otherwise.
+  /// 加入 [apiKey] 轮询轮换池的额外 API key。
+  /// 仅对基于 key 的服务有意义；否则保持为空。
   final List<String> extraApiKeys;
 
   const SearchServiceOptions({required this.id, this.extraApiKeys = const []});
 
   Map<String, dynamic> toJson();
 
-  /// Reads the optional `apiKeys` list persisted alongside the primary key.
+  /// 读取与主 key 一同持久化的可选 `apiKeys` 列表。
   static List<String> parseExtraApiKeys(Map<String, dynamic> json) =>
       (json['apiKeys'] as List?)
           ?.map((e) => e.toString().trim())
@@ -196,12 +196,12 @@ abstract class SearchServiceOptions {
           .toList() ??
       const [];
 
-  /// Resolves the API key for the next request, rotating through
-  /// [extraApiKeys] (round-robin) when any are configured.
+  /// 为下一次请求解析 API key，当配置了
+  /// [extraApiKeys] 时按轮询轮换。
   String effectiveApiKey(String primary) =>
       SearchApiKeyRotator.instance.select(id, primary, extraApiKeys);
 
-  /// The primary API key for key-based services; empty for the rest.
+  /// 基于 key 的服务的主 API key；其余服务为空。
   String get primaryApiKey => (toJson()['apiKey'] as String?) ?? '';
 
   static SearchServiceOptions fromJson(Map<String, dynamic> json) {
@@ -258,7 +258,7 @@ abstract class SearchServiceOptions {
   );
 }
 
-// Service-specific option classes
+// 服务专属选项类
 class BingLocalOptions extends SearchServiceOptions {
   final String acceptLanguage;
 
@@ -524,8 +524,8 @@ class DuckDuckGoOptions extends SearchServiceOptions {
 class PerplexityOptions extends SearchServiceOptions {
   final String apiKey;
   final String? country; // ISO 3166-1 alpha-2
-  final List<String>? searchDomainFilter; // domains/URLs
-  final int? maxTokensPerPage; // default 1024
+  final List<String>? searchDomainFilter; // 域名/URL
+  final int? maxTokensPerPage; // 默认 1024
 
   PerplexityOptions({
     required super.id,
@@ -562,11 +562,11 @@ class PerplexityOptions extends SearchServiceOptions {
 
 class BochaOptions extends SearchServiceOptions {
   final String apiKey;
-  // Optional parameters supported by Bocha API
-  final String? freshness; // e.g., 'noLimit', 'week', 'month', etc.
-  final bool summary; // whether to include textual summary
-  final String? include; // e.g., 'qq.com|m.163.com'
-  final String? exclude; // e.g., 'qq.com|m.163.com'
+  // Bocha API 支持的可选参数
+  final String? freshness; // 例如 'noLimit'、'week'、'month' 等
+  final bool summary; // 是否包含文本摘要
+  final String? include; // 例如 'qq.com|m.163.com'
+  final String? exclude; // 例如 'qq.com|m.163.com'
 
   BochaOptions({
     required super.id,

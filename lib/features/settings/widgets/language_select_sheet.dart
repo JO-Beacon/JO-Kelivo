@@ -129,7 +129,7 @@ Future<LanguageOption?> showLanguageSelector(BuildContext context) async {
     );
   }
 
-  // Desktop anchored menu
+  // 桌面锚定菜单
   final l10n = AppLocalizations.of(context)!;
   LanguageOption? selected;
   final items = [
@@ -168,7 +168,7 @@ class _LanguageSelectSheet extends StatefulWidget {
 }
 
 class _LanguageSelectSheetState extends State<_LanguageSelectSheet> {
-  // Auto height with a max constraint; no draggable sheet.
+  // 自动高度并带最大高度约束；没有可拖动弹层。
 
   @override
   Widget build(BuildContext context) {
@@ -191,7 +191,7 @@ class _LanguageSelectSheetState extends State<_LanguageSelectSheet> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Header with drag indicator (reduced spacing)
+                // 带拖动指示器的标题（减小间距）
                 Padding(
                   padding: const EdgeInsets.only(top: 6, bottom: 6),
                   child: Container(
@@ -203,7 +203,7 @@ class _LanguageSelectSheetState extends State<_LanguageSelectSheet> {
                     ),
                   ),
                 ),
-                // No title per iOS style; keep content close to handle
+                // 按 iOS 风格不显示标题；让内容靠近把手
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
                   child: Column(
@@ -213,7 +213,7 @@ class _LanguageSelectSheetState extends State<_LanguageSelectSheet> {
                         (lang) => _languageOption(context, lang),
                       ),
                       const SizedBox(height: 8),
-                      // Clear translation row (iOS style)
+                      // 清除翻译行（iOS 风格）
                       SizedBox(
                         height: 48,
                         child: IosCardPress(
@@ -283,7 +283,7 @@ class _LanguageSelectSheetState extends State<_LanguageSelectSheet> {
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(
             children: [
-              // Flag only
+              // 只显示旗帜
               Text(lang.flag, style: const TextStyle(fontSize: 20)),
               const SizedBox(width: 10),
               Expanded(

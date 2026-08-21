@@ -6,11 +6,11 @@ import '../../l10n/app_localizations.dart';
 import '../../shared/widgets/ios_tactile.dart';
 import '../../theme/app_font_weights.dart';
 
-/// Desktop right-side pane for read-only legacy memories (§14.5).
+/// 桌面右侧面板，用于只读旧记忆（§14.5）。
 class DesktopLegacyMemoryPane extends StatelessWidget {
   const DesktopLegacyMemoryPane({super.key, this.assistantId});
 
-  /// When set, only legacy memories of that assistant are listed.
+  /// 设置后，仅列出该助手的旧记忆。
   final String? assistantId;
 
   @override

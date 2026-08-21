@@ -4,7 +4,7 @@ import '../../../icons/lucide_adapter.dart';
 import 'provider_detail_page.dart';
 import '../widgets/import_provider_sheet.dart';
 import '../widgets/add_provider_sheet.dart';
-// grid reorder removed in favor of iOS-style list reordering
+// 已移除网格排序，改用 iOS 风格列表排序
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../l10n/app_localizations.dart';
@@ -94,10 +94,10 @@ class _ProvidersPageState extends State<ProvidersPage> {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
 
-    // Base, fixed providers (recompute each build so dynamic additions reflect immediately)
+    // 基础固定供应商（每次构建重新计算，使动态新增立即生效）
     final base = _providers(l10n: l10n);
 
-    // Dynamic providers from settings
+    // 来自设置的动态供应商
     final settings = context.watch<SettingsProvider>();
     final cfgs = settings.providerConfigs;
     final baseKeys = {for (final p in base) p.keyName};
@@ -115,7 +115,7 @@ class _ProvidersPageState extends State<ProvidersPage> {
       }
     });
 
-    // Merge base + dynamic, then apply saved order
+    // 合并基础供应商和动态供应商，然后应用已保存顺序
     final merged = <_Provider>[...base, ...dynamicItems];
     final order = settings.providersOrder;
     final map = {for (final p in merged) p.keyName: p};
@@ -124,7 +124,7 @@ class _ProvidersPageState extends State<ProvidersPage> {
       final p = map.remove(k);
       if (p != null) tmp.add(p);
     }
-    // Append any remaining providers not recorded in order
+    // 追加未记录在顺序中的剩余供应商
     tmp.addAll(map.values);
     final items = tmp;
     final filteredItems = _applySearchToProviders(
@@ -432,7 +432,7 @@ class _ProvidersPageState extends State<ProvidersPage> {
               onMoveToGroup: _onMoveSelectedToGroup,
               onSelectAll: () {
                 setState(() {
-                  // Select all deletable (non-built-in) providers
+                  // 选中所有可删除（非内置）供应商
                   final baseKeys = {for (final p in base) p.keyName};
                   final deletable = [
                     for (final key in visibleProviderKeys)
@@ -444,12 +444,12 @@ class _ProvidersPageState extends State<ProvidersPage> {
                       _selected.length == deletable.length;
                   _selected.removeWhere((k) => !deletable.contains(k));
                   if (allSelected) {
-                    // Unselect all deletable
+                    // 取消选中所有可删除供应商
                     for (final k in deletable) {
                       _selected.remove(k);
                     }
                   } else {
-                    // Select all deletable
+                    // 选中所有可删除供应商
                     _selected
                       ..removeWhere((k) => !deletable.contains(k))
                       ..addAll(deletable);
@@ -551,7 +551,7 @@ class _ProvidersPageState extends State<ProvidersPage> {
           : groupById[groupKey]?.name;
       if (title == null) continue;
       final list = providersForGroup(groupKey, title);
-      if (list.isEmpty) continue; // hide empty groups on list page
+      if (list.isEmpty) continue; // 列表页隐藏空分组
       final collapsed = searching ? false : isGroupCollapsed(groupKey);
       rows.add(
         _ProviderGroupingHeaderVM(
@@ -643,14 +643,14 @@ class _ProvidersPageState extends State<ProvidersPage> {
     final l10n = AppLocalizations.of(context)!;
     final assistantProvider = context.read<AssistantProvider>();
     final settingsProvider = context.read<SettingsProvider>();
-    // Skip built-in providers (default ones)
+    // 跳过内置供应商（默认供应商）
     final builtInKeys = {for (final p in _providers(l10n: l10n)) p.keyName};
     final keysToDelete = _selected
         .where((k) => !builtInKeys.contains(k))
         .toList(growable: false);
 
     if (keysToDelete.isEmpty) {
-      // Nothing deletable selected
+      // 没有选中可删除供应商
       return;
     }
 
@@ -714,7 +714,7 @@ class _ProviderGroupingHeaderVM extends _ProviderGroupingRowVM {
     required this.collapsed,
   });
 
-  /// groupId or `__ungrouped__`
+  /// groupId 或 `__ungrouped__`
   final String groupKey;
   final String title;
   final int count;
@@ -729,11 +729,11 @@ class _ProviderGroupingProviderVM extends _ProviderGroupingRowVM {
 
   final _Provider provider;
 
-  /// groupId or `__ungrouped__`
+  /// groupId 或 `__ungrouped__`
   final String groupKey;
 }
 
-// iOS-style providers list (reorderable by long-press)
+// iOS 风格供应商列表（长按排序）
 class _ProvidersList extends StatelessWidget {
   const _ProvidersList({
     required this.items,
@@ -762,28 +762,27 @@ class _ProvidersList extends StatelessWidget {
       alpha: isDark ? 0.08 : 0.06,
     );
 
-    // Adapt height: wrap to content if short; flush to bottom if long
+    // 自适应高度：内容较短时包裹内容，较长时贴底
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final media = MediaQuery.of(context);
           final safeBottom = media.padding.bottom;
-          final bottomGapIfFlush =
-              safeBottom + 16.0; // leave room above system bar
+          final bottomGapIfFlush = safeBottom + 16.0; // 在系统栏上方留出空间
 
           final maxH = constraints.hasBoundedHeight
               ? constraints.maxHeight
               : double.infinity;
-          // Estimate row height: avatar(22) + vertical paddings(11*2) ~= 44
+          // 估算行高：头像（22）+ 上下内边距（11*2）≈ 44
           const double rowH = 44.0;
-          const double dividerH = 6.0; // _iosDivider height
-          const double listPadV = 8.0; // ReorderableListView vertical padding
+          const double dividerH = 6.0; // _iosDivider 高度
+          const double listPadV = 8.0; // ReorderableListView 垂直内边距
           final int n = items.length;
           final double baseContentH = n == 0
               ? 0.0
               : (n * rowH + (n - 1) * dividerH + listPadV);
-          // Decide if we should treat it as reaching bottom (considering the bottom gap we will add)
+          // 判断是否应视为贴底（考虑将要添加的底部间隙）
           final bool reachesBottom =
               maxH.isFinite &&
               (baseContentH >= maxH - 0.5 ||
@@ -801,7 +800,7 @@ class _ProvidersList extends StatelessWidget {
               borderRadius: BorderRadius.only(
                 topLeft: const Radius.circular(12),
                 topRight: const Radius.circular(12),
-                // If not reaching bottom, use rounded corners; if reaching bottom, flush
+                // 未贴底时使用圆角；贴底时拉平
                 bottomLeft: Radius.circular(reachesBottom ? 0 : 12),
                 bottomRight: Radius.circular(reachesBottom ? 0 : 12),
               ),
@@ -846,7 +845,7 @@ class _ProvidersList extends StatelessWidget {
   }
 }
 
-// iOS-style grouped providers list (flattened: header + provider rows)
+// iOS 风格分组供应商列表（展平：标题和供应商行）
 class _GroupedProvidersList extends StatelessWidget {
   const _GroupedProvidersList({
     required this.rows,
@@ -886,23 +885,22 @@ class _GroupedProvidersList extends StatelessWidget {
       alpha: isDark ? 0.08 : 0.06,
     );
 
-    // Adapt height: wrap to content if short; flush to bottom if long
+    // 自适应高度：内容较短时包裹内容，较长时贴底
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final media = MediaQuery.of(context);
           final safeBottom = media.padding.bottom;
-          final bottomGapIfFlush =
-              safeBottom + 16.0; // leave room above system bar
+          final bottomGapIfFlush = safeBottom + 16.0; // 在系统栏上方留出空间
 
           final maxH = constraints.hasBoundedHeight
               ? constraints.maxHeight
               : double.infinity;
-          // Estimate row height: keep close to _ProvidersList.
+          // 估算行高：保持与 _ProvidersList 接近。
           const double rowH = 44.0;
-          const double dividerH = 6.0; // _iosDivider height (provider rows)
-          const double listPadV = 8.0; // ReorderableListView vertical padding
+          const double dividerH = 6.0; // _iosDivider 高度（provider rows）
+          const double listPadV = 8.0; // ReorderableListView 垂直内边距
 
           final collapsedByGroupKey = <String, bool>{};
           for (final r in rows) {
@@ -1222,7 +1220,9 @@ class _ProviderRow extends StatelessWidget {
     final statusBg = enabled
         ? context.appColors.success.withValues(alpha: 0.12)
         : context.appColors.warning.withValues(alpha: 0.15);
-    final statusFg = enabled ? context.appColors.success : context.appColors.warning;
+    final statusFg = enabled
+        ? context.appColors.success
+        : context.appColors.warning;
 
     final row = _TactileRow(
       onTap: () {
@@ -1240,7 +1240,7 @@ class _ProviderRow extends StatelessWidget {
           );
         }
       },
-      pressedScale: 1.00, // no scale per spec
+      pressedScale: 1.00, // 按规范不缩放
       haptics: false,
       builder: (pressed) {
         final base = cs.onSurface.withValues(alpha: 0.9);
@@ -1255,7 +1255,7 @@ class _ProviderRow extends StatelessWidget {
                 curve: Curves.easeOutCubic,
                 child: Row(
                   children: [
-                    // Animated appear of select dot area with width transition
+                    // 选择圆点区域带宽度过渡动画出现
                     AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
                       curve: Curves.easeOutCubic,
@@ -1361,8 +1361,8 @@ class _ProviderRow extends StatelessWidget {
       },
     );
 
-    // Return row directly; container card background is provided by the wrapper
-    // so dragged-out slot shows card color instead of page background.
+    // 直接返回行；容器卡片背景由包装器提供，
+    // 使拖出的插槽显示卡片颜色而不是页面背景。
     return row;
   }
 }
@@ -1595,13 +1595,13 @@ Future<void> _showMultiExportSheet(
                 ),
               ),
               const SizedBox(height: 12),
-              // Show QR only when selection is small to avoid overlong input
+              // 仅当选择数量较少时显示二维码，避免输入过长
               if (showQr) ...[
                 Center(
                   child: Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.white, // color-gate: ignore (QR scannability)
+                      color: Colors.white, // color-gate: ignore（QR 可扫描性）
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: cs.outlineVariant.withValues(alpha: 0.2),
@@ -1621,7 +1621,7 @@ Future<void> _showMultiExportSheet(
                 ),
                 const SizedBox(height: 12),
               ],
-              // Limited preview of codes (6-7 lines), full content still copied/shared
+              // 代码预览限制在 6 到 7 行，完整内容仍会复制或分享
               SizedBox(
                 height: 128,
                 child: SingleChildScrollView(
@@ -1679,10 +1679,10 @@ Future<void> _showMultiExportSheet(
   );
 }
 
-// Drag handle removed per design; dragging is triggered by long-pressing the card.
+// 按设计已移除拖动把手；长按卡片触发拖动。
 
-// Replaced custom reorder grid with reorderable_grid_view for
-// smoother, battle-tested drag animations and reordering.
+// 用 reorderable_grid_view 替换自定义排序网格，
+// 获得更平滑、经过验证的拖动动画和排序效果。
 
 class _SettleAnim extends StatelessWidget {
   const _SettleAnim({required this.active, required this.child});
@@ -1738,7 +1738,7 @@ class _Provider {
   });
 }
 
-// Icon-only tactile icon button for AppBar: no ripple, scale + color on press, no haptics
+// AppBar 的纯图标触感按钮：无涟漪，按下缩放并变色，无触感
 class _TactileIconButton extends StatefulWidget {
   const _TactileIconButton({
     required this.icon,
@@ -1794,7 +1794,7 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   }
 }
 
-// Row tactile wrapper for iOS-style lists: no ripple, optional haptics, color-only press feedback
+// iOS 风格列表的行触感包装：无涟漪，可选触感，仅颜色按压反馈
 class _TactileRow extends StatefulWidget {
   const _TactileRow({
     required this.builder,

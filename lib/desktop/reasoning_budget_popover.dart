@@ -119,7 +119,7 @@ class _ReasoningPopoverOverlayState extends State<_ReasoningPopoverOverlay>
   @override
   Widget build(BuildContext context) {
     final screen = MediaQuery.of(context).size;
-    // Slightly narrower than input width
+    // 比输入框略窄
     final width = (widget.anchorWidth - 16).clamp(260.0, 720.0);
     final left =
         (widget.anchorRect.left + (widget.anchorRect.width - width) / 2).clamp(
@@ -134,7 +134,7 @@ class _ReasoningPopoverOverlayState extends State<_ReasoningPopoverOverlay>
         opacity: _suspended ? 0.0 : 1.0,
         child: Stack(
           children: [
-            // tap outside to close
+            // 点击外部关闭
             Positioned.fill(
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
@@ -202,10 +202,8 @@ class _GlassPanel extends StatelessWidget {
         filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            // Match the preferred grey smudge style
-            color: cs.surface.withValues(
-              alpha: isDark ? 0.28 : 0.56,
-            ),
+            // 匹配偏好的灰色柔和样式
+            color: cs.surface.withValues(alpha: isDark ? 0.28 : 0.56),
             border: Border(
               top: BorderSide(
                 color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.18),
@@ -481,9 +479,7 @@ class _HoverRowState extends State<_HoverRow> {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final baseBg = Colors.transparent;
-    final hoverBg = cs.onSurface.withValues(
-      alpha: isDark ? 0.12 : 0.10,
-    );
+    final hoverBg = cs.onSurface.withValues(alpha: isDark ? 0.12 : 0.10);
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,

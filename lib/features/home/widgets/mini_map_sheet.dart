@@ -2,9 +2,12 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../core/models/conversation_tree.dart';
 import '../../../core/models/message_part.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/conversation_tree_map.dart';
 import '../../../theme/app_font_weights.dart';
 
 Future<String?> showMiniMapSheet(
@@ -14,6 +17,10 @@ Future<String?> showMiniMapSheet(
   Set<String>? selectedMessageIds,
   Listenable? selectionListenable,
   ValueChanged<String>? onToggleSelection,
+  List<ConversationBranch>? branches,
+  ConversationTree? conversationTree,
+  String? activeBranchId,
+  ValueChanged<String>? onSelectBranch,
 }) async {
   assert(
     !selecting || (selectedMessageIds != null && onToggleSelection != null),
@@ -32,6 +39,10 @@ Future<String?> showMiniMapSheet(
       selectedMessageIds: selectedMessageIds,
       selectionListenable: selectionListenable,
       onToggleSelection: onToggleSelection,
+      branches: branches,
+      conversationTree: conversationTree,
+      activeBranchId: activeBranchId,
+      onSelectBranch: onSelectBranch,
     ),
   );
 }
@@ -42,6 +53,10 @@ class _MiniMapSheet extends StatefulWidget {
   final Set<String>? selectedMessageIds;
   final Listenable? selectionListenable;
   final ValueChanged<String>? onToggleSelection;
+  final List<ConversationBranch>? branches;
+  final ConversationTree? conversationTree;
+  final String? activeBranchId;
+  final ValueChanged<String>? onSelectBranch;
 
   const _MiniMapSheet({
     required this.messages,
@@ -49,6 +64,10 @@ class _MiniMapSheet extends StatefulWidget {
     this.selectedMessageIds,
     this.selectionListenable,
     this.onToggleSelection,
+    this.branches,
+    this.conversationTree,
+    this.activeBranchId,
+    this.onSelectBranch,
   });
 
   @override
@@ -144,7 +163,7 @@ class _MiniMapSheetState extends State<_MiniMapSheet>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Pinned drag handle
+                // 固定拖拽把手
                 Center(
                   child: Container(
                     width: 40,
@@ -156,7 +175,7 @@ class _MiniMapSheetState extends State<_MiniMapSheet>
                   ),
                 ),
                 const SizedBox(height: 10),
-                // Pinned title
+                // 固定标题
                 Row(
                   children: [
                     Icon(Lucide.Map, size: 18, color: cs.primary),
@@ -199,9 +218,24 @@ class _MiniMapSheetState extends State<_MiniMapSheet>
                   ],
                 ),
                 const SizedBox(height: 12),
-                // Scrollable content
+                if (_shouldShowBranchPanel) ...[
+                  Semantics(
+                    label: AppLocalizations.of(context)!.treeBranchPanelTitle,
+                    child: _buildBranchPanel(context),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                // 可滚动内容
                 Expanded(
-                  child: widget.selecting && widget.selectionListenable != null
+                  child: widget.conversationTree != null && !widget.selecting
+                      ? ConversationTreeMap(
+                          tree: widget.conversationTree!,
+                          messages: widget.messages,
+                          query: _query,
+                          activeBranchId: widget.activeBranchId,
+                          onTapMessage: (id) => Navigator.of(context).pop(id),
+                        )
+                      : widget.selecting && widget.selectionListenable != null
                       ? AnimatedBuilder(
                           animation: widget.selectionListenable!,
                           builder: (context, child) => buildList(),
@@ -214,6 +248,114 @@ class _MiniMapSheetState extends State<_MiniMapSheet>
         },
       ),
     );
+  }
+
+  bool get _shouldShowBranchPanel {
+    final branches = widget.branches;
+    return branches != null &&
+        branches.isNotEmpty &&
+        widget.conversationTree == null &&
+        widget.onSelectBranch != null;
+  }
+
+  List<ConversationBranch> get _orderedBranches {
+    final branches = List<ConversationBranch>.of(widget.branches ?? const [])
+      ..sort((left, right) {
+        final byTime = left.createdAt.compareTo(right.createdAt);
+        if (byTime != 0) return byTime;
+        return left.id.compareTo(right.id);
+      });
+    return branches;
+  }
+
+  Widget _buildBranchPanel(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final branches = _orderedBranches;
+
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: branches.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final branch = branches[index];
+          final active = branch.id == widget.activeBranchId;
+          final baseColor = active
+              ? cs.primary.withValues(alpha: isDark ? 0.22 : 0.12)
+              : cs.surfaceContainerHighest.withValues(
+                  alpha: isDark ? 0.45 : 0.72,
+                );
+          final border = active
+              ? Border.all(
+                  color: cs.primary.withValues(alpha: isDark ? 0.75 : 0.55),
+                )
+              : Border.all(
+                  color: cs.outlineVariant.withValues(
+                    alpha: isDark ? 0.55 : 0.8,
+                  ),
+                );
+
+          return IosCardPress(
+            borderRadius: BorderRadius.circular(12),
+            baseColor: baseColor,
+            border: border,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            onTap: () {
+              if (!active) {
+                widget.onSelectBranch?.call(branch.id);
+              }
+              Navigator.of(context).pop();
+            },
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Lucide.GitFork,
+                  size: 16,
+                  color: active
+                      ? cs.primary
+                      : cs.onSurface.withValues(alpha: 0.75),
+                ),
+                const SizedBox(width: 6),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 180),
+                  child: Text(
+                    _branchLabel(context, branch, index),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: active
+                          ? AppFontWeights.emphasis
+                          : AppFontWeights.regular,
+                      color: active
+                          ? cs.primary
+                          : cs.onSurface.withValues(alpha: 0.88),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  String _branchLabel(
+    BuildContext context,
+    ConversationBranch branch,
+    int index,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    final name = branch.name.trim();
+    if (name.isNotEmpty) return name;
+    if (branch.id == 'root' || branch.id.startsWith('root-')) {
+      return l10n.treeBranchRootLabel;
+    }
+    return '${l10n.treeBranchDefaultLabel} ${index + 1}';
   }
 
   Widget _buildSearchToggle(BuildContext context, double maxWidth) {
@@ -320,7 +462,7 @@ class _MiniMapSheetState extends State<_MiniMapSheet>
     ChatMessage? pendingUser;
     for (final m in items) {
       if (m.role == 'user') {
-        // Push previous if it had no assistant
+        // 如果上一条消息没有对应助手消息，则先压入
         if (pendingUser != null) {
           pairs.add(_QaPair(user: pendingUser, assistant: null));
         }
@@ -330,7 +472,7 @@ class _MiniMapSheetState extends State<_MiniMapSheet>
           pairs.add(_QaPair(user: pendingUser, assistant: m));
           pendingUser = null;
         } else {
-          // Assistant without user: show as orphan on the right
+          // 没有对应用户消息的助手消息：在右侧显示为孤立节点
           pairs.add(_QaPair(user: null, assistant: m));
         }
       }
@@ -373,7 +515,7 @@ class _MiniMapRow extends StatelessWidget {
 
   String _summaryText(ChatMessage? message) {
     if (message == null) return '';
-    // ImagePart/FilePart are excluded; only TextPart contributes to the summary.
+    // ImagePart/FilePart 被排除；只有 TextPart 参与摘要。
     final text = message.parts
         .whereType<TextPart>()
         .map((part) => part.text)
@@ -382,8 +524,8 @@ class _MiniMapRow extends StatelessWidget {
   }
 
   String _oneLine(String s) {
-    // Strip vendor inline reasoning blocks if present; attachment markers are
-    // no longer parsed because summaries are built from TextPart only.
+    // 如果存在供应商内联推理块，则移除；附件标记
+    // 不再解析，因为摘要只由 TextPart 构建。
     var t = s
         .replaceAll(
           RegExp(
@@ -433,14 +575,14 @@ class _MiniMapRow extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // User bubble — match main chat style (right aligned rounded rectangle)
+          // 用户气泡 — 与主聊天样式匹配（右对齐圆角矩形）
           Align(
             alignment: Alignment.centerRight,
             child: ConstrainedBox(
               constraints: BoxConstraints(
                 maxWidth:
                     MediaQuery.sizeOf(context).width * 0.75 -
-                    32, // subtract side paddings approx in sheet
+                    32, // 近似减去 sheet 内的侧边内边距
               ),
               child: Material(
                 color: Colors.transparent,
@@ -506,14 +648,14 @@ class _MiniMapRow extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          // Assistant message
+          // 助手消息
           Align(
             alignment: Alignment.centerLeft,
             child: ConstrainedBox(
               constraints: BoxConstraints(
                 maxWidth: MediaQuery.sizeOf(
                   context,
-                ).width, //* 0.75 - 32, // subtract side paddings approx in sheet
+                ).width, //* 0.75 - 32, // 近似减去 sheet 内的侧边内边距
               ),
               child: Material(
                 color: Colors.transparent,

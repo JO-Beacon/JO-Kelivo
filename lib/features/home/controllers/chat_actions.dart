@@ -7,6 +7,7 @@ import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
+import '../../../core/models/conversation_tree.dart';
 import '../../../core/models/token_usage.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -87,7 +88,7 @@ class _GenerationCheckpointCursor {
   int nextSeq;
 }
 
-/// Result of a send/regenerate action.
+/// 发送/重新生成操作的结果。
 class ChatActionResult {
   final bool success;
   final String? errorMessage;
@@ -112,30 +113,28 @@ class ChatActionResult {
       ChatActionResult(success: false, errorMessage: 'in_flight');
 }
 
-/// Actions class for chat operations (send, regenerate, cancel, streaming).
+/// 聊天操作的 Actions 类（发送、重新生成、取消、流式处理）。
 ///
-/// This class contains ONLY business logic, NO UI operations.
-/// It operates on messages, calls services/streams, and returns results.
-/// UI layer is responsible for handling snackbars, scrolling, animations, etc.
+/// 此类只包含业务逻辑，不包含 UI 操作。
+/// 它操作消息，调用服务/流并返回结果。
+/// UI 层负责处理 Snackbar、滚动、动画等。
 ///
-/// Key responsibilities:
-/// - Send new messages
-/// - Regenerate existing messages
-/// - Cancel streaming
-/// - Handle stream chunks (reasoning, tools, content)
-/// - Manage streaming state
+/// 主要职责：
+/// - 发送新消息
+/// - 重新生成已有消息
+/// - 取消流式处理
+/// - 处理流式分块（推理、工具、内容）
+/// - 管理流式状态
 class ChatActions {
   static bool shouldPhysicallyRemoveRegenerationTail({
     required bool deleteTrailingEnabled,
     required bool isTemporaryConversation,
   }) => deleteTrailingEnabled && isTemporaryConversation;
 
-  /// Whether regenerate should append a new assistant reply instead of adding
-  /// a version to an existing reply group.
+  /// 重新生成时是否应追加新的助手回复，而不是向已有回复组添加版本。
   ///
-  /// [targetGroupId] is null when the assistant is treated as a new reply, or
-  /// when the anchor is a user message with no following assistant group
-  /// (e.g. every generated version was deleted).
+  /// 当助手被视为新回复，或锚点是后面没有助手组的用户消息时
+  /// （例如所有已生成版本都被删除），[targetGroupId] 为 null。
   @visibleForTesting
   static bool shouldBeginNewAssistantReply({
     required String role,
@@ -158,13 +157,12 @@ class ChatActions {
     _current = this;
   }
 
-  /// Latest live instance. Deletion entry points that sit outside the home
-  /// controller graph (e.g. the drawer's conversation delete) reach the
-  /// active generation state through it to uphold the "deleting implies
-  /// stopping generation" invariant.
+  /// 最新的存活实例。位于主页控制器图之外的删除入口
+  /// （例如抽屉中的会话删除）通过它访问活动生成状态，
+  /// 以维持“删除意味着停止生成”的约束。
   static ChatActions? _current;
 
-  /// Flush the latest in-memory generation snapshot before the app exits.
+  /// 在应用退出前刷新最新的内存生成快照。
   static Future<void> flushActiveGenerationProgress() async {
     final actions = _current;
     if (actions == null) return;
@@ -173,8 +171,8 @@ class ChatActions {
     );
   }
 
-  /// Stop any in-flight generation for [conversationId] before its rows are
-  /// deleted, so streaming checkpoints cannot write to removed messages.
+  /// 在 [conversationId] 对应行被删除前停止其进行中的生成，
+  /// 使流式检查点不能写入已删除消息。
   static Future<void> cancelActiveGenerationFor(String conversationId) async {
     final actions = _current;
     if (actions == null || !actions._hasActiveGeneration(conversationId)) {
@@ -183,10 +181,9 @@ class ChatActions {
     await actions.cancelStreamingById(conversationId);
   }
 
-  /// Stop in-flight generations for every conversation owned by
-  /// [assistantId]. Used by assistant deletion, which batch-deletes the
-  /// assistant's conversations and must uphold the "deleting implies
-  /// stopping generation" invariant for each of them.
+  /// 停止 [assistantId] 拥有的每个会话的进行中生成。
+  /// 用于助手删除，该操作会批量删除助手会话，并且必须为每个会话
+  /// 维持“删除意味着停止生成”的约束。
   static Future<void> cancelActiveGenerationsForAssistant(
     String assistantId,
   ) async {
@@ -213,52 +210,52 @@ class ChatActions {
   final BuildContext contextProvider;
 
   // ============================================================================
-  // Callbacks for UI updates (set by HomeViewModel)
+  // UI 更新回调（由 HomeViewModel 设置）
   // ============================================================================
 
-  /// Called when messages list is updated.
+  /// 消息列表更新时调用。
   VoidCallback? onMessagesChanged;
 
-  /// Called once after a successful send pair is visible in the tail window.
+  /// 发送成功的一对消息出现在尾部窗口后调用一次。
   VoidCallback? onSendPairAppended;
 
-  /// Called when conversation loading state changes.
+  /// 会话加载状态变化时调用。
   void Function(String conversationId, bool loading)? onLoadingChanged;
 
-  /// Called when stream content is updated (for throttled updates).
+  /// 流式内容更新时调用（用于节流更新）。
   void Function(String messageId, String content, int totalTokens)?
   onContentUpdated;
 
-  /// Called when an error occurs during streaming.
+  /// 流式过程中发生错误时调用。
   void Function(String error)? onStreamError;
 
-  /// Called when stream finishes and title may need to be generated.
+  /// 流结束时调用，此时可能需要生成标题。
   void Function(String conversationId)? onMaybeGenerateTitle;
 
-  /// Called when summary may need to be generated (every N messages).
+  /// 可能需要生成摘要时调用（每 N 条消息）。
   void Function(String conversationId)? onMaybeGenerateSummary;
 
-  /// Called when chat suggestions may need to be generated.
+  /// 可能需要生成聊天建议时调用。
   void Function(String conversationId)? onMaybeGenerateSuggestions;
 
-  /// Called to schedule inline image sanitization.
+  /// 调用以安排行内图片清理。
   void Function(String messageId, String content, {bool immediate})?
   onScheduleImageSanitize;
 
-  /// Called when streaming finishes for [conversationId].
+  /// [conversationId] 的流结束时调用。
   void Function(String conversationId)? onStreamFinished;
 
-  /// Called when a successful assistant reply is finalized.
+  /// 成功的助手回复最终化时调用。
   void Function(ChatMessage message)? onAssistantMessageFinished;
 
-  /// Called when file processing starts.
+  /// 文件处理开始时调用。
   VoidCallback? onFileProcessingStarted;
 
-  /// Called when file processing finishes.
+  /// 文件处理结束时调用。
   VoidCallback? onFileProcessingFinished;
 
   // ============================================================================
-  // Private Helpers
+  // 私有辅助方法
   // ============================================================================
 
   AppLocalizations? get _l10n => AppLocalizations.of(contextProvider);
@@ -341,8 +338,8 @@ class ChatActions {
     }
   }
 
-  /// Track in-flight _finishStreaming futures so _handleStreamDone can await
-  /// completion before removing notifiers or triggering rebuild.
+  /// 跟踪进行中的 _finishStreaming Future，使 _handleStreamDone
+  /// 可以在移除通知器或触发重建前等待其完成。
   final Map<String, Future<void>> _finishStreamingFutures =
       <String, Future<void>>{};
   final Map<String, LatestWinsCheckpointWriter<_StreamingCheckpoint>>
@@ -357,14 +354,13 @@ class ChatActions {
   final Map<String, Future<void>> _cancelStreamingFutures =
       <String, Future<void>>{};
 
-  /// Per-conversation send/regenerate claim, taken synchronously before the
-  /// first await so a re-entrant call loses before persisting anything. The
-  /// claim is handed off to the loading guard once loading is set; the token
-  /// prevents a stale finally from clearing a newer claim.
+  /// 每个会话的发送/重新生成占用标记，在首个 await 前同步取得，
+  /// 以便重入调用在持久化任何内容前失败。设置加载状态后，
+  /// 该标记交给加载守卫；令牌可防止过期的 finally 清除较新的标记。
   final Map<String, int> _sendInFlightClaims = <String, int>{};
   var _sendInFlightClaimSerial = 0;
 
-  /// Whether send/regenerate or cancellation teardown owns [conversationId].
+  /// 当前拥有 [conversationId] 的是发送/重新生成还是取消清理流程。
   bool isSendInFlight(String conversationId) =>
       _sendInFlightClaims.containsKey(conversationId) ||
       isStopping(conversationId);
@@ -385,25 +381,24 @@ class ChatActions {
       _activeAssistantMessages[conversationId] != null ||
       isStopping(conversationId);
 
-  /// Id of the assistant message an in-flight generation checkpoints into,
-  /// or null when [conversationId] has no active generation.
+  /// 进行中生成写入检查点的助手消息 ID；
+  /// 当 [conversationId] 没有活动生成时为 null。
   String? activeStreamingMessageId(String conversationId) =>
       _activeAssistantMessages[conversationId]?.id;
 
   static const Duration _streamCancelTimeout = Duration(seconds: 3);
 
-  /// A barrier cancel only completes once the generator leaves its current
-  /// suspension point, which a dead connection can stall indefinitely even
-  /// after `cancelRequest`; bound the wait and continue local cleanup.
+  /// 屏障取消只有在生成器离开当前挂起点后才会完成；死连接甚至
+  /// 在 `cancelRequest` 后也可能无限期停滞，因此要限制等待并继续本地清理。
   Future<void> _cancelSubscriptionWithTimeout(
     StreamSubscription<dynamic> subscription,
   ) async {
     try {
       await subscription.cancel().timeout(_streamCancelTimeout);
     } on TimeoutException {
-      // Cancellation keeps running in the background.
+      // 取消过程继续在后台运行。
     } catch (_) {
-      // The HTTP request is already aborted; local terminal cleanup must still run.
+      // HTTP 请求已中止；本地收尾清理仍必须执行。
     }
   }
 
@@ -442,9 +437,8 @@ class ChatActions {
     );
   }
 
-  /// Elapsed milliseconds since [start], or null when unknown or when a
-  /// device clock rollback made the difference negative (the message_rows
-  /// CHECK constraint rejects negative durations).
+  /// 自 [start] 起经过的毫秒数；未知或设备时钟回拨导致差值为负时
+  /// 为 null（message_rows 的 CHECK 约束会拒绝负持续时间）。
   int? _elapsedMsFrom(DateTime? start) {
     if (start == null) return null;
     final elapsed = DateTime.now().difference(start).inMilliseconds;
@@ -463,7 +457,7 @@ class ChatActions {
       promptTokens: state.usage?.promptTokens,
       completionTokens: state.usage?.completionTokens,
       cachedTokens: state.usage?.cachedTokens,
-      // copyWith keeps base.durationMs when this resolves to null.
+      // 当此处解析为 null 时，copyWith 保留 base.durationMs。
       durationMs: _elapsedMsFrom(state.streamStartedAt),
     );
   }
@@ -480,11 +474,11 @@ class ChatActions {
 
   _StreamingCheckpoint _createStreamingCheckpoint(ChatMessage message) {
     final cursor = _generationCheckpointCursors[message.id];
-    // While the run is still `preparing` the checkpoint CAS (which only
-    // matches requesting/streaming/waiting_tool) would raise a conflict and,
-    // through the writer, kill the just-started generation. Persist a plain
-    // message snapshot without a run id/seq until the run reaches
-    // `requesting`, mirroring _finalizeStreamingCheckpoint's preparing case.
+    // 当运行仍处于 `preparing` 时，检查点 CAS（只匹配
+    // requesting/streaming/waiting_tool）会触发冲突，并通过写入器
+    // 终止刚启动的生成。因此先持久化不带运行 id/seq 的普通消息快照，
+    // 直到运行到达 `requesting`，这与
+    // _finalizeStreamingCheckpoint 对 preparing 状态的处理一致。
     if (cursor == null || cursor.state == GenerationRunState.preparing) {
       return _StreamingCheckpoint(
         message: message,
@@ -865,7 +859,7 @@ class ChatActions {
     ];
   }
 
-  /// Transform raw content using assistant regexes.
+  /// 使用助手正则表达式转换原始内容。
   String _transformAssistantContent(
     stream_ctrl.StreamingState state, [
     String? raw,
@@ -879,17 +873,17 @@ class ChatActions {
   }
 
   // ============================================================================
-  // Send Message
+  // 发送消息
   // ============================================================================
 
-  /// Send a new message and start generating assistant response.
+  /// 发送新消息并开始生成助手回复。
   ///
-  /// Returns [ChatActionResult] with success status and the assistant message.
-  /// UI is responsible for:
-  /// - Adding messages to the list (user + assistant)
-  /// - Showing snackbars on errors
-  /// - Scrolling once to the newly appended tail
-  /// - Haptic feedback
+  /// 返回包含成功状态和助手消息的 [ChatActionResult]。
+  /// UI 负责：
+  /// - 将消息（用户消息和助手消息）添加到列表
+  /// - 出错时显示 Snackbar
+  /// - 滚动一次到新追加的尾部
+  /// - 触感反馈
   Future<ChatActionResult> sendMessage({
     required ChatInputData input,
     required Conversation conversation,
@@ -924,7 +918,7 @@ class ChatActions {
 
     final settings = contextProvider.read<SettingsProvider>();
     final assistantProvider = contextProvider.read<AssistantProvider>();
-    // Capture approval service reference before async gap
+    // 在异步间隙前捕获审批服务引用
     ToolApprovalService? approvalService;
     AskUserInteractionService? askUserService;
     try {
@@ -995,11 +989,11 @@ class ChatActions {
     }
     _activeAssistantMessages.put(assistantMessage);
     _setConversationLoading(conversation.id, true);
-    // The loading guard now owns re-entry exclusion for this conversation.
+    // 此时加载守卫拥有此会话的重入排除。
     _sendInFlightClaims.remove(conversation.id);
 
-    // Pre-create streaming notifier BEFORE adding message to list
-    // so that MessageListView can detect it's streaming on first render
+    // 在将消息加入列表前预先创建流式通知器，
+    // 使 MessageListView 在首次渲染时就能识别到流式状态。
     streamController.markStreamingStarted(assistantMessage.id);
 
     if (await chatController.appendPersistedTailMessages([
@@ -1011,7 +1005,7 @@ class ChatActions {
     onMessagesChanged?.call();
     onSendPairAppended?.call();
 
-    // Reset tool parts and initialize reasoning
+    // 重置工具部分并初始化推理
     streamController.toolParts.remove(assistantMessage.id);
     final supportsReasoning = _isReasoningModel(providerKey, modelId);
     final enableReasoning =
@@ -1019,7 +1013,7 @@ class ChatActions {
         _isReasoningEnabled(
           assistant?.thinkingBudget ?? settings.thinkingBudget,
         );
-    // Prepare API messages
+    // 准备 API 消息
     messageGenerationService.onFileProcessingStarted = onFileProcessingStarted;
     messageGenerationService.onFileProcessingFinished =
         onFileProcessingFinished;
@@ -1047,7 +1041,7 @@ class ChatActions {
             askUserService: askUserService,
           );
 
-      // Build user image paths
+      // 构建用户图片路径
       final userImagePaths = messageGenerationService.buildUserImagePaths(
         input: input,
         lastUserImagePaths: prepared.lastUserImagePaths,
@@ -1056,7 +1050,7 @@ class ChatActions {
         modelId: modelId,
       );
 
-      // Execute generation
+      // 执行生成
       final ctx = messageGenerationService.buildGenerationContext(
         assistantMessage: assistantMessage,
         prepared: prepared,
@@ -1078,7 +1072,7 @@ class ChatActions {
       await _executeGeneration(ctx);
       return ChatActionResult.success(assistantMessage);
     } catch (e) {
-      // Ensure file processing indicator is cleared on error
+      // 出错时确保清除文件处理指示器
       onFileProcessingFinished?.call();
       await _finishPreparingMessage(conversation.id, assistantMessage);
       return ChatActionResult.error(e.toString());
@@ -1096,11 +1090,11 @@ class ChatActions {
     );
   }
 
-  /// Resolves the generation context window size.
+  /// 解析生成上下文窗口大小。
   ///
-  /// When the assistant limits context, [resolvePersistedCount] is not called.
-  /// Otherwise the real persisted count is awaited so unknown (-1) never
-  /// silently clamps to [Assistant.maxContextMessageSize].
+  /// 当助手限制上下文时，不会调用 [resolvePersistedCount]。
+  /// 否则会等待真实持久化数量，避免未知值（-1）被静默
+  /// 限制为 [Assistant.maxContextMessageSize]。
   @visibleForTesting
   static Future<int> resolveContextReadLimit({
     required Assistant? assistant,
@@ -1137,20 +1131,21 @@ class ChatActions {
   }
 
   // ============================================================================
-  // Regenerate Message
+  // 重新生成消息
   // ============================================================================
 
-  /// Regenerate response at a specific message.
+  /// 在指定消息处重新生成回复。
   ///
-  /// Returns [ChatActionResult] with success status and the new assistant message.
-  /// UI is responsible for:
-  /// - Adding new assistant placeholder
-  /// - Showing snackbars on errors
-  /// - Haptic feedback
+  /// 返回包含成功状态和新助手消息的 [ChatActionResult]。
+  /// UI 负责：
+  /// - 添加新的助手占位消息
+  /// - 出错时显示 Snackbar
+  /// - 触感反馈
   Future<ChatActionResult> regenerateAtMessage({
     required ChatMessage message,
     required Conversation conversation,
     bool assistantAsNewReply = false,
+    String? existingBranchId,
     bool allowImagesApiRouting = true,
   }) async {
     final claimToken = ++_sendInFlightClaimSerial;
@@ -1163,6 +1158,7 @@ class ChatActions {
         message: message,
         conversation: conversation,
         assistantAsNewReply: assistantAsNewReply,
+        existingBranchId: existingBranchId,
         allowImagesApiRouting: allowImagesApiRouting,
       );
     } finally {
@@ -1176,13 +1172,14 @@ class ChatActions {
     required ChatMessage message,
     required Conversation conversation,
     bool assistantAsNewReply = false,
+    String? existingBranchId,
     bool allowImagesApiRouting = true,
   }) async {
-    // Avoid using BuildContext across async gaps (this class holds a BuildContext).
+    // 避免跨异步间隙使用 BuildContext（此类持有 BuildContext）。
     final settings = contextProvider.read<SettingsProvider>();
-    final truncateFuture = settings.regenerateDeleteTrailingMessages;
+    const truncateFuture = false;
     final assistantProvider = contextProvider.read<AssistantProvider>();
-    // Capture approval service reference before async gap
+    // 在异步间隙前捕获审批服务引用
     ToolApprovalService? regenApprovalService;
     AskUserInteractionService? regenAskUserService;
     try {
@@ -1203,30 +1200,46 @@ class ChatActions {
     final isTemporaryConversation = chatService.isTemporaryConversation(
       conversation.id,
     );
-    final completeMessages = isTemporaryConversation
-        ? await chatController.messagesForCompleteHistoryContext(conversation)
-        : await chatController.messagesForGenerationContext(
-            conversation,
-            maxMessages: await _contextReadLimit(assistant, conversation),
-            throughRevisionId: message.id,
-            includeFollowingAssistant: true,
-          );
-    final idx = completeMessages.indexWhere((m) => m.id == message.id);
-    if (idx < 0) {
-      return ChatActionResult.error('message_not_found');
+    late final List<ChatMessage> completeMessages;
+    late final ({String? targetGroupId, int nextVersion, int lastKeep})
+    versioning;
+    if (isTemporaryConversation) {
+      completeMessages = await chatController.messagesForCompleteHistoryContext(
+        conversation,
+      );
+      versioning = messageGenerationService.calculateRegenerationVersioning(
+        message: message,
+        messages: completeMessages,
+        assistantAsNewReply: assistantAsNewReply,
+      );
+      if (versioning.lastKeep < 0) {
+        return ChatActionResult.error('invalid_versioning');
+      }
+    } else {
+      final tree = await chatService.loadConversationTree(conversation.id);
+      final edge = tree?.edges[message.id];
+      if (tree == null || edge == null) {
+        return ChatActionResult.error('message_not_found');
+      }
+      final contextTargetId =
+          message.role == 'assistant' && !assistantAsNewReply
+          ? edge.parentMessageId
+          : message.id;
+      completeMessages = contextTargetId == null
+          ? const <ChatMessage>[]
+          : await chatController.messagesForGenerationContext(
+              conversation,
+              maxMessages: await _contextReadLimit(assistant, conversation),
+              throughRevisionId: contextTargetId,
+            );
+      versioning = (
+        targetGroupId: null,
+        nextVersion: 0,
+        lastKeep: completeMessages.length - 1,
+      );
     }
 
-    // Calculate versioning using service
-    final versioning = messageGenerationService.calculateRegenerationVersioning(
-      message: message,
-      messages: completeMessages,
-      assistantAsNewReply: assistantAsNewReply,
-    );
-    if (versioning.lastKeep < 0) {
-      return ChatActionResult.error('invalid_versioning');
-    }
-
-    // Get model config
+    // 获取模型配置
     final assistantId = assistant?.id;
     final modelConfig = messageGenerationService.getModelConfig(
       settings,
@@ -1239,11 +1252,13 @@ class ChatActions {
     final providerKey = modelConfig.providerKey!;
     final modelId = modelConfig.modelId!;
 
-    final projectedMessages = ChatActions.projectMessagesForRegenerationContext(
-      messages: completeMessages,
-      lastKeep: versioning.lastKeep,
-      targetGroupId: versioning.targetGroupId,
-    );
+    final projectedMessages = isTemporaryConversation
+        ? ChatActions.projectMessagesForRegenerationContext(
+            messages: completeMessages,
+            lastKeep: versioning.lastKeep,
+            targetGroupId: versioning.targetGroupId,
+          )
+        : completeMessages;
     if (_hasUnsupportedAudioAttachments(
       messages: projectedMessages,
       conversation: isTemporaryConversation
@@ -1252,7 +1267,7 @@ class ChatActions {
       settings: settings,
       providerKey: providerKey,
       modelId: modelId,
-      maxRawTruncateIndex: versioning.lastKeep,
+      maxRawTruncateIndex: isTemporaryConversation ? versioning.lastKeep : -1,
     )) {
       return ChatActionResult.error('audio_attachment_unsupported');
     }
@@ -1277,44 +1292,93 @@ class ChatActions {
 
     late final ({ChatMessage assistantMessage, String? runId}) begin;
     final targetGroupId = versioning.targetGroupId;
-    if (shouldBeginNewAssistantReply(
-      role: message.role,
-      targetGroupId: targetGroupId,
-      assistantAsNewReply: assistantAsNewReply,
-    )) {
+    if (isTemporaryConversation) {
+      if (shouldBeginNewAssistantReply(
+        role: message.role,
+        targetGroupId: targetGroupId,
+        assistantAsNewReply: assistantAsNewReply,
+      )) {
+        begin = await messageGenerationService.beginAssistantGeneration(
+          conversationId: conversation.id,
+          modelId: modelId,
+          providerKey: providerKey,
+          anchorGroupId: message.groupId ?? message.id,
+          truncateFuture: truncateFuture,
+        );
+      } else {
+        if (targetGroupId == null) {
+          return ChatActionResult.error('invalid_versioning');
+        }
+        final nextVersion = versioning.nextVersion;
+        begin = await messageGenerationService.beginRegeneration(
+          conversationId: conversation.id,
+          modelId: modelId,
+          providerKey: providerKey,
+          groupId: targetGroupId,
+          version: nextVersion,
+          truncateFuture: truncateFuture,
+        );
+      }
+    } else {
+      await chatService.ensureConversationTree(conversation.id);
+      final tree = await chatService.loadConversationTree(conversation.id);
+      if (tree == null) {
+        return ChatActionResult.error('conversation_tree_missing');
+      }
+      final oldEdge = tree.edges[message.id];
+      final newReply = shouldBeginNewAssistantReply(
+        role: message.role,
+        targetGroupId: targetGroupId,
+        assistantAsNewReply: assistantAsNewReply,
+      );
+      final String? fromMessageId;
+      final String? parentMessageId;
+      if (message.role == 'user') {
+        fromMessageId = message.id;
+        parentMessageId = message.id;
+      } else if (newReply) {
+        fromMessageId = message.id;
+        parentMessageId = message.id;
+      } else {
+        fromMessageId = oldEdge?.parentMessageId;
+        parentMessageId = oldEdge?.parentMessageId;
+      }
+      final ConversationTree createdTree;
+      if (existingBranchId != null) {
+        final existingTree = await chatService.loadConversationTree(
+          conversation.id,
+        );
+        final existingBranch = existingTree?.branches[existingBranchId];
+        if (existingTree == null || existingBranch == null) {
+          return ChatActionResult.error('existing_branch_not_found');
+        }
+        if (existingBranch.tipMessageId != message.id) {
+          return ChatActionResult.error('existing_branch_tip_mismatch');
+        }
+        createdTree = existingTree;
+      } else {
+        createdTree = await chatService.createConversationBranch(
+          conversationId: conversation.id,
+          fromMessageId: fromMessageId,
+        );
+      }
+      viewModel.installConversationTree(createdTree);
       begin = await messageGenerationService.beginAssistantGeneration(
         conversationId: conversation.id,
         modelId: modelId,
         providerKey: providerKey,
         anchorGroupId: message.groupId ?? message.id,
         truncateFuture: truncateFuture,
-      );
-    } else {
-      if (targetGroupId == null) {
-        return ChatActionResult.error('invalid_versioning');
-      }
-      final nextVersion = isTemporaryConversation
-          ? versioning.nextVersion
-          : await chatService.getMaxMessageVersionForGroup(
-                  conversation.id,
-                  targetGroupId,
-                ) +
-                1;
-      begin = await messageGenerationService.beginRegeneration(
-        conversationId: conversation.id,
-        modelId: modelId,
-        providerKey: providerKey,
-        groupId: targetGroupId,
-        version: nextVersion,
-        truncateFuture: truncateFuture,
+        parentMessageId: parentMessageId,
+        branchId: createdTree.activeBranchId,
       );
     }
     final assistantMessage = begin.assistantMessage;
     _registerGenerationRun(assistantMessage.id, begin.runId);
     _activeAssistantMessages.put(assistantMessage);
 
-    // Pre-create streaming notifier BEFORE adding message to list
-    // so that MessageListView can detect it's streaming on first render
+    // 在将消息加入列表前预先创建流式通知器，
+    // 使 MessageListView 在首次渲染时就能识别到流式状态。
     streamController.markStreamingStarted(assistantMessage.id);
 
     if (assistantMessage.groupId case final groupId?) {
@@ -1328,9 +1392,8 @@ class ChatActions {
       assistantPlaceholder: assistantMessage,
     );
 
-    // Keep the loaded window around the persisted generation message instead
-    // of replacing a distant reading position with the conversation tail
-    // (which can exclude this streaming revision in a long conversation).
+    // 将已加载窗口保持在持久化生成消息附近，而不是用会话尾部
+    // 替换较远的阅读位置（长会话中这可能会排除此流式版本）。
     if (await chatController.openAroundPersistedMessage(
       assistantMessage,
       truncateFollowingSlots: !isTemporaryConversation && truncateFuture,
@@ -1340,10 +1403,10 @@ class ChatActions {
     onMessagesChanged?.call();
 
     _setConversationLoading(conversation.id, true);
-    // The loading guard now owns re-entry exclusion for this conversation.
+    // 此时加载守卫拥有此会话的重入排除。
     _sendInFlightClaims.remove(conversation.id);
 
-    // Initialize reasoning
+    // 初始化推理
     final supportsReasoning = _isReasoningModel(providerKey, modelId);
     final enableReasoning =
         supportsReasoning &&
@@ -1356,7 +1419,7 @@ class ChatActions {
         enableReasoning: enableReasoning,
       );
 
-      // Prepare API messages
+      // 准备 API 消息
       final prepared = await messageGenerationService
           .prepareApiMessagesWithInjections(
             messages: regenerationMessages,
@@ -1377,7 +1440,7 @@ class ChatActions {
             askUserService: regenAskUserService,
           );
 
-      // Build user image paths
+      // 构建用户图片路径
       final userImagePaths = messageGenerationService.buildUserImagePaths(
         input: null,
         lastUserImagePaths: prepared.lastUserImagePaths,
@@ -1386,7 +1449,7 @@ class ChatActions {
         modelId: modelId,
       );
 
-      // Execute generation
+      // 执行生成
       final ctx = messageGenerationService.buildGenerationContext(
         assistantMessage: assistantMessage,
         prepared: prepared,
@@ -1534,17 +1597,17 @@ class ChatActions {
   }
 
   // ============================================================================
-  // Cancel Streaming
+  // 取消流式处理
   // ============================================================================
 
-  /// Cancel the active streaming for the current conversation.
+  /// 取消当前会话的活动流式处理。
   Future<void> cancelStreaming(Conversation? conversation) async {
     final cid = conversation?.id;
     if (cid == null) return;
     await cancelStreamingById(cid);
   }
 
-  /// Cancel the active streaming for the conversation with id [cid].
+  /// 取消 ID 为 [cid] 的会话的活动流式处理。
   Future<void> cancelStreamingById(String cid) {
     final existing = _cancelStreamingFutures[cid];
     if (existing != null) return existing;
@@ -1562,37 +1625,36 @@ class ChatActions {
   }
 
   Future<void> _cancelStreamingByIdOnce(String cid) async {
-    // Cancel pending tool approval requests for this conversation to prevent
-    // deadlock. Scoped by conversation id: the static deletion entry points
-    // (cancelActiveGenerationFor / cancelActiveGenerationsForAssistant) may
-    // cancel a background conversation while another one is streaming, and a
-    // global cancelAll would deny that other conversation's pending approvals.
+    // 取消该会话的待处理工具审批请求以防止死锁。
+    // 作用域按会话 ID 限定：静态删除入口
+    // （cancelActiveGenerationFor / cancelActiveGenerationsForAssistant）
+    // 可能取消后台会话，而另一个会话仍在流式处理；
+    // 全局 cancelAll 会拒绝另一个会话的待处理审批。
     try {
       contextProvider.read<ToolApprovalService>().cancelForConversation(cid);
     } catch (_) {
-      // ToolApprovalService may not be registered yet
+      // ToolApprovalService 可能尚未注册
     }
     try {
       contextProvider.read<AskUserInteractionService>().cancelForConversation(
         cid,
       );
     } catch (_) {
-      // AskUserInteractionService may not be registered yet
+      // AskUserInteractionService 可能尚未注册
     }
 
-    // Reset file processing state on cancel
+    // 取消时重置文件处理状态
     onFileProcessingFinished?.call();
 
-    // Abort the HTTP request before waiting on the subscription: the barrier
-    // cancel only completes once the generator leaves its network await,
-    // which a stalled connection would otherwise block indefinitely.
+    // 在等待订阅前中止 HTTP 请求：屏障取消只有在生成器
+    // 离开网络 await 后才完成；停滞连接否则会无限期阻塞。
     ChatApiService.cancelRequest(cid);
 
-    // Cancel active stream for current conversation only
+    // 仅取消当前会话的活动流
     final sub = _conversationStreams.remove(cid);
 
-    // End the visible streaming state immediately. The conversation remains
-    // internally busy through [_cancelStreamingFutures] until teardown ends.
+    // 立即结束可见的流式状态。会话在清理结束前会通过
+    // [_cancelStreamingFutures] 保持内部忙碌。
     final visibleStreaming = _activeAssistantMessages.cancellationTarget(
       cid,
       _messages,
@@ -1615,13 +1677,13 @@ class ChatActions {
       await _cancelSubscriptionWithTimeout(sub);
     }
 
-    // The active identity is independent from the currently loaded window.
+    // 活动身份独立于当前已加载窗口。
     final streaming = _activeAssistantMessages.cancellationTarget(
       cid,
       _messages,
     );
     if (streaming != null) {
-      // Mark streaming as ended to allow UI rebuilds again
+      // 标记流式结束，以允许 UI 再次重建
       streamController.markStreamingEnded(streaming.id);
       streamController.cleanupTimers(streaming.id);
 
@@ -1652,7 +1714,7 @@ class ChatActions {
         streamController.removeStreamingNotifier(streaming.id);
       }
 
-      // If streaming output included inline base64 images, sanitize them even on manual cancel
+      // 如果流式输出包含行内 base64 图片，即使手动取消也要清理它们
       onScheduleImageSanitize?.call(
         streaming.id,
         latestStreaming.content,
@@ -1665,10 +1727,10 @@ class ChatActions {
   }
 
   // ============================================================================
-  // Stream Execution
+  // 流式执行
   // ============================================================================
 
-  /// Execute generation with the given context.
+  /// 使用给定上下文执行生成。
   Future<void> _executeGeneration(stream_ctrl.GenerationContext ctx) async {
     final state = stream_ctrl.StreamingState(ctx);
     final assistant = ctx.assistant;
@@ -1683,7 +1745,7 @@ class ChatActions {
       state.hadThinkingBlock = true;
     }
 
-    // Mark this message as actively streaming to suppress UI rebuilds
+    // 将此消息标记为正在流式处理，以抑制 UI 重建
     streamController.markStreamingStarted(state.messageId);
     _activeAssistantMessages.put(state.ctx.assistantMessage);
     _streamingToolEvents[state.messageId] = chatService
@@ -1748,10 +1810,9 @@ class ChatActions {
         ocrActive: ctx.ocrActive,
       );
 
-      // Replacing a previous stream: the new request has not registered its
-      // cancel token yet (that happens on listen), so cancelRequest still
-      // targets the old one. Break its network wait first so the barrier
-      // cancel below cannot stall on a dead connection.
+      // 替换先前的流：新请求尚未注册其取消令牌（这发生在监听时），
+      // 因此 cancelRequest 仍指向旧流。先打断其网络等待，
+      // 防止下方屏障取消在死连接上停滞。
       final previousSub = _conversationStreams.remove(conversationId);
       if (previousSub != null) {
         ChatApiService.cancelRequest(conversationId);
@@ -1770,10 +1831,10 @@ class ChatActions {
   }
 
   // ============================================================================
-  // Stream Chunk Handlers
+  // 流式分块处理器
   // ============================================================================
 
-  /// Dispatch stream chunk to appropriate handler.
+  /// 将流式分块分发到合适的处理器。
   Future<void> _handleStreamChunk(
     ChatStreamChunk chunk,
     stream_ctrl.StreamingState state,
@@ -1786,8 +1847,8 @@ class ChatActions {
           )
         : '';
 
-    // Persist vendor reasoning details (may carry thinking signatures) so
-    // they can be echoed back on subsequent turns.
+    // 持久化供应商推理详情（可能携带思考签名），
+    // 以便在后续轮次中回传。
     if (chunk.reasoningDetails != null) {
       streamController.setReasoningDetails(
         state.messageId,
@@ -1795,22 +1856,22 @@ class ChatActions {
       );
     }
 
-    // Handle reasoning
+    // 处理推理
     if ((chunk.reasoning ?? '').isNotEmpty && state.ctx.supportsReasoning) {
       await _handleReasoningChunk(chunk, state);
     }
 
-    // Handle tool calls
+    // 处理工具调用
     if ((chunk.toolCalls ?? const []).isNotEmpty) {
       await _handleToolCallsChunk(chunk, state);
     }
 
-    // Handle tool results
+    // 处理工具结果
     if ((chunk.toolResults ?? const []).isNotEmpty) {
       await _handleToolResultsChunk(chunk, state);
     }
 
-    // Handle finish or content
+    // 处理完成或内容
     if (chunk.isDone) {
       await _handleStreamFinish(chunk, state, chunkContent);
     } else {
@@ -1846,7 +1907,7 @@ class ChatActions {
     }
   }
 
-  /// Handle reasoning chunk from stream.
+  /// 处理流中的推理分块。
   Future<void> _handleReasoningChunk(
     ChatStreamChunk chunk,
     stream_ctrl.StreamingState state,
@@ -1854,7 +1915,7 @@ class ChatActions {
     await streamController.handleReasoningChunk(chunk, state);
   }
 
-  /// Handle tool calls chunk from stream.
+  /// 处理流中的工具调用分块。
   Future<void> _handleToolCallsChunk(
     ChatStreamChunk chunk,
     stream_ctrl.StreamingState state,
@@ -1863,7 +1924,7 @@ class ChatActions {
       chunk,
       state,
       updateReasoningSegmentsInDb: (String messageId, String json) async {
-        // The complete reasoning snapshot is coalesced after this chunk.
+        // 完整推理快照在此分块后合并。
       },
       setToolEventsInDb:
           (String messageId, List<Map<String, dynamic>> events) async {
@@ -1875,7 +1936,7 @@ class ChatActions {
     );
   }
 
-  /// Handle tool results chunk from stream.
+  /// 处理流中的工具结果分块。
   Future<void> _handleToolResultsChunk(
     ChatStreamChunk chunk,
     stream_ctrl.StreamingState state,
@@ -1904,13 +1965,13 @@ class ChatActions {
     );
   }
 
-  /// Handle content chunk from stream (non-done).
+  /// 处理流中的内容分块（未完成）。
   Future<void> _handleContentChunk(
     ChatStreamChunk chunk,
     stream_ctrl.StreamingState state,
     String chunkContent,
   ) async {
-    // Fast bail-out: if _finishStreaming already ran, don't touch state at all.
+    // 快速退出：如果 _finishStreaming 已运行，则完全不修改状态。
     if (state.finishHandled) return;
 
     final messageId = state.messageId;
@@ -1971,10 +2032,10 @@ class ChatActions {
         }
       }
 
-      // After any await point, _finishStreaming may have already run and
-      // updated _messages[index] with the FULL final content. If we continue
-      // with this stale streamingProcessed we would overwrite the final content
-      // with a partial snapshot. Bail out early to prevent that.
+      // 在任何 await 点之后，_finishStreaming 可能已经运行并用完整最终内容
+      // 更新了 _messages[index]。如果继续使用这份过期的
+      // streamingProcessed，就会用部分快照覆盖最终内容。
+      // 因此提前退出以避免这种情况。
       if (state.finishHandled) return;
 
       onScheduleImageSanitize?.call(
@@ -1996,19 +2057,18 @@ class ChatActions {
       }
     }
 
-    // End reasoning when content starts
+    // 内容开始时结束推理
     if (state.ctx.streamOutput && chunkContent.isNotEmpty) {
       await _finishReasoningOnContent(state);
     }
 
     _scheduleIosBackgroundGenerationUpdate(state);
 
-    // Re-check before scheduling timer — timer creation after _finishStreaming
-    // would create a new timer that periodically overwrites _messages[index]
-    // with stale partial content.
+    // 在调度计时器前重新检查：在 _finishStreaming 之后创建计时器
+    // 会产生一个周期性用过期部分内容覆盖 _messages[index] 的新计时器。
     if (state.finishHandled) return;
 
-    // Schedule throttled UI update via StreamController
+    // 通过 StreamController 调度节流的 UI 更新
     if (state.ctx.streamOutput) {
       streamController.scheduleThrottledUpdate(
         messageId,
@@ -2029,7 +2089,7 @@ class ChatActions {
     }
   }
 
-  /// Finish reasoning segment when content starts arriving.
+  /// 当内容开始到达时结束推理片段。
   Future<void> _finishReasoningOnContent(
     stream_ctrl.StreamingState state,
   ) async {
@@ -2042,12 +2102,12 @@ class ChatActions {
             DateTime? reasoningFinishedAt,
             String? reasoningSegmentsJson,
           }) async {
-            // The complete reasoning snapshot is coalesced after this chunk.
+            // 完整推理快照在此分块后合并。
           },
     );
   }
 
-  /// Handle stream finish (isDone == true).
+  /// 处理流完成（isDone == true）。
   Future<void> _handleStreamFinish(
     ChatStreamChunk chunk,
     stream_ctrl.StreamingState state,
@@ -2081,7 +2141,7 @@ class ChatActions {
       state.fullContentRaw += chunkContent;
     }
 
-    // Don't finish if tools are still loading
+    // 如果工具仍在加载，则不要完成
     final hasLoadingTool =
         (streamController.toolParts[messageId]?.any((p) => p.loading) ?? false);
     if (hasLoadingTool) {
@@ -2096,7 +2156,7 @@ class ChatActions {
       state.totalTokens = state.usage!.totalTokens;
     }
 
-    // Materialize buffered reasoning before the final checkpoint.
+    // 在最终检查点前将缓冲的推理具体化。
     if (!state.ctx.streamOutput && state.bufferedReasoning.isNotEmpty) {
       final now = DateTime.now();
       final startAt = state.reasoningStartAt ?? now;
@@ -2107,27 +2167,27 @@ class ChatActions {
         ..expanded = !(autoCollapseThinking ?? false);
     }
 
-    // Track the _finishStreaming future so _handleStreamDone can await it
-    // if it fires concurrently (stream.onDone can fire while we're still
-    // awaiting async work inside _finishStreaming).
+    // 跟踪 _finishStreaming Future，使 _handleStreamDone 在并发触发时
+    // 可以等待它（stream.onDone 可能在我们仍等待
+    // _finishStreaming 中的异步工作时触发）。
     final finishFuture = _finishStreaming(state);
     _finishStreamingFutures[messageId] = finishFuture;
     await finishFuture;
     _finishStreamingFutures.remove(messageId);
 
-    // Notify for background notification if needed
+    // 需要时触发后台通知
     if (!state.finishHandled) {
       onStreamFinished?.call(conversationId);
     }
 
-    // This finish handler runs inside the sequential drain, so awaiting the
-    // barrier cancel here would wait on this very drain and never complete.
-    // The source stream is finishing on its own (a done chunk arrived);
-    // onDone performs the remaining cleanup, so only drop the map entry.
+    // 此完成处理器运行在顺序排空逻辑内，因此在此等待屏障取消
+    // 会等待当前排空流程本身，永远无法完成。
+    // 源流正在自行结束（已到达完成分块）；
+    // onDone 会执行剩余清理，所以这里只移除映射条目。
     _conversationStreams.remove(conversationId);
   }
 
-  /// Finish streaming and persist final state.
+  /// 结束流式处理并持久化最终状态。
   Future<void> _finishStreaming(
     stream_ctrl.StreamingState state, {
     bool generateTitle = true,
@@ -2135,10 +2195,10 @@ class ChatActions {
     final messageId = state.messageId;
     final conversationId = state.conversationId;
 
-    // Mark streaming as ended to allow UI rebuilds again
+    // 标记流式结束，以允许 UI 再次重建
     streamController.markStreamingEnded(messageId);
 
-    // Clean up stream throttle timer and flush final content
+    // 清理流式节流计时器并刷新最终内容
     streamController.cleanupTimers(messageId);
 
     final shouldGenerateTitle =
@@ -2156,19 +2216,18 @@ class ChatActions {
     }
     streamController.finishReasoningIfNeeded(messageId);
 
-    // Replace extremely long inline base64 images with local files to avoid jank
+    // 将超长行内 base64 图片替换为本地文件，避免卡顿
     final processedContent = _transformAssistantContent(state);
 
-    // Compute final duration
+    // 计算最终持续时间
     final finalDurationMs = _elapsedMsFrom(state.streamStartedAt);
     final finalPromptTokens = state.usage?.promptTokens;
     final finalCompletionTokens = state.usage?.completionTokens;
     final finalCachedTokens = state.usage?.cachedTokens;
 
-    // Flush final content to the streaming notifier before async operations.
-    // This ensures any intermediate rebuild (e.g., from isProcessingFiles change
-    // or onDone firing concurrently) still shows the correct content via the
-    // notifier-based streaming path.
+    // 在异步操作前将最终内容刷新到流式通知器。
+    // 这样任何中间重建（例如 isProcessingFiles 变化或
+    // onDone 并发触发）仍能通过基于通知器的流式路径显示正确内容。
     streamController.streamingContentNotifier.updateContent(
       messageId,
       processedContent,
@@ -2207,27 +2266,26 @@ class ChatActions {
         onMaybeGenerateTitle?.call(conversationId);
       }
 
-      // Trigger summary generation check (actual logic in HomeViewModel)
+      // 触发摘要生成检查（实际逻辑在 HomeViewModel 中）
       onMaybeGenerateSummary?.call(conversationId);
 
-      // Trigger follow-up suggestions after the final assistant reply is stored.
+      // 最终助手回复存储后触发后续建议。
       onMaybeGenerateSuggestions?.call(conversationId);
       await _finishIosBackgroundGeneration(success: true);
     } finally {
-      // UI lifecycle cleanup is independent from terminal persistence success.
+      // UI 生命周期清理独立于最终持久化是否成功。
       if (chatController.publishTerminalMessage(finalizedMessage)) {
         onMessagesChanged?.call();
       }
       streamController.removeStreamingNotifier(messageId);
       _setConversationLoading(conversationId, false);
-      // Terminal widgets are usually taller than the streaming ones; pin
-      // once more after isGenerating becomes false so layout-phase follow
-      // does not miss that height change.
+      // 最终控件通常比流式控件更高；在 isGenerating 变为 false 后
+      // 再固定一次，使布局阶段的跟随不会错过高度变化。
       onStreamFinished?.call(conversationId);
     }
   }
 
-  /// Handle stream error.
+  /// 处理流错误。
   Future<void> _handleStreamError(
     dynamic e,
     stream_ctrl.StreamingState state,
@@ -2236,10 +2294,10 @@ class ChatActions {
     final conversationId = state.conversationId;
     final errorText = e.toString();
 
-    // Reset file processing state on error
+    // 出错时重置文件处理状态
     onFileProcessingFinished?.call();
 
-    // Mark streaming as ended to allow UI rebuilds again
+    // 标记流式结束，以允许 UI 再次重建
     streamController.markStreamingEnded(messageId);
 
     streamController.cleanupTimers(messageId);
@@ -2269,9 +2327,9 @@ class ChatActions {
       }
       streamController.removeStreamingNotifier(messageId);
       _setConversationLoading(conversationId, false);
-      // The sequential stream drain owns source cancellation after this error
-      // handler returns. Re-entering its barrier cancel here would wait on this
-      // handler itself and prevent the UI error callback below from firing.
+      // 此错误处理器返回后，顺序流排空逻辑拥有源流取消。
+      // 此处再次进入其屏障取消会等待当前处理器本身，
+      // 并阻止下方 UI 错误回调触发。
       _conversationStreams.remove(conversationId);
       onStreamError?.call(errorText);
       onStreamFinished?.call(conversationId);
@@ -2279,23 +2337,23 @@ class ChatActions {
     }
   }
 
-  /// Handle stream done callback.
+  /// 处理流完成回调。
   Future<void> _handleStreamDone(stream_ctrl.StreamingState state) async {
-    // Reset file processing state on done (just in case)
+    // 完成时重置文件处理状态（以防万一）
     onFileProcessingFinished?.call();
 
     final conversationId = state.conversationId;
     final messageId = state.messageId;
 
-    // Ensure streaming is marked as ended
+    // 确保流式状态被标记为已结束
     streamController.markStreamingEnded(messageId);
 
     streamController.cleanupTimers(messageId);
 
-    // If _finishStreaming is already in-flight (started by _handleStreamFinish),
-    // wait for it to complete before removing notifiers or triggering rebuild.
-    // This prevents a race where the notifier is removed and a rebuild is
-    // triggered while _finishStreaming hasn't yet updated _messages[index].
+    // 如果 _finishStreaming 已在执行中（由 _handleStreamFinish 启动），
+    // 在移除通知器或触发重建前等待其完成。
+    // 这可以防止在 _finishStreaming 尚未更新 _messages[index] 时，
+    // 通知器已被移除且重建已被触发的竞态。
     final inFlight = _finishStreamingFutures[messageId];
     if (inFlight != null) {
       await inFlight;
@@ -2305,25 +2363,25 @@ class ChatActions {
         generateTitle: state.ctx.generateTitleOnFinish,
       );
     }
-    // Idempotent: ensure notifier is removed even if _finishStreaming was skipped
+    // 幂等操作：即使跳过了 _finishStreaming，也确保移除通知器
     streamController.removeStreamingNotifier(messageId);
     onStreamFinished?.call(conversationId);
-    // The source stream is already done and this handler runs inside the
-    // sequential drain; awaiting the barrier cancel here would wait on this
-    // very drain and never complete, so only drop the map entry.
+    // 源流已经完成，且此处理器运行在顺序排空逻辑内；
+    // 在此等待屏障取消会等待当前排空流程本身，永远无法完成，
+    // 所以只移除映射条目。
     _conversationStreams.remove(conversationId);
   }
 
   // ============================================================================
-  // Flush Progress (for switching conversations)
+  // 刷新进度（用于切换会话）
   // ============================================================================
 
-  /// Persist latest in-flight assistant message content and reasoning.
+  /// 持久化最新进行中的助手消息内容和推理。
   Future<void> flushConversationProgress(Conversation? conversation) async {
     final cid = conversation?.id;
     if (cid == null || _messages.isEmpty) return;
 
-    // Find the latest streaming assistant message in the current conversation
+    // 在当前会话中查找最新的流式助手消息
     ChatMessage? streaming;
     for (var i = _messages.length - 1; i >= 0; i--) {
       final m = _messages[i];
@@ -2334,12 +2392,12 @@ class ChatActions {
     }
     if (streaming == null) return;
 
-    // Prefer the full accumulated stream text over the typewriter prefix that
-    // may still be sitting on the in-memory message widget.
+    // 优先使用完整累积流文本，而不是可能仍停留在内存消息控件上的
+    // 打字机前缀。
     final latestContent =
         streamController.getPendingStreamContent(streaming.id) ??
         streaming.content;
-    // Also capture reasoning progress if tracked in-memory
+    // 如果内存中跟踪了推理进度，也一并捕获
     final r = streamController.reasoning[streaming.id];
     final segs = streamController.reasoningSegments[streaming.id];
 
@@ -2372,7 +2430,7 @@ class ChatActions {
       writer.add(() => _createStreamingCheckpoint(snapshot));
       await writer.barrier();
     }
-    // Ensure any inline data URLs get converted even if the user navigates away mid-stream
+    // 即使用户在流式过程中离开，也确保转换所有行内 data URL
     onScheduleImageSanitize?.call(streaming.id, latestContent, immediate: true);
   }
 }

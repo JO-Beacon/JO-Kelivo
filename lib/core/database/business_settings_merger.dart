@@ -408,8 +408,8 @@ final class BusinessSettingsMerger {
       seenIds.add(id);
     }
 
-    // Rewrite relatedIds that pointed at remapped incoming ids. Only touch
-    // rows that came from the incoming side so local payloads stay identical.
+    // 重写指向已重新映射的 incoming id 的 relatedIds。只处理
+    // 来自导入侧的行，以便本地 payload 保持原样。
     if (idRemap.isNotEmpty) {
       for (var index = localCount; index < out.length; index++) {
         final row = out[index];
@@ -427,7 +427,7 @@ final class BusinessSettingsMerger {
       }
     }
 
-    // Drop dangling relatedIds that point at ids absent from the merge result.
+    // 删除指向合并结果中不存在 id 的悬空 relatedIds。
     final knownIds = <String>{for (final row in out) row.id};
     for (var index = 0; index < out.length; index++) {
       final row = out[index];
@@ -486,7 +486,7 @@ final class BusinessSettingsMerger {
     List<BusinessEntityValue> existing,
     List<BusinessEntityValue> incoming,
   ) {
-    // Local field wins by id (field key); incoming only fills gaps.
+    // 本地字段按 id（字段键）优先；incoming 仅填补空缺。
     return _mergeEntityRowsById(existing, incoming);
   }
 

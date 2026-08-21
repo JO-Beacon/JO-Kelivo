@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 
 import '../models/chat_message.dart';
 import '../models/conversation.dart';
+import '../models/conversation_tree.dart';
 import '../models/message_part.dart';
 import '../utils/multimodal_input_utils.dart';
 import '../../utils/sandbox_path_resolver.dart';
@@ -34,6 +35,7 @@ typedef InstalledChatDatabaseInfo = ({int schemaVersion, String? databaseId});
 typedef ParsedChatImportBatch = ({
   Conversation conversation,
   List<ChatMessage> messages,
+  ConversationTree? tree,
 });
 
 final class LinearMessageWindowSlot {
@@ -95,7 +97,7 @@ class BackupMergeReport {
   final int skippedConversations;
   final Map<String, String> remappedConversationIds;
 
-  /// Target conversation ids newly inserted by this merge (post-remap ids).
+  /// 此合并新插入的目标会话 ID（重映射后的 ID）。
   final List<String> importedConversationIds;
 
   int get remappedConversations => remappedConversationIds.length;
@@ -219,25 +221,32 @@ class ChatDatabaseRepository {
   }
 
   static Future<bool> migrateInstalledDatabase(File file) async {
-    final database = sqlite.sqlite3.open(
-      file.absolute.path,
-      mode: sqlite.OpenMode.readOnly,
-    );
-    late final int schemaVersion;
     try {
-      schemaVersion = database.userVersion;
-      if (schemaVersion != AppDatabase.currentSchemaVersion) {
-        throw StateError('database_schema_version');
+      final installedSchemaVersion = _readRawUserVersion(file);
+      if (installedSchemaVersion > AppDatabase.currentSchemaVersion) {
+        throw StateError('database_schema_too_new');
       }
-      _validateRawStructure(database);
+      if (installedSchemaVersion == AppDatabase.currentSchemaVersion) {
+        _validateRawDatabaseFile(file);
+        return false;
+      }
+
+      final appDatabase = AppDatabase.open(file: file);
+      try {
+        await appDatabase.customSelect('SELECT 1;').getSingle();
+      } finally {
+        await appDatabase.close();
+      }
+      _validateRawDatabaseFile(file);
+      return true;
     } on sqlite.SqliteException {
       throw StateError('database_corrupt');
-    } finally {
-      database.close();
     }
-
-    return false;
   }
+
+  /// 读取 SQLite 的 user_version，而不打开 Drift 运行时。
+  /// 启动门在这里暂停，以免升级旧数据库。
+  static int readInstalledSchemaVersion(File file) => _readRawUserVersion(file);
 
   static InstalledChatDatabaseInfo inspectInstalledDatabase(
     File file, {
@@ -547,6 +556,30 @@ class ChatDatabaseRepository {
     );
   }
 
+  static int _readRawUserVersion(File file) {
+    final database = sqlite.sqlite3.open(
+      file.absolute.path,
+      mode: sqlite.OpenMode.readOnly,
+    );
+    try {
+      return database.userVersion;
+    } finally {
+      database.close();
+    }
+  }
+
+  static void _validateRawDatabaseFile(File file) {
+    final database = sqlite.sqlite3.open(
+      file.absolute.path,
+      mode: sqlite.OpenMode.readOnly,
+    );
+    try {
+      _validateRawStructure(database);
+    } finally {
+      database.close();
+    }
+  }
+
   static void _validateRawStructure(sqlite.Database database) {
     if (database.userVersion != AppDatabase.currentSchemaVersion) {
       throw StateError('database_schema_version');
@@ -556,6 +589,9 @@ class ChatDatabaseRepository {
       'conversation_rows',
       'conversation_mcp_server_rows',
       'message_rows',
+      'message_tree_edge_rows',
+      'conversation_branch_rows',
+      'conversation_tree_state_rows',
       'chat_storage_meta_rows',
       'message_part_rows',
       'generation_run_rows',
@@ -591,7 +627,6 @@ class ChatDatabaseRepository {
     if (tables.intersection(const {
       'message_slot_rows',
       'message_revision_rows',
-      'conversation_branch_rows',
       'conversation_state_rows',
     }).isNotEmpty) {
       throw StateError('retired_tables');
@@ -644,6 +679,23 @@ class ChatDatabaseRepository {
         'cached_tokens',
         'duration_ms',
         'message_order',
+      ],
+      'message_tree_edge_rows': [
+        'conversation_id',
+        'message_id',
+        'parent_message_id',
+      ],
+      'conversation_branch_rows': [
+        'id',
+        'conversation_id',
+        'tip_message_id',
+        'name',
+        'created_at',
+      ],
+      'conversation_tree_state_rows': [
+        'conversation_id',
+        'active_branch_id',
+        'branch_selections_json',
       ],
       'chat_storage_meta_rows': ['key', 'value'],
       'message_part_rows': [
@@ -754,6 +806,9 @@ class ChatDatabaseRepository {
     }
 
     const expectedPrimaryKeys = <String, List<String>>{
+      'message_tree_edge_rows': ['conversation_id', 'message_id'],
+      'conversation_branch_rows': ['id'],
+      'conversation_tree_state_rows': ['conversation_id'],
       'asset_rows': ['id'],
       'message_asset_rows': ['revision_id', 'asset_id', 'kind'],
       'asset_gc_rows': ['asset_id'],
@@ -879,6 +934,21 @@ class ChatDatabaseRepository {
       columns: const ['scope', 'assistant_id', 'type', 'content_normalized'],
     );
     requireIndex(
+      table: 'message_tree_edge_rows',
+      name: 'idx_message_tree_edges_conversation',
+      columns: const ['conversation_id'],
+    );
+    requireIndex(
+      table: 'conversation_branch_rows',
+      name: 'idx_conversation_branches_conversation',
+      columns: const ['conversation_id'],
+    );
+    requireIndex(
+      table: 'conversation_tree_state_rows',
+      name: 'idx_conversation_tree_state_conversation',
+      columns: const ['conversation_id'],
+    );
+    requireIndex(
       table: 'message_prompt_rows',
       name: 'idx_message_prompts_conversation_snapshot',
       columns: const ['conversation_id', 'carries_memory_snapshot'],
@@ -930,6 +1000,15 @@ class ChatDatabaseRepository {
         'conversation_id->conversation_rows.id:CASCADE',
       },
       'message_rows': {'conversation_id->conversation_rows.id:CASCADE'},
+      'message_tree_edge_rows': {
+        'conversation_id->conversation_rows.id:CASCADE',
+      },
+      'conversation_branch_rows': {
+        'conversation_id->conversation_rows.id:CASCADE',
+      },
+      'conversation_tree_state_rows': {
+        'conversation_id->conversation_rows.id:CASCADE',
+      },
       'message_part_rows': {'revision_id->message_rows.id:CASCADE'},
       'generation_run_rows': {
         'conversation_id->conversation_rows.id:CASCADE',
@@ -1015,6 +1094,62 @@ class ChatDatabaseRepository {
 
   Future<void> ensureReady() async {
     await _db.customSelect('SELECT 1').get();
+  }
+
+  Future<List<LegacyTreeMigrationWarning>>
+  readAndClearContextTreeMigrationWarnings() async {
+    return _db.transaction(() async {
+      final rows =
+          await (_db.select(_db.chatStorageMetaRows)..where(
+                (row) =>
+                    row.key.equals(AppDatabase.contextTreeMigrationWarningsKey),
+              ))
+              .get();
+      if (rows.isEmpty) return const <LegacyTreeMigrationWarning>[];
+
+      Object? decoded;
+      var malformed = false;
+      try {
+        decoded = jsonDecode(rows.first.value);
+      } catch (_) {
+        malformed = true;
+        decoded = const <Object>[];
+      }
+      await (_db.delete(_db.chatStorageMetaRows)..where(
+            (row) =>
+                row.key.equals(AppDatabase.contextTreeMigrationWarningsKey),
+          ))
+          .go();
+      if (malformed || decoded is! List) {
+        return const <LegacyTreeMigrationWarning>[
+          LegacyTreeMigrationWarning(
+            conversationId: '',
+            groupId: '',
+            fallbackVersion: 0,
+          ),
+        ];
+      }
+
+      final warnings = <LegacyTreeMigrationWarning>[];
+      for (final value in decoded) {
+        if (value is! Map) continue;
+        final conversationId = value['conversationId'];
+        final groupId = value['groupId'];
+        final fallbackVersion = value['fallbackVersion'];
+        if (conversationId is String &&
+            groupId is String &&
+            fallbackVersion is int) {
+          warnings.add(
+            LegacyTreeMigrationWarning(
+              conversationId: conversationId,
+              groupId: groupId,
+              fallbackVersion: fallbackVersion,
+            ),
+          );
+        }
+      }
+      return warnings;
+    });
   }
 
   Future<ChatDatabaseConnectionContract> validateConnectionContract() async {
@@ -1135,8 +1270,8 @@ class ChatDatabaseRepository {
       var scanned = 0;
       var updated = 0;
       var skipped = 0;
-      // Cursor on part_id (AUTOINCREMENT PK): stable order, no missed rows,
-      // and no re-scan loop after payload rewrites (part_id is unchanged).
+      // 基于 part_id（AUTOINCREMENT 主键）的游标：顺序稳定，不会遗漏行，
+      // 且在 payload 重写后不会重新扫描循环（part_id 不变）。
       var cursor = 0;
       while (true) {
         final rows = await _db
@@ -1251,8 +1386,8 @@ class ChatDatabaseRepository {
     return (payload: payload, parseError: null);
   }
 
-  /// Remote/data URIs stay available; local paths use [localFileExists]
-  /// (no fix→File SMB probe).
+  /// 远程/data URI 保持可用；本地路径使用 [localFileExists]
+  /// （不进行 fix→File SMB 探测）。
   bool _unavailableForRewrittenUri(String nextUri) {
     if (isRemoteOrDataUri(nextUri)) return false;
     return !SandboxPathResolver.localFileExists(nextUri);
@@ -1349,11 +1484,10 @@ class ChatDatabaseRepository {
     );
   }
 
-  /// Bulk variant of [markMessageAssetReferencesDirty] for restore/import
-  /// paths that write message rows without going through
-  /// `_replaceMessageParts`. Queuing the revisions keeps the asset-reference
-  /// backfill invariant: every attachment-bearing revision is re-registered
-  /// before GC may collect its files.
+  /// [markMessageAssetReferencesDirty] 的批量变体，用于恢复/导入路径，
+  /// 这些路径写入消息行时不经过 `_replaceMessageParts`。将修订加入队列可维持
+  /// 资产引用回填不变式：每个带附件的修订都会在 GC 可能收集其文件前
+  /// 重新注册。
   Future<void> _markMessageAssetReferencesDirtyBatch(
     List<String> revisionIds,
   ) async {
@@ -1472,8 +1606,8 @@ class ChatDatabaseRepository {
                   ),
                 ]))
                 .get();
-        // One bulk read instead of a per-conversation query; the ordinal
-        // ordering is preserved by the in-Dart bucketing below.
+        // 一次批量读取，而不是逐个会话查询；顺序排序由下面的 Dart 内分桶
+        // 保留。
         final mcpRows = await (_db.select(
           _db.conversationMcpServerRows,
         )..orderBy([(t) => OrderingTerm.asc(t.ordinal)])).get();
@@ -1631,10 +1765,10 @@ class ChatDatabaseRepository {
     );
   }
 
-  /// Strictly validates every persisted attachment payload in bounded pages.
+  /// 以有界分页严格校验每个已持久化附件的 payload。
   ///
-  /// This is a migration publication guard, not a normal hydration path:
-  /// malformed rows fail the migration instead of becoming [MalformedPart]s.
+  /// 这是迁移发布守卫，而不是正常的水合路径：
+  /// 格式错误的行会使迁移失败，而不是变成 [MalformedPart]。
   Future<void> validateAttachmentPartPayloads({
     void Function(int processed, int total)? onProgress,
     @visibleForTesting void Function(int rowCount)? onMetadataWindow,
@@ -1723,21 +1857,20 @@ class ChatDatabaseRepository {
     }
   }
 
-  /// When true, the worker-isolate digest path throws before spawn so tests can
-  /// assert the Drift fallback still completes validation.
+  /// 为 true 时，worker isolate 摘要路径会在 spawn 前抛出异常，以便测试
+  /// 断言 Drift 回退仍能完成校验。
   @visibleForTesting
   bool debugForceTextPartDigestIsolateFailureForTest = false;
 
-  /// Order-independent digest of every `kind='text'` part payload.
+  /// 对每个 `kind='text'` 的 part payload 生成的顺序无关摘要。
   ///
-  /// Each row contributes `SHA-256(revision_id || NUL || payload)` XORed into a
-  /// 32-byte accumulator. When a database file path is available the scan and
-  /// SHA-256 work prefer a **dedicated worker isolate** (not the Drift SQL
-  /// isolate and not the UI isolate). Any infrastructure failure on that path
-  /// (including [Isolate.spawn]) is recorded via [_observer] and transparently
-  /// falls back to the Drift in-process scan — only a digest *mismatch* at the
-  /// call site should fail migration. [onProgress] reports SQLite `LENGTH`
-  /// character counts (same unit for total and processed).
+  /// 每行贡献 `SHA-256(revision_id || NUL || payload)`，XOR 进 32 字节累加器。
+  /// 当数据库文件路径可用时，扫描和 SHA-256 工作优先使用**专用 worker isolate**
+  /// （不是 Drift SQL isolate，也不是 UI isolate）。该路径上的任何基础设施
+  /// 故障（包括 [Isolate.spawn]）都会通过 [_observer] 记录，并透明回退到
+  /// Drift 进程内扫描——只有调用点的摘要 *mismatch* 才应使迁移失败。
+  /// [onProgress] 报告 SQLite `LENGTH` 字符数
+  /// （总数和已处理使用同一单位）。
   Future<String> getTextPartContentDigest({
     void Function(int processedChars, int totalChars)? onProgress,
   }) async {
@@ -1757,7 +1890,7 @@ class ChatDatabaseRepository {
             );
           } catch (error) {
             isolateSw.stop();
-            // Infrastructure-only: digest mismatch is decided by the caller.
+            // 仅基础设施：摘要不匹配由调用方决定。
             _observer.recordFailure(
               operation: ChatDatabaseOperation.queryTextPartContentDigest,
               elapsedMicros: isolateSw.elapsedMicroseconds,
@@ -1770,9 +1903,8 @@ class ChatDatabaseRepository {
     );
   }
 
-  /// Drift-backed scan: SQL on the Drift worker isolate, SHA-256 on the caller.
-  /// Used when no file path is available, and as fallback when the dedicated
-  /// digest isolate cannot complete.
+  /// Drift 支持的扫描：SQL 在 Drift worker isolate 上执行，SHA-256 在调用方执行。
+  /// 在没有文件路径时使用，并在专用 digest isolate 无法完成时作为回退。
   Future<String> _computeTextPartContentDigestViaDrift({
     void Function(int processedChars, int totalChars)? onProgress,
   }) async {
@@ -1859,11 +1991,11 @@ class ChatDatabaseRepository {
     }
   }
 
-  /// Worker entry: own read-only sqlite3 connection; never touches the UI
-  /// isolate. Progress/result maps are sent back on [args.sendPort].
+  /// Worker 入口：拥有自己的只读 sqlite3 连接；绝不接触 UI isolate。
+  /// 进度/结果映射通过 [args.sendPort] 发回。
   ///
-  /// Progress uses SQLite `LENGTH(payload)` for both total and processed so
-  /// emoji / surrogate pairs cannot push the bar past 100%.
+  /// 进度对总数和已处理数都使用 SQLite `LENGTH(payload)`，这样
+  /// emoji/代理对不会让进度条超过 100%。
   static void _textPartContentDigestIsolateMain(
     ({String path, SendPort sendPort}) args,
   ) {
@@ -1939,7 +2071,7 @@ class ChatDatabaseRepository {
     onProgress(safeProcessed, safeTotal);
   }
 
-  /// Mixes one text part into an order-independent 32-byte XOR digest.
+  /// 将一个文本 part 混入顺序无关的 32 字节 XOR 摘要。
   static void mixTextPartContentDigest(
     Uint8List digest,
     String revisionId,
@@ -2040,11 +2172,10 @@ class ChatDatabaseRepository {
     }, resultCount: (rows) => rows.length);
   }
 
-  /// Loads the selected linear message versions needed for model context.
+  /// 加载模型上下文所需的选定线性消息版本。
   ///
-  /// Version collapsing, truncate-index application, tail limiting, and part
-  /// hydration intentionally happen in one SQL statement so a large
-  /// conversation is never materialized merely to discard its prefix.
+  /// 版本折叠、截断索引应用、尾部限制和 part hydration 有意放在一条 SQL 语句中，
+  /// 这样大型会话不会仅仅为了丢弃前缀而被物化。
   Future<List<ChatMessage>> getSelectedContextMessages(
     String conversationId, {
     required int truncateIndex,
@@ -2512,7 +2643,7 @@ class ChatDatabaseRepository {
     String conversationId,
     Iterable<String> groupIds,
   ) async {
-    final ids = groupIds.where((id) => id.isNotEmpty).toSet();
+    final ids = groupIds.toSet();
     if (ids.isEmpty) return const <String, int>{};
     final group = _db.messageRows.groupId;
     final minOrder = _db.messageRows.messageOrder.min();
@@ -2538,7 +2669,7 @@ class ChatDatabaseRepository {
     String conversationId,
     Iterable<String> groupIds,
   ) async {
-    final ids = groupIds.where((id) => id.isNotEmpty).toSet();
+    final ids = groupIds.toSet();
     if (ids.isEmpty) return const <ChatMessage>[];
     return _observer.measure(
       ChatDatabaseOperation.queryMessagesForGroups,
@@ -2582,12 +2713,12 @@ class ChatDatabaseRepository {
     });
   }
 
-  /// Searches conversations for [tokens].
+  /// 按 [tokens] 搜索会话。
   ///
-  /// [conversationId] restricts the search to one conversation and
-  /// [excludeConversationId] omits one. Both are applied in SQL rather than by
-  /// the caller, because the candidate `LIMIT` is global: a conversation whose
-  /// matches rank below the cut would otherwise be filtered down to nothing.
+  /// [conversationId] 将搜索限定到一个对话，
+  /// [excludeConversationId] 则排除一个对话。两者都在 SQL 中应用，而不是由
+  /// 调用方应用，因为候选 `LIMIT` 是全局的：匹配项排名低于截断值的对话
+  /// 否则会被过滤到一条不剩。
   Future<List<ConversationSearchMatch>> searchConversationMatches({
     required List<String> tokens,
     int limit = 200,
@@ -2693,8 +2824,7 @@ class ChatDatabaseRepository {
         ..add(ftsQuery);
     }
 
-    // Applied alongside the match predicate so the candidate LIMIT is spent on
-    // rows the caller can actually use.
+    // 与匹配谓词同时应用，以便候选 LIMIT 只用于调用方实际可用的行。
     final scopeArgs = <String>[];
     var scopeSql = '';
     if (conversationId != null && conversationId.isNotEmpty) {
@@ -3135,9 +3265,8 @@ class ChatDatabaseRepository {
   }) async {
     if (limit <= 0) return const <AssetGcCandidate>[];
     return _db.transaction(() async {
-      // Page candidates with keyset pagination, then ask SQLite once per page
-      // whether any dirty text references those paths (set-based instr). Never
-      // pull the full dirty payload corpus into Dart.
+      // 用 keyset 分页候选行，然后每页询问 SQLite 一次，是否有 dirty text 引用这些
+      // 路径（基于集合的 instr）。绝不把完整 dirty payload 语料拉入 Dart。
       final ids = <String>[];
       final protectedIds = <String>[];
       var scanned = 0;
@@ -3264,13 +3393,12 @@ class ChatDatabaseRepository {
     });
   }
 
-  /// Set-based dirty-part protection for a candidate page.
+  /// 对候选页面进行基于集合的脏 part 保护。
   ///
-  /// A never-registered malformed attachment whose raw payload no longer
-  /// contains its path (for example, a non-string `uri`) cannot be protected
-  /// here and may be collected. We accept that residual loss window because a
-  /// global malformed-part interlock would let one corrupt row disable all
-  /// asset GC indefinitely and cause unbounded disk growth.
+  /// 一个从未注册的畸形附件，其原始 payload 不再包含其路径（例如非字符串 `uri`），
+  /// 无法在此受到保护，可能被收集。我们接受这一残余损失窗口，
+  /// 因为全局畸形部分联锁会让一行损坏数据无限期禁用所有资产 GC，
+  /// 导致磁盘无界增长。
   Future<Set<String>> _dirtyPartProtectedAssetIds(
     List<({String id, String path, int notBefore})> page,
   ) async {
@@ -3357,8 +3485,8 @@ class ChatDatabaseRepository {
     required String path,
     DateTime? completedAt,
   }) async {
-    // Dirty-part protection must match either stored form. Never pass '' —
-    // instr(x, '') is always true and would stall GC forever.
+    // 脏 part 保护必须匹配任一存储形式。绝不要传入 ''——
+    // instr(x, '') 永远为 true，会让 GC 永久停滞。
     final pathForm = path.isEmpty ? ' ' : path;
     final altForm = _alternateAssetPathForm(pathForm);
     final jsonPathForm = _jsonEscapedPathForm(pathForm);
@@ -3465,9 +3593,9 @@ class ChatDatabaseRepository {
         tokenize = 'unicode61 remove_diacritics 2'
       );
     ''');
-    // Index only finalized text parts. Positive EXISTS (not NOT EXISTS) so a
-    // deferred part insert that races ahead of its message_rows parent stays
-    // out of the index until a later finalize/rebuild path can see is_streaming=0.
+    // 只索引已完成的文本 part。使用正向 EXISTS（而不是 NOT EXISTS），这样
+    // 比其 message_rows 父行提前插入的延迟 part 会保持不在索引中，直到后续
+    // finalize/rebuild 路径能够看到 is_streaming=0。
     await _db.customStatement('''
       CREATE TRIGGER IF NOT EXISTS message_search_fts_insert
       AFTER INSERT ON message_part_rows
@@ -3484,9 +3612,9 @@ class ChatDatabaseRepository {
         );
       END;
     ''');
-    // Symmetric with insert: only reverse-delete postings that were indexed.
-    // During ON DELETE CASCADE the parent message_rows row is already gone, so
-    // this WHEN fails — message_search_fts_message_delete covers that path.
+    // 与插入对称：只反向删除已索引的 posting。
+    // 在 ON DELETE CASCADE 期间，父 message_rows 行已经消失，因此
+    // 此 WHEN 失败——message_search_fts_message_delete 覆盖该路径。
     await _db.customStatement('''
       CREATE TRIGGER IF NOT EXISTS message_search_fts_delete
       AFTER DELETE ON message_part_rows
@@ -3504,8 +3632,8 @@ class ChatDatabaseRepository {
         );
       END;
     ''');
-    // Rare direct payload rewrites (e.g. sandbox path migration). Normal
-    // checkpoints delete+insert parts instead.
+    // 极少数直接重写 payload 的情况（例如沙箱路径迁移）。常规的
+    // checkpoint 改为删除并重新插入 parts。
     await _db.customStatement('''
       CREATE TRIGGER IF NOT EXISTS message_search_fts_update
       AFTER UPDATE OF payload, conversation_id, kind ON message_part_rows
@@ -3530,9 +3658,9 @@ class ChatDatabaseRepository {
         WHERE new.kind = 'text';
       END;
     ''');
-    // Streaming checkpoints defer FTS; when is_streaming flips to 0, index the
-    // text parts present at that moment. The subsequent part rewrite (if any)
-    // then delete+inserts under the finalized gate.
+    // 流式 checkpoint 会推迟 FTS；当 is_streaming 变为 0 时，索引
+    // 当时存在的文本 parts。随后的 part 重写（如果发生）
+    // 会在 finalized gate 下执行删除并重新插入。
     await _db.customStatement('''
       CREATE TRIGGER IF NOT EXISTS message_search_fts_finalize
       AFTER UPDATE OF is_streaming ON message_rows
@@ -3547,9 +3675,9 @@ class ChatDatabaseRepository {
         WHERE p.revision_id = new.id AND p.kind = 'text';
       END;
     ''');
-    // Symmetric with finalize: reopening a finished revision (0→1) must drop
-    // its postings before streaming checkpoints rewrite parts under the
-    // is_streaming≠0 gate that would otherwise leave orphan FTS rows.
+    // 与 finalize 对称：重新打开一个已完成的 revision（0→1）必须先丢弃
+    // 其 postings，否则流式 checkpoint 会在 is_streaming≠0 gate 下重写 parts，
+    // 留下孤立的 FTS 行。
     await _db.customStatement('''
       CREATE TRIGGER IF NOT EXISTS message_search_fts_unindex
       AFTER UPDATE OF is_streaming ON message_rows
@@ -3564,9 +3692,9 @@ class ChatDatabaseRepository {
         WHERE p.revision_id = new.id AND p.kind = 'text';
       END;
     ''');
-    // Cascade deletes remove parts after the parent row is invisible to the
-    // part DELETE trigger's EXISTS gate. Clean FTS here first, and only for
-    // revisions that were eligible to be indexed (is_streaming = 0).
+    // 级联删除会在父行对 part DELETE 触发器的 EXISTS 门控不可见之后
+    // 删除 part。此处先清理 FTS，并且只清理有资格建立索引的修订
+    // （is_streaming = 0）。
     await _db.customStatement('''
       CREATE TRIGGER IF NOT EXISTS message_search_fts_message_delete
       BEFORE DELETE ON message_rows
@@ -3598,8 +3726,8 @@ class ChatDatabaseRepository {
 
   Future<void> putConversation(Conversation conversation) async {
     await _db.transaction(() async {
-      // Existing rows keep the database-owned hash written by prompt freeze;
-      // cached Conversation instances may still hold an older value.
+      // 现有行保留 prompt freeze 写入的、由数据库拥有的 hash；
+      // 缓存的 Conversation 实例可能仍持有较旧的值。
       final updated =
           await (_db.update(
             _db.conversationRows,
@@ -3784,7 +3912,257 @@ class ChatDatabaseRepository {
           .into(_db.messageRows)
           .insertOnConflictUpdate(_messageCompanion(message, order));
       await _replaceMessageParts(message);
+      await _appendMessageToTree(message.conversationId, message.id);
     });
+  }
+
+  Future<void> saveConversationTree(ConversationTree tree) {
+    return _db.transaction(() => _writeConversationTree(tree));
+  }
+
+  Future<void> _writeConversationTree(ConversationTree tree) async {
+    await (_db.delete(
+      _db.messageTreeEdgeRows,
+    )..where((row) => row.conversationId.equals(tree.conversationId))).go();
+    await (_db.delete(
+      _db.conversationBranchRows,
+    )..where((row) => row.conversationId.equals(tree.conversationId))).go();
+    await (_db.delete(
+      _db.conversationTreeStateRows,
+    )..where((row) => row.conversationId.equals(tree.conversationId))).go();
+
+    for (final edge in tree.edges.values) {
+      await _db
+          .into(_db.messageTreeEdgeRows)
+          .insert(
+            MessageTreeEdgeRowsCompanion.insert(
+              conversationId: tree.conversationId,
+              messageId: edge.messageId,
+              parentMessageId: Value(edge.parentMessageId),
+            ),
+          );
+    }
+    for (final branch in tree.branches.values) {
+      await _db
+          .into(_db.conversationBranchRows)
+          .insert(
+            ConversationBranchRowsCompanion.insert(
+              id: branch.id,
+              conversationId: tree.conversationId,
+              tipMessageId: Value(branch.tipMessageId),
+              name: Value(branch.name),
+              createdAt: branch.createdAt,
+            ),
+          );
+    }
+    await _db
+        .into(_db.conversationTreeStateRows)
+        .insert(
+          ConversationTreeStateRowsCompanion.insert(
+            conversationId: tree.conversationId,
+            activeBranchId: tree.activeBranchId,
+            branchSelectionsJson: Value(jsonEncode(tree.branchSelections)),
+          ),
+        );
+  }
+
+  Future<ConversationTree?> loadConversationTree(String conversationId) async {
+    return _db.transaction(() => _loadConversationTree(conversationId));
+  }
+
+  // 会话树横跨三张表；当其他操作可能整棵替换会话树时，
+  // 必须在同一个事务快照中读取。
+  Future<ConversationTree?> _loadConversationTree(String conversationId) async {
+    final branchRows = await (_db.select(
+      _db.conversationBranchRows,
+    )..where((row) => row.conversationId.equals(conversationId))).get();
+    if (branchRows.isEmpty) return null;
+
+    final edgeRows = await (_db.select(
+      _db.messageTreeEdgeRows,
+    )..where((row) => row.conversationId.equals(conversationId))).get();
+    final stateRow =
+        await (_db.select(_db.conversationTreeStateRows)
+              ..where((row) => row.conversationId.equals(conversationId)))
+            .getSingleOrNull();
+    if (stateRow == null) {
+      throw StateError('conversation_tree_state_missing');
+    }
+
+    return ConversationTree(
+      conversationId: conversationId,
+      activeBranchId: stateRow.activeBranchId,
+      branchSelections: _decodeBranchSelections(stateRow.branchSelectionsJson),
+      branches: {
+        for (final row in branchRows)
+          row.id: ConversationBranch(
+            id: row.id,
+            conversationId: row.conversationId,
+            tipMessageId: row.tipMessageId,
+            name: row.name,
+            createdAt: row.createdAt,
+          ),
+      },
+      edges: {
+        for (final row in edgeRows)
+          row.messageId: MessageTreeEdge(
+            messageId: row.messageId,
+            parentMessageId: row.parentMessageId,
+          ),
+      },
+    );
+  }
+
+  Map<String, String> _decodeBranchSelections(String rawJson) {
+    try {
+      final decoded = jsonDecode(rawJson);
+      if (decoded is Map<String, dynamic>) {
+        return {
+          for (final entry in decoded.entries)
+            if (entry.value is String) entry.key: entry.value as String,
+        };
+      }
+    } catch (_) {}
+    return <String, String>{};
+  }
+
+  String _conversationRootBranchId(String conversationId) =>
+      'root-$conversationId';
+
+  Future<void> syncLinearConversationTree(String conversationId) {
+    return _db.transaction(
+      () => _syncLinearTreeForConversation(conversationId),
+    );
+  }
+
+  Future<void> _syncLinearTreeForConversation(String conversationId) async {
+    final messageRows =
+        await (_db.select(_db.messageRows)
+              ..where((row) => row.conversationId.equals(conversationId))
+              ..orderBy([
+                (row) => OrderingTerm.asc(row.messageOrder),
+                (row) => OrderingTerm.asc(row.id),
+              ]))
+            .get();
+    final conversationRow = await (_db.select(
+      _db.conversationRows,
+    )..where((row) => row.id.equals(conversationId))).getSingleOrNull();
+    final createdAt =
+        conversationRow?.createdAt ??
+        (messageRows.isEmpty ? DateTime.now() : messageRows.first.timestamp);
+    await _writeConversationTree(
+      ConversationTree.linear(
+        conversationId: conversationId,
+        messageIds: messageRows.map((row) => row.id).toList(growable: false),
+        activeBranchId: _conversationRootBranchId(conversationId),
+        createdAt: createdAt,
+      ),
+    );
+  }
+
+  Future<ConversationTree> _loadOrCreateConversationTree(
+    String conversationId,
+  ) async {
+    final existing = await _loadConversationTree(conversationId);
+    if (existing != null) return existing;
+
+    final messageRows =
+        await (_db.select(_db.messageRows)
+              ..where((row) => row.conversationId.equals(conversationId))
+              ..orderBy([
+                (row) => OrderingTerm.asc(row.messageOrder),
+                (row) => OrderingTerm.asc(row.id),
+              ]))
+            .get();
+    final conversationRow = await (_db.select(
+      _db.conversationRows,
+    )..where((row) => row.id.equals(conversationId))).getSingleOrNull();
+    final createdAt =
+        conversationRow?.createdAt ??
+        (messageRows.isEmpty ? DateTime.now() : messageRows.first.timestamp);
+    return ConversationTree.linear(
+      conversationId: conversationId,
+      messageIds: messageRows.map((row) => row.id).toList(growable: false),
+      activeBranchId: _conversationRootBranchId(conversationId),
+      createdAt: createdAt,
+    );
+  }
+
+  Future<void> _appendMessageToTree(
+    String conversationId,
+    String messageId, {
+    String? parentMessageId,
+    String? branchId,
+  }) async {
+    final persistedTree = await _loadConversationTree(conversationId);
+    final tree =
+        persistedTree ?? await _loadOrCreateConversationTree(conversationId);
+    var baseTree = tree;
+    if (branchId != null && !tree.branches.containsKey(branchId)) {
+      baseTree = tree.forkBranchFromParent(
+        branchId: branchId,
+        fromMessageId: parentMessageId,
+        createdAt: DateTime.now(),
+      );
+    }
+    final nextTree = baseTree.edges.containsKey(messageId)
+        ? baseTree
+        : baseTree.appendToActiveBranch(
+            messageId,
+            parentMessageId: parentMessageId,
+            branchId: branchId,
+            createdAt: DateTime.now(),
+            activate: branchId != null,
+          );
+    if (persistedTree == null) {
+      await _writeConversationTree(nextTree);
+    } else {
+      await _appendTreeRows(tree, nextTree, messageId);
+    }
+  }
+
+  Future<void> _appendTreeRows(
+    ConversationTree previous,
+    ConversationTree next,
+    String messageId,
+  ) async {
+    final edge = next.edges[messageId];
+    if (edge != null && !previous.edges.containsKey(messageId)) {
+      await _db
+          .into(_db.messageTreeEdgeRows)
+          .insert(
+            MessageTreeEdgeRowsCompanion.insert(
+              conversationId: next.conversationId,
+              messageId: edge.messageId,
+              parentMessageId: Value(edge.parentMessageId),
+            ),
+          );
+    }
+
+    for (final branch in next.branches.values) {
+      if (previous.branches[branch.id] == branch) continue;
+      await _db
+          .into(_db.conversationBranchRows)
+          .insertOnConflictUpdate(
+            ConversationBranchRowsCompanion.insert(
+              id: branch.id,
+              conversationId: next.conversationId,
+              tipMessageId: Value(branch.tipMessageId),
+              name: Value(branch.name),
+              createdAt: branch.createdAt,
+            ),
+          );
+    }
+
+    await _db
+        .into(_db.conversationTreeStateRows)
+        .insertOnConflictUpdate(
+          ConversationTreeStateRowsCompanion.insert(
+            conversationId: next.conversationId,
+            activeBranchId: next.activeBranchId,
+            branchSelectionsJson: Value(jsonEncode(next.branchSelections)),
+          ),
+        );
   }
 
   Future<Conversation> appendLinearMessageToConversation({
@@ -3851,6 +4229,8 @@ class ChatDatabaseRepository {
     required ChatMessage assistantMessage,
     required String runId,
     required bool truncateFuture,
+    String? parentMessageId,
+    String? branchId,
   }) {
     _validateGenerationBeginMessages(
       conversation: conversation,
@@ -3865,18 +4245,16 @@ class ChatDatabaseRepository {
     return _observer.measure(
       ChatDatabaseOperation.commandAppendMessage,
       () => _db.transaction(() async {
-        var current = conversation;
         if (truncateFuture) {
-          current = await _truncateLinearMessageGroupsAfter(
-            conversation: conversation,
-            anchorGroupId: assistantMessage.groupId!,
-          );
+          throw StateError('tree_regeneration_cannot_truncate_future');
         }
         final persisted = await _appendLinearMessageToConversation(
-          conversation: current,
+          conversation: conversation,
           message: assistantMessage,
           selectVersion: true,
           touchUpdatedAt: true,
+          parentMessageId: parentMessageId,
+          branchId: branchId,
         );
         final run = await GenerationRunCommands(_db).create(
           id: runId,
@@ -3900,6 +4278,8 @@ class ChatDatabaseRepository {
     required String anchorGroupId,
     required String runId,
     required bool truncateFuture,
+    String? parentMessageId,
+    String? branchId,
   }) {
     _validateGenerationBeginMessages(
       conversation: conversation,
@@ -3908,18 +4288,16 @@ class ChatDatabaseRepository {
     return _observer.measure(
       ChatDatabaseOperation.commandAppendMessage,
       () => _db.transaction(() async {
-        var current = conversation;
         if (truncateFuture) {
-          current = await _truncateLinearMessageGroupsAfter(
-            conversation: conversation,
-            anchorGroupId: anchorGroupId,
-          );
+          throw StateError('tree_generation_cannot_truncate_future');
         }
         final persisted = await _appendLinearMessageToConversation(
-          conversation: current,
+          conversation: conversation,
           message: assistantMessage,
           selectVersion: false,
           touchUpdatedAt: true,
+          parentMessageId: parentMessageId,
+          branchId: branchId,
         );
         final run = await GenerationRunCommands(_db).create(
           id: runId,
@@ -3935,46 +4313,6 @@ class ChatDatabaseRepository {
         );
       }),
     );
-  }
-
-  Future<Conversation> _truncateLinearMessageGroupsAfter({
-    required Conversation conversation,
-    required String anchorGroupId,
-  }) async {
-    final rows =
-        await (_db.select(_db.messageRows)
-              ..where((row) => row.conversationId.equals(conversation.id))
-              ..orderBy([(row) => OrderingTerm.asc(row.messageOrder)]))
-            .get();
-    final firstOrderByGroup = <String, int>{};
-    for (final row in rows) {
-      final groupId = row.groupId ?? row.id;
-      final current = firstOrderByGroup[groupId];
-      if (current == null || row.messageOrder < current) {
-        firstOrderByGroup[groupId] = row.messageOrder;
-      }
-    }
-    final anchorOrder = firstOrderByGroup[anchorGroupId];
-    if (anchorOrder == null) {
-      throw StateError('linear_message_group_missing');
-    }
-    final trailingGroupIds = {
-      for (final entry in firstOrderByGroup.entries)
-        if (entry.value > anchorOrder) entry.key,
-    };
-    if (trailingGroupIds.isEmpty) return conversation;
-
-    final trailing = rows
-        .where((row) => trailingGroupIds.contains(row.groupId ?? row.id))
-        .toList(growable: false);
-    final deleted = await _deleteMessages(
-      conversationId: conversation.id,
-      messageIds: trailing.map((row) => row.id).toSet(),
-      versionSelectionChanges: {
-        for (final groupId in trailingGroupIds) groupId: null,
-      },
-    );
-    return deleted?.conversation ?? conversation;
   }
 
   static void _validateGenerationBeginMessages({
@@ -4000,6 +4338,8 @@ class ChatDatabaseRepository {
     required ChatMessage message,
     required bool selectVersion,
     required bool touchUpdatedAt,
+    String? parentMessageId,
+    String? branchId,
   }) {
     if (message.conversationId != conversation.id) {
       throw ArgumentError.value(
@@ -4029,12 +4369,42 @@ class ChatDatabaseRepository {
       if (existingRow == null) {
         await _replaceMcpServers(persisted.id, persisted.mcpServerIds);
       }
+      var resolvedParentMessageId = parentMessageId;
+      var resolvedBranchId = branchId;
+      if (resolvedBranchId == null &&
+          (message.groupId != null || message.version > 0)) {
+        final anchorRow =
+            await (_db.select(_db.messageRows)
+                  ..where(
+                    (row) =>
+                        row.conversationId.equals(persisted.id) &
+                        (row.id.equals(message.groupId ?? '') |
+                            row.groupId.equals(message.groupId ?? '')),
+                  )
+                  ..orderBy([(row) => OrderingTerm.asc(row.messageOrder)])
+                  ..limit(1))
+                .getSingleOrNull();
+        if (anchorRow != null) {
+          final tree = await _loadOrCreateConversationTree(persisted.id);
+          final anchor = tree.edges[anchorRow.id];
+          if (anchor != null) {
+            resolvedParentMessageId = anchor.parentMessageId;
+            resolvedBranchId = 'branch-${const Uuid().v4()}';
+          }
+        }
+      }
 
       final order = await _nextMessageOrder(persisted.id);
       await _db
           .into(_db.messageRows)
           .insert(_messageCompanion(message, order), mode: InsertMode.insert);
       await _replaceMessageParts(message);
+      await _appendMessageToTree(
+        persisted.id,
+        message.id,
+        parentMessageId: resolvedParentMessageId,
+        branchId: resolvedBranchId,
+      );
       return persisted;
     });
   }
@@ -4048,10 +4418,9 @@ class ChatDatabaseRepository {
       await markMessageAssetReferencesDirty(message.id);
     }
     final preservedToolEvents = toolEvents ?? await getToolEvents(message.id);
-    // A mid-stream reasoning pause is not a reasoning removal: the checkpoint
-    // snapshot still carries the pre-allocated reasoningStartAt timestamp, so
-    // keep the persisted reasoning part until a timestamp-free message proves
-    // the reasoning is gone (full rebuild, edit, finalize).
+    // 流中途的 reasoning 暂停不是移除 reasoning：checkpoint 快照仍带有预分配的
+    // reasoningStartAt 时间戳，因此保留持久化 reasoning part，直到无时间戳消息
+    // 证明 reasoning 已消失（完全重建、编辑、finalize）。
     final effectiveReasoningText =
         message.reasoningText == null && message.reasoningStartAt != null
         ? (await (_db.select(_db.messagePartRows)
@@ -4068,8 +4437,8 @@ class ChatDatabaseRepository {
     if (effectiveReasoningText != null && effectiveReasoningText.isNotEmpty) {
       message = message.copyWith(reasoningText: effectiveReasoningText);
     }
-    // Attachment-bearing messages own interleaved body ordinals; the
-    // text/reasoning fast path cannot preserve them safely.
+    // 带 attachment 的消息拥有交错排列的 body ordinals；
+    // text/reasoning fast path 无法安全地保留它们。
     if (preserveUnchangedToolParts &&
         preservedToolEvents.isNotEmpty &&
         !_messageHasAttachmentParts(message)) {
@@ -4137,11 +4506,10 @@ class ChatDatabaseRepository {
     }
   }
 
-  /// Returns the number of persisted tool_call parts when they already match
-  /// what a full rebuild would write for [toolEvents] (payload and ordinal),
-  /// or null when any difference forces the full delete-and-reinsert. A
-  /// reasoning presence change renumbers tool ordinals, so it also forces a
-  /// full rebuild. Each tool event produces exactly one `tool_call` part.
+  /// 当现有持久化 tool_call part 与完整重建为 [toolEvents] 所写内容
+  /// （payload 和 ordinal）一致时返回其数量；任何差异导致完整删除并重插时返回 null。
+  /// reasoning 出现或消失会重新编号工具 ordinal，因此也会强制完整重建。
+  /// 每个 tool event 恰好产生一个 `tool_call` part。
   Future<int?> _unchangedToolPartCount(
     ChatMessage message,
     List<Map<String, dynamic>> toolEvents,
@@ -4179,8 +4547,8 @@ class ChatDatabaseRepository {
     return persistedToolParts.length;
   }
 
-  /// Rewrites only the text/reasoning parts; the [toolPartCount] persisted
-  /// tool parts keep their rows, ordinals and timestamps.
+  /// 仅重写 text/reasoning parts；[toolPartCount] 个已持久化的
+  /// tool parts 保留各自的 rows、ordinals 和 timestamps。
   Future<void> _replaceTextAndReasoningParts(
     ChatMessage message,
     int toolPartCount,
@@ -4260,7 +4628,7 @@ class ChatDatabaseRepository {
               .getSingleOrNull();
       if (conversationRow == null) return null;
 
-      // Metadata only — body text is written via message parts.
+      // 仅 Metadata —— body 文本通过 message parts 写入。
       final groupId = originalRow.groupId ?? originalRow.id;
       final maxVersion = _db.messageRows.version.max();
       final maxVersionRow =
@@ -4276,9 +4644,9 @@ class ChatDatabaseRepository {
                 ))
               .getSingle();
       final nextVersion = (maxVersionRow.read(maxVersion) ?? -1) + 1;
-      // Content-only append must load original parts first and keep non-text
-      // attachments (ImagePart/FilePart/etc.) on the new revision, preserving
-      // ordinal ([Image, Text] stays [Image, Text(new)], not [Text(new), Image]).
+      // 仅追加 Content 时必须先加载原始 parts，并在新 revision 上保留非文本
+      // attachments（ImagePart/FilePart/etc.），同时保持
+      // ordinal（[Image, Text] 保持为 [Image, Text(new)]，而不是 [Text(new), Image]）。
       final List<MessagePart> resolvedParts;
       if (parts != null) {
         resolvedParts = parts;
@@ -4316,6 +4684,19 @@ class ChatDatabaseRepository {
           .into(_db.messageRows)
           .insert(_messageCompanion(message, order), mode: InsertMode.insert);
       await _replaceMessageParts(message);
+      final tree = await _loadOrCreateConversationTree(conversation.id);
+      final originalEdge = tree.edges[messageId];
+      if (originalEdge == null) {
+        throw StateError('edited_message_tree_edge_missing');
+      }
+      final branchId = 'branch-${const Uuid().v4()}';
+      final updatedTree = tree.createBranchFromParent(
+        branchId: branchId,
+        parentMessageId: originalEdge.parentMessageId,
+        tipMessageId: message.id,
+        createdAt: message.timestamp,
+      );
+      await _writeConversationTree(updatedTree);
       await (_db.update(_db.conversationRows)
             ..where((row) => row.id.equals(conversation.id)))
           .write(_conversationCompanion(conversation));
@@ -4398,9 +4779,8 @@ class ChatDatabaseRepository {
     });
   }
 
-  /// Commits a fully parsed external import together with its business-data
-  /// patch. Nothing is written unless both repositories share this exact
-  /// [AppDatabase] instance.
+  /// 提交已完全解析的外部导入及其业务数据补丁。除非两个仓库共享这个确切的
+  /// [AppDatabase] 实例，否则不会写入任何内容。
   Future<void> commitParsedImport({
     required BusinessRepository businessRepository,
     required bool overwrite,
@@ -4460,6 +4840,10 @@ class ChatDatabaseRepository {
         geminiSignaturesByMessageId: const {},
         freshParts: false,
       );
+      for (final batch in conversationBatches) {
+        final tree = batch.tree;
+        if (tree != null) await _writeConversationTree(tree);
+      }
 
       for (final entry in messagesToAppend.entries) {
         final current = await getConversation(entry.key);
@@ -4625,8 +5009,8 @@ class ChatDatabaseRepository {
     }
   }
 
-  /// Chats-only restore/merge: mark local attachment parts unavailable unless
-  /// remote/data. Does not reuse path/hash coincidence from asset_rows.
+  /// 仅 Chats 的 restore/merge：将本地 attachment parts 标记为 unavailable，
+  /// 除非它们来自 remote/data。不会复用 asset_rows 中 path/hash 的巧合。
   Future<int> recomputeAttachmentAvailabilityForConversations({
     required Iterable<String> conversationIds,
     required bool filesRestored,
@@ -4693,21 +5077,19 @@ class ChatDatabaseRepository {
     if (filesRestored) {
       return !SandboxPathResolver.localFileExists(uri);
     }
-    // Chats-only: never trust candidate asset_rows path / content_hash
-    // coincidence on the target machine (same path may hold different bytes).
-    // Reuse would require hashing the live target file and comparing bytes.
+    // 仅 Chats：绝不能信任候选 asset_rows 的 path / content_hash
+    // 在目标机器上的巧合（同一 path 可能包含不同的 bytes）。
+    // 复用需要对目标机器上的实际文件做 hash 并比较 bytes。
     return true;
   }
 
-  /// Open [databaseFile] with raw sqlite3 and mark local attachments
-  /// unavailable when [filesRestored] is false (overwrite chats-only candidate
-  /// processing before publish). Avoids opening a Drift isolate inside
-  /// restore staging.
+  /// 使用原生 sqlite3 打开 [databaseFile]，并在 [filesRestored] 为 false 时
+  /// 将本地附件标记为不可用（覆盖发布前仅聊天候选的处理逻辑）。避免在恢复
+  /// 暂存阶段打开 Drift isolate。
   ///
-  /// Minimal policy: every non-remote/data local attachment becomes
-  /// unavailable. We deliberately do **not** reuse candidate `asset_rows`
-  /// content_hash + path existence — that would treat the candidate's own
-  /// absolute path (or a colliding target file with different bytes) as proof.
+  /// 最小策略：每个非 remote/data 的本地附件都会变为不可用。这里刻意**不复用**
+  /// 候选项 `asset_rows` 的 content_hash + 路径存在性——那会把候选项目自己的
+  /// 绝对路径（或字节不同的目标冲突文件）当成证明。
   static Future<int> recomputeAttachmentAvailabilityOnDatabaseFile({
     required File databaseFile,
     required bool filesRestored,
@@ -4783,14 +5165,12 @@ class ChatDatabaseRepository {
           variables: [Variable<String>(id)],
         )
         .get();
-    // Text/reasoning/tool payloads and thought signatures are fingerprinted
-    // from materialized parts/artifacts; part_id, timestamps, and ordinals are
-    // excluded so equal payloads hash equally across snapshots. Both load once
-    // per conversation: merging a large backup calls this per candidate id, so
-    // per-message queries would cost four DB round trips per message. They join
-    // through message_rows instead of trusting the denormalized
-    // message_part_rows.conversation_id, matching the revision-keyed grouping
-    // the fingerprint has always used.
+    // 文本/推理/工具负载和思考签名从物化的 parts/artifacts 中提取指纹；
+    // part_id、时间戳和序号被排除，使相同负载在不同快照中哈希一致。两者
+    // 每个会话只加载一次：合并大型备份时会对每个候选 id 调用本逻辑，
+    // 因此逐消息查询会使每条消息产生四次数据库往返。它们通过 message_rows
+    // 联接，而不是信任反规范化的 message_part_rows.conversation_id，
+    // 与指纹一直使用的按修订版本分组保持一致。
     final partRows = await _db
         .customSelect(
           'SELECT p.revision_id, p.kind, p.payload '
@@ -4802,7 +5182,7 @@ class ChatDatabaseRepository {
         )
         .get();
     final partPayloads = <String, Map<String, List<String>>>{};
-    // Image/file identity payloads in ordinal order (unavailable stripped).
+    // Image/file identity payloads 按 ordinal 顺序排列（unavailable 已剥离）。
     final attachmentPayloads = <String, List<String>>{};
     for (final part in partRows) {
       final revisionId = part.read<String>('revision_id');
@@ -4896,9 +5276,9 @@ class ChatDatabaseRepository {
     return normalized;
   }
 
-  /// Attachment identity for merge fingerprints. Drops environment-state
-  /// `unavailable` so the same attachment available on one device and missing
-  /// on another still dedupes; keeps uri/name/mime/assetId and ordinal order.
+  /// 用于 merge fingerprints 的 attachment identity。丢弃环境状态
+  /// `unavailable`，使同一 attachment 在一台设备可用、在另一台缺失时仍能去重；
+  /// 保留 uri/name/mime/assetId 和 ordinal 顺序。
   String _fingerprintAttachmentPayload(String kind, String payload) {
     try {
       final decoded = jsonDecode(payload);
@@ -4935,9 +5315,8 @@ class ChatDatabaseRepository {
     return rows.map((row) => row.read<String>('id')).toList(growable: false);
   }
 
-  /// Message deletion intentionally preserves `message_order` gaps, so sparse
-  /// orders are valid; only negative or duplicate values that bypassed the
-  /// database constraints are rejected here.
+  /// 消息删除会故意保留 `message_order` 的空洞，因此稀疏序号是合法的；
+  /// 这里仅拒绝绕过了数据库约束的负值或重复值。
   Future<void> _requireValidMessageOrder(
     String schema,
     String conversationId,
@@ -4994,10 +5373,9 @@ class ChatDatabaseRepository {
     final remapping = sourceId != targetId;
     final groupIdMap = <String, String>{};
     for (final row in sourceMessages) {
-      // A group is keyed by COALESCE(group_id, id): the first revision keeps a
-      // null group_id, later versions carry that revision's id. Remapped groups
-      // must therefore follow the anchor revision's new id, otherwise the
-      // anchor and its later versions end up in two different groups.
+      // 分组以 COALESCE(group_id, id) 为键：首个修订保留 null group_id，
+      // 后续版本携带该修订的 id。因此重映射后的分组必须跟随锚点修订的
+      // 新 id，否则锚点和其后续版本会落入两个不同的组。
       final groupId =
           row.data['group_id']?.toString() ?? row.read<String>('id');
       if (groupIdMap.containsKey(groupId)) continue;
@@ -5047,8 +5425,8 @@ class ChatDatabaseRepository {
         (row) => row.read<String>('id') == entry.key,
       );
       final sourceGroupId = sourceMessage.data['group_id']?.toString();
-      // Anchor revisions keep their null group_id so the merged rows describe
-      // the same groups as the snapshot and stay fingerprint-identical.
+      // Anchor revisions 保留它们的 null group_id，这样合并后的 rows 描述的 groups
+      // 与 snapshot 相同，并保持 fingerprint 一致。
       final targetGroupId = sourceGroupId == null
           ? null
           : (groupIdMap[sourceGroupId] ?? sourceGroupId);
@@ -5064,8 +5442,8 @@ class ChatDatabaseRepository {
         'reasoning_finished_at, translation, reasoning_segments_json, '
         '?, version, '
         'prompt_tokens, completion_tokens, cached_tokens, duration_ms, '
-        // message_order is part of the conversation fingerprint. Preserve it
-        // verbatim so sparse snapshots remain idempotent across repeated merges.
+        // message_order 是 conversation fingerprint 的一部分。原样保留它，
+        // 以便稀疏的 snapshots 在重复 merge 时保持幂等。
         'message_order FROM merge_source.message_rows WHERE id = ?;',
         [entry.value, targetId, targetGroupId, entry.key],
       );
@@ -5077,8 +5455,8 @@ class ChatDatabaseRepository {
         'FROM merge_source.message_part_rows WHERE revision_id = ?;',
         [targetId, entry.value, entry.key],
       );
-      // generation_run_rows are intentionally not copied: merged revisions
-      // are always persisted as non-streaming.
+      // generation_run_rows 有意不复制：合并后的 revisions
+      // 始终以 non-streaming 方式持久化。
       await _db.customStatement(
         'INSERT INTO main.provider_artifact_rows '
         '(conversation_id, revision_id, kind, payload, created_at, updated_at) '
@@ -5087,14 +5465,101 @@ class ChatDatabaseRepository {
         [targetId, entry.value, entry.key],
       );
     }
-    // Merged revisions bypass _replaceMessageParts, so queue the
-    // attachment-bearing ones for the asset-reference backfill before GC can
-    // treat their files as unreferenced.
+    // 合并的修订绕过了 _replaceMessageParts，因此在 GC 可能把附件文件视为
+    // 未引用之前，先让带附件的修订加入资源引用回填队列。
     await _db.customStatement(
       'INSERT OR IGNORE INTO asset_reference_dirty_rows(revision_id) '
       'SELECT DISTINCT revision_id FROM main.message_part_rows '
       "WHERE conversation_id = ? AND kind IN ('image', 'file');",
       [targetId],
+    );
+    final sourceBranches = await _db
+        .customSelect(
+          'SELECT id, tip_message_id, name, created_at '
+          'FROM merge_source.conversation_branch_rows '
+          'WHERE conversation_id = ? ORDER BY id;',
+          variables: [Variable<String>(sourceId)],
+        )
+        .get();
+    final sourceState = await _db
+        .customSelect(
+          'SELECT * '
+          'FROM merge_source.conversation_tree_state_rows '
+          'WHERE conversation_id = ?;',
+          variables: [Variable<String>(sourceId)],
+        )
+        .getSingleOrNull();
+    final sourceEdges = await _db
+        .customSelect(
+          'SELECT message_id, parent_message_id '
+          'FROM merge_source.message_tree_edge_rows '
+          'WHERE conversation_id = ?;',
+          variables: [Variable<String>(sourceId)],
+        )
+        .get();
+    if (sourceState == null ||
+        sourceBranches.isEmpty ||
+        sourceEdges.length != sourceMessages.length) {
+      await _rebuildLegacyConversationTree(targetId);
+      return;
+    }
+    final branchIdMap = <String, String>{};
+    for (final row in sourceBranches) {
+      final sourceBranchId = row.read<String>('id');
+      branchIdMap[sourceBranchId] = remapping
+          ? _deterministicMergeId('branch', sourceBranchId, targetId)
+          : sourceBranchId;
+    }
+    for (final edge in sourceEdges) {
+      final sourceMessageId = edge.read<String>('message_id');
+      final sourceParentId = edge.readNullable<String>('parent_message_id');
+      await _db.customStatement(
+        'INSERT INTO main.message_tree_edge_rows '
+        '(conversation_id, message_id, parent_message_id) VALUES (?, ?, ?);',
+        [
+          targetId,
+          messageIdMap[sourceMessageId]!,
+          sourceParentId == null ? null : messageIdMap[sourceParentId]!,
+        ],
+      );
+    }
+    for (final branch in sourceBranches) {
+      final sourceBranchId = branch.read<String>('id');
+      final sourceTipId = branch.readNullable<String>('tip_message_id');
+      await _db.customStatement(
+        'INSERT INTO main.conversation_branch_rows '
+        '(id, conversation_id, tip_message_id, name, created_at) '
+        'VALUES (?, ?, ?, ?, ?);',
+        [
+          branchIdMap[sourceBranchId]!,
+          targetId,
+          sourceTipId == null ? null : messageIdMap[sourceTipId]!,
+          branch.read<String>('name'),
+          branch.read<int>('created_at'),
+        ],
+      );
+    }
+    final sourceBranchSelections = _decodeBranchSelections(
+      sourceState.data['branch_selections_json']?.toString() ?? '{}',
+    );
+    final targetBranchSelections = <String, String>{};
+    for (final entry in sourceBranchSelections.entries) {
+      final targetMessageId = messageIdMap[entry.key];
+      final targetBranchId = branchIdMap[entry.value];
+      if (targetMessageId != null && targetBranchId != null) {
+        targetBranchSelections[targetMessageId] = targetBranchId;
+      }
+    }
+    final activeSourceBranchId = sourceState.read<String>('active_branch_id');
+    final activeTargetBranchId = branchIdMap[activeSourceBranchId];
+    if (activeTargetBranchId == null) {
+      throw StateError('merge_source_active_branch_missing');
+    }
+    await _db.customStatement(
+      'INSERT INTO main.conversation_tree_state_rows '
+      '(conversation_id, active_branch_id, branch_selections_json) '
+      'VALUES (?, ?, ?);',
+      [targetId, activeTargetBranchId, jsonEncode(targetBranchSelections)],
     );
   }
 
@@ -5103,9 +5568,9 @@ class ChatDatabaseRepository {
     required List<({ChatMessage message, int messageOrder})> messages,
     required Map<String, List<Map<String, dynamic>>> toolEventsByMessageId,
     required Map<String, String> geminiSignaturesByMessageId,
-    // True when the target rows are known to have no stored parts (fresh or
-    // freshly cleared database): absent tool events then mean "no events"
-    // rather than "preserve stored ones", skipping a per-message SELECT.
+    // 当已知目标 rows 没有已存储的 parts（新数据库或刚清空的数据库）时为 true：
+    // 此时缺少 tool events 表示“no events”，而不是“preserve stored ones”，
+    // 从而跳过逐 message 的 SELECT。
     required bool freshParts,
   }) async {
     await _db.batch((batch) {
@@ -5135,8 +5600,8 @@ class ChatDatabaseRepository {
         );
       }
     });
-    // Parts/artifacts are the only persistence for tool events and thought
-    // signatures; the legacy tables no longer receive writes.
+    // Parts/artifacts 是 tool events 和 thought signatures 的唯一持久化载体；
+    // legacy tables 不再接收写入。
     final batchMessageIds = <String>{};
     for (final entry in messages) {
       final id = entry.message.id;
@@ -5157,12 +5622,90 @@ class ChatDatabaseRepository {
     for (final entry in geminiSignaturesByMessageId.entries) {
       await _upsertGeminiThoughtSignature(entry.key, entry.value);
     }
-    // _replaceMessageParts already queues attachment-bearing revisions; the
-    // bulk mark stays as cheap insurance for the asset backfill invariant.
+    // _replaceMessageParts 已将带 attachment 的 revisions 入队；批量标记
+    // 作为 asset backfill 不变量的低成本保险保留。
     await _markMessageAssetReferencesDirtyBatch([
       for (final entry in messages)
         if (_messageHasAttachmentParts(entry.message)) entry.message.id,
     ]);
+    final affectedConversationIds = <String>{
+      for (final conversation in conversations) conversation.id,
+      for (final entry in messages) entry.message.conversationId,
+    };
+    for (final conversationId in affectedConversationIds) {
+      await _rebuildLegacyConversationTree(conversationId);
+    }
+  }
+
+  Future<void> _rebuildLegacyConversationTree(String conversationId) async {
+    final conversationRow = await (_db.select(
+      _db.conversationRows,
+    )..where((row) => row.id.equals(conversationId))).getSingleOrNull();
+    if (conversationRow == null) return;
+    final rows =
+        await (_db.select(_db.messageRows)
+              ..where((row) => row.conversationId.equals(conversationId))
+              ..orderBy([
+                (row) => OrderingTerm.asc(row.messageOrder),
+                (row) => OrderingTerm.asc(row.id),
+              ]))
+            .get();
+    final groups = <String, List<MessageRow>>{};
+    for (final row in rows) {
+      groups.putIfAbsent(row.groupId ?? row.id, () => <MessageRow>[]).add(row);
+    }
+    final selections = _decodeStringIntMap(
+      conversationRow.versionSelectionsJson,
+    );
+    final edges = <String, MessageTreeEdge>{};
+    final branches = <String, ConversationBranch>{};
+    String? previousSelectedId;
+    for (final entry in groups.entries) {
+      final versions = entry.value
+        ..sort((left, right) {
+          final byVersion = left.version.compareTo(right.version);
+          if (byVersion != 0) return byVersion;
+          return left.id.compareTo(right.id);
+        });
+      final selectedVersion = selections[entry.key];
+      final selected =
+          versions.cast<MessageRow?>().firstWhere(
+            (row) => row!.version == selectedVersion,
+            orElse: () => null,
+          ) ??
+          versions.last;
+      for (final version in versions) {
+        edges[version.id] = MessageTreeEdge(
+          messageId: version.id,
+          parentMessageId: previousSelectedId,
+        );
+        if (version.id != selected.id) {
+          final branchId = 'legacy-${version.id}';
+          branches[branchId] = ConversationBranch(
+            id: branchId,
+            conversationId: conversationId,
+            tipMessageId: version.id,
+            createdAt: version.timestamp,
+          );
+        }
+      }
+      previousSelectedId = selected.id;
+    }
+    final rootBranchId = _conversationRootBranchId(conversationId);
+    branches[rootBranchId] = ConversationBranch(
+      id: rootBranchId,
+      conversationId: conversationId,
+      tipMessageId: previousSelectedId,
+      createdAt: conversationRow.createdAt,
+    );
+    await _writeConversationTree(
+      ConversationTree(
+        conversationId: conversationId,
+        activeBranchId: rootBranchId,
+        branches: branches,
+        edges: edges,
+      ),
+    );
   }
 
   Future<void> updateMessage(ChatMessage message) async {
@@ -5178,11 +5721,9 @@ class ChatDatabaseRepository {
     )..where((t) => t.id.equals(message.id))).write(_messageUpdate(message));
   }
 
-  /// Partial-column UPDATE: only the non-null fields are written, so
-  /// concurrent writers touching disjoint columns cannot clobber each other.
-  /// Message parts are rebuilt only when content or reasoning text changes;
-  /// the other columns never affect parts. Returns the post-update message,
-  /// or null when no row matches [messageId].
+  /// 部分列 UPDATE：只写入非 null 字段，因此写方修改互不相交的列时不会互相覆盖。
+  /// 仅当内容或推理文本变化时才重建消息 parts；其他列绝不会影响 parts。返回
+  /// 更新后的消息；没有行匹配 [messageId] 时返回 null。
   Future<ChatMessage?> updateMessageFields(
     String messageId, {
     String? role,
@@ -5237,9 +5778,8 @@ class ChatDatabaseRepository {
       final updated = await getMessage(messageId);
       if (updated == null) return null;
       if (content == null && reasoningText == null) return updated;
-      // getMessage resolves content/reasoning from parts, which still hold
-      // the pre-update payloads. Overlay only the provided fields so a
-      // content-only write does not clear reasoning (and vice versa).
+      // getMessage 会从 parts 中解析内容和推理，而它们仍保存着更新前的负载。
+      // 只覆盖提供的字段，这样仅写内容不会清空推理（反之亦然）。
       final corrected = updated.copyWith(
         content: content ?? updated.content,
         reasoningText: reasoningText ?? updated.reasoningText,
@@ -5278,12 +5818,10 @@ class ChatDatabaseRepository {
     int? checkpointSeq,
   }) async {
     await _db.transaction(() async {
-      // Guard against a late flush resurrecting an already-finalized message.
-      // A streaming snapshot (is_streaming = true) that arrives after the
-      // terminal write has committed (row is_streaming = 0) must not overwrite
-      // the terminal content or flip is_streaming back on (which would also
-      // unindex it from search). Final writes carry is_streaming = false and
-      // are unaffected.
+      // 防止迟到的 flush 复活已终结的消息。
+      // 流式快照（is_streaming = true）在最终写入已提交（行 is_streaming = 0）后到达时，
+      // 绝不能覆盖最终内容，也不能把 is_streaming 重新打开（这还会把它从搜索
+      // 索引中移除）。最终写入携带 is_streaming = false，因此不受影响。
       if (message.isStreaming) {
         final existing =
             await (_db.select(_db.messageRows)
@@ -5294,8 +5832,8 @@ class ChatDatabaseRepository {
           return;
         }
       }
-      // Keep message_rows (incl. is_streaming) ahead of parts rewrite so the
-      // FTS finalize trigger indexes the pre-rewrite text part correctly.
+      // 保持 message_rows（包括 is_streaming）先于 parts 重写，以便
+      // FTS finalize 触发器正确索引重写前的 text part。
       await _updateMessageRow(message);
       await _replaceMessageParts(
         message,
@@ -5389,23 +5927,43 @@ class ChatDatabaseRepository {
                 ..where((row) => row.conversationId.equals(conversationId))
                 ..orderBy([(row) => OrderingTerm.asc(row.messageOrder)]))
               .get();
-      final deletedRows = rows
+      final requestedRows = rows
           .where((row) => messageIds.contains(row.id))
           .toList(growable: false);
-      if (deletedRows.isEmpty) return null;
-      if (deletedRows.length != messageIds.length) {
+      if (requestedRows.isEmpty) return null;
+      if (requestedRows.length != messageIds.length) {
         throw StateError('delete_messages_not_found');
       }
 
-      // Version groups are anchored at MIN(message_order) in the timeline
-      // queries, while appended revisions get end-of-conversation orders.
-      // Deleting the anchor row would therefore make the surviving revisions
-      // drift to the appended position (e.g. edit mid-conversation, then
-      // delete the old version -> group jumps to the bottom). Keep the group
-      // in place by moving the earliest surviving revision back onto the
-      // freed anchor order. The anchor slot is guaranteed free: it belonged
-      // to a row of this same group that is deleted in this transaction, and
-      // distinct groups never share an anchor row.
+      final treeBeforeDelete = await _loadOrCreateConversationTree(
+        conversationId,
+      );
+      var treeAfterDelete = treeBeforeDelete;
+      for (final row in requestedRows) {
+        treeAfterDelete = treeAfterDelete.deleteSubtree(row.id);
+      }
+      final survivingEdges = treeAfterDelete.edges.keys.toSet();
+      final effectiveMessageIds = treeBeforeDelete.edges.keys
+          .where((id) => !survivingEdges.contains(id))
+          .toSet();
+      if (treeAfterDelete.activeBranchId != treeBeforeDelete.activeBranchId) {
+        debugPrint(
+          'conversation_tree_active_branch_fallback: '
+          '$conversationId ${treeBeforeDelete.activeBranchId} '
+          '-> ${treeAfterDelete.activeBranchId}',
+        );
+      }
+
+      final deletedRows = rows
+          .where((row) => effectiveMessageIds.contains(row.id))
+          .toList(growable: false);
+      if (deletedRows.isEmpty) return null;
+
+      // 版本组在时间线查询中以 MIN(message_order) 为锚，后续 revision 得到
+      // 会话末尾的 order。因此删除锚行会让幸存 revision 漂移到追加位置
+      // （例如编辑会话后删除旧版本，组会跳到底部）。为了保留组位置，把
+      // 最早幸存 revision 移回释放出来的锚 order。锚槽保证空闲：它属于本次
+      // 事务删除的同一组行，而不同组不会共享锚行。
       final anchorRewrites = <String, int>{};
       final rowsByGroup = <String, List<MessageRow>>{};
       for (final row in rows) {
@@ -5414,12 +5972,12 @@ class ChatDatabaseRepository {
             .add(row);
       }
       for (final group in rowsByGroup.values) {
-        // `rows` is ordered by message_order, so group.first is the anchor.
+        // `rows` 按 message_order 排序，因此 group.first 是锚点。
         final anchor = group.first;
-        if (!messageIds.contains(anchor.id)) continue;
+        if (!effectiveMessageIds.contains(anchor.id)) continue;
         MessageRow? survivor;
         for (final row in group) {
-          if (!messageIds.contains(row.id)) {
+          if (!effectiveMessageIds.contains(row.id)) {
             survivor = row;
             break;
           }
@@ -5429,7 +5987,7 @@ class ChatDatabaseRepository {
       }
 
       final remainingRows = rows
-          .where((row) => !messageIds.contains(row.id))
+          .where((row) => !effectiveMessageIds.contains(row.id))
           .toList(growable: false);
       final effectiveOrders = <String, int>{
         for (final row in remainingRows)
@@ -5452,6 +6010,7 @@ class ChatDatabaseRepository {
               ..where((row) => row.id.equals(rewrite.key)))
             .write(MessageRowsCompanion(messageOrder: Value(rewrite.value)));
       }
+      await _writeConversationTree(treeAfterDelete);
       final currentConversation = await _conversationFromRow(
         conversationRow,
         includeMessageIds: false,
@@ -5469,7 +6028,7 @@ class ChatDatabaseRepository {
       }
       final remainingByGroup = <String, List<MessageRow>>{};
       for (final row in rows) {
-        if (messageIds.contains(row.id)) continue;
+        if (effectiveMessageIds.contains(row.id)) continue;
         remainingByGroup
             .putIfAbsent(row.groupId ?? row.id, () => <MessageRow>[])
             .add(row);
@@ -5496,8 +6055,8 @@ class ChatDatabaseRepository {
       await (_db.update(_db.conversationRows)
             ..where((row) => row.id.equals(conversationId)))
           .write(_conversationCompanion(conversation));
-      // Callers (ChatService.deleteMessages) only need message.id for cache
-      // invalidation; body text is intentionally omitted.
+      // 调用方（ChatService.deleteMessages）只需要 message.id 用于缓存
+      // 失效；正文文本有意省略。
       return (
         conversation: conversation,
         messages: [
@@ -5617,9 +6176,9 @@ class ChatDatabaseRepository {
 
   static const String imageOcrArtifactKind = 'image_ocr_v1';
 
-  /// Batch-load OCR artifacts for revisions.
+  /// 批量加载各修订的 OCR 产物。
   ///
-  /// Returns revisionId → (contentHash → OCR text).
+  /// 返回 revisionId → (contentHash → OCR text)。
   Future<Map<String, Map<String, String>>> getImageOcrArtifacts(
     Iterable<String> revisionIds,
   ) async {
@@ -5644,7 +6203,7 @@ class ChatDatabaseRepository {
     return result;
   }
 
-  /// Merge OCR items into the revision artifact and upsert.
+  /// 将 OCR 条目合并进修订产物并 upsert。
   Future<void> upsertImageOcrArtifactItems({
     required String revisionId,
     required Map<String, String> items,
@@ -5695,7 +6254,7 @@ class ChatDatabaseRepository {
     });
   }
 
-  /// Copy still-present image OCR items from one revision to another.
+  /// 将仍然存在的图片 OCR 条目从一个修订复制到另一个修订。
   Future<void> inheritImageOcrArtifacts({
     required String fromRevisionId,
     required String toRevisionId,
@@ -5719,10 +6278,10 @@ class ChatDatabaseRepository {
     );
   }
 
-  /// Look up content hashes for known asset paths.
+  /// 查找已知资源路径对应的 content hash。
   ///
-  /// Paths with multiple distinct content hashes are omitted so callers cannot
-  /// accidentally reuse a stale hash after the file at that path changed.
+  /// 具有多个不同 content hash 的路径会被省略，这样调用方就不会在该路径上的
+  /// 文件变化后意外复用陈旧的 hash。
   Future<Map<String, String>> getAssetContentHashesByPaths(
     Iterable<String> paths,
   ) async {
@@ -5757,7 +6316,7 @@ class ChatDatabaseRepository {
     };
   }
 
-  /// Content hashes of image assets linked to a revision.
+  /// 链接到某个修订的图片资源的 content hash。
   Future<Set<String>> getMessageImageContentHashes(String revisionId) async {
     final id = revisionId.trim();
     if (id.isEmpty) return const {};
@@ -5860,7 +6419,7 @@ class ChatDatabaseRepository {
     )..where((t) => t.key.equals(ChatStorageMetaKeys.activeStreamingIds))).go();
   }
 
-  /// Atomically terminalizes every generation abandoned by a prior process.
+  /// 原子地终结所有由先前进程遗留的 generation。
   Future<int> resetStaleStreamingState() async {
     return _db.transaction(() async {
       final activeStates = const [
@@ -5893,8 +6452,8 @@ class ChatDatabaseRepository {
           updates: {_db.generationRunRows},
         );
       }
-      // Clearing is_streaming fires message_search_fts_finalize, which indexes
-      // the checkpointed text parts left by the abandoned stream.
+      // 清除 is_streaming 会触发 message_search_fts_finalize，从而索引
+      // 已放弃流所留下的 checkpointed text parts。
       await (_db.update(_db.messageRows)
             ..where((row) => row.isStreaming.equals(true)))
           .write(const MessageRowsCompanion(isStreaming: Value(false)));
@@ -6086,8 +6645,8 @@ class ChatDatabaseRepository {
     ];
   }
 
-  /// Parts come only from [authoritativeParts] in ordinal order. Missing or
-  /// empty parts yield empty content via the derived [ChatMessage.content].
+  /// Parts 仅按序号顺序来自 [authoritativeParts]。缺失或空 parts
+  /// 会通过派生的 [ChatMessage.content] 得到空内容。
   ChatMessage _messageFromRow(
     MessageRow row, {
     List<MessagePartRow>? authoritativeParts,
@@ -6140,9 +6699,8 @@ class ChatDatabaseRepository {
     );
   }
 
-  /// Body parts persisted after reasoning/tool_call rows. Reasoning and
-  /// tool_call continue to be sourced from [ChatMessage.reasoningText] /
-  /// tool-event arguments so streaming overlays stay equivalent.
+  /// Body parts 在 reasoning/tool_call 行之后持久化。reasoning 和
+  /// tool_call 仍从 [ChatMessage.reasoningText] / tool-event 参数获取，以保持流式叠加行为一致。
   List<MessagePart> _bodyPartsForPersistence(ChatMessage message) {
     final body = <MessagePart>[
       for (final part in message.parts)
@@ -6256,13 +6814,12 @@ class ChatDatabaseRepository {
     }
   }
 
-  // —— Memory system V1 read path (§13.3) ——
+  // —— 记忆系统 V1 读取路径（§13.3）——
 
-  /// Visible memories for [assistantId]: `status='active'` (unless
-  /// [includeArchived]) and `(scope='global' OR (scope='assistant' AND
-  /// assistant_id = :aid))`. When [assistantId] is null, only global rows
-  /// are visible. Ordered for in-block injection (§7.2):
-  /// `scope_rank ASC, entry_created_at ASC, id ASC` (global before assistant).
+  /// [assistantId] 的可见记忆：`status='active'`（除非 [includeArchived]）并且
+  /// `(scope='global' OR (scope='assistant' AND assistant_id = :aid))`。当
+  /// [assistantId] 为 null 时，只有全局行可见。为块内注入排序（§7.2）：
+  /// `scope_rank ASC, entry_created_at ASC, id ASC`（全局排在助手之前）。
   Future<List<MemoryEntry>> queryVisibleMemories({
     required String? assistantId,
     MemoryType? type,
@@ -6302,7 +6859,7 @@ class ChatDatabaseRepository {
     );
   }
 
-  /// Counts active visible memories by [MemoryType] for [assistantId].
+  /// 按 [MemoryType] 统计 [assistantId] 的活动可见记忆数量。
   Future<Map<MemoryType, int>> countVisibleMemoriesByType({
     required String? assistantId,
   }) async {
@@ -6325,16 +6882,15 @@ class ChatDatabaseRepository {
     return result;
   }
 
-  /// Search memories by pre-normalized, LIKE-escaped [tokens].
+  /// 按预先规范化并经过 LIKE 转义的 [tokens] 搜索记忆。
   ///
-  /// Callers must lowercase/normalize tokens and escape `%`, `_`, and `\`
-  /// (e.g. via [MemoryTokenizer.escapeLike]) before passing them here.
+  /// 调用方必须将 token 转为小写/规范化，并转义 `%`、`_` 和 `\`，
+  /// 再传入这里（例如通过 [MemoryTokenizer.escapeLike]）。
   ///
-  /// - [matchAll] `true` (§5.9): every token must match (`AND`), ordered by
-  ///   `entry_updated_at DESC, id ASC`.
-  /// - [matchAll] `false` (§12.6): `hits` = count of matching tokens (`OR`),
-  ///   filter `hits >= 1`, ordered by
-  ///   `hits DESC, entry_updated_at DESC, id ASC`.
+  /// - [matchAll] `true`（§5.9）：每个词都必须匹配（`AND`），按
+  ///   `entry_updated_at DESC, id ASC` 排序。
+  /// - [matchAll] `false`（§12.6）：`hits` = 匹配词数量（`OR`），
+  ///   筛选 `hits >= 1`，按 `hits DESC, entry_updated_at DESC, id ASC` 排序。
   Future<List<MemoryEntry>> searchMemories({
     required String? assistantId,
     required List<String> tokens,
@@ -6399,7 +6955,7 @@ class ChatDatabaseRepository {
     ];
     final hitsExpr = hitParts.join(' + ');
 
-    // Variable order must match `?` appearance: SELECT hits, then WHERE.
+    // 变量顺序必须匹配 `?` 的出现顺序：先 SELECT hits，再 WHERE。
     final clauses = <String>[
       "status = 'active'",
       _memoryVisibilitySql(assistantId),
@@ -6499,7 +7055,7 @@ class ChatDatabaseRepository {
     return row.read<int>('count');
   }
 
-  /// All memory entries across every assistant (global management UI §14.4).
+  /// 所有助手的所有记忆条目（全局管理 UI §14.4）。
   Future<List<MemoryEntry>> queryAllMemories({
     bool includeArchived = false,
     MemoryType? type,
@@ -6530,7 +7086,7 @@ class ChatDatabaseRepository {
     );
   }
 
-  /// Search across every assistant (§14.4 / §5.9 AND semantics).
+  /// 在所有助手间搜索（§14.4 / §5.9 AND 语义）。
   Future<List<MemoryEntry>> searchAllMemories({
     required List<String> tokens,
     MemoryType? type,
@@ -6625,13 +7181,12 @@ class ChatDatabaseRepository {
         );
   }
 
-  /// Freezes a message's final prompt string and, when a snapshot was
-  /// injected, advances the conversation's injected-memory hash in the same
-  /// transaction.
+  /// 冻结消息的最终提示字符串；如果注入了快照，则在同一个事务中推进会话的
+  /// 注入记忆哈希。
   ///
-  /// The two writes must not be split: a crash between them leaves a hash that
-  /// claims a snapshot was delivered while no message carries one, costing an
-  /// extra full re-injection once self-healing notices (§8.3).
+  /// 这两次写入不能拆分：若在其中间崩溃，会留下一个声称已投递快照、
+  /// 但没有任何消息实际携带该快照的 hash；一旦自愈机制发现（§8.3），
+  /// 将付出额外一次完整重新注入的代价。
   Future<void> freezeMessagePrompt({
     required String revisionId,
     required String conversationId,
@@ -6672,11 +7227,10 @@ class ChatDatabaseRepository {
     return row != null;
   }
 
-  /// The last memory snapshot hash delivered to [conversationId].
+  /// 投递给 [conversationId] 的最后一个 memory snapshot hash。
   ///
-  /// Read this rather than a cached [Conversation]: the field is written by
-  /// [freezeMessagePrompt] and never loaded back into the in-memory model, so a
-  /// cached copy reports the value from whenever it was constructed.
+  /// 请读取此方法而不是缓存的 [Conversation]：该字段由 [freezeMessagePrompt]
+  /// 写入，并且永远不会重新载入内存模型，因此缓存副本报告的是其构造时的值。
   Future<String?> getConversationInjectedMemoryHash(
     String conversationId,
   ) async {
@@ -6946,6 +7500,8 @@ class ChatStorageMetaKeys {
   static const activeStreamingIds = 'active_streaming_ids';
   static const hiveMigrationComplete = 'hive_migration_complete_v1';
   static const databaseIdentity = 'database_identity_v1';
+  static const contextTreeMigrationWarnings =
+      AppDatabase.contextTreeMigrationWarningsKey;
   static const sandboxPathVersion = 'sandbox_path_migration_version';
   static const assetReferenceBackfillVersion =
       'asset_reference_backfill_version';

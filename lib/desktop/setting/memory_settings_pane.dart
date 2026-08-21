@@ -4,7 +4,7 @@ import '../../features/settings/pages/memory_settings_page.dart';
 import '../../l10n/app_localizations.dart';
 import '../../theme/app_font_weights.dart';
 
-/// Desktop right-side pane for global memory settings.
+/// 桌面右侧全局记忆设置面板。
 class DesktopMemorySettingsPane extends StatelessWidget {
   const DesktopMemorySettingsPane({super.key});
 

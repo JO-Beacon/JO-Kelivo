@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
+import '../../../core/models/conversation_tree.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -31,6 +32,7 @@ import '../../../desktop/message_edit_dialog.dart';
 import '../../../desktop/hotkeys/chat_action_bus.dart';
 import '../../../desktop/hotkeys/sidebar_tab_bus.dart';
 import 'chat_controller.dart';
+import 'message_render_model.dart';
 import 'stream_controller.dart' as stream_ctrl;
 import 'generation_controller.dart';
 import 'scroll_controller.dart' as scroll_ctrl;
@@ -47,23 +49,23 @@ import '../../model/widgets/model_select_sheet.dart';
 
 enum ChatSelectionMode { share, delete }
 
-/// Translation data for UI state (expanded/collapsed).
+/// UI 状态的翻译数据（展开/折叠）。
 class TranslationData {
-  bool expanded = true; // default to expanded when translation is added
+  bool expanded = true; // 添加翻译时默认展开
 }
 
-/// Controller that manages all state and service wiring for HomePage.
+/// 管理 HomePage 所有状态和服务接线的控制器。
 ///
-/// This controller extracts the non-UI logic from _HomePageState to:
-/// - Centralize state management
-/// - Make the code more testable
-/// - Allow reuse across different page layouts (mobile/tablet/desktop)
-/// - Reduce the complexity of the State class
+/// 此控制器从 _HomePageState 中抽取非 UI 逻辑，用于：
+/// - 集中管理状态
+/// - 使代码更易测试
+/// - 支持在不同页面布局（移动端/平板/桌面端）中复用
+/// - 降低 State 类的复杂度
 ///
-/// The HomePage widget now only manages:
-/// - Lifecycle (initState, dispose)
-/// - Layout selection (mobile vs tablet)
-/// - Building the UI tree
+/// HomePage widget 现在只管理：
+/// - 生命周期（initState、dispose）
+/// - 布局选择（移动端或平板）
+/// - 构建 UI 树
 class HomePageController extends ChangeNotifier {
   HomePageController({
     required BuildContext context,
@@ -99,7 +101,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Dependencies (injected)
+  // 依赖（注入）
   // ============================================================================
 
   final BuildContext _context;
@@ -112,7 +114,7 @@ class HomePageController extends ChangeNotifier {
   ScrollController _scrollController;
 
   // ============================================================================
-  // Services & Controllers (created internally)
+  // 服务和控制器（内部创建）
   // ============================================================================
 
   late ChatService _chatService;
@@ -131,7 +133,7 @@ class HomePageController extends ChangeNotifier {
   StreamSubscription<ChatAction>? _chatActionSub;
 
   // ============================================================================
-  // Animation Controllers
+  // 动画控制器
   // ============================================================================
 
   late AnimationController _convoFadeController;
@@ -140,13 +142,13 @@ class HomePageController extends ChangeNotifier {
   late Animation<double> _messageJumpOpacity;
   bool _chatControllerReady = false;
 
-  /// Serial of the latest animated conversation transition; superseded
-  /// transitions check it to discard their pre-commit work.
+  /// 最新动画会话切换的序列号；被取代的切换会检查它，
+  /// 以丢弃自己的预提交工作。
   int _switchSerial = 0;
 
-  // Startup warm-up (cache plan measure 14): after the initial restore
-  // completes, an idle-time serial prefetch of the most recent conversations.
-  // Any user operation bumps _warmupSerial, abandoning the remaining queue.
+  // 启动预热（缓存方案第 14 项）：初始恢复完成后，
+  // 在空闲时间串行预取最近的会话。
+  // 任何用户操作都会递增 _warmupSerial，放弃剩余队列。
   static const int startupWarmupConversationCount = 4;
   int _warmupSerial = 0;
   bool _startupWarmupScheduled = false;
@@ -163,70 +165,69 @@ class HomePageController extends ChangeNotifier {
   HomeViewModel get debugViewModel => _viewModel;
 
   // ============================================================================
-  // State Fields
+  // 状态字段
   // ============================================================================
 
-  // Translations UI state
+  // 翻译 UI 状态
   final Map<String, TranslationData> _translations =
       <String, TranslationData>{};
 
-  /// Timeline slots currently playing their deletion animation. The slot's
-  /// data is deleted only after the animation completes, so the widget can
-  /// fade out and collapse while the surrounding messages splice together.
+  /// 当前正在播放删除动画的时间线槽位。槽位数据只有在动画完成后
+  /// 才会删除，这样控件可以淡出并折叠，同时周围消息拼接在一起。
   final Set<String> _removingSlotIds = <String>{};
 
-  // Note: GlobalKey-based message navigation was replaced by indexed scrolling.
+  // 注意：基于 GlobalKey 的消息导航已替换为索引滚动。
 
-  // Selection mode
+  // 选择模式
   bool _selecting = false;
   ChatSelectionMode _selectionMode = ChatSelectionMode.share;
   final Set<String> _selectedItems = <String>{};
 
-  /// Selectable projection ids from the last full-history selection load.
-  /// Null until select-all / toggle-all / invert loads projections.
+  /// 来自上次全历史选择加载的可选择投影 ID。
+  /// 在全选/全切换/反选加载投影前为 null。
   Set<String>? _selectableProjectionIds;
 
-  /// Bumped when selection starts, cancels, completes, or the conversation
-  /// switches so in-flight select-all / toggle / invert results are ignored.
+  /// 选择开始、取消、完成或会话切换时递增，
+  /// 使进行中的全选/切换/反选结果被忽略。
   int _selectionEpoch = 0;
   bool _showThinkingTools = false;
   bool _showThinkingContent = false;
 
-  // Desktop drag-and-drop
+  // 桌面端拖放
   bool _isDragHovering = false;
 
-  // App lifecycle (currently unused but kept for future notification logic)
+  // 应用生命周期（当前未使用，但为将来的通知逻辑保留）
   // ignore: unused_field
   bool _appInForeground = true;
 
-  // Sidebar state (tablet/desktop)
+  // 侧边栏状态（平板/桌面端）
   bool _tabletSidebarOpen = true;
   bool _rightSidebarOpen = true;
   double _embeddedSidebarWidth = 300;
   double _rightSidebarWidth = 300;
   bool _desktopUiInited = false;
 
-  // Drawer state
+  // 抽屉状态
   double _lastDrawerValue = 0.0;
 
-  // Desktop global-search mode
+  // 桌面端全局搜索模式
   bool _isGlobalSearchMode = false;
   String _globalSearchQuery = '';
 
-  // Message-level spotlight target after selecting a global search result
+  // 选择全局搜索结果后的消息级聚焦目标
   String? _spotlightMessageId;
   int _spotlightToken = 0;
 
-  // Input bar measurement
+  // 输入栏测量
   double _inputBarHeight = 72;
 
-  // Animation tuning
+  // 动画调优
   static const Duration _postSwitchScrollDelay = Duration(milliseconds: 220);
   static const double _sidebarMinWidth = 200;
   static const double _sidebarMaxWidth = 360;
 
   // ============================================================================
-  // Getters - State Access
+  // Getter - 状态访问
   // ============================================================================
 
   GlobalKey<ScaffoldState> get scaffoldKey => _scaffoldKey;
@@ -262,25 +263,111 @@ class HomePageController extends ChangeNotifier {
   static double get sidebarMinWidth => _sidebarMinWidth;
   static double get sidebarMaxWidth => _sidebarMaxWidth;
 
-  // Delegate to ChatController
+  // 委托给 ChatController
   Conversation? get currentConversation => _chatController.currentConversation;
   List<ChatMessage> get messages => _chatController.messages;
+  ConversationTree? get conversationTree => _viewModel.conversationTree;
+  String? get activeBranchId => _viewModel.activeBranchId;
   Map<String, int> get versionSelections => _chatController.versionSelections;
   Set<String> get loadingConversationIds => _viewModel.loadingConversationIds;
   Map<String, StreamSubscription<dynamic>> get conversationStreams =>
       _chatController.conversationStreams;
 
-  /// True from app start until the initial conversation restore (or draft
-  /// creation) finishes, so the empty state never flashes during startup.
+  List<ChatMessage> get visibleMessages =>
+      _filterActivePath(_chatController.messages);
+
+  List<ChatMessage> get visibleCollapsedMessages {
+    final tree = _viewModel.conversationTree;
+    if (tree == null) {
+      return _filterActivePath(_chatController.collapsedMessages);
+    }
+    // 在树模式下，活动路径就是投影。旧版本组不能折叠掉
+    // 当前选中的分支。
+    return _filterActivePath(_chatController.messages);
+  }
+
+  Map<String, List<ChatMessage>> get visibleGroupedMessages {
+    final tree = _viewModel.conversationTree;
+    if (tree == null) {
+      final visibleGroupIds = <String>{
+        for (final message in visibleCollapsedMessages)
+          message.groupId ?? message.id,
+      };
+      return <String, List<ChatMessage>>{
+        for (final entry in _chatController.groupedMessages.entries)
+          if (visibleGroupIds.contains(entry.key)) entry.key: entry.value,
+      };
+    }
+    return <String, List<ChatMessage>>{
+      for (final message in visibleCollapsedMessages)
+        message.groupId ?? message.id: <ChatMessage>[message],
+    };
+  }
+
+  List<MessageRenderModel> get visibleMessageRenderModels {
+    final tree = _viewModel.conversationTree;
+    if (tree == null) {
+      final visibleIds = <String>{
+        for (final message in visibleCollapsedMessages) message.id,
+      };
+      return _chatController.messageRenderModels
+          .where((model) => visibleIds.contains(model.message.id))
+          .toList(growable: false);
+    }
+    final visible = visibleCollapsedMessages;
+    final grouped = visibleGroupedMessages;
+    return MessageRenderModelProjector.project(
+      messages: visible,
+      byGroup: grouped,
+      versionSelections: <String, int>{
+        for (final message in visible)
+          message.groupId ?? message.id: message.version,
+      },
+      versionCounts: <String, int>{
+        for (final entry in grouped.entries) entry.key: entry.value.length,
+      },
+      contextDividerIndex: _treeContextDividerIndex(visible),
+    );
+  }
+
+  Map<String, List<String>> get siblingBranchIdsByMessageId {
+    final tree = _viewModel.conversationTree;
+    if (tree == null) return const <String, List<String>>{};
+    return tree.siblingBranchIdsByMessageId();
+  }
+
+  List<ChatMessage> _filterActivePath(Iterable<ChatMessage> source) {
+    final tree = _viewModel.conversationTree;
+    if (tree == null) return source.toList(growable: false);
+    final activeIds = tree.activePath().toSet();
+    return source
+        .where((message) => activeIds.contains(message.id))
+        .toList(growable: false);
+  }
+
+  int _treeContextDividerIndex(List<ChatMessage> visible) {
+    final raw = _chatController.loadedWindowTruncateIndex();
+    if (raw <= 0 || visible.isEmpty) return -1;
+    final visibleIds = visible.map((message) => message.id).toSet();
+    final rawMessages = _chatController.messages;
+    var visibleIndex = 0;
+    final limit = raw.clamp(0, rawMessages.length);
+    for (var index = 0; index < limit; index++) {
+      if (visibleIds.contains(rawMessages[index].id)) visibleIndex++;
+    }
+    return visibleIndex - 1;
+  }
+
+  /// 从应用启动到初始会话恢复（或草稿创建）完成为 true，
+  /// 使空状态不会在启动期间闪现。
   bool _startupConversationPending = true;
 
-  /// Drives the message-list three-state placeholder: true only while the
-  /// initial restore is pending or a cold window load is in flight. Fast-path
-  /// cache hits resolve within one frame batch and never surface a skeleton.
+  /// 驱动消息列表三态占位符：仅当初始恢复等待中或冷窗口加载进行中
+  /// 为 true。快速路径缓存命中会在一帧批次内完成，永远不会显示骨架。
   bool get isLoadingWindow =>
       _startupConversationPending || _chatController.isLoadingWindow;
 
-  // Delegate to StreamController
+  // 委托给 StreamController
   Map<String, stream_ctrl.ReasoningData> get reasoning =>
       _streamController.reasoning;
   Map<String, List<stream_ctrl.ReasoningSegmentData>> get reasoningSegments =>
@@ -289,12 +376,12 @@ class HomePageController extends ChangeNotifier {
       _streamController.contentSplits;
   Map<String, List<ToolUIPart>> get toolParts => _streamController.toolParts;
 
-  /// Lightweight notifier for streaming content updates.
-  /// Use this with ValueListenableBuilder in MessageListView to avoid full page rebuilds.
+  /// 流式内容更新的轻量通知器。
+  /// 在 MessageListView 中与 ValueListenableBuilder 一起使用，避免整页重建。
   stream_ctrl.StreamingContentNotifier get streamingContentNotifier =>
       _streamController.streamingContentNotifier;
 
-  // Delegate to scroll controller
+  // 委托给滚动控制器
   scroll_ctrl.ChatScrollController get scrollCtrl => _scrollCtrl;
 
   bool get isDesktopPlatform => PlatformUtils.isDesktopTarget;
@@ -321,7 +408,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Initialization
+  // 初始化
   // ============================================================================
 
   void _initialize() {
@@ -509,7 +596,7 @@ class HomePageController extends ChangeNotifier {
       _scrollCtrl.positionAtBottomOnNextLayout();
     };
     _viewModel.onStreamFinished = (conversationId) {
-      // Trigger UI update when streaming finishes
+      // 流结束时触发 UI 更新
       notifyListeners();
       if (currentConversation?.id == conversationId) {
         _scrollCtrl.stickToBottomAfterGeneration();
@@ -541,8 +628,8 @@ class HomePageController extends ChangeNotifier {
     );
   }
 
-  /// Give a newly opened conversation its own scroll state, matching
-  /// RikkaHub's per-ChatPage `rememberLazyListState` lifecycle.
+  /// 为新打开的会话提供自己的滚动状态，
+  /// 与 RikkaHub 每个 ChatPage 的 `rememberLazyListState` 生命周期一致。
   void replaceScrollController(ScrollController controller) {
     if (identical(_scrollController, controller)) return;
     _scrollCtrl.dispose();
@@ -662,8 +749,7 @@ class HomePageController extends ChangeNotifier {
     required String messageId,
   }) async {
     await switchConversationAnimated(conversationId);
-    // Wait one extra frame so the new conversation's indexed message list is
-    // attached before resolving the target.
+    // 多等待一帧，让新会话的索引消息列表在解析目标前完成挂载。
     try {
       await WidgetsBinding.instance.endOfFrame;
     } catch (_) {}
@@ -679,7 +765,7 @@ class HomePageController extends ChangeNotifier {
     final prefs = _context.read<SettingsProvider>();
     final assistantProvider = _context.read<AssistantProvider>();
     try {
-      // The two startups are independent of each other.
+      // 这两个启动流程彼此独立。
       await Future.wait([assistantProvider.loaded, _chatService.init()]);
       if (prefs.newChatOnLaunch) {
         await _createNewConversation();
@@ -688,8 +774,8 @@ class HomePageController extends ChangeNotifier {
         if (conversations.isNotEmpty) {
           final recent = conversations.first;
           _chatService.setCurrentConversation(recent.id);
-          // Assistant restore and window load are independent; the message
-          // list already tolerates a one-frame missing-assistant fallback.
+          // 助手恢复和窗口加载彼此独立；消息列表已经能够容忍
+          // 一帧的缺少助手回退。
           final restoreAssistant = Future<void>(() async {
             if ((recent.assistantId ?? '').isNotEmpty) {
               try {
@@ -702,19 +788,18 @@ class HomePageController extends ChangeNotifier {
           final loadWindow = _chatController.setCurrentConversationAndLoad(
             recent,
           );
-          // Rebuild while the window load is in flight so a cold load shows
-          // the skeleton instead of a blank list.
+          // 在窗口加载进行中重建，使冷加载显示骨架屏而不是空白列表。
           notifyListeners();
           await Future.wait([restoreAssistant, loadWindow]);
+          await _viewModel.ensureConversationTreeForCurrentConversation();
           _streamController.clearGeminiThoughtSigs();
           _restoreMessageUiState();
           _scrollCtrl.positionAtBottomOnNextLayout();
           notifyListeners();
           _scheduleStartupWarmup();
         } else {
-          // No conversations exist — create a new empty one so the UI
-          // correctly shows the temporary-chat toggle button instead of
-          // falling back to "new conversation" button.
+          // 没有会话存在时创建一个新的空会话，使 UI 正确显示
+          // 临时聊天开关按钮，而不是回退到“新建会话”按钮。
           await _createNewConversation();
         }
       }
@@ -724,8 +809,8 @@ class HomePageController extends ChangeNotifier {
     }
   }
 
-  /// Queues an idle-time warm-up of the most recent conversations after the
-  /// initial restore (cache plan measure 14). Runs once per launch.
+  /// 初始恢复后在空闲时间排队预热最近会话（缓存方案第 14 项）。
+  /// 每次启动只运行一次。
   void _scheduleStartupWarmup() {
     if (_startupWarmupScheduled) return;
     _startupWarmupScheduled = true;
@@ -748,16 +833,15 @@ class HomePageController extends ChangeNotifier {
         debugLabel: 'home.startupWarmup',
       );
     } catch (_) {
-      // No scheduler binding (bare unit tests): warm-up is optional.
+      // 没有调度器绑定（纯单元测试）：预热是可选的。
       return;
     }
     unawaited(task.catchError((Object _) {}));
   }
 
-  /// Cache-only warm-up: fills the service message cache (counted against the
-  /// regular cache budget) and never notifies listeners. The remaining queue
-  /// is abandoned once [serial] no longer matches the current warm-up serial,
-  /// i.e. after any user operation.
+  /// 仅缓存预热：填充服务消息缓存（计入常规缓存预算），
+  /// 且不通知监听器。当 [serial] 不再匹配当前预热序列号时
+  /// （即任何用户操作后），剩余队列会被放弃。
   @visibleForTesting
   Future<void> warmUpRecentConversations(
     List<String> conversationIds,
@@ -765,7 +849,7 @@ class HomePageController extends ChangeNotifier {
   ) async {
     for (final id in conversationIds) {
       if (serial != _warmupSerial || !_context.mounted) return;
-      // A streaming conversation owns the single connection queue.
+      // 流式会话拥有单一连接队列。
       if (_chatController.loadingConversationIds.contains(id)) continue;
       try {
         await _chatService.loadTimelinePage(
@@ -773,7 +857,7 @@ class HomePageController extends ChangeNotifier {
           limit: ChatService.defaultTimelineInitialSlots,
         );
       } catch (_) {
-        // Warm-up failures lose nothing user-visible.
+        // 预热失败不会造成用户可见损失。
       }
     }
   }
@@ -798,7 +882,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Public Methods - Message Actions
+  // 公共方法 - 消息操作
   // ============================================================================
 
   Future<ChatInputSubmissionResult> sendMessage(ChatInputData input) async {
@@ -828,8 +912,8 @@ class HomePageController extends ChangeNotifier {
       _replaceInputWithSuggestion(text);
       return;
     }
-    // A tap landing inside the pre-loading race window is a duplicate: the
-    // first send has been claimed but has not set the loading guard yet.
+    // 落在预加载竞态窗口内的点击是重复操作：
+    // 第一次发送已被占用，但尚未设置加载守卫。
     final conversationId = currentConversation?.id;
     if (conversationId != null &&
         _viewModel.isConversationSendInFlight(conversationId)) {
@@ -875,29 +959,15 @@ class HomePageController extends ChangeNotifier {
   Future<void> regenerateAtMessage(
     ChatMessage message, {
     bool assistantAsNewReply = false,
+    String? existingBranchId,
   }) async {
     if (currentConversation == null) return;
     _warmupSerial++;
 
-    final settings = _context.read<SettingsProvider>();
-    if (settings.regenerateDeleteTrailingMessages) {
-      final versioning = _messageGenerationService
-          .calculateRegenerationVersioning(
-            message: message,
-            messages: messages,
-            assistantAsNewReply: assistantAsNewReply,
-          );
-      if (versioning.lastKeep >= 0 &&
-          versioning.lastKeep < messages.length - 1) {
-        for (int i = versioning.lastKeep + 1; i < messages.length; i++) {
-          _translations.remove(messages[i].id);
-        }
-      }
-    }
-
     final success = await _viewModel.regenerateAtMessage(
       message,
       assistantAsNewReply: assistantAsNewReply,
+      existingBranchId: existingBranchId,
       allowImagesApiRouting: _mediaController.allowImagesApiRouting,
     );
     if (success) {
@@ -960,27 +1030,27 @@ class HomePageController extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Public Methods - Conversation Management
+  // 公共方法 - 会话管理
   // ============================================================================
 
   Future<void> switchConversationAnimated(String id) async {
     final serial = ++_switchSerial;
     _warmupSerial++;
     if (currentConversation?.id == id) {
-      // Already on the target: the serial bump above cancels any in-flight
-      // switch; reveal the current list again in case a fade-out is pending
-      // or in flight. forward() is a no-op when the list is fully visible.
+      // 已在目标会话上：上面的串行递增会取消任何进行中的切换；
+      // 再次显示当前列表，以防淡出正在等待或进行中。
+      // 当列表完全可见时，forward() 是无操作。
       if (!isDesktopPlatform) {
         unawaited(_forwardConvoFade());
       }
       return;
     }
-    // Invalidate in-flight select-all / toggle / invert for the prior chat.
+    // 使先前聊天的进行中全选/切换/反选失效。
     _selectionEpoch++;
     if (!isDesktopPlatform) {
-      // Fetch-then-commit: fade-out, progress flush, and the DB fetch run
-      // concurrently, but the fetched window is committed only after the
-      // fade-out completes so no new data flashes while opacity is not 0.
+      // 先获取后提交：淡出、进度刷新和数据库获取并发运行，
+      // 但获取到的窗口只有在淡出完成后才提交，
+      // 避免在透明度不为 0 时闪现新数据。
       final fadeFuture = _reverseConvoFade();
       final flushFuture = _flushProgressSilently();
       final PreparedConversationSwitch? prepared;
@@ -994,7 +1064,7 @@ class HomePageController extends ChangeNotifier {
       await Future.wait([fadeFuture, flushFuture]);
       if (serial != _switchSerial) return;
       if (prepared == null) {
-        // Target vanished; reveal the current list again.
+        // 目标已消失；再次显示当前列表。
         await _forwardConvoFade();
         return;
       }
@@ -1005,8 +1075,8 @@ class HomePageController extends ChangeNotifier {
       try {
         await WidgetsBinding.instance.endOfFrame;
         if (serial != _switchSerial || currentConversation?.id != id) return;
-        // Resolve the real last item while the new conversation is still
-        // transparent. Its first maxScrollExtent can contain lazy estimates.
+        // 在新会话仍然透明时解析真正的最后一项。
+        // 它的首个 maxScrollExtent 可能包含惰性估算。
         final activeScrollController = _scrollCtrl;
         await activeScrollController.settleAtBottomBeforeReveal();
         if (serial != _switchSerial ||
@@ -1017,8 +1087,8 @@ class HomePageController extends ChangeNotifier {
         await _convoFadeController.forward();
       } catch (_) {}
     } else {
-      // Desktop uses the same prepare/commit atomicity as mobile, without
-      // fade: current conversation/selection stay unchanged until commit.
+      // 桌面端使用与移动端相同的准备/提交原子性，但不使用淡出：
+      // 当前会话/选择在提交前保持不变。
       await _flushProgressSilently();
       try {
         _convoFadeController.stop();
@@ -1059,7 +1129,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   Future<void> createNewConversationAnimated() async {
-    // Cancel any in-flight conversation switch fetch.
+    // 取消任何进行中的会话切换获取。
     _switchSerial++;
     _warmupSerial++;
     _selectionEpoch++;
@@ -1097,10 +1167,10 @@ class HomePageController extends ChangeNotifier {
     _scrollToBottomSoon(animate: false);
   }
 
-  /// Clears selection chrome without notifying.
+  /// 在不通知的情况下清除选择界面。
   ///
-  /// Bumps the selection epoch so in-flight select-all / toggle / invert
-  /// results cannot write into the next conversation.
+  /// 递增选择纪元，使进行中的全选/切换/反选结果
+  /// 不能写入下一个会话。
   void _clearSelectionState() {
     _selectionEpoch++;
     _selecting = false;
@@ -1114,14 +1184,14 @@ class HomePageController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Compress context: summarize via LLM, create new conversation.
-  /// Returns null on success, or an error string on failure.
+  /// 压缩上下文：通过 LLM 生成摘要，创建新会话。
+  /// 成功返回 null，失败返回错误字符串。
   Future<String?> compressContext({
     required CompressContextOptions options,
   }) async {
     final result = await _viewModel.compressContext(options: options);
     if (result == null) {
-      // Success - switched to new conversation
+      // 成功 - 已切换到新会话
       _translations.clear();
       notifyListeners();
       _scrollToBottomSoon(animate: false);
@@ -1130,7 +1200,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Public Methods - Message Operations
+  // 公共方法 - 消息操作
   // ============================================================================
 
   Future<void> deleteMessage({
@@ -1139,9 +1209,8 @@ class HomePageController extends ChangeNotifier {
   }) async {
     final keepAtBottom = _scrollCtrl.isNearBottom();
     final gid = (message.groupId ?? message.id);
-    // Deleting the only version removes the whole slot; deleting one version
-    // of several swaps content in place, which reads better without a
-    // removal animation.
+    // 删除唯一版本会移除整个槽位；删除多个版本中的一个会在原位替换内容，
+    // 这样在不使用移除动画时阅读体验更好。
     final slotDisappears = (byGroup[gid] ?? const <ChatMessage>[]).length <= 1;
     int? preserveRequest;
     if (slotDisappears && _shouldAnimateSlotRemoval(message)) {
@@ -1194,15 +1263,38 @@ class HomePageController extends ChangeNotifier {
     }
   }
 
-  /// Clears the removal-animation state for [gid] and settles the scroll
-  /// position.
+  Future<void> deleteAllBranchSiblings(ChatMessage message) async {
+    final keepAtBottom = _scrollCtrl.isNearBottom();
+    final gid = (message.groupId ?? message.id);
+    int? preserveRequest;
+    if (_shouldAnimateSlotRemoval(message)) {
+      preserveRequest = await _playSlotRemovalAnimation(
+        gid,
+        keepAtBottom: keepAtBottom,
+      );
+    }
+    try {
+      final deletedIds = await _viewModel.deleteBranchSiblings(message);
+      for (final id in deletedIds) {
+        _translations.remove(id);
+      }
+    } finally {
+      _settleAfterSlotRemoval(
+        gid,
+        conversationId: message.conversationId,
+        keepAtBottom: keepAtBottom,
+        preserveRequest: preserveRequest,
+      );
+    }
+  }
+
+  /// 清除 [gid] 的移除动画状态并稳定滚动位置。
   ///
-  /// Runs from a `finally`: when the deletion itself fails the slot must not
-  /// stay collapsed in [_removingSlotIds] and an armed distance-preserving
-  /// request must still be released, otherwise the list keeps snapping back
-  /// to the preserved offset. The scroll adjustments are skipped when the
-  /// user switched away from [conversationId] mid-deletion — they would
-  /// target the newly opened conversation's list instead.
+  /// 从 `finally` 运行：当删除本身失败时，槽位不能继续折叠在
+  /// [_removingSlotIds] 中，且已武装的距离保持请求必须释放，
+  /// 否则列表会不断弹回保留的偏移。当用户在删除中途
+  /// 离开 [conversationId] 时，会跳过滚动调整，
+  /// 因为此时调整会错误作用于新打开会话的列表。
   void _settleAfterSlotRemoval(
     String gid, {
     required String conversationId,
@@ -1219,13 +1311,11 @@ class HomePageController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Whether removing [message]'s slot should play the fade-and-collapse
-  /// animation.
+  /// 移除 [message] 的槽位时是否应播放淡出折叠动画。
   ///
-  /// Skipped when the platform asks for reduced motion, and for slots taller
-  /// than the viewport: collapsing a screen-filling message reads as violent
-  /// scrolling rather than a splice, so such slots are removed instantly and
-  /// the anchor restore keeps the surrounding content still.
+  /// 当平台要求减少动画时跳过；对于高于视口的槽位也跳过：
+  /// 折叠铺满屏幕的消息会显得像剧烈滚动而不是拼接，
+  /// 因此这些槽位会被立即移除，锚点恢复会让周围内容保持不动。
   bool _shouldAnimateSlotRemoval(ChatMessage message) {
     if (_removalAnimationsDisabled) return false;
     final index = _chatController.indexOfCollapsedMessageId(message.id);
@@ -1240,13 +1330,12 @@ class HomePageController extends ChangeNotifier {
     return extent <= _scrollController.position.viewportDimension;
   }
 
-  /// Flags [slotId] as animating out and waits for the animation to finish.
+  /// 将 [slotId] 标记为正在移出并等待动画完成。
   ///
-  /// When the timeline sits near its bottom, the collapse would otherwise
-  /// drag the content away from the tail frame by frame, so the scroll
-  /// position keeps its distance from the end for the whole animation; the
-  /// returned request must be released with
-  /// [_finishPreserveDistanceAfterFrame] once the deletion has been applied.
+  /// 当时间线靠近底部时，折叠否则会逐帧把内容从尾部拖离，
+  /// 因此整个动画期间滚动位置会与末尾保持距离；
+  /// 删除应用后必须通过 [_finishPreserveDistanceAfterFrame]
+  /// 释放返回的请求。
   Future<int?> _playSlotRemovalAnimation(
     String slotId, {
     required bool keepAtBottom,
@@ -1260,8 +1349,7 @@ class HomePageController extends ChangeNotifier {
     }
     _removingSlotIds.add(slotId);
     notifyListeners();
-    // One extra frame of margin so the collapse has fully painted before the
-    // slot's data is removed.
+    // 额外留一帧余量，让折叠在槽位数据被移除前完成绘制。
     await Future.delayed(
       ChatLayoutConstants.slotRemovalAnimationDuration +
           const Duration(milliseconds: 16),
@@ -1291,7 +1379,7 @@ class HomePageController extends ChangeNotifier {
     if (selectedMessageIds.isEmpty) return;
 
     final keepAtBottom = _scrollCtrl.isNearBottom();
-    // Invalidate in-flight select-all before awaiting delete work.
+    // 在等待删除工作前使进行中的全选失效。
     _selectionEpoch++;
     final deletedMessageIds = await _selectedMessageIdsForDeletion(
       selectedMessageIds,
@@ -1350,6 +1438,20 @@ class HomePageController extends ChangeNotifier {
     }
   }
 
+  Future<void> switchConversationBranch(String branchId) {
+    return _viewModel.switchConversationBranch(branchId);
+  }
+
+  Future<List<ChatMessage>> loadAllConversationMessages() {
+    final conversation = currentConversation;
+    if (conversation == null) return Future.value(const <ChatMessage>[]);
+    return _chatService.loadAllConversationMessages(conversation.id);
+  }
+
+  Future<void> ensureConversationTreeForCurrentConversation() {
+    return _viewModel.ensureConversationTreeForCurrentConversation();
+  }
+
   Future<void> editMessage(ChatMessage message) async {
     final ctx = _context;
     if (!ctx.mounted) return;
@@ -1373,18 +1475,25 @@ class HomePageController extends ChangeNotifier {
     );
     if (newMsg == null) return;
 
+    await _viewModel.refreshConversationTree(newMsg.conversationId);
+
     if (await _chatController.openAroundPersistedMessage(newMsg)) {
       _viewModel.restoreMessageUiState();
     }
+    final existingBranchId = _viewModel.activeBranchId;
     final gid = (newMsg.groupId ?? newMsg.id);
     versionSelections[gid] = newMsg.version;
     notifyListeners();
 
     if (!result.shouldSend) return;
     if (message.role == 'assistant') {
-      await regenerateAtMessage(newMsg, assistantAsNewReply: true);
+      await regenerateAtMessage(
+        newMsg,
+        assistantAsNewReply: true,
+        existingBranchId: existingBranchId,
+      );
     } else if (message.role == 'user') {
-      await regenerateAtMessage(newMsg);
+      await regenerateAtMessage(newMsg, existingBranchId: existingBranchId);
     }
   }
 
@@ -1408,8 +1517,8 @@ class HomePageController extends ChangeNotifier {
         if (index != -1) {
           messages[index] = loadingMessage;
         }
-        // Messages are mutated externally; invalidate ChatController caches so
-        // collapsed/grouped views reflect updates immediately.
+        // 消息在外部被修改；使 ChatController 缓存失效，
+        // 让折叠/分组视图立即反映更新。
         _chatController.invalidateCache();
         _translations[message.id] = TranslationData();
         notifyListeners();
@@ -1570,10 +1679,10 @@ class HomePageController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// True when every known selectable projection id is selected.
+  /// 当每个已知可选择的投影 ID 都被选中时为 true。
   ///
-  /// Uses the cache filled by async full-projection selection ops. Before that
-  /// cache exists, falls back to the loaded window only.
+  /// 使用异步全投影选择操作填充的缓存。在该缓存存在前，
+  /// 仅回退到已加载窗口。
   bool get allSelectableMessagesSelected {
     final cached = _selectableProjectionIds;
     if (cached != null) {
@@ -1586,14 +1695,13 @@ class HomePageController extends ChangeNotifier {
         selectable.every((m) => _selectedItems.contains(m.id));
   }
 
-  /// True when a selected group may have multiple versions.
+  /// 当所选组可能具有多个版本时为 true。
   ///
-  /// Uses the loaded collapsed window + [ChatService.getMessagesForGroups]
-  /// (filled by visible-group preload). Never walks full conversation order /
-  /// [getMessagesRange] just to render the delete action bar. When group
-  /// preload is incomplete / unknown — including selected ids outside the
-  /// loaded window — conservatively returns true so both delete options stay
-  /// available; final delete still uses async DB paths.
+  /// 使用已加载的折叠窗口和 [ChatService.getMessagesForGroups]
+  /// （由可见组预加载填充）。绝不会仅为渲染删除操作栏而遍历
+  /// 完整会话顺序或 [getMessagesRange]。当组预加载不完整/未知时，
+  /// 包括所选 ID 在已加载窗口之外，都会保守地返回 true，
+  /// 使两个删除选项保持可用；最终删除仍使用异步数据库路径。
   bool get selectedMessagesIncludeMultipleVersions {
     final conversation = currentConversation;
     if (conversation == null || _selectedItems.isEmpty) return false;
@@ -1610,7 +1718,7 @@ class HomePageController extends ChangeNotifier {
     for (final groupId in groupIds) {
       final known = counts[groupId] ?? 0;
       if (known > 1) return true;
-      // Incomplete preload: do not treat unknown as single-version.
+      // 预加载不完整：不要将未知状态视为单版本。
       if (known == 0) return true;
       for (final message in _chatController.collapsedMessages) {
         if ((message.groupId ?? message.id) != groupId) continue;
@@ -1628,8 +1736,8 @@ class HomePageController extends ChangeNotifier {
     final windowMessages = _chatController
         .allCollapsedMessagesForCurrentConversation();
     final windowIds = {for (final message in windowMessages) message.id};
-    // Out-of-window selections are unknown for versioning — surface a
-    // synthetic group key so callers treat them as potentially multi-version.
+    // 窗口外的选择对版本化来说是未知的，因此给出合成组键，
+    // 使调用方将其视为潜在的多版本。
     final groupIds = <String>{
       for (final message in windowMessages)
         if (_selectedItems.contains(message.id)) message.groupId ?? message.id,
@@ -1890,7 +1998,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Public Methods - Version Management
+  // 公共方法 - 版本管理
   // ============================================================================
 
   Future<void> setSelectedVersion(String groupId, int version) async {
@@ -1909,21 +2017,21 @@ class HomePageController extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Public Methods - UI State
+  // 公共方法 - UI 状态
   // ============================================================================
 
   void toggleReasoning(String messageId) {
     final r = reasoning[messageId];
     if (r != null) {
       r.expanded = !r.expanded;
-      // Check if reasoning is still loading (finishedAt == null means streaming)
-      // This is O(1) - no list traversal needed
+      // 检查推理是否仍在加载（finishedAt == null 表示流式处理中）
+      // 这是 O(1) 操作，不需要遍历列表
       final isStillStreaming = r.finishedAt == null && r.text.isNotEmpty;
       if (isStillStreaming && streamingContentNotifier.hasNotifier(messageId)) {
-        // For actively streaming messages, use lightweight notifier update
+        // 对正在流式处理的消息，使用轻量通知器更新
         streamingContentNotifier.forceRebuild(messageId);
       } else {
-        // For non-streaming messages, trigger full page rebuild
+        // 对非流式消息，触发整页重建
         notifyListeners();
       }
     }
@@ -1942,14 +2050,14 @@ class HomePageController extends ChangeNotifier {
     if (segments != null && segmentIndex < segments.length) {
       final seg = segments[segmentIndex];
       seg.expanded = !seg.expanded;
-      // Check if this segment is still loading (finishedAt == null means streaming)
-      // This is O(1) - no list traversal needed
+      // 检查此片段是否仍在加载（finishedAt == null 表示流式处理中）
+      // 这是 O(1) 操作，不需要遍历列表
       final isStillStreaming = seg.finishedAt == null && seg.text.isNotEmpty;
       if (isStillStreaming && streamingContentNotifier.hasNotifier(messageId)) {
-        // For actively streaming messages, use lightweight notifier update
+        // 对正在流式处理的消息，使用轻量通知器更新
         streamingContentNotifier.forceRebuild(messageId);
       } else {
-        // For non-streaming messages, trigger full page rebuild
+        // 对非流式消息，触发整页重建
         notifyListeners();
       }
     }
@@ -1961,7 +2069,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Public Methods - Sidebar Management
+  // 公共方法 - 侧边栏管理
   // ============================================================================
 
   void toggleTabletSidebar() {
@@ -2029,7 +2137,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Public Methods - Drawer
+  // 公共方法 - 抽屉
   // ============================================================================
 
   void onDrawerValueChanged(double value) {
@@ -2054,7 +2162,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Public Methods - Input
+  // 公共方法 - 输入
   // ============================================================================
 
   void dismissKeyboard() {
@@ -2080,7 +2188,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Public Methods - Quick Phrases
+  // 公共方法 - 快捷短语
   // ============================================================================
 
   Future<void> handleQuickPhraseSelection(QuickPhrase? selected) async {
@@ -2109,7 +2217,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Public Methods - File Upload
+  // 公共方法 - 文件上传
   // ============================================================================
 
   Future<void> onPickPhotos() => _fileUploadService.onPickPhotos();
@@ -2119,7 +2227,7 @@ class HomePageController extends ChangeNotifier {
       _fileUploadService.onFilesDroppedDesktop(files);
 
   // ============================================================================
-  // Public Methods - Scroll
+  // 公共方法 - 滚动
   // ============================================================================
 
   void scrollToBottom({bool animate = true}) =>
@@ -2146,9 +2254,9 @@ class HomePageController extends ChangeNotifier {
   Future<List<ChatMessage>> loadAllCollapsedMessagesForCurrentConversation() =>
       _chatController.loadAllCollapsedMessagesForCurrentConversation();
 
-  // Issue 7 audit: jumps via collapsed-index + loadUntilMessageVisible only.
-  // Does not call ChatService.getMessageIndex, so an absent message-order
-  // skeleton during loadTimelinePage backfill does not require a guard here.
+  // 问题 7 审计：仅通过折叠索引 + loadUntilMessageVisible 跳转。
+  // 不调用 ChatService.getMessageIndex，因此在 loadTimelinePage
+  // 回填期间缺少 message-order 骨架也不需要在此处保护。
   Future<void> scrollToMessageId(
     String targetId, {
     bool useRikkaTransition = false,
@@ -2290,7 +2398,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Public Methods - Model Checks
+  // 公共方法 - 模型检查
   // ============================================================================
 
   bool isReasoningModel(String providerKey, String modelId) {
@@ -2308,18 +2416,16 @@ class HomePageController extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Public Methods - Helpers
+  // 公共方法 - 辅助方法
   // ============================================================================
 
   String titleForLocale() => _titleForLocale(_context);
 
   String clearContextLabel() {
     final l10n = AppLocalizations.of(_context)!;
-    return _viewModel.getClearContextLabel(
-      (actual, configured) =>
-          l10n.homePageClearContextWithCount(actual, configured),
-      l10n.homePageClearContext,
-    );
+    return _viewModel.isContextMasked
+        ? l10n.contextManagementRestoreContext
+        : l10n.contextManagementMaskContext;
   }
 
   String? currentStreamingMessageId() {
@@ -2338,7 +2444,7 @@ class HomePageController extends ChangeNotifier {
     return true;
   }
 
-  /// Transform raw content using assistant regexes.
+  /// 使用助手正则表达式转换原始内容。
   String transformAssistantContent(
     stream_ctrl.StreamingState state, [
     String? raw,
@@ -2352,7 +2458,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Lifecycle Management
+  // 生命周期管理
   // ============================================================================
 
   void onAppLifecycleStateChanged(AppLifecycleState state) {
@@ -2374,7 +2480,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Private Methods
+  // 私有方法
   // ============================================================================
 
   String _titleForLocale(BuildContext context) {
@@ -2387,7 +2493,7 @@ class HomePageController extends ChangeNotifier {
   void _scrollToBottomSoon({bool animate = true}) =>
       _scrollCtrl.scrollToBottomSoon(animate: animate);
 
-  // _getViewportBounds removed: the indexed list exposes its visible range.
+  // _getViewportBounds 已移除：索引列表会暴露其可见范围。
 
   void _restoreMessageUiState() {
     for (int i = 0; i < messages.length; i++) {
@@ -2472,11 +2578,11 @@ class HomePageController extends ChangeNotifier {
   }
 
   Future<void> _onMcpChanged() async {
-    // Kept for potential future use
+    // 为可能的将来使用保留
   }
 
   // ============================================================================
-  // Disposal
+  // 释放
   // ============================================================================
 
   @override
@@ -2487,6 +2593,7 @@ class HomePageController extends ChangeNotifier {
     _messageJumpTransitionController.dispose();
     _mcpProvider?.removeListener(_onMcpChanged);
     _scrollCtrl.dispose();
+    _viewModel.dispose();
     try {
       _chatActionSub?.cancel();
     } catch (_) {}

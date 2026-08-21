@@ -4,7 +4,7 @@ import '../../features/settings/pages/memory_trace_page.dart';
 import '../../l10n/app_localizations.dart';
 import '../../theme/app_font_weights.dart';
 
-/// Desktop right-side pane for the memory pipeline trace viewer.
+/// 桌面右侧记忆管线跟踪查看器面板。
 class DesktopMemoryTracePane extends StatelessWidget {
   const DesktopMemoryTracePane({super.key});
 

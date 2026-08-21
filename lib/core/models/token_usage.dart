@@ -12,10 +12,10 @@ class TokenUsage {
   });
 
   TokenUsage merge(TokenUsage other) {
-    // For streaming responses:
-    // - prompt tokens: take max (usually stays constant after initial value)
-    // - completion tokens: take max (grows as response streams)
-    // - cached tokens: take max (usually set once)
+    // 对于流式响应：
+    // - prompt tokens：取最大值（通常在初始值后保持不变）
+    // - completion tokens：取最大值（随响应流式输出而增长）
+    // - cached tokens：取最大值（通常只设置一次）
     final prompt = other.promptTokens > 0 ? other.promptTokens : promptTokens;
     final completion = other.completionTokens > 0
         ? other.completionTokens

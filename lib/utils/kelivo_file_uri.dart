@@ -1,12 +1,11 @@
 import 'package:path/path.dart' as p;
 
-/// Logical URI for managed app-local files.
+/// 用于受管应用本地文件的逻辑 URI。
 ///
-/// Wire form: `kelivo-file:///<root>/<relative...>`
-/// where `<root>` ∈ { upload, images, avatars, fonts }.
+/// 线上形式：`kelivo-file:///<root>/<relative...>`
+/// 其中 `<root>` ∈ { upload, images, avatars, fonts }。
 ///
-/// Pure/lexical — no filesystem I/O (`dart:io` is forbidden). Roots are
-/// injected by the caller.
+/// 纯词法处理，不执行文件系统 I/O（禁止使用 `dart:io`）。根目录由调用方注入。
 final class KelivoFileUri {
   KelivoFileUri._();
 
@@ -21,20 +20,20 @@ final class KelivoFileUri {
     'fonts',
   ];
 
-  /// Cheap prefix check. Does **not** validate structure.
+  /// 廉价的前缀检查，**不会**校验结构。
   static bool isKelivoFileUri(String value) => value.startsWith(_prefix);
 
-  /// Strict decode. Returns `['upload','foo.png']` or `null` if invalid.
+  /// 严格解码。返回 `['upload','foo.png']`；无效时返回 `null`。
   static List<String>? decodeToSegments(String uri) {
-    // Require empty authority: `kelivo-file:///...`.
-    // Rejects `kelivo-file://host/...` and `kelivo-file:/...`.
+    // 要求 authority 为空：`kelivo-file:///...`。
+    // 拒绝 `kelivo-file://host/...` 和 `kelivo-file:/...`。
     if (!uri.startsWith(_head)) return null;
     final rest = uri.substring(_head.length);
     if (rest.isEmpty) return null;
-    // Reject query/fragment without Uri.parse normalization side effects.
+    // 在不触发 Uri.parse 规范化副作用的前提下拒绝 query/fragment。
     if (rest.contains('?') || rest.contains('#')) return null;
-    // Reject host form already covered by _head, and empty segments / dots
-    // before percent-decoding so `images/./a` cannot be normalized away.
+    // 在百分号解码前拒绝 _head 已覆盖的 host 形式，以及空路径段和点段，
+    // 避免 `images/./a` 被规范化掉。
     final rawParts = rest.split('/');
     if (rawParts.any((s) => s.isEmpty)) return null;
 
@@ -58,8 +57,8 @@ final class KelivoFileUri {
     return List<String>.unmodifiable(segments);
   }
 
-  /// Resolve against an absolute app-data [root]. No existence checks.
-  /// Returns `null` when [uri] is not a valid kelivo-file URI.
+  /// 基于绝对应用数据 [root] 解析。不检查文件是否存在。
+  /// 当 [uri] 不是有效 kelivo-file URI 时返回 `null`。
   static String? resolveToAbsolute(String uri, {required String root}) {
     final segments = decodeToSegments(uri);
     if (segments == null) return null;
@@ -67,15 +66,13 @@ final class KelivoFileUri {
     return ctx.joinAll([root, ...segments]);
   }
 
-  /// Encode an absolute path under `[root]/<managed>/...`.
-  /// Returns `null` for external / unmanaged paths.
+  /// 将 `[root]/<managed>/...` 下的绝对路径编码为 URI。
+  /// 外部或非受管路径返回 `null`。
   ///
-  /// Segments containing `\` are rejected so the encoder never emits a URI
-  /// that [decodeToSegments] cannot round-trip.
-  /// Managed roots are lowercased on the wire (`Images` → `images`).
+  /// 包含 `\` 的路径段会被拒绝，确保编码器不会生成 [decodeToSegments]
+  /// 无法往返还原的 URI。受管根目录在线上会转为小写（`Images` → `images`）。
   static String? encodeFromAbsolute(String abs, {required String root}) {
-    // Reject POSIX backslash filenames before path normalization can reinterpret
-    // them on Windows-style contexts.
+    // 在路径规范化可能按 Windows 风格重新解释之前，拒绝 POSIX 反斜杠文件名。
     final looksWindows =
         RegExp(r'^[A-Za-z]:[\\/]').hasMatch(abs) ||
         root.contains('\\') ||
@@ -85,7 +82,7 @@ final class KelivoFileUri {
     final ctx = _contextFor(root);
     final normalizedAbs = ctx.normalize(abs);
     final normalizedRoot = ctx.normalize(root);
-    // Windows roots compare case-insensitively via Style.windows.
+    // Windows 根目录通过 Style.windows 进行不区分大小写比较。
     if (!ctx.isWithin(normalizedRoot, normalizedAbs)) return null;
 
     final rel = ctx.relative(normalizedAbs, from: normalizedRoot);
@@ -101,36 +98,34 @@ final class KelivoFileUri {
     return _encodeSegments(parts);
   }
 
-  /// Known production bundle / package identifiers that own managed roots.
-  /// Substring matches (e.g. `com.other.kelivo.notes`) are intentionally
-  /// rejected — only exact whitelist entries count.
+  /// 已知拥有受管根目录的生产 bundle 或包标识。
+  /// 故意拒绝子串匹配（例如 `com.other.kelivo.notes`），只允许精确白名单条目。
   static const Set<String> _knownBundleIds = {
     'com.psyche.kelivo',
     'psyche.kelivo',
   };
 
-  /// Windows AppData folder name (Flutter BINARY_NAME). Compared
-  /// case-insensitively as a whole segment — not a substring.
+  /// Windows AppData 文件夹名（Flutter BINARY_NAME）。
+  /// 作为完整路径段进行不区分大小写比较，而不是子串比较。
   static const String _windowsAppFolder = 'kelivo';
 
   static final RegExp _iosUuid = RegExp(
     r'^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$',
   );
 
-  /// Best-effort conversion of a legacy absolute sandbox path into a
-  /// kelivo-file URI. Marker order (strict platform sandboxes only):
-  /// 1. iOS device `/var/mobile/...` (path-start anchored)
-  /// 2. iOS Simulator `/Users/.../CoreSimulator/...` (path-start anchored)
-  /// 3. macOS Kelivo container Documents (exact bundle whitelist)
-  /// 4. macOS/Linux Application Support / `.local/share` (exact whitelist)
+  /// 尽力将旧版绝对沙箱路径转换为 kelivo-file URI。标记顺序
+  /// （仅限严格的平台沙箱）：
+  /// 1. iOS 设备 `/var/mobile/...`（锚定路径开头）
+  /// 2. iOS 模拟器 `/Users/.../CoreSimulator/...`（锚定路径开头）
+  /// 3. macOS Kelivo 容器 Documents（精确 bundle 白名单）
+  /// 4. macOS/Linux Application Support / `.local/share`（精确白名单）
   /// 5. Windows `AppData\Local|Roaming\[com.psyche\]kelivo`
-  /// 6. Android package-private app_flutter / files (exact package whitelist)
-  /// 7. Generic fallback: first `/<managed>/` occurrence
-  ///    (disabled when [allowGenericFallback] is false)
+  /// 6. Android 应用私有 app_flutter / files（精确包白名单）
+  /// 7. 通用回退：第一个 `/<managed>/` 出现位置
+  ///    （当 [allowGenericFallback] 为 false 时禁用）
   ///
-  /// Purely lexical — no `existsSync`. UNC/SMB rejected. Every platform
-  /// matcher is anchored at the start of the portable path so nested archive
-  /// copies (`/tmp/archive/...`) cannot be claimed as live sandboxes.
+  /// 纯词法处理，不调用 `existsSync`。拒绝 UNC/SMB。所有平台匹配器都锚定在
+  /// 可移植路径开头，避免嵌套归档副本（`/tmp/archive/...`）被误认为活动沙箱。
   static String? tryEncodeLegacyAbsolutePath(
     String abs, {
     bool allowGenericFallback = true,
@@ -141,9 +136,9 @@ final class KelivoFileUri {
     final raw = portable;
 
     const subdirs = ['avatars', 'fonts', 'images', 'upload'];
-    String? tail; // starts with '/managed/...'
+    String? tail; // 以 '/managed/...' 开头
 
-    // iOS device — must begin at /var/mobile/...
+    // iOS 设备：必须以 /var/mobile/... 开头。
     final iosDevice = RegExp(
       r'^/var/mobile/Containers/Data/Application/([^/]+)/Documents/',
       caseSensitive: false,
@@ -152,7 +147,7 @@ final class KelivoFileUri {
       tail = _normalizeManagedTail('/${raw.substring(iosDevice.end)}', subdirs);
     }
 
-    // iOS Simulator — full home-rooted CoreSimulator path from the start.
+    // iOS 模拟器：从头开始的完整用户目录 CoreSimulator 路径。
     if (tail == null) {
       final iosSim = RegExp(
         r'^/Users/[^/]+/Library/Developer/CoreSimulator/Devices/'
@@ -166,7 +161,7 @@ final class KelivoFileUri {
       }
     }
 
-    // macOS Kelivo app container Documents (exact bundle id).
+    // macOS Kelivo 应用容器 Documents（精确 bundle id）。
     if (tail == null) {
       final macContainer = RegExp(
         r'^/Users/[^/]+/Library/Containers/([^/]+)/Data/Documents/',
@@ -180,7 +175,7 @@ final class KelivoFileUri {
       }
     }
 
-    // macOS/Linux Application Support / .local/share Kelivo root.
+    // macOS/Linux Application Support / .local/share 下的 Kelivo 根目录。
     if (tail == null) {
       final support = RegExp(
         r'^/(?:Users/[^/]+/Library/Application Support|'
@@ -192,8 +187,8 @@ final class KelivoFileUri {
       }
     }
 
-    // Windows: C:/Users/<user>/AppData/Local|Roaming/[com.psyche/]<Kelivo>/...
-    // Folder name must equal "kelivo" case-insensitively (not KelivoNotes).
+    // Windows：C:/Users/<user>/AppData/Local|Roaming/[com.psyche/]<Kelivo>/...
+    // 文件夹名必须不区分大小写地等于 "kelivo"（不能是 KelivoNotes）。
     if (tail == null) {
       final win = RegExp(
         r'^[A-Za-z]:/Users/[^/]+/AppData/(?:Local|Roaming)/'
@@ -205,7 +200,7 @@ final class KelivoFileUri {
       }
     }
 
-    // Android package-private app_flutter
+    // Android 应用私有 app_flutter 目录
     if (tail == null) {
       final flutter = RegExp(
         r'^/(?:data/user/\d+|data/data)/([^/]+)/app_flutter/',
@@ -216,7 +211,7 @@ final class KelivoFileUri {
       }
     }
 
-    // Android package-private files
+    // Android 应用私有 files 目录
     if (tail == null) {
       final files = RegExp(
         r'^/(?:(?:data/user/\d+|data/data)/([^/]+)/files/|'
@@ -255,13 +250,13 @@ final class KelivoFileUri {
   static bool _isKnownBundleId(String value) =>
       _knownBundleIds.contains(value.toLowerCase());
 
-  /// Convert an absolute / file URI into a portable slash path for matching.
+  /// 将绝对路径或 file URI 转换为用于匹配的可移植斜杠路径。
   ///
-  /// Returns `null` for UNC/SMB / empty inputs. Windows drive paths keep the
-  /// `C:/...` form; POSIX backslash filenames are rejected.
+  /// UNC/SMB 或空输入返回 `null`。Windows 驱动器路径保留 `C:/...` 形式；
+  /// 拒绝 POSIX 反斜杠文件名。
   ///
-  /// Uses the URI path (always `/`) for `file:` inputs so a Windows host can
-  /// still recognize iOS `file:///var/mobile/...` sandbox markers.
+  /// 对 `file:` 输入使用 URI 路径（始终为 `/`），以便 Windows 主机仍能识别
+  /// iOS 的 `file:///var/mobile/...` 沙箱标记。
   static String? toPortableSlashPath(String abs) {
     if (abs.isEmpty) return null;
     var value = abs;
@@ -302,7 +297,7 @@ final class KelivoFileUri {
     final lower = tail.toLowerCase();
     for (final s in subdirs) {
       if (lower.startsWith('/$s/')) {
-        // Preserve filename/relative case after the managed root.
+        // 保留受管根目录之后文件名或相对路径的大小写。
         return '/$s${tail.substring(1 + s.length)}';
       }
     }

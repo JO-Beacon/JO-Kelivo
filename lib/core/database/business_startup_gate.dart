@@ -6,22 +6,20 @@ import 'business_migration_engine.dart';
 import 'business_preferences.dart';
 import 'business_repository.dart';
 
-/// Completes the one-time legacy migration before exposing business state.
+/// 在公开业务状态之前完成一次性旧版迁移。
 ///
-/// Keeping this gate outside the widget tree prevents providers from observing
-/// an empty database when migration, verification, or legacy cleanup fails.
+/// 将该 gate 放在 widget tree 之外，可防止当迁移、验证或旧版清理失败时
+/// provider 观察到空的数据库。
 final class BusinessStartupGate {
   BusinessStartupGate._();
 
-  /// Non-null when the last [migrateAndLoad] degraded a recoverable business
-  /// migration validation failure instead of migrating cleanly. The legacy
-  /// preferences source is retained (the failed migration transaction rolled
-  /// back and wrote no receipt), so a fixed future build can retry.
+  /// 当上次 [migrateAndLoad] 将可恢复的业务迁移校验失败降级处理而未干净
+  /// 迁移时非空。旧版偏好源被保留（失败的迁移事务已回滚且未写 receipt），
+  /// 因此后续修复版本可以重试。
   static String? lastDegradedReason;
 
-  // Validation-class failures that must degrade rather than lock the user out
-  // of the app. Anything else (e.g. a genuine database fault) still fails
-  // closed so we never hide real corruption behind an empty settings screen.
+  // 校验类失败必须降级处理，而不是把用户锁在应用外。其他问题（例如真正的
+  // 数据库故障）仍会失败关闭，以免在空设置界面后隐藏真实损坏。
   static bool _isRecoverableMigrationFailure(Object error) =>
       error is StateError &&
       (error.message == 'business_migration_export_mismatch' ||
@@ -41,11 +39,9 @@ final class BusinessStartupGate {
           ).run)();
     } catch (error, stackTrace) {
       if (!_isRecoverableMigrationFailure(error)) rethrow;
-      // The migration transaction rolled back, so the database holds no
-      // migrated business data and no receipt. Entering with defaults keeps
-      // the user in the app (and their legacy preference data intact for a
-      // later retry) instead of trapping them behind a fail-closed startup
-      // screen.
+      // 迁移事务已回滚，因此数据库中没有已迁移的业务数据和 receipt。以默认值
+      // 进入可让用户留在应用内（并保留其旧版偏好数据供以后重试），
+      // 而不是把他们困在失败关闭的启动界面后。
       lastDegradedReason = (error as StateError).message;
       developer.log(
         'Business migration degraded; entering with defaults and retaining '

@@ -52,7 +52,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Restart JO-Kelivo'), findsOneWidget);
-    expect(find.text('Copy diagnostic code'), findsOneWidget);
+    expect(find.byTooltip('Copy diagnostic code'), findsOneWidget);
 
     await tester.tap(find.text('Restart JO-Kelivo'));
     await tester.pump();

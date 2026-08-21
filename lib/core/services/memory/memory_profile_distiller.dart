@@ -8,7 +8,7 @@ import 'memory_prompts.dart';
 import 'memory_repository.dart';
 import 'memory_trace.dart';
 
-/// One distilled profile field from Distiller JSON (§12.7).
+/// Distiller JSON 中的一个提炼后的画像字段（§12.7）。
 class MemoryDistilledField {
   const MemoryDistilledField({required this.key, required this.value});
 
@@ -16,7 +16,7 @@ class MemoryDistilledField {
   final String value;
 }
 
-/// Distiller parse outcome. [ok] false means unparseable JSON.
+/// Distiller 解析结果。[ok] 为 false 表示 JSON 无法解析。
 class MemoryDistillParseResult {
   const MemoryDistillParseResult._({required this.ok, required this.fields});
 
@@ -33,7 +33,7 @@ class MemoryDistillParseResult {
   final List<MemoryDistilledField> fields;
 }
 
-/// Profile Distiller (§12.7).
+/// Profile Distiller（§12.7）。
 class MemoryProfileDistiller {
   MemoryProfileDistiller({
     required this.repository,
@@ -74,7 +74,7 @@ class MemoryProfileDistiller {
         .replaceAll('{{identityEntries}}', identityEntries);
   }
 
-  /// Format identity memories for `{{identityEntries}}`.
+  /// 为 `{{identityEntries}}` 格式化身份记忆。
   static String formatIdentityEntries(List<MemoryEntry> entries) {
     if (entries.isEmpty) return '';
     final buf = StringBuffer();
@@ -84,7 +84,7 @@ class MemoryProfileDistiller {
     return buf.toString().trimRight();
   }
 
-  /// Extract a JSON object from model output (prose / fences tolerated).
+  /// 从模型输出中提取 JSON 对象（可容忍正文文本 / 代码围栏）。
   static Object? extractJsonObject(String response) {
     var text = response.trim();
     final fence = RegExp(
@@ -118,14 +118,14 @@ class MemoryProfileDistiller {
       final value = (map['value'] ?? '').toString().trim();
       if (key.isEmpty || value.isEmpty) continue;
       if (!UserProfileField.isValidKey(key)) continue;
-      // Distiller never clears (§12.7); empty already skipped.
+      // Distiller 从不清除（§12.7）；空内容已在前面跳过。
       fields.add(MemoryDistilledField(key: key, value: value));
     }
     return MemoryDistillParseResult.ok(fields);
   }
 
-  /// Run Distiller after identity NEW/MERGE/CONFLICT. Returns false on LLM/parse
-  /// failure (caller still advances watermark per §12.8).
+  /// 在 identity NEW/MERGE/CONFLICT 后运行 Distiller。遇到 LLM/解析失败时返回 false
+  /// （调用方仍按 §12.8 推进 watermark）。
   Future<bool> run({
     required MemoryPromptLang lang,
     required String? assistantId,
@@ -200,7 +200,7 @@ class MemoryProfileDistiller {
           ),
         );
       } catch (_) {
-        // Illegal keys already filtered; ignore write races.
+        // 非法键已被过滤；忽略写入竞争。
       }
     }
     return true;

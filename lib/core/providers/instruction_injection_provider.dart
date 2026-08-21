@@ -142,7 +142,7 @@ class InstructionInjectionProvider with ChangeNotifier {
     final list = List<InstructionInjection>.from(_items);
     final moved = list.removeAt(globalOld);
 
-    // Recompute group indices after removal.
+    // 移除后重新计算分组索引。
     final after = <int>[];
     for (int i = 0; i < list.length; i++) {
       if (_normGroup(list[i].group) == targetGroup) after.add(i);

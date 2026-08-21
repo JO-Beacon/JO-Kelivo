@@ -12,8 +12,10 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'package:Kelivo/core/database/app_database.dart';
+import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/database/generation_run.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/models/conversation_tree.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
@@ -69,6 +71,127 @@ void main() {
     return service;
   }
 
+  Future<({ChatDatabaseRepository repository, ChatService service})>
+  createBranchedService(String fileName) async {
+    final repository = ChatDatabaseRepository.open(
+      file: File('${tempDir.path}/$fileName'),
+    );
+    addTearDown(repository.close);
+    await repository.ensureReady();
+
+    final conversation = Conversation(
+      id: 'conversation-branch',
+      title: 'branch',
+    );
+    final messages = <({ChatMessage message, int messageOrder})>[
+      (
+        message: ChatMessage(
+          id: 'u1',
+          conversationId: conversation.id,
+          role: 'user',
+          content: 'question',
+          timestamp: DateTime.utc(2026, 1, 1),
+        ),
+        messageOrder: 0,
+      ),
+      (
+        message: ChatMessage(
+          id: 'a1-v0',
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: 'old answer',
+          groupId: 'assistant-group',
+          version: 0,
+          timestamp: DateTime.utc(2026, 1, 1, 0, 0, 1),
+        ),
+        messageOrder: 1,
+      ),
+      (
+        message: ChatMessage(
+          id: 'a1-v1',
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: 'selected answer',
+          groupId: 'assistant-group',
+          version: 1,
+          timestamp: DateTime.utc(2026, 1, 1, 0, 0, 2),
+        ),
+        messageOrder: 2,
+      ),
+      (
+        message: ChatMessage(
+          id: 'u2-v0',
+          conversationId: conversation.id,
+          role: 'user',
+          content: 'old follow-up',
+          timestamp: DateTime.utc(2026, 1, 1, 0, 0, 3),
+        ),
+        messageOrder: 3,
+      ),
+      (
+        message: ChatMessage(
+          id: 'u2-v1',
+          conversationId: conversation.id,
+          role: 'user',
+          content: 'selected follow-up',
+          timestamp: DateTime.utc(2026, 1, 1, 0, 0, 4),
+        ),
+        messageOrder: 4,
+      ),
+    ];
+    await repository.putMigrationBatch(
+      conversations: [
+        conversation.copyWith(
+          messageIds: messages
+              .map((entry) => entry.message.id)
+              .toList(growable: false),
+          versionSelections: const {'assistant-group': 1},
+        ),
+      ],
+      messages: messages,
+      toolEventsByMessageId: const {},
+      geminiSignaturesByMessageId: const {},
+    );
+    await repository.saveConversationTree(
+      ConversationTree(
+        conversationId: conversation.id,
+        activeBranchId: 'root',
+        branches: <String, ConversationBranch>{
+          'root': ConversationBranch(
+            id: 'root',
+            conversationId: conversation.id,
+            tipMessageId: 'u2-v1',
+            createdAt: DateTime.utc(2026, 1, 1),
+          ),
+          'old': ConversationBranch(
+            id: 'old',
+            conversationId: conversation.id,
+            tipMessageId: 'u2-v0',
+            createdAt: DateTime.utc(2026, 1, 1),
+          ),
+        },
+        edges: const <String, MessageTreeEdge>{
+          'u1': MessageTreeEdge(messageId: 'u1', parentMessageId: null),
+          'a1-v0': MessageTreeEdge(messageId: 'a1-v0', parentMessageId: 'u1'),
+          'a1-v1': MessageTreeEdge(messageId: 'a1-v1', parentMessageId: 'u1'),
+          'u2-v0': MessageTreeEdge(
+            messageId: 'u2-v0',
+            parentMessageId: 'a1-v0',
+          ),
+          'u2-v1': MessageTreeEdge(
+            messageId: 'u2-v1',
+            parentMessageId: 'a1-v1',
+          ),
+        },
+      ),
+    );
+
+    final service = ChatService(existingRepository: repository);
+    addTearDown(service.close);
+    await service.init();
+    return (repository: repository, service: service);
+  }
+
   test('cold init clears every stale streaming flag', () async {
     final first = createService();
     await first.init();
@@ -106,6 +229,11 @@ void main() {
     }
 
     // Cache only a tail window so the append lands in a partial cache.
+    service.debugPrimeMessageCountState(
+      conversation.id,
+      cachedMessages: const [],
+      clearCounts: true,
+    );
     await service.loadTimelinePage(conversation.id, limit: 1);
     expect(service.getMessages(conversation.id).map((message) => message.id), [
       ids.last,
@@ -119,7 +247,7 @@ void main() {
     );
 
     expect(service.getMessages(conversation.id).map((message) => message.id), [
-      ids.last,
+      ...ids,
       result.userMessage!.id,
       result.assistantMessage.id,
     ]);
@@ -538,18 +666,19 @@ void main() {
       expect(edited, isNotNull);
       expect(edited!.groupId, original.groupId ?? original.id);
       expect(edited.version, original.version + 1);
-      expect(await first.getMessageIds(conversation.id), [
-        original.id,
-        edited.id,
-      ]);
+      expect(await first.getMessageIds(conversation.id), [edited.id]);
+      expect(
+        await first.loadPersistedMessageIds(conversation.id),
+        containsAll(<String>[original.id, edited.id]),
+      );
       await first.close();
       services.remove(first);
 
       final restarted = createService();
       await restarted.init();
       final messages = await restarted.loadMessages(conversation.id);
-      expect(messages.map((message) => message.id), [original.id, edited.id]);
-      final after = messages.last;
+      expect(messages.map((message) => message.id), [edited.id]);
+      final after = messages.single;
       expect(after.parts.map((part) => part.kind), ['text', 'file', 'future']);
       expect((after.parts[0] as TextPart).text, 'after');
       expect((after.parts[1] as FilePart).name, 'new.pdf');
@@ -1179,4 +1308,64 @@ void main() {
     );
     expect(page!.slots.single.message.id, original.id);
   });
+
+  test('tree timeline projects the active branch after switching', () async {
+    final branched = await createBranchedService('branch-timeline.sqlite');
+    final service = branched.service;
+
+    await service.switchConversationBranch(
+      conversationId: 'conversation-branch',
+      branchId: 'old',
+    );
+    final oldPage = await service.loadTimelinePage(
+      'conversation-branch',
+      fromStart: true,
+      limit: 10,
+    );
+    expect(oldPage!.slots.map((slot) => slot.message.id), const [
+      'u1',
+      'a1-v0',
+      'u2-v0',
+    ]);
+
+    await service.switchConversationBranch(
+      conversationId: 'conversation-branch',
+      branchId: 'root',
+    );
+    final rootPage = await service.loadTimelinePage(
+      'conversation-branch',
+      fromStart: true,
+      limit: 10,
+    );
+    expect(rootPage!.slots.map((slot) => slot.message.id), const [
+      'u1',
+      'a1-v1',
+      'u2-v1',
+    ]);
+  });
+
+  test(
+    'deleteBranchSiblings deletes the selected subtree and keeps its sibling',
+    () async {
+      final branched = await createBranchedService('branch-siblings.sqlite');
+      final repository = branched.repository;
+      final service = branched.service;
+
+      final deleted = await service.deleteBranchSiblings(
+        conversationId: 'conversation-branch',
+        messageId: 'a1-v1',
+      );
+
+      expect(deleted, containsAll(<String>['a1-v1', 'u2-v1']));
+      expect(deleted, isNot(containsAll(<String>['u1', 'a1-v0', 'u2-v0'])));
+      expect(await repository.getMessage('u1'), isNotNull);
+      expect(await repository.getMessage('a1-v0'), isNotNull);
+      expect(await repository.getMessage('a1-v1'), isNull);
+      expect(await repository.getMessage('u2-v0'), isNotNull);
+      expect(await repository.getMessage('u2-v1'), isNull);
+      final tree = await repository.loadConversationTree('conversation-branch');
+      expect(tree, isNotNull);
+      expect(tree!.activePath(), const ['u1', 'a1-v0', 'u2-v0']);
+    },
+  );
 }

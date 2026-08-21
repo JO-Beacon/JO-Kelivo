@@ -1,12 +1,12 @@
 import 'dart:io' show Platform;
 import 'package:flutter_background/flutter_background.dart';
 
-/// Simple manager for enabling/disabling background execution on Android.
-/// All calls are no-ops on non-Android platforms.
+/// 用于在 Android 上启用或禁用后台执行的简单管理器。
+/// 在非 Android 平台上，所有调用均为空操作。
 class AndroidBackgroundManager {
   static bool _initialized = false;
 
-  /// Initialize the plugin once and request needed permissions.
+  /// 初始化插件一次，并请求所需权限。
   static Future<bool> ensureInitialized({
     required String notificationTitle,
     required String notificationText,
@@ -18,7 +18,7 @@ class AndroidBackgroundManager {
         notificationTitle: notificationTitle,
         notificationText: notificationText,
         notificationImportance: AndroidNotificationImportance.normal,
-        // Explicitly use app launcher icon from mipmap to avoid resource resolution issues
+        // 显式使用 mipmap 中的应用启动图标，以避免资源解析问题
         notificationIcon: const AndroidResource(
           name: 'ic_launcher',
           defType: 'mipmap',
@@ -34,11 +34,11 @@ class AndroidBackgroundManager {
     }
   }
 
-  /// Enable/disable background execution. Requires [ensureInitialized] to have run.
+  /// 启用或禁用后台执行。需要先运行 [ensureInitialized]。
   static Future<void> setEnabled(bool enable) async {
     if (!Platform.isAndroid) return;
     try {
-      // Short-circuit if state already matches
+      // 如果状态已经匹配，则直接返回
       try {
         final current = FlutterBackground.isBackgroundExecutionEnabled;
         if (current == enable) return;
@@ -50,17 +50,17 @@ class AndroidBackgroundManager {
         }
         await FlutterBackground.enableBackgroundExecution();
       } else {
-        // Try to disable without forcing initialization to avoid permission prompts
+        // 尝试在不强制初始化的情况下禁用，以避免弹出权限提示
         try {
           await FlutterBackground.disableBackgroundExecution();
         } catch (_) {}
       }
     } catch (_) {
-      // ignore runtime errors; best effort only
+      // 忽略运行时错误；仅尽力而为
     }
   }
 
-  /// Convenience to query whether background execution is currently enabled.
+  /// 查询当前是否已启用后台执行的便捷方法。
   static Future<bool> isEnabled() async {
     if (!Platform.isAndroid) return false;
     try {

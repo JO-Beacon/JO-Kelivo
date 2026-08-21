@@ -16,14 +16,14 @@ class LegacyDecodeResult {
   });
 }
 
-/// Decode legacy marker-bearing content into structured [MessagePart]s.
+/// 将带旧版标记的 content 解码为结构化 [MessagePart]。
 ///
-/// This is the only runtime-adjacent place allowed to recognize
-/// `[image:…]` / `[file:…]` markers. Production send/render paths must not
-/// reintroduce marker parsing.
+/// 这是唯一允许识别
+/// `[image:…]` / `[file:…]` 标记的运行时相关位置。生产环境的发送/渲染路径不得
+/// 重新引入标记解析。
 ///
-/// When [existingParts] already contains image/file parts, the input is
-/// returned unchanged (message-level idempotency).
+/// 当 [existingParts] 已包含 image/file part 时，输入原样
+/// 返回（消息级幂等）。
 Future<LegacyDecodeResult> decodeLegacyContent(
   String content, {
   List<MessagePart>? existingParts,
@@ -55,9 +55,9 @@ Future<LegacyDecodeResult> decodeLegacyContent(
   var malformed = 0;
   var missingFiles = 0;
   _FenceState? fence;
-  // When a convertible marker is removed between text runs, keep one newline so
-  // joining TextPart payloads (no separator) yields `a\nb` rather than `ab`.
-  // The separator is the original ending that followed the preceding text line.
+  // 当可转换标记在文本片段之间被移除时，保留一个换行符，使
+  // TextPart 载荷拼接（无分隔符）得到 `a\nb` 而非 `ab`。
+  // 该分隔符是前一段文本行原本的结尾。
   String? pendingEnding;
   String lastFlushedEol = '\n';
 
@@ -166,13 +166,13 @@ Future<LegacyDecodeResult> decodeLegacyContent(
   );
 }
 
-/// Independently strip convertible exclusive markers from legacy content and
-/// return the remaining text segments (with newlines preserved across removed
-/// markers). Used for migration digest expectations so validation does not
-/// merely echo decoder [TextPart] objects.
+/// 独立地从旧版 content 中剥离可转换的独占标记，并
+/// 返回剩余的文本段（在移除的标记间保留换行符）。
+/// 用于迁移摘要预期，使校验不会
+/// 只是回显解码器的 [TextPart] 对象。
 ///
-/// Joining the returned segments with an empty separator matches
-/// [ChatMessage.content] after a successful decode of the same input.
+/// 用空分隔符拼接返回的段，等于对同一输入
+/// 成功解码后的 [ChatMessage.content]。
 List<String> stripLegacyContentTextSegments(String content) {
   if (content.isEmpty) return const [''];
 
@@ -247,11 +247,10 @@ List<String> stripLegacyContentTextSegments(String content) {
   }
 
   flushText();
-  // Reaching here with no segments means every line was a convertible marker
-  // (empty content already returned [''] above). The decoder emits no TextPart
-  // for such attachment-only content and the migration service only
-  // substitutes TextPart('') when the part list is entirely empty, so the
-  // digest expectation must also be empty.
+  // 到达此处却没有段，意味着每行都是可转换标记
+  // （空内容已在上方返回 ['']）。解码器对这种纯附件内容
+  // 不输出 TextPart，迁移服务仅当 part 列表完全为空时
+  // 才替换为 TextPart('')，因此摘要预期也必须为空。
   if (segments.isEmpty) return const <String>[];
   return List<String>.unmodifiable(segments);
 }
@@ -275,9 +274,9 @@ class _FenceState {
   const _FenceState({required this.char, required this.length});
 }
 
-/// Split [content] while preserving each original `\r\n` / `\n` / `\r`
-/// separator. Mirrors `split` on line breaks by keeping a trailing empty line
-/// when [content] ends with a newline.
+/// 拆分 [content] 同时保留每个原始 `\r\n` / `\n` / `\r`
+/// 分隔符。镜像 `split` 对换行的处理：当 [content] 以换行结尾时
+/// 保留尾部空行。
 List<_ContentLine> _splitKeepingEndings(String content) {
   if (content.isEmpty) return const <_ContentLine>[];
 
@@ -296,7 +295,7 @@ List<_ContentLine> _splitKeepingEndings(String content) {
   if (start < content.length) {
     out.add(_ContentLine(text: content.substring(start), eol: ''));
   } else {
-    // Trailing newline → empty final line, matching String.split behavior.
+    // 尾部换行 → 末尾空行，与 String.split 行为一致。
     out.add(const _ContentLine(text: '', eol: ''));
   }
   return out;
@@ -314,9 +313,9 @@ String _joinContentLines(List<_ContentLine> lines) {
   return buffer.toString();
 }
 
-/// CommonMark opening fence: optional 0–3 spaces + run of 3+ ` or ~.
-/// Info string is allowed only on the opening fence; backtick fences reject
-/// info strings that themselves contain backticks.
+/// CommonMark 开场围栏：可选 0–3 个空格 + 3 个及以上的 ` 或 ~。
+/// info string 仅在开场围栏允许；反引号围栏拒绝
+/// 自身包含反引号的 info string。
 _FenceState? _matchOpeningFence(String line) {
   final match = _openingFence.firstMatch(line);
   if (match == null) return null;
@@ -327,8 +326,8 @@ _FenceState? _matchOpeningFence(String line) {
   return _FenceState(char: char, length: run.length);
 }
 
-/// CommonMark closing fence: optional 0–3 spaces + run of the same character
-/// with length >= opening length, then optional spaces to EOL only.
+/// CommonMark 闭合围栏：可选 0–3 个空格 + 相同字符的连续段
+/// 长度 >= 开场长度，之后仅允许到行尾的可选空格。
 bool _isClosingFence(String line, _FenceState fence) {
   final escaped = RegExp.escape(fence.char);
   final closing = RegExp('^( {0,3})($escaped{${fence.length},}) *\$');
@@ -347,7 +346,7 @@ String? _matchExclusiveFileMarker(String line) {
 }
 
 ({String uri, String name, String mime})? _parseFileMarker(String inner) {
-  // Re-validate against the strict 3-segment form on the reconstructed line.
+  // 对重构后的行按严格的 3 段格式重新校验。
   final match = _validFileSegments.firstMatch('[file:$inner]');
   if (match == null) return null;
   final uri = match.group(1)!.trim();
@@ -360,7 +359,7 @@ String? _matchExclusiveFileMarker(String line) {
 bool _isLocalPath(String uri) => !isRemoteOrDataUri(uri);
 
 bool _defaultFileExists(String path) {
-  // Do not use fix(): its generic `/images/`·basename probe can mark a
-  // missing external path available when a same-named managed file exists.
+  // 不要使用 fix()：其通用的 `/images/`·basename 探测在存在同名受管文件时，
+  // 可能把缺失的外部路径标记为可用。
   return SandboxPathResolver.localFileExists(path);
 }

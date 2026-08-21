@@ -17,9 +17,9 @@ import '../../shared/widgets/snackbar.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
-/// Desktop: TTS (语音服务) right-side pane
-/// Adapts mobile TTS page to desktop with hoverable list card style
-/// similar to DesktopSearchServicesPane.
+/// 桌面 TTS（语音服务）右侧面板。
+/// 将移动端 TTS 页面适配为桌面端，使用类似 DesktopSearchServicesPane
+/// 的可悬停列表卡片样式。
 class DesktopTtsServicesPane extends StatefulWidget {
   const DesktopTtsServicesPane({super.key});
   @override
@@ -70,11 +70,11 @@ class _DesktopTtsServicesPaneState extends State<DesktopTtsServicesPane> {
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
-              // On desktop we do not provide System TTS (flutter_tts disabled)
-              // so we skip the System TTS card entirely.
+              // 桌面端不提供系统 TTS（flutter_tts 已禁用），
+              // 因此完全跳过系统 TTS 卡片。
               const SliverToBoxAdapter(child: SizedBox(height: 8)),
 
-              // Network TTS services list
+              // 网络 TTS 服务列表
               SliverToBoxAdapter(child: _NetworkTtsList()),
               const SliverToBoxAdapter(
                 child: AsrServicesSection(desktop: true),
@@ -249,7 +249,7 @@ class _NetworkServiceCardState extends State<_NetworkServiceCard> {
                     icon: lucide.Lucide.Trash2,
                     onTap: widget.onDelete,
                   ),
-                  // no check icon on desktop
+                  // 桌面端不显示对勾图标
                 ],
               ),
               if (_error != null && _error!.isNotEmpty) ...[
@@ -337,7 +337,7 @@ void _showErrorDialog(BuildContext context, String message) {
               const SizedBox(height: 10),
               _deskDivider(ctx),
               const SizedBox(height: 10),
-              // Make error content scrollable to avoid overflow
+              // 让错误内容可滚动，避免溢出
               Flexible(
                 child: SingleChildScrollView(
                   child: SelectableText(
@@ -504,7 +504,7 @@ class _SystemTtsCardState extends State<_SystemTtsCard> {
           constraints: const BoxConstraints(minHeight: 64),
           child: Row(
             children: [
-              // Brand-like circular badge with a speaker icon
+              // 带扬声器图标的品牌风格圆形徽章
               _CircleIconBadge(icon: lucide.Lucide.Volume2, size: 24),
               const SizedBox(width: 10),
               Expanded(
@@ -615,7 +615,7 @@ class _SystemTtsCardState extends State<_SystemTtsCard> {
                   const SizedBox(height: 10),
                   _deskDivider(context),
                   const SizedBox(height: 10),
-                  // Engine selection
+                  // 引擎选择
                   FutureBuilder<List<String>>(
                     future: tts.listEngines(),
                     builder: (context, snap) {
@@ -637,7 +637,7 @@ class _SystemTtsCardState extends State<_SystemTtsCard> {
                     },
                   ),
                   const SizedBox(height: 6),
-                  // Language selection
+                  // 语言选择
                   FutureBuilder<List<String>>(
                     future: tts.listLanguages(),
                     builder: (context, snap) {
@@ -717,7 +717,7 @@ class _SystemTtsCardState extends State<_SystemTtsCard> {
   }
 }
 
-// --------- Small UI helpers (local to this file) ---------
+// --------- 本文件局部的小型 UI 辅助函数 ---------
 
 class _CircleIconBadge extends StatelessWidget {
   const _CircleIconBadge({required this.icon, this.size = 24});
@@ -871,7 +871,7 @@ Future<TtsServiceOptions?> _showNetworkDialog(
   final l10n = AppLocalizations.of(context)!;
   NetworkTtsKind kind = initial?.kind ?? NetworkTtsKind.openai;
   final nameCtl = TextEditingController(text: initial?.name ?? '');
-  // Common fields
+  // 公共字段
   final apiKeyCtl = TextEditingController(
     text: (initial is OpenAiTtsOptions)
         ? initial.apiKey
@@ -1125,13 +1125,13 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                     const SizedBox(height: 10),
                     _deskDivider(context),
                     const SizedBox(height: 10),
-                    // Scrollable form area
+                    // 可滚动表单区域
                     Flexible(
                       child: SingleChildScrollView(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // Provider kind
+                            // 供应商类型
                             _SelectRow(
                               label: l10n.ttsServicesDialogProviderType,
                               value: networkTtsKindDisplayName(kind),
@@ -1596,7 +1596,7 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                         ),
                       ),
                     ),
-                    // Actions
+                    // 操作按钮
                     Align(
                       alignment: Alignment.centerRight,
                       child: Row(

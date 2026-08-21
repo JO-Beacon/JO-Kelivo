@@ -28,10 +28,10 @@ final class _RestorePreparationCleanupException implements Exception {
       'Restore preparation failed ($error) and cleanup failed ($cleanupError)';
 }
 
-/// Stages and logically publishes a validated restore bundle for startup.
+/// 暂存并在逻辑上发布一个经过验证的恢复 bundle，供启动使用。
 ///
-/// A successful result owns its durably published workspace until the next
-/// startup gate finalizes and archives the run.
+/// 成功的结果会一直拥有其持久发布的工作区，直到下一个
+/// 启动门最终确定并归档这次运行。
 final class RestoreBundlePreparation {
   RestoreBundlePreparation._();
 

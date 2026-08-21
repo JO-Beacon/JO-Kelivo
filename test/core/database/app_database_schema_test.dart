@@ -1,7 +1,11 @@
+import 'dart:io';
+
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:drift_dev/api/migrations_native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'package:Kelivo/core/database/app_database.dart';
 
@@ -16,9 +20,9 @@ void main() {
     verifier = SchemaVerifier(GeneratedHelper());
   });
 
-  test('frozen schema includes and matches current schema 1', () async {
-    expect(AppDatabase.currentSchemaVersion, 1);
-    expect(GeneratedHelper.versions, [AppDatabase.currentSchemaVersion]);
+  test('frozen schema includes and matches current schema 3', () async {
+    expect(AppDatabase.currentSchemaVersion, 3);
+    expect(GeneratedHelper.versions, const [1, 2, 3]);
     final database = AppDatabase(NativeDatabase.memory());
     try {
       await database.customSelect('SELECT 1;').getSingle();
@@ -32,7 +36,7 @@ void main() {
     }
   });
 
-  test('schema 1 creates every business and asset persistence table', () async {
+  test('schema 3 creates every business and tree persistence table', () async {
     final database = AppDatabase(NativeDatabase.memory());
     try {
       final rows = await database
@@ -43,6 +47,9 @@ void main() {
       expect(
         tables,
         containsAll(const {
+          'message_tree_edge_rows',
+          'conversation_branch_rows',
+          'conversation_tree_state_rows',
           'assistant_rows',
           'provider_rows',
           'provider_group_rows',
@@ -71,24 +78,26 @@ void main() {
   });
 
   test('unpublished schema is rejected instead of migrated', () async {
-    final database = AppDatabase(
-      NativeDatabase.memory(
-        setup: (rawDatabase) {
-          rawDatabase.userVersion = 2;
-        },
-      ),
+    final directory = await Directory.systemTemp.createTemp(
+      'kelivo_too_new_schema_',
     );
+    addTearDown(() async {
+      if (await directory.exists()) await directory.delete(recursive: true);
+    });
+    final file = File(p.join(directory.path, AppDatabase.databaseFileName));
+    final raw = sqlite.sqlite3.open(file.path);
+    raw.userVersion = 4;
+    raw.close();
+
+    final database = AppDatabase.open(file: file);
     try {
-      await expectLater(
-        database.customSelect('SELECT 1;').getSingle(),
-        throwsA(
-          isA<StateError>().having(
-            (error) => error.message,
-            'message',
-            'database_schema_version',
-          ),
-        ),
-      );
+      Object? caught;
+      try {
+        await database.customSelect('SELECT 1;').getSingle();
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught.toString(), contains('database_schema_too_new'));
     } finally {
       await database.close();
     }

@@ -7,8 +7,7 @@ import 'package:path/path.dart' as p;
 
 import 'restore_durability.dart';
 
-/// Thrown when another business process or this Dart process already owns the
-/// restore business lease.
+/// 当另一个业务进程或此 Dart 进程已拥有恢复业务租约时抛出。
 final class RestoreBusinessLeaseUnavailable implements Exception {
   const RestoreBusinessLeaseUnavailable(this.path, {this.cause});
 
@@ -19,13 +18,10 @@ final class RestoreBusinessLeaseUnavailable implements Exception {
   String toString() => 'Restore business lease is unavailable: $path';
 }
 
-/// A process-lifetime lease preventing restore cutover from overlapping an
-/// already running business process.
+/// 一个进程生命周期租约，防止恢复切换与已在运行的业务进程重叠。
 ///
-/// The operating-system advisory lock is non-blocking. The process registry is
-/// also required because POSIX advisory locks have process-wide semantics and
-/// may otherwise allow the same Dart process to appear to acquire the lock
-/// more than once.
+/// 操作系统咨询锁是非阻塞的。进程注册表也是必需的，因为 POSIX 咨询锁
+/// 具有进程级语义，否则可能让同一个 Dart 进程看起来多次获取该锁。
 final class RestoreBusinessLease {
   RestoreBusinessLease._({
     required this.lockFile,
@@ -46,10 +42,10 @@ final class RestoreBusinessLease {
   final File lockFile;
   final String instanceId;
 
-  /// Stable native process identity captured when this lease was acquired.
+  /// 获取此租约时捕获的稳定原生进程标识。
   ///
-  /// Unlike [instanceId], reacquiring the lease in the same OS process keeps
-  /// this value unchanged. It is intentionally part of cold-restart proof.
+  /// 与 [instanceId] 不同，在同一操作系统进程中重新获取租约
+  /// 会保持此值不变。它被有意纳入冷重启证明的一部分。
   final int processId;
   final File _processOwnerFile;
   final _ProcessOwnerProbe _processOwnerProbe;
@@ -58,10 +54,10 @@ final class RestoreBusinessLease {
 
   bool get isClosed => _handle == null;
 
-  /// Acquires the fixed AppData business lease without waiting.
+  /// 以非等待方式获取固定的 AppData 业务租约。
   ///
-  /// [RestoreBusinessLeaseUnavailable] means that the exact lease is already
-  /// held. Other filesystem or durability failures are propagated unchanged.
+  /// [RestoreBusinessLeaseUnavailable] 表示该租约已被持有。
+  /// 其他文件系统或持久性故障会原样传播。
   static Future<RestoreBusinessLease> acquire({
     required Directory appDataDirectory,
     RestoreDurability? durability,
@@ -161,7 +157,7 @@ final class RestoreBusinessLease {
     }
   }
 
-  /// Releases this lease. Repeated calls are harmless.
+  /// 释放此租约。重复调用是无害的。
   Future<void> close() async {
     final handle = _handle;
     if (handle == null) return;
@@ -259,9 +255,8 @@ final class RestoreBusinessLease {
           if (await _ProcessOwnerProbe.isLive(ownerFile)) {
             throw RestoreBusinessLeaseUnavailable(registryKey);
           }
-          // The OS lock has already been acquired and the same-PID isolate
-          // probe is no longer live. This is the orphan left by hot restart or
-          // Android engine recreation, so every build mode may reclaim it.
+          // OS 锁已获取，同 PID 的 isolate 探针也不再存活。这是热重启或
+          // Android 引擎重建留下的孤儿，因此每种构建模式都可以回收它。
           await _deleteProcessOwner(ownerFile);
         } else {
           throw StateError('restore_business_lease_process_owner');
@@ -304,8 +299,8 @@ final class RestoreBusinessLease {
         try {
           await _deleteProcessOwner(ownerFile);
         } catch (_) {
-          // Preserve the durability failure. A leftover marker is intentionally
-          // fail-closed and will be cleaned by a later different process.
+          // 保留持久性故障。遗留标记被有意设计为 fail-closed，
+          // 稍后会由另一个不同的进程清理。
         }
         Error.throwWithStackTrace(error, stackTrace);
       }
@@ -333,9 +328,8 @@ final class RestoreBusinessLease {
       if (p.equals(entity.path, currentOwner.path)) continue;
       await File(entity.path).delete();
     }
-    // Owner markers coordinate live isolates only. The OS file lock remains
-    // authoritative across processes, so stale-marker cleanup needs no
-    // post-crash durability barrier.
+    // Owner 标记只协调存活的 isolate。OS 文件锁在进程之间仍然具有权威性，
+    // 因此清理陈旧标记不需要崩溃后的持久性屏障。
   }
 
   static Future<void> _deleteProcessOwner(File ownerFile) async {
@@ -423,7 +417,7 @@ final class _ProcessOwnerProbe {
       socket.writeln(request == _token ? 'alive' : 'denied');
       await socket.flush();
     } catch (_) {
-      // A malformed probe is not a lease failure.
+      // 格式错误的探测不是租约故障。
     } finally {
       await socket.close();
     }

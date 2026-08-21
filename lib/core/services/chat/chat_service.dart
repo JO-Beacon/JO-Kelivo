@@ -5,7 +5,6 @@ import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 import '../../database/app_database.dart';
@@ -17,6 +16,7 @@ import '../../database/generation_run.dart';
 import '../../models/chat_message.dart';
 import '../../models/message_part.dart';
 import '../../models/conversation.dart';
+import '../../models/conversation_tree.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/app_directories.dart';
 
@@ -61,7 +61,7 @@ class ChatService extends ChangeNotifier {
     ChatDatabaseRepository? existingRepository,
     AssetContentHash? assetContentHash,
   }) : _databaseGateway = databaseGateway ?? ChatDatabaseGateway.instance,
-       // Public injection name intentionally omits the private-field prefix.
+       // 公共注入名称有意省略私有字段前缀。
        // ignore: prefer_initializing_formals
        _existingRepository = existingRepository,
        _assetContentHash = assetContentHash ?? _hashAssetFile;
@@ -75,8 +75,8 @@ class ChatService extends ChangeNotifier {
   static const int _messageCacheMaxEntries = 720;
   static const int _messageCacheMaxBytes = 8 * 1024 * 1024;
 
-  // Kill switch for the loadTimelinePage in-memory fast path; set to false to
-  // force the database path everywhere.
+  // loadTimelinePage 内存快速路径的总开关；设为 false 会
+  // 强制所有场景走数据库路径。
   static bool timelineCacheFastPathEnabled = true;
   static const int _assetReferenceBackfillVersion = 2;
   static const Duration _assetGcDelay = Duration(days: 7);
@@ -90,19 +90,16 @@ class ChatService extends ChangeNotifier {
   ChatDatabaseLease? _databaseLease;
   Future<void>? _assetReferenceMaintenanceFuture;
   Future<void>? _postStartupAssetMaintenanceFuture;
-  // Per-conversation full message-ID skeleton backfill kicked off by
-  // loadTimelinePage so first paint is not blocked on getMessageIds.
-  // Futures cover idle wait + query and are awaitable before idle fires.
-  final Map<String, Future<void>> _messageOrderBackfillFutures = {};
-  // Completing these aborts the idle wait (close) without resurrecting order.
-  final Map<String, Completer<void>> _messageOrderBackfillAbort = {};
 
   String? _currentConversationId;
   final Map<String, List<ChatMessage>> _messagesCache = {};
+  // 为组导向操作加载的正文可能包含隐藏的兄弟分支。
+  // 它们不得污染活动时间线投影。
+  final Map<String, List<ChatMessage>> _groupMessagesCache = {};
   final Map<String, Conversation> _conversationsCache = {};
   final Map<String, Conversation> _draftConversations = {};
   final Set<String> _temporaryConversationIds = <String>{};
-  // Evicting these ids could reopen persistence races with background work.
+  // 逐出这些 id 可能会重新引入与后台工作的持久化竞争。
   final Set<String> _discardedTemporaryConversationIds = <String>{};
   final Set<String> _discardedTemporaryMessageIds = <String>{};
   final Map<String, List<Map<String, dynamic>>> _temporaryToolEvents =
@@ -112,14 +109,13 @@ class ChatService extends ChangeNotifier {
   final Map<String, String> _geminiThoughtSigsCache = {};
   final Map<String, Map<String, int>> _firstGroupIndicesCache = {};
   final Map<String, int> _messageCounts = {};
-  // Invariant: a key is either absent or holds the complete authoritative
-  // message-ID order. Never store a partial / half-filled skeleton.
+  // 不变量：键要么不存在，要么保存完整的权威
+  // 消息 ID 顺序。绝不存储部分或半填充的骨架。
   final Map<String, List<String>> _messageOrderIds = {};
 
-  // OCR identity memo: avoids re-reading image bytes on every send. Validated
-  // by length + mtime so a replaced file is re-hashed; the asset registry's
-  // path→hash rows stay untrusted (a path may point at different historical
-  // assets after content replacement).
+  // OCR 身份记忆：避免每次发送时重新读取图片字节。通过长度 + mtime 验证，
+  // 因此替换后的文件会重新计算哈希；asset 注册表的 path→hash 行始终保持不受信任
+  // （同一路径在内容替换后可能指向不同的历史资产）。
   final Map<String, ({int length, int mtimeMs, String hash})>
   _imageContentHashCache = {};
 
@@ -128,25 +124,17 @@ class ChatService extends ChangeNotifier {
   @visibleForTesting
   int get debugTimelineFastPathHitCount => _timelineFastPathHitCount;
 
-  /// In-flight full order backfill for [conversationId], if any.
-  ///
-  /// [loadTimelinePage] schedules this after caching the first-page window so
-  /// callers (and tests) can await completeness without blocking first paint.
-  @visibleForTesting
-  Future<void>? debugMessageOrderBackfillFuture(String conversationId) =>
-      _messageOrderBackfillFutures[conversationId];
-
-  /// Whether `_messageOrderIds` currently holds a complete skeleton entry.
+  /// 是否已经存在完整的消息顺序骨架条目。
   @visibleForTesting
   bool debugHasMessageOrderSkeleton(String conversationId) =>
       _messageOrderIds.containsKey(conversationId);
 
-  /// Length of the cached order skeleton, or null when absent.
+  /// 缓存的顺序骨架的长度；不存在时为 null。
   @visibleForTesting
   int? debugMessageOrderSkeletonLength(String conversationId) =>
       _messageOrderIds[conversationId]?.length;
 
-  /// Test-only: prime message cache / count / order without private-field access.
+  /// 仅测试用：无需访问私有字段即可预填充消息缓存 / 计数 / 顺序。
   @visibleForTesting
   void debugPrimeMessageCountState(
     String conversationId, {
@@ -170,7 +158,7 @@ class ChatService extends ChangeNotifier {
     }
   }
 
-  // Localized default title for new conversations; set by UI on startup.
+  // 新会话的本地化默认标题；由 UI 在启动时设置。
   String _defaultConversationTitle = 'New Chat';
   void setDefaultConversationTitle(String title) {
     if (title.trim().isEmpty) return;
@@ -181,8 +169,8 @@ class ChatService extends ChangeNotifier {
   Future<void>? _initFuture;
   bool get initialized => _initialized;
 
-  /// Underlying typed repository when ready (after [init], or the injected
-  /// [existingRepository] before init). Null for uninitialized services.
+  /// 就绪后的底层类型化仓库（在 [init] 之后，或初始化前注入的
+  /// [existingRepository]）。未初始化的服务为 null。
   ChatDatabaseRepository? get chatRepositoryOrNull {
     if (_initialized) return _repo;
     return _existingRepository;
@@ -191,9 +179,9 @@ class ChatService extends ChangeNotifier {
   int _statisticsRevision = 0;
   int get statisticsRevision => _statisticsRevision;
 
-  // Bumped only when sidebar list semantics change (conversation add/remove,
-  // rename, pin, ordering via updatedAt, assistant/MCP association). Message
-  // content and streaming updates must not bump it.
+  // 仅在侧边栏列表语义变化时递增（会话添加/移除、
+  // 重命名、置顶、按 updatedAt 排序、assistant/MCP 关联）。消息
+  // 内容和流式更新不得递增它。
   int _conversationListRevision = 0;
   int get conversationListRevision => _conversationListRevision;
 
@@ -240,12 +228,12 @@ class ChatService extends ChangeNotifier {
       _repo = existingRepository;
     }
     try {
-      // Versioned and transactional: normal launches return before scanning rows.
+      // 带版本控制且事务化：正常启动会在扫描行之前返回。
       await _migrateSandboxPaths();
       await _loadConversationsCache();
 
-      // Reset any stale isStreaming flags left over from a previous app crash or
-      // force-quit. After a fresh launch no message can be actively streaming.
+      // 重置上一次应用崩溃或强制退出后遗留的过期 isStreaming 标志。
+      // 全新启动后，不可能有消息仍在主动流式传输。
       await _resetStaleStreamingFlags();
 
       _initialized = true;
@@ -295,20 +283,6 @@ class ChatService extends ChangeNotifier {
         await assetMaintenance;
       } catch (_) {}
     }
-    // Abort idle waits so close never hangs on Priority.idle.
-    for (final abort in _messageOrderBackfillAbort.values) {
-      if (!abort.isCompleted) abort.complete();
-    }
-    _messageOrderBackfillAbort.clear();
-    final orderBackfills = List<Future<void>>.of(
-      _messageOrderBackfillFutures.values,
-    );
-    _messageOrderBackfillFutures.clear();
-    for (final backfill in orderBackfills) {
-      try {
-        await backfill;
-      } catch (_) {}
-    }
     _initialized = false;
     final lease = _databaseLease;
     _databaseLease = null;
@@ -336,8 +310,8 @@ class ChatService extends ChangeNotifier {
     _geminiThoughtSigsCache.clear();
     _messageOrderIds.clear();
     _firstGroupIndicesCache.clear();
-    // Drop stale counts on reload; do not re-fill via full-DB aggregation.
-    // Counts are resolved lazily on read/write paths that need them.
+    // 重新加载时丢弃过期计数；不要通过全库聚合重新填充。
+    // 计数在需要它们的读/写路径上按需解析。
     _messageCounts.clear();
     _conversationsCache
       ..clear()
@@ -349,12 +323,11 @@ class ChatService extends ChangeNotifier {
     _bumpConversationListRevision();
   }
 
-  /// Returns a known in-memory count, or resolves once via the per-conversation
-  /// index and caches it. Never returns the unknown sentinel (-1).
+  /// 返回已知的内存计数，或者通过按会话索引解析一次并缓存。
+  /// 绝不返回未知哨兵值 (-1)。
   ///
-  /// Temporary/draft conversations use in-memory message length and do not hit
-  /// DB. Persisted unknowns query only [_repo.getMessageCount] for that id;
-  /// never [ChatDatabaseRepository.getMessageCountsByConversation].
+  /// 临时/草稿会话使用内存中的消息长度，不会访问数据库。持久化的未知会话只按该 id 查询
+  /// [_repo.getMessageCount]，绝不使用 [ChatDatabaseRepository.getMessageCountsByConversation]。
   Future<int> resolveMessageCount(String conversationId) async {
     if (_temporaryConversationIds.contains(conversationId) ||
         _draftConversations.containsKey(conversationId)) {
@@ -362,7 +335,8 @@ class ChatService extends ChangeNotifier {
     }
     final cached = getMessageCount(conversationId);
     if (cached >= 0) return cached;
-    final count = await _repo.getMessageCount(conversationId);
+    final tree = await _loadOrCreateConversationTree(conversationId);
+    final count = tree.activePath().length;
     _messageCounts[conversationId] = count;
     return count;
   }
@@ -373,138 +347,16 @@ class ChatService extends ChangeNotifier {
   Future<List<String>> _loadMessageOrder(String conversationId) async {
     final cached = _messageOrderIds[conversationId];
     if (cached != null) return cached;
-    final ids = (await _repo.getMessageIds(
-      conversationId,
-    )).toList(growable: true);
-    // Presence means complete & authoritative. A concurrent writer may have
-    // installed a full skeleton (and appended newer ids) while getMessageIds
-    // was in flight — never clobber that with a potentially stale snapshot.
+    final tree = await _loadOrCreateConversationTree(conversationId);
+    final ids = tree.activePath().toList(growable: true);
+    // 存在意味着完整且权威。并发写入方可能在 getMessageIds
+    // 进行中已安装完整骨架（并追加了更新的 id），
+    // 绝不用可能过期的快照覆盖它。
     final raced = _messageOrderIds[conversationId];
     if (raced != null) return raced;
     _messageOrderIds[conversationId] = ids;
     _messageCounts[conversationId] = ids.length;
     return ids;
-  }
-
-  /// Idle-deferred full order backfill. Keeps `_messageOrderIds` absent until a
-  /// complete list is ready. Failure only logs — it never removes a concurrent
-  /// foreground-installed skeleton. Cancel/close leave an absent key absent.
-  ///
-  /// Does not start [getMessageIds] immediately — waits past the next frame,
-  /// then for [SchedulerBinding.scheduleTask] at [Priority.idle] (same pattern
-  /// as chat/home idle warm-ups). Post-frame matters: an idle task alone can
-  /// still start during first-paint sibling awaits (e.g. visible-group preload)
-  /// and contend for SQLite. The registered future covers frame + idle wait +
-  /// query so tests and [close] can await it deterministically.
-  void _scheduleMessageOrderBackfill(String conversationId) {
-    if (_messageOrderIds.containsKey(conversationId)) return;
-    if (_messageOrderBackfillFutures.containsKey(conversationId)) return;
-
-    final abort = Completer<void>();
-    _messageOrderBackfillAbort[conversationId] = abort;
-
-    late final Future<void> backfill;
-    backfill = _runMessageOrderBackfill(conversationId, abort).whenComplete(() {
-      if (identical(_messageOrderBackfillFutures[conversationId], backfill)) {
-        _messageOrderBackfillFutures.remove(conversationId);
-      }
-      if (identical(_messageOrderBackfillAbort[conversationId], abort)) {
-        _messageOrderBackfillAbort.remove(conversationId);
-      }
-    });
-    _messageOrderBackfillFutures[conversationId] = backfill;
-    unawaited(backfill);
-  }
-
-  void _abortMessageOrderBackfill(String conversationId) {
-    final abort = _messageOrderBackfillAbort.remove(conversationId);
-    if (abort != null && !abort.isCompleted) {
-      abort.complete();
-    }
-  }
-
-  /// Returns `false` when [abort] wins before the idle slot is granted.
-  Future<bool> _awaitMessageOrderBackfillSlot(Completer<void> abort) async {
-    try {
-      final binding = SchedulerBinding.instance;
-      // 1) Past the next frame so first paint / visible-group preload DB work
-      // is not contended by a full-ID scan during their awaits.
-      final frame = Completer<void>();
-      binding.addPostFrameCallback((_) {
-        if (!frame.isCompleted) frame.complete();
-      });
-      binding.ensureVisualUpdate();
-      await Future.any<void>([frame.future, abort.future]);
-      if (abort.isCompleted) return false;
-
-      // 2) Project idle-priority slot (chat/home warm-up pattern).
-      await Future.any<void>([
-        binding.scheduleTask<void>(
-          () {},
-          Priority.idle,
-          debugLabel: 'chat.messageOrderBackfill',
-        ),
-        abort.future,
-      ]);
-      return !abort.isCompleted;
-    } catch (_) {
-      // No scheduler binding (rare bare isolates): proceed immediately.
-      return !abort.isCompleted;
-    }
-  }
-
-  Future<void> _runMessageOrderBackfill(
-    String conversationId,
-    Completer<void> abort,
-  ) async {
-    try {
-      if (!await _awaitMessageOrderBackfillSlot(abort)) return;
-      if (_messageOrderIds.containsKey(conversationId)) return;
-
-      // Race the query against abort so [close] never hangs on a gated /
-      // slow getMessageIds. Orphaned queries swallow late errors.
-      final query = Completer<List<String>>();
-      unawaited(() async {
-        try {
-          final ids = (await _repo.getMessageIds(
-            conversationId,
-          )).toList(growable: true);
-          if (!query.isCompleted) query.complete(ids);
-        } catch (error, stack) {
-          if (!query.isCompleted) query.completeError(error, stack);
-        }
-      }());
-      await Future.any<void>([query.future.then((_) {}), abort.future]);
-      if (abort.isCompleted) {
-        unawaited(query.future.catchError((Object _) => <String>[]));
-        return;
-      }
-      final ids = await query.future;
-
-      // Cancel / delete while in flight: do not resurrect a removed skeleton.
-      if (abort.isCompleted) return;
-      final raced = _messageOrderIds[conversationId];
-      if (raced != null) return;
-      if (!_conversationsCache.containsKey(conversationId) &&
-          !_draftConversations.containsKey(conversationId)) {
-        return;
-      }
-      // Existence == complete: install atomically with matching count.
-      _messageOrderIds[conversationId] = ids;
-      _messageCounts[conversationId] = ids.length;
-      // Re-project any already-cached messages through the complete order so
-      // getMessages matches the pre-Issue-7 awaited-skeleton ordering.
-      final cached = _messagesCache[conversationId];
-      if (cached != null) {
-        _cacheLoadedMessages(conversationId, cached);
-      }
-    } catch (error) {
-      // Do not remove caches on failure: this task never installs a partial
-      // skeleton (existence == complete), and a concurrent foreground
-      // `_loadMessageOrder` may have already written a full authoritative
-      // entry while our getMessageIds was in flight.
-      debugPrint('Message order backfill failed for $conversationId: $error');
-    }
   }
 
   Future<List<ChatMessage>> loadActiveTimelineMessages(
@@ -516,26 +368,20 @@ class ChatService extends ChangeNotifier {
         _messagesCache[conversationId] ?? const <ChatMessage>[],
       );
     }
-    final probe = await _repo.loadLinearMessageWindow(
-      conversationId: conversationId,
-      fromStart: true,
-      limit: 1,
-    );
-    if (probe.totalSlotCount == 0) return const <ChatMessage>[];
-    final timeline = await _repo.loadLinearMessageWindow(
-      conversationId: conversationId,
-      fromStart: true,
-      limit: probe.totalSlotCount,
-    );
-    final revisionIds = timeline.slots
-        .map((slot) => slot.revisionId)
-        .toList(growable: false);
+    final tree = await _loadOrCreateConversationTree(conversationId);
+    final revisionIds = tree.activePath();
+    if (revisionIds.isEmpty) return const <ChatMessage>[];
     final messages = await _repo.getMessagesByIds(revisionIds);
     final byId = {for (final message in messages) message.id: message};
-    return List<ChatMessage>.unmodifiable([
-      for (final revisionId in revisionIds)
-        if (byId[revisionId] != null) byId[revisionId]!,
-    ]);
+    final activeMessages = <ChatMessage>[];
+    for (final revisionId in revisionIds) {
+      final message = byId[revisionId];
+      if (message == null) {
+        throw StateError('active_timeline_message_missing');
+      }
+      activeMessages.add(message);
+    }
+    return List<ChatMessage>.unmodifiable(activeMessages);
   }
 
   Future<LoadedTimelinePage?> loadTimelinePage(
@@ -557,69 +403,118 @@ class ChatService extends ChangeNotifier {
         limit: limit,
       );
     }
+    final conversationTree = await _loadOrCreateConversationTree(
+      conversationId,
+    );
+    final activePath = conversationTree.activePath();
+    _messageOrderIds[conversationId] = List<String>.of(activePath);
+    _messageCounts[conversationId] = activePath.length;
     if (timelineCacheFastPathEnabled &&
         !fromStart &&
         beforeRevisionId == null &&
         afterRevisionId == null &&
         aroundRevisionId == null) {
-      final cachedPage = _tryLoadCachedTailPage(conversationId, limit: limit);
+      final cachedPage = _tryLoadCachedTreeTailPage(
+        conversationId,
+        tree: conversationTree,
+        limit: limit,
+      );
       if (cachedPage != null) {
         _timelineFastPathHitCount += 1;
-        _debugVerifyCachedTailPage(cachedPage, limit: limit);
         return cachedPage;
       }
     }
-    final page = await _repo.loadLinearMessageWindow(
-      conversationId: conversationId,
+    final page = await _loadTreeTimelinePage(
+      conversationId,
+      conversationTree,
       beforeRevisionId: beforeRevisionId,
       afterRevisionId: afterRevisionId,
       aroundRevisionId: aroundRevisionId,
       fromStart: fromStart,
       limit: limit,
     );
-    final revisionIds = page.slots
-        .map((slot) => slot.revisionId)
+    if (page == null) return null;
+    final messages = page.slots
+        .map((slot) => slot.message)
         .toList(growable: false);
+    _cacheLoadedMessages(conversationId, messages);
+    await _cacheMessageArtifacts(messages);
+    return page;
+  }
+
+  Future<LoadedTimelinePage?> _loadTreeTimelinePage(
+    String conversationId,
+    ConversationTree tree, {
+    String? beforeRevisionId,
+    String? afterRevisionId,
+    String? aroundRevisionId,
+    required bool fromStart,
+    required int limit,
+  }) async {
+    final cursorCount = <String?>[
+      beforeRevisionId,
+      afterRevisionId,
+      aroundRevisionId,
+    ].whereType<String>().length;
+    if (cursorCount > 1 || (fromStart && cursorCount != 0)) {
+      throw ArgumentError('Only one tree timeline cursor may be supplied.');
+    }
+
+    final path = tree.activePath();
+    var start = 0;
+    var end = path.length;
+    if (fromStart) {
+      end = limit.clamp(0, path.length).toInt();
+    } else if (aroundRevisionId != null) {
+      final targetIndex = path.indexOf(aroundRevisionId);
+      if (targetIndex < 0) return null;
+      start = (targetIndex - (limit ~/ 2)).clamp(0, path.length).toInt();
+      end = (start + limit).clamp(start, path.length).toInt();
+      start = (end - limit).clamp(0, end).toInt();
+    } else if (beforeRevisionId != null) {
+      final targetIndex = path.indexOf(beforeRevisionId);
+      if (targetIndex < 0) return null;
+      end = targetIndex;
+      start = (end - limit).clamp(0, end).toInt();
+    } else if (afterRevisionId != null) {
+      final targetIndex = path.indexOf(afterRevisionId);
+      if (targetIndex < 0) return null;
+      start = targetIndex + 1;
+      end = (start + limit).clamp(start, path.length).toInt();
+    } else {
+      start = (path.length - limit).clamp(0, path.length).toInt();
+    }
+
+    final revisionIds = path.sublist(start, end);
     final messages = await _repo.getMessagesByIds(revisionIds);
-    final byId = {for (final message in messages) message.id: message};
-    String? parentRevisionId;
+    final byId = <String, ChatMessage>{
+      for (final message in messages) message.id: message,
+    };
+    String? parentRevisionId = start == 0 ? null : path[start - 1];
     final loadedSlots = <LoadedTimelineSlot>[];
-    for (final slot in page.slots) {
-      final message = byId[slot.revisionId];
-      if (message == null) continue;
+    for (var index = 0; index < revisionIds.length; index++) {
+      final message = byId[revisionIds[index]];
+      if (message == null) {
+        throw StateError('timeline_selected_revision_shadow_missing');
+      }
       loadedSlots.add(
         LoadedTimelineSlot(
           identity: ActiveTimelineSlot(
-            slotId: slot.groupId,
-            revisionId: slot.revisionId,
+            slotId: message.id,
+            revisionId: message.id,
             parentRevisionId: parentRevisionId,
             role: message.role,
             createdAt: message.timestamp,
             updatedAt: message.timestamp,
             finalizedAt: message.isStreaming ? null : message.timestamp,
-            versionCount: slot.versionCount,
-            logicalIndex: slot.logicalIndex,
+            versionCount: 1,
+            logicalIndex: start + index,
           ),
           message: message,
         ),
       );
       parentRevisionId = message.id;
     }
-    if (loadedSlots.length != page.slots.length) {
-      throw StateError('timeline_selected_revision_shadow_missing');
-    }
-    // First-page paint must not await the full message-ID skeleton. Cache the
-    // window, return, then backfill order in the background. Invariant:
-    // `_messageOrderIds` stays absent until backfill installs a complete list.
-    //
-    // Scroll audit (home_page_controller.scrollToMessageId / post-initChat):
-    // jump uses collapsed-index + loadUntilMessageVisible, not getMessageIndex
-    // on the order skeleton, so an absent order during first paint is safe.
-    // `_tryAppendPersistedTail` already treats missing order (index -1 / count
-    // unknown) as a contiguity miss and falls back to a full reload.
-    _cacheLoadedMessages(conversationId, messages);
-    await _cacheMessageArtifacts(messages);
-    _scheduleMessageOrderBackfill(conversationId);
     return LoadedTimelinePage(
       conversationId: conversationId,
       stateRevision:
@@ -629,9 +524,9 @@ class ChatService extends ChangeNotifier {
           0,
       contextStartRevisionId: null,
       slots: loadedSlots,
-      hasMoreBefore: page.hasMoreBefore,
-      hasMoreAfter: page.hasMoreAfter,
-      totalSlotCount: page.totalSlotCount,
+      hasMoreBefore: start > 0,
+      hasMoreAfter: end < path.length,
+      totalSlotCount: path.length,
     );
   }
 
@@ -743,62 +638,35 @@ class ChatService extends ChangeNotifier {
     );
   }
 
-  // In-memory tail window for loadTimelinePage. Conservative by contract:
-  // anything that cannot be decided exactly from the cache returns null so the
-  // caller falls back to the database.
-  LoadedTimelinePage? _tryLoadCachedTailPage(
+  LoadedTimelinePage? _tryLoadCachedTreeTailPage(
     String conversationId, {
+    required ConversationTree tree,
     required int limit,
   }) {
-    final order = _messageOrderIds[conversationId];
-    if (order == null) return null;
     final conversation = _conversationsCache[conversationId];
-    if (conversation == null) return null;
     final cached = _messagesCache[conversationId];
-    if (cached == null) return null;
+    if (conversation == null || cached == null) return null;
+    final path = tree.activePath();
     final byId = <String, ChatMessage>{
       for (final message in cached) message.id: message,
     };
-    // Group membership, version counts, and the total slot count are only
-    // exact when every skeleton id resolves to a cached message.
-    final groups = <String, List<ChatMessage>>{};
-    final groupOrder = <String>[];
-    for (final id in order) {
-      final message = byId[id];
-      if (message == null) return null;
-      final groupId = message.groupId ?? message.id;
-      final revisions = groups[groupId];
-      if (revisions == null) {
-        groups[groupId] = <ChatMessage>[message];
-        groupOrder.add(groupId);
-      } else {
-        revisions.add(message);
-      }
-    }
-    final selections = conversation.versionSelections;
-    final selected = <ChatMessage>[];
-    for (final groupId in groupOrder) {
-      selected.add(
-        _selectTimelineRevision(groups[groupId]!, selections[groupId]),
-      );
-    }
-    final totalSlots = groupOrder.length;
-    final start = totalSlots > limit ? totalSlots - limit : 0;
-    String? parentRevisionId;
-    final loadedSlots = <LoadedTimelineSlot>[];
-    for (var index = start; index < totalSlots; index++) {
-      final message = selected[index];
-      loadedSlots.add(
+    if (path.any((id) => byId[id] == null)) return null;
+    final start = (path.length - limit).clamp(0, path.length).toInt();
+    String? parentRevisionId = start == 0 ? null : path[start - 1];
+    final slots = <LoadedTimelineSlot>[];
+    for (var index = start; index < path.length; index++) {
+      final message = byId[path[index]]!;
+      slots.add(
         LoadedTimelineSlot(
           identity: ActiveTimelineSlot(
-            slotId: groupOrder[index],
+            slotId: message.id,
             revisionId: message.id,
             parentRevisionId: parentRevisionId,
             role: message.role,
             createdAt: message.timestamp,
             updatedAt: message.timestamp,
             finalizedAt: message.isStreaming ? null : message.timestamp,
-            versionCount: groups[groupOrder[index]]!.length,
+            versionCount: 1,
             logicalIndex: index,
           ),
           message: message,
@@ -810,102 +678,31 @@ class ChatService extends ChangeNotifier {
       conversationId: conversationId,
       stateRevision: conversation.updatedAt.microsecondsSinceEpoch,
       contextStartRevisionId: null,
-      slots: loadedSlots,
+      slots: slots,
       hasMoreBefore: start > 0,
       hasMoreAfter: false,
-      totalSlotCount: totalSlots,
+      totalSlotCount: path.length,
     );
-  }
-
-  // Mirrors the ranking in ChatDatabaseRepository.loadLinearMessageWindow:
-  // the explicitly selected version wins, otherwise the highest version.
-  // Revisions arrive in message_order, so a later entry wins version ties.
-  static ChatMessage _selectTimelineRevision(
-    List<ChatMessage> revisions,
-    int? selectedVersion,
-  ) {
-    if (selectedVersion != null) {
-      ChatMessage? selected;
-      for (final revision in revisions) {
-        if (revision.version == selectedVersion) selected = revision;
-      }
-      if (selected != null) return selected;
-    }
-    var latest = revisions.first;
-    for (final revision in revisions) {
-      if (revision.version >= latest.version) latest = revision;
-    }
-    return latest;
-  }
-
-  void _debugVerifyCachedTailPage(
-    LoadedTimelinePage page, {
-    required int limit,
-  }) {
-    if (!kDebugMode && !kProfileMode) return;
-    final conversationId = page.conversationId;
-    unawaited(() async {
-      try {
-        final window = await _repo.loadLinearMessageWindow(
-          conversationId: conversationId,
-          limit: limit,
-        );
-        // The conversation may have legitimately changed since the hit; only
-        // compare when it is untouched.
-        final current = _conversationsCache[conversationId];
-        if (current == null ||
-            current.updatedAt.microsecondsSinceEpoch != page.stateRevision) {
-          return;
-        }
-        String describe(
-          String groupId,
-          String revisionId,
-          int versionCount,
-          int logicalIndex,
-        ) => '$groupId/$revisionId/$versionCount/$logicalIndex';
-        final expected = [
-          for (final slot in window.slots)
-            describe(
-              slot.groupId,
-              slot.revisionId,
-              slot.versionCount,
-              slot.logicalIndex,
-            ),
-        ];
-        final actual = [
-          for (final slot in page.slots)
-            describe(
-              slot.identity.slotId,
-              slot.identity.revisionId,
-              slot.identity.versionCount,
-              slot.identity.logicalIndex,
-            ),
-        ];
-        final consistent =
-            window.totalSlotCount == page.totalSlotCount &&
-            window.hasMoreBefore == page.hasMoreBefore &&
-            window.hasMoreAfter == page.hasMoreAfter &&
-            listEquals(expected, actual);
-        if (!consistent) {
-          // The database result is authoritative; this indicates a fast-path
-          // bug, not data the caller should act on.
-          debugPrint(
-            'timeline cache fast path mismatch for $conversationId; '
-            'database result is authoritative',
-          );
-          assert(
-            false,
-            'timeline cache fast path mismatch for $conversationId',
-          );
-        }
-      } catch (error) {
-        debugPrint('timeline cache fast path verification failed: $error');
-      }
-    }());
   }
 
   int getContextStartIndex(String conversationId) =>
       _conversationsCache[conversationId]?.truncateIndex ?? -1;
+
+  Future<void> _syncContextBoundaryToActivePath(
+    String conversationId,
+    ConversationTree tree,
+  ) async {
+    final conversation = _conversationsCache[conversationId];
+    if (conversation == null || conversation.truncateIndex < 0) return;
+
+    final activePathLength = tree.activePath().length;
+    final nextTruncateIndex = activePathLength == 0 ? -1 : activePathLength;
+    if (conversation.truncateIndex == nextTruncateIndex) return;
+
+    conversation.truncateIndex = nextTruncateIndex;
+    conversation.updatedAt = DateTime.now();
+    await _saveConversation(conversation);
+  }
 
   Future<void> _cacheMessageArtifacts(Iterable<ChatMessage> messages) async {
     final ids = messages.map((message) => message.id).toSet();
@@ -934,8 +731,8 @@ class ChatService extends ChangeNotifier {
         message.id: message,
       for (final message in messages) message.id: message,
     };
-    // Without the order skeleton an intersection would drop every message just
-    // loaded; keep the merged insertion order instead of filtering to empty.
+    // 没有顺序骨架时，交集会丢弃刚加载的所有消息；
+    // 应保留合并后的插入顺序，而不是过滤成空。
     final order = _messageOrderIds[conversationId];
     _messagesCache[conversationId] = order == null
         ? byId.values.toList(growable: true)
@@ -972,12 +769,11 @@ class ChatService extends ChangeNotifier {
         conversationId == _currentConversationId ||
         _temporaryConversationIds.contains(conversationId);
 
-    // The current conversation is exempt from eviction: its cache upper bound
-    // is the full conversation or the idle-backfill count threshold.
+    // 当前会话免于逐出：其缓存上限
+    // 是整个会话或空闲回填计数阈值。
     //
-    // A conversation that alone exceeds the budget is tail-trimmed (keeps its
-    // most recent messages) instead of cascading an eviction of every other
-    // cached conversation.
+    // 单独一个会话超过预算时，会对其尾部进行裁剪（保留最近的消息），
+    // 而不是连锁驱逐所有其他已缓存的会话。
     for (final conversationId in _messagesCache.keys.toList()) {
       if (isExempt(conversationId)) continue;
       final messages = _messagesCache[conversationId]!;
@@ -1097,8 +893,8 @@ class ChatService extends ChangeNotifier {
         _messageOrderIds.containsKey(conversationId);
   }
 
-  /// Ids only, in message order; never hydrates messages into the LRU cache
-  /// (import merge duplicate checks use this to avoid flushing the cache).
+  /// 仅返回 id，并按消息顺序排列；绝不将消息水合到 LRU 缓存中
+  /// （导入合并查重使用此方法，以避免刷新缓存）。
   Future<List<String>> getMessageIds(String conversationId) async {
     if (_temporaryConversationIds.contains(conversationId)) {
       return [
@@ -1127,7 +923,7 @@ class ChatService extends ChangeNotifier {
     Iterable<String> groupIds,
   ) {
     if (!_initialized) return const <String, int>{};
-    final ids = groupIds.where((id) => id.isNotEmpty).toSet();
+    final ids = groupIds.toSet();
     if (ids.isEmpty) return const <String, int>{};
     final cached = _firstGroupIndicesCache[conversationId] ?? const {};
     return {
@@ -1140,7 +936,7 @@ class ChatService extends ChangeNotifier {
     String conversationId,
     Iterable<String> groupIds,
   ) async {
-    final ids = groupIds.where((id) => id.isNotEmpty).toSet();
+    final ids = groupIds.toSet();
     if (ids.isEmpty) return const {};
     if (_temporaryConversationIds.contains(conversationId) ||
         _draftConversations.containsKey(conversationId)) {
@@ -1167,10 +963,17 @@ class ChatService extends ChangeNotifier {
     Iterable<String> groupIds,
   ) {
     if (!_initialized) return const <ChatMessage>[];
-    final ids = groupIds.where((id) => id.isNotEmpty).toSet();
+    final ids = groupIds.toSet();
     if (ids.isEmpty) return const <ChatMessage>[];
-    final messages = _messagesCache[conversationId] ?? const <ChatMessage>[];
-    return messages
+    final byId = <String, ChatMessage>{
+      for (final message
+          in _messagesCache[conversationId] ?? const <ChatMessage>[])
+        message.id: message,
+      for (final message
+          in _groupMessagesCache[conversationId] ?? const <ChatMessage>[])
+        message.id: message,
+    };
+    return byId.values
         .where((message) => ids.contains(message.groupId ?? message.id))
         .toList(growable: false);
   }
@@ -1183,19 +986,27 @@ class ChatService extends ChangeNotifier {
         _draftConversations.containsKey(conversationId)) {
       return getMessagesForGroups(conversationId, groupIds);
     }
-    // Group-directed preload must not await / install the full order skeleton.
-    // `_cacheLoadedMessages` merges bodies only when order is absent and never
-    // creates a half `_messageOrderIds` or writes `_messageCounts` from a
-    // partial group load (existence == complete).
+    // 面向分组的预加载不得等待或安装完整的顺序骨架。`_cacheLoadedMessages` 只在顺序缺失时合并正文，
+    // 绝不从部分分组加载中创建不完整的 `_messageOrderIds` 或写入 `_messageCounts`
+    // （存在即完整）。
     final messages = await _repo.getMessagesForGroups(conversationId, groupIds);
-    _cacheLoadedMessages(conversationId, messages);
+    final cached = _groupMessagesCache.putIfAbsent(
+      conversationId,
+      () => <ChatMessage>[],
+    );
+    final byId = <String, ChatMessage>{
+      for (final message in cached) message.id: message,
+      for (final message in messages) message.id: message,
+    };
+    cached
+      ..clear()
+      ..addAll(byId.values);
     await _cacheMessageArtifacts(messages);
     return messages;
   }
 
-  /// Loads only the persisted revision ids of [conversationId]. Merge-dedup
-  /// checks must not hydrate full messages into the cache, so this goes
-  /// through the id-order skeleton instead of [loadMessages].
+  /// 仅加载 [conversationId] 已持久化的修订 id。合并去重检查不得将完整消息水合到缓存中，
+  /// 因此这里通过 id 顺序骨架处理，而不是 [loadMessages]。
   Future<Set<String>> loadPersistedMessageIds(String conversationId) async {
     if (_temporaryConversationIds.contains(conversationId) ||
         _draftConversations.containsKey(conversationId)) {
@@ -1204,8 +1015,10 @@ class ChatService extends ChangeNotifier {
           .toSet();
     }
     if (!_initialized) return const <String>{};
-    final order = await _loadMessageOrder(conversationId);
-    return order.toSet();
+    // 合并/去重必须检查每个持久化修订，包括隐藏的
+    // 兄弟分支。这刻意独立于聊天界面使用的活动
+    // 时间线缓存。
+    return (await _repo.getMessageIds(conversationId)).toSet();
   }
 
   Future<List<ConversationSearchMatch>> searchConversationMatches({
@@ -1247,7 +1060,7 @@ class ChatService extends ChangeNotifier {
     return _messagesCache[conversationId] ?? const [];
   }
 
-  // Same completeness judgment the loadMessages cache-hit branch uses.
+  // 与 loadMessages 缓存命中分支使用相同的完整性判断。
   bool isConversationFullyCached(String conversationId) {
     if (!_initialized) return false;
     final cached = _messagesCache[conversationId];
@@ -1260,12 +1073,10 @@ class ChatService extends ChangeNotifier {
 
   static const int _titleSourceMaxChars = 3000;
 
-  /// Builds the source text for LLM title generation.
+  /// 构建用于 LLM 标题生成的源文本。
   ///
-  /// Collects the conversation tail (most recent ~3000 content characters,
-  /// honoring the conversation's logical truncateIndex) identically on both
-  /// paths: served from the cache when the conversation is fully cached,
-  /// otherwise paged from the selected logical timeline.
+  /// 以两种路径完全相同的方式收集会话尾部（最近的约 3000 个内容字符，并遵循会话的逻辑 truncateIndex）：
+  /// 会话完全缓存时从缓存提供，否则从选定的逻辑时间线分页获取。
   Future<String> generateTitleSource(String conversationId) async {
     if (!_initialized) return '';
     if (_conversationForMessages(conversationId) == null) return '';
@@ -1337,10 +1148,9 @@ class ChatService extends ChangeNotifier {
     return selected;
   }
 
-  /// In-memory equivalent of [_loadTitleSourceTail]: walks the fully cached
-  /// message list from the tail and keeps the most recent messages whose
-  /// content totals at least [_titleSourceMaxChars] characters, so both
-  /// `generateTitleSource` paths feed the model the same window.
+  /// [_loadTitleSourceTail] 的内存等价实现：从尾部遍历完全缓存的消息列表，
+  /// 保留内容合计至少达到 [_titleSourceMaxChars] 个字符的最近消息，
+  /// 因此两条 `generateTitleSource` 路径都会向模型提供相同的窗口。
   List<ChatMessage> _titleSourceTailWindow(
     List<ChatMessage> messages,
     int start,
@@ -1392,7 +1202,7 @@ class ChatService extends ChangeNotifier {
 
   Future<List<ChatMessage>> loadMessages(String conversationId) async {
     if (!_initialized) return const [];
-    // Require a known count: unknown (-1) must not short-circuit as a cache hit.
+    // 要求已知计数：未知值 (-1) 不得作为缓存命中短路。
     if (isConversationFullyCached(conversationId)) {
       return _messagesCache[conversationId]!;
     }
@@ -1401,46 +1211,27 @@ class ChatService extends ChangeNotifier {
         _draftConversations[conversationId];
     if (conversation == null) return [];
 
-    final List<ChatMessage> messages;
     if (_temporaryConversationIds.contains(conversationId)) {
-      messages = _messagesCache[conversationId] ?? const <ChatMessage>[];
-    } else {
-      final total = await _resolveMessageCount(conversationId);
-      messages = await _repo.getMessagesRange(
-        conversationId,
-        start: 0,
-        limit: total,
-      );
+      return _messagesCache[conversationId] ?? const <ChatMessage>[];
     }
 
-    if (!_temporaryConversationIds.contains(conversationId)) {
-      await _cacheMessageArtifacts(messages);
-      // A full read sorted by message_order is the authoritative order; backfill
-      // the skeleton so later windowed loads don't intersect against stale data.
-      // Merge instead of replacing outright: a concurrent addMessage may have
-      // appended ids while the reads above were in flight, and dropping them
-      // here would lose them for good (_loadMessageOrder short-circuits on the
-      // cached skeleton and never rebuilds it).
-      final orderedIds = messages
-          .map((message) => message.id)
-          .toList(growable: true);
-      final existingOrder = _messageOrderIds[conversationId];
-      if (existingOrder != null && existingOrder.isNotEmpty) {
-        final snapshotIds = orderedIds.toSet();
-        for (final id in existingOrder) {
-          if (!snapshotIds.contains(id)) orderedIds.add(id);
-        }
-      }
-      _messageOrderIds[conversationId] = orderedIds;
-      _messageCounts[conversationId] = orderedIds.length;
-    }
+    await reloadActiveTimelineCache(conversationId);
+    return _messagesCache[conversationId] ?? const <ChatMessage>[];
+  }
 
-    // Merge into the cache instead of replacing it: a concurrent addMessage
-    // may have appended a message while the reads above were in flight, and
-    // it must survive alongside the snapshot (mirrors the order skeleton
-    // merge above).
-    _cacheLoadedMessages(conversationId, messages);
-    return messages;
+  /// 加载所有持久化消息修订版本，包括隐藏树分支。
+  Future<List<ChatMessage>> loadAllConversationMessages(
+    String conversationId,
+  ) async {
+    if (!_initialized) return const <ChatMessage>[];
+    if (_temporaryConversationIds.contains(conversationId) ||
+        _draftConversations.containsKey(conversationId)) {
+      return _messagesCache[conversationId] ?? const <ChatMessage>[];
+    }
+    final ids = await _repo.getMessageIds(conversationId);
+    final messages = await _repo.getMessagesByIds(ids);
+    await _cacheMessageArtifacts(messages);
+    return List<ChatMessage>.unmodifiable(messages);
   }
 
   Future<List<ChatMessage>> loadSelectedContextMessages(
@@ -1497,15 +1288,47 @@ class ChatService extends ChangeNotifier {
       final boundedStart = start + (available - limit).clamp(0, available);
       return selected.sublist(boundedStart, end);
     }
-    final messages = await _repo.getSelectedContextMessages(
-      conversationId,
-      truncateIndex: truncateIndex,
-      limit: limit,
-      throughRevisionId: throughRevisionId,
-      includeFollowingAssistant: includeFollowingAssistant,
-    );
+    final tree = await _loadOrCreateConversationTree(conversationId);
+    final path = tree.activePath();
+    var end = path.length;
+    if (throughRevisionId != null) {
+      final target = path.indexOf(throughRevisionId);
+      if (target < 0) return const <ChatMessage>[];
+      end = target + 1;
+      if (includeFollowingAssistant) {
+        final pathMessages = await _repo.getMessagesByIds(path);
+        final byId = <String, ChatMessage>{
+          for (final message in pathMessages) message.id: message,
+        };
+        if (byId[throughRevisionId]?.role == 'user') {
+          for (var index = target + 1; index < path.length; index++) {
+            if (byId[path[index]]?.role == 'assistant') {
+              end = index + 1;
+              break;
+            }
+          }
+        }
+      }
+    }
+    final start = truncateIndex >= 0 && truncateIndex <= end
+        ? truncateIndex
+        : 0;
+    final available = end - start;
+    final boundedStart = start + (available - limit).clamp(0, available);
+    final selectedIds = path.sublist(boundedStart, end);
+    final loaded = await _repo.getMessagesByIds(selectedIds);
+    final byId = <String, ChatMessage>{
+      for (final message in loaded) message.id: message,
+    };
+    final messages = <ChatMessage>[
+      for (final id in selectedIds)
+        if (byId[id] != null) byId[id]!,
+    ];
+    if (messages.length != selectedIds.length) {
+      throw StateError('context_active_path_message_missing');
+    }
     await _cacheMessageArtifacts(messages);
-    return messages;
+    return List<ChatMessage>.unmodifiable(messages);
   }
 
   Future<int> getMaxMessageVersionForGroup(
@@ -1535,7 +1358,7 @@ class ChatService extends ChangeNotifier {
         limit: _messagesCache[conversationId]?.length ?? 0,
       );
     }
-    return _repo.getSelectedMessageProjections(conversationId);
+    return loadActiveTimelineMessages(conversationId);
   }
 
   Future<List<ChatMessage>> loadMessagesByIds(List<String> ids) async {
@@ -1616,13 +1439,27 @@ class ChatService extends ChangeNotifier {
       return const <ChatMessage>[];
     }
 
-    await _loadMessageOrder(conversationId);
-
-    final messages = await _repo.getMessagesRange(
-      conversationId,
-      start: start,
-      limit: limit,
+    final tree = await _loadOrCreateConversationTree(conversationId);
+    final ids = tree.activePath();
+    _messageOrderIds[conversationId] = List<String>.of(ids);
+    _messageCounts[conversationId] = ids.length;
+    final safeStart = start.clamp(0, ids.length).toInt();
+    final safeEnd = (safeStart + limit).clamp(safeStart, ids.length).toInt();
+    if (safeStart >= safeEnd) return const <ChatMessage>[];
+    final loaded = await _repo.getMessagesByIds(
+      ids.sublist(safeStart, safeEnd),
     );
+    final byId = <String, ChatMessage>{
+      for (final message in loaded) message.id: message,
+    };
+    final messages = <ChatMessage>[];
+    for (final id in ids.sublist(safeStart, safeEnd)) {
+      final message = byId[id];
+      if (message == null) {
+        throw StateError('active_timeline_message_missing');
+      }
+      messages.add(message);
+    }
     _cacheLoadedMessages(conversationId, messages);
     await _cacheMessageArtifacts(messages);
     return messages;
@@ -1652,8 +1489,8 @@ class ChatService extends ChangeNotifier {
       return const <ChatMessage>[];
     }
 
-    // Resolve unknown (-1) before empty short-circuit / clamp; -1 must never
-    // reuse the total == 0 branch or become a clamp upper bound.
+    // 在空短路/截断之前先解析未知值 (-1)；-1 绝不能
+    // 复用 total == 0 分支或成为截断上界。
     final total = await _resolveMessageCount(conversationId);
     if (total == 0) return const <ChatMessage>[];
     final minCount = minMessages.clamp(1, total).toInt();
@@ -1745,7 +1582,7 @@ class ChatService extends ChangeNotifier {
     }
   }
 
-  // Create a draft conversation that is not persisted until first message arrives.
+  // 创建一个草稿对话，在首条消息到达前不会持久化。
   Future<Conversation> createDraftConversation({
     String? title,
     String? assistantId,
@@ -1784,6 +1621,7 @@ class ChatService extends ChangeNotifier {
     }
     _draftConversations.remove(id);
     _messagesCache.remove(id);
+    _groupMessagesCache.remove(id);
     if (_currentConversationId == id) {
       _currentConversationId = null;
     }
@@ -1797,7 +1635,7 @@ class ChatService extends ChangeNotifier {
         await _deletePersistedConversation(id);
     if (!deleted) return;
 
-    // Delete orphaned files (not referenced by any remaining conversation)
+    // 删除孤立文件（未被任何剩余对话引用）
     await _cleanupOrphanUploads();
 
     notifyListeners();
@@ -1829,6 +1667,7 @@ class ChatService extends ChangeNotifier {
       _temporaryGeminiThoughtSigs.remove(message.id);
     }
     _messagesCache.remove(id);
+    _groupMessagesCache.remove(id);
     if (_currentConversationId == id) {
       _currentConversationId = null;
     }
@@ -1841,16 +1680,16 @@ class ChatService extends ChangeNotifier {
 
     await _repo.deleteConversation(id);
     _conversationsCache.remove(id);
-    // Stop any deferred/in-flight order backfill before clearing caches so a
-    // late getMessageIds cannot resurrect order/count for a deleted id.
-    _abortMessageOrderBackfill(id);
     final removedMessages = _messagesCache.remove(id);
+    final removedGroupMessages = _groupMessagesCache.remove(id);
     final removedOrder = _messageOrderIds.remove(id);
     _messageCounts.remove(id);
     _firstGroupIndicesCache.remove(id);
     final artifactMessageIds = <String>{
       if (removedMessages != null)
         for (final message in removedMessages) message.id,
+      if (removedGroupMessages != null)
+        for (final message in removedGroupMessages) message.id,
       ...?removedOrder,
     };
     for (final messageId in artifactMessageIds) {
@@ -1899,8 +1738,8 @@ class ChatService extends ChangeNotifier {
     final fromParts = <String, ({String path, String kind})>{};
     for (final part in message.parts) {
       if (part is ImagePart) {
-        // Unavailable placeholders stay in history for UI but must not enter
-        // asset sync — missing files would otherwise dirty/throw forever.
+        // 不可用的占位符保留在历史记录中供 UI 使用，但不得进入
+        // 资产同步——否则缺失文件会一直产生脏数据或抛出异常。
         if (part.unavailable) continue;
         final uri = part.uri.trim();
         if (uri.isEmpty || uri.startsWith('http') || uri.startsWith('data:')) {
@@ -1923,9 +1762,9 @@ class ChatService extends ChangeNotifier {
     return List.unmodifiable(fromParts.values);
   }
 
-  /// Image sources eligible for OCR identity: local files and data URLs.
+  /// 可用于 OCR 身份识别的图像来源：本地文件和 data URLs。
   ///
-  /// Parts-only — content-marker fallback is intentionally unsupported.
+  /// 仅支持 Parts——content-marker 回退有意不受支持。
   List<String> _extractOcrImageSourcesFromMessage(ChatMessage message) {
     final fromParts = <String>[];
     for (final part in message.parts) {
@@ -2021,8 +1860,8 @@ class ChatService extends ChangeNotifier {
     if (message.parts.any(
       (part) => part is MalformedPart && part.isAttachmentKind,
     )) {
-      // Parsing is insufficient to build an authoritative replacement set.
-      // Preserve existing message_asset_rows and keep the revision retryable.
+      // 仅凭解析不足以构建权威的替换集合。
+      // 保留现有 message_asset_rows，并让该修订保持可重试。
       await _repo.markMessageAssetReferencesDirty(message.id);
       return false;
     }
@@ -2073,9 +1912,9 @@ class ChatService extends ChangeNotifier {
     try {
       await _synchronizeMessageAssets(message);
     } catch (error) {
-      // Message persistence is authoritative. The message transaction queues
-      // relevant revisions first, so a failed asset-index update is retried by
-      // the bounded startup backfill instead of failing the send.
+      // 消息持久化是权威来源。消息事务会先排队
+      // 相关修订，因此资产索引更新失败会由
+      // 有界启动回填重试，而不是导致发送失败。
       debugPrint('Message asset synchronization failed: $error');
     }
   }
@@ -2101,10 +1940,9 @@ class ChatService extends ChangeNotifier {
     }
   }
 
-  /// Reset stale isStreaming flags left over from a previous app crash or
-  /// force-quit.  After a fresh launch no message can be actively streaming,
-  /// so any persisted `isStreaming: true` is stale and must be cleared to
-  /// avoid stuck loading indicators.
+  /// 重置因上次应用崩溃或强制退出而残留的过期 isStreaming 标记。全新启动后，
+  /// 不会有消息正在流式传输，因此任何持久化的 `isStreaming: true` 都已过期，
+  /// 必须清除，以避免加载指示器卡住。
   ///
   Future<void> _resetStaleStreamingFlags() async {
     await _repo.resetStaleStreamingState();
@@ -2199,7 +2037,7 @@ class ChatService extends ChangeNotifier {
     List<ChatMessage> messages,
   ) async {
     if (!_initialized) await init();
-    // Ensure messageIds are in the same order
+    // 确保 messageIds 保持相同的顺序
     final ids = messages.map((m) => m.id).toList();
     final restored = Conversation(
       id: conversation.id,
@@ -2228,7 +2066,7 @@ class ChatService extends ChangeNotifier {
     await _backfillAssetReferencesForCurrentRoot();
     await _refreshConversation(restored.id);
 
-    // Update caches
+    // 更新缓存
     _messagesCache[restored.id] = List.of(messages);
     _messageOrderIds[restored.id] = messages
         .map((message) => message.id)
@@ -2238,9 +2076,8 @@ class ChatService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Publishes a fully parsed external import. Chat rows and the associated
-  /// business patch commit in one transaction; caches and files change only
-  /// after that transaction succeeds.
+  /// 发布完全解析后的外部导入。聊天行和关联的业务补丁在一个事务中提交；
+  /// 缓存和文件仅在该事务成功之后才变更。
   Future<void> commitParsedImport({
     required BusinessRepository businessRepository,
     required bool overwrite,
@@ -2322,7 +2159,7 @@ class ChatService extends ChangeNotifier {
     return report;
   }
 
-  /// Chats-only merge/restore follow-up for imported conversations.
+  /// 仅针对已导入对话的 Chats 合并/恢复后续处理。
   Future<int> recomputeImportedAttachmentAvailability({
     required Iterable<String> conversationIds,
     required bool filesRestored,
@@ -2358,7 +2195,7 @@ class ChatService extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Add a message directly to an existing conversation (for merge mode)
+  // 直接将消息添加到现有对话（用于合并模式）
   Future<void> addMessageDirectly(
     String conversationId,
     ChatMessage message,
@@ -2367,8 +2204,7 @@ class ChatService extends ChangeNotifier {
 
     final conversation = _conversationsCache[conversationId];
     if (conversation == null) return;
-    final order = await _loadMessageOrder(conversationId);
-    if (order.contains(message.id)) return;
+    if (await _repo.getMessage(message.id) != null) return;
     final persisted = await _repo.appendLinearMessageToConversation(
       conversation: conversation,
       message: message,
@@ -2378,20 +2214,12 @@ class ChatService extends ChangeNotifier {
       await _synchronizeMessageAssetsBestEffort(message);
     }
     _conversationsCache[conversationId] = persisted;
-    order.add(message.id);
-    _messageCounts[conversationId] = order.length;
-
-    // Update cache
-    if (_messagesCache.containsKey(conversationId)) {
-      if (!_messagesCache[conversationId]!.any((m) => m.id == message.id)) {
-        _messagesCache[conversationId]!.add(message);
-      }
-    }
+    await reloadActiveTimelineCache(conversationId);
 
     notifyListeners();
   }
 
-  // Conversation-scoped MCP servers selection
+  // 对话范围内的 MCP 服务器选择
   List<String> getConversationMcpServers(String conversationId) {
     if (!_initialized) return const <String>[];
     final c =
@@ -2456,7 +2284,7 @@ class ChatService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Updates the conversation summary generated by LLM.
+  /// 更新由 LLM 生成的对话摘要。
   Future<void> updateConversationSummary(
     String id,
     String summary,
@@ -2481,7 +2309,7 @@ class ChatService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Gets all conversations with non-empty summaries for a specific assistant.
+  /// 获取特定助手所有摘要非空的对话。
   List<Conversation> getConversationsWithSummaryForAssistant(
     String assistantId,
   ) {
@@ -2496,7 +2324,7 @@ class ChatService extends ChangeNotifier {
         .toList();
   }
 
-  /// Clears the summary of a specific conversation.
+  /// 清除特定对话的摘要。
   Future<void> clearConversationSummary(String conversationId) async {
     if (!_initialized) return;
 
@@ -2662,19 +2490,14 @@ class ChatService extends ChangeNotifier {
       _draftConversations.remove(conversationId);
       _conversationsCache[conversationId] = persisted;
       conversation = persisted;
-      final order = _messageOrderIds.putIfAbsent(
-        conversationId,
-        () => <String>[],
-      );
-      if (!order.contains(message.id)) order.add(message.id);
-      _messageCounts[conversationId] = order.length;
-      // Persisted append touches updatedAt (list order) and may promote a
-      // draft into the persisted list.
+      await reloadActiveTimelineCache(conversationId);
+      // 持久化追加会修改 updatedAt（列表顺序），并可能将
+      // 草稿提升为持久化列表。
       _bumpConversationListRevision();
     }
 
-    // Update cache
-    if (_messagesCache.containsKey(conversationId)) {
+    // 更新缓存
+    if (_messagesCache.containsKey(conversationId) && temporary) {
       _messagesCache[conversationId]!.add(message);
     }
     _touchMessageCache(conversationId);
@@ -2730,6 +2553,8 @@ class ChatService extends ChangeNotifier {
     required String groupId,
     required int version,
     required bool truncateFuture,
+    String? parentMessageId,
+    String? branchId,
   }) async {
     if (!_initialized) await init();
     if (isTemporaryConversation(conversationId)) {
@@ -2753,6 +2578,8 @@ class ChatService extends ChangeNotifier {
       assistantMessage: assistantMessage,
       runId: const Uuid().v4(),
       truncateFuture: truncateFuture,
+      parentMessageId: parentMessageId,
+      branchId: branchId,
     );
     if (truncateFuture) {
       _messagesCache.remove(conversationId);
@@ -2770,6 +2597,8 @@ class ChatService extends ChangeNotifier {
     required String providerId,
     required String anchorGroupId,
     required bool truncateFuture,
+    String? parentMessageId,
+    String? branchId,
   }) async {
     if (!_initialized) await init();
     if (isTemporaryConversation(conversationId)) {
@@ -2792,6 +2621,8 @@ class ChatService extends ChangeNotifier {
       anchorGroupId: anchorGroupId,
       runId: const Uuid().v4(),
       truncateFuture: truncateFuture,
+      parentMessageId: parentMessageId,
+      branchId: branchId,
     );
     if (truncateFuture) {
       _messagesCache.remove(conversationId);
@@ -2807,26 +2638,11 @@ class ChatService extends ChangeNotifier {
     final conversationId = result.conversation.id;
     _draftConversations.remove(conversationId);
     _conversationsCache[conversationId] = result.conversation;
-    final messages = [
-      if (result.userMessage case final userMessage?) userMessage,
-      result.assistantMessage,
-    ];
     if (result.userMessage case final userMessage?
         when _messageCanOwnAssets(userMessage)) {
       await _synchronizeMessageAssetsBestEffort(userMessage);
     }
-    final order = _messageOrderIds.putIfAbsent(
-      conversationId,
-      () => <String>[],
-    );
-    for (final message in messages) {
-      if (!order.contains(message.id)) order.add(message.id);
-    }
-    _messageCounts[conversationId] = order.length;
-    if (_messagesCache.containsKey(conversationId)) {
-      _messagesCache[conversationId]!.addAll(messages);
-    }
-    _touchMessageCache(conversationId);
+    await reloadActiveTimelineCache(conversationId);
     _bumpConversationListRevision();
     notifyListeners();
   }
@@ -2847,12 +2663,16 @@ class ChatService extends ChangeNotifier {
 
   void _replaceCachedMessage(ChatMessage updatedMessage) {
     final messages = _messagesCache[updatedMessage.conversationId];
-    if (messages == null) return;
-    final index = messages.indexWhere((m) => m.id == updatedMessage.id);
-    if (index >= 0) {
-      messages[index] = updatedMessage;
+    if (messages != null) {
+      final index = messages.indexWhere((m) => m.id == updatedMessage.id);
+      if (index >= 0) messages[index] = updatedMessage;
+      _touchMessageCache(updatedMessage.conversationId);
     }
-    _touchMessageCache(updatedMessage.conversationId);
+    final groupMessages = _groupMessagesCache[updatedMessage.conversationId];
+    if (groupMessages != null) {
+      final index = groupMessages.indexWhere((m) => m.id == updatedMessage.id);
+      if (index >= 0) groupMessages[index] = updatedMessage;
+    }
   }
 
   Future<void> updateMessage(
@@ -2911,9 +2731,8 @@ class ChatService extends ChangeNotifier {
     return true;
   }
 
-  /// Update message content during streaming without triggering notifyListeners.
-  /// This is used for streaming updates to avoid unnecessary rebuilds of
-  /// widgets watching ChatService (e.g., side_drawer).
+  /// 在流式传输期间更新消息内容，而不触发 notifyListeners。
+  /// 这用于流式更新，避免观察 ChatService 的 widget（例如 side_drawer）进行不必要的重建。
   Future<void> updateMessageSilent(
     String messageId, {
     String? content,
@@ -2947,8 +2766,8 @@ class ChatService extends ChangeNotifier {
     );
   }
 
-  // Partial-column writes only: concurrent writers updating disjoint fields
-  // (e.g. translation vs. image sanitization) must not overwrite each other.
+  // 仅进行部分列写入：并发写入者更新互不相交的字段
+  // （例如翻译与图像清理）时不得互相覆盖。
   Future<void> _updateMessage(
     String messageId, {
     required bool notify,
@@ -2967,7 +2786,7 @@ class ChatService extends ChangeNotifier {
   }) async {
     if (!_initialized) return;
 
-    // Temporary conversations live only in memory.
+    // 临时对话仅存在于内存中。
     final temporaryMessage = _cachedTemporaryMessage(messageId);
     if (temporaryMessage != null) {
       _replaceCachedMessage(
@@ -3019,7 +2838,7 @@ class ChatService extends ChangeNotifier {
     if (notify) notifyListeners();
   }
 
-  /// Persists one complete streaming snapshot without a read-before-write.
+  /// 在不先读后写的情况下持久化一个完整的流式快照。
   Future<void> updateStreamingCheckpointSilent(
     ChatMessage message,
     List<Map<String, dynamic>> toolEvents, {
@@ -3109,7 +2928,7 @@ class ChatService extends ChangeNotifier {
     return run;
   }
 
-  // Tool events persistence (per assistant message)
+  // 工具事件持久化（按助手消息）
   List<Map<String, dynamic>> getToolEvents(String assistantMessageId) {
     if (!_initialized) return const <Map<String, dynamic>>[];
     final temporary = _temporaryToolEvents[assistantMessageId];
@@ -3153,11 +2972,11 @@ class ChatService extends ChangeNotifier {
     final cleanId = (id).toString();
 
     int idx = -1;
-    // Prefer matching by a non-empty id
+    // 优先通过非空 id 进行匹配
     if (cleanId.isNotEmpty) {
       idx = list.indexWhere((e) => (e['id']?.toString() ?? '') == cleanId);
     }
-    // If no id or not found, match the first placeholder (no content) with same name
+    // 如果没有 id 或未找到，则匹配同名且（无内容）的第一个占位符
     if (idx < 0) {
       idx = list.indexWhere(
         (e) =>
@@ -3194,7 +3013,7 @@ class ChatService extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Gemini thought signature persistence (per assistant message)
+  // Gemini 思考签名持久化（按助手消息）
   String? getGeminiThoughtSignature(String assistantMessageId) {
     if (!_initialized) return null;
     final temporary = _temporaryGeminiThoughtSigs[assistantMessageId];
@@ -3230,6 +3049,149 @@ class ChatService extends ChangeNotifier {
     } catch (_) {}
   }
 
+  Future<ConversationTree?> loadConversationTree(String conversationId) async {
+    if (!_initialized) await init();
+    return _repo.loadConversationTree(conversationId);
+  }
+
+  Future<List<LegacyTreeMigrationWarning>>
+  consumeContextTreeMigrationWarnings() async {
+    if (!_initialized) await init();
+    final warnings = await _repo.readAndClearContextTreeMigrationWarnings();
+    if (warnings.isEmpty) return warnings;
+    await _writeContextTreeMigrationWarningLog(warnings);
+    return warnings;
+  }
+
+  Future<void> _writeContextTreeMigrationWarningLog(
+    List<LegacyTreeMigrationWarning> warnings,
+  ) async {
+    try {
+      final root = await AppDirectories.getAppDataDirectory();
+      final logsDirectory = Directory(p.join(root.path, 'logs'));
+      await logsDirectory.create(recursive: true);
+      final file = File(
+        p.join(logsDirectory.path, 'context_tree_migration_warnings.log'),
+      );
+      final timestamp = DateTime.now().toUtc().toIso8601String();
+      final payload = <String, Object>{
+        'timestamp': timestamp,
+        'warnings': [for (final warning in warnings) warning.toJson()],
+      };
+      final sink = file.openWrite(mode: FileMode.append);
+      try {
+        sink.writeln(jsonEncode(payload));
+        await sink.flush();
+      } finally {
+        await sink.close();
+      }
+    } catch (_) {
+      // 失败的警告日志不得导致正常启动失败。
+    }
+  }
+
+  Future<void> ensureConversationTree(String conversationId) async {
+    if (!_initialized) await init();
+    await _loadOrCreateConversationTree(conversationId);
+  }
+
+  Future<ConversationTree> _loadOrCreateConversationTree(
+    String conversationId,
+  ) async {
+    var tree = await _repo.loadConversationTree(conversationId);
+    if (tree != null) return tree;
+    await _repo.syncLinearConversationTree(conversationId);
+    tree = await _repo.loadConversationTree(conversationId);
+    if (tree == null) {
+      throw StateError('conversation_tree_missing_after_migration');
+    }
+    return tree;
+  }
+
+  /// 从持久化活动树重建内存消息投影。
+  ///
+  /// 树突变不能简单追加或裁剪旧的线性缓存：分支可以在存储中保持相同逻辑
+  /// 位置的同时替换旧兄弟消息内容。当前路径是正常聊天界面唯一的权威窗口。
+  Future<void> reloadActiveTimelineCache(String conversationId) async {
+    if (!_initialized) await init();
+    if (_temporaryConversationIds.contains(conversationId)) return;
+
+    final tree = await _loadOrCreateConversationTree(conversationId);
+    final activeIds = tree.activePath();
+    final messages = await _repo.getMessagesByIds(activeIds);
+    final byId = <String, ChatMessage>{
+      for (final message in messages) message.id: message,
+    };
+    final activeMessages = <ChatMessage>[
+      for (final id in activeIds)
+        if (byId[id] != null) byId[id]!,
+    ];
+    if (activeMessages.length != activeIds.length) {
+      throw StateError('active_timeline_message_missing');
+    }
+    _messagesCache[conversationId] = activeMessages;
+    _messageOrderIds[conversationId] = List<String>.of(activeIds);
+    _messageCounts[conversationId] = activeIds.length;
+    final firstIndices = <String, int>{};
+    for (var index = 0; index < activeMessages.length; index++) {
+      final groupId = activeMessages[index].groupId ?? activeMessages[index].id;
+      firstIndices.putIfAbsent(groupId, () => index);
+    }
+    _firstGroupIndicesCache[conversationId] = firstIndices;
+    await _cacheMessageArtifacts(activeMessages);
+    _touchMessageCache(conversationId);
+  }
+
+  Future<ConversationTree?> switchConversationBranch({
+    required String conversationId,
+    required String branchId,
+  }) async {
+    if (!_initialized) await init();
+    final tree = await _loadOrCreateConversationTree(conversationId);
+    if (!tree.branches.containsKey(branchId)) {
+      throw StateError('conversation_branch_missing');
+    }
+    final updated = tree.switchBranch(branchId);
+    await _repo.saveConversationTree(updated);
+    await _syncContextBoundaryToActivePath(conversationId, updated);
+    await reloadActiveTimelineCache(conversationId);
+    notifyListeners();
+    return updated;
+  }
+
+  Future<ConversationTree> createConversationBranch({
+    required String conversationId,
+    required String? fromMessageId,
+    String name = '',
+  }) async {
+    if (!_initialized) await init();
+    final tree = await _loadOrCreateConversationTree(conversationId);
+    final branchId = 'branch-${const Uuid().v4()}';
+    final updated = tree.forkBranchFromParent(
+      branchId: branchId,
+      fromMessageId: fromMessageId,
+      name: name,
+    );
+    await _repo.saveConversationTree(updated);
+    await _syncContextBoundaryToActivePath(conversationId, updated);
+    await reloadActiveTimelineCache(conversationId);
+    notifyListeners();
+    return updated;
+  }
+
+  Future<Set<String>> deleteBranchSiblings({
+    required String conversationId,
+    required String messageId,
+  }) async {
+    if (!_initialized) await init();
+    final targetIds = <String>{messageId};
+    return deleteMessages(
+      conversationId: conversationId,
+      messageIds: targetIds,
+      versionSelectionChanges: const {},
+    );
+  }
+
   Future<Conversation> forkConversationAtRevision({
     required String sourceConversationId,
     required String sourceRevisionId,
@@ -3241,26 +3203,26 @@ class ChatService extends ChangeNotifier {
     final targetMessage = await _repo.getMessage(sourceRevisionId);
     if (targetMessage == null ||
         targetMessage.conversationId != sourceConversationId) {
-      throw StateError('linear_fork_target_missing');
+      throw StateError('conversation_fork_target_missing');
     }
-    final targetGroupId = targetMessage.groupId ?? targetMessage.id;
-    final probe = await _repo.loadLinearMessageWindow(
-      conversationId: sourceConversationId,
-      fromStart: true,
-      limit: 1,
-    );
-    final window = await _repo.loadLinearMessageWindow(
-      conversationId: sourceConversationId,
-      fromStart: true,
-      limit: probe.totalSlotCount,
-    );
-    final targetIndex = window.slots.indexWhere(
-      (slot) => slot.groupId == targetGroupId,
-    );
-    if (targetIndex < 0) throw StateError('linear_fork_target_not_visible');
-    final sourceMessages = await _repo.getMessagesByIds([
-      for (final slot in window.slots.take(targetIndex + 1)) slot.revisionId,
-    ]);
+    final tree = await _loadOrCreateConversationTree(sourceConversationId);
+    final activePath = tree.activePath();
+    final targetIndex = activePath.indexOf(sourceRevisionId);
+    if (targetIndex < 0) {
+      throw StateError('conversation_fork_target_not_in_active_path');
+    }
+    final sourceIds = activePath.take(targetIndex + 1).toList(growable: false);
+    final loaded = await _repo.getMessagesByIds(sourceIds);
+    final sourceById = <String, ChatMessage>{
+      for (final message in loaded) message.id: message,
+    };
+    final sourceMessages = <ChatMessage>[
+      for (final id in sourceIds)
+        if (sourceById[id] != null) sourceById[id]!,
+    ];
+    if (sourceMessages.length != sourceIds.length) {
+      throw StateError('conversation_fork_path_message_missing');
+    }
     final persisted = await createConversation(
       title: source.title,
       assistantId: source.assistantId,
@@ -3321,8 +3283,8 @@ class ChatService extends ChangeNotifier {
       final nextVersion = versions.isEmpty
           ? 0
           : versions.reduce((a, b) => a > b ? a : b) + 1;
-      // Content-only append must keep prior ImagePart/FilePart attachments
-      // and preserve ordinal ([Image, Text] stays [Image, Text(new)]).
+      // 仅追加内容时必须保留先前的 ImagePart/FilePart 附件，
+      // 并保持顺序（[Image, Text] 保持为 [Image, Text(new)]）。
       final resolvedParts =
           parts ??
           ChatMessage.partsWithReplacedText(temporaryOriginal.parts, content);
@@ -3364,23 +3326,16 @@ class ChatService extends ChangeNotifier {
     }
     final cid = newMsg.conversationId;
     _conversationsCache[cid] = result.conversation;
-    final order = _messageOrderIds.putIfAbsent(cid, () => <String>[]);
-    if (!order.contains(newMsg.id)) order.add(newMsg.id);
-    _messageCounts[cid] = order.length;
-    // Update caches
-    final arr = _messagesCache[cid];
-    if (arr != null) arr.add(newMsg);
-    _touchMessageCache(cid);
+    await reloadActiveTimelineCache(cid);
     _bumpConversationListRevision();
     notifyListeners();
     return newMsg;
   }
 
-  /// Resolve image path/data-URL → content SHA-256 from current bytes.
+  /// 根据当前字节将图像 path/data-URL 解析为内容 SHA-256。
   ///
-  /// Never trusts path→hash rows alone: the same path may point at different
-  /// historical assets after content replacement. Duplicate inputs are hashed
-  /// once and reused.
+  /// 绝不只信任 path→hash 行：同一路径在内容替换后可能指向不同的历史资产。
+  /// 重复输入只计算一次哈希并复用。
   Future<Map<String, String>> resolveImageContentHashes(
     List<String> imagePaths,
   ) async {
@@ -3425,7 +3380,7 @@ class ChatService extends ChangeNotifier {
         );
         result[path] = hash;
       } catch (_) {
-        // Skip unreadable sources; caller will treat them as cache misses.
+        // 跳过无法读取的来源；调用方会将其视为缓存未命中。
       }
     }
     return result;
@@ -3535,7 +3490,10 @@ class ChatService extends ChangeNotifier {
         break;
       }
     }
-    if (target == null) throw StateError('message_version_missing');
+    final selectedTarget = target;
+    if (selectedTarget == null) {
+      throw StateError('message_version_missing');
+    }
     final conversation = await _repo.setSelectedVersion(
       conversationId: conversationId,
       groupId: groupId,
@@ -3543,6 +3501,32 @@ class ChatService extends ChangeNotifier {
     );
     if (conversation == null) return;
     _conversationsCache[conversationId] = conversation;
+    var tree = await _loadOrCreateConversationTree(conversationId);
+    final matchingBranches =
+        tree.branches.values
+            .where(
+              (branch) =>
+                  tree.branchPath(branch.id).contains(selectedTarget.id),
+            )
+            .toList()
+          ..sort((left, right) {
+            final leftExact = left.tipMessageId == selectedTarget.id ? 0 : 1;
+            final rightExact = right.tipMessageId == selectedTarget.id ? 0 : 1;
+            if (leftExact != rightExact) return leftExact.compareTo(rightExact);
+            final leftLength = tree.branchPath(left.id).length;
+            final rightLength = tree.branchPath(right.id).length;
+            if (leftLength != rightLength) {
+              return leftLength.compareTo(rightLength);
+            }
+            return left.id.compareTo(right.id);
+          });
+    if (matchingBranches.isNotEmpty &&
+        matchingBranches.first.id != tree.activeBranchId) {
+      tree = tree.switchBranch(matchingBranches.first.id);
+      await _repo.saveConversationTree(tree);
+    }
+    await _syncContextBoundaryToActivePath(conversationId, tree);
+    await reloadActiveTimelineCache(conversationId);
     _bumpConversationListRevision();
     notifyListeners();
   }
@@ -3565,6 +3549,7 @@ class ChatService extends ChangeNotifier {
     );
     if (conversation == null) return;
     _conversationsCache[conversationId] = conversation;
+    await reloadActiveTimelineCache(conversationId);
     _bumpConversationListRevision();
     notifyListeners();
   }
@@ -3574,10 +3559,10 @@ class ChatService extends ChangeNotifier {
     String? defaultTitle,
   }) async {
     if (!_initialized) await init();
-    // Draft case
+    // 草稿情况
     if (_draftConversations.containsKey(conversationId)) {
       final draft = _draftConversations[conversationId]!;
-      final lastIndexPlusOne = draft.messageIds.length; // last index + 1
+      final lastIndexPlusOne = draft.messageIds.length; // 最后一个索引 + 1
       final newValue = (draft.truncateIndex == lastIndexPlusOne)
           ? -1
           : lastIndexPlusOne;
@@ -3587,18 +3572,15 @@ class ChatService extends ChangeNotifier {
       notifyListeners();
       return draft;
     }
-    // Persisted case
+    // 已持久化的情况
     final c = _conversationsCache[conversationId];
     if (c == null) return null;
-    final probe = await _repo.loadLinearMessageWindow(
-      conversationId: conversationId,
-      fromStart: true,
-      limit: 1,
-    );
-    if (probe.totalSlotCount == 0) return c;
-    c.truncateIndex = c.truncateIndex == probe.totalSlotCount
+    final tree = await _loadOrCreateConversationTree(conversationId);
+    final activePathLength = tree.activePath().length;
+    if (activePathLength == 0) return c;
+    c.truncateIndex = c.truncateIndex == activePathLength
         ? -1
-        : probe.totalSlotCount;
+        : activePathLength;
     if ((defaultTitle ?? '').isNotEmpty) c.title = defaultTitle!;
     c.updatedAt = DateTime.now();
     await _saveConversation(c);
@@ -3683,9 +3665,18 @@ class ChatService extends ChangeNotifier {
       _geminiThoughtSigsCache.remove(message.id);
     }
     _messagesCache.remove(conversationId);
+    final groupMessages = _groupMessagesCache[conversationId];
+    if (groupMessages != null) {
+      groupMessages.removeWhere((message) => deletedIds.contains(message.id));
+      if (groupMessages.isEmpty) _groupMessagesCache.remove(conversationId);
+    }
     _messageOrderIds.remove(conversationId);
     _firstGroupIndicesCache.remove(conversationId);
-    await _loadMessageOrder(conversationId);
+    final tree = await _repo.loadConversationTree(conversationId);
+    if (tree != null) {
+      await _syncContextBoundaryToActivePath(conversationId, tree);
+    }
+    await reloadActiveTimelineCache(conversationId);
     await _cleanupOrphanUploads();
     _bumpConversationListRevision();
     notifyListeners();
@@ -3709,6 +3700,7 @@ class ChatService extends ChangeNotifier {
       _rememberDiscardedTemporaryConversation(id);
     }
     _messagesCache.clear();
+    _groupMessagesCache.clear();
     _conversationsCache.clear();
     _draftConversations.clear();
     _temporaryConversationIds.clear();
@@ -3730,7 +3722,7 @@ class ChatService extends ChangeNotifier {
     if (await uploadDir.exists()) await uploadDir.delete(recursive: true);
   }
 
-  // Uploads stats: count and total size of files under app documents/upload
+  // 上传统计：应用 documents/upload 目录下文件的数量和总大小
   Future<UploadStats> getUploadStats() async {
     try {
       final uploadDir = await AppDirectories.getUploadDirectory();
@@ -3754,16 +3746,16 @@ class ChatService extends ChangeNotifier {
     }
   }
 
-  // Move an existing conversation to a different assistant.
-  // If the conversation is still a draft, update it in memory;
-  // otherwise persist the assistantId change and updatedAt.
+  // 将现有会话移动到不同的助手。
+  // 如果会话仍是草稿，则在内存中更新；
+  // 否则持久化 assistantId 变更和 updatedAt。
   Future<bool> moveConversationToAssistant({
     required String conversationId,
     required String assistantId,
   }) async {
     if (!_initialized) await init();
 
-    // Draft conversation case
+    // 草稿会话情况
     if (_draftConversations.containsKey(conversationId)) {
       final draft = _draftConversations[conversationId]!;
       draft.assistantId = assistantId;

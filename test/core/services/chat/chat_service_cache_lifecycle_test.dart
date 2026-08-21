@@ -224,8 +224,7 @@ void main() {
         conversation.id,
         [second.id],
       );
-      // Indices are raw message_order values; deletion leaves the gap.
-      expect(reloaded, {second.id: 1});
+      expect(reloaded, isEmpty);
     });
   });
 

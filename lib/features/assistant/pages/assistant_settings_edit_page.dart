@@ -282,7 +282,7 @@ class _AssistantSettingsEditPageState extends State<AssistantSettingsEditPage>
   }
 
   void _handleTabChanged() {
-    // Close IME when switching tabs and refresh state.
+    // 切换标签时关闭输入法并刷新状态。
     FocusManager.instance.primaryFocus?.unfocus();
     if (mounted) setState(() {});
   }
@@ -860,9 +860,9 @@ class _SegTabBar extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     const double outerHeight = 44;
-    const double innerPadding = 4; // gap between shell and selected block
-    const double gap = 6; // spacing between segments
-    const double minSegWidth = 88; // ensure readability; scroll if not enough
+    const double innerPadding = 4; // shell 与选中块之间的间隙
+    const double gap = 6; // 分段之间的间距
+    const double minSegWidth = 88; // 保证可读性；空间不足时滚动
     final double pillRadius = 18;
     final double innerRadius = ((pillRadius - innerPadding).clamp(
       0.0,
@@ -1051,7 +1051,7 @@ class _BrandAvatarLike extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    // Map known names to brand assets used in default_model_page
+    // 将已知名称映射到 default_model_page 使用的品牌资源
     final asset = BrandAssets.assetForName(name);
     if (asset != null) {
       if (asset.endsWith('.svg')) {
@@ -1112,7 +1112,7 @@ class _BrandAvatarLike extends StatelessWidget {
   }
 }
 
-// --- iOS-style helpers ---
+// --- iOS 风格辅助函数 ---
 
 class _TactileIconButton extends StatefulWidget {
   const _TactileIconButton({
@@ -1151,7 +1151,7 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
         onTapCancel: () => setState(() => _pressed = false),
         onTap: () {
           Haptics.light();
-          // Close IME when tapping buttons
+          // 点击按钮时关闭输入法
           FocusManager.instance.primaryFocus?.unfocus();
           widget.onTap();
         },
@@ -1277,7 +1277,7 @@ class _TactileRowState extends State<_TactileRow> {
                   context.read<SettingsProvider>().hapticsOnListItemTap) {
                 Haptics.soft();
               }
-              // Close IME when tapping segmented/tab rows or list items
+              // 点击分段或标签行、列表项时关闭输入法
               FocusManager.instance.primaryFocus?.unfocus();
               widget.onTap!.call();
             },
@@ -1384,14 +1384,14 @@ class _IosButton extends StatefulWidget {
     required this.onTap,
     this.icon,
     this.filled = false,
-    this.neutral = true, // Use neutral colors by default for chat background
+    this.neutral = true, // 聊天背景默认使用中性色
     this.dense = false,
   });
   final String label;
   final VoidCallback onTap;
   final IconData? icon;
   final bool filled;
-  final bool neutral; // If true, use neutral colors instead of primary
+  final bool neutral; // 为 true 时使用中性色而不是 primary
   final bool dense;
 
   @override
@@ -1405,7 +1405,7 @@ class _IosButtonState extends State<_IosButton> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    // Determine if this is a Material icon (needs more spacing)
+    // 判断这是否是 Material 图标（需要更多间距）
     final isMaterialIcon =
         widget.icon != null &&
         (widget.icon == Icons.image ||
@@ -1473,7 +1473,7 @@ class _IosButtonState extends State<_IosButton> {
   }
 }
 
-// ===== Desktop Assistant Dialog (reuses mobile tabs) =====
+// ===== 桌面助手对话框（复用移动端标签） =====
 
 enum _AssistantDesktopMenu {
   basic,
@@ -1749,7 +1749,7 @@ class _DesktopAssistantBasicPaneState
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Assistant avatar (display only)
+            // 助手头像（仅展示）
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               key: _avatarKey,
@@ -1882,7 +1882,7 @@ class _DesktopAssistantBasicPaneState
     }
 
     Widget labelWithHelp(String text, String help) {
-      // Keep icon right next to the text (not at the far right)
+      // 让图标紧贴文本（不要放在最右侧）
       return Align(
         alignment: Alignment.centerLeft,
         child: Row(
@@ -1902,7 +1902,7 @@ class _DesktopAssistantBasicPaneState
                 color: cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(8),
               ),
-              // Use themed text to respect user-selected fonts
+              // 使用主题文本，尊重用户选择的字体
               textStyle: Theme.of(
                 context,
               ).textTheme.bodySmall?.copyWith(color: cs.onSurface),
@@ -1978,7 +1978,7 @@ class _DesktopAssistantBasicPaneState
           children: [
             header(),
             sectionDivider(),
-            // Temperature
+            // 温度
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
               child: Column(
@@ -2030,7 +2030,7 @@ class _DesktopAssistantBasicPaneState
               ),
             ),
             sectionDivider(),
-            // Top-P
+            // Top-P 参数
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
               child: Column(
@@ -2078,7 +2078,7 @@ class _DesktopAssistantBasicPaneState
               ),
             ),
             sectionDivider(),
-            // Context messages
+            // 上下文消息
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
               child: Column(
@@ -2155,7 +2155,7 @@ class _DesktopAssistantBasicPaneState
               ),
             ),
             sectionDivider(),
-            // Max tokens
+            // 最大 token
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
               child: Column(
@@ -2185,7 +2185,7 @@ class _DesktopAssistantBasicPaneState
                       decoration: InputDecoration(
                         hintText: l10n.assistantEditMaxTokensHint,
                         isDense: true,
-                        // Increase height for desktop spec
+                        // 按桌面规格增加高度
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 20,
@@ -2222,7 +2222,7 @@ class _DesktopAssistantBasicPaneState
               ),
             ),
             sectionDivider(),
-            // Switches
+            // 开关
             Padding(
               padding: const EdgeInsets.only(top: 4, bottom: 4),
               child: Column(
@@ -2254,7 +2254,7 @@ class _DesktopAssistantBasicPaneState
               ),
             ),
             sectionDivider(),
-            // Chat model
+            // 聊天模型
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
               child: Column(
@@ -2382,7 +2382,7 @@ class _DesktopAssistantBasicPaneState
               ),
             ),
             sectionDivider(),
-            // Chat background
+            // 聊天背景
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
               child: Column(

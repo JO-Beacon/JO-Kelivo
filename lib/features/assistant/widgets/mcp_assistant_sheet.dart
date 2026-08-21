@@ -208,7 +208,7 @@ class _AssistantMcpSheet extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                // Tools count tag moved to right side before switch
+                                // 工具数量标签移到右侧，位于开关之前
                                 tag(
                                   l10n.assistantEditMcpToolsCountTag(
                                     enabledTools.toString(),

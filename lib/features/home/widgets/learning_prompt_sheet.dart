@@ -6,14 +6,13 @@ import '../../../l10n/app_localizations.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
-/// Bottom sheet for editing the active instruction injection prompt.
+/// 用于编辑当前指令注入提示词的底部面板。
 ///
-/// This widget allows users to edit the prompt text of an instruction
-/// injection item directly.
+/// 此组件允许用户直接编辑指令注入项的提示词文本。
 class LearningPromptSheet extends StatefulWidget {
   const LearningPromptSheet({super.key, required this.target});
 
-  /// The instruction injection item to edit.
+  /// 要编辑的指令注入项。
   final InstructionInjection target;
 
   @override
@@ -124,10 +123,9 @@ class _LearningPromptSheetState extends State<LearningPromptSheet> {
   }
 }
 
-/// Shows the learning prompt bottom sheet.
+/// 显示学习提示词底部面板。
 ///
-/// This function initializes the provider and shows the sheet for editing
-/// the active instruction injection item's prompt.
+/// 此函数初始化 provider 并显示用于编辑当前指令注入项提示词的面板。
 Future<void> showLearningPromptSheet(BuildContext context) async {
   final provider = context.read<InstructionInjectionProvider>();
   await provider.initialize();

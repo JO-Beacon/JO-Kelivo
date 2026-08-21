@@ -13,8 +13,7 @@ import 'package:Kelivo/theme/app_semantic_colors.dart';
 class QuickPhrasesPage extends StatefulWidget {
   const QuickPhrasesPage({super.key, this.assistantId});
 
-  final String?
-  assistantId; // null = global phrases, non-null = assistant-specific
+  final String? assistantId; // null 表示全局短语，非 null 表示仅限某个助理
 
   @override
   State<QuickPhrasesPage> createState() => _QuickPhrasesPageState();
@@ -24,7 +23,7 @@ class _QuickPhrasesPageState extends State<QuickPhrasesPage> {
   @override
   void initState() {
     super.initState();
-    // Provider will handle loading
+    // Provider 会负责加载
   }
 
   Future<void> _showAddEditSheet({QuickPhrase? phrase}) async {
@@ -55,7 +54,7 @@ class _QuickPhrasesPageState extends State<QuickPhrasesPage> {
       if (title.isEmpty || content.isEmpty) return;
 
       if (phrase == null) {
-        // Add new
+        // 新增
         final newPhrase = QuickPhrase(
           id: const Uuid().v4(),
           title: title,
@@ -65,7 +64,7 @@ class _QuickPhrasesPageState extends State<QuickPhrasesPage> {
         );
         await quickPhraseProvider.add(newPhrase);
       } else {
-        // Update existing
+        // 更新现有条目
         await quickPhraseProvider.update(
           phrase.copyWith(title: title, content: content),
         );
@@ -143,7 +142,7 @@ class _QuickPhrasesPageState extends State<QuickPhrasesPage> {
               itemCount: phrases.length,
               buildDefaultDragHandles: false,
               proxyDecorator: (child, index, animation) {
-                // Smooth scale, no shadow/elevation
+                // 平滑缩放，无阴影或海拔
                 return AnimatedBuilder(
                   animation: animation,
                   builder: (context, _) {
@@ -156,7 +155,7 @@ class _QuickPhrasesPageState extends State<QuickPhrasesPage> {
                 );
               },
               onReorderItem: (oldIndex, newIndex) {
-                // Update immediately for smooth drop animation
+                // 立即更新，使放下动画更平滑
                 context.read<QuickPhraseProvider>().reorderPhrases(
                   oldIndex: oldIndex,
                   newIndex: newIndex,
@@ -474,7 +473,7 @@ class _QuickPhraseEditSheetState extends State<_QuickPhraseEditSheet> {
   }
 }
 
-// --- iOS tactile helpers (no ripple) ---
+// --- iOS 触感辅助函数（无涟漪） ---
 
 class _TactileIconButton extends StatefulWidget {
   const _TactileIconButton({
@@ -541,7 +540,9 @@ class _TactileCardState extends State<_TactileCard> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final overlay = _pressed
-        ? (Theme.of(context).colorScheme.onSurface.withValues(alpha: isDark ? 0.06 : 0.05))
+        ? (Theme.of(
+            context,
+          ).colorScheme.onSurface.withValues(alpha: isDark ? 0.06 : 0.05))
         : Colors.transparent;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,

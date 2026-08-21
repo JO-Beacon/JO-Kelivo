@@ -25,7 +25,7 @@ class RequestLogEntry {
        warnings = warnings ?? <String>[];
 
   final int id;
-  // Monotonic sequence to disambiguate duplicate ids across app restarts.
+  // 单调递增序列，用于区分应用重启后的重复 id。
   final int sequence;
 
   DateTime? startedAt;
@@ -41,18 +41,18 @@ class RequestLogEntry {
   Map<String, dynamic>? responseHeaders;
   String? responseBody;
 
-  /// Characters dropped from each body by the parser's size cap.
+  /// 因解析器大小上限而从每个正文中丢弃的字符数。
   int requestBodyTruncated;
   int responseBodyTruncated;
 
-  /// Inline base64 images/files that were replaced by placeholders.
+  /// 被占位符替换的内联 base64 图片或文件。
   final List<LogPayloadRef> attachments;
 
   final List<String> errors;
   final List<String> warnings;
 
-  // Parsed lazily rather than stored: keeps the entry cheap to send across
-  // an isolate boundary, and most entries never need the parsed form.
+  // 延迟解析而不是预先存储：使条目跨 isolate 边界传输更轻量，
+  // 而且大多数条目永远不需要解析后的形式。
   Uri? _uri;
   bool _uriParsed = false;
 
@@ -125,14 +125,12 @@ class RequestLogParser {
     dotAll: true,
   );
 
-  /// Keeps a single body from blowing up the viewer. Matches
-  /// `LogRedactor._maxJsonBodyChars`.
+  /// 防止单个正文撑爆查看器。与 `LogRedactor._maxJsonBodyChars` 保持一致。
   static const int defaultMaxBodyChars = 256 * 1024;
 
-  /// [elide] replaces inline base64 payloads with placeholders — needed for
-  /// files written before write-side elision existed. [maxBodyChars] caps
-  /// whatever survives; the full text stays on disk and is reachable by
-  /// exporting the file.
+  /// [elide] 会用占位符替换内联 base64 数据，用于在写入端脱敏功能出现前
+  /// 写入的文件。[maxBodyChars] 限制剩余内容大小；完整文本仍保存在磁盘上，
+  /// 可通过导出文件查看。
   static List<RequestLogEntry> parse(
     String content, {
     bool elide = true,
@@ -145,9 +143,8 @@ class RequestLogParser {
     final Map<int, StringBuffer> chunkBuffers = <int, StringBuffer>{};
     int seq = 0;
 
-    /// Elides, caps, and records what the elision found. Attachments are
-    /// reported either way — [elide] only decides whether the body text
-    /// itself is rewritten.
+    /// 执行脱敏、限制大小并记录脱敏发现。无论是否脱敏都会报告附件；
+    /// [elide] 只决定正文文本本身是否重写。
     ({String text, int truncated}) prepareBody(
       String body,
       RequestLogEntry entry,
@@ -278,8 +275,8 @@ class RequestLogParser {
         if (id == null) continue;
         final e = ensureEntry(id);
         touch(e, ts);
-        // Buffered rather than `prev + chunk`: string concatenation per chunk
-        // is O(n^2) over a long streamed response.
+        // 使用缓冲而不是 `prev + chunk`：对长流式响应逐块拼接字符串
+        // 会达到 O(n^2) 复杂度。
         final buf = chunkBuffers.putIfAbsent(
           e.sequence,
           () => StringBuffer(e.responseBody ?? ''),
@@ -320,8 +317,7 @@ class RequestLogParser {
       }
     }
 
-    // Elide the reassembled stream once, so payloads split across chunk
-    // boundaries are caught too.
+    // 对重新拼接后的流执行一次脱敏，这样跨分块边界的载荷也能被发现。
     if (chunkBuffers.isNotEmpty) {
       for (final e in entries) {
         final buf = chunkBuffers[e.sequence];
@@ -332,7 +328,7 @@ class RequestLogParser {
       }
     }
 
-    // Newest first (when possible)
+    // 尽可能按最新优先
     entries.sort((a, b) {
       final at = a.startedAt ?? a.lastEventAt;
       final bt = b.startedAt ?? b.lastEventAt;
@@ -388,12 +384,11 @@ class RequestLogParser {
 
   static final RegExp _escapeRe = RegExp(r'\\[nrt\\]');
 
-  /// Reverses `RequestLogger.escape()` (handles `\\`, `\\r`, `\\n`, `\\t`).
+  /// 反转 `RequestLogger.escape()`（处理 `\\`、`\\r`、`\\n`、`\\t`）。
   ///
-  /// Single native pass. A char-by-char loop allocates a new one-character
-  /// String per index, which is seconds of work on a multi-MB body.
-  /// Unknown escapes (`\x`) fall outside the pattern and pass through as-is,
-  /// matching the previous behaviour.
+  /// 单次原生处理。逐字符循环会为每个索引分配一个新的单字符 String，
+  /// 在数 MB 正文上会耗时数秒。未知转义（`\x`）不在模式内，会原样透传，
+  /// 与之前行为一致。
   static String unescape(String input) {
     if (input.isEmpty) return input;
     return input.replaceAllMapped(_escapeRe, (m) {

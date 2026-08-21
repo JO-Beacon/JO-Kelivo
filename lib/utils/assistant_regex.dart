@@ -5,13 +5,13 @@ final Map<String, RegExp?> _compiledPatternCache = <String, RegExp?>{};
 const int _maxCompiledPatternCacheSize = 256;
 
 enum AssistantRegexTransformTarget {
-  /// Persist-time transform. Changes stored content.
+  /// 持久化时执行的转换，会修改已存储的内容。
   persist,
 
-  /// Visual-only transform. Only affects what is rendered.
+  /// 仅影响显示的转换，只改变渲染结果。
   visual,
 
-  /// Send-time transform. Only affects content sent to the model.
+  /// 发送时执行的转换，只影响发送给模型的内容。
   send,
 }
 
@@ -57,16 +57,16 @@ String applyAssistantRegexes(
   return out;
 }
 
-/// Expands replacement string with capture group references ($0, $1, $2, etc.)
+/// 用捕获组引用（$0、$1、$2 等）展开替换字符串。
 String _expandReplacement(String replacement, Match match) {
-  // Pattern to match $0, $1, $2, ... $99
+  // 用于匹配 $0、$1、$2、... $99 的模式
   final refPattern = RegExp(r'\$(\d{1,2})');
   return replacement.replaceAllMapped(refPattern, (m) {
     final groupIndex = int.parse(m.group(1)!);
     if (groupIndex <= match.groupCount) {
       return match.group(groupIndex) ?? '';
     }
-    // Return original reference if group doesn't exist
+    // 如果对应捕获组不存在，则返回原始引用
     return m.group(0)!;
   });
 }

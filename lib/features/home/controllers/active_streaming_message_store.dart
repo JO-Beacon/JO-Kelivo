@@ -1,6 +1,6 @@
 import '../../../core/models/chat_message.dart';
 
-/// Keeps generation identity independent from the currently loaded timeline.
+/// 让生成身份与当前加载的时间线保持独立。
 class ActiveStreamingMessageStore {
   final Map<String, ChatMessage> _messagesByConversation =
       <String, ChatMessage>{};

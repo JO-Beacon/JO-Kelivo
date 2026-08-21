@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 import '../animations/widgets.dart';
 
 class LoadingDialogCard extends StatelessWidget {
-  const LoadingDialogCard({super.key, this.label});
+  const LoadingDialogCard({super.key, this.label, this.progress});
 
   final String? label;
+  final double? progress;
 
   @override
   Widget build(BuildContext context) {
@@ -44,6 +45,16 @@ class LoadingDialogCard extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const CupertinoActivityIndicator(radius: 16),
+                    const SizedBox(height: 14),
+                    ClipRRect(
+                      borderRadius: BorderRadius.all(Radius.circular(999)),
+                      child: LinearProgressIndicator(
+                        minHeight: 4,
+                        value: progress,
+                        backgroundColor: cs.surfaceContainerHighest,
+                        color: cs.primary,
+                      ),
+                    ),
                     if (hasLabel) ...[
                       const SizedBox(height: 12),
                       Text(

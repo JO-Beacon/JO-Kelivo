@@ -2,8 +2,8 @@ class QuickPhrase {
   final String id;
   final String title;
   final String content;
-  final bool isGlobal; // true = global, false = assistant-specific
-  final String? assistantId; // null for global phrases
+  final bool isGlobal; // true 表示全局，false 表示仅限某个助理
+  final String? assistantId; // 全局短语时为 null
 
   const QuickPhrase({
     required this.id,

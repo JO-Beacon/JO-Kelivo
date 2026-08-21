@@ -16,14 +16,14 @@ import '../services/tool_approval_service.dart';
 import 'chat_controller.dart';
 import 'stream_controller.dart' as stream_ctrl;
 
-/// Controller for coordinating message generation (send and regenerate).
+/// 协调消息生成（发送与重新生成）的控制器。
 ///
-/// This controller:
-/// - Coordinates message sending and regeneration flows
-/// - Uses MessageBuilderService to construct API messages
-/// - Uses StreamController to handle streaming responses
-/// - Uses ToolHandlerService to manage tool definitions and handlers
-/// - Manages generation state (loading, streaming)
+/// 该控制器：
+/// - 协调消息发送与重新生成流程
+/// - 使用 MessageBuilderService 构建 API 消息
+/// - 使用 StreamController 处理流式响应
+/// - 使用 ToolHandlerService 管理工具定义与处理器
+/// - 管理生成状态（加载、流式）
 class GenerationController {
   GenerationController({
     required this.chatService,
@@ -42,24 +42,24 @@ class GenerationController {
   final stream_ctrl.StreamController streamController;
   final MessageBuilderService messageBuilderService;
 
-  /// Service for handling tool definitions and tool call execution
+  /// 负责工具定义与工具调用执行的服务
   final ToolHandlerService toolHandlerService;
 
-  /// Build context (used for accessing providers)
+  /// 构建上下文（用于访问 providers）
   final BuildContext contextProvider;
 
-  /// Callback when state changes (trigger setState in the widget)
+  /// 状态变化时的回调（在 widget 中触发 setState）
   final VoidCallback onStateChanged;
 
-  /// Function to get localized title
+  /// 获取本地化标题的函数
   final String Function(BuildContext context) getTitleForLocale;
 
   // ============================================================================
-  // Tool Schema Sanitization (delegated to ToolHandlerService)
+  // 工具 Schema 清洗（委托给 ToolHandlerService）
   // ============================================================================
 
-  /// Sanitize/translate JSON Schema to each provider's accepted subset.
-  /// Delegates to ToolHandlerService.sanitizeToolParametersForProvider.
+  /// 将 JSON Schema 清洗/转换为各 provider 接受的子集。
+  /// 委托给 ToolHandlerService.sanitizeToolParametersForProvider。
   static Map<String, dynamic> sanitizeToolParametersForProvider(
     Map<String, dynamic> schema,
     ProviderKind kind,
@@ -68,7 +68,7 @@ class GenerationController {
   }
 
   // ============================================================================
-  // Model Capability Checks
+  // 模型能力检查
   // ============================================================================
 
   bool isReasoningModel(String providerKey, String modelId) {
@@ -110,21 +110,21 @@ class GenerationController {
   }
 
   bool isReasoningEnabled(int? budget) {
-    if (budget == null) return true; // treat null as default/auto -> enabled
-    if (budget == -1) return true; // auto
+    if (budget == null) return true; // 将 null 视为默认/自动 -> 启用
+    if (budget == -1) return true; // 自动
     return budget >= 1024;
   }
 
   // ============================================================================
-  // Tool Definitions Builder (delegated to ToolHandlerService)
+  // 工具定义构建器（委托给 ToolHandlerService）
   // ============================================================================
 
   McpToolRouteSnapshot captureMcpToolRoutes(Assistant? assistant) {
     return toolHandlerService.captureMcpToolRoutes(assistant);
   }
 
-  /// Prepare tool definitions for API call.
-  /// Delegates to ToolHandlerService.buildToolDefinitions.
+  /// 为 API 调用准备工具定义。
+  /// 委托给 ToolHandlerService.buildToolDefinitions。
   List<Map<String, dynamic>> buildToolDefinitions(
     SettingsProvider settings,
     Assistant? assistant,
@@ -144,8 +144,8 @@ class GenerationController {
     );
   }
 
-  /// Build tool call handler function.
-  /// Delegates to ToolHandlerService.buildToolCallHandler.
+  /// 构建工具调用处理函数。
+  /// 委托给 ToolHandlerService.buildToolCallHandler。
   ToolCallHandler? buildToolCallHandler(
     SettingsProvider settings,
     Assistant? assistant, {
@@ -165,10 +165,10 @@ class GenerationController {
   }
 
   // ============================================================================
-  // Custom Headers/Body Builders
+  // 自定义请求头/请求体构建器
   // ============================================================================
 
-  /// Build custom headers from assistant settings.
+  /// 根据助手设置构建自定义请求头。
   Map<String, String>? buildCustomHeaders(Assistant? assistant) {
     if ((assistant?.customHeaders.isNotEmpty ?? false)) {
       final headers = <String, String>{
@@ -181,7 +181,7 @@ class GenerationController {
     return null;
   }
 
-  /// Build custom body from assistant settings.
+  /// 根据助手设置构建自定义请求体。
   Map<String, dynamic>? buildCustomBody(Assistant? assistant) {
     if ((assistant?.customBody.isNotEmpty ?? false)) {
       final body = <String, dynamic>{
@@ -195,10 +195,10 @@ class GenerationController {
   }
 
   // ============================================================================
-  // Assistant Content Transform
+  // 助手内容转换
   // ============================================================================
 
-  /// Transform raw content using assistant regexes.
+  /// 使用助手正则转换原始内容。
   String transformAssistantContent(String raw, Assistant? assistant) {
     return applyAssistantRegexes(
       raw,
@@ -209,10 +209,10 @@ class GenerationController {
   }
 
   // ============================================================================
-  // Generation Context Builder
+  // 生成上下文构建器
   // ============================================================================
 
-  /// Build generation context with all necessary data for streaming.
+  /// 构建流式生成所需的包含全部必要数据的生成上下文。
   stream_ctrl.GenerationContext buildGenerationContext({
     required ChatMessage assistantMessage,
     required List<Map<String, dynamic>> apiMessages,

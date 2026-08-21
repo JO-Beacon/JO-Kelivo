@@ -7,12 +7,80 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/features/migration/hive_to_sqlite_migration_page.dart';
 import 'package:Kelivo/features/migration/hive_to_sqlite_migration_service.dart';
+import 'package:Kelivo/desktop/window_title_bar.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/main.dart' show MigrationApp;
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 
 void main() {
+  testWidgets('desktop restart and retry reuse the verified backup', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(800, 1000);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final testDirectory = Directory.systemTemp.createTempSync(
+      'kelivo_desktop_migration_retry_',
+    );
+    addTearDown(() {
+      if (testDirectory.existsSync()) {
+        testDirectory.deleteSync(recursive: true);
+      }
+    });
+    final backup = File('${testDirectory.path}/verified.zip')
+      ..writeAsStringSync('verified migration backup');
+    final service = _DesktopRestartMigrationService(
+      HiveToSqliteMigrationDecision(
+        needsMigration: true,
+        appDataDir: testDirectory,
+        sqliteFile: File('${testDirectory.path}/kelivo-test.sqlite'),
+        hiveFiles: const <File>[],
+      ),
+      backup,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('zh'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: HiveToSqliteMigrationPage(service: service, sqliteMode: true),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.byType(WindowTitleBar), findsOneWidget);
+    expect(find.text('线性 SQLite'), findsOneWidget);
+    expect(find.text('树化 SQLite'), findsOneWidget);
+    expect(find.text('Hive'), findsNothing);
+
+    final startButton = _buttonForIcon(tester, Lucide.FolderPlus);
+    await tester.runAsync(() async {
+      startButton.onTap!();
+      await _waitUntil(() => service.migrationBackupPaths.length == 1);
+    });
+    await tester.pump();
+
+    expect(service.backupCalls, 0);
+    expect(service.migrationBackupPaths, <String?>[backup.path]);
+    expect(find.byIcon(Lucide.RotateCcw), findsOneWidget);
+
+    final retryButton = _buttonForIcon(tester, Lucide.RotateCcw);
+    await tester.runAsync(() async {
+      retryButton.onTap!();
+      await _waitUntil(() => service.migrationBackupPaths.length == 2);
+    });
+    await tester.pump();
+
+    expect(service.backupCalls, 0);
+    expect(service.migrationBackupPaths, <String?>[backup.path, backup.path]);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+  });
+
   testWidgets('mobile retry does not export an already saved backup again', (
     tester,
   ) async {
@@ -196,6 +264,35 @@ final class _RetryMigrationService extends HiveToSqliteMigrationService {
     backupCalls++;
     temporaryBackup.writeAsStringSync('temporary migration backup');
     return temporaryBackup;
+  }
+
+  @override
+  Future<void> migrate({String? backupPath}) async {
+    migrationBackupPaths.add(backupPath);
+    if (migrationBackupPaths.length == 1) {
+      throw StateError('injected migration failure');
+    }
+  }
+}
+
+final class _DesktopRestartMigrationService
+    extends HiveToSqliteMigrationService {
+  _DesktopRestartMigrationService(super.decision, this.backup);
+
+  final File backup;
+  final List<String?> migrationBackupPaths = <String?>[];
+  int backupCalls = 0;
+
+  @override
+  Future<String?> existingBackupPath() async => backup.path;
+
+  @override
+  Future<bool> hasExternallySavedBackup() async => true;
+
+  @override
+  Future<File> backupToFile(File file) async {
+    backupCalls++;
+    return file;
   }
 
   @override

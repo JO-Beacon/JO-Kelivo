@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 import '../../../l10n/app_localizations.dart';
 import 'token_detail_popup.dart';
 
-/// Compact token display that shows "123 tokens" and pops up a detail bubble.
+/// 紧凑的 token 显示，展示“123 tokens”并弹出详情气泡。
 ///
-/// - Mobile: tap to toggle popup (transparent barrier closes it)
-/// - Desktop: hover with 200ms delay to show, 300ms delay to close
-/// - Fade + slight slide animation on show/hide
+/// - 移动端：点击切换弹窗（透明遮罩会关闭弹窗）
+/// - 桌面端：悬停 200ms 后显示，300ms 后关闭
+/// - 显示/隐藏时使用淡入和轻微滑动动画
 class TokenDisplayWidget extends StatefulWidget {
   const TokenDisplayWidget({
     super.key,
@@ -59,7 +59,7 @@ class _TokenDisplayWidgetState extends State<TokenDisplayWidget>
 
   static const double _estimatedPopupHeight = 120;
 
-  /// Lazily create animation controller on first use (when popup actually opens).
+  /// 在首次使用时（弹窗实际打开时）延迟创建动画控制器。
   CurvedAnimation _ensureAnimation() {
     _animController ??= AnimationController(
       vsync: this,
@@ -113,14 +113,14 @@ class _TokenDisplayWidgetState extends State<TokenDisplayWidget>
       offset = const Offset(0, -8);
     }
 
-    // Listen to scroll position to dismiss popup on scroll
+    // 监听滚动位置，滚动时关闭弹窗
     _attachScrollListener();
 
     final overlay = Overlay.of(context, rootOverlay: true);
 
     if (!_isDesktop) {
-      // Use Listener (onPointerDown) instead of GestureDetector (onTap)
-      // so that scroll gestures (which start with pointerDown) also dismiss
+      // 使用 Listener（onPointerDown）而非 GestureDetector（onTap）
+      // 这样滚动手势（从 pointerDown 开始）也会关闭弹窗
       _barrierEntry = OverlayEntry(
         builder: (_) => Listener(
           behavior: HitTestBehavior.translucent,
@@ -270,10 +270,7 @@ class _TokenDisplayWidgetState extends State<TokenDisplayWidget>
       return CompositedTransformTarget(link: _layerLink, child: label);
     }
 
-    Widget child = CompositedTransformTarget(
-      link: _layerLink,
-      child: label,
-    );
+    Widget child = CompositedTransformTarget(link: _layerLink, child: label);
 
     if (_isDesktop) {
       child = MouseRegion(
@@ -323,12 +320,11 @@ class _AnimatedPopupContent extends StatelessWidget {
     final begin = Offset(0, showBelow ? -0.15 : 0.15);
 
     Widget content = SlideTransition(
-      position:
-          Tween<Offset>(begin: begin, end: Offset.zero).animate(animation),
-      child: FadeTransition(
-        opacity: animation,
-        child: child,
-      ),
+      position: Tween<Offset>(
+        begin: begin,
+        end: Offset.zero,
+      ).animate(animation),
+      child: FadeTransition(opacity: animation, child: child),
     );
 
     if (isDesktop) {

@@ -71,7 +71,7 @@ class ProviderGroupPickerSheet extends StatelessWidget {
     final id = await sp.createGroup(name);
     if (id.isEmpty) return;
     await sp.setProviderGroup(providerKey, id);
-    if (context.mounted) Navigator.of(context).pop(); // close sheet
+    if (context.mounted) Navigator.of(context).pop(); // 关闭 sheet
   }
 
   Future<void> _openGroupManager(BuildContext context) async {

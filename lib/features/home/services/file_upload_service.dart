@@ -34,7 +34,7 @@ class FileUploadService {
   /// 媒体控制器，用于添加图片和文件到输入栏
   final ChatInputBarController mediaController;
 
-  /// Context provider callback to avoid storing stale context
+  /// Context 提供器回调，用于避免存储过期 context
   final BuildContext Function() getContext;
   final bool Function() isImageCropperEnabled;
   final ImageCompressConfig Function() getImageCompressConfig;
@@ -80,7 +80,7 @@ class FileUploadService {
   /// 从相册选取图片
   Future<void> onPickPhotos() async {
     try {
-      // On desktop, fall back to FilePicker as image_picker is not supported.
+      // 桌面端回退到 FilePicker，因为不支持 image_picker。
       if (PlatformUtils.isDesktopTarget) {
         final res = await FilePicker.platform.pickFiles(
           allowMultiple: true,
@@ -125,10 +125,10 @@ class FileUploadService {
   /// [context] 用于显示权限提示和错误消息
   Future<void> onPickCamera(BuildContext context) async {
     try {
-      // Proactive permission check on mobile
+      // 移动端主动权限检查
       if (PlatformUtils.isMobile) {
         var status = await Permission.camera.status;
-        // Request if not determined; otherwise guide user
+        // 如果未确定则请求；否则引导用户
         if (status.isDenied || status.isRestricted) {
           status = await Permission.camera.request();
         }
@@ -214,7 +214,7 @@ class FileUploadService {
     final mediaMime = inferMediaMimeFromSource(name);
     if (mediaMime.isNotEmpty) return mediaMime;
     final lower = name.toLowerCase();
-    // Documents / text
+    // 文档 / 文本
     if (lower.endsWith('.pdf')) return 'application/pdf';
     if (lower.endsWith('.docx')) {
       return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -246,9 +246,9 @@ class FileUploadService {
         withData: false,
         type: FileType.custom,
         allowedExtensions: const [
-          // images
+          // 图片
           'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'heic', 'heif',
-          // videos
+          // 视频
           'mp4',
           'avi',
           'mkv',
@@ -260,12 +260,12 @@ class FileUploadService {
           'webm',
           '3gp',
           '3gpp',
-          // audio
+          // 音频
           'wav',
           'mp3',
           'pcm',
           'pcm16',
-          // docs
+          // 文档
           'txt',
           'md',
           'json',

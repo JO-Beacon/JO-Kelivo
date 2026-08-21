@@ -1,20 +1,20 @@
-/// Rotates API keys for search services that configure multiple keys.
+/// 为配置了多个 key 的搜索服务轮换 API key。
 ///
-/// The rotation pool is `[primary, ...extras]` (trimmed, deduplicated).
-/// The next-index cursor is kept in memory per service id, matching the
-/// ephemeral round-robin behavior of `ApiKeyManager` for model providers.
+/// 轮换池为 `[primary, ...extras]`（去空白、去重）。
+/// 下一次索引游标按 service id 保存在内存中，与模型 provider 的
+/// `ApiKeyManager` 瞬时轮询行为一致。
 class SearchApiKeyRotator {
   SearchApiKeyRotator._();
 
   static final SearchApiKeyRotator instance = SearchApiKeyRotator._();
 
-  final Map<String, int> _indices = {}; // serviceId -> next pool index
+  final Map<String, int> _indices = {}; // serviceId -> 下一个池索引
 
-  /// Picks the key to use for the next request of [serviceId].
+  /// 选择 [serviceId] 下一次请求使用的 key。
   ///
-  /// When the cleaned pool holds a single key (e.g. an empty [primary] with
-  /// one extra), that key is returned without advancing any cursor. When the
-  /// pool is empty the raw [primary] is returned as-is.
+  /// 当清洗后的池只有一个 key（例如空 [primary] 加一个
+  /// extra）时，直接返回该 key 而不推进游标。当
+  /// 池为空时，原样返回原始 [primary]。
   String select(String serviceId, String primary, List<String> extras) {
     final pool = _pool(primary, extras);
     if (pool.isEmpty) return primary;
@@ -25,13 +25,13 @@ class SearchApiKeyRotator {
     return pool[index];
   }
 
-  /// All keys that participate in rotation, in rotation order.
+  /// 参与轮换的所有 key，按轮换顺序。
   static List<String> rotationPool(String primary, List<String> extras) =>
       _pool(primary, extras);
 
-  /// Splits a batch paste into individual keys. Accepts keys separated by
-  /// newlines, commas, semicolons, or whitespace; trims and deduplicates
-  /// while preserving order.
+  /// 将批量粘贴拆分为单个 key。接受以换行、逗号、
+  /// 分号或空白分隔的 key；去空白、去重并
+  /// 保留顺序。
   static List<String> parseBatch(String input) {
     final seen = <String>{};
     final keys = <String>[];
@@ -43,7 +43,7 @@ class SearchApiKeyRotator {
     return keys;
   }
 
-  /// Masks a key for display, keeping the first and last four characters.
+  /// 对 key 做掩码处理用于展示，保留首尾各四位字符。
   static String mask(String key) {
     final trimmed = key.trim();
     if (trimmed.length <= 8) return '••••••••';

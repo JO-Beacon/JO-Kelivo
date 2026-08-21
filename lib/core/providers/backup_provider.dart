@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../database/business_preferences.dart';
 import '../database/business_repository.dart';
 import '../models/backup.dart';
+import '../models/progress_update.dart';
 import '../services/chat/chat_service.dart';
 import '../services/backup/data_sync.dart';
 
@@ -53,12 +54,12 @@ class BackupProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> backup() async {
+  Future<bool> backup({ProgressCallback? onProgress}) async {
     _busy = true;
     _message = null;
     notifyListeners();
     try {
-      await _dataSync.backupToWebDav(_cfg);
+      await _dataSync.backupToWebDav(_cfg, onProgress: onProgress);
       _message = 'Backup uploaded';
       return true;
     } catch (e) {
@@ -73,12 +74,18 @@ class BackupProvider extends ChangeNotifier {
   Future<void> restoreFromItem(
     BackupFileItem item, {
     RestoreMode mode = RestoreMode.overwrite,
+    ProgressCallback? onProgress,
   }) async {
     _busy = true;
     _message = null;
     notifyListeners();
     try {
-      await _dataSync.restoreFromWebDav(_cfg, item, mode: mode);
+      await _dataSync.restoreFromWebDav(
+        _cfg,
+        item,
+        mode: mode,
+        onProgress: onProgress,
+      );
       _message = 'Restored';
     } catch (e) {
       _message = e.toString();
@@ -98,9 +105,19 @@ class BackupProvider extends ChangeNotifier {
     return _dataSync.listBackupFiles(_cfg);
   }
 
-  Future<File> exportToFile() => _dataSync.exportToFile(_cfg);
+  Future<File> exportToFile({ProgressCallback? onProgress}) =>
+      _dataSync.exportToFile(_cfg, onProgress: onProgress);
+
+  Future<File> exportKelivoBackupToFile() => _dataSync.prepareBackupFile(_cfg);
+
   Future<void> restoreFromLocalFile(
     File file, {
     RestoreMode mode = RestoreMode.overwrite,
-  }) => _dataSync.restoreFromLocalFile(file, _cfg, mode: mode);
+    ProgressCallback? onProgress,
+  }) => _dataSync.restoreFromLocalFile(
+    file,
+    _cfg,
+    mode: mode,
+    onProgress: onProgress,
+  );
 }

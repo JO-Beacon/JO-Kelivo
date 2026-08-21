@@ -46,7 +46,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
     final total = apiKeys.length;
     final normal = apiKeys.where((k) => k.status == ApiKeyStatus.active).length;
     final errors = apiKeys.where((k) => k.status == ApiKeyStatus.error).length;
-    // accuracy metric removed from UI; no longer needed
+    // 准确率指标已从 UI 移除，不再需要
 
     return Scaffold(
       appBar: AppBar(
@@ -381,12 +381,12 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
     );
   }
 
-  // iOS-style section container
+  // iOS 风格分区容器
   Widget _iosSectionCard({required List<Widget> children}) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    // Blend with surface to better match page background while retaining a card feel
+    // 与 surface 混合，更好地匹配页面背景，同时保留卡片感
     final Color bg = context.appColors.surfaceCard;
     return Container(
       decoration: BoxDecoration(
@@ -402,7 +402,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
     );
   }
 
-  // Single row with label-left and custom trailing
+  // 单行布局：左侧标签，自定义尾部内容
   Widget _iosRow(
     BuildContext context, {
     required String label,
@@ -469,7 +469,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
       type: NotificationType.info,
       actionLabel: AppLocalizations.of(context)!.multiKeyPageUndo,
       onAction: () async {
-        // Re-insert if user taps undo
+        // 用户点击撤销时重新插入
         final latest = settings.getProviderConfig(
           widget.providerKey,
           defaultName: widget.providerDisplayName,
@@ -501,7 +501,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
     if (updated == null) {
       return;
     }
-    // Optional: prevent duplicate keys if key changed
+    // 可选：密钥变化时防止重复
     final cfg = settings.getProviderConfig(
       widget.providerKey,
       defaultName: widget.providerDisplayName,
@@ -564,7 +564,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
       type: NotificationType.success,
     );
 
-    // Auto-detect imported keys
+    // 自动检测导入的密钥
     await _detectOnly(keys: unique);
   }
 
@@ -746,7 +746,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                // Only show Round Robin and Random for now
+                // 目前只显示 Round Robin 和 Random
                 for (final s in <LoadBalanceStrategy>[
                   LoadBalanceStrategy.roundRobin,
                   LoadBalanceStrategy.random,
@@ -1167,7 +1167,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
           updatedAt: DateTime.now().millisecondsSinceEpoch,
         );
       }
-      // Small delay between tests for UX
+      // 测试之间短暂延迟，改善体验
       await Future.delayed(const Duration(milliseconds: 120));
     }
     await settings.setProviderConfig(
@@ -1195,7 +1195,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
   }
 }
 
-// A scale-on-tap wrapper for iOS-like lightweight feedback (no ripple)
+// 点击缩放的 iOS 风格轻量反馈包装（无涟漪）
 class _TactileScale extends StatefulWidget {
   const _TactileScale({required this.child, this.onTap});
   final Widget child;
@@ -1237,7 +1237,7 @@ class _TactileScaleState extends State<_TactileScale> {
   }
 }
 
-// Icon-only, no-border, iOS-like tactile icon button
+// 纯图标、无边框、iOS 风格触感图标按钮
 class _TactileIconButton extends StatefulWidget {
   const _TactileIconButton({
     required this.icon,
@@ -1303,7 +1303,7 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   }
 }
 
-// Builder-based tactile wrapper to expose pressed state and optional scale
+// 基于 Builder 的触感包装，暴露按压状态和可选缩放
 class _TactileRow extends StatefulWidget {
   const _TactileRow({
     required this.builder,

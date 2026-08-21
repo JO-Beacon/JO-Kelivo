@@ -90,7 +90,7 @@ final class _PosixRestoreDurability implements RestoreDurability {
   late final _ChmodDart _chmod;
   late final _ErrnoDart _errno;
 
-  // Android ARM uses architecture-specific O_DIRECTORY/O_NOFOLLOW values.
+  // Android ARM 使用与架构相关的 O_DIRECTORY/O_NOFOLLOW 值。
   bool get _usesAndroidArmOpenFlags {
     final abi = Abi.current();
     return abi == Abi.androidArm || abi == Abi.androidArm64;
@@ -370,9 +370,8 @@ final class _WindowsRestoreDurability implements RestoreDurability {
         expected) {
       throw FileSystemException('restore_durability_path_type', entity.path);
     }
-    // Files under Windows Application Support inherit its user ACL. Explicit
-    // chmod-style mode changes do not exist; the write-through operations
-    // below preserve that inherited security boundary.
+    // Windows Application Support 下的文件继承其用户 ACL。显式
+    // 不存在 chmod 式模式变更；下方的直写操作会保留继承的安全边界。
   }
 
   @override
@@ -385,9 +384,9 @@ final class _WindowsRestoreDurability implements RestoreDurability {
     Directory directory, {
     bool fullBarrier = false,
   }) async {
-    // Windows has no separate Apple-style F_FULLFSYNC primitive. Keep using
-    // the existing FlushFileBuffers path; its directory behavior remains a
-    // platform acceptance boundary until exercised on supported filesystems.
+    // Windows 没有独立的 Apple 风格 F_FULLFSYNC 原语。继续使用现有的
+    // FlushFileBuffers 路径；其目录行为仍是平台验收边界，
+    // 直到在受支持文件系统上得到验证。
     await _syncPath(directory, directory: true);
   }
 
@@ -469,9 +468,9 @@ final class _WindowsRestoreDurability implements RestoreDurability {
     final nativeSource = sourcePath.toNativeUtf16();
     final nativeTarget = target.toNativeUtf16();
     try {
-      // MOVEFILE_WRITE_THROUGH is the only durability primitive used here.
-      // Same-volume rename and directory metadata remain Windows acceptance
-      // boundaries until exercised on every supported filesystem.
+      // MOVEFILE_WRITE_THROUGH 是这里使用的唯一持久性原语。
+      // 同卷重命名和目录元数据仍是 Windows 验收边界，
+      // 直到在每种受支持文件系统上得到验证。
       if (_moveFileEx(nativeSource, nativeTarget, _moveFileWriteThrough) == 0) {
         throw FileSystemException(
           'restore_durability_rename:${_getLastError()}:$target',

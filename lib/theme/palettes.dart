@@ -96,7 +96,7 @@ class ThemePalettes {
     ),
   );
 
-  // Blue palette: derived from provided logs
+  // 蓝色调色板：根据提供的日志派生
   static const ThemePalette blue = ThemePalette(
     id: blueId,
     zhName: '海霄蓝',
@@ -163,7 +163,7 @@ class ThemePalettes {
     ),
   );
 
-  // Green palette
+  // 绿色调色板
   static const ThemePalette green = ThemePalette(
     id: greenId,
     zhName: '竹影绿',
@@ -230,7 +230,7 @@ class ThemePalettes {
     ),
   );
 
-  // Purple palette
+  // 紫色调色板
   static const ThemePalette purple = ThemePalette(
     id: purpleId,
     zhName: '暮紫韵',
@@ -297,7 +297,7 @@ class ThemePalettes {
     ),
   );
 
-  // Yellow palette
+  // 黄色调色板
   static const ThemePalette yellow = ThemePalette(
     id: yellowId,
     zhName: '琥珀金',
@@ -364,7 +364,7 @@ class ThemePalettes {
     ),
   );
 
-  // New: Smoky Rose palette — exact values from logs
+  // 新增：Smoky Rose 调色板，精确值来自日志
   static const ThemePalette smokyRose = ThemePalette(
     id: smokyRoseId,
     zhName: '暮霭玫',
@@ -431,7 +431,7 @@ class ThemePalettes {
     ),
   );
 
-  // New: Terracotta Clay palette — exact values from logs
+  // 新增：Terracotta Clay 调色板，精确值来自日志
   static const ThemePalette terracotta = ThemePalette(
     id: terracottaId,
     zhName: '陶砂红',
@@ -564,7 +564,7 @@ class ThemePalettes {
     ),
   );
 
-  // New: Document Theme palette based on provided spec
+  // 新增：基于提供的规格生成的 Document Theme 调色板
   static const ThemePalette docTheme = ThemePalette(
     id: docThemeId,
     zhName: '樱桃绿',
@@ -642,8 +642,8 @@ class ThemePalettes {
     docTheme,
   ];
 
-  /// Id of the user-customized palette (built at runtime from the selected
-  /// [CustomTheme] — see theme/custom_theme.dart — not part of [all]).
+  /// 用户自定义调色板的 id（根据所选 [CustomTheme] 在运行时构建，
+  /// 参见 theme/custom_theme.dart；不属于 [all]）。
   static const String customPaletteId = 'custom';
 
   static ThemePalette byId(String id) {

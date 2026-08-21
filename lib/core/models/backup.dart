@@ -11,7 +11,7 @@ class WebDavConfig {
   final String password;
   final String path;
   final String userAgent;
-  final bool includeChats; // Hive boxes
+  final bool includeChats; // Hive 数据箱
   final bool includeFiles; // uploads/
 
   const WebDavConfig({
@@ -83,15 +83,13 @@ class WebDavConfig {
 class S3Config {
   final String
   endpoint; // e.g. https://s3.amazonaws.com or https://<accountid>.r2.cloudflarestorage.com
-  final String
-  region; // e.g. us-east-1 / auto (for some S3-compatible providers)
+  final String region; // 例如 us-east-1 / auto（部分兼容 S3 的提供商支持 auto）
   final String bucket;
   final String accessKeyId;
   final String secretAccessKey;
-  final String sessionToken; // optional
-  final String prefix; // object key prefix/folder
-  final bool
-  pathStyle; // safer for custom endpoints (no bucket subdomain TLS mismatch)
+  final String sessionToken; // 可选
+  final String prefix; // 对象键前缀/文件夹
+  final bool pathStyle; // 对自定义端点更安全（避免 bucket 子域名 TLS 不匹配）
   final String userAgent;
   final bool includeChats;
   final bool includeFiles;
@@ -185,7 +183,7 @@ class S3Config {
 }
 
 class BackupFileItem {
-  final Uri href; // absolute
+  final Uri href; // 绝对路径
   final String displayName;
   final int size;
   final DateTime? lastModified;

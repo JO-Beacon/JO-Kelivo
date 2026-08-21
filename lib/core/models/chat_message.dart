@@ -11,16 +11,16 @@ class ChatMessage extends HiveObject {
   final String id;
 
   @HiveField(1)
-  final String role; // 'user' or 'assistant'
+  final String role; // 'user' 或 'assistant'
 
-  /// Structured parts — single source of truth for body text and attachments.
+  /// 结构化 parts —— 正文文本和附件的唯一事实来源。
   ///
-  /// Hive field 2 (legacy content string) is intentionally not a stored field
-  /// here. [ChatMessageAdapter] still reads field 2 for migration only;
-  /// [content] is derived from [TextPart]s.
+  /// 此处有意不把 Hive 字段 2（旧版 content 字符串）存储为字段。
+  /// [ChatMessageAdapter] 仍仅出于迁移目的读取字段 2；
+  /// [content] 派生自 [TextPart]。
   final List<MessagePart> parts;
 
-  /// Derived text body: concatenation of every [TextPart] in [parts] order.
+  /// 派生文本正文：按 [parts] 顺序连接每个 [TextPart]。
   String get content =>
       parts.whereType<TextPart>().map((part) => part.text).join();
 
@@ -42,7 +42,7 @@ class ChatMessage extends HiveObject {
   @HiveField(8)
   final bool isStreaming;
 
-  // Optional reasoning fields for assistant messages
+  // 助手消息的可选推理字段
   @HiveField(9)
   final String? reasoningText;
 
@@ -52,16 +52,16 @@ class ChatMessage extends HiveObject {
   @HiveField(11)
   final DateTime? reasoningFinishedAt;
 
-  // Translation field for translated content
+  // 用于翻译内容的翻译字段
   @HiveField(12)
   final String? translation;
 
-  // JSON encoded reasoning segments for multiple reasoning blocks
+  // 用于多个推理块的 JSON 编码推理片段
   @HiveField(13)
   final String? reasoningSegmentsJson;
 
-  // Versioning: group messages sharing the same semantic position
-  // groupId identifies a message thread; version starts from 0 and increments
+  // 版本控制：将共享同一语义位置的消息分组，
+  // groupId 标识一个消息线程；version 从 0 开始递增
   @HiveField(14)
   final String? groupId;
 
@@ -110,12 +110,12 @@ class ChatMessage extends HiveObject {
        groupId = groupId ?? id,
        version = version ?? 0;
 
-  /// Content-only rewrite that preserves part ordinal.
+  /// 仅重写内容的操作，保留 part 的序号。
   ///
-  /// Walks [original] in order: emits [TextPart] with [newContent] at the first
-  /// TextPart position, skips later TextParts, and keeps Image/File/ToolCall/
-  /// Reasoning/Unknown/Malformed parts in place. If there is no TextPart,
-  /// prepends one.
+  /// 按顺序遍历 [original]：在第一个 TextPart 位置发出带 [newContent] 的 [TextPart]，
+  /// 跳过后续 TextPart，并将 Image/File/ToolCall/
+  /// Reasoning/Unknown/Malformed part 保留在原位。如果没有 TextPart，
+  /// 则在开头插入一个。
   static List<MessagePart> partsWithReplacedText(
     List<MessagePart> original,
     String newContent,
@@ -165,8 +165,8 @@ class ChatMessage extends HiveObject {
     if (parts != null) {
       nextParts = parts;
     } else if (content != null) {
-      // Expand-step compat: rewrite derived text into a single TextPart while
-      // preserving non-TextPart attachments and their ordinal.
+      // 展开步骤兼容：将派生文本重写为单个 TextPart，同时
+      // 保留非 TextPart 附件及其序号。
       nextParts = partsWithReplacedText(this.parts, content);
     } else {
       nextParts = this.parts;
@@ -200,14 +200,11 @@ class ChatMessage extends HiveObject {
     return {
       'id': id,
       'role': role,
-      // Derived text for older readers; structured attachments live in [parts].
+      // 供较旧读取器使用的派生文本；结构化附件位于 [parts] 中。
       'content': content,
       'parts': [
         for (final part in parts)
-          {
-            'kind': part.kind,
-            'payload': part.encodePayload(),
-          },
+          {'kind': part.kind, 'payload': part.encodePayload()},
       ],
       'timestamp': timestamp.toIso8601String(),
       'modelId': modelId,
@@ -253,9 +250,9 @@ class ChatMessage extends HiveObject {
     return ChatMessage(
       id: json['id'] as String,
       role: json['role'] as String,
-      // Prefer structured parts when present. Legacy backups that only carry
-      // marker-bearing [content] keep that string here; import boundaries run
-      // decodeLegacyContent to promote markers into parts.
+      // 存在结构化 part 时优先使用它们。只携带
+      // 含标记的 [content] 的旧备份会将字符串保留在此处；导入边界会运行
+      // decodeLegacyContent，将标记提升为 part。
       content: parts == null ? json['content'] as String : null,
       parts: parts,
       timestamp: DateTime.parse(json['timestamp'] as String),

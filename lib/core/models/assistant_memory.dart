@@ -1,5 +1,5 @@
 class AssistantMemory {
-  final int id; // 0 for new (not used in store), >0 persisted
+  final int id; // 0 表示新建（不写入存储），>0 表示已持久化
   final String assistantId;
   final String content;
 

@@ -59,7 +59,7 @@ Uri? _tryNormalizeExternalUri(String raw) {
   var u = raw.trim();
   if (u.isEmpty) return null;
 
-  // Handle JSON-ish values like `"example.com"` defensively.
+  // 防御性地处理类 JSON 值（例如 `"example.com"`）。
   if ((u.startsWith('"') && u.endsWith('"')) ||
       (u.startsWith("'") && u.endsWith("'"))) {
     u = u.substring(1, u.length - 1).trim();
@@ -80,13 +80,13 @@ Uri? _tryNormalizeExternalUri(String raw) {
   return uri;
 }
 
-/// Extract markdown images from MCP/tool result content.
+/// 从 MCP/工具结果内容中提取 Markdown 图片。
 ///
-/// Returns `(cleanText, imagePaths)`. Matches `![alt](url)` only — custom
-/// attachment marker strings are left as plain text.
+/// 返回 `(cleanText, imagePaths)`。仅匹配 `![alt](url)`，
+/// 自定义附件标记字符串保留为纯文本。
 ///
-/// Destinations may contain parentheses (e.g. `/tmp/run (1)/image.png`); the
-/// parser finds `![...](` then scans balanced parentheses to the matching `)`.
+/// 目标可能包含括号（例如 `/tmp/run (1)/image.png`）；
+/// 解析器找到 `![...](` 后扫描平衡括号到匹配的 `)`。
 (String, List<String>) _parseMcpImagePaths(String? content) {
   if (content == null || content.isEmpty) return ('', const []);
 
@@ -144,10 +144,10 @@ String _resolveAttachmentImageUri(String uri) {
   return SandboxPathResolver.fix(path);
 }
 
-/// Shared image widget for tool thumbnails and message attachment previews.
+/// 工具缩略图和消息附件预览的共享图片控件。
 ///
-/// `http(s)` → [Image.network], `data:` → [Image.memory], otherwise local
-/// [Image.file]. Unavailable/empty/decode failures use [placeholder].
+/// `http(s)` → [Image.network]，`data:` → [Image.memory]，
+/// 否则为本地 [Image.file]。不可用/空/解码失败时使用 [placeholder]。
 Widget _buildResolvedImage(
   BuildContext context,
   String rawPath, {
@@ -686,11 +686,11 @@ class ChatMessageWidget extends StatefulWidget {
   final ChatMessage message;
   final Widget? modelIcon;
   final bool showModelIcon;
-  // Assistant identity override
+  // 助手身份覆盖
   final bool useAssistantAvatar;
   final bool useAssistantName;
   final String? assistantName;
-  final String? assistantAvatar; // path/url/emoji; null => use initial
+  final String? assistantAvatar; // path/url/emoji；null 表示使用首字母
   final bool showUserAvatar;
   final bool showTokenStats;
   final VoidCallback? onRegenerate;
@@ -699,33 +699,33 @@ class ChatMessageWidget extends StatefulWidget {
   final VoidCallback? onTranslate;
   final VoidCallback? onSpeak;
   final VoidCallback? onMore;
-  final VoidCallback? onEdit; // user: edit
-  final VoidCallback? onDelete; // user: delete
-  // Optional version switcher (branch) UI controls
-  final int? versionIndex; // zero-based display ordinal, not a version number
+  final VoidCallback? onEdit; // 用户：编辑
+  final VoidCallback? onDelete; // 用户：删除
+  // 可选版本切换器（分支）UI 控件
+  final int? versionIndex; // 从 0 开始的展示序号，不是版本号
   final int? versionCount;
   final VoidCallback? onPrevVersion;
   final VoidCallback? onNextVersion;
-  // Optional reasoning UI props (for reasoning-capable models)
+  // 可选推理 UI 属性（用于支持推理的模型）
   final String? reasoningText;
   final bool reasoningExpanded;
   final bool reasoningLoading;
   final DateTime? reasoningStartAt;
   final DateTime? reasoningFinishedAt;
   final VoidCallback? onToggleReasoning;
-  // For multiple reasoning segments
+  // 用于多个推理片段
   final List<ReasoningSegment>? reasoningSegments;
-  // Optional translation UI props
+  // 可选翻译 UI 属性
   final bool translationExpanded;
   final VoidCallback? onToggleTranslation;
-  // MCP tool calls/results mixed-in cards
+  // MCP 工具调用/结果混排卡片
   final List<ToolUIPart>? toolParts;
   final List<int>? contentSplitOffsets;
   final List<int>? reasoningCountAtSplit;
   final List<int>? toolCountAtSplit;
-  // Hide streaming dots when pinned globally
+  // 全局置顶时隐藏流式圆点
   final bool hideStreamingIndicator;
-  // Whether files are currently being processed
+  // 文件是否正在处理中
   final bool isProcessingFiles;
   final bool enableStreamingTextMotion;
   final List<String> suggestions;
@@ -785,26 +785,25 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   final DateFormat _dateFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
   final ScrollController _reasoningScroll = ScrollController();
   bool _tickActive = false;
-  // Local expand state for inline <think> card (defaults to expanded)
+  // 内联 <think> 卡片的本地展开状态（默认展开）
   bool? _inlineThinkExpanded;
   bool _inlineThinkManuallyToggled = false;
-  // User message context menu state
+  // 用户消息上下文菜单状态
   final GlobalKey _userBubbleKey = GlobalKey();
   OverlayEntry? _userMenuOverlay;
-  // Desktop anchored menus for bottom action buttons
+  // 底部操作按钮的桌面端锚定菜单
   final GlobalKey _moreBtnKey1 = GlobalKey();
   final GlobalKey _moreBtnKey2 = GlobalKey();
   final GlobalKey _translateBtnKey2 = GlobalKey();
-  // ValueNotifier for reasoning animation tick - avoids full widget rebuild
+  // 推理动画 tick 的 ValueNotifier，避免整控件重建
   final ValueNotifier<int> _reasoningTick = ValueNotifier<int>(0);
   Timer? _reasoningTimer;
-  // Memoized think-tag parse, keyed by source string equality. The parser is
-  // a pure function of message content, so a single slot is enough.
+  // 记忆化 think-tag 解析，以源字符串相等为键。解析器是消息内容的
+  // 纯函数，单个槽位足够。
   String? _inlineThinkMemoSource;
   ThinkingTagParseResult? _inlineThinkMemoResult;
-  // Memoized assistant visual-regex results, keyed by scope + input string.
-  // Cleared when the rule signature changes; skipped while streaming because
-  // the content changes every frame anyway.
+  // 记忆化助手视觉正则结果，以 scope + 输入字符串为键。
+  // 规则签名变化时清除；流式期间跳过，因为内容每帧都在变化。
   final Map<String, String> _visualRegexMemo = <String, String>{};
   String _visualRegexMemoSignature = '';
 
@@ -813,8 +812,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     super.initState();
     _syncTicker();
 
-    // Determine initial state for inline <think> card BEFORE first paint to avoid
-    // post-frame size changes that can cause list scroll jitter/snapping.
+    // 在首次绘制前确定内联 <think> 卡片的初始状态，避免
+    // 帧后尺寸变化可能导致列表滚动抖动/跳动。
     try {
       final parsed = _legacyInlineThinkingFor(widget);
       final extracted = parsed.thinkingTexts.join('\n\n');
@@ -828,7 +827,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         _inlineThinkExpanded = !autoCollapse ? true : false;
       }
     } catch (_) {
-      // If anything fails here, fall back to later update logic.
+      // 如果此处出错，回退到后续更新逻辑。
     }
   }
 
@@ -836,7 +835,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   void didUpdateWidget(covariant ChatMessageWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     _syncTicker();
-    // Auto-collapse when inline <think> transitions from loading -> finished
+    // 当内联 <think> 从加载态进入完成态时自动折叠
     _applyAutoCollapseInlineThinkIfFinished(oldWidget: oldWidget);
   }
 
@@ -862,8 +861,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
     final autoCollapse = context.read<SettingsProvider>().autoCollapseThinking;
 
-    // If finished now (not loading), inline think is used, and auto-collapse is on
-    // Only collapse when user hasn't manually toggled; also if we don't yet have a chosen state.
+    // 如果当前已完成（非加载中）、使用了行内思考且自动折叠开启
+    // 仅在用户未手动展开时折叠；尚未有选择状态时也折叠。
     final finishedNow = usingInlineThinkNew;
     final justFinished = oldWidget != null
         ? (!usingInlineThinkOld && finishedNow)
@@ -876,7 +875,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       }
     }
 
-    // On first mount where already finished and no user choice yet, honor autoCollapse
+    // 首次挂载时若已完成且用户尚未选择，遵循 autoCollapse
     if (oldWidget == null &&
         usingInlineThinkNew &&
         _inlineThinkExpanded == null) {
@@ -925,8 +924,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   }
 
   String _visualRegexSignature(Assistant assistant) {
-    // String signature (not a hash) so rule edits can never collide into a
-    // stale memo hit.
+    // 字符串签名（不是哈希），使规则编辑不会碰撞出过期的记忆命中。
     return assistant.regexRules
         .map(
           (rule) =>
@@ -1006,9 +1004,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     }
 
     final l10n = AppLocalizations.of(context)!;
-    final content = settings.regenerateDeleteTrailingMessages
-        ? l10n.chatMessageWidgetRegenerateConfirmDeleteTrailingContent
-        : l10n.chatMessageWidgetRegenerateConfirmContent;
+    final content = l10n.chatMessageWidgetRegenerateConfirmContent;
     final ok = await showDialog<bool>(
       context: context,
       builder: (dctx) => AlertDialog(
@@ -1033,7 +1029,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   String _resolveModelDisplayName(SettingsProvider settings) {
     final modelId = widget.message.modelId;
     if (modelId == null || modelId.trim().isEmpty) {
-      // Model metadata can be missing for legacy/preset messages.
+      // 旧版/预设消息可能缺少模型元数据。
       return AppLocalizations.of(context)?.messageExportSheetAssistant ??
           'Assistant';
     }
@@ -1062,7 +1058,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           }
         }
       } catch (_) {
-        // ignore lookup failures; fall through to inferred name.
+        // 忽略查找失败；回退到推断名称。
       }
     }
 
@@ -1093,7 +1089,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   }
 
   void _showUserContextMenu() {
-    // Haptic feedback (optional)
+    // 触感反馈（可选）
     try {
       Haptics.light();
     } catch (_) {}
@@ -1106,18 +1102,18 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final bubbleTopLeft = box.localToGlobal(Offset.zero, ancestor: overlayBox);
     final bubbleSize = box.size;
     final screenSize = overlayBox.size;
-    final insets = MediaQuery.paddingOf(context); // status bar / gesture insets
+    final insets = MediaQuery.paddingOf(context); // 状态栏 / 手势安全区
     final safeLeft = insets.left + 12;
     final safeRight = insets.right + 12;
     final safeTop = insets.top + 12;
     final safeBottom = insets.bottom + 12;
 
-    const double menuWidth = 220; // compact width
-    const double estMenuHeight = 140; // ~ 3 rows
-    const double gap = 10; // space between bubble and menu
+    const double menuWidth = 220; // 紧凑宽度
+    const double estMenuHeight = 140; // 约 3 行
+    const double gap = 10; // 气泡与菜单之间的间距
 
-    // Horizontal placement: align menu's right edge to bubble's right edge,
-    // and clamp into safe area for better reachability on long messages.
+    // 水平放置：将菜单右边缘对齐气泡右边缘，
+    // 并限制在安全区内以提高长消息的可达性。
     final double bubbleRight = bubbleTopLeft.dx + bubbleSize.width;
     double x = bubbleRight - menuWidth;
     final double minX = safeLeft;
@@ -1125,7 +1121,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     if (x < minX) x = minX;
     if (x > maxX) x = maxX;
 
-    // Decide above vs below using safe area
+    // 根据安全区决定在上方还是下方显示
     final availableAbove = bubbleTopLeft.dy - gap - safeTop;
     final availableBelow =
         (screenSize.height - safeBottom) -
@@ -1139,7 +1135,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     } else if (canPlaceBelow) {
       placeAbove = false;
     } else {
-      // Fallback: choose the side with more space
+      // 回退：选择空间更大的一侧
       placeAbove = availableAbove > availableBelow;
     }
 
@@ -1147,7 +1143,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         ? (bubbleTopLeft.dy - estMenuHeight - gap)
         : (bubbleTopLeft.dy + bubbleSize.height + gap);
 
-    // Clamp vertically to remain fully visible within safe area
+    // 垂直限制，保持在安全区内完全可见
     final double minY = safeTop;
     final double maxY = screenSize.height - safeBottom - estMenuHeight;
     if (y < minY) y = minY;
@@ -1165,14 +1161,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       pageBuilder: (ctx, _, __) {
         return Stack(
           children: [
-            // Positioned popup
+            // 定位弹窗
             Positioned(
               left: x,
               top: y,
               width: menuWidth,
               child: _AnimatedPopup(
                 child: DecoratedBox(
-                  // Draw border outside the clipped/blurred content to avoid corner clipping
+                  // 在裁剪/模糊内容外部绘制边框，避免角落被裁剪
                   decoration: ShapeDecoration(
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
@@ -1333,7 +1329,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   }
 
   Widget _buildToolMessage() {
-    // Parse JSON payload embedded in tool message content
+    // 解析嵌入工具消息内容的 JSON 负载
     String toolName = 'tool';
     Map<String, dynamic> args = const {};
     String result = '';
@@ -1389,8 +1385,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             enableMarkdown: s.enableUserMarkdown,
           ),
         );
-    // Attachments come from structured parts only. Literal marker-like text
-    // inside TextPart stays plain text and is never re-parsed.
+    // 附件仅来自结构化部分。TextPart 中类似标记的字面文本
+    // 保持纯文本，永不重新解析。
     final assistant = _assistantForMessage();
     final visualText = _applyVisualAssistantRegexes(
       widget.message.content,
@@ -1426,7 +1422,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Header: User info and avatar
+          // 标题：用户信息和头像
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
@@ -1459,20 +1455,20 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 ),
               if (widget.showUserAvatar) ...[
                 const SizedBox(width: 8),
-                // User avatar
+                // 用户头像
                 _buildUserAvatar(userAvatarType, userAvatarValue, cs),
               ],
             ],
           ),
           const SizedBox(height: 8),
-          // Message content (context menu: long-press on mobile, right-click on desktop)
+          // 消息内容（上下文菜单：移动端长按，桌面端右键）
           GestureDetector(
             onLongPressStart: (_) {
               final isDesktop =
                   defaultTargetPlatform == TargetPlatform.macOS ||
                   defaultTargetPlatform == TargetPlatform.windows ||
                   defaultTargetPlatform == TargetPlatform.linux;
-              if (isDesktop) return; // Desktop uses right-click menu
+              if (isDesktop) return; // 桌面端使用右键菜单
               _showUserContextMenu();
             },
             onSecondaryTapDown: (details) {
@@ -1480,7 +1476,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   defaultTargetPlatform == TargetPlatform.macOS ||
                   defaultTargetPlatform == TargetPlatform.windows ||
                   defaultTargetPlatform == TargetPlatform.linux;
-              if (!isDesktop) return; // Mobile keeps long-press
+              if (!isDesktop) return; // 移动端保留长按
               _showUserContextMenuAt(details.globalPosition);
             },
             behavior: HitTestBehavior.translucent,
@@ -1636,7 +1632,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
   void _showUserContextMenuAt(Offset globalPosition) async {
     final l10n = AppLocalizations.of(context)!;
-    // Haptic feedback
+    // 触感反馈
     try {
       Haptics.light();
     } catch (_) {}
@@ -1727,9 +1723,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         : content;
   }
 
-  /// Attachment previews in [parts] ordinal order (not images-then-files).
+  /// [parts] 顺序的附件预览（不是图片在前文件在后）。
   ///
-  /// [alignEnd] true for user bubbles (trailing), false for assistant (start).
+  /// [alignEnd] 为用户气泡用 true（尾部），助手用 false（起始）。
   Widget? _buildAttachmentPreview(
     BuildContext context, {
     required List<MessagePart> parts,
@@ -2059,7 +2055,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     required BuildContext context,
     required Widget child,
   }) {
-    // Reuse same styles, but flag as non-user for default fallthrough
+    // 复用相同样式，但标记为非用户以用于默认回退
     return _buildBubbleContainer(context: context, isUser: false, child: child);
   }
 
@@ -2334,7 +2330,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: Model info and time
+          // 标题：模型信息和时间
           Row(
             children: [
               if (widget.useAssistantAvatar) ...[
@@ -2385,7 +2381,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                             ),
                           );
                         }
-                        // Token stats moved to action toolbar
+                        // token 统计移至操作工具栏
                         return rowChildren.isNotEmpty
                             ? Row(children: rowChildren)
                             : const SizedBox.shrink();
@@ -2403,7 +2399,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             const SizedBox(height: 8),
           ],
 
-          // File Processing Indicator (inserted before content)
+          // 文件处理指示器（插入在内容之前）
           if (widget.isProcessingFiles) ...[
             const FileProcessingIndicator(),
             const SizedBox(height: 8),
@@ -2669,7 +2665,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               ),
             ),
           ],
-          // Sources summary card (tap to open full citations)
+          // 来源摘要卡片（点击打开完整引用）
           if (searchItems.isNotEmpty) ...[
             const SizedBox(height: 8),
             _SourcesSummaryCard(
@@ -2678,7 +2674,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               onTap: () => _showCitationsSheet(searchItems),
             ),
           ],
-          // Action buttons (hidden while generating)
+          // 操作按钮（生成期间隐藏）
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 220),
             switchInCurve: Curves.easeOutCubic,
@@ -2910,8 +2906,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     );
   }
 
-  // Build once per message so each citation marker only performs a map lookup.
-  // Insert IDs first so an exact ID match wins over a legacy numeric index.
+  // 每条消息只构建一次，使每个引用标记只需一次映射查找。
+  // 先插入 ID，使精确 ID 匹配优先于旧版数字索引。
   Map<String, String> _buildCitationIndexLookup(
     List<Map<String, dynamic>> items,
   ) {
@@ -2940,7 +2936,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     return asIndex == null ? null : citationIndexLookup[asIndex.toString()];
   }
 
-  // Try resolve citation id -> url from the latest search_web tool results of this assistant message
+  // 尝试从此助手消息的最新 search_web 工具结果解析引用 id -> url
   void _handleCitationTap(String id) async {
     final l10n = AppLocalizations.of(context)!;
     final items = _allSearchItems();
@@ -2951,9 +2947,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           orElse: () => null,
         );
 
-    // Fallbacks for models that don't strictly follow "index:id":
-    // 1) If id is actually an index number, match by item.index.
-    // 2) If id itself looks like a URL, open it directly.
+    // 不严格遵循 "index:id" 的模型的回退：
+    // 1) 如果 id 实际上是索引号，按 item.index 匹配。
+    // 2) 如果 id 本身看起来像 URL，直接打开。
     String? url = match?['url']?.toString();
     if (url == null || url.isEmpty) {
       final idx = int.tryParse(id.trim());
@@ -3010,8 +3006,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     }
   }
 
-  // Extract items from all search_web or builtin_search tool results for this assistant message.
-  // We scan from end to start so "latest" items win when there are duplicates.
+  // 从此助手消息的所有 search_web 或 builtin_search 工具结果中提取条目。
+  // 从末尾向开头扫描，使重复时"最新"条目优先。
   List<Map<String, dynamic>> _allSearchItems() {
     final parts = widget.toolParts ?? const <ToolUIPart>[];
     if (parts.isEmpty) return const <Map<String, dynamic>>[];
@@ -3032,14 +3028,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           if (it is! Map) continue;
           final m = it.cast<String, dynamic>();
           final key = (m['id'] ?? m['url'] ?? '')
-              .toString(); // builtin_search no id
+              .toString(); // builtin_search 没有 id
           if (key.isNotEmpty) {
             if (!seen.add(key)) continue;
           }
           out.add(m);
         }
       } catch (_) {
-        // ignore broken tool payload
+        // 忽略损坏的工具负载
       }
     }
     return out;
@@ -3132,7 +3128,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         }
         return _assistantInitial(cs);
       }
-      // treat as emoji or single char label
+      // 视为 emoji 或单字符标签
       final bool isIOS = defaultTargetPlatform == TargetPlatform.iOS;
       final double fs = 18;
       final Offset? nudge = isIOS ? Offset(fs * 0.065, fs * -0.05) : null;
@@ -3350,8 +3346,8 @@ class _MenuItem extends StatelessWidget {
     final ic = danger
         ? Theme.of(context).colorScheme.error
         : cs.onSurface.withValues(alpha: 0.9);
-    // iOS-style press effect: no ripple. Use transparent base and a subtle
-    // pressed blend inside the blurred/glass menu container.
+    // iOS 风格按压效果：无涟漪。使用透明基底，
+    // 在模糊/玻璃质感菜单容器内做轻微按压混合。
     return IosCardPress(
       borderRadius: BorderRadius.zero,
       baseColor: Colors.transparent,
@@ -3393,7 +3389,7 @@ class _BranchSelector extends StatelessWidget {
     this.onPrev,
     this.onNext,
   });
-  final int index; // zero-based
+  final int index; // 从 0 开始
   final int total;
   final VoidCallback? onPrev;
   final VoidCallback? onNext;
@@ -3456,7 +3452,7 @@ class _BranchSelector extends StatelessWidget {
   }
 }
 
-// Pulsing 3-dot loading indicator for chat thinking states (shared)
+// 聊天思考状态的脉动三点加载指示器（共享）
 class LoadingIndicator extends StatefulWidget {
   const LoadingIndicator({
     super.key,
@@ -3550,11 +3546,11 @@ class _LoadingDotsPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
-/// Streaming visual wrapper for assistant message content.
+/// 助手消息内容的流式视觉包装器。
 ///
-/// Goals:
-/// - Make streaming output feel less "chunky" by smoothing size growth.
-/// - Respect reduce-motion settings.
+/// 目标：
+/// - 通过平滑高度增长使流式输出感觉不那么"块状"。
+/// - 遵循减少动画设置。
 class _StreamingAssistantMessageMotion extends StatelessWidget {
   const _StreamingAssistantMessageMotion({
     required this.enabled,
@@ -3579,12 +3575,12 @@ class _StreamingAssistantMessageMotion extends StatelessWidget {
   }
 }
 
-// UI data for MCP tool calls/results
+// MCP 工具调用/结果的 UI 数据
 class ToolUIPart {
   final String id;
   final String toolName;
   final Map<String, dynamic> arguments;
-  final String? content; // null means still loading/result not yet available
+  final String? content; // null 表示仍在加载或结果尚不可用
   final bool loading;
   const ToolUIPart({
     required this.id,
@@ -3595,7 +3591,7 @@ class ToolUIPart {
   });
 }
 
-// Data for a reasoning segment (for mixed display)
+// 推理片段数据（用于混合显示）
 class ReasoningSegment {
   final String text;
   final bool expanded;
@@ -3603,7 +3599,7 @@ class ReasoningSegment {
   final DateTime? startAt;
   final DateTime? finishedAt;
   final VoidCallback? onToggle;
-  // Index of the first tool call that occurs after this segment starts.
+  // 此片段开始后首个工具调用的索引。
   final int toolStartIndex;
 
   const ReasoningSegment({
@@ -4133,18 +4129,10 @@ class _ChainOfThoughtReasoningStepState
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: const [
-                      Color(
-                        0x00FFFFFF,
-                      ), // color-gate: ignore (dstIn alpha mask)
-                      Color(
-                        0xFFFFFFFF,
-                      ), // color-gate: ignore (dstIn alpha mask)
-                      Color(
-                        0xFFFFFFFF,
-                      ), // color-gate: ignore (dstIn alpha mask)
-                      Color(
-                        0x00FFFFFF,
-                      ), // color-gate: ignore (dstIn alpha mask)
+                      Color(0x00FFFFFF), // color-gate: ignore（dstIn alpha 蒙版）
+                      Color(0xFFFFFFFF), // color-gate: ignore（dstIn alpha 蒙版）
+                      Color(0xFFFFFFFF), // color-gate: ignore（dstIn alpha 蒙版）
+                      Color(0x00FFFFFF), // color-gate: ignore（dstIn alpha 蒙版）
                     ],
                     stops: [0.0, sTop, sBot, 1.0],
                   ).createShader(rect);
@@ -4520,7 +4508,7 @@ class _ToolCallItem extends StatefulWidget {
 }
 
 class _ToolCallItemState extends State<_ToolCallItem> {
-  // Cache image paths (local file or URL)
+  // 缓存图片路径（本地文件或 URL）
   List<String> _imagePaths = const [];
   String? _lastContent;
 
@@ -4533,7 +4521,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
     _imagePaths = paths;
   }
 
-  /// Build image widget from path (http(s), data URI, or local file).
+  /// 从路径构建图片控件（http(s)、data URI 或本地文件）。
   Widget _buildImageFromPath(
     String path, {
     double? height,
@@ -4569,10 +4557,10 @@ class _ToolCallItemState extends State<_ToolCallItem> {
     return _toolTitleFor(context, name, args, isResult: isResult);
   }
 
-  /// Build a short argument summary for display in the approval card.
+  /// 构建简短参数摘要，用于在审批卡片中显示。
   String _argsSummary(Map<String, dynamic> args) {
     if (args.isEmpty) return '';
-    // Show first 1-2 key=value pairs, truncated
+    // 显示前 1-2 个 key=value 对，截断
     final entries = args.entries.take(2).map((e) {
       final v = e.value?.toString() ?? '';
       final truncated = v.length > 40 ? '${v.substring(0, 40)}...' : v;
@@ -4600,14 +4588,14 @@ class _ToolCallItemState extends State<_ToolCallItem> {
       );
     }
 
-    // Check if this tool call is pending approval
+    // 检查此工具调用是否等待审批
     final approvalService = context.watch<ToolApprovalService>();
     final isPendingApproval =
         widget.part.loading &&
         approvalService.pendingRequests.values.any(
           (req) => req.toolName == widget.part.toolName,
         );
-    // Find the matching approval request
+    // 查找匹配的审批请求
     String? pendingToolCallId;
     if (isPendingApproval) {
       try {
@@ -4638,7 +4626,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Icon — approval pending / loading spinner / result icon
+                // 图标 — 审批等待中 / 加载旋转器 / 结果图标
                 if (isPendingApproval)
                   SizedBox(
                     width: 18,
@@ -4673,7 +4661,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Title: always show tool name; add "waiting" badge when pending
+                      // 标题：始终显示工具名；等待时添加"等待中"徽标
                       Text(
                         _titleFor(
                           context,
@@ -4687,7 +4675,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                           color: isPendingApproval ? fg.accent : fg.strong,
                         ),
                       ),
-                      // "Waiting for approval" subtitle
+                      // "等待审批"副标题
                       if (isPendingApproval) ...[
                         const SizedBox(height: 2),
                         Text(
@@ -4737,7 +4725,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                 },
               ),
             ],
-            // Argument summary so users know what the tool is about to do
+            // 参数摘要，让用户知道工具即将做什么
             if (isPendingApproval && widget.part.arguments.isNotEmpty) ...[
               const SizedBox(height: 8),
               Container(
@@ -4762,7 +4750,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                 ),
               ),
             ],
-            // Approval action buttons
+            // 审批操作按钮
             if (isPendingApproval && pendingToolCallId != null) ...[
               const SizedBox(height: 10),
               Row(
@@ -4791,7 +4779,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                 ],
               ),
             ],
-            // Show image thumbnails if available
+            // 如可用，显示图片缩略图
             if (hasImages) ...[
               const SizedBox(height: 10),
               SizedBox(
@@ -4859,8 +4847,8 @@ class _ToolCallItemState extends State<_ToolCallItem> {
     _showToolDetail(context, widget.part);
   }
 
-  /// Show full-size image using ImageViewerPage for save/share/copy support.
-  /// [path] can be a local file path or HTTP URL.
+  /// 使用 ImageViewerPage 显示全尺寸图片，支持保存/分享/复制。
+  /// [path] 可以是本地文件路径或 HTTP URL。
   void _showFullImage(BuildContext context, String path) {
     Navigator.of(context).push(
       PageRouteBuilder<void>(
@@ -5646,7 +5634,7 @@ class _AskUserSubmitButton extends StatelessWidget {
   }
 }
 
-/// Tactile button for tool approval actions (approve / deny).
+/// 工具审批操作的触感按钮（批准 / 拒绝）。
 class _ApprovalButton extends StatelessWidget {
   const _ApprovalButton({
     required this.label,
@@ -5659,7 +5647,7 @@ class _ApprovalButton extends StatelessWidget {
   final Color color;
   final VoidCallback? onTap;
 
-  /// When true, uses a solid fill background; when false, outline style.
+  /// 为 true 时使用实色填充背景；为 false 时使用轮廓样式。
   final bool filled;
 
   @override
@@ -5877,7 +5865,7 @@ class _ReasoningSection extends StatefulWidget {
 }
 
 class _ReasoningSectionState extends State<_ReasoningSection> {
-  // Use ValueNotifier to only update elapsed time display, not rebuild entire widget
+  // 使用 ValueNotifier 只更新经过时间显示，不重建整个控件
   final ValueNotifier<int> _elapsedTick = ValueNotifier<int>(0);
   Timer? _elapsedTimer;
   final ScrollController _scroll = ScrollController();
@@ -5957,10 +5945,10 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
     );
     final loading = widget.loading;
 
-    // Android-like surface style
+    // Android 风格表面样式
     final curve = const Cubic(0.2, 0.8, 0.2, 1);
 
-    // Build a compact header with optional scrolling preview when loading
+    // 构建紧凑标题，加载时带可选滚动预览
     Widget header = IosCardPress(
       borderRadius: BorderRadius.circular(12),
       baseColor: Colors.transparent,
@@ -5997,10 +5985,10 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
                   ),
                 ),
               ),
-            // No header marquee; content area handles scrolling when loading
+            // 无标题跑马灯；内容区在加载时处理滚动
             const Spacer(),
             AnimatedRotation(
-              turns: widget.expanded ? 0.25 : 0.0, // right -> down
+              turns: widget.expanded ? 0.25 : 0.0, // 右箭头变为向下
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeInOutCubic,
               child: Icon(Lucide.ChevronRight, size: 18, color: fg.strong),
@@ -6072,18 +6060,10 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: const [
-                        Color(
-                          0x00FFFFFF,
-                        ), // color-gate: ignore (dstIn alpha mask)
-                        Color(
-                          0xFFFFFFFF,
-                        ), // color-gate: ignore (dstIn alpha mask)
-                        Color(
-                          0xFFFFFFFF,
-                        ), // color-gate: ignore (dstIn alpha mask)
-                        Color(
-                          0x00FFFFFF,
-                        ), // color-gate: ignore (dstIn alpha mask)
+                        Color(0x00FFFFFF), // color-gate: ignore（dstIn alpha 蒙版）
+                        Color(0xFFFFFFFF), // color-gate: ignore（dstIn alpha 蒙版）
+                        Color(0xFFFFFFFF), // color-gate: ignore（dstIn alpha 蒙版）
+                        Color(0x00FFFFFF), // color-gate: ignore（dstIn alpha 蒙版）
                       ],
                       stops: [0.0, sTop, sBot, 1.0],
                     ).createShader(rect);
@@ -6112,7 +6092,7 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
       );
     }
 
-    // Enable long-press text selection in reasoning body
+    // 在推理正文中启用长按文本选择
     body = SelectionArea(child: body);
 
     return AnimatedSize(
@@ -6138,7 +6118,7 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
   }
 }
 
-// Lightweight shimmer effect without external dependency
+// 无外部依赖的轻量微光效果
 class _Shimmer extends StatefulWidget {
   final Widget child;
   final bool enabled;
@@ -6197,13 +6177,13 @@ class _ShimmerState extends State<_Shimmer> with TickerProviderStateMixin {
                 colors: [
                   Colors.white.withValues(
                     alpha: 0.0,
-                  ), // color-gate: ignore (shimmer effect)
+                  ), // color-gate: ignore（微光效果）
                   Colors.white.withValues(
                     alpha: 0.35,
-                  ), // color-gate: ignore (shimmer effect)
+                  ), // color-gate: ignore（微光效果）
                   Colors.white.withValues(
                     alpha: 0.0,
-                  ), // color-gate: ignore (shimmer effect)
+                  ), // color-gate: ignore（微光效果）
                 ],
                 stops: const [0.0, 0.5, 1.0],
                 begin: Alignment.centerLeft,

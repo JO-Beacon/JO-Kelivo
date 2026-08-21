@@ -65,7 +65,7 @@ class _LocalToolsTab extends StatelessWidget {
           }
           await DeviceLocalTools.openUsageAccessSettings();
         }
-        // Match rikkahub: still enable even if Usage Access is not granted yet.
+        // 与 RikkaHub 保持一致：即使尚未授予使用情况访问权限也仍然启用。
         await updateTool(toolId, true);
         return;
       }
@@ -77,7 +77,7 @@ class _LocalToolsTab extends StatelessWidget {
         if (!granted) {
           final requested = await DeviceLocalTools.requestCalendarPermission();
           if (!requested) {
-            // Do not enable until the user grants calendar access.
+            // 在用户授予日历访问权限前不要启用。
             return;
           }
         }

@@ -4,12 +4,12 @@ List<Map<String, dynamic>> _toResponsesToolsFormat(
   List<Map<String, dynamic>> tools,
 ) {
   return tools.map((tool) {
-    // Keep non-function tools (e.g., web_search) unchanged
+    // 保持非 function 工具（例如 web_search）不变
     if ((tool['type'] ?? '').toString() != 'function') {
       return Map<String, dynamic>.from(tool);
     }
 
-    // If already flattened (no nested 'function'), return as-is
+    // 如果已经扁平化（没有嵌套 'function'），原样返回
     if (tool['function'] is! Map) {
       return Map<String, dynamic>.from(tool);
     }
@@ -22,10 +22,10 @@ List<Map<String, dynamic>> _toResponsesToolsFormat(
     };
     final params = fn['parameters'];
     if (params is Map<String, dynamic>) {
-      // Ensure parameters stays as-is (schema)
+      // 确保 parameters 保持原样（schema）
       out['parameters'] = params;
     }
-    // Preserve strict flag if present (either at tool-level or function-level)
+    // 如果存在 strict 标记则保留（无论位于 tool 级还是 function 级）
     final strict = (tool['strict'] ?? fn['strict']);
     if (strict is bool) {
       out['strict'] = strict;

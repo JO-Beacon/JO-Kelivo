@@ -105,15 +105,15 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
   final List<_HeaderKV> _headers = [];
   final List<_BodyKV> _bodies = [];
 
-  // Provider kind for conditional UI
+  // 用于条件 UI 的供应商类型
   ProviderKind? _providerKind;
 
-  // Google built-in tools
+  // Google 内置工具
   bool _googleUrlContextTool = false;
   bool _googleCodeExecutionTool = false;
   bool _googleYoutubeTool = false;
 
-  // OpenAI built-in tools
+  // OpenAI 内置工具
   bool _openaiCodeInterpreterTool = false;
   bool _openaiImageGenerationTool = false;
 
@@ -127,7 +127,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
       explicitType: cfg.providerType,
     );
 
-    // Determine tab count: 3 for Google/OpenAI (has tools tab), 2 for others
+    // 确定选项卡数量：Google/OpenAI 为 3（有工具选项卡），其他为 2
     final hasToolsTab =
         _providerKind == ProviderKind.google ||
         _providerKind == ProviderKind.openai;
@@ -146,8 +146,8 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
       }
     });
 
-    // Resolve display model id from per-model overrides when present (apiModelId),
-    // falling back to the logical key for backwards compatibility.
+    // 当存在模型级覆盖（apiModelId）时解析显示模型 id，
+    // 否则回退到逻辑键以保持向后兼容。
     Map<String, dynamic>? initialOv;
     if (!widget.isNew) {
       final raw = cfg.modelOverrides[widget.modelId];
@@ -275,7 +275,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
     }
   }
 
-  // Desktop input decoration matching provider settings inputs
+  // 与供应商设置输入项一致的桌面输入装饰
   InputDecoration _deskInputDecoration(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return InputDecoration(
@@ -349,7 +349,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Header
+                // 标题栏
                 Container(
                   height: 52,
                   color: cs.surface,
@@ -384,7 +384,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
                     ),
                   ),
                 ),
-                // Body
+                // 内容区
                 Expanded(
                   child: Container(
                     color: cs.surface,
@@ -436,7 +436,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
                     ),
                   ),
                 ),
-                // Footer: right aligned confirm/add
+                // 底部操作区：右对齐确认或添加
                 Container(
                   color: cs.surface,
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -803,8 +803,8 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
     ),
   );
 
-  // Generate a unique logical key for a model instance within a provider.
-  // This allows multiple configurations to share the same upstream API model id.
+  // 在供应商内为模型实例生成唯一逻辑键。
+  // 这允许多个配置共享同一个上游 API 模型 id。
   String _nextModelKey(ProviderConfig cfg, String apiModelId) {
     final existing = <String>{...cfg.models, ...cfg.modelOverrides.keys};
     if (!existing.contains(apiModelId)) return apiModelId;

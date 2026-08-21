@@ -407,7 +407,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
               ),
             ],
           ),
-          // Inline cards replaced by sheet-triggering rows above.
+          // 内联卡片已被上方触发面板的行替代。
         ],
       ),
     );
@@ -622,7 +622,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
             notificationText: notificationText,
           );
           await AndroidBackgroundManager.setEnabled(true);
-          // Prepare notification channel as well to avoid FGS notification issues on some ROMs
+          // 同时准备通知渠道，避免部分 ROM 上的前台服务通知问题
           await NotificationService.ensureInitialized();
         } catch (_) {}
         break;
@@ -1274,7 +1274,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
   }
 }
 
-// --- iOS-style helpers ---
+// --- iOS 风格辅助函数 ---
 
 Widget _iosSectionCard({required List<Widget> children}) {
   return Builder(
@@ -1724,7 +1724,7 @@ Future<void> _showMobileMessageNavModeSheet(BuildContext context) async {
   await context.read<SettingsProvider>().setMobileMessageNavButtonsMode(choice);
 }
 
-// --- Subpages ---
+// --- 子页面 ---
 
 class ChatItemDisplaySettingsPage extends StatelessWidget {
   const ChatItemDisplaySettingsPage({super.key});
@@ -2009,7 +2009,7 @@ class _AutoCollapseCodeBlockLinesRowState
     final cs = Theme.of(context).colorScheme;
     final sp = context.watch<SettingsProvider>();
 
-    // Keep controller in sync when not editing
+    // 不编辑时保持控制器同步
     if (!_focusNode.hasFocus) {
       final t = '${sp.autoCollapseCodeBlockLines}';
       if (_controller.text != t) _controller.text = t;
@@ -2166,17 +2166,6 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                 value: sp.wideChatLayout,
                 onChanged: (v) =>
                     context.read<SettingsProvider>().setWideChatLayout(v),
-              ),
-              _iosDivider(context),
-              _iosSwitchRow(
-                context,
-                icon: Lucide.RefreshCw,
-                label: l10n
-                    .displaySettingsPageRegenerateDeleteTrailingMessagesTitle,
-                value: sp.regenerateDeleteTrailingMessages,
-                onChanged: (v) => context
-                    .read<SettingsProvider>()
-                    .setRegenerateDeleteTrailingMessages(v),
               ),
               _iosDivider(context),
               _iosSwitchRow(

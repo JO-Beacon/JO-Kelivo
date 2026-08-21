@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import '../../database/business_settings_router.dart';
 
-/// Pure validation shared by backup preflight and business-data restoration.
+/// 由备份预检和业务数据恢复共享的纯校验。
 final class BackupSettingsValidator {
   BackupSettingsValidator._();
 
@@ -67,7 +67,7 @@ final class BackupSettingsValidator {
     validate(data);
   }
 
-  /// Removes device-bound recognizers from the portable backup payload.
+  /// 从可移植备份载荷中移除与设备绑定的识别器。
   static void retainCloudAsrForExport(Map<String, Object?> data) {
     if (!data.containsKey(_asrServicesKey)) {
       data.remove(_asrSelectedServiceKey);

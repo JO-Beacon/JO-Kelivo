@@ -84,7 +84,7 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
           value,
           fontSize: 40,
           optimizeEmojiAlign: true,
-          nudge: Offset.zero, // dialog avatar: no extra nudge
+          nudge: Offset.zero, // 对话框头像：无额外微调
         ),
       );
     } else if (type == 'url' && value != null && value.isNotEmpty) {
@@ -164,7 +164,9 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
                             color: cs.primary,
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerHigh,
                               width: 2,
                             ),
                           ),
@@ -196,7 +198,7 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
                         isDense: true,
                       ),
                       onChanged: (v) {
-                        // Real-time save
+                        // 实时保存
                         context.read<UserProvider>().setName(v);
                       },
                       onSubmitted: (_) => Navigator.of(context).maybePop(),
@@ -261,7 +263,7 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
           icon: lucide.Lucide.Image,
           label: l10n.desktopAvatarMenuChangeFromImage,
           onTap: () async {
-            // Desktop: choose an image file and persist it into app's avatars folder
+            // 桌面端：选择图片文件并保存到应用头像目录
             try {
               final res = await FilePicker.platform.pickFiles(
                 allowMultiple: false,
@@ -285,7 +287,7 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
                 await up.setAvatarFilePath(path);
               }
             } catch (_) {
-              // no-op on failure
+              // 失败时不做处理
             }
           },
         ),
@@ -482,7 +484,7 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
               actions: [
                 TextButton(
                   onPressed: () async {
-                    // Try multiple times until a valid avatar is fetched
+                    // 多次尝试，直到获取到有效头像
                     const int maxTries = 20;
                     bool applied = false;
                     for (int i = 0; i < maxTries; i++) {

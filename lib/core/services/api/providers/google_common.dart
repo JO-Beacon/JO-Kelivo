@@ -1,9 +1,9 @@
 part of '../chat_api_service.dart';
 
-/// Builds the Gemini tools array, handling Gemini 3 coexistence vs 2.x mutual exclusion.
+/// 构建 Gemini tools 数组，处理 Gemini 3 共存与 2.x 互斥。
 ///
-/// Gemini 3: built-in tools can coexist with function_declarations (MCP).
-/// Gemini 2.x and below: code_execution is exclusive; search/url_context exclude MCP.
+/// Gemini 3：内置工具可与 function_declarations（MCP）共存。
+/// Gemini 2.x 及以下：code_execution 独占；search/url_context 会排除 MCP。
 List<Map<String, dynamic>> _buildGeminiToolsArray({
   required Set<String> builtIns,
   required bool allowCoexistence,
@@ -89,7 +89,7 @@ Map<String, dynamic> _googleThinkingConfig(
     };
   }
 
-  // Match gemini-3-pro or gemini-3-pro-preview (and similar variants)
+  // 匹配 gemini-3-pro 或 gemini-3-pro-preview（以及类似变体）
   final isGemini3ProImage = upstreamModelId.contains(
     RegExp(r'gemini-3-pro-image(-preview)?', caseSensitive: false),
   );
@@ -111,7 +111,7 @@ Map<String, dynamic> _googleThinkingConfig(
       if (budget != null && budget >= 0) 'thinkingBudget': budget,
     };
   }
-  // Gemini 3.1 Pro: supports 'low', 'medium', 'high' (no minimal)
+  // Gemini 3.1 Pro：支持 'low'、'medium'、'high'（不支持 minimal）
   if (isGemini31Pro) {
     String level = 'high';
     if (off) {
@@ -120,22 +120,22 @@ Map<String, dynamic> _googleThinkingConfig(
       if (budget < 8000) {
         level = 'low';
       } else if (budget < 24000) {
-        level = 'medium'; // gemini 3.1 pro support medium
+        level = 'medium'; // gemini 3.1 pro 支持 medium
       }
     }
     return {'includeThoughts': true, 'thinkingLevel': level};
   }
-  // Gemini 3 Pro: supports 'low' and 'high' only (no off)
+  // Gemini 3 Pro：仅支持 'low' 和 'high'（不支持 off）
   if (isGemini3Pro) {
     String level = 'high';
     if (off || (budget != null && budget > 0 && budget < 8000)) {
-      // Off or Light (1024) -> low
+      // Off 或 Light (1024) -> low
       level = 'low';
     }
     return {'includeThoughts': true, 'thinkingLevel': level};
   }
-  // Gemini 3 Flash, 3.5 Flash/Lite, and 3.6 Flash support
-  // 'minimal', 'low', 'medium', and 'high'.
+  // Gemini 3 Flash、3.5 Flash/Lite 和 3.6 Flash 支持
+  // 'minimal'、'low'、'medium' 和 'high'。
   if (isGemini3Flash || isGemini35Flash || isGemini36Flash) {
     String level = isGemini35FlashLite
         ? 'minimal'
@@ -143,7 +143,7 @@ Map<String, dynamic> _googleThinkingConfig(
     if (off) {
       level = 'minimal';
     } else if (budget != null && budget > 0) {
-      // Light (1024) -> low, Medium (16000) -> medium, Heavy (32000) -> high
+      // Light (1024) -> low，Medium (16000) -> medium，Heavy (32000) -> high
       if (budget < 8000) {
         level = 'low';
       } else if (budget < 24000) {
@@ -154,7 +154,7 @@ Map<String, dynamic> _googleThinkingConfig(
     }
     return {'includeThoughts': true, 'thinkingLevel': level};
   }
-  // Gemini 2.x and below: use thinkingBudget
+  // Gemini 2.x 及以下：使用 thinkingBudget
   if (off) return {'includeThoughts': false};
   return {
     'includeThoughts': true,
@@ -177,7 +177,7 @@ Map<String, dynamic>? _googleFunctionCallPartFromToolCall(Map toolCall) {
     if (google is Map) {
       final part = google['part'];
       if (part is Map && part['functionCall'] is Map) {
-        // Mutable copy: callers may need to backfill a thought signature.
+        // 可变副本：调用方可能需要回填 thought 签名。
         return Map<String, dynamic>.from(part);
       }
     }
@@ -200,12 +200,11 @@ Map<String, dynamic>? _googleFunctionCallPartFromToolCall(Map toolCall) {
   return part;
 }
 
-/// Gemini 3 validates that the first functionCall part of a replayed model
-/// turn carries a thought signature; a missing one fails the whole request
-/// with "Function call is missing a thought_signature in functionCall parts".
-/// When the original signature was not persisted (legacy history, non-streaming
-/// responses), fall back to the documented placeholder so old conversations
-/// keep working.
+/// Gemini 3 会校验重放的模型轮次中第一个 functionCall 部分
+/// 是否携带思考签名；缺失会导致整个请求失败，
+/// 错误为 "Function call is missing a thought_signature in functionCall parts"。
+/// 当原始签名未被持久化时（旧历史、非流式响应），
+/// 回退到文档规定的占位符，以便旧对话继续正常工作。
 void _ensureGeminiFunctionCallThoughtSig(List<Map<String, dynamic>> parts) {
   for (final part in parts) {
     if (part['functionCall'] is! Map) continue;
@@ -215,7 +214,7 @@ void _ensureGeminiFunctionCallThoughtSig(List<Map<String, dynamic>> parts) {
     if (!hasSig) {
       part['thoughtSignature'] = _geminiDummyThoughtSignature;
     }
-    return; // Only the first functionCall part is validated.
+    return; // 仅第一个 functionCall 部分会被校验。
   }
 }
 
@@ -287,9 +286,9 @@ bool _shouldRequestGoogleThoughts(
   return _apiModelId(config, modelId).toLowerCase().contains('gemini');
 }
 
-/// Gemini reports prompt-level blocks (safety filters etc.) in-band as
-/// `promptFeedback.blockReason` on a frame without candidates; surface those
-/// as a stream error instead of an empty "normal" completion.
+/// Gemini 会在没有候选结果的帧中以内联方式报告提示词级别的拦截（安全过滤器等），
+/// 即 `promptFeedback.blockReason`；应将这些情况作为流错误抛出，
+/// 而不是返回一个空的“正常”完成。
 void _throwIfGeminiPromptBlocked(String data) {
   if (!data.contains('blockReason')) return;
   Object? decoded;
@@ -313,10 +312,8 @@ void _throwIfGeminiPromptBlocked(String data) {
   );
 }
 
-/// Output-side content filtering ends the candidate with one of these
-/// `finishReason` values and then closes the stream like a regular
-/// completion, so a mid-generation block would otherwise just look like a
-/// short reply.
+/// 输出侧内容过滤会让候选回复以这些 `finishReason` 值之一结束，
+/// 然后像正常完成一样关闭流，否则生成中途的拦截看起来只是一条很短的回复。
 const Set<String> _geminiBlockedFinishReasons = {
   'SAFETY',
   'RECITATION',
@@ -326,8 +323,8 @@ const Set<String> _geminiBlockedFinishReasons = {
   'IMAGE_SAFETY',
 };
 
-/// Surfaces candidate-level content filtering (`finishReason: SAFETY` etc.)
-/// as a stream error so truncated output is not persisted as a normal finish.
+/// 将候选级别的内容过滤（如 `finishReason: SAFETY`）作为流错误抛出，
+/// 这样被截断的输出就不会被当作正常完成持久化。
 void _throwIfGeminiCandidateBlocked(String data) {
   if (!data.contains('finishReason')) return;
   Object? decoded;
@@ -368,8 +365,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
   Map<String, dynamic>? extraBody,
   bool stream = true,
 }) async* {
-  // Check for Vertex AI Claude models (prefix "claude-")
-  // If it's a Claude model on Vertex, route to special handling
+  // 检查 Vertex AI Claude 模型（前缀为 "claude-"）
+  // 如果它是 Vertex 上的 Claude 模型，则路由到特殊处理
   if ((config.vertexAI == true) &&
       modelId.toLowerCase().startsWith('claude-')) {
     yield* _sendGoogleVertexClaudeStream(
@@ -396,10 +393,10 @@ Stream<ChatStreamChunk> _sendGoogleStream(
   final bool persistGeminiThoughtSigs = isGemini3;
   final builtIns = _builtInTools(config, modelId);
   final enableYoutube = builtIns.contains(BuiltInToolNames.youtube);
-  // Effective model features (includes user overrides)
+  // 生效的模型功能（包含用户覆写）
   final effective = _effectiveModelInfo(config, modelId);
   final isReasoning = _shouldRequestGoogleThoughts(config, modelId, effective);
-  // Non-streaming path: use generateContent
+  // 非流式路径：使用 generateContent
   if (!stream) {
     final isVertex = config.vertexAI == true;
     final base = config.baseUrl.endsWith('/')
@@ -415,7 +412,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       url = '$base/models/$upstreamModelId:generateContent';
     }
 
-    // Extract system messages into systemInstruction (Google Gemini API best practice)
+    // 将系统消息提取到 systemInstruction 中（Google Gemini API 最佳实践）
     String systemPrompt = '';
     final contents = <Map<String, dynamic>>[];
     for (int i = 0; i < messages.length; i++) {
@@ -469,14 +466,14 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         }
       }
 
-      // Semantic media detection only - custom attachment markers are not
-      // recognized. Attachments arrive via structured media-path keys /
-      // userImagePaths, plus Markdown ![](...).
+      // 仅进行语义媒体检测：自定义附件标记不会被识别。
+      // 附件通过结构化 media-path 键 / userImagePaths 以及
+      // Markdown ![](...) 传入。
       final hasMarkdownImages = raw.contains('![') && raw.contains('](');
       final internalMediaRefs = parseInternalMediaRefs(
         msg[multimodalInternalMediaPathsKey],
       );
-      // Consume injected media refs for user and assistant history turns.
+      // 消费为 user 和 assistant 历史轮次注入的媒体引用。
       final hasInternalMedia = internalMediaRefs.isNotEmpty;
       final hasAttachedImages =
           isLast && role == 'user' && (userImagePaths?.isNotEmpty == true);
@@ -548,12 +545,12 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       } else {
         if (raw.isNotEmpty) parts.add({'text': raw});
       }
-      // YouTube URL ingestion as file_data parts (Gemini official API)
-      // Only inject on the last user message of this request.
+      // 将 YouTube URL 作为 file_data 部分摄取（Gemini 官方 API）
+      // 仅在本次请求的最后一条 user 消息中注入。
       if (role == 'user' && isLast && enableYoutube) {
         final urls = _extractYouTubeUrls(raw);
         for (final u in urls) {
-          // Vertex AI requires mime_type for file_data
+          // Vertex AI 要求 file_data 提供 mime_type
           if (isVertex) {
             parts.add({
               'file_data': {'file_uri': u, 'mime_type': 'video/*'},
@@ -575,7 +572,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       contents.add({'role': role, 'parts': parts});
     }
 
-    // Map OpenAI-style tools to Gemini functionDeclarations (MCP)
+    // 将 OpenAI 风格的工具映射为 Gemini functionDeclarations（MCP）
     List<Map<String, dynamic>>? geminiTools;
     if (tools != null && tools.isNotEmpty) {
       final decls = <Map<String, dynamic>>[];
@@ -718,10 +715,10 @@ Stream<ChatStreamChunk> _sendGoogleStream(
           final args =
               (call['args'] as Map?)?.cast<String, dynamic>() ??
               const <String, dynamic>{};
-          // Prefer API-provided functionCall id, fall back to synthetic.
+          // 优先使用 API 提供的 functionCall id，否则回退到合成值。
           final partId = _effectiveToolCallId(call['id'], 'fn', idx);
-          // Preserve the raw part (incl. thoughtSignature) so the tool event
-          // metadata can replay this model turn exactly on later requests.
+          // 保留原始 part（包括 thoughtSignature），以便工具事件元数据
+          // 能在后续请求中精确重放该模型轮次。
           final rawPart = fc.cast<String, dynamic>();
           String? thoughtSigKey;
           dynamic thoughtSigVal;
@@ -782,16 +779,15 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         }
         currentContents = [
           ...currentContents,
-          // Pass ALL parts from model response (preserves server-side tool parts,
-          // thought signatures, and other fields)
+          // 传递模型响应中的所有 part（保留服务端工具 part、
+          // thought 签名以及其他字段）
           {'role': 'model', 'parts': parts},
           {'role': 'user', 'parts': responseParts},
         ];
         continue;
       }
-      // Emit server-side code execution parts as tool cards.
-      // Assumes executableCode and codeExecutionResult alternate in 1:1 pairs
-      // (matching current Gemini API behavior).
+      // 将服务端代码执行部分作为工具卡片发出。假设 executableCode 和 codeExecutionResult
+      // 按 1:1 成对交替出现（与当前 Gemini API 行为一致）。
       int codeExecIdx = 0;
       for (final p in parts) {
         if (p is! Map) continue;
@@ -878,8 +874,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
     }
   }
 
-  // Implement SSE streaming via :streamGenerateContent with alt=sse
-  // Build endpoint per Vertex vs Gemini
+  // 通过 :streamGenerateContent 并使用 alt=sse 实现 SSE 流式传输
+  // 根据 Vertex 与 Gemini 分别构建端点
   String baseUrl;
   if (config.vertexAI == true &&
       (config.location?.isNotEmpty == true) &&
@@ -895,14 +891,14 @@ Stream<ChatStreamChunk> _sendGoogleStream(
     baseUrl = '$base/models/$upstreamModelId:streamGenerateContent';
   }
 
-  // Build query with alt=sse
+  // 使用 alt=sse 构建查询
   final uriBase = Uri.parse(baseUrl);
   final qp = Map<String, String>.from(uriBase.queryParameters);
   qp['alt'] = 'sse';
   final uri = uriBase.replace(queryParameters: qp);
   final isVertex = config.vertexAI == true;
 
-  // Extract system messages into systemInstruction (Google Gemini API best practice)
+  // 将系统消息提取到 systemInstruction（Google Gemini API 最佳实践）
   String systemPrompt = '';
   final contents = <Map<String, dynamic>>[];
   for (int i = 0; i < messages.length; i++) {
@@ -954,15 +950,14 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       }
     }
 
-    // Only parse images if there are images to process.
-    // Semantic media detection only - custom attachment markers are not
-    // recognized. Attachments arrive via structured media-path keys /
-    // userImagePaths, plus Markdown ![](...).
+    // 仅在有图像需要处理时解析图像。
+    // 仅做语义媒体检测，不识别自定义附件标记。附件通过结构化 media-path 键 /
+    // userImagePaths 以及 Markdown ![](...) 到达。
     final hasMarkdownImages = raw.contains('![') && raw.contains('](');
     final internalMediaRefs = parseInternalMediaRefs(
       msg[multimodalInternalMediaPathsKey],
     );
-    // Consume injected media refs for user and assistant history turns.
+    // 消费为用户与助手历史轮次注入的媒体引用。
     final hasInternalMedia = internalMediaRefs.isNotEmpty;
     final hasAttachedImages =
         isLast && role == 'user' && (userImagePaths?.isNotEmpty == true);
@@ -976,7 +971,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         keepRemoteMarkdownText: true,
       );
       if (parsed.text.isNotEmpty) parts.add({'text': parsed.text});
-      // Images extracted from this message's text
+      // 从此消息文本中提取的图像
       for (final ref in parsed.images) {
         final normalized = normalizeSrc(ref.src);
         if (!seenSources.add(normalized)) continue;
@@ -989,7 +984,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
               'inline_data': {'mime_type': mime, 'data': b64},
             });
           } else {
-            // If malformed data URL, include as plain text fallback
+            // 如果数据 URL 格式不正确，则作为纯文本回退包含
             parts.add({'text': ref.src});
           }
         } else if (ref.kind == 'path') {
@@ -1000,7 +995,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
             'inline_data': {'mime_type': mime, 'data': b64},
           });
         } else {
-          // Remote URL: Gemini official API doesn't fetch http(s) here; keep short reference
+          // 远程 URL：Gemini 官方 API 不会在此处抓取 http(s)；保留简短引用
           parts.add({'text': '(image) ${ref.src}'});
         }
       }
@@ -1031,21 +1026,21 @@ Stream<ChatStreamChunk> _sendGoogleStream(
               'inline_data': {'mime_type': mime, 'data': b64},
             });
           } else {
-            // http url fallback reference text
+            // http url 回退引用文本
             parts.add({'text': '(image) $p'});
           }
         }
       }
     } else {
-      // No images, use simple text content
+      // 无图像，使用简单文本内容
       if (raw.isNotEmpty) parts.add({'text': raw});
     }
-    // YouTube URL ingestion as file_data parts (Gemini official API)
-    // Only inject on the last user message of this request.
+    // 将 YouTube URL 作为 file_data 部件摄取（Gemini 官方 API），
+    // 仅注入到本请求的最后一条用户消息中。
     if (role == 'user' && isLast && enableYoutube) {
       final urls = _extractYouTubeUrls(raw);
       for (final u in urls) {
-        // Vertex AI requires mime_type for file_data
+        // Vertex AI 要求 file_data 提供 mime_type
         if (isVertex) {
           parts.add({
             'file_data': {'file_uri': u, 'mime_type': 'video/*'},
@@ -1071,7 +1066,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
   bool expectImage = wantsImageOutput;
   bool receivedImage = false;
 
-  // Map OpenAI-style tools to Gemini functionDeclarations (MCP)
+  // 将 OpenAI 风格的工具映射到 Gemini functionDeclarations（MCP）
   List<Map<String, dynamic>>? geminiTools;
   if (tools != null && tools.isNotEmpty) {
     final decls = <Map<String, dynamic>>[];
@@ -1087,8 +1082,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         if (desc.isNotEmpty) 'description': desc,
       };
       if (params != null) {
-        // Google Gemini requires strict JSON Schema compliance
-        // Fix array properties that are missing 'items' field
+        // Google Gemini 要求严格符合 JSON Schema
+        // 修复缺少 'items' 字段的数组属性
         final cleanedParams = _cleanSchemaForGemini(params);
         d['parameters'] = cleanedParams;
       }
@@ -1110,12 +1105,12 @@ Stream<ChatStreamChunk> _sendGoogleStream(
     isGemini3: isGemini3 && !isVertex,
   );
 
-  // Maintain a rolling conversation for multi-round tool calls
+  // 为多轮工具调用维护滚动对话
   List<Map<String, dynamic>> convo = List<Map<String, dynamic>>.from(contents);
   TokenUsage? usage;
   int totalTokens = 0;
 
-  // Accumulate built-in search citations across stream rounds
+  // 跨流式轮次累积内置搜索引用
   final List<Map<String, dynamic>> builtinCitations = <Map<String, dynamic>>[];
   int malformedResponseRetryCount = 0;
 
@@ -1132,7 +1127,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       if (web is! Map) continue;
       final uri = (web['uri'] ?? web['url'] ?? '').toString();
       if (uri.isEmpty) continue;
-      // Deduplicate by uri
+      // 按 uri 去重
       if (seen.contains(uri)) continue;
       seen.add(uri);
       final title = (web['title'] ?? web['name'] ?? uri).toString();
@@ -1154,7 +1149,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       if (!omitSamplingParams && topP != null) 'topP': topP,
       if (maxTokens ?? defaultMaxOutputTokens case final resolvedMaxTokens?)
         'maxOutputTokens': resolvedMaxTokens,
-      // Enable IMAGE+TEXT output modalities when model is configured to output images
+      // 当模型配置为输出图像时启用 IMAGE+TEXT 输出模态
       if (wantsImageOutput) 'responseModalities': ['TEXT', 'IMAGE'],
       if (isReasoning)
         ...() {
@@ -1219,22 +1214,22 @@ Stream<ChatStreamChunk> _sendGoogleStream(
 
     final sse = resp.stream.transform(utf8.decoder);
     String buffer = '';
-    // Collect any function calls in this round
+    // 收集本轮中的任何函数调用
     final List<Map<String, dynamic>> calls =
         <Map<String, dynamic>>[]; // {id,name,args,res}
-    // Preserve the model turn parts in the exact order they were received.
+    // 按接收到的原始顺序保留模型轮次部件。
     final List<Map<String, dynamic>> roundModelParts = <Map<String, dynamic>>[];
-    // Counter for server-side code execution tool cards
+    // 用于服务端代码执行工具卡片的计数器
     int codeExecCounter = 0;
     bool retryMalformedResponse = false;
 
-    // Capture thought signatures for history (Gemini 3 image/editing)
+    // 捕获思考签名用于历史记录（Gemini 3 图像/编辑）
     String? responseTextThoughtSigKey;
     dynamic responseTextThoughtSigVal;
     final List<Map<String, dynamic>> responseImageThoughtSigs =
         <Map<String, dynamic>>[];
 
-    // Track a streaming inline image; buffer chunks and emit only the latest frame once finished
+    // 跟踪流式内联图像；缓冲分块，完成后仅发出最新帧
     String imageMime = 'image/png';
     String pendingImageData = '';
     String pendingImageTrailingText = '';
@@ -1270,8 +1265,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
     void bufferInlineImageChunk(String mime, String data) {
       imageMime = mime.isNotEmpty ? mime : 'image/png';
       final hasExisting = pendingImageData.isNotEmpty;
-      // Gemini image-preview streams often send full preview frames instead of deltas.
-      // If the previous chunk already looks complete (padding) or a new frame header appears, replace it.
+      // Gemini 图像预览流通常发送完整预览帧而非增量。
+      // 如果上一个分块已看似完整（含 padding）或出现新帧头，则替换它。
       final prevLooksComplete = hasExisting && pendingImageData.endsWith('=');
       final newFrame = hasExisting && looksLikeImageStart(data);
       if (prevLooksComplete || newFrame) {
@@ -1308,17 +1303,17 @@ Stream<ChatStreamChunk> _sendGoogleStream(
     await for (final chunk in _ensureTrailingNewline(sse)) {
       buffer += chunk;
       final lines = buffer.split('\n');
-      buffer = lines.last; // keep incomplete line
+      buffer = lines.last; // 保留不完整的行
 
       for (int i = 0; i < lines.length - 1; i++) {
         final line = lines[i].trim();
         if (line.isEmpty) continue;
         if (!line.startsWith('data:')) continue;
-        final data = line.substring(5).trim(); // after 'data:'
+        final data = line.substring(5).trim(); // 位于 'data:' 之后
         if (data.isEmpty) continue;
-        // Gemini can deliver {"error":{code,message,status}}, a prompt-level
-        // block, or a candidate-level content-filter finish in-band on a 2xx
-        // stream; raise before the malformed-chunk guard below can swallow it.
+        // Gemini 可能会在 2xx 流中以带内方式返回 {"error":{code,message,status}}、提示级
+        // 阻止，或候选级内容过滤完成信号；应在下方畸形分块保护
+        // 可能吞掉它之前抛出。
         _throwIfInBandStreamError(data);
         _throwIfGeminiPromptBlocked(data);
         _throwIfGeminiCandidateBlocked(data);
@@ -1340,7 +1335,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
           if (candidates is List && candidates.isNotEmpty) {
             String textDelta = '';
             String reasoningDelta = '';
-            String? finishReason; // detect stream completion from server
+            String? finishReason; // 检测来自服务器的流完成
             for (final cand in candidates) {
               if (cand is! Map) continue;
               final content = cand['content'];
@@ -1367,7 +1362,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                   roundModelParts.add(rawPart);
                 }
 
-                // Capture thought signature for text part (Gemini 3 image/editing)
+                // 为文本部件捕获思考签名（Gemini 3 图像/编辑）
                 if (persistGeminiThoughtSigs &&
                     !thought &&
                     partThoughtSigKey != null &&
@@ -1387,8 +1382,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                     textDelta += t;
                   }
                 }
-                // Parse inline image data from Gemini (inlineData)
-                // Response shape: { inlineData: { mimeType: 'image/png', data: '...base64...' } }
+                // 解析来自 Gemini 的内联图像数据（inlineData），
+                // 响应形状：{ inlineData: { mimeType: 'image/png', data: '...base64...' } }
                 final inline = (p['inlineData'] ?? p['inline_data']);
                 if (inline is Map) {
                   final mime =
@@ -1414,7 +1409,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                     bufferInlineImageChunk(mime, data);
                   }
                 }
-                // Parse fileData: { fileUri: 'https://...', mimeType: 'image/png' }
+                // 解析 fileData：{ fileUri: 'https://...', mimeType: 'image/png' }
                 final fileData = (p['fileData'] ?? p['file_data']);
                 if (fileData is Map) {
                   final mime =
@@ -1454,9 +1449,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                     } catch (_) {}
                   }
                 }
-                // Emit server-side code execution parts as tool cards.
-                // Assumes executableCode and codeExecutionResult alternate in
-                // 1:1 pairs (matching current Gemini API behavior).
+                // 将服务端代码执行部分作为工具卡片发出。假设 executableCode 和
+                // codeExecutionResult 按 1:1 成对交替出现（与当前 Gemini API 行为一致）。
                 final codeExec = p['executableCode'] ?? p['executable_code'];
                 if (codeExec is Map) {
                   final lang = (codeExec['language'] ?? '')
@@ -1516,12 +1510,12 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                           .cast<String, dynamic>();
                     } catch (_) {}
                   }
-                  // Prefer API-provided functionCall id, fall back to synthetic
+                  // 优先使用 API 提供的 functionCall id，否则回退到合成值
                   final apiId = fc['id']?.toString();
                   final id = _effectiveToolCallId(apiId, 'call', p.hashCode);
 
-                  // Capture thought signature (Gemini 3 Pro requirement)
-                  // Preserve exact key/value as received
+                  // 捕获思考签名（Gemini 3 Pro 要求）
+                  // 按收到的内容原样保留 key/value
                   String? thoughtSigKey;
                   dynamic thoughtSigVal;
                   if (p.containsKey('thoughtSignature')) {
@@ -1532,7 +1526,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                     thoughtSigVal = p['thought_signature'];
                   }
 
-                  // Emit placeholder immediately
+                  // 立即输出占位符
                   yield ChatStreamChunk(
                     content: '',
                     isDone: false,
@@ -1597,15 +1591,15 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                   calls.add(call);
                 }
               }
-              // Capture explicit finish reason if present
+              // 如果存在，则捕获明确的结束原因
               final fr = cand['finishReason'];
               if (fr is String && fr.isNotEmpty) finishReason = fr;
 
-              // Parse grounding metadata for citations if present
+              // 如果存在，则解析用于引用的 grounding 元数据
               final gm = cand['groundingMetadata'] ?? obj['groundingMetadata'];
               final cite = parseCitations(gm);
               if (cite.isNotEmpty) {
-                // merge unique by url
+                // 按 url 去重合并
                 final existingUrls = builtinCitations
                     .map((e) => e['url']?.toString() ?? '')
                     .toSet();
@@ -1615,7 +1609,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                   builtinCitations.add(it);
                   existingUrls.add(u);
                 }
-                // emit a tool result chunk so UI can render citations card
+                // 输出工具结果分块，以便 UI 渲染引用卡片
                 final payload = jsonEncode({'items': builtinCitations});
                 yield ChatStreamChunk(
                   content: '',
@@ -1638,7 +1632,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
               retryMalformedResponse = true;
             }
 
-            // When finishing, emit any buffered inline image (and trailing text) in one batch to avoid partial base64 during streaming.
+            // 结束时一次性发出所有缓冲的内联图像（以及尾部文本），
+            // 避免流式传输过程中出现不完整的 base64。
             if (finishReason != null && !retryMalformedResponse) {
               final pendingImage = await takeBufferedImageMarkdown();
               if (pendingImage.isNotEmpty) {
@@ -1665,12 +1660,12 @@ Stream<ChatStreamChunk> _sendGoogleStream(
               );
             }
 
-            // If server signaled finish, end stream immediately
+            // 如果服务端已发出结束信号，则立即结束流
             if (finishReason != null &&
                 !retryMalformedResponse &&
                 calls.isEmpty &&
                 (!expectImage || receivedImage)) {
-              // Emit final citations if any not emitted
+              // 如果还有未输出的最终引用，则输出它们
               if (builtinCitations.isNotEmpty) {
                 final payload = jsonEncode({'items': builtinCitations});
                 yield ChatStreamChunk(
@@ -1713,14 +1708,14 @@ Stream<ChatStreamChunk> _sendGoogleStream(
             }
           }
         } catch (_) {
-          // ignore malformed chunk
+          // 忽略格式错误的分块
         }
       }
     }
 
     if (retryMalformedResponse) {
-      // This is a transient model-generation failure, so retry the unchanged
-      // round once without adding the malformed candidate to conversation.
+      // 这是短暂的模型生成失败，因此原样重试该轮一次，
+      // 不将格式错误的候选内容加入对话。
       if (malformedResponseRetryCount == 0) {
         malformedResponseRetryCount++;
         continue;
@@ -1730,7 +1725,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       );
     }
 
-    // Flush any buffered inline image (e.g., when stream ends without explicit finishReason)
+    // 刷新任何缓冲的内联图片（例如，当流在没有明确 finishReason 的情况下结束时）
     final pendingImage = await takeBufferedImageMarkdown();
     if (pendingImage.isNotEmpty) {
       final sanitized = await sanitizeTextIfNeeded(pendingImage);
@@ -1743,7 +1738,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
     }
 
     if (calls.isEmpty) {
-      // No tool calls; this round finished
+      // 没有工具调用；本轮已完成
       if (persistGeminiThoughtSigs) {
         final metaComment = _buildGeminiThoughtSigComment(
           textKey: responseTextThoughtSigKey,
@@ -1768,13 +1763,13 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       return;
     }
 
-    // Append model functionCall(s) and user functionResponse(s) to conversation, then loop
+    // 将模型的 functionCall(s) 和用户的 functionResponse(s) 追加到对话中，然后循环
     malformedResponseRetryCount = 0;
     if (isGemini3) {
-      // Gemini 3: preserve the original model parts order exactly.
+      // Gemini 3：精确保留原始模型 parts 的顺序。
       convo.add({'role': 'model', 'parts': roundModelParts});
 
-      // 4. All functionResponses in one user turn
+      // 4. 所有 functionResponses 放在一个用户轮次中
       final responseParts = <Map<String, dynamic>>[];
       for (final c in calls) {
         final name = (c['name'] ?? '').toString();
@@ -1796,7 +1791,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       }
       convo.add({'role': 'user', 'parts': responseParts});
     } else {
-      // Gemini 2.x: existing per-call reconstruction
+      // Gemini 2.x：现有的逐调用重建
       for (final c in calls) {
         final name = (c['name'] ?? '').toString();
         final args =
@@ -1832,6 +1827,6 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         });
       }
     }
-    // Continue while(true) for next round
+    // 继续 while(true) 以进行下一轮
   }
 }

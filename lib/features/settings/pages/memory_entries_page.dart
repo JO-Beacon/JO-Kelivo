@@ -13,7 +13,7 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../utils/platform_utils.dart';
 import '../widgets/memory_ui.dart';
 
-/// Global memory list with search, filters, batch delete, orphan cleanup (§14.4).
+/// 带搜索、筛选、批量删除和孤立项清理的全局记忆列表（§14.4）。
 class MemoryEntriesPage extends StatelessWidget {
   const MemoryEntriesPage({super.key});
 
@@ -195,10 +195,7 @@ class _MemoryEntriesContentState extends State<MemoryEntriesContent> {
             options: [
               DesktopSelectOption(value: null, label: l10n.memoryFilterTypeAll),
               for (final t in MemoryType.values)
-                DesktopSelectOption(
-                  value: t,
-                  label: memoryTypeLabel(l10n, t),
-                ),
+                DesktopSelectOption(value: t, label: memoryTypeLabel(l10n, t)),
             ],
             onSelected: (v) async {
               setState(() => _type = v);

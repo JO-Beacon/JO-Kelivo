@@ -22,18 +22,18 @@ class IosCheckbox extends StatefulWidget {
   final bool value;
   final ValueChanged<bool>? onChanged;
 
-  // Visual configuration
-  final double size; // visual circle diameter
-  final double hitTestSize; // tap target size
+  // 视觉配置
+  final double size; // 视觉圆形直径
+  final double hitTestSize; // 点击目标尺寸
   final double borderWidth;
   final Color? activeColor;
   final Color? borderColor;
   final Color? checkmarkColor;
 
-  // Accessibility
+  // 无障碍
   final String? semanticLabel;
 
-  // UX
+  // 交互体验
   final bool enableHaptics;
 
   @override
@@ -50,10 +50,10 @@ class _IosCheckboxState extends State<IosCheckbox> {
     final isDark = materialTheme.brightness == Brightness.dark;
     final activeColor =
         widget.activeColor ?? CupertinoTheme.of(context).primaryColor;
-    // Neutral gray ring matching the original Cupertino systemGrey4 (light) /
-    // systemGrey3 (dark); several palettes define outlineVariant as pure
-    // black/white, which made this border far too strong.
-    final borderColor = widget.borderColor ??
+    // 中性灰色圆环，匹配原始 Cupertino systemGrey4（浅色）或 systemGrey3（深色）。
+    // 部分调色板将 outlineVariant 定义为纯黑或纯白，会让边框过于醒目。
+    final borderColor =
+        widget.borderColor ??
         cs.onSurface.withValues(alpha: isDark ? 0.24 : 0.20);
 
     final bool enabled = widget.onChanged != null;
@@ -61,13 +61,14 @@ class _IosCheckboxState extends State<IosCheckbox> {
         ? activeColor
         : CupertinoColors.transparent;
     final Color effectiveBorderColor = widget.value ? activeColor : borderColor;
-    // Dynamically compute check color similar to providers multi-select:
-    // - If using theme primary, use `onPrimary` for best contrast.
-    // - If a custom activeColor is provided, compute contrast by brightness.
+    // 类似供应商多选那样动态计算对勾颜色：
+    // - 使用主题主色时，用 `onPrimary` 获得最佳对比度。
+    // - 提供自定义 activeColor 时，按亮度计算对比色。
     Color contrastOn(Color bg) {
       final b = ThemeData.estimateBrightnessForColor(bg);
       return b == Brightness.dark
-          ? CupertinoColors.white // color-gate: ignore (contrast vs caller color)
+          ? CupertinoColors
+                .white // color-gate: ignore（与调用方颜色的对比）
           : CupertinoColors.black;
     }
 
@@ -83,7 +84,7 @@ class _IosCheckboxState extends State<IosCheckbox> {
     final double visualSize = widget.size;
     final double tapSize = math.max(widget.hitTestSize, visualSize);
 
-    // Smooth press feedback scale
+    // 平滑的按压反馈缩放
     final double pressScale = _pressed && enabled ? 0.95 : 1.0;
 
     return Semantics(
@@ -160,7 +161,7 @@ class _AnimatedCheck extends StatelessWidget {
       curve: Curves.easeOutBack,
       tween: Tween<double>(begin: 0, end: show ? 1 : 0),
       builder: (context, t, child) {
-        // Slight scale pop as it appears
+        // 出现时轻微缩放弹出
         final scale = 0.9 + 0.1 * t;
         return Transform.scale(
           scale: scale,
@@ -199,7 +200,7 @@ class _CheckPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
-    // Define a clean iOS-like check path
+    // 定义简洁的 iOS 风格对勾路径
     final w = size.width;
     final h = size.height;
     final path = Path()
@@ -207,7 +208,7 @@ class _CheckPainter extends CustomPainter {
       ..lineTo(0.46 * w, 0.70 * h)
       ..lineTo(0.75 * w, 0.34 * h);
 
-    // Draw partial path based on progress
+    // 根据进度绘制部分路径
     final metrics = path.computeMetrics().toList();
     if (metrics.isEmpty) return;
     final first = metrics.first;

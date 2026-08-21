@@ -137,13 +137,13 @@ abstract final class StorageUsageService {
         File(p.join(root.path, AppDatabase.databaseFileName)),
       );
     } catch (_) {
-      // An unreadable database must not make legacy files clearable.
+      // 数据库不可读时不得让旧版文件变为可清理。
     }
     var restoreTraces = RestoreTraceSnapshot.empty;
     try {
       restoreTraces = await RestoreTraceService(root).inspect();
     } catch (_) {
-      // Malformed or active restore workspaces stay hidden and non-clearable.
+      // 损坏或正在使用的恢复工作区保持隐藏且不可清理。
     }
 
     final byCat = <StorageUsageCategoryKey, _MutableStats>{
@@ -212,9 +212,9 @@ abstract final class StorageUsageService {
           continue;
         }
 
-        // Root-level chat data is stored by Drift in the SQLite database file
-        // family. Legacy Hive boxes are migration inputs only and should not
-        // affect the steady-state chat records size.
+        // 根级聊天数据由 Drift 存储在 SQLite 数据库文件
+        // 族中。旧版 Hive boxes 只是迁移输入，不应影响
+        // 稳态聊天记录大小。
         if (parts.length == 1) {
           final name = parts.first;
           final chatSubId = _chatDatabaseSubcategoryId(name);
@@ -254,8 +254,8 @@ abstract final class StorageUsageService {
             assistantSubs['avatars']!.add(bytes);
             break;
           case 'images':
-            // Inline/generated images are stored under appData/images.
-            // Treat them as "Images" so users can manage them together.
+            // 内联/生成的图片存储在 appData/images 下。
+            // 将其归为“图片”，以便用户统一管理。
             byCat[StorageUsageCategoryKey.images]!.add(bytes);
             break;
           case 'cache':
@@ -285,7 +285,7 @@ abstract final class StorageUsageService {
         }
       }
     } catch (_) {
-      // If listing fails for any reason, fall back to 0s; UI will show load failed.
+      // 若因任何原因列目录失败，回退为 0；UI 会显示加载失败。
     }
 
     final avatarsDir = await AppDirectories.getAvatarsDirectory();
@@ -294,7 +294,7 @@ abstract final class StorageUsageService {
     final avatarCacheDir = await AppDirectories.getAvatarCacheDirectory();
     final logsDir = Directory(p.join(root.path, 'logs'));
 
-    // Platform cache directory (e.g. Android /data/user/0/<package>/cache).
+    // 平台缓存目录（例如 Android /data/user/0/<package>/cache）。
     try {
       if (await systemCacheDir.exists()) {
         await for (final ent in systemCacheDir.list(
@@ -441,7 +441,7 @@ abstract final class StorageUsageService {
       ),
     ];
 
-    // Ensure consistent ordering.
+    // 确保一致的排序。
     categories.sort(
       (a, b) => _categoryOrder
           .indexOf(a.key)
@@ -582,11 +582,11 @@ abstract final class StorageUsageService {
           );
         }
       } catch (_) {
-        // Ignore listing errors and return partial results.
+        // 忽略列目录错误并返回部分结果。
       }
     }
 
-    // Chat attachments live under upload/. Inline/generated images live under images/.
+    // 聊天附件位于 upload/ 下。内联/生成的图片位于 images/ 下。
     await addFromDir(
       dir,
       includeImages: images,
@@ -642,13 +642,13 @@ abstract final class StorageUsageService {
             try {
               await ent.delete();
             } catch (_) {
-              // Some platforms lock active log files; try truncating.
+              // 部分平台会锁定活动日志文件；尝试截断。
               try {
                 await ent.writeAsBytes(const <int>[], flush: true);
               } catch (_) {}
             }
           } else if (ent is Directory) {
-            // We'll delete empty dirs in a second pass.
+            // 空目录将在第二轮中删除。
           } else {
             try {
               await ent.delete();
@@ -657,7 +657,7 @@ abstract final class StorageUsageService {
         } catch (_) {}
       }
 
-      // Delete empty directories bottom-up.
+      // 自底向上删除空目录。
       final dirs = <Directory>[];
       await for (final ent in dir.list(recursive: true, followLinks: false)) {
         if (ent is Directory) dirs.add(ent);

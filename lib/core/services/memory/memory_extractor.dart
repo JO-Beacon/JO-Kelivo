@@ -2,7 +2,7 @@ import '../../models/assistant.dart';
 import '../../models/memory_entry.dart';
 import 'memory_prompts.dart';
 
-/// One candidate extracted from a conversation window (§12.5).
+/// 从对话窗口提取的一个候选项（§12.5）。
 class MemoryExtractedItem {
   const MemoryExtractedItem({
     required this.type,
@@ -13,12 +13,12 @@ class MemoryExtractedItem {
   final MemoryType type;
   final String content;
 
-  /// Raw `scope` attribute from the model (`global` / `assistant`), if any.
-  /// Only honoured when write policy is `toolDefault*` (§4.3 / §12.5).
+  /// 模型中原始的 `scope` 属性（`global` / `assistant`），如果有的话。
+  /// 仅当写入策略为 `toolDefault*` 时才会采用（§4.3 / §12.5）。
   final String? scopeAttr;
 }
 
-/// Extract parse outcome.
+/// Extract 解析结果。
 class MemoryExtractParseResult {
   const MemoryExtractParseResult._({required this.ok, required this.items});
 
@@ -35,7 +35,7 @@ class MemoryExtractParseResult {
   final List<MemoryExtractedItem> items;
 }
 
-/// Pure Extract helpers (§12.5).
+/// 纯 Extract 辅助函数（§12.5）。
 abstract final class MemoryExtractor {
   MemoryExtractor._();
 
@@ -107,9 +107,9 @@ abstract final class MemoryExtractor {
         .replaceAll('{{conversation}}', conversation);
   }
 
-  /// Parse Extract XML. Requires an `<extracted` tag; otherwise [malformed].
+  /// 解析 Extract XML。必须包含 `<extracted` 标签；否则返回 [malformed]。
   ///
-  /// Invalid types / empty content are dropped. Caps at [maxItems].
+  /// 无效类型或空内容会被丢弃。最多保留 [maxItems] 项。
   static MemoryExtractParseResult parse(String response) {
     if (!_extractedOpenRe.hasMatch(response)) {
       return MemoryExtractParseResult.malformed();

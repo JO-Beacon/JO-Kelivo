@@ -28,7 +28,7 @@ List<_ImportResult> _decodeChatBoxJson(BuildContext context, String s) {
   final out = <_ImportResult>[];
   String uniqueKey(String prefix, String display) {
     final existing = settings.providerConfigs.keys.toSet();
-    // If display equals prefix, generate '<prefix> - <n>' starting at 1
+    // 如果显示名等于前缀，则从 1 开始生成 '<prefix> - <n>'
     if (display.toLowerCase() == prefix.toLowerCase()) {
       int i = 1;
       String candidate = '$prefix - $i';
@@ -38,7 +38,7 @@ List<_ImportResult> _decodeChatBoxJson(BuildContext context, String s) {
       }
       return candidate;
     }
-    // Otherwise prefer '<prefix> - <display>', then add ' (n)'
+    // 否则优先使用 '<prefix> - <display>'，必要时添加 ' (n)'
     String base = '$prefix - $display';
     if (!existing.contains(base)) return base;
     int i = 2;
@@ -284,7 +284,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // iOS-style header: centered title with left/right actions
+                  // iOS 风格标题栏：居中标题，左右操作
                   SizedBox(
                     height: 36,
                     child: Stack(
@@ -318,7 +318,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                                 if (!ctx.mounted) return;
                                 final settings = ctx.read<SettingsProvider>();
                                 final results = <_ImportResult>[];
-                                // Support combined multi-provider QR content: newline-separated share strings or JSON
+                                // 支持组合多供应商二维码内容：换行分隔的分享字符串或 JSON
                                 final parts = code
                                     .split(RegExp(r'\r?\n+'))
                                     .map((e) => e.trim())
@@ -399,7 +399,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                                 l10n.importProviderSheetFromGalleryTooltip,
                             onTap: () async {
                               try {
-                                // pick from gallery and analyze
+                                // 从相册选择并解析
                                 final picker = ImagePicker();
                                 final img = await picker.pickImage(
                                   source: ImageSource.gallery,
@@ -412,7 +412,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                                 String? code;
                                 if (result != null) {
                                   try {
-                                    // dynamic access to barcodes for compatibility
+                                    // 为兼容性动态访问 barcodes
                                     final bars =
                                         (result as dynamic).barcodes as List?;
                                     if (bars != null) {
@@ -518,8 +518,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                           decoration: InputDecoration(
                             hintText: l10n.importProviderSheetDescription,
                             filled: true,
-                            fillColor:
-                                ctx.appColors.surfaceCard,
+                            fillColor: ctx.appColors.surfaceCard,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
@@ -571,7 +570,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                             try {
                               final settings = ctx.read<SettingsProvider>();
                               final results = <_ImportResult>[];
-                              // Support multi-line input where each non-empty line is a share string or JSON
+                              // 支持多行输入，每个非空行是分享字符串或 JSON
                               final lines = raw
                                   .split(RegExp(r'\r?\n'))
                                   .map((e) => e.trim())
@@ -588,7 +587,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                                       );
                                     }
                                   } catch (_) {
-                                    // skip invalid line
+                                    // 跳过无效行
                                   }
                                 }
                                 if (results.isEmpty) {
@@ -608,7 +607,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                               }
                               for (final r in results) {
                                 await settings.setProviderConfig(r.key, r.cfg);
-                                // Put to front
+                                // 放到最前
                                 final order = List<String>.of(
                                   settings.providersOrder,
                                 );
@@ -652,7 +651,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
   );
 }
 
-// Local iOS-like tactile icon button (no ripple, light haptics)
+// 本地 iOS 风格触感图标按钮（无涟漪，轻触感）
 class _TactileIconButton extends StatefulWidget {
   const _TactileIconButton({
     required this.icon,

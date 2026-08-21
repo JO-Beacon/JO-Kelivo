@@ -16,7 +16,7 @@ class ClipboardImages {
     }
   }
 
-  // Set an image to the system clipboard from a file path (desktop only).
+  // 从文件路径将图片写入系统剪贴板（仅桌面端）。
   static Future<bool> setImagePath(String path) async {
     try {
       final res = await _channel.invokeMethod<dynamic>(
@@ -30,8 +30,8 @@ class ClipboardImages {
     }
   }
 
-  // Get file paths from system clipboard (desktop only).
-  // Returns absolute file system paths for items copied in Finder/Explorer/Files.
+  // 从系统剪贴板获取文件路径（仅桌面端）。
+  // 返回在 Finder/Explorer/Files 中复制的项目的绝对文件系统路径。
   static Future<List<String>> getFilePaths() async {
     try {
       final res = await _channel.invokeMethod<List<dynamic>>(

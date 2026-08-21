@@ -11,8 +11,7 @@ import '../../../utils/app_directories.dart';
 
 enum SherpaModelArchitecture { paraformer, senseVoice, streamingZipformer }
 
-/// A downloadable model published by sherpa-onnx's official `asr-models`
-/// GitHub release.
+/// 由 sherpa-onnx 官方 `asr-models` GitHub release 发布的可下载模型。
 final class SherpaModelDefinition {
   const SherpaModelDefinition({
     required this.id,
@@ -124,23 +123,21 @@ final class SherpaModelDownloadProgress {
   final int receivedBytes;
   final int? totalBytes;
 
-  /// Number of archive bytes received from the network so far.
+  /// 到目前为止从网络接收的归档文件字节数。
   int get bytesReceived => receivedBytes;
 
-  /// Download completion in the inclusive range 0...1.
+  /// 下载完成度，范围为闭区间 0...1。
   ///
-  /// Returns null when neither the server nor the model catalog provides a
-  /// usable total size.
+  /// 当服务器和模型目录都未提供可用的总大小时，返回 null。
   double? get progress {
     final total = totalBytes;
     if (total == null || total <= 0) return null;
     return (receivedBytes / total).clamp(0, 1).toDouble();
   }
 
-  /// Whole-number download percentage suitable for a UI label.
+  /// 适合 UI 标签的整数下载百分比。
   ///
-  /// This intentionally rounds down so an in-flight download cannot display
-  /// 100% merely because it is close to completion.
+  /// 这里有意向下取整，避免正在进行的下载仅因接近完成就显示 100%。
   int? get percent {
     final total = totalBytes;
     if (total == null || total <= 0) return null;
@@ -151,7 +148,7 @@ final class SherpaModelDownloadProgress {
 
   int? get displayPercent => percent;
 
-  /// Backwards-compatible alias used by the existing model progress bar.
+  /// 现有模型进度条使用的向后兼容别名。
   double? get fraction => progress;
 }
 
@@ -198,9 +195,9 @@ final class SherpaDownloadCancelledException implements Exception {
   String toString() => 'Sherpa model download was cancelled';
 }
 
-/// Downloads, validates, and installs sherpa-onnx models outside the app
-/// bundle. A model only becomes visible at `<app data>/asr_models/<id>` after
-/// every required inference file has been verified.
+/// 在应用包之外下载、验证并安装 sherpa-onnx 模型。
+/// 只有在所有必需的推理文件都验证通过后，模型才会出现在
+/// `<app data>/asr_models/<id>`。
 final class SherpaModelManager {
   SherpaModelManager({
     http.Client? httpClient,
@@ -576,9 +573,8 @@ Future<void> _extractTarBz2Cancellable(
       token.whenCancelled.then<Object>((_) => _cancelledMarker),
     ]);
     if (identical(result, _cancelledMarker)) {
-      // Killing synchronous archive IO immediately can leave its file handle
-      // locked for the lifetime of the Windows process. Let the current
-      // isolate event unwind there so its stream finally blocks can close.
+      // 立即终止同步归档 IO 可能让它的文件句柄在整个 Windows 进程生命周期内保持锁定。
+      // 让当前 isolate 事件在那里自然结束，以便其 stream 的 finally 块可以关闭。
       isolate.kill(
         priority: Platform.isWindows
             ? Isolate.beforeNextEvent
@@ -741,7 +737,7 @@ Future<void> _deleteFileIfPresent(File file) async {
       await file.delete();
       return;
     } on PathAccessException {
-      // Windows can retain a closed stream handle briefly after cancellation.
+      // 取消后，Windows 可能会短暂保留已关闭的 stream 句柄。
       if (!Platform.isWindows || attempt >= 9) rethrow;
       await Future<void>.delayed(const Duration(milliseconds: 20));
     }

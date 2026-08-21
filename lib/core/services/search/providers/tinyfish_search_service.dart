@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../search_service.dart';
 
-/// TinyFish Search API. Requires `X-API-Key`. Fetch/Scrape is not implemented.
+/// TinyFish Search API。需要 `X-API-Key`。未实现 Fetch/Scrape。
 class TinyFishSearchService extends SearchService<TinyFishOptions> {
   TinyFishSearchService({super.client});
 
@@ -53,10 +53,7 @@ class TinyFishSearchService extends SearchService<TinyFishOptions> {
 
       final response = await withHttpClient(
         (client) => client
-            .get(
-              uri,
-              headers: {'X-API-Key': apiKey},
-            )
+            .get(uri, headers: {'X-API-Key': apiKey})
             .timeout(Duration(milliseconds: commonOptions.timeout)),
       );
 

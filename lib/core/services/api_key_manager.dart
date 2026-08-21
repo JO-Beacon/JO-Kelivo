@@ -14,7 +14,7 @@ class ApiKeyManager {
   ApiKeyManager._internal();
 
   final Map<String, int> _roundRobinIndexMap = {}; // providerId -> index
-  final Map<String, int> _keyUsageMap = {}; // keyId -> total uses (ephemeral)
+  final Map<String, int> _keyUsageMap = {}; // keyId -> 总使用次数（临时）
 
   KeySelectionResult selectForProvider(ProviderConfig provider) {
     final keys = List<ApiKeyConfig>.from(
@@ -22,7 +22,7 @@ class ApiKeyManager {
     );
     if (keys.isEmpty) return const KeySelectionResult(null, 'no_keys');
 
-    // Filter by status and cooldown
+    // 按状态和冷却时间过滤
     final now = DateTime.now().millisecondsSinceEpoch;
     final cooldownMs =
         (provider.keyManagement?.failureRecoveryTimeMinutes ?? 5) * 60 * 1000;
@@ -32,7 +32,7 @@ class ApiKeyManager {
         final since = now - (k.updatedAt);
         if (since < cooldownMs) return false;
       }
-      // Only select keys marked active; error keys are filtered by cooldown above and disabled are skipped.
+      // 只选择标记为 active 的 key；error key 已被上面的冷却时间过滤，disabled key 会被跳过。
       return k.status == ApiKeyStatus.active;
     }).toList();
 

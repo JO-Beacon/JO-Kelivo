@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart';
 
 import '../../models/backup.dart';
+import '../../models/progress_update.dart';
 
 class S3BackupClient {
   const S3BackupClient();
@@ -29,7 +30,7 @@ class S3BackupClient {
       throw Exception('S3 endpoint is empty');
     }
     if (!s.contains('://')) {
-      // User-friendly: allow entering host only.
+      // 用户友好：允许仅输入 host。
       s = 'https://$s';
     }
     return s;
@@ -48,9 +49,9 @@ class S3BackupClient {
 
     final host = cfg.pathStyle ? base.host : '${cfg.bucket}.${base.host}';
     final segs = cfg.pathStyle ? [...baseSegs, cfg.bucket] : [...baseSegs];
-    // Dart's `Uri(queryParameters: ...)` encodes space as `+`, but some S3-compatible
-    // providers (e.g. Cloudflare R2) require strict RFC3986 encoding for SigV4.
-    // Build the encoded query string ourselves to ensure spaces become `%20`.
+    // Dart 的 `Uri(queryParameters: ...)` 会将空格编码为 `+`，但某些兼容 S3 的
+    // 服务商（例如 Cloudflare R2）要求 SigV4 使用严格的 RFC3986 编码。
+    // 我们自己构建编码后的查询字符串，以确保空格变成 `%20`。
     final queryStr = (query != null && query.isNotEmpty)
         ? _canonicalQuery(query)
         : null;
@@ -165,7 +166,7 @@ class S3BackupClient {
   }
 
   static String _awsEncode(String s) {
-    // RFC3986 percent-encoding, preserving "~"
+    // RFC3986 百分号编码，保留 "~"
     return Uri.encodeComponent(s).replaceAll('%7E', '~');
   }
 
@@ -304,9 +305,9 @@ class S3BackupClient {
     final client = http.Client();
     try {
       final streamed = await client.send(req);
-      // IMPORTANT: we must fully read the response stream before closing the
-      // underlying client; otherwise the socket can be closed mid-body which
-      // surfaces as `ClientException: Connection closed while receiving data`.
+      // 重要：必须先完整读取响应流，再关闭
+      // 底层客户端；否则 socket 可能在响应体传输中被关闭，
+      // 表现为 `ClientException: Connection closed while receiving data`。
       final res = await http.Response.fromStream(streamed);
       return res;
     } finally {
@@ -314,21 +315,22 @@ class S3BackupClient {
     }
   }
 
-  /// Like [_sendSigned] but streams a [File] as the request body instead of
-  /// buffering all bytes in memory.  Uses `UNSIGNED-PAYLOAD` so we don't need
-  /// to hash the entire file content for the SigV4 signature.
+  /// 与 [_sendSigned] 类似，但将 [File] 作为请求体进行流式传输，
+  /// 而不是把所有字节缓冲到内存中。使用 `UNSIGNED-PAYLOAD`，因此无需
+  /// 为 SigV4 签名哈希整个文件内容。
   static Future<http.StreamedResponse> _sendSignedStreamedFile(
     S3Config cfg, {
     required String method,
     required Uri uri,
     required File bodyFile,
     Map<String, String>? headers,
+    ProgressCallback? onProgress,
   }) async {
     final now = DateTime.now().toUtc();
     final amzDate = _amzDate(now);
     final dateStamp = _dateStamp(now);
-    // UNSIGNED-PAYLOAD tells S3 we won't provide a content hash, which is
-    // allowed for single PUT uploads over HTTPS.
+    // UNSIGNED-PAYLOAD 告诉 S3 我们不会提供内容哈希，
+    // 这被允许用于通过 HTTPS 进行的单个 PUT 上传。
     const payloadHash = 'UNSIGNED-PAYLOAD';
     final query = uri.queryParameters;
     final canonicalQueryStr = query.isEmpty ? '' : _canonicalQuery(query);
@@ -378,12 +380,21 @@ class S3BackupClient {
 
     final req = http.StreamedRequest(method, uri);
     req.headers.addAll({...reqHeaders, 'Authorization': auth});
-    // Pipe file bytes into the request body. addStream honors the sink's pause
-    // signal, so a slow network throttles disk reads instead of buffering the
-    // whole zip in RAM (which OOM-killed large mobile uploads).
+    // 将文件字节流入请求体。addStream 遵循 sink 的暂停
+    // 信号，因此慢网络会节流磁盘读取，而不是把整个
+    // zip 缓存在内存中（那会 OOM 杀掉大型移动端上传）。
+    var uploaded = 0;
     unawaited(
       req.sink
-          .addStream(bodyFile.openRead())
+          .addStream(
+            bodyFile.openRead().map((chunk) {
+              uploaded += chunk.length;
+              onProgress?.call(
+                ProgressUpdate(processed: uploaded, total: fileLen),
+              );
+              return chunk;
+            }),
+          )
           .then(
             (_) => req.sink.close(),
             onError: (Object error) {
@@ -400,14 +411,15 @@ class S3BackupClient {
       client.close();
       rethrow;
     }
-    // NOTE: caller is responsible for reading the response body and closing
-    // the client (by draining the stream).
+    // 注意：调用方负责读取响应体，并关闭
+    // 客户端（通过排空流）。
   }
 
   static Future<void> _sendSignedDownloadToFile(
     S3Config cfg, {
     required Uri uri,
     required File destination,
+    ProgressCallback? onProgress,
   }) async {
     final now = DateTime.now().toUtc();
     final amzDate = _amzDate(now);
@@ -468,7 +480,17 @@ class S3BackupClient {
       }
       await destination.parent.create(recursive: true);
       final sink = destination.openWrite();
-      await streamed.stream.pipe(sink);
+      final total = streamed.contentLength;
+      var downloaded = 0;
+      await streamed.stream
+          .map((chunk) {
+            downloaded += chunk.length;
+            onProgress?.call(
+              ProgressUpdate(processed: downloaded, total: total),
+            );
+            return chunk;
+          })
+          .pipe(sink);
     } finally {
       client.close();
     }
@@ -568,7 +590,9 @@ class S3BackupClient {
         .map((e) => e.cast<String, dynamic>())
         .where((e) {
           final key = (e['key'] as String?)?.trim() ?? '';
-          return key.isNotEmpty && key.toLowerCase().endsWith('.zip');
+          return key.isNotEmpty &&
+              (key.toLowerCase().endsWith('.zip') ||
+                  key.toLowerCase().endsWith('.joaiclient'));
         })
         .map((e) => _itemFromManifestEntry(cfg, e))
         .toList();
@@ -671,7 +695,10 @@ class S3BackupClient {
         final size = int.tryParse(sizeStr.trim()) ?? 0;
         final mtime = _parseDateTime(mtimeStr);
         final name = _displayNameFromKey(key);
-        if (!name.toLowerCase().endsWith('.zip')) continue;
+        final lowerName = name.toLowerCase();
+        if (!lowerName.endsWith('.zip') && !lowerName.endsWith('.joaiclient')) {
+          continue;
+        }
 
         items.add(
           BackupFileItem(
@@ -851,12 +878,13 @@ class S3BackupClient {
     );
   }
 
-  /// Upload a file from disk using a streamed PUT request.
-  /// This avoids loading the entire file into memory.
+  /// 使用流式 PUT 请求从磁盘上传文件。
+  /// 这样可以避免将整个文件加载到内存中。
   Future<void> uploadFile(
     S3Config cfg, {
     required String key,
     required File file,
+    ProgressCallback? onProgress,
   }) async {
     _validateConfigBasics(cfg);
     final uri = _buildObjectUri(cfg, key);
@@ -866,8 +894,9 @@ class S3BackupClient {
       uri: uri,
       bodyFile: file,
       headers: {'content-type': 'application/zip'},
+      onProgress: onProgress,
     );
-    // Fully consume the response so the underlying connection can be released.
+    // 完全读取响应，以便释放底层连接。
     final res = await http.Response.fromStream(streamed);
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception('S3 upload failed: ${_extractErrorMessage(res)}');
@@ -880,16 +909,22 @@ class S3BackupClient {
     );
   }
 
-  /// Download an S3 object directly to a local file using a streamed response.
-  /// This avoids buffering the full object in memory.
+  /// 使用流式响应将 S3 对象直接下载到本地文件。
+  /// 这样可以避免在内存中缓冲完整对象。
   Future<void> downloadToFile(
     S3Config cfg, {
     required String key,
     required File destination,
+    ProgressCallback? onProgress,
   }) async {
     _validateConfigBasics(cfg);
     final uri = _buildObjectUri(cfg, key);
-    await _sendSignedDownloadToFile(cfg, uri: uri, destination: destination);
+    await _sendSignedDownloadToFile(
+      cfg,
+      uri: uri,
+      destination: destination,
+      onProgress: onProgress,
+    );
   }
 
   Future<void> deleteObject(S3Config cfg, {required String key}) async {

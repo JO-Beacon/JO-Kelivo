@@ -16,18 +16,22 @@ import '../../database/business_repository.dart';
 import '../../database/business_preferences.dart';
 import '../../database/business_restore_service.dart';
 import '../../database/business_settings_router.dart';
+import '../../database/app_database.dart';
 import '../../database/chat_database_repository.dart';
 import '../../models/backup.dart';
 import '../../models/chat_message.dart';
 import '../../models/message_part.dart';
 import '../../models/conversation.dart';
+import '../../models/progress_update.dart';
 import '../chat/chat_service.dart';
 import '../migration/legacy_message_content_decoder.dart';
 import '../migration/legacy_record_sanitizer.dart';
+import '../migration/migration_backup_file_name.dart';
 import '../../utils/multimodal_input_utils.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import 'backup_settings_validator.dart';
+import 'joaiclient_archive.dart';
 import 'restore_bundle_preparation.dart';
 import 'temporary_restore_file.dart';
 
@@ -47,13 +51,12 @@ typedef _VersionedBackupInfo = ({
   String normalizedManifestSha256,
 });
 
-/// Recompute [ImagePart]/[FilePart.unavailable] against the live filesystem.
+/// 根据当前文件系统重新计算 [ImagePart]/[FilePart.unavailable]。
 ///
-/// Remote/data URIs stay available. Local URIs use
-/// [SandboxPathResolver.localFileExists] (structured remap only; no generic
-/// images/upload basename probe).
-/// Intended for post-file-restore refresh of legacy chats.json imports that
-/// decoded before assets were copied.
+/// Remote/data URI 保持可用。Local URI 使用 [SandboxPathResolver.localFileExists]
+/// （仅结构化重映射；不做通用的 images/upload basename 探测）。
+/// 用于文件恢复后刷新旧版 chats.json 导入，这些导入在资源复制
+/// 之前已经解码。
 
 List<MessagePart> _normalizeAttachmentPartUris(List<MessagePart> parts) {
   var changed = false;
@@ -187,8 +190,8 @@ bool _unavailableForUri(String uri, bool Function(String path) exists) {
 }
 
 bool _attachmentExistsOnDisk(String path) {
-  // Do not use fix(): its generic `/images/`·basename probe can mark a
-  // missing external path available when a same-named managed file exists.
+  // 不要使用 fix()：其通用的 `/images/`·基名探测可能将
+  // 缺失的外部路径标记为可用，只因存在同名的受管文件。
   return SandboxPathResolver.localFileExists(path);
 }
 
@@ -197,11 +200,11 @@ class DataSync {
   static const _backupFormatVersion = 2;
   static const _manifestEntryName = 'manifest.json';
   static const _databaseEntryName = 'database/kelivo.db';
-  // A 16 MiB metadata cap keeps manifest parsing and entry metadata bounded.
+  // 16 MiB 的元数据上限可让清单解析和条目元数据保持有界。
   static const _maxManifestBytes = 16 * 1024 * 1024;
-  // Settings are parsed as one JSON object, so keep their decoded input bound.
+  // 设置会被解析为单个 JSON 对象，因此要保持其解码输入有界。
   static const _maxSettingsBytes = 16 * 1024 * 1024;
-  // ZIP64 supports larger entries. Restore keeps explicit, diagnosable bounds.
+  // ZIP64 支持更大的条目。恢复过程保持明确且可诊断的边界。
   static const _maxRestoreEntryBytes = 8 * 1024 * 1024 * 1024;
   static const _maxRestoreTotalBytes = 16 * 1024 * 1024 * 1024;
   static const _maxRestoreEntries = 100000;
@@ -245,7 +248,7 @@ class DataSync {
     );
   });
 
-  // ===== WebDAV helpers =====
+  // ===== WebDAV 辅助方法 =====
   Uri _collectionUri(WebDavConfig cfg) {
     String base = cfg.url.trim();
     if (base.endsWith('/')) base = base.substring(0, base.length - 1);
@@ -253,7 +256,7 @@ class DataSync {
     if (pathPart.isNotEmpty) {
       pathPart = '/${pathPart.replaceAll(RegExp(r'^/+'), '')}';
     }
-    // Ensure trailing slash for collection
+    // 确保集合路径末尾有斜杠
     final full = '$base$pathPart/';
     return Uri.parse(full);
   }
@@ -280,7 +283,7 @@ class DataSync {
   Future<void> _ensureCollection(WebDavConfig cfg) async {
     final client = http.Client();
     try {
-      // Ensure each segment exists
+      // 确保每个路径段都存在
       final url = cfg.url.trim().replaceAll(RegExp(r'/+$'), '');
       final segments = cfg.path
           .split('/')
@@ -289,7 +292,7 @@ class DataSync {
       String acc = url;
       for (final seg in segments) {
         acc = '$acc/$seg';
-        // PROPFIND depth 0 on this collection (with trailing slash)
+        // 对此集合执行 PROPFIND depth 0（末尾带斜杠）
         final u = Uri.parse('$acc/');
         final req = http.Request('PROPFIND', u);
         req.headers.addAll({
@@ -302,7 +305,7 @@ class DataSync {
             '<?xml version="1.0" encoding="utf-8" ?><d:propfind xmlns:d="DAV:"><d:prop><d:displayname/></d:prop></d:propfind>';
         final res = await client.send(req).then(http.Response.fromStream);
         if (res.statusCode == 404) {
-          // create this level
+          // 创建这一层级
           final mk = await client
               .send(
                 http.Request('MKCOL', u)
@@ -320,7 +323,7 @@ class DataSync {
         } else if (res.statusCode == 401) {
           throw Exception('Unauthorized');
         } else if (!(res.statusCode >= 200 && res.statusCode < 400)) {
-          // Some servers return 207 Multi-Status; accept 2xx/3xx/207
+          // 有些服务器返回 207 Multi-Status；接受 2xx/3xx/207
           if (res.statusCode != 207) {
             throw Exception('PROPFIND error at $u: ${res.statusCode}');
           }
@@ -331,7 +334,7 @@ class DataSync {
     }
   }
 
-  // ===== Public APIs =====
+  // ===== 公共 API =====
   Future<void> testWebdav(WebDavConfig cfg) async {
     final uri = _collectionUri(cfg);
     final req = http.Request('PROPFIND', uri);
@@ -370,7 +373,7 @@ class DataSync {
     File? settingsTmp;
     File? databaseTmp;
     try {
-      // --- Step 1: Prepare temp files that need ChatService (main isolate) ---
+      // --- 第 1 步：准备需要 ChatService 的临时文件（主 isolate）---
       // settings.json
       final businessExport = await _exportBusinessSettings();
       final settingsFile = await _writeTempText(
@@ -396,7 +399,7 @@ class DataSync {
       final manifestFile = File(p.join(workDir.path, '_bk_manifest.json'));
       manifestTmp = manifestFile;
 
-      // Resolve directory paths (need AppDirectories on main isolate)
+      // 解析目录路径（需要在主 isolate 上使用 AppDirectories）
       final uploadDirPath = (await _getUploadDir()).path;
       final avatarsDirPath = (await _getAvatarsDir()).path;
       final imagesDirPath = (await _getImagesDir()).path;
@@ -407,7 +410,7 @@ class DataSync {
       final includeFiles = cfg.includeFiles;
       final verifyDirPath = p.join(workDir.path, '_verify');
 
-      // --- Step 2: Run CPU-heavy ZIP packing in a separate isolate ---
+      // --- 第 2 步：在独立 isolate 中执行 CPU 密集的 ZIP 打包 ---
       await Isolate.run(() async {
         _packZipSync(
           outPath: outPath,
@@ -444,11 +447,66 @@ class DataSync {
       await _deleteDirectoryQuietly(workDir);
       rethrow;
     } finally {
-      // Cleanup temp intermediate files. The final zip is returned to callers
-      // and must be deleted by the upload/export caller after it is consumed.
+      // 清理临时中间文件。最终 zip 会返回给调用方，
+      // 并由上传/导出调用方在使用完毕后负责删除。
       await _deleteFileQuietly(settingsTmp);
       await _deleteFileQuietly(databaseTmp);
       await _deleteFileQuietly(manifestTmp);
+    }
+  }
+
+  /// 使用相同的 payload writer 打包迁移快照。
+  /// 这是 0.1.8+8 导出路径。调用方提供快照数据库和已导出的业务设置，
+  /// 因为迁移在实时会话服务和当前 schema 数据库接收之前运行。
+  static Future<File> prepareMigrationBackupFile({
+    required Directory outputDirectory,
+    required File snapshotDatabase,
+    required ChatDatabaseSnapshotInfo snapshotInfo,
+    required String settingsJson,
+    required Map<String, List<String>> businessEntityRowIds,
+    required Directory uploadDirectory,
+    required Directory avatarsDirectory,
+    required Directory imagesDirectory,
+    required Directory fontsDirectory,
+  }) async {
+    await outputDirectory.create(recursive: true);
+    final workDir = await Directory.systemTemp.createTemp(
+      'kelivo_migration_backup_',
+    );
+    final outFile = File(
+      p.join(outputDirectory.path, migrationBackupFileName()),
+    );
+    final settingsFile = File(p.join(workDir.path, '_bk_settings.json'))
+      ..writeAsStringSync(settingsJson, flush: true);
+    final manifestFile = File(p.join(workDir.path, '_bk_manifest.json'));
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      final appVersion = packageInfo.buildNumber.trim().isEmpty
+          ? packageInfo.version
+          : '${packageInfo.version}+${packageInfo.buildNumber}';
+      await Isolate.run(() {
+        _packZipSync(
+          outPath: outFile.path,
+          manifestPath: manifestFile.path,
+          settingsPath: settingsFile.path,
+          databasePath: snapshotDatabase.path,
+          snapshotInfo: snapshotInfo,
+          includeChats: true,
+          includeFiles: true,
+          appVersion: appVersion,
+          businessEntityRowIds: businessEntityRowIds,
+          uploadDirPath: uploadDirectory.path,
+          avatarsDirPath: avatarsDirectory.path,
+          imagesDirPath: imagesDirectory.path,
+          fontsDirPath: fontsDirectory.path,
+        );
+      });
+      return outFile;
+    } catch (_) {
+      if (await outFile.exists()) await outFile.delete();
+      rethrow;
+    } finally {
+      if (await workDir.exists()) await workDir.delete(recursive: true);
     }
   }
 
@@ -481,15 +539,18 @@ class DataSync {
     } catch (_) {}
   }
 
-  /// Parses the creation time out of a `kelivo_backup_<iso-with-dashes>` name
-  /// (see [prepareBackupFile], which replaces ':' with '-'). Returns null for
-  /// names that do not carry a timestamp.
+  /// 从 `kelivo_backup_<iso-with-dashes>` 名称中解析出创建时间
+  /// （参见 [prepareBackupFile]，该方法会把 ':' 替换为 '-'）。对于
+  /// 不包含时间戳的名称返回 null。
   static DateTime? _backupTempTimestampFromName(String name) {
     const prefix = 'kelivo_backup_';
     if (!name.startsWith(prefix)) return null;
     var core = name.substring(prefix.length);
-    if (core.endsWith('.zip')) {
-      core = core.substring(0, core.length - 4);
+    for (final extension in const ['.joaiclient', '.zip']) {
+      if (core.endsWith(extension)) {
+        core = core.substring(0, core.length - extension.length);
+        break;
+      }
     }
     final match = RegExp(
       r'^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})(.*)$',
@@ -503,10 +564,9 @@ class DataSync {
   static Future<void> _cleanupPreviousBackupTempFiles(Directory tmp) async {
     try {
       if (!await tmp.exists()) return;
-      // Only reclaim entries that are clearly abandoned. WebDAV, S3 and local
-      // export are independent providers with no shared busy flag, so an
-      // age-blind sweep here would delete the working directory of a backup
-      // that another provider is still packing or uploading.
+      // 仅回收明确废弃的条目。WebDAV、S3 和本地导出是独立提供者，
+      // 没有共享的 busy 标志，因此这里按时间盲目清理会删除仍被另一个提供者
+      // 打包或上传中的备份工作目录。
       final cutoff = DateTime.now().subtract(const Duration(hours: 6));
       Future<bool> isStale(FileSystemEntity entity, String name) async {
         final fromName = _backupTempTimestampFromName(name);
@@ -514,7 +574,7 @@ class DataSync {
         try {
           return (await entity.stat()).modified.isBefore(cutoff);
         } catch (_) {
-          // Unknown age: keep it rather than risk racing a live backup.
+          // 年龄未知：保留它，而不是冒着与正在进行的备份竞争的风险。
           return false;
         }
       }
@@ -524,7 +584,8 @@ class DataSync {
         if (ent is Directory && name.startsWith('kelivo_backup_')) {
           if (await isStale(ent, name)) await _deleteDirectoryQuietly(ent);
         } else if (ent is File &&
-            ((name.startsWith('kelivo_backup_') && name.endsWith('.zip')) ||
+            ((name.startsWith('kelivo_backup_') &&
+                    (name.endsWith('.zip') || name.endsWith('.joaiclient'))) ||
                 name == '_bk_settings.json' ||
                 name == '_bk_chats.json' ||
                 name == '_bk_manifest.json' ||
@@ -535,7 +596,7 @@ class DataSync {
     } catch (_) {}
   }
 
-  /// Synchronous ZIP packing — runs inside an Isolate.
+  /// 同步 ZIP 打包 —— 在 Isolate 内运行。
   static void _packZipSync({
     required String outPath,
     required String manifestPath,
@@ -643,7 +704,7 @@ class DataSync {
     entries[canonicalName] = writer.addFile(file, canonicalName);
   }
 
-  /// Add all files from [srcDirPath] into the zip under [zipPrefix].
+  /// 将 [srcDirPath] 中的所有文件添加到 zip 中的 [zipPrefix] 下。
   static void _addDirectoryToZip(
     _StreamingZipWriter writer,
     String srcDirPath,
@@ -657,7 +718,7 @@ class DataSync {
     for (final ent in fileSystemEntries) {
       if (ent is File) {
         final rel = p.relative(ent.path, from: srcDirPath);
-        // ZIP entries must use forward slashes regardless of platform
+        // ZIP 条目必须使用正斜杠，与平台无关
         final relPosix = rel.replaceAll('\\', '/');
         _addFileToZip(
           writer,
@@ -674,8 +735,8 @@ class DataSync {
     return name.replaceAll('\\', '/').replaceAll(RegExp(r'^/+'), '');
   }
 
-  /// Decode a DOS date/time packed value (from ZIP entry's lastModTime) into
-  /// a [DateTime]. Returns null when the date portion is zero (unset).
+  /// 将 DOS 日期/时间打包值（来自 ZIP 条目的 lastModTime）解码为
+  /// [DateTime]。当日期部分为零（未设置）时返回 null。
   static DateTime? _decodeDosDateTime(int packed) {
     final dosDate = packed >> 16;
     final dosTime = packed & 0xFFFF;
@@ -693,10 +754,46 @@ class DataSync {
     }
   }
 
-  /// Synchronous ZIP extraction — runs inside an Isolate.
-  /// Uses InputFileStream so the ZIP bytes are read from disk on demand rather
-  /// than loading the entire archive into a single byte array.
-  static void _extractZipSync(String zipPath, String extractDirPath) {
+  static Future<void> _extractZipWithProgress({
+    required String zipPath,
+    required String extractDirPath,
+    required void Function(int processed, int total) onProgress,
+  }) async {
+    final progressPort = ReceivePort();
+    final sendPort = progressPort.sendPort;
+    final subscription = progressPort.listen((message) {
+      if (message is List && message.length == 2) {
+        final processed = message[0];
+        final total = message[1];
+        if (processed is int && total is int) {
+          onProgress(processed, total);
+        }
+      }
+    });
+    try {
+      await Isolate.run(() {
+        _extractZipSync(
+          zipPath,
+          extractDirPath,
+          onProgress: (processed, total) {
+            sendPort.send([processed, total]);
+          },
+        );
+      });
+    } finally {
+      await subscription.cancel();
+      progressPort.close();
+    }
+  }
+
+  /// 同步 ZIP 解压，在 isolate 中运行。
+  /// 使用 InputFileStream 按需从磁盘读取 ZIP 字节，
+  /// 而不是把整个归档加载到单个字节数组中。
+  static void _extractZipSync(
+    String zipPath,
+    String extractDirPath, {
+    void Function(int processed, int total)? onProgress,
+  }) {
     final inputStream = InputFileStream(zipPath);
     try {
       final rawEntryNames = <String>[];
@@ -790,6 +887,9 @@ class DataSync {
         if (manifestEntry != null) {
           extractionBudget.reserve(manifestEntry.size);
         }
+        final extractionTotal = declaredTotalBytes - (manifestEntry?.size ?? 0);
+        var extractedBytes = 0;
+        onProgress?.call(extractedBytes, extractionTotal);
         for (final entry in archive) {
           final canonical = _validatedZipEntryName(entry.name);
           if (canonical == _manifestEntryName) continue;
@@ -802,6 +902,10 @@ class DataSync {
               expectedBytes: declaredEntrySizes?[canonical] ?? entry.size,
               maxEntryBytes: _maxRestoreEntryBytes,
               budget: extractionBudget,
+              onWrite: (bytes) {
+                extractedBytes += bytes;
+                onProgress?.call(extractedBytes, extractionTotal);
+              },
             );
             try {
               entry.writeContent(output);
@@ -819,6 +923,7 @@ class DataSync {
             Directory(outPath).createSync(recursive: true);
           }
         }
+        onProgress?.call(extractionTotal, extractionTotal);
       } finally {
         archive.clearSync();
       }
@@ -901,26 +1006,48 @@ class DataSync {
     return entries;
   }
 
-  Future<void> backupToWebDav(WebDavConfig cfg) async {
-    final file = await prepareBackupFile(cfg);
+  Future<void> backupToWebDav(
+    WebDavConfig cfg, {
+    ProgressCallback? onProgress,
+  }) async {
+    final file = await prepareJoaiclientFile(
+      cfg,
+      onProgress: (update) => onProgress?.call(
+        ProgressUpdate(
+          value: update.fraction == null ? null : update.fraction! * 0.55,
+        ),
+      ),
+    );
     try {
+      onProgress?.call(const ProgressUpdate(value: 0.6));
       await _ensureCollection(cfg);
       final target = _fileUri(cfg, p.basename(file.path));
       final fileLen = await file.length();
-      // Use a streamed request so we don't load the entire file into RAM.
+      // 使用流式请求，以免将整个文件加载到 RAM 中。
       final req = http.StreamedRequest('PUT', target);
       req.headers.addAll({
-        'content-type': 'application/zip',
+        'content-type': 'application/octet-stream',
         'content-length': fileLen.toString(),
         ..._authHeaders(cfg),
         ..._extraHeaders(cfg),
       });
-      // Pipe the file stream into the request body. addStream honors the
-      // sink's pause signal, so a slow network throttles disk reads instead of
-      // buffering the whole zip in RAM (which OOM-killed large mobile uploads).
+      // 将文件流传入请求体。addStream 会遵循 sink 的暂停信号，
+      // 使慢速网络节流磁盘读取，而不是在内存中缓存整个 zip
+      // （此前曾导致大型移动端上传被 OOM 杀死）。
+      var uploaded = 0;
       unawaited(
         req.sink
-            .addStream(file.openRead())
+            .addStream(
+              file.openRead().map((chunk) {
+                uploaded += chunk.length;
+                onProgress?.call(
+                  ProgressUpdate(
+                    value: fileLen == 0 ? 1 : 0.6 + uploaded / fileLen * 0.4,
+                  ),
+                );
+                return chunk;
+              }),
+            )
             .then(
               (_) => req.sink.close(),
               onError: (Object error) {
@@ -935,6 +1062,7 @@ class DataSync {
         if (res.statusCode < 200 || res.statusCode >= 300) {
           throw Exception('Upload failed: ${res.statusCode}');
         }
+        onProgress?.call(const ProgressUpdate(value: 1));
       } finally {
         client.close();
       }
@@ -972,7 +1100,7 @@ class DataSync {
     for (final resp in doc.findAllElements('response', namespace: '*')) {
       final href = resp.getElement('href', namespace: '*')?.innerText ?? '';
       if (href.isEmpty) continue;
-      // Skip the collection itself
+      // 跳过集合本身
       final abs = Uri.parse(href).isAbsolute
           ? Uri.parse(href).toString()
           : uri.resolve(href).toString();
@@ -1002,14 +1130,14 @@ class DataSync {
           ? disp.first.trim()
           : Uri.parse(href).pathSegments.last;
 
-      // If mtime is null, try to extract from filename (format: kelivo_backup_2025-01-19T12-34-56.123456.zip)
+      // 如果 mtime 为 null，则尝试从文件名中提取（格式：kelivo_backup_2025-01-19T12-34-56.123456.zip）
       if (mtime == null) {
         final match = RegExp(
-          r'kelivo_backup_(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d+)\.zip',
+          r'kelivo_backup_(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d+)\.(?:joaiclient|zip)$',
         ).firstMatch(name);
         if (match != null) {
           try {
-            // Replace hyphens in time part back to colons
+            // 将时间部分中的连字符替换回冒号
             final timestamp = match
                 .group(1)!
                 .replaceAll(
@@ -1021,7 +1149,7 @@ class DataSync {
         }
       }
 
-      // Skip directories
+      // 跳过目录
       if (abs.endsWith('/')) continue;
       final fullHref = Uri.parse(abs);
       items.add(
@@ -1045,8 +1173,9 @@ class DataSync {
     WebDavConfig cfg,
     BackupFileItem item, {
     RestoreMode mode = RestoreMode.overwrite,
+    ProgressCallback? onProgress,
   }) async {
-    // Stream the download to a file instead of buffering in memory.
+    // 将下载内容流式写入文件，而不是缓冲在内存中。
     final client = http.Client();
     File? file;
     try {
@@ -1054,15 +1183,40 @@ class DataSync {
       req.headers.addAll({..._authHeaders(cfg), ..._extraHeaders(cfg)});
       final streamed = await client.send(req);
       if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
-        // Drain the response body to allow the client to close cleanly.
+        // 排空响应体，以便客户端能够干净地关闭。
         await streamed.stream.drain<void>();
         throw Exception('Download failed: ${streamed.statusCode}');
       }
       final tmpDir = await _ensureTempDir();
       file = await createTemporaryRestoreFile(tmpDir);
       final sink = file.openWrite();
-      await streamed.stream.pipe(sink);
-      await _restoreFromBackupFile(file, cfg, mode: mode);
+      final total = streamed.contentLength;
+      var downloaded = 0;
+      await streamed.stream
+          .map((chunk) {
+            downloaded += chunk.length;
+            onProgress?.call(
+              ProgressUpdate(
+                value: total == null || total <= 0
+                    ? null
+                    : downloaded / total * 0.3,
+              ),
+            );
+            return chunk;
+          })
+          .pipe(sink);
+      await _restoreFromBackupFile(
+        file,
+        cfg,
+        mode: mode,
+        onProgress: (update) => onProgress?.call(
+          ProgressUpdate(
+            value: update.fraction == null
+                ? null
+                : 0.3 + update.fraction! * 0.7,
+          ),
+        ),
+      );
     } finally {
       client.close();
       await _deleteFileQuietly(file);
@@ -1081,19 +1235,59 @@ class DataSync {
     }
   }
 
-  Future<File> exportToFile(WebDavConfig cfg) => prepareBackupFile(cfg);
+  Future<File> exportToFile(WebDavConfig cfg, {ProgressCallback? onProgress}) =>
+      prepareJoaiclientFile(cfg, onProgress: onProgress);
+
+  /// 创建本地、WebDAV 和 S3 使用的隐式外部归档备份文件。
+  /// [prepareBackupFile] 仍作为旧内部文件和旧测试数据的 ZIP 生产者；
+  /// 新导出文件从不暴露 ZIP 文件边界之外的入口名称。
+  Future<File> prepareJoaiclientFile(
+    WebDavConfig cfg, {
+    ProgressCallback? onProgress,
+  }) async {
+    final zipFile = await prepareBackupFile(
+      cfg.copyWith(includeChats: true, includeFiles: true),
+    );
+    onProgress?.call(const ProgressUpdate(value: 0.5));
+    final outputFile = File(
+      p.join(
+        zipFile.parent.path,
+        '${p.basenameWithoutExtension(zipFile.path)}.joaiclient',
+      ),
+    );
+    try {
+      await JoaiclientArchive.wrapZipPayload(
+        zipFile: zipFile,
+        outputFile: outputFile,
+        onProgress: (update) => onProgress?.call(
+          ProgressUpdate(
+            value: update.fraction == null
+                ? null
+                : 0.5 + update.fraction! * 0.5,
+          ),
+        ),
+      );
+      await zipFile.delete();
+      onProgress?.call(const ProgressUpdate(value: 1));
+      return outputFile;
+    } catch (_) {
+      await _deleteFileQuietly(outputFile);
+      rethrow;
+    }
+  }
 
   Future<void> restoreFromLocalFile(
     File file,
     WebDavConfig cfg, {
     RestoreMode mode = RestoreMode.overwrite,
+    ProgressCallback? onProgress,
   }) async {
     if (!await file.exists()) throw Exception('备份文件不存在');
-    await _restoreFromBackupFile(file, cfg, mode: mode);
+    await _restoreFromBackupFile(file, cfg, mode: mode, onProgress: onProgress);
   }
 
-  // ===== Internal helpers =====
-  /// Ensures the temporary directory exists (some macOS installs may not create the cache folder until first use).
+  // ===== 内部辅助方法 =====
+  /// 确保临时目录存在（某些 macOS 安装可能直到首次使用才创建缓存文件夹）。
   Future<Directory> _ensureTempDir() async {
     Directory dir = await getTemporaryDirectory();
     if (!await dir.exists()) {
@@ -1262,13 +1456,32 @@ class DataSync {
       final databaseFile = File(
         p.joinAll([extractDirPath, ..._databaseEntryName.split('/')]),
       );
+      final installedSchemaVersion =
+          ChatDatabaseRepository.readInstalledSchemaVersion(databaseFile);
+      if (installedSchemaVersion != schemaVersion) {
+        throw const FormatException('manifest_database_metadata');
+      }
+      if (installedSchemaVersion > AppDatabase.currentSchemaVersion) {
+        throw StateError('database_schema_too_new');
+      }
+      if (installedSchemaVersion < 1) {
+        throw StateError('database_schema_version');
+      }
+      if (installedSchemaVersion < AppDatabase.currentSchemaVersion) {
+        await ChatDatabaseRepository.migrateInstalledDatabase(databaseFile);
+      }
       final databaseInfo =
           await ChatDatabaseRepository.prepareSnapshotForRestore(databaseFile);
-      if (databaseInfo.schemaVersion != schemaVersion ||
-          databaseInfo.conversationCount != conversationCount ||
+      if (databaseInfo.conversationCount != conversationCount ||
           databaseInfo.messageCount != messageCount) {
         throw const FormatException('manifest_database_metadata');
       }
+      manifest['database'] = {
+        'entry': _databaseEntryName,
+        'schemaVersion': databaseInfo.schemaVersion,
+        'conversationCount': databaseInfo.conversationCount,
+        'messageCount': databaseInfo.messageCount,
+      };
       entries[_databaseEntryName] = (
         bytes: databaseFile.lengthSync(),
         sha256: _sha256FileSync(databaseFile),
@@ -1385,14 +1598,13 @@ class DataSync {
     try {
       await target.setLastModified(await source.lastModified());
     } on FileSystemException {
-      // Payload copy is authoritative; timestamps are optional metadata on
-      // filesystems that do not support setting them.
+      // 有效负载复制是权威的；时间戳只是可选元数据，
+      // 适用于不支持设置时间戳的文件系统。
     }
   }
 
-  /// Copies the backup's asset payload directories (upload/images/avatars/
-  /// fonts) into the live directories without deleting anything already
-  /// present, so files referenced by an untouched chat database survive.
+  /// 将备份的资源负载目录（upload/images/avatars/fonts）复制到实时目录，
+  /// 不删除任何已有内容，以便未改动的聊天数据库所引用的文件仍能保留。
   Future<void> _restoreAssetDirectoriesAdditive(
     Directory payloadDirectory,
   ) async {
@@ -1434,8 +1646,8 @@ class DataSync {
         final parsed = _sanitizeLegacyChatBackup(
           await _parseChatBackup(File(chatsPath)),
         );
-        // Sanitized data must satisfy the strict invariants; a violation here
-        // is a sanitizer bug, not a tolerated legacy shape.
+        // 经过净化的数据必须满足严格的不变量；此处违反
+        // 是净化器的错误，而不是可容忍的旧格式。
         _validateBackupReferences(
           conversations: parsed.conversations,
           messages: parsed.messages,
@@ -1493,10 +1705,10 @@ class DataSync {
         )
         .toList();
 
-    // Import boundary for legacy chats.json: promote marker-bearing content
-    // into structured parts only when the raw JSON lacks a `parts` list.
-    // New exports already carry `parts` (including literal marker-shaped text)
-    // and must round-trip without re-promotion.
+    // 旧版 chats.json 的导入边界：仅当原始 JSON 缺少 `parts` 列表时，
+    // 才将带标记的内容提升为结构化 parts。
+    // 新导出的内容已经带有 `parts`（包括字面上形似标记的文本），
+    // 必须能够往返而不被再次提升。
     var converted = 0;
     var malformed = 0;
     var missingFiles = 0;
@@ -1520,7 +1732,7 @@ class DataSync {
           message = message.copyWith(parts: decoded.parts);
         }
       }
-      // Import boundary: persist managed local attachments as kelivo-file URIs.
+      // 导入边界：将受管理的本地附件持久化为 kelivo-file URI。
       final normalized = _normalizeAttachmentPartUris(message.parts);
       if (!identical(normalized, message.parts)) {
         message = message.copyWith(parts: normalized);
@@ -1551,17 +1763,14 @@ class DataSync {
     );
   }
 
-  /// Legacy (1.1.17) backups can carry shapes the old runtime silently
-  /// tolerated: dangling or duplicate messageIds references, messages no
-  /// conversation references, and messages whose conversationId disagrees
-  /// with the conversation referencing them. Restore what 1.1.17 actually
-  /// displayed instead of rejecting the archive: each conversation's
-  /// messageIds order is authoritative, dangling references are pruned
-  /// (SQLite derives order from message_order, so pruning matches the old
-  /// runtime), duplicate references keep their first occurrence, and
-  /// unreferenced messages were never visible so they are skipped. It also
-  /// converts the raw message index and version ordinal used by 1.1.17 into
-  /// the logical slot index and concrete message version used by SQLite.
+  /// 旧版（1.1.17）备份可能带有旧运行时静默容忍的形状：悬空或重复的
+  /// messageIds 引用、没有任何会话引用的消息，以及 conversationId 与引用
+  /// 它们的会话不一致的消息。这里恢复 1.1.17 实际显示的内容，而不是拒绝
+  /// 归档：每个会话的 messageIds 顺序是权威顺序；悬空引用会被剪除（SQLite
+  /// 从 message_order 推导顺序，因此剪除结果与旧运行时一致）；重复引用只
+  /// 保留第一次出现；未被引用的消息从未显示，因此会被跳过。它还会把
+  /// 1.1.17 使用的原始消息索引和版本序号转换为 SQLite 使用的逻辑槽位
+  /// 索引和具体消息版本。
   static _ParsedChatBackup _sanitizeLegacyChatBackup(_ParsedChatBackup parsed) {
     final conversations = <Conversation>[];
     final conversationIds = <String>{};
@@ -1604,10 +1813,10 @@ class DataSync {
         }
       }
       final keptMessageIds = <String>[];
-      // SQLite enforces unique(conversationId, groupId, version) while the
-      // 1.1.17 runtime tolerated duplicate (groupId, version) pairs (and
-      // rehoming above can create new ones); reassign versions the same way
-      // the Hive migration does so INSERT OR REPLACE cannot swallow rows.
+      // SQLite 强制 unique(conversationId, groupId, version)，而
+      // 1.1.17 运行时容忍重复的 (groupId, version) 对（并且
+      // 上面的重新归属可能产生新的重复）；按照与 Hive 迁移相同的
+      // 方式重新分配版本，使 INSERT OR REPLACE 不会吞掉行。
       final seenGroupVersions = <String>{};
       final maxGroupVersions = <String, int>{};
       final legacyGroupIds = <String?>[];
@@ -1635,11 +1844,10 @@ class DataSync {
           rehomedMessages++;
           message = message.copyWith(conversationId: conversation.id);
         }
-        // Field-level repair (empty role, negative tokens/duration,
-        // out-of-range version, inverted reasoning timestamps) shares logic
-        // with the Hive migration; it must run before the version-conflict
-        // repair below because clamping version can introduce collisions
-        // that repair resolves.
+        // 字段级修复（空 role、负数的 tokens/duration、超出范围的版本、
+        // 顺序颠倒的推理时间戳）与 Hive 迁移共用逻辑；它必须在此处的版本冲突
+        // 修复之前运行，因为压缩版本可能引入冲突，而后续修复会解决这些
+        // 冲突。
         final fieldSanitized = sanitizeLegacyMessageFields(message);
         if (!identical(fieldSanitized, message)) {
           dirtyFieldRepairs++;
@@ -1685,9 +1893,9 @@ class DataSync {
         versionSelections[entry.key] =
             repairedVersionsByMessageId[selected.id] ?? selected.version;
       }
-      // Counter clamping shares logic with the Hive migration so a legacy
-      // backup carrying out-of-range values (e.g. negative truncateIndex)
-      // cannot trip the conversation_rows CHECK constraints on restore.
+      // 计数器钳制与 Hive 迁移共享逻辑，这样携带越界值
+      // （例如负的 truncateIndex）的旧备份在恢复时
+      // 就不会触发 conversation_rows 的 CHECK 约束。
       final rebuilt = conversation.copyWith(
         messageIds: keptMessageIds,
         mcpServerIds: mcpServerIds,
@@ -1916,22 +2124,54 @@ class DataSync {
     File file,
     WebDavConfig cfg, {
     RestoreMode mode = RestoreMode.overwrite,
+    ProgressCallback? onProgress,
   }) async {
     _lastMergeReport = null;
-    // Extract to temp using file-stream decoding to avoid loading the full ZIP
-    // into RAM (the old approach called file.readAsBytes() which for a 600-800 MB
-    // file would allocate a contiguous byte array of the same size).
+    // 使用文件流解码提取到临时目录，避免将整个 ZIP 加载到
+    // RAM（旧方法调用 file.readAsBytes()，对于 600-800 MB 的
+    // 文件会分配同样大小的连续字节数组）。
     final tmp = await _ensureTempDir();
     final extractDir = Directory(
       p.join(tmp.path, 'restore_${DateTime.now().millisecondsSinceEpoch}'),
     );
     await extractDir.create(recursive: true);
 
+    File? payloadFile;
     try {
-      // Run ZIP extraction in an isolate to keep the UI responsive.
-      await Isolate.run(() {
-        _extractZipSync(file.path, extractDir.path);
-      });
+      final isJoaiclient = await JoaiclientArchive.isJoaiclient(file);
+      // .joaiclient 是完整快照，其恢复语义刻意独立于
+      // provider 的可选旧版标志。
+      final effectiveConfig = isJoaiclient
+          ? cfg.copyWith(includeChats: true, includeFiles: true)
+          : cfg;
+      final effectiveMode = isJoaiclient ? RestoreMode.overwrite : mode;
+      if (isJoaiclient) {
+        payloadFile = File(p.join(extractDir.path, '_payload.zip'));
+        await JoaiclientArchive.unwrapToZip(
+          sourceFile: file,
+          zipFile: payloadFile,
+          onProgress: (update) => onProgress?.call(
+            ProgressUpdate(
+              value: update.fraction == null ? null : update.fraction! * 0.2,
+            ),
+          ),
+        );
+      }
+      final zipSource = payloadFile ?? file;
+      // 在 isolate 中运行 ZIP 解压以保持 UI 响应。
+      await _extractZipWithProgress(
+        zipPath: zipSource.path,
+        extractDirPath: extractDir.path,
+        onProgress: (processed, total) => onProgress?.call(
+          ProgressUpdate(
+            value: total <= 0
+                ? null
+                : (isJoaiclient ? 0.2 : 0) +
+                      processed / total * (isJoaiclient ? 0.35 : 0.55),
+          ),
+        ),
+      );
+      onProgress?.call(ProgressUpdate(value: isJoaiclient ? 0.55 : 0.55));
 
       final manifestFile = File(p.join(extractDir.path, _manifestEntryName));
       final restorePayloadDirectory = extractDir;
@@ -1961,15 +2201,19 @@ class DataSync {
       final businessRestore = BusinessRestoreService(businessRepository);
       Future<void> Function()? pendingBusinessRestore;
       if (versionedBackup != null) {
+        onProgress?.call(const ProgressUpdate(value: 0.65));
         final entityRowIds = versionedBackup.businessEntityRowIds;
         final preserveExplicitEmptyInstructionList = entityRowIds == null;
         final includeChats = versionedBackup.includeChats;
         final includeFiles = versionedBackup.includeFiles;
-        final restoreChats = cfg.includeChats && includeChats;
-        final restoreFiles = cfg.includeFiles && includeFiles;
-        if (mode == RestoreMode.merge && restoreChats) {
-          // Chat merge commits independently, so reject a mismatched business
-          // payload before either live domain is changed.
+        if (isJoaiclient && (!includeChats || !includeFiles)) {
+          throw const FormatException('joaiclient_not_full_snapshot');
+        }
+        final restoreChats = effectiveConfig.includeChats && includeChats;
+        final restoreFiles = effectiveConfig.includeFiles && includeFiles;
+        if (effectiveMode == RestoreMode.merge && restoreChats) {
+          // 聊天合并独立提交，因此在修改任何活跃域之前
+          // 拒绝不匹配的业务载荷。
           BusinessSettingsRouter.normalizeAndRoute(
             settings,
             preserveExplicitEmptyInstructionList:
@@ -1977,13 +2221,12 @@ class DataSync {
             entityRowIds: entityRowIds,
           );
         }
-        if (mode == RestoreMode.overwrite) {
+        if (effectiveMode == RestoreMode.overwrite) {
           if (!restoreChats) {
             if (restoreFiles) {
-              // File restore is independent from chat restore. The live
-              // database stays untouched here, so copy the payload
-              // additively (never deleting existing files it references)
-              // and persist business data last, matching the legacy path.
+              // 文件恢复独立于聊天恢复。这里的实时数据库保持不变，因此以
+              // 追加方式复制负载（绝不删除它所引用的现有文件），最后再持久化
+              // 业务数据，与旧路径保持一致。
               await _restoreAssetDirectoriesAdditive(extractDir);
             }
             await _runLiveBusinessRestore(
@@ -2008,14 +2251,15 @@ class DataSync {
             restoreChats: restoreChats,
             restoreFiles: restoreFiles,
           );
+          onProgress?.call(const ProgressUpdate(value: 1));
           return;
         }
         if (restoreChats) {
           _lastMergeReport = await chatService.mergeDatabaseSnapshot(
             File(p.join(extractDir.path, _databaseEntryName)),
           );
-          // Chats-only: never leave local attachments marked available when
-          // files were not restored (path collision on target is insufficient).
+          // 仅聊天恢复：在文件未恢复时，绝不让本地附件标记为可用
+          // （目标路径冲突不足以证明文件已恢复）。
           if (!restoreFiles && _lastMergeReport != null) {
             await chatService.recomputeImportedAttachmentAvailability(
               conversationIds: _lastMergeReport!.importedConversationIds,
@@ -2039,14 +2283,14 @@ class DataSync {
       }
       final restoreChats =
           versionedBackup == null &&
-          cfg.includeChats &&
+          effectiveConfig.includeChats &&
           await chatsFile.exists();
 
       var conversations = const <Conversation>[];
       var messages = const <ChatMessage>[];
       var toolEvents = const <String, List<Map<String, dynamic>>>{};
       var geminiThoughtSigs = const <String, String>{};
-      if (mode == RestoreMode.overwrite && restoreChats) {
+      if (effectiveMode == RestoreMode.overwrite && restoreChats) {
         await _validateOverwriteChatCandidate(
           stagingDirectory: extractDir,
           chatsFile: chatsFile,
@@ -2063,16 +2307,15 @@ class DataSync {
       }
 
       if (versionedBackup == null) {
-        // Chat and file restoration can commit independently. Reject the
-        // complete legacy business payload before changing either domain,
-        // then persist business data last so a later failure cannot strand
-        // the post-restore write fence without a restart prompt.
+        // 聊天恢复和文件恢复可以独立提交。在更改任一域之前先拒绝完整的
+        // 旧业务负载，然后最后持久化业务数据，这样后续失败不会在无重启提示
+        // 的情况下搁置恢复后的写入围栏。
         BusinessSettingsRouter.normalizeAndRoute(
           settings,
           preserveExplicitEmptyInstructionList: true,
           assumePreV3EmbeddingMigrationWhenVersionMissing: true,
         );
-        pendingBusinessRestore = mode == RestoreMode.overwrite
+        pendingBusinessRestore = effectiveMode == RestoreMode.overwrite
             ? () => businessRestore.overwrite(
                 settings,
                 preserveExplicitEmptyInstructionList: true,
@@ -2085,11 +2328,11 @@ class DataSync {
               );
       }
 
-      // Restore files
-      if (cfg.includeFiles) {
-        if (mode == RestoreMode.overwrite) {
-          // Overwrite mode: Delete existing directories and copy all
-          // Restore upload directory
+      // 恢复文件
+      if (effectiveConfig.includeFiles) {
+        if (effectiveMode == RestoreMode.overwrite) {
+          // 覆盖模式：删除现有目录并复制全部
+          // 恢复上传目录
           final uploadSrc = Directory(
             p.join(restorePayloadDirectory.path, 'upload'),
           );
@@ -2108,7 +2351,7 @@ class DataSync {
             }
           }
 
-          // Restore images directory
+          // 恢复 images 目录
           final imagesSrc = Directory(
             p.join(restorePayloadDirectory.path, 'images'),
           );
@@ -2127,7 +2370,7 @@ class DataSync {
             }
           }
 
-          // Restore avatars directory
+          // 恢复 avatars 目录
           final avatarsSrc = Directory(
             p.join(restorePayloadDirectory.path, 'avatars'),
           );
@@ -2146,7 +2389,7 @@ class DataSync {
             }
           }
 
-          // Restore managed local fonts directory
+          // 恢复受管理的本地 fonts 目录
           final fontsSrc = Directory(
             p.join(restorePayloadDirectory.path, 'fonts'),
           );
@@ -2165,14 +2408,14 @@ class DataSync {
             }
           }
         } else {
-          // Merge mode: Only copy non-existing files
+          // 合并模式：仅复制不存在的文件
           await _restoreAssetDirectoriesAdditive(restorePayloadDirectory);
         }
       }
-      // Legacy chats.json decodes before assets exist. After files land,
-      // directed-remap old absolute roots onto restored managed relatives,
-      // then refresh availability (no global generic canonicalize fallback).
-      if (restoreChats && cfg.includeFiles) {
+      // 旧版 chats.json 在资源存在前解码。文件到位后，
+      // 将旧绝对根路径定向重映射到恢复的受管相对路径，
+      // 然后刷新可用性（不使用全局通用规范化回退）。
+      if (restoreChats && effectiveConfig.includeFiles) {
         if (SandboxPathResolver.docsDir == null) {
           await SandboxPathResolver.init();
         }
@@ -2187,8 +2430,8 @@ class DataSync {
           );
         }
         messages = refreshed;
-      } else if (restoreChats && !cfg.includeFiles) {
-        // Chats-only legacy import: local attachments unavailable by default.
+      } else if (restoreChats && !effectiveConfig.includeFiles) {
+        // 仅聊天旧版导入：本地附件默认不可用。
         final refreshed = <ChatMessage>[];
         for (final message in messages) {
           final nextParts = recomputeAttachmentAvailability(
@@ -2204,10 +2447,10 @@ class DataSync {
         messages = refreshed;
       }
 
-      // Restore chats
+      // 恢复聊天
       if (restoreChats) {
         try {
-          if (mode == RestoreMode.overwrite) {
+          if (effectiveMode == RestoreMode.overwrite) {
             await chatService.replaceAllDataFromBackup(
               conversations: conversations,
               messages: messages,
@@ -2215,18 +2458,18 @@ class DataSync {
               geminiSignaturesByMessageId: geminiThoughtSigs,
             );
           } else {
-            // Merge mode: Add only non-existing conversations and messages
+            // 合并模式：仅添加不存在的会话和消息
             final existingConvs = chatService.getAllCompleteConversations();
             final existingConvIds = existingConvs.map((c) => c.id).toSet();
 
-            // Create a map of message IDs to avoid duplicates (ids only:
-            // full message loads would flush the LRU cache for no gain)
+            // 创建消息 ID 映射以避免重复（仅使用 id：
+            // 完整加载消息会无谓地刷新 LRU 缓存）
             final existingMsgIds = <String>{};
             for (final conv in existingConvs) {
               existingMsgIds.addAll(await chatService.getMessageIds(conv.id));
             }
 
-            // Group messages by conversation
+            // 按会话分组消息
             final byConv = <String, List<ChatMessage>>{};
             for (final m in messages) {
               if (!existingMsgIds.contains(m.id)) {
@@ -2234,7 +2477,7 @@ class DataSync {
               }
             }
 
-            // Restore non-existing conversations and their messages
+            // 恢复不存在的会话及其消息
             final mergedConvIds = <String>[];
             for (final c in conversations) {
               if (!existingConvIds.contains(c.id)) {
@@ -2242,7 +2485,7 @@ class DataSync {
                 await chatService.restoreConversation(c, list);
                 mergedConvIds.add(c.id);
               } else if (byConv.containsKey(c.id)) {
-                // Conversation exists but has new messages
+                // 会话已存在但有新消息
                 final newMessages = byConv[c.id]!;
                 for (final msg in newMessages) {
                   await chatService.addMessageDirectly(c.id, msg);
@@ -2251,7 +2494,7 @@ class DataSync {
               }
             }
 
-            // Merge tool events
+            // 合并工具事件
             for (final entry in toolEvents.entries) {
               final existing = chatService.getToolEvents(entry.key);
               if (existing.isEmpty) {
@@ -2269,8 +2512,8 @@ class DataSync {
                 );
               }
             }
-            // §6.7: restored history must not re-trigger background extraction,
-            // and injection hashes must clear so the next request self-heals.
+            // §6.7：恢复的历史记录不得再次触发后台提取，
+            // 注入哈希必须清除，以便下一次请求能够自愈。
             await businessRepository.applyPostMergeMemoryConversationState(
               mergedConvIds,
             );
@@ -2310,11 +2553,13 @@ class _BoundedOutputFileStream extends OutputFileStream {
     required this.expectedBytes,
     required this.maxEntryBytes,
     required this.budget,
+    this.onWrite,
   }) : super.withFileHandle(FileHandle(path, mode: FileAccess.write));
 
   final int expectedBytes;
   final int maxEntryBytes;
   final _ExtractionBudget budget;
+  final void Function(int bytes)? onWrite;
   int _entryBytes = 0;
 
   void _reserve(int bytes) {
@@ -2341,6 +2586,7 @@ class _BoundedOutputFileStream extends OutputFileStream {
     }
     _reserve(writeLength);
     super.writeBytes(bytes, length: writeLength);
+    onWrite?.call(writeLength);
   }
 
   @override
@@ -2391,8 +2637,8 @@ class _StreamingZipWriter {
 
     final stat = file.statSync();
     final uncompressedSize = stat.size;
-    // Deflate may grow incompressible input slightly, so reserve ZIP64 before
-    // the 32-bit boundary instead of discovering overflow after streaming.
+    // Deflate 可能会让不可压缩的输入略微变大，所以在 32 位边界之前
+    // 预留 ZIP64，而不是等流式写入后才发现溢出。
     final usesZip64Entry = uncompressedSize > _maxZip32 - (16 * 1024 * 1024);
 
     final modified = stat.modified;
@@ -2472,7 +2718,7 @@ class _StreamingZipWriter {
     if (usesZip64) {
       _output.writeUint16(0x0001);
       _output.writeUint16(16);
-      // Sizes are finalized by the ZIP64 data descriptor and central directory.
+      // 大小由 ZIP64 数据描述符和中央目录最终确定。
       _output.writeUint64(0);
       _output.writeUint64(0);
     }

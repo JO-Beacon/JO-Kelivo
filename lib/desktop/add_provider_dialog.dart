@@ -341,7 +341,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Header
+                // 标题栏
                 Container(
                   height: 52,
                   color: cs.surface,
@@ -371,7 +371,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
                     ],
                   ),
                 ),
-                // Tabs
+                // 选项卡
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                   child: _SmallSegTabBar(
@@ -379,7 +379,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
                     tabs: const ['OpenAI', 'Google', 'Claude'],
                   ),
                 ),
-                // Body
+                // 内容区
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -402,7 +402,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
                     ),
                   ),
                 ),
-                // Footer
+                // 底部操作区
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                   child: Row(
@@ -428,7 +428,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Top switches: Enabled, then Use Responses API
+        // 顶部开关：启用状态，然后使用 Responses API
         _switchTile(
           label: l10n.addProviderSheetEnabledLabel,
           value: _openaiEnabled,
@@ -441,7 +441,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
           onChanged: (v) => setState(() => _openaiUseResponse = v),
         ),
         const SizedBox(height: 12),
-        // Inputs
+        // 输入项
         _label(context, l10n.addProviderSheetNameLabel),
         TextField(
           controller: _openaiName,
@@ -476,7 +476,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Top switches: Enabled, then Vertex AI
+        // 顶部开关：启用状态，然后 Vertex AI
         _switchTile(
           label: l10n.addProviderSheetEnabledLabel,
           value: _googleEnabled,
@@ -489,7 +489,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
           onChanged: (v) => setState(() => _googleVertex = v),
         ),
         const SizedBox(height: 12),
-        // Inputs
+        // 输入项
         _label(context, l10n.addProviderSheetNameLabel),
         TextField(
           controller: _googleName,

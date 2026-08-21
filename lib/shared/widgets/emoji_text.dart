@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 
-/// A single-emoji Text widget with cross‑platform alignment tweaks.
+/// 带有跨平台对齐微调的单 emoji Text widget。
 class EmojiText extends StatelessWidget {
   const EmojiText(
     this.text, {
@@ -21,35 +21,35 @@ class EmojiText extends StatelessWidget {
   final double? lineHeight;
   final TextAlign textAlign;
   final bool optimizeEmojiAlign;
-  final Offset? nudge; // optional explicit offset override
+  final Offset? nudge; // 可选显式偏移覆盖
 
   @override
   Widget build(BuildContext context) {
-    // Ensure we render at most one grapheme (ZWJ sequences remain intact)
+    // 确保最多渲染一个字符（ZWJ 序列保持完整）
     final String glyph = text.characters.take(1).toString();
 
-    // Optional platform-specific scaling for Windows to reduce line jitter
+    // Windows 上可选执行平台特定缩放，以减少行抖动
     final bool isWindows =
         !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
     const double winScale = 0.9;
     final double scaleFactor = isWindows ? winScale : 1.0;
     double fs = fontSize * scaleFactor;
 
-    // Compute effective height from figmaLineHeight or explicit lineHeight
+    // 根据 figmaLineHeight 或显式 lineHeight 计算有效高度
     double? effectiveHeight;
     if (figmaLineHeight != null && figmaLineHeight! > 0) {
-      // Height is ratio of line px to current font size
+      // 高度是行像素与当前字体大小的比值
       effectiveHeight = figmaLineHeight! / fs;
     } else if (lineHeight != null && lineHeight! > 0) {
-      // Keep visual line height stable when scaling font
+      // 缩放字体时保持视觉行高稳定
       effectiveHeight = (lineHeight! / scaleFactor) / fs;
     } else if (optimizeEmojiAlign) {
-      // Default to 1.0 for stable, compact single-emoji rows
+      // 默认使用 1.0，以获得稳定紧凑的单 emoji 行
       effectiveHeight = 1.0;
     }
 
-    // Common fallback families to improve emoji availability.
-    // These only take effect if present on the system.
+    // 通用回退字体族，提高 emoji 可用性。
+    // 这些字体只有在系统中存在时才会生效。
     const List<String> fallback = <String>[
       'Apple Color Emoji',
       'Segoe UI Emoji',
@@ -62,7 +62,7 @@ class EmojiText extends StatelessWidget {
     final TextStyle style = base.copyWith(
       fontSize: fs,
       height: effectiveHeight,
-      // Encourage even leading distribution for better visual centering
+      // 促进均匀的行距分布，以获得更好的视觉居中效果
       leadingDistribution: optimizeEmojiAlign
           ? TextLeadingDistribution.even
           : null,
@@ -70,7 +70,7 @@ class EmojiText extends StatelessWidget {
       decoration: TextDecoration.none,
     );
 
-    // Platform-directed micro-nudge to counter platform font bearings.
+    // 根据平台进行微小偏移，抵消平台字体边距差异。
     double dx = 0, dy = 0;
     if (optimizeEmojiAlign) {
       if (nudge != null) {
@@ -78,19 +78,19 @@ class EmojiText extends StatelessWidget {
         dy = nudge!.dy;
       } else if (defaultTargetPlatform == TargetPlatform.iOS) {
         // iOS
-        dx = fs * 0.04; // ~5% right
-        dy = fs * -0.075; // ~1.2% up
+        dx = fs * 0.04; // 约 5% 右移
+        dy = fs * -0.075; // 约 1.2% 上移
       } else if (defaultTargetPlatform == TargetPlatform.macOS) {
         // macOS
-        dx = fs * 0.08; // ~3.5% right
-        dy = fs * -0.008; // ~0.8% up
+        dx = fs * 0.08; // 约 3.5% 右移
+        dy = fs * -0.008; // 约 0.8% 上移
       } else if (isWindows) {
-        // Windows (Segoe UI Emoji)
-        dx = fs * 0.015; // slight right
+        // Windows（Segoe UI Emoji）
+        dx = fs * 0.015; // 轻微右移
         dy = 0;
       } else {
-        // Linux/others (Noto, etc.)
-        dx = fs * 0.012; // tiny right
+        // Linux/其他（Noto 等）
+        dx = fs * 0.012; // 微小右移
         dy = 0;
       }
     }
@@ -101,7 +101,7 @@ class EmojiText extends StatelessWidget {
         glyph,
         textAlign: textAlign,
         style: style,
-        // Use StrutStyle to stabilize line metrics across platforms
+        // 使用 StrutStyle 稳定跨平台行度量
         strutStyle: StrutStyle(
           forceStrutHeight: true,
           height: style.height,

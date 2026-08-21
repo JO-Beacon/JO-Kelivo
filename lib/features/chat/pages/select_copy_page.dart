@@ -12,8 +12,8 @@ class SelectCopyPage extends StatelessWidget {
 
   void _copyAll(BuildContext context) async {
     final l10n = AppLocalizations.of(context)!;
-    // Ensure there is a text input connection on iOS before showing system copy UI
-    // Here we bypass system menu by writing directly to clipboard and showing a snackbar
+    // 在显示系统复制 UI 前，确保 iOS 上存在文本输入连接
+    // 这里直接写入剪贴板并显示 Snackbar，从而绕过系统菜单
     await Clipboard.setData(ClipboardData(text: message.content));
     if (!context.mounted) return;
     showAppSnackBar(

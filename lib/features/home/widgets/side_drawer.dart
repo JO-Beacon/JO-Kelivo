@@ -77,12 +77,12 @@ class SideDrawer extends StatefulWidget {
   final FutureOr<void> Function({bool closeDrawer})? onNewConversation;
   final ValueNotifier<int>? closePickerTicker;
   final Set<String> loadingConversationIds;
-  final double? embeddedWidth; // optional explicit width for docked mode
-  final bool showBottomBar; // desktop can hide this bottom area
+  final double? embeddedWidth; // 停靠模式的可选显式宽度
+  final bool showBottomBar; // 桌面端可隐藏此底部区域
   final SidebarPresentation presentation;
   final SidebarCapabilities capabilities;
 
-  // Global search mode
+  // 全局搜索模式
   final bool globalSearchMode;
   final String globalSearchQuery;
   final ValueChanged<String>? onGlobalSearchQueryChanged;
@@ -91,31 +91,29 @@ class SideDrawer extends StatefulWidget {
   final Future<void> Function(String conversationId, String messageId)?
   onOpenGlobalSearchResult;
 
-  /// Number of times the conversation-list area has (re)built. The sidebar
-  /// subscribes only to conversation-list semantics, so unrelated ChatService
-  /// notifications must not increase this count.
+  /// 会话列表区域（重新）构建的次数。侧边栏只订阅会话列表语义，
+  /// 因此无关的 ChatService 通知不得增加此计数。
   @visibleForTesting
   static int debugConversationListBuildCount = 0;
 
-  /// Number of times the flattened sidebar row list has been recomputed.
-  /// Theme/animation rebuilds with an unchanged memo key must not increase
-  /// this count.
+  /// 扁平侧边栏行列表重新计算的次数。
+  /// 记忆键未变化的主题/动画重建不得增加此计数。
   @visibleForTesting
   static int debugSidebarRowsComputeCount = 0;
 
-  /// Testing hook: forces a host [setState] without changing the sidebar-rows
-  /// memo key `(conversationListRevision, initialized, query, assistantId)`.
+  /// 测试钩子：强制宿主 [setState]，但不改变侧边栏行的
+  /// 记忆键 `(conversationListRevision, initialized, query, assistantId)`。
   @visibleForTesting
   static VoidCallback? debugRequestConversationListHostRebuild;
 
-  /// Exposes the private conversation tile type for viewport widget tests.
+  /// 暴露私有会话块类型，供视口控件测试使用。
   @visibleForTesting
   static Type get debugChatTileType => _ChatTile;
 
-  /// Enter-animation delay for a sidebar tile at [indexInSection].
+  /// 位于 [indexInSection] 的侧边栏块的入场动画延迟。
   ///
-  /// Caps absolute-index stagger so virtualized deep rows never wait multiple
-  /// seconds. Pinned rows use a slightly larger per-step delay than date rows.
+  /// 限制绝对索引交错，使虚拟化深层行不会等待数秒。
+  /// 置顶行的每步延迟略大于日期行。
   @visibleForTesting
   static Duration debugSidebarTileStaggerDelay({
     required int indexInSection,
@@ -150,10 +148,10 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   bool _mobileSearchSwipeHandled = false;
   final FocusNode _mobileSearchFocusNode = FocusNode();
   bool _showMobileSearchTip = false;
-  TabController? _tabController; // desktop tabs
+  TabController? _tabController; // 桌面标签
   StreamSubscription<int>? _tabBusSub;
 
-  // Global search state
+  // 全局搜索状态
   List<GlobalSessionSearchResult> _globalSearchResults = const [];
   String? _selectedResultConversationId;
   String? _hoveredResultConversationId;
@@ -162,8 +160,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   int _globalSearchRequestId = 0;
   String? _runningGlobalSearchQuery;
 
-  // Flattened sidebar rows memoized by (conversationListRevision,
-  // initialized, query, assistantId) so theme/animation rebuilds skip the
+  // 按（conversationListRevision、initialized、query、assistantId）
+  // 记忆化扁平侧边栏行，使主题/动画重建跳过这些工作。
   // O(n) rebuild.
   int? _cachedSidebarRowsRevision;
   bool? _cachedSidebarRowsInitialized;
@@ -202,16 +200,16 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
         }
       }
     });
-    // Sync initial globalSearchQuery text into the controller when entering global search
+    // 进入全局搜索时，将初始 globalSearchQuery 文本同步到控制器
     if (widget.globalSearchMode && widget.globalSearchQuery.isNotEmpty) {
       _searchController.text = widget.globalSearchQuery;
       _query = widget.globalSearchQuery;
     }
-    // Update check moved to app startup (main.dart)
-    // Prepare the assistant/topics tab controller when the host requests tabs.
+    // 更新检查已移到应用启动（main.dart）
+    // 当宿主请求标签时准备助手/主题标签控制器。
     _tabController = TabController(length: 2, vsync: this, initialIndex: 0);
     _tabController!.addListener(_onDesktopTabChanged);
-    // Reflect current index to bus and listen for external switches
+    // 将当前索引反映到总线，并监听外部切换
     DesktopSidebarTabBus.instance.setCurrentIndex(_tabController!.index);
     _tabBusSub = DesktopSidebarTabBus.instance.stream.listen((idx) {
       if (_showTabs && mounted) {
@@ -229,7 +227,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   void _onDesktopTabChanged() {
     if (!mounted) return;
     DesktopSidebarTabBus.instance.setCurrentIndex(_tabController?.index ?? 0);
-    setState(() {}); // update search hint when switching tabs
+    setState(() {}); // 切换标签时更新搜索提示
   }
 
   void _showChatMenu(
@@ -242,7 +240,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     final isPinned = chat.isPinned;
 
     if (_pointerInteractions) {
-      // Desktop: glass anchored menu near cursor/button
+      // 桌面端：在光标/按钮附近显示玻璃质感锚定菜单
       Offset pos = anchor ?? DesktopMenuAnchor.positionOrCenter(context);
       await showDesktopContextMenuAt(
         context,
@@ -287,7 +285,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
               final keepSidebarOpenOnTopicTap = context
                   .read<SettingsProvider>()
                   .keepSidebarOpenOnTopicTap;
-              // Pre-compute next recent conversation for current assistant
+              // 预先计算当前助手下一条最近会话
               String? nextId;
               try {
                 final ap = context.read<AssistantProvider>();
@@ -480,7 +478,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                         final conv = chatService.getConversation(chat.id);
                         final movingCurrent =
                             chatService.currentConversationId == chat.id;
-                        // Pre-compute next recent conversation for current assistant
+                        // 预先计算当前助手下一条最近会话
                         String? nextId;
                         try {
                           final ap = context.read<AssistantProvider>();
@@ -706,12 +704,12 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     final convo = chatService.getConversation(conversationId);
     if (convo == null) return;
 
-    // Get assistant for this conversation
+    // 获取此会话的助手
     final assistant = convo.assistantId != null
         ? assistantProvider.getById(convo.assistantId!)
         : assistantProvider.currentAssistant;
 
-    // Decide model: prefer title model, else fall back to assistant's model, then to global default
+    // 决定模型：优先标题模型，否则回退到助手模型，再到全局默认
     final provKey =
         settings.titleModelProvider ??
         assistant?.chatModelProvider ??
@@ -729,8 +727,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     final locale = Localizations.localeOf(context).toLanguageTag();
 
     try {
-      // Content (shared source builder with HomeViewModel title generation;
-      // applies truncateIndex and collapses multi-version groups)
+      // 内容（与 HomeViewModel 标题生成共享源构建器；
+      // 应用 truncateIndex 并折叠多版本组）
       final content = await chatService.generateTitleSource(conversationId);
       final prompt = settings.titlePrompt
           .replaceAll('{locale}', locale)
@@ -811,9 +809,9 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     if (oldWidget.closePickerTicker != widget.closePickerTicker) {
       _attachCloseTicker(widget.closePickerTicker);
     }
-    // Sync search text when global search query changes externally.
-    // Use copyWith to preserve the user's cursor position instead of
-    // resetting it to position 0 (which happens when assigning .text directly).
+    // 当全局搜索查询从外部变化时同步搜索文本。
+    // 使用 copyWith 保留用户光标位置，而不是将其重置到 0
+    // （直接给 .text 赋值会重置到 0）。
     if (widget.globalSearchMode &&
         widget.globalSearchQuery != _searchController.text) {
       _searchController.value = _searchController.value.copyWith(
@@ -821,7 +819,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       );
       _query = widget.globalSearchQuery;
     }
-    // Reset results state when exiting global search mode
+    // 退出全局搜索模式时重置结果状态
     if (oldWidget.globalSearchMode && !widget.globalSearchMode) {
       _clearGlobalSearchState(clearText: true);
     }
@@ -998,7 +996,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       if (!_pointerInteractions) {
         return const SizedBox.shrink();
       }
-      // Pre-search: top-aligned hint
+      // 搜索前：顶部对齐提示
       return Align(
         alignment: Alignment.topCenter,
         child: Padding(
@@ -1037,7 +1035,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Result count label
+        // 结果数量标签
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
           child: Text(
@@ -1189,13 +1187,13 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
 
   List<_ChatGroup> _groupByDate(List<ChatItem> source) {
     final items = [...source];
-    // group by day (truncate time)
+    // 按天分组（截断时间）
     final map = <DateTime, List<ChatItem>>{};
     for (final c in items) {
       final d = DateTime(c.created.year, c.created.month, c.created.day);
       map.putIfAbsent(d, () => []).add(c);
     }
-    // sort groups by date desc (recent first)
+    // 按日期降序排列分组（最近优先）
     final keys = map.keys.toList()..sort((a, b) => b.compareTo(a));
     return [
       for (final k in keys)
@@ -1206,11 +1204,10 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     ];
   }
 
-  /// Memoized flatten of pinned section + date groups into sidebar rows.
-  /// Recomputes only when `(revision, initialized, query, assistantId)`
-  /// changes.
-  /// Headers store stable date buckets (not localized labels) so locale
-  /// switches can re-render without bumping this memo.
+  /// 将置顶区和日期分组记忆化地扁平化为侧边栏行。
+  /// 仅在 `(revision, initialized, query, assistantId)` 变化时重新计算。
+  /// 头部保存稳定日期桶（不是本地化标签），使语言切换可以重新渲染
+  /// 而不递增此记忆。
   List<_SidebarRow> _sidebarRowsFor({
     required int revision,
     required bool initialized,
@@ -1247,7 +1244,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     final q = query.trim().toLowerCase();
     final pinned = <ChatItem>[];
     final rest = <ChatItem>[];
-    // Single pass: filter assistant + query, split pinned/rest via ChatItem.isPinned.
+    // 单次遍历：筛选助手和查询，按 ChatItem.isPinned 拆分置顶/其余。
     for (final c in chatService.getAllConversations()) {
       if (c.assistantId != assistantId && c.assistantId != null) continue;
       final title = c.title;
@@ -1418,7 +1415,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     final ap = context.watch<AssistantProvider>();
     final currentAssistantId = ap.currentAssistantId;
 
-    // Avatar renderer: emoji / url / file / default initial
+    // 头像渲染器：emoji / URL / 文件 / 默认首字母
     Widget avatarWidget(String name, UserProvider up, {double size = 40}) {
       final type = up.avatarType;
       final value = up.avatarValue;
@@ -1495,7 +1492,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
           );
         }
       }
-      // default: initial
+      // 默认：首字母
       final letter = name.isNotEmpty ? name.characters.first : '?';
       return Container(
         width: size,
@@ -1523,10 +1520,10 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     final inner = SafeArea(
       child: Stack(
         children: [
-          // Main column content
+          // 主列内容
           Column(
             children: [
-              // Fixed header + search
+              // 固定标题 + 搜索
               Padding(
                 padding: EdgeInsets.fromLTRB(
                   16,
@@ -1622,7 +1619,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                     ),
                                     suffixIcon:
                                         widget.globalSearchMode && _docked
-                                        // Global search mode: search (submit), history, cancel
+                                        // 全局搜索模式：搜索（提交）、历史、取消
                                         ? Padding(
                                             padding: const EdgeInsets.only(
                                               right: 4,
@@ -1707,7 +1704,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                               ],
                                             ),
                                           )
-                                        // Normal mode: history icon (skip for topics-only)
+                                        // 普通模式：历史图标（仅主题模式跳过）
                                         : topicsOnly
                                         ? null
                                         : Padding(
@@ -2203,10 +2200,10 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                 ),
               ),
 
-              // Scrollable area below header
+              // 标题下方可滚动区域
               Expanded(
                 child: () {
-                  // Global search mode replaces the list area
+                  // 全局搜索模式替换列表区域
                   if (widget.globalSearchMode) {
                     return _buildGlobalSearchResultsList(context);
                   }
@@ -2219,10 +2216,10 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                       ],
                     );
                   }
-                  // Sidebar fine-grained subscription (cache plan measure 16):
-                  // the list rebuilds only when conversation-list semantics
-                  // change; message/streaming notifications keep the cached
-                  // subtree.
+                  // 侧边栏细粒度订阅（缓存方案第 16 项）：
+                  // 列表仅在会话列表语义变化时重建；
+                  // 消息/流式通知保持缓存不变。
+                  // 子树。
                   return Selector<
                     ChatService,
                     ({int revision, bool initialized})
@@ -2237,9 +2234,9 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                       final assistantId = context
                           .watch<AssistantProvider>()
                           .currentAssistantId;
-                      // Use last-activity time (updatedAt) for ordering and grouping.
-                      // Flattened + memoized by
-                      // (revision, initialized, query, assistantId).
+                      // 使用最后活动时间（updatedAt）进行排序和分组。
+                      // 按（revision、initialized、query、assistantId）
+                      // 扁平化并记忆化。
                       final rows = _sidebarRowsFor(
                         revision: selection.revision,
                         initialized: selection.initialized,
@@ -2408,12 +2405,12 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
             ],
           ),
 
-          // iOS-style blur/fade effect above user area
+          // 用户区域上方的 iOS 风格模糊/淡出效果
           if (!_docked)
             Positioned(
               left: 0,
               right: 0,
-              bottom: 62, // Approximate height of user area
+              bottom: 62, // 用户区域的大致高度
               child: IgnorePointer(
                 child: Container(
                   height: 20,
@@ -2461,9 +2458,9 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       _assistantsExpanded = goingToExpand;
     });
     if (goingToExpand) {
-      // Smoothly reveal the assistant list at the top
+      // 在顶部平滑显示助手列表
       if (_listController.hasClients) {
-        // Slight delay to ensure layout is ready before animating
+        // 轻微延迟，确保动画前布局已就绪
         Future<void>.delayed(const Duration(milliseconds: 10), () {
           if (!_listController.hasClients) return;
           _listController.animateTo(
@@ -2491,7 +2488,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     }
     final ap = context.read<AssistantProvider>();
     await ap.setCurrentAssistant(assistant.id);
-    // Desktop: optionally switch to Topics tab per user preference
+    // 桌面端：根据用户偏好可选切换到主题标签
     try {
       if (_pointerInteractions &&
           _docked &&
@@ -2510,15 +2507,14 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     if (forceNewChat) {
       widget.onNewConversation?.call(closeDrawer: closeDrawer);
     } else {
-      // Jump to the most recent conversation for this assistant if any,
-      // otherwise create a new conversation.
+      // 如有该助手的最近会话则跳转到它，否则创建新会话。
       try {
         final chatService = context.read<ChatService>();
         final all = chatService.getAllConversations();
-        // Filter conversations owned by this assistant and pick the newest
+        // 筛选该助手拥有的会话并选择最新一条
         final recent = all.where((c) => c.assistantId == assistant.id).toList();
         if (recent.isNotEmpty) {
-          // getAllConversations is already sorted by updatedAt desc
+          // getAllConversations 已按 updatedAt 降序排列
           widget.onSelectConversation?.call(
             recent.first.id,
             closeDrawer: closeDrawer,
@@ -2527,7 +2523,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
           widget.onNewConversation?.call(closeDrawer: closeDrawer);
         }
       } catch (_) {
-        // Fallback: new conversation on any error
+        // 回退：任何错误时创建新会话
         widget.onNewConversation?.call(closeDrawer: closeDrawer);
       }
     }
@@ -2649,8 +2645,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
 
   Future<String?> _pickEmoji(BuildContext context) async {
     final l10n = AppLocalizations.of(context)!;
-    // Provide input to allow any emoji via system emoji keyboard,
-    // plus a large set of quick picks for convenience.
+    // 提供输入以允许通过系统 emoji 键盘输入任意 emoji，
+    // 并提供大量快捷选择以方便使用。
     final controller = TextEditingController();
     String value = '';
     bool validGrapheme(String s) {
@@ -2778,8 +2774,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
         final cs = Theme.of(ctx).colorScheme;
         return StatefulBuilder(
           builder: (ctx, setLocal) {
-            // Revert to non-scrollable dialog but cap grid height
-            // based on available height when keyboard is visible.
+            // 回退到不可滚动对话框，但在键盘可见时
+            // 根据可用高度限制网格高度。
             final size = MediaQuery.sizeOf(ctx);
             final viewInsets = MediaQuery.viewInsetsOf(ctx);
             final avail = size.height - viewInsets.bottom;
@@ -2811,8 +2807,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                             : value.characters.take(1).toString(),
                         fontSize: 40,
                         optimizeEmojiAlign: true,
-                        nudge: Offset
-                            .zero, // mobile/desktop picker preview: no extra nudge
+                        nudge: Offset.zero, // 移动端/桌面端选择器预览：无额外微调
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -2875,8 +2870,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                 e,
                                 fontSize: 20,
                                 optimizeEmojiAlign: true,
-                                nudge:
-                                    Offset.zero, // picker grid: no extra nudge
+                                nudge: Offset.zero, // 选择器网格：无额外微调
                               ),
                             ),
                           );
@@ -3030,7 +3024,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
             4,
             2,
             1,
-          ]; // ratio only; ensures 1-2 > 3-4 > 5-8 > 9
+          ]; // 仅比例；确保 1-2 > 3-4 > 5-8 > 9
           final firstTotal = firstWeights.fold<int>(0, (a, b) => a + b);
           int r2 = rnd.nextInt(firstTotal) + 1;
           int idx = 0;
@@ -3090,7 +3084,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
               actions: [
                 TextButton(
                   onPressed: () async {
-                    // Try multiple times until a valid avatar is fetched
+                    // 多次尝试，直到获取到有效头像
                     const int maxTries = 20;
                     bool applied = false;
                     for (int i = 0; i < maxTries; i++) {
@@ -3183,7 +3177,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
         return;
       }
     } on PlatformException {
-      // Gracefully degrade when plugin channel isn't available or permission denied.
+      // 插件通道不可用或权限被拒绝时优雅降级。
       if (!context.mounted) return;
       final l10n = AppLocalizations.of(context)!;
       showAppSnackBar(
@@ -3310,17 +3304,17 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     }
   }
 
-  // Build assistants list (ungrouped + grouped by tags). When inlineMode=false (desktop tabs),
-  // apply search filter on assistant names.
+  // 构建助手列表（未分组 + 按标签分组）。当 inlineMode=false（桌面标签）时，
+  // 对助手名称应用搜索筛选。
   Widget _buildAssistantsList(BuildContext context, {bool inlineMode = false}) {
     final ap2 = context.watch<AssistantProvider>();
     final tp = context.watch<TagProvider>();
     final textBase2 = Theme.of(context).colorScheme.onSurface;
 
     List<Assistant> assistants = ap2.assistants;
-    // Apply search filter when:
-    // - Desktop tab mode (inlineMode == false), OR
-    // - Desktop assistants-only mode (left sidebar when topics are on right)
+    // 在以下情况下应用搜索筛选：
+    // - 桌面标签模式（inlineMode == false），或
+    // - 桌面仅助手模式（主题在右侧时，助手在左侧边栏）
     final shouldFilterAssistants = (!inlineMode) || _assistantsOnly;
     if (shouldFilterAssistants && _query.trim().isNotEmpty) {
       final q = _query.toLowerCase();
@@ -3362,7 +3356,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       );
     }
 
-    // Drag reorder is a pointer-only capability owned by the host shell.
+    // 拖动排序是宿主外壳拥有的仅指针能力。
     final bool enableReorder = _assistantReorder;
 
     Widget buildReorderable(
@@ -3380,7 +3374,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
         physics: const NeverScrollableScrollPhysics(),
         buildDefaultDragHandles: false,
         proxyDecorator: (child, index, animation) {
-          // Remove default shadow/elevation and clip to rounded card only.
+          // 移除默认阴影/海拔，仅裁剪为圆角卡片。
           return AnimatedBuilder(
             animation: animation,
             builder: (context, _) {
@@ -3453,8 +3447,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     );
   }
 
-  // Build conversations list area, optionally including the update banner.
-  // Owns scrolling via [ListView.builder] over the flattened [rows].
+  // 构建会话列表区域，可选包含更新横幅。
+  // 通过 [ListView.builder] 在扁平化的 [rows] 上拥有滚动。
   Widget _buildConversationsList(
     BuildContext context,
     ColorScheme cs,
@@ -3466,8 +3460,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     EdgeInsetsGeometry? padding,
     Widget? leading,
   }) {
-    // Cold start only: before ChatService init completes the lists below are
-    // empty, so render tile placeholders instead of a blank area.
+    // 仅冷启动：ChatService 初始化完成前下方列表为空，
+    // 因此渲染占位块而不是空白区域。
     if (!chatService.initialized) {
       return ListView(
         controller: controller,
@@ -3562,9 +3556,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
           )
         : null;
 
-    // Light transition signature (cache plan measure 16): changes on the same
-    // membership/order events as the previous id-join string without
-    // allocating it.
+    // 轻量过渡签名（缓存方案第 16 项）：在与先前 id-join 字符串
+    // 相同的成员/顺序事件上变化，而不分配该字符串。
     var listSignature = _query.hashCode;
     for (final row in rows) {
       if (row is _SidebarTileRow) {
@@ -3639,8 +3632,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
 
           final tile = row as _SidebarTileRow;
           final isPinnedSection = tile.kind == _SidebarHeaderKind.pinned;
-          // Cap absolute-index stagger to the first ~8 visual items so
-          // virtualized far rows (e.g. index 1000) never wait multiple seconds.
+          // 将绝对索引交错限制在前约 8 个可视项，
+          // 使虚拟化远处行（如索引 1000）绝不会等待数秒。
           final staggerDelay = SideDrawer.debugSidebarTileStaggerDelay(
             indexInSection: tile.indexInSection,
             pinnedSection: isPinnedSection,
@@ -3700,8 +3693,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   }
 }
 
-/// Max absolute index that still contributes to tile enter stagger.
-/// Indices beyond this share the same delay (~112–140ms).
+/// 仍对块入场交错做出贡献的最大绝对索引。
+/// 超过此值的索引共享相同延迟（约 112–140ms）。
 const int _kMaxSidebarStaggerIndex = 7;
 
 String _sidebarDateBucketKey(DateTime? date) {
@@ -3734,8 +3727,8 @@ class _SidebarHeaderRow extends _SidebarRow {
 
   final _SidebarHeaderKind kind;
 
-  /// Stable local calendar day for date headers; null when [kind] is pinned.
-  /// Localized label is resolved at render time from [AppLocalizations].
+  /// 日期头部的稳定本地日历日；当 [kind] 为置顶时为 null。
+  /// 本地化标签在渲染时从 [AppLocalizations] 解析。
   final DateTime? dateBucket;
 }
 
@@ -3750,7 +3743,7 @@ class _SidebarTileRow extends _SidebarRow {
   final int indexInSection;
   final _SidebarHeaderKind kind;
 
-  /// Stable local-day bucket for date-section animation keys; null when pinned.
+  /// 日期区动画键的稳定本地日桶；置顶时为 null。
   final DateTime? dateBucket;
 }
 
@@ -3783,14 +3776,14 @@ class _ChatTileState extends State<_ChatTile> {
   bool _hovered = false;
   bool _prefetchTriggered = false;
 
-  /// Desktop hover warm-up (cache plan measure 14): fills the service cache
-  /// so a subsequent tap hits the in-memory fast path. Cache-only;
-  /// loadTimelinePage notifies no listeners.
+  /// 桌面端悬停预热（缓存方案第 14 项）：填充服务缓存，
+  /// 使后续点击命中内存快速路径。仅缓存；
+  /// loadTimelinePage 不通知任何监听器。
   void _prefetchOnHover() {
     if (_prefetchTriggered) return;
     _prefetchTriggered = true;
     final chatService = context.read<ChatService>();
-    // The current conversation is already loaded and backfilled.
+    // 当前会话已加载并回填。
     if (chatService.currentConversationId == widget.chat.id) return;
     unawaited(() async {
       try {
@@ -3799,7 +3792,7 @@ class _ChatTileState extends State<_ChatTile> {
           limit: ChatService.defaultTimelineInitialSlots,
         );
       } catch (_) {
-        // Prefetch failures lose nothing user-visible.
+        // 预取失败不会造成用户可见损失。
       }
     }());
   }
@@ -3807,15 +3800,15 @@ class _ChatTileState extends State<_ChatTile> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    // Per-tile selection subscription (cache plan measure 16): switching the
-    // current conversation rebuilds only the affected tiles, not the list.
+    // 逐块选择订阅（缓存方案第 16 项）：切换当前会话
+    // 只重建受影响的块，而不是整个列表。
     final selected = context.select<ChatService, bool>(
       (service) => service.currentConversationId == widget.chat.id,
     );
     final embedded = widget.docked;
     final Color tileColor;
     if (embedded) {
-      // In tablet embedded mode, keep selected highlight, others transparent
+      // 在平板嵌入模式下，保持选中项高亮，其他项透明
       tileColor = selected
           ? cs.primary.withValues(alpha: 0.16)
           : Colors.transparent;
@@ -3954,7 +3947,7 @@ class _GroupHeader extends StatelessWidget {
         child: Row(
           children: [
             AnimatedRotation(
-              turns: collapsed ? 0.0 : 0.25, // right -> down
+              turns: collapsed ? 0.0 : 0.25, // 右箭头变为向下
               duration: const Duration(milliseconds: 260),
               curve: Curves.easeOutCubic,
               child: Icon(
@@ -3983,7 +3976,7 @@ class _GroupHeader extends StatelessWidget {
   }
 }
 
-// Desktop: Header tabs (Assistants / Topics)
+// 桌面端：头部标签（助手 / 主题）
 class _DesktopSidebarTabs extends StatefulWidget {
   const _DesktopSidebarTabs({
     required this.textColor,
@@ -4039,7 +4032,7 @@ class _DesktopSidebarTabsState extends State<_DesktopSidebarTabs> {
               ),
               child: Stack(
                 children: [
-                  // Selection knob
+                  // 选择旋钮
                   AnimatedPositioned(
                     duration: const Duration(milliseconds: 140),
                     curve: Curves.easeOutCubic,
@@ -4058,7 +4051,7 @@ class _DesktopSidebarTabsState extends State<_DesktopSidebarTabs> {
                       ),
                     ),
                   ),
-                  // Left segment
+                  // 左侧分段
                   Row(
                     children: [
                       Expanded(
@@ -4081,7 +4074,7 @@ class _DesktopSidebarTabsState extends State<_DesktopSidebarTabs> {
                             ),
                             child: Stack(
                               children: [
-                                // Hover wash
+                                // 悬停洗色
                                 AnimatedOpacity(
                                   duration: const Duration(milliseconds: 120),
                                   curve: Curves.easeOutCubic,
@@ -4094,7 +4087,7 @@ class _DesktopSidebarTabsState extends State<_DesktopSidebarTabs> {
                                     ),
                                   ),
                                 ),
-                                // Label
+                                // 标签
                                 Center(
                                   child: AnimatedDefaultTextStyle(
                                     duration: const Duration(milliseconds: 140),
@@ -4201,7 +4194,7 @@ class _DesktopSidebarTabsState extends State<_DesktopSidebarTabs> {
   }
 }
 
-// Desktop: TabBarView area hosting assistants and topics lists
+// 桌面端：承载助手和主题列表的 TabBarView 区域
 class _DesktopTabViews extends StatelessWidget {
   const _DesktopTabViews({
     required this.controller,
@@ -4211,7 +4204,7 @@ class _DesktopTabViews extends StatelessWidget {
   final TabController controller;
   final Widget Function() buildAssistants;
 
-  /// Conversations pane owns its own virtualized scroll view (and controller).
+  /// 会话窗格拥有自己的虚拟化滚动视图（和控制器）。
   final Widget Function() buildConversations;
 
   @override
@@ -4220,19 +4213,19 @@ class _DesktopTabViews extends StatelessWidget {
       controller: controller,
       physics: const BouncingScrollPhysics(),
       children: [
-        // Assistants — leave as a non-virtualized children dump.
+        // 助手列表 — 保持为未虚拟化的子项转储。
         ListView(
           padding: const EdgeInsets.fromLTRB(10, 2, 10, 16),
           children: [buildAssistants()],
         ),
-        // Topics (conversations) — virtualized list owns scrolling.
+        // 主题（会话） — 虚拟化列表拥有滚动。
         buildConversations(),
       ],
     );
   }
 }
 
-// Legacy (mobile/tablet): original single-list layout with optional inline assistants
+// 旧版（移动端/平板）：带可选内联助手的原始单列表布局
 class _LegacyListArea extends StatelessWidget {
   const _LegacyListArea({
     required this.isDesktop,
@@ -4244,8 +4237,8 @@ class _LegacyListArea extends StatelessWidget {
   final bool assistantsExpanded;
   final Widget Function() buildAssistants;
 
-  /// Builds the virtualized conversations list that owns scrolling, with the
-  /// inline assistants [leading] widget and shared [padding].
+  /// 构建拥有滚动的虚拟化会话列表，带内联助手 [leading] 控件
+  /// 和共享 [padding]。
   final Widget Function(Widget leading, EdgeInsets padding) buildConversations;
 
   @override
@@ -4394,8 +4387,8 @@ class _AssistantInlineTileState extends State<_AssistantInlineTile> {
   }
 }
 
-/// Tile-shaped shimmer skeleton shown only while ChatService is still
-/// initializing; real tiles render as soon as the first notify lands.
+/// 仅在 ChatService 仍在初始化时显示的块状微光骨架；
+/// 首次通知到达后立即渲染真实块。
 class _ConversationListSkeleton extends StatefulWidget {
   const _ConversationListSkeleton();
 

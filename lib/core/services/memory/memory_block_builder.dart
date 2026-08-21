@@ -6,9 +6,9 @@ import '../../models/memory_entry.dart';
 import '../../models/user_profile_field.dart';
 import 'memory_prompts.dart';
 
-/// Pure serialization for memory / profile injection blocks (§7.2–§7.5, §13.5).
+/// 用于 memory / profile 注入块的纯序列化（§7.2–§7.5、§13.5）。
 ///
-/// No database, no `DateTime.now()`, no locale lookups.
+/// 不访问数据库，不调用 `DateTime.now()`，也不进行语言环境查询。
 abstract final class MemoryBlockBuilder {
   MemoryBlockBuilder._();
 
@@ -84,7 +84,7 @@ abstract final class MemoryBlockBuilder {
     required List<UserProfileField> fields,
     required MemoryPromptLang lang,
   }) {
-    // Profile tags are language-neutral (§7.3); [lang] kept for §13.5 API.
+    // Profile 标签与语言无关（§7.3）；保留 [lang] 供 §13.5 API 使用。
     final nonEmpty = fields
         .where((f) => f.value.trim().isNotEmpty)
         .toList(growable: false);
@@ -110,7 +110,7 @@ abstract final class MemoryBlockBuilder {
     return out.toString();
   }
 
-  /// SHA-256 of `profileBlock + memoryBlock`, hex, first 16 chars (§7.4).
+  /// 对 `profileBlock + memoryBlock` 计算 SHA-256，取十六进制前 16 个字符（§7.4）。
   static String hashBlocks(String profileBlock, String memoryBlock) {
     final digest = sha256.convert(utf8.encode(profileBlock + memoryBlock));
     return digest.toString().substring(0, 16);
@@ -137,13 +137,13 @@ abstract final class MemoryBlockBuilder {
         '\n';
   }
 
-  /// Exclusive end index of a §7.6 prefix at the start of [payload], or null.
+  /// [payload] 开头处 §7.6 前缀的独占结束索引，如果没有则为 null。
   static int? endOfInjectedPrefix(String payload) {
     if (payload.isEmpty) return null;
     return _endOfUpdatePrefix(payload) ?? _endOfFullPrefix(payload);
   }
 
-  /// Split a frozen user payload into snapshot prefix + remaining user text.
+  /// 将冻结的用户 payload 拆分为 snapshot 前缀和剩余用户文本。
   static ({String prefix, String rest, String kind})? splitInjectedPrefix(
     String payload,
   ) {
@@ -252,7 +252,7 @@ abstract final class MemoryBlockBuilder {
     }
   }
 
-  /// `yyyy-MM-dd` from the local timezone of [timestamp].
+  /// 返回 [timestamp] 本地时区的 `yyyy-MM-dd` 日期。
   static String fmtDate(DateTime timestamp) {
     final local = timestamp.isUtc ? timestamp.toLocal() : timestamp;
     final y = local.year.toString().padLeft(4, '0');
@@ -261,7 +261,7 @@ abstract final class MemoryBlockBuilder {
     return '$y-$m-$d';
   }
 
-  /// Escape `&`, `<`, `>` only (entry content never enters attributes).
+  /// 仅转义 `&`、`<`、`>`（条目内容不会进入属性）。
   static String escape(String text) {
     return text
         .replaceAll('&', '&amp;')
@@ -269,12 +269,12 @@ abstract final class MemoryBlockBuilder {
         .replaceAll('>', '&gt;');
   }
 
-  /// Escape for XML attribute values (`"` in addition to [escape]).
+  /// 用于 XML 属性值的转义（除 [escape] 外还会转义 `\"`）。
   static String escapeAttr(String text) {
     return escape(text).replaceAll('"', '&quot;');
   }
 
-  /// Collapse newlines and whitespace runs to a single space, then trim.
+  /// 将换行和连续空白折叠为单个空格，然后去除首尾空白。
   static String flatten(String text) {
     return text.replaceAll(RegExp(r'\s+'), ' ').trim();
   }

@@ -24,7 +24,7 @@ class GlobalSessionSearchResult {
 class GlobalSessionSearchService {
   const GlobalSessionSearchService._();
 
-  // Hidden/internal blocks that should not participate in global search.
+  // 不应参与全局搜索的隐藏或内部块。
   static final RegExp _geminiThoughtSigRe = RegExp(
     r'<!--\s*gemini_thought_signatures:.*?-->',
     dotAll: true,
@@ -89,8 +89,8 @@ class GlobalSessionSearchService {
     final contentItems = <_ContentRef>[];
     for (final m in matches) {
       if (!_isVisibleVersion(m)) continue;
-      // Only search visible conversation body: user + assistant messages.
-      // Exclude tool/system-like messages and hidden reasoning/thought blocks.
+      // 只搜索可见会话正文：用户和助手消息。
+      // 排除工具或系统类消息以及隐藏的推理或思考块。
       if (m.messageRole != 'user' && m.messageRole != 'assistant') continue;
       final body = _searchableBody(m.messageContent ?? '');
       if (body.isEmpty) continue;
@@ -123,7 +123,7 @@ class GlobalSessionSearchService {
     final targetMessageId = matchedMessageId.isNotEmpty
         ? matchedMessageId
         : fallbackMessageId;
-    // Title-only conversations: targetMessageId is empty but title matched — include with empty messageId
+    // 仅标题命中的会话：targetMessageId 为空但标题匹配，以空 messageId 包含结果。
 
     final displayTitle = title.isEmpty ? '(Untitled)' : title;
     var snippet = firstMatchedIndex >= 0
@@ -140,9 +140,8 @@ class GlobalSessionSearchService {
     );
     var snippetHasVisibleHit = _containsAnyToken(snippet.toLowerCase(), tokens);
 
-    // Guarantee each visible result has at least one highlightable token in
-    // either title or snippet. If the current snippet misses all tokens,
-    // fallback to a focused snippet from the first matched message.
+    // 保证每个可见结果在标题或摘要中至少有一个可高亮 token。
+    // 如果当前摘要缺少所有 token，则回退到第一条匹配消息的聚焦摘要。
     if (!titleHasVisibleHit && !snippetHasVisibleHit) {
       if (firstMatchedIndex >= 0 && firstMatchedIndex < contentItems.length) {
         snippet = _snippetFor(contentItems[firstMatchedIndex].text, tokens);
@@ -257,8 +256,8 @@ class GlobalSessionSearchService {
     var end = windowText.length;
     if (windowText.length > maxChars) {
       if (hit >= 0) {
-        // Keep hit around the middle of the preview so it is likely visible
-        // within the 3-line snippet and visually lands near line 2.
+        // 让命中位置保持在预览中间，使其在三行摘要中很可能可见，
+        // 并大致落在第二行附近。
         final anchor = (maxChars * 0.45).round();
         start = (hit - anchor).clamp(0, windowText.length - maxChars);
       }

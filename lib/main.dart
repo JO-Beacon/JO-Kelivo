@@ -1,19 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
-    show kIsWeb, defaultTargetPlatform, TargetPlatform;
+    show
+        kIsWeb,
+        defaultTargetPlatform,
+        TargetPlatform,
+        ValueListenable,
+        ValueNotifier;
 import 'dart:async';
 import 'dart:ui' show AppExitResponse;
 import 'l10n/app_localizations.dart';
 import 'features/home/pages/home_page.dart';
 import 'features/migration/hive_to_sqlite_migration_page.dart';
 import 'features/migration/hive_to_sqlite_migration_service.dart';
+import 'features/migration/sqlite_schema_migration_service.dart';
 import 'desktop/desktop_home_page.dart';
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 import 'desktop/desktop_window_controller.dart';
 import 'desktop/desktop_tray_controller.dart';
 // import 'package:logging/logging.dart' as logging;
-// Theme is now managed in SettingsProvider
+// 主题现在由 SettingsProvider 管理
 import 'theme/theme_factory.dart';
 import 'theme/palettes.dart';
 import 'theme/custom_theme.dart';
@@ -34,6 +40,7 @@ import 'core/providers/world_book_provider.dart';
 import 'core/providers/memory_provider.dart';
 import 'core/providers/memory_provider_v2.dart';
 import 'core/providers/backup_provider.dart';
+import 'core/models/progress_update.dart';
 import 'core/services/memory/memory_pipeline.dart';
 import 'core/services/memory/memory_repository.dart';
 import 'core/providers/s3_backup_provider.dart';
@@ -47,6 +54,7 @@ import 'core/database/business_repository.dart';
 import 'core/database/business_startup_gate.dart';
 import 'core/database/chat_database_gateway.dart';
 import 'core/services/chat/chat_service.dart';
+import 'core/services/migration/migration_chain_state.dart';
 import 'core/services/app_exit_flush.dart';
 import 'core/services/backup/restore_archive_pruner.dart';
 import 'core/services/backup/restore_business_lease.dart';
@@ -64,6 +72,7 @@ import 'shared/widgets/loading_dialog_card.dart';
 import 'shared/widgets/snackbar.dart';
 import 'shared/widgets/restore_failure_screen.dart';
 import 'shared/widgets/restore_outcome_notice.dart';
+import 'shared/widgets/context_tree_migration_notice.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:system_fonts/system_fonts.dart';
 import 'dart:io'
@@ -71,7 +80,7 @@ import 'dart:io'
         Directory,
         File,
         Platform,
-        stderr; // kept for global override usage inside provider
+        stderr; // 保留以便 provider 内进行全局覆盖
 import 'core/services/android_background.dart';
 import 'core/services/notification_service.dart';
 import 'features/home/controllers/chat_actions.dart';
@@ -79,27 +88,32 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 final RouteObserver<ModalRoute<dynamic>> routeObserver =
     RouteObserver<ModalRoute<dynamic>>();
-bool _didCheckUpdates = false; // one-time update check flag
-bool _didEnsureAssistants = false; // ensure defaults after l10n ready
+bool _didCheckUpdates = false; // 一次性更新检查标记
+bool _didEnsureAssistants = false; // 在 l10n 就绪后确保默认值
 
 Future<void> main() async {
+  final startupProgress = ValueNotifier<ProgressUpdate?>(null);
   await runZoned(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
-      // Render a persistence-free shell before restore/database admission.
-      // Restore cutover validates and moves potentially large bundles before
-      // the real app can be constructed; the native desktop window must not
-      // look like an unresponsive white screen during that work.
-      runApp(const _StartupApp());
+      // 在恢复或数据库准入前渲染一个不依赖持久化数据的启动外壳。
+      // 恢复切换会在真正构建应用之前校验并移动可能很大的数据包；
+      // 在此过程中，原生桌面窗口不能显示成无响应的白屏。
+      runApp(_StartupApp(progress: startupProgress));
+      void reportStartupProgress(double value) {
+        startupProgress.value = ProgressUpdate(value: value);
+      }
+
+      reportStartupProgress(0.02);
       FlutterLogger.installGlobalHandlers();
-      // Configure and show the desktop window before the potentially lengthy
-      // restore/database admission path starts.
+      // 在可能耗时的恢复或数据库准入流程开始前，先配置并显示桌面窗口。
       await _initDesktopWindow();
+      reportStartupProgress(0.08);
       final appDataDirectory = await AppDirectories.getAppDataDirectory();
       final RestoreReceipt? restoreOutcome;
       try {
-        // The lease remains process-owned through its internal registry until
-        // process exit, preventing another instance from racing business I/O.
+        // 租约通过其内部注册表在进程退出前始终由进程持有，
+        // 防止另一个实例与当前实例争抢业务 I/O。
         final businessLease = await RestoreBusinessLease.acquire(
           appDataDirectory: appDataDirectory,
         );
@@ -108,6 +122,7 @@ Future<void> main() async {
               appDataDirectory: appDataDirectory,
               businessLease: businessLease,
             );
+        reportStartupProgress(0.24);
       } catch (error, stackTrace) {
         stderr.writeln('[RestoreStartupGate] $error\n$stackTrace');
         await _initRestoreFailureWindow();
@@ -124,31 +139,46 @@ Future<void> main() async {
         final enabled = prefs.getBool('flutter_log_enabled_v1') ?? false;
         await FlutterLogger.setEnabled(enabled);
       } catch (_) {}
-      // Trim Flutter global image cache to reduce memory pressure from large images
+      reportStartupProgress(0.32);
+      // 缩小 Flutter 全局图片缓存，减轻大图带来的内存压力
       try {
         PaintingBinding.instance.imageCache.maximumSize = 200;
         PaintingBinding.instance.imageCache.maximumSizeBytes =
             48 << 20; // ~48MB
       } catch (_) {}
-      // Avoid preloading all system fonts at launch (huge memory on desktop)
-      // Debug logging and global error handlers were enabled previously for diagnosis.
-      // They are commented out now per request to reduce log noise.
+      // 避免启动时预加载所有系统字体（桌面端会占用大量内存）。
+      // 之前曾启用调试日志和全局错误处理器用于诊断。
+      // 现在按要求将它们注释掉，以减少日志噪音。
       // FlutterError.onError = (FlutterErrorDetails details) { ... };
       // WidgetsBinding.instance.platformDispatcher.onError = (Object error, StackTrace stack) { ... };
       // logging.Logger.root.level = logging.Level.ALL;
       // logging.Logger.root.onRecord.listen((rec) { ... });
-      // Cache current Documents directory to fix sandboxed absolute paths on iOS
+      // 缓存当前 Documents 目录，以修复 iOS 上的沙箱绝对路径
       await SandboxPathResolver.init();
+      reportStartupProgress(0.4);
       ChatDatabaseLease? processDatabaseLease;
       BusinessPreferences? businessPreferences;
       var recoveryAttempted = false;
       while (true) {
         try {
+          reportStartupProgress(0.46);
           final migrationDecision = await HiveToSqliteMigrationService.check();
           if (migrationDecision.needsMigration) {
             runApp(
               MigrationApp(
                 service: HiveToSqliteMigrationService(migrationDecision),
+                restoreOutcome: restoreOutcome?.state,
+              ),
+            );
+            return;
+          }
+          final sqliteMigrationDecision =
+              await SqliteSchemaMigrationService.check(appDataDirectory);
+          reportStartupProgress(0.54);
+          if (sqliteMigrationDecision.needsMigration) {
+            runApp(
+              SqliteMigrationApp(
+                service: SqliteSchemaMigrationService(sqliteMigrationDecision),
                 restoreOutcome: restoreOutcome?.state,
               ),
             );
@@ -162,6 +192,7 @@ Future<void> main() async {
                 ) ??
                 false,
           );
+          reportStartupProgress(0.66);
           final databaseFile = File(
             '${appDataDirectory.path}/${AppDatabase.databaseFileName}',
           );
@@ -176,8 +207,10 @@ Future<void> main() async {
                   repository: databaseLease.businessRepository,
                   legacyPreferences: legacyPreferences,
                 );
+            reportStartupProgress(0.84);
             processDatabaseLease = databaseLease;
             businessPreferences = loadedBusinessPreferences;
+            await MigrationChainStateStore(appDataDirectory).clear();
           } catch (_) {
             await databaseLease.release();
             rethrow;
@@ -216,13 +249,14 @@ Future<void> main() async {
           return;
         }
       }
-      // Desktop exit hook: drain queued preference writes before process exit.
+      // 桌面退出钩子：在进程退出前排空已排队的偏好写入。
       _installExitFlush(businessPreferences);
-      // Best-effort trim of archived restore runs after a few cold starts.
+      // 经过几次冷启动后，尽力清理已归档的恢复运行。
       unawaited(_pruneRestoreArchive(appDataDirectory));
-      // Enable edge-to-edge to allow content under system bars (Android)
+      // 启用 edge-to-edge，让内容延伸到系统栏下方（Android）
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-      // Start app (Flutter log capture is toggleable and off by default)
+      // 启动应用（Flutter 日志捕获可开关，默认关闭）
+      startupProgress.value = const ProgressUpdate(value: 1);
       runApp(
         MyApp(
           databaseLease: processDatabaseLease,
@@ -242,7 +276,7 @@ Future<void> main() async {
 
 enum _AdmissionRecovery { none, rebuilt, remigrate }
 
-/// Names must mirror HiveToSqliteMigrationService.check().
+/// 名称必须与 HiveToSqliteMigrationService.check() 保持一致。
 const _legacyHiveSourceNames = <String>[
   'conversations.hive',
   'messages.hive',
@@ -359,10 +393,12 @@ class _RestoreFailureApp extends StatelessWidget {
   }
 }
 
-/// Persistence-free shell shown while startup restore and database admission
-/// are running. It intentionally owns no providers or business state.
+/// 启动恢复和数据库准入运行期间显示的、不依赖持久化数据的外壳。
+/// 它刻意不持有任何 provider 或业务状态。
 class _StartupApp extends StatelessWidget {
-  const _StartupApp();
+  const _StartupApp({required this.progress});
+
+  final ValueListenable<ProgressUpdate?> progress;
 
   @override
   Widget build(BuildContext context) {
@@ -374,23 +410,33 @@ class _StartupApp extends StatelessWidget {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: buildLightThemeForScheme(palette.light),
       darkTheme: buildDarkThemeForScheme(palette.dark),
-      home: const _StartupScreen(),
+      home: _StartupScreen(progress: progress),
     );
   }
 }
 
 class _StartupScreen extends StatelessWidget {
-  const _StartupScreen();
+  const _StartupScreen({required this.progress});
+
+  final ValueListenable<ProgressUpdate?> progress;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return Scaffold(body: LoadingDialogCard(label: l10n.startupRecoveryBusy));
+    return Scaffold(
+      body: ValueListenableBuilder<ProgressUpdate?>(
+        valueListenable: progress,
+        builder: (context, update, child) => LoadingDialogCard(
+          label: l10n.startupRecoveryBusy,
+          progress: update?.fraction,
+        ),
+      ),
+    );
   }
 }
 
-/// Shown when the installed database was written by a newer app version;
-/// restarting cannot help, so the only action is updating JO-Kelivo.
+/// 当已安装数据库由更新版本的应用写入时显示；
+/// 重启无法解决问题，唯一操作是升级 JO-Kelivo。
 class _UpdateRequiredScreen extends StatelessWidget {
   const _UpdateRequiredScreen({required this.diagnosticCode});
 
@@ -453,12 +499,28 @@ class _UpdateRequiredScreen extends StatelessWidget {
                           color: colors.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: SelectableText(
-                          l10n.backupRestoreFailureDiagnostic(diagnosticCode),
-                          style: textTheme.bodySmall?.copyWith(
-                            color: colors.onSurfaceVariant,
-                            fontFamily: 'monospace',
-                          ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: SelectableText(
+                                l10n.backupRestoreFailureDiagnostic(
+                                  diagnosticCode,
+                                ),
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: colors.onSurfaceVariant,
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () => Clipboard.setData(
+                                ClipboardData(text: diagnosticCode),
+                              ),
+                              tooltip: l10n.backupRestoreFailureCopyButton,
+                              icon: const Icon(Icons.copy_rounded, size: 18),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -480,22 +542,21 @@ Future<void> _initDesktopWindow() async {
       await windowManager.ensureInitialized();
       await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
     }
-    // Initialize and show desktop window with persisted size/position
+    // 初始化并按持久化的大小和位置显示桌面窗口
     await DesktopWindowController.instance.initializeAndShow(
       title: 'JO-Kelivo',
     );
   } catch (_) {
-    // Ignore on unsupported platforms.
+    // 在不支持的平台上忽略。
   }
 }
 
-// Removed eager system font preloading to reduce memory footprint at launch.
+// 已移除启动时急切预加载系统字体，以降低启动内存占用。
 
 AppLifecycleListener? _exitFlushListener;
 
-/// Desktop-only: mobile process kills cannot be intercepted, and SQLite WAL
-/// already protects committed transactions, so only Dart-side write queues
-/// need draining before exit.
+/// 仅桌面端：移动端进程被杀无法拦截，且 SQLite WAL 已保护已提交事务，
+/// 因此退出前只需排空 Dart 侧的写入队列。
 void _installExitFlush(BusinessPreferences businessPreferences) {
   if (kIsWeb) return;
   final isDesktop =
@@ -508,8 +569,8 @@ void _installExitFlush(BusinessPreferences businessPreferences) {
   _exitFlushListener = AppLifecycleListener(
     onExitRequested: () async {
       try {
-        // Bound the wait: a stuck write transaction must not leave the
-        // process unkillable after macOS answers NSTerminateLater.
+        // 限制等待时间：卡住的写入事务不能让进程在 macOS 响应
+        // NSTerminateLater 后仍无法退出。
         await AppExitFlush.flushAll().timeout(
           const Duration(seconds: 2),
           onTimeout: () {},
@@ -553,6 +614,36 @@ class MigrationApp extends StatelessWidget {
       home: RestoreOutcomeNotice(
         outcome: restoreOutcome,
         child: HiveToSqliteMigrationPage(service: service),
+      ),
+    );
+  }
+}
+
+class SqliteMigrationApp extends StatelessWidget {
+  const SqliteMigrationApp({
+    super.key,
+    required this.service,
+    this.restoreOutcome,
+  });
+
+  final SqliteSchemaMigrationService service;
+  final RestoreReceiptState? restoreOutcome;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = ThemePalettes.defaultPalette;
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'JO-Kelivo',
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      theme: buildLightThemeForScheme(palette.light),
+      darkTheme: buildDarkThemeForScheme(palette.dark),
+      builder: (context, child) =>
+          AppSnackBarOverlay(child: child ?? const SizedBox.shrink()),
+      home: RestoreOutcomeNotice(
+        outcome: restoreOutcome,
+        child: HiveToSqliteMigrationPage(service: service, sqliteMode: true),
       ),
     );
   }
@@ -658,7 +749,7 @@ class MyApp extends StatelessWidget {
           create: (_) =>
               BackupReminderProvider(preferences: businessPreferences),
         ),
-        // Desktop hotkeys provider
+        // 桌面热键 provider
         ChangeNotifierProvider(create: (_) => HotkeyProvider()),
         ChangeNotifierProvider(
           create: (ctx) => BackupProvider(
@@ -680,10 +771,10 @@ class MyApp extends StatelessWidget {
       child: Builder(
         builder: (context) {
           final settings = context.watch<SettingsProvider>();
-          // Apply global proxy overrides when settings change
+          // 设置变化时应用全局代理覆盖
           settings.applyGlobalProxyOverridesIfNeeded();
-          // Lazily ensure system fonts only if user selected a system family (desktop only)
-          // Load ONLY selected families to avoid huge memory from loading all system fonts.
+          // 仅当用户选择了系统字体时，才延迟确保系统字体可用（仅桌面端）。
+          // 只加载已选字体，避免加载全部系统字体导致内存过高。
           WidgetsBinding.instance.addPostFrameCallback((_) async {
             try {
               final isDesktop =
@@ -692,7 +783,7 @@ class MyApp extends StatelessWidget {
                       defaultTargetPlatform == TargetPlatform.macOS ||
                       defaultTargetPlatform == TargetPlatform.linux);
               if (!isDesktop) return;
-              // Selected system app/code fonts (not Google, not local alias)
+              // 已选择的系统应用或代码字体（非 Google 字体，也非本地别名）
               final wantsAppSystem =
                   (settings.appFontFamily?.isNotEmpty == true) &&
                   !settings.appFontIsGoogle &&
@@ -720,7 +811,7 @@ class MyApp extends StatelessWidget {
               }
             } catch (_) {}
           });
-          // One-time app update check after first build
+          // 首次构建后执行一次应用更新检查
           if (settings.showAppUpdates && !_didCheckUpdates) {
             _didCheckUpdates = true;
             WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -745,7 +836,7 @@ class MyApp extends StatelessWidget {
               // }
               final isAndroid =
                   Theme.of(context).platform == TargetPlatform.android;
-              // Update dynamic color capability for settings UI (avoid notify during build)
+              // 更新设置 UI 的动态颜色能力（避免在构建期间触发通知）
               final dynSupported =
                   isAndroid && (lightDynamic != null || darkDynamic != null);
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -754,7 +845,7 @@ class MyApp extends StatelessWidget {
                 } catch (_) {}
               });
 
-              // Initialize desktop hotkeys on supported platforms
+          // 在受支持的平台上初始化桌面热键
               WidgetsBinding.instance.addPostFrameCallback((_) async {
                 try {
                   final isDesktop =
@@ -768,7 +859,7 @@ class MyApp extends StatelessWidget {
                 } catch (_) {}
               });
 
-              // Android-only: ensure background execution matches setting and prepare notifications if needed
+          // 仅 Android：确保后台执行状态与设置一致，并在需要时准备通知
               WidgetsBinding.instance.addPostFrameCallback((_) async {
                 try {
                   if (Platform.isAndroid) {
@@ -776,7 +867,7 @@ class MyApp extends StatelessWidget {
                     if (mode != AndroidBackgroundChatMode.off) {
                       final l10n = AppLocalizations.of(context);
                       if (l10n == null) return;
-                      // Enable only if currently disabled to avoid duplicate ROM prompts
+                      // 仅当当前未启用时才启用，避免重复弹出系统 ROM 提示
                       try {
                         final already =
                             await AndroidBackgroundManager.isEnabled();
@@ -817,7 +908,7 @@ class MyApp extends StatelessWidget {
                 dynamicScheme: useDyn ? darkDynamic : null,
                 pureBackground: settings.usePureBackground,
               );
-              // Resolve effective app font family (system/Google/local alias)
+              // 解析实际生效的应用字体（系统、Google 或本地别名）
               String? effectiveAppFontFamily() {
                 final fam = settings.appFontFamily;
                 if (fam == null || fam.isEmpty) return null;
@@ -834,7 +925,7 @@ class MyApp extends StatelessWidget {
 
               final effectiveAppFont = effectiveAppFontFamily();
 
-              // Apply user-selected app font to theme text styles and app bar
+              // 将用户选择的应用字体应用到主题文本样式和 AppBar
               ThemeData applyAppFont(ThemeData base) {
                 if (effectiveAppFont == null || effectiveAppFont.isEmpty) {
                   return base;
@@ -865,7 +956,7 @@ class MyApp extends StatelessWidget {
                   toolbarTextStyle: (bar.toolbarTextStyle ?? const TextStyle())
                       .copyWith(fontFamily: effectiveAppFont),
                 );
-                // Apply as default family to all text in ThemeData
+                // 将所选字体设为 ThemeData 中所有文本的默认字体
                 return base.copyWith(
                   textTheme: apply(base.textTheme),
                   primaryTextTheme: apply(base.primaryTextTheme),
@@ -875,14 +966,14 @@ class MyApp extends StatelessWidget {
 
               final themedLight = applyAppFont(light);
               final themedDark = applyAppFont(dark);
-              // Log top-level colors likely used by widgets (card/bg/shadow approximations)
+              // 记录 widget 可能使用的顶层颜色（卡片、背景、阴影的近似值）
               // debugPrint('[Theme/App] Light scaffoldBg=${light.colorScheme.surface.value.toRadixString(16)} card≈${light.colorScheme.surface.value.toRadixString(16)} shadow=${light.colorScheme.shadow.value.toRadixString(16)}');
               // debugPrint('[Theme/App] Dark scaffoldBg=${dark.colorScheme.surface.value.toRadixString(16)} card≈${dark.colorScheme.surface.value.toRadixString(16)} shadow=${dark.colorScheme.shadow.value.toRadixString(16)}');
               return MaterialApp(
                 debugShowCheckedModeBanner: false,
                 title: 'JO-Kelivo',
                 navigatorKey: rootNavigatorKey,
-                // App UI language; null = follow system (respects iOS per-app language)
+                // 应用 UI 语言；null 表示跟随系统（遵循 iOS 的应用内语言设置）
                 locale: settings.appLocaleForMaterialApp,
                 supportedLocales: AppLocalizations.supportedLocales,
                 localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -892,7 +983,7 @@ class MyApp extends StatelessWidget {
                 navigatorObservers: <NavigatorObserver>[routeObserver],
                 home: RestoreOutcomeNotice(
                   outcome: restoreOutcome,
-                  child: _selectHome(),
+                  child: ContextTreeMigrationNotice(child: _selectHome()),
                 ),
                 builder: (ctx, child) {
                   final bright = Theme.of(ctx).brightness;
@@ -915,7 +1006,7 @@ class MyApp extends StatelessWidget {
                           systemNavigationBarDividerColor: Colors.transparent,
                           systemNavigationBarContrastEnforced: false,
                         );
-                  // Ensure localized defaults (assistants and chat default title) after first frame
+                  // 首帧后确保本地化默认值（助手和聊天默认标题）已就绪
                   if (!_didEnsureAssistants) {
                     _didEnsureAssistants = true;
                     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -937,7 +1028,7 @@ class MyApp extends StatelessWidget {
                     });
                   }
 
-                  // Desktop tray + close behaviour (minimize to tray) sync
+                  // 同步桌面托盘和关闭行为（关闭时最小化到托盘）
                   final l10n = AppLocalizations.of(ctx);
                   if (l10n != null) {
                     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -980,7 +1071,7 @@ class MyApp extends StatelessWidget {
                         : mq,
                     child: AppOverlays(child: child ?? const SizedBox.shrink()),
                   );
-                  // Enforce app font as a default across the tree for Texts without explicit family
+                  // 在整棵 widget 树中，为未显式指定字体的 Text 强制使用应用字体
                   return AnnotatedRegion<SystemUiOverlayStyle>(
                     value: overlay,
                     child: effectiveAppFont == null
@@ -1001,7 +1092,7 @@ class MyApp extends StatelessWidget {
 }
 
 Widget _selectHome() {
-  // Mobile remains the default platform. Desktop is an added platform.
+  // 移动端仍是默认平台，桌面端是额外支持的平台。
   if (kIsWeb) return const HomePage();
   final isDesktop =
       defaultTargetPlatform == TargetPlatform.macOS ||
@@ -1010,4 +1101,4 @@ Widget _selectHome() {
   return isDesktop ? const DesktopHomePage() : const HomePage();
 }
 
-// Overrides logic is implemented within SettingsProvider now.
+// 覆盖逻辑现在已在 SettingsProvider 中实现。

@@ -15,6 +15,7 @@ import '../../../core/services/haptics.dart';
 import '../../../core/database/business_preferences.dart';
 import '../../../core/database/business_repository.dart';
 import '../../../core/models/backup.dart';
+import '../../../core/models/progress_update.dart';
 import '../../../core/providers/backup_provider.dart';
 import '../../../core/providers/backup_reminder_provider.dart';
 import '../../../core/providers/s3_backup_provider.dart';
@@ -32,7 +33,7 @@ import '../backup_restart_dialog.dart';
 import '../widgets/backup_reminder_helpers.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
-// File size formatter (B, KB, MB, GB)
+// 文件大小格式化器（B、KB、MB、GB）
 String _fmtBytes(int bytes) {
   const kb = 1024;
   const mb = kb * 1024;
@@ -188,7 +189,7 @@ class _BackupPageState extends State<BackupPage> {
 
   Future<T> _runWithExportingOverlay<T>(
     BuildContext context,
-    Future<T> Function() task,
+    Future<T> Function(ProgressCallback onProgress) task,
   ) async {
     final l10n = AppLocalizations.of(context)!;
     return runWithLoadingTaskDialog(
@@ -200,7 +201,7 @@ class _BackupPageState extends State<BackupPage> {
 
   Future<T> _runWithImportingOverlay<T>(
     BuildContext context,
-    Future<T> Function() task,
+    Future<T> Function(ProgressCallback onProgress) task,
   ) => runWithLoadingTaskDialog(context: context, task: task);
 
   @override
@@ -235,7 +236,7 @@ class _BackupPageState extends State<BackupPage> {
           final cfg = vm.config;
           final s3Cfg = s3Vm.config;
 
-          // iOS-style section header
+          // iOS 风格分区标题
           Widget header(String text, {bool first = false}) => Padding(
             padding: EdgeInsets.fromLTRB(12, first ? 2 : 18, 12, 6),
             child: Text(
@@ -352,7 +353,7 @@ class _BackupPageState extends State<BackupPage> {
                           : () async {
                               final list = await _runWithImportingOverlay(
                                 context,
-                                () => vm.listRemote(),
+                                (_) => vm.listRemote(),
                               );
                               // 按时间倒序排列（最新的在前）
                               list.sort((a, b) {
@@ -421,12 +422,12 @@ class _BackupPageState extends State<BackupPage> {
 
                                     if (confirm != true) return;
 
-                                    // 1. Close current sheet
+                                    // 1. 关闭当前面板
                                     if (context.mounted) {
                                       Navigator.of(context).pop();
                                     }
 
-                                    // 2. Show loading dialog
+                                    // 2. 显示加载对话框
                                     if (context.mounted) {
                                       showDialog(
                                         context: context,
@@ -441,7 +442,7 @@ class _BackupPageState extends State<BackupPage> {
                                         item,
                                       );
 
-                                      // Close loading dialog
+                                      // 关闭加载对话框
                                       if (context.mounted) {
                                         Navigator.of(
                                           context,
@@ -449,7 +450,7 @@ class _BackupPageState extends State<BackupPage> {
                                         ).pop();
                                       }
 
-                                      // Sort list
+                                      // 排序列表
                                       list.sort((a, b) {
                                         if (a.lastModified != null &&
                                             b.lastModified != null) {
@@ -473,7 +474,7 @@ class _BackupPageState extends State<BackupPage> {
 
                                       if (!context.mounted) return;
 
-                                      // Re-open the sheet by calling the same logic again.
+                                      // 再次调用相同逻辑重新打开面板。
                                       await showModalBottomSheet(
                                         context: context,
                                         isScrollControlled: true,
@@ -487,7 +488,7 @@ class _BackupPageState extends State<BackupPage> {
                                           items: _remote,
                                           loading: false,
                                           onDelete: (item) async {
-                                            // Simplified recursive delete logic for subsequent deletions
+                                            // 后续删除使用简化的递归删除逻辑
                                             final confirm = await showDialog<bool>(
                                               context: context,
                                               builder: (dctx) => AlertDialog(
@@ -592,15 +593,18 @@ class _BackupPageState extends State<BackupPage> {
                                             try {
                                               await _runWithImportingOverlay(
                                                 context,
-                                                () => vm.restoreFromItem(
-                                                  item,
-                                                  mode: mode,
-                                                ),
+                                                (onProgress) =>
+                                                    vm.restoreFromItem(
+                                                      item,
+                                                      mode: mode,
+                                                      onProgress: onProgress,
+                                                    ),
                                               );
                                             } catch (e) {
                                               if (!context.mounted) return;
-                                              showAppSnackBar(
+                                              showBackupRestoreErrorSnackBar(
                                                 context,
+                                                e,
                                                 message: l10n
                                                     .backupPageRestoreFailedMessage(
                                                       backupRestoreErrorMessage(
@@ -608,7 +612,6 @@ class _BackupPageState extends State<BackupPage> {
                                                         e,
                                                       ),
                                                     ),
-                                                type: NotificationType.error,
                                               );
                                               return;
                                             }
@@ -632,7 +635,7 @@ class _BackupPageState extends State<BackupPage> {
                                         ),
                                       );
                                     } catch (e) {
-                                      // If error, ensure loading dialog is closed
+                                      // 如果出错，确保关闭加载对话框
                                       if (context.mounted &&
                                           Navigator.canPop(context)) {
                                         Navigator.of(
@@ -663,20 +666,17 @@ class _BackupPageState extends State<BackupPage> {
                                     try {
                                       await _runWithImportingOverlay(
                                         context,
-                                        () => vm.restoreFromItem(
+                                        (onProgress) => vm.restoreFromItem(
                                           item,
                                           mode: mode,
+                                          onProgress: onProgress,
                                         ),
                                       );
                                     } catch (e) {
                                       if (!context.mounted) return;
-                                      showAppSnackBar(
+                                      showBackupRestoreErrorSnackBar(
                                         context,
-                                        message: backupRestoreErrorMessage(
-                                          l10n,
-                                          e,
-                                        ),
-                                        type: NotificationType.error,
+                                        e,
                                       );
                                       return;
                                     }
@@ -712,7 +712,8 @@ class _BackupPageState extends State<BackupPage> {
                                   .read<BackupReminderProvider>();
                               final success = await _runWithExportingOverlay(
                                 context,
-                                () => vm.backup(),
+                                (onProgress) =>
+                                    vm.backup(onProgress: onProgress),
                               );
                               if (!context.mounted) return;
                               final rawMessage = vm.message;
@@ -775,7 +776,7 @@ class _BackupPageState extends State<BackupPage> {
                           : () async {
                               final list = await _runWithImportingOverlay(
                                 context,
-                                () => s3Vm.listRemote(),
+                                (_) => s3Vm.listRemote(),
                               );
                               list.sort((a, b) {
                                 if (a.lastModified != null &&
@@ -999,15 +1000,18 @@ class _BackupPageState extends State<BackupPage> {
                                             try {
                                               await _runWithImportingOverlay(
                                                 context,
-                                                () => s3Vm.restoreFromItem(
-                                                  item,
-                                                  mode: mode,
-                                                ),
+                                                (onProgress) =>
+                                                    s3Vm.restoreFromItem(
+                                                      item,
+                                                      mode: mode,
+                                                      onProgress: onProgress,
+                                                    ),
                                               );
                                             } catch (e) {
                                               if (!context.mounted) return;
-                                              showAppSnackBar(
+                                              showBackupRestoreErrorSnackBar(
                                                 context,
+                                                e,
                                                 message: l10n
                                                     .backupPageRestoreFailedMessage(
                                                       backupRestoreErrorMessage(
@@ -1015,7 +1019,6 @@ class _BackupPageState extends State<BackupPage> {
                                                         e,
                                                       ),
                                                     ),
-                                                type: NotificationType.error,
                                               );
                                               return;
                                             }
@@ -1068,20 +1071,17 @@ class _BackupPageState extends State<BackupPage> {
                                     try {
                                       await _runWithImportingOverlay(
                                         context,
-                                        () => s3Vm.restoreFromItem(
+                                        (onProgress) => s3Vm.restoreFromItem(
                                           item,
                                           mode: mode,
+                                          onProgress: onProgress,
                                         ),
                                       );
                                     } catch (e) {
                                       if (!context.mounted) return;
-                                      showAppSnackBar(
+                                      showBackupRestoreErrorSnackBar(
                                         context,
-                                        message: backupRestoreErrorMessage(
-                                          l10n,
-                                          e,
-                                        ),
-                                        type: NotificationType.error,
+                                        e,
                                       );
                                       return;
                                     }
@@ -1117,7 +1117,8 @@ class _BackupPageState extends State<BackupPage> {
                                   .read<BackupReminderProvider>();
                               final success = await _runWithExportingOverlay(
                                 context,
-                                () => s3Vm.backup(),
+                                (onProgress) =>
+                                    s3Vm.backup(onProgress: onProgress),
                               );
                               if (!context.mounted) return;
                               final rawMessage = s3Vm.message;
@@ -1173,12 +1174,12 @@ class _BackupPageState extends State<BackupPage> {
             icon: Lucide.Box,
             label: l10n.backupPageImportFromCherryStudio,
             onTap: () async {
-              // 1) Warn user that Cherry import is experimental
+              // 1）提醒用户 Cherry 导入为实验性功能
               final acknowledged = await _confirmCherryImport(context);
               if (acknowledged != true) return;
 
               if (!context.mounted) return;
-              // Pick Cherry Studio backup (.zip or .bak)
+              // 选择 Cherry Studio 备份（.zip 或 .bak）
               final result = await FilePicker.platform.pickFiles(
                 type: FileType.custom,
                 allowedExtensions: ['zip', 'bak'],
@@ -1191,11 +1192,11 @@ class _BackupPageState extends State<BackupPage> {
               if (mode == null) return;
               if (!context.mounted) return;
 
-              await _runWithImportingOverlay(context, () async {
+              await _runWithImportingOverlay(context, (_) async {
                 try {
                   final cs = context.read<ChatService>();
                   final file = File(path);
-                  // Defer import to service
+                  // 将导入委托给 service
                   final res = await CherryImporter.importFromCherryStudio(
                     file: file,
                     mode: mode,
@@ -1263,7 +1264,7 @@ class _BackupPageState extends State<BackupPage> {
             icon: Lucide.Box,
             label: l10n.backupPageImportFromChatbox,
             onTap: () async {
-              // Pick Chatbox exported json
+              // 选择 Chatbox 导出的 json
               final result = await FilePicker.platform.pickFiles(
                 type: FileType.custom,
                 allowedExtensions: ['json'],
@@ -1276,7 +1277,7 @@ class _BackupPageState extends State<BackupPage> {
               if (mode == null) return;
               if (!context.mounted) return;
 
-              await _runWithImportingOverlay(context, () async {
+              await _runWithImportingOverlay(context, (_) async {
                 try {
                   final cs = context.read<ChatService>();
                   final file = File(path);
@@ -1352,8 +1353,8 @@ class _BackupPageState extends State<BackupPage> {
     final l10n = AppLocalizations.of(context)!;
     File? file;
     try {
-      await _runWithExportingOverlay(context, () async {
-        file = await vm.exportToFile();
+      await _runWithExportingOverlay(context, (onProgress) async {
+        file = await vm.exportToFile(onProgress: onProgress);
         if (!context.mounted) return;
         final exportFile = file!;
         final isMobile = Platform.isAndroid || Platform.isIOS;
@@ -1386,7 +1387,7 @@ class _BackupPageState extends State<BackupPage> {
         }
       });
     } catch (e) {
-      // A failed archive or an unwritable target must not look successful.
+      // 失败的归档或不可写目标不能显示为成功。
       if (!context.mounted) return;
       showAppSnackBar(
         context,
@@ -1415,16 +1416,20 @@ class _BackupPageState extends State<BackupPage> {
     try {
       await _runWithImportingOverlay(
         context,
-        () => vm.restoreFromLocalFile(File(path), mode: mode),
+        (onProgress) => vm.restoreFromLocalFile(
+          File(path),
+          mode: mode,
+          onProgress: onProgress,
+        ),
       );
     } catch (error) {
       if (!context.mounted) return;
-      showAppSnackBar(
+      showBackupRestoreErrorSnackBar(
         context,
+        error,
         message: l10n.backupPageRestoreFailedMessage(
           backupRestoreErrorMessage(l10n, error),
         ),
-        type: NotificationType.error,
       );
       return;
     }
@@ -1675,7 +1680,7 @@ class _ReminderFrequencyTileState extends State<_ReminderFrequencyTile> {
   }
 }
 
-// --- iOS-style widgets ---
+// --- iOS 风格组件 ---
 
 class _InputRow extends StatelessWidget {
   const _InputRow({
@@ -1985,7 +1990,7 @@ Widget _iosNavRow(
   );
 }
 
-// --- Local iOS-style buttons for sheets ---
+// --- 弹层使用的本地 iOS 风格按钮 ---
 class _IosOutlineButton extends StatefulWidget {
   const _IosOutlineButton({required this.label, required this.onTap});
   final String label;
@@ -2754,7 +2759,7 @@ class _S3SettingsPageState extends State<_S3SettingsPage> {
   }
 }
 
-// iOS-style password toggle button (no ripple)
+// iOS 风格密码切换按钮（无涟漪）
 class _PasswordToggleButton extends StatefulWidget {
   const _PasswordToggleButton({
     required this.showPassword,

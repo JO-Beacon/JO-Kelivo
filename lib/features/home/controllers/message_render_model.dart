@@ -1,9 +1,8 @@
 import '../../../core/models/chat_message.dart';
 
-/// Immutable, precomputed input for one logical timeline slot.
+/// 一个逻辑时间线槽位的不可变、预计算输入。
 ///
-/// Renderer code must not scan the full message list or sort revisions while
-/// building an individual row.
+/// 渲染器代码在构建单行时不得扫描完整消息列表或排序修订。
 final class MessageRenderModel {
   const MessageRenderModel({
     required this.slotId,

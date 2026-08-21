@@ -46,8 +46,8 @@ bool isPublicMcpOAuthAddress(
 }) {
   final bytes = address.rawAddress;
   if (bytes.length == 4) {
-    // Proxy/VPN fake-IP DNS commonly uses 198.18.0.0/15; TLS still validates
-    // the original hostname. Literal addresses never enable this exception.
+    // 代理/VPN 的假 IP DNS 通常使用 198.18.0.0/15；TLS 仍会校验
+    // 原始主机名。字面地址永远不会启用此例外。
     return _isPublicIpv4(bytes) ||
         (allowProxyFakeIp && _isProxyFakeIpv4(bytes));
   }

@@ -22,7 +22,7 @@ import 'memory_repository.dart';
 import 'memory_smart_add.dart';
 import 'memory_trace.dart';
 
-/// Result of a background organize run (§12 / §13.6).
+/// 后台 organize 运行的结果（§12 / §13.6）。
 class MemoryOrganizeResult {
   const MemoryOrganizeResult({
     required this.advanced,
@@ -39,8 +39,7 @@ class MemoryOrganizeResult {
   final String? error;
   final bool forcedAdvance;
 
-  /// Messages in the processed window; 0 when the run stopped before building
-  /// one.
+  /// 已处理窗口中的消息数；如果运行在构建窗口之前停止，则为 0。
   final int windowSize;
 }
 
@@ -67,9 +66,9 @@ class _PipelineJob {
   final void Function(String error)? onError;
 }
 
-/// Background memory pipeline: Gatekeeper → Extract → Smart Add → Distiller.
+/// 后台记忆流水线：Gatekeeper → Extract → Smart Add → Distiller。
 ///
-/// Process-wide single-concurrency queue (max 8; drop oldest when full) (§12.8).
+/// 进程级单并发队列（最多 8 个；已满时丢弃最旧的）（§12.8）。
 class MemoryPipelineService {
   MemoryPipelineService({
     required this.chatService,
@@ -117,7 +116,7 @@ class MemoryPipelineService {
   final MemorySmartAdd smartAdd;
   final MemoryProfileDistiller distiller;
 
-  /// Collects step-by-step traces of every background run (§debug viewer).
+  /// 收集每次后台运行的分步追踪记录（§debug viewer）。
   final MemoryTraceRecorder traceRecorder;
 
   final SettingsProvider Function() _settings;
@@ -138,13 +137,13 @@ class MemoryPipelineService {
   final Queue<_PipelineJob> _queue = Queue<_PipelineJob>();
   bool _running = false;
 
-  /// Failures keyed by `(conversationId, watermark, windowEndOrder)`.
+  /// 失败记录以 `(conversationId, watermark, windowEndOrder)` 为键。
   final Map<String, int> _windowFailures = {};
 
   MemoryOrganizeStatus _lastStatus = const MemoryOrganizeStatus();
   MemoryOrganizeStatus get lastStatus => _lastStatus;
 
-  /// Collapse to the selected version chain (same rules as title generation).
+  /// 折叠到选定的版本链（与标题生成使用相同的规则）。
   static List<ChatMessage> collapseSelectedVersions(
     List<ChatMessage> messages,
     Map<String, int> selections,
@@ -178,7 +177,7 @@ class MemoryPipelineService {
     ];
   }
 
-  /// Build `buildConversationText(window)` (§12.3).
+  /// 构建 `buildConversationText(window)`（§12.3）。
   static String buildConversationText(
     List<ChatMessage> window,
     MemoryPromptLang lang,
@@ -195,7 +194,7 @@ class MemoryPipelineService {
       } else {
         continue;
       }
-      // TextPart bodies only — image/file attachments live as structured parts.
+      // 仅 TextPart 正文 —— 图片/文件附件作为结构化部分存在。
       var text = m.parts
           .whereType<TextPart>()
           .map((part) => part.text)
@@ -214,7 +213,7 @@ class MemoryPipelineService {
     return out;
   }
 
-  /// Whether conversation summary generation is allowed (§12.10 / D-27).
+  /// 是否允许生成对话摘要（§12.10 / D-27）。
   static bool shouldGenerateConversationSummary({
     required bool allowPastConversationRecall,
     required bool generateConversationSummary,
@@ -222,7 +221,7 @@ class MemoryPipelineService {
     return allowPastConversationRecall && generateConversationSummary;
   }
 
-  /// Schedule after an assistant finalize. Never awaits; never throws to chat.
+  /// 在助手 finalize 后调度。绝不等待；绝不向聊天抛出异常。
   void scheduleIfNeeded({
     required String conversationId,
     required String assistantId,
@@ -243,7 +242,7 @@ class MemoryPipelineService {
     }
   }
 
-  /// Manual "整理记忆" — bypasses autoOrganize + N-turns; still needs model.
+  /// 手动 "整理记忆" —— 绕过 autoOrganize + N-turns；仍需要模型。
   Future<MemoryOrganizeResult> runNow({
     required String conversationId,
     required String assistantId,
@@ -261,9 +260,8 @@ class MemoryPipelineService {
   }
 
   void _enqueue(_PipelineJob job) {
-    // A temporary conversation is discarded when the user leaves it and never
-    // reaches the database. Distilling it into long-term memory would outlive
-    // the conversation the user asked to be throwaway.
+    // 临时会话在用户离开时即被丢弃，且不会写入数据库。从中提炼长期记忆
+    // 会让用户要求的一次性会话继续存续下去。
     if (chatService.isTemporaryConversation(job.conversationId)) {
       job.completer?.complete(
         const MemoryOrganizeResult(
@@ -275,7 +273,7 @@ class MemoryPipelineService {
       return;
     }
 
-    // Coalesce pending (not running) jobs for the same conversation.
+    // 合并同一对话中待处理（未运行）的任务。
     _queue.removeWhere(
       (j) =>
           j.conversationId == job.conversationId &&
@@ -337,9 +335,9 @@ class MemoryPipelineService {
     'empty_window',
   }.contains(error);
 
-  /// Open a trace for [job]. Returns null when recording is off or fails.
+  /// 为 [job] 打开一个追踪记录。录制关闭或失败时返回 null。
   MemoryTraceHandle? _beginJobTrace(_PipelineJob job) {
-    // Temporary chats are discarded on exit; keep their traces out of the UI.
+    // 临时聊天在退出时会被丢弃；不要让其追踪记录出现在 UI 中。
     if (chatService.isTemporaryConversation(job.conversationId)) {
       return null;
     }
@@ -418,7 +416,7 @@ class MemoryPipelineService {
         error: 'memory_model_unset',
       );
     }
-    // Provider/model must still exist (D-20).
+    // Provider/model 必须仍然存在（D-20）。
     final cfg = settings.getProviderConfig(provKey);
     if (cfg.models.isNotEmpty &&
         !cfg.models.contains(mdlId) &&
@@ -439,10 +437,10 @@ class MemoryPipelineService {
       );
     }
 
-    // Skip while this conversation still has a streaming message (§12.1).
-    // Finalize already ran after the turn; a racing stream is rare — the next
-    // successful finalize will re-trigger, so do not re-enqueue here (avoids
-    // draining the same job forever).
+    // 该对话仍存在流式消息时跳过（§12.1）。
+    // Finalize 已在本轮结束后运行；竞争性的流式消息很少见 —— 下一次
+    // 成功的 finalize 会重新触发，因此不要在此重新入队（避免
+    // 永远耗尽同一个任务）。
     if (chatService.getMessages(job.conversationId).any((m) => m.isStreaming)) {
       return const MemoryOrganizeResult(
         advanced: false,
@@ -511,12 +509,12 @@ class MemoryPipelineService {
     );
   }
 
-  /// Gatekeeper → Extract → Smart Add → Distiller for a prepared window.
+  /// 针对准备好的窗口执行：Gatekeeper → Extract → Smart Add → Distiller。
   ///
-  /// Exposed for tests (§18.1 / watermark / short-circuit).
+  /// 为测试公开（§18.1 / watermark / short-circuit）。
   ///
-  /// When [trace] is null a trace is opened and committed here, so direct
-  /// callers are recorded too.
+  /// 当 [trace] 为 null 时，会在这里打开并提交一个 trace，因此直接
+  /// 调用者也会被记录。
   @visibleForTesting
   Future<MemoryOrganizeResult> processWindow({
     required String conversationId,
@@ -782,7 +780,7 @@ class MemoryPipelineService {
     });
     smartStep?.finish(MemoryTraceStepStatus.success);
 
-    // ── Profile Distiller (identity changes only) ─────────────────────────
+    // ── Profile Distiller（仅身份变化）─────────────────────────
     if (smart.identityChanged) {
       final distillStep = handle?.beginStep(
         MemoryTraceStepKind.profileDistiller,
@@ -808,7 +806,7 @@ class MemoryPipelineService {
       _skipStep(handle, MemoryTraceStepKind.profileDistiller);
     }
 
-    // Smart Add (including degraded) and Distiller failure both advance (§12.8).
+    // Smart Add（包括降级情况）和 Distiller 失败都会推进（§12.8）。
     await _advance(conversationId, windowEnd);
     _windowFailures.remove(failureKey);
     return MemoryOrganizeResult(
@@ -819,7 +817,7 @@ class MemoryPipelineService {
     );
   }
 
-  /// Record a stage the run never reached, so the viewer shows the full chain.
+  /// 记录运行从未到达的阶段，以便查看器显示完整链路。
   void _skipStep(MemoryTraceHandle? handle, MemoryTraceStepKind kind) {
     handle?.beginStep(kind)?.finish(MemoryTraceStepStatus.skipped);
   }
@@ -878,7 +876,7 @@ class MemoryPipelineService {
       conversationId,
       order,
     );
-    // Keep in-memory Conversation in sync when present.
+    // 当存在内存中的 Conversation 时，使其保持同步。
     final convo = chatService.getConversation(conversationId);
     if (convo != null) {
       convo.lastMemoryExtractedOrder = order;

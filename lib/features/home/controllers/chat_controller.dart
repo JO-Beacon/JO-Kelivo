@@ -7,9 +7,9 @@ import '../../../core/models/conversation.dart';
 import '../../../core/services/chat/chat_service.dart';
 import 'message_render_model.dart';
 
-/// Initial window for a conversation switch, loaded by
-/// [ChatController.fetchConversationWindow] and installed atomically by
-/// [ChatController.commitConversationWindow].
+/// 会话切换的初始窗口，由
+/// [ChatController.fetchConversationWindow] 加载，
+/// 并由 [ChatController.commitConversationWindow] 原子安装。
 class FetchedConversationWindow {
   const FetchedConversationWindow({
     required this.conversation,
@@ -26,14 +26,14 @@ class FetchedConversationWindow {
   final bool lazyHistoryEnabled;
 }
 
-/// Controller for managing conversation state in the home page.
+/// 管理主页会话状态的控制器。
 ///
-/// This controller handles:
-/// - Current conversation and message list management
-/// - Version selection for message groups
-/// - Conversation loading states (for streaming)
-/// - Conversation stream subscriptions
-/// - Message grouping and collapsing logic
+/// 此控制器负责：
+/// - 当前会话和消息列表管理
+/// - 消息组的版本选择
+/// - 会话加载状态（用于流式处理）
+/// - 会话流订阅
+/// - 消息分组和折叠逻辑
 class ChatController extends ChangeNotifier {
   factory ChatController({
     required ChatService chatService,
@@ -49,79 +49,79 @@ class ChatController extends ChangeNotifier {
   final ChatService _chatService;
 
   // ============================================================================
-  // State Fields
+  // 状态字段
   // ============================================================================
 
-  /// The currently active conversation.
+  /// 当前活动会话。
   Conversation? _currentConversation;
   Conversation? get currentConversation => _currentConversation;
 
-  /// Messages in the current conversation.
+  /// 当前会话中的消息。
   List<ChatMessage> _messages = [];
   List<ChatMessage> get messages => _messages;
 
-  /// Index in the persisted conversation where [_messages] starts.
+  /// [_messages] 在持久化会话中的起始索引。
   int _loadedStartIndex = 0;
   int get loadedStartIndex => _loadedStartIndex;
 
-  /// Total persisted message count for the current conversation.
+  /// 当前会话的持久化消息总数。
   int _totalMessageCount = 0;
   int get totalMessageCount => _totalMessageCount;
 
-  /// versionCount from the latest loaded timeline window, keyed by groupId.
+  /// 来自最新已加载时间线窗口的 versionCount，按 groupId 索引。
   Map<String, int> _windowVersionCounts = <String, int>{};
   bool get hasMoreBefore => _loadedStartIndex > 0;
   bool get hasMoreAfter =>
       _loadedStartIndex + _messages.length < _totalMessageCount;
 
-  /// Whether an initial/around-message window load is in flight.
+  /// 初始窗口或围绕消息的窗口加载是否正在进行。
   bool _isLoadingWindow = false;
   bool get isLoadingWindow => _isLoadingWindow;
 
-  /// Serial of the latest window load; only it may clear [_isLoadingWindow].
+  /// 最新窗口加载的序列号；只有它可以清除 [_isLoadingWindow]。
   int _windowLoadSerial = 0;
 
   bool _lazyHistoryEnabled;
   bool get lazyHistoryEnabled => _lazyHistoryEnabled;
 
-  /// Slot budget for the idle cache backfill: the current conversation's
-  /// cache ceiling is its full history or this threshold, whichever is lower.
+  /// 空闲缓存回填的槽位预算：当前会话的缓存上限
+  /// 是其完整历史或此阈值中较小者。
   @visibleForTesting
   static const int idleCacheBackfillSlotLimit = 5000;
 
-  /// Selected version per message group (groupId -> selected version index).
+  /// 每个消息组的已选版本（groupId -> 已选版本索引）。
   Map<String, int> _versionSelections = <String, int>{};
   Map<String, int> get versionSelections => _versionSelections;
 
-  /// Cached collapsed messages (invalidated on notifyListeners).
+  /// 缓存的折叠消息（在 notifyListeners 时失效）。
   List<ChatMessage>? _collapsedCache;
   Map<String, int>? _collapsedIdToIndex;
   Map<String, List<ChatMessage>>? _groupCache;
   List<ChatMessage>? _messagesWithVisibleGroupsCache;
   List<MessageRenderModel>? _renderModelsCache;
 
-  /// Conversation IDs that are currently generating (streaming).
+  /// 当前正在生成（流式处理）的会话 ID。
   final Set<String> _loadingConversationIds = <String>{};
   Set<String> get loadingConversationIds => _loadingConversationIds;
 
-  /// Active stream subscriptions per conversation.
+  /// 每个会话的活动流订阅。
   final Map<String, StreamSubscription<dynamic>> _conversationStreams =
       <String, StreamSubscription<dynamic>>{};
   Map<String, StreamSubscription<dynamic>> get conversationStreams =>
       _conversationStreams;
 
   // ============================================================================
-  // Getters
+  // 获取器
   // ============================================================================
 
-  /// Whether the current conversation is actively generating.
+  /// 当前会话是否正在生成。
   bool get isCurrentConversationLoading {
     final cid = _currentConversation?.id;
     if (cid == null) return false;
     return _loadingConversationIds.contains(cid);
   }
 
-  /// Get the ChatService instance.
+  /// 获取 ChatService 实例。
   ChatService get chatService => _chatService;
 
   void _syncCurrentConversationWithService() {
@@ -133,12 +133,12 @@ class ChatController extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Conversation Management
+  // 会话管理
   // ============================================================================
 
-  /// Sets a newly created empty draft without opening a persisted window.
+  /// 设置新建的空草稿，而不打开持久化窗口。
   void setDraftConversation(Conversation conversation) {
-    // Unknown count (-1) is not "has messages"; only reject when known non-zero.
+    // 未知数量（-1）不等于“有消息”；仅在已知非零时才拒绝。
     if (_chatService.isMessageCountKnown(conversation.id) &&
         _chatService.getMessageCount(conversation.id) != 0) {
       throw StateError('persisted_conversation_requires_async_open');
@@ -167,9 +167,9 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Fetch phase of a conversation switch: loads the initial window for
-  /// [conversation] without mutating any current state. Install the result
-  /// with [commitConversationWindow].
+  /// 会话切换的获取阶段：为 [conversation] 加载初始窗口，
+  /// 但不修改任何当前状态。使用 [commitConversationWindow]
+  /// 安装结果。
   Future<FetchedConversationWindow> fetchConversationWindow(
     Conversation conversation,
   ) async {
@@ -212,9 +212,9 @@ class ChatController extends ChangeNotifier {
     );
   }
 
-  /// Commit phase of a conversation switch: installs a window previously
-  /// fetched by [fetchConversationWindow]. Supersedes any in-flight window
-  /// load, so its late page and loading-flag clear both lose.
+  /// 会话切换的提交阶段：安装此前由 [fetchConversationWindow]
+  /// 获取的窗口。它会取代任何进行中的窗口加载，
+  /// 因此迟到的分页和加载标志清除都会失效。
   void commitConversationWindow(
     FetchedConversationWindow fetched, {
     VoidCallback? onDeferredGroupDataLoaded,
@@ -257,13 +257,13 @@ class ChatController extends ChangeNotifier {
     }
   }
 
-  /// Update the current conversation reference (e.g., after title change).
+  /// 更新当前会话引用（例如标题变化后）。
   void updateCurrentConversation(Conversation? conversation) {
     _currentConversation = conversation;
     notifyListeners();
   }
 
-  /// Load version selections for the current conversation.
+  /// 加载当前会话的版本选择。
   void _loadVersionSelections() {
     final cid = _currentConversation?.id;
     if (cid == null) {
@@ -277,13 +277,13 @@ class ChatController extends ChangeNotifier {
     }
   }
 
-  /// Reload version selections (public method for external use).
+  /// 重新加载版本选择（供外部使用的公共方法）。
   void loadVersionSelections() {
     _loadVersionSelections();
     notifyListeners();
   }
 
-  /// Create a new conversation and set it as current.
+  /// 创建新会话并将其设为当前会话。
   Future<Conversation> createNewConversation({
     required String title,
     String? assistantId,
@@ -302,7 +302,7 @@ class ChatController extends ChangeNotifier {
     return conversation;
   }
 
-  /// Clear the current conversation state.
+  /// 清除当前会话状态。
   void clearCurrentConversation() {
     _clearCurrentConversationState();
     notifyListeners();
@@ -328,7 +328,7 @@ class ChatController extends ChangeNotifier {
               limit: ChatService.defaultTimelineInitialSlots,
             )
           : await _fetchCompleteTimeline(conversationId);
-      // Discard the page if the conversation changed while loading.
+      // 如果加载期间会话发生变化，则丢弃该页。
       if (serial != _windowLoadSerial ||
           _currentConversation?.id != conversationId ||
           _lazyHistoryEnabled != lazyHistoryEnabled) {
@@ -438,8 +438,8 @@ class ChatController extends ChangeNotifier {
     );
   }
 
-  /// Queues a silent full-cache backfill for [conversationId] to run once the
-  /// UI is idle (i.e. after the first frame of a freshly opened window).
+  /// 排队对 [conversationId] 的静默完整缓存回填，
+  /// 在 UI 空闲后运行（即新打开窗口首帧之后）。
   void _scheduleIdleCacheBackfill(String conversationId) {
     final Future<void> task;
     try {
@@ -449,21 +449,20 @@ class ChatController extends ChangeNotifier {
         debugLabel: 'chat.idleCacheBackfill',
       );
     } catch (_) {
-      // No scheduler binding (bare unit tests): warm-up is optional.
+      // 没有调度器绑定（纯单元测试）：预热是可选的。
       return;
     }
     unawaited(task.catchError((Object _) {}));
   }
 
-  /// Silently warms the full message cache for the current conversation.
+  /// 静默预热当前会话的完整消息缓存。
   ///
-  /// Cache warm-up only: no listeners are notified and every guard failure
-  /// just skips the load. Guards: the conversation must still be current, its
-  /// slot count must fit [idleCacheBackfillSlotLimit], and it must not be
-  /// generating (a streaming write owns the single connection queue). The
-  /// current conversation is exempt from cache eviction; if a backfill pushes
-  /// the cache over budget, tail truncation (cache plan measure 13) keeps the
-  /// newest entries.
+  /// 仅缓存预热：不通知监听器，任何保护条件失败都会跳过加载。
+  /// 保护条件：会话必须仍是当前会话，其槽位数量必须不超过
+  /// [idleCacheBackfillSlotLimit]，且不能正在生成
+  /// （流式写入拥有单一连接队列）。当前会话免受缓存驱逐；
+  /// 如果回填使缓存超出预算，尾部截断（缓存方案第 13 项）
+  /// 会保留最新条目。
   @visibleForTesting
   Future<void> backfillCurrentConversationCache(String conversationId) async {
     if (_currentConversation?.id != conversationId) return;
@@ -473,7 +472,7 @@ class ChatController extends ChangeNotifier {
     try {
       await _chatService.loadMessages(conversationId);
     } catch (_) {
-      // Warm-up failures lose nothing user-visible.
+      // 预热失败不会造成用户可见损失。
     }
   }
 
@@ -584,7 +583,7 @@ class ChatController extends ChangeNotifier {
       fromStart: true,
       limit: ChatService.defaultLoadedWindowMax,
     );
-    // Discard the page if the conversation changed while loading.
+    // 如果加载期间会话发生变化，则丢弃该页。
     if (_currentConversation?.id != conversation.id) return false;
     _replaceWindow(page);
     await _preloadVisibleGroupData();
@@ -600,7 +599,7 @@ class ChatController extends ChangeNotifier {
       conversation.id,
       limit: ChatService.defaultLoadedWindowMax,
     );
-    // Discard the page if the conversation changed while loading.
+    // 如果加载期间会话发生变化，则丢弃该页。
     if (_currentConversation?.id != conversation.id) return false;
     _replaceWindow(page);
     await _preloadVisibleGroupData();
@@ -647,7 +646,7 @@ class ChatController extends ChangeNotifier {
         aroundRevisionId: messageId,
         limit: limit,
       );
-      // Discard the page if the conversation changed while loading.
+      // 如果加载期间会话发生变化，则丢弃该页。
       if (_currentConversation?.id != conversation.id) return false;
       if (page == null || page.slots.isEmpty) return false;
       _replaceWindow(page);
@@ -700,21 +699,19 @@ class ChatController extends ChangeNotifier {
     return page != null;
   }
 
-  /// Applies a deletion to the loaded window in place instead of reloading it.
+  /// 直接在已加载窗口内应用删除，而不是重新加载整个窗口。
   ///
-  /// A full reload rebuilds the window around a database anchor, which can
-  /// reshape it (backfilled head, shifted indices); the list widget then loses
-  /// track of which rows survived and has to drop every measured row height,
-  /// making the viewport drift while everything is re-measured. Removing the
-  /// deleted revisions from the loaded window directly keeps every surviving
-  /// slot identity stable, so the list only sees "these slots disappeared".
+  /// 完整重载会围绕数据库锚点重建窗口，可能重塑窗口
+  /// （回填头部、索引偏移）；随后列表控件会失去对幸存行的跟踪，
+  /// 必须丢弃所有已测量的行高，在重新测量所有内容时视口会漂移。
+  /// 直接从已加载窗口中移除被删除修订可以让每个幸存槽位身份保持稳定，
+  /// 因此列表只会看到“这些槽位消失了”。
   ///
-  /// [survivingVersionsByGroup] must contain an entry for every group that
-  /// lost at least one revision, holding the versions that remain (empty when
-  /// the whole slot is gone). Returns false when the mutation cannot be
-  /// expressed as an in-window edit — deleted revisions belonging to slots
-  /// outside the loaded window, missing survivor data, or a window that would
-  /// empty out — in which case the caller falls back to the full reload.
+  /// [survivingVersionsByGroup] 必须为每个至少失去一个修订的组
+  /// 提供条目，保存仍然存在的版本（当整个槽位消失时为空）。
+  /// 当变更不能表达为窗口内编辑时返回 false，包括被删除修订属于
+  /// 已加载窗口外的槽位、缺少幸存数据，或窗口会因此清空；
+  /// 此时调用方回退到完整重载。
   bool _removeRevisionsFromWindow(
     Set<String> removedRevisionIds,
     Map<String, List<ChatMessage>> survivingVersionsByGroup,
@@ -723,8 +720,8 @@ class ChatController extends ChangeNotifier {
     final windowSlotIds = <String>{
       for (final message in _messages) message.groupId ?? message.id,
     };
-    // A group outside the window changes slot counts in a region this method
-    // does not track, so only a reload can resolve it.
+    // 窗口外的组会改变此方法未跟踪区域的槽位数量，
+    // 因此只能通过重新加载来解决。
     for (final groupId in survivingVersionsByGroup.keys) {
       if (!windowSlotIds.contains(groupId)) return false;
     }
@@ -774,16 +771,15 @@ class ChatController extends ChangeNotifier {
     return true;
   }
 
-  /// Drops slots a tail-anchored reload backfilled ahead of the old window.
+  /// 丢弃以尾部为锚点的重载在旧窗口前回填的槽位。
   ///
-  /// A reload without an anchor always fills a full-size window, so deleting
-  /// the last message pulls one extra older message in at the head. The
-  /// refreshed list then has the same length as before with every slot shifted
-  /// by one; SuperSliverList reuses its children under the new indices and
-  /// keeps their stale layout offsets, which parks the viewport above the real
-  /// bottom with no way to scroll back down. Cutting the backfilled head makes
-  /// the new window a prefix of the old one, so the list just loses its
-  /// trailing child. The dropped history is paged back in by [loadMoreBefore].
+  /// 没有锚点的重载总是填充完整大小的窗口，因此删除最后一条消息
+  /// 会在头部多拉入一条更早的消息。刷新后的列表长度与之前相同，
+  /// 但每个槽位偏移一位；SuperSliverList 会在新索引下复用子项，
+  /// 并保留过期的布局偏移，导致视口停在真实底部之上且无法向下滚回。
+  /// 截断回填头部会使新窗口成为旧窗口的前缀，
+  /// 因此列表只是失去尾部子项。被丢弃的历史由 [loadMoreBefore]
+  /// 重新分页加载。
   LoadedTimelinePage? _withoutBackfilledHead(
     LoadedTimelinePage? page,
     Set<String> previousSlotIds,
@@ -796,13 +792,12 @@ class ChatController extends ChangeNotifier {
         !previousSlotIds.contains(page.slots[cut].identity.slotId)) {
       cut++;
     }
-    // cut == 0: nothing backfilled. cut == length: the window moved entirely
-    // off the old one, so there is no shared head to preserve.
+    // cut == 0：没有回填内容。cut == length：窗口已完全移离旧窗口，
+    // 因此没有可保留的共享头部。
     if (cut == 0 || cut >= page.slots.length) return page;
-    // A batch deletion leaves only a handful of the old slots in the reloaded
-    // window, and trimming down to those would show a near-empty list that only
-    // refills once the user scrolls. Reusing children is not worth that, so
-    // below a screenful of survivors keep the full window instead.
+    // 批量删除后，重新加载的窗口中只剩少量旧槽位；如果缩减到这些槽位，
+    // 会显示一个近乎空白的列表，只有用户滚动时才会重新填充。
+    // 为此复用子项并不值得，所以当幸存槽位不足一屏时保留完整窗口。
     final remaining = page.slots.length - cut;
     if (remaining <
         math.min(
@@ -838,8 +833,8 @@ class ChatController extends ChangeNotifier {
     return conversation.copyWith(truncateIndex: localTruncateIndex);
   }
 
-  /// Current loaded-window collapsed projection only — never walks the full
-  /// conversation via [ChatService.getMessagesRange] / full order skeleton.
+  /// 仅使用当前已加载窗口的折叠投影，绝不通过
+  /// [ChatService.getMessagesRange] / 完整顺序骨架遍历整个会话。
   List<ChatMessage> allCollapsedMessagesForCurrentConversation() {
     if (_currentConversation == null) return const <ChatMessage>[];
     return collapsedMessages;
@@ -861,7 +856,10 @@ class ChatController extends ChangeNotifier {
   Future<List<ChatMessage>> messagesForCompleteHistoryContext(
     Conversation conversation,
   ) {
-    return _chatService.loadMessages(conversation.id);
+    if (_chatService.isTemporaryConversation(conversation.id)) {
+      return _chatService.loadMessages(conversation.id);
+    }
+    return _chatService.loadActiveTimelineMessages(conversation.id);
   }
 
   Future<List<ChatMessage>> messagesForGenerationContext(
@@ -920,7 +918,7 @@ class ChatController extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Message Management
+  // 消息管理
   // ============================================================================
 
   Future<ChatMessage> addMessage({
@@ -953,22 +951,20 @@ class ChatController extends ChangeNotifier {
     return message;
   }
 
-  /// Add an already-persisted tail message to the loaded window.
+  /// 将已持久化的尾部消息添加到已加载窗口。
   ///
-  /// ChatService appends new message versions and streaming placeholders to the
-  /// persisted conversation before callers update UI state. This method keeps
-  /// [_messages] as a real contiguous persisted range instead of mixing a tail
-  /// message into an older loaded window.
+  /// ChatService 会在调用方更新 UI 状态前将新消息版本和流式占位项
+  /// 追加到持久化会话。此方法使 [_messages] 保持真实连续的持久化范围，
+  /// 而不是把尾部消息混入较旧的已加载窗口。
   Future<bool> appendPersistedTailMessage(ChatMessage message) async {
     return appendPersistedTailMessages([message]);
   }
 
-  /// Opens the logical window around an already-persisted revision mutation.
+  /// 围绕已持久化的修订变更打开逻辑窗口。
   ///
-  /// Editing or selecting a version can target a slot far outside the tail
-  /// window, so it must not reuse the append-to-tail navigation path. Set
-  /// [truncateFollowingSlots] when persistence removed every logical slot
-  /// after the target.
+  /// 编辑或选择版本可能作用于远离尾部窗口的槽位，
+  /// 因此不能复用追加到尾部的导航路径。当持久化移除了
+  /// 目标之后的所有逻辑槽位时，设置 [truncateFollowingSlots]。
   Future<bool> openAroundPersistedMessage(
     ChatMessage message, {
     bool truncateFollowingSlots = false,
@@ -983,11 +979,10 @@ class ChatController extends ChangeNotifier {
       (candidate) => (candidate.groupId ?? candidate.id) == groupId,
     );
     if (visibleIndex >= 0) {
-      // An edited revision belongs to the same logical timeline slot. Keep the
-      // current bounded window intact so the list can preserve its visible
-      // anchor while only this slot remeasures its extent. Preserve the current
-      // visible-group snapshot until its asynchronous refresh completes so
-      // unrelated version switchers do not briefly disappear.
+      // 编辑后的版本属于同一个逻辑时间线槽位。保持当前有界窗口不变，
+      // 使列表在仅此槽位重新测量高度时仍能保留可见锚点。
+      // 在异步刷新完成前保留当前可见组快照，
+      // 避免无关的版本切换器短暂消失。
       final visibleSnapshot = List<ChatMessage>.of(
         _messagesWithVisibleGroups(),
       );
@@ -1037,14 +1032,12 @@ class ChatController extends ChangeNotifier {
     return opened;
   }
 
-  /// Publishes one atomic persistence result to the loaded tail as one UI
-  /// mutation. A send begins with a user/assistant pair, so refreshing the
-  /// persisted count between those two messages would briefly create a false
-  /// gap and trigger an unnecessary window reload.
+  /// 将一次原子持久化结果作为一次 UI 变更发布到已加载尾部。
+  /// 一次发送以用户/助手消息对开始，因此在这两条消息之间刷新持久化数量
+  /// 会短暂制造错误间隙并触发不必要的窗口重载。
   ///
-  /// Normal path appends the already-persisted messages straight into the
-  /// loaded window with no timeline query; only a detected count gap falls
-  /// back to the full window reload.
+  /// 正常路径直接将已持久化消息追加到已加载窗口而不查询时间线；
+  /// 只有检测到数量间隙时才回退到完整窗口重载。
   Future<bool> appendPersistedTailMessages(List<ChatMessage> messages) async {
     if (messages.isEmpty) return false;
     final conversation = _currentConversation;
@@ -1060,8 +1053,8 @@ class ChatController extends ChangeNotifier {
       return true;
     }
 
-    // Fallback: the window does not provably cover the persisted tail, so
-    // reload the whole tail window instead of appending blindly.
+    // 回退：当前窗口不能证明覆盖持久化尾部，因此重新加载整个尾部窗口，
+    // 而不是盲目追加。
     final page = _lazyHistoryEnabled
         ? await _chatService.loadTimelinePage(
             conversation.id,
@@ -1075,20 +1068,19 @@ class ChatController extends ChangeNotifier {
     return true;
   }
 
-  /// Folds persisted tail messages into the loaded window without a timeline
-  /// query. Returns false when contiguity cannot be proven, so the caller
-  /// falls back to the full window reload.
+  /// 将持久化尾部消息折叠进已加载窗口而不查询时间线。
+  /// 当连续性无法证明时返回 false，调用方会回退到完整窗口重载。
   bool _tryAppendPersistedTail(
     String conversationId,
     List<ChatMessage> messages,
   ) {
-    // The loaded window must currently reach the persisted tail.
+    // 已加载窗口当前必须到达持久化尾部。
     if (_loadedStartIndex + _messages.length != _totalMessageCount) {
       return false;
     }
 
-    // Every incoming message must open a new slot. A new version of a loaded
-    // group would change that slot's selection, which only a reload resolves.
+    // 每条传入消息都必须打开一个新槽位。已加载组的新版本会改变该槽位的选择，
+    // 这只能通过重新加载来解决。
     final knownGroups = <String>{
       for (final loaded in _messages) loaded.groupId ?? loaded.id,
     };
@@ -1100,13 +1092,11 @@ class ChatController extends ChangeNotifier {
       }
     }
 
-    // Gap detection compares persisted row (revision) indices only — never
-    // the collapsed slot count, which multi-version conversations make
-    // diverge from the row count. The batch must occupy the final rows
-    // directly after the loaded tail; anything else means an unseen mutation
-    // landed in between.
-    // Unknown count (-1) fails `rowCount < messages.length` and conservatively
-    // skips the fast append path (falls back to a full reload).
+    // 间隙检测只比较持久化行（修订）索引，绝不比较折叠槽位数量；
+    // 多版本会话会使折叠槽位数偏离行数。该批次必须紧接在已加载尾部
+    // 之后占据最后几行；否则意味着中间出现了未见过的变更。
+    // 未知数量（-1）会使 `rowCount < messages.length` 失败，
+    // 并保守地跳过快速追加路径（回退到完整重载）。
     final rowCount = _chatService.getMessageCount(conversationId);
     if (rowCount < messages.length) return false;
     final firstRowIndex = _chatService.getMessageIndex(
@@ -1142,7 +1132,7 @@ class ChatController extends ChangeNotifier {
     return true;
   }
 
-  /// Update a message in the list.
+  /// 更新列表中的消息。
   void updateMessageInList(String messageId, ChatMessage updatedMessage) {
     if (!replaceMessageSnapshot(updatedMessage)) return;
     publishGenerationState(
@@ -1152,8 +1142,8 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Mirrors an in-memory message snapshot into the timeline window without
-  /// publishing a full-window change. Streaming UI has its own narrow notifier.
+  /// 将内存消息快照镜像到时间线窗口，而不发布全窗口变更。
+  /// 流式 UI 有自己的窄范围通知器。
   bool replaceMessageSnapshot(ChatMessage updatedMessage) {
     if (_currentConversation?.id != updatedMessage.conversationId) {
       return false;
@@ -1183,8 +1173,8 @@ class ChatController extends ChangeNotifier {
     return _currentConversation?.id == conversationId;
   }
 
-  /// Publishes a terminal generation snapshot and always closes the timeline's
-  /// generation lifecycle, even when the message is outside the loaded window.
+  /// 发布最终生成快照，并始终结束时间线的生成生命周期，
+  /// 即使消息在已加载窗口之外。
   bool publishTerminalMessage(ChatMessage message) {
     final terminalMessage = message.isStreaming
         ? message.copyWith(isStreaming: false)
@@ -1194,7 +1184,7 @@ class ChatController extends ChangeNotifier {
     return replaced;
   }
 
-  /// Update a message by ID with optional new values.
+  /// 按 ID 使用可选的新值更新消息。
   Future<void> updateMessage(
     String messageId, {
     String? content,
@@ -1225,15 +1215,15 @@ class ChatController extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Version Selection
+  // 版本选择
   // ============================================================================
 
-  /// Get the selected real version number for a message group.
+  /// 获取消息组的已选真实版本号。
   int getSelectedVersion(String groupId) {
     return _versionSelections[groupId] ?? -1;
   }
 
-  /// Set the selected real version number for a message group.
+  /// 设置消息组的已选真实版本号。
   Future<void> setSelectedVersion(String groupId, int version) async {
     _versionSelections[groupId] = version;
     if (_currentConversation != null) {
@@ -1246,22 +1236,22 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Remove version selection for a group.
+  /// 移除组的版本选择。
   void removeVersionSelection(String groupId) {
     _versionSelections.remove(groupId);
     notifyListeners();
   }
 
   // ============================================================================
-  // Loading State Management
+  // 加载状态管理
   // ============================================================================
 
-  /// Check if a specific conversation is loading.
+  /// 检查指定会话是否正在加载。
   bool isConversationLoading(String conversationId) {
     return _loadingConversationIds.contains(conversationId);
   }
 
-  /// Set the loading state for a conversation.
+  /// 设置会话的加载状态。
   void setConversationLoading(String conversationId, bool loading) {
     final prev = _loadingConversationIds.contains(conversationId);
     if (loading) {
@@ -1274,22 +1264,22 @@ class ChatController extends ChangeNotifier {
       if (!loading &&
           _currentConversation?.id == conversationId &&
           !_chatService.isConversationFullyCached(conversationId)) {
-        // Resume an idle backfill that generation paused.
+        // 恢复因生成而暂停的空闲回填。
         _scheduleIdleCacheBackfill(conversationId);
       }
     }
   }
 
   // ============================================================================
-  // Stream Subscription Management
+  // 流订阅管理
   // ============================================================================
 
-  /// Get the stream subscription for a conversation.
+  /// 获取会话的流订阅。
   StreamSubscription<dynamic>? getStreamSubscription(String conversationId) {
     return _conversationStreams[conversationId];
   }
 
-  /// Set a stream subscription for a conversation.
+  /// 设置会话的流订阅。
   void setStreamSubscription(
     String conversationId,
     StreamSubscription<dynamic> subscription,
@@ -1297,13 +1287,13 @@ class ChatController extends ChangeNotifier {
     _conversationStreams[conversationId] = subscription;
   }
 
-  /// Cancel and remove a stream subscription.
+  /// 取消并移除流订阅。
   Future<void> cancelStreamSubscription(String conversationId) async {
     final sub = _conversationStreams.remove(conversationId);
     await sub?.cancel();
   }
 
-  /// Cancel all stream subscriptions.
+  /// 取消所有流订阅。
   Future<void> cancelAllStreams() async {
     for (final sub in _conversationStreams.values) {
       await sub.cancel();
@@ -1312,13 +1302,13 @@ class ChatController extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Version Collapsing Logic
+  // 版本折叠逻辑
   // ============================================================================
 
-  /// Collapse message versions to show only the selected version per group.
+  /// 折叠消息版本，每组只显示已选版本。
   ///
-  /// This groups messages by their groupId and returns only the message
-  /// at the selected version index for each group.
+  /// 此方法按 groupId 对消息分组，并只返回每个组
+  /// 已选版本索引处的消息。
   List<ChatMessage> collapseVersions(List<ChatMessage> items) {
     final Map<String, List<ChatMessage>> byGroup =
         <String, List<ChatMessage>>{};
@@ -1333,12 +1323,12 @@ class ChatController extends ChangeNotifier {
       list.add(m);
     }
 
-    // Sort each group by version
+    // 按版本对每个组排序
     for (final e in byGroup.entries) {
       e.value.sort((a, b) => a.version.compareTo(b.version));
     }
 
-    // Select the appropriate version from each group
+    // 从每个组中选择合适的版本
     final out = <ChatMessage>[];
     for (final gid in order) {
       final vers = byGroup[gid]!;
@@ -1358,7 +1348,7 @@ class ChatController extends ChangeNotifier {
     return out;
   }
 
-  /// Get messages collapsed by version (cached).
+  /// 获取按版本折叠后的消息（缓存）。
   List<ChatMessage> get collapsedMessages {
     if (_collapsedCache != null) return _collapsedCache!;
     _collapsedCache = collapseVersions(_messagesWithVisibleGroups());
@@ -1468,9 +1458,9 @@ class ChatController extends ChangeNotifier {
     return message.groupId ?? message.id;
   }
 
-  /// O(1) lookup of a message's index in the collapsed list.
+  /// O(1) 查找消息在折叠列表中的索引。
   int indexOfCollapsedMessageId(String id) {
-    collapsedMessages; // ensure cache is built
+    collapsedMessages; // 确保缓存已构建
     return _collapsedIdToIndex?[id] ?? -1;
   }
 
@@ -1491,13 +1481,13 @@ class ChatController extends ChangeNotifier {
     ];
   }
 
-  /// Get messages grouped by groupId (cached).
+  /// 获取按 groupId 分组的消息（缓存）。
   Map<String, List<ChatMessage>> get groupedMessages {
     return _groupCache ??= groupMessagesByGroup();
   }
 
-  /// Complete renderer projection for the current bounded timeline window.
-  /// Computed once per message snapshot, never once per visible row.
+  /// 当前有界时间线窗口的完整渲染投影。
+  /// 每个消息快照只计算一次，绝不按每个可见行计算。
   List<MessageRenderModel> get messageRenderModels {
     return _renderModelsCache ??= MessageRenderModelProjector.project(
       messages: collapsedMessages,
@@ -1523,7 +1513,7 @@ class ChatController extends ChangeNotifier {
     return count - 1;
   }
 
-  /// Group all messages by their groupId.
+  /// 按 groupId 对所有消息分组。
   Map<String, List<ChatMessage>> groupMessagesByGroup() {
     final Map<String, List<ChatMessage>> byGroup =
         <String, List<ChatMessage>>{};
@@ -1535,13 +1525,13 @@ class ChatController extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Cache Invalidation
+  // 缓存失效
   // ============================================================================
 
-  /// Invalidate collapsed/grouped caches without firing listeners.
+  /// 在不触发监听器的情况下使折叠/分组缓存失效。
   ///
-  /// Call this when _messages is mutated externally (e.g. by ChatActions)
-  /// and the caller will fire its own notifyListeners().
+  /// 当 _messages 被外部修改（例如由 ChatActions）且调用方会自行
+  /// 触发 notifyListeners() 时调用此方法。
   void invalidateCache() {
     _collapsedCache = null;
     _collapsedIdToIndex = null;
@@ -1557,7 +1547,7 @@ class ChatController extends ChangeNotifier {
   }
 
   // ============================================================================
-  // Cleanup
+  // 清理
   // ============================================================================
 
   @override

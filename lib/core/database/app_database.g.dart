@@ -1977,6 +1977,978 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
   }
 }
 
+class $MessageTreeEdgeRowsTable extends MessageTreeEdgeRows
+    with TableInfo<$MessageTreeEdgeRowsTable, MessageTreeEdgeRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MessageTreeEdgeRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _conversationIdMeta = const VerificationMeta(
+    'conversationId',
+  );
+  @override
+  late final GeneratedColumn<String> conversationId = GeneratedColumn<String>(
+    'conversation_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES conversation_rows (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _messageIdMeta = const VerificationMeta(
+    'messageId',
+  );
+  @override
+  late final GeneratedColumn<String> messageId = GeneratedColumn<String>(
+    'message_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _parentMessageIdMeta = const VerificationMeta(
+    'parentMessageId',
+  );
+  @override
+  late final GeneratedColumn<String> parentMessageId = GeneratedColumn<String>(
+    'parent_message_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    conversationId,
+    messageId,
+    parentMessageId,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'message_tree_edge_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MessageTreeEdgeRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('conversation_id')) {
+      context.handle(
+        _conversationIdMeta,
+        conversationId.isAcceptableOrUnknown(
+          data['conversation_id']!,
+          _conversationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_conversationIdMeta);
+    }
+    if (data.containsKey('message_id')) {
+      context.handle(
+        _messageIdMeta,
+        messageId.isAcceptableOrUnknown(data['message_id']!, _messageIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_messageIdMeta);
+    }
+    if (data.containsKey('parent_message_id')) {
+      context.handle(
+        _parentMessageIdMeta,
+        parentMessageId.isAcceptableOrUnknown(
+          data['parent_message_id']!,
+          _parentMessageIdMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {conversationId, messageId};
+  @override
+  MessageTreeEdgeRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MessageTreeEdgeRow(
+      conversationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}conversation_id'],
+      )!,
+      messageId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}message_id'],
+      )!,
+      parentMessageId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}parent_message_id'],
+      ),
+    );
+  }
+
+  @override
+  $MessageTreeEdgeRowsTable createAlias(String alias) {
+    return $MessageTreeEdgeRowsTable(attachedDatabase, alias);
+  }
+}
+
+class MessageTreeEdgeRow extends DataClass
+    implements Insertable<MessageTreeEdgeRow> {
+  final String conversationId;
+  final String messageId;
+  final String? parentMessageId;
+  const MessageTreeEdgeRow({
+    required this.conversationId,
+    required this.messageId,
+    this.parentMessageId,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['conversation_id'] = Variable<String>(conversationId);
+    map['message_id'] = Variable<String>(messageId);
+    if (!nullToAbsent || parentMessageId != null) {
+      map['parent_message_id'] = Variable<String>(parentMessageId);
+    }
+    return map;
+  }
+
+  MessageTreeEdgeRowsCompanion toCompanion(bool nullToAbsent) {
+    return MessageTreeEdgeRowsCompanion(
+      conversationId: Value(conversationId),
+      messageId: Value(messageId),
+      parentMessageId: parentMessageId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentMessageId),
+    );
+  }
+
+  factory MessageTreeEdgeRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MessageTreeEdgeRow(
+      conversationId: serializer.fromJson<String>(json['conversationId']),
+      messageId: serializer.fromJson<String>(json['messageId']),
+      parentMessageId: serializer.fromJson<String?>(json['parentMessageId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'conversationId': serializer.toJson<String>(conversationId),
+      'messageId': serializer.toJson<String>(messageId),
+      'parentMessageId': serializer.toJson<String?>(parentMessageId),
+    };
+  }
+
+  MessageTreeEdgeRow copyWith({
+    String? conversationId,
+    String? messageId,
+    Value<String?> parentMessageId = const Value.absent(),
+  }) => MessageTreeEdgeRow(
+    conversationId: conversationId ?? this.conversationId,
+    messageId: messageId ?? this.messageId,
+    parentMessageId: parentMessageId.present
+        ? parentMessageId.value
+        : this.parentMessageId,
+  );
+  MessageTreeEdgeRow copyWithCompanion(MessageTreeEdgeRowsCompanion data) {
+    return MessageTreeEdgeRow(
+      conversationId: data.conversationId.present
+          ? data.conversationId.value
+          : this.conversationId,
+      messageId: data.messageId.present ? data.messageId.value : this.messageId,
+      parentMessageId: data.parentMessageId.present
+          ? data.parentMessageId.value
+          : this.parentMessageId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MessageTreeEdgeRow(')
+          ..write('conversationId: $conversationId, ')
+          ..write('messageId: $messageId, ')
+          ..write('parentMessageId: $parentMessageId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(conversationId, messageId, parentMessageId);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MessageTreeEdgeRow &&
+          other.conversationId == this.conversationId &&
+          other.messageId == this.messageId &&
+          other.parentMessageId == this.parentMessageId);
+}
+
+class MessageTreeEdgeRowsCompanion extends UpdateCompanion<MessageTreeEdgeRow> {
+  final Value<String> conversationId;
+  final Value<String> messageId;
+  final Value<String?> parentMessageId;
+  final Value<int> rowid;
+  const MessageTreeEdgeRowsCompanion({
+    this.conversationId = const Value.absent(),
+    this.messageId = const Value.absent(),
+    this.parentMessageId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  MessageTreeEdgeRowsCompanion.insert({
+    required String conversationId,
+    required String messageId,
+    this.parentMessageId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : conversationId = Value(conversationId),
+       messageId = Value(messageId);
+  static Insertable<MessageTreeEdgeRow> custom({
+    Expression<String>? conversationId,
+    Expression<String>? messageId,
+    Expression<String>? parentMessageId,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (conversationId != null) 'conversation_id': conversationId,
+      if (messageId != null) 'message_id': messageId,
+      if (parentMessageId != null) 'parent_message_id': parentMessageId,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  MessageTreeEdgeRowsCompanion copyWith({
+    Value<String>? conversationId,
+    Value<String>? messageId,
+    Value<String?>? parentMessageId,
+    Value<int>? rowid,
+  }) {
+    return MessageTreeEdgeRowsCompanion(
+      conversationId: conversationId ?? this.conversationId,
+      messageId: messageId ?? this.messageId,
+      parentMessageId: parentMessageId ?? this.parentMessageId,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (conversationId.present) {
+      map['conversation_id'] = Variable<String>(conversationId.value);
+    }
+    if (messageId.present) {
+      map['message_id'] = Variable<String>(messageId.value);
+    }
+    if (parentMessageId.present) {
+      map['parent_message_id'] = Variable<String>(parentMessageId.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MessageTreeEdgeRowsCompanion(')
+          ..write('conversationId: $conversationId, ')
+          ..write('messageId: $messageId, ')
+          ..write('parentMessageId: $parentMessageId, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ConversationBranchRowsTable extends ConversationBranchRows
+    with TableInfo<$ConversationBranchRowsTable, ConversationBranchRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ConversationBranchRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _conversationIdMeta = const VerificationMeta(
+    'conversationId',
+  );
+  @override
+  late final GeneratedColumn<String> conversationId = GeneratedColumn<String>(
+    'conversation_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES conversation_rows (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _tipMessageIdMeta = const VerificationMeta(
+    'tipMessageId',
+  );
+  @override
+  late final GeneratedColumn<String> tipMessageId = GeneratedColumn<String>(
+    'tip_message_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> createdAt =
+      GeneratedColumn<int>(
+        'created_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>(
+        $ConversationBranchRowsTable.$convertercreatedAt,
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    conversationId,
+    tipMessageId,
+    name,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'conversation_branch_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ConversationBranchRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('conversation_id')) {
+      context.handle(
+        _conversationIdMeta,
+        conversationId.isAcceptableOrUnknown(
+          data['conversation_id']!,
+          _conversationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_conversationIdMeta);
+    }
+    if (data.containsKey('tip_message_id')) {
+      context.handle(
+        _tipMessageIdMeta,
+        tipMessageId.isAcceptableOrUnknown(
+          data['tip_message_id']!,
+          _tipMessageIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ConversationBranchRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ConversationBranchRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      conversationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}conversation_id'],
+      )!,
+      tipMessageId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tip_message_id'],
+      ),
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      createdAt: $ConversationBranchRowsTable.$convertercreatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}created_at'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  $ConversationBranchRowsTable createAlias(String alias) {
+    return $ConversationBranchRowsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $convertercreatedAt =
+      const MicrosecondDateTimeConverter();
+}
+
+class ConversationBranchRow extends DataClass
+    implements Insertable<ConversationBranchRow> {
+  final String id;
+  final String conversationId;
+  final String? tipMessageId;
+  final String name;
+  final DateTime createdAt;
+  const ConversationBranchRow({
+    required this.id,
+    required this.conversationId,
+    this.tipMessageId,
+    required this.name,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['conversation_id'] = Variable<String>(conversationId);
+    if (!nullToAbsent || tipMessageId != null) {
+      map['tip_message_id'] = Variable<String>(tipMessageId);
+    }
+    map['name'] = Variable<String>(name);
+    {
+      map['created_at'] = Variable<int>(
+        $ConversationBranchRowsTable.$convertercreatedAt.toSql(createdAt),
+      );
+    }
+    return map;
+  }
+
+  ConversationBranchRowsCompanion toCompanion(bool nullToAbsent) {
+    return ConversationBranchRowsCompanion(
+      id: Value(id),
+      conversationId: Value(conversationId),
+      tipMessageId: tipMessageId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(tipMessageId),
+      name: Value(name),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory ConversationBranchRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ConversationBranchRow(
+      id: serializer.fromJson<String>(json['id']),
+      conversationId: serializer.fromJson<String>(json['conversationId']),
+      tipMessageId: serializer.fromJson<String?>(json['tipMessageId']),
+      name: serializer.fromJson<String>(json['name']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'conversationId': serializer.toJson<String>(conversationId),
+      'tipMessageId': serializer.toJson<String?>(tipMessageId),
+      'name': serializer.toJson<String>(name),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  ConversationBranchRow copyWith({
+    String? id,
+    String? conversationId,
+    Value<String?> tipMessageId = const Value.absent(),
+    String? name,
+    DateTime? createdAt,
+  }) => ConversationBranchRow(
+    id: id ?? this.id,
+    conversationId: conversationId ?? this.conversationId,
+    tipMessageId: tipMessageId.present ? tipMessageId.value : this.tipMessageId,
+    name: name ?? this.name,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  ConversationBranchRow copyWithCompanion(
+    ConversationBranchRowsCompanion data,
+  ) {
+    return ConversationBranchRow(
+      id: data.id.present ? data.id.value : this.id,
+      conversationId: data.conversationId.present
+          ? data.conversationId.value
+          : this.conversationId,
+      tipMessageId: data.tipMessageId.present
+          ? data.tipMessageId.value
+          : this.tipMessageId,
+      name: data.name.present ? data.name.value : this.name,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ConversationBranchRow(')
+          ..write('id: $id, ')
+          ..write('conversationId: $conversationId, ')
+          ..write('tipMessageId: $tipMessageId, ')
+          ..write('name: $name, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, conversationId, tipMessageId, name, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ConversationBranchRow &&
+          other.id == this.id &&
+          other.conversationId == this.conversationId &&
+          other.tipMessageId == this.tipMessageId &&
+          other.name == this.name &&
+          other.createdAt == this.createdAt);
+}
+
+class ConversationBranchRowsCompanion
+    extends UpdateCompanion<ConversationBranchRow> {
+  final Value<String> id;
+  final Value<String> conversationId;
+  final Value<String?> tipMessageId;
+  final Value<String> name;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const ConversationBranchRowsCompanion({
+    this.id = const Value.absent(),
+    this.conversationId = const Value.absent(),
+    this.tipMessageId = const Value.absent(),
+    this.name = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ConversationBranchRowsCompanion.insert({
+    required String id,
+    required String conversationId,
+    this.tipMessageId = const Value.absent(),
+    this.name = const Value.absent(),
+    required DateTime createdAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       conversationId = Value(conversationId),
+       createdAt = Value(createdAt);
+  static Insertable<ConversationBranchRow> custom({
+    Expression<String>? id,
+    Expression<String>? conversationId,
+    Expression<String>? tipMessageId,
+    Expression<String>? name,
+    Expression<int>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (conversationId != null) 'conversation_id': conversationId,
+      if (tipMessageId != null) 'tip_message_id': tipMessageId,
+      if (name != null) 'name': name,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ConversationBranchRowsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? conversationId,
+    Value<String?>? tipMessageId,
+    Value<String>? name,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return ConversationBranchRowsCompanion(
+      id: id ?? this.id,
+      conversationId: conversationId ?? this.conversationId,
+      tipMessageId: tipMessageId ?? this.tipMessageId,
+      name: name ?? this.name,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (conversationId.present) {
+      map['conversation_id'] = Variable<String>(conversationId.value);
+    }
+    if (tipMessageId.present) {
+      map['tip_message_id'] = Variable<String>(tipMessageId.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(
+        $ConversationBranchRowsTable.$convertercreatedAt.toSql(createdAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ConversationBranchRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('conversationId: $conversationId, ')
+          ..write('tipMessageId: $tipMessageId, ')
+          ..write('name: $name, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ConversationTreeStateRowsTable extends ConversationTreeStateRows
+    with TableInfo<$ConversationTreeStateRowsTable, ConversationTreeStateRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ConversationTreeStateRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _conversationIdMeta = const VerificationMeta(
+    'conversationId',
+  );
+  @override
+  late final GeneratedColumn<String> conversationId = GeneratedColumn<String>(
+    'conversation_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES conversation_rows (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _activeBranchIdMeta = const VerificationMeta(
+    'activeBranchId',
+  );
+  @override
+  late final GeneratedColumn<String> activeBranchId = GeneratedColumn<String>(
+    'active_branch_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _branchSelectionsJsonMeta =
+      const VerificationMeta('branchSelectionsJson');
+  @override
+  late final GeneratedColumn<String> branchSelectionsJson =
+      GeneratedColumn<String>(
+        'branch_selections_json',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('{}'),
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    conversationId,
+    activeBranchId,
+    branchSelectionsJson,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'conversation_tree_state_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ConversationTreeStateRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('conversation_id')) {
+      context.handle(
+        _conversationIdMeta,
+        conversationId.isAcceptableOrUnknown(
+          data['conversation_id']!,
+          _conversationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_conversationIdMeta);
+    }
+    if (data.containsKey('active_branch_id')) {
+      context.handle(
+        _activeBranchIdMeta,
+        activeBranchId.isAcceptableOrUnknown(
+          data['active_branch_id']!,
+          _activeBranchIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_activeBranchIdMeta);
+    }
+    if (data.containsKey('branch_selections_json')) {
+      context.handle(
+        _branchSelectionsJsonMeta,
+        branchSelectionsJson.isAcceptableOrUnknown(
+          data['branch_selections_json']!,
+          _branchSelectionsJsonMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {conversationId};
+  @override
+  ConversationTreeStateRow map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ConversationTreeStateRow(
+      conversationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}conversation_id'],
+      )!,
+      activeBranchId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}active_branch_id'],
+      )!,
+      branchSelectionsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}branch_selections_json'],
+      )!,
+    );
+  }
+
+  @override
+  $ConversationTreeStateRowsTable createAlias(String alias) {
+    return $ConversationTreeStateRowsTable(attachedDatabase, alias);
+  }
+}
+
+class ConversationTreeStateRow extends DataClass
+    implements Insertable<ConversationTreeStateRow> {
+  final String conversationId;
+  final String activeBranchId;
+  final String branchSelectionsJson;
+  const ConversationTreeStateRow({
+    required this.conversationId,
+    required this.activeBranchId,
+    required this.branchSelectionsJson,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['conversation_id'] = Variable<String>(conversationId);
+    map['active_branch_id'] = Variable<String>(activeBranchId);
+    map['branch_selections_json'] = Variable<String>(branchSelectionsJson);
+    return map;
+  }
+
+  ConversationTreeStateRowsCompanion toCompanion(bool nullToAbsent) {
+    return ConversationTreeStateRowsCompanion(
+      conversationId: Value(conversationId),
+      activeBranchId: Value(activeBranchId),
+      branchSelectionsJson: Value(branchSelectionsJson),
+    );
+  }
+
+  factory ConversationTreeStateRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ConversationTreeStateRow(
+      conversationId: serializer.fromJson<String>(json['conversationId']),
+      activeBranchId: serializer.fromJson<String>(json['activeBranchId']),
+      branchSelectionsJson: serializer.fromJson<String>(
+        json['branchSelectionsJson'],
+      ),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'conversationId': serializer.toJson<String>(conversationId),
+      'activeBranchId': serializer.toJson<String>(activeBranchId),
+      'branchSelectionsJson': serializer.toJson<String>(branchSelectionsJson),
+    };
+  }
+
+  ConversationTreeStateRow copyWith({
+    String? conversationId,
+    String? activeBranchId,
+    String? branchSelectionsJson,
+  }) => ConversationTreeStateRow(
+    conversationId: conversationId ?? this.conversationId,
+    activeBranchId: activeBranchId ?? this.activeBranchId,
+    branchSelectionsJson: branchSelectionsJson ?? this.branchSelectionsJson,
+  );
+  ConversationTreeStateRow copyWithCompanion(
+    ConversationTreeStateRowsCompanion data,
+  ) {
+    return ConversationTreeStateRow(
+      conversationId: data.conversationId.present
+          ? data.conversationId.value
+          : this.conversationId,
+      activeBranchId: data.activeBranchId.present
+          ? data.activeBranchId.value
+          : this.activeBranchId,
+      branchSelectionsJson: data.branchSelectionsJson.present
+          ? data.branchSelectionsJson.value
+          : this.branchSelectionsJson,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ConversationTreeStateRow(')
+          ..write('conversationId: $conversationId, ')
+          ..write('activeBranchId: $activeBranchId, ')
+          ..write('branchSelectionsJson: $branchSelectionsJson')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(conversationId, activeBranchId, branchSelectionsJson);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ConversationTreeStateRow &&
+          other.conversationId == this.conversationId &&
+          other.activeBranchId == this.activeBranchId &&
+          other.branchSelectionsJson == this.branchSelectionsJson);
+}
+
+class ConversationTreeStateRowsCompanion
+    extends UpdateCompanion<ConversationTreeStateRow> {
+  final Value<String> conversationId;
+  final Value<String> activeBranchId;
+  final Value<String> branchSelectionsJson;
+  final Value<int> rowid;
+  const ConversationTreeStateRowsCompanion({
+    this.conversationId = const Value.absent(),
+    this.activeBranchId = const Value.absent(),
+    this.branchSelectionsJson = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ConversationTreeStateRowsCompanion.insert({
+    required String conversationId,
+    required String activeBranchId,
+    this.branchSelectionsJson = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : conversationId = Value(conversationId),
+       activeBranchId = Value(activeBranchId);
+  static Insertable<ConversationTreeStateRow> custom({
+    Expression<String>? conversationId,
+    Expression<String>? activeBranchId,
+    Expression<String>? branchSelectionsJson,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (conversationId != null) 'conversation_id': conversationId,
+      if (activeBranchId != null) 'active_branch_id': activeBranchId,
+      if (branchSelectionsJson != null)
+        'branch_selections_json': branchSelectionsJson,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ConversationTreeStateRowsCompanion copyWith({
+    Value<String>? conversationId,
+    Value<String>? activeBranchId,
+    Value<String>? branchSelectionsJson,
+    Value<int>? rowid,
+  }) {
+    return ConversationTreeStateRowsCompanion(
+      conversationId: conversationId ?? this.conversationId,
+      activeBranchId: activeBranchId ?? this.activeBranchId,
+      branchSelectionsJson: branchSelectionsJson ?? this.branchSelectionsJson,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (conversationId.present) {
+      map['conversation_id'] = Variable<String>(conversationId.value);
+    }
+    if (activeBranchId.present) {
+      map['active_branch_id'] = Variable<String>(activeBranchId.value);
+    }
+    if (branchSelectionsJson.present) {
+      map['branch_selections_json'] = Variable<String>(
+        branchSelectionsJson.value,
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ConversationTreeStateRowsCompanion(')
+          ..write('conversationId: $conversationId, ')
+          ..write('activeBranchId: $activeBranchId, ')
+          ..write('branchSelectionsJson: $branchSelectionsJson, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $ConversationMcpServerRowsTable extends ConversationMcpServerRows
     with TableInfo<$ConversationMcpServerRowsTable, ConversationMcpServerRow> {
   @override
@@ -11001,6 +11973,12 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     this,
   );
   late final $MessageRowsTable messageRows = $MessageRowsTable(this);
+  late final $MessageTreeEdgeRowsTable messageTreeEdgeRows =
+      $MessageTreeEdgeRowsTable(this);
+  late final $ConversationBranchRowsTable conversationBranchRows =
+      $ConversationBranchRowsTable(this);
+  late final $ConversationTreeStateRowsTable conversationTreeStateRows =
+      $ConversationTreeStateRowsTable(this);
   late final $ConversationMcpServerRowsTable conversationMcpServerRows =
       $ConversationMcpServerRowsTable(this);
   late final $ChatStorageMetaRowsTable chatStorageMetaRows =
@@ -11071,6 +12049,18 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_message_rows_streaming',
     'CREATE INDEX idx_message_rows_streaming ON message_rows (id) WHERE is_streaming = 1',
   );
+  late final Index idxMessageTreeEdgesConversation = Index(
+    'idx_message_tree_edges_conversation',
+    'CREATE INDEX idx_message_tree_edges_conversation ON message_tree_edge_rows (conversation_id)',
+  );
+  late final Index idxConversationBranchesConversation = Index(
+    'idx_conversation_branches_conversation',
+    'CREATE INDEX idx_conversation_branches_conversation ON conversation_branch_rows (conversation_id)',
+  );
+  late final Index idxConversationTreeStateConversation = Index(
+    'idx_conversation_tree_state_conversation',
+    'CREATE INDEX idx_conversation_tree_state_conversation ON conversation_tree_state_rows (conversation_id)',
+  );
   late final Index idxMessagePartsRevisionOrdinal = Index(
     'idx_message_parts_revision_ordinal',
     'CREATE INDEX idx_message_parts_revision_ordinal ON message_part_rows (conversation_id, revision_id, ordinal)',
@@ -11118,6 +12108,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     conversationRows,
     messageRows,
+    messageTreeEdgeRows,
+    conversationBranchRows,
+    conversationTreeStateRows,
     conversationMcpServerRows,
     chatStorageMetaRows,
     messagePartRows,
@@ -11149,6 +12142,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxMessagesConversationTimestamp,
     idxMessagesGroup,
     idxMessageRowsStreaming,
+    idxMessageTreeEdgesConversation,
+    idxConversationBranchesConversation,
+    idxConversationTreeStateConversation,
     idxMessagePartsRevisionOrdinal,
     idxProviderArtifactsRevisionKind,
     idxMessageAssetsAsset,
@@ -11168,6 +12164,31 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('message_rows', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'conversation_rows',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('message_tree_edge_rows', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'conversation_rows',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [
+        TableUpdate('conversation_branch_rows', kind: UpdateKind.delete),
+      ],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'conversation_rows',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [
+        TableUpdate('conversation_tree_state_rows', kind: UpdateKind.delete),
+      ],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
@@ -11275,6 +12296,84 @@ final class $$ConversationRowsTableReferences
     ).filter((f) => f.conversationId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_messageRowsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $MessageTreeEdgeRowsTable,
+    List<MessageTreeEdgeRow>
+  >
+  _messageTreeEdgeRowsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.messageTreeEdgeRows,
+        aliasName:
+            'conversation_rows__id__message_tree_edge_rows__conversation_id',
+      );
+
+  $$MessageTreeEdgeRowsTableProcessedTableManager get messageTreeEdgeRowsRefs {
+    final manager = $$MessageTreeEdgeRowsTableTableManager(
+      $_db,
+      $_db.messageTreeEdgeRows,
+    ).filter((f) => f.conversationId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _messageTreeEdgeRowsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $ConversationBranchRowsTable,
+    List<ConversationBranchRow>
+  >
+  _conversationBranchRowsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.conversationBranchRows,
+        aliasName:
+            'conversation_rows__id__conversation_branch_rows__conversation_id',
+      );
+
+  $$ConversationBranchRowsTableProcessedTableManager
+  get conversationBranchRowsRefs {
+    final manager = $$ConversationBranchRowsTableTableManager(
+      $_db,
+      $_db.conversationBranchRows,
+    ).filter((f) => f.conversationId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _conversationBranchRowsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $ConversationTreeStateRowsTable,
+    List<ConversationTreeStateRow>
+  >
+  _conversationTreeStateRowsRefsTable(
+    _$AppDatabase db,
+  ) => MultiTypedResultKey.fromTable(
+    db.conversationTreeStateRows,
+    aliasName:
+        'conversation_rows__id__conversation_tree_state_rows__conversation_id',
+  );
+
+  $$ConversationTreeStateRowsTableProcessedTableManager
+  get conversationTreeStateRowsRefs {
+    final manager = $$ConversationTreeStateRowsTableTableManager(
+      $_db,
+      $_db.conversationTreeStateRows,
+    ).filter((f) => f.conversationId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _conversationTreeStateRowsRefsTable($_db),
+    );
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -11428,6 +12527,84 @@ class $$ConversationRowsTableFilterComposer
                 $removeJoinBuilderFromRootComposer,
           ),
     );
+    return f(composer);
+  }
+
+  Expression<bool> messageTreeEdgeRowsRefs(
+    Expression<bool> Function($$MessageTreeEdgeRowsTableFilterComposer f) f,
+  ) {
+    final $$MessageTreeEdgeRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.messageTreeEdgeRows,
+      getReferencedColumn: (t) => t.conversationId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessageTreeEdgeRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.messageTreeEdgeRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> conversationBranchRowsRefs(
+    Expression<bool> Function($$ConversationBranchRowsTableFilterComposer f) f,
+  ) {
+    final $$ConversationBranchRowsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.conversationBranchRows,
+          getReferencedColumn: (t) => t.conversationId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$ConversationBranchRowsTableFilterComposer(
+                $db: $db,
+                $table: $db.conversationBranchRows,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<bool> conversationTreeStateRowsRefs(
+    Expression<bool> Function($$ConversationTreeStateRowsTableFilterComposer f)
+    f,
+  ) {
+    final $$ConversationTreeStateRowsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.conversationTreeStateRows,
+          getReferencedColumn: (t) => t.conversationId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$ConversationTreeStateRowsTableFilterComposer(
+                $db: $db,
+                $table: $db.conversationTreeStateRows,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
     return f(composer);
   }
 
@@ -11646,6 +12823,85 @@ class $$ConversationRowsTableAnnotationComposer
     return f(composer);
   }
 
+  Expression<T> messageTreeEdgeRowsRefs<T extends Object>(
+    Expression<T> Function($$MessageTreeEdgeRowsTableAnnotationComposer a) f,
+  ) {
+    final $$MessageTreeEdgeRowsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.messageTreeEdgeRows,
+          getReferencedColumn: (t) => t.conversationId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MessageTreeEdgeRowsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.messageTreeEdgeRows,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<T> conversationBranchRowsRefs<T extends Object>(
+    Expression<T> Function($$ConversationBranchRowsTableAnnotationComposer a) f,
+  ) {
+    final $$ConversationBranchRowsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.conversationBranchRows,
+          getReferencedColumn: (t) => t.conversationId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$ConversationBranchRowsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.conversationBranchRows,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<T> conversationTreeStateRowsRefs<T extends Object>(
+    Expression<T> Function($$ConversationTreeStateRowsTableAnnotationComposer a)
+    f,
+  ) {
+    final $$ConversationTreeStateRowsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.conversationTreeStateRows,
+          getReferencedColumn: (t) => t.conversationId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$ConversationTreeStateRowsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.conversationTreeStateRows,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
   Expression<T> conversationMcpServerRowsRefs<T extends Object>(
     Expression<T> Function($$ConversationMcpServerRowsTableAnnotationComposer a)
     f,
@@ -11715,6 +12971,9 @@ class $$ConversationRowsTableTableManager
           ConversationRow,
           PrefetchHooks Function({
             bool messageRowsRefs,
+            bool messageTreeEdgeRowsRefs,
+            bool conversationBranchRowsRefs,
+            bool conversationTreeStateRowsRefs,
             bool conversationMcpServerRowsRefs,
             bool generationRunRowsRefs,
           })
@@ -11807,6 +13066,9 @@ class $$ConversationRowsTableTableManager
           prefetchHooksCallback:
               ({
                 messageRowsRefs = false,
+                messageTreeEdgeRowsRefs = false,
+                conversationBranchRowsRefs = false,
+                conversationTreeStateRowsRefs = false,
                 conversationMcpServerRowsRefs = false,
                 generationRunRowsRefs = false,
               }) {
@@ -11814,6 +13076,10 @@ class $$ConversationRowsTableTableManager
                   db: db,
                   explicitlyWatchedTables: [
                     if (messageRowsRefs) db.messageRows,
+                    if (messageTreeEdgeRowsRefs) db.messageTreeEdgeRows,
+                    if (conversationBranchRowsRefs) db.conversationBranchRows,
+                    if (conversationTreeStateRowsRefs)
+                      db.conversationTreeStateRows,
                     if (conversationMcpServerRowsRefs)
                       db.conversationMcpServerRows,
                     if (generationRunRowsRefs) db.generationRunRows,
@@ -11836,6 +13102,69 @@ class $$ConversationRowsTableTableManager
                                 table,
                                 p0,
                               ).messageRowsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.conversationId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (messageTreeEdgeRowsRefs)
+                        await $_getPrefetchedData<
+                          ConversationRow,
+                          $ConversationRowsTable,
+                          MessageTreeEdgeRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ConversationRowsTableReferences
+                              ._messageTreeEdgeRowsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ConversationRowsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).messageTreeEdgeRowsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.conversationId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (conversationBranchRowsRefs)
+                        await $_getPrefetchedData<
+                          ConversationRow,
+                          $ConversationRowsTable,
+                          ConversationBranchRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ConversationRowsTableReferences
+                              ._conversationBranchRowsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ConversationRowsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).conversationBranchRowsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.conversationId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (conversationTreeStateRowsRefs)
+                        await $_getPrefetchedData<
+                          ConversationRow,
+                          $ConversationRowsTable,
+                          ConversationTreeStateRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ConversationRowsTableReferences
+                              ._conversationTreeStateRowsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ConversationRowsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).conversationTreeStateRowsRefs,
                           referencedItemsForCurrentItem:
                               (item, referencedItems) => referencedItems.where(
                                 (e) => e.conversationId == item.id,
@@ -11906,6 +13235,9 @@ typedef $$ConversationRowsTableProcessedTableManager =
       ConversationRow,
       PrefetchHooks Function({
         bool messageRowsRefs,
+        bool messageTreeEdgeRowsRefs,
+        bool conversationBranchRowsRefs,
+        bool conversationTreeStateRowsRefs,
         bool conversationMcpServerRowsRefs,
         bool generationRunRowsRefs,
       })
@@ -12731,6 +14063,962 @@ typedef $$MessageRowsTableProcessedTableManager =
         bool messageAssetRowsRefs,
         bool assetReferenceDirtyRowsRefs,
       })
+    >;
+typedef $$MessageTreeEdgeRowsTableCreateCompanionBuilder =
+    MessageTreeEdgeRowsCompanion Function({
+      required String conversationId,
+      required String messageId,
+      Value<String?> parentMessageId,
+      Value<int> rowid,
+    });
+typedef $$MessageTreeEdgeRowsTableUpdateCompanionBuilder =
+    MessageTreeEdgeRowsCompanion Function({
+      Value<String> conversationId,
+      Value<String> messageId,
+      Value<String?> parentMessageId,
+      Value<int> rowid,
+    });
+
+final class $$MessageTreeEdgeRowsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $MessageTreeEdgeRowsTable,
+          MessageTreeEdgeRow
+        > {
+  $$MessageTreeEdgeRowsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $ConversationRowsTable _conversationIdTable(_$AppDatabase db) =>
+      db.conversationRows.createAlias(
+        'message_tree_edge_rows__conversation_id__conversation_rows__id',
+      );
+
+  $$ConversationRowsTableProcessedTableManager get conversationId {
+    final $_column = $_itemColumn<String>('conversation_id')!;
+
+    final manager = $$ConversationRowsTableTableManager(
+      $_db,
+      $_db.conversationRows,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_conversationIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$MessageTreeEdgeRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $MessageTreeEdgeRowsTable> {
+  $$MessageTreeEdgeRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get messageId => $composableBuilder(
+    column: $table.messageId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get parentMessageId => $composableBuilder(
+    column: $table.parentMessageId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$ConversationRowsTableFilterComposer get conversationId {
+    final $$ConversationRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MessageTreeEdgeRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $MessageTreeEdgeRowsTable> {
+  $$MessageTreeEdgeRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get messageId => $composableBuilder(
+    column: $table.messageId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get parentMessageId => $composableBuilder(
+    column: $table.parentMessageId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$ConversationRowsTableOrderingComposer get conversationId {
+    final $$ConversationRowsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableOrderingComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MessageTreeEdgeRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MessageTreeEdgeRowsTable> {
+  $$MessageTreeEdgeRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get messageId =>
+      $composableBuilder(column: $table.messageId, builder: (column) => column);
+
+  GeneratedColumn<String> get parentMessageId => $composableBuilder(
+    column: $table.parentMessageId,
+    builder: (column) => column,
+  );
+
+  $$ConversationRowsTableAnnotationComposer get conversationId {
+    final $$ConversationRowsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MessageTreeEdgeRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $MessageTreeEdgeRowsTable,
+          MessageTreeEdgeRow,
+          $$MessageTreeEdgeRowsTableFilterComposer,
+          $$MessageTreeEdgeRowsTableOrderingComposer,
+          $$MessageTreeEdgeRowsTableAnnotationComposer,
+          $$MessageTreeEdgeRowsTableCreateCompanionBuilder,
+          $$MessageTreeEdgeRowsTableUpdateCompanionBuilder,
+          (MessageTreeEdgeRow, $$MessageTreeEdgeRowsTableReferences),
+          MessageTreeEdgeRow,
+          PrefetchHooks Function({bool conversationId})
+        > {
+  $$MessageTreeEdgeRowsTableTableManager(
+    _$AppDatabase db,
+    $MessageTreeEdgeRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MessageTreeEdgeRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MessageTreeEdgeRowsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$MessageTreeEdgeRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> conversationId = const Value.absent(),
+                Value<String> messageId = const Value.absent(),
+                Value<String?> parentMessageId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => MessageTreeEdgeRowsCompanion(
+                conversationId: conversationId,
+                messageId: messageId,
+                parentMessageId: parentMessageId,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String conversationId,
+                required String messageId,
+                Value<String?> parentMessageId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => MessageTreeEdgeRowsCompanion.insert(
+                conversationId: conversationId,
+                messageId: messageId,
+                parentMessageId: parentMessageId,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$MessageTreeEdgeRowsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({conversationId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (conversationId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.conversationId,
+                                referencedTable:
+                                    $$MessageTreeEdgeRowsTableReferences
+                                        ._conversationIdTable(db),
+                                referencedColumn:
+                                    $$MessageTreeEdgeRowsTableReferences
+                                        ._conversationIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$MessageTreeEdgeRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $MessageTreeEdgeRowsTable,
+      MessageTreeEdgeRow,
+      $$MessageTreeEdgeRowsTableFilterComposer,
+      $$MessageTreeEdgeRowsTableOrderingComposer,
+      $$MessageTreeEdgeRowsTableAnnotationComposer,
+      $$MessageTreeEdgeRowsTableCreateCompanionBuilder,
+      $$MessageTreeEdgeRowsTableUpdateCompanionBuilder,
+      (MessageTreeEdgeRow, $$MessageTreeEdgeRowsTableReferences),
+      MessageTreeEdgeRow,
+      PrefetchHooks Function({bool conversationId})
+    >;
+typedef $$ConversationBranchRowsTableCreateCompanionBuilder =
+    ConversationBranchRowsCompanion Function({
+      required String id,
+      required String conversationId,
+      Value<String?> tipMessageId,
+      Value<String> name,
+      required DateTime createdAt,
+      Value<int> rowid,
+    });
+typedef $$ConversationBranchRowsTableUpdateCompanionBuilder =
+    ConversationBranchRowsCompanion Function({
+      Value<String> id,
+      Value<String> conversationId,
+      Value<String?> tipMessageId,
+      Value<String> name,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+final class $$ConversationBranchRowsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $ConversationBranchRowsTable,
+          ConversationBranchRow
+        > {
+  $$ConversationBranchRowsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $ConversationRowsTable _conversationIdTable(_$AppDatabase db) =>
+      db.conversationRows.createAlias(
+        'conversation_branch_rows__conversation_id__conversation_rows__id',
+      );
+
+  $$ConversationRowsTableProcessedTableManager get conversationId {
+    final $_column = $_itemColumn<String>('conversation_id')!;
+
+    final manager = $$ConversationRowsTableTableManager(
+      $_db,
+      $_db.conversationRows,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_conversationIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$ConversationBranchRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $ConversationBranchRowsTable> {
+  $$ConversationBranchRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tipMessageId => $composableBuilder(
+    column: $table.tipMessageId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get createdAt =>
+      $composableBuilder(
+        column: $table.createdAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  $$ConversationRowsTableFilterComposer get conversationId {
+    final $$ConversationRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ConversationBranchRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ConversationBranchRowsTable> {
+  $$ConversationBranchRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get tipMessageId => $composableBuilder(
+    column: $table.tipMessageId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$ConversationRowsTableOrderingComposer get conversationId {
+    final $$ConversationRowsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableOrderingComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ConversationBranchRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ConversationBranchRowsTable> {
+  $$ConversationBranchRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get tipMessageId => $composableBuilder(
+    column: $table.tipMessageId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$ConversationRowsTableAnnotationComposer get conversationId {
+    final $$ConversationRowsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ConversationBranchRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ConversationBranchRowsTable,
+          ConversationBranchRow,
+          $$ConversationBranchRowsTableFilterComposer,
+          $$ConversationBranchRowsTableOrderingComposer,
+          $$ConversationBranchRowsTableAnnotationComposer,
+          $$ConversationBranchRowsTableCreateCompanionBuilder,
+          $$ConversationBranchRowsTableUpdateCompanionBuilder,
+          (ConversationBranchRow, $$ConversationBranchRowsTableReferences),
+          ConversationBranchRow,
+          PrefetchHooks Function({bool conversationId})
+        > {
+  $$ConversationBranchRowsTableTableManager(
+    _$AppDatabase db,
+    $ConversationBranchRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ConversationBranchRowsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$ConversationBranchRowsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$ConversationBranchRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> conversationId = const Value.absent(),
+                Value<String?> tipMessageId = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ConversationBranchRowsCompanion(
+                id: id,
+                conversationId: conversationId,
+                tipMessageId: tipMessageId,
+                name: name,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String conversationId,
+                Value<String?> tipMessageId = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                required DateTime createdAt,
+                Value<int> rowid = const Value.absent(),
+              }) => ConversationBranchRowsCompanion.insert(
+                id: id,
+                conversationId: conversationId,
+                tipMessageId: tipMessageId,
+                name: name,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$ConversationBranchRowsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({conversationId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (conversationId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.conversationId,
+                                referencedTable:
+                                    $$ConversationBranchRowsTableReferences
+                                        ._conversationIdTable(db),
+                                referencedColumn:
+                                    $$ConversationBranchRowsTableReferences
+                                        ._conversationIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$ConversationBranchRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ConversationBranchRowsTable,
+      ConversationBranchRow,
+      $$ConversationBranchRowsTableFilterComposer,
+      $$ConversationBranchRowsTableOrderingComposer,
+      $$ConversationBranchRowsTableAnnotationComposer,
+      $$ConversationBranchRowsTableCreateCompanionBuilder,
+      $$ConversationBranchRowsTableUpdateCompanionBuilder,
+      (ConversationBranchRow, $$ConversationBranchRowsTableReferences),
+      ConversationBranchRow,
+      PrefetchHooks Function({bool conversationId})
+    >;
+typedef $$ConversationTreeStateRowsTableCreateCompanionBuilder =
+    ConversationTreeStateRowsCompanion Function({
+      required String conversationId,
+      required String activeBranchId,
+      Value<String> branchSelectionsJson,
+      Value<int> rowid,
+    });
+typedef $$ConversationTreeStateRowsTableUpdateCompanionBuilder =
+    ConversationTreeStateRowsCompanion Function({
+      Value<String> conversationId,
+      Value<String> activeBranchId,
+      Value<String> branchSelectionsJson,
+      Value<int> rowid,
+    });
+
+final class $$ConversationTreeStateRowsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $ConversationTreeStateRowsTable,
+          ConversationTreeStateRow
+        > {
+  $$ConversationTreeStateRowsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $ConversationRowsTable _conversationIdTable(_$AppDatabase db) =>
+      db.conversationRows.createAlias(
+        'conversation_tree_state_rows__conversation_id__conversation_rows__id',
+      );
+
+  $$ConversationRowsTableProcessedTableManager get conversationId {
+    final $_column = $_itemColumn<String>('conversation_id')!;
+
+    final manager = $$ConversationRowsTableTableManager(
+      $_db,
+      $_db.conversationRows,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_conversationIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$ConversationTreeStateRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $ConversationTreeStateRowsTable> {
+  $$ConversationTreeStateRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get activeBranchId => $composableBuilder(
+    column: $table.activeBranchId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get branchSelectionsJson => $composableBuilder(
+    column: $table.branchSelectionsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$ConversationRowsTableFilterComposer get conversationId {
+    final $$ConversationRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ConversationTreeStateRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ConversationTreeStateRowsTable> {
+  $$ConversationTreeStateRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get activeBranchId => $composableBuilder(
+    column: $table.activeBranchId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get branchSelectionsJson => $composableBuilder(
+    column: $table.branchSelectionsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$ConversationRowsTableOrderingComposer get conversationId {
+    final $$ConversationRowsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableOrderingComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ConversationTreeStateRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ConversationTreeStateRowsTable> {
+  $$ConversationTreeStateRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get activeBranchId => $composableBuilder(
+    column: $table.activeBranchId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get branchSelectionsJson => $composableBuilder(
+    column: $table.branchSelectionsJson,
+    builder: (column) => column,
+  );
+
+  $$ConversationRowsTableAnnotationComposer get conversationId {
+    final $$ConversationRowsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ConversationTreeStateRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ConversationTreeStateRowsTable,
+          ConversationTreeStateRow,
+          $$ConversationTreeStateRowsTableFilterComposer,
+          $$ConversationTreeStateRowsTableOrderingComposer,
+          $$ConversationTreeStateRowsTableAnnotationComposer,
+          $$ConversationTreeStateRowsTableCreateCompanionBuilder,
+          $$ConversationTreeStateRowsTableUpdateCompanionBuilder,
+          (
+            ConversationTreeStateRow,
+            $$ConversationTreeStateRowsTableReferences,
+          ),
+          ConversationTreeStateRow,
+          PrefetchHooks Function({bool conversationId})
+        > {
+  $$ConversationTreeStateRowsTableTableManager(
+    _$AppDatabase db,
+    $ConversationTreeStateRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ConversationTreeStateRowsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$ConversationTreeStateRowsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$ConversationTreeStateRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> conversationId = const Value.absent(),
+                Value<String> activeBranchId = const Value.absent(),
+                Value<String> branchSelectionsJson = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ConversationTreeStateRowsCompanion(
+                conversationId: conversationId,
+                activeBranchId: activeBranchId,
+                branchSelectionsJson: branchSelectionsJson,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String conversationId,
+                required String activeBranchId,
+                Value<String> branchSelectionsJson = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ConversationTreeStateRowsCompanion.insert(
+                conversationId: conversationId,
+                activeBranchId: activeBranchId,
+                branchSelectionsJson: branchSelectionsJson,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$ConversationTreeStateRowsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({conversationId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (conversationId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.conversationId,
+                                referencedTable:
+                                    $$ConversationTreeStateRowsTableReferences
+                                        ._conversationIdTable(db),
+                                referencedColumn:
+                                    $$ConversationTreeStateRowsTableReferences
+                                        ._conversationIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$ConversationTreeStateRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ConversationTreeStateRowsTable,
+      ConversationTreeStateRow,
+      $$ConversationTreeStateRowsTableFilterComposer,
+      $$ConversationTreeStateRowsTableOrderingComposer,
+      $$ConversationTreeStateRowsTableAnnotationComposer,
+      $$ConversationTreeStateRowsTableCreateCompanionBuilder,
+      $$ConversationTreeStateRowsTableUpdateCompanionBuilder,
+      (ConversationTreeStateRow, $$ConversationTreeStateRowsTableReferences),
+      ConversationTreeStateRow,
+      PrefetchHooks Function({bool conversationId})
     >;
 typedef $$ConversationMcpServerRowsTableCreateCompanionBuilder =
     ConversationMcpServerRowsCompanion Function({
@@ -18812,6 +21100,18 @@ class $AppDatabaseManager {
       $$ConversationRowsTableTableManager(_db, _db.conversationRows);
   $$MessageRowsTableTableManager get messageRows =>
       $$MessageRowsTableTableManager(_db, _db.messageRows);
+  $$MessageTreeEdgeRowsTableTableManager get messageTreeEdgeRows =>
+      $$MessageTreeEdgeRowsTableTableManager(_db, _db.messageTreeEdgeRows);
+  $$ConversationBranchRowsTableTableManager get conversationBranchRows =>
+      $$ConversationBranchRowsTableTableManager(
+        _db,
+        _db.conversationBranchRows,
+      );
+  $$ConversationTreeStateRowsTableTableManager get conversationTreeStateRows =>
+      $$ConversationTreeStateRowsTableTableManager(
+        _db,
+        _db.conversationTreeStateRows,
+      );
   $$ConversationMcpServerRowsTableTableManager get conversationMcpServerRows =>
       $$ConversationMcpServerRowsTableTableManager(
         _db,

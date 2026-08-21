@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 
-/// Result of a tool approval request.
+/// 工具审批请求的结果。
 class ToolApprovalResult {
   final bool approved;
   final String? denyReason;
@@ -14,7 +14,7 @@ class ToolApprovalResult {
       ToolApprovalResult(approved: false, denyReason: reason);
 }
 
-/// A pending approval request for an MCP tool call.
+/// 一个待处理的 MCP 工具调用审批请求。
 class ToolApprovalRequest {
   final String toolCallId;
   final String toolName;
@@ -31,30 +31,30 @@ class ToolApprovalRequest {
   });
 }
 
-/// Manages approval state for MCP tool calls that require user confirmation.
+/// 管理需要用户确认的 MCP 工具调用的审批状态。
 ///
-/// Flow:
-/// 1. [requestApproval] is called from the tool handler when a tool needs approval.
-///    It creates a [Completer], stores the request in [pendingRequests], and returns
-///    the completer's future. The tool handler `await`s this future, blocking execution.
-/// 2. The UI watches this service and shows approve/deny buttons.
-/// 3. When the user taps approve/deny, [approve] or [deny] completes the completer,
-///    unblocking the tool handler.
+/// 流程：
+/// 1. 工具需要审批时，工具处理器调用 [requestApproval]。
+///    它创建一个 [Completer]，将请求存入 [pendingRequests]，并返回
+///    该 completer 的 future。工具处理器 `await` 此 future，从而阻塞执行。
+/// 2. UI 监听本服务并显示批准/拒绝按钮。
+/// 3. 用户点击批准/拒绝时，[approve] 或 [deny] 完成 completer，
+///    解除对工具处理器的阻塞。
 class ToolApprovalService extends ChangeNotifier {
   final Map<String, ToolApprovalRequest> _pending = {};
 
-  /// Unmodifiable view of pending approval requests.
+  /// 待处理审批请求的不可修改视图。
   Map<String, ToolApprovalRequest> get pendingRequests =>
       Map.unmodifiable(_pending);
 
-  /// Whether there are any pending approval requests.
+  /// 是否存在待处理审批请求。
   bool get hasPending => _pending.isNotEmpty;
 
-  /// Check if a specific tool call is pending approval.
+  /// 检查特定工具调用是否正在等待审批。
   bool isPending(String toolCallId) => _pending.containsKey(toolCallId);
 
-  /// Request approval for a tool call.
-  /// Returns a [Future] that completes when the user approves or denies.
+  /// 为工具调用请求审批。
+  /// 返回一个在用户批准或拒绝时完成的 [Future]。
   Future<ToolApprovalResult> requestApproval({
     required String toolCallId,
     required String toolName,
@@ -73,7 +73,7 @@ class ToolApprovalService extends ChangeNotifier {
     return completer.future;
   }
 
-  /// Approve a pending tool call.
+  /// 批准一个待处理工具调用。
   void approve(String toolCallId) {
     final req = _pending.remove(toolCallId);
     if (req != null && !req._completer.isCompleted) {
@@ -82,7 +82,7 @@ class ToolApprovalService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Deny a pending tool call with an optional reason.
+  /// 拒绝一个待处理工具调用，可附原因。
   void deny(String toolCallId, [String? reason]) {
     final req = _pending.remove(toolCallId);
     if (req != null && !req._completer.isCompleted) {
@@ -91,7 +91,7 @@ class ToolApprovalService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Cancel all pending approvals (e.g., when streaming is cancelled).
+  /// 取消所有待处理审批（例如流式被取消时）。
   void cancelAll() {
     for (final req in _pending.values) {
       if (!req._completer.isCompleted) {
@@ -102,10 +102,9 @@ class ToolApprovalService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Cancel pending approvals that belong to [conversationId]. Requests with
-  /// no recorded conversation are cancelled too (fail-safe against leaking a
-  /// blocked tool handler), but approvals owned by other conversations keep
-  /// waiting so cancelling one conversation cannot break another's stream.
+  /// 取消属于 [conversationId] 的待处理审批。未记录会话的请求也会被取消
+  /// （防止泄漏被阻塞的工具处理器的兜底措施），但属于其他会话的审批继续
+  /// 等待，使取消一个会话不会破坏另一个会话的流。
   void cancelForConversation(String conversationId) {
     final toCancel = _pending.values
         .where(

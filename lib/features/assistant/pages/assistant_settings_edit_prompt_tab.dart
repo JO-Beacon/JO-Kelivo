@@ -279,7 +279,7 @@ class _PromptTabState extends State<_PromptTab> {
       _sysCtrl.text,
     );
 
-    // Sample preview for message template
+    // 消息模板的示例预览
     final now = DateTime.now();
     // final ts = zh
     //     ? DateFormat('yyyy年M月d日 a h:mm:ss', 'zh').format(now)
@@ -297,7 +297,7 @@ class _PromptTabState extends State<_PromptTab> {
       );
     }
 
-    // System Prompt Card (no border, iOS style)
+    // 系统提示词卡片（无边框，iOS 风格）
     final sysCard = Container(
       decoration: BoxDecoration(
         color: context.appColors.surfaceCard,
@@ -409,7 +409,7 @@ class _PromptTabState extends State<_PromptTab> {
                 context.read<AssistantProvider>().updateAssistant(
                   a.copyWith(systemPrompt: _sysCtrl.text),
                 );
-                // Restore focus to the input to keep cursor active
+                // 恢复输入框焦点，保持光标活跃
                 Future.microtask(() => _sysFocus.requestFocus());
               },
             ),
@@ -466,7 +466,7 @@ class _PromptTabState extends State<_PromptTab> {
       ],
     );
 
-    // Template Card with preview (no border, iOS style)
+    // 带预览的模板卡片（无边框，iOS 风格）
     final tmplCard = Container(
       decoration: BoxDecoration(
         color: context.appColors.surfaceCard,
@@ -535,7 +535,7 @@ class _PromptTabState extends State<_PromptTab> {
                 context.read<AssistantProvider>().updateAssistant(
                   a.copyWith(messageTemplate: _tmplCtrl.text),
                 );
-                // Restore focus to the input to keep cursor active
+                // 恢复输入框焦点，保持光标活跃
                 Future.microtask(() => _tmplFocus.requestFocus());
               },
             ),
@@ -549,7 +549,7 @@ class _PromptTabState extends State<_PromptTab> {
               ),
             ),
             const SizedBox(height: 6),
-            // Use real chat message widgets for preview (consistent styling)
+            // 使用真实聊天消息 widget 进行预览（保持样式一致）
             const SizedBox(height: 6),
             Builder(
               builder: (context) {
@@ -585,7 +585,7 @@ class _PromptTabState extends State<_PromptTab> {
       ),
     );
 
-    // Preset conversation card
+    // 预设会话卡片
     Widget presetCard() {
       final a = ap.getById(widget.assistantId)!;
       final items = a.presetMessages;
@@ -725,7 +725,7 @@ class _PromptTabState extends State<_PromptTab> {
                   physics: const NeverScrollableScrollPhysics(),
                   buildDefaultDragHandles: false,
                   proxyDecorator: (child, index, anim) {
-                    // No extra elevation/shadow while dragging; keep rounded clip only
+                    // 拖动时无额外海拔或阴影；只保留圆角裁剪
                     return AnimatedBuilder(
                       animation: anim,
                       builder: (_, __) => ClipRRect(
@@ -767,7 +767,7 @@ class _PromptTabState extends State<_PromptTab> {
                   },
                 ),
 
-              // Input area at the bottom
+              // 底部输入区域
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
                 switchInCurve: Curves.easeOutCubic,
@@ -1010,7 +1010,7 @@ class _PresetMessageCard extends StatefulWidget {
     required this.onEdit,
     required this.onDelete,
   });
-  final String role; // 'user' | 'assistant'
+  final String role; // 'user' 或 'assistant'
   final String content;
   final VoidCallback onEdit;
   final VoidCallback onDelete;

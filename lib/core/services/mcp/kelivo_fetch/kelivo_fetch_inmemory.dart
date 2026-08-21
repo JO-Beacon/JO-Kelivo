@@ -2,7 +2,7 @@ import 'package:mcp_client/mcp_client.dart' as mcp;
 
 import 'kelivo_fetch_server.dart';
 
-/// Build a function-call-friendly tool name (similar to Cherry Studio strategy)
+/// 构建一个便于函数调用的工具名称（类似 Cherry Studio 的策略）
 String buildFunctionCallToolName(String serverName, String toolName) {
   String sanitizedServer = serverName.trim().replaceAll('-', '_');
   String sanitizedTool = toolName.trim().replaceAll('-', '_');
@@ -30,8 +30,8 @@ String buildFunctionCallToolName(String serverName, String toolName) {
   return name;
 }
 
-/// Start the in-memory @kelivo/fetch MCP server and connect a client to it.
-/// Returns the connected client and a stop() to dispose both ends.
+/// 启动内存中的 @kelivo/fetch MCP 服务器并连接一个客户端。
+/// 返回已连接的客户端以及用于释放两端的 stop()。
 Future<({mcp.Client client, Future<void> Function() stop})>
 startFetchMcpInMemory() async {
   final server = KelivoFetchMcpServerEngine();
@@ -55,7 +55,7 @@ startFetchMcpInMemory() async {
   );
 }
 
-/// List tools from the connected in-memory client and optionally map to stable ids.
+/// 从已连接的内存客户端列出工具，并可选择映射到稳定 id。
 Future<List<(mcp.Tool tool, String id)>> listFetchTools(
   mcp.Client client,
 ) async {
@@ -66,7 +66,7 @@ Future<List<(mcp.Tool tool, String id)>> listFetchTools(
       .toList(growable: false);
 }
 
-/// Fetch a URL through the in-memory tool with bounded output.
+/// 通过内存工具获取 URL，并限制输出大小。
 Future<mcp.CallToolResult> callFetchTool(
   mcp.Client client, {
   required String url,

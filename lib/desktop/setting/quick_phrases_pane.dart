@@ -21,7 +21,7 @@ class _DesktopQuickPhrasesPaneState extends State<DesktopQuickPhrasesPane> {
   @override
   void initState() {
     super.initState();
-    // Ensure phrases are loaded on first open
+    // 首次打开时确保短语已加载
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<QuickPhraseProvider>().initialize();

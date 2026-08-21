@@ -321,12 +321,12 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
   Future<void> _onAdd() async {
     final settings = context.read<SettingsProvider>();
     String uniqueKey(String prefix, String display) {
-      // Ensure the generated key is truly unique among existing keys
+      // 确保生成的键在现有键中真正唯一
       final existing = settings.providerConfigs.keys.toSet();
 
-      // Case 1: display equals prefix (user used default name), use: "<prefix> - <n>"
+      // 情况 1：显示名等于前缀（用户使用默认名），使用 "<prefix> - <n>"
       if (display.toLowerCase() == prefix.toLowerCase()) {
-        // Start from 1, bump until free
+        // 从 1 开始，直到找到空闲序号
         int i = 1;
         String candidate = '$prefix - $i';
         while (existing.contains(candidate)) {
@@ -336,7 +336,7 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
         return candidate;
       }
 
-      // Case 2: custom display name. Prefer "<prefix> - <display>", then suffix (n)
+      // 情况 2：自定义显示名。优先使用 "<prefix> - <display>"，必要时添加 (n)
       String base = '$prefix - $display';
       if (!existing.contains(base)) return base;
       int i = 2;
@@ -364,7 +364,7 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
         name: display,
         apiKey: _openaiKey.text.trim(),
         baseUrl: base,
-        providerType: ProviderKind.openai, // Explicitly set as OpenAI type
+        providerType: ProviderKind.openai, // 显式设置为 OpenAI 类型
         chatPath: _openaiUseResponse
             ? null
             : (_openaiPath.text.trim().isEmpty
@@ -398,7 +398,7 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
         name: display,
         apiKey: _googleVertex ? '' : _googleKey.text.trim(),
         baseUrl: base,
-        providerType: ProviderKind.google, // Explicitly set as Google type
+        providerType: ProviderKind.google, // 显式设置为 Google 类型
         vertexAI: _googleVertex,
         location: _googleVertex
             ? (_googleLocation.text.trim().isEmpty
@@ -432,7 +432,7 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
         name: display,
         apiKey: _claudeKey.text.trim(),
         baseUrl: base,
-        providerType: ProviderKind.claude, // Explicitly set as Claude type
+        providerType: ProviderKind.claude, // 显式设置为 Claude 类型
         models: const [],
         modelOverrides: const {},
         proxyEnabled: false,
@@ -446,9 +446,9 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
       createdKey = keyName;
     }
 
-    // Ensure providers appear in order list at least once
+    // 确保供应商至少出现在顺序列表中一次
     final order = List<String>.of(settings.providersOrder);
-    // Put the newly created provider at the front
+    // 将新创建的供应商放到最前
     order.remove(createdKey);
     order.insert(0, createdKey);
     await settings.setProvidersOrder(order);
@@ -553,8 +553,8 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
                     icon: Lucide.Plus,
                     label: l10n.addProviderSheetAddButton,
                     backgroundColor: cs.primary,
-                    // No need to set foreground/border; component tints background lightly,
-                    // uses theme color for text, and draws a subtle same-hue border.
+                    // 无需设置前景色或边框；组件会轻微着色背景，
+                    // 使用主题色渲染文本，并绘制细微同色系边框。
                     onTap: _onAdd,
                   ),
                 ),
@@ -646,7 +646,7 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
   }
 }
 
-// Copy of assistant _SegTabBar to ensure consistency
+// 复制助手的 _SegTabBar 以保证一致性
 class _SegTabBar extends StatelessWidget {
   const _SegTabBar({required this.controller, required this.tabs});
   final TabController controller;
@@ -693,13 +693,13 @@ class _SegTabBar extends StatelessWidget {
               child: _TactileRow(
                 onTap: () => controller.animateTo(index),
                 builder: (pressed) {
-                  // Background does not change on press; only selected shows subtle tint
+                  // 按压时背景不变；只有选中项显示细微着色
                   final Color baseBg = selected
                       ? cs.primary.withValues(alpha: 0.14)
                       : Colors.transparent;
                   final Color bg = baseBg;
 
-                  // Text color lightens slightly on press
+                  // 按压时文本颜色略微变浅
                   final Color baseTextColor = selected
                       ? cs.primary
                       : cs.onSurface.withValues(alpha: 0.82);
@@ -799,7 +799,7 @@ class _TactileRowState extends State<_TactileRow> {
   }
 }
 
-// Local tactile icon button (no ripple), for close "X"
+// 本地触感图标按钮（无涟漪），用于关闭 "X"
 class _TactileIconButton extends StatefulWidget {
   const _TactileIconButton({
     required this.icon,

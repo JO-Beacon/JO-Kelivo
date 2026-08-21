@@ -25,16 +25,6 @@ class _FakePathProviderPlatform extends PathProviderPlatform {
   Future<String?> getTemporaryPath() async => '$path/tmp';
 }
 
-Future<void> _flushIdleTasks() async {
-  final binding = TestWidgetsFlutterBinding.ensureInitialized();
-  binding.scheduleFrame();
-  binding.handleBeginFrame(Duration.zero);
-  binding.handleDrawFrame();
-  for (var i = 0; i < 10; i++) {
-    await Future<void>.delayed(Duration.zero);
-  }
-}
-
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -95,16 +85,15 @@ void main() {
       expect(page, isNotNull);
       expect(page!.slots.map((slot) => slot.message.id), orderedEquals(ids));
 
-      // The regression wrote an empty list here: without the order skeleton the
-      // intersection in _cacheLoadedMessages dropped every loaded message.
-      // Bodies are cached on the first-page return path; the full order
-      // skeleton (and ordered projection) arrives via Issue 7 backfill.
+      // The tree is the source of truth, so the active-path skeleton is
+      // installed before the first page is read.
       expect(
-        service.getMessages(conversationId).map((message) => message.id).toSet(),
+        service
+            .getMessages(conversationId)
+            .map((message) => message.id)
+            .toSet(),
         ids.toSet(),
       );
-      await _flushIdleTasks();
-      await service.debugMessageOrderBackfillFuture(conversationId);
       expect(service.debugHasMessageOrderSkeleton(conversationId), isTrue);
       expect(service.getMessageCount(conversationId), ids.length);
       expect(
@@ -129,6 +118,72 @@ void main() {
       orderedEquals(ids),
     );
   });
+
+  test(
+    'restart and idle backfill preserve the persisted active branch',
+    () async {
+      final writer = createService();
+      await writer.init();
+      final conversation = await writer.createConversation(title: 'Chat');
+      final user = await writer.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'question',
+      );
+      final rootReply = await writer.addMessage(
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: 'root reply',
+      );
+      final fork = await writer.createConversationBranch(
+        conversationId: conversation.id,
+        fromMessageId: user.id,
+      );
+      final forkReply = await writer.addMessage(
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: 'fork reply',
+      );
+      expect(fork.activeBranchId, isNot('root-${conversation.id}'));
+      await writer.close();
+      services.remove(writer);
+
+      final reader = createService();
+      await reader.init();
+      final expectedActive = [user.id, forkReply.id];
+      expect(
+        (await reader.loadMessages(
+          conversation.id,
+        )).map((message) => message.id),
+        orderedEquals(expectedActive),
+      );
+      final page = await reader.loadTimelinePage(conversation.id);
+      expect(
+        page!.slots.map((slot) => slot.message.id),
+        orderedEquals(expectedActive),
+      );
+
+      expect(
+        reader.getMessages(conversation.id).map((message) => message.id),
+        orderedEquals(expectedActive),
+      );
+
+      final tree = await reader.loadConversationTree(conversation.id);
+      expect(tree, isNotNull);
+      await reader.switchConversationBranch(
+        conversationId: conversation.id,
+        branchId: tree!.branches.values
+            .singleWhere((branch) => branch.tipMessageId == rootReply.id)
+            .id,
+      );
+      expect(
+        (await reader.loadMessages(
+          conversation.id,
+        )).map((message) => message.id),
+        orderedEquals([user.id, rootReply.id]),
+      );
+    },
+  );
 
   test('paging after a full loadMessages keeps the cache intact', () async {
     final (service, conversationId, ids) = await seedRestartedService(
@@ -198,9 +253,9 @@ void main() {
       messageIds: {ids[1]},
       versionSelectionChanges: const {},
     );
-    expect(deleted, {ids[1]});
+    expect(deleted, {ids[1], ids[2]});
 
-    final remaining = [ids[0], ids[2]];
+    final remaining = [ids[0]];
     expect(service.getMessageCount(conversation.id), remaining.length);
 
     final page = await service.loadTimelinePage(conversation.id);

@@ -8,7 +8,7 @@ import 'chat_database_repository.dart';
 final class ChatDatabaseLease {
   ChatDatabaseLease._(this.repository, this.businessRepository, this._gateway);
 
-  /// Compatibility alias for existing chat-only callers.
+  /// 面向现有仅聊天的调用方的兼容性别名。
   final ChatDatabaseRepository repository;
   ChatDatabaseRepository get chatRepository => repository;
   final BusinessRepository businessRepository;

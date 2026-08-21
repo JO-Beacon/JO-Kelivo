@@ -21,9 +21,8 @@ class UnicodeSanitizer {
             continue;
           }
 
-          // Common corruption pattern observed in some PDF text extraction:
-          // the low surrogate may have its high nibble stripped, turning e.g.
-          // 0xDCE1 into U+0CE1 (0x0CE1). Repair when it looks like this.
+          // 一些 PDF 文本提取中常见的损坏模式：低代理项的高半字节可能被剥离，
+          // 例如把 0xDCE1 变成 U+0CE1（0x0CE1）。遇到这种情况时进行修复。
           if (_looksLikeStrippedLowSurrogate(next)) {
             final repairedLow = 0xD000 | next;
             if (_isLowSurrogate(repairedLow)) {

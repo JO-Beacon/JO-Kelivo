@@ -3,8 +3,8 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 
-/// Thrown when a Cherry Studio direct backup uses a format version that stores
-/// live data in SQLite (v7+) rather than Local Storage / IndexedDB.
+/// 当 Cherry Studio 直接备份使用的格式版本将实时数据存储在 SQLite（v7+）
+/// 而非 Local Storage / IndexedDB 中时抛出。
 class CherryUnsupportedBackupVersionException implements Exception {
   final int version;
   const CherryUnsupportedBackupVersionException(this.version);
@@ -17,10 +17,9 @@ class CherryUnsupportedBackupVersionException implements Exception {
 class CherryDirectBackupReader {
   CherryDirectBackupReader._();
 
-  /// Reads root `metadata.json` when present. Throws
-  /// [CherryUnsupportedBackupVersionException] for version >= 7.
-  /// Returns null when the entry is missing or unreadable — legacy archives
-  /// without metadata must keep falling through to the JSON entry scan.
+  /// 如果存在根级 `metadata.json`，则读取它。版本 >= 7 时抛出
+  /// [CherryUnsupportedBackupVersionException]。当条目缺失或不可读时返回 null ——
+  /// 没有 metadata 的旧归档必须继续回退到 JSON 条目扫描。
   static Map<String, dynamic>? readMetadataOrThrowIfUnsupported(
     Archive archive,
   ) {
@@ -346,8 +345,8 @@ class CherryDirectBackupReader {
       }
     }
 
-    // Keep the raw scan as a compatibility fallback for unusual LevelDB files
-    // or partially-copied backups where structured parsing cannot finish.
+    // 保留原始扫描作为兼容回退，用于异常的 LevelDB 文件
+    // 或结构化解析无法完成的部分复制备份。
     if (!yieldedStructuredPayload) yield bytes;
   }
 
@@ -420,7 +419,7 @@ class CherryDirectBackupReader {
     List<int> payload,
   ) sync* {
     if (payload.length < 12) return;
-    var offset = 12; // 8-byte sequence number + 4-byte record count.
+    var offset = 12; // 8 字节序列号 + 4 字节记录计数。
     final count =
         payload[8] |
         (payload[9] << 8) |
@@ -836,7 +835,7 @@ class _V8ValueScanner {
         final value = reader.readValue();
         values.add(value);
       } catch (_) {
-        // Wrong offsets are expected while scanning raw LevelDB bytes.
+        // 扫描原始 LevelDB 字节时，错误的偏移量是预期情况。
       }
     }
     return values;

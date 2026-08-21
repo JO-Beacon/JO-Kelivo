@@ -97,10 +97,9 @@ class ChatApiService {
     } catch (_) {}
   }
 
-  /// Resolve the upstream/vendor model id for a given logical model key.
-  /// When per-instance overrides specify `apiModelId`, that value is used for
-  /// outbound HTTP requests and vendor-specific heuristics. Otherwise the
-  /// logical `modelId` key is treated as the upstream id (backwards compatible).
+  /// 解析给定逻辑模型键对应的上游/供应商模型 id。
+  /// 当实例级覆盖指定了 `apiModelId` 时，该值用于外发 HTTP 请求和供应商特定启发式逻辑；
+  /// 否则逻辑 `modelId` 键会被视为上游 id（向后兼容）。
   static String _apiModelId(ProviderConfig cfg, String modelId) {
     try {
       final ov = _modelOverride(cfg, modelId);
@@ -135,8 +134,8 @@ class ChatApiService {
     return cfg.apiKey;
   }
 
-  // Read built-in tools configured per model (e.g., ['search', 'url_context']).
-  // Stored under ProviderConfig.modelOverrides[modelId].builtInTools.
+  // 读取按模型配置的内置工具（例如 ['search', 'url_context']）。
+  // 存储在 ProviderConfig.modelOverrides[modelId].builtInTools 下。
   static Set<String> _builtInTools(ProviderConfig cfg, String modelId) {
     try {
       return BuiltInToolNames.parseFromOverride(cfg.modelOverrides[modelId]);
@@ -144,7 +143,7 @@ class ChatApiService {
     return const <String>{};
   }
 
-  // Helpers to read per-model overrides (headers/body) from ProviderConfig
+  // 用于从 ProviderConfig 读取按模型覆盖配置（headers/body）的辅助方法
   static Map<String, dynamic> _modelOverride(
     ProviderConfig cfg,
     String modelId,
@@ -163,7 +162,7 @@ class ChatApiService {
   }) {
     final ov = _modelOverride(cfg, modelId);
     final automatic = <String, String>{...providerDefaultHeaders(cfg)};
-    // AIhubmix promo header (opt-in per-provider)
+    // AIhubmix 推广标头（按提供商选择加入）
     if (_isAihubmix(cfg) && cfg.aihubmixAppCodeEnabled == true) {
       automatic.putIfAbsent('APP-Code', () => _aihubmixAppCode);
     }
@@ -196,7 +195,7 @@ class ChatApiService {
     return base.contains('aihubmix.com');
   }
 
-  // Resolve effective model info by respecting per-model overrides; fallback to inference
+  // 通过遵循按模型覆盖配置解析有效模型信息；回退到推断
   static ModelInfo _effectiveModelInfo(ProviderConfig cfg, String modelId) {
     final upstreamId = _apiModelId(cfg, modelId);
     final base = ModelRegistry.infer(
@@ -230,7 +229,7 @@ class ChatApiService {
     return 'image/png';
   }
 
-  // Simple container for parsed text + image refs
+  // 用于解析后的文本 + 图像引用的简单容器
   static Future<bool> _isValidRemoteImageUrl(String url) async {
     try {
       final uri = Uri.tryParse(url);
@@ -240,22 +239,22 @@ class ChatApiService {
       final client = http.Client();
       try {
         final resp = await client.head(uri).timeout(const Duration(seconds: 5));
-        // Treat standard success / redirect as valid; 4xx/5xx (e.g. 404) as invalid.
+        // 将标准成功 / 重定向视为有效；将 4xx/5xx（例如 404）视为无效。
         final code = resp.statusCode;
         if (code >= 200 && code < 400) return true;
-        // Some servers do not support HEAD and may return 405/501; treat them as indeterminate but valid.
+        // 部分服务器不支持 HEAD，可能返回 405/501；将其视为不确定但有效。
         if (code == 405 || code == 501) return true;
         return false;
       } finally {
         client.close();
       }
     } catch (_) {
-      // Network errors / timeouts → treat as invalid so we fall back to plain text.
+      // 网络错误 / 超时 → 视为无效，以便回退到纯文本。
       return false;
     }
   }
 
-  // Simple container for parsed text + image refs
+  // 用于保存解析后的文本 + 图片引用的简单容器
   static Future<_ParsedTextAndImages> _parseTextAndImages(
     String raw, {
     required bool allowRemoteImages,
@@ -266,24 +265,24 @@ class ChatApiService {
   }) async {
     if (raw.isEmpty) return const _ParsedTextAndImages('', <_ImageRef>[]);
     final mdImg = RegExp(r'!\[[^\]]*\]\(([^)]+)\)');
-    // Custom attachment markers are intentionally not recognized here.
-    // Attachments arrive via structured parts / media-path keys.
+    // 这里有意不识别自定义附件标记。
+    // 附件通过结构化 parts / media-path 键传入。
     final images = <_ImageRef>[];
     final buf = StringBuffer();
     int i = 0;
     while (i < raw.length) {
-      // Skip fenced code blocks (``` or ~~~): content inside is never an image.
+      // 跳过围栏代码块（``` 或 ~~~）：其中的内容永远不是图片。
       if ((raw.startsWith('```', i) || raw.startsWith('~~~', i)) &&
           (i == 0 || raw[i - 1] == '\n')) {
         final fence = raw.substring(i, i + 3);
         buf.write(fence);
         i += 3;
-        // Skip the rest of the opening fence line (language tag, etc.)
+        // 跳过开围栏行剩余内容（语言标签等）。
         while (i < raw.length && raw[i] != '\n') {
           buf.write(raw[i]);
           i++;
         }
-        // Advance until the matching closing fence at the start of a line.
+        // 继续推进，直到行首出现匹配的闭合围栏。
         bool closed = false;
         while (i < raw.length) {
           if (raw[i] == '\n') {
@@ -292,7 +291,7 @@ class ChatApiService {
             if (raw.startsWith(fence, i)) {
               buf.write(fence);
               i += 3;
-              // Skip trailing content on the closing fence line.
+              // 跳过闭合围栏行的尾随内容。
               while (i < raw.length && raw[i] != '\n') {
                 buf.write(raw[i]);
                 i++;
@@ -306,13 +305,13 @@ class ChatApiService {
           }
         }
         if (!closed) {
-          // Unclosed fence: rest of text was written as-is already.
+          // 未闭合的围栏：剩余文本已按原样写出。
         }
         continue;
       }
-      // Skip inline code spans (backtick sequences).
+      // 跳过行内代码片段（反引号序列）。
       if (raw[i] == '`') {
-        // Determine the length of the opening backtick sequence.
+        // 确定开反引号序列的长度。
         int tickLen = 0;
         while (i + tickLen < raw.length && raw[i + tickLen] == '`') {
           tickLen++;
@@ -320,7 +319,7 @@ class ChatApiService {
         final openTicks = raw.substring(i, i + tickLen);
         buf.write(openTicks);
         i += tickLen;
-        // Advance until the matching closing backtick sequence.
+        // 继续推进，直到匹配的闭合反引号序列。
         bool closedTick = false;
         while (i < raw.length) {
           if (raw.startsWith(openTicks, i)) {
@@ -333,7 +332,7 @@ class ChatApiService {
           i++;
         }
         if (!closedTick) {
-          // Unclosed inline code: content was already written.
+          // 未闭合的行内代码：内容已写出。
         }
         continue;
       }
@@ -343,12 +342,12 @@ class ChatApiService {
         final full = raw.substring(m1.start, m1.end);
         final url = (m1.group(1) ?? '').trim();
         if (url.isEmpty) {
-          // Empty URL: treat as plain text, do not try to interpret as image.
+          // 空 URL：按纯文本处理，不尝试解析为图片。
           buf.write(full);
           i = m1.end;
           continue;
         }
-        // Inline base64 / data URLs: always treat as image but keep them out of text.
+        // 行内 base64 / data URL：始终视为图片，但不放入文本。
         if (url.startsWith('data:')) {
           if (allowDataImages) {
             images.add(_ImageRef('data', url));
@@ -358,31 +357,31 @@ class ChatApiService {
           i = m1.end;
           continue;
         }
-        // Remote http(s) URLs
+        // 远程 http(s) URL
         if (url.startsWith('http://') || url.startsWith('https://')) {
           if (!allowRemoteImages) {
-            // Model does not accept image input (or we intentionally skip http images):
-            // keep original markdown so the model can see the template.
+            // 模型不接受图片输入（或我们有意跳过 http 图片）：
+            // 保留原始 markdown，让模型能看到模板。
             if (keepDisallowedImageText) buf.write(full);
             i = m1.end;
             continue;
           }
           final ok = await _isValidRemoteImageUrl(url);
           if (!ok) {
-            // Invalid / unreachable image URL (e.g. 404) → keep as plain text.
+            // 无效 / 无法访问的图片 URL（例如 404）→ 保留为纯文本。
             buf.write(full);
             i = m1.end;
             continue;
           }
           images.add(_ImageRef('url', url));
           if (keepRemoteMarkdownText) {
-            // Keep markdown so the model can see template syntax and URL.
+            // 保留 markdown，让模型能看到模板语法和 URL。
             buf.write(full);
           }
           i = m1.end;
           continue;
         }
-        // Local / relative path: only treat as image when the file exists.
+        // 本地 / 相对路径：仅当文件存在时视为图片。
         if (!allowLocalImages) {
           if (keepDisallowedImageText) buf.write(full);
           i = m1.end;
@@ -397,19 +396,19 @@ class ChatApiService {
           }
           final file = File(resolved);
           if (!file.existsSync()) {
-            // Missing local file: do NOT treat as image; keep original markdown.
+            // 本地文件缺失：不要视为图片；保留原始 markdown。
             buf.write(full);
             i = m1.end;
             continue;
           }
         } catch (_) {
-          // Any error probing the file → fall back to plain text.
+          // 探测文件时发生任何错误 → 回退到纯文本。
           buf.write(full);
           i = m1.end;
           continue;
         }
         images.add(_ImageRef('path', url));
-        // For real local files we keep previous behavior: only attach as image, omit markdown from text.
+        // 对于真实本地文件，我们保持之前的行为：仅作为图片附加，从文本中省略 markdown。
         i = m1.end;
         continue;
       }
@@ -437,8 +436,8 @@ class ChatApiService {
     return b64;
   }
 
-  /// Like [_encodeBase64File], but returns null for missing/unreadable files
-  /// so provider request builders can skip unavailable attachments.
+  /// 与 [_encodeBase64File] 类似，但对于缺失 / 不可读的文件返回 null，
+  /// 以便 provider 请求构建器可以跳过不可用的附件。
   static Future<String?> _tryEncodeBase64File(
     String path, {
     bool withPrefix = false,
@@ -734,7 +733,7 @@ class ChatApiService {
     }
   }
 
-  // Non-streaming text generation for utilities like title summarization
+  // 用于标题摘要等工具的非流式文本生成
   static Future<String> generateText({
     required ProviderConfig config,
     required String modelId,
@@ -765,7 +764,7 @@ class ChatApiService {
           upstreamModelId: upstreamModelId,
         );
         if (config.useResponseApi == true) {
-          // Inject built-in web_search tool when enabled and supported
+          // 在启用且受支持时注入内置 web_search 工具
           final toolsList = <Map<String, dynamic>>[];
           bool isResponsesWebSearchSupported(String id) {
             if (BuiltInToolsHelper.isOpenAIResponsesBuiltInSearchSupportedModel(
@@ -881,7 +880,7 @@ class ChatApiService {
         );
         final extra = _customBody(config, modelId, assistantBody: extraBody);
         if (extra.isNotEmpty) body.addAll(extra);
-        // Vendor-specific reasoning knobs for chat-completions compatible hosts (non-streaming)
+        // 面向兼容 chat-completions 的主机的供应商特定推理开关（非流式）
         if (config.useResponseApi != true) {
           _applyVendorReasoningKnobs(
             body,
@@ -898,7 +897,7 @@ class ChatApiService {
             );
           }
         }
-        // Ensure Responses tools use the flattened schema even if supplied via overrides
+        // 确保 Responses 工具即使通过 overrides 提供也使用扁平化 schema
         try {
           if (config.useResponseApi == true && body['tools'] is List) {
             final raw = (body['tools'] as List).cast<dynamic>();
@@ -925,10 +924,10 @@ class ChatApiService {
         final responseText = _decodeUtf8Body(resp);
         final data = jsonDecode(responseText);
         if (config.useResponseApi == true) {
-          // Prefer SDK-style convenience when present
+          // 当存在时优先使用 SDK 风格的便捷方式
           final ot = data['output_text'];
           if (ot is String && ot.isNotEmpty) return ot;
-          // Aggregate text from `output` list of message blocks
+          // 从 `output` 的消息块列表中聚合文本
           final out = data['output'];
           if (out is List) {
             final buf = StringBuffer();
@@ -1029,10 +1028,10 @@ class ChatApiService {
         return '';
       } else {
         // Google
-        // Check for Vertex AI Claude models (prefix "claude-")
+        // 检查 Vertex AI Claude 模型（前缀为 "claude-"）
         if ((config.vertexAI == true) &&
             modelId.toLowerCase().startsWith('claude-')) {
-          // Reuse existing streaming method but buffer the output for non-streaming
+          // 复用现有流式方法，但为非流式请求缓冲输出
           final stream = _sendGoogleVertexClaudeStream(
             client: client,
             config: config,
@@ -1074,9 +1073,9 @@ class ChatApiService {
           ],
         };
 
-        // Inject Gemini built-in tools with version-aware mutual exclusion.
-        // Gemini 2.x: code_execution is exclusive (cannot coexist with others).
-        // Gemini 3: all built-in tools can coexist.
+        // 注入 Gemini 内置工具，并按版本处理互斥关系。
+        // Gemini 2.x：code_execution 具有排他性（不能与其他工具共存）。
+        // Gemini 3：所有内置工具可以共存。
         final builtIns = _builtInTools(config, modelId);
         if (builtIns.isNotEmpty) {
           final bool isGemini3 = upstreamModelId.toLowerCase().contains(
@@ -1093,14 +1092,14 @@ class ChatApiService {
         final baseHeaders = <String, String>{
           'Content-Type': 'application/json',
         };
-        // Add API Key header for non-Vertex
+        // 为非 Vertex 请求添加 API Key 请求头
         if (!(config.vertexAI == true)) {
           final apiKey = _apiKeyForRequest(config, modelId);
           if (apiKey.isNotEmpty) {
             baseHeaders['x-goog-api-key'] = apiKey;
           }
         }
-        // Add Bearer for Vertex via service account JSON
+        // 通过服务账号 JSON 为 Vertex 添加 Bearer 令牌
         if (config.vertexAI == true) {
           final token = await _maybeVertexAccessToken(config);
           if (token != null && token.isNotEmpty) {
@@ -1391,19 +1390,19 @@ class ChatApiService {
     return topP;
   }
 
-  // Clean JSON Schema for Google Gemini API strict validation
-  // Google requires array types to have 'items' field
+  // 清理 JSON Schema，以满足 Google Gemini API 的严格校验
+  // Google 要求数组类型必须包含 'items' 字段
   static Map<String, dynamic> _cleanSchemaForGemini(
     Map<String, dynamic> schema,
   ) {
     final result = Map<String, dynamic>.from(schema);
 
-    // Recursively fix 'properties' if present
+    // 如果存在 'properties'，则递归修复
     Map<String, dynamic> props = const <String, dynamic>{};
     if (result['properties'] is Map) {
       props = Map<String, dynamic>.from(result['properties'] as Map);
     } else if ((result['type'] ?? '').toString() == 'object') {
-      // Ensure objects always have a properties map for Gemini validation
+      // 确保对象始终具有 properties 映射，以满足 Gemini 校验
       props = <String, dynamic>{};
     }
     if (props.isNotEmpty || result['type'] == 'object') {
@@ -1411,12 +1410,12 @@ class ChatApiService {
         if (value is Map) {
           final propMap = Map<String, dynamic>.from(value);
           // print('[ChatApi/Schema] Property $key: type=${propMap['type']}, hasItems=${propMap.containsKey('items')}');
-          // If type is array but items is missing, add a permissive items schema
+          // 如果类型是 array 但缺少 items，则添加一个宽松的 items schema
           if (propMap['type'] == 'array' && !propMap.containsKey('items')) {
-            // print('[ChatApi/Schema] Adding items to array property: $key');
-            propMap['items'] = {'type': 'string'}; // Default to string array
+            // print('[ChatApi/Schema] 将项目添加到数组属性：$key');
+            propMap['items'] = {'type': 'string'}; // 默认字符串数组
           }
-          // Recursively clean nested objects
+          // 递归清理嵌套对象
           if (propMap['type'] == 'object' &&
               propMap.containsKey('properties')) {
             propMap['properties'] = _cleanSchemaForGemini({
@@ -1427,22 +1426,20 @@ class ChatApiService {
         }
       });
 
-      // Gemini requires every entry in `required` to exist in `properties`
+      // Gemini 要求 `required` 中的每一项都必须存在于 `properties` 中
       final req = result['required'];
       if (req is List) {
         for (final r in req) {
           final name = r.toString();
           if (!props.containsKey(name)) {
-            props[name] = {
-              'type': 'string',
-            }; // Fallback to a simple string field
+            props[name] = {'type': 'string'}; // 回退到简单字符串字段
           }
         }
       }
       result['properties'] = props;
     }
 
-    // Handle array items recursively
+    // 递归处理数组项
     if (result['items'] is Map) {
       result['items'] = _cleanSchemaForGemini(
         result['items'] as Map<String, dynamic>,
@@ -1492,11 +1489,10 @@ class _ResponsesImageGenerationResult {
 
 class ChatStreamChunk {
   final String content;
-  // Optional reasoning delta (when model supports reasoning)
+  // 可选推理增量（当模型支持推理时）
   final String? reasoning;
-  // Optional vendor reasoning details (OpenRouter-style `reasoning_details`
-  // array, may carry thinking signatures). Emitted as a cumulative snapshot so
-  // it can be persisted and echoed back on later requests.
+  // 可选的供应商推理详情（OpenRouter 风格的 `reasoning_details` 数组，
+  // 可能携带思考签名）。以累积快照形式发出，便于持久化并在后续请求中回传。
   final dynamic reasoningDetails;
   final bool isDone;
   final int totalTokens;

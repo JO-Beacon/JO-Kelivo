@@ -16,15 +16,15 @@ class AvatarCache {
   }
 
   static String _safeName(String url) {
-    // Use 64-bit FNV-1a hash to avoid collisions from common URL prefixes
-    int h = 0xcbf29ce484222325; // FNV offset basis
-    const int prime = 0x100000001b3; // FNV prime
+    // 使用 64 位 FNV-1a 哈希，避免常见 URL 前缀带来的冲突
+    int h = 0xcbf29ce484222325; // FNV 偏移基数
+    const int prime = 0x100000001b3; // FNV 质数
     for (final c in url.codeUnits) {
       h ^= c;
-      h = (h * prime) & 0xFFFFFFFFFFFFFFFF; // keep 64-bit
+      h = (h * prime) & 0xFFFFFFFFFFFFFFFF; // 保持 64 位
     }
     final hex = h.toRadixString(16).padLeft(16, '0');
-    // Attempt to keep a reasonable extension (may help some platforms)
+    // 尽量保留合理的扩展名（可能有助于部分平台识别）
     final uri = Uri.tryParse(url);
     String ext = 'img';
     if (uri != null) {
@@ -39,9 +39,8 @@ class AvatarCache {
     return 'av_$hex.$ext';
   }
 
-  /// Synchronous cache peek: returns the locally cached file path for [url]
-  /// only if it is already memoized and the file still exists on disk.
-  /// Returns null when not yet resolved (caller should fall back to [getPath]).
+  /// 同步查看缓存：仅当 [url] 已缓存且文件仍存在于磁盘时，返回本地缓存文件路径。
+  /// 尚未解析时返回 null（调用方应回退到 [getPath]）。
   static String? peek(String url) {
     if (url.isEmpty) return null;
     final cached = _memo[url];
@@ -52,8 +51,8 @@ class AvatarCache {
     return null;
   }
 
-  /// Ensures avatar at [url] is cached locally and returns the file path.
-  /// On failure, returns null.
+  /// 确保 [url] 对应的头像已缓存到本地，并返回文件路径。
+  /// 失败时返回 null。
   static Future<String?> getPath(String url) async {
     if (url.isEmpty) return null;
     if (_memo.containsKey(url)) {
@@ -63,7 +62,7 @@ class AvatarCache {
         final f = File(cached);
         if (await f.exists()) return cached;
       } catch (_) {}
-      // Stale entry: file was deleted; re-resolve.
+      // 过期条目：文件已被删除，需要重新解析。
       _memo.remove(url);
     }
     try {
@@ -77,7 +76,7 @@ class AvatarCache {
         _memo[url] = file.path;
         return file.path;
       }
-      // Download and save
+      // 下载并保存
       final res = await http.get(Uri.parse(url));
       if (res.statusCode >= 200 && res.statusCode < 300) {
         await file.writeAsBytes(res.bodyBytes, flush: true);

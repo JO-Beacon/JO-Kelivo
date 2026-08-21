@@ -9,6 +9,8 @@ import 'package:path/path.dart' as p;
 import 'package:reel_text/reel_text.dart';
 
 import '../../core/services/native_file_save.dart';
+import '../../core/services/migration/migration_backup_file_name.dart';
+import '../../desktop/window_title_bar.dart';
 import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
 import '../../shared/widgets/restart_app_action.dart';
@@ -25,10 +27,12 @@ class HiveToSqliteMigrationPage extends StatefulWidget {
     super.key,
     required this.service,
     this.mobileBackupSaver,
+    this.sqliteMode = false,
   });
 
-  final HiveToSqliteMigrationService service;
+  final MigrationWorkflow service;
   final MobileBackupSaver? mobileBackupSaver;
+  final bool sqliteMode;
 
   @override
   State<HiveToSqliteMigrationPage> createState() =>
@@ -81,7 +85,15 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
     var backupPhaseComplete = false;
     try {
       File? backupFile;
-      if (_usesMobileBackupFlow) {
+      final existingBackupPath = await widget.service.existingBackupPath();
+      final externalBackupSaved = await widget.service
+          .hasExternallySavedBackup();
+      if (existingBackupPath != null) {
+        backupFile = File(existingBackupPath);
+      } else if (externalBackupSaved) {
+        // 原生文档选择器会确认外部副本，但其 URI 在所有平台上都刻意无法
+        // 作为本地 File 读取。
+      } else if (_usesMobileBackupFlow) {
         _mobileBackupSaved = false;
         if (!await _createAndSaveMobileBackup()) return;
         _mobileBackupSaved = true;
@@ -91,8 +103,8 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
       }
       if (!mounted) return;
       setState(() => _backupFile = backupFile);
-      // migrate() bumps the attempt counter itself; anything before this is a
-      // backup-phase failure that must still count toward unlocking skip.
+      // migrate() 会自己递增尝试计数；此前的任何失败都属于备份阶段失败，
+      // 仍须计入以解锁跳过选项。
       backupPhaseComplete = true;
       await widget.service.migrate(backupPath: backupFile?.path);
     } catch (error, stackTrace) {
@@ -100,7 +112,7 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
         try {
           await widget.service.recordFailedAttempt();
         } catch (_) {
-          // Counter persistence is best-effort; never mask the real failure.
+          // 计数器持久化是尽力而为；绝不能掩盖真实失败。
         }
       }
       await _refreshSkipAvailability();
@@ -127,6 +139,18 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
   }
 
   Future<File?> _createDesktopBackup() async {
+    if (widget.sqliteMode) {
+      final path = await FilePicker.platform.saveFile(
+        dialogTitle: AppLocalizations.of(
+          context,
+        )!.sqliteMigrationChooseFileButton,
+        fileName: migrationBackupFileName(),
+        type: FileType.custom,
+        allowedExtensions: const ['zip'],
+      );
+      if (path == null || path.trim().isEmpty) return null;
+      return widget.service.backupToFile(File(path));
+    }
     final path = await FilePicker.platform.getDirectoryPath(
       dialogTitle: AppLocalizations.of(context)!.migrationChooseFolderButton,
     );
@@ -155,7 +179,10 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
         sourcePath: backupFile.path,
         fileName: p.basename(backupFile.path),
       );
-      if (saved) return true;
+      if (saved) {
+        await widget.service.recordExternalBackupSaved();
+        return true;
+      }
       if (mounted) {
         setState(() => _status = widget.service.initialStatus());
       }
@@ -190,7 +217,7 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
     try {
       await widget.service.migrate(backupPath: backupPath);
     } catch (_) {
-      // Status stream already carries the failure details.
+      // 状态流已经包含失败详情。
       await _refreshSkipAvailability();
     } finally {
       await _deleteTemporaryBackup();
@@ -277,27 +304,37 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
       child: Scaffold(
         backgroundColor: cs.surface,
         extendBody: true,
-        body: DecoratedBox(
-          decoration: BoxDecoration(color: cs.surface),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: desktop ? 520 : 430),
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  desktop ? 32 : 20,
-                  (desktop ? 34 : 18) + viewPadding.top,
-                  desktop ? 32 : 20,
-                  (desktop ? 34 : 18) + viewPadding.bottom,
-                ),
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 260),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
-                  child: _bodyForStatus(l10n, key: ValueKey(_status.stage)),
+        body: Column(
+          children: [
+            if (Platform.isWindows) WindowTitleBar(backgroundColor: cs.surface),
+            Expanded(
+              child: DecoratedBox(
+                decoration: BoxDecoration(color: cs.surface),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: desktop ? 520 : 430),
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        desktop ? 32 : 20,
+                        (desktop ? 34 : 18) + viewPadding.top,
+                        desktop ? 32 : 20,
+                        (desktop ? 34 : 18) + viewPadding.bottom,
+                      ),
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 260),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        child: _bodyForStatus(
+                          l10n,
+                          key: ValueKey(_status.stage),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -310,6 +347,7 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
         key: key,
         status: _status,
         mobileBackupFlow: _usesMobileBackupFlow,
+        sqliteMode: widget.sqliteMode,
         onStart: _busy ? null : _pickBackupAndStart,
         onSkip: onSkip,
       ),
@@ -318,10 +356,12 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
       HiveToSqliteMigrationStage.migrating => _ProgressStep(
         key: key,
         status: _status,
+        sqliteMode: widget.sqliteMode,
       ),
       HiveToSqliteMigrationStage.complete => _CompleteStep(
         key: key,
         status: _status,
+        sqliteMode: widget.sqliteMode,
         onRestart: () async {
           await requestAppRestart(context, PlatformUtils.restartApp);
         },
@@ -329,6 +369,7 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
       HiveToSqliteMigrationStage.failed => _FailedStep(
         key: key,
         status: _status,
+        sqliteMode: widget.sqliteMode,
         onRetry: _busy ? null : _retry,
         onSkip: onSkip,
       ),
@@ -341,12 +382,14 @@ class _IntroStep extends StatelessWidget {
     super.key,
     required this.status,
     required this.mobileBackupFlow,
+    required this.sqliteMode,
     required this.onStart,
     this.onSkip,
   });
 
   final HiveToSqliteMigrationStatus status;
   final bool mobileBackupFlow;
+  final bool sqliteMode;
   final VoidCallback? onStart;
   final VoidCallback? onSkip;
 
@@ -360,16 +403,22 @@ class _IntroStep extends StatelessWidget {
       activeStep: 0,
       children: [
         _Header(
-          title: l10n.migrationIntroTitle,
-          subtitle: l10n.migrationIntroSubtitle,
+          title: sqliteMode
+              ? l10n.sqliteMigrationTitle
+              : l10n.migrationIntroTitle,
+          subtitle: sqliteMode
+              ? l10n.sqliteMigrationSubtitle
+              : l10n.migrationIntroSubtitle,
         ),
         const SizedBox(height: 18),
-        _MigrationViz(active: false),
+        _MigrationViz(active: false, sqliteMode: sqliteMode),
         const SizedBox(height: 14),
         _NoteCard(
           icon: Lucide.Shield,
           color: cs.primary,
-          text: l10n.migrationBackupNote,
+          text: sqliteMode
+              ? l10n.sqliteMigrationBackupNote
+              : l10n.migrationBackupNote,
         ),
         const SizedBox(height: 10),
         _NoteCard(
@@ -382,6 +431,8 @@ class _IntroStep extends StatelessWidget {
           icon: Lucide.FolderPlus,
           label: mobileBackupFlow
               ? l10n.migrationSaveBackupButton
+              : sqliteMode
+              ? l10n.sqliteMigrationChooseFileButton
               : l10n.migrationChooseFolderButton,
           onPressed: onStart,
         ),
@@ -404,9 +455,14 @@ class _IntroStep extends StatelessWidget {
 }
 
 class _ProgressStep extends StatelessWidget {
-  const _ProgressStep({super.key, required this.status});
+  const _ProgressStep({
+    super.key,
+    required this.status,
+    required this.sqliteMode,
+  });
 
   final HiveToSqliteMigrationStatus status;
+  final bool sqliteMode;
 
   @override
   Widget build(BuildContext context) {
@@ -421,10 +477,18 @@ class _ProgressStep extends StatelessWidget {
       children: [
         _Header(
           title: inMigration
-              ? l10n.migrationMigratingTitle
+              ? sqliteMode
+                    ? l10n.sqliteMigrationMigratingTitle
+                    : l10n.migrationMigratingTitle
+              : sqliteMode
+              ? l10n.sqliteMigrationBackingUpTitle
               : l10n.migrationBackingUpTitle,
           subtitle: inMigration
-              ? l10n.migrationMigratingSubtitle
+              ? sqliteMode
+                    ? l10n.sqliteMigrationMigratingSubtitle
+                    : l10n.migrationMigratingSubtitle
+              : sqliteMode
+              ? l10n.sqliteMigrationBackingUpSubtitle
               : l10n.migrationBackingUpSubtitle,
         ),
         const SizedBox(height: 18),
@@ -432,9 +496,13 @@ class _ProgressStep extends StatelessWidget {
           label: inMigration
               ? _migratingDetail(l10n, status)
               : status.stage == HiveToSqliteMigrationStage.backupReady
-              ? l10n.migrationBackupReadyDetail
+              ? sqliteMode
+                    ? l10n.sqliteMigrationBackupReadyDetail
+                    : l10n.migrationBackupReadyDetail
               : status.detail == 'saving_zip'
               ? l10n.migrationSavingBackupZipDetail
+              : sqliteMode
+              ? _sqliteBackupDetail(l10n, status.detail)
               : l10n.migrationBackingUpDetail(status.detail),
           animateLabel: inMigration,
           progress: status.progress,
@@ -442,7 +510,7 @@ class _ProgressStep extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         _ChecklistCard(
-          items: inMigration ? _migrationItems(l10n) : _backupItems(),
+          items: inMigration ? _migrationItems(l10n) : _backupItems(l10n),
         ),
         if (status.chatsExportDegraded) ...[
           const SizedBox(height: 12),
@@ -460,7 +528,8 @@ class _ProgressStep extends StatelessWidget {
     );
   }
 
-  List<_ChecklistItem> _backupItems() {
+  List<_ChecklistItem> _backupItems(AppLocalizations l10n) {
+    if (sqliteMode) return _sqliteBackupItems(l10n);
     if (status.backupItems.isEmpty) {
       return const <_ChecklistItem>[];
     }
@@ -483,6 +552,24 @@ class _ProgressStep extends StatelessWidget {
   }
 
   List<_ChecklistItem> _migrationItems(AppLocalizations l10n) {
+    if (sqliteMode) {
+      return [
+        _ChecklistItem(
+          l10n.sqliteMigrationChecklistUpgradeSchema,
+          state: status.detail == 'schema'
+              ? _TaskState.active
+              : _TaskState.done,
+        ),
+        _ChecklistItem(
+          l10n.sqliteMigrationChecklistValidateDatabase,
+          state: status.detail == 'schema'
+              ? _TaskState.pending
+              : status.detail == 'validate'
+              ? _TaskState.active
+              : _TaskState.done,
+        ),
+      ];
+    }
     final detail = status.detail;
     return [
       _ChecklistItem(
@@ -521,6 +608,13 @@ class _ProgressStep extends StatelessWidget {
     AppLocalizations l10n,
     HiveToSqliteMigrationStatus status,
   ) {
+    if (sqliteMode) {
+      return switch (status.detail) {
+        'schema' => l10n.sqliteMigrationUpgradeSchemaDetail,
+        'validate' => l10n.sqliteMigrationValidateDatabaseDetail,
+        _ => l10n.sqliteMigrationUpgradeSchemaDetail,
+      };
+    }
     return switch (status.detail) {
       'schema' => l10n.migrationMigratingPrepareDetail,
       'tool_events' => l10n.migrationMigratingToolEventsDetail,
@@ -528,16 +622,53 @@ class _ProgressStep extends StatelessWidget {
       _ => l10n.migrationMigratingDetail(status.messages),
     };
   }
+
+  String _sqliteBackupDetail(AppLocalizations l10n, String detail) {
+    return switch (detail) {
+      'snapshot' => l10n.sqliteMigrationCreateSnapshotDetail,
+      'package' => l10n.sqliteMigrationPackageBackupDetail,
+      'validate' => l10n.sqliteMigrationValidateBackupDetail,
+      _ => l10n.sqliteMigrationCreateSnapshotDetail,
+    };
+  }
+
+  List<_ChecklistItem> _sqliteBackupItems(AppLocalizations l10n) {
+    final detail = status.detail;
+    return [
+      _ChecklistItem(
+        l10n.sqliteMigrationChecklistSnapshot,
+        state: detail == 'snapshot' ? _TaskState.active : _TaskState.done,
+      ),
+      _ChecklistItem(
+        l10n.sqliteMigrationChecklistPackage,
+        state: switch (detail) {
+          'snapshot' => _TaskState.pending,
+          'package' => _TaskState.active,
+          _ => _TaskState.done,
+        },
+      ),
+      _ChecklistItem(
+        l10n.sqliteMigrationChecklistValidateBackup,
+        state: switch (detail) {
+          'validate' => _TaskState.active,
+          'done' => _TaskState.done,
+          _ => _TaskState.pending,
+        },
+      ),
+    ];
+  }
 }
 
 class _CompleteStep extends StatelessWidget {
   const _CompleteStep({
     super.key,
     required this.status,
+    required this.sqliteMode,
     required this.onRestart,
   });
 
   final HiveToSqliteMigrationStatus status;
+  final bool sqliteMode;
   final Future<void> Function() onRestart;
 
   @override
@@ -567,8 +698,12 @@ class _CompleteStep extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         _Header(
-          title: l10n.migrationCompleteTitle,
-          subtitle: l10n.migrationCompleteSubtitle,
+          title: sqliteMode
+              ? l10n.sqliteMigrationCompleteTitle
+              : l10n.migrationCompleteTitle,
+          subtitle: sqliteMode
+              ? l10n.sqliteMigrationCompleteSubtitle
+              : l10n.migrationCompleteSubtitle,
         ),
         const SizedBox(height: 14),
         _StatsCard(
@@ -603,11 +738,13 @@ class _FailedStep extends StatelessWidget {
   const _FailedStep({
     super.key,
     required this.status,
+    required this.sqliteMode,
     required this.onRetry,
     required this.onSkip,
   });
 
   final HiveToSqliteMigrationStatus status;
+  final bool sqliteMode;
   final VoidCallback? onRetry;
   final VoidCallback? onSkip;
 
@@ -622,8 +759,12 @@ class _FailedStep extends StatelessWidget {
         Icon(Lucide.TriangleAlert, color: cs.error, size: 58),
         const SizedBox(height: 16),
         _Header(
-          title: l10n.migrationFailedTitle,
-          subtitle: l10n.migrationFailedSubtitle,
+          title: sqliteMode
+              ? l10n.sqliteMigrationFailedTitle
+              : l10n.migrationFailedTitle,
+          subtitle: sqliteMode
+              ? l10n.sqliteMigrationFailedSubtitle
+              : l10n.migrationFailedSubtitle,
         ),
         const SizedBox(height: 14),
         _ErrorCard(error: status.error ?? l10n.migrationUnknownError),
@@ -738,9 +879,10 @@ class _Header extends StatelessWidget {
 }
 
 class _MigrationViz extends StatelessWidget {
-  const _MigrationViz({required this.active});
+  const _MigrationViz({required this.active, required this.sqliteMode});
 
   final bool active;
+  final bool sqliteMode;
 
   @override
   Widget build(BuildContext context) {
@@ -753,7 +895,9 @@ class _MigrationViz extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             _DatabaseBubble(
-              label: l10n.migrationSourceDatabaseLabel,
+              label: sqliteMode
+                  ? l10n.sqliteMigrationSourceDatabaseLabel
+                  : l10n.migrationSourceDatabaseLabel,
               color: cs.onSurfaceVariant,
             ),
             Padding(
@@ -761,7 +905,9 @@ class _MigrationViz extends StatelessWidget {
               child: Icon(Lucide.ArrowRight, color: cs.primary),
             ),
             _DatabaseBubble(
-              label: l10n.migrationTargetDatabaseLabel,
+              label: sqliteMode
+                  ? l10n.sqliteMigrationTargetDatabaseLabel
+                  : l10n.migrationTargetDatabaseLabel,
               color: cs.primary,
               active: active,
             ),
@@ -1356,8 +1502,8 @@ class _StatsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    // Match checklist/card hairlines — full-opacity outlineVariant reads too
-    // heavy against surfaceContainerLow cards.
+    // 匹配检查清单或卡片细线；全不透明 outlineVariant 在
+    // surfaceContainerLow 卡片上显得过重。
     final dividerColor = cs.outlineVariant.withValues(alpha: 0.28);
     Widget verticalDivider() =>
         Container(width: 1, height: 42, color: dividerColor);
@@ -1491,8 +1637,7 @@ class _LogCard extends StatelessWidget {
             constraints: const BoxConstraints(maxHeight: 120),
             child: SingleChildScrollView(
               child: Text(
-                // The error and stack trace are appended at the end of the
-                // log; the head is progress noise, so show the tail.
+                // 错误和堆栈会追加到日志末尾；开头是进度噪音，因此显示尾部。
                 (lines.length <= 24 ? lines : lines.sublist(lines.length - 24))
                     .join('\n'),
                 style: TextStyle(

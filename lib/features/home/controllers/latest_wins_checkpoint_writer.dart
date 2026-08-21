@@ -2,10 +2,10 @@ import 'dart:async';
 
 typedef CheckpointDelay = Future<void> Function(Duration duration);
 
-/// Serializes checkpoint writes while retaining only the newest pending value.
+/// 串行化检查点写入，同时只保留最新的待处理值。
 ///
-/// [finalize] closes the queue, drops a pending checkpoint that the final write
-/// supersedes, waits for any in-flight checkpoint, and then runs the final write.
+/// [finalize] 关闭队列，丢弃被最终写入取代的待处理检查点，等待正在进行的检查点，
+/// 然后执行最终写入。
 class LatestWinsCheckpointWriter<T> {
   LatestWinsCheckpointWriter({
     required this.write,
@@ -66,12 +66,12 @@ class LatestWinsCheckpointWriter<T> {
         try {
           await write(build());
         } catch (error, stackTrace) {
-          // Intermediate checkpoints are best-effort. A failed snapshot
-          // (e.g. a transient DB busy/locked) is dropped and reported, but
-          // must never poison the queue or abort the in-flight generation:
-          // the next chunk supersedes it, and the authoritative finalize
-          // write surfaces any persistent failure (such as disk full) on its
-          // own.
+          // 中间检查点是尽力而为。失败的快照
+          // （例如临时 DB busy/locked）会被丢弃并报告，
+          // 但绝不能污染队列或中止正在进行的生成：
+          // 下一个块会取代它，权威的 finalize
+          // 写入会暴露其上的任何持久性失败（例如磁盘已满）。
+          // 自身。
           onError?.call(error, stackTrace);
         }
       }

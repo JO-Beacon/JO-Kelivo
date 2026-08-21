@@ -15,11 +15,10 @@ final class RestorePreviousBundle {
   final RestorePreviousPlan plan;
 }
 
-/// Describes the closed live bundle before any restore object is moved.
+/// 在移动任何恢复对象之前，描述已关闭的 live bundle。
 ///
-/// File contents are hashed as streams. The resulting immutable plan is the
-/// authority used by later cutover phases; this builder never mutates the
-/// live database or asset roots.
+/// 文件内容以流方式哈希。生成的不可变计划是后续切换阶段使用的权威依据；
+/// 此构建器从不修改实时数据库或资源根目录。
 final class RestorePreviousBuilder {
   RestorePreviousBuilder._();
 
@@ -248,11 +247,10 @@ final class RestorePreviousBuilder {
     return RestorePreviousAssetsPlan(rootStates: rootStates, entries: entries);
   }
 
-  /// Makes the selected live asset roots durable before the first rename.
+  /// 在第一次重命名之前，使选定的 live asset roots 持久化。
   ///
-  /// Files are synchronized first, followed by their directories from the
-  /// deepest level to [root]. The final root barrier also orders all earlier
-  /// file and directory flushes on Apple platforms.
+  /// 先同步文件，再按从最深层到 [root] 的顺序同步其目录。最终的根屏障
+  /// 还会在 Apple 平台上为之前所有文件和目录刷盘建立顺序。
   static Future<void> syncAssetRoots({
     required Directory root,
     required RestorePreviousAssetsPlan expected,

@@ -170,9 +170,14 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
               ),
               const SizedBox(height: 8),
 
-              // App header
+              // 应用标题
               _AppHeaderCard(
                 description: l10n.aboutPageAppDescription,
+                updateLabel: updateProvider.checking
+                    ? l10n.aboutPageCheckingForUpdates
+                    : l10n.aboutPageCheckForUpdates,
+                updateEnabled: !updateProvider.checking,
+                onCheckForUpdates: _checkForUpdates,
                 onIconLongPress: () {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(builder: (_) => const DebugPage()),
@@ -182,7 +187,7 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
 
               const SizedBox(height: 16),
 
-              // JO-Kelivo info and links
+              // JO-Kelivo 信息和链接
               _DeskCard(
                 title: l10n.settingsPageAbout,
                 children: [
@@ -250,23 +255,6 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              Align(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 320),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: IosTileButton(
-                      label: updateProvider.checking
-                          ? l10n.aboutPageCheckingForUpdates
-                          : l10n.aboutPageCheckForUpdates,
-                      icon: lucide.Lucide.RefreshCw,
-                      enabled: !updateProvider.checking,
-                      onTap: _checkForUpdates,
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
         ),
@@ -276,9 +264,18 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
 }
 
 class _AppHeaderCard extends StatefulWidget {
-  const _AppHeaderCard({required this.description, this.onIconLongPress});
+  const _AppHeaderCard({
+    required this.description,
+    required this.updateLabel,
+    required this.updateEnabled,
+    required this.onCheckForUpdates,
+    this.onIconLongPress,
+  });
 
   final String description;
+  final String updateLabel;
+  final bool updateEnabled;
+  final VoidCallback onCheckForUpdates;
   final VoidCallback? onIconLongPress;
 
   @override
@@ -348,12 +345,32 @@ class _AppHeaderCardState extends State<_AppHeaderCard> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          l10n.aboutPageAppName,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: AppFontWeights.emphasis,
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                l10n.aboutPageAppName,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: AppFontWeights.emphasis,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            IosTileButton(
+                              label: widget.updateLabel,
+                              icon: lucide.Lucide.RefreshCw,
+                              enabled: widget.updateEnabled,
+                              fontSize: 12,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                                vertical: 7,
+                              ),
+                              onTap: widget.onCheckForUpdates,
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 4),
                         Text(

@@ -74,7 +74,7 @@ class QuickPhraseProvider with ChangeNotifier {
   }) {
     final bool isGlobal = assistantId == null;
 
-    // Determine indices in the subset (global or specific assistant)
+    // 确定子集（全局或特定助手）中的索引
     final List<int> subsetIndices = [];
     for (int i = 0; i < _phrases.length; i++) {
       final p = _phrases[i];
@@ -88,7 +88,7 @@ class QuickPhraseProvider with ChangeNotifier {
     if (oldIndex < 0 || oldIndex >= subsetIndices.length) return;
     if (newIndex < 0 || newIndex >= subsetIndices.length) return;
 
-    // Extract the subset in current order
+    // 按当前顺序提取子集
     final List<QuickPhrase> subset = subsetIndices
         .map((i) => _phrases[i])
         .toList(growable: true);
@@ -96,7 +96,7 @@ class QuickPhraseProvider with ChangeNotifier {
     final item = subset.removeAt(oldIndex);
     subset.insert(newIndex, item);
 
-    // Merge reordered subset back into original list
+    // 将重新排序后的子集合并回原始列表
     final List<QuickPhrase> merged = [];
     int take = 0;
     for (int i = 0; i < _phrases.length; i++) {
@@ -127,13 +127,13 @@ class QuickPhraseProvider with ChangeNotifier {
     await _store.save(_phrases);
   }
 
-  // Backward/alternate API name for clarity
+  // 为清晰起见提供的向后/替代 API 名称
   Future<void> reorderPhrases({
     required int oldIndex,
     required int newIndex,
     String? assistantId,
   }) async {
-    // Immediate UI update, then persist
+    // 立即更新 UI，然后持久化
     _reorderInMemory(
       oldIndex: oldIndex,
       newIndex: newIndex,

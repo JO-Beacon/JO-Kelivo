@@ -4,10 +4,10 @@ import 'package:flutter/foundation.dart';
 
 import '../database/business_preferences.dart';
 
-/// Stores UI collapse state for instruction injection groups.
+/// 存储指令注入分组的 UI 折叠状态。
 ///
-/// Groups are keyed by their normalized name (trimmed). Empty group names are
-/// stored under a stable special key so the collapse state can be remembered.
+/// 分组以其规范化名称（去除首尾空格）作为键。空分组名称会
+/// 存储在一个稳定的特殊键下，以便记住折叠状态。
 class InstructionInjectionGroupProvider extends ChangeNotifier {
   static const String _collapsedKey =
       'instruction_injection_group_collapsed_v1'; // groupKey -> bool

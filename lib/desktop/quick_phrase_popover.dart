@@ -189,9 +189,7 @@ class _GlassPanel extends StatelessWidget {
         filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: cs.surface.withValues(
-              alpha: isDark ? 0.28 : 0.56,
-            ),
+            color: cs.surface.withValues(alpha: isDark ? 0.28 : 0.56),
             border: Border(
               top: BorderSide(
                 color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.18),
@@ -272,9 +270,7 @@ class _RowItemState extends State<_RowItem> {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final baseBg = Colors.transparent;
-    final hoverBg = cs.onSurface.withValues(
-      alpha: isDark ? 0.12 : 0.10,
-    );
+    final hoverBg = cs.onSurface.withValues(alpha: isDark ? 0.12 : 0.10);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
@@ -292,7 +288,7 @@ class _RowItemState extends State<_RowItem> {
           ),
           child: Row(
             children: [
-              // Left: icon + title
+              // 左侧：图标与标题
               Icon(
                 widget.isGlobal ? Lucide.Zap : Lucide.botMessageSquare,
                 size: 16,
@@ -315,7 +311,7 @@ class _RowItemState extends State<_RowItem> {
                 ),
               ),
               const SizedBox(width: 8),
-              // Right: content preview
+              // 右侧：内容预览
               Expanded(
                 flex: 1,
                 child: Text(

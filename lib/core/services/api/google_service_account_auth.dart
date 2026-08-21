@@ -4,12 +4,12 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:jose/jose.dart';
 
-/// Minimal Service Account credentials parsed from a JSON string.
+/// 从 JSON 字符串解析出的最小化服务账号凭据。
 class GoogleServiceAccountCredentials {
   final String clientEmail;
-  final String privateKey; // PKCS#8 PEM with header/footer
-  final String tokenUri; // defaults to https://oauth2.googleapis.com/token
-  final String? projectId; // optional; Vertex API path may need it
+  final String privateKey; // PKCS#8 PEM，带 header/footer
+  final String tokenUri; // 默认为 https://oauth2.googleapis.com/token
+  final String? projectId; // 可选；Vertex API 路径可能需要它
 
   GoogleServiceAccountCredentials({
     required this.clientEmail,
@@ -42,16 +42,16 @@ class GoogleServiceAccountCredentials {
 
 class _CachedToken {
   final String token;
-  final int expiresAt; // epoch seconds
+  final int expiresAt; // epoch 秒数
   _CachedToken(this.token, this.expiresAt);
 }
 
-/// Exchanges a service account JWT for an OAuth2 access token and caches it in-memory.
+/// 用服务账号 JWT 换取 OAuth2 access token，并缓存在内存中。
 class GoogleServiceAccountAuth {
   static final Map<String, _CachedToken> _cache = <String, _CachedToken>{};
 
-  /// Returns an access token using a service account JSON string.
-  /// Default scope is cloud-platform which covers Vertex AI.
+  /// 使用服务账号 JSON 字符串返回 access token。
+  /// 默认 scope 为 cloud-platform，该范围涵盖 Vertex AI。
   static Future<String> getAccessTokenFromJson(
     String serviceAccountJson, {
     List<String> scopes = const [
@@ -82,10 +82,10 @@ class GoogleServiceAccountAuth {
       'scope': scopes.join(' '),
       'aud': creds.tokenUri,
       'iat': now,
-      'exp': now + 3600, // max 1 hour
+      'exp': now + 3600, // 最长 1 小时
     };
 
-    // Sign with RS256 using PEM private key
+    // 使用 PEM 私钥以 RS256 签名
     final jwk = JsonWebKey.fromPem(creds.privateKey);
     final builder = JsonWebSignatureBuilder()
       ..jsonContent = claims

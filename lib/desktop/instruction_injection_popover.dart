@@ -114,7 +114,7 @@ class _InstructionInjectionPopoverState
   @override
   Widget build(BuildContext context) {
     final screen = MediaQuery.of(context).size;
-    // Match search popover width behavior
+    // 匹配搜索弹层的宽度行为
     final width = (widget.anchorWidth - 16).clamp(260.0, 720.0);
     final left =
         (widget.anchorRect.left + (widget.anchorRect.width - width) / 2).clamp(
@@ -186,9 +186,7 @@ class _GlassPanel extends StatelessWidget {
         filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: cs.surface.withValues(
-              alpha: isDark ? 0.28 : 0.56,
-            ),
+            color: cs.surface.withValues(alpha: isDark ? 0.28 : 0.56),
             border: Border(
               top: BorderSide(
                 color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.18),
@@ -356,9 +354,7 @@ class _GroupHeaderRowState extends State<_GroupHeaderRow> {
     final cs = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final hoverBg = cs.onSurface.withValues(
-      alpha: isDark ? 0.10 : 0.06,
-    );
+    final hoverBg = cs.onSurface.withValues(alpha: isDark ? 0.10 : 0.06);
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -382,7 +378,7 @@ class _GroupHeaderRowState extends State<_GroupHeaderRow> {
                 height: 16,
                 child: Center(
                   child: AnimatedRotation(
-                    turns: widget.collapsed ? 0.0 : 0.25, // right -> down
+                    turns: widget.collapsed ? 0.0 : 0.25, // 右箭头变为向下
                     duration: const Duration(milliseconds: 220),
                     curve: Curves.easeOutCubic,
                     child: Icon(
@@ -437,9 +433,7 @@ class _CancelRowState extends State<_CancelRow> {
     final cs = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final hoverBg = cs.onSurface.withValues(
-      alpha: isDark ? 0.10 : 0.06,
-    );
+    final hoverBg = cs.onSurface.withValues(alpha: isDark ? 0.10 : 0.06);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
@@ -509,9 +503,7 @@ class _RowItemState extends State<_RowItem> {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final baseBg = Colors.transparent;
-    final hoverBg = cs.onSurface.withValues(
-      alpha: isDark ? 0.12 : 0.10,
-    );
+    final hoverBg = cs.onSurface.withValues(alpha: isDark ? 0.12 : 0.10);
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,

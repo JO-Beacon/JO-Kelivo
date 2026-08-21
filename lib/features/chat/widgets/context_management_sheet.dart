@@ -7,7 +7,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
-/// Bottom sheet for mobile: compress context or clear context.
+/// 移动端底部面板：压缩上下文或清空上下文。
 class ContextManagementSheet extends StatelessWidget {
   const ContextManagementSheet({
     super.key,
@@ -45,7 +45,7 @@ class ContextManagementSheet extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Drag handle
+          // 拖拽把手
           Container(
             width: 40,
             height: 4,

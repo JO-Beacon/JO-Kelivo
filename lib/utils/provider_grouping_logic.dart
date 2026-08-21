@@ -131,7 +131,7 @@ int mapVisibleGroupTargetToActualInsertIndex({
   return idx >= 0 ? idx : fullWithoutMoved.length;
 }
 
-// ----- Reorder analysis (UI-independent) -----
+// ----- 排序分析（与 UI 无关） -----
 
 sealed class ProviderGroupingRowVM {
   const ProviderGroupingRowVM();
@@ -139,7 +139,7 @@ sealed class ProviderGroupingRowVM {
 
 class ProviderGroupingHeaderVM extends ProviderGroupingRowVM {
   const ProviderGroupingHeaderVM({required this.groupKey});
-  final String groupKey; // groupId or `__ungrouped__`
+  final String groupKey; // groupId 或 `__ungrouped__`
 }
 
 class ProviderGroupingProviderVM extends ProviderGroupingRowVM {
@@ -148,7 +148,7 @@ class ProviderGroupingProviderVM extends ProviderGroupingRowVM {
     required this.groupKey,
   });
   final String providerKey;
-  final String groupKey; // groupId or `__ungrouped__` (original group)
+  final String groupKey; // groupId 或 `__ungrouped__`（原始分组）
 }
 
 class ProviderGroupingMoveIntent {
@@ -160,10 +160,10 @@ class ProviderGroupingMoveIntent {
 
   final String providerKey;
 
-  /// groupId or `__ungrouped__`
+  /// groupId 或 `__ungrouped__`
   final String targetGroupKey;
 
-  /// Position within the target group's visible provider segment (0-based).
+  /// 在目标组可见供应商区间中的位置（从 0 开始）。
   final int targetPos;
 }
 
@@ -213,7 +213,7 @@ ProviderGroupingReorderAnalysis analyzeProviderGroupingReorder({
     return const ProviderGroupingReorderAnalysis.invalid();
   }
 
-  // onReorderItem already reports the index after removing the old item.
+  // onReorderItem 已报告移除旧项之后的索引。
   newIndex = newIndex.clamp(0, rows.length);
   if (disallowInsertBeforeFirstHeader && newIndex == 0) newIndex = 1;
   if (newIndex == oldIndex) {
@@ -306,7 +306,7 @@ ProviderGroupingHeaderReorderIntent? analyzeProviderGroupingHeaderReorder({
   );
 }
 
-// ----- Provider order + group map updates (pure) -----
+// ----- 供应商顺序与分组映射更新（纯函数） -----
 
 class ProviderGroupingMoveResult {
   const ProviderGroupingMoveResult({
@@ -316,7 +316,7 @@ class ProviderGroupingMoveResult {
 
   final List<String> providersOrder;
 
-  /// providerKey -> groupId (missing = ungrouped)
+  /// providerKey -> groupId（缺失表示未分组）
   final Map<String, String> providerGroupMap;
 }
 
@@ -386,7 +386,7 @@ ProviderGroupingMoveResult moveProviderInGroupedOrder({
       ? targetGroupId
       : null;
 
-  // Clean mapping first (best-effort) and apply providerKey update.
+  // 先尽力清理映射，再应用 providerKey 更新。
   final nextMap = <String, String>{};
   for (final entry in providerGroupMap.entries) {
     final k = entry.key;
@@ -401,7 +401,7 @@ ProviderGroupingMoveResult moveProviderInGroupedOrder({
     nextMap[providerKey] = normalizedTargetGroupId;
   }
 
-  // Normalize order: keep known keys, dedupe, and remove the moved key.
+  // 规范化顺序：保留已知键、去重，并移除被移动的键。
   final nextOrder = <String>[];
   final seen = <String>{};
   for (final k in providersOrder) {

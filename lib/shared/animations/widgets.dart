@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:animations/animations.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
-// Common durations
+// 通用时长
 const Duration kAnimFast = Duration(milliseconds: 180);
 const Duration kAnim = Duration(milliseconds: 240);
 const Duration kAnimSlow = Duration(milliseconds: 320);
 
-// A compact AnimatedSwitcher for icon glyph/state changes.
+// 用于图标字形或状态变化的紧凑 AnimatedSwitcher。
 class AnimatedIconSwap extends StatelessWidget {
   const AnimatedIconSwap({
     super.key,
@@ -27,7 +27,7 @@ class AnimatedIconSwap extends StatelessWidget {
   }
 }
 
-// A simple text switcher: fade + slide up on change.
+// 简单的文本切换器：变化时淡出并向上滑动。
 class AnimatedTextSwap extends StatelessWidget {
   const AnimatedTextSwap({
     super.key,
@@ -76,7 +76,7 @@ class AnimatedTextSwap extends StatelessWidget {
   }
 }
 
-// Handy appear animation using flutter_animate (fade + slight Y move)
+// 使用 flutter_animate 的便捷出现动画（淡入加轻微 Y 轴位移）
 extension Appear on Widget {
   Widget appear({
     Duration duration = kAnim,

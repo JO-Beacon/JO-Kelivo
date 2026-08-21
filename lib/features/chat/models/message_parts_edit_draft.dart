@@ -1,9 +1,9 @@
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 
-/// Mutable edit draft that keeps the persisted part order as its source of
-/// truth. Only text, image, and file parts are editable; every other part is
-/// carried through unchanged.
+/// 可变编辑草稿，以已持久化的 part 顺序作为唯一事实来源。
+/// 只有 text、image 和 file part 可编辑；其他 part 都
+/// 原样保留。
 class MessagePartsEditDraft {
   MessagePartsEditDraft(Iterable<MessagePart> parts)
     : _parts = List<MessagePart>.of(parts);

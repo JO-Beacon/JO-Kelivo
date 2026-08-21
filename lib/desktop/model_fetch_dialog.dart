@@ -137,7 +137,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
     final l10n = AppLocalizations.of(context)!;
     final settingsWatch = context.watch<SettingsProvider>();
 
-    // Compute header filtered list and selection state for toggle icon
+    // 计算标题过滤列表和切换图标的选中状态
     final headerQuery = _searchCtrl.text.trim().toLowerCase();
     final headerFiltered = <ModelInfo>[
       for (final m in _items)
@@ -181,7 +181,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Title bar with inset divider
+                // 带内嵌分隔线的标题栏
                 Container(
                   height: 48,
                   decoration: BoxDecoration(color: cs.surface),
@@ -213,7 +213,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                     ),
                   ),
                 ),
-                // Body area uses desktop surface background
+                // 内容区使用桌面 surface 背景
                 Expanded(
                   child: Container(
                     color: cs.surface,
@@ -304,7 +304,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                                           ];
                                           if (filtered.isEmpty) return;
                                           if (allHeaderFilteredSelected) {
-                                            // Deselect all filtered
+                                            // 取消选中所有过滤结果
                                             final toRemove = filtered
                                                 .map((m) => m.id)
                                                 .toSet();
@@ -319,7 +319,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                                               cfg.copyWith(models: next),
                                             );
                                           } else {
-                                            // Select all filtered
+                                            // 选中所有过滤结果
                                             final setIds = cfg.models.toSet();
                                             setIds.addAll(
                                               filtered.map((m) => m.id),
@@ -481,7 +481,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
       padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
       children: [
         for (final g in groupKeys) ...[
-          // Group header
+          // 分组标题
           Padding(
             padding: const EdgeInsets.fromLTRB(4, 6, 4, 6),
             child: _TactileRow(
@@ -709,10 +709,14 @@ class _TactileRowState extends State<_TactileRow> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final overlay = () {
       if (_pressed) {
-        return Theme.of(context).colorScheme.onSurface.withValues(alpha: isDark ? 0.08 : 0.06);
+        return Theme.of(
+          context,
+        ).colorScheme.onSurface.withValues(alpha: isDark ? 0.08 : 0.06);
       }
       if (_hovered) {
-        return Theme.of(context).colorScheme.onSurface.withValues(alpha: isDark ? 0.04 : 0.03);
+        return Theme.of(
+          context,
+        ).colorScheme.onSurface.withValues(alpha: isDark ? 0.04 : 0.03);
       }
       return Colors.transparent;
     }();

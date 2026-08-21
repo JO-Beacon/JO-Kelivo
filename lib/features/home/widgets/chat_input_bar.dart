@@ -83,8 +83,8 @@ class _ImageProcessingTask {
   final String sourcePath;
   final ImageCompressConfig config;
 
-  /// Only ever true for app-owned temp sources (clipboard paste temps);
-  /// user-picked files must never be flagged for deletion.
+  /// 仅对应用拥有的临时来源（剪贴板粘贴临时文件）为 true；
+  /// 用户选择的文件绝不能标记为待删除。
   final bool deleteSourceAfterProcessing;
 }
 
@@ -124,6 +124,7 @@ class ChatInputBar extends StatefulWidget {
     this.onOpenWorldBook,
     this.onClearContext,
     this.onCompressContext,
+    this.clearContextLabel,
     this.onLongPressLearning,
     this.learningModeActive = false,
     this.worldBookActive = false,
@@ -176,6 +177,7 @@ class ChatInputBar extends StatefulWidget {
   final VoidCallback? onOpenWorldBook;
   final VoidCallback? onClearContext;
   final VoidCallback? onCompressContext;
+  final String? clearContextLabel;
   final VoidCallback? onLongPressLearning;
   final bool learningModeActive;
   final bool worldBookActive;
@@ -199,9 +201,9 @@ class ChatInputBar extends StatefulWidget {
 class _ChatInputBarState extends State<ChatInputBar>
     with WidgetsBindingObserver {
   late TextEditingController _controller;
-  bool _isExpanded = false; // Track expand/collapse state for input field
-  // The ASR provider owns microphone capture. This widget only owns the
-  // composer presentation and an exact snapshot used by Cancel.
+  bool _isExpanded = false; // 跟踪输入框展开/收起状态
+  // ASR provider 负责麦克风采集。此 widget 只负责输入区展示，
+  // 以及取消操作所需的精确快照。
   final List<double> _voiceLevels = <double>[];
   final ValueNotifier<int> _voiceLevelsVersion = ValueNotifier<int>(0);
   static const int _maxVoiceLevels = 400;
@@ -224,12 +226,11 @@ class _ChatInputBarState extends State<ChatInputBar>
   int _nextTextPasteId = 0;
   int _draftReplacementRevision = 0;
   Future<void> _textPasteWriteTail = Future<void>.value();
-  final List<DocumentAttachment> _docs =
-      <DocumentAttachment>[]; // files to upload
+  final List<DocumentAttachment> _docs = <DocumentAttachment>[]; // 要上传的文件
   final Map<LogicalKeyboardKey, Timer?> _repeatTimers = {};
   static const Duration _repeatInitialDelay = Duration(milliseconds: 300);
   static const Duration _repeatPeriod = Duration(milliseconds: 35);
-  // Anchor for the responsive overflow menu on the left action bar
+  // 左侧操作栏响应式溢出菜单的锚点
   final GlobalKey _leftOverflowAnchorKey = GlobalKey(
     debugLabel: 'left-overflow-anchor',
   );
@@ -240,7 +241,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   static const double _imagePreviewHeight = 64;
   static const double _imageRemoveButtonSize = 18;
   static const int _maxInlinePasteCharacters = 5000;
-  // Suppress context menu briefly after app resume to avoid flickering
+  // 应用恢复后短暂抑制上下文菜单，避免闪烁
   bool _suppressContextMenu = false;
   bool _isSubmitting = false;
   String? _imageModeModelKey;
@@ -319,7 +320,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       _pendingImagePasteIds.isNotEmpty ||
       _pendingTextPasteIds.isNotEmpty;
 
-  // Instance method for onChanged to avoid recreating the callback on every build
+  // 为 onChanged 使用实例方法，避免每次构建重新创建回调
   void _onTextChanged(String _) => setState(() {});
 
   void _addImages(List<String> paths) {
@@ -530,12 +531,12 @@ class _ChatInputBarState extends State<ChatInputBar>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    // When app resumes from background, suppress context menu briefly to avoid flickering
+    // 应用从后台恢复时短暂抑制上下文菜单，避免闪烁
     if (state == AppLifecycleState.resumed) {
       _suppressContextMenu = true;
-      // Also unfocus to reset any stuck toolbar state
+      // 同时取消焦点，重置可能卡住的工具栏状态
       widget.focusNode?.unfocus();
-      // Re-enable context menu after a short delay
+      // 短暂延迟后重新启用上下文菜单
       Future.delayed(const Duration(milliseconds: 300), () {
         if (mounted) {
           setState(() => _suppressContextMenu = false);
@@ -543,7 +544,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       });
     } else if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused) {
-      // When going to background, hide any open toolbar
+      // 进入后台时隐藏任何已打开的工具栏
       _suppressContextMenu = true;
       widget.focusNode?.unfocus();
       if (_ownsVoiceSession) unawaited(_cancelVoiceInput());
@@ -601,18 +602,18 @@ class _ChatInputBarState extends State<ChatInputBar>
     return l10n.chatInputBarHint;
   }
 
-  /// Returns the number of lines in the input text (minimum 1).
+  /// 返回输入文本的行数（至少为 1）。
   int get _lineCount {
     final text = _controller.text;
     if (text.isEmpty) return 1;
     return text.split('\n').length;
   }
 
-  /// Whether to show the expand/collapse button (when text has 3+ lines).
+  /// 是否显示展开或折叠按钮（文本达到 3 行以上时）。
   bool get _showExpandButton => _lineCount >= 3;
 
   // ---------------------------------------------------------------------------
-  // Voice input
+  // 语音输入
   // ---------------------------------------------------------------------------
 
   Future<void> _startVoiceInput() async {
@@ -644,8 +645,8 @@ class _ChatInputBarState extends State<ChatInputBar>
     } catch (error) {
       _stopVoiceLevelSampling();
       if (!mounted) return;
-      // Provider failures normally arrive through its listener first. This is
-      // the fallback for errors raised before the provider can publish state.
+      // 供应商失败通常会先通过其监听器到达。这里处理 provider
+      // 发布状态前就抛出的错误。
       if (_ownsVoiceSession) {
         final original = _voiceBaseValue;
         if (original != null) _controller.value = original;
@@ -675,7 +676,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       _reportVoiceFailure(error);
       scheduleMicrotask(asr.clearError);
     } else if (!asr.isActive && !_finishingVoice) {
-      // Some system recognizers publish a final result and stop on their own.
+      // 部分系统识别器会自行发布最终结果并停止。
       _stopVoiceLevelSampling();
       final detectedSpeech = asr.transcript.trim().isNotEmpty;
       _voiceBaseValue = null;
@@ -826,7 +827,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     });
   }
 
-  /// Bottom row shown while recording: cancel (X) — waveform — stop — send.
+  /// 录音时显示的底部行：取消（X）——波形——停止——发送。
   Widget _buildVoiceRecordingRow(BuildContext context, ThemeData theme) {
     final l10n = AppLocalizations.of(context)!;
     final canFinish =
@@ -842,8 +843,7 @@ class _ChatInputBarState extends State<ChatInputBar>
         Expanded(
           child: Padding(
             padding: const EdgeInsets.only(left: 8, right: 2),
-            // Match the normal action row height (32) so the input bar
-            // doesn't jump when switching in/out of recording state
+            // 匹配普通操作行高度（32），避免切换录音状态时输入栏跳动
             child: SizedBox(
               height: 32,
               child: AnimatedSwitcher(
@@ -878,7 +878,7 @@ class _ChatInputBarState extends State<ChatInputBar>
             ),
           ),
         ),
-        // Stop: finish recording and transcribe into the input field
+        // 停止：结束录音并将转写内容填入输入框
         _CompactIconButton(
           tooltip: l10n.chatInputBarVoiceStopTooltip,
           icon: Lucide.Square,
@@ -897,7 +897,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           ),
         ),
         const SizedBox(width: 8),
-        // Send: transcribe and send the message right away
+        // 发送：转写并立即发送消息
         _CompactSendButton(
           enabled: canFinish,
           onSend: () => unawaited(_finishVoiceInput(sendAfter: true)),
@@ -947,7 +947,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           _docs.remove(document);
         }
         setState(() {});
-        // Keep focus on desktop so user can continue typing
+        // 桌面端保持焦点，使用户可以继续输入
         try {
           if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
             widget.focusNode?.requestFocus();
@@ -1015,7 +1015,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     _ensureCaretVisible();
   }
 
-  // Keep the caret visible after programmatic edits (e.g., Shift+Enter insert)
+  // 程序化编辑（例如 Shift+Enter 插入）后保持光标可见
   void _ensureCaretVisible() {
     try {
       final selection = _controller.selection;
@@ -1035,10 +1035,10 @@ class _ChatInputBarState extends State<ChatInputBar>
     } catch (_) {}
   }
 
-  // Instance method for contextMenuBuilder to avoid flickering caused by recreating
-  // the callback on every build. See: https://github.com/flutter/flutter/issues/150551
+  // 为 contextMenuBuilder 使用实例方法，避免每次构建重新创建回调导致闪烁。
+  // 参见：https://github.com/flutter/flutter/issues/150551
   Widget _buildContextMenu(BuildContext context, EditableTextState state) {
-    // Suppress context menu during app lifecycle transitions to avoid flickering
+    // 应用生命周期转换期间抑制上下文菜单，避免闪烁
     if (_suppressContextMenu) {
       return const SizedBox.shrink();
     }
@@ -1052,7 +1052,7 @@ class _ChatInputBarState extends State<ChatInputBar>
         final hasSelection = selection.isValid && !selection.isCollapsed;
         final hasText = value.text.isNotEmpty;
 
-        // Cut
+        // 剪切
         if (hasSelection) {
           items.add(
             ContextMenuButtonItem(
@@ -1075,7 +1075,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           );
         }
 
-        // Copy
+        // 复制
         if (hasSelection) {
           items.add(
             ContextMenuButtonItem(
@@ -1093,7 +1093,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           );
         }
 
-        // Paste (text or image via _handlePasteFromClipboard)
+        // 粘贴（文本或通过 _handlePasteFromClipboard 处理图片）
         items.add(
           ContextMenuButtonItem(
             onPressed: () {
@@ -1104,7 +1104,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           ),
         );
 
-        // Insert newline
+        // 插入换行
         items.add(
           ContextMenuButtonItem(
             onPressed: () {
@@ -1115,7 +1115,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           ),
         );
 
-        // Select all
+        // 全选
         if (hasText) {
           items.add(
             ContextMenuButtonItem(
@@ -1157,7 +1157,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
-    // Enhance hardware keyboard behavior
+    // 增强硬件键盘行为
     final w = MediaQuery.sizeOf(node.context!).width;
     final isTabletOrDesktop = w >= AppBreakpoints.tablet;
     final isIosTablet = Platform.isIOS && isTabletOrDesktop;
@@ -1172,10 +1172,10 @@ class _ChatInputBarState extends State<ChatInputBar>
         key == LogicalKeyboardKey.arrowRight;
     final isPasteV = key == LogicalKeyboardKey.keyV;
 
-    // Enter handling on tablet/desktop: configurable shortcut
+    // 平板或桌面端 Enter 处理：可配置快捷键
     if (isEnter && isTabletOrDesktop) {
-      if (!isDown) return KeyEventResult.handled; // ignore key up
-      // Respect IME composition (e.g., Chinese Pinyin). If composing, let IME handle Enter.
+      if (!isDown) return KeyEventResult.handled; // 忽略按键抬起
+      // 尊重输入法组合（例如中文拼音）。组合期间让输入法处理 Enter。
       final composing = _controller.value.composing;
       final composingActive = composing.isValid && !composing.isCollapsed;
       if (composingActive) return KeyEventResult.ignored;
@@ -1190,23 +1190,23 @@ class _ChatInputBarState extends State<ChatInputBar>
           keys.contains(LogicalKeyboardKey.metaLeft) ||
           keys.contains(LogicalKeyboardKey.metaRight);
       final ctrlOrMeta = ctrl || meta;
-      // Get send shortcut setting
+      // 获取发送快捷键设置
       final sendShortcut = Provider.of<SettingsProvider>(
         node.context!,
         listen: false,
       ).desktopSendShortcut;
       if (sendShortcut == DesktopSendShortcut.ctrlEnter) {
-        // Ctrl/Cmd+Enter to send, Enter to newline
+        // Ctrl/Cmd+Enter 发送，Enter 换行
         if (ctrlOrMeta) {
           unawaited(_handleSend());
         } else if (!shift) {
           _insertNewlineAtCursor();
         } else {
-          // Shift+Enter also newline
+          // Shift+Enter 也换行
           _insertNewlineAtCursor();
         }
       } else {
-        // Enter to send, Shift+Enter or Ctrl/Cmd+Enter to newline (default)
+        // Enter 发送，Shift+Enter 或 Ctrl/Cmd+Enter 换行（默认）
         if (shift || ctrlOrMeta) {
           _insertNewlineAtCursor();
         } else {
@@ -1216,7 +1216,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       return KeyEventResult.handled;
     }
 
-    // Paste handling for images on iOS/macOS (tablet/desktop)
+    // iOS/macOS 平板或桌面端的图片粘贴处理
     if (isDown && isPasteV) {
       final keys = HardwareKeyboard.instance.logicalKeysPressed;
       final meta =
@@ -1231,7 +1231,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       }
     }
 
-    // Arrow repeat fix only needed on iOS tablets
+    // 仅在 iOS 平板上需要修复方向键重复
     if (!isIosTablet || !isArrow) return KeyEventResult.ignored;
 
     final keys = HardwareKeyboard.instance.logicalKeysPressed;
@@ -1255,23 +1255,23 @@ class _ChatInputBarState extends State<ChatInputBar>
     }
 
     if (event is KeyDownEvent) {
-      // Initial move
+      // 初始移动
       moveOnce();
-      // Start repeat timer if not already
+      // 尚未启动重复定时器时启动
       if (!_repeatTimers.containsKey(key)) {
         Timer? periodic;
         final starter = Timer(_repeatInitialDelay, () {
           periodic = Timer.periodic(_repeatPeriod, (_) => moveOnce());
           _repeatTimers[key] = periodic!;
         });
-        // Store starter temporarily; replace when periodic begins
+        // 临时保存起始值；周期开始后替换
         _repeatTimers[key] = starter;
       }
       return KeyEventResult.handled;
     }
 
     if (event is KeyUpEvent) {
-      // Key up -> cancel repeat
+      // 按键抬起时取消重复
       final t = _repeatTimers.remove(key);
       try {
         t?.cancel();
@@ -1370,13 +1370,13 @@ class _ChatInputBarState extends State<ChatInputBar>
         .read<SettingsProvider>()
         .resolveImageCompressConfig();
 
-    // 1) Prefer reading via super_clipboard for better Windows support
+    // 1）优先通过 super_clipboard 读取，以获得更好的 Windows 支持
     try {
       final clipboard = SystemClipboard.instance;
       if (clipboard != null) {
         final reader = await clipboard.read();
 
-        // Helper: read bytes for a given file format from DataReader (ClipboardReader or item)
+        // 辅助函数：从 DataReader（ClipboardReader 或 item）读取指定文件格式的字节
         Future<Uint8List?> readFileBytes(
           DataReader dataReader,
           FileFormat format,
@@ -1406,7 +1406,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           }
         }
 
-        // Try aggregated formats in priority: png > jpeg > gif > webp
+        // 按优先级尝试聚合格式：png > jpeg > gif > webp
         Uint8List? bytes;
         String? fmt;
         if (reader.canProvide(Formats.png)) {
@@ -1427,7 +1427,7 @@ class _ChatInputBarState extends State<ChatInputBar>
         }
 
         if (bytes == null) {
-          // Try per-item formats
+          // 尝试逐项格式
           for (final item in reader.items) {
             if (bytes == null && item.canProvide(Formats.png)) {
               bytes = await readFileBytes(item, Formats.png);
@@ -1467,7 +1467,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           }
         }
 
-        // If clipboard has plain text via super_clipboard, paste it
+        // 如果 super_clipboard 中存在纯文本，则粘贴
         if (reader.canProvide(Formats.plainText)) {
           try {
             final String? text = await reader.readValue(Formats.plainText);
@@ -1480,14 +1480,14 @@ class _ChatInputBarState extends State<ChatInputBar>
       }
     } catch (_) {}
 
-    // 2) Fallback: legacy platform channel image handling
+    // 2）回退：旧平台通道图片处理
     final imageTempPaths = await ClipboardImages.getImagePaths();
     if (imageTempPaths.isNotEmpty) {
       await _enqueueClipboardImages(imageTempPaths);
       return;
     }
 
-    // 3) Try files via platform channel on desktop (Finder/Explorer copies)
+    // 3）在桌面端通过平台通道尝试文件（Finder 或 Explorer 复制）
     bool handledFiles = false;
     try {
       if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
@@ -1527,7 +1527,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     } catch (_) {}
     if (handledFiles) return;
 
-    // 4) Last resort: paste text via Flutter Clipboard API
+    // 4）最后回退：通过 Flutter Clipboard API 粘贴文本
     try {
       final data = await Clipboard.getData(Clipboard.kTextPlain);
       final text = data?.text ?? '';
@@ -1637,8 +1637,8 @@ class _ChatInputBarState extends State<ChatInputBar>
     }
   }
 
-  // Copy arbitrary files to upload directory (without deleting the source),
-  // split into images and document attachments.
+  // 将任意文件复制到 upload 目录（不删除源文件），
+  // 并拆分为图片和文档附件。
   Future<({List<String> images, List<DocumentAttachment> docs})>
   _copyFilesToUpload(List<String> srcPaths) async {
     final images = <String>[];
@@ -1679,12 +1679,12 @@ class _ChatInputBarState extends State<ChatInputBar>
     return (images: images, docs: docs);
   }
 
-  // Build a responsive left action bar that hides overflowing actions
-  // into an anchored "+" menu using DesktopContextMenu style.
+  // 构建响应式左侧操作栏，将溢出的操作隐藏到使用 DesktopContextMenu
+  // 风格的锚定“+”菜单中。
   Widget _buildResponsiveLeftActions(BuildContext context) {
     const double spacing = 8;
-    const double normalButtonW = 32; // 20 + padding(6*2)
-    const double modelButtonW = 30; // 28 + padding(1*2)
+    const double normalButtonW = 32; // 20 + padding（6*2）
+    const double modelButtonW = 30; // 28 + padding（1*2）
     const double plusButtonW = 32;
 
     final l10n = AppLocalizations.of(context)!;
@@ -1697,7 +1697,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       builder: (context, constraints) {
         final List<_OverflowAction> actions = [];
 
-        // Model select (always present; can be hidden if overflow)
+        // 模型选择（始终存在；溢出时可隐藏）
         actions.add(
           _OverflowAction(
             width: (widget.modelIcon != null) ? modelButtonW : normalButtonW,
@@ -1717,7 +1717,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           ),
         );
 
-        // Search button (stateful icon depending on provider config)
+        // 搜索按钮（图标根据供应商配置变化）
         final settings = context.watch<SettingsProvider>();
         final ap = context.watch<AssistantProvider>();
         final a = ap.currentAssistant;
@@ -1727,7 +1727,7 @@ class _ChatInputBarState extends State<ChatInputBar>
         final cfg = (currentProviderKey != null)
             ? settings.getProviderConfig(currentProviderKey)
             : null;
-        // Check built-in tools state using helper
+        // 使用辅助函数检查内置工具状态
         final toolsState = BuiltInToolsHelper.getActiveTools(
           cfg: cfg,
           modelId: currentModelId,
@@ -1748,12 +1748,12 @@ class _ChatInputBarState extends State<ChatInputBar>
           return BrandAssets.assetForName(svc.name);
         })();
 
-        // Search button
+        // 搜索按钮
         actions.add(
           _OverflowAction(
             width: normalButtonW,
             builder: () {
-              // Not enabled at all -> default globe
+              // 完全未启用时显示默认地球图标
               if (!appSearchEnabled && !builtinSearchActive) {
                 return _CompactIconButton(
                   tooltip: l10n.chatInputBarOnlineSearchTooltip,
@@ -1762,7 +1762,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                   onTap: lockTap(widget.onOpenSearch),
                 );
               }
-              // Built-in search -> magnifier icon in theme color
+              // 内置搜索时显示主题色放大镜图标
               if (builtinSearchActive) {
                 return _CompactIconButton(
                   tooltip: l10n.chatInputBarOnlineSearchTooltip,
@@ -1771,7 +1771,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                   onTap: lockTap(widget.onOpenSearch),
                 );
               }
-              // External provider search -> brand icon
+              // 外部供应商搜索时显示品牌图标
               return _CompactIconButton(
                 tooltip: l10n.chatInputBarOnlineSearchTooltip,
                 icon: Lucide.Globe,
@@ -1803,7 +1803,7 @@ class _ChatInputBarState extends State<ChatInputBar>
               );
             },
             menu: () {
-              // Prefer vector icon if brandAsset is svg, otherwise pick reasonable default
+              // 如果品牌资源是 svg，优先使用矢量图标，否则选择合理默认图标
               if (!appSearchEnabled && !builtinSearchActive) {
                 return DesktopContextMenuItem(
                   icon: Lucide.Globe,
@@ -1858,7 +1858,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           );
         }
 
-        // MCP button
+        // MCP 按钮
         if (widget.showMcpButton) {
           actions.add(
             _OverflowAction(
@@ -2005,7 +2005,9 @@ class _ChatInputBarState extends State<ChatInputBar>
                   ),
                 DesktopContextMenuItem(
                   icon: Lucide.Eraser,
-                  label: l10n.bottomToolsSheetClearContext,
+                  label:
+                      widget.clearContextLabel ??
+                      l10n.bottomToolsSheetClearContext,
                   onTap: lockTap(widget.onClearContext),
                 ),
               ],
@@ -2069,7 +2071,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           );
         }
 
-        // Compute total width with spacing to see if overflow is needed
+        // 计算带间距的总宽度，判断是否需要溢出
         double full = 0;
         for (var i = 0; i < actions.length; i++) {
           if (i > 0) full += spacing;
@@ -2079,7 +2081,7 @@ class _ChatInputBarState extends State<ChatInputBar>
         final maxW = constraints.maxWidth;
         int visibleCount = actions.length;
         if (full > maxW) {
-          // First pass: include as many as possible ignoring the +
+          // 第一轮：忽略“+”按钮，尽可能多地容纳
           double used = 0;
           visibleCount = 0;
           for (var i = 0; i < actions.length; i++) {
@@ -2091,9 +2093,9 @@ class _ChatInputBarState extends State<ChatInputBar>
               break;
             }
           }
-          // Ensure + button fits; remove items until it does
+          // 确保“+”按钮放得下；否则移除项直到放得下
           while (visibleCount > 0 && used + spacing + plusButtonW > maxW) {
-            // remove last
+            // 移除最后一项
             used -= actions[visibleCount - 1].width;
             if (visibleCount - 1 > 0) used -= spacing;
             visibleCount--;
@@ -2140,7 +2142,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     final mediaMime = inferMediaMimeFromSource(name);
     if (mediaMime.isNotEmpty) return mediaMime;
     final lower = name.toLowerCase();
-    // Documents / text
+    // 文档或文本
     if (lower.endsWith('.pdf')) return 'application/pdf';
     if (lower.endsWith('.docx')) {
       return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -2188,16 +2190,16 @@ class _ChatInputBarState extends State<ChatInputBar>
       final temporary = <String>[];
       for (var raw in srcPaths) {
         try {
-          // Normalize path (strip file:// if present)
+          // 规范化路径（若有 file:// 则去除）
           final src = raw.startsWith('file://') ? raw.substring(7) : raw;
-          // If already under upload directory, just keep it
+          // 如果已在 upload 目录下，直接保留
           if (src.contains('/upload/') || src.contains('\\upload\\')) {
             ready.add(src);
             continue;
           }
           if (await File(src).exists()) temporary.add(src);
         } catch (_) {
-          // skip single file errors
+          // 跳过单个文件错误
         }
       }
       _addImages(ready);
@@ -2221,10 +2223,10 @@ class _ChatInputBarState extends State<ChatInputBar>
 
     int nextOffset(int from, int direction) {
       if (!byWord) return (from + direction).clamp(0, text.length);
-      // Move by simple word boundary: skip whitespace; then skip non-whitespace
+      // 按简单单词边界移动：先跳过空白，再跳过非空白
       int i = from;
       if (direction < 0) {
-        // Move left
+        // 向左移动
         while (i > 0 && text[i - 1].trim().isEmpty) {
           i--;
         }
@@ -2232,7 +2234,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           i--;
         }
       } else {
-        // Move right
+        // 向右移动
         while (i < text.length && text[i].trim().isEmpty) {
           i++;
         }
@@ -2344,7 +2346,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                                           strokeWidth: 2,
                                           valueColor: AlwaysStoppedAnimation<Color>(
                                             Colors
-                                                .white, // color-gate: ignore (on scrim over photo)
+                                                .white, // color-gate: ignore（在照片上的遮罩上）
                                           ),
                                         ),
                                       ),
@@ -2396,8 +2398,8 @@ class _ChatInputBarState extends State<ChatInputBar>
                             child: Icon(
                               Icons.close,
                               size: 11,
-                              color: Colors
-                                  .white, // color-gate: ignore (on scrim over photo)
+                              color:
+                                  Colors.white, // color-gate: ignore（在照片上的遮罩上）
                             ),
                           ),
                         ),
@@ -2506,7 +2508,7 @@ class _ChatInputBarState extends State<ChatInputBar>
               (hasDocs ? _documentPreviewHeight : 0) +
               AppSpacing.xxs
         : 0;
-    const double baseChromeHeight = 120; // padding + action row + chrome buffer
+    const double baseChromeHeight = 120; // padding + 操作行 + chrome 缓冲
     double maxInputHeight = double.infinity;
     if (isMobileLayout) {
       final double available =
@@ -2519,7 +2521,7 @@ class _ChatInputBarState extends State<ChatInputBar>
         maxInputHeight = math.max(80.0, softCap);
       }
     }
-    // Cap text field height on mobile so expanded input stays above the keyboard.
+    // 移动端限制输入框高度，使展开后的输入区保持在键盘上方。
     final BoxConstraints textFieldConstraints =
         (isMobileLayout && maxInputHeight.isFinite && maxInputHeight > 0)
         ? BoxConstraints(maxHeight: maxInputHeight)
@@ -2554,17 +2556,17 @@ class _ChatInputBarState extends State<ChatInputBar>
             Stack(
               clipBehavior: Clip.none,
               children: [
-                // Main input container with iOS-like frosted glass effect
+                // 带 iOS 风格磨砂玻璃效果的主输入容器
                 ClipRRect(
                   borderRadius: BorderRadius.circular(20),
                   child: BackdropFilter(
                     filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
                     child: Container(
                       decoration: BoxDecoration(
-                        // Translucent background over blurred content
+                        // 模糊内容上的半透明背景
                         color: inputFillColor,
                         borderRadius: BorderRadius.circular(20),
-                        // Use previous gray border for better contrast on white
+                        // 使用之前的灰色边框，在白色背景上对比度更好
                         border: Border.all(
                           color: isDark
                               ? theme.colorScheme.onSurface.withValues(
@@ -2580,7 +2582,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                         children: [
                           if (hasDocs || hasImages)
                             _buildInlineAttachmentPreviews(context, isDark),
-                          // Input field with expand/collapse button
+                          // 带展开或折叠按钮的输入框
                           Stack(
                             children: [
                               Padding(
@@ -2596,7 +2598,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                                     onKeyEvent: _handleKeyEvent,
                                     child: Builder(
                                       builder: (ctx) {
-                                        // Desktop: show a right-click context menu with paste/cut/copy/select all
+                                        // 桌面端：显示带粘贴/剪切/复制/全选的右键上下文菜单
                                         // Future<void> _showDesktopContextMenu(Offset globalPos) async {
                                         //   bool isDesktop = false;
                                         //   try { isDesktop = Platform.isMacOS || Platform.isWindows || Platform.isLinux; } catch (_) {}
@@ -2692,8 +2694,8 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                 _ownsVoiceSession,
                                             minLines: 1,
                                             maxLines: _isExpanded ? 25 : 5,
-                                            // On mobile, optionally show "Send" on the return key and submit on tap.
-                                            // Still keep multiline so pasted text preserves line breaks.
+                                            // 移动端可选在回车键上显示"发送"并点击提交。
+                                            // 仍保持多行以保留粘贴文本的换行。
                                             keyboardType:
                                                 TextInputType.multiline,
                                             textInputAction: enterToSend
@@ -2703,9 +2705,9 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                 ? (_) =>
                                                       unawaited(_handleSend())
                                                 : null,
-                                            // Custom context menu: use instance method to avoid flickering
-                                            // caused by recreating the callback on every build.
-                                            // See: https://github.com/flutter/flutter/issues/150551
+                                            // 自定义上下文菜单：使用实例方法避免每次 build
+                                            // 重建回调导致的闪烁。
+                                            // 参见：https://github.com/flutter/flutter/issues/150551
                                             contextMenuBuilder:
                                                 _buildContextMenu,
                                             autofocus: false,
@@ -2742,7 +2744,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                                   ),
                                 ),
                               ),
-                              // Expand/Collapse icon button (only shown when 3+ lines)
+                              // 展开/折叠图标按钮（仅在 3 行以上时显示）
                               if (_showExpandButton)
                                 Positioned(
                                   top: 10,
@@ -2766,7 +2768,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                                 ),
                             ],
                           ),
-                          // Bottom buttons row (no divider)
+                          // 底部按钮行（无分隔线）
                           Padding(
                             padding: const EdgeInsets.fromLTRB(
                               AppSpacing.xs,
@@ -2796,7 +2798,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                                       mainAxisAlignment:
                                           MainAxisAlignment.spaceBetween,
                                       children: [
-                                        // Responsive left action bar that overflows into a + menu on desktop
+                                        // 桌面端响应式左操作栏，溢出时折叠到 + 菜单
                                         Expanded(
                                           child: _buildResponsiveLeftActions(
                                             context,
@@ -3110,7 +3112,7 @@ class _ImageModePill extends StatelessWidget {
   }
 }
 
-// Internal data model for responsive overflow actions on desktop
+// 桌面端响应式溢出操作的内部数据模型
 class _OverflowAction {
   final double width;
   final Widget Function() builder;
@@ -3122,7 +3124,7 @@ class _OverflowAction {
   });
 }
 
-// New compact button for the integrated input bar
+// 集成输入栏的新紧凑按钮
 class _CompactIconButton extends StatelessWidget {
   const _CompactIconButton({
     required this.icon,
@@ -3154,22 +3156,18 @@ class _CompactIconButton extends StatelessWidget {
     final bool isDesktop =
         Platform.isWindows || Platform.isLinux || Platform.isMacOS;
 
-    // Keep overall button size constant. For model icon with child, enlarge child slightly
-    // and reduce padding so (2*padding + childSize) stays unchanged.
+    // 保持按钮整体大小不变。带子项的模型图标放大子项
+    // 并减少 padding，使（2*padding + childSize）保持不变。
     final bool isModelChild = modelIcon && child != null;
-    final double iconSize = 20.0; // default glyph size
-    final double childSize = isModelChild
-        ? 28.0
-        : iconSize; // enlarge circle a bit more
-    final double padding = isModelChild
-        ? 1.0
-        : 6.0; // keep total ~30px (2*1 + 28)
+    final double iconSize = 20.0; // 默认字形大小
+    final double childSize = isModelChild ? 28.0 : iconSize; // 圆形稍大
+    final double padding = isModelChild ? 1.0 : 6.0; // 保持总计约 30px（2*1 + 28）
 
     final button = IosIconButton(
       size: isModelChild ? childSize : 20,
       padding: EdgeInsets.all(padding),
       onTap: onTap,
-      // Disable long press on desktop platforms
+      // 桌面平台禁用长按
       onLongPress: isDesktop ? null : onLongPress,
       color: fgColor,
       builder: childBuilder != null
@@ -3200,7 +3198,7 @@ class _CompactIconButton extends StatelessWidget {
   }
 }
 
-// New compact send button for the integrated input bar
+// 集成输入栏的新紧凑发送按钮
 class _CompactSendButton extends StatelessWidget {
   const _CompactSendButton({
     required this.enabled,
@@ -3266,7 +3264,7 @@ class _CompactSendButton extends StatelessWidget {
   }
 }
 
-// Scrolling waveform driven by real mic amplitude samples (newest on the right).
+// 由真实麦克风振幅样本驱动的滚动波形（最新在右侧）。
 class _VoiceWaveform extends StatelessWidget {
   const _VoiceWaveform({super.key, required this.levels, required this.color});
 
@@ -3340,7 +3338,7 @@ class _VoiceTranscribingIndicatorState
 class _VoiceWaveformPainter extends CustomPainter {
   _VoiceWaveformPainter({required this.levels, required this.color});
 
-  /// Normalized mic levels in [0, 1]; the last entry is the newest sample.
+  /// 归一化麦克风电平 [0, 1]；最后一个条目是最新的样本。
   final List<double> levels;
   final Color color;
 
@@ -3355,24 +3353,24 @@ class _VoiceWaveformPainter extends CustomPainter {
     if (count <= 0) return;
     final centerY = size.height / 2;
     final maxH = size.height * 0.92;
-    // Center the bar row so both ends get the same inset — the capsule
-    // caps are then symmetric regardless of the exact width.
+    // 居中条形行使两端获得相同内边距，胶囊帽
+    // 无论精确宽度都保持对称。
     final leftInset = (size.width - (count * step - _barGap)) / 2;
-    // Samples are right-aligned onto the bar slots: the newest sample sits
-    // at the right edge and older samples scroll left, like a real recorder.
+    // 样本右对齐到条形槽位：最新样本在最右边缘，
+    // 旧样本向左滚动，如真实录音机。
     final visible = math.min(count, levels.length);
     final first = levels.length - visible;
     for (var i = 0; i < visible; i++) {
       final level = levels[first + i].clamp(0.0, 1.0);
       final slot = count - visible + i;
       final x = leftInset + slot * step;
-      // True capsule silhouette: a rectangle with fully-rounded ends, i.e.
-      // the corner radius equals half the max bar height. Bars inside the
-      // cap are shortened along the semicircle but still follow the volume.
+      // 真实胶囊轮廓：两端全圆角矩形，即圆角半径等于
+      // 最大条形高度的一半。帽内的条形沿半圆缩短，
+      // 但仍跟随音量。
       final radius = maxH / 2;
       final dCenter =
           math.min(x, size.width - (x + _barWidth)) +
-          _barWidth / 2; // bar center distance to the nearest edge
+          _barWidth / 2; // 条中心到最近边缘的距离
       double envelope = 1.0;
       if (dCenter < radius) {
         envelope =

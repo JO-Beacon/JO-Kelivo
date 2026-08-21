@@ -95,7 +95,9 @@ class _ChatHistoryPageState extends State<ChatHistoryPage>
                       onPressed: () => Navigator.of(ctx).pop(true),
                       child: Text(
                         l10n.chatHistoryPageDelete,
-                        style: TextStyle(color: Theme.of(context).colorScheme.error),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                       ),
                     ),
                   ],
@@ -329,7 +331,7 @@ class _ConversationCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                // Leading icon/avatar
+                // 前置图标/头像
                 Container(
                   width: 32,
                   height: 32,
@@ -345,7 +347,7 @@ class _ConversationCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 10),
-                // Title and time
+                // 标题和时间
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -381,7 +383,7 @@ class _ConversationCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                // Pin toggle
+                // 置顶开关
                 _PinButton(conversation: conversation),
               ],
             ),

@@ -4,21 +4,18 @@ import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 import './app_directories.dart';
 import './kelivo_file_uri.dart';
 
-/// Resolves persisted absolute file paths that include the iOS sandbox UUID
-/// to the current app container path after an app update.
+/// 将包含 iOS 沙箱 UUID 的持久化绝对文件路径，在应用更新后解析为当前应用容器路径。
 ///
-/// Example:
-///   Before update: /var/mobile/Containers/Data/Application/ABC/Documents/upload/x.png
-///   After update:  /var/mobile/Containers/Data/Application/XYZ/Documents/upload/x.png
+/// 示例：
+///   更新前：/var/mobile/Containers/Data/Application/ABC/Documents/upload/x.png
+///   更新后：/var/mobile/Containers/Data/Application/XYZ/Documents/upload/x.png
 ///
-/// We store absolute paths in message content. On iOS, the container prefix
-/// changes after update. This helper rewrites any path that points into our
-/// previous container's Documents subfolders (upload/avatars) to the current
-/// Documents directory. If the rewritten file exists, it returns the new path;
-/// otherwise returns the original path.
+/// 我们会在消息内容中存储绝对路径。iOS 更新后容器前缀会变化。此工具会将指向
+/// 旧容器 Documents 子目录（upload/avatars）的路径重写为当前 Documents 目录。
+/// 如果重写后的文件存在，返回新路径；否则返回原路径。
 ///
-/// Canonical `kelivo-file:///` URIs are resolved lexically against the cached
-/// Documents root with no filesystem existence checks.
+/// 规范的 `kelivo-file:///` URI 会基于缓存的 Documents 根目录进行词法解析，
+/// 不检查文件系统是否存在该文件。
 class SandboxPathResolver {
   SandboxPathResolver._();
 
@@ -26,10 +23,10 @@ class SandboxPathResolver {
   static String? _supportDir;
   static bool debug = false;
 
-  /// Call once during app startup to cache the current Documents directory.
+  /// 应用启动时调用一次，缓存当前 Documents 目录。
   static Future<void> init() async {
     try {
-      // Use the platform-specific app data directory
+      // 使用平台特定的应用数据目录
       final dir = await AppDirectories.getAppDataDirectory();
       _docsDir = dir.path;
       try {
@@ -44,25 +41,23 @@ class SandboxPathResolver {
         );
       }
     } catch (_) {
-      // Leave null; fix() will no-op in this case.
+      // 保持为 null；这种情况下 fix() 会直接跳过。
       _docsDir = null;
       _supportDir = null;
     }
   }
 
-  /// Test-only seam to inject Documents / Support roots without `path_provider`.
+  /// 仅测试用的注入点，可在不依赖 `path_provider` 的情况下注入 Documents / Support 根目录。
   @visibleForTesting
   static void debugSetDirs({String? docsDir, String? supportDir}) {
     _docsDir = docsDir;
     _supportDir = supportDir;
   }
 
-  /// Synchronously map an old absolute path to the current container's path
-  /// when it points under our managed subfolders (upload/images/avatars).
-  /// If mapping succeeds and the target exists, returns the mapped path;
-  /// otherwise returns [path] unchanged.
+  /// 当旧绝对路径位于受管子目录（upload/images/avatars）下时，同步映射到当前容器路径。
+  /// 如果映射成功且目标存在，返回映射后的路径；否则原样返回 [path]。
   ///
-  /// Canonical `kelivo-file:` URIs are resolved without existence probes.
+  /// 规范的 `kelivo-file:` URI 在解析时不进行存在性探测。
   static String fix(String path) {
     if (path.isEmpty) return path;
 
@@ -72,12 +67,12 @@ class SandboxPathResolver {
       return KelivoFileUri.resolveToAbsolute(path, root: docs) ?? path;
     }
 
-    // Decode file:// percent-escapes before remapping (avoid %20 → %2520).
-    // Non-local / UNC file: URIs must not be remapped or probed (SMB risk).
+    // 在重映射前解码 file:// 的百分号转义（避免 %20 变成 %2520）。
+    // 非本地或 UNC file: URI 不得重映射或探测（存在 SMB 风险）。
     final String raw0 = _decodeFileUri(path);
     if (raw0 == path && path.toLowerCase().startsWith('file:')) return path;
     if (_isUncPath(raw0)) return path;
-    // Only Windows drive paths normalize `\`; POSIX backslash filenames stay.
+    // 只有 Windows 驱动器路径会规范化 `\`；POSIX 反斜杠文件名保持不变。
     final String raw = _normalizeSeparatorsForMatch(raw0);
     if (_isUncPath(raw)) return path;
 
@@ -85,10 +80,10 @@ class SandboxPathResolver {
     final support = _supportDir;
     if (docs == null || docs.isEmpty) return raw;
 
-    // Determine root and tail to map. Prefer the same structured sandbox
-    // markers as KelivoFileUri.tryEncodeLegacyAbsolutePath, then generic.
+    // 确定要映射的根目录和尾部路径。优先使用与
+    // KelivoFileUri.tryEncodeLegacyAbsolutePath 相同的结构化沙箱标记，然后才使用通用规则。
     const subdirs = ['avatars', 'fonts', 'images', 'upload'];
-    String? tail; // starts with '/'
+    String? tail; // 以 '/' 开头
     String rootType = 'unknown';
 
     final encoded = KelivoFileUri.tryEncodeLegacyAbsolutePath(
@@ -103,13 +98,13 @@ class SandboxPathResolver {
       }
     }
 
-    // Final generic fallback: detect '/avatars/' '/images/' '/upload/' anywhere
-    // (runtime recovery only — canonicalize never uses this path).
+    // 最终通用回退：在任意位置检测 '/avatars/'、'/images/'、'/upload/'
+    // （仅用于运行时恢复，canonicalize 从不使用此路径）。
     if (tail == null) {
       for (final s in subdirs) {
         final i = raw.indexOf('/$s/');
         if (i != -1) {
-          tail = raw.substring(i); // includes leading '/'
+          tail = raw.substring(i); // 包含前导 '/'
           rootType = 'generic_subdir';
           break;
         }
@@ -125,7 +120,7 @@ class SandboxPathResolver {
       return raw;
     }
 
-    // Primary: map to current ApplicationDocumentsDirectory
+    // 首选：映射到当前 ApplicationDocumentsDirectory
     final String mapped = '$docs$tail';
     try {
       if (File(mapped).existsSync()) {
@@ -150,7 +145,7 @@ class SandboxPathResolver {
       }
     }
 
-    // Secondary: try ApplicationSupportDirectory
+    // 备选：尝试 ApplicationSupportDirectory
     if (support != null && support.isNotEmpty) {
       final alt = '$support$tail';
       try {
@@ -177,7 +172,7 @@ class SandboxPathResolver {
       }
     }
 
-    // Fallback: search by basename under common folders in both roots
+    // 回退：在两个根目录的常用文件夹下按文件名搜索
     final String base = _basename(tail);
     for (final root in <String?>[docs, support]) {
       if (root == null || root.isEmpty) continue;
@@ -222,21 +217,19 @@ class SandboxPathResolver {
     return i == -1 ? norm : norm.substring(i + 1);
   }
 
-  /// Convert a local absolute path (or `file://` URL) into a stable
-  /// `kelivo-file:///` URI when it points under managed app storage.
+  /// 当本地绝对路径（或 `file://` URL）指向受管应用存储时，将其转换为稳定的
+  /// `kelivo-file:///` URI。
   ///
-  /// Remote (`http`/`https`), `data:`, and already-canonical kelivo-file URIs
-  /// pass through unchanged. External absolute paths that cannot be encoded
-  /// are returned as-is (after decoding an optional local `file://` prefix).
+  /// 远程（`http`/`https`）、`data:` 以及已经是规范形式的 kelivo-file URI 会原样透传。
+  /// 无法编码的外部绝对路径在解码可选的本地 `file://` 前缀后原样返回。
   ///
-  /// Encoding never uses the generic `/images/`·`/upload/` guess. Structured
-  /// sandbox markers (`Documents` / `kelivo` / `app_flutter`·`files`) are
-  /// still recognized after [encodeFromAbsolute] fails, so old container
-  /// UUID paths canonicalize even when [_docsDir] is already set.
+  /// 编码过程从不使用 `/images/`·`/upload/` 这种通用猜测。即使 [encodeFromAbsolute]
+  /// 失败，仍会识别结构化沙箱标记（`Documents` / `kelivo` / `app_flutter`·`files`），
+  /// 因此即使 [_docsDir] 已设置，旧容器 UUID 路径仍可规范化。
   static String canonicalize(String uri) {
     if (uri.isEmpty) return uri;
     if (KelivoFileUri.isKelivoFileUri(uri)) return uri;
-    // Case-insensitive: HTTPS://… must not fall into local-path heuristics.
+    // 不区分大小写：HTTPS://… 不得落入本地路径启发式逻辑。
     final lower = uri.toLowerCase();
     if (lower.startsWith('http://') ||
         lower.startsWith('https://') ||
@@ -244,20 +237,20 @@ class SandboxPathResolver {
       return uri;
     }
 
-    // Portable slash path for legacy matching (Windows must still recognize
-    // iOS file:///var/mobile/... markers; Uri.toFilePath is host-specific).
+    // 为旧路径匹配生成可移植斜杠路径（Windows 仍需识别 iOS 的
+    // file:///var/mobile/... 标记；Uri.toFilePath 是平台相关的）。
     final portable = KelivoFileUri.toPortableSlashPath(uri);
     if (portable == null) {
-      // Non-local file: / UNC / empty — leave unchanged.
+      // 非本地 file:、UNC 或空输入：保持不变。
       return uri;
     }
 
     final docs = _docsDir;
     if (docs != null && docs.isNotEmpty) {
-      // Prefer encode under the live root (case-insensitive on Windows).
+      // 优先在当前根目录下编码（Windows 上不区分大小写）。
       final underRoot = KelivoFileUri.encodeFromAbsolute(portable, root: docs);
       if (underRoot != null) return underRoot;
-      // Also try host-native absolute form when docsDir uses backslashes.
+      // 当 docsDir 使用反斜杠时，也尝试宿主平台原生绝对路径形式。
       final native = _decodeFileUri(uri);
       if (native != portable) {
         final underNative = KelivoFileUri.encodeFromAbsolute(
@@ -279,12 +272,10 @@ class SandboxPathResolver {
         portable;
   }
 
-  /// Restore-boundary remap: if [uri] is a known previous managed sandbox
-  /// absolute path and the corresponding file exists under the current docs
-  /// root (because backup files were copied), return the kelivo-file URI.
+  /// 恢复边界重映射：如果 [uri] 是已知的旧受管沙箱绝对路径，且对应文件
+  /// 因备份文件复制而存在于当前 docs 根目录，则返回 kelivo-file URI。
   ///
-  /// Does **not** reopen generic `/images/` fallback for arbitrary external
-  /// paths that merely share a basename with a restored file.
+  /// 对于仅与恢复文件同名的任意外部路径，**不会**重新启用通用 `/images/` 回退。
   static String? tryRemapRestoredManagedAbsolute(String uri) {
     final docs = _docsDir;
     if (docs == null || docs.isEmpty) return null;
@@ -311,10 +302,10 @@ class SandboxPathResolver {
     return null;
   }
 
-  /// Decode a local `file:` URI to a filesystem path.
+  /// 将本地 `file:` URI 解码为文件系统路径。
   ///
-  /// Returns `null` for UNC/SMB / non-local hosts (`file://server/share/...`)
-  /// so callers never turn assistant markdown into network file I/O.
+  /// UNC/SMB 或非本地主机（`file://server/share/...`）返回 `null`，
+  /// 避免调用方把助手 Markdown 变成网络文件 I/O。
   static String? tryDecodeLocalFileUri(String value) {
     final lower = value.toLowerCase();
     if (!lower.startsWith('file:')) return null;
@@ -322,11 +313,11 @@ class SandboxPathResolver {
       final parsed = Uri.parse(value);
       if (parsed.scheme.toLowerCase() != 'file') return null;
       final host = parsed.host.toLowerCase();
-      // Non-local hosts (SMB/UNC via file://server/...) are rejected.
+      // 拒绝非本地主机（通过 file://server/... 表示的 SMB/UNC）。
       if (host.isNotEmpty && host != 'localhost') return null;
-      // Dart's toFilePath rejects file://localhost/... on non-Windows; drop
-      // the authority first. Empty-host UNC forms (file:////server/share)
-      // still decode to //server/... and are rejected below.
+      // Dart 的 toFilePath 在非 Windows 上会拒绝 file://localhost/...；
+      // 因此先移除 authority。空主机 UNC 形式（file:////server/share）
+      // 仍会解码为 //server/...，并在下方被拒绝。
       final local = host.isEmpty
           ? parsed
           : Uri(scheme: 'file', path: parsed.path);
@@ -338,11 +329,10 @@ class SandboxPathResolver {
     }
   }
 
-  /// Resolve [path] for local file I/O without [fix]'s generic `/images/` or
-  /// basename probe (those can alias a missing external path onto a
-  /// same-named managed file).
+  /// 为本地文件 I/O 解析 [path]，不使用 [fix] 中的通用 `/images/` 或文件名探测
+  /// （这些逻辑可能把缺失的外部路径错误映射到同名受管文件）。
   ///
-  /// Returns `null` when [path] is a non-local `file:` URI.
+  /// 当 [path] 是非本地 `file:` URI 时返回 `null`。
   static String? resolveForIo(String path) {
     if (path.isEmpty) return path;
     if (KelivoFileUri.isKelivoFileUri(path)) return fix(path);
@@ -363,7 +353,7 @@ class SandboxPathResolver {
     return remapped ?? candidate;
   }
 
-  /// Whether [path] refers to an existing local file, using [resolveForIo].
+  /// 使用 [resolveForIo] 判断 [path] 是否指向已存在的本地文件。
   static bool localFileExists(String path) {
     final resolved = resolveForIo(path);
     if (resolved == null) return false;
@@ -390,8 +380,8 @@ class SandboxPathResolver {
     return null;
   }
 
-  /// Decode a `file:` URI for path remapping. Non-file inputs unchanged.
-  /// Non-local/UNC `file:` URIs are returned unchanged (not decoded).
+  /// 为路径重映射解码 `file:` URI。非 file 输入保持不变。
+  /// 非本地或 UNC 的 `file:` URI 原样返回（不进行解码）。
   static String _decodeFileUri(String value) {
     final lower = value.toLowerCase();
     if (!lower.startsWith('file:')) return value;
@@ -404,7 +394,7 @@ class SandboxPathResolver {
   static bool _looksLikeWindowsDrivePath(String path) =>
       RegExp(r'^[A-Za-z]:[\\/]').hasMatch(path);
 
-  /// Convert `\` → `/` only for Windows drive paths. POSIX keeps `\`.
+  /// 仅对 Windows 驱动器路径将 `\` 转换为 `/`；POSIX 保留 `\`。
   static String _normalizeSeparatorsForMatch(String path) {
     if (_looksLikeWindowsDrivePath(path)) {
       return path.replaceAll('\\', '/');
@@ -412,7 +402,7 @@ class SandboxPathResolver {
     return path;
   }
 
-  // Expose current dirs for diagnostic purposes
+  // 暴露当前目录用于诊断
   static String? get docsDir => _docsDir;
   static String? get supportDir => _supportDir;
 }

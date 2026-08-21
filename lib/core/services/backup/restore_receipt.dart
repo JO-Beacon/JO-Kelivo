@@ -344,11 +344,10 @@ final class RestoreReceiptStore {
   Future<List<RestoreReceipt>> readHistory() =>
       _workspaceLock.synchronized(_readHistoryUnlocked);
 
-  /// Reads the journal while the caller holds this app-data workspace lock.
+  /// 在调用方持有此应用数据工作区锁时读取 journal。
   ///
-  /// Startup inspection needs one stable lock scope across marker, run,
-  /// receipt, and candidate validation, so acquiring the same lock again here
-  /// would deadlock the process-local FIFO.
+  /// 启动检查需要在 marker、run、receipt 和候选验证之间保持一个稳定的锁
+  /// 作用域，因此在这里再次获取同一把锁会使进程本地 FIFO 死锁。
   Future<RestoreReceipt?> readLatestWhileWorkspaceLocked() =>
       _readLatestUnlocked();
 

@@ -7,10 +7,10 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
-/// Shared visual vocabulary for the TTS and ASR halves of Voice Services.
+/// TTS 和 ASR 两半语音服务共享的视觉语言。
 ///
-/// These controls intentionally mirror the compact settings surfaces already
-/// used by Kelivo instead of introducing stock dropdowns or switches.
+/// 这些控件刻意沿用 JO-Kelivo 已有的紧凑设置界面，
+/// 而不是引入现成的下拉框或开关。
 class VoiceServiceSectionHeader extends StatelessWidget {
   const VoiceServiceSectionHeader({
     super.key,

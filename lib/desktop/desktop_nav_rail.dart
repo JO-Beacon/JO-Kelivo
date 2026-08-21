@@ -10,7 +10,7 @@ import '../icons/lucide_adapter.dart' as lucide;
 import '../utils/sandbox_path_resolver.dart';
 import '../theme/app_font_weights.dart';
 
-/// A compact left rail for desktop with avatar, primary actions, and bottom system toggles.
+/// 桌面端紧凑左侧导航栏，包含头像、主要操作和底部系统开关。
 class DesktopNavRail extends StatelessWidget {
   const DesktopNavRail({
     super.key,
@@ -143,7 +143,7 @@ class _UserAvatarButtonState extends State<_UserAvatarButton> {
         ),
       );
     } else if (type == 'file' && value != null && value.isNotEmpty) {
-      // Local file path (gracefully handle missing files from imported backups)
+      // 本地文件路径（优雅处理导入备份中缺失的文件）
       final fixed = SandboxPathResolver.fix(value);
       final f = File(fixed);
       if (f.existsSync()) {
@@ -166,11 +166,11 @@ class _UserAvatarButtonState extends State<_UserAvatarButton> {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: GestureDetector(
         onTap: () {
-          // Open centered profile dialog
+          // 打开居中的个人资料对话框
           showUserProfileDialog(context);
         },
         onSecondaryTap: () {
-          // Also open dialog on right-click for consistency
+          // 为保持一致，右键时也打开对话框
           showUserProfileDialog(context);
         },
         child: _HoverCircle(size: 42, child: avatar),
@@ -194,13 +194,13 @@ class _UserAvatarButtonState extends State<_UserAvatarButton> {
           color: cs.primary,
           fontWeight: AppFontWeights.emphasis,
           decoration: TextDecoration.none,
-          fontSize: 36 * 0.44, // keep initial scaled to avatar size
+          fontSize: 36 * 0.44, // 保持首字母缩放到头像大小
         ),
       ),
     );
   }
 
-  // Context menu moved into the centered dialog (avatar tap opens menu there).
+  // 上下文菜单已移入居中对话框（点击头像会在此处打开菜单）。
 }
 
 class _CircleAction extends StatelessWidget {

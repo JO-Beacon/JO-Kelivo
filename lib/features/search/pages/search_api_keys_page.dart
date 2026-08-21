@@ -7,14 +7,13 @@ import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
-/// Full-page manager for a search service's API key rotation pool.
+/// 搜索服务 API key 轮换池的全页管理器。
 ///
-/// The list shown here is the exact rotation order: the first key is the
-/// primary key stored in `apiKey`, the rest are `extraApiKeys`. Popping the
-/// page returns the full pool as a `List<String>`.
+/// 此处列表就是精确的轮换顺序：第一个 key 是存储在 `apiKey` 中的主 key，
+/// 其余为 `extraApiKeys`。弹出页面时返回完整的 key 池 `List<String>`。
 ///
-/// Per-key usage is intentionally not queried here: hammering the usage
-/// endpoint for every key would risk provider rate limits (HTTP 429).
+/// 这里有意不查询逐 key 用量：为每个 key 请求用量接口
+/// 会触发供应商限流（HTTP 429）。
 class SearchApiKeysPage extends StatefulWidget {
   const SearchApiKeysPage({
     super.key,

@@ -7,7 +7,7 @@ bool shouldAttachGeminiFunctionCallingConfig(List<Map<String, dynamic>> tools) {
   return false;
 }
 
-/// Whether [tools] contains both built-in tools and non-empty function_declarations.
+/// [tools] 是否同时包含内置工具和非空的 function_declarations。
 bool hasBuiltInAndFunctionDeclarations(List<Map<String, dynamic>> tools) {
   bool hasBuiltIn = false;
   bool hasFuncDecls = false;
@@ -25,16 +25,12 @@ bool hasBuiltInAndFunctionDeclarations(List<Map<String, dynamic>> tools) {
   return hasBuiltIn && hasFuncDecls;
 }
 
-/// Builds the `toolConfig` map for Gemini API requests.
+/// 为 Gemini API 请求构建 `toolConfig` map。
 ///
-/// Gemini 3 with combined built-in + custom tools:
-///   - VALIDATED mode (AUTO not supported with server-side tool invocations)
-///   - includeServerSideToolInvocations: true
+/// 内置工具与自定义工具组合时的 Gemini 3：
+///   - VALIDATED 模式（服务端工具调用不支持 AUTO）；includeServerSideToolInvocations: true
 ///
-/// All other cases with function_declarations:
-///   - AUTO mode (existing behavior)
-///
-/// Returns null if no toolConfig is needed.
+/// 其他包含 function_declarations 的情况：AUTO 模式（现有行为）。无需 toolConfig 时返回 null。
 Map<String, dynamic>? buildGeminiToolConfig({
   required List<Map<String, dynamic>> tools,
   required bool isGemini3,

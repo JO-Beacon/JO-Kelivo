@@ -8,6 +8,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/core/models/conversation_tree.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/utils/app_directories.dart';
 
@@ -34,6 +35,8 @@ class _SpyChatDatabaseRepository extends ChatDatabaseRepository {
 
   int messageCountsByConversationCalls = 0;
   int perConversationMessageCountCalls = 0;
+  int conversationTreeLoads = 0;
+  int messagesByIdsCalls = 0;
   final List<int> messagesRangeLimits = <int>[];
 
   @override
@@ -55,11 +58,19 @@ class _SpyChatDatabaseRepository extends ChatDatabaseRepository {
     required int limit,
   }) async {
     messagesRangeLimits.add(limit);
-    return super.getMessagesRange(
-      conversationId,
-      start: start,
-      limit: limit,
-    );
+    return super.getMessagesRange(conversationId, start: start, limit: limit);
+  }
+
+  @override
+  Future<ConversationTree?> loadConversationTree(String conversationId) async {
+    conversationTreeLoads++;
+    return super.loadConversationTree(conversationId);
+  }
+
+  @override
+  Future<List<ChatMessage>> getMessagesByIds(List<String> ids) async {
+    messagesByIdsCalls++;
+    return super.getMessagesByIds(ids);
   }
 }
 
@@ -114,7 +125,9 @@ void main() {
     return spy;
   }
 
-  Future<(String, List<String>)> seedConversation({int messageCount = 3}) async {
+  Future<(String, List<String>)> seedConversation({
+    int messageCount = 3,
+  }) async {
     final writer = createService();
     await writer.init();
     final conversation = await writer.createConversation(title: 'Chat');
@@ -167,7 +180,9 @@ void main() {
         expect(service.isMessageCountKnown(conversationId), isTrue);
         expect(service.getMessageCount(conversationId), ids.length);
         // -1 must never be treated as the empty-conversation short-circuit.
-        expect(spy.perConversationMessageCountCalls, greaterThan(0));
+        expect(spy.perConversationMessageCountCalls, 0);
+        expect(spy.conversationTreeLoads, greaterThan(0));
+        expect(spy.messagesByIdsCalls, greaterThan(0));
       },
     );
 
@@ -194,11 +209,10 @@ void main() {
         expect(service.isMessageCountKnown(conversationId), isTrue);
         expect(service.getMessageCount(conversationId), ids.length);
         expect(service.isConversationFullyCached(conversationId), isTrue);
-        expect(spy.messagesRangeLimits, isNotEmpty);
-        expect(spy.messagesRangeLimits, everyElement(greaterThanOrEqualTo(0)));
-        expect(spy.messagesRangeLimits, isNot(contains(-1)));
-        expect(spy.messagesRangeLimits.first, ids.length);
-        expect(spy.perConversationMessageCountCalls, greaterThan(0));
+        expect(spy.messagesRangeLimits, isEmpty);
+        expect(spy.perConversationMessageCountCalls, 0);
+        expect(spy.conversationTreeLoads, greaterThan(0));
+        expect(spy.messagesByIdsCalls, greaterThan(0));
         expect(spy.messageCountsByConversationCalls, 0);
       },
     );

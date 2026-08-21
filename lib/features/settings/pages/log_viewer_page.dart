@@ -23,7 +23,7 @@ import '../logs/request_log_parser.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
-/// Mobile log viewer - shows list of log files and allows viewing/exporting
+/// 移动端日志查看器，显示日志文件列表并支持查看或导出
 class LogViewerPage extends StatefulWidget {
   const LogViewerPage({super.key, this.initialTab = contextTab});
 
@@ -91,7 +91,7 @@ class _LogViewerPageState extends State<LogViewerPage>
           } else if (name.startsWith('logs')) {
             request.add(f);
           } else {
-            // Keep "other" logs in the simpler viewer.
+            // 将“其他”日志保留在较简单的查看器中。
             app.add(f);
           }
         }
@@ -433,7 +433,7 @@ class _FileIcon extends StatelessWidget {
   }
 }
 
-/// Page to view plain-text log file content with export option.
+/// 用于查看纯文本日志文件内容并提供导出选项的页面。
 class _PlainLogContentPage extends StatefulWidget {
   const _PlainLogContentPage({required this.file, required this.title});
   final File file;
@@ -535,8 +535,8 @@ class _PlainLogContentPageState extends State<_PlainLogContentPage> {
 
 typedef _ParseRequest = ({String path, bool elide});
 
-/// Runs on a background isolate: reading and parsing a multi-MB log on the UI
-/// isolate stutters the page transition.
+/// 在后台 isolate 中运行：在 UI isolate 上读取和解析数 MB 日志
+/// 会让页面切换卡顿。
 Future<List<RequestLogEntry>> _readAndParseRequestLog(_ParseRequest req) async {
   final content = await File(req.path).readAsString();
   return RequestLogParser.parse(content, elide: req.elide);
@@ -566,8 +566,8 @@ class _RequestLogFilePageState extends State<_RequestLogFilePage> {
     setState(() => _loading = true);
     final elide = context.read<SettingsProvider>().logElideLargePayloads;
     try {
-      // compute() rather than Isolate.run(): web is a build target, and there
-      // it degrades to an inline call instead of throwing.
+      // 使用 compute() 而不是 Isolate.run()：Web 也是构建目标，
+      // 在 Web 上它会降级为内联调用而不是抛错。
       final entries = await compute(_readAndParseRequestLog, (
         path: widget.file.path,
         elide: elide,
@@ -1103,7 +1103,7 @@ class _ContextLogSnapshotCard extends StatelessWidget {
   }
 }
 
-/// Per-source token totals in snapshot order (stable across builds).
+/// 按快照顺序排列的各来源 token 总数（跨构建保持稳定）。
 List<MapEntry<ContextSource, int>> _compositionOf(ContextLogSnapshot snapshot) {
   final totals = <ContextSource, int>{};
   for (final message in snapshot.messages) {
@@ -1121,7 +1121,7 @@ List<MapEntry<ContextSource, int>> _compositionOf(ContextLogSnapshot snapshot) {
   return entries;
 }
 
-/// Thin proportional bar showing how much of the context each source uses.
+/// 细比例条，显示每个来源占用上下文的多少。
 class _ContextCompositionBar extends StatelessWidget {
   const _ContextCompositionBar({required this.snapshot});
 
@@ -1311,7 +1311,7 @@ class _ContextSnapshotDetailPage extends StatelessWidget {
   }
 }
 
-/// App-style info card: thin border, no section icon header.
+/// 应用风格信息卡片：细边框，没有带分区图标标题。
 class _ContextInfoCard extends StatelessWidget {
   const _ContextInfoCard({required this.snapshot, required this.kv});
 
@@ -1383,7 +1383,7 @@ class _ContextMessageGroup extends StatelessWidget {
   }
 }
 
-/// Turn raw segment meta (world book position, snapshot kind) into readable text.
+/// 将原始片段元数据（世界书位置、快照类型）转换为可读文本。
 String _contextSegmentMetaLabel(AppLocalizations l10n, ContextSegment segment) {
   final meta = segment.meta;
   if (meta == null) return '';
@@ -1992,7 +1992,7 @@ String _fmtDateTimeSeconds(DateTime dt) {
       '${two(local.hour)}:${two(local.minute)}:${two(local.second)}';
 }
 
-/// Custom provider keys are stored as `"OpenAI - DeepSeek"`; show the name only.
+/// 自定义供应商键存储为 `"OpenAI - DeepSeek"`；仅显示名称。
 String _displayProviderName(String raw) {
   final name = raw.trim();
   if (name.isEmpty) return '';
@@ -2010,7 +2010,7 @@ String _trimSurroundingBlankLines(String text) {
 }
 
 Color _contextSourceColor(ContextSource source, {required bool isDark}) {
-  // Muted palette tuned to sit quietly on surfaceCard in both themes.
+  // 调低的柔和配色，在两种主题下都能安静地融入 surfaceCard。
   final Color base;
   switch (source) {
     case ContextSource.systemPrompt:
@@ -2059,7 +2059,7 @@ String _contextSourceLabel(AppLocalizations l10n, ContextSource source) {
   }
 }
 
-/// Bodies larger than this are pretty-printed on a background isolate.
+/// 大于此值的正文会在后台 isolate 中进行格式化。
 const int _prettyJsonInlineLimit = 64 * 1024;
 
 String _prettyJson(String text) {
@@ -2096,8 +2096,8 @@ class _RequestLogDetailPage extends StatefulWidget {
 }
 
 class _RequestLogDetailPageState extends State<_RequestLogDetailPage> {
-  // Formatted once here rather than on every build(): jsonDecode plus an
-  // indenting re-encode of a large body is far too slow for a frame.
+  // 只在这里格式化一次，而不是每次 build() 都执行：对大正文进行 jsonDecode
+  // 再缩进重编码对一帧来说太慢。
   late String _reqBodyText;
   late String _resBodyText;
 
@@ -2539,20 +2539,19 @@ class _CodeBlock extends StatelessWidget {
   }
 }
 
-/// Code block that stays collapsed until tapped, and only ever hands
-/// [SelectableText] a bounded slice — a multi-MB paragraph cannot be laid out
-/// inside a frame budget.
+/// 折叠到被点击前一直保持折叠的代码块，并且只向 [SelectableText] 提供有界片段；
+/// 数 MB 的段落无法在一帧预算内完成布局。
 class _CollapsibleCodeBlock extends StatefulWidget {
   const _CollapsibleCodeBlock({required this.text, required this.tone});
 
   final String text;
   final _CodeTone tone;
 
-  /// Slice rendered while collapsed; `maxLines` trims it visually.
+  /// 折叠时渲染的片段；`maxLines` 在视觉上截断它。
   static const int collapsedChars = 2048;
   static const int collapsedLines = 8;
 
-  /// Extra text revealed per "show more" tap.
+  /// 每次点击“显示更多”时额外展示的文本。
   static const int windowChars = 32 * 1024;
 
   @override
@@ -2566,7 +2565,7 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
   @override
   void didUpdateWidget(covariant _CollapsibleCodeBlock oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // The body arrives unformatted and is replaced once the isolate is done.
+    // 正文到达时尚未格式化，isolate 完成后会替换。
     if (oldWidget.text != widget.text) {
       _shown = _CollapsibleCodeBlock.windowChars;
     }
@@ -2657,7 +2656,7 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        // Action, not state: "Collapse" while expanded.
+                        // 这是操作而非状态：展开时显示“折叠”。
                         _expanded
                             ? MaterialLocalizations.of(
                                 context,
@@ -2701,7 +2700,7 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
   }
 }
 
-/// One chip per inline base64 payload the logger replaced with a placeholder.
+/// 每个被记录器替换为占位符的内联 base64 数据对应一个标签。
 class _AttachmentChips extends StatelessWidget {
   const _AttachmentChips({required this.attachments});
 
@@ -2993,7 +2992,7 @@ class _LogSettingsSheet extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Drag handle
+            // 拖动把手
             Container(
               width: 36,
               height: 4,
@@ -3013,7 +3012,7 @@ class _LogSettingsSheet extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // Save output toggle
+            // 保存输出开关
             Container(
               decoration: BoxDecoration(
                 color: tileBg,
@@ -3056,7 +3055,7 @@ class _LogSettingsSheet extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // Omit large base64 payloads
+            // 省略较大的 base64 数据
             Container(
               decoration: BoxDecoration(
                 color: tileBg,
@@ -3099,7 +3098,7 @@ class _LogSettingsSheet extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // Auto-delete
+            // 自动删除
             _SettingTile(
               tileBg: tileBg,
               border: border,
@@ -3125,7 +3124,7 @@ class _LogSettingsSheet extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // Max size
+            // 最大大小
             _SettingTile(
               tileBg: tileBg,
               border: border,

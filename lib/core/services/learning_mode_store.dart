@@ -1,5 +1,4 @@
-/// Shared default prompt for the database-backed learning-mode setting and
-/// instruction-injection seeding.
+/// 用于数据库支持的学习模式设置和指令注入填充的共享默认提示词。
 class LearningModeStore {
   LearningModeStore._();
 

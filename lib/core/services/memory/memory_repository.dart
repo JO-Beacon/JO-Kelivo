@@ -32,11 +32,11 @@ class MemoryCreateManyResult {
   final int skipped;
 }
 
-/// Write-path entry point for memory system V1 (§13.4).
+/// 内存系统 V1 的写路径入口点。
 ///
-/// Every mutation is a full-table read-modify-write through
-/// [BusinessPreferences] → [BusinessRepository.synchronizeEntities], so
-/// payload and derived typed columns stay in the same transaction.
+/// 每一次突变都涉及全表读、写操作
+/// [业务偏好] → [业务仓库同步实体]，所以
+/// 事务中保持 payload 和派生类型列不变。
 class MemoryRepository extends JsonBlobStore<MemoryEntry> {
   MemoryRepository(super.preferences);
 
@@ -87,11 +87,11 @@ class MemoryRepository extends JsonBlobStore<MemoryEntry> {
     });
   }
 
-  /// Creates a deduplicated batch in one read-modify-write transaction.
+  /// 创建一次读修改写入事务中的去重批处理。
   ///
-  /// Exact scope/content duplicates are skipped. When a skipped draft carries
-  /// a [MemoryCreateDraft.migrationId], the receipt is attached to the existing
-  /// entry so future migration attempts can skip model conversion as well.
+  /// 跳过完全相同的代码内容。当一份草稿被跳过时，
+  /// [MemoryCreateDraft.migrationId]，附件已附在现有记录上
+  /// 未来迁移尝试可跳过模型转换。
   Future<MemoryCreateManyResult> createMany(List<MemoryCreateDraft> drafts) {
     if (drafts.isEmpty) {
       return Future.value(const MemoryCreateManyResult(created: 0, skipped: 0));
@@ -195,7 +195,7 @@ class MemoryRepository extends JsonBlobStore<MemoryEntry> {
     });
   }
 
-  /// Move an entry between global and an assistant scope (§14.2 scope badge).
+  /// 将条目从全局（global）移动到辅助器（assistant）的scope中。
   Future<MemoryEntry?> updateScope(
     String id, {
     required MemoryScope scope,
@@ -232,8 +232,8 @@ class MemoryRepository extends JsonBlobStore<MemoryEntry> {
     });
   }
 
-  /// Soft-delete (model `memory_delete` / CONFLICT). Also strips reverse
-  /// `relatedIds` references from every other entry in the same write (D-25).
+  /// 软删除（模型 memory_delete，冲突）。此外会移除反向
+  /// `relatedIds` 从同一写入中每个其他条目引用的。
   Future<bool> archive(String id) {
     return runExclusive(() async {
       final all = await readAll();
@@ -269,8 +269,8 @@ class MemoryRepository extends JsonBlobStore<MemoryEntry> {
     });
   }
 
-  /// Hard-delete (UI only). Also strips reverse `relatedIds` in the same
-  /// write (D-25).
+  /// 硬删除（仅 UI 支持）：同样会移除反向 `relatedIds`。
+  /// 写入（D-25）。
   Future<bool> hardDelete(String id) {
     return runExclusive(() async {
       final all = await readAll();
@@ -300,11 +300,11 @@ class MemoryRepository extends JsonBlobStore<MemoryEntry> {
     });
   }
 
-  /// Idempotent bidirectional `relatedIds` link (D-25).
+  /// 无状态双向关联 ID 链接（D-25）。
   ///
-  /// Deliberately leaves `updatedAt` alone: `relatedIds` never reaches the
-  /// injected block (§7.2), so bumping the entry date here would change the
-  /// snapshot hash and force a pointless full re-injection.
+  /// 故意让 `updatedAt` 单独存在：`relatedIds` 永远无法到达
+  /// 注入块（§7.2），因此在此处增加条目日期将改变该值。
+  /// 快照哈希并强制进行无意义的完整重注入。
   Future<void> linkBidirectional(String a, String b) {
     return runExclusive(() async {
       if (a == b) return;
@@ -328,8 +328,8 @@ class MemoryRepository extends JsonBlobStore<MemoryEntry> {
     });
   }
 
-  /// Hard-deletes assistant-scoped entries whose assistant no longer exists,
-  /// cleaning reverse `relatedIds` in the same write.
+  /// 硬删除未存在的助手会话的条目
+  /// 在相同的写入中清理 `relatedIds`。
   Future<int> deleteOrphanAssistantMemories() {
     return runExclusive(() async {
       final assistantIds = await _readAssistantIds();
@@ -412,7 +412,7 @@ class MemoryRepository extends JsonBlobStore<MemoryEntry> {
 
   static String _newUniqueId(Set<String> taken) {
     var id = MemoryEntry.newId();
-    // Random ids collide occasionally; retry rather than fail the write.
+    // 随机 id 偶尔会碰撞；与其让写入失败，不如重试。
     for (var attempt = 0; taken.contains(id) && attempt < 16; attempt++) {
       id = MemoryEntry.newId();
     }

@@ -22,10 +22,10 @@ final class PersistedRestorePrevious {
   final String manifestSha256;
 }
 
-/// Owns the immutable previous control files inside one restore run.
+/// 在一次恢复运行中拥有不可变的 previous 控制文件。
 ///
-/// `manifest.json` is published last. No live file may be moved until
-/// [persistPending] has returned and [readPending] can reopen the exact plan.
+/// `manifest.json` 最后发布。在 [persistPending] 返回且 [readPending] 能够重新打开
+/// 完全相同的计划之前，不得移动任何 live 文件。
 final class RestorePreviousStore {
   RestorePreviousStore({
     required this.runDirectory,

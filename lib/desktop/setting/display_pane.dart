@@ -1,6 +1,6 @@
 part of '../desktop_settings_page.dart';
 
-// ===== Display Settings Body =====
+// ===== 显示设置主体 =====
 
 class _DisplaySettingsBody extends StatelessWidget {
   const _DisplaySettingsBody({super.key});
@@ -113,8 +113,6 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _ToggleRowInsertNewAssistantAtTop(),
                   _RowDivider(),
                   _ToggleRowWideChatLayout(),
-                  _RowDivider(),
-                  _ToggleRowRegenerateDeleteTrailingMessages(),
                   _RowDivider(),
                   _ToggleRowShowRegenerateConfirmDialog(),
                   _RowDivider(),
@@ -366,7 +364,7 @@ class _SettingsCard extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(4, 2, 4, 8),
               child: Text(
                 title,
-                // Align card title with other panes (15, semi-bold)
+                // 使卡片标题与其他面板对齐（15、半粗）
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: AppFontWeights.semibold,
@@ -417,7 +415,7 @@ class _LabeledRow extends StatelessWidget {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              // Match other settings row labels (14, normal, slightly dimmed)
+              // 匹配其他设置行标签（14、常规、略微变暗）
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: AppFontWeights.regular,
@@ -443,7 +441,7 @@ class _LabeledRow extends StatelessWidget {
   }
 }
 
-// --- Color Mode ---
+// --- 颜色模式 ---
 class _ColorModeRow extends StatelessWidget {
   const _ColorModeRow();
   @override
@@ -535,7 +533,7 @@ class _ThemeModeSegmentedState extends State<_ThemeModeSegmented> {
                         items[i].$2,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        // Reduce segmented labels to 14 for consistency
+                        // 为保持一致，将分段标签缩小到 14
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: AppFontWeights.regular,
@@ -558,7 +556,7 @@ class _ThemeModeSegmentedState extends State<_ThemeModeSegmented> {
   }
 }
 
-// --- Theme Color ---
+// --- 主题颜色 ---
 class _ThemeColorRow extends StatelessWidget {
   const _ThemeColorRow();
   @override
@@ -822,7 +820,7 @@ class _ChatMessageBackgroundRow extends StatelessWidget {
   }
 }
 
-// --- Topic position (desktop) ---
+// --- 主题位置（桌面端） ---
 class _TopicPositionRow extends StatelessWidget {
   const _TopicPositionRow();
   @override
@@ -835,7 +833,7 @@ class _TopicPositionRow extends StatelessWidget {
   }
 }
 
-// --- Desktop tray settings ---
+// --- 桌面托盘设置 ---
 class _DesktopTrayShowRow extends StatelessWidget {
   const _DesktopTrayShowRow();
   @override
@@ -1014,7 +1012,7 @@ class _SimpleOptionTileState extends State<_SimpleOptionTile> {
   }
 }
 
-// --- Fonts: language + chat font size ---
+// --- 字体：语言与聊天字号 ---
 class _AppLanguageRow extends StatefulWidget {
   const _AppLanguageRow();
   @override
@@ -1040,9 +1038,9 @@ class _AppLanguageRowState extends State<_AppLanguageRow> {
     final minW = triggerW;
     _entry = OverlayEntry(
       builder: (ctx) {
-        // measure desired content width for centering under trigger
+        // 测量所需内容宽度，以便在触发按钮下方居中
         double measureContentWidth() {
-          // Keep measurement consistent with dropdown item text (14)
+          // 测量与下拉项文本保持一致（14）
           final style = TextStyle(fontSize: 14);
           final labels = <String>[
             '🖥️ ${AppLocalizations.of(ctx)!.settingsPageSystemMode}',
@@ -1059,8 +1057,8 @@ class _AppLanguageRowState extends State<_AppLanguageRow> {
             )..layout();
             if (tp.width > maxText) maxText = tp.width;
           }
-          // item padding (12*2) + check icon (16) + gap to check (10)
-          // + list padding (8*2) + gap between flag and text (8) + small fudge (2)
+          // 项内边距（12*2）+ 对勾图标（16）+ 与对勾的间距（10）
+          // + 列表内边距（8*2）+ 旗帜与文本间距（8）+ 少量冗余（2）
           return maxText + 12 * 2 + 16 + 10 + 8 * 2 + 8 + 2;
         }
 
@@ -1069,7 +1067,7 @@ class _AppLanguageRowState extends State<_AppLanguageRow> {
         final dx = (triggerW - width) / 2;
         return Stack(
           children: [
-            // tap outside to close
+            // 点击外部关闭
             Positioned.fill(
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
@@ -1189,7 +1187,7 @@ class _HoverDropdownButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(borderRadius),
-            // Match input border color and width
+            // 匹配输入框边框颜色和宽度
             border: Border.all(
               color: cs.outlineVariant.withValues(alpha: 0.12),
               width: 0.6,
@@ -1309,7 +1307,7 @@ class _OverlayMenuItemState extends State<_OverlayMenuItem> {
   }
 }
 
-// Generic overlay item with leading icon, label and optional selected checkmark.
+// 带前导图标、标签和可选选中对勾的通用覆盖项。
 class _OverlayItem extends StatefulWidget {
   const _OverlayItem({
     required this.icon,
@@ -1531,7 +1529,7 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
 class _LangItem {
   final String flag;
   final String label;
-  final String tag; // 'system' | 'zh_CN' | 'zh_Hant' | 'en_US'
+  final String tag; // 'system'、'zh_CN'、'zh_Hant' 或 'en_US'
   const _LangItem({required this.flag, required this.label, required this.tag});
 }
 
@@ -1689,7 +1687,7 @@ class _BorderInputState extends State<_BorderInput> {
     super.initState();
     _focus = FocusNode();
     _focus.addListener(() {
-      // Rebuild border color on focus change
+      // 焦点变化时重建边框颜色
       if (mounted) setState(() {});
       if (!_focus.hasFocus) widget.onFocusLost(widget.controller.text);
     });
@@ -1704,7 +1702,7 @@ class _BorderInputState extends State<_BorderInput> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    // hover to change border color (not background)
+    // 悬停时改变边框颜色（不改变背景）
     final baseBorder = OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
       borderSide: BorderSide(
@@ -1753,7 +1751,7 @@ class _BorderInputState extends State<_BorderInput> {
   }
 }
 
-// --- Desktop Font Rows ---
+// --- 桌面字体行 ---
 class _DesktopAppFontRow extends StatelessWidget {
   const _DesktopAppFontRow();
   @override
@@ -1932,7 +1930,7 @@ Future<String?> _showDesktopFontChooserDialog(
   Future<List<String>> fetchSystemFonts() async {
     try {
       final sf = SystemFonts();
-      // Only fetch the font family list to avoid huge memory spikes.
+      // 只获取字体族列表，避免内存大幅上升。
       final fontList = await Future.value(sf.getFontList());
       final out = List<String>.from(fontList);
       out.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
@@ -1940,7 +1938,7 @@ Future<String?> _showDesktopFontChooserDialog(
         return out;
       }
     } catch (_) {
-      /* ignore and fallback */
+      /* 忽略并回退 */
     }
     return <String>[
       'System UI',
@@ -1962,7 +1960,7 @@ Future<String?> _showDesktopFontChooserDialog(
     ]..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
   }
 
-  // Show loading dialog only if fetch takes time, and ensure it closes
+  // 仅当获取耗时较长时显示加载对话框，并确保其会关闭
   bool loadingShown = false;
   final loadingTimer = Timer(const Duration(milliseconds: 300), () {
     loadingShown = true;
@@ -2139,7 +2137,7 @@ class _FontRowItem extends StatefulWidget {
   State<_FontRowItem> createState() => _FontRowItemState();
 }
 
-// Cache loaded/ongoing system fonts to avoid duplicate loads
+// 缓存已加载或加载中的系统字体，避免重复加载
 final Set<String> _loadedSystemFontFamilies = <String>{};
 final Set<String> _loadingSystemFontFamilies = <String>{};
 
@@ -2148,7 +2146,7 @@ class _FontRowItemState extends State<_FontRowItem> {
   @override
   void initState() {
     super.initState();
-    // Lazy-load this row's font family for preview (only for visible items)
+    // 仅为可见项懒加载此行字体族用于预览
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final fam = widget.family;
       if (_loadedSystemFontFamilies.contains(fam) ||
@@ -2159,7 +2157,7 @@ class _FontRowItemState extends State<_FontRowItem> {
       try {
         await SystemFonts().loadFont(fam);
       } catch (_) {
-        // best-effort; fallback rendering will be used if load fails
+        // 尽力而为；加载失败时会使用回退渲染
       } finally {
         _loadingSystemFontFamilies.remove(fam);
         _loadedSystemFontFamilies.add(fam);
@@ -2231,7 +2229,7 @@ class _FontRowItemState extends State<_FontRowItem> {
   }
 }
 
-// --- Toggles Groups ---
+// --- 开关分组 ---
 class _ToggleRowShowUserAvatar extends StatelessWidget {
   const _ToggleRowShowUserAvatar();
   @override
@@ -2523,22 +2521,6 @@ class _ToggleRowInsertSuggestionOnly extends StatelessWidget {
       value: sp.insertSuggestionOnTapOnly,
       onChanged: (v) =>
           context.read<SettingsProvider>().setInsertSuggestionOnTapOnly(v),
-    );
-  }
-}
-
-class _ToggleRowRegenerateDeleteTrailingMessages extends StatelessWidget {
-  const _ToggleRowRegenerateDeleteTrailingMessages();
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final sp = context.watch<SettingsProvider>();
-    return _ToggleRow(
-      label: l10n.displaySettingsPageRegenerateDeleteTrailingMessagesTitle,
-      value: sp.regenerateDeleteTrailingMessages,
-      onChanged: (v) => context
-          .read<SettingsProvider>()
-          .setRegenerateDeleteTrailingMessages(v),
     );
   }
 }
@@ -2884,7 +2866,7 @@ class _ToggleRow extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  // Reduce toggle row label size to 14 to match other panes
+                  // 将开关行标签缩小到 14，与其他面板保持一致
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: AppFontWeights.regular,
@@ -2921,7 +2903,7 @@ class _AutoCollapseCodeBlocksSection extends StatelessWidget {
   }
 }
 
-// --- Others: inputs ---
+// --- 其他：输入项 ---
 class _AutoScrollDelayRow extends StatefulWidget {
   const _AutoScrollDelayRow();
   @override
@@ -3244,7 +3226,7 @@ class _OpacityInputGroup extends StatelessWidget {
   }
 }
 
-// --- Send shortcut ---
+// --- 发送快捷键 ---
 class _SendShortcutRow extends StatelessWidget {
   const _SendShortcutRow();
   @override
@@ -3463,7 +3445,7 @@ class _SendShortcutOverlayState extends State<_SendShortcutOverlay>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final borderColor = cs.outlineVariant.withValues(alpha: 0.12);
 
-    // Platform-specific modifier key
+    // 平台特定的修饰键
     final modifier = Platform.isMacOS ? '⌘' : 'Ctrl';
     final items = <(DesktopSendShortcut, String)>[
       (

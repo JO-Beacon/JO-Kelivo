@@ -24,16 +24,16 @@ class QuickPhraseMenu extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final size = MediaQuery.of(context).size;
-    AppLocalizations.of(context); // keep localization wired; no new strings
+    AppLocalizations.of(context); // 保持本地化已接入；不新增字符串
 
-    // Calculate menu position anchored to the input bar's global left and bottom inset
+    // 根据输入栏全局左侧位置和底部内边距计算菜单位置
     final double menuWidth = 250;
     final double maxMenuHeight = size.height * 0.5;
 
-    // Use provided anchor; dx is global left of input bar, dy is input bar height
+    // 使用提供的锚点；dx 是输入栏全局左侧位置，dy 是输入栏高度
     final double margin = 16;
     double left = anchorPosition.dx;
-    // Clamp within screen margins
+    // 限制在屏幕边距内
     if (left.isNaN || !left.isFinite) {
       left = margin;
     }
@@ -44,7 +44,7 @@ class QuickPhraseMenu extends StatelessWidget {
       left = size.width - menuWidth - margin;
     }
 
-    // Place menu above input bar + keyboard with a small gap
+    // 将菜单放在输入栏和键盘上方，并保留小间距
     final double bottom = 72 + 12 + 38;
 
     return Stack(
@@ -62,10 +62,9 @@ class QuickPhraseMenu extends StatelessWidget {
                   width: menuWidth,
                   constraints: BoxConstraints(maxHeight: maxMenuHeight),
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .surfaceContainerHigh
-                        .withValues(alpha: 0.66),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHigh.withValues(alpha: 0.66),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: isDark

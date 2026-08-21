@@ -73,7 +73,7 @@ Future<void> preRenderMermaidCodesForExport(
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final themeVars = buildThemeVarsFromColorScheme(cs);
 
-  // De-dup codes and skip those already cached
+  // 去重代码，并跳过已缓存的代码
   final distinct = codes
       .toSet()
       .where((c) => MermaidImageCache.get(c) == null)
@@ -83,7 +83,7 @@ Future<void> preRenderMermaidCodesForExport(
   final overlay = Overlay.maybeOf(context);
   if (overlay == null) return;
 
-  // Sequentially render codes with a single offscreen overlay to avoid heavy composites
+  // 使用单个离屏 overlay 顺序渲染代码，避免昂贵的合成操作
   for (final code in distinct) {
     final key = GlobalKey();
     final handle = createMermaidView(
@@ -97,7 +97,7 @@ Future<void> preRenderMermaidCodesForExport(
     late OverlayEntry entry;
     entry = OverlayEntry(
       builder: (ctx) {
-        // Wait a few frames to allow WebView to load and mermaid to render
+        // 等待几帧，让 WebView 加载并让 mermaid 渲染
         WidgetsBinding.instance.addPostFrameCallback((_) async {
           if (!ready.isCompleted) ready.complete();
         });
@@ -113,13 +113,13 @@ Future<void> preRenderMermaidCodesForExport(
     );
     overlay.insert(entry);
     try {
-      // Wait initial frame and a small delay for mermaid.run
+      // 等待首帧，并稍作延迟以等待 mermaid.run
       await ready.future;
       await Future<void>.delayed(const Duration(milliseconds: 500));
       final toBytes = handle.exportPngBytes;
       if (toBytes != null) {
         Uint8List? bytes;
-        // Retry a few times as Mermaid may not be ready immediately
+        // Mermaid 可能不会立即就绪，因此重试几次
         for (int i = 0; i < 8; i++) {
           bytes = await toBytes();
           if (bytes != null && bytes.isNotEmpty) break;

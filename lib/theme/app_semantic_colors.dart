@@ -1,10 +1,10 @@
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 
-/// Semantic colors that have no dedicated role in [ColorScheme].
+/// 在 [ColorScheme] 中没有专用角色的语义颜色。
 ///
-/// All values are derived from (or harmonized with) the active [ColorScheme]
-/// so custom/seed-generated themes get sensible values automatically.
+/// 所有值都由当前 [ColorScheme] 派生或与之协调，因此自定义或种子生成的主题
+/// 也能自动获得合适的颜色。
 class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   final Color surfaceFill;
   final Color surfaceCard;
@@ -30,20 +30,19 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     required this.chartSeries,
   });
 
-  /// Subtle fill for text fields, chips, small cards and tag containers.
-  /// Replaces the old `isDark ? Colors.white10 : Color(0xFFF2F3F5/F7F7F9)` idiom.
+  /// 用于输入框、标签、小卡片和标签容器的柔和填充色。
+  /// 替代旧的 `isDark ? Colors.white10 : Color(0xFFF2F3F5/F7F7F9)` 写法。
   ///
-  /// Dark mode uses a stronger alpha (0.14) than the historical white10/white12
-  /// because these fills most often sit on [surfaceCard] (white@0.10 over
-  /// surface) — at 0.10 the two were indistinguishable (e.g. input fields in
-  /// section cards became invisible).
+  /// 深色模式使用比历史 white10/white12 更强的 alpha（0.14），因为这些填充通常
+  /// 位于 [surfaceCard] 上（surface 上的 white@0.10）；在 0.10 时两者难以区分，
+  /// 例如分区卡片中的输入框会变得不可见。
   static Color _deriveSurfaceFill(ColorScheme cs) {
     final alpha = cs.brightness == Brightness.dark ? 0.16 : 0.05;
     return Color.alphaBlend(cs.onSurface.withValues(alpha: alpha), cs.surface);
   }
 
-  /// iOS-style section card background.
-  /// Replaces the old `isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96)` idiom.
+  /// iOS 风格的分区卡片背景。
+  /// 替代旧的 `isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96)` 写法。
   static Color _deriveSurfaceCard(ColorScheme cs) {
     return cs.brightness == Brightness.dark
         ? Color.alphaBlend(
@@ -145,13 +144,27 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
       surfaceFill: Color.lerp(surfaceFill, other.surfaceFill, t)!,
       surfaceCard: Color.lerp(surfaceCard, other.surfaceCard, t)!,
       success: Color.lerp(success, other.success, t)!,
-      successContainer: Color.lerp(successContainer, other.successContainer, t)!,
-      onSuccessContainer:
-          Color.lerp(onSuccessContainer, other.onSuccessContainer, t)!,
+      successContainer: Color.lerp(
+        successContainer,
+        other.successContainer,
+        t,
+      )!,
+      onSuccessContainer: Color.lerp(
+        onSuccessContainer,
+        other.onSuccessContainer,
+        t,
+      )!,
       warning: Color.lerp(warning, other.warning, t)!,
-      warningContainer: Color.lerp(warningContainer, other.warningContainer, t)!,
-      onWarningContainer:
-          Color.lerp(onWarningContainer, other.onWarningContainer, t)!,
+      warningContainer: Color.lerp(
+        warningContainer,
+        other.warningContainer,
+        t,
+      )!,
+      onWarningContainer: Color.lerp(
+        onWarningContainer,
+        other.onWarningContainer,
+        t,
+      )!,
       searchHighlight: Color.lerp(searchHighlight, other.searchHighlight, t)!,
       chartSeries: List.generate(
         len,
@@ -162,9 +175,8 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
 }
 
 extension AppSemanticColorsX on BuildContext {
-  /// The ambient [AppSemanticColors]. Falls back to deriving values from the
-  /// ambient [ColorScheme] when the extension is not attached (e.g. in widget
-  /// tests that pump a plain MaterialApp).
+  /// 当前环境中的 [AppSemanticColors]。当扩展未挂载时（例如只 pump 了一个
+  /// 普通 MaterialApp 的 widget 测试），会回退为从环境中的 [ColorScheme] 派生。
   AppSemanticColors get appColors {
     final theme = Theme.of(this);
     final ext = theme.extension<AppSemanticColors>();

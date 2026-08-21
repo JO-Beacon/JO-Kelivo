@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../search_service.dart';
 
-/// Firecrawl Search (v2). Hosted `/v2/search` accepts keyless requests;
-/// a Bearer API key is optional and only used for higher rate limits.
-/// Scrape is intentionally not implemented.
+/// Firecrawl Search（v2）。托管的 `/v2/search` 接受无 key 请求；
+/// Bearer API key 是可选的，仅用于获得更高限流额度。
+/// 有意不实现 Scrape。
 class FirecrawlSearchService extends SearchService<FirecrawlOptions> {
   FirecrawlSearchService({super.client});
 

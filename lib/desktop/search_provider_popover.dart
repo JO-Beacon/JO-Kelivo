@@ -13,9 +13,9 @@ import '../utils/brand_assets.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/app_font_weights.dart';
 
-/// Show a desktop-only floating popover for search provider selection.
-/// It appears above the chat input bar with blurred background, top rounded corners,
-/// slightly narrower than the input width, and slides down to dismiss.
+/// 显示仅桌面端使用的搜索供应商选择浮动弹层。
+/// 它出现在聊天输入栏上方，带模糊背景、顶部圆角，宽度略窄于输入框，
+/// 并通过向下滑动关闭。
 Future<void> showDesktopSearchProviderPopover(
   BuildContext context, {
   required GlobalKey anchorKey,
@@ -70,7 +70,7 @@ class _SearchPopoverOverlayState extends State<_SearchPopoverOverlay>
   late final AnimationController _controller;
   late final Animation<double> _fadeIn;
   bool _closing = false;
-  // Positive dy means positioned slightly below final spot (slide up to appear)
+  // 正 dy 表示位于最终位置稍下方（出现时向上滑动）
   Offset _offset = const Offset(0, 0.12);
 
   @override
@@ -81,7 +81,7 @@ class _SearchPopoverOverlayState extends State<_SearchPopoverOverlay>
       duration: const Duration(milliseconds: 260),
     );
     _fadeIn = CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
-    // Kick off enter: slide up into place from slightly below
+    // 开始入场：从稍下方滑入到最终位置
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       setState(() => _offset = Offset.zero);
@@ -100,7 +100,7 @@ class _SearchPopoverOverlayState extends State<_SearchPopoverOverlay>
   Future<void> _close() async {
     if (_closing) return;
     _closing = true;
-    // Slide down out of the clipped area, then fade out
+    // 向下滑出裁剪区域，然后淡出
     setState(() => _offset = const Offset(0, 1.0));
     try {
       await _controller.reverse();
@@ -111,7 +111,7 @@ class _SearchPopoverOverlayState extends State<_SearchPopoverOverlay>
   @override
   Widget build(BuildContext context) {
     final screen = MediaQuery.of(context).size;
-    // Slightly narrower than input width
+    // 比输入框略窄
     final width = (widget.anchorWidth - 16).clamp(260.0, 720.0);
     final left =
         (widget.anchorRect.left + (widget.anchorRect.width - width) / 2).clamp(
@@ -122,14 +122,14 @@ class _SearchPopoverOverlayState extends State<_SearchPopoverOverlay>
 
     return Stack(
       children: [
-        // Transparent barrier to close on outside tap
+        // 透明遮罩，点击外部时关闭
         Positioned.fill(
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
             onTap: _close,
           ),
         ),
-        // Clip area so the panel is only visible above the input's top edge
+        // 裁剪区域，使面板仅在输入框上边缘上方可见
         Positioned(
           left: 0,
           right: 0,
@@ -181,9 +181,7 @@ class _GlassPanel extends StatelessWidget {
         filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: cs.surface.withValues(
-              alpha: isDark ? 0.28 : 0.56,
-            ),
+            color: cs.surface.withValues(alpha: isDark ? 0.28 : 0.56),
             border: Border(
               top: BorderSide(
                 color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.18),
@@ -372,7 +370,7 @@ class _SearchContent extends StatelessWidget {
 
     final rows = <Widget>[];
 
-    // 1) Cancel item at top
+    // 1）顶部取消项
     rows.add(
       _RowItem(
         leading: Icon(Lucide.CircleX, size: 16, color: cs.onSurface),
@@ -386,7 +384,7 @@ class _SearchContent extends StatelessWidget {
       ),
     );
 
-    // 2) Built-in search (when supported)
+    // 2）内置搜索（受支持时）
     if (supportsBuiltIn) {
       rows.add(
         _RowItem(
@@ -422,7 +420,7 @@ class _SearchContent extends StatelessWidget {
       }
     }
 
-    // 3) External services list (hidden when url_context is active)
+    // 3）外部服务列表（url_context 激活时隐藏）
     if (!builtInMode) {
       for (int i = 0; i < services.length; i++) {
         final s = services[i];
@@ -493,11 +491,9 @@ class _RowItemState extends State<_RowItem> {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final onColor = widget.selected ? cs.primary : cs.onSurface;
-    // Use stronger overlay for hover to be clearly visible on glass
+    // 悬停时使用更强的覆盖层，使玻璃背景上清晰可见
     final baseBg = Colors.transparent;
-    final hoverBg = cs.onSurface.withValues(
-      alpha: isDark ? 0.12 : 0.10,
-    );
+    final hoverBg = cs.onSurface.withValues(alpha: isDark ? 0.12 : 0.10);
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,

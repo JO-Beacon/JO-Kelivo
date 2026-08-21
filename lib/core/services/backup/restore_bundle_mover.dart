@@ -11,7 +11,7 @@ import 'restore_previous_plan.dart';
 import 'restore_previous_store.dart';
 import 'restore_receipt.dart';
 
-/// Performs only descriptor-guarded, same-volume bundle moves.
+/// 仅执行受描述符保护且在同一卷内的 bundle 移动。
 final class RestoreBundleMover {
   RestoreBundleMover({
     required this.appDataDirectory,

@@ -2,14 +2,14 @@ import 'dart:io' show Platform;
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
-/// Thin wrapper over a macOS-only MethodChannel that gets/sets
-/// the NSWindow frame origin (Cocoa coordinates; origin at bottom-left).
+/// macOS 专用 MethodChannel 的轻量封装，用于获取或设置
+/// NSWindow 窗口原点（Cocoa 坐标，原点在左下角）。
 class MacOSWindowPosition {
   static const MethodChannel _chan = MethodChannel('app.windowPosition');
 
   static bool get isSupported => !kIsWeb && Platform.isMacOS;
 
-  /// Returns the window origin (frame.origin.x/y) in Cocoa coordinates.
+  /// 以 Cocoa 坐标返回窗口原点（frame.origin.x/y）。
   static Future<Offset> getOrigin() async {
     if (!isSupported) {
       throw StateError('MacOSWindowPosition used on unsupported platform');
@@ -20,7 +20,7 @@ class MacOSWindowPosition {
     return Offset(dx, dy);
   }
 
-  /// Sets the window origin (frame.origin.x/y) with clamping to visible frame.
+  /// 设置窗口原点（frame.origin.x/y），并限制在可见屏幕范围内。
   static Future<bool> setOrigin(Offset origin) async {
     if (!isSupported) return false;
     final ok = await _chan.invokeMethod('setWindowOrigin', <double>[
@@ -30,7 +30,7 @@ class MacOSWindowPosition {
     return ok == true;
   }
 
-  /// Visible frame for current screen (x,y,width,height) in Cocoa coordinates.
+  /// 当前屏幕的可见区域（x、y、宽、高），使用 Cocoa 坐标。
   static Future<Rect?> getCurrentVisibleFrame() async {
     if (!isSupported) return null;
     final List<dynamic> res = await _chan.invokeMethod(

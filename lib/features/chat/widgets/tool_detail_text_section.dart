@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
-/// Labeled text block for the tool detail view, rendered as a sliver.
+/// 工具详情视图中带标签的文本块，以 sliver 方式渲染。
 ///
-/// Small payloads render as a single [Text]. Large payloads are split into
-/// line-bounded chunks built on demand, so opening the detail view never lays
-/// out an entire multi-megabyte tool result at once.
+/// 小载荷作为单个 [Text] 渲染。大载荷会拆分为
+/// 按需构建有行数上限的块，因此打开详情视图时
+/// 不会一次布局整个数 MB 的工具结果。
 class ToolDetailTextSection extends StatelessWidget {
   const ToolDetailTextSection({
     super.key,
@@ -15,7 +15,7 @@ class ToolDetailTextSection extends StatelessWidget {
     this.textStyle = const TextStyle(fontSize: 12),
   });
 
-  /// Above this many lines (or characters) the text is chunked and built lazily.
+  /// 超过此行数（或字符数）后，文本会分块并延迟构建。
   static const int lazyLineThreshold = 120;
   static const int lazyCharThreshold = 8000;
   static const int chunkLines = 40;

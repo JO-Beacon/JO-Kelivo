@@ -16,11 +16,11 @@ import '../../shared/widgets/ios_tactile.dart';
 import '../../shared/widgets/ios_tile_button.dart';
 import '../../theme/app_font_weights.dart';
 
-/// Shared chrome for memory-related desktop dialogs (matches MCP / assistant
-/// dialog shells: surface Dialog + title row + close).
+/// 记忆相关桌面对话框的共享外壳（与 MCP 或助手对话框外壳一致：
+/// surface Dialog 加标题行加关闭按钮）。
 ///
-/// Uses a fixed-height pane shell (`Expanded` body) — good for list / settings
-/// pages. For compact input forms prefer [showDesktopMemoryFormDialog].
+/// 使用固定高度面板外壳（`Expanded` 内容区），适合列表或设置页面。
+/// 对于紧凑输入表单，优先使用 [showDesktopMemoryFormDialog]。
 Future<T?> showDesktopMemoryDialog<T>(
   BuildContext context, {
   required String title,
@@ -88,11 +88,10 @@ Future<T?> showDesktopMemoryDialog<T>(
   );
 }
 
-/// Compact, screen-centered form dialog.
+/// 紧凑、屏幕居中的表单对话框。
 ///
-/// Shrinks to content height (up to [maxHeight]) so short editors stay visually
-/// centered — unlike bottom sheets or fixed-height pane shells that pin content
-/// toward the bottom of the window.
+/// 高度收缩到内容高度（最高为 [maxHeight]），让较短的编辑器保持视觉居中；
+/// 不像底部弹层或固定高度面板那样把内容固定在窗口底部。
 Future<T?> showDesktopMemoryFormDialog<T>(
   BuildContext context, {
   required String title,
@@ -206,9 +205,7 @@ Future<void> showDesktopUserProfileMemoryDialog(BuildContext context) {
   return showDesktopMemoryDialog<void>(
     context,
     title: l10n.userProfilePageTitle,
-    body: const UserProfileContent(
-      padding: EdgeInsets.fromLTRB(20, 8, 20, 24),
-    ),
+    body: const UserProfileContent(padding: EdgeInsets.fromLTRB(20, 8, 20, 24)),
   );
 }
 
@@ -264,9 +261,7 @@ Future<void> showDesktopMemoryTraceDialog(BuildContext context) {
   return showDesktopMemoryDialog<void>(
     context,
     title: l10n.memoryTracePageTitle,
-    body: const MemoryTraceContent(
-      padding: EdgeInsets.fromLTRB(20, 8, 20, 24),
-    ),
+    body: const MemoryTraceContent(padding: EdgeInsets.fromLTRB(20, 8, 20, 24)),
   );
 }
 
@@ -298,8 +293,8 @@ Future<void> showDesktopMemoryTraceDetailDialog(
   );
 }
 
-/// Desktop add/edit memory entry — delegates to [showMemoryEntryEditor], which
-/// already presents a centered Dialog on desktop targets.
+/// 桌面添加或编辑记忆条目，委托给 [showMemoryEntryEditor]；
+/// 后者已在桌面目标上显示居中 Dialog。
 Future<void> showDesktopMemoryEntryEditor(
   BuildContext context, {
   MemoryEntry? existing,
@@ -314,7 +309,7 @@ Future<void> showDesktopMemoryEntryEditor(
   );
 }
 
-/// Desktop option picker — delegates to [showMemoryOptionPicker].
+/// 桌面选项选择器，委托给 [showMemoryOptionPicker]。
 Future<T?> showDesktopMemoryOptionPicker<T>(
   BuildContext context, {
   required String title,
@@ -329,7 +324,7 @@ Future<T?> showDesktopMemoryOptionPicker<T>(
   );
 }
 
-/// Desktop text / number input — centered form dialog (not a bottom sheet).
+/// 桌面文本或数字输入，居中表单对话框（不是底部弹层）。
 Future<String?> showDesktopMemoryTextInputDialog(
   BuildContext context, {
   required String title,
@@ -538,7 +533,7 @@ class _DesktopMemoryTextInputDialogState
   }
 }
 
-/// Desktop confirm dialog (replaces mobile custom bottom sheets).
+/// 桌面确认对话框（替代移动端自定义底部弹层）。
 Future<bool> showDesktopMemoryConfirmDialog(
   BuildContext context, {
   required String title,

@@ -176,9 +176,7 @@ class _GlassPanel extends StatelessWidget {
         filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: cs.surface.withValues(
-              alpha: isDark ? 0.28 : 0.56,
-            ),
+            color: cs.surface.withValues(alpha: isDark ? 0.28 : 0.56),
             border: Border(
               top: BorderSide(
                 color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.18),
@@ -219,7 +217,7 @@ class _McpServersContent extends StatelessWidget {
         .toList();
 
     final rows = <Widget>[];
-    // Top clear row
+    // 顶部清空行
     rows.add(
       _RowItem(
         leading: Icon(Lucide.CircleX, size: 16, color: cs.onSurface),
@@ -255,7 +253,7 @@ class _McpServersContent extends StatelessWidget {
             await context.read<AssistantProvider>().updateAssistant(
               a.copyWith(mcpServerIds: set.toList()),
             );
-            // Do not close; allow multi-select
+            // 不关闭；允许多选
           },
         ),
       );
@@ -310,9 +308,7 @@ class _RowItemState extends State<_RowItem> {
     final isDark = theme.brightness == Brightness.dark;
     final onColor = widget.selected ? cs.primary : cs.onSurface;
     final baseBg = Colors.transparent;
-    final hoverBg = cs.onSurface.withValues(
-      alpha: isDark ? 0.12 : 0.10,
-    );
+    final hoverBg = cs.onSurface.withValues(alpha: isDark ? 0.12 : 0.10);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),

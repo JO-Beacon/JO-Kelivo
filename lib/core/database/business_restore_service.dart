@@ -33,9 +33,9 @@ final class BusinessRestoreService {
     Map<String, Object?>? entityRowIds,
     bool assumePreV3EmbeddingMigrationWhenVersionMissing = false,
   }) async {
-    // Validate and normalize before opening the write transaction. The
-    // transaction then merges those immutable imported rows with its current
-    // snapshot, preserving both sides' database identities.
+    // 在开启写事务之前先校验并规范化。事务随后将这些不可变的
+    // 导入行与其当前快照合并，同时保留双方的
+    // 数据库身份。
     final incoming = BusinessSettingsRouter.normalizeAndRoute(
       imported,
       preserveExplicitEmptyInstructionList:

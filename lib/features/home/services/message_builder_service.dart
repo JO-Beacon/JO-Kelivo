@@ -32,28 +32,28 @@ import '../../../utils/assistant_regex.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
 import 'ocr_service.dart';
 
-/// Result of §7.6 memory-prefix resolution.
+/// §7.6 记忆前缀解析结果。
 typedef MemoryPrefixResolution = ({
   String prefix,
   String? hash,
   String? snapshotKind,
 });
 
-/// Memory injection state shared by the messages assembled in one request.
+/// 同一次请求中组装的消息共享的记忆注入状态。
 ///
-/// Persisted conversations could read all of this back from the database, but
-/// temporary ones are never written there, so without a pass-scoped record each
-/// message would look like the first and re-inject the same snapshot.
+/// 持久化会话可以从数据库读回所有这些信息，但临时会话从不写入数据库，
+/// 因此如果没有按次请求作用域记录，每条消息看起来都会像第一条，
+/// 并重复注入同一快照。
 class MemoryInjectionPass {
-  /// Revision ids that received a memory block during this request.
+  /// 本次请求中收到记忆块的修订 ID。
   final Set<String> snapshotCarriers = <String>{};
 
-  /// The most recent hash injected during this request, if any.
+  /// 本次请求中最近注入的哈希（如有）。
   String? get injectedHash => _injectedHash;
   String? _injectedHash;
 
-  /// Whether [injectedHash] has been set, distinguishing "none yet" from a
-  /// legitimately null hash.
+  /// [injectedHash] 是否已设置，用于区分“尚未设置”
+  /// 和合法的 null 哈希。
   bool get hasInjectedHash => _hasInjectedHash;
   bool _hasInjectedHash = false;
 
@@ -63,17 +63,17 @@ class MemoryInjectionPass {
   }
 }
 
-/// Service for building API messages from conversation state.
+/// 从会话状态构建 API 消息的服务。
 ///
-/// This service handles:
-/// - Building API messages list from chat history
-/// - Processing user messages (documents, OCR, templates)
-/// - Injecting system prompts
-/// - Injecting memory and recent chats context
-/// - Injecting search prompts
-/// - Injecting instruction prompts
-/// - Applying context limits
-/// - Inlining local images for model context
+/// 此服务负责：
+/// - 从聊天历史构建 API 消息列表
+/// - 处理用户消息（文档、OCR、模板）
+/// - 注入系统提示词
+/// - 注入记忆和近期聊天上下文
+/// - 注入搜索提示词
+/// - 注入指令提示词
+/// - 应用上下文限制
+/// - 为模型上下文内联本地图片
 class MessageBuilderService {
   static const String internalMediaPathsKey = multimodalInternalMediaPathsKey;
   static const String internalRevisionIdKey = multimodalInternalRevisionIdKey;
@@ -89,17 +89,17 @@ class MessageBuilderService {
 
   final ChatService chatService;
 
-  /// Optional override for `promptContent` freeze and §7.6 injection.
-  /// When null, falls back to [ChatService.chatRepositoryOrNull].
+  /// `promptContent` 冻结和 §7.6 注入的可选覆盖。
+  /// 为 null 时回退到 [ChatService.chatRepositoryOrNull]。
   final ChatDatabaseRepository? chatRepository;
 
   ChatDatabaseRepository? get _repo =>
       chatRepository ?? chatService.chatRepositoryOrNull;
 
-  /// Build context (used for accessing providers via context.read)
+  /// 构建上下文（用于通过 context.read 访问提供器）
   final BuildContext contextProvider;
 
-  /// OCR handler for processing images (optional, injected from home_page)
+  /// 处理图片的 OCR 处理器（可选，从 home_page 注入）
   final Future<String?> Function(
     List<String> imagePaths, {
     String? revisionId,
@@ -107,26 +107,26 @@ class MessageBuilderService {
   })?
   ocrHandler;
 
-  /// Optional batch prefetch of persisted OCR before per-message processing.
+  /// 逐消息处理前对持久化 OCR 的可选批量预取。
   final Future<OcrPrepareSession> Function({
     required List<String> revisionIds,
     required List<String> imagePaths,
   })?
   ocrPrefetch;
 
-  /// OCR text wrapper function
+  /// OCR 文本包装函数
   String Function(String ocrText)? ocrTextWrapper;
 
-  /// Handler to append Gemini thought signatures for API calls
+  /// 为 API 调用追加 Gemini 思考签名的处理器
   final String Function(ChatMessage message, String content)?
   geminiThoughtSignatureHandler;
 
-  /// Cache for document text extraction to avoid re-reading files on every message
-  /// Keyed by path, validated with (modified + size) to avoid stale reuse.
+  /// 文档文本提取缓存，避免每条消息都重新读取文件。
+  /// 按路径索引，通过（修改时间 + 大小）校验以避免复用过期数据。
   final Map<String, _DocTextCacheEntry> _docTextCache =
       <String, _DocTextCacheEntry>{};
 
-  /// Collapse message versions to show only selected version per group.
+  /// 折叠消息版本，每组只显示已选版本。
   List<ChatMessage> collapseVersions(
     List<ChatMessage> items,
     Map<String, int> versionSelections,
@@ -144,12 +144,12 @@ class MessageBuilderService {
       list.add(m);
     }
 
-    // Sort each group by version
+    // 按版本对每个组排序
     for (final e in byGroup.entries) {
       e.value.sort((a, b) => a.version.compareTo(b.version));
     }
 
-    // Select the appropriate version from each group
+    // 从每个组中选择合适的版本
     final out = <ChatMessage>[];
     for (final gid in order) {
       final vers = byGroup[gid]!;
@@ -169,9 +169,9 @@ class MessageBuilderService {
     return out;
   }
 
-  /// Build API messages list from current conversation state.
+  /// 从当前会话状态构建 API 消息列表。
   ///
-  /// Applies truncation and version collapsing. Attachments come from parts.
+  /// 应用截断和版本折叠。附件来自消息部分。
   List<Map<String, dynamic>> buildApiMessages({
     required List<ChatMessage> messages,
     required Map<String, int> versionSelections,
@@ -200,7 +200,7 @@ class MessageBuilderService {
       if (includeToolMessages && m.role == 'assistant') {
         final events = chatService.getToolEvents(m.id);
         if (events.isNotEmpty) {
-          // Tool-call history is only valid once every call has a result.
+          // 只有每个调用都有结果后，工具调用历史才有效。
           final hasPendingToolEvent = events.any((e) => e['content'] == null);
           if (!hasPendingToolEvent) {
             final calls = <Map<String, dynamic>>[];
@@ -254,11 +254,10 @@ class MessageBuilderService {
                 assistantToolMessage['reasoning_content'] =
                     assistantReasoningContent;
               }
-              // The persisted reasoning_details belong to the final round of
-              // this message; attaching them to this synthetic pre-tool
-              // assistant message as well would replay the same reasoning
-              // twice, which OpenRouter/Anthropic reject. Only the final
-              // assistant message below carries them.
+              // 持久化的 reasoning_details 属于此消息的最后一轮；
+              // 如果也把它们附加到这条合成的工具前助手消息，就会重复
+              // 回放同一段推理，而 OpenRouter/Anthropic 会拒绝。
+              // 只有下方最终助手消息才携带它们。
               if (ContextLogger.enabled) {
                 ContextSegmentTags.replaceWithSingle(
                   assistantToolMessage,
@@ -287,10 +286,10 @@ class MessageBuilderService {
         content = geminiThoughtSignatureHandler!(m, content);
       }
       final mediaRefs = mediaRefsFromParts(m);
-      // Pure-attachment turns have empty text content but still must be sent.
-      // Document FileParts are omitted from mediaRefs (they travel via
-      // document extraction), so also keep messages that still have a usable
-      // ImagePart/FilePart for processUserMessagesForApi to inject text.
+      // 纯附件轮次的文本内容为空，但仍必须发送。
+      // 文档 FilePart 不包含在 mediaRefs 中（它们通过文档提取传输），
+      // 因此还要保留仍包含可用 ImagePart/FilePart 的消息，
+      // 供 processUserMessagesForApi 注入文本。
       if (content.isEmpty &&
           mediaRefs.isEmpty &&
           !_hasUsableAttachmentPart(m)) {
@@ -323,10 +322,10 @@ class MessageBuilderService {
     return out;
   }
 
-  /// Collect structured `_kelivo_media_paths` entries from image/file parts.
+  /// 从图片/文件部分收集结构化 `_kelivo_media_paths` 条目。
   ///
-  /// Skips unavailable parts. Document (non-media) FileParts are omitted — they
-  /// travel through document extraction, not media-path attachments.
+  /// 跳过不可用部分。文档（非媒体）FilePart 会被省略，
+  /// 因为它们通过文档提取传输，而不是媒体路径附件。
   static List<Map<String, dynamic>> mediaRefsFromParts(ChatMessage message) {
     final refs = <Map<String, dynamic>>[];
     for (final part in message.parts) {
@@ -349,8 +348,8 @@ class MessageBuilderService {
             isVideoMime(effectiveMime))) {
           continue;
         }
-        // Prefer resolved media mime over stale generics like
-        // application/octet-stream stored on the part.
+        // 优先使用已解析的媒体 MIME，而不是部分上存储的
+        // application/octet-stream 等过期通用类型。
         refs.add(
           encodeInternalMediaRef(
             uri: uri,
@@ -362,8 +361,8 @@ class MessageBuilderService {
     return refs;
   }
 
-  /// True when the message still has a non-unavailable image/file attachment
-  /// that should survive into API preparation even without media refs.
+  /// 当消息仍有非不可用的图片/文件附件且即使没有媒体引用也应
+  /// 保留到 API 准备阶段时为 true。
   static bool _hasUsableAttachmentPart(ChatMessage message) {
     for (final part in message.parts) {
       if (part is ImagePart && !part.unavailable) {
@@ -375,7 +374,7 @@ class MessageBuilderService {
     return false;
   }
 
-  /// Remove internal keys before provider requests.
+  /// 在供应商请求前移除内部键。
   void stripInternalRevisionIds(List<Map<String, dynamic>> apiMessages) {
     for (final message in apiMessages) {
       message.remove(internalRevisionIdKey);
@@ -461,9 +460,8 @@ class MessageBuilderService {
     return pick(persisted);
   }
 
-  /// Extract persisted vendor reasoning details (OpenRouter-style
-  /// `reasoning_details`, may carry thinking signatures) so they can be
-  /// echoed back to the provider on later turns.
+  /// 提取持久化的供应商推理详情（OpenRouter 风格 `reasoning_details`，
+  /// 可能携带思考签名），以便在后续轮次回传给供应商。
   dynamic _reasoningDetailsForApi(ChatMessage message) {
     dynamic pick(ChatMessage candidate) {
       final raw = (candidate.reasoningSegmentsJson ?? '').trim();
@@ -485,10 +483,10 @@ class MessageBuilderService {
     return pick(persisted);
   }
 
-  /// Parse attachments from structured [ChatMessage.parts].
+  /// 从结构化 [ChatMessage.parts] 解析附件。
   ///
-  /// Parts-only contract for API request building. Content-marker decode is
-  /// not performed here — migration owns that via the legacy decoder.
+  /// 这是 API 请求构建的仅部分约定。此处不执行内容标记解码，
+  /// 迁移逻辑通过旧解码器负责该任务。
   ChatInputData parseInputFromMessage(
     ChatMessage message, {
     bool includeMediaFilePathsAsImages = true,
@@ -500,8 +498,8 @@ class MessageBuilderService {
       if (part is TextPart) {
         textParts.add(part.text);
       } else if (part is ImagePart) {
-        // Unavailable parts stay in persisted history for UI placeholders but
-        // must not enter API media paths.
+        // 不可用部分仍保留在持久化历史中用于 UI 占位，
+        // 但不得进入 API 媒体路径。
         if (part.unavailable) continue;
         final uri = part.uri.trim();
         if (uri.isNotEmpty) images.add(uri);
@@ -530,9 +528,9 @@ class MessageBuilderService {
     );
   }
 
-  /// Build [ChatInputData] from an API map when no [ChatMessage] is available.
+  /// 当没有 [ChatMessage] 可用时，从 API 映射构建 [ChatInputData]。
   ///
-  /// Uses content text plus [internalMediaPathsKey] only — no marker decode.
+  /// 仅使用内容文本和 [internalMediaPathsKey]，不执行标记解码。
   ChatInputData parseInputFromApiMap(
     Map<String, dynamic> message, {
     bool includeMediaFilePathsAsImages = true,
@@ -575,10 +573,10 @@ class MessageBuilderService {
     return resolveDocumentAttachmentMime(attachment);
   }
 
-  /// Process user messages in apiMessages: prefer frozen `promptContent`, else
-  /// assemble (docs/OCR → memory prefix → template → time) and freeze (§8).
+  /// 处理 apiMessages 中的用户消息：优先使用已冻结的 `promptContent`，
+  /// 否则组装（文档/OCR → 记忆前缀 → 模板 → 时间）并冻结（§8）。
   ///
-  /// Returns the image paths from the last user message (for API call).
+  /// 返回最后一条用户消息的图片路径（用于 API 调用）。
   Future<List<String>> processUserMessagesForApi(
     List<Map<String, dynamic>> apiMessages,
     SettingsProvider settings,
@@ -593,8 +591,8 @@ class MessageBuilderService {
 
     List<String>? lastUserImagePaths;
 
-    // Only real persisted user messages carry an internal revision ID.
-    // WorldBook lore may also use role=user and must not be treated as chat input.
+    // 只有真实持久化用户消息才携带内部修订 ID。
+    // WorldBook 背景也可能使用 role=user，不得被当作聊天输入。
     bool isPersistedUserMessage(Map<String, dynamic> message) {
       if (message['role'] != 'user') return false;
       return (message[internalRevisionIdKey] ?? '')
@@ -603,7 +601,7 @@ class MessageBuilderService {
           .isNotEmpty;
     }
 
-    // Find last real user message index (skip injected lore).
+    // 查找最后一条真实用户消息索引（跳过注入的背景设定）。
     int lastUserIdx = -1;
     for (int i = apiMessages.length - 1; i >= 0; i--) {
       if (isPersistedUserMessage(apiMessages[i])) {
@@ -621,7 +619,7 @@ class MessageBuilderService {
         ? null
         : await _repo!.getMessagePrompts(persistedRevisionIds);
 
-    // Prefetch OCR only for messages that still need generation (no freeze yet).
+    // 只为仍需生成（尚未冻结）的消息预取 OCR。
     OcrPrepareSession? ocrSession;
     if (ocrActive && ocrPrefetch != null) {
       final revisionIds = <String>[];
@@ -675,11 +673,11 @@ class MessageBuilderService {
     }
 
     Future<String?> readDocument(DocumentAttachment d) async {
-      // Resolve once so cache key and extractor share the same absolute path.
-      // null means rejected (UNC/SMB) — never fall back to the raw path.
+      // 只解析一次，使缓存键和提取器共享同一绝对路径。
+      // null 表示被拒绝（UNC/SMB），绝不回退到原始路径。
       final resolvedPath = SandboxPathResolver.resolveForIo(d.path);
       if (resolvedPath == null) return null;
-      // Use file stat to detect content changes without hashing.
+      // 使用文件状态检测内容变化，避免哈希计算。
       FileStat? stat;
       try {
         stat = await File(resolvedPath).stat();
@@ -699,7 +697,7 @@ class MessageBuilderService {
           path: resolvedPath,
           mime: d.mime,
         );
-        // Cache only when stat is available; otherwise avoid staleness.
+        // 仅在有文件状态时缓存；否则避免过期数据。
         if (stat != null) {
           _docTextCache[resolvedPath] = _DocTextCacheEntry(
             text: text,
@@ -751,8 +749,8 @@ class MessageBuilderService {
             if (part.unavailable) continue;
             final uri = part.uri.trim();
             if (uri.isEmpty) continue;
-            // Prefer resolved media mime over stale generics like
-            // application/octet-stream stored on the part.
+            // 优先使用已解析的媒体 MIME，而不是部分上存储的
+            // application/octet-stream 等过期通用类型。
             final fileName = uri.split(RegExp(r'[\\/]')).last;
             final effectiveMime = resolveMediaAttachmentMime(
               explicitMime: part.mime ?? '',
@@ -816,14 +814,14 @@ class MessageBuilderService {
         apiMessages[i][internalMediaPathsKey] = messageMediaPaths;
       }
 
-      // Capture image paths from last user message (from parts).
+      // 从最后一条用户消息（从各部分）捕获图片路径。
       if (i == lastUserIdx &&
           lastUserImagePaths == null &&
           parsedUser.imagePaths.isNotEmpty) {
         lastUserImagePaths = List<String>.of(parsedUser.imagePaths);
       }
 
-      // Prefer frozen promptContent — never recompute (§8.3).
+      // 优先使用已冻结的 promptContent，绝不重新计算（§8.3）。
       final existing = frozenPrompts?[revisionId];
       if (existing != null) {
         final sendPayload = _legacyAwareFrozenPayload(
@@ -844,7 +842,7 @@ class MessageBuilderService {
         continue;
       }
 
-      // Apply replace-only regexes at send-time on user text.
+      // 发送时对用户文本应用仅替换型正则表达式。
       final replacedUserText = applyAssistantRegexes(
         parsedUser.text,
         assistant: assistant,
@@ -852,8 +850,8 @@ class MessageBuilderService {
         target: AssistantRegexTransformTarget.send,
       );
 
-      // Attachments travel via internalMediaPathsKey / lastUserImagePaths —
-      // never re-embed legacy attachment markers into content.
+      // 附件通过 internalMediaPathsKey / lastUserImagePaths 传输，
+      // 绝不把旧版附件标记重新嵌入内容。
       final cleanedUser = replacedUserText.trim();
 
       final filePrompts = StringBuffer();
@@ -924,8 +922,8 @@ class MessageBuilderService {
           freezePrompt: canFreezePrompt,
         );
       } else {
-        // No conversation or no matching stored message: nothing to freeze
-        // against, so render the template without a memory prefix.
+        // 没有会话或没有匹配的已存储消息：没有可冻结对象，
+        // 因此渲染模板时不带记忆前缀。
         final templ =
             (assistant?.messageTemplate ?? '{{ message }}').trim().isEmpty
             ? '{{ message }}'
@@ -947,28 +945,24 @@ class MessageBuilderService {
     return lastUserImagePaths ?? <String>[];
   }
 
-  /// The stored message behind an api payload, or null when it cannot be
-  /// found.
+  /// API 负载背后的已存储消息；无法找到时为 null。
   ///
-  /// [sourceMessages] is the list this request's api payloads were built from
-  /// and is checked first. `ChatService.getMessages` only serves conversations
-  /// already in its cache, so on a freshly created conversation it returns
-  /// nothing and the new message would silently skip memory injection and
-  /// freezing — then pick both up a turn later, rewriting history and losing
-  /// the prompt cache.
+  /// [sourceMessages] 是本次请求 API 负载所基于的列表，会先被检查。
+  /// `ChatService.getMessages` 只服务已在其缓存中的会话，
+  /// 因此新创建的会话会返回空结果，新消息会静默跳过记忆注入和冻结，
+  /// 随后在下一轮才补上，从而重写历史并丢失提示词缓存。
   ///
-  /// A synthesized stand-in would have to invent a timestamp, and freezing that
-  /// would bake the wrong `{{ time }}` into the prompt forever, so a genuine
-  /// miss returns null and stays on the unfrozen render path.
+  /// 合成替代对象必须虚构时间戳，冻结它会将错误的 `{{ time }}`
+  /// 永久写入提示词，因此真正未命中时返回 null 并留在未冻结渲染路径。
   ChatMessage? _resolveChatMessage({
     required String revisionId,
     required Conversation? conversation,
     required List<ChatMessage>? sourceMessages,
   }) {
     if (revisionId.isEmpty) return null;
-    // Prefer the request's source messages even when Conversation is absent —
-    // otherwise structured ImagePart/FilePart attachments are dropped and the
-    // caller silently falls back to content-only parsing.
+    // 即使 Conversation 不存在也优先使用请求的源消息；
+    // 否则结构化 ImagePart/FilePart 附件会被丢弃，
+    // 调用方会静默回退到仅内容解析。
     if (sourceMessages != null) {
       for (final candidate in sourceMessages) {
         if (candidate.id == revisionId) return candidate;
@@ -981,7 +975,7 @@ class MessageBuilderService {
     return null;
   }
 
-  /// §8.3 immutability contract: return frozen payload or assemble + freeze.
+  /// §8.3 不可变性约定：返回已冻结负载，或组装并冻结。
   Future<String> resolvePromptContent({
     required ChatMessage message,
     required String processedUserBody,
@@ -1067,8 +1061,8 @@ class MessageBuilderService {
       }
     }
 
-    // Temporary drafts never land in message_rows; freezing would violate the
-    // message_prompt_rows FK. Assemble in-memory only for those.
+    // 临时草稿永远不会进入 message_rows；冻结会违反
+    // message_prompt_rows 外键。对这些内容仅做内存组装。
     if (persist && freezePrompt) {
       await repo.freezeMessagePrompt(
         revisionId: message.id,
@@ -1091,9 +1085,8 @@ class MessageBuilderService {
     }
   }
 
-  /// Drop a v2 snapshot that was frozen into history while the new memory
-  /// system was on. The stored freeze row is left intact so switching back
-  /// still hits prompt cache / hash gating.
+  /// 丢弃在新记忆系统开启时冻结进历史的 v2 快照。
+  /// 保留已存储的冻结行，使切换回来时仍命中提示词缓存/哈希门控。
   String _legacyAwareFrozenPayload({
     required String payload,
     required bool carriesMemorySnapshot,
@@ -1103,7 +1096,7 @@ class MessageBuilderService {
     return MemoryBlockBuilder.splitInjectedPrefix(payload)?.rest ?? payload;
   }
 
-  /// §7.6 hash gating + self-healing. Compare hash **before** writing it.
+  /// §7.6 哈希门控 + 自愈。在写入哈希之前先进行比较。
   Future<MemoryPrefixResolution> resolveMemoryPrefix({
     required Conversation conversation,
     required Assistant assistant,
@@ -1147,9 +1140,8 @@ class MessageBuilderService {
       memoryBlock,
     );
 
-    // Self-healing: any history user message in *this* request carrying a
-    // snapshot? Read revision ids before stripInternalRevisionIds; exclude
-    // the message being assembled now.
+    // 自愈逻辑：本次请求中是否有任何历史用户消息携带快照？
+    // 在 stripInternalRevisionIds 前读取修订 ID；排除当前正在组装的消息。
     final historyUserIds = <String>[];
     for (final message in apiMessages) {
       if ((message['role'] ?? '').toString() != 'user') continue;
@@ -1165,24 +1157,22 @@ class MessageBuilderService {
         ) ||
         await repo.anyPromptCarriesMemorySnapshot(historyUserIds);
 
-    // With no prior snapshot there is nothing to clear. Once a snapshot has
-    // been sent, however, the all-empty state is itself the latest snapshot.
+    // 没有先前快照时无需清除。然而一旦快照已发送，
+    // 全空状态本身就是最新快照。
     if (!hasProfile && !hasAnyMemory && !hasSnapshot) {
       return (prefix: '', hash: null, snapshotKind: null);
     }
 
-    // CRITICAL: compare against the prior hash BEFORE any write (appendix §6).
-    // Writing first makes currentHash == injectedMemoryHash and the update
-    // branch is permanently unreachable.
+    // 关键：在任何写入之前与先前哈希比较（附录 §6）。
+    // 先写入会使 currentHash == injectedMemoryHash，
+    // 更新分支将永远不可达。
     //
-    // Read from the database, not from [conversation]: callers hand us
-    // `conversation.copyWith(...)` and nothing ever loads this column back into
-    // the model, so the cached value is stale forever and every turn would look
-    // like a change.
+    // 从数据库读取，而不是从 [conversation] 读取：调用方传给我们的是
+    // `conversation.copyWith(...)`，且没有任何逻辑会把此列加载回模型，
+    // 因此缓存值会永远过期，每一轮看起来都像发生变化。
     //
-    // A hash already injected earlier in this same request wins, because
-    // temporary conversations are never persisted and would otherwise read
-    // null for every message and repeat an identical update block on each one.
+    // 同一次请求中早先已注入的哈希优先，因为临时会话从不持久化，
+    // 否则每条消息都会读到 null，并重复执行相同的更新块。
     final previousHash = pass != null && pass.hasInjectedHash
         ? pass.injectedHash
         : await repo.getConversationInjectedMemoryHash(conversation.id);
@@ -1207,13 +1197,12 @@ class MessageBuilderService {
       return (prefix: '', hash: null, snapshotKind: null);
     }
 
-    // The hash lands in the database through freezeMessagePrompt, in the same
-    // transaction as the prompt row.
+    // 哈希通过 freezeMessagePrompt 在与提示词行相同的事务中写入数据库。
     pass?.recordInjectedHash(currentHash);
     return (prefix: prefix, hash: currentHash, snapshotKind: snapshotKind);
   }
 
-  /// Default OCR text wrapper
+  /// 默认 OCR 文本包装函数
   String _defaultWrapOcrBlock(String ocrText) {
     final buf = StringBuffer();
     buf.writeln(
@@ -1226,7 +1215,7 @@ class MessageBuilderService {
     return buf.toString();
   }
 
-  /// Inject system prompt into apiMessages.
+  /// 将系统提示词注入 apiMessages。
   void injectSystemPrompt(
     List<Map<String, dynamic>> apiMessages,
     Assistant? assistant,
@@ -1256,13 +1245,13 @@ class MessageBuilderService {
     }
   }
 
-  /// Inject §11 memory rules into the system message.
+  /// 将 §11 记忆规则注入系统消息。
   ///
-  /// Pure function of `(enableMemory, allowPastConversationRecall, lang,
-  /// user template)` — must not vary with memory content or the clock (§11.1).
-  /// Relative order among remaining system injections is preserved by the
-  /// caller (`injectSystemPrompt` → this → `injectSearchPrompt` →
-  /// `injectInstructionPrompts` → `injectWorldBookPrompts`).
+  /// 这是 `(enableMemory, allowPastConversationRecall, lang, user template)`
+  /// 的纯函数，不得随记忆内容或时钟变化（§11.1）。
+  /// 其余系统注入的相对顺序由调用方保持：
+  /// （`injectSystemPrompt` → 此方法 → `injectSearchPrompt` →
+  /// `injectInstructionPrompts` → `injectWorldBookPrompts`）。
   Future<void> injectMemoryAndRecentChats(
     List<Map<String, dynamic>> apiMessages,
     Assistant? assistant, {
@@ -1279,9 +1268,9 @@ class MessageBuilderService {
         );
         return;
       }
-      // The two gates are independent: chat_search is registered on
-      // allowPastConversationRecall alone, so its rules cannot ride along with
-      // the long-term memory rules or the tool ships without instructions.
+      // 这两个开关相互独立：chat_search 仅由 allowPastConversationRecall
+      // 注册，因此其规则不能与长期记忆规则一起附加，
+      // 否则该工具会缺少指令。
       final wantsMemoryRules = assistant.enableMemory;
       final wantsRecallRules = assistant.allowPastConversationRecall;
       if (!wantsMemoryRules && !wantsRecallRules) return;
@@ -1374,7 +1363,7 @@ class MessageBuilderService {
         sb.writeln('这是用户最近的一些对话标题和摘要，你可以参考这些内容了解用户偏好和关注点');
         for (final c in relevantChats) {
           sb.writeln('<conversation>');
-          // Format: timestamp: title || summary
+          // 格式：时间戳: 标题 || 摘要
           final timestamp = c.updatedAt.toIso8601String().substring(0, 10);
           final title = c.title.trim();
           final summary = (c.summary ?? '').trim();
@@ -1399,7 +1388,7 @@ class MessageBuilderService {
     return '${now.year}年${now.month}月${now.day}日的${now.hour}点';
   }
 
-  /// Inject search tool usage prompt into apiMessages.
+  /// 将搜索工具使用提示词注入 apiMessages。
   void injectSearchPrompt(
     List<Map<String, dynamic>> apiMessages,
     SettingsProvider settings,
@@ -1416,7 +1405,7 @@ class MessageBuilderService {
     }
   }
 
-  /// Inject instruction injection prompts into apiMessages.
+  /// 将指令注入提示词注入 apiMessages。
   Future<void> injectInstructionPrompts(
     List<Map<String, dynamic>> apiMessages,
     String? assistantId,
@@ -1443,7 +1432,7 @@ class MessageBuilderService {
     } catch (_) {}
   }
 
-  /// Inject world book (lorebook) entries into apiMessages.
+  /// 将 WorldBook（世界书）条目注入 apiMessages。
   Future<void> injectWorldBookPrompts(
     List<Map<String, dynamic>> apiMessages,
     String? assistantId,
@@ -1600,7 +1589,7 @@ class MessageBuilderService {
             .add(t.entry);
       }
 
-      // BEFORE/AFTER_SYSTEM_PROMPT: merge into system message.
+      // BEFORE/AFTER_SYSTEM_PROMPT：合并到系统消息。
       final beforeContent = joinContents(
         byPosition[WorldBookInjectionPosition.beforeSystemPrompt] ??
             const <WorldBookEntry>[],
@@ -1712,7 +1701,7 @@ class MessageBuilderService {
         }
       }
 
-      // TOP_OF_CHAT: insert before first user message.
+      // TOP_OF_CHAT：插入到第一条用户消息之前。
       final topInjections = byPosition[WorldBookInjectionPosition.topOfChat];
       if (topInjections != null && topInjections.isNotEmpty) {
         var insertIndex = apiMessages.indexWhere(
@@ -1729,7 +1718,7 @@ class MessageBuilderService {
         );
       }
 
-      // BOTTOM_OF_CHAT: insert before last message.
+      // BOTTOM_OF_CHAT：插入到最后一条消息之前。
       final bottomInjections =
           byPosition[WorldBookInjectionPosition.bottomOfChat];
       if (bottomInjections != null && bottomInjections.isNotEmpty) {
@@ -1744,7 +1733,7 @@ class MessageBuilderService {
         );
       }
 
-      // AT_DEPTH: insert at depth from end (depth=1 means before last message).
+      // AT_DEPTH：从末尾按深度插入（depth=1 表示在最后一条消息之前）。
       final atDepthInjections = byPosition[WorldBookInjectionPosition.atDepth];
       if (atDepthInjections != null && atDepthInjections.isNotEmpty) {
         final byDepth = <int, List<WorldBookEntry>>{};
@@ -1777,7 +1766,7 @@ class MessageBuilderService {
     } catch (_) {}
   }
 
-  /// Helper to append content to the system message (or create one if missing).
+  /// 向系统消息追加内容的辅助方法（缺少时创建一个）。
   void _appendToSystemMessage(
     List<Map<String, dynamic>> apiMessages,
     String content, {
@@ -1806,7 +1795,7 @@ class MessageBuilderService {
     }
   }
 
-  /// Apply context message limit based on assistant settings.
+  /// 根据助手设置应用上下文消息限制。
   void applyContextLimit(
     List<Map<String, dynamic>> apiMessages,
     Assistant? assistant,
@@ -1828,7 +1817,7 @@ class MessageBuilderService {
           ..removeRange(startIdx, apiMessages.length)
           ..addAll(trimmed);
       }
-      // Context trimming can cut in the middle of a tool-call triplet; avoid sending dangling tool messages.
+      // 上下文裁剪可能切到工具调用三元组中间；避免发送悬空工具消息。
       while (apiMessages.length > startIdx &&
           (apiMessages[startIdx]['role'] ?? '').toString() == 'tool') {
         apiMessages.removeAt(startIdx);
@@ -1836,7 +1825,7 @@ class MessageBuilderService {
     }
   }
 
-  /// Convert local Markdown image links to inline base64 for model context.
+  /// 将本地 Markdown 图片链接转换为模型上下文可用的行内 base64。
   Future<void> inlineLocalImages(List<Map<String, dynamic>> apiMessages) async {
     for (int i = 0; i < apiMessages.length; i++) {
       final s = (apiMessages[i]['content'] ?? '').toString();
@@ -1847,7 +1836,7 @@ class MessageBuilderService {
     }
   }
 
-  /// Check if built-in search is enabled for the given provider/model.
+  /// 检查给定供应商/模型是否启用了内置搜索。
   bool hasBuiltInSearch(
     SettingsProvider settings,
     String providerKey,

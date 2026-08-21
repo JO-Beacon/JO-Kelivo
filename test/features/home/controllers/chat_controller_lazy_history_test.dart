@@ -1923,7 +1923,8 @@ void main() {
         expect(contextConversation.truncateIndex, 30);
         expect(controller.messages, messages.sublist(60));
         expect(controller.loadedStartIndex, 60);
-        expect(chatService.fullLoadCalls, 1);
+        expect(chatService.activeTimelineLoadCalls, 1);
+        expect(chatService.fullLoadCalls, 0);
       },
     );
 

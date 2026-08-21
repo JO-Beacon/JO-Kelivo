@@ -146,7 +146,7 @@ class _TagsManagerPageState extends State<TagsManagerPage> {
         itemCount: tags.length,
         buildDefaultDragHandles: false,
         proxyDecorator: (child, index, animation) {
-          // No shadow during drag; slight scale only
+          // 拖动时无阴影；只有轻微缩放
           return ScaleTransition(
             scale: Tween<double>(begin: 1.0, end: 1.02).animate(animation),
             child: child,

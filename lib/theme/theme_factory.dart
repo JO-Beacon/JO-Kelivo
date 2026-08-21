@@ -6,7 +6,7 @@ import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
 
-// CJK/Latin fallback to stabilize fontWeight (w100-w600) on iOS for Chinese
+// CJK/Latin 回退字体，用于在 iOS 上稳定中文的 fontWeight（w100-w600）
 const List<String> kDefaultFontFamilyFallback = <String>[
   'PingFang SC',
   'Heiti SC',
@@ -16,7 +16,7 @@ const List<String> kDefaultFontFamilyFallback = <String>[
 
 const List<String> kAndroidFontFamilyFallback = <String>['sans-serif'];
 
-// Windows-specific font fallback to fix Chinese font rendering issues
+// Windows 专用字体回退，用于修复中文渲染问题
 const List<String> kWindowsFontFamilyFallback = <String>[
   'Twemoji Country Flags',
   'Segoe UI',
@@ -24,7 +24,7 @@ const List<String> kWindowsFontFamilyFallback = <String>[
   'SimHei',
 ];
 
-// Get platform-appropriate font fallback list
+// 获取适合当前平台的字体回退列表
 List<String> getPlatformFontFallback() {
   if (defaultTargetPlatform == TargetPlatform.android) {
     return kAndroidFontFamilyFallback;
@@ -35,15 +35,14 @@ List<String> getPlatformFontFallback() {
   return kDefaultFontFamilyFallback;
 }
 
-// Internal helper for theme building
+// 用于构建主题的内部辅助函数
 List<String> _getPlatformFontFallback() => getPlatformFontFallback();
 
-/// Derive neutral `surfaceContainer*` roles from the scheme's surface.
+/// 从当前 scheme 的 surface 派生中性的 `surfaceContainer*` 角色。
 ///
-/// Palettes in this app only define the classic ColorScheme roles, leaving the
-/// M3 surface containers at their static (purple-tinted) defaults, which clash
-/// with non-purple palettes. Deriving them here keeps dialogs, menus, cards
-/// and other Material surfaces consistent with the active palette.
+/// 本应用的调色板只定义经典 ColorScheme 角色，M3 surface 容器仍保持静态的
+/// 紫色默认值，这与其他非紫色调色板不协调。在这里派生这些角色可让对话框、
+/// 菜单、卡片和其他 Material 表面与当前调色板保持一致。
 ColorScheme _withDerivedSurfaceContainers(ColorScheme s) {
   final dark = s.brightness == Brightness.dark;
   const white = Color(0xFFFFFFFF);
@@ -54,8 +53,8 @@ ColorScheme _withDerivedSurfaceContainers(ColorScheme s) {
     surfaceContainerLowest: dark ? over(black, 0.28) : over(white, 0.72),
     surfaceContainerLow: dark ? over(white, 0.03) : over(white, 0.55),
     surfaceContainer: dark ? over(white, 0.045) : over(white, 0.35),
-    // Light "high" containers must stay ≈ white: chat bubbles, cards, menus
-    // and dialogs historically used plain Colors.white in light mode.
+    // 浅色模式的“高”容器必须接近白色：聊天气泡、卡片、菜单和对话框
+    // 过去在浅色模式下都直接使用 Colors.white。
     surfaceContainerHigh: dark ? over(white, 0.06) : over(white, 0.85),
     surfaceContainerHighest: dark ? over(white, 0.09) : over(s.onSurface, 0.05),
   );
@@ -99,7 +98,7 @@ TextTheme _withFontFallback(TextTheme base, List<String> fallback) {
 // }
 //
 // void _logColorScheme(String tag, ColorScheme s) {
-//   // Log a comprehensive dump of the scheme with HEX/RGB/HSL/HSV/Luminance.
+//   // 输出 scheme 的完整信息，包括 HEX/RGB/HSL/HSV/Luminance。
 //   debugPrint('[Theme/$tag] ================= ColorScheme Dump =================');
 //   debugPrint('[Theme/$tag] brightness=${s.brightness}');
 //   _logOne(tag, 'primary', s.primary);
@@ -132,11 +131,11 @@ TextTheme _withFontFallback(TextTheme base, List<String> fallback) {
 //   _logOne(tag, 'onInverseSurface', s.onInverseSurface);
 //   _logOne(tag, 'inversePrimary', s.inversePrimary);
 //   _logOne(tag, 'surfaceTint', s.surfaceTint);
-//   // Derived/common surfaces used in this app
+//   // 本应用使用的派生或常用表面
 //   _logOne(tag, 'cardBackground≈surface', s.surface);
 //   _logOne(tag, 'scaffoldBackground', s.surface);
 //   _logOne(tag, 'appBarBackground', s.surface);
-//   // M3 tinted surfaces approximation at common elevations
+//   // 在常用海拔高度上近似 M3 着色表面
 //   final e1 = ElevationOverlay.applySurfaceTint(s.surface, s.surfaceTint, 1);
 //   final e3 = ElevationOverlay.applySurfaceTint(s.surface, s.surfaceTint, 3);
 //   final e6 = ElevationOverlay.applySurfaceTint(s.surface, s.surfaceTint, 6);
@@ -149,41 +148,41 @@ TextTheme _withFontFallback(TextTheme base, List<String> fallback) {
 ThemeData buildLightTheme(ColorScheme? dynamicScheme) {
   final fontFallback = _getPlatformFontFallback();
   final scheme = _withDerivedSurfaceContainers(
-      (dynamicScheme?.harmonized()) ??
-      const ColorScheme(
-        brightness: Brightness.light,
-        primary: Color(0xFF4D5C92),
-        onPrimary: Color(0xFFFFFFFF),
-        primaryContainer: Color(0xFFDCE1FF),
-        onPrimaryContainer: Color(0xFF03174B),
-        secondary: Color(0xFF595D72),
-        onSecondary: Color(0xFFFFFFFF),
-        secondaryContainer: Color(0xFFDEE1F9),
-        onSecondaryContainer: Color(0xFF161B2C),
-        tertiary: Color(0xFF75546F),
-        onTertiary: Color(0xFFFFFFFF),
-        tertiaryContainer: Color(0xFFFFD7F6),
-        onTertiaryContainer: Color(0xFF2C122A),
-        error: Color(0xFFBB0947),
-        onError: Color(0xFFFFFFFF),
-        errorContainer: Color(0xFFFDDADE),
-        onErrorContainer: Color(0xFF400013),
-        // background: Color(0xFFFEFBFF),
-        // onBackground: Color(0xFF1A1B21),
-        surface: Color(0xFFFEFBFF),
-        onSurface: Color(0xFF1A1B21),
-        // surfaceVariant: Color(0xFFE2E1EC),
-        onSurfaceVariant: Color(0xFF45464F),
-        outline: Color(0xFF75757F),
-        outlineVariant: Color(0xFFC6C6D0),
-        shadow: Color(0xFF000000),
-        scrim: Color(0xFF000000),
-        inverseSurface: Color(0xFF2F3036),
-        onInverseSurface: Color(0xFFF1F0F7),
-        inversePrimary: Color(0xFFB6C4FF),
-        surfaceTint: Color(0xFF4D5C92),
-      ),
-    );
+    (dynamicScheme?.harmonized()) ??
+        const ColorScheme(
+          brightness: Brightness.light,
+          primary: Color(0xFF4D5C92),
+          onPrimary: Color(0xFFFFFFFF),
+          primaryContainer: Color(0xFFDCE1FF),
+          onPrimaryContainer: Color(0xFF03174B),
+          secondary: Color(0xFF595D72),
+          onSecondary: Color(0xFFFFFFFF),
+          secondaryContainer: Color(0xFFDEE1F9),
+          onSecondaryContainer: Color(0xFF161B2C),
+          tertiary: Color(0xFF75546F),
+          onTertiary: Color(0xFFFFFFFF),
+          tertiaryContainer: Color(0xFFFFD7F6),
+          onTertiaryContainer: Color(0xFF2C122A),
+          error: Color(0xFFBB0947),
+          onError: Color(0xFFFFFFFF),
+          errorContainer: Color(0xFFFDDADE),
+          onErrorContainer: Color(0xFF400013),
+          // background: Color(0xFFFEFBFF),
+          // onBackground: Color(0xFF1A1B21),
+          surface: Color(0xFFFEFBFF),
+          onSurface: Color(0xFF1A1B21),
+          // surfaceVariant: Color(0xFFE2E1EC),
+          onSurfaceVariant: Color(0xFF45464F),
+          outline: Color(0xFF75757F),
+          outlineVariant: Color(0xFFC6C6D0),
+          shadow: Color(0xFF000000),
+          scrim: Color(0xFF000000),
+          inverseSurface: Color(0xFF2F3036),
+          onInverseSurface: Color(0xFFF1F0F7),
+          inversePrimary: Color(0xFFB6C4FF),
+          surfaceTint: Color(0xFF4D5C92),
+        ),
+  );
   // _logColorScheme('Light ${dynamicScheme != null ? 'Dynamic' : 'Static'}', scheme);
 
   final theme = ThemeData(
@@ -234,7 +233,7 @@ ThemeData buildLightTheme(ColorScheme? dynamicScheme) {
   );
 }
 
-// New: Build themes from a provided static palette (with optional dynamic override)
+// 新增：根据提供的静态调色板构建主题（可选动态覆盖）
 ThemeData buildLightThemeForScheme(
   ColorScheme staticScheme, {
   ColorScheme? dynamicScheme,
@@ -250,7 +249,7 @@ ThemeData buildLightThemeForScheme(
     );
   }
   scheme = _withDerivedSurfaceContainers(scheme);
-  // Align logging behavior with buildLightTheme so diagnostics are consistent.
+  // 让日志行为与 buildLightTheme 保持一致，以便诊断结果一致。
   // _logColorScheme('Light ${dynamicScheme != null ? 'Dynamic' : 'Static'}', scheme);
   final theme = ThemeData(
     useMaterial3: true,
@@ -303,41 +302,41 @@ ThemeData buildLightThemeForScheme(
 ThemeData buildDarkTheme(ColorScheme? dynamicScheme) {
   final fontFallback = _getPlatformFontFallback();
   final scheme = _withDerivedSurfaceContainers(
-      (dynamicScheme?.harmonized()) ??
-      const ColorScheme(
-        brightness: Brightness.dark,
-        primary: Color(0xFFB6C4FF),
-        onPrimary: Color(0xFF1D2D61),
-        primaryContainer: Color(0xFF354479),
-        onPrimaryContainer: Color(0xFFDCE1FF),
-        secondary: Color(0xFFC2C5DD),
-        onSecondary: Color(0xFF2B3042),
-        secondaryContainer: Color(0xFF424659),
-        onSecondaryContainer: Color(0xFFDEE1F9),
-        tertiary: Color(0xFFE3BADA),
-        onTertiary: Color(0xFF432740),
-        tertiaryContainer: Color(0xFF5B3D57),
-        onTertiaryContainer: Color(0xFFFFD7F6),
-        error: Color(0xFFFCB4BD),
-        onError: Color(0xFF670023),
-        errorContainer: Color(0xFF910034),
-        onErrorContainer: Color(0xFFFCB4BD),
-        // background: Color(0xFF1A1B21),
-        // onBackground: Color(0xFFE3E1E9),
-        surface: Color(0xFF1A1B21),
-        onSurface: Color(0xFFE3E1E9),
-        // surfaceVariant: Color(0xFF45464F),
-        onSurfaceVariant: Color(0xFFC6C6D0),
-        outline: Color(0xFF90909A),
-        outlineVariant: Color(0xFF45464F),
-        shadow: Color(0xFF000000),
-        scrim: Color(0xFF000000),
-        inverseSurface: Color(0xFFE3E1E9),
-        onInverseSurface: Color(0xFF2F3036),
-        inversePrimary: Color(0xFF4D5C92),
-        surfaceTint: Color(0xFFB6C4FF),
-      ),
-    );
+    (dynamicScheme?.harmonized()) ??
+        const ColorScheme(
+          brightness: Brightness.dark,
+          primary: Color(0xFFB6C4FF),
+          onPrimary: Color(0xFF1D2D61),
+          primaryContainer: Color(0xFF354479),
+          onPrimaryContainer: Color(0xFFDCE1FF),
+          secondary: Color(0xFFC2C5DD),
+          onSecondary: Color(0xFF2B3042),
+          secondaryContainer: Color(0xFF424659),
+          onSecondaryContainer: Color(0xFFDEE1F9),
+          tertiary: Color(0xFFE3BADA),
+          onTertiary: Color(0xFF432740),
+          tertiaryContainer: Color(0xFF5B3D57),
+          onTertiaryContainer: Color(0xFFFFD7F6),
+          error: Color(0xFFFCB4BD),
+          onError: Color(0xFF670023),
+          errorContainer: Color(0xFF910034),
+          onErrorContainer: Color(0xFFFCB4BD),
+          // background: Color(0xFF1A1B21),
+          // onBackground: Color(0xFFE3E1E9),
+          surface: Color(0xFF1A1B21),
+          onSurface: Color(0xFFE3E1E9),
+          // surfaceVariant: Color(0xFF45464F),
+          onSurfaceVariant: Color(0xFFC6C6D0),
+          outline: Color(0xFF90909A),
+          outlineVariant: Color(0xFF45464F),
+          shadow: Color(0xFF000000),
+          scrim: Color(0xFF000000),
+          inverseSurface: Color(0xFFE3E1E9),
+          onInverseSurface: Color(0xFF2F3036),
+          inversePrimary: Color(0xFF4D5C92),
+          surfaceTint: Color(0xFFB6C4FF),
+        ),
+  );
   // _logColorScheme('Dark ${dynamicScheme != null ? 'Dynamic' : 'Static'}', scheme);
 
   final theme = ThemeData(
@@ -403,7 +402,7 @@ ThemeData buildDarkThemeForScheme(
     );
   }
   scheme = _withDerivedSurfaceContainers(scheme);
-  // Align logging behavior with buildDarkTheme so diagnostics are consistent.
+  // 让日志行为与 buildDarkTheme 保持一致，以便诊断结果一致。
   // _logColorScheme('Dark ${dynamicScheme != null ? 'Dynamic' : 'Static'}', scheme);
   final theme = ThemeData(
     useMaterial3: true,

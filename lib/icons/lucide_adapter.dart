@@ -3,7 +3,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart' as lucide;
 
-// Adapter to use `Lucide.*` style as requested.
+// 适配器，用于按需求使用 `Lucide.*` 风格。
 class Lucide {
   static const IconData ListTree = lucide.LucideIcons.listTree;
   static const IconData Menu = lucide.LucideIcons.menu;
@@ -156,9 +156,9 @@ class Lucide {
   static const IconData bookDashed = lucide.LucideIcons.bookDashed;
   static const IconData toggleRight = lucide.LucideIcons.toggleRight;
   static const IconData Calendar = lucide.LucideIcons.calendar;
-   static const IconData CalendarPlus = lucide.LucideIcons.calendarPlus;
-   static const IconData Hourglass = lucide.LucideIcons.hourglass;
-   static const IconData Smartphone = lucide.LucideIcons.smartphone;
+  static const IconData CalendarPlus = lucide.LucideIcons.calendarPlus;
+  static const IconData Hourglass = lucide.LucideIcons.hourglass;
+  static const IconData Smartphone = lucide.LucideIcons.smartphone;
   static const IconData ImageOff = lucide.LucideIcons.imageOff;
   static const IconData RotateCcw = lucide.LucideIcons.rotateCcw;
   static const IconData FlipHorizontal2 = lucide.LucideIcons.flipHorizontal2;

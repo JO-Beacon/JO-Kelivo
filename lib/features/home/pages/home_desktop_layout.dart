@@ -25,9 +25,9 @@ import '../widgets/assistant_avatar.dart';
 import '../widgets/assistant_entry_actions.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
-/// Desktop/Tablet layout scaffold for the home page
-/// Handles the overall structure: left sidebar, main content, optional right sidebar
-/// All message list rendering and input bar logic remain in home_page.dart
+/// 主页的桌面/平板布局骨架
+/// 负责整体结构：左侧栏、主内容区、可选右侧栏
+/// 所有消息列表渲染与输入栏逻辑仍留在 home_page.dart
 class HomeDesktopScaffold extends StatelessWidget {
   const HomeDesktopScaffold({
     super.key,
@@ -37,14 +37,14 @@ class HomeDesktopScaffold extends StatelessWidget {
     required this.title,
     required this.providerName,
     required this.modelDisplay,
-    // Sidebar state
+    // 侧栏状态
     required this.tabletSidebarOpen,
     required this.rightSidebarOpen,
     required this.embeddedSidebarWidth,
     required this.rightSidebarWidth,
     required this.sidebarMinWidth,
     required this.sidebarMaxWidth,
-    // Callbacks
+    // 回调
     required this.onToggleSidebar,
     required this.onToggleRightSidebar,
     required this.onSelectConversation,
@@ -74,7 +74,7 @@ class HomeDesktopScaffold extends StatelessWidget {
   final String? providerName;
   final String? modelDisplay;
 
-  // Sidebar state
+  // 侧栏状态
   final bool tabletSidebarOpen;
   final bool rightSidebarOpen;
   final double embeddedSidebarWidth;
@@ -82,7 +82,7 @@ class HomeDesktopScaffold extends StatelessWidget {
   final double sidebarMinWidth;
   final double sidebarMaxWidth;
 
-  // Callbacks
+  // 回调
   final VoidCallback onToggleSidebar;
   final VoidCallback onToggleRightSidebar;
   final void Function(String id) onSelectConversation;
@@ -125,9 +125,9 @@ class HomeDesktopScaffold extends StatelessWidget {
         SizedBox.expand(
           child: Row(
             children: [
-              // Left sidebar
+              // 左侧栏
               _buildLeftSidebar(context, cs, topicsOnRight),
-              // Left sidebar resize handle / divider
+              // 左侧栏调整大小手柄 / 分隔线
               if (_isDesktop)
                 SidebarResizeHandle(
                   visible: tabletSidebarOpen,
@@ -147,7 +147,7 @@ class HomeDesktopScaffold extends StatelessWidget {
                         )
                       : const SizedBox.shrink(),
                 ),
-              // Main content
+              // 主内容区
               Expanded(
                 child: Scaffold(
                   key: scaffoldKey,
@@ -160,7 +160,7 @@ class HomeDesktopScaffold extends StatelessWidget {
                   body: body,
                 ),
               ),
-              // Right sidebar (desktop only with topics on right)
+              // 右侧栏（仅桌面端且话题在右时）
               _buildRightSidebar(context, cs, topicsOnRight),
             ],
           ),
@@ -552,7 +552,7 @@ class HomeDesktopScaffold extends StatelessWidget {
 
   List<Widget> _buildActions(BuildContext context, bool topicsOnRight) {
     return [
-      // Right sidebar toggle (desktop + topics on right)
+      // 右侧栏开关（桌面端 + 话题在右）
       if (_isDesktop && topicsOnRight)
         IosIconButton(
           size: 20,
@@ -593,7 +593,7 @@ class HomeDesktopScaffold extends StatelessWidget {
   }
 }
 
-/// Sidebar resize handle widget for desktop
+/// 桌面端侧栏调整大小手柄 widget
 class SidebarResizeHandle extends StatefulWidget {
   const SidebarResizeHandle({
     super.key,
@@ -643,7 +643,7 @@ class _SidebarResizeHandleState extends State<SidebarResizeHandle> {
   }
 }
 
-/// Desktop background widget with assistant-specific image
+/// 带助手专属图片的桌面端背景组件
 class DesktopBackgroundLayer extends StatelessWidget {
   const DesktopBackgroundLayer({super.key});
 
@@ -696,7 +696,7 @@ class DesktopBackgroundLayer extends StatelessWidget {
   }
 }
 
-/// Scroll navigation buttons for desktop (same as mobile but with different padding)
+/// 桌面端滚动导航按钮（与移动端相同，但内边距不同）
 class DesktopScrollNavigationButtons extends StatelessWidget {
   const DesktopScrollNavigationButtons({
     super.key,
@@ -723,7 +723,7 @@ class DesktopScrollNavigationButtons extends StatelessWidget {
 
     return Stack(
       children: [
-        // Scroll to bottom button
+        // 滚动到底部按钮
         Align(
           alignment: Alignment.bottomRight,
           child: SafeArea(
@@ -752,7 +752,7 @@ class DesktopScrollNavigationButtons extends StatelessWidget {
             ),
           ),
         ),
-        // Scroll to previous message button
+        // 滚动到上一条消息按钮
         Align(
           alignment: Alignment.bottomRight,
           child: SafeArea(
@@ -841,7 +841,7 @@ class _DesktopScrollButton extends StatelessWidget {
   }
 }
 
-/// Selection mode toolbar overlay for desktop
+/// 桌面端选择模式工具栏遮罩
 class DesktopSelectionToolbarOverlay extends StatelessWidget {
   const DesktopSelectionToolbarOverlay({
     super.key,

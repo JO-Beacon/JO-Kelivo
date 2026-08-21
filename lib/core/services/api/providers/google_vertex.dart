@@ -35,11 +35,11 @@ Stream<ChatStreamChunk> _sendGoogleVertexStream(
   );
 }
 
-/// Whether Vertex media downloads may attach Bearer / X-Goog-User-Project.
+/// Vertex 媒体下载是否可以附带 Bearer / X-Goog-User-Project。
 ///
-/// Strict Google host allowlist only — never broad *.google.com.
-/// Auth headers are HTTPS-only so tokens are never sent in cleartext on
-/// `http://storage.googleapis.com/...` (or any other allowlisted HTTP URL).
+/// 仅使用严格的 Google 主机白名单，绝不使用宽泛的 *.google.com。
+/// 认证头仅用于 HTTPS，因此令牌绝不会在
+/// `http://storage.googleapis.com/...`（或任何其他已白名单的 HTTP URL）上以明文发送。
 bool _shouldAttachVertexMediaAuth(Uri uri) {
   if (uri.scheme.toLowerCase() != 'https') return false;
   final host = uri.host.trim().toLowerCase();
@@ -62,7 +62,7 @@ Future<String> _downloadRemoteAsBase64(
 ) async {
   final uri = Uri.parse(url);
   final req = http.Request('GET', uri);
-  // Attach Vertex auth only for allowlisted Google media hosts.
+  // 仅对已白名单的 Google 媒体主机附加 Vertex 认证。
   if (config.vertexAI == true && _shouldAttachVertexMediaAuth(uri)) {
     try {
       final token = await _maybeVertexAccessToken(config);
@@ -87,19 +87,19 @@ Future<String> _downloadRemoteAsBase64(
   return base64Encode(bytes);
 }
 
-// Returns OAuth token for Vertex AI when serviceAccountJson is configured; otherwise null.
+// 当配置了 serviceAccountJson 时，返回 Vertex AI 的 OAuth 令牌；否则返回 null。
 Future<String?> _maybeVertexAccessToken(ProviderConfig cfg) async {
   if (cfg.vertexAI == true) {
     final jsonStr = (cfg.serviceAccountJson ?? '').trim();
     if (jsonStr.isEmpty) {
-      // Fallback: some users may paste a temporary OAuth token into apiKey
+      // 回退：部分用户可能会将临时 OAuth 令牌粘贴到 apiKey 中
       if (cfg.apiKey.isNotEmpty) return cfg.apiKey;
       return null;
     }
     try {
       return await GoogleServiceAccountAuth.getAccessTokenFromJson(jsonStr);
     } catch (_) {
-      // On failure, do not crash streaming; let server return 401 and surface error upstream
+      // 失败时不要中断流式处理；让服务器返回 401，并将错误向上游抛出
       return null;
     }
   }
@@ -107,7 +107,7 @@ Future<String?> _maybeVertexAccessToken(ProviderConfig cfg) async {
 }
 
 int _getMaxOutputTokensForClaudeModel(String modelId) {
-  // Limits based on Google Vertex AI documentation
+  // 限制依据 Google Vertex AI 文档
   switch (modelId) {
     case 'claude-fable-5':
     case 'claude-opus-5':
@@ -131,7 +131,7 @@ int _getMaxOutputTokensForClaudeModel(String modelId) {
     case 'claude-3-5-sonnet-v2@20241022':
       return 8192;
     default:
-      // Fallback for older models
+      // 旧模型的回退方案
       return 4096;
   }
 }
@@ -156,7 +156,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
   final loc = (config.location ?? 'us-central1').trim();
   final proj = (config.projectId ?? '').trim();
   final endpoint = stream ? 'streamRawPredict' : 'rawPredict';
-  // Vertex AI Anthropic URL
+  // Vertex AI Anthropic 地址
   final host = (loc.toLowerCase() == 'global')
       ? 'aiplatform.googleapis.com'
       : '$loc-aiplatform.googleapis.com';
@@ -169,20 +169,20 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
     modelId,
   ).abilities.contains(ModelAbility.reasoning);
 
-  // Determine effective max_tokens based on model capabilities
+  // 根据模型能力确定有效的 max_tokens
   int effectiveMaxTokens =
       maxTokens ?? _getMaxOutputTokensForClaudeModel(upstreamId);
 
-  // Ensure thinking_budget < max_tokens (API requirement)
+  // 确保 thinking_budget < max_tokens（API 要求）
   int? effectiveThinkingBudget = thinkingBudget;
   if (isReasoning &&
       effectiveThinkingBudget != null &&
       effectiveThinkingBudget > 0) {
     if (effectiveThinkingBudget >= effectiveMaxTokens) {
-      // Reserve at least 1k tokens for response content
+      // 至少为响应内容预留 1k 个 token
       effectiveThinkingBudget = effectiveMaxTokens - 1024;
       if (effectiveThinkingBudget < 1024) {
-        effectiveThinkingBudget = 1024; // floor
+        effectiveThinkingBudget = 1024; // 下限
       }
     }
   }
@@ -199,7 +199,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
     assistantHeaders: extraHeaders,
   );
 
-  // Extract system prompt
+  // 提取系统提示词
   String systemPrompt = '';
   final nonSystemMessages = <Map<String, dynamic>>[];
   for (final m in messages) {
@@ -211,7 +211,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
       }
       continue;
     }
-    // Keep media-paths through transform; final request only emits role/content.
+    // 让 media-paths 在转换过程中保留；最终请求只输出 role/content。
     nonSystemMessages.add(
       Map<String, dynamic>.from(m)
         ..remove(multimodalInternalRevisionIdKey)
@@ -219,21 +219,20 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
     );
   }
 
-  // Transform messages + images (Force Base64 for Vertex)
+  // 转换消息与图像（对 Vertex 强制使用 Base64）
   final initialMessages = <Map<String, dynamic>>[];
   for (int i = 0; i < nonSystemMessages.length; i++) {
     final m = nonSystemMessages[i];
     final isLast = i == nonSystemMessages.length - 1;
     final roleName = (m['role'] ?? 'user').toString();
     final raw = (m['content'] ?? '').toString();
-    // Semantic media detection only - custom attachment markers are not
-    // recognized. Attachments arrive via structured media-path keys /
-    // userImagePaths, plus Markdown ![](...).
+    // 仅做语义媒体检测，不识别自定义附件标记。附件通过结构化 media-path 键 /
+    // userImagePaths 以及 Markdown ![](...) 到达。
     final hasMarkdownImages = raw.contains('![') && raw.contains('](');
     final internalMediaRefs = parseInternalMediaRefs(
       m[multimodalInternalMediaPathsKey],
     );
-    // Consume injected media refs for user and assistant history turns.
+    // 消费已注入的媒体引用，用于用户和助手的历史轮次。
     final hasInternalMedia = internalMediaRefs.isNotEmpty;
     final hasAttachedImages =
         isLast && roleName == 'user' && (userImagePaths?.isNotEmpty == true);
@@ -257,8 +256,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
       }) async {
         final normalized = normalizeSrc(source);
         if (!seenSources.add(normalized)) return;
-        // Vertex AI Claude does not support remote URLs in 'image' blocks generally.
-        // We must download and encode.
+        // Vertex AI Claude 通常不支持 'image' 块中的远程 URL，必须下载并编码。
         String mime;
         String b64;
         if (source.startsWith('http://') || source.startsWith('https://')) {
@@ -266,7 +264,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
             b64 = await _downloadRemoteAsBase64(client, config, source);
             mime = (explicitMime != null && explicitMime.trim().isNotEmpty)
                 ? explicitMime.trim()
-                : 'image/png'; // TODO: detect mime from response or url
+                : 'image/png'; // TODO：从响应或 URL 检测 MIME 类型
             if (explicitMime == null || explicitMime.trim().isEmpty) {
               final lower = source.toLowerCase();
               if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
@@ -331,8 +329,8 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
       );
       for (final mediaRef in supplementalRefs) {
         final mime = _mimeForInternalMediaRef(mediaRef);
-        // Never emit Anthropic image blocks for video/audio or other
-        // non-Claude image MIME types (e.g. video/mp4).
+        // 切勿为视频/音频或其他非 Claude 图像 MIME 类型
+        // （例如 video/mp4）输出 Anthropic 图像块。
         if (isVideoMime(mime) ||
             isAudioMime(mime) ||
             !_isClaudeSupportedImageMime(mime)) {
@@ -358,7 +356,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
     }
   }
 
-  // Tools setup (copy logic from Claude)
+  // 工具设置（沿用 Claude 的逻辑）
   List<Map<String, dynamic>>? anthropicTools;
   if (tools != null && tools.isNotEmpty) {
     anthropicTools = [];
@@ -474,10 +472,10 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
     }
 
     if (!stream) {
-      // Vertex rawPredict response is same as Anthropic non-stream response
+      // Vertex rawPredict 响应与 Anthropic 非流式响应相同
       final txt = await response.stream.bytesToString();
       final obj = jsonDecode(txt) as Map;
-      // Usage
+      // 用量
       try {
         final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
         if (u != null) {
@@ -571,13 +569,13 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
             toolResults: resultsInfo,
           );
         }
-        // Extend convo: assistant + user tool_result, loop
+        // 扩展对话：助手 + 用户 tool_result，然后循环
         final assistantMsg = {'role': 'assistant', 'content': assistantBlocks};
         final userToolMsg = {'role': 'user', 'content': results};
         convo = [...convo, assistantMsg, userToolMsg];
-        continue; // next round
+        continue; // 下一轮
       }
-      // No tool use -> return final text
+      // 未使用工具 -> 返回最终文本
       yield ChatStreamChunk(
         content: buf.toString(),
         isDone: true,
@@ -587,7 +585,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
       return;
     }
 
-    // Streaming path
+    // 流式路径
     final sse = response.stream.transform(utf8.decoder);
     String buffer = '';
     int roundTokens = 0;
@@ -601,7 +599,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
     final List<Map<String, dynamic>> assistantBlocks = <Map<String, dynamic>>[];
     final StringBuffer textBuf = StringBuffer();
 
-    // Server tool helpers (web_search)
+    // 服务端工具辅助函数（web_search）
     final Map<int, String> srvIndexToId = <int, String>{};
     final Map<String, String> srvArgsStr = <String, String>{};
     final Map<String, Map<String, dynamic>> srvArgs =
@@ -639,9 +637,9 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
         if (line.isEmpty || !line.startsWith('data:')) continue;
 
         final data = line.substring(5).trimLeft();
-        // Anthropic-on-Vertex reports failures in-band as `event: error` with
-        // {type:"error", error:{type,message}}; raise before the
-        // malformed-chunk guard below can swallow it.
+        // Anthropic-on-Vertex 会以 `event: error` 在带内报告失败，
+        // 并携带 {type:"error", error:{type,message}}；请在下方
+        // 格式错误分块保护逻辑吞掉它之前抛出异常。
         _throwIfInBandStreamError(data);
         try {
           final obj = jsonDecode(data);
@@ -707,7 +705,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
                 srvIndexToId[idx2] = id;
                 srvArgsStr[id] = '';
               }
-              // Emit placeholder for server tool to show card (e.g., built-in web_search)
+              // 为服务端工具发出占位符，以显示卡片（例如内置的 web_search）
               if (id.isNotEmpty) {
                 yield ChatStreamChunk(
                   content: '',
@@ -724,7 +722,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
                 );
               }
             } else if (cb is Map && (cb['type'] == 'web_search_tool_result')) {
-              // Emit simplified search results to UI
+              // 向 UI 输出简化的搜索结果
               final toolUseId = (cb['tool_use_id'] ?? '').toString();
               final contentBlock = cb['content'];
               final items = <Map<String, dynamic>>[];
@@ -893,7 +891,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
               } catch (_) {
                 args = <String, dynamic>{};
               }
-              // Update last assistant tool_use block input
+              // 更新最后一个助手 tool_use 块的输入
               for (int k = assistantBlocks.length - 1; k >= 0; k--) {
                 final b = assistantBlocks[k];
                 if (b['type'] == 'tool_use' &&
@@ -980,7 +978,8 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
     if (anthToolUse.isEmpty) {
       final sr = lastStopReason ?? '';
       if (sr == 'pause_turn') {
-        // Continue this turn with assistant content only (not fully supported by Vertex streamRawPredict yet, but good for future proofing)
+        // 本轮继续只使用助手内容（Vertex streamRawPredict 目前尚未完全支持，
+        // 但可为未来兼容预留）
         convo = [
           ...convo,
           {'role': 'assistant', 'content': assistantBlocks},
@@ -997,7 +996,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
       }
     }
 
-    // Build tool_result blocks
+    // 构建 tool_result 块
     final toolResultsBlocks = <Map<String, dynamic>>[];
     for (final entry in anthToolUse.entries) {
       final id = entry.key;

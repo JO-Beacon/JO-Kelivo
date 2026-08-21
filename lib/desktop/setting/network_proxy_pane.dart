@@ -35,7 +35,7 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
   String _type = 'http';
   bool _enabled = false;
 
-  // Test state
+  // 测试状态
   final TextEditingController _testUrlCtl = TextEditingController(
     text: 'https://www.google.com',
   );
@@ -397,7 +397,7 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
   }
 }
 
-// --- Helpers (matched with backup pane style) ---
+// --- 辅助函数（与备份面板样式保持一致） ---
 Widget _rowDivider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;
   final isDark = Theme.of(context).brightness == Brightness.dark;

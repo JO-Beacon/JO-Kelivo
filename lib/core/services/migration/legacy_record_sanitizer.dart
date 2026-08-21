@@ -1,15 +1,14 @@
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
 
-/// Field-level repair for dirty legacy (1.1.17 / Hive-era) records so they
-/// satisfy the SQLite CHECK constraints. Shared by the Hive-to-SQLite
-/// migration and the chats.json import boundary: both read data written by
-/// the old runtime, which tolerated shapes the new schema rejects (device
-/// clock rollback could persist negative durations, corrupted records could
-/// carry empty roles or out-of-range counters).
+/// 对脏的旧版（1.1.17 / Hive 时代）记录做字段级修复，使其
+/// 满足 SQLite CHECK 约束。由 Hive 转 SQLite 迁移
+/// 和 chats.json 导入边界共享：二者都读取旧运行时写入的数据，
+/// 旧运行时容忍新 schema 拒绝的形态（设备时钟回拨可能持久化负时长，
+/// 损坏记录可能携带空角色或越界计数器）。
 ///
-/// Returns the input object unchanged (identical) when nothing needed repair,
-/// so callers can count repairs via `identical(...)`.
+/// 无需修复时原样（同一对象）返回输入，
+/// 以便调用方通过 `identical(...)` 统计修复次数。
 ChatMessage sanitizeLegacyMessageFields(ChatMessage message) {
   var changed = false;
   int? nonNegativeOrNull(int? value) {
@@ -20,9 +19,9 @@ ChatMessage sanitizeLegacyMessageFields(ChatMessage message) {
     return value;
   }
 
-  // message_rows enforces CHECK (role != ''). An empty role can only come
-  // from a corrupted legacy record; default it to 'user' rather than losing
-  // the message.
+  // message_rows 强制 CHECK (role != '')。空角色只能来自损坏的
+  // 旧版记录；默认置为 'user' 而非丢弃
+  // 该消息。
   var role = message.role;
   if (role.isEmpty) {
     changed = true;
@@ -33,9 +32,9 @@ ChatMessage sanitizeLegacyMessageFields(ChatMessage message) {
   final completionTokens = nonNegativeOrNull(message.completionTokens);
   final cachedTokens = nonNegativeOrNull(message.cachedTokens);
   final durationMs = nonNegativeOrNull(message.durationMs);
-  // Clamp instead of null: version is non-nullable and feeds the
-  // (conversationId, groupId, version) uniqueness repair that both callers
-  // run after this, which resolves any collision introduced by clamping.
+  // 用钳制而非置 null：version 不可空，且供两个调用方在此之后运行的
+  // (conversationId, groupId, version) 唯一性修复使用，
+  // 该修复会解决钳制引入的任何冲突。
   var version = message.version;
   if (version < 0) {
     changed = true;
@@ -51,7 +50,7 @@ ChatMessage sanitizeLegacyMessageFields(ChatMessage message) {
   }
   if (!changed) return message;
 
-  // copyWith cannot clear fields to null, so rebuild explicitly.
+  // copyWith 无法将字段清为 null，因此显式重建。
   return ChatMessage(
     id: message.id,
     role: role,
@@ -76,16 +75,15 @@ ChatMessage sanitizeLegacyMessageFields(ChatMessage message) {
   );
 }
 
-/// Clamps legacy conversation counters so they satisfy the conversation_rows
-/// CHECK constraints (truncateIndex >= -1, lastSummarizedMessageCount >= 0,
-/// lastMemoryExtractedOrder >= -1). Returns the input unchanged (identical)
-/// when nothing needed repair.
+/// 钳制旧版会话计数器，使其满足 conversation_rows
+/// CHECK 约束（truncateIndex >= -1，lastSummarizedMessageCount >= 0，
+/// lastMemoryExtractedOrder >= -1）。无需修复时原样
+/// （同一对象）返回输入。
 Conversation sanitizeLegacyConversationFields(Conversation conversation) {
   final truncateIndex = conversation.truncateIndex < -1
       ? -1
       : conversation.truncateIndex;
-  final lastSummarizedMessageCount =
-      conversation.lastSummarizedMessageCount < 0
+  final lastSummarizedMessageCount = conversation.lastSummarizedMessageCount < 0
       ? 0
       : conversation.lastSummarizedMessageCount;
   final lastMemoryExtractedOrder = conversation.lastMemoryExtractedOrder < -1

@@ -1,6 +1,6 @@
 part of '../desktop_settings_page.dart';
 
-// ===== Providers (Desktop right content) =====
+// ===== 供应商（桌面右侧内容） =====
 
 class _DesktopProvidersBody extends StatefulWidget {
   const _DesktopProvidersBody({super.key, this.initialSelectedKey});
@@ -286,7 +286,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
     final l10n = AppLocalizations.of(context)!;
     final settings = context.watch<SettingsProvider>();
 
-    // Base providers (same as mobile list)
+    // 基础供应商（与移动端列表相同）
     List<({String name, String key})> base() => [
       (name: 'OpenAI', key: 'OpenAI'),
       (name: l10n.providersPageSiliconFlowName, key: 'SiliconFlow'),
@@ -315,7 +315,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
         ));
       }
     });
-    // Apply saved order
+    // 应用已保存的顺序
     final merged = <({String name, String key})>[...base(), ...dynamicItems];
     final order = settings.providersOrder;
     final map = {for (final p in merged) p.key: p};
@@ -364,7 +364,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
           constraints: const BoxConstraints(maxWidth: 1200),
           child: Row(
             children: [
-              // Left providers list
+              // 左侧供应商列表
               SizedBox(
                 width: 256,
                 child: Column(
@@ -647,7 +647,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                                 if (mounted) setState(() {});
                               },
                               proxyDecorator: (child, index, animation) {
-                                // No shadow; clip to rounded corners to avoid white outside of the grey card
+                                // 无阴影；裁剪到圆角，避免灰色卡片外出现白色
                                 return AnimatedBuilder(
                                   animation: animation,
                                   builder: (context, _) => ClipRRect(
@@ -681,7 +681,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                             ),
                     ),
                     const SizedBox(height: 8),
-                    // Bottom add button
+                    // 底部添加按钮
                     _AddFullWidthButton(
                       height: 36,
                       label: l10n.addProviderSheetAddButton,
@@ -706,7 +706,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                 thickness: 0.5,
                 color: cs.outlineVariant.withValues(alpha: 0.12),
               ),
-              // Right detail pane
+              // 右侧详情面板
               Expanded(child: rightPane),
             ],
           ),
@@ -873,7 +873,7 @@ class _DesktopProviderGroupHeaderRowState
           child: Row(
             children: [
               AnimatedRotation(
-                turns: widget.collapsed ? 0.0 : 0.25, // right -> down
+                turns: widget.collapsed ? 0.0 : 0.25, // 右箭头变为向下
                 duration: const Duration(milliseconds: 260),
                 curve: Curves.easeOutCubic,
                 child: Icon(
@@ -937,11 +937,11 @@ class _DesktopProviderDetailPaneState
   final Set<String> _pendingModels = {};
   int _providerScopedStateEpoch = 0;
 
-  // Connection test state for inline dialog
-  // Keep local to this file to avoid cross-file coupling
+  // 内嵌对话框的连接测试状态
+  // 保持在本文件局部，避免跨文件耦合
 
-  // Persistent controllers for provider top inputs (desktop)
-  // Avoid rebuilding controllers each frame which breaks focus/IME
+  // 桌面端供应商顶部输入项的持久化控制器。
+  // 避免每帧重建控制器，否则会破坏焦点或输入法。
   final TextEditingController _apiKeyCtrl = TextEditingController();
   final TextEditingController _baseUrlCtrl = TextEditingController();
   final TextEditingController _locationCtrl = TextEditingController();
@@ -960,7 +960,7 @@ class _DesktopProviderDetailPaneState
 
   void _syncCtrl(TextEditingController c, String newText) {
     final v = c.value;
-    // Do not disturb ongoing IME composition
+    // 不打断正在进行的输入法组合
     if (v.composing.isValid) return;
     if (c.text != newText) {
       c.value = TextEditingValue(
@@ -1129,7 +1129,7 @@ class _DesktopProviderDetailPaneState
       widget.providerKey,
       defaultName: widget.displayName,
     );
-    // Keep controllers synced without breaking IME composition
+    // 在不打断输入法组合的情况下同步控制器
     _syncControllersFromConfig(cfg);
     final kind = ProviderConfig.classify(
       widget.providerKey,
@@ -1152,7 +1152,7 @@ class _DesktopProviderDetailPaneState
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
               children: [
-                // Title + Settings button grouped at left, per request
+                // 按需求将标题和设置按钮分组放在左侧
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -1207,7 +1207,7 @@ class _DesktopProviderDetailPaneState
                       widget.providerKey,
                       old.copyWith(enabled: v),
                     );
-                    // If provider is now disabled, clear model selections referencing it
+                    // 如果供应商现在被禁用，清除引用它的模型选择
                     if (!v && old.enabled) {
                       await sp.clearSelectionsForProvider(widget.providerKey);
                       try {
@@ -1238,7 +1238,7 @@ class _DesktopProviderDetailPaneState
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
             children: [
-              // Partner info banners
+              // 合作伙伴信息横幅
               if (widget.providerKey.toLowerCase() == 'tensdaq') ...[
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -1428,7 +1428,7 @@ class _DesktopProviderDetailPaneState
                 const SizedBox(height: 12),
               ],
 
-              // API Key (hidden when Google Vertex)
+              // API Key（Google Vertex 时隐藏）
               if (!(kind == ProviderKind.google && (cfg.vertexAI == true))) ...[
                 Row(
                   children: [
@@ -1483,7 +1483,7 @@ class _DesktopProviderDetailPaneState
                     controller: _apiKeyCtrl,
                     obscureText: !_showApiKey ? true : false,
                     onChanged: (v) async {
-                      // For API keys, save immediately regardless of IME composition
+                      // API Key 保存时不受输入法组合状态影响，立即保存
                       final old = sp.getProviderConfig(
                         widget.providerKey,
                         defaultName: widget.displayName,
@@ -1548,7 +1548,7 @@ class _DesktopProviderDetailPaneState
                 const SizedBox(height: 14),
               ],
 
-              // API Base URL or Vertex AI fields
+              // API Base URL 或 Vertex AI 字段
               if (!(kind == ProviderKind.google && (cfg.vertexAI == true))) ...[
                 _sectionLabel(
                   context,
@@ -1803,7 +1803,7 @@ class _DesktopProviderDetailPaneState
                       if (res == null || res.files.isEmpty) return;
 
                       final file = res.files.first;
-                      // Desktop FilePicker may not include bytes unless withData is true; fall back to disk read.
+                      // 除非 withData 为 true，桌面 FilePicker 可能不返回字节；此时回退到磁盘读取。
                       String? content;
                       if (file.bytes != null && file.bytes!.isNotEmpty) {
                         content = utf8.decode(file.bytes!);
@@ -1844,7 +1844,7 @@ class _DesktopProviderDetailPaneState
                 ),
               ],
 
-              // API Path (OpenAI chat)
+              // API Path（OpenAI 聊天）
               if (kind == ProviderKind.openai &&
                   (cfg.useResponseApi != true)) ...[
                 const SizedBox(height: 14),
@@ -1913,7 +1913,7 @@ class _DesktopProviderDetailPaneState
               ],
 
               const SizedBox(height: 18),
-              // Models header with count + search + actions (test / add / fetch)
+              // 模型标题：数量、搜索和操作（测试、添加、获取）
               Row(
                 children: [
                   Expanded(
@@ -2157,7 +2157,7 @@ class _DesktopProviderDetailPaneState
               ),
 
               const SizedBox(height: 6),
-              // Accordion groups
+              // 手风琴分组
               for (final entry in groups.entries)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
@@ -2199,7 +2199,7 @@ class _DesktopProviderDetailPaneState
       }
       (map[g] ??= <String>[]).add(m);
     }
-    // Keep stable order by key
+    // 按键保持稳定顺序
     final entries = map.entries.toList()
       ..sort((a, b) => a.key.toLowerCase().compareTo(b.key.toLowerCase()));
     return {for (final e in entries) e.key: e.value};
@@ -2367,7 +2367,7 @@ class _DesktopProviderDetailPaneState
                   widget.providerKey,
                   defaultName: widget.displayName,
                 );
-                // IME-friendly sync: avoid overwriting while composing
+                // 输入法友好的同步：组合期间避免覆盖
                 void syncCtrl(TextEditingController ctrl, String text) {
                   final v = ctrl.value;
                   if (v.composing.isValid) return;
@@ -2495,14 +2495,14 @@ class _DesktopProviderDetailPaneState
                           color: cs.outlineVariant.withValues(alpha: 0.12),
                         ),
                       ),
-                      // Centered provider avatar (smaller than user dialog)
+                      // 居中的供应商头像（比用户对话框小）
                       Padding(
                         padding: const EdgeInsets.only(top: 14, bottom: 6),
                         child: Center(
                           child: GestureDetector(
                             key: avatarKey,
                             onTapDown: (_) async {
-                              // Open avatar menu (anchored)
+                              // 打开锚定的头像菜单
                               final l10n2 = AppLocalizations.of(context)!;
                               await showDesktopAnchoredMenu(
                                 context,
@@ -2606,7 +2606,7 @@ class _DesktopProviderDetailPaneState
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // 1) Name
+                            // 1）名称
                             row(
                               l10n.providerDetailPageNameLabel,
                               Focus(
@@ -2665,17 +2665,16 @@ class _DesktopProviderDetailPaneState
                                       ),
                                     );
                                   },
-                                  // onChanged intentionally omitted:
-                                  // Saving on every keystroke triggers
-                                  // Consumer rebuild which recreates the
-                                  // widget tree and steals focus on desktop.
-                                  // Saving is handled by onSubmitted,
-                                  // onEditingComplete and Focus.onFocusChange.
+                                  // 有意省略 onChanged：
+                                  // 每次按键保存都会触发 Consumer 重建，
+                                  // 重新创建 widget 树，并在桌面端抢占焦点。
+                                  // 保存由 onSubmitted、onEditingComplete
+                                  // 和 Focus.onFocusChange 处理。
                                 ),
                               ),
                             ),
                             const SizedBox(height: 4),
-                            // 1.5) Group
+                            // 1.5）分组
                             row(
                               l10n.providerGroupsGroupLabel,
                               Row(
@@ -2777,7 +2776,7 @@ class _DesktopProviderDetailPaneState
                               ),
                             ),
                             const SizedBox(height: 4),
-                            // 2) Provider type
+                            // 2）供应商类型
                             row(
                               l10n.providerDetailPageProviderTypeTitle,
                               _ProviderTypeDropdown(
@@ -2795,7 +2794,7 @@ class _DesktopProviderDetailPaneState
                               ),
                             ),
                             const SizedBox(height: 4),
-                            // 3) Multi-Key
+                            // 3）多密钥
                             row(
                               l10n.providerDetailPageMultiKeyModeTitle,
                               Align(
@@ -2816,7 +2815,7 @@ class _DesktopProviderDetailPaneState
                               ),
                             ),
                             const SizedBox(height: 4),
-                            // 4) Response (OpenAI) or Vertex (Google). Hide for Claude, with animation.
+                            // 4）Response（OpenAI）或 Vertex（Google）。Claude 隐藏，并带动画。
                             AnimatedSwitcher(
                               duration: const Duration(milliseconds: 180),
                               switchInCurve: Curves.easeOutCubic,
@@ -3236,7 +3235,7 @@ class _DesktopProviderDetailPaneState
                               ),
                             ],
                             const SizedBox(height: 4),
-                            // 5) Network proxy inline
+                            // 5）内联网络代理
                             row(
                               l10n.providerDetailPageNetworkTab,
                               Align(
@@ -3885,8 +3884,8 @@ class _DesktopProviderDetailPaneState
           );
         }
 
-        // addKeys defined below after detection helpers
-        // Persisted state across inner StatefulBuilder rebuilds
+        // addKeys 在检测辅助函数之后定义
+        // 跨内部 StatefulBuilder 重建的持久状态
         String? detectModelId;
         bool detecting = false;
         String? testingKeyId;
@@ -3912,7 +3911,7 @@ class _DesktopProviderDetailPaneState
           String modelId,
           ApiKeyConfig key,
         ) async {
-          // Force using the specific key by disabling multi-key selection
+          // 通过禁用多密钥选择强制使用指定密钥
           final cfg2 = baseCfg.copyWith(
             apiKey: key.key,
             multiKeyEnabled: false,
@@ -4231,7 +4230,7 @@ class _DesktopProviderDetailPaneState
           return res;
         }
 
-        // Define addKeys now that helpers are in scope
+        // 现在辅助函数已在作用域中，定义 addKeys
         Future<void> addKeys(BuildContext c) async {
           final text = await _inputDialog(
             c,
@@ -4326,7 +4325,7 @@ class _DesktopProviderDetailPaneState
                                 ),
                               ),
                             ),
-                            // Delete all error keys
+                            // 删除所有错误密钥
                             Tooltip(
                               message: l10n.multiKeyPageDeleteErrorsTooltip,
                               child: _IconBtn(
@@ -4335,7 +4334,7 @@ class _DesktopProviderDetailPaneState
                               ),
                             ),
                             const SizedBox(width: 4),
-                            // Detect / test all keys
+                            // 检测或测试所有密钥
                             if (detecting)
                               Padding(
                                 padding: const EdgeInsets.symmetric(
@@ -4459,7 +4458,7 @@ class _DesktopProviderDetailPaneState
                                         );
                                         if (updated == null) return;
                                         if (!dctx.mounted) return;
-                                        // Prevent duplicate keys
+                                        // 防止重复密钥
                                         final latest = sp.getProviderConfig(
                                           widget.providerKey,
                                           defaultName: widget.displayName,
@@ -4546,10 +4545,10 @@ class _DesktopProviderDetailPaneState
     );
   }
 
-  // Replaced with desktop centered dialog: showModelFetchDialog
+  // 已替换为桌面居中对话框：showModelFetchDialog
 
   // Future<void> _showGetModelsDialog(BuildContext context) async {
-  //   // For now this acts similar to Detect, but kept separate per spec.
+  //   // 目前行为与 Detect 类似，但按规格保留为独立方法。
   //   return _showDetectModelsDialog(context);
   // }
 
@@ -4572,7 +4571,7 @@ class _DesktopProviderDetailPaneState
       barrierDismissible: true,
       builder: (ctx) {
         Future<void> pickModel() async {
-          // Use the desktop model selector dialog and limit to current provider
+          // 使用桌面模型选择对话框，并限制在当前供应商
           final sel = await showModelSelector(
             ctx,
             limitProviderKey: widget.providerKey,
@@ -5219,8 +5218,8 @@ class _ProviderTypeDropdownState extends State<_ProviderTypeDropdown> {
             ),
           ),
         );
-        final width = triggerW; // menu width equals trigger width
-        final dx = 0.0; // align left edges
+        final width = triggerW; // 菜单宽度等于触发器宽度
+        final dx = 0.0; // 左边缘对齐
         return Stack(
           children: [
             Positioned.fill(
@@ -5405,7 +5404,7 @@ class _StrategyDropdownState extends State<_StrategyDropdown> {
   }
 }
 
-// Small, consistent section label used in providers pane dialogs
+// 供应商面板对话框中使用的小型统一区块标签
 Widget _sectionLabel(BuildContext context, String text, {bool bold = false}) {
   final cs = Theme.of(context).colorScheme;
   return Text(
@@ -6094,8 +6093,7 @@ class _DesktopProviderShareDialogState
                   child: Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color:
-                          Colors.white, // color-gate: ignore (QR scannability)
+                      color: Colors.white, // color-gate: ignore（QR 可扫描性）
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: cs.outlineVariant.withValues(alpha: 0.2),
@@ -6419,7 +6417,7 @@ class _ProviderListRowState extends State<_ProviderListRow> {
                               : context.appColors.warning)
                           .withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(999),
-                  // No border for left list status
+                  // 左侧列表状态无边框
                 ),
                 child: Text(
                   widget.enabled
@@ -6600,7 +6598,7 @@ class _DesktopKeyRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           child: Row(
             children: [
-              // Status capsule
+              // 状态胶囊
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
@@ -6746,7 +6744,7 @@ class _ModelGroupAccordionState extends State<_ModelGroupAccordion> {
                   child: Row(
                     children: [
                       AnimatedRotation(
-                        turns: _open ? 0.25 : 0.0, // right (0) -> down (0.25)
+                        turns: _open ? 0.25 : 0.0, // right（0）变为向下（0.25）
                         duration: const Duration(milliseconds: 180),
                         curve: Curves.easeOutCubic,
                         child: Icon(
@@ -6840,7 +6838,7 @@ class _ModelRow extends StatelessWidget {
     final cfg = sp.getProviderConfig(providerKey);
     ModelInfo infer(String id) =>
         ModelRegistry.infer(ModelInfo(id: id, displayName: id));
-    // Resolve upstream/api model id for inference + capsules
+    // 解析用于推理和胶囊显示的上游或 API 模型 id
     String baseId = modelId;
     final rawOv = cfg.modelOverrides[modelId];
     final Map<String, dynamic>? ov = rawOv is Map
@@ -6860,7 +6858,7 @@ class _ModelRow extends StatelessWidget {
     }
 
     final info = effective();
-    // Display label: prefer override name, then upstream model id, then logical key
+    // 显示标签：优先覆盖名称，其次上游模型 id，最后逻辑键
     String displayName = modelId;
     if (ov != null) {
       final overrideName = ov['name']?.toString().trim();
@@ -6972,7 +6970,7 @@ class _ModelRow extends StatelessWidget {
                     providerKey,
                     old.copyWith(models: list),
                   );
-                  // Clear global and assistant-level model selections that reference the deleted model
+                  // 清除引用已删除模型的全局和助手级模型选择
                   await sp.clearSelectionsForModel(providerKey, modelId);
                   try {
                     for (final a in ap.assistants) {
@@ -7043,10 +7041,10 @@ class _CardPressState extends State<_CardPress> {
   }
 }
 
-// Removed embedded default model pane; now in setting/default_model_pane.dart
+// 已移除内嵌默认模型面板；现在位于 setting/default_model_pane.dart
 
-// Removed default model prompt dialogs; migrated to setting/default_model_pane.dart
+// 已移除默认模型提示对话框；迁移到 setting/default_model_pane.dart
 
-// Removed embedded default model card; now in setting/default_model_pane.dart
+// 已移除内嵌默认模型卡片；现在位于 setting/default_model_pane.dart
 
-// ===== Display Settings Body =====
+// ===== 显示设置主体 =====

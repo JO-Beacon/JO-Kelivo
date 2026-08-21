@@ -121,7 +121,7 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
         await _confirmClose();
       },
       child: Padding(
-        // Ensure keyboard-safe bottom inset for the sheet
+        // 为面板确保键盘安全的下方内边距
         padding: EdgeInsets.only(
           bottom: MediaQuery.viewInsetsOf(context).bottom,
         ),

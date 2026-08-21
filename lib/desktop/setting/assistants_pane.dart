@@ -1,6 +1,6 @@
 part of '../desktop_settings_page.dart';
 
-// ===== Assistants (Desktop right content) =====
+// ===== 助手（桌面右侧内容） =====
 
 class _DesktopAssistantsBody extends StatelessWidget {
   const _DesktopAssistantsBody({super.key});

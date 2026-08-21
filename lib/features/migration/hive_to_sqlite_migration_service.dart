@@ -18,6 +18,8 @@ import '../../core/services/backup/backup_settings_validator.dart';
 import '../../core/services/backup/restore_durability.dart';
 import '../../core/services/migration/legacy_message_content_decoder.dart';
 import '../../core/services/migration/legacy_record_sanitizer.dart';
+import '../../core/services/migration/migration_backup_file_name.dart';
+import '../../core/services/migration/migration_chain_state.dart';
 import '../../utils/app_directories.dart';
 import '../../utils/sandbox_path_resolver.dart';
 
@@ -87,13 +89,13 @@ class HiveToSqliteMigrationStatus {
   final int conversations;
   final int messages;
 
-  /// Legacy attachment markers successfully converted to parts.
+  /// 已成功转换为 parts 的旧附件标记。
   final int converted;
 
-  /// Marker-shaped lines that could not be parsed and were kept as text.
+  /// 形似标记但无法解析、因而保留为文本的行。
   final int malformed;
 
-  /// Converted local attachments whose files were missing on disk.
+  /// 已转换但磁盘文件缺失的本地附件。
   final int missingFiles;
   final List<HiveToSqliteBackupItem> backupItems;
   final bool chatsExportDegraded;
@@ -133,6 +135,25 @@ class HiveToSqliteMigrationStatus {
   }
 }
 
+/// 迁移屏幕的共享工作流契约。底层存储引擎不同，但备份闸门、进度报告、
+/// 重试和重启行为必须保持一致。
+abstract interface class MigrationWorkflow {
+  Stream<HiveToSqliteMigrationStatus> get statusStream;
+  HiveToSqliteMigrationStatus initialStatus();
+  bool get canOfferSkip;
+  Future<int> loadAttemptState();
+  Future<File> backupTo(Directory selectedDirectory);
+  Future<File> backupToFile(File file);
+  Future<File> backupToTemporaryFile();
+  Future<void> migrate({String? backupPath});
+  Future<String?> existingBackupPath();
+  Future<bool> hasExternallySavedBackup();
+  Future<void> recordExternalBackupSaved();
+  Future<void> recordFailedAttempt();
+  Future<void> skipMigrationAndStartFresh();
+  Future<void> dispose();
+}
+
 class HiveToSqliteMigrationDecision {
   const HiveToSqliteMigrationDecision({
     required this.needsMigration,
@@ -147,7 +168,7 @@ class HiveToSqliteMigrationDecision {
   final List<File> hiveFiles;
 }
 
-class HiveToSqliteMigrationService {
+class HiveToSqliteMigrationService implements MigrationWorkflow {
   HiveToSqliteMigrationService(this.decision, {RestoreDurability? durability})
     : _durability = durability ?? RestorePlatformDurability();
 
@@ -176,15 +197,14 @@ class HiveToSqliteMigrationService {
 
   final HiveToSqliteMigrationDecision decision;
 
-  /// Invoked after all batches are written and immediately before [_validate].
-  /// Tests use this to corrupt the temporary database and assert rollback.
+  /// 在所有批次写入完成且即将执行 [_validate] 前调用。
+  /// 测试可用此钩子破坏临时数据库并断言回滚。
   @visibleForTesting
   Future<void> Function(ChatDatabaseRepository repo)?
   debugBeforeValidateForTest;
 
-  /// Message ids whose per-message processing should throw, simulating a
-  /// corrupt/undecodable legacy record. Tests use this to assert that a single
-  /// bad message is isolated instead of failing the whole migration.
+  /// 哪些消息 id 在逐条处理时应抛出异常，用于模拟损坏或无法解码的旧记录。
+  /// 测试用此断言单条坏消息会被隔离，而不会让整个迁移失败。
   @visibleForTesting
   Set<String> debugFailMessageIdsForTest = <String>{};
   @visibleForTesting
@@ -202,14 +222,17 @@ class HiveToSqliteMigrationService {
   var _missingFiles = 0;
   String? _persistedStageBreadcrumb;
 
+  @override
   Stream<HiveToSqliteMigrationStatus> get statusStream => _controller.stream;
 
   int get attemptCount => _attemptCount;
 
+  @override
   bool get canOfferSkip => _attemptCount >= skipAttemptThreshold;
 
   String? get lastAttemptStage => _persistedStageBreadcrumb;
 
+  @override
   Future<int> loadAttemptState() async {
     final state = await _readAttemptState();
     _attemptCount = state.attempts;
@@ -237,6 +260,20 @@ class HiveToSqliteMigrationService {
       );
     }
     if (sqliteFile.existsSync()) {
+      // 读取 user_version 不会打开 Drift，因此不会在外部备份闸门保护文件前
+      // 执行树结构升级。
+      final installedSchema = ChatDatabaseRepository.readInstalledSchemaVersion(
+        sqliteFile,
+      );
+      if (installedSchema >= 1 &&
+          installedSchema < AppDatabase.currentSchemaVersion) {
+        return HiveToSqliteMigrationDecision(
+          needsMigration: false,
+          appDataDir: appDataDir,
+          sqliteFile: sqliteFile,
+          hiveFiles: hiveFiles,
+        );
+      }
       final repo = ChatDatabaseRepository.open(file: sqliteFile);
       try {
         if (await repo.isMigrationComplete()) {
@@ -261,6 +298,7 @@ class HiveToSqliteMigrationService {
     );
   }
 
+  @override
   HiveToSqliteMigrationStatus initialStatus() {
     return HiveToSqliteMigrationStatus(
       stage: HiveToSqliteMigrationStage.intro,
@@ -272,15 +310,58 @@ class HiveToSqliteMigrationService {
     );
   }
 
+  @override
   Future<File> backupTo(Directory selectedDirectory) async {
     await selectedDirectory.create(recursive: true);
-    final backupFile = File(p.join(selectedDirectory.path, _backupFileName()));
-    return _backupToFile(backupFile);
+    final backupFile = File(
+      p.join(selectedDirectory.path, migrationBackupFileName()),
+    );
+    final result = await _backupToFile(backupFile);
+    await MigrationChainStateStore(decision.appDataDir).write(
+      MigrationChainState(
+        sourceKind: 'hive',
+        backupPath: result.path,
+        stage: 'backup-verified',
+      ),
+    );
+    return result;
   }
 
+  @override
+  Future<File> backupToFile(File file) => _backupToFile(file);
+
+  @override
   Future<File> backupToTemporaryFile() async {
     return _backupToFile(
-      File(p.join(Directory.systemTemp.path, _backupFileName())),
+      File(p.join(Directory.systemTemp.path, migrationBackupFileName())),
+    );
+  }
+
+  @override
+  Future<String?> existingBackupPath() async {
+    final state = await MigrationChainStateStore(decision.appDataDir).read();
+    if (state?.sourceKind != 'hive' || state?.backupPath == null) return null;
+    final file = File(state!.backupPath!);
+    return await file.exists() ? file.path : null;
+  }
+
+  @override
+  Future<bool> hasExternallySavedBackup() async {
+    final state = await MigrationChainStateStore(decision.appDataDir).read();
+    return state?.sourceKind == 'hive' && state?.externalBackupSaved == true;
+  }
+
+  @override
+  Future<void> recordExternalBackupSaved() async {
+    final store = MigrationChainStateStore(decision.appDataDir);
+    final state = await store.read();
+    await store.write(
+      MigrationChainState(
+        sourceKind: 'hive',
+        backupPath: state?.sourceKind == 'hive' ? state?.backupPath : null,
+        stage: 'backup-verified',
+        externalBackupSaved: true,
+      ),
     );
   }
 
@@ -414,24 +495,29 @@ class HiveToSqliteMigrationService {
     return backupFile;
   }
 
-  String _backupFileName() {
-    final timestamp = DateTime.now()
-        .toUtc()
-        .toIso8601String()
-        .replaceAll(':', '-')
-        .replaceAll('.', '-');
-    return 'kelivo_migration_backup_$timestamp.zip';
-  }
-
+  @override
   Future<void> migrate({String? backupPath}) async {
+    final chainStore = MigrationChainStateStore(decision.appDataDir);
+    final chain = await chainStore.read();
+    backupPath ??= chain?.sourceKind == 'hive' ? chain!.backupPath : null;
+    if (backupPath != null || chain?.externalBackupSaved == true) {
+      await chainStore.write(
+        MigrationChainState(
+          sourceKind: 'hive',
+          backupPath: backupPath,
+          stage: 'migrating',
+          externalBackupSaved: chain?.externalBackupSaved == true,
+        ),
+      );
+    }
     ChatDatabaseRepository? repo;
     LazyBox<Conversation>? conversationsBox;
     LazyBox<ChatMessage>? messagesBox;
     LazyBox<dynamic>? toolEventsBox;
     var published = false;
     try {
-      // Bind canonicalize to this process's app data root (refresh even if a
-      // previous test/session left docsDir pointing elsewhere).
+      // 将 canonicalize 绑定到本进程的应用数据根目录
+      // （即使之前的测试或会话让 docsDir 指向了其他位置，也会刷新）。
       await SandboxPathResolver.init();
       await _beginAttempt();
       await _recordStageBreadcrumb(
@@ -463,9 +549,8 @@ class HiveToSqliteMigrationService {
       await _deleteSqliteFamily(tempFile);
       repo = ChatDatabaseRepository.open(file: tempFile);
 
-      // 1.1.17 tolerated dangling references, cross-conversation reuse and
-      // duplicate (groupId, version) pairs at runtime; the batches must repair
-      // or skip those shapes instead of failing the whole migration.
+      // 1.1.17 在运行时容忍悬空引用、跨会话复用和重复的 (groupId, version) 对；
+      // 批次处理必须修复或跳过这些形态，而不是让整个迁移失败。
       final repairStats = _MigrationRepairStats();
       final conversations = <Conversation>[];
       for (final key in conversationsBox.keys) {
@@ -479,9 +564,8 @@ class HiveToSqliteMigrationService {
           final conversation = await conversationsBox.get(key);
           if (conversation != null) conversations.add(conversation);
         } catch (error, stackTrace) {
-          // A conversation record that cannot be deserialized must cost only
-          // that conversation, not the whole migration. The Hive source is
-          // retained, so nothing is destroyed.
+          // 无法反序列化的会话记录只能影响该会话本身，不能拖垮整个迁移。
+          // Hive 源文件会保留，因此不会破坏任何数据。
           repairStats.undecodableConversations++;
           _logLine('legacy-conversation skipped ($key): $error');
           _logLine(stackTrace.toString());
@@ -568,18 +652,16 @@ class HiveToSqliteMigrationService {
                 repairStats.conversationIdMismatches++;
                 message = message.copyWith(conversationId: conversation.id);
               }
-              // Field-level repair (empty role, negative tokens/duration,
-              // out-of-range version, inverted reasoning timestamps) shares
-              // logic with the chats.json import boundary.
+              // 字段级修复（空 role、负 token 或 duration、越界 version、
+              // 反转的推理时间戳）与 chats.json 导入边界共享逻辑。
               final sanitized = sanitizeLegacyMessageFields(message);
               if (!identical(sanitized, message)) {
                 repairStats.dirtyNumericFields++;
                 message = sanitized;
               }
               final groupId = message.groupId;
-              // '' is stored verbatim and is a real value to the
-              // unique(conversationId, groupId, version) index (unlike NULL),
-              // so empty-string groups need version repair too.
+              // 空字符串会原样存储，并且对 unique(conversationId, groupId, version)
+              // 索引而言是真实值（与 NULL 不同），因此空字符串分组也需要修复 version。
               if (groupId != null) {
                 var version = message.version;
                 if (!seenGroupVersions.add('$groupId\u0000$version')) {
@@ -600,15 +682,13 @@ class HiveToSqliteMigrationService {
               );
               var parts = List<MessagePart>.of(decodeResult.parts);
               if (parts.isEmpty) {
-                // Match repository persistence: empty body becomes one empty
-                // text part.
+                // 与仓储持久化保持一致：空正文变成一个空 text part。
                 parts = const <MessagePart>[TextPart('')];
               }
               parts = _normalizeAttachmentPartUris(parts);
               message = message.copyWith(parts: parts);
-              // Expected digest comes from independently stripped legacy text,
-              // not merely echoing decoder TextPart objects. Compute it before
-              // committing so a strip failure skips the message cleanly.
+              // 预期摘要来自独立剥离后的旧文本，而不是简单回显解码出的 TextPart。
+              // 在提交前计算，以便剥离失败时干净地跳过该消息。
               final textSegments = stripLegacyContentTextSegments(
                 legacyContent,
               );
@@ -623,10 +703,9 @@ class HiveToSqliteMigrationService {
                 signature = await _signatureFor(toolEventsBox, message.id);
               }
 
-              // Commit only after every fallible step succeeded, so a message
-              // that threw above is skipped entirely and never contributes to
-              // the batch, the expected counts, or the digest. The batch write
-              // itself stays outside this try: a DB failure must fail loudly.
+              // 只有每个可能失败的步骤都成功后才提交，这样上方抛出的消息会被完全跳过，
+              // 不会计入批次、预期数量或摘要。批次写入本身保持在 try 之外：
+              // 数据库失败必须显式暴露。
               _converted += decodeResult.converted;
               _malformed += decodeResult.malformed;
               _missingFiles += decodeResult.missingFiles;
@@ -649,9 +728,8 @@ class HiveToSqliteMigrationService {
                 geminiSignaturesByMessageId[message.id] = signature;
               }
             } catch (error, stackTrace) {
-              // A single corrupt/undecodable legacy record must not sink the
-              // whole migration. Skip it, count it, and keep going; the Hive
-              // source is retained so nothing is destroyed.
+              // 单条损坏或无法解码的旧记录不应拖垮整个迁移。
+              // 跳过并计数后继续；Hive 源文件会保留，因此不会破坏任何数据。
               repairStats.decodeFailures++;
               _logLine('legacy-message skipped ($messageId): $error');
               _logLine(stackTrace.toString());
@@ -749,8 +827,8 @@ class HiveToSqliteMigrationService {
       await repo.checkpoint();
       await repo.close();
       repo = null;
-      // WAL truncate can leave empty -wal/-shm files behind; strip them before
-      // the publish assertion treats any sidecar as unexpected data loss.
+      // WAL 截断可能留下空的 -wal/-shm 文件；在发布断言把任何附属文件
+      // 视为意外数据丢失之前先清理它们。
       await _deleteDatabaseSidecars(tempFile);
 
       await _recordStageBreadcrumb(
@@ -796,8 +874,8 @@ class HiveToSqliteMigrationService {
       await messagesBox?.close();
       await toolEventsBox?.close();
       if (!published) {
-        // A failed attempt must not leave the half-migrated database family
-        // behind; the startup gate would otherwise keep rejecting it.
+        // 失败的尝试不能留下半迁移的数据库文件族；
+        // 否则启动闸门会持续拒绝它。
         await _deleteSqliteFamily(
           File('${decision.sqliteFile.path}.migrating'),
         );
@@ -805,9 +883,8 @@ class HiveToSqliteMigrationService {
     }
   }
 
-  /// Delegates to the shared legacy sanitizer and counts repairs in the
-  /// migration stats. Out-of-range counters in dirty Hive data would
-  /// otherwise abort the whole migration with SQLITE_CONSTRAINT_CHECK.
+  /// 委托给共享旧数据清理器，并在迁移统计中记录修复数量。
+  /// 脏 Hive 数据中的越界计数器否则会以 SQLITE_CONSTRAINT_CHECK 中止整个迁移。
   Conversation _sanitizeLegacyConversationFields(
     Conversation conversation,
     _MigrationRepairStats stats,
@@ -819,10 +896,8 @@ class HiveToSqliteMigrationService {
     return sanitized;
   }
 
-  /// Prescan-safe message read: an undecodable record is treated like a
-  /// dangling reference instead of aborting the migration. The same record
-  /// is read again by the main loop, where the failure is counted once in
-  /// the repair stats.
+  /// 预扫描安全的消息读取：无法解码的记录会像悬空引用一样处理，而不是中止迁移。
+  /// 主循环会再次读取同一条记录，并在修复统计中计数一次。
   Future<ChatMessage?> _tryGetLegacyMessage(
     LazyBox<ChatMessage> messagesBox,
     String messageId,
@@ -932,10 +1007,10 @@ class HiveToSqliteMigrationService {
         : conversation;
   }
 
-  /// Escape hatch after repeated migration failures: renames the legacy Hive
-  /// artifacts to `<name>.retired` so [check] stops requesting migration and
-  /// the next launch starts with an empty SQLite database. The retired files
-  /// stay on disk for manual recovery.
+  /// 多次迁移失败后的逃生通道：将旧 Hive 文件重命名为 `<name>.retired`，
+  /// 使 [check] 停止请求迁移，下一次启动从空 SQLite 数据库开始。
+  /// 退役文件会保留在磁盘上供手动恢复。
+  @override
   Future<void> skipMigrationAndStartFresh() async {
     for (final hiveFile in decision.hiveFiles) {
       final lockFile = File('${p.withoutExtension(hiveFile.path)}.lock');
@@ -944,20 +1019,21 @@ class HiveToSqliteMigrationService {
           await lockFile.rename('${lockFile.path}.retired');
         }
       } catch (error) {
-        // Lock files are advisory; leaving one behind must not block the skip.
+        // 锁文件只是建议性的；残留文件不能阻塞跳过操作。
         _logLine('skip-migration lock rename: $error');
       }
       if (await hiveFile.exists()) {
         await hiveFile.rename('${hiveFile.path}.retired');
       }
     }
-    // A failed attempt can leave the temporary database family behind.
+    // 失败的尝试可能留下临时数据库文件族。
     await _deleteSqliteFamily(File('${decision.sqliteFile.path}.migrating'));
     await _deleteSqliteFamily(File('${decision.sqliteFile.path}.previous'));
     await _clearAttemptState();
     _logLine('skip-migration: legacy hive files retired');
   }
 
+  @override
   Future<void> dispose() async {
     await _controller.close();
   }
@@ -1031,10 +1107,9 @@ class HiveToSqliteMigrationService {
       ),
     );
 
-    // Snapshot the raw .hive files before anything opens Hive: openLazyBox
-    // (used by the chats.json export below) runs crash recovery, which can
-    // truncate a damaged box in place. The archive must preserve the original
-    // bytes — they are the authoritative fallback the backup promises.
+    // 在任何操作打开 Hive 前快照原始 .hive 文件：下面的 chats.json 导出
+    // 会使用 openLazyBox，后者会执行崩溃恢复，可能就地截断损坏的 box。
+    // 归档必须保留原始字节，它们是备份承诺的权威回退数据。
     final hiveSnapshots = <String, File>{};
     for (final hiveFile in decision.hiveFiles) {
       final snapshot = File(
@@ -1079,9 +1154,8 @@ class HiveToSqliteMigrationService {
         },
       );
     } catch (error, stackTrace) {
-      // The raw .hive files below stay in the archive and remain the complete
-      // fallback, so a broken chats.json export degrades the backup instead of
-      // failing it.
+      // 下方的原始 .hive 文件会留在归档中，继续作为完整回退数据；
+      // 因此损坏的 chats.json 导出只会降低备份质量，而不会让备份失败。
       _chatsExportDegraded = true;
       _logLine('chats.json export skipped: $error');
       _logLine(stackTrace.toString());
@@ -1105,8 +1179,7 @@ class HiveToSqliteMigrationService {
         ),
       );
     } else {
-      // Drop the checklist row entirely; the manifest reset below would
-      // otherwise leave it pending forever.
+      // 完全删除检查清单行；否则下方的清单重置会让它永远保持待处理状态。
       items = [
         for (final item
             in (_lastBackupItems.isEmpty ? items : _lastBackupItems))
@@ -1117,8 +1190,7 @@ class HiveToSqliteMigrationService {
 
     for (final hiveFile in decision.hiveFiles) {
       final itemName = p.basename(hiveFile.path);
-      // Archive the pre-open snapshot, not the live file that Hive may have
-      // crash-recovered (truncated) in the meantime.
+      // 归档打开前快照，而不是 Hive 在此过程中可能已崩溃恢复（截断）的活动文件。
       final source = hiveSnapshots[hiveFile.path] ?? hiveFile;
       final bytes = await source.length();
       items = _updateBackupItem(items, itemName, bytes: bytes);
@@ -1400,8 +1472,8 @@ class HiveToSqliteMigrationService {
               if (message != null) {
                 if (!firstMessage) sink.write(',');
                 firstMessage = false;
-                // Legacy chats backup must stay parts-free so restore paths
-                // that only understand content/markers remain compatible.
+                // 旧版 chats 备份必须保持不含 parts，以便只理解 content/markers
+                // 的恢复路径仍然兼容。
                 final json = message.toJson();
                 json.remove('parts');
                 sink.write(jsonEncode(json));
@@ -1586,8 +1658,8 @@ class HiveToSqliteMigrationService {
         );
       },
     );
-    // Digest scans multi-GB payloads on a worker isolate; map byte progress
-    // into the remaining validate window so the migration bar keeps moving.
+    // 摘要计算在工作 isolate 上扫描数 GB 数据；将字节进度映射到剩余的
+    // 校验窗口，使迁移进度条持续前进。
     var lastDigestProgressEmit = DateTime.fromMillisecondsSinceEpoch(0);
     final textContentDigest = await repo.getTextPartContentDigest(
       onProgress: (processedChars, totalChars) {
@@ -1733,11 +1805,11 @@ class HiveToSqliteMigrationService {
     );
   }
 
-  /// Records an attempt that failed before [migrate] could run (i.e. during
-  /// backup creation). [migrate] increments the counter itself via
-  /// [_beginAttempt], so callers must only invoke this for backup-phase
-  /// failures; otherwise a disk-full or unwritable-target user could never
-  /// reach the skip escape hatch and would be trapped on the migration page.
+  /// 记录在 [migrate] 运行前（即备份创建阶段）失败的尝试。
+  /// [migrate] 会通过 [_beginAttempt] 自己递增计数器，因此调用方只能为
+  /// 备份阶段失败调用此方法；否则磁盘满或目标不可写的用户永远无法
+  /// 到达跳过逃生通道，而会被困在迁移页面。
+  @override
   Future<void> recordFailedAttempt() async {
     final state = await _readAttemptState();
     _attemptCount = state.attempts + 1;
@@ -1804,8 +1876,8 @@ class HiveToSqliteMigrationService {
       jsonEncode({'attempts': attempts, 'stage': stage}),
       flush: true,
     );
-    // POSIX rename replaces an existing target atomically. Windows requires
-    // the target to be absent, which briefly opens a neither-file window.
+    // POSIX rename 会原子地替换现有目标。Windows 要求目标不存在，
+    // 这会短暂出现“两边都没有文件”的窗口。
     if (Platform.isWindows && await file.exists()) {
       await file.delete();
     }

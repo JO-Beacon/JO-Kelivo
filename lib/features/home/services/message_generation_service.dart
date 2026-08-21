@@ -19,7 +19,7 @@ import 'ask_user_interaction_service.dart';
 import 'message_builder_service.dart';
 import 'tool_approval_service.dart';
 
-/// Callback types for UI updates from MessageGenerationService
+/// MessageGenerationService 用于 UI 更新的回调类型
 typedef OnMessagesChanged = void Function();
 typedef OnConversationLoadingChanged =
     void Function(String conversationId, bool loading);
@@ -48,7 +48,7 @@ Map<String, String>? buildConversationRequestHeaders({
   return headers.isEmpty ? null : headers;
 }
 
-/// Result of preparing a message generation
+/// 准备消息生成的结果
 class PreparedGeneration {
   final List<Map<String, dynamic>> apiMessages;
   final List<Map<String, dynamic>> toolDefs;
@@ -65,15 +65,15 @@ class PreparedGeneration {
   });
 }
 
-/// Service for handling message generation orchestration.
+/// 负责消息生成编排的服务。
 ///
-/// This service coordinates:
-/// - Message creation (user + assistant placeholder)
-/// - API message preparation with all injections
-/// - Stream execution and management
-/// - Reasoning state initialization
+/// 该服务负责协调：
+/// - 创建消息（用户消息 + 助手占位）
+/// - 准备 API 消息（含所有注入）
+/// - 流式执行与管理
+/// - 推理状态初始化
 ///
-/// UI updates are communicated through callbacks to maintain separation.
+/// UI 更新通过回调传递，以保持职责分离。
 class MessageGenerationService {
   MessageGenerationService({
     required this.chatService,
@@ -89,7 +89,7 @@ class MessageGenerationService {
   final stream_ctrl.StreamController streamController;
   final BuildContext contextProvider;
 
-  // Callbacks for UI updates (set by home_page)
+  // UI 更新回调（由 home_page 设置）
   OnMessagesChanged? onMessagesChanged;
   OnConversationLoadingChanged? onConversationLoadingChanged;
   OnScrollToBottom? onScrollToBottom;
@@ -97,20 +97,20 @@ class MessageGenerationService {
   OnShowWarning? onShowWarning;
   OnHapticFeedback? onHapticFeedback;
 
-  /// Called when file processing starts.
+  /// 文件处理开始时调用。
   VoidCallback? onFileProcessingStarted;
 
-  /// Called when file processing finishes.
+  /// 文件处理结束时调用。
   VoidCallback? onFileProcessingFinished;
 
-  /// Check if reasoning is enabled for given budget
+  /// 检查给定预算下是否启用推理
   bool isReasoningEnabled(int? budget) {
     if (budget == null) return true;
     if (budget == -1) return true;
     return budget >= 1024;
   }
 
-  /// Prepare API messages with all injections applied.
+  /// 准备应用所有注入后的 API 消息。
   Future<PreparedGeneration> prepareApiMessagesWithInjections({
     required List<ChatMessage> messages,
     required Map<String, int> versionSelections,
@@ -134,7 +134,7 @@ class MessageGenerationService {
 
     onFileProcessingStarted?.call();
 
-    // Build API messages
+    // 构建 API 消息
     final apiMessages = messageBuilderService.buildApiMessages(
       messages: messages,
       versionSelections: versionSelections,
@@ -142,7 +142,7 @@ class MessageGenerationService {
       includeToolMessages: includeToolMessages,
     );
 
-    // Apply assistant replace-only regexes at send-time (visual stays unchanged).
+    // 在发送时应用助手仅替换型正则（显示保持不变）。
     if (assistant != null && assistant.regexRules.isNotEmpty) {
       for (int i = 0; i < apiMessages.length; i++) {
         final role = (apiMessages[i]['role'] ?? '').toString();
@@ -158,9 +158,9 @@ class MessageGenerationService {
       }
     }
 
-    // Inject prompts first so WorldBook can scan the full untrimmed history
-    // (same keyword trigger range as before OCR-after-trim). Document/OCR work
-    // runs only after the single final context trim below.
+    // 先注入 prompts，以便 WorldBook 能扫描未裁剪的完整历史
+    // （与 OCR 后裁剪前相同的关键词触发范围）。文档/OCR 处理
+    // 仅在下方单次最终上下文裁剪之后执行。
     messageBuilderService.injectSystemPrompt(apiMessages, assistant, modelId);
     await messageBuilderService.injectMemoryAndRecentChats(
       apiMessages,
@@ -189,9 +189,9 @@ class MessageGenerationService {
       assistantId,
     );
 
-    // Single final trim after WorldBook TOP/BOTTOM/AT_DEPTH injections. OCR and
-    // document extraction must run only on this retained set so images that will
-    // not be sent are never processed (#769).
+    // 在 WorldBook TOP/BOTTOM/AT_DEPTH 注入后做单次最终裁剪。OCR 与
+    // 文档抽取必须仅对该保留集合执行，确保不会被发送的图片
+    // 永不处理 (#769)。
     messageBuilderService.applyContextLimit(apiMessages, assistant);
 
     final lastUserImagePaths = await messageBuilderService
@@ -218,7 +218,7 @@ class MessageGenerationService {
     }
     messageBuilderService.stripInternalRevisionIds(apiMessages);
 
-    // Prepare tools
+    // 准备工具
     final mcpRouteSnapshot = generationController.captureMcpToolRoutes(
       assistant,
     );
@@ -250,7 +250,7 @@ class MessageGenerationService {
     );
   }
 
-  /// Create user message from input data.
+  /// 根据输入数据创建用户消息。
   Future<ChatMessage> createUserMessage({
     required String conversationId,
     required ChatInputData input,
@@ -318,6 +318,8 @@ class MessageGenerationService {
     required String groupId,
     required int version,
     required bool truncateFuture,
+    String? parentMessageId,
+    String? branchId,
   }) async {
     if (chatService.isTemporaryConversation(conversationId)) {
       final assistantMessage = await createAssistantPlaceholder(
@@ -336,6 +338,8 @@ class MessageGenerationService {
       groupId: groupId,
       version: version,
       truncateFuture: truncateFuture,
+      parentMessageId: parentMessageId,
+      branchId: branchId,
     );
     return (assistantMessage: result.assistantMessage, runId: result.run.id);
   }
@@ -347,6 +351,8 @@ class MessageGenerationService {
     required String providerKey,
     required String anchorGroupId,
     required bool truncateFuture,
+    String? parentMessageId,
+    String? branchId,
   }) async {
     if (chatService.isTemporaryConversation(conversationId)) {
       final assistantMessage = await createAssistantPlaceholder(
@@ -362,14 +368,16 @@ class MessageGenerationService {
       providerId: providerKey,
       anchorGroupId: anchorGroupId,
       truncateFuture: truncateFuture,
+      parentMessageId: parentMessageId,
+      branchId: branchId,
     );
     return (assistantMessage: result.assistantMessage, runId: result.run.id);
   }
 
-  /// Build structured parts for a persisted user message.
+  /// 为持久化的用户消息构建结构化 parts。
   ///
-  /// Text is always present (possibly empty). Attachments follow in the
-  /// user's selection order. No legacy attachment markers are produced.
+  /// 文本始终存在（可能为空）。附件按用户
+  /// 选择顺序追加。不生成旧版附件标记。
   static Future<List<MessagePart>> buildPersistedUserMessageParts(
     ChatInputData input, {
     required Assistant? assistant,
@@ -406,7 +414,7 @@ class MessageGenerationService {
     return parts;
   }
 
-  /// Derived text body for callers that still need a plain string.
+  /// 供仍需要纯字符串的调用方使用的派生文本正文。
   static Future<String> buildPersistedUserMessageContent(
     ChatInputData input, {
     required Assistant? assistant,
@@ -418,7 +426,7 @@ class MessageGenerationService {
     return parts.whereType<TextPart>().map((part) => part.text).join();
   }
 
-  /// Create assistant message placeholder.
+  /// 创建助手消息占位。
   Future<ChatMessage> createAssistantPlaceholder({
     required String conversationId,
     required String modelId,
@@ -439,7 +447,7 @@ class MessageGenerationService {
     );
   }
 
-  /// Initialize reasoning state for a message if reasoning is enabled.
+  /// 若启用推理，则为消息初始化推理状态。
   Future<void> initializeReasoningState({
     required String messageId,
     required bool enableReasoning,
@@ -454,7 +462,7 @@ class MessageGenerationService {
     }
   }
 
-  /// Build GenerationContext for streaming.
+  /// 为流式生成构建 GenerationContext。
   stream_ctrl.GenerationContext buildGenerationContext({
     required ChatMessage assistantMessage,
     required PreparedGeneration prepared,
@@ -500,7 +508,7 @@ class MessageGenerationService {
     );
   }
 
-  /// Get current model and provider from assistant or global settings.
+  /// 从助手或全局设置获取当前 model 和 provider。
   ({String? providerKey, String? modelId}) getModelConfig(
     SettingsProvider settings,
     Assistant? assistant,
@@ -512,7 +520,7 @@ class MessageGenerationService {
     );
   }
 
-  /// Calculate version info for regeneration.
+  /// 为重新生成计算版本信息。
   ({String? targetGroupId, int nextVersion, int lastKeep})
   calculateRegenerationVersioning({
     required ChatMessage message,
@@ -545,7 +553,7 @@ class MessageGenerationService {
         nextVersion = maxVer + 1;
       }
     } else {
-      // User message
+      // 用户消息
       final userGroupId = message.groupId ?? message.id;
       int userFirst = -1;
       for (int i = 0; i < messages.length; i++) {
@@ -590,7 +598,7 @@ class MessageGenerationService {
     );
   }
 
-  /// Remove trailing messages after regeneration cut point.
+  /// 移除重新生成分割点之后的后续消息。
   @visibleForTesting
   static List<String> collectTrailingMessageIdsForRemoval({
     required List<ChatMessage> messages,
@@ -617,7 +625,7 @@ class MessageGenerationService {
     return removeIds;
   }
 
-  /// Remove trailing messages after regeneration cut point.
+  /// 移除重新生成分割点之后的后续消息。
   Future<List<String>> removeTrailingMessages({
     required List<ChatMessage> messages,
     required int lastKeep,
@@ -659,8 +667,8 @@ class MessageGenerationService {
     required String providerKey,
     required String modelId,
   }) {
-    // Former Omni audio allowlist removed; OpenAI-compatible providers do not
-    // receive special audio attachment support via this gate.
+    // 旧的 Omni 音频白名单已移除；OpenAI 兼容 provider 不会
+    // 通过此关卡获得特殊音频附件支持。
     return false;
   }
 
@@ -721,7 +729,7 @@ class MessageGenerationService {
         .toList(growable: false);
   }
 
-  /// Build user image paths considering OCR mode.
+  /// 考虑 OCR 模式构建用户图片路径。
   List<String> buildUserImagePaths({
     required ChatInputData? input,
     required List<String> lastUserImagePaths,

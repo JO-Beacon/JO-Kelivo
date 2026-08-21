@@ -780,8 +780,8 @@ class _MemoryTabState extends State<_MemoryTab> {
   }
 }
 
-/// Text/number input: centered Dialog on desktop, bottom sheet on mobile.
-/// Controller lives in a [State] so it survives the exit transition.
+/// 文本或数字输入：桌面端居中 Dialog，移动端底部弹层。
+/// 控制器位于 [State] 中，以便在退出过渡期间继续存在。
 Future<String?> _showMemoryTextSheet(
   BuildContext context, {
   required String title,
@@ -878,7 +878,7 @@ class _MemoryTextInputFormState extends State<_MemoryTextInputForm> {
     final cs = Theme.of(context).colorScheme;
     final media = MediaQuery.of(context);
     final bottomInset = media.viewInsets.bottom;
-    // Cap to available height above the keyboard so the Column cannot overflow.
+    // 限制在键盘上方可用高度，避免 Column 溢出。
     final maxHeight = (media.size.height - bottomInset) * 0.9;
 
     return SafeArea(

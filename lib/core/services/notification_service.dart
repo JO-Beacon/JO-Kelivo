@@ -17,7 +17,7 @@ class NotificationService {
     if (!Platform.isAndroid) return;
     if (_inited) return;
 
-    // Android initialization
+    // Android 初始化
     const AndroidInitializationSettings androidInit =
         AndroidInitializationSettings('@mipmap/ic_launcher');
     const InitializationSettings init = InitializationSettings(
@@ -25,19 +25,19 @@ class NotificationService {
     );
     await _plugin.initialize(init);
 
-    // Create channel
+    // 创建通知渠道
     final android = _plugin
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
         >();
     if (android != null) {
       await android.createNotificationChannel(_channel);
-      // Runtime notification permission (Android 13+) should be requested by app UI if needed
+      // 运行时通知权限（Android 13+）应按需由应用 UI 请求
     }
     _inited = true;
   }
 
-  /// Ensure Android 13+ notifications permission is granted (no-op on lower versions/other platforms).
+  /// 确保已授予 Android 13+ 通知权限（在更低版本和其他平台上为空操作）。
   static Future<bool> ensureAndroidNotificationsPermission() async {
     if (!Platform.isAndroid) return true;
     final android = _plugin

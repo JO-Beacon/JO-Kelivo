@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -22,7 +23,7 @@ void main() {
                 invocation = runWithLoadingTaskDialog<int>(
                   context: context,
                   label: 'Exporting',
-                  task: () {
+                  task: (_) {
                     taskStarted = true;
                     return task.future;
                   },
@@ -63,7 +64,7 @@ void main() {
             onPressed: () {
               invocation = runWithLoadingTaskDialog<void>(
                 context: context,
-                task: () => task.future,
+                task: (_) => task.future,
               );
             },
             child: const Text('Start'),
@@ -86,5 +87,41 @@ void main() {
     await expectation;
 
     expect(find.byType(CupertinoActivityIndicator), findsNothing);
+  });
+
+  testWidgets('keeps the Windows title bar outside the loading barrier', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    try {
+      final task = Completer<void>();
+      Future<void>? invocation;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => TextButton(
+              onPressed: () {
+                invocation = runWithLoadingTaskDialog<void>(
+                  context: context,
+                  task: (_) => task.future,
+                );
+              },
+              child: const Text('Start'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Start'));
+      await tester.pump();
+
+      expect(tester.getTopLeft(find.byType(ModalBarrier).last).dy, 40);
+
+      task.complete();
+      await invocation;
+      await tester.pump();
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 }

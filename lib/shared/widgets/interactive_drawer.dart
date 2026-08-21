@@ -1,10 +1,10 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
-/// Drawer placement side.
+/// 抽屉所在的一侧。
 enum DrawerSide { left, right }
 
-/// Controller to programmatically control the drawer.
+/// 用于以编程方式控制抽屉的控制器。
 class InteractiveDrawerController extends ChangeNotifier {
   InteractiveDrawerController({double initialValue = 0.0})
     : _valueOffline = initialValue.clamp(0.0, 1.0);
@@ -12,7 +12,7 @@ class InteractiveDrawerController extends ChangeNotifier {
   AnimationController? _controller;
   double _valueOffline;
 
-  /// Current progress in [0.0, 1.0].
+  /// 当前进度，范围为 [0.0, 1.0]。
   double get value => _controller?.value ?? _valueOffline;
   bool get isOpen => value >= 1.0 - 1e-6;
   bool get isClosed => value <= 1e-6;
@@ -39,17 +39,17 @@ class InteractiveDrawerController extends ChangeNotifier {
     return c;
   }
 
-  /// Open with fling-like motion (positive velocity).
+  /// 以类似快速滑动的方式打开（正速度）。
   Future<void> open({double velocity = 2.0}) async {
     _requireAttached().fling(velocity: velocity.abs());
   }
 
-  /// Close with fling-like motion (negative velocity).
+  /// 以类似快速滑动的方式关闭（负速度）。
   Future<void> close({double velocity = -2.0}) async {
     _requireAttached().fling(velocity: -velocity.abs());
   }
 
-  /// Toggle open/close with fling-like motion.
+  /// 以类似快速滑动的方式切换打开或关闭。
   Future<void> toggle({double velocity = 2.0}) async {
     if (isOpen) {
       await close(velocity: velocity);
@@ -58,7 +58,7 @@ class InteractiveDrawerController extends ChangeNotifier {
     }
   }
 
-  /// Animate to a specific progress.
+  /// 动画到指定进度。
   Future<void> animateTo(
     double target, {
     Duration duration = const Duration(milliseconds: 250),
@@ -72,7 +72,7 @@ class InteractiveDrawerController extends ChangeNotifier {
     );
   }
 
-  /// Jump to a specific progress without animation.
+  /// 无动画地跳转到指定进度。
   void jumpTo(double target) {
     assert(target >= 0.0 && target <= 1.0);
     if (_controller != null) {
@@ -84,9 +84,9 @@ class InteractiveDrawerController extends ChangeNotifier {
   }
 }
 
-/// Interactive drawer where:
-/// - child is full-screen draggable with in-child scrim
-/// - drawer slides in/out following the progress and is also draggable
+/// 交互式抽屉：
+/// - 子组件全屏可拖动，并在其内部显示遮罩
+/// - 抽屉跟随进度滑入或滑出，也可拖动
 class InteractiveDrawer extends StatefulWidget {
   const InteractiveDrawer({
     super.key,
@@ -107,50 +107,50 @@ class InteractiveDrawer extends StatefulWidget {
     this.onScrimTap,
   });
 
-  /// The main content; it will translate horizontally with the drawer progress.
+  /// 主内容；会随抽屉进度水平移动。
   final Widget child;
 
-  /// The drawer content with a fixed width.
+  /// 固定宽度的抽屉内容。
   final Widget drawer;
 
-  /// External controller. If null, an internal one is created.
+  /// 外部控制器。如果为 null，则创建内部控制器。
   final InteractiveDrawerController? controller;
 
-  /// Left or right side.
+  /// 左侧或右侧。
   final DrawerSide side;
 
-  /// Drawer width. Default: min(360, screenWidth * 0.86).
+  /// 抽屉宽度。默认：min(360, screenWidth * 0.86)。
   final double? drawerWidth;
 
-  /// Default duration for programmatic animations (not for drag).
+  /// 编程动画的默认时长（不适用于拖动）。
   final Duration duration;
 
-  /// Default curve for programmatic animations (drag is always linear).
+  /// 编程动画的默认曲线（拖动始终为线性）。
   final Curve curve;
 
-  /// Scrim base color (applied INSIDE the child only).
+  /// 遮罩基础色（仅应用于子组件内部）。
   final Color? scrimColor;
 
-  /// Maximum scrim opacity (0 ~ 1).
+  /// 最大遮罩不透明度（0 到 1）。
   final double maxScrimOpacity;
 
-  /// Tap on scrim to close.
+  /// 点击遮罩关闭。
   final bool barrierDismissible;
 
-  /// Whether tapping blank area inside the drawer closes it.
+  /// 点击抽屉内空白区域是否关闭抽屉。
   final bool enableDrawerTapToClose;
 
-  /// Tablet mode: persistent sidebar with slide+fade.
+  /// 平板模式：持续显示的侧边栏，带滑动和淡入效果。
   final bool tabletMode;
 
-  /// Material elevation for the drawer.
+  /// 抽屉的 Material 海拔。
   final double elevation;
 
-  /// A11y label.
+  /// 无障碍标签。
   final String? semanticLabel;
 
-  /// Optional callback fired when the user taps the right-side scrim
-  /// to dismiss the drawer (only when [barrierDismissible] and drawer is open).
+  /// 当用户点击右侧遮罩以关闭抽屉时触发的可选回调
+  /// （仅在 [barrierDismissible] 为 true 且抽屉打开时触发）。
   final VoidCallback? onScrimTap;
 
   @override
@@ -199,7 +199,7 @@ class _InteractiveDrawerState extends State<InteractiveDrawer>
     super.dispose();
   }
 
-  // -------- Shared drag handlers (used by both child and drawer) --------
+  // -------- 子组件和抽屉共用的拖动处理逻辑 --------
 
   void _onDragStart(DragStartDetails details) {
     _anim.stop();
@@ -209,26 +209,26 @@ class _InteractiveDrawerState extends State<InteractiveDrawer>
     if (_drawerWidth <= 0) return;
     final double deltaPx = details.primaryDelta ?? 0.0;
     final double signedDelta =
-        (_isLeft ? deltaPx : -deltaPx) / _drawerWidth; // positive => opening
+        (_isLeft ? deltaPx : -deltaPx) / _drawerWidth; // 正值表示打开
     _anim.value = (_anim.value + signedDelta).clamp(0.0, 1.0);
   }
 
   void _onDragEnd(DragEndDetails details) {
     if (_drawerWidth <= 0) return;
     final double vxPx = details.velocity.pixelsPerSecond.dx;
-    final double signedVxPx = _isLeft ? vxPx : -vxPx; // positive => opening
+    final double signedVxPx = _isLeft ? vxPx : -vxPx; // 正值表示打开
 
-    // Velocity-based fling if fast enough.
+    // 速度足够快时按速度执行快速滑动。
     if (signedVxPx.abs() >= _kMinFlingVelocityPxPerSec) {
       final double visualVelocity = (signedVxPx / _drawerWidth).clamp(
         -2.0,
         2.0,
-      ); // progress/sec
+      ); // 进度/秒
       _anim.fling(velocity: visualVelocity);
       return;
     }
 
-    // Otherwise settle to the nearest state.
+    // 否则回落到最近的状态。
     if (_anim.value >= 0.5) {
       _controllerProxy.open();
     } else {
@@ -236,10 +236,10 @@ class _InteractiveDrawerState extends State<InteractiveDrawer>
     }
   }
 
-  /// Draggable child with an in-child scrim (does not cover the drawer).
+  /// 可拖动的子组件，内部带遮罩（不会覆盖抽屉）。
   Widget _buildDraggableChild() {
     if (widget.tabletMode) {
-      // In tablet mode the child is static (no translation, no scrim).
+      // 平板模式下子组件保持静态（不位移，也没有遮罩）。
       return widget.child;
     }
     final double dx = (_isLeft ? 1 : -1) * _drawerWidth * _anim.value;
@@ -257,7 +257,7 @@ class _InteractiveDrawerState extends State<InteractiveDrawer>
         onHorizontalDragEnd: _onDragEnd,
         onTap: widget.barrierDismissible && _controllerProxy.isOpen
             ? () {
-                // Haptic or other side effects can be hooked by parent.
+                // 父组件可挂接触感或其他副作用。
                 widget.onScrimTap?.call();
                 _controllerProxy.close();
               }
@@ -270,8 +270,9 @@ class _InteractiveDrawerState extends State<InteractiveDrawer>
               IgnorePointer(
                 ignoring: !widget.barrierDismissible,
                 child: Container(
-                  color: (widget.scrimColor ?? Theme.of(context).colorScheme.scrim)
-                      .withValues(alpha: scrimOpacity),
+                  color:
+                      (widget.scrimColor ?? Theme.of(context).colorScheme.scrim)
+                          .withValues(alpha: scrimOpacity),
                 ),
               ),
           ],
@@ -280,11 +281,11 @@ class _InteractiveDrawerState extends State<InteractiveDrawer>
     );
   }
 
-  /// Draggable drawer that follows progress (slides from offscreen to edge).
+  /// 跟随进度的可拖动抽屉（从屏幕外滑动到边缘）。
   Widget _buildDraggableDrawer() {
     if (widget.tabletMode) {
-      // Slide + fade (width fixed to configured _drawerWidth). When closed: translated fully offscreen.
-      final targetWidth = _drawerWidth; // already resolved in build()
+      // 滑动加淡入（宽度固定为配置的 _drawerWidth）。关闭时完全移到屏幕外。
+      final targetWidth = _drawerWidth; // 在 build() 中已解析
       final double translateX =
           (_isLeft ? -1 : 1) * (1 - _anim.value) * targetWidth;
       final drawerBody = Material(
@@ -305,7 +306,7 @@ class _InteractiveDrawerState extends State<InteractiveDrawer>
             child: Transform.translate(
               offset: Offset(translateX, 0),
               child: IgnorePointer(
-                // Only interactive when sufficiently open.
+                // 只有在打开到足够程度时才可交互。
                 ignoring: _anim.value < 0.95,
                 child: drawerBody,
               ),
@@ -314,11 +315,10 @@ class _InteractiveDrawerState extends State<InteractiveDrawer>
         ),
       );
     }
-    // When closed (value=0), drawer is fully offscreen.
-    // It moves toward 0 offset as it opens.
+    // 关闭时（value=0），抽屉完全在屏幕外。
+    // 打开过程中它会向 0 偏移移动。
     final double hiddenOffset = _isLeft ? -_drawerWidth : _drawerWidth;
-    final double dx =
-        hiddenOffset * (1.0 - _anim.value); // 1->hidden, 0->onscreen
+    final double dx = hiddenOffset * (1.0 - _anim.value); // 1->隐藏，0->在屏幕上
 
     final drawerBody = Material(
       elevation: widget.elevation,
@@ -359,7 +359,7 @@ class _InteractiveDrawerState extends State<InteractiveDrawer>
       child: LayoutBuilder(
         builder: (context, constraints) {
           if (widget.tabletMode) {
-            _drawerWidth = widget.drawerWidth ?? 250.0; // tablet default 250
+            _drawerWidth = widget.drawerWidth ?? 250.0; // 平板默认 250
           } else {
             _drawerWidth =
                 widget.drawerWidth ??
@@ -378,7 +378,7 @@ class _InteractiveDrawerState extends State<InteractiveDrawer>
               animation: _anim,
               builder: (context, _) {
                 if (widget.tabletMode) {
-                  // Stack: main content with dynamic padding + sliding drawer on top alignment.
+                  // Stack：带动态 padding 的主内容，以及顶部对齐的滑动抽屉。
                   final sidePadding = _drawerWidth * _anim.value;
                   EdgeInsets mainPadding;
                   if (_isLeft) {
@@ -389,11 +389,11 @@ class _InteractiveDrawerState extends State<InteractiveDrawer>
                   return Stack(
                     fit: StackFit.expand,
                     children: [
-                      // Main content shifts via padding to make space as drawer reveals.
+                      // 抽屉显现时，主内容通过 padding 移动以腾出空间。
                       AnimatedContainer(
                         duration: const Duration(
                           milliseconds: 16,
-                        ), // near-frame for smoothness
+                        ), // 接近帧间隔以保证流畅度
                         curve: Curves.linear,
                         padding: mainPadding,
                         child: _buildDraggableChild(),

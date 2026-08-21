@@ -18,11 +18,10 @@ typedef _PreviousState = ({
   ValidatedRestoreCandidate candidate,
 });
 
-/// Reports that cutover failed and its compensating rollback also failed.
+/// 报告切换失败，并且其补偿性回滚也失败了。
 ///
-/// The original objects and stack traces remain available for diagnostics,
-/// while [toString] exposes only error types so propagating this exception
-/// cannot accidentally include paths or persisted values.
+/// 原始对象和堆栈跟踪仍可用于诊断，而 [toString] 只暴露错误类型，
+/// 这样传播此异常时不会意外包含路径或持久化值。
 final class RestoreCutoverRollbackException extends StateError {
   RestoreCutoverRollbackException({
     required this.cutoverError,
@@ -43,8 +42,8 @@ final class RestoreCutoverRollbackException extends StateError {
       'rollbackError: ${rollbackError.runtimeType})';
 }
 
-/// Converges one published restore run while the startup workspace lock is
-/// held and no business persistence has been opened.
+/// 在启动工作区锁被持有、且尚未打开任何业务持久化时，
+/// 收敛一次已发布的恢复运行。
 final class RestoreCutoverExecutor {
   factory RestoreCutoverExecutor({
     required Directory appDataDirectory,
@@ -208,10 +207,9 @@ final class RestoreCutoverExecutor {
     }
   }
 
-  /// Re-converges a terminal run before its evidence leaves active admission.
-  /// A committed run is never rolled back here: any unexplained divergence
-  /// remains fail-closed. A rolled-back run may repeat its idempotent reverse
-  /// moves so an interrupted terminal barrier cannot expose mixed state.
+  /// 在终态运行的证据离开活动准入之前重新收敛它。已提交的运行在这里绝不
+  /// 回滚：任何无法解释的分歧都保持失败关闭。已回滚的运行可以重复其幂等
+  /// 反向移动，这样被中断的终态屏障不会暴露混合状态。
   Future<RestoreReceipt> revalidateTerminalWhileWorkspaceLocked(
     RestoreReceipt terminalReceipt,
   ) async {

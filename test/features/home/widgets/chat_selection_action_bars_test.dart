@@ -56,8 +56,8 @@ void main() {
     expect(find.text('MD'), findsOneWidget);
     expect(find.text('Image'), findsOneWidget);
     expect(find.text('Delete Selected'), findsNothing);
-    expect(find.text('Delete This Version'), findsNothing);
-    expect(find.text('Delete All Versions'), findsNothing);
+    expect(find.text('Delete Message'), findsNothing);
+    expect(find.text('Delete Branch'), findsNothing);
   });
 
   testWidgets('删除栏在单版本选择时只展示普通删除', (tester) async {
@@ -78,8 +78,8 @@ void main() {
     );
 
     expect(find.text('Delete'), findsOneWidget);
-    expect(find.text('Delete This Version'), findsNothing);
-    expect(find.text('Delete All Versions'), findsNothing);
+    expect(find.text('Delete Message'), findsNothing);
+    expect(find.text('Delete Branch'), findsNothing);
     expect(tester.getSize(find.byType(IosCardPress)).width, closeTo(396, 0.1));
     expect(
       tester.widget<Text>(find.text('Delete')).style?.fontWeight,
@@ -108,11 +108,11 @@ void main() {
       ),
     );
 
-    expect(find.text('Delete This Version'), findsOneWidget);
-    expect(find.text('Delete All Versions'), findsOneWidget);
+    expect(find.text('Delete Message'), findsOneWidget);
+    expect(find.text('Delete Branch'), findsOneWidget);
 
-    await tester.tap(find.text('Delete This Version'));
-    await tester.tap(find.text('Delete All Versions'));
+    await tester.tap(find.text('Delete Message'));
+    await tester.tap(find.text('Delete Branch'));
 
     expect(currentVersionDeletes, 1);
     expect(allVersionDeletes, 1);

@@ -36,7 +36,7 @@ class DesktopBackupPane extends StatefulWidget {
 }
 
 class _DesktopBackupPaneState extends State<DesktopBackupPane> {
-  // Local form controllers
+  // 本地表单控制器
   late TextEditingController _url;
   late TextEditingController _username;
   late TextEditingController _password;
@@ -223,11 +223,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
       await action(mode);
     } catch (e) {
       if (!rootCtx.mounted) return;
-      showAppSnackBar(
-        rootCtx,
-        message: backupRestoreErrorMessage(AppLocalizations.of(rootCtx)!, e),
-        type: NotificationType.error,
-      );
+      showBackupRestoreErrorSnackBar(rootCtx, e);
       return;
     }
     if (!rootCtx.mounted) return;
@@ -237,7 +233,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     );
   }
 
-  Future<void> _exportLocalBackup(BuildContext context) async {
+  Future<void> _exportLocalBackup(
+    BuildContext context, {
+    bool kelivoCompatible = false,
+  }) async {
     final l10n = AppLocalizations.of(context)!;
     final backupProvider = context.read<BackupProvider>();
     File? file;
@@ -248,15 +247,19 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
       await runWithLoadingTaskDialog<void>(
         context: context,
         label: l10n.backupPageExporting,
-        task: () async {
-          file = await backupProvider.exportToFile();
+        task: (onProgress) async {
+          file = kelivoCompatible
+              ? await backupProvider.exportKelivoBackupToFile()
+              : await backupProvider.exportToFile(onProgress: onProgress);
           if (!context.mounted) return;
           final exportFile = file!;
           final savePath = await FilePicker.platform.saveFile(
-            dialogTitle: l10n.backupPageExportKelivoBackup,
+            dialogTitle: kelivoCompatible
+                ? l10n.backupPageExportKelivoBackup
+                : l10n.backupPageLocalBackupAction,
             fileName: exportFile.uri.pathSegments.last,
             type: FileType.custom,
-            allowedExtensions: ['zip'],
+            allowedExtensions: [kelivoCompatible ? 'zip' : 'joaiclient'],
           );
           if (savePath == null) return;
 
@@ -279,6 +282,31 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     } finally {
       await DataSync.cleanupTemporaryBackupFile(file);
     }
+  }
+
+  Future<void> _restoreLocalBackup(
+    BuildContext context, {
+    bool kelivoCompatible = false,
+  }) async {
+    final backupProvider = context.read<BackupProvider>();
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: [kelivoCompatible ? 'zip' : 'joaiclient'],
+      allowMultiple: false,
+    );
+    final path = result?.files.single.path;
+    if (path == null) return;
+    final file = File(path);
+    await _chooseRestoreModeAndRun((mode) async {
+      await runWithLoadingTaskDialog<void>(
+        context: context,
+        task: (onProgress) => backupProvider.restoreFromLocalFile(
+          file,
+          mode: mode,
+          onProgress: onProgress,
+        ),
+      );
+    });
   }
 
   Future<void> _openUserDataDirectory() async {
@@ -313,7 +341,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
           constraints: const BoxConstraints(maxWidth: 960),
           child: CustomScrollView(
             slivers: [
-              // Title row
+              // 标题行
               SliverToBoxAdapter(
                 child: SizedBox(
                   height: 36,
@@ -348,7 +376,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 6)),
 
-              // Backup management (applies to WebDAV and local import/export)
+              // 备份管理（适用于 WebDAV 和本地导入或导出）
               SliverToBoxAdapter(
                 child: _sectionCard(
                   children: [
@@ -455,7 +483,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
-              // WebDAV settings card with left label right input, realtime save
+              // WebDAV 设置卡片：左侧标签、右侧输入、实时保存
               SliverToBoxAdapter(
                 child: _sectionCard(
                   children: [
@@ -662,7 +690,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
-              // S3 settings card with left label right input, realtime save
+              // S3 设置卡片：左侧标签、右侧输入、实时保存
               SliverToBoxAdapter(
                 child: _sectionCard(
                   children: [
@@ -961,32 +989,30 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
             runSpacing: 6,
             children: [
               _DeskIosButton(
-                label: l10n.backupPageExportKelivoBackup,
+                label: l10n.backupPageLocalBackupAction,
                 filled: false,
                 dense: true,
                 onTap: () => _exportLocalBackup(context),
               ),
               _DeskIosButton(
+                label: l10n.backupPageRestore,
+                filled: false,
+                dense: true,
+                onTap: () => _restoreLocalBackup(context),
+              ),
+              _DeskIosButton(
+                label: l10n.backupPageExportKelivoBackup,
+                filled: false,
+                dense: true,
+                onTap: () =>
+                    _exportLocalBackup(context, kelivoCompatible: true),
+              ),
+              _DeskIosButton(
                 label: l10n.backupPageImportKelivoBackup,
                 filled: false,
                 dense: true,
-                onTap: () async {
-                  final backupProvider = context.read<BackupProvider>();
-                  final result = await FilePicker.platform.pickFiles(
-                    type: FileType.any,
-                    allowMultiple: false,
-                  );
-                  final path = result?.files.single.path;
-                  if (path == null) return;
-                  final f = File(path);
-                  await _chooseRestoreModeAndRun((mode) async {
-                    await runWithLoadingTaskDialog<void>(
-                      context: context,
-                      task: () =>
-                          backupProvider.restoreFromLocalFile(f, mode: mode),
-                    );
-                  });
-                },
+                onTap: () =>
+                    _restoreLocalBackup(context, kelivoCompatible: true),
               ),
               _DeskIosButton(
                 label: l10n.backupPageImportFromCherryStudio,
@@ -1509,7 +1535,7 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
     setState(() => _loading = true);
     try {
       final list = await widget.listRemote();
-      // Sort by newest first (desc by lastModified), mimic mobile behavior
+      // 按最新优先排序（按 lastModified 降序），与移动端行为保持一致
       list.sort((a, b) {
         final aTime = a.lastModified;
         final bTime = b.lastModified;
@@ -1517,7 +1543,7 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
         if (aTime == null && bTime == null) {
           return b.displayName.compareTo(a.displayName);
         }
-        if (aTime == null) return 1; // items with time go first
+        if (aTime == null) return 1; // 带时间的项排在前面
         return -1;
       });
       if (mounted) {
@@ -1539,8 +1565,7 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
   Future<void> _chooseRestoreModeAndRun(
     Future<void> Function(RestoreMode) action,
   ) async {
-    // Use a stable context so we can still show a restart prompt even if this
-    // dialog is closed while the restore task is running.
+    // 使用稳定 context，即使恢复任务运行期间此对话框已关闭，仍能显示重启提示。
     final rootCtx = Navigator.of(context, rootNavigator: true).context;
     final mode = await showDialog<RestoreMode>(
       context: context,
@@ -1552,11 +1577,7 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
       await action(mode);
     } catch (e) {
       if (!rootCtx.mounted) return;
-      showAppSnackBar(
-        rootCtx,
-        message: backupRestoreErrorMessage(AppLocalizations.of(rootCtx)!, e),
-        type: NotificationType.error,
-      );
+      showBackupRestoreErrorSnackBar(rootCtx, e);
       return;
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -1677,9 +1698,7 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
                                 );
                                 if (confirm != true) return;
 
-                                setState(
-                                  () => _loading = true,
-                                ); // Show loading inside dialog
+                                setState(() => _loading = true); // 在对话框内显示加载状态
                                 try {
                                   final next = await widget.deleteAndReload(it);
                                   next.sort((a, b) {
@@ -2040,7 +2059,7 @@ Widget _sectionCard({required List<Widget> children}) {
 }
 
 InputDecoration _deskInputDecoration(BuildContext context) {
-  // Match provider dialog style (compact), but slightly shorter height and 14px font hint
+  // 匹配供应商对话框的紧凑样式，但高度略低，并使用 14px 字体提示
   final cs = Theme.of(context).colorScheme;
   return InputDecoration(
     isDense: true,

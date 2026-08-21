@@ -1,13 +1,13 @@
-/// Memory prompt language for model-facing contracts (not UI l10n / ARB).
+/// 模型面向契约的提示词语言（非 UI 国际化 / ARB）。
 enum MemoryPromptLang { zh, en }
 
-/// Built-in default prompt templates and pure time helpers for the memory system.
+/// 内置默认提示模板和纯时间辅助器用于内存系统。
 ///
-/// These strings are model contracts and must NOT go through ARB (§16.2).
+/// 这些字符串是模型契约，不得通过ARB（§16.2）。
 abstract final class MemoryPrompts {
   MemoryPrompts._();
 
-  // ── §11.2 / §11.3 memory rules ───────────────────────────────────────────
+  // ── §11.2 / §11.3 记忆规则 ──────────────────────────────────────────────
 
   static final String rulesZh =
       '''
@@ -57,15 +57,15 @@ When the user says an entry is wrong, use memory_edit to fix it or memory_delete
 '''
           .trim();
 
-  /// Appended to [rulesZh] when `allowPastConversationRecall` is on.
+  /// 当允许过去对话召回时，在 [rulesZh] 中附加。
   static const String rulesPastConversationRecallZh =
       '需要回忆之前聊过的内容时，用 chat_search 按关键词搜索历史对话，不要凭印象作答。';
 
-  /// Appended to [rulesEn] when `allowPastConversationRecall` is on.
+  /// 当允许过去对话召回时，在 [rulesEn] 中附加。
   static const String rulesPastConversationRecallEn =
       'When you need to recall something discussed before, use chat_search to search past conversations by keyword. Do not answer from impression.';
 
-  // ── §12.4 Gatekeeper ─────────────────────────────────────────────────────
+  // ── §12.4 门卫 ──────────────────────────────────────────────────────────
 
   static final String gateZh =
       '''
@@ -101,7 +101,7 @@ Output format (follow this XML exactly, no extra text):
 '''
           .trim();
 
-  // ── §12.5 Extract ────────────────────────────────────────────────────────
+  // ── §12.5 提取 ─────────────────────────────────────────────────────────
 
   static final String extractZh =
       '''
@@ -171,14 +171,14 @@ If there is nothing worth extracting:
 '''
           .trim();
 
-  /// Appended under Extract rules when write scope is `toolDefault*`.
+  /// 在编写时，当写范围设置为`toolDefault*`时。
   static const String extractToolDefaultScopeRuleZh =
       '- 只对当前助手成立的信息，在 item 上加 scope="assistant"；对所有场景都成立的加 scope="global" 或省略';
 
   static const String extractToolDefaultScopeRuleEn =
       '- For information that only applies to the current assistant, add scope="assistant" on the item; for information that applies everywhere, add scope="global" or omit it';
 
-  // ── §12.6 Smart Add (per-item) ───────────────────────────────────────────
+  // ── §12.6 智能添加（逐项） ─────────────────────────────────────────────
 
   static final String smartAddZh =
       '''
@@ -228,7 +228,7 @@ Output JSON only, no explanation:
 '''
           .trim();
 
-  // ── §12.6 Smart Add (batched) ────────────────────────────────────────────
+  // ── §12.6 智能添加（批量） ──────────────────────────────────────────────
 
   static final String smartAddBatchZh =
       '''
@@ -276,7 +276,7 @@ Output JSON only, no explanation:
 '''
           .trim();
 
-  // ── §12.7 Profile Distiller ──────────────────────────────────────────────
+  // ── §12.7 档案蒸馏 ────────────────────────────────────────────────────
 
   static final String profileDistillZh =
       '''
@@ -324,7 +324,7 @@ Output JSON only, no explanation:
 '''
           .trim();
 
-  // ── §7.5 injection intros ────────────────────────────────────────────────
+  // ── §7.5 注入开场语 ─────────────────────────────────────────────────────
 
   static const String introFullZh = '以下内容由系统提供，不是用户本轮发送的内容。';
   static const String introFullEn =
@@ -333,13 +333,13 @@ Output JSON only, no explanation:
   static const String introUpdateEn =
       'The following memory changes happened after this conversation started, provided by the system.';
 
-  // ── §7.2 moreHint ────────────────────────────────────────────────────────
+  // ── §7.2 更多提示 ──────────────────────────────────────────────────────
 
   static const String moreHintZh = '[更多内容请使用 memory_search_profile 查询]';
   static const String moreHintEn =
       '[More entries exist. Use memory_search_profile to look them up.]';
 
-  // ── §9.1 / §9.3 time helpers ─────────────────────────────────────────────
+  // ── §9.1 / §9.3 时间辅助函数 ───────────────────────────────────────────
 
   static const List<String> _weekdayAbbrev = [
     'Mon',
@@ -351,8 +351,8 @@ Output JSON only, no explanation:
     'Sun',
   ];
 
-  /// Wraps [timestamp] as `<current_time>EEE yy-MM-dd HH:mm:ss</current_time>`
-  /// in the local timezone, without a UTC offset (§9.1).
+  /// 将时间戳包裹在 `<当前时间>EEEE 年 MM 月 DD 日 HH:MM:SS</当前时间>` 中
+  /// 在本地时区，无UTC偏移量（§9.1）。
   static String formatCurrentTimeTag(DateTime timestamp) {
     final local = timestamp.isUtc ? timestamp.toLocal() : timestamp;
     final eee = _weekdayAbbrev[local.weekday - 1];
@@ -365,8 +365,8 @@ Output JSON only, no explanation:
     return '<current_time>$eee $yy-$mm-$dd $hh:$min:$ss</current_time>';
   }
 
-  /// Returns which of `{cur_date}`, `{cur_time}`, `{cur_datetime}` occur in
-  /// [systemPrompt], in that fixed order. `{timezone}` etc. are ignored (§9.3).
+  /// 返回哪些日期、时间和时间戳在
+  /// 在固定顺序中，`{timezone}` 等变量被忽略（§9.3）。
   static List<String> detectTimeVariablesInSystemPrompt(String systemPrompt) {
     const candidates = ['{cur_date}', '{cur_time}', '{cur_datetime}'];
     return [

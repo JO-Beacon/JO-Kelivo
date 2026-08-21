@@ -5,25 +5,25 @@ import 'package:flutter/foundation.dart';
 
 import '../../models/assistant.dart';
 
-/// What caused a background memory run to start.
+/// 触发后台记忆运行的原因。
 enum MemoryTraceTrigger {
-  /// Automatic organize after the assistant's turn threshold was reached.
+  /// 助手轮次达到阈值后自动整理。
   autoTurns,
 
-  /// User pressed "organize now".
+  /// 用户点击“立即整理”。
   manual,
 
-  /// A model tool call (`memory_*` / `chat_search`).
+  /// 模型工具调用（`memory_*` / `chat_search`）。
   toolCall,
 
-  /// Background conversation summary generation (feeds past-conversation recall).
+  /// 后台会话摘要生成（用于过往会话回忆）。
   conversationSummary,
 }
 
-/// Whether the run wrote into assistant-scoped or global memory.
+/// 本次运行写入的是助手作用域还是全局记忆。
 enum MemoryTraceScope { assistant, global }
 
-/// Map an assistant write policy onto the scope label shown in a trace.
+/// 将助手写入策略映射为 trace 中显示的作用域标签。
 MemoryTraceScope memoryTraceScopeOf(MemoryWriteScope scope) {
   switch (scope) {
     case MemoryWriteScope.alwaysGlobal:
@@ -35,7 +35,7 @@ MemoryTraceScope memoryTraceScopeOf(MemoryWriteScope scope) {
   }
 }
 
-/// One stage of background memory work.
+/// 后台记忆工作的一个阶段。
 enum MemoryTraceStepKind {
   gatekeeper,
   extract,
@@ -48,7 +48,7 @@ enum MemoryTraceStepKind {
 
 enum MemoryTraceStepStatus { running, skipped, success, failed }
 
-/// A concrete change the run applied to stored state.
+/// 本次运行对存储状态应用的具体变更。
 enum MemoryTraceMutationKind {
   memoryCreated,
   memoryMerged,
@@ -71,23 +71,23 @@ class MemoryTraceMutation {
 
   final MemoryTraceMutationKind kind;
 
-  /// Memory entry id / profile field key / conversation id.
+  /// 记忆条目 id / profile 字段键 / 会话 id。
   final String? targetId;
 
-  /// Extra qualifier such as the memory type or the scope.
+  /// 额外限定信息，例如记忆类型或作用域。
   final String? label;
 
   final String? before;
   final String? after;
 }
 
-/// One recorded pipeline stage, with everything needed to debug it.
+/// 一个已记录的流水线阶段，包含调试所需的全部信息。
 class MemoryTraceStep {
   MemoryTraceStep({required this.kind, required this.startedAt, this.label});
 
   final MemoryTraceStepKind kind;
 
-  /// Free-form qualifier, e.g. the tool name for [MemoryTraceStepKind.memoryTool].
+  /// 自由格式限定信息，例如 [MemoryTraceStepKind.memoryTool] 的工具名。
   final String? label;
 
   final DateTime startedAt;
@@ -95,13 +95,13 @@ class MemoryTraceStep {
 
   MemoryTraceStepStatus status = MemoryTraceStepStatus.running;
 
-  /// Exact prompt(s) sent to the model. Multiple calls are appended in order.
+  /// 发送给模型的精确 prompt。多次调用按顺序追加。
   String get prompt => _prompt.toString();
 
-  /// Raw model response(s), in the same order as [prompt].
+  /// 模型的原始响应，顺序与 [prompt] 一致。
   String get rawResponse => _rawResponse.toString();
 
-  /// Human-readable parsed result (JSON when structured).
+  /// 人类可读的解析结果（结构化时为 JSON）。
   String? parsedResult;
 
   String? error;
@@ -148,7 +148,7 @@ class MemoryTraceStep {
   }
 }
 
-/// Everything that happened for one background memory trigger.
+/// 单次后台记忆触发所发生的全部事件。
 class MemoryTrace {
   MemoryTrace({
     required this.id,
@@ -175,11 +175,11 @@ class MemoryTrace {
   final String? conversationId;
   final String? conversationTitle;
 
-  /// Null for runs that are not bound to an assistant.
+  /// 未绑定助手的运行为 null。
   final String? assistantId;
   final String? assistantName;
 
-  /// Watermark (message order) the run started from.
+  /// 本次运行起始的水位线（消息顺序）。
   int? watermark;
   int? windowStartOrder;
   int? windowEndOrder;
@@ -190,17 +190,17 @@ class MemoryTrace {
   bool advanced = false;
   bool forcedAdvance = false;
 
-  /// Pipeline error / skip reason code, e.g. `below_threshold`.
+  /// 流水线错误 / 跳过原因码，例如 `below_threshold`。
   String? error;
 
-  /// How many identical consecutive no-op triggers this entry stands for.
+  /// 本条目代表的相同连续空操作触发次数。
   int repeatCount = 1;
 
   Duration? get duration => endedAt?.difference(startedAt);
 
   bool get hasError => (error ?? '').isNotEmpty;
 
-  /// A trigger that never reached the model (gating / threshold checks).
+  /// 从未到达模型的触发（门控 / 阈值检查）。
   bool get isNoOp => steps.isEmpty;
 
   int get mutationCount {
@@ -212,10 +212,10 @@ class MemoryTrace {
   }
 }
 
-/// Live handle used by the pipeline to fill in a trace.
+/// 流水线用于填充 trace 的活跃句柄。
 ///
-/// Every method swallows its own failures: observability must never break the
-/// pipeline.
+/// 每个方法都会吞掉自身失败：可观测性绝不能破坏
+/// 流水线。
 class MemoryTraceHandle {
   MemoryTraceHandle(this._recorder, this.trace);
 
@@ -246,7 +246,7 @@ class MemoryTraceHandle {
     } catch (_) {}
   }
 
-  /// Finalize the outcome and publish the trace.
+  /// 结束结果并发布 trace。
   void commit({
     bool advanced = false,
     bool forcedAdvance = false,
@@ -269,18 +269,18 @@ class MemoryTraceHandle {
   }
 }
 
-/// In-memory ring buffer of recent background memory traces.
+/// 近期后台记忆 trace 的内存环形缓冲。
 ///
-/// Traces hold full prompts and raw responses, so they are large: a single
-/// organize run can carry ~5 prompts built from a 12 KB conversation window
-/// plus their responses (~100 KB worst case). [maxTraces] is therefore kept at
-/// 24 — roughly a working session's worth of runs, bounded at a couple of MB —
-/// and nothing is ever persisted.
+/// trace 持有完整 prompt 和原始响应，因此体积很大：单次
+/// 整理运行可能携带约 5 个由 12 KB 会话窗口构建的 prompt，
+/// 加上它们的响应（最差约 100 KB）。因此 [maxTraces] 保持在
+/// 24——约一个工作会话的运行量、上限两三 MB——
+/// 且不进行任何持久化。
 class MemoryTraceRecorder extends ChangeNotifier {
-  /// [_enabled] mirrors the user preference; pass false to start suppressed.
+  /// [_enabled] 镜像用户偏好；传入 false 以初始即抑制。
   MemoryTraceRecorder([this._enabled = true]);
 
-  /// Process-wide recorder used by the pipeline and the viewer page.
+  /// 流水线与查看页面使用的进程级记录器。
   static final MemoryTraceRecorder instance = MemoryTraceRecorder();
 
   static const int maxTraces = 24;
@@ -291,7 +291,7 @@ class MemoryTraceRecorder extends ChangeNotifier {
 
   bool get enabled => _enabled;
 
-  /// Newest first.
+  /// 最新的在前。
   List<MemoryTrace> get traces =>
       List<MemoryTrace>.unmodifiable(_traces.toList().reversed);
 
@@ -312,7 +312,7 @@ class MemoryTraceRecorder extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Start a trace, or return null when recording is off.
+  /// 启动一个 trace，录制关闭时返回 null。
   MemoryTraceHandle? begin({
     required MemoryTraceTrigger trigger,
     required MemoryTraceScope scope,
@@ -336,12 +336,12 @@ class MemoryTraceRecorder extends ChangeNotifier {
     return MemoryTraceHandle(this, trace);
   }
 
-  /// Store a finished trace. Called by [MemoryTraceHandle.commit].
+  /// 存储已完成的 trace。由 [MemoryTraceHandle.commit] 调用。
   @visibleForTesting
   void publish(MemoryTrace trace) {
     if (!_enabled) return;
-    // Coalesce repeated no-op triggers (e.g. "below_threshold" after every
-    // turn) so they cannot push real runs out of the buffer.
+    // 合并重复的空操作触发（例如每轮后的 "below_threshold"），
+    // 使其不会把真实运行挤出缓冲区。
     final newest = _traces.isEmpty ? null : _traces.last;
     if (newest != null &&
         trace.isNoOp &&

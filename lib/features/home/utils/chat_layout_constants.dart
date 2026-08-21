@@ -1,15 +1,14 @@
-/// Shared layout constants for the Home chat UI (desktop/tablet).
+/// 首页聊天 UI（桌面或平板）共享布局常量。
 class ChatLayoutConstants {
-  /// Max readable width for the chat message list area.
+  /// 聊天消息列表区域的最大可读宽度。
   static const double maxContentWidth = 860.0;
 
-  /// Max width for the chat input bar area.
+  /// 聊天输入栏区域的最大宽度。
   static const double maxInputWidth = 860.0;
 
-  /// How long a deleted message fades out and collapses before its slot is
-  /// actually removed from the timeline. The controller waits this long
-  /// between flagging the slot and performing the deletion, so the widget
-  /// animation and the data mutation stay in lockstep.
+  /// 已删除消息在真正从时间线移除前，淡出并折叠所需的时间。
+  /// 控制器在标记插槽和实际删除之间等待此时长，
+  /// 使 widget 动画和数据变更保持同步。
   static const Duration slotRemovalAnimationDuration = Duration(
     milliseconds: 240,
   );

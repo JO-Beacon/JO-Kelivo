@@ -49,7 +49,7 @@ class AssistantProvider extends ChangeNotifier {
       _assistants
         ..clear()
         ..addAll(_decodeAssistants(raw));
-      // Fix any sandboxed local paths (avatars/backgrounds) imported from other platforms
+      // 修复从其他平台导入的沙盒本地路径（头像/背景）
       bool changed = false;
       for (int i = 0; i < _assistants.length; i++) {
         final a = _assistants[i];
@@ -88,9 +88,9 @@ class AssistantProvider extends ChangeNotifier {
         } catch (_) {}
       }
     }
-    // Do not create defaults here because localization is not available.
-    // Defaults will be ensured later via ensureDefaults(context).
-    // Restore current assistant if present
+    // 不要在此处创建默认值，因为本地化尚不可用。
+    // 默认值将在稍后通过 ensureDefaults(context) 确保。
+    // 如果存在当前助手则恢复
     final savedValue = preferences.get(_currentAssistantKey);
     final savedId = savedValue is String ? savedValue : null;
     if (savedId != null && _assistants.any((a) => a.id == savedId)) {
@@ -123,7 +123,7 @@ class AssistantProvider extends ChangeNotifier {
     limitContextMessages: false,
   );
 
-  // Ensure localized default assistants exist; call this after localization is ready.
+  // 确保本地化默认助手存在；请在本地化就绪后调用此方法。
   Future<void> ensureDefaults(dynamic context) async {
     await loaded;
     if (_assistants.isNotEmpty) return;
@@ -144,7 +144,7 @@ class AssistantProvider extends ChangeNotifier {
       ),
     );
     await _persist();
-    // Set current assistant if not set
+    // 若当前助手未设置，则进行设置
     if (_currentAssistantId == null && _assistants.isNotEmpty) {
       _currentAssistantId = _assistants.first.id;
       await preferences.setString(_currentAssistantKey, _currentAssistantId!);
@@ -289,7 +289,7 @@ class AssistantProvider extends ChangeNotifier {
     return _assistants[idx];
   }
 
-  // Lightweight accessor so callers don't depend on Assistant.presetMessages symbol
+  // 轻量级访问器，使调用方无需依赖 Assistant.presetMessages 符号
   List<Map<String, String>> getPresetMessagesForAssistant(String? assistantId) {
     Assistant? a;
     if (assistantId != null) {
@@ -427,14 +427,14 @@ class AssistantProvider extends ChangeNotifier {
         }
       }
 
-      // Prefetch URL avatar to allow offline display later
+      // 预取 URL 头像，以便稍后可离线显示
       if (changed && raw.startsWith('http')) {
         try {
           await AvatarCache.getPath(raw);
         } catch (_) {}
       }
 
-      // Handle background persistence similar to avatar, but under images/
+      // 处理背景持久化，方式与头像类似，但位于 images/ 下
       final bgRaw = (updated.background ?? '').trim();
       final prevBgRaw = (prev.background ?? '').trim();
       final bgChanged = bgRaw != prevBgRaw;
@@ -461,7 +461,7 @@ class AssistantProvider extends ChangeNotifier {
         }
       }
     } catch (_) {
-      // On any failure, fall back to the provided value unchanged.
+      // 任何失败时，原样回退到提供的值。
     }
 
     _assistants[idx] = next;
@@ -495,7 +495,7 @@ class AssistantProvider extends ChangeNotifier {
   Future<bool> deleteAssistant(String id) async {
     final idx = _assistants.indexWhere((a) => a.id == id);
     if (idx == -1) return false;
-    // Do not allow deleting the last remaining assistant
+    // 不允许删除最后一个剩余的助手
     if (_assistants.length <= 1) return false;
 
     await chatService?.deleteConversationsForAssistant(id);
@@ -525,15 +525,15 @@ class AssistantProvider extends ChangeNotifier {
     final assistant = _assistants.removeAt(oldIndex);
     _assistants.insert(newIndex, assistant);
 
-    // Notify listeners immediately for smooth UI update
+    // 立即通知监听器，以便 UI 平滑更新
     notifyListeners();
 
-    // Then persist the changes
+    // 然后持久化更改
     await _persist();
   }
 
-  // Reorder only within a subset (e.g., assistants belonging to a tag group or ungrouped).
-  // subsetIds defines the set and order boundary; other assistants remain in place.
+  // 仅在子集内重新排序（例如属于某个标签组或未分组的助手）。
+  // subsetIds 定义集合与顺序边界；其他助手保持原位。
   Future<void> reorderAssistantsWithin({
     required List<String> subsetIds,
     required int oldIndex,
@@ -542,7 +542,7 @@ class AssistantProvider extends ChangeNotifier {
     if (oldIndex == newIndex) return;
     if (subsetIds.isEmpty) return;
 
-    // Build subset indices in the master list preserving current order
+    // 在主列表中构建子集索引，同时保留当前顺序
     final idSet = subsetIds.toSet();
     final subsetIndices = <int>[];
     for (int i = 0; i < _assistants.length; i++) {
@@ -552,14 +552,14 @@ class AssistantProvider extends ChangeNotifier {
     if (oldIndex < 0 || oldIndex >= subsetIndices.length) return;
     if (newIndex < 0 || newIndex >= subsetIndices.length) return;
 
-    // Extract subset in current order
+    // 按当前顺序提取子集
     final subset = subsetIndices
         .map((i) => _assistants[i])
         .toList(growable: true);
     final moved = subset.removeAt(oldIndex);
     subset.insert(newIndex, moved);
 
-    // Merge back into master list
+    // 合并回主列表
     final merged = <Assistant>[];
     int take = 0;
     for (int i = 0; i < _assistants.length; i++) {

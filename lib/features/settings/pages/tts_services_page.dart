@@ -83,7 +83,7 @@ class TtsServicesPage extends StatelessWidget {
               ),
               _iosSectionCard(
                 children: [
-                  // System TTS as first row
+                  // 系统 TTS 作为第一行
                   _TactileRow(
                     pressedScale: 0.98,
                     haptics: false,
@@ -169,7 +169,7 @@ class TtsServicesPage extends StatelessWidget {
                                   enabled: available,
                                 ),
                                 const SizedBox(width: 8),
-                                // right indicator: show check only when selected
+                                // 右侧指示器：仅选中时显示对勾
                                 Builder(
                                   builder: (_) {
                                     final sp2 = context
@@ -205,7 +205,7 @@ class TtsServicesPage extends StatelessWidget {
   }
 }
 
-// --- iOS-style widgets and helpers ---
+// --- iOS 风格组件和辅助函数 ---
 
 Widget _header(BuildContext context, String text, {bool first = false}) {
   final cs = Theme.of(context).colorScheme;
@@ -765,7 +765,7 @@ void _showMobileErrorDetails(BuildContext context, String message) {
   );
 }
 
-// Removed selected tag; background highlight indicates selection
+// 已移除选中标签；背景高亮表示选中状态
 
 Future<TtsServiceOptions?> _showAddNetworkTtsSheet(BuildContext context) =>
     _showNetworkTtsEditorPage(context, null);
@@ -1924,7 +1924,7 @@ Future<void> _showSystemTtsConfig(BuildContext context) async {
                 ),
               ),
               const SizedBox(height: 10),
-              // Engine selector
+              // 引擎选择器
               FutureBuilder<List<String>>(
                 future: tts.listEngines(),
                 builder: (context, snap) {
@@ -1944,7 +1944,7 @@ Future<void> _showSystemTtsConfig(BuildContext context) async {
                 },
               ),
               const SizedBox(height: 4),
-              // Language selector
+              // 语言选择器
               FutureBuilder<List<String>>(
                 future: tts.listLanguages(),
                 builder: (context, snap) {
@@ -1982,7 +1982,7 @@ Future<void> _showSystemTtsConfig(BuildContext context) async {
                 max: 1.0,
                 onChanged: (v) {
                   rate = v;
-                  // Rebuild this bottom sheet
+                  // 重建此底部弹层
                   (ctx as Element).markNeedsBuild();
                 },
                 onChangeEnd: (v) async {
@@ -2113,7 +2113,7 @@ Widget _sheetSelectRow(
   );
 }
 
-// Bottom sheet iOS-style option
+// 底部弹层 iOS 风格选项
 Widget _sheetOption(
   BuildContext context, {
   required String label,
@@ -2338,7 +2338,7 @@ String _voiceLabelFor(NetworkTtsKind k, AppLocalizations l10n) {
     case NetworkTtsKind.openai:
       return l10n.ttsServicesFieldVoiceLabel;
     case NetworkTtsKind.gemini:
-      return l10n.ttsServicesFieldVoiceLabel; // same label
+      return l10n.ttsServicesFieldVoiceLabel; // 相同标签
     case NetworkTtsKind.azure:
       return l10n.ttsServicesFieldVoiceLabel;
     case NetworkTtsKind.minimax:

@@ -4,18 +4,18 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// Platform-specific application data directory utilities.
+/// 平台相关的应用数据目录工具。
 ///
-/// - Windows/macOS/Linux: use the Application Support (app data) directory
-///   provided by `path_provider`.
-/// - Android/iOS: keep using the Application Documents directory.
+/// - Windows/macOS/Linux：使用 `path_provider` 提供的 Application Support
+///   （应用数据）目录。
+/// - Android/iOS：继续使用 Application Documents 目录。
 class AppDirectories {
   AppDirectories._();
 
-  /// Gets the root directory for application data storage.
+  /// 获取应用数据存储的根目录。
   ///
-  /// - Windows/macOS/Linux: Application Support directory
-  /// - Android/iOS: Application Documents directory
+  /// - Windows/macOS/Linux：Application Support 目录
+  /// - Android/iOS：Application Documents 目录
   static Future<Directory> getAppDataDirectory() async {
     switch (defaultTargetPlatform) {
       case TargetPlatform.windows:
@@ -29,7 +29,7 @@ class AppDirectories {
     }
   }
 
-  /// Opens a directory in the platform file manager.
+  /// 在平台文件管理器中打开目录。
   static Future<bool> openDirectory(Directory directory) async {
     if (!await directory.exists()) {
       await directory.create(recursive: true);
@@ -63,52 +63,52 @@ class AppDirectories {
     );
   }
 
-  /// Gets the directory for uploaded files.
+  /// 获取上传文件的目录。
   static Future<Directory> getUploadDirectory() async {
     final root = await getAppDataDirectory();
     return Directory('${root.path}/upload');
   }
 
-  /// Gets the directory for image files.
+  /// 获取图片文件的目录。
   static Future<Directory> getImagesDirectory() async {
     final root = await getAppDataDirectory();
     return Directory('${root.path}/images');
   }
 
-  /// Gets the directory for avatar files.
+  /// 获取头像文件的目录。
   static Future<Directory> getAvatarsDirectory() async {
     final root = await getAppDataDirectory();
     return Directory('${root.path}/avatars');
   }
 
-  /// Gets the directory for user-imported font files.
+  /// 获取用户导入字体文件的目录。
   static Future<Directory> getFontsDirectory() async {
     final root = await getAppDataDirectory();
     return Directory('${root.path}/fonts');
   }
 
-  /// Gets the directory for cache files.
+  /// 获取缓存文件的目录。
   static Future<Directory> getCacheDirectory() async {
     final root = await getAppDataDirectory();
     return Directory('${root.path}/cache');
   }
 
-  /// Gets the platform-provided application cache directory.
+  /// 获取平台提供的应用缓存目录。
   ///
-  /// - Android: /data/user/0/`<package>`/cache
-  /// - iOS/macOS: Caches directory
-  /// - Windows/Linux: platform cache directory (app-specific on Linux via XDG)
+  /// - Android：/data/user/0/`<package>`/cache
+  /// - iOS/macOS：Caches 目录
+  /// - Windows/Linux：平台缓存目录（Linux 上通过 XDG 指定为应用专属目录）
   static Future<Directory> getSystemCacheDirectory() async {
     return await getApplicationCacheDirectory();
   }
 
-  /// Gets the directory for avatar cache files.
+  /// 获取头像缓存文件的目录。
   static Future<Directory> getAvatarCacheDirectory() async {
     final root = await getAppDataDirectory();
     return Directory('${root.path}/cache/avatars');
   }
 
-  /// Get file extension from MIME type
+  /// 根据 MIME 类型获取文件扩展名。
   static String extFromMime(String mime) {
     switch (mime.toLowerCase()) {
       case 'image/jpeg':
@@ -123,9 +123,9 @@ class AppDirectories {
     }
   }
 
-  /// Save base64 image data to images directory.
-  /// [prefix] is used for filename (e.g. 'img', 'mcp_img').
-  /// Returns the saved file path, or null if failed.
+  /// 将 base64 图片数据保存到 images 目录。
+  /// [prefix] 用于文件名（例如 'img'、'mcp_img'）。
+  /// 返回保存后的文件路径；失败时返回 null。
   static Future<String?> saveBase64Image(
     String mime,
     String base64Data, {
@@ -138,7 +138,7 @@ class AppDirectories {
       }
       final cleaned = base64Data.replaceAll(RegExp(r'\s'), '');
       List<int> bytes;
-      // Support both standard base64 and URL-safe base64
+      // 同时支持标准 base64 和 URL 安全 base64
       if (cleaned.contains('-') || cleaned.contains('_')) {
         bytes = base64Url.decode(cleaned);
       } else {

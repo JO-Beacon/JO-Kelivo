@@ -5,11 +5,10 @@ import '../models/memory_entry.dart';
 import '../models/user_profile_field.dart';
 import '../services/memory/memory_repository.dart';
 
-/// UI-facing ChangeNotifier for memory system V1 (§13.7).
+/// 面向 UI 的 ChangeNotifier，用于记忆系统 V1（§13.7）。
 ///
-/// Intentionally not named [MemoryProvider] — that class remains the legacy
-/// read-only store for §14.5. Mixing the two via `context.read` would silently
-/// wire the wrong system.
+/// 有意不命名为 [MemoryProvider]：该类仍是 §14.5 的旧版只读存储。
+/// 通过 `context.read` 混用两者会在不知不觉中接入错误的系统。
 class MemoryProviderV2 extends ChangeNotifier {
   MemoryProviderV2({required this.repository, required this.chatRepository});
 
@@ -24,7 +23,7 @@ class MemoryProviderV2 extends ChangeNotifier {
   bool _initialized = false;
   Future<void>? _initializationFuture;
 
-  /// Full cached entry list from the last [refresh] / [refreshAll].
+  /// 来自上次 [refresh] / [refreshAll] 的完整缓存条目列表。
   List<MemoryEntry> get entries => List<MemoryEntry>.unmodifiable(_entries);
 
   List<UserProfileField> get profileFields =>
@@ -32,7 +31,7 @@ class MemoryProviderV2 extends ChangeNotifier {
 
   int get orphanCount => _orphanCount;
 
-  /// Active memories visible for [assistantId] (global ∪ assistant).
+  /// 对 [assistantId] 可见的活跃记忆（全局 ∪ 助手）。
   List<MemoryEntry> visibleFor(String? assistantId) {
     return _entries
         .where(
@@ -43,7 +42,7 @@ class MemoryProviderV2 extends ChangeNotifier {
         .toList(growable: false);
   }
 
-  /// Archived memories visible for [assistantId] (global ∪ assistant).
+  /// 对 [assistantId] 可见的已归档记忆（全局 ∪ 助手）。
   List<MemoryEntry> archivedFor(String? assistantId) {
     return _entries
         .where(
@@ -75,10 +74,10 @@ class MemoryProviderV2 extends ChangeNotifier {
     }
   }
 
-  /// Reloads caches from the typed-column read path (§13.1 / §13.3).
+  /// 从类型化列读取路径（§13.1 / §13.3）重新加载缓存。
   ///
-  /// Pass [assistantId] to include that assistant's scoped entries alongside
-  /// globals. `null` loads globals only unless [loadAll] is true.
+  /// 传入 [assistantId] 可将该助手的限定条目与全局条目一并加载。
+  /// `null` 仅加载全局条目，除非 [loadAll] 为 true。
   Future<void> refresh({String? assistantId, bool loadAll = false}) async {
     _focusAssistantId = assistantId;
     _loadAll = loadAll;
@@ -104,20 +103,19 @@ class MemoryProviderV2 extends ChangeNotifier {
     }
   }
 
-  /// Convenience for the global management UI (§14.4).
+  /// 面向全局管理界面（§14.4）的便捷方法。
   Future<void> refreshAll() => refresh(loadAll: true);
 
-  /// Re-read without changing which entries the UI is currently showing.
+  /// 重新读取，而不改变界面当前显示的条目。
   ///
-  /// Background work has no business narrowing the visible set: it knows which
-  /// assistant it ran for, but the user may be looking at every assistant, and
-  /// passing that id to [refresh] would make the other entries vanish until the
-  /// page is reopened.
+  /// 后台工作不应缩小可见集合：它知道自己为哪个助手运行，
+  /// 但用户可能正在查看所有助手，而把该 id 传给 [refresh] 会让其他条目消失，
+  /// 直到页面重新打开才恢复。
   Future<void> reloadCurrentScope() =>
       refresh(assistantId: _focusAssistantId, loadAll: _loadAll);
 
-  /// Search via §5.9 token AND. When [acrossAll] is true, searches every
-  /// assistant; otherwise respects [assistantId] visibility.
+  /// 按 §5.9 token AND 搜索。当 [acrossAll] 为 true 时，搜索所有
+  /// 助手；否则遵循 [assistantId] 的可见范围。
   Future<List<MemoryEntry>> search({
     required List<String> tokens,
     String? assistantId,

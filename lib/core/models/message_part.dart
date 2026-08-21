@@ -1,15 +1,15 @@
 import 'dart:convert';
 
-/// Structured message part — single source of truth for attachments and text.
+/// 结构化消息 part —— 附件和文本的唯一事实来源。
 ///
-/// Payload contract:
-/// - `text` / `reasoning`: raw string
-/// - `tool_call`: JSON string preserved as-is
-/// - `image`: `{"uri","mime"?,"assetId"?,"unavailable"?}`
-/// - `file`: `{"uri","name","mime"?,"assetId"?,"unavailable"?}`
-/// - unknown kinds: stored in [UnknownPart] and written back unchanged
-/// - malformed known kinds: created only while hydrating database rows and
-///   stored in [MalformedPart] for lossless write-back
+/// 载荷约定：
+/// - `text` / `reasoning`：原始字符串
+/// - `tool_call`：原样保留的 JSON 字符串
+/// - `image`：`{"uri","mime"?,"assetId"?,"unavailable"?}`
+/// - `file`：`{"uri","name","mime"?,"assetId"?,"unavailable"?}`
+/// - 未知类型：存储在 [UnknownPart] 中，并按原样写回
+/// - 已知类型的损坏数据：仅在从数据库行水合时创建，并
+///   存储在 [MalformedPart] 中以便无损写回
 sealed class MessagePart {
   const MessagePart();
 
@@ -157,7 +157,7 @@ final class FilePart extends MessagePart {
   });
 }
 
-/// Forward-compatible carrier for kinds this build does not understand.
+/// 用于此构建无法理解的 kind 的前向兼容载体。
 final class UnknownPart extends MessagePart {
   const UnknownPart({required this.rawKind, required this.payload});
 
@@ -171,11 +171,11 @@ final class UnknownPart extends MessagePart {
   String encodePayload() => payload;
 }
 
-/// A known part kind whose persisted payload cannot be parsed.
+/// 已知的 part 类型，但其持久化载荷无法解析。
 ///
-/// Unlike [UnknownPart], an attachment-shaped malformed part may still own an
-/// asset reference. Database hydration uses this carrier to isolate corrupt
-/// rows while preserving their exact payload for a later repair or write-back.
+/// 与 [UnknownPart] 不同，一个附件形态的损坏 part 仍可能拥有
+/// 资源引用。数据库水合使用此载体隔离损坏的
+/// 行，同时保留其精确载荷，以便后续修复或写回。
 final class MalformedPart extends MessagePart {
   const MalformedPart({
     required this.rawKind,

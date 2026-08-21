@@ -16,8 +16,8 @@ import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/platform_utils.dart';
 
-/// Debug viewer for the background memory pipeline (Gatekeeper → Extract →
-/// Smart Add → Distiller, plus summaries, recall and memory tool calls).
+/// 后台记忆管线的调试查看器（Gatekeeper → Extract → Smart Add → Distiller，
+/// 以及摘要、召回和记忆工具调用）。
 class MemoryTracePage extends StatelessWidget {
   const MemoryTracePage({super.key});
 
@@ -47,7 +47,7 @@ class MemoryTracePage extends StatelessWidget {
   }
 }
 
-/// Body of [MemoryTracePage], reused by the desktop pane.
+/// [MemoryTracePage] 的主体，桌面面板会复用。
 class MemoryTraceContent extends StatelessWidget {
   const MemoryTraceContent({super.key, this.padding});
 
@@ -201,7 +201,7 @@ class MemoryTraceContent extends StatelessWidget {
   }
 }
 
-/// Full step-by-step view of a single trace.
+/// 单条跟踪的完整逐步视图。
 class MemoryTraceDetailPage extends StatelessWidget {
   const MemoryTraceDetailPage({super.key, required this.trace});
 
@@ -233,9 +233,13 @@ class MemoryTraceDetailPage extends StatelessWidget {
   }
 }
 
-/// Body of [MemoryTraceDetailPage], reused by the desktop dialog.
+/// [MemoryTraceDetailPage] 的主体，桌面对话框会复用。
 class MemoryTraceDetailContent extends StatelessWidget {
-  const MemoryTraceDetailContent({super.key, required this.trace, this.padding});
+  const MemoryTraceDetailContent({
+    super.key,
+    required this.trace,
+    this.padding,
+  });
 
   final MemoryTrace trace;
   final EdgeInsetsGeometry? padding;
@@ -255,7 +259,7 @@ class MemoryTraceDetailContent extends StatelessWidget {
   }
 }
 
-// ── Cards ───────────────────────────────────────────────────────────────────
+// ── 卡片 ───────────────────────────────────────────────────────────────────
 
 class _TraceCard extends StatelessWidget {
   const _TraceCard({required this.trace, required this.onTap});
@@ -614,7 +618,7 @@ class _BeforeAfterLine extends StatelessWidget {
   }
 }
 
-/// Long prompt / response text: monospace, copyable, collapsed by default.
+/// 长提示词或响应文本：等宽字体、可复制、默认折叠。
 class _CollapsibleCode extends StatefulWidget {
   const _CollapsibleCode({required this.label, required this.text});
 
@@ -729,7 +733,7 @@ class _CollapsibleCodeState extends State<_CollapsibleCode> {
   }
 }
 
-// ── Small shared pieces ─────────────────────────────────────────────────────
+// ── 小型共享组件 ─────────────────────────────────────────────────────────────
 
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.title});
@@ -1153,7 +1157,7 @@ class _KvGrid extends StatelessWidget {
   }
 }
 
-// ── Formatting ──────────────────────────────────────────────────────────────
+// ── 格式化 ──────────────────────────────────────────────────────────────────
 
 String _joinIdentity(String? name, String? id) {
   final n = (name ?? '').trim();

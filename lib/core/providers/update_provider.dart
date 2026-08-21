@@ -161,9 +161,9 @@ class UpdateProvider extends ChangeNotifier {
       final info = UpdateInfo.fromGitHubRelease(data);
 
       final pkg = await PackageInfo.fromPlatform();
-      final currentVer = pkg.version; // e.g., 1.0.0
+      final currentVer = pkg.version; // 例如：1.0.0
 
-      // Compare by version only; ignore build numbers
+      // 仅按版本号比较，忽略构建号
       final hasNew = isRemoteNewerForTest(
         remoteVersion: info.version,
         currentVersion: currentVer,

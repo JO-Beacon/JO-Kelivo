@@ -3,11 +3,11 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../theme/app_font_weights.dart';
 
-/// Widget that displays the current model's icon.
+/// 显示当前模型图标的组件。
 ///
-/// Shows either:
-/// - A brand SVG/PNG icon if available for the model/provider
-/// - A circular placeholder with the first letter of the model name
+/// 显示以下内容之一：
+/// - 如果模型/供应商有可用的品牌 SVG/PNG 图标
+/// - 使用模型名称首字母的圆形占位符
 class CurrentModelIcon extends StatelessWidget {
   const CurrentModelIcon({
     super.key,
@@ -20,9 +20,9 @@ class CurrentModelIcon extends StatelessWidget {
 
   final String? providerKey;
   final String? modelId;
-  final double size; // outer diameter
-  final bool withBackground; // whether to draw circular background
-  final Color? backgroundColor; // override background color if provided
+  final double size; // 外径
+  final bool withBackground; // 是否绘制圆形背景
+  final Color? backgroundColor; // 如果提供则覆盖背景颜色
 
   @override
   Widget build(BuildContext context) {

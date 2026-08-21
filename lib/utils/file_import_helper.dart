@@ -5,14 +5,14 @@ import 'package:image_picker/image_picker.dart';
 import '../shared/dialogs/file_duplicate_dialog.dart';
 
 class FileImportHelper {
-  /// Copies a file (represented by XFile) to the target directory with duplicate handling.
+  /// 将文件（由 XFile 表示）复制到目标目录，并处理重名情况。
   ///
-  /// If a file with the same name exists:
-  /// - Compares size and modification time.
-  /// - If identical, asks user whether to use existing or upload as new copy.
-  /// - If not identical or user chooses new copy, generates a versioned name (e.g. "file(1).ext").
+  /// 如果存在同名文件：
+  /// - 比较文件大小和修改时间。
+  /// - 如果完全相同，询问用户是使用现有文件还是作为新副本上传。
+  /// - 如果不相同或用户选择新副本，则生成带版本号的文件名（例如 "file(1).ext"）。
   ///
-  /// Returns the path of the saved/reused file, or null if operation failed.
+  /// 返回已保存或复用的文件路径；操作失败时返回 null。
   static Future<String?> copyXFile(
     XFile xFile,
     Directory targetDir,
@@ -23,7 +23,7 @@ class FileImportHelper {
         await targetDir.create(recursive: true);
       }
 
-      // XFile.name is the preferred filename
+      // XFile.name 是首选文件名
       final String originalName = xFile.name.isNotEmpty
           ? xFile.name
           : (xFile.path.isNotEmpty
@@ -73,7 +73,7 @@ class FileImportHelper {
           }
         }
 
-        // Generate versioned name
+        // 生成带版本号的文件名
         final base = p.basenameWithoutExtension(originalName);
         final ext = p.extension(originalName);
         var counter = 1;
@@ -85,10 +85,10 @@ class FileImportHelper {
         dest = File(candidate);
       }
 
-      // Perform copy
+      // 执行复制
       await dest.writeAsBytes(await xFile.readAsBytes());
 
-      // Keep modified time to help cache keying
+      // 保留修改时间，以帮助缓存键计算
       if (srcStat != null) {
         try {
           await dest.setLastModified(srcStat.modified);

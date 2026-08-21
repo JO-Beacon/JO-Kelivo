@@ -5,7 +5,7 @@ import '../../core/providers/settings_provider.dart';
 import '../../core/services/haptics.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
-/// iOS-style icon button: no ripple, color tween on press, no scale.
+/// iOS 风格图标按钮：无涟漪，按下时颜色渐变，不缩放。
 class IosIconButton extends StatefulWidget {
   const IosIconButton({
     super.key,
@@ -26,16 +26,15 @@ class IosIconButton extends StatefulWidget {
        );
 
   final IconData? icon;
-  // Builder receives the current animated color to render custom child (e.g., SVG).
+  // Builder 接收当前动画颜色以渲染自定义子组件（例如 SVG）。
   final Widget Function(Color color)? builder;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final double size;
   final EdgeInsets padding;
-  final Color? color; // base color; defaults to theme onSurface
-  final Color?
-  pressedColor; // override pressed color; defaults to blend with primary
-  final double? minSize; // min tap target (e.g., 44 for AppBar)
+  final Color? color; // 基础颜色；默认使用主题 onSurface
+  final Color? pressedColor; // 覆盖按下颜色；默认与 primary 混合
+  final double? minSize; // 最小点击目标（例如 AppBar 使用 44）
   final String? semanticLabel;
   final bool enabled;
 
@@ -50,7 +49,7 @@ class _IosIconButtonState extends State<IosIconButton> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // Respect provided color opacity when enabled; only dim when disabled.
+    // 启用时保留所提供颜色的透明度；仅在禁用时变暗。
     final Color base = () {
       if (widget.color != null) {
         final alpha = (widget.color!.a * 0.45).clamp(0.0, 1.0).toDouble();
@@ -62,8 +61,8 @@ class _IosIconButtonState extends State<IosIconButton> {
         alpha: widget.enabled ? 1 : 0.45,
       );
     }();
-    // On press, shift icon color toward white (light theme) or black (dark theme)
-    // to get a subtle lighter/gray look, unless overridden via pressedColor.
+    // 按下时，将图标颜色向白色（浅色主题）或黑色（深色主题）偏移，
+    // 得到轻微变亮或变灰的效果，除非通过 pressedColor 覆盖。
     final bool isDark = theme.brightness == Brightness.dark;
     final Color pressTarget =
         widget.pressedColor ??
@@ -92,11 +91,15 @@ class _IosIconButtonState extends State<IosIconButton> {
       },
     );
 
-    // Subtle hover background for desktop/web
+    // 桌面或 Web 上的柔和悬停背景
     final Color bgTarget = _pressed
-        ? (Theme.of(context).colorScheme.onSurface.withValues(alpha: isDark ? 0.12 : 0.08))
+        ? (Theme.of(
+            context,
+          ).colorScheme.onSurface.withValues(alpha: isDark ? 0.12 : 0.08))
         : (_hovered
-              ? (Theme.of(context).colorScheme.onSurface.withValues(alpha: isDark ? 0.08 : 0.06))
+              ? (Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: isDark ? 0.08 : 0.06))
               : Colors.transparent);
 
     final content = Semantics(
@@ -156,7 +159,7 @@ class _IosIconButtonState extends State<IosIconButton> {
   }
 }
 
-/// iOS-style card press effect: background color tween on press, no ripple, no scale.
+/// iOS 风格卡片按压效果：按下时背景色渐变，无涟漪，不缩放。
 class IosCardPress extends StatefulWidget {
   const IosCardPress({
     super.key,
@@ -181,14 +184,14 @@ class IosCardPress extends StatefulWidget {
   final BorderRadius? borderRadius;
   final BoxBorder? border;
   final Color? baseColor;
-  // 0..1; how much to blend towards surface tint on press
+  // 0..1；按下时向 surface tint 混合的程度
   final double? pressedBlendStrength;
   final EdgeInsetsGeometry? padding;
-  // Optional subtle scale when pressed (e.g., 0.98). Defaults to 1.0 (no scale).
+  // 按下时可选轻微缩放（例如 0.98）。默认为 1.0（不缩放）。
   final double? pressedScale;
-  // Optional custom animation duration for color/scale tween.
+  // 颜色或缩放渐变的可选自定义动画时长。
   final Duration? duration;
-  // Whether to perform a soft haptic on tap (also gated by settings/global toggles)
+  // 点击时是否执行轻柔触感反馈（同时受设置或全局开关控制）
   final bool haptics;
 
   @override
@@ -203,8 +206,7 @@ class _IosCardPressState extends State<IosCardPress> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final Color base =
-        widget.baseColor ?? (context.appColors.surfaceCard);
+    final Color base = widget.baseColor ?? (context.appColors.surfaceCard);
     final double k = widget.pressedBlendStrength ?? (isDark ? 0.14 : 0.12);
     final Color pressTarget =
         Color.lerp(base, theme.colorScheme.onSurface, k) ?? base;

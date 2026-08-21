@@ -84,7 +84,7 @@ class _ChatHistoryDesktopDialogState extends State<_ChatHistoryDesktopDialog> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Header
+                // 标题栏
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
                   child: Row(
@@ -135,7 +135,11 @@ class _ChatHistoryDesktopDialogState extends State<_ChatHistoryDesktopDialog> {
                                   onPressed: () => Navigator.of(ctx).pop(true),
                                   child: Text(
                                     l10n.chatHistoryPageDelete,
-                                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                                    style: TextStyle(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.error,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -174,7 +178,7 @@ class _ChatHistoryDesktopDialogState extends State<_ChatHistoryDesktopDialog> {
                   ),
                 ),
 
-                // Search bar (toggle)
+                // 搜索栏（可切换）
                 AnimatedSize(
                   duration: kAnim,
                   curve: Curves.easeOutCubic,
@@ -344,7 +348,7 @@ class _ConversationTileDesktopState extends State<_ConversationTileDesktop> {
               ),
               child: Row(
                 children: [
-                  // Leading dot/icon
+                  // 前导圆点或图标
                   Container(
                     width: 32,
                     height: 32,
@@ -359,7 +363,7 @@ class _ConversationTileDesktopState extends State<_ConversationTileDesktop> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  // Title + date
+                  // 标题与日期
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,

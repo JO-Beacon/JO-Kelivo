@@ -92,7 +92,7 @@ class SettingsPage extends StatelessWidget {
       }
     }
 
-    // iOS-style section header (neutral color, not theme color)
+    // iOS 风格分区标题（中性色，而不是主题色）
     Widget header(String text, {bool first = false}) => Padding(
       padding: EdgeInsets.fromLTRB(12, first ? 2 : 12, 12, 6),
       child: Text(
@@ -432,7 +432,7 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
-// --- iOS-style widgets for Settings page ---
+// --- 设置页面使用的 iOS 风格组件 ---
 
 Widget _iosSectionCard({required List<Widget> children}) {
   return Builder(
@@ -440,7 +440,7 @@ Widget _iosSectionCard({required List<Widget> children}) {
       final theme = Theme.of(context);
       final cs = theme.colorScheme;
       final isDark = theme.brightness == Brightness.dark;
-      // Light: white with slight transparency; Dark: subtle translucent dark
+      // 浅色：带轻微透明度的白色；深色：细微的深色半透明
       final Color bg = context.appColors.surfaceCard;
       return Container(
         decoration: BoxDecoration(
@@ -463,7 +463,7 @@ Widget _iosSectionCard({required List<Widget> children}) {
 
 Widget _iosDivider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;
-  // Restore previous visual: align with icon slot (36) + gap (12) + padding (12)
+  // 恢复之前的视觉：对齐图标槽（36）、间距（12）和内边距（12）
   return Divider(
     height: 6,
     thickness: 0.6,
@@ -473,7 +473,7 @@ Widget _iosDivider(BuildContext context) {
   );
 }
 
-// Shared color tween wrapper to mimic iOS gentle press color transition
+// 共享颜色渐变包装，模拟 iOS 轻柔按压颜色过渡
 class _AnimatedPressColor extends StatelessWidget {
   const _AnimatedPressColor({
     required this.pressed,
@@ -660,7 +660,7 @@ class _TactileRowState extends State<_TactileRow> {
   }
 }
 
-// Icon-only tactile button for AppBar: no ripple, slight press scale
+// AppBar 的纯图标触感按钮：无涟漪，轻微按压缩放
 class _TactileIconButton extends StatefulWidget {
   const _TactileIconButton({
     required this.icon,
@@ -711,7 +711,7 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   }
 }
 
-// Bottom sheet iOS-style option with tactile feedback (no ripple)
+// 带触感反馈的底部弹层 iOS 风格选项（无涟漪）
 Widget _sheetOption(
   BuildContext context, {
   required IconData icon,

@@ -74,12 +74,12 @@ String resolveDocumentAttachmentMime(DocumentAttachment attachment) {
   );
 }
 
-/// Parsed form of one `_kelivo_media_paths` entry (legacy [String] or map).
+/// 单个 `_kelivo_media_paths` 条目（旧版 [String] 或 map）的解析形式。
 ///
-/// Wire contract:
-/// - bare [String] URI, or
-/// - map with keys `uri` / `mime` / `unavailable` (legacy `path` accepted
-///   when reading for compatibility).
+/// 传输契约：
+/// - 裸 [String] URI，或
+/// - 带 `uri` / `mime` / `unavailable` 键的 map（读取时为兼容性
+///   接受旧版 `path`）。
 typedef InternalMediaRef = ({String uri, String? mime, bool unavailable});
 
 bool _mediaRefAsBool(dynamic value) {
@@ -92,10 +92,10 @@ bool _mediaRefAsBool(dynamic value) {
   return false;
 }
 
-/// Parse a single internal media ref from a bare URI string or
-/// `{uri, mime?, unavailable?}` map. Returns null when no usable URI exists.
+/// 从裸 URI 字符串或
+/// `{uri, mime?, unavailable?}` map 解析单个内部媒体引用。无可用 URI 时返回 null。
 ///
-/// Unavailable map entries are skipped unless [includeUnavailable] is true.
+/// 除非 [includeUnavailable] 为 true，否则跳过 unavailable 的 map 条目。
 InternalMediaRef? parseInternalMediaRef(
   dynamic entry, {
   bool includeUnavailable = false,
@@ -124,10 +124,10 @@ InternalMediaRef? parseInternalMediaRef(
   return (uri: uri, mime: null, unavailable: false);
 }
 
-/// Encode a structured media ref for `_kelivo_media_paths`.
+/// 为 `_kelivo_media_paths` 编码结构化媒体引用。
 ///
-/// Writes `{uri, mime?, unavailable?}`. Writers should skip unavailable parts
-/// rather than encoding them; [unavailable] is only for rare diagnostic cases.
+/// 写入 `{uri, mime?, unavailable?}`。写入方应跳过 unavailable 的 part，
+/// 而非编码它们；[unavailable] 仅用于罕见诊断场景。
 Map<String, dynamic> encodeInternalMediaRef({
   required String uri,
   String? mime,
@@ -142,9 +142,9 @@ Map<String, dynamic> encodeInternalMediaRef({
   };
 }
 
-/// Parse usable refs from a `_kelivo_media_paths` list value.
+/// 从 `_kelivo_media_paths` 列表值解析可用引用。
 ///
-/// Skips unavailable map entries unless [includeUnavailable] is true.
+/// 除非 [includeUnavailable] 为 true，否则跳过 unavailable 的 map 条目。
 List<InternalMediaRef> parseInternalMediaRefs(
   dynamic raw, {
   bool includeUnavailable = false,
@@ -161,7 +161,7 @@ List<InternalMediaRef> parseInternalMediaRefs(
   return out;
 }
 
-/// Encode many refs; skips empty URIs and unavailable entries by default.
+/// 编码多个引用；默认跳过空 URI 和 unavailable 条目。
 List<Map<String, dynamic>> encodeInternalMediaRefs(
   Iterable<InternalMediaRef> refs, {
   bool includeUnavailable = false,
@@ -182,8 +182,8 @@ List<Map<String, dynamic>> encodeInternalMediaRefs(
   return out;
 }
 
-/// URI-only view of `_kelivo_media_paths` (String|Map entries).
-/// Unavailable map entries are omitted.
+/// `_kelivo_media_paths` 的纯 URI 视图（String|Map 条目）。
+/// 省略 unavailable 的 map 条目。
 List<String> internalMediaPathsFromRaw(dynamic raw) {
   return [for (final ref in parseInternalMediaRefs(raw)) ref.uri];
 }
@@ -195,8 +195,8 @@ bool isRemoteOrDataUri(String uri) {
       lower.startsWith('https://');
 }
 
-/// Shared MIME inference used by legacy decoder and new create paths.
-/// Order: explicit → data-URL declaration → content sniff → extension → null.
+/// 旧版解码器与新建路径共享的 MIME 推断。
+/// 顺序：显式 → data-URL 声明 → 内容嗅探 → 扩展名 → null。
 Future<String?> inferAttachmentMime({
   required String uri,
   String? explicitMime,

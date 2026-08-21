@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../models/model_types.dart';
 import '../services/logging/flutter_logger.dart';
 
-/// Shared utilities for parsing and applying per-model override maps.
+/// 解析和应用逐模型覆盖映射的共享工具。
 class ModelOverrideResolver {
   static const Set<String> _embeddingTypeStrings = {'embedding', 'embeddings'};
   static const Set<String> _chatTypeStrings = {'chat'};
@@ -91,7 +91,7 @@ class ModelOverrideResolver {
     return mods.isEmpty ? const [Modality.text] : mods;
   }
 
-  /// Apply a per-model override map onto a base [ModelInfo].
+  /// 将逐模型覆盖映射应用到基础 [ModelInfo] 上。
   static ModelInfo applyModelOverride(
     ModelInfo base,
     Map ov, {

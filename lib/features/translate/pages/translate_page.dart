@@ -82,7 +82,7 @@ class _TranslatePageState extends State<TranslatePage> {
         _providerKey = sel.providerKey;
         _modelId = sel.modelId;
       });
-      // Persist translate model selection so it’s remembered next time
+      // 持久化翻译模型选择，下次启动时继续使用
       await context.read<SettingsProvider>().setTranslateModel(
         sel.providerKey,
         sel.modelId,
@@ -145,7 +145,7 @@ class _TranslatePageState extends State<TranslatePage> {
         (chunk) {
           final s = chunk.content;
           if (_dst.text.isEmpty) {
-            // Remove any leading whitespace/newlines from the first chunk to avoid top gap
+            // 移除首个分块前导空白或换行，避免顶部出现空隙
             final cleaned = s.replaceFirst(RegExp(r'^\s+'), '');
             _dst.text = cleaned;
           } else {
@@ -267,7 +267,7 @@ class _TranslatePageState extends State<TranslatePage> {
         ),
         title: Text(l10n.desktopNavTranslateTooltip),
         actions: [
-          // Paste
+          // 粘贴
           Tooltip(
             message: l10n.translatePagePasteButton,
             child: Padding(
@@ -280,7 +280,7 @@ class _TranslatePageState extends State<TranslatePage> {
               ),
             ),
           ),
-          // Copy result
+          // 复制结果
           Tooltip(
             message: l10n.translatePageCopyResult,
             child: Padding(
@@ -293,7 +293,7 @@ class _TranslatePageState extends State<TranslatePage> {
               ),
             ),
           ),
-          // Clear all
+          // 清空全部
           Tooltip(
             message: l10n.translatePageClearAll,
             child: Padding(
@@ -306,7 +306,7 @@ class _TranslatePageState extends State<TranslatePage> {
               ),
             ),
           ),
-          // Model brand icon
+          // 模型品牌图标
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: IosIconButton(
@@ -341,7 +341,7 @@ class _TranslatePageState extends State<TranslatePage> {
       body: SafeArea(
         child: Column(
           children: [
-            // Input
+            // 输入
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
               child: SizedBox(
@@ -365,7 +365,7 @@ class _TranslatePageState extends State<TranslatePage> {
                 ),
               ),
             ),
-            // Output
+            // 输出
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
@@ -389,7 +389,7 @@ class _TranslatePageState extends State<TranslatePage> {
                 ),
               ),
             ),
-            // Bottom: language card + translate button
+            // 底部：语言卡片和翻译按钮
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
               child: Row(
@@ -527,7 +527,7 @@ class _Card extends StatelessWidget {
   }
 }
 
-// Copy of the tactile back icon used on settings-like pages
+// 设置类页面使用的触感返回图标的副本
 class _TactileIconButton extends StatefulWidget {
   const _TactileIconButton({
     required this.icon,

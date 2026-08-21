@@ -1,10 +1,9 @@
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/models/assistant.dart';
 
-/// Helper class for extracting model display information.
+/// 用于提取模型显示信息的辅助类。
 ///
-/// This class eliminates repetitive code patterns for getting provider/model
-/// information that was duplicated across multiple locations in home_page.dart.
+/// 此类消除了在 home_page.dart 多处重复出现的供应商或模型信息获取模式。
 class ModelDisplayInfo {
   const ModelDisplayInfo({
     this.providerName,
@@ -13,45 +12,45 @@ class ModelDisplayInfo {
     this.modelId,
   });
 
-  /// Display name of the provider (e.g., "OpenAI", "Anthropic")
+  /// 供应商显示名（例如 "OpenAI"、"Anthropic"）
   final String? providerName;
 
-  /// Display name of the model (from override, apiModelId, or raw modelId)
+  /// 模型显示名（来自覆盖项、apiModelId 或原始 modelId）
   final String? modelDisplay;
 
-  /// Raw provider key used in settings
+  /// 设置中使用的原始供应商键
   final String? providerKey;
 
-  /// Raw model ID
+  /// 原始模型 ID
   final String? modelId;
 
-  /// Check if both provider and model are configured
+  /// 检查供应商和模型是否都已配置
   bool get isConfigured => providerKey != null && modelId != null;
 
-  /// Get the ProviderConfig for this model (if configured)
+  /// 获取此模型的 ProviderConfig（已配置时）
   ProviderConfig? getConfig(SettingsProvider settings) {
     if (providerKey == null) return null;
     return settings.getProviderConfig(providerKey!);
   }
 }
 
-/// Extracts model display information from settings and assistant.
+/// 从设置和助手中提取模型显示信息。
 ///
-/// This consolidates the repeated pattern of:
+/// 统一了以下重复模式：
 /// ```dart
 /// final providerKey = assistant?.chatModelProvider ?? settings.currentModelProvider;
 /// final modelId = assistant?.chatModelId ?? settings.currentModelId;
 /// if (providerKey != null && modelId != null) {
 ///   final cfg = settings.getProviderConfig(providerKey);
 ///   final ov = cfg.modelOverrides[modelId] as Map?;
-///   // ...handle overrides
+///   // ...处理覆盖项
 /// }
 /// ```
 ModelDisplayInfo getModelDisplayInfo(
   SettingsProvider settings, {
   Assistant? assistant,
 }) {
-  // Determine provider and model from assistant or global defaults
+  // 从助手或全局默认值确定供应商和模型
   final providerKey =
       assistant?.chatModelProvider ?? settings.currentModelProvider;
   final modelId = assistant?.chatModelId ?? settings.currentModelId;
@@ -63,11 +62,11 @@ ModelDisplayInfo getModelDisplayInfo(
   final cfg = settings.getProviderConfig(providerKey);
   final providerName = cfg.name.isNotEmpty ? cfg.name : providerKey;
 
-  // Extract model display name from overrides or use raw modelId
+  // 从覆盖项提取模型显示名，否则使用原始 modelId
   String modelDisplay = modelId;
   final ov = cfg.modelOverrides[modelId] as Map?;
   if (ov != null) {
-    // Priority: override name > apiModelId > api_model_id > raw modelId
+    // 优先级：覆盖名称 > apiModelId > api_model_id > 原始 modelId
     final overrideName = (ov['name'] as String?)?.trim();
     if (overrideName != null && overrideName.isNotEmpty) {
       modelDisplay = overrideName;
@@ -87,9 +86,8 @@ ModelDisplayInfo getModelDisplayInfo(
   );
 }
 
-/// Gets just the provider key and model ID without display formatting.
-///
-/// Use this when you only need the raw identifiers for API calls.
+/// 只获取供应商键和模型 ID，不做显示格式化。
+/// 当只需要 API 调用的原始标识时使用。
 ({String? providerKey, String? modelId}) getActiveModelIds(
   SettingsProvider settings, {
   Assistant? assistant,
@@ -100,7 +98,7 @@ ModelDisplayInfo getModelDisplayInfo(
   );
 }
 
-/// Gets the ProviderConfig for the active model.
+/// 获取当前模型的 ProviderConfig。
 ProviderConfig? getActiveProviderConfig(
   SettingsProvider settings, {
   Assistant? assistant,

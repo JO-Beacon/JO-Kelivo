@@ -1,4 +1,4 @@
-/// A stable source block in an append-only streaming Markdown document.
+/// 追加式流式 Markdown 文档中的稳定源块。
 final class IncrementalMarkdownBlock {
   const IncrementalMarkdownBlock({required this.start, required this.text});
 
@@ -6,8 +6,8 @@ final class IncrementalMarkdownBlock {
   final String text;
 }
 
-/// Splits streaming Markdown at safe blank-line boundaries and only rescans
-/// the last (possibly incomplete) block when content is appended.
+/// 在安全的空行边界拆分流式 Markdown，并在追加内容时只重新扫描最后一个
+/// （可能不完整）的块。
 final class IncrementalMarkdownDocument {
   static final _listMarker = RegExp(
     r'^(?:[*+-](?:\s+\[[ xX]\])?|\d{1,9}[.)])(?:\s|$)',

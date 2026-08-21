@@ -103,14 +103,14 @@ void _applyCompatibleBuiltInSearch(
     return;
   }
 
-  // MiMo: native chat Completions `web_search` tool (+ optional web_search_usage).
+  // MiMo：原生 chat Completions `web_search` 工具（以及可选的 web_search_usage）。
   if (BuiltInToolsHelper.isMimoProvider(config) &&
       BuiltInToolsHelper.isMimoBuiltInSearchSupportedModel(upstreamModelId)) {
     _appendChatTool(body, {'type': 'web_search'});
     return;
   }
 
-  // GLM / Zhipu: native chat web_search tool structure.
+  // GLM / Zhipu：原生 chat web_search 工具结构。
   if (BuiltInToolsHelper.isZhipuProvider(config) &&
       BuiltInToolsHelper.isGlmBuiltInSearchSupportedModel(upstreamModelId)) {
     _appendChatTool(body, {
@@ -312,28 +312,26 @@ void _normalizeMoonshotKimiChatBody(
   }
 }
 
-/// Accumulates streamed `reasoning_details` entries.
+/// 累积流式传输的 `reasoning_details` 条目。
 ///
-/// OpenRouter streams the array as ordered deltas (each chunk may carry one
-/// or more new entries) that must be concatenated and replayed unmodified
-/// and in the original order, so chunks are appended by default and identical
-/// consecutive deltas are preserved. Some other providers instead resend the
-/// full array-so-far with each chunk; for those (when [allowSnapshots] is
-/// set) a chunk that positively looks like such a cumulative snapshot (same
-/// entries plus new ones appended) switches the accumulator to snapshot
-/// mode, and later chunks replace the buffer instead of appending
-/// duplicates. For OpenRouter itself [allowSnapshots] is cleared because its
-/// documented semantics are always delta-style concatenation.
+/// OpenRouter 将数组作为有序增量流传输（每个分块可能携带一个
+/// 或多个新条目），必须按原始顺序原样拼接并重放，因此默认追加分块，
+/// 并保留连续相同的增量。其他一些服务则会在每个分块中重发截至当前的
+/// 完整数组；对于这些服务（当设置了 [allowSnapshots] 时），如果某个
+/// 分块明显像是这种累积快照（原有条目加上新追加的条目），累加器会
+/// 切换到快照模式，后续分块将替换缓冲区，而不是重复追加。对于
+/// OpenRouter 本身，[allowSnapshots] 会被清除，因为其文档化语义
+/// 始终是按增量拼接。
 class _ReasoningDetailsAccumulator {
   _ReasoningDetailsAccumulator({this.allowSnapshots = true});
 
-  /// Whether cumulative-snapshot detection is enabled (false for OpenRouter,
-  /// whose documented semantics are delta-style concatenation).
+  /// 是否启用累积快照检测（对于 OpenRouter 为 false，
+  /// 因为其文档化语义是增量式拼接）。
   final bool allowSnapshots;
   List<dynamic> _details = const <dynamic>[];
   bool _snapshotMode = false;
 
-  /// The accumulated entries, or null when nothing was captured.
+  /// 累积的条目；若未捕获任何内容则为 null。
   List<dynamic>? get detailsOrNull => _details.isEmpty ? null : _details;
 
   void add(List<dynamic> incoming) {
@@ -344,13 +342,13 @@ class _ReasoningDetailsAccumulator {
     }
     final prefixMatches = allowSnapshots && _hasCurrentAsPrefix(incoming);
     if (prefixMatches && incoming.length > _details.length) {
-      // Positive evidence of a cumulative snapshot: same prefix, but longer.
+      // 累积快照的明确证据：前缀相同，但更长。
       _snapshotMode = true;
       _details = List<dynamic>.of(incoming);
       return;
     }
     if (_snapshotMode && prefixMatches) {
-      // Snapshot-style resend of the same array; keep the buffer as-is.
+      // 对同一数组进行快照式重发；保持缓冲区原样。
       return;
     }
     _details = <dynamic>[..._details, ...incoming];
@@ -410,9 +408,9 @@ String _effectiveOpenAIEffort(
   Map<String, dynamic> body, {
   required String fallbackEffort,
 }) {
-  // Read the effort from the final payload shape first, then fall back to the
-  // budget-derived value. Overrides can set either chat-completions style
-  // (`reasoning_effort`) or Responses style (`reasoning.effort`).
+  // 先读取最终载荷结构中的 effort，若没有则回退到
+  // 由预算推导出的值。覆盖项可以设置 chat-completions 风格
+  // （`reasoning_effort`）或 Responses 风格（`reasoning.effort`）。
   final reasoningEffort = body['reasoning_effort'];
   if (reasoningEffort is String && reasoningEffort.trim().isNotEmpty) {
     return reasoningEffort.trim().toLowerCase();
@@ -431,8 +429,8 @@ bool _allowsSamplingParamsForOpenAIModel(
   String upstreamModelId, {
   required String effort,
 }) {
-  // Source: https://developers.openai.com/api/docs/guides/latest-model
-  // Only documented per-model compatibility rules are enforced here.
+  // 来源：https://developers.openai.com/api/docs/guides/latest-model
+  // 这里仅强制实施文档中记录的按模型兼容性规则。
   return openAIAllowsSamplingParams(upstreamModelId, effort: effort);
 }
 
@@ -442,8 +440,8 @@ void _sanitizeOpenAIGpt5SamplingParams(
   required String fallbackEffort,
   required bool isOpenRouter,
 }) {
-  // Must run on the final request body (after override merges), otherwise
-  // we may keep/drop sampling params based on stale effort assumptions.
+  // 必须基于最终请求体运行（在覆盖项合并之后），否则
+  // 我们可能依据过期的 effort 假设保留或丢弃采样参数。
   final hasChatFunctionTools =
       body['messages'] is List &&
       body['tools'] is List &&
@@ -483,9 +481,9 @@ void _sanitizeOpenAIGpt5SamplingParams(
 }
 
 bool _isLongCatHost(String baseUrl) {
-  // Callers may pass a full URL or a bare hostname (e.g. `api.longcat.chat`).
-  // `Uri.tryParse('api.longcat.chat')?.host` is '' (not null), so never rely on
-  // `??` fallback alone — normalize via an explicit https:// prefix when needed.
+  // 调用方可能传入完整 URL 或纯主机名（例如 `api.longcat.chat`）。
+  // `Uri.tryParse('api.longcat.chat')?.host` 是 ''（不是 null），因此绝不能仅依赖
+  // `??` 回退——必要时通过显式的 https:// 前缀进行规范化。
   final raw = baseUrl.trim().toLowerCase();
   if (raw.isEmpty) return false;
   final parsed = Uri.tryParse(raw.contains('://') ? raw : 'https://$raw');
@@ -598,10 +596,10 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
   bool stripReasoningContent = false,
 }) async {
   final out = <Map<String, dynamic>>[];
-  // Assistant turns cannot carry image_url/video_url; stash for the last user
-  // message (same pattern as Responses shouldAttachAssistantImage).
-  // Use last *user* index — not array-tail — so tool follow-ups that append
-  // assistant tool_calls / tool results still receive stashed assistant media.
+  // 助手轮次不能携带 image_url/video_url；暂存到最后一个用户消息
+  // （与 Responses 的 shouldAttachAssistantImage 模式相同）。
+  // 使用最后一个 *用户* 索引——不是数组末尾——这样追加了
+  // 助手 tool_calls / tool 结果的工具后续消息仍能收到暂存的助手媒体。
   int lastUserIndex = -1;
   for (int i = messages.length - 1; i >= 0; i--) {
     if ((messages[i]['role'] ?? '').toString() == 'user') {
@@ -655,8 +653,8 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
       }
     }
 
-    // Bare userImagePaths attach to the last *user* turn (not array-tail), so
-    // tool follow-ups that append assistant/tool messages still keep them.
+    // 裸 userImagePaths 会附加到最后一个 *用户* 轮次（不是数组末尾），所以
+    // 追加助手/工具消息的工具后续消息仍会保留它们。
     final hasAttachedImages =
         canImageInput &&
         role == 'user' &&
@@ -677,10 +675,9 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
                       .where((part) => !_isRemoteImageContentPart(part))
                       .toList(growable: false))
           : raw;
-      // List-shaped content used to early-return before assistant-media /
-      // userImagePaths attachment. Merge those onto the last user turn, and
-      // still stash assistant media — including image_url/video_url already
-      // embedded in the List with no structured sidecar refs.
+      // 列表形式的内容会在 assistant-media / userImagePaths 附件之前提前返回。
+      // 将这些附件合并到最后一个用户回合，同时仍保存助手媒体——包括已内嵌在
+      // List 中、没有结构化 sidecar 引用的 image_url/video_url。
       final listHasEmbeddedMedia =
           canImageInput &&
           content is List &&
@@ -758,8 +755,8 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
           addVideoUrl(url);
         }
 
-        // Index existing List media; on assistant turns also stash them so the
-        // role gate moves unsupported image_url/video_url onto the last user.
+        // 索引现有 List 媒体；在助手轮次中还会暂存它们，以便
+        // 角色闸门将不受支持的 image_url/video_url 移到最后一个用户。
         for (final part in List<Map<String, dynamic>>.from(parts)) {
           final type = (part['type'] ?? '').toString();
           if (type == 'image_url') {
@@ -830,7 +827,7 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
           }
         }
         if (isAssistant) {
-          // Keep assistant List content image-free; media is stashed above.
+          // 保持助手 List 内容不含图片；媒体已在上面暂存。
           content = [
             for (final part in parts)
               if (part['type'] != 'image_url' && part['type'] != 'video_url')
@@ -862,10 +859,10 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
     }
 
     final hasMarkdownImages = raw.contains('![') && raw.contains('](');
-    // Semantic media detection only - custom attachment markers are not
-    // recognized. Attachments arrive via structured media-path keys /
-    // userMediaPaths, plus Markdown ![](...).
-    // Consume injected media refs for user and assistant history turns.
+    // 仅进行语义媒体检测——自定义附件标记不会被识别。
+    // 附件通过结构化 media-path 键 /
+    // userMediaPaths 以及 Markdown ![](...) 传入。
+    // 消费用户和助手历史轮次中注入的媒体引用。
 
     if (!hasMarkdownImages &&
         !hasAttachedImages &&
@@ -974,8 +971,8 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
     for (final mediaRef in supplementalRefs) {
       final p = mediaRef.uri;
       if (!allowRemoteImages && _isRemoteHttpUrl(p)) {
-        // Keep the remote reference visible as text when image fetch/embed
-        // is disabled for this model (e.g. Kimi K3).
+        // 当该模型（例如 Kimi K3）禁用图片获取/嵌入时，
+        // 将远程引用保留为可见文本。
         final normalized = normalizeSrc(p);
         if (!seenSources.add(normalized)) continue;
         parts.add({'type': 'text', 'text': p});
@@ -997,7 +994,7 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
         stashOrAddImageUrl(dataUrl);
       }
     }
-    // Attach stashed assistant media to the last user message.
+    // 将暂存的助手媒体附加到最后一个用户消息。
     if (shouldAttachAssistantMedia) {
       for (final url in pendingAssistantMediaUrls) {
         if (pendingAssistantVideoUrls.contains(url)) {
@@ -1007,7 +1004,7 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
         }
       }
     }
-    // Assistant content stays string or multimodal text-only parts.
+    // 助手内容保持为字符串或仅多模态文本的部分。
     if (isAssistant) {
       if (parts.isEmpty) {
         outMsg['content'] = raw;
@@ -1054,8 +1051,8 @@ String _extractOpenAICompatibleDeltaText(Map? delta) {
   return '';
 }
 
-/// Appends a trailing newline to [source] so that any partial line
-/// remaining in the SSE buffer is flushed during the final split('\n').
+/// 向 [source] 追加一个尾部换行符，以便在最后一次 `split('\n')` 时
+/// 将 SSE 缓冲区中剩余的任何不完整行一并刷新出来。
 Stream<String> _ensureTrailingNewline(Stream<String> source) async* {
   await for (final chunk in source) {
     yield chunk;
@@ -1063,10 +1060,10 @@ Stream<String> _ensureTrailingNewline(Stream<String> source) async* {
   yield '\n';
 }
 
-/// Follow-up tool-call responses are consumed inside the SSE parser's
-/// per-event catch, which tolerates malformed JSON. Convert their transport
-/// failures into [HttpException] up front so that catch cannot swallow them
-/// and let the no-[DONE] fallback persist truncated output as a completion.
+/// 后续工具调用响应会在 SSE 解析器的每个事件 catch 中被消费，
+/// 该 catch 会容忍格式错误的 JSON。请将其传输失败
+/// 预先转换为 [HttpException]，这样 catch 就不会吞掉这些失败，
+/// 也不会让无 [DONE] 的回退逻辑把截断的输出当作完成结果持久化。
 Stream<String> _rethrowFollowUpStreamErrors(Stream<String> source) {
   return source.transform(
     StreamTransformer<String, String>.fromHandlers(
@@ -1085,16 +1082,15 @@ Stream<String> _rethrowFollowUpStreamErrors(Stream<String> source) {
   );
 }
 
-/// Some providers (e.g. OpenRouter rate limits/moderation) report failures as
-/// an in-band `{"error": ...}` frame on an otherwise 2xx stream. Surface those
-/// as a stream error so truncated output is not persisted as a completion.
+/// 一些服务提供商（例如 OpenRouter 的限流/审核）会在本应返回 2xx 的流中
+/// 以带内 `{"error": ...}` 帧报告失败。请将其
+/// 作为流错误暴露出来，以免截断的输出被持久化为完成结果。
 ///
-/// OpenRouter's documented mid-stream failure frame carries the top-level
-/// `error` alongside a non-empty `choices` list whose entry has
-/// `finish_reason: "error"`, so the presence of choices/candidates must not
-/// mask a non-empty error payload. Healthy chunks either lack the `error` key
-/// or carry a null/empty placeholder, which [_throwOnInBandStreamError]
-/// ignores.
+/// OpenRouter 文档化的流中失败帧会在顶层携带 `error`，同时带有一个非空的
+/// `choices` 列表，其条目中的 `finish_reason` 为 "error"，因此存在
+/// choices/candidates 不能掩盖非空错误载荷。健康分块要么没有 `error` 键，
+/// 要么携带 null/空占位值，而 [_throwOnInBandStreamError]
+/// 会忽略这种情况。
 void _throwIfInBandStreamError(String data) {
   final mayCarryError =
       data.contains('"error"') ||
@@ -1110,9 +1106,9 @@ void _throwIfInBandStreamError(String data) {
   if (decoded is! Map) return;
   final type = (decoded['type'] ?? '').toString();
   if (type == 'error') {
-    // `event: error` frames: Anthropic-style ones nest the payload under
-    // `error`, while the Responses API puts code/message on the frame itself
-    // ({"type":"error","code":...,"message":...}).
+    // `event: error` 帧：Anthropic 风格会把负载嵌套在
+    // `error` 下，而 Responses API 会把 code/message 放在帧本身
+    // （{"type":"error","code":...,"message":...}）。
     final nested = decoded['error'];
     if (nested is Map && nested.isNotEmpty) {
       _throwOnInBandStreamError(nested);
@@ -1120,7 +1116,7 @@ void _throwIfInBandStreamError(String data) {
     _throwOnInBandStreamError(decoded);
   }
   if (type == 'response.failed' || type == 'response.incomplete') {
-    // Responses API terminal failure events nest the error under `response`.
+    // Responses API 的终止失败事件会把错误嵌套在 `response` 下。
     final response = decoded['response'];
     if (response is Map) {
       _throwOnInBandStreamError(response['error']);
@@ -1134,15 +1130,15 @@ void _throwIfInBandStreamError(String data) {
         );
       }
     }
-    // A failure event without a parseable payload still must not fall
-    // through and be treated as a normal finish.
+    // 即使失败事件没有可解析的负载，也绝不能让它穿透
+    // 并被当作正常完成来处理。
     throw HttpException('Provider error: $type');
   }
   _throwOnInBandStreamError(decoded['error']);
 }
 
-/// Throws when [error] carries a provider error payload; no-op for the null or
-/// empty placeholders some providers emit on healthy chunks.
+/// 当 [error] 携带服务提供商错误负载时抛出异常；对于某些服务提供商在健康分块中
+/// 发出的 null 或空占位符则不执行任何操作。
 void _throwOnInBandStreamError(Object? error) {
   if (error is Map && error.isNotEmpty) {
     final message = (error['message'] ?? '').toString().trim();
@@ -1321,8 +1317,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
 }) async* {
   final upstreamModelId = _apiModelId(config, modelId);
   final url = _openAICompatibleUrl(config);
-  // Claude models served through OpenAI-compatible proxies require signed
-  // thinking blocks; unsigned reasoning echoes are stripped before sending.
+  // 通过 OpenAI 兼容代理提供的 Claude 模型需要经过签名的
+  // thinking 块；未签名的推理回声会在发送前被剥离。
   final isClaudeUpstream = upstreamModelId.toLowerCase().contains('claude');
 
   final effectiveInfo = _effectiveModelInfo(config, modelId);
@@ -1338,9 +1334,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
     providerId: config.id.toLowerCase(),
     upstreamModelId: upstreamModelId,
   );
-  // OpenRouter documents delta-style `reasoning_details` chunks that must be
-  // concatenated in order, so cumulative-snapshot detection is disabled for
-  // it; other providers may resend the full array-so-far with each chunk.
+  // OpenRouter 文档定义的是必须按顺序拼接的增量式 `reasoning_details` 分块，
+  // 因此对其禁用累积快照检测；其他服务可能在每个分块中重发截至当前的完整数组。
   final reasoningDetailsAllowSnapshots =
       !BuiltInToolsHelper.isOpenRouterProvider(config);
   final bool needsReasoningEcho = info.needsReasoningEcho && isReasoning;
@@ -1348,8 +1343,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
     if (maxTokens != null) map[info.completionTokensKey] = maxTokens;
   }
 
-  // Kimi K3 Formula web-search: fetch tool decls, then fiber-execute calls.
-  // Only names actually inserted after duplicate resolution are dispatched.
+  // Kimi K3 Formula 网络搜索：获取工具声明，然后通过 fiber 执行调用。
+  // 仅派发去重解析后实际插入的名称。
   final formulaToolNames = <String>{};
   List<Map<String, dynamic>> kimiFormulaTools = const <Map<String, dynamic>>[];
   final builtInSearchEnabled = _builtInTools(
@@ -1394,7 +1389,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
       : null;
 
   Map<String, dynamic> body;
-  // Keep initial Responses request context so we can perform follow-up requests when tools are called
+  // 保留初始 Responses 请求上下文，以便工具被调用时能够执行后续请求
   List<Map<String, dynamic>> responsesInitialInput =
       const <Map<String, dynamic>>[];
   List<Map<String, dynamic>> responsesToolsSpec =
@@ -1403,9 +1398,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
   List<dynamic>? responsesIncludeParam;
   if (config.useResponseApi == true) {
     final input = <Map<String, dynamic>>[];
-    // Extract system messages into `instructions` (Responses API best practice)
+    // 将系统消息提取到 `instructions` 中（Responses API 的最佳实践）
     String instructions = '';
-    // Prepare tools list for Responses path (may be augmented with built-in web search)
+    // 准备 Responses 路径的工具列表（可能会补充内置网络搜索）
     final List<Map<String, dynamic>> toolList = [];
     if (tools != null && tools.isNotEmpty) {
       for (final t in tools) {
@@ -1421,7 +1416,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
       if (!exists) toolList.add(entry);
     }
 
-    // OpenAI built-in tools (Responses API)
+    // OpenAI 内置工具（Responses API）
     if (builtIns.contains(BuiltInToolNames.codeInterpreter)) {
       addResponsesBuiltInTool({
         'type': 'code_interpreter',
@@ -1432,7 +1427,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
       addResponsesBuiltInTool({'type': 'image_generation'});
     }
 
-    // Built-in web search for Responses API when enabled on supported models
+    // 在支持的模型上启用时，用于 Responses API 的内置网络搜索
     bool isResponsesWebSearchSupported(String id) {
       if (BuiltInToolsHelper.isOpenAIResponsesBuiltInSearchSupportedModel(id)) {
         return true;
@@ -1456,7 +1451,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             BuiltInToolsHelper.isArkProvider(config)) {
           addResponsesBuiltInTool({'type': 'web_search'});
         } else {
-          // Optional per-model configuration under modelOverrides[modelId]['webSearch']
+          // modelOverrides[modelId]['webSearch'] 下的可选按模型配置
           Map<String, dynamic> ws = const <String, dynamic>{};
           try {
             final ov = config.modelOverrides[modelId];
@@ -1470,7 +1465,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           final entry = <String, dynamic>{
             'type': usePreview ? 'web_search_preview' : 'web_search',
           };
-          // Domain filters
+          // 域名过滤
           if (ws['allowed_domains'] is List &&
               (ws['allowed_domains'] as List).isNotEmpty) {
             entry['filters'] = {
@@ -1479,26 +1474,26 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               ),
             };
           }
-          // User location
+          // 用户位置
           if (ws['user_location'] is Map) {
             entry['user_location'] = (ws['user_location'] as Map)
                 .cast<String, dynamic>();
           }
-          // Search context size (preview tool only)
+          // 搜索上下文大小（仅预览工具）
           if (usePreview && ws['search_context_size'] is String) {
             entry['search_context_size'] = ws['search_context_size'];
           }
           addResponsesBuiltInTool(entry);
-          // Optionally request sources in output
+          // 可选择在输出中请求来源
           if (ws['include_sources'] == true) {
-            // Merge/append include array
-            // We'll add this after input loop when building body
+            // 合并/追加 include 数组，
+            // 构建请求体时将在输入循环后添加此项
           }
         }
       }
     }
-    // Collect assistant images to attach to the last user message.
-    // Use last *user* index so tool follow-ups still receive stashed media.
+    // 收集助手图片，以附加到最后一条用户消息。
+    // 使用最后一条 *用户* 消息的索引，确保工具后续调用仍能收到暂存媒体。
     final List<String> lastAssistantImageUrls = <String>[];
     int lastResponsesUserIndex = -1;
     for (int i = messages.length - 1; i >= 0; i--) {
@@ -1515,7 +1510,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           : (originalContent ?? '').toString();
       final roleRaw = (m['role'] ?? 'user').toString();
 
-      // Responses API supports a top-level `instructions` field that has higher priority
+      // Responses API 支持顶层 `instructions` 字段，其优先级更高
       if (roleRaw == 'system') {
         if (raw.isNotEmpty) {
           instructions = instructions.isEmpty ? raw : ('$instructions\n\n$raw');
@@ -1523,7 +1518,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
         continue;
       }
 
-      // Handle tool result messages (role: 'tool') - convert to function_call_output format
+      // 处理工具结果消息（role: 'tool'），转换为 function_call_output 格式
       if (roleRaw == 'tool') {
         final toolCallId = (m['tool_call_id'] ?? '').toString();
         final content = (m['content'] ?? '').toString();
@@ -1539,7 +1534,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
 
       final isAssistant = roleRaw == 'assistant';
 
-      // Handle assistant messages with tool_calls - convert to function_call format
+      // 处理带 tool_calls 的助手消息，转换为 function_call 格式
       if (isAssistant && m['tool_calls'] is List) {
         final toolCalls = m['tool_calls'] as List;
         for (final tc in toolCalls) {
@@ -1558,26 +1553,26 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             });
           }
         }
-        // Skip adding the assistant message content if it only contains tool calls
+        // 如果助手消息内容仅包含工具调用，则跳过添加
         if (raw.trim().isEmpty || raw.trim() == '\n\n') continue;
       }
 
-      // Only parse images if there are images to process.
-      // Semantic media detection only - custom attachment markers are not
-      // recognized. Attachments arrive via structured media-path keys /
-      // userImagePaths, plus Markdown ![](...).
+      // 仅当有图片需要处理时才解析图片。
+      // 仅进行语义媒体检测，无法识别自定义附件标记。
+      // 附件通过结构化 media-path 键 /
+      // userImagePaths，以及 Markdown 的 ![](...) 传入。
       final hasMarkdownImages = raw.contains('![') && raw.contains('](');
       final internalMediaRefs = parseInternalMediaRefs(
         m[multimodalInternalMediaPathsKey],
       );
-      // Consume injected media refs for user and assistant history turns.
+      // 消费为用户与助手历史轮次注入的媒体引用。
       final hasInternalMedia = canImageInput && internalMediaRefs.isNotEmpty;
       final hasAttachedImages =
           canImageInput &&
           (m['role'] == 'user') &&
           i == lastResponsesUserIndex &&
           (userImagePaths?.isNotEmpty == true);
-      // For the last user message, also attach the last assistant image if available
+      // 对于最后一条用户消息，如有可用，还附加最后一张助手图片
       final shouldAttachAssistantImage =
           canImageInput &&
           (m['role'] == 'user') &&
@@ -1633,13 +1628,13 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
         }
 
         if (parsed.text.isNotEmpty) {
-          // Use output_text for assistant, input_text for user
+          // 助手使用 output_text，用户使用 input_text
           parts.add({
             'type': isAssistant ? 'output_text' : 'input_text',
             'text': parsed.text,
           });
         }
-        // Images extracted from this message's text
+        // 从此消息文本中提取的图片
         for (final ref in parsed.images) {
           final normalized = normalizeSrc(ref.src);
           if (!seenImageSources.add(normalized)) continue;
@@ -1652,7 +1647,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           } else {
             url = ref.src; // http(s)
           }
-          // For assistant messages, collect images; for user messages, add directly
+          // 对于助手消息，收集图片；对于用户消息，直接添加
           if (isAssistant) {
             if (!lastAssistantImageUrls.contains(url)) {
               lastAssistantImageUrls.add(url);
@@ -1661,7 +1656,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             addImage(url);
           }
         }
-        // Structured / attached media refs (user + assistant history turns)
+        // 结构化 / 附加的媒体引用（用户与助手历史轮次）
         final supplementalRefs = _supplementalMediaRefs(
           internalRaw: m[multimodalInternalMediaPathsKey],
           userPaths: userImagePaths,
@@ -1672,10 +1667,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           final String mime = _mimeForInternalMediaRef(mediaRef);
           final bool isAv = isAudioMime(mime) || isVideoMime(mime);
           if (isAv) {
-            // Responses path has no first-class A/V input parts here; never
-            // encode video/audio as input_image. Keep a text reference for both
-            // remote and local paths so pure A/V attachments do not become
-            // content: [] (API reject / silent drop).
+            // 此处的 Responses 路径没有一等 A/V 输入部件；切勿
+            // 将视频/音频编码为 input_image。为远程和本地路径
+            // 都保留文本引用，以免纯 A/V 附件变成
+            // content: []（API 拒绝 / 静默丢弃）。
             final normalized = normalizeSrc(p);
             if (seenImageSources.add(normalized)) {
               parts.add({
@@ -1686,7 +1681,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             continue;
           }
           if (!allowRemoteImages && _isRemoteHttpUrl(p)) {
-            // Keep the remote reference visible as text when image embed is off.
+            // 当图片嵌入关闭时，将远程引用以文本形式保持可见。
             final normalized = normalizeSrc(p);
             if (!seenImageSources.add(normalized)) continue;
             parts.add({
@@ -1701,8 +1696,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               ? p
               : await _tryEncodeBase64DataUrl(p, explicitMime: mediaRef.mime);
           if (dataUrl == null) continue;
-          // Assistant Responses messages may only contain output_text/refusal.
-          // Mirror the markdown path: stash for the following user turn.
+          // 助手 Responses 消息只能包含 output_text/refusal。
+          // 与 Markdown 路径保持一致：暂存到下一轮用户消息。
           if (isAssistant) {
             if (!lastAssistantImageUrls.contains(dataUrl)) {
               lastAssistantImageUrls.add(dataUrl);
@@ -1711,15 +1706,15 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             addImage(dataUrl);
           }
         }
-        // Attach all stashed assistant images to the last user message
+        // 将所有暂存的助手图片附加到最后一条用户消息
         if (shouldAttachAssistantImage) {
           for (final url in lastAssistantImageUrls) {
             addImage(url);
           }
         }
-        // Use proper message object format for assistant messages
+        // 为助手消息使用正确的消息对象格式
         if (isAssistant) {
-          // Never emit input_image inside assistant completed output.
+          // 绝不在助手完成输出中生成 input_image。
           final assistantContent = <Map<String, dynamic>>[
             for (final part in parts)
               if (part['type'] == 'output_text' || part['type'] == 'refusal')
@@ -1738,9 +1733,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           input.add({'role': roleRaw, 'content': parts});
         }
       } else {
-        // No images
+        // 无图片
         if (isAssistant) {
-          // Use proper message object format for assistant messages
+          // 为助手消息使用正确的消息对象格式
           input.add({
             'type': 'message',
             'role': 'assistant',
@@ -1778,7 +1773,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
       isReasoning: isReasoning,
       thinkingBudget: thinkingBudget,
     );
-    // Append include parameter if we opted into sources via overrides
+    // 如果通过覆盖配置启用了来源，则追加 include 参数
     if (!BuiltInToolsHelper.isDashScopeProvider(config)) {
       try {
         final ov = config.modelOverrides[modelId];
@@ -1788,7 +1783,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
         }
       } catch (_) {}
     }
-    // Save initial Responses context
+    // 保存初始 Responses 上下文
     try {
       responsesInitialInput = List<Map<String, dynamic>>.from(
         (body['input'] as List).map((e) => (e as Map).cast<String, dynamic>()),
@@ -1841,7 +1836,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
     setMaxTokens(body);
   }
 
-  // Vendor-specific reasoning knobs for chat-completions compatible hosts
+  // 针对兼容 chat-completions 的主机的供应商特定推理调节项
   if (config.useResponseApi != true) {
     _applyVendorReasoningKnobs(
       body,
@@ -1894,7 +1889,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
     upstreamModelId: upstreamModelId,
   );
 
-  // Merge custom body keys (override takes precedence)
+  // 合并自定义 body 键（覆盖优先）
   final extraBodyCfg = _customBody(config, modelId, assistantBody: extraBody);
   if (extraBodyCfg.isNotEmpty) {
     body.addAll(extraBodyCfg);
@@ -1919,12 +1914,12 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
     throw HttpException('HTTP ${response.statusCode}: $errorBody');
   }
 
-  // Non-streaming path: parse one-shot JSON and optionally follow tool calls.
+  // 非流式路径：解析一次性 JSON，并在需要时继续处理工具调用。
   if (!stream) {
     final txt = await response.stream.bytesToString();
     try {
       final obj = jsonDecode(txt);
-      // Responses API non-stream
+      // Responses API 非流式
       if (config.useResponseApi == true) {
         String outText = '';
         final rawOutput = obj['output'] ?? obj['response']?['output'];
@@ -1991,7 +1986,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
         return;
       }
 
-      // Chat Completions non-stream with tool-calls follow-ups
+      // Chat Completions 非流式，并包含工具调用后续处理
       TokenUsage? aggUsage;
       Map<String, dynamic> lastObj = obj is Map
           ? Map<String, dynamic>.from(obj)
@@ -2100,7 +2095,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               toolResults: resultsInfo,
             );
           }
-          // Follow-up request
+          // 后续请求
           final req = http.Request('POST', url);
           final headers2 = _customHeaders(
             config,
@@ -2158,11 +2153,11 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           }
           final txt2 = await resp2.stream.bytesToString();
           lastObj = jsonDecode(txt2) as Map<String, dynamic>;
-          messages = next; // update transcript for next round
+          messages = next; // 更新下一轮的对话记录
           continue;
         }
 
-        // No tool calls -> final content
+        // 没有工具调用 -> 最终内容
         String content = '';
         final cmsg = (c0['message'] as Map?)?.cast<String, dynamic>();
         if (cmsg != null) {
@@ -2207,12 +2202,12 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
     }
   }
 
-  // Streaming path
+  // 流式路径
   final sse = response.stream.transform(utf8.decoder);
   String buffer = '';
   int totalTokens = 0;
   TokenUsage? usage;
-  // Fallback approx token calculation when provider doesn't include usage
+  // 当提供方未返回 usage 时，采用近似的 token 回退计算
   int approxTokensFromChars(int chars) => (chars / 4).round();
   final int approxPromptChars = messages.fold<int>(
     0,
@@ -2226,13 +2221,13 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
   );
   String assistantContentBuffer = '';
 
-  // Track potential tool calls (OpenAI Chat Completions)
+  // 跟踪潜在工具调用（OpenAI Chat Completions）
   final Map<int, Map<String, String>> toolAcc =
       <int, Map<String, String>>{}; // index -> {id,name,args}
-  // Track potential tool calls (OpenAI Responses API)
+  // 跟踪潜在工具调用（OpenAI Responses API）
   final Map<String, Map<String, String>> toolAccResp =
       <String, Map<String, String>>{}; // id/name -> {name,args}
-  // Responses API: track by output_index to capture call_id reliably
+  // Responses API：按 output_index 跟踪，以便可靠地捕获 call_id
   final Map<int, Map<String, String>> respToolCallsByIndex =
       <int, Map<String, String>>{}; // index -> {call_id,name,args}
   final Map<int, _ResponsesImageGenerationResult> responsesImagesByIndex =
@@ -2252,8 +2247,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
 
       final data = line.substring(5).trimLeft();
       if (data == '[DONE]') {
-        // If model streamed tool_calls but didn't include finish_reason on prior chunks,
-        // execute tool flow now and start follow-up request.
+        // 如果模型已流式返回 tool_calls，但之前的分块中没有包含 finish_reason，
+        // 则现在执行工具流程并启动后续请求。
         if (effectiveOnToolCall != null && toolAcc.isNotEmpty) {
           final calls = <Map<String, dynamic>>[];
           final callInfos = <ToolCallInfo>[];
@@ -2290,7 +2285,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             );
           }
 
-          // Execute tools and emit results
+          // 执行工具并发出结果
           final results = <Map<String, dynamic>>[];
           final resultsInfo = <ToolResultInfo>[];
           for (final m in toolMsgs) {
@@ -2313,7 +2308,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             );
           }
 
-          // Build follow-up messages
+          // 构建后续消息
           final mm2 = <Map<String, dynamic>>[];
           for (final m in messages) {
             mm2.add(_copyChatCompletionMessage(m));
@@ -2342,7 +2337,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             });
           }
 
-          // Follow-up request(s) with multi-round tool calls
+          // 包含多轮工具调用的后续请求
           var currentMessages = mm2;
           while (true) {
             final Map<String, dynamic> body2 = {
@@ -2373,7 +2368,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               thinkingBudget: thinkingBudget,
             );
 
-            // Ask for usage in streaming (when supported)
+            // 在流式模式下请求 usage（受支持时）
             _applyCompatibleBuiltInSearch(
               body2,
               config: config,
@@ -2387,7 +2382,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               host: info.host,
             );
 
-            // Apply custom body overrides
+            // 应用自定义 body 覆盖配置
             if (extraBodyCfg.isNotEmpty) {
               body2.addAll(extraBodyCfg);
             }
@@ -2425,11 +2420,11 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             }
             final s2 = resp2.stream.transform(utf8.decoder);
             String buf2 = '';
-            // Track potential subsequent tool calls
+            // 跟踪可能出现的后续工具调用
             final Map<int, Map<String, String>> toolAcc2 =
                 <int, Map<String, String>>{};
             String? finishReason2;
-            String contentAccum = ''; // Accumulate content for this round
+            String contentAccum = ''; // 累积本轮内容
             String reasoningAccum = '';
             final reasoningDetailsAccum = _ReasoningDetailsAccumulator(
               allowSnapshots: reasoningDetailsAllowSnapshots,
@@ -2443,7 +2438,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 if (l.isEmpty || !l.startsWith('data:')) continue;
                 final d = l.substring(5).trimLeft();
                 if (d == '[DONE]') {
-                  // This round finished; handle below
+                  // 本轮已完成；在下方处理
                   continue;
                 }
                 _throwIfInBandStreamError(d);
@@ -2463,7 +2458,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     final txt = _extractOpenAICompatibleDeltaText(delta);
                     final rc =
                         delta?['reasoning_content'] ?? delta?['reasoning'];
-                    // Capture Grok citations
+                    // 捕获 Grok 引用
                     final gCitations = o['citations'];
                     if (gCitations is List && gCitations.isNotEmpty) {
                       final items = <Map<String, dynamic>>[];
@@ -2500,7 +2495,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                       );
                     }
                     if (txt.isNotEmpty) {
-                      contentAccum += txt; // Accumulate content
+                      contentAccum += txt; // 累积内容
                       yield ChatStreamChunk(
                         content: txt,
                         isDone: false,
@@ -2508,7 +2503,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                         usage: usage,
                       );
                     }
-                    // Fallback/merge: message.content in same chunk (if any)
+                    // 回退/合并：同一分块中的 message.content（如果存在）
                     if (message != null && message['content'] != null) {
                       final mc = message['content'];
                       if (mc is String && mc.isNotEmpty) {
@@ -2538,11 +2533,11 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     if (rdMsg is List && rdMsg.isNotEmpty) {
                       reasoningDetailsAccum.add(rdMsg);
                     }
-                    // Handle image outputs from OpenRouter-style deltas
-                    // Possible shapes:
+                    // 处理 OpenRouter 风格 deltas 中的图片输出，
+                    // 可能的格式：
                     // - delta['images']: [ { type: 'image_url', image_url: { url: 'data:...' }, index: 0 }, ... ]
                     // - delta['content']: [ { type: 'image_url', image_url: { url: '...' } }, { type: 'text', text: '...' } ]
-                    // - delta['image_url'] directly (less common)
+                    // - 直接使用 delta['image_url']（较少见）
                     if (wantsImageOutput) {
                       final List<dynamic> imageItems = <dynamic>[];
                       final imgs = delta?['images'];
@@ -2619,7 +2614,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               }
             }
 
-            // After this follow-up round finishes: if tool calls again, execute and loop
+            // 本轮后续处理完成后：如果再次出现工具调用，则执行并循环
             if (finishReason2 == 'tool_calls' || toolAcc2.isNotEmpty) {
               final calls2 = <Map<String, dynamic>>[];
               final callInfos2 = <ToolCallInfo>[];
@@ -2683,7 +2678,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   toolResults: resultsInfo2,
                 );
               }
-              // Append for next loop - including any content accumulated in this round
+              // 追加供下一轮循环使用——包括本轮累积的任何内容
               final nextAssistantToolCall = _buildAssistantToolCallMessage(
                 calls: calls2,
                 content: contentAccum,
@@ -2707,10 +2702,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     'content': r['content'],
                   },
               ];
-              // Continue loop
+              // 继续循环
               continue;
             } else {
-              // No further tool calls; finish
+              // 没有更多工具调用；结束
               final approxTotal =
                   approxPromptTokens +
                   approxTokensFromChars(approxCompletionChars);
@@ -2745,7 +2740,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
         String? reasoning;
 
         if (config.useResponseApi == true) {
-          // OpenAI /responses SSE types
+          // OpenAI /responses 的 SSE 类型
           final type = json['type'];
           if (type == 'response.output_text.delta') {
             final delta = json['delta'];
@@ -2827,7 +2822,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               }
             } catch (_) {}
           } else if (type is String && type.contains('function_call')) {
-            // Accumulate function call args for Responses API
+            // 为 Responses API 累积函数调用参数
             final id = (json['id'] ?? json['call_id'] ?? '').toString();
             final name = (json['name'] ?? json['function']?['name'] ?? '')
                 .toString();
@@ -2854,12 +2849,12 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               usage = _mergeOpenAICompatibleUsage(usage, u);
               totalTokens = usage?.totalTokens ?? totalTokens;
             }
-            // Extract web search citations from final output (Responses API)
+            // 从最终输出中提取网页搜索引用（Responses API）
             try {
               final output = json['response']?['output'];
               final items = <Map<String, dynamic>>[];
               final completedImageIndexes = <int>{};
-              // Save output items for potential follow-up call input
+              // 保存输出项，作为可能的后续调用输入
               lastResponseOutputItems = const <Map<String, dynamic>>[];
               if (output is List) {
                 lastResponseOutputItems = [
@@ -2900,8 +2895,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                       }
                     }
                   } else if (_isResponsesImageGenerationType(it['type'])) {
-                    // Handle image generation output from OpenAI Responses API
-                    // it['result'] contains base64 image data or a data URL.
+                    // 处理来自 OpenAI Responses API 的图像生成输出，
+                    // it['result'] 包含 base64 图像数据或 data URL。
                     final b64 = (it['result'] ?? '').toString();
                     if (b64.isNotEmpty) {
                       completedImageIndexes.add(outputIndex);
@@ -2961,13 +2956,13 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 );
               }
             } catch (_) {}
-            // Responses tool calling follow-up handling
+            // Responses 工具调用的后续处理
             final bool hasRespCalls =
                 respToolCallsByIndex.isNotEmpty || toolAccResp.isNotEmpty;
             if (effectiveOnToolCall != null && hasRespCalls) {
-              // Prefer the indexed calls (with call_id); fallback to toolAccResp
+              // 优先使用带索引的调用（含 call_id）；回退到 toolAccResp
               final callInfos = <ToolCallInfo>[];
-              final msgs = <Map<String, dynamic>>[]; // for executing tools
+              final msgs = <Map<String, dynamic>>[]; // 用于执行工具
               if (respToolCallsByIndex.isNotEmpty) {
                 final sorted = respToolCallsByIndex.keys.toList()..sort();
                 for (final idx in sorted) {
@@ -3064,7 +3059,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 );
               }
 
-              // Build follow-up Responses request input
+              // 构建后续 Responses 请求输入
               List<Map<String, dynamic>> currentInput = <Map<String, dynamic>>[
                 ...responsesInitialInput,
               ];
@@ -3073,11 +3068,11 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               }
               currentInput.addAll(followUpOutputs);
 
-              // Iteratively request until the model stops issuing tool calls,
-              // consistent with how Claude, Gemini and OpenAI Chat Completions
-              // providers handle the tool-call loop (while-true until done).
-              // Guard: break if the exact same tool-call set repeats 3 times
-              // consecutively, which indicates the model is stuck in a loop.
+              // 迭代请求，直到模型停止发出工具调用，
+              // 这与 Claude、Gemini 和 OpenAI Chat Completions
+              // 提供程序处理工具调用循环的方式一致（while-true 直到完成）。
+              // 防护：如果完全相同的工具调用集合连续重复 3 次，
+              // 则中断循环，因为这表明模型陷入了循环。
               const int maxConsecutiveDupes = 3;
               String? lastToolSignature;
               int consecutiveDupeCount = 0;
@@ -3111,14 +3106,14 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   thinkingBudget: thinkingBudget,
                 );
 
-                // Apply overrides
+                // 应用覆盖项
                 final extraCfg = _customBody(
                   config,
                   modelId,
                   assistantBody: extraBody,
                 );
                 if (extraCfg.isNotEmpty) body2.addAll(extraCfg);
-                // Ensure tools are flattened
+                // 确保工具已展平
                 try {
                   if (body2['tools'] is List) {
                     final raw = (body2['tools'] as List).cast<dynamic>();
@@ -3161,8 +3156,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 } on HttpException {
                   rethrow;
                 } catch (e) {
-                  // Keep as HttpException so the per-event catch below (which
-                  // tolerates malformed JSON) cannot swallow this failure.
+                  // 保留为 HttpException，以便下面的逐事件捕获逻辑（它会
+                  // 容忍格式错误的 JSON）无法吞掉此失败。
                   throw HttpException('Follow-up request failed: $e');
                 }
                 final s2 = _rethrowFollowUpStreamErrors(
@@ -3240,13 +3235,13 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                         }
                       } else if (o is Map &&
                           (o['type'] ?? '') == 'response.completed') {
-                        // usage
+                        // 用量
                         final u2 = o['response']?['usage'];
                         if (u2 != null) {
                           usage = _mergeOpenAICompatibleUsage(usage, u2);
                           totalTokens = usage?.totalTokens ?? totalTokens;
                         }
-                        // capture output items
+                        // 捕获输出项
                         final out2 = o['response']?['output'];
                         if (out2 is List) {
                           outItems2 = [
@@ -3260,7 +3255,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 }
 
                 if (respCalls2.isEmpty) {
-                  // No further tool calls; finalize
+                  // 没有更多工具调用；完成收尾
                   final approxTotal2 =
                       approxPromptTokens +
                       approxTokensFromChars(approxCompletionChars);
@@ -3274,7 +3269,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   return;
                 }
 
-                // Detect consecutive duplicate tool-call patterns
+                // 检测连续重复的工具调用模式
                 final sorted2 = respCalls2.keys.toList()..sort();
                 final sigParts = <String>[];
                 for (final idx2 in sorted2) {
@@ -3285,7 +3280,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 if (currentSig == lastToolSignature) {
                   consecutiveDupeCount += 1;
                   if (consecutiveDupeCount >= maxConsecutiveDupes) {
-                    // Break out of loop – model is stuck repeating the same calls
+                    // 跳出循环：模型卡在重复执行相同调用
                     break;
                   }
                 } else {
@@ -3293,7 +3288,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   consecutiveDupeCount = 1;
                 }
 
-                // Execute next round of tool calls
+                // 执行下一轮工具调用
                 final callInfos2 = <ToolCallInfo>[];
                 final msgs2 = <Map<String, dynamic>>[];
                 for (final idx2 in sorted2) {
@@ -3363,14 +3358,14 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     toolResults: resultsInfo2,
                   );
                 }
-                // Extend current input with this round's model output and our outputs
+                // 使用本轮的模型输出和我们的输出来扩展当前输入
                 if (responseOutputItems2.isNotEmpty) {
                   currentInput.addAll(responseOutputItems2);
                 }
                 currentInput.addAll(followUpOutputs2);
               }
 
-              // Safety
+              // 安全保护
               final approxTotal =
                   approxPromptTokens +
                   approxTokensFromChars(approxCompletionChars);
@@ -3396,7 +3391,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             );
             return;
           } else {
-            // Fallback for providers that inline output
+            // 为内联输出的提供程序提供回退方案
             final output = json['output'];
             if (output != null) {
               content = (output['content'] ?? '').toString();
@@ -3409,7 +3404,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             }
           }
         } else {
-          // Handle standard OpenAI Chat Completions format
+          // 处理标准 OpenAI Chat Completions 格式
           final choices = json['choices'];
           if (choices != null && choices.isNotEmpty) {
             final c0 = choices[0];
@@ -3418,14 +3413,14 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             //   print('[ChatApi] Received finishReason from choices: $finishReason');
             // }
 
-            // Some providers may include both delta and message.content in SSE chunks.
-            // Prioritize delta, then fallback to message.content; merge if both present.
+            // 某些提供程序可能在 SSE 分块中同时包含 delta 和 message.content。
+            // 优先使用 delta，然后回退到 message.content；如果两者都存在则合并。
             final message = c0['message'];
             final delta = c0['delta'];
 
-            // 1) Parse delta first
+            // 1) 首先解析 delta
             if (delta != null) {
-              // Streaming format: choices[0].delta.content
+              // 流式格式：choices[0].delta.content
               final dc = delta['content'];
               final deltaContent = _extractOpenAICompatibleDeltaText(delta);
               if (deltaContent.isNotEmpty) {
@@ -3433,21 +3428,21 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 approxCompletionChars += deltaContent.length;
               }
 
-              // reasoning_content handling (unchanged)
+              // reasoning_content 处理（保持不变）
               final rc =
                   (delta['reasoning_content'] ?? delta['reasoning']) as String?;
               if (rc != null && rc.isNotEmpty) {
                 reasoning = rc;
                 if (needsReasoningEcho) reasoningBuffer += rc;
               }
-              // Capture vendor reasoning details (may carry thinking
-              // signatures) from any provider that sends them.
+              // 从发送这些信息的任何提供方捕获供应商推理详情（可能带有思考
+              // 签名）。
               final rdDelta = delta['reasoning_details'];
               if (rdDelta is List && rdDelta.isNotEmpty) {
                 reasoningDetailsBuffer.add(rdDelta);
               }
 
-              // images handling from delta (unchanged)
+              // 来自 delta 的 images 处理（保持不变）
               if (wantsImageOutput) {
                 final List<dynamic> imageItems = <dynamic>[];
                 final imgs = delta['images'];
@@ -3487,7 +3482,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 }
               }
 
-              // tool_calls handling from delta (unchanged)
+              // 来自 delta 的 tool_calls 处理（保持不变）
               final tcs = delta['tool_calls'] as List?;
               if (tcs != null) {
                 for (final t in tcs) {
@@ -3516,7 +3511,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               }
             }
 
-            // 2) Fallback and merge: parse choices[0].message.content
+            // 2) 回退并合并：解析 choices[0].message.content
             if (message != null && message['content'] != null) {
               final mc = message['content'];
               String messageContent = '';
@@ -3542,7 +3537,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 approxCompletionChars += messageContent.length;
               }
 
-              // Capture reasoning_content if only present on the message object
+              // 如果仅存在于 message 对象上，则捕获 reasoning_content
               if (message != null) {
                 final rcMsg =
                     message['reasoning_content'] ?? message['reasoning'];
@@ -3552,7 +3547,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 }
               }
 
-              // images handling from message content (unchanged)
+              // 来自 message content 的 images 处理（保持不变）
               if (wantsImageOutput && mc is List) {
                 final List<dynamic> imageItems = <dynamic>[];
                 for (final it in mc) {
@@ -3582,7 +3577,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               }
             }
           }
-          // XinLiu (iflow.cn) compatibility: tool_calls at root level instead of delta
+          // XinLiu（iflow.cn）兼容：tool_calls 位于根级别而不是 delta
           final rootToolCalls = json['tool_calls'] as List?;
           if (rootToolCalls != null) {
             // print('[ChatApi/XinLiu] Detected root-level tool_calls, count: ${rootToolCalls.length}, original finishReason: $finishReason');
@@ -3612,8 +3607,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               entry['name'] = name;
               entry['args'] = argsStr;
             }
-            // When root-level tool_calls are present, always treat as tool_calls finish reason
-            // (override any other finish_reason from provider)
+            // 当存在根级别 tool_calls 时，始终视为 tool_calls 结束原因
+            // （覆盖提供方返回的任何其他 finish_reason）
             if (rootToolCalls.isNotEmpty) {
               // print('[ChatApi/XinLiu] Overriding finishReason from "$finishReason" to "tool_calls"');
               finishReason = 'tool_calls';
@@ -3638,18 +3633,18 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           );
         }
 
-        // Some providers (e.g., OpenRouter) may omit the [DONE] sentinel
-        // and only send finish_reason on the last delta. If we see a
-        // definitive finish that's not tool_calls, end the stream now so
-        // the UI can persist the message.
-        // XinLiu compatibility: Execute tools immediately if we have finish_reason='tool_calls' and accumulated calls
+        // 一些提供方（例如 OpenRouter）可能会省略 [DONE] 哨兵标记，
+        // 并且只在最后一个 delta 上发送 finish_reason。如果我们看到
+        // 一个不是 tool_calls 的明确结束，则立即结束流，以便
+        // UI 可以持久化消息。
+        // XinLiu 兼容：如果 finish_reason='tool_calls' 且已累积调用，则立即执行工具
         if (config.useResponseApi != true &&
             finishReason == 'tool_calls' &&
             toolAcc.isNotEmpty &&
             effectiveOnToolCall != null) {
           // print('[ChatApi/XinLiu] Executing tools immediately (finishReason=tool_calls, toolAcc.size=${toolAcc.length})');
-          // Some providers (like XinLiu) return tool_calls with finish_reason='tool_calls' but no [DONE]
-          // Execute tools immediately in this case
+          // 一些提供方（如 XinLiu）返回 tool_calls 且 finish_reason='tool_calls'，但没有 [DONE]
+          // 这种情况下立即执行工具
           final calls = <Map<String, dynamic>>[];
           final callInfos = <ToolCallInfo>[];
           final toolMsgs = <Map<String, dynamic>>[];
@@ -3683,7 +3678,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               toolCalls: callInfos,
             );
           }
-          // Execute tools and emit results
+          // 执行工具并发出结果
           final results = <Map<String, dynamic>>[];
           final resultsInfo = <ToolResultInfo>[];
           for (final m in toolMsgs) {
@@ -3705,7 +3700,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               toolResults: resultsInfo,
             );
           }
-          // Build follow-up messages
+          // 构建后续消息
           final mm2 = <Map<String, dynamic>>[];
           for (final m in messages) {
             mm2.add(_copyChatCompletionMessage(m));
@@ -3733,7 +3728,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               'content': r['content'],
             });
           }
-          // Continue streaming with follow-up request
+          // 使用后续请求继续流式传输
           var currentMessages = mm2;
           while (true) {
             final Map<String, dynamic> body2 = {
@@ -3812,8 +3807,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             } on HttpException {
               rethrow;
             } catch (e) {
-              // Keep as HttpException so the per-event catch below (which
-              // tolerates malformed JSON) cannot swallow this failure.
+              // 保持为 HttpException，以便下面逐事件捕获（它
+              // 容忍格式错误的 JSON）不能吞掉此失败。
               throw HttpException('Follow-up request failed: $e');
             }
             final s2 = _rethrowFollowUpStreamErrors(
@@ -3855,7 +3850,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     final txt = _extractOpenAICompatibleDeltaText(delta);
                     final rc =
                         delta?['reasoning_content'] ?? delta?['reasoning'];
-                    // Capture Grok citations
+                    // 捕获 Grok 引用
                     final gCitations = o['citations'];
                     if (gCitations is List && gCitations.isNotEmpty) {
                       final items = <Map<String, dynamic>>[];
@@ -3972,7 +3967,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                       }
                     }
 
-                    // Fallback/merge: message.content in same chunk (if any)
+                    // 回退/合并：同一块中的 message.content（如有）
                     final message = c0['message'] as Map?;
                     if (message != null && message['content'] != null) {
                       final mc = message['content'];
@@ -4004,7 +3999,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                       reasoningDetailsAccum.add(rdMsg);
                     }
                   }
-                  // XinLiu compatibility for follow-up requests too
+                  // 后续请求也同样兼容 XinLiu
                   final rootToolCalls2 = o['tool_calls'] as List?;
                   if (rootToolCalls2 != null) {
                     for (final t in rootToolCalls2) {
@@ -4139,15 +4134,15 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             }
           }
         }
-        // XinLiu compatibility: Don't end early if we have accumulated tool calls
+        // XinLiu 兼容：如果已累积工具调用，不要提前结束
         if (config.useResponseApi != true &&
             finishReason != null &&
             finishReason != 'tool_calls') {
           final bool hasPendingToolCalls =
               toolAcc.isNotEmpty || toolAccResp.isNotEmpty;
           if (hasPendingToolCalls) {
-            // Some providers (like XinLiu/iflow.cn) may return tool_calls with finish_reason='stop'
-            // and may not send a [DONE] marker. Execute tools immediately in this case.
+            // 一些提供方（如 XinLiu/iflow.cn）可能返回 finish_reason='stop' 的 tool_calls，
+            // 并且可能不发送 [DONE] 标记。这种情况下立即执行工具。
             if (effectiveOnToolCall != null && toolAcc.isNotEmpty) {
               final calls = <Map<String, dynamic>>[];
               final callInfos = <ToolCallInfo>[];
@@ -4184,7 +4179,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   toolCalls: callInfos,
                 );
               }
-              // Execute tools and emit results
+              // 执行工具并发出结果
               final results = <Map<String, dynamic>>[];
               final resultsInfo = <ToolResultInfo>[];
               for (final m in toolMsgs) {
@@ -4215,7 +4210,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   toolResults: resultsInfo,
                 );
               }
-              // Build follow-up messages
+              // 构建后续消息
               final mm2 = <Map<String, dynamic>>[];
               for (final m in messages) {
                 mm2.add(_copyChatCompletionMessage(m));
@@ -4243,7 +4238,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   'content': r['content'],
                 });
               }
-              // Continue streaming with follow-up request - reuse existing multi-round logic from [DONE] handler
+              // 使用后续请求继续流式传输 - 复用 [DONE] 处理器中现有的多轮逻辑
               var currentMessages = mm2;
               while (true) {
                 final Map<String, dynamic> body2 = {
@@ -4324,8 +4319,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 } on HttpException {
                   rethrow;
                 } catch (e) {
-                  // Keep as HttpException so the per-event catch below (which
-                  // tolerates malformed JSON) cannot swallow this failure.
+                  // 保持为 HttpException，以便下面逐事件捕获（它
+                  // 容忍格式错误的 JSON）不能吞掉此失败。
                   throw HttpException('Follow-up request failed: $e');
                 }
                 final s2 = _rethrowFollowUpStreamErrors(
@@ -4458,7 +4453,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                           }
                         }
 
-                        // Fallback/merge: message.content in same chunk (if any)
+                        // 回退/合并：同一块中的 message.content（如有）
                         final message = c0['message'] as Map?;
                         if (message != null && message['content'] != null) {
                           final mc = message['content'];
@@ -4491,7 +4486,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                           reasoningDetailsAccum.add(rdMsg);
                         }
                       }
-                      // XinLiu compatibility for follow-up requests too
+                      // 后续请求也同样兼容 XinLiu
                       final rootToolCalls2 = o['tool_calls'] as List?;
                       if (rootToolCalls2 != null) {
                         for (final t in rootToolCalls2) {
@@ -4641,19 +4636,17 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           }
         }
       } on HttpException {
-        // In-band error frames raised inside this block (follow-up tool-call
-        // streams call _throwIfInBandStreamError in here) and failed follow-up
-        // requests must surface as stream errors; swallowing them would let
-        // the no-[DONE] fallback below persist truncated output as a normal
-        // completion.
+        // 此块内抛出的带内错误帧（后续工具调用流会在这里调用
+        // _throwIfInBandStreamError）以及失败的后续请求必须作为流错误暴露；吞掉它们会让
+        // 下方无 [DONE] 的回退逻辑把截断输出当作正常完成持久化。
         rethrow;
       } catch (e) {
-        // Skip malformed JSON
+        // 跳过格式错误的 JSON
       }
     }
   }
 
-  // Fallback: provider closed SSE without sending [DONE]
+  // 回退：提供方在没有发送 [DONE] 的情况下关闭了 SSE
   final approxTotal =
       usage?.totalTokens ??
       (approxPromptTokens + approxTokensFromChars(approxCompletionChars));

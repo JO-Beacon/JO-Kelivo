@@ -13,7 +13,7 @@ class _LegacyMemoryTabBody extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final controller = TextEditingController(text: initial);
-    // Desktop: custom dialog; Mobile: keep bottom sheet
+    // 桌面端：自定义对话框；移动端：保留底部弹层
     final platform = Theme.of(context).platform;
     final isDesktop =
         platform == TargetPlatform.macOS ||
@@ -278,7 +278,7 @@ class _LegacyMemoryTabBody extends StatelessWidget {
     final ap = context.watch<AssistantProvider>();
     final a = ap.getById(assistantId)!;
     final mp = context.watch<MemoryProvider>();
-    // Ensure provider loads persisted memories once
+    // 确保 provider 只加载一次已持久化记忆
     try {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         mp.initialize();
@@ -286,7 +286,7 @@ class _LegacyMemoryTabBody extends StatelessWidget {
     } catch (_) {}
     final memories = mp.getForAssistant(assistantId);
 
-    // Align the section card visuals with the basic settings page iOS-style list cards
+    // 让分区卡片视觉与基础设置页的 iOS 风格列表卡片对齐
     Widget sectionCard({
       required Widget child,
       EdgeInsets padding = const EdgeInsets.symmetric(vertical: 6),
@@ -294,7 +294,7 @@ class _LegacyMemoryTabBody extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Container(
         decoration: BoxDecoration(
-          // Match Settings page: Light uses translucent white; Dark uses subtle white10
+          // 与设置页面一致：浅色使用半透明白；深色使用 subtle white10
           color: context.appColors.surfaceCard,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
@@ -311,7 +311,7 @@ class _LegacyMemoryTabBody extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(0, 8, 0, 16),
       children: [
         if (header != null) header!,
-        // Feature switches
+        // 功能开关
         sectionCard(
           child: Column(
             children: [
@@ -356,7 +356,7 @@ class _LegacyMemoryTabBody extends StatelessWidget {
           ),
         ),
 
-        // Manage memories header with add button
+        // 管理记忆标题，带添加按钮
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
           child: Row(
@@ -409,7 +409,7 @@ class _LegacyMemoryTabBody extends StatelessWidget {
             ),
           ),
 
-        // Memory list
+        // 记忆列表
         ...memories.map((m) {
           return Padding(
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
@@ -464,7 +464,7 @@ class _LegacyMemoryTabBody extends StatelessWidget {
           );
         }),
 
-        // Summaries section
+        // 摘要区块
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 24, 16, 4),
           child: Row(
@@ -746,7 +746,7 @@ class _LegacyMemoryTabBody extends StatelessWidget {
       return;
     }
 
-    // Mobile: BottomSheet
+    // 移动端：BottomSheet
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,

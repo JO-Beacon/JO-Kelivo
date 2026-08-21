@@ -14,20 +14,20 @@ import '../utils/model_display_helper.dart';
 import 'chat_input_bar.dart';
 import 'model_icon.dart';
 
-/// Callback for checking if a model supports tool calling.
+/// 检查模型是否支持工具调用的回调。
 typedef IsToolModelCallback = bool Function(String providerKey, String modelId);
 
-/// Callback for checking if a model supports reasoning.
+/// 检查模型是否支持推理的回调。
 typedef IsReasoningModelCallback =
     bool Function(String providerKey, String modelId);
 
-/// Callback for checking if reasoning is enabled.
+/// 检查推理是否已启用的回调。
 typedef IsReasoningEnabledCallback = bool Function(int? budget);
 
-/// Widget that wraps ChatInputBar with all the necessary logic and callbacks.
+/// 使用必要逻辑和回调包装 ChatInputBar 的组件。
 ///
-/// This widget extracts the _buildChatInputBar logic from HomePageState
-/// to reduce coupling and improve maintainability.
+/// 此组件从 HomePageState 提取 _buildChatInputBar 逻辑，
+/// 以降低耦合并提高可维护性。
 class ChatInputSection extends StatelessWidget {
   const ChatInputSection({
     super.key,
@@ -64,6 +64,7 @@ class ChatInputSection extends StatelessWidget {
     this.onLongPressLearning,
     this.onClearContext,
     this.onCompressContext,
+    this.clearContextLabel,
     this.conversationId,
     this.sendButtonTooltip,
     this.backgroundImageActive = false,
@@ -76,12 +77,12 @@ class ChatInputSection extends StatelessWidget {
   final bool isTablet;
   final bool isLoading;
 
-  // Model capability checkers
+  // 模型能力检查器
   final IsToolModelCallback isToolModel;
   final IsReasoningModelCallback isReasoningModel;
   final IsReasoningEnabledCallback isReasoningEnabled;
 
-  // Callbacks
+  // 回调
   final VoidCallback? onMore;
   final VoidCallback? onSelectModel;
   final VoidCallback? onLongPressSelectModel;
@@ -106,6 +107,7 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onLongPressLearning;
   final VoidCallback? onClearContext;
   final VoidCallback? onCompressContext;
+  final String? clearContextLabel;
   final String? conversationId;
   final String? sendButtonTooltip;
   final bool backgroundImageActive;
@@ -118,12 +120,12 @@ class ChatInputSection extends StatelessWidget {
     final a = ap.currentAssistant;
     final assistantId = a?.id;
 
-    // Use unified helper to get model identifiers
+    // 使用统一辅助函数获取模型标识符
     final modelIds = getActiveModelIds(settings, assistant: a);
     final pk = modelIds.providerKey;
     final mid = modelIds.modelId;
 
-    // Enforce model capabilities: disable MCP selection if model doesn't support tools
+    // 强制模型能力约束：如果模型不支持工具，则禁用 MCP 选择
     _enforceModelCapabilities(context, settings, ap, a, pk, mid);
 
     final isDesktop = _isDesktopPlatform(context);
@@ -178,7 +180,7 @@ class ChatInputSection extends StatelessWidget {
       showQuickPhraseButton: _hasQuickPhrases(context, a),
       onQuickPhrase: onQuickPhrase,
       onLongPressQuickPhrase: onLongPressQuickPhrase,
-      // OCR button: show on desktop for mobile layout, always check settings for tablet layout
+      // OCR 按钮：移动布局在桌面端显示，平板布局始终检查设置
       showOcrButton: isTablet
           ? (settings.ocrModelProvider != null && settings.ocrModelId != null)
           : (isDesktop &&
@@ -186,7 +188,7 @@ class ChatInputSection extends StatelessWidget {
                 settings.ocrModelId != null),
       ocrActive: settings.ocrEnabled,
       onToggleOcr: onToggleOcr,
-      // Tablet-specific parameters
+      // 平板专属参数
       showMiniMapButton: isTablet,
       onOpenMiniMap: isTablet ? onOpenMiniMap : null,
       onPickCamera: isTablet ? (isDesktop ? null : onPickCamera) : null,
@@ -210,6 +212,7 @@ class ChatInputSection extends StatelessWidget {
       showMoreButton: !isTablet,
       onClearContext: isTablet ? onClearContext : null,
       onCompressContext: isTablet ? onCompressContext : null,
+      clearContextLabel: clearContextLabel,
       backgroundImageActive: backgroundImageActive,
       inputBackgroundOpacityLight: settings.chatInputBackgroundOpacityLight,
       inputBackgroundOpacityDark: settings.chatInputBackgroundOpacityDark,

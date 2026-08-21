@@ -107,11 +107,11 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
   Set<ModelAbility>? _cachedChatAbilities;
   Set<Modality>? _cachedEmbeddingInput;
 
-  // Advanced (UI only)
+  // 高级选项（仅 UI）
   final List<_HeaderKV> _headers = [];
   final List<_BodyKV> _bodies = [];
 
-  // Built-in tools (per provider)
+  // 内置工具（按供应商）
   bool _googleUrlContextTool = false;
   bool _googleCodeExecutionTool = false;
   bool _googleYoutubeTool = false;
@@ -143,8 +143,8 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
         }
       });
     });
-    // Resolve display model id from per-model overrides when present (apiModelId),
-    // falling back to the logical key for backwards compatibility.
+    // 当存在模型级覆盖（apiModelId）时解析显示模型 id，
+    // 否则回退到逻辑键以保持向后兼容。
     Map<String, dynamic>? initialOv;
     if (!widget.isNew) {
       final raw = cfg.modelOverrides[widget.modelId];
@@ -162,7 +162,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
       }
     }
     _idCtrl = TextEditingController(text: displayModelId);
-    // Defaults from inferred base if id provided; otherwise generic defaults for new
+    // 提供 id 时从推断的基础模型取默认值；否则为新模型使用通用默认值
     final base = ModelRegistry.infer(
       ModelInfo(
         id: displayModelId.isEmpty ? 'custom' : displayModelId,
@@ -354,7 +354,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
                 ),
               ),
             ),
-            // Right spacer to balance title centering
+            // 右侧占位，使标题居中
             const SizedBox(width: 36),
           ],
         ),
@@ -363,7 +363,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
   }
 
   Widget _buildTabs(BuildContext context, AppLocalizations l10n) {
-    // iOS segmented tabs like provider add sheet
+    // 类似供应商添加弹层的 iOS 分段标签
     final tabs = <String>[
       l10n.modelDetailSheetBasicTab,
       l10n.modelDetailSheetAdvancedTab,
@@ -398,7 +398,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
             const SizedBox(height: 6),
             TextField(
               controller: _idCtrl,
-              readOnly: !widget.isNew, // existing model ID is read-only
+              readOnly: !widget.isNew, // 已有模型 ID 只读
               enableInteractiveSelection: widget.isNew,
               style: TextStyle(
                 color: widget.isNew
@@ -820,8 +820,8 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
     ),
   );
 
-  // Generate a unique logical key for a model instance within a provider.
-  // This allows multiple configurations to share the same upstream API model id.
+  // 在供应商内为模型实例生成唯一逻辑键。
+  // 这允许多个配置共享同一个上游 API 模型 id。
   String _nextModelKey(ProviderConfig cfg, String apiModelId) {
     final existing = <String>{...cfg.models, ...cfg.modelOverrides.keys};
     if (!existing.contains(apiModelId)) return apiModelId;
@@ -836,11 +836,11 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
   Future<void> _save() async {
     final settings = context.read<SettingsProvider>();
     final old = settings.getProviderConfig(widget.providerKey);
-    // Logical key used inside configs (stable across edits)
+    // 配置中使用的逻辑键（编辑时保持稳定）
     final String prevKey = widget.modelId;
-    // Upstream/vendor model id typed by the user
+    // 用户输入的上游或供应商模型 id
     final String apiModelId = _idCtrl.text.trim();
-    // Basic validation
+    // 基础校验
     if (apiModelId.isEmpty || apiModelId.length < 2) {
       final l10n = AppLocalizations.of(context)!;
       showAppSnackBar(
@@ -888,7 +888,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
       }
     }
     final builtInTools = BuiltInToolNames.orderedForStorage(builtInSet);
-    // Decide which logical key to use for this instance
+    // 决定此实例使用哪个逻辑键
     final String key = (prevKey.isEmpty || widget.isNew)
         ? _nextModelKey(old, apiModelId)
         : prevKey;
@@ -913,17 +913,17 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
       if (!isEmbedding && builtInTools.isNotEmpty) 'builtInTools': builtInTools,
     };
 
-    // Apply updates to provider config
+    // 将更新应用到供应商配置
     try {
       if (prevKey.isEmpty || widget.isNew) {
-        // Creating a new model
+        // 创建新模型
         final list = old.models.toList()..add(key);
         await settings.setProviderConfig(
           widget.providerKey,
           old.copyWith(modelOverrides: ov, models: list),
         );
       } else {
-        // Existing model instance; keep logical key stable and just persist overrides
+        // 已有模型实例；保持逻辑键稳定，只持久化覆盖项
         await settings.setProviderConfig(
           widget.providerKey,
           old.copyWith(modelOverrides: ov),
@@ -1480,7 +1480,7 @@ class _CopySuffixButtonState extends State<_CopySuffixButton> {
   }
 }
 
-// Segmented tab bar matching provider add sheet style
+// 匹配供应商添加弹层样式的分段标签栏
 class _SegTabBar extends StatelessWidget {
   const _SegTabBar({required this.controller, required this.tabs});
   final TabController controller;

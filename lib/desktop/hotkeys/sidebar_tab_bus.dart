@@ -1,12 +1,12 @@
 import 'dart:async';
 
-/// Desktop sidebar tabs control bus (Assistants/Topics) for embedded left panel.
+/// 桌面侧边栏标签（助手、主题）控制总线，用于内嵌左侧面板。
 class DesktopSidebarTabBus {
   DesktopSidebarTabBus._();
   static final DesktopSidebarTabBus instance = DesktopSidebarTabBus._();
 
   final _controller = StreamController<int>.broadcast();
-  // 0 = Assistants, 1 = Topics
+  // 0 = 助手，1 = 主题
   Stream<int> get stream => _controller.stream;
 
   int _currentIndex = 0;

@@ -223,7 +223,7 @@ class _NetworkProxyPageState extends State<NetworkProxyPage> {
             ],
           ),
           const SizedBox(height: 12),
-          // Bottom: connection test section with card wrapper
+          // 底部：带卡片包装的连接测试区块
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 2, 12, 6),
             child: Text(
@@ -349,7 +349,7 @@ class _NetworkProxyPageState extends State<NetworkProxyPage> {
   }
 }
 
-// Bottom-sheet selector styled like Display Settings language/background sheets (no ripple)
+// 样式类似显示设置语言或背景弹层的底部选择器（无涟漪）
 class _ProxyTypeSheetField extends StatelessWidget {
   const _ProxyTypeSheetField({required this.value, required this.onChanged});
   final String value;
@@ -503,7 +503,7 @@ class _ProxyTypeSheetField extends StatelessWidget {
   }
 }
 
-// Local minimal copies of iOS-style bits to match app style
+// 本地精简复制的 iOS 风格组件，以匹配应用样式
 class _TactileIconButton extends StatefulWidget {
   const _TactileIconButton({
     required this.icon,
@@ -590,7 +590,7 @@ Widget _labeledField(
   );
 }
 
-// Reuse desktop input styles to keep consistent look
+// 复用桌面输入样式，保持外观一致
 InputDecoration _deskInputDecoration(BuildContext context) {
   final cs = Theme.of(context).colorScheme;
   return InputDecoration(

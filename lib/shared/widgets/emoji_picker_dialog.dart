@@ -4,8 +4,8 @@ import 'emoji_text.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
-/// A reusable emoji picker dialog used by both mobile and desktop.
-/// Returns the chosen emoji (single grapheme) or null if cancelled.
+/// 移动端和桌面端共用的可复用 emoji 选择对话框。
+/// 返回所选 emoji（单个字素）；取消时返回 null。
 Future<String?> showEmojiPickerDialog(
   BuildContext context, {
   String? title,
@@ -171,7 +171,7 @@ Future<String?> showEmojiPickerDialog(
                           : value.characters.take(1).toString(),
                       fontSize: 40,
                       optimizeEmojiAlign: true,
-                      nudge: Offset.zero, // picker preview: no extra nudge
+                      nudge: Offset.zero, // 选择器预览：无额外微调
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -234,7 +234,7 @@ Future<String?> showEmojiPickerDialog(
                               e,
                               fontSize: 20,
                               optimizeEmojiAlign: true,
-                              nudge: Offset.zero, // picker grid: no extra nudge
+                              nudge: Offset.zero, // 选择器网格：无额外微调
                             ),
                           ),
                         );

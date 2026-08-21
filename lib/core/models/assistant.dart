@@ -30,31 +30,29 @@ class Assistant {
 
   final String id;
   final String name;
-  final String? avatar; // path/url/base64, null for initial-letter avatar
-  final bool
-  useAssistantAvatar; // replace model icon in chat with assistant avatar
-  final bool useAssistantName; // replace model name in chat with assistant name
-  final String? chatModelProvider; // null -> use global default
-  final String? chatModelId; // null -> use global default
-  final double? temperature; // null to disable; else 0.0 - 2.0
-  final double? topP; // null to disable; else 0.0 - 1.0
-  final int contextMessageSize; // number of previous messages to include
-  final bool limitContextMessages; // whether to enforce contextMessageSize
-  final bool streamOutput; // streaming responses
-  final int?
-  thinkingBudget; // null = use global/default; 0=off; >0 tokens budget
-  final int? maxTokens; // null = unlimited
+  final String? avatar; // path/url/base64；null 表示使用首字母头像
+  final bool useAssistantAvatar; // 在聊天中用助理头像替换模型图标
+  final bool useAssistantName; // 在聊天中用助理名称替换模型名称
+  final String? chatModelProvider; // null 表示使用全局默认值
+  final String? chatModelId; // null 表示使用全局默认值
+  final double? temperature; // null 表示禁用；否则为 0.0 - 2.0
+  final double? topP; // null 表示禁用；否则为 0.0 - 1.0
+  final int contextMessageSize; // 要包含的先前消息数量
+  final bool limitContextMessages; // 是否强制执行 contextMessageSize
+  final bool streamOutput; // 是否使用流式响应
+  final int? thinkingBudget; // null = 使用全局/默认值；0 = 关闭；>0 = token 预算
+  final int? maxTokens; // null = 不限制
   final String systemPrompt;
-  final String messageTemplate; // e.g. "{{ message }}"
-  final bool searchEnabled; // per-assistant external web search switch
-  final List<String> mcpServerIds; // bound MCP server IDs
-  final List<String> localToolIds; // enabled local tool IDs
-  final String? background; // chat background (color/image ref)
-  // Custom request overrides (per assistant)
+  final String messageTemplate; // 例如 "{{ message }}"
+  final bool searchEnabled; // 每个助手的联网搜索开关
+  final List<String> mcpServerIds; // 绑定的 MCP 服务器 ID
+  final List<String> localToolIds; // 启用的本地工具 ID
+  final String? background; // 聊天背景（颜色/图片引用）
+  // 自定义请求覆盖（每个助手）
   final List<Map<String, String>>
   customHeaders; // [{name:'X-Header', value:'v'}]
   final List<Map<String, String>> customBody; // [{key:'foo', value:'{"a":1}'}]
-  // Memory features (§4.1)
+  // 记忆功能 (§4.1)
   final bool enableMemory;
   final bool autoOrganizeMemory;
   final int memoryOrganizeEveryNTurns;
@@ -62,12 +60,11 @@ class Assistant {
   final MemoryWriteScope memoryWriteScope;
   final bool allowPastConversationRecall;
   final bool generateConversationSummary;
-  final int
-  recentChatsSummaryMessageCount; // refresh summary after N new messages
+  final int recentChatsSummaryMessageCount; // 每新增 N 条消息后刷新摘要
   final bool appendCurrentTimeToUserMessage;
-  // Preset conversation messages (ordered)
+  // 预设会话消息（有序）
   final List<PresetMessage> presetMessages;
-  // Regex replacement rules
+  // 正则替换规则
   final List<AssistantRegex> regexRules;
 
   const Assistant({
@@ -300,7 +297,7 @@ class Assistant {
     memoryWriteScope: memoryWriteScopeFromString(
       json['memoryWriteScope'] as String?,
     ),
-    // Legacy `enableRecentChatsReference` maps onto allowPastConversationRecall.
+    // 旧版 `enableRecentChatsReference` 会映射到 allowPastConversationRecall。
     allowPastConversationRecall:
         json['allowPastConversationRecall'] as bool? ??
         json['enableRecentChatsReference'] as bool? ??

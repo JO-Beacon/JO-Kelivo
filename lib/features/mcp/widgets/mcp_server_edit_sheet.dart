@@ -31,7 +31,7 @@ Future<void> showMcpServerEditSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: cs.surface,
-    // Match provider sheet corner radius
+    // 匹配供应商弹层的圆角
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -96,7 +96,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     super.dispose();
   }
 
-  // Match provider sheet switch row style
+  // 匹配供应商弹层开关行样式
   Widget _switchRow({
     required String label,
     required bool value,
@@ -115,7 +115,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     );
   }
 
-  // Simple iOS-style card wrapper, same as provider sheet
+  // 与供应商弹层一致的简洁 iOS 风格卡片包装
   Widget _iosCard({required List<Widget> children}) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -169,9 +169,9 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
           decoration: InputDecoration(
             hintText: hint,
             filled: true,
-            // Match provider sheet input background
+            // 匹配供应商弹层输入背景
             fillColor: context.appColors.surfaceCard,
-            // Match provider sheet border styles
+            // 匹配供应商弹层边框样式
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
@@ -198,7 +198,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     );
   }
 
-  // Segmented choice bar (like top tabs), used for transport type
+  // 分段选择栏（类似顶部标签），用于传输类型
   Widget _transportPicker() {
     final labels = ['Streamable HTTP', 'SSE'];
     final idx = _transport == McpTransportType.http ? 0 : 1;
@@ -364,7 +364,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
 
   Future<void> _onSave() async {
     final mcp = context.read<McpProvider>();
-    // Built-in: only toggle enabled
+    // 内置服务器：只能切换启用状态
     if (isEdit && _transport == McpTransportType.inmemory) {
       final old = mcp.getById(widget.serverId!)!;
       await mcp.updateServerMetadata(old.copyWith(enabled: _enabled));
@@ -440,7 +440,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                 ),
               ),
               const SizedBox(height: 12),
-              // Header: centered title with close on the left (match provider sheet)
+              // 标题栏：居中标题，关闭按钮在左侧（匹配供应商弹层）
               SizedBox(
                 height: 36,
                 child: Stack(
@@ -516,7 +516,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                             if (idx == 0) {
                               return _basicForm();
                             } else {
-                              // Tools tab
+                              // 工具选项卡
                               final tools =
                                   server?.tools ?? const <McpToolConfig>[];
                               if (tools.isEmpty) {
@@ -541,8 +541,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                                       margin: const EdgeInsets.only(bottom: 10),
                                       padding: const EdgeInsets.all(12),
                                       decoration: BoxDecoration(
-                                        color:
-                                            context.appColors.surfaceFill,
+                                        color: context.appColors.surfaceFill,
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
                                           color: cs.outlineVariant.withValues(
@@ -663,7 +662,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                                               ),
                                             ],
                                           ),
-                                          // Approval toggle — compact row inside the card
+                                          // 审批开关，卡片内的紧凑行
                                           if (tool.enabled) ...[
                                             Padding(
                                               padding: const EdgeInsets.only(
@@ -744,7 +743,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
   }
 }
 
-// --- iOS tactile helpers (no ripple) ---
+// --- iOS 触感辅助函数（无涟漪） ---
 
 class _TactileIconButton extends StatefulWidget {
   const _TactileIconButton({
@@ -816,7 +815,7 @@ class _TactileRowState extends State<_TactileRow> {
       onTapUp: widget.onTap == null
           ? null
           : (_) {
-              /* keep pressed a bit for better feel */
+              /* 保持短暂按压以获得更好手感 */
             },
       onTapCancel: widget.onTap == null ? null : () => _set(false),
       onTap: widget.onTap == null
@@ -840,7 +839,7 @@ class _TactileRowState extends State<_TactileRow> {
   }
 }
 
-// Generic segmented choice bar (visual style matches provider segmented tabs)
+// 通用分段选择栏（视觉样式匹配供应商分段标签）
 class _SegChoiceBar extends StatelessWidget {
   const _SegChoiceBar({
     required this.labels,
@@ -968,7 +967,7 @@ class _SegChoiceBar extends StatelessWidget {
   }
 }
 
-// Copy of provider segmented tab to match style
+// 复制供应商分段标签以匹配样式
 class _SegTabBar extends StatelessWidget {
   const _SegTabBar({required this.controller, required this.tabs});
   final TabController controller;
@@ -1015,13 +1014,13 @@ class _SegTabBar extends StatelessWidget {
               child: _TactileRow(
                 onTap: () => controller.animateTo(index),
                 builder: (pressed) {
-                  // Background does not change on press; only selected shows subtle tint
+                  // 按压时背景不变；只有选中项显示细微着色
                   final Color baseBg = selected
                       ? cs.primary.withValues(alpha: 0.14)
                       : Colors.transparent;
                   final Color bg = baseBg;
 
-                  // Text color lightens slightly on press
+                  // 按压时文本颜色略微变浅
                   final Color baseTextColor = selected
                       ? cs.primary
                       : cs.onSurface.withValues(alpha: 0.82);

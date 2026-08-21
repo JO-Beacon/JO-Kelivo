@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'dart:isolate';
 
 import 'package:drift/drift.dart';
@@ -14,6 +15,40 @@ typedef SqliteExecutionIsolateProbeResult = ({
   int openingIsolateCalls,
   int backgroundIsolateCalls,
 });
+
+class _LegacyTreeMessage {
+  const _LegacyTreeMessage({
+    required this.id,
+    required this.groupId,
+    required this.version,
+    required this.messageOrder,
+    required this.timestamp,
+  });
+
+  final String id;
+  final String groupId;
+  final int version;
+  final int messageOrder;
+  final int timestamp;
+}
+
+class LegacyTreeMigrationWarning {
+  const LegacyTreeMigrationWarning({
+    required this.conversationId,
+    required this.groupId,
+    required this.fallbackVersion,
+  });
+
+  final String conversationId;
+  final String groupId;
+  final int fallbackVersion;
+
+  Map<String, Object> toJson() => {
+    'conversationId': conversationId,
+    'groupId': groupId,
+    'fallbackVersion': fallbackVersion,
+  };
+}
 
 class MicrosecondDateTimeConverter extends TypeConverter<DateTime, int> {
   const MicrosecondDateTimeConverter();
@@ -63,6 +98,52 @@ class ConversationRows extends Table {
 
   @override
   Set<Column<Object>> get primaryKey => {id};
+}
+
+@TableIndex(
+  name: 'idx_message_tree_edges_conversation',
+  columns: {#conversationId},
+)
+class MessageTreeEdgeRows extends Table {
+  TextColumn get conversationId =>
+      text().references(ConversationRows, #id, onDelete: KeyAction.cascade)();
+  TextColumn get messageId => text()();
+  TextColumn get parentMessageId => text().nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {conversationId, messageId};
+}
+
+@TableIndex(
+  name: 'idx_conversation_branches_conversation',
+  columns: {#conversationId},
+)
+class ConversationBranchRows extends Table {
+  TextColumn get id => text()();
+  TextColumn get conversationId =>
+      text().references(ConversationRows, #id, onDelete: KeyAction.cascade)();
+  TextColumn get tipMessageId => text().nullable()();
+  TextColumn get name => text().withDefault(const Constant(''))();
+  IntColumn get createdAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+@TableIndex(
+  name: 'idx_conversation_tree_state_conversation',
+  columns: {#conversationId},
+)
+class ConversationTreeStateRows extends Table {
+  TextColumn get conversationId =>
+      text().references(ConversationRows, #id, onDelete: KeyAction.cascade)();
+  TextColumn get activeBranchId => text()();
+  TextColumn get branchSelectionsJson =>
+      text().withDefault(const Constant('{}'))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {conversationId};
 }
 
 @TableIndex(
@@ -179,7 +260,7 @@ class MessagePartRows extends Table {
       // ignore: recursive_getters
       .check(ordinal.isBiggerOrEqualValue(0))();
   TextColumn get kind => text().check(
-    // Forward-compat: unknown future kinds persist as UnknownPart.
+    // 向前兼容：未知的未来类型将以 UnknownPart 持久化。
     // ignore: recursive_getters
     kind.isNotValue(''),
   )();
@@ -592,7 +673,7 @@ class MemoryEntryRows extends Table {
 }
 
 class UserProfileFieldRows extends Table {
-  TextColumn get id => text()(); // = field key, e.g. preferred_name
+  TextColumn get id => text()(); // = 字段键，例如 preferred_name
   IntColumn get sortOrder =>
       integer()
       // ignore: recursive_getters
@@ -633,6 +714,9 @@ class MessagePromptRows extends Table {
   tables: [
     ConversationRows,
     MessageRows,
+    MessageTreeEdgeRows,
+    ConversationBranchRows,
+    ConversationTreeStateRows,
     ConversationMcpServerRows,
     ChatStorageMetaRows,
     MessagePartRows,
@@ -664,22 +748,23 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
 
   static const databaseFileName = 'kelivo.db';
+  static const contextTreeMigrationWarningsKey =
+      'context_tree_migration_warnings_v1';
 
-  // Schema 1 is the first published SQLite contract. Every other non-zero
-  // version belongs to an unpublished or future format and is rejected.
-  static const currentSchemaVersion = 1;
-  // Keep SQLite's established 1000-page cadence explicit. At the usual 4 KiB
-  // page size this starts a checkpoint around 4 MiB, but page size remains the
-  // source of truth.
+  // Schema 1 是第一个发布的 SQLite 契约。模式 2 添加显式消息树边、
+  // 分支和活动分支状态，而不改变现有消息/会话行。模式 3 存储每个共享
+  // 树前缀下最后选择的分支。
+  static const currentSchemaVersion = 3;
+  // 保持 SQLite 既定的 1000 页节奏显式声明。按通常 4 KiB 页大小计算，
+  // 这大约在 4 MiB 时触发一次检查点，但页大小仍是实际依据。
   static const walAutoCheckpointPages = 1000;
-  // This limits retained journal/WAL storage after reset/checkpoint; it is not
-  // a promise that an active WAL can never temporarily exceed 16 MiB.
+  // 这会限制 reset/checkpoint 之后保留的 journal/WAL 存储；它并不
+  // 承诺活跃 WAL 绝不会临时超过 16 MiB。
   static const journalSizeLimitBytes = 16 << 20;
   static const busyTimeoutMillis = 5000;
-  // Under WAL, NORMAL still guarantees crash consistency; a power loss can
-  // only drop transactions since the last checkpoint, which the
-  // generation-run recovery path already tolerates. FULL would add an fsync
-  // per write transaction on the streaming hot path.
+  // 在 WAL 下，NORMAL 仍然保证崩溃一致性；断电最多只会丢弃自上次
+  // 检查点以来的事务，而生成运行恢复路径已经能够容忍这一点。FULL 会
+  // 在流式热路径上为每次写事务增加一次 fsync。
   static const synchronousNormal = 1;
   static const _executionIsolateProbeFunction =
       'kelivo_sqlite_on_opening_isolate';
@@ -707,13 +792,11 @@ class AppDatabase extends _$AppDatabase {
       file,
       setup: (database) {
         final installedSchema = database.userVersion;
-        if (installedSchema != 0 &&
-            installedSchema != AppDatabase.currentSchemaVersion) {
-          throw StateError('database_schema_version');
+        if (installedSchema > AppDatabase.currentSchemaVersion) {
+          throw StateError('database_schema_too_new');
         }
-        // This callback is registered and invoked by SQLite on drift's worker
-        // isolate. Keep it non-deterministic so a multi-row profile query
-        // cannot be folded into a single callback by SQLite.
+        // 此回调由 SQLite 在 drift 的 worker isolate 上注册并调用。让它保持
+        // 非确定性，以避免 SQLite 将多行 profile 查询折叠为单次回调。
         database.createFunction(
           functionName: _executionIsolateProbeFunction,
           argumentCount: const AllowedArgumentCount(0),
@@ -734,9 +817,9 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
-  /// Samples the isolate executing callbacks on the live SQLite connection.
+  /// 对在活动 SQLite 连接上执行回调的 isolate 进行采样。
   ///
-  /// The opening isolate is the Flutter UI isolate in the profile harness.
+  /// 在 profile 测试夹具中，打开连接的 isolate 是 Flutter UI isolate。
   Future<SqliteExecutionIsolateProbeResult> probeExecutionIsolate({
     int samples = 64,
   }) async {
@@ -770,13 +853,206 @@ FROM probe;
     );
   }
 
+  Future<List<LegacyTreeMigrationWarning>>
+  _populateLegacyConversationTreeBranchRows() async {
+    final conversationRows = await customSelect(
+      'SELECT id, created_at, version_selections_json '
+      'FROM conversation_rows;',
+    ).get();
+    final messageRows = await customSelect(
+      'SELECT id, conversation_id, group_id, version, message_order, timestamp '
+      'FROM message_rows '
+      'ORDER BY conversation_id, message_order, id;',
+    ).get();
+
+    final messagesByConversation = <String, List<_LegacyTreeMessage>>{};
+    for (final row in messageRows) {
+      final conversationId = row.read<String>('conversation_id');
+      final message = _LegacyTreeMessage(
+        id: row.read<String>('id'),
+        groupId: row.readNullable<String>('group_id') ?? row.read<String>('id'),
+        version: row.read<int>('version'),
+        messageOrder: row.read<int>('message_order'),
+        timestamp: row.read<int>('timestamp'),
+      );
+      messagesByConversation
+          .putIfAbsent(conversationId, () => <_LegacyTreeMessage>[])
+          .add(message);
+    }
+
+    final warnings = <LegacyTreeMigrationWarning>[];
+    for (final conversationRow in conversationRows) {
+      final conversationId = conversationRow.read<String>('id');
+      final createdAt = conversationRow.read<int>('created_at');
+      final decodedSelections = _decodeVersionSelections(
+        conversationRow.read<String>('version_selections_json'),
+      );
+      final selections = <String, int>{};
+      for (final entry in decodedSelections.entries) {
+        final value = entry.value;
+        if (value is num) selections[entry.key] = value.toInt();
+      }
+      final messages = messagesByConversation[conversationId] ?? const [];
+
+      final groups = <String, List<_LegacyTreeMessage>>{};
+      final groupMinOrder = <String, int>{};
+      for (final message in messages) {
+        final groupId = message.groupId;
+        groups.putIfAbsent(groupId, () => <_LegacyTreeMessage>[]).add(message);
+        final currentMin = groupMinOrder[groupId];
+        if (currentMin == null || message.messageOrder < currentMin) {
+          groupMinOrder[groupId] = message.messageOrder;
+        }
+      }
+
+      final orderedGroupIds = groupMinOrder.keys.toList(growable: false)
+        ..sort((left, right) {
+          final byOrder = groupMinOrder[left]!.compareTo(groupMinOrder[right]!);
+          if (byOrder != 0) return byOrder;
+          return left.compareTo(right);
+        });
+
+      String? previousSelectedId;
+      for (final groupId in orderedGroupIds) {
+        final versions =
+            List<_LegacyTreeMessage>.of(groups[groupId] ?? const [])
+              ..sort((left, right) {
+                final byVersion = left.version.compareTo(right.version);
+                if (byVersion != 0) return byVersion;
+                return left.id.compareTo(right.id);
+              });
+        if (versions.isEmpty) continue;
+
+        final selectedVersion = selections[groupId];
+        _LegacyTreeMessage? selected;
+        if (selectedVersion != null) {
+          for (final version in versions) {
+            if (version.version == selectedVersion) {
+              selected = version;
+              break;
+            }
+          }
+        }
+        if (selected == null && versions.length > 1) {
+          selected = versions.last;
+          selections[groupId] = selected.version;
+          warnings.add(
+            LegacyTreeMigrationWarning(
+              conversationId: conversationId,
+              groupId: groupId,
+              fallbackVersion: selected.version,
+            ),
+          );
+        } else {
+          selected ??= versions.last;
+        }
+
+        for (final version in versions) {
+          final parentMessageId = previousSelectedId;
+          await customStatement(
+            '''
+            INSERT INTO message_tree_edge_rows
+              (conversation_id, message_id, parent_message_id)
+            VALUES (?, ?, ?);
+            ''',
+            [conversationId, version.id, parentMessageId],
+          );
+          if (version.id != selected.id) {
+            await customStatement(
+              '''
+              INSERT INTO conversation_branch_rows
+                (id, conversation_id, tip_message_id, name, created_at)
+              VALUES (?, ?, ?, '', ?);
+              ''',
+              [
+                'legacy-${version.id}',
+                conversationId,
+                version.id,
+                version.timestamp,
+              ],
+            );
+          }
+        }
+        previousSelectedId = selected.id;
+      }
+
+      await customStatement(
+        '''
+        INSERT INTO conversation_branch_rows
+          (id, conversation_id, tip_message_id, name, created_at)
+        VALUES (?, ?, ?, '', ?);
+        ''',
+        ['root-$conversationId', conversationId, previousSelectedId, createdAt],
+      );
+      await customStatement(
+        '''
+        INSERT INTO conversation_tree_state_rows
+          (conversation_id, active_branch_id)
+        VALUES (?, ?);
+        ''',
+        [conversationId, 'root-$conversationId'],
+      );
+      await customStatement(
+        '''
+        UPDATE conversation_rows
+        SET version_selections_json = ?
+        WHERE id = ?;
+        ''',
+        [jsonEncode(selections), conversationId],
+      );
+    }
+    await customStatement(
+      '''
+      INSERT INTO chat_storage_meta_rows (key, value)
+      VALUES (?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+      ''',
+      [
+        AppDatabase.contextTreeMigrationWarningsKey,
+        jsonEncode([for (final warning in warnings) warning.toJson()]),
+      ],
+    );
+    return warnings;
+  }
+
+  Map<String, dynamic> _decodeVersionSelections(String rawJson) {
+    try {
+      final decoded = jsonDecode(rawJson);
+      if (decoded is Map<String, dynamic>) return decoded;
+    } catch (_) {}
+    return <String, dynamic>{};
+  }
+
   @override
   int get schemaVersion => currentSchemaVersion;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-    onUpgrade: (_, _, _) async {
-      throw StateError('database_schema_version');
+    onUpgrade: (migrator, from, to) async {
+      if (from < 2) {
+        await migrator.createTable(messageTreeEdgeRows);
+        await migrator.createTable(conversationBranchRows);
+        await migrator.createTable(conversationTreeStateRows);
+        await customStatement(
+          'CREATE INDEX idx_message_tree_edges_conversation '
+          'ON message_tree_edge_rows (conversation_id);',
+        );
+        await customStatement(
+          'CREATE INDEX idx_conversation_branches_conversation '
+          'ON conversation_branch_rows (conversation_id);',
+        );
+        await customStatement(
+          'CREATE INDEX idx_conversation_tree_state_conversation '
+          'ON conversation_tree_state_rows (conversation_id);',
+        );
+        await _populateLegacyConversationTreeBranchRows();
+      }
+      if (from >= 2 && from < 3) {
+        await migrator.addColumn(
+          conversationTreeStateRows,
+          conversationTreeStateRows.branchSelectionsJson,
+        );
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON;');

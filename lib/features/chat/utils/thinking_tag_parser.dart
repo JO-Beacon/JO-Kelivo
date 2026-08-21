@@ -16,7 +16,7 @@ class ThinkingTagParser {
     caseSensitive: false,
   );
 
-  /// Test hook: number of [parseLegacyInlineBlocks] executions.
+  /// 测试钩子：[parseLegacyInlineBlocks] 的执行次数。
   static int debugParseCount = 0;
 
   static ThinkingTagParseResult parseLegacyInlineBlocks(String input) {

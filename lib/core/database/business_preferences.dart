@@ -11,11 +11,10 @@ typedef _SyntheticEntityIdentity = ({
   Object? payloadId,
 });
 
-/// An in-memory key-value view over business data in SQLite.
+/// SQLite 中业务数据的内存键值视图。
 ///
-/// Callers share and inject one instance so synchronous reads observe the same
-/// snapshot. Writes are serialized and update the in-memory view only after the
-/// repository operation succeeds.
+/// 调用方共享并注入同一实例，使同步读取观察到相同快照。写入被串行化，
+/// 并且只有在仓库操作成功后才更新内存视图。
 final class BusinessPreferences {
   BusinessPreferences(this._repository);
 
@@ -52,9 +51,9 @@ final class BusinessPreferences {
     }
   }
 
-  /// Drains accepted writes, runs one live restore, and keeps this process
-  /// read-only after a successful commit. Restore callers already require a
-  /// cold restart, so late background writes must not overwrite restored data.
+  /// 排空已接受的写入，执行一次实时恢复，并在成功提交后保持当前进程
+  /// 只读。恢复调用方本就要求冷重启，因此迟到的后台写入不得覆盖
+  /// 已恢复的数据。
   Future<T> runWithRestoreWriteFence<T>(Future<T> Function() operation) async {
     if (_writesBlockedForRestore) {
       throw StateError('business_preferences_restore_fence');
@@ -69,8 +68,8 @@ final class BusinessPreferences {
     }
   }
 
-  /// Awaits every write accepted so far. Desktop exit hooks flush through this
-  /// so the serialized queue reaches SQLite before the process exits.
+  /// 等待所有到目前为止已接受的写入。桌面退出钩子通过此方法刷出队列，
+  /// 以便串行队列在进程退出前到达 SQLite。
   Future<void> flushPendingWrites() => _writeTail;
 
   Object? get(String key) => _copyForRead(_values[key]);

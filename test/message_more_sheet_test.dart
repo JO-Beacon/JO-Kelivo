@@ -73,16 +73,16 @@ void main() {
 
     expect(find.text('Select Messages'), findsOneWidget);
     expect(find.text('Create Branch'), findsOneWidget);
-    expect(find.text('Delete This Version'), findsOneWidget);
-    expect(find.text('Delete All Versions'), findsOneWidget);
+    expect(find.text('Delete Message'), findsOneWidget);
+    expect(find.text('Delete Branch'), findsOneWidget);
   });
 
   testWidgets('单版本消息菜单不显示删除全部版本', (tester) async {
     await _openMoreSheet(tester, canDeleteAllVersions: false);
 
     expect(find.text('Select Messages'), findsOneWidget);
-    expect(find.text('Delete This Version'), findsOneWidget);
-    expect(find.text('Delete All Versions'), findsNothing);
+    expect(find.text('Delete Message'), findsOneWidget);
+    expect(find.text('Delete Branch'), findsNothing);
   });
 
   testWidgets('临时会话消息菜单不显示创建分支', (tester) async {

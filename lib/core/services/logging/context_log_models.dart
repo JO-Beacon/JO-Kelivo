@@ -4,7 +4,7 @@ import '../../utils/token_estimator.dart';
 import '../memory/memory_block_builder.dart';
 import 'log_payload_elider.dart';
 
-/// Internal per-message key. Stripped before the request is sent.
+/// 内部每条消息的键。在发送请求前会将其剥离。
 const String kelivoContextSegmentsKey = '_kelivo_ctx_segments';
 
 enum ContextSource {
@@ -141,7 +141,7 @@ class ContextLogSnapshot {
   }
 }
 
-/// Length-only tags stored on api message maps during assembly.
+/// 组装期间存储在 api 消息映射上的仅长度标记。
 class ContextSegmentTags {
   static Map<String, dynamic> item({
     required ContextSource source,
@@ -225,7 +225,7 @@ String extractApiMessageText(dynamic content) {
   return content.toString();
 }
 
-/// Replace inlined `data:...;base64,...` payloads with a short placeholder.
+/// 将内联的 `data:...;base64,...` 负载替换为简短占位符。
 String truncateBase64DataUris(String text) =>
     LogPayloadElider.elideDataUris(text);
 
@@ -239,7 +239,7 @@ ContextSource inferContextSource(Map<String, dynamic> message) {
   return ContextSource.chatHistory;
 }
 
-/// Rebuild display segments from the tagged api message (post-trim, pre-strip).
+/// 根据带标记的 api 消息重建显示分段（在裁剪之后、剥离之前）。
 List<ContextSegment> segmentsFromTaggedMessage(Map<String, dynamic> message) {
   var content = extractApiMessageText(message['content']);
   final toolCalls = message['tool_calls'];
@@ -294,7 +294,7 @@ List<ContextSegment> segmentsFromTaggedMessage(Map<String, dynamic> message) {
   return splitMemorySnapshotUserText(out);
 }
 
-/// If a memory-snapshot segment still contains the user turn, split it.
+/// 如果记忆快照分段仍包含用户轮次，则将其拆分。
 List<ContextSegment> splitMemorySnapshotUserText(
   List<ContextSegment> segments,
 ) {

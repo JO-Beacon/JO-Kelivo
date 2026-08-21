@@ -7,7 +7,7 @@ import 'package:flutter/services.dart' show LogicalKeyboardKey;
 
 import '../../desktop/hotkeys/hotkey_event_bus.dart';
 
-/// A single hotkey item definition and state.
+/// 单个热键项的定义与状态。
 class AppHotkey {
   AppHotkey({
     required this.id,
@@ -18,24 +18,24 @@ class AppHotkey {
   });
 
   final String id;
-  final String l10nLabelKey; // key in AppLocalizations
-  final String? defaultWinLinux; // e.g., 'ctrl+comma'
-  final String? defaultMac; // e.g., 'cmd+comma'
+  final String l10nLabelKey; // AppLocalizations 中的 key
+  final String? defaultWinLinux; // 例如：'ctrl+comma'
+  final String? defaultMac; // 例如：'cmd+comma'
   final bool enabledByDefault;
 
-  // runtime state
-  String? command; // normalized key string, platform-independent
+  // 运行时状态
+  String? command; // 规范化按键字符串，平台无关
   bool enabled = true;
 }
 
-/// Provider that stores hotkey assignments and registers them via hotkey_manager.
+/// 存储热键分配并通过 hotkey_manager 注册它们的 Provider。
 class HotkeyProvider extends ChangeNotifier {
   static const _prefsKeyCommands =
       'desktop_hotkeys_commands_v1'; // id -> command
   static const _prefsKeyEnabled = 'desktop_hotkeys_enabled_v1'; // id -> bool
 
   final Map<String, AppHotkey> _items = {
-    // Toggle app visibility (no default)
+    // 切换应用可见性（无默认值）
     'toggle_app_visibility': AppHotkey(
       id: 'toggle_app_visibility',
       l10nLabelKey: 'hotkeyToggleAppVisibility',
@@ -43,7 +43,7 @@ class HotkeyProvider extends ChangeNotifier {
       defaultMac: '',
       enabledByDefault: true,
     ),
-    // Close window (in-app scope)
+    // 关闭窗口（应用内范围）
     'close_window': AppHotkey(
       id: 'close_window',
       l10nLabelKey: 'hotkeyCloseWindow',
@@ -51,7 +51,7 @@ class HotkeyProvider extends ChangeNotifier {
       defaultMac: 'cmd+w',
       enabledByDefault: true,
     ),
-    // Open settings
+    // 打开设置
     'open_settings': AppHotkey(
       id: 'open_settings',
       l10nLabelKey: 'hotkeyOpenSettings',
@@ -59,7 +59,7 @@ class HotkeyProvider extends ChangeNotifier {
       defaultMac: 'cmd+comma',
       enabledByDefault: true,
     ),
-    // New topic (chat)
+    // 新建话题（聊天）
     'new_topic': AppHotkey(
       id: 'new_topic',
       l10nLabelKey: 'hotkeyNewTopic',
@@ -67,7 +67,7 @@ class HotkeyProvider extends ChangeNotifier {
       defaultMac: 'cmd+n',
       enabledByDefault: true,
     ),
-    // Switch model (chat; no default)
+    // 切换模型（聊天；无默认值）
     'switch_model': AppHotkey(
       id: 'switch_model',
       l10nLabelKey: 'hotkeySwitchModel',
@@ -75,7 +75,7 @@ class HotkeyProvider extends ChangeNotifier {
       defaultMac: '',
       enabledByDefault: true,
     ),
-    // Toggle assistants panel (left topics layout only)
+    // 切换助手面板（仅左侧话题布局）
     'toggle_assistants': AppHotkey(
       id: 'toggle_assistants',
       l10nLabelKey: 'hotkeyToggleAssistantPanel',
@@ -83,7 +83,7 @@ class HotkeyProvider extends ChangeNotifier {
       defaultMac: 'cmd+bracketleft',
       enabledByDefault: true,
     ),
-    // Toggle topics panel (left topics layout only)
+    // 切换话题面板（仅左侧话题布局）
     'toggle_topics': AppHotkey(
       id: 'toggle_topics',
       l10nLabelKey: 'hotkeyToggleTopicPanel',
@@ -104,14 +104,14 @@ class HotkeyProvider extends ChangeNotifier {
   Future<void> initialize() async {
     if (_initialized) return;
     final prefs = await SharedPreferences.getInstance();
-    // Load enabled map
+    // 加载启用状态映射
     final enabledMap = (prefs.getStringList(_prefsKeyEnabled) ?? [])
         .map((e) => e.split('='))
         .where((p) => p.length == 2)
         .map((p) => MapEntry(p[0], p[1] == '1'))
         .toList();
     final enabled = <String, bool>{for (final e in enabledMap) e.key: e.value};
-    // Load commands map
+    // 加载命令映射
     final cmdList = (prefs.getStringList(_prefsKeyCommands) ?? [])
         .map((e) => e.split('='))
         .where((p) => p.length == 2)
@@ -119,7 +119,7 @@ class HotkeyProvider extends ChangeNotifier {
         .toList();
     final commands = <String, String>{for (final e in cmdList) e.key: e.value};
 
-    // Seed defaults
+    // 初始化默认值
     final isMac = Platform.isMacOS;
     for (final e in _items.values) {
       e.enabled = enabled[e.id] ?? e.enabledByDefault;
@@ -191,14 +191,14 @@ class HotkeyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ===== Registration via hotkey_manager =====
+  // ===== 通过 hotkey_manager 注册 =====
 
   Future<void> _rebindAll() async {
-    // Hard reset: ensure no stale registrations (especially system scope)
+    // 硬重置：确保没有残留的注册（尤其是系统作用域）
     try {
       await HotKeyManager.instance.unregisterAll();
     } catch (_) {
-      // Fallback to unregister known ones if needed
+      // 必要时回退为注销已知项
       for (final hk in _registered.values) {
         try {
           await HotKeyManager.instance.unregister(hk);
@@ -207,7 +207,7 @@ class HotkeyProvider extends ChangeNotifier {
     }
     _registered.clear();
 
-    // Register each enabled item with valid command
+    // 为每个具有有效命令的已启用项进行注册
     for (final e in _items.values) {
       if (!e.enabled) continue;
       final cmd = e.command;
@@ -225,7 +225,7 @@ class HotkeyProvider extends ChangeNotifier {
         );
         _registered[e.id] = hk;
       } catch (_) {
-        // Ignore registration error (e.g., duplicate)
+        // 忽略注册错误（例如重复项）
       }
     }
   }
@@ -256,9 +256,9 @@ class HotkeyProvider extends ChangeNotifier {
     }
   }
 
-  // ===== Helpers for parsing/displaying hotkey strings =====
+  // ===== 用于解析/显示热键字符串的辅助方法 =====
 
-  // Supported commands format: 'ctrl+shift+n', 'cmd+comma', 'ctrl+bracketleft'
+  // 支持的命令格式：'ctrl+shift+n'、'cmd+comma'、'ctrl+bracketleft'
   HotKey? _parseCommandToHotKey(
     String command, {
     HotKeyScope scope = HotKeyScope.inapp,
@@ -314,7 +314,7 @@ class HotkeyProvider extends ChangeNotifier {
       }
     }
     if (keyboardKey == null) return null;
-    // Require at least one modifier (avoid single-key capture)
+    // 至少需要一个修饰键（避免单键捕获）
     if (modifiers.isEmpty) return null;
     return HotKey(key: keyboardKey, modifiers: modifiers, scope: scope);
   }

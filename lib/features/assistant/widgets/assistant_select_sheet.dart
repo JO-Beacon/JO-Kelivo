@@ -15,10 +15,10 @@ import '../../../utils/avatar_cache.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../theme/app_font_weights.dart';
 
-// Show an assistant picker for moving a topic.
-// - Mobile: bottom sheet
-// - Desktop: custom dialog
-// Returns selected assistant id, or null if cancelled.
+// 显示用于移动主题的助手选择器。
+// - 移动端：底部弹层
+// - 桌面端：自定义对话框
+// 返回所选助手 id；取消时返回 null。
 Future<String?> showAssistantMoveSelector(
   BuildContext context, {
   String? excludeAssistantId,
@@ -89,7 +89,7 @@ Future<String?> showAssistantMoveSelector(
     );
   }
 
-  // Desktop: custom dialog with hover effects, no ripples, no header divider
+  // 桌面端：带悬停效果的自定义对话框，无涟漪，标题无分隔线
   String? result;
   await showGeneralDialog<void>(
     context: context,
@@ -132,7 +132,7 @@ Future<String?> showAssistantMoveSelector(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Header (no divider below)
+                        // 标题（下方无分隔线）
                         SizedBox(
                           height: 48,
                           child: Padding(
@@ -366,7 +366,9 @@ class _DeskAssistantRowState extends State<_DeskAssistantRow> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
-        ? (Theme.of(context).colorScheme.onSurface.withValues(alpha: isDark ? 0.06 : 0.05))
+        ? (Theme.of(
+            context,
+          ).colorScheme.onSurface.withValues(alpha: isDark ? 0.06 : 0.05))
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),

@@ -11,7 +11,7 @@ class _QuickPhraseTab extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
 
-    // Desktop: custom dialog; Mobile: bottom sheet
+    // 桌面端：自定义对话框；移动端：底部弹层
     final platform = Theme.of(context).platform;
     final isDesktop =
         platform == TargetPlatform.macOS ||
@@ -80,8 +80,7 @@ class _QuickPhraseTab extends StatelessWidget {
                           decoration: InputDecoration(
                             labelText: l10n.quickPhraseTitleLabel,
                             filled: true,
-                            fillColor:
-                                ctx.appColors.surfaceFill,
+                            fillColor: ctx.appColors.surfaceFill,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
@@ -105,8 +104,7 @@ class _QuickPhraseTab extends StatelessWidget {
                             labelText: l10n.quickPhraseContentLabel,
                             alignLabelWithHint: true,
                             filled: true,
-                            fillColor:
-                                ctx.appColors.surfaceFill,
+                            fillColor: ctx.appColors.surfaceFill,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
@@ -201,7 +199,7 @@ class _QuickPhraseTab extends StatelessWidget {
       if (title.isEmpty || content.isEmpty) return;
 
       if (phrase == null) {
-        // Add new
+        // 新增
         final newPhrase = QuickPhrase(
           id: const Uuid().v4(),
           title: title,
@@ -211,7 +209,7 @@ class _QuickPhraseTab extends StatelessWidget {
         );
         await quickPhraseProvider.add(newPhrase);
       } else {
-        // Update existing
+        // 更新现有条目
         await quickPhraseProvider.update(
           phrase.copyWith(title: title, content: content),
         );
@@ -286,7 +284,7 @@ class _QuickPhraseTab extends StatelessWidget {
             );
           },
           onReorderItem: (oldIndex, newIndex) {
-            // Update immediately for smooth drop animation
+            // 立即更新，使放下动画更平滑
             context.read<QuickPhraseProvider>().reorderPhrases(
               oldIndex: oldIndex,
               newIndex: newIndex,
@@ -358,7 +356,9 @@ class _QuickPhraseTab extends StatelessWidget {
                       pressedScale: 0.98,
                       builder: (pressed) {
                         final bg = context.appColors.surfaceCard;
-                        final overlay = cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05);
+                        final overlay = cs.onSurface.withValues(
+                          alpha: isDark ? 0.06 : 0.05,
+                        );
                         final pressedBg = Color.alphaBlend(overlay, bg);
                         return Container(
                           decoration: BoxDecoration(
@@ -427,7 +427,7 @@ class _QuickPhraseTab extends StatelessWidget {
             );
           },
         ),
-        // Glass circular add button (icon-only), matching providers multi-select style
+        // 玻璃圆形添加按钮（仅图标），匹配供应商多选样式
         Positioned(
           left: 0,
           right: 0,
@@ -445,7 +445,7 @@ class _QuickPhraseTab extends StatelessWidget {
   }
 }
 
-// Local glass circle button for Quick Phrase (icon-only, frosted background)
+// 快捷短语使用的本地玻璃圆形按钮（仅图标，磨砂背景）
 class _GlassCircleButtonQP extends StatefulWidget {
   const _GlassCircleButtonQP({
     required this.icon,

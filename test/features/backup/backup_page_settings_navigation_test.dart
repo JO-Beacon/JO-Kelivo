@@ -279,6 +279,21 @@ void main() {
       expect(find.text('Local Backup'), findsOneWidget);
       expect(find.text('WebDAV Server Settings'), findsOneWidget);
       expect(find.text('S3 Settings'), findsOneWidget);
+      for (final label in [
+        'Backup',
+        'Restore',
+        'Export as Kelivo Backup',
+        'Import from Kelivo',
+        'Import from Cherry Studio',
+        'Import from Chatbox',
+        'Import from DeepSeek Web/App',
+      ]) {
+        expect(
+          find.text(label),
+          label == 'Restore' ? findsWidgets : findsOneWidget,
+          reason: label,
+        );
+      }
       _expectAbove(tester, 'Backup Reminder', 'Local Backup');
       _expectAbove(tester, 'Local Backup', 'WebDAV Server Settings');
       _expectAbove(tester, 'WebDAV Server Settings', 'S3 Settings');

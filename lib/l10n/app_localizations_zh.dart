@@ -478,11 +478,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get languageSelectSheetClearButton => '清空翻译';
 
   @override
-  String get homePageClearContext => '清空上下文';
+  String get homePageClearContext => '临时屏蔽上下文';
 
   @override
   String homePageClearContextWithCount(String actual, String configured) {
-    return '清空上下文 ($actual/$configured)';
+    return '临时屏蔽上下文 ($actual/$configured)';
   }
 
   @override
@@ -662,16 +662,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get userProviderDefaultUserName => '用户';
 
   @override
-  String get homePageDeleteMessage => '删除本版本';
+  String get homePageDeleteMessage => '删除消息';
 
   @override
-  String get homePageDeleteMessageConfirm => '确定要删除当前版本吗？此操作不可撤销。';
+  String get homePageDeleteMessageConfirm => '确定要删除这条消息及其后续分支吗？此操作不可撤销。';
 
   @override
-  String get homePageDeleteAllVersions => '删除全部版本';
+  String get homePageDeleteAllVersions => '删除分支';
 
   @override
-  String get homePageDeleteAllVersionsConfirm => '确定要删除这条消息的全部版本吗？此操作不可撤销。';
+  String get homePageDeleteAllVersionsConfirm => '确定要删除这条分支及其后代吗？其他分支会保留。';
 
   @override
   String get homePageCancel => '取消';
@@ -1567,6 +1567,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupRestoreRolledBackContent => '恢复未能完成。JO-Kelivo 已验证并保留原有数据。';
 
   @override
+  String get contextTreeMigrationWarningsTitle => '旧版对话迁移已修复';
+
+  @override
+  String contextTreeMigrationWarningsContent(int count) {
+    return 'JO-Kelivo 在转换旧版对话分支时修复了 $count 条缺失的选中版本记录。修复结果已写入警告日志，未读取或修改消息正文。';
+  }
+
+  @override
   String get backupRestoreFailureTitle => '恢复需要处理';
 
   @override
@@ -1592,6 +1600,11 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String backupRestoreFailureDiagnostic(String code) {
     return '诊断码：$code';
+  }
+
+  @override
+  String backupRestoreCorruptArchiveMessage(String code) {
+    return '所选的 JO-Kelivo 备份文件已损坏或不完整，因此未执行还原。当前数据未被修改。诊断码：$code';
   }
 
   @override
@@ -1682,6 +1695,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageBackup => '立即备份';
 
   @override
+  String get backupPageLocalBackupAction => '备份';
+
+  @override
   String get backupPageExporting => '正在导出...';
 
   @override
@@ -1700,7 +1716,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageImportBackupFileSubtitle => '导入本地备份文件';
 
   @override
-  String get backupPageImportKelivoBackup => '从 Kelivo 备份导入';
+  String get backupPageImportKelivoBackup => '从 Kelivo 导入';
 
   @override
   String get backupPageImportFromOtherApps => '从其他APP导入';
@@ -2007,7 +2023,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get bottomToolsSheetUpload => '上传文件';
 
   @override
-  String get bottomToolsSheetClearContext => '清空上下文';
+  String get bottomToolsSheetClearContext => '临时屏蔽上下文';
+
+  @override
+  String get contextManagementMaskContext => '临时屏蔽上下文';
+
+  @override
+  String get contextManagementRestoreContext => '恢复上下文';
 
   @override
   String get compressContext => '压缩上下文';
@@ -2016,7 +2038,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compressContextDesc => '总结对话并开始新聊天';
 
   @override
-  String get clearContextDesc => '标记上下文分界点';
+  String get clearContextDesc => '临时屏蔽更早的消息，仅将分界点之后的内容发送给模型。';
 
   @override
   String get contextManagement => '上下文管理';
@@ -2118,10 +2140,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageMoreSheetCreateBranch => '创建分支';
 
   @override
-  String get messageMoreSheetDelete => '删除本版本';
+  String get messageMoreSheetDelete => '删除消息';
 
   @override
-  String get messageMoreSheetDeleteAllVersions => '删除全部版本';
+  String get messageMoreSheetDeleteAllVersions => '删除分支';
 
   @override
   String get reasoningBudgetSheetOff => '关闭';
@@ -2370,12 +2392,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String chatSelectionDeleteSelectedConfirm(int count) {
-    return '确定要删除已选择的$count个版本吗？此操作不可撤销。';
+    return '确定要删除已选择的$count条消息吗？此操作不可撤销。';
   }
 
   @override
   String chatSelectionDeleteSelectedAllVersionsConfirm(int count) {
-    return '确定要删除已选择$count条消息的全部版本吗？此操作不可撤销。';
+    return '确定要删除已选择$count条消息的分支及其后代吗？此操作不可撤销。';
   }
 
   @override
@@ -3766,6 +3788,21 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get miniMapScrollToBottomTooltip => '滚动到底部';
+
+  @override
+  String get treeBranchPanelTitle => '上下文分支';
+
+  @override
+  String get treeBranchRootLabel => '主分支';
+
+  @override
+  String get treeBranchDefaultLabel => '分支';
+
+  @override
+  String get treeMapUserLabel => '用户';
+
+  @override
+  String get treeMapAssistantLabel => '助手';
 
   @override
   String get searchServicesPageApiKeyRequiredStatus => '需要 API Key';
@@ -7265,6 +7302,89 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get memoryTraceShowLess => '收起';
+
+  @override
+  String get sqliteMigrationTitle => '准备存储迁移';
+
+  @override
+  String get sqliteMigrationSourceDatabaseLabel => '线性 SQLite';
+
+  @override
+  String get sqliteMigrationTargetDatabaseLabel => '树化 SQLite';
+
+  @override
+  String get sqliteMigrationSubtitle =>
+      'JO-Kelivo 需要先迁移这份较旧的 SQLite 存档，然后才能启动。';
+
+  @override
+  String get sqliteMigrationBackupNote =>
+      '迁移开始前，JO-Kelivo 会先保存并校验一份包含设置、聊天记录和本地文件的 ZIP 备份。';
+
+  @override
+  String get sqliteMigrationChooseFileButton => '保存迁移备份';
+
+  @override
+  String get sqliteMigrationCreateSnapshotDetail => '正在创建数据库快照';
+
+  @override
+  String get sqliteMigrationPackageBackupDetail => '正在打包迁移备份';
+
+  @override
+  String get sqliteMigrationValidateBackupDetail => '正在校验备份';
+
+  @override
+  String get sqliteMigrationBackupReadyDetail => '备份已校验';
+
+  @override
+  String get sqliteMigrationUpgradeSchemaDetail => '正在升级数据库架构';
+
+  @override
+  String get sqliteMigrationValidateDatabaseDetail => '正在校验迁移后的数据库';
+
+  @override
+  String get sqliteMigrationChecklistSnapshot => '创建数据库快照';
+
+  @override
+  String get sqliteMigrationChecklistPackage => '打包设置和本地文件';
+
+  @override
+  String get sqliteMigrationChecklistValidateBackup => '校验备份';
+
+  @override
+  String get sqliteMigrationChecklistUpgradeSchema => '升级数据库架构';
+
+  @override
+  String get sqliteMigrationChecklistValidateDatabase => '校验迁移后的数据库';
+
+  @override
+  String get sqliteMigrationBackingUpTitle => '正在备份原始存储';
+
+  @override
+  String get sqliteMigrationBackingUpSubtitle => '正在复制并校验原始文件，请不要关闭 JO-Kelivo。';
+
+  @override
+  String get sqliteMigrationMigratingTitle => '正在迁移存储';
+
+  @override
+  String get sqliteMigrationMigratingSubtitle => '数据库升级期间会保留已校验的原始备份。';
+
+  @override
+  String get sqliteMigrationCompleteTitle => '存储迁移完成';
+
+  @override
+  String get sqliteMigrationCompleteSubtitle => '请重启 JO-Kelivo 以打开迁移后的存储。';
+
+  @override
+  String get sqliteMigrationFailedTitle => '存储迁移失败';
+
+  @override
+  String get sqliteMigrationFailedSubtitle => '迁移已停止。请查看错误信息，解决原因后再重试。';
+
+  @override
+  String get sqliteMigrationRetryButton => '重试迁移';
+
+  @override
+  String get sqliteMigrationRestartButton => '重启 JO-Kelivo';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -7741,11 +7861,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get languageSelectSheetClearButton => '清空翻译';
 
   @override
-  String get homePageClearContext => '清空上下文';
+  String get homePageClearContext => '临时屏蔽上下文';
 
   @override
   String homePageClearContextWithCount(String actual, String configured) {
-    return '清空上下文 ($actual/$configured)';
+    return '临时屏蔽上下文 ($actual/$configured)';
   }
 
   @override
@@ -7925,16 +8045,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get userProviderDefaultUserName => '用户';
 
   @override
-  String get homePageDeleteMessage => '删除本版本';
+  String get homePageDeleteMessage => '删除消息';
 
   @override
-  String get homePageDeleteMessageConfirm => '确定要删除当前版本吗？此操作不可撤销。';
+  String get homePageDeleteMessageConfirm => '确定要删除这条消息及其后续分支吗？此操作不可撤销。';
 
   @override
-  String get homePageDeleteAllVersions => '删除全部版本';
+  String get homePageDeleteAllVersions => '删除分支';
 
   @override
-  String get homePageDeleteAllVersionsConfirm => '确定要删除这条消息的全部版本吗？此操作不可撤销。';
+  String get homePageDeleteAllVersionsConfirm => '确定要删除这条分支及其后代吗？其他分支会保留。';
 
   @override
   String get homePageCancel => '取消';
@@ -8830,6 +8950,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupRestoreRolledBackContent => '恢复未能完成。JO-Kelivo 已验证并保留原有数据。';
 
   @override
+  String get contextTreeMigrationWarningsTitle => '旧版对话迁移已修复';
+
+  @override
+  String contextTreeMigrationWarningsContent(int count) {
+    return 'JO-Kelivo 在转换旧版对话分支时修复了 $count 条缺失的选中版本记录。修复结果已写入警告日志，未读取或修改消息正文。';
+  }
+
+  @override
   String get backupRestoreFailureTitle => '恢复需要处理';
 
   @override
@@ -8855,6 +8983,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String backupRestoreFailureDiagnostic(String code) {
     return '诊断码：$code';
+  }
+
+  @override
+  String backupRestoreCorruptArchiveMessage(String code) {
+    return '所选的 JO-Kelivo 备份文件已损坏或不完整，因此未执行还原。当前数据未被修改。诊断码：$code';
   }
 
   @override
@@ -8945,6 +9078,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageBackup => '立即备份';
 
   @override
+  String get backupPageLocalBackupAction => '备份';
+
+  @override
   String get backupPageExporting => '正在导出...';
 
   @override
@@ -8963,7 +9099,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageImportBackupFileSubtitle => '导入本地备份文件';
 
   @override
-  String get backupPageImportKelivoBackup => '从 Kelivo 备份导入';
+  String get backupPageImportKelivoBackup => '从 Kelivo 导入';
 
   @override
   String get backupPageImportFromOtherApps => '从其他APP导入';
@@ -9270,7 +9406,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get bottomToolsSheetUpload => '上传文件';
 
   @override
-  String get bottomToolsSheetClearContext => '清空上下文';
+  String get bottomToolsSheetClearContext => '临时屏蔽上下文';
+
+  @override
+  String get contextManagementMaskContext => '临时屏蔽上下文';
+
+  @override
+  String get contextManagementRestoreContext => '恢复上下文';
 
   @override
   String get compressContext => '压缩上下文';
@@ -9279,7 +9421,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get compressContextDesc => '总结对话并开始新聊天';
 
   @override
-  String get clearContextDesc => '标记上下文分界点';
+  String get clearContextDesc => '临时屏蔽更早的消息，仅将分界点之后的内容发送给模型。';
 
   @override
   String get contextManagement => '上下文管理';
@@ -9381,10 +9523,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get messageMoreSheetCreateBranch => '创建分支';
 
   @override
-  String get messageMoreSheetDelete => '删除本版本';
+  String get messageMoreSheetDelete => '删除消息';
 
   @override
-  String get messageMoreSheetDeleteAllVersions => '删除全部版本';
+  String get messageMoreSheetDeleteAllVersions => '删除分支';
 
   @override
   String get reasoningBudgetSheetOff => '关闭';
@@ -9633,12 +9775,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String chatSelectionDeleteSelectedConfirm(int count) {
-    return '确定要删除已选择的$count个版本吗？此操作不可撤销。';
+    return '确定要删除已选择的$count条消息吗？此操作不可撤销。';
   }
 
   @override
   String chatSelectionDeleteSelectedAllVersionsConfirm(int count) {
-    return '确定要删除已选择$count条消息的全部版本吗？此操作不可撤销。';
+    return '确定要删除已选择$count条消息的分支及其后代吗？此操作不可撤销。';
   }
 
   @override
@@ -11029,6 +11171,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get miniMapScrollToBottomTooltip => '滚动到底部';
+
+  @override
+  String get treeBranchPanelTitle => '上下文分支';
+
+  @override
+  String get treeBranchRootLabel => '主分支';
+
+  @override
+  String get treeBranchDefaultLabel => '分支';
+
+  @override
+  String get treeMapUserLabel => '用户';
+
+  @override
+  String get treeMapAssistantLabel => '助手';
 
   @override
   String get searchServicesPageApiKeyRequiredStatus => '需要 API Key';
@@ -14528,6 +14685,89 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get memoryTraceShowLess => '收起';
+
+  @override
+  String get sqliteMigrationTitle => '准备存储迁移';
+
+  @override
+  String get sqliteMigrationSourceDatabaseLabel => '线性 SQLite';
+
+  @override
+  String get sqliteMigrationTargetDatabaseLabel => '树化 SQLite';
+
+  @override
+  String get sqliteMigrationSubtitle =>
+      'JO-Kelivo 需要先迁移这份较旧的 SQLite 存档，然后才能启动。';
+
+  @override
+  String get sqliteMigrationBackupNote =>
+      '迁移开始前，JO-Kelivo 会先保存并校验一份包含设置、聊天记录和本地文件的 ZIP 备份。';
+
+  @override
+  String get sqliteMigrationChooseFileButton => '保存迁移备份';
+
+  @override
+  String get sqliteMigrationCreateSnapshotDetail => '正在创建数据库快照';
+
+  @override
+  String get sqliteMigrationPackageBackupDetail => '正在打包迁移备份';
+
+  @override
+  String get sqliteMigrationValidateBackupDetail => '正在校验备份';
+
+  @override
+  String get sqliteMigrationBackupReadyDetail => '备份已校验';
+
+  @override
+  String get sqliteMigrationUpgradeSchemaDetail => '正在升级数据库架构';
+
+  @override
+  String get sqliteMigrationValidateDatabaseDetail => '正在校验迁移后的数据库';
+
+  @override
+  String get sqliteMigrationChecklistSnapshot => '创建数据库快照';
+
+  @override
+  String get sqliteMigrationChecklistPackage => '打包设置和本地文件';
+
+  @override
+  String get sqliteMigrationChecklistValidateBackup => '校验备份';
+
+  @override
+  String get sqliteMigrationChecklistUpgradeSchema => '升级数据库架构';
+
+  @override
+  String get sqliteMigrationChecklistValidateDatabase => '校验迁移后的数据库';
+
+  @override
+  String get sqliteMigrationBackingUpTitle => '正在备份原始存储';
+
+  @override
+  String get sqliteMigrationBackingUpSubtitle => '正在复制并校验原始文件，请不要关闭 JO-Kelivo。';
+
+  @override
+  String get sqliteMigrationMigratingTitle => '正在迁移存储';
+
+  @override
+  String get sqliteMigrationMigratingSubtitle => '数据库升级期间会保留已校验的原始备份。';
+
+  @override
+  String get sqliteMigrationCompleteTitle => '存储迁移完成';
+
+  @override
+  String get sqliteMigrationCompleteSubtitle => '请重启 JO-Kelivo 以打开迁移后的存储。';
+
+  @override
+  String get sqliteMigrationFailedTitle => '存储迁移失败';
+
+  @override
+  String get sqliteMigrationFailedSubtitle => '迁移已停止。请查看错误信息，解决原因后再重试。';
+
+  @override
+  String get sqliteMigrationRetryButton => '重试迁移';
+
+  @override
+  String get sqliteMigrationRestartButton => '重启 JO-Kelivo';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -15004,11 +15244,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get languageSelectSheetClearButton => '清空翻譯';
 
   @override
-  String get homePageClearContext => '清空上下文';
+  String get homePageClearContext => '暫時屏蔽上下文';
 
   @override
   String homePageClearContextWithCount(String actual, String configured) {
-    return '清空上下文 ($actual/$configured)';
+    return '暫時屏蔽上下文 ($actual/$configured)';
   }
 
   @override
@@ -15188,16 +15428,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get userProviderDefaultUserName => '使用者';
 
   @override
-  String get homePageDeleteMessage => '刪除本版本';
+  String get homePageDeleteMessage => '刪除訊息';
 
   @override
-  String get homePageDeleteMessageConfirm => '確定要刪除目前版本嗎？此操作不可撤銷。';
+  String get homePageDeleteMessageConfirm => '確定要刪除這則訊息及其後續分支嗎？此操作不可撤銷。';
 
   @override
-  String get homePageDeleteAllVersions => '刪除全部版本';
+  String get homePageDeleteAllVersions => '刪除分支';
 
   @override
-  String get homePageDeleteAllVersionsConfirm => '確定要刪除這則訊息的全部版本嗎？此操作不可撤銷。';
+  String get homePageDeleteAllVersionsConfirm => '確定要刪除這條分支及其後代嗎？其他分支會保留。';
 
   @override
   String get homePageCancel => '取消';
@@ -16093,6 +16333,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupRestoreRolledBackContent => '還原未能完成。JO-Kelivo 已驗證並保留先前的資料。';
 
   @override
+  String get contextTreeMigrationWarningsTitle => '舊版對話遷移已修復';
+
+  @override
+  String contextTreeMigrationWarningsContent(int count) {
+    return 'JO-Kelivo 在轉換舊版對話分支時修復了 $count 筆遺失的選取版本記錄。修復結果已寫入警告記錄，未讀取或修改訊息正文。';
+  }
+
+  @override
   String get backupRestoreFailureTitle => '還原需要處理';
 
   @override
@@ -16118,6 +16366,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String backupRestoreFailureDiagnostic(String code) {
     return '診斷碼：$code';
+  }
+
+  @override
+  String backupRestoreCorruptArchiveMessage(String code) {
+    return '所選的 JO-Kelivo 備份檔案已損壞或不完整，因此未執行還原。目前資料未被修改。診斷碼：$code';
   }
 
   @override
@@ -16208,6 +16461,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageBackup => '立即備份';
 
   @override
+  String get backupPageLocalBackupAction => '備份';
+
+  @override
   String get backupPageExporting => '正在匯出...';
 
   @override
@@ -16226,7 +16482,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageImportBackupFileSubtitle => '匯入本機備份檔案';
 
   @override
-  String get backupPageImportKelivoBackup => '從 Kelivo 備份匯入';
+  String get backupPageImportKelivoBackup => '從 Kelivo 匯入';
 
   @override
   String get backupPageImportFromOtherApps => '從其他APP匯入';
@@ -16532,7 +16788,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get bottomToolsSheetUpload => '上傳檔案';
 
   @override
-  String get bottomToolsSheetClearContext => '清空上下文';
+  String get bottomToolsSheetClearContext => '暫時屏蔽上下文';
+
+  @override
+  String get contextManagementMaskContext => '暫時屏蔽上下文';
+
+  @override
+  String get contextManagementRestoreContext => '恢復上下文';
 
   @override
   String get compressContext => '壓縮上下文';
@@ -16541,7 +16803,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get compressContextDesc => '總結對話並開始新聊天';
 
   @override
-  String get clearContextDesc => '標記上下文分界點';
+  String get clearContextDesc => '暫時屏蔽更早的訊息，僅將分界點之後的內容傳送給模型。';
 
   @override
   String get contextManagement => '上下文管理';
@@ -16643,10 +16905,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get messageMoreSheetCreateBranch => '建立分支';
 
   @override
-  String get messageMoreSheetDelete => '刪除本版本';
+  String get messageMoreSheetDelete => '刪除訊息';
 
   @override
-  String get messageMoreSheetDeleteAllVersions => '刪除全部版本';
+  String get messageMoreSheetDeleteAllVersions => '刪除分支';
 
   @override
   String get reasoningBudgetSheetOff => '關閉';
@@ -16895,12 +17157,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String chatSelectionDeleteSelectedConfirm(int count) {
-    return '確定要刪除已選擇的$count個版本嗎？此操作不可撤銷。';
+    return '確定要刪除已選擇的$count則訊息嗎？此操作不可撤銷。';
   }
 
   @override
   String chatSelectionDeleteSelectedAllVersionsConfirm(int count) {
-    return '確定要刪除已選擇$count條訊息的全部版本嗎？此操作不可撤銷。';
+    return '確定要刪除已選擇$count則訊息的分支及其後代嗎？此操作不可撤銷。';
   }
 
   @override
@@ -18290,6 +18552,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get miniMapScrollToBottomTooltip => '捲動到底部';
+
+  @override
+  String get treeBranchPanelTitle => '上下文分支';
+
+  @override
+  String get treeBranchRootLabel => '主分支';
+
+  @override
+  String get treeBranchDefaultLabel => '分支';
+
+  @override
+  String get treeMapUserLabel => '使用者';
+
+  @override
+  String get treeMapAssistantLabel => '助手';
 
   @override
   String get searchServicesPageApiKeyRequiredStatus => '需要 API Key';
@@ -21791,4 +22068,87 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get memoryTraceShowLess => '收合';
+
+  @override
+  String get sqliteMigrationTitle => '準備儲存遷移';
+
+  @override
+  String get sqliteMigrationSourceDatabaseLabel => '線性 SQLite';
+
+  @override
+  String get sqliteMigrationTargetDatabaseLabel => '樹狀 SQLite';
+
+  @override
+  String get sqliteMigrationSubtitle =>
+      'JO-Kelivo 需要先遷移這份較舊的 SQLite 存檔，然後才能啟動。';
+
+  @override
+  String get sqliteMigrationBackupNote =>
+      '遷移開始前，JO-Kelivo 會先儲存並驗證一份包含設定、聊天記錄和本機檔案的 ZIP 備份。';
+
+  @override
+  String get sqliteMigrationChooseFileButton => '儲存遷移備份';
+
+  @override
+  String get sqliteMigrationCreateSnapshotDetail => '正在建立資料庫快照';
+
+  @override
+  String get sqliteMigrationPackageBackupDetail => '正在封裝遷移備份';
+
+  @override
+  String get sqliteMigrationValidateBackupDetail => '正在驗證備份';
+
+  @override
+  String get sqliteMigrationBackupReadyDetail => '備份已驗證';
+
+  @override
+  String get sqliteMigrationUpgradeSchemaDetail => '正在升級資料庫結構';
+
+  @override
+  String get sqliteMigrationValidateDatabaseDetail => '正在驗證遷移後的資料庫';
+
+  @override
+  String get sqliteMigrationChecklistSnapshot => '建立資料庫快照';
+
+  @override
+  String get sqliteMigrationChecklistPackage => '封裝設定和本機檔案';
+
+  @override
+  String get sqliteMigrationChecklistValidateBackup => '驗證備份';
+
+  @override
+  String get sqliteMigrationChecklistUpgradeSchema => '升級資料庫結構';
+
+  @override
+  String get sqliteMigrationChecklistValidateDatabase => '驗證遷移後的資料庫';
+
+  @override
+  String get sqliteMigrationBackingUpTitle => '正在備份原始儲存';
+
+  @override
+  String get sqliteMigrationBackingUpSubtitle => '正在複製並驗證原始檔案，請不要關閉 JO-Kelivo。';
+
+  @override
+  String get sqliteMigrationMigratingTitle => '正在遷移儲存';
+
+  @override
+  String get sqliteMigrationMigratingSubtitle => '資料庫升級期間會保留已驗證的原始備份。';
+
+  @override
+  String get sqliteMigrationCompleteTitle => '儲存遷移完成';
+
+  @override
+  String get sqliteMigrationCompleteSubtitle => '請重新啟動 JO-Kelivo 以開啟遷移後的儲存。';
+
+  @override
+  String get sqliteMigrationFailedTitle => '儲存遷移失敗';
+
+  @override
+  String get sqliteMigrationFailedSubtitle => '遷移已停止。請查看錯誤訊息，解決原因後再重試。';
+
+  @override
+  String get sqliteMigrationRetryButton => '重試遷移';
+
+  @override
+  String get sqliteMigrationRestartButton => '重新啟動 JO-Kelivo';
 }

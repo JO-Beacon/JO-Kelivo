@@ -3,15 +3,20 @@ import 'package:window_manager/window_manager.dart';
 import 'package:provider/provider.dart';
 import '../core/providers/settings_provider.dart';
 
-/// A custom Windows title bar implemented in Flutter.
+/// 使用 Flutter 实现的自定义 Windows 标题栏。
 ///
-/// - Provides a drag area for moving the window
-/// - Renders minimize / maximize / restore / close buttons
-/// - Accepts optional left-side children (e.g., app icon, menu toggle)
+/// - 提供用于移动窗口的拖动区域
+/// - 渲染最小化、最大化、还原和关闭按钮
+/// - 接受可选的左侧子组件（例如应用图标、菜单切换按钮）
 class WindowTitleBar extends StatefulWidget {
-  const WindowTitleBar({super.key, this.leftChildren = const <Widget>[]});
+  const WindowTitleBar({
+    super.key,
+    this.leftChildren = const <Widget>[],
+    this.backgroundColor,
+  });
 
   final List<Widget> leftChildren;
+  final Color? backgroundColor;
 
   @override
   State<WindowTitleBar> createState() => _WindowTitleBarState();
@@ -54,10 +59,13 @@ class _WindowTitleBarState extends State<WindowTitleBar> with WindowListener {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final brightness = Theme.of(context).brightness;
-    final sp = context.watch<SettingsProvider>();
-    final Color bg = sp.usePureBackground
-        ? cs.surface
-        : cs.surfaceContainerHighest;
+    final Color bg;
+    if (widget.backgroundColor case final backgroundColor?) {
+      bg = backgroundColor;
+    } else {
+      final sp = context.watch<SettingsProvider>();
+      bg = sp.usePureBackground ? cs.surface : cs.surfaceContainerHighest;
+    }
     return Container(
       height: 40,
       decoration: BoxDecoration(
@@ -74,7 +82,7 @@ class _WindowTitleBarState extends State<WindowTitleBar> with WindowListener {
           const SizedBox(width: 6),
           ...widget.leftChildren,
           // https://github.com/leanflutter/window_manager/issues/136
-          // Only the middle area should be draggable, not the buttons.
+          // 只有中间区域应可拖动，按钮区域不应可拖动。
           Expanded(child: DragToMoveArea(child: const SizedBox.expand())),
           WindowCaptionButton.minimize(
             brightness: brightness,

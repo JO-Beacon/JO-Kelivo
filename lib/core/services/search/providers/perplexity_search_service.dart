@@ -60,7 +60,7 @@ class PerplexitySearchService extends SearchService<PerplexityOptions> {
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final resultsList = (data['results'] as List?) ?? const <dynamic>[];
-      // Support both single-query (list of items) and multi-query (list of lists)
+      // 同时支持单查询（条目列表）和多查询（列表的列表）
       final flat = <Map<String, dynamic>>[];
       for (final item in resultsList) {
         if (item is List) {

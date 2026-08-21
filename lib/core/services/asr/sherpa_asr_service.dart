@@ -8,9 +8,9 @@ import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
 import 'sherpa_model_manager.dart';
 
-/// Runs local sherpa-onnx recognition without retaining native recognizers
-/// between recordings. Keeping the complete native lifecycle inside the
-/// worker isolate also keeps model loading and decoding off the UI isolate.
+/// 在两次录音之间运行本地 sherpa-onnx 识别，而不保留原生识别器。
+/// 将完整的原生生命周期保留在 worker isolate 中，
+/// 还可以让模型加载和解码不占用 UI isolate。
 final class SherpaAsrService {
   SherpaAsrService({SherpaModelManager? modelManager, this.numThreads = 2})
     : modelManager = modelManager ?? SherpaModelManager() {
@@ -41,9 +41,8 @@ final class SherpaAsrService {
       pcm16,
       sampleRate: sampleRate,
     );
-    // Offline recognizers can hallucinate short phrases from silence or a
-    // brief burst of room noise. Do not load the model unless there is enough
-    // sustained speech-like energy to decode.
+    // 离线识别器可能会从静音或短暂的房间噪声中幻觉出短语。只有在有足够
+    // 持续且类似语音的能量可供解码时，才加载模型。
     if (speechPcm16 == null) return '';
     final configuredDirectoryPath = modelDirectoryPath?.trim();
     final hasConfiguredDirectoryPath =
@@ -93,9 +92,8 @@ final class SherpaAsrService {
     return samples;
   }
 
-  /// Rejects silence/very short captures and trims quiet edges before native
-  /// decoding. The detector intentionally uses a conservative energy gate,
-  /// not a language-specific VAD, so it works for every bundled model.
+  /// 在原生解码前拒绝静音/极短录音并修剪安静边缘。检测器有意采用保守的能量门限，
+  /// 而不是语言相关的 VAD，因此适用于所有内置模型。
   static Uint8List? preparePcm16ForRecognition(
     Uint8List pcm16, {
     required int sampleRate,
@@ -112,7 +110,7 @@ final class SherpaAsrService {
     if (sampleCount < minimumSamples) return null;
 
     final data = ByteData.sublistView(pcm16);
-    final frameSamples = math.max(1, sampleRate ~/ 50); // 20 ms
+    final frameSamples = math.max(1, sampleRate ~/ 50); // 20 毫秒
     final frameRms = <double>[];
     for (var start = 0; start < sampleCount; start += frameSamples) {
       final end = math.min(start + frameSamples, sampleCount);
@@ -146,8 +144,8 @@ final class SherpaAsrService {
       firstActive = firstActive < 0 ? index : firstActive;
       lastActive = index;
     }
-    // Total energy plus a short continuous run reject taps and scattered
-    // keyboard noise while preserving ordinary short words.
+    // 总能量加上短暂的连续运行时长，可以拒绝敲击和分散的
+    // 键盘噪声，同时保留普通短词。
     if (activeFrames < 8 || longestActiveRun < 5 || firstActive < 0) {
       return null;
     }
@@ -329,7 +327,7 @@ String _recognizeZipformer(
       }
     }
 
-    // Streaming transducers need trailing silence to emit their last tokens.
+    // 流式 transducer 需要尾部静音才能发出最后几个 token。
     stream.acceptWaveform(
       samples: Float32List(request.sampleRate ~/ 2),
       sampleRate: request.sampleRate,

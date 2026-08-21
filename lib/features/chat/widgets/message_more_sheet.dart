@@ -58,7 +58,7 @@ Future<MessageMoreAction?> showMessageMoreSheet(
     );
   }
 
-  // Desktop: show anchored glass menu near the clicked button
+  // 桌面端：在点击按钮附近显示锚定玻璃菜单
   final l10n = AppLocalizations.of(context)!;
   MessageMoreAction? selected;
   Future<void> Function()? afterClose;
@@ -188,7 +188,7 @@ class _MessageMoreSheet extends StatefulWidget {
 }
 
 class _MessageMoreSheetState extends State<_MessageMoreSheet> {
-  // Draggable sheet removed; use auto height with max constraint.
+  // 已移除可拖拽面板；使用带最大约束的自动高度。
 
   Widget _actionItem({
     required IconData icon,
@@ -242,7 +242,7 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
 
-    // Footer metadata (time/model) removed per iOS-style spec
+    // 按 iOS 风格规范移除底部元数据（时间/模型）
 
     final maxHeight = MediaQuery.sizeOf(context).height * 0.8;
     return SafeArea(
@@ -254,7 +254,7 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Drag handle
+              // 拖拽把手
               Padding(
                 padding: const EdgeInsets.only(top: 6, bottom: 6),
                 child: Container(
@@ -266,7 +266,7 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                   ),
                 ),
               ),
-              // No title per design; keep content close to handle
+              // 按设计不显示标题；让内容紧贴拖拽把手
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
                 child: Column(
@@ -276,9 +276,9 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                       icon: Lucide.TextSelect,
                       label: l10n.messageMoreSheetSelectCopy,
                       onTap: () {
-                        // Close current sheet, then open iOS-style select-copy sheet
+                        // 先关闭当前面板，再打开 iOS 风格的选择复制面板
                         Navigator.of(context).pop();
-                        // Schedule next frame with parent context to avoid stacking sheets
+                        // 使用父级 context 安排下一帧，避免面板堆叠
                         final parentCtx = widget.parentContext;
                         WidgetsBinding.instance.addPostFrameCallback((_) {
                           if (!parentCtx.mounted) return;

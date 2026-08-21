@@ -32,28 +32,26 @@ class ThemeSettingsPage extends StatelessWidget {
       ),
     );
 
-    // Section header with trailing action icons (e.g. new/import theme).
-    Widget headerWithActions(
-      String text, {
-      required List<Widget> actions,
-    }) => Padding(
-      padding: const EdgeInsets.fromLTRB(12, 18, 8, 6),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: AppFontWeights.semibold,
-                color: cs.onSurface.withValues(alpha: 0.8),
+    // 带尾部操作图标的分区标题（例如新建或导入主题）。
+    Widget headerWithActions(String text, {required List<Widget> actions}) =>
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 18, 8, 6),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: AppFontWeights.semibold,
+                    color: cs.onSurface.withValues(alpha: 0.8),
+                  ),
+                ),
               ),
-            ),
+              ...actions,
+            ],
           ),
-          ...actions,
-        ],
-      ),
-    );
+        );
 
     return Scaffold(
       appBar: AppBar(
@@ -151,7 +149,7 @@ class ThemeSettingsPage extends StatelessWidget {
   }
 }
 
-/// Saved custom themes list (create/import live in the section header).
+/// 已保存自定义主题列表（新建或导入入口位于分区标题中）。
 Widget _customThemesSection(BuildContext context) {
   final l10n = AppLocalizations.of(context)!;
   final settings = context.watch<SettingsProvider>();
@@ -177,8 +175,8 @@ Widget _customThemesSection(BuildContext context) {
         _customThemeRow(
           context,
           theme: themes[i],
-          selected: isCustomActive &&
-              settings.selectedCustomThemeId == themes[i].id,
+          selected:
+              isCustomActive && settings.selectedCustomThemeId == themes[i].id,
           onTap: () =>
               context.read<SettingsProvider>().selectCustomTheme(themes[i].id),
           onCopy: () => exportCustomThemeToClipboard(context, themes[i]),
@@ -257,7 +255,7 @@ Widget _rowAction(
   );
 }
 
-// --- iOS-style helpers ---
+// --- iOS 风格辅助函数 ---
 
 Widget _iosSectionCard({required List<Widget> children}) {
   return Builder(
@@ -473,7 +471,7 @@ Widget _paletteRow(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           child: Row(
             children: [
-              // color dot (slightly smaller)
+              // 颜色圆点（略小）
               Container(
                 width: 24,
                 height: 24,

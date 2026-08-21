@@ -5,7 +5,7 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../core/services/haptics.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
-/// Toolbar for selection mode with cancel and confirm buttons.
+/// 带取消和确认按钮的选择模式工具栏。
 class SelectionToolbar extends StatelessWidget {
   const SelectionToolbar({
     super.key,
@@ -19,7 +19,7 @@ class SelectionToolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    // Use compact icon-only glass buttons to avoid taking too much width
+    // 使用紧凑的纯图标玻璃按钮，避免占用过多宽度
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -41,7 +41,7 @@ class SelectionToolbar extends StatelessWidget {
   }
 }
 
-/// Animated container that slides/fades in/out like provider multi-select bar.
+/// 与供应商多选栏类似的滑入/滑出、淡入/淡出动画容器。
 class AnimatedSelectionBar extends StatelessWidget {
   const AnimatedSelectionBar({
     super.key,
@@ -68,7 +68,7 @@ class AnimatedSelectionBar extends StatelessWidget {
   }
 }
 
-/// iOS-style glass capsule button (no ripple), similar to providers multi-select style.
+/// iOS 风格玻璃胶囊按钮（无涟漪），类似供应商多选风格。
 class GlassCapsuleButton extends StatefulWidget {
   const GlassCapsuleButton({
     super.key,
@@ -95,7 +95,7 @@ class _GlassCapsuleButtonState extends State<GlassCapsuleButton> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    // Glass background, match providers' capsule taste
+    // 玻璃背景，与供应商胶囊按钮的视觉风格一致
     final glassBase = cs.surface.withValues(alpha: isDark ? 0.06 : 0.65);
     final overlay = cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05);
     final tileColor = _pressed
@@ -153,7 +153,7 @@ class _GlassCapsuleButtonState extends State<GlassCapsuleButton> {
   }
 }
 
-/// Compact icon-only glass button to minimize width (like providers multi-select icons).
+/// 紧凑的纯图标玻璃按钮，最小化宽度（类似供应商多选图标）。
 class GlassCircleButtonSmall extends StatefulWidget {
   const GlassCircleButtonSmall({
     super.key,
@@ -168,7 +168,7 @@ class GlassCircleButtonSmall extends StatefulWidget {
   final Color color;
   final VoidCallback onTap;
   final String? semanticLabel;
-  final double size; // diameter
+  final double size; // 直径
 
   @override
   State<GlassCircleButtonSmall> createState() => _GlassCircleButtonSmallState();

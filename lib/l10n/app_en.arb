@@ -227,8 +227,8 @@
   "languageDisplaySpanish": "Spanish",
   "languageSelectSheetTitle": "Select Translation Language",
   "languageSelectSheetClearButton": "Clear Translation",
-  "homePageClearContext": "Clear Context",
-  "homePageClearContextWithCount": "Clear Context ({actual}/{configured})",
+  "homePageClearContext": "Temporarily Mask Context",
+  "homePageClearContextWithCount": "Temporarily Mask Context ({actual}/{configured})",
   "@homePageClearContextWithCount": {
     "placeholders": {
       "actual": {
@@ -310,10 +310,10 @@
   },
   "chatServiceDefaultConversationTitle": "New Chat",
   "userProviderDefaultUserName": "User",
-  "homePageDeleteMessage": "Delete This Version",
-  "homePageDeleteMessageConfirm": "Are you sure you want to delete this version? This cannot be undone.",
-  "homePageDeleteAllVersions": "Delete All Versions",
-  "homePageDeleteAllVersionsConfirm": "Are you sure you want to delete all versions of this message? This cannot be undone.",
+  "homePageDeleteMessage": "Delete Message",
+  "homePageDeleteMessageConfirm": "Are you sure you want to delete this message and its following branch? This cannot be undone.",
+  "homePageDeleteAllVersions": "Delete Branch",
+  "homePageDeleteAllVersionsConfirm": "Are you sure you want to delete this branch and its descendants? Other branches will remain.",
   "homePageCancel": "Cancel",
   "homePageDelete": "Delete",
   "homePageSelectMessagesToShare": "Please select messages to share",
@@ -663,6 +663,15 @@
   "restartAppFailedMessage": "JO-Kelivo could not restart automatically. Fully close it, then open it again.",
   "backupRestoreRolledBackTitle": "Restore was rolled back",
   "backupRestoreRolledBackContent": "The restore could not be completed. JO-Kelivo verified and kept your previous data.",
+  "contextTreeMigrationWarningsTitle": "Legacy chat migration repaired",
+  "contextTreeMigrationWarningsContent": "JO-Kelivo repaired {count} missing selected-version records while converting legacy chat branches. The repaired choices were written to the warning log. No message text was opened or changed.",
+  "@contextTreeMigrationWarningsContent": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "backupRestoreFailureTitle": "Restore requires attention",
   "backupRestoreFailureContent": "JO-Kelivo could not verify a complete old or new data set, so chat data was not opened. Close JO-Kelivo and try again. If this repeats, keep the diagnostic code for support.",
   "backupRestoreBusinessLeaseUnavailableTitle": "JO-Kelivo is already running",
@@ -672,6 +681,14 @@
   "backupRestoreFailureCopied": "Diagnostic code copied",
   "backupRestoreFailureDiagnostic": "Diagnostic code: {code}",
   "@backupRestoreFailureDiagnostic": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "backupRestoreCorruptArchiveMessage": "The selected JO-Kelivo backup is damaged or incomplete, so it was not restored. Your current data was not modified. Diagnostic code: {code}",
+  "@backupRestoreCorruptArchiveMessage": {
     "placeholders": {
       "code": {
         "type": "String"
@@ -712,13 +729,14 @@
   "backupPageRestore": "Restore",
   "backupPageBackupUploaded": "Backup uploaded",
   "backupPageBackup": "Backup",
+  "backupPageLocalBackupAction": "Backup",
   "backupPageExporting": "Exporting...",
   "backupPageExportToFile": "Export to File",
   "backupPageExportToFileSubtitle": "Export app data to a file",
   "backupPageExportKelivoBackup": "Export as Kelivo Backup",
   "backupPageImportBackupFile": "Import Backup File",
   "backupPageImportBackupFileSubtitle": "Import a local backup file",
-  "backupPageImportKelivoBackup": "Import from Kelivo Backup",
+  "backupPageImportKelivoBackup": "Import from Kelivo",
   "backupPageImportFromOtherApps": "Import from Other Apps",
   "backupPageImportFromRikkaHub": "Import from RikkaHub",
   "backupPageNotSupportedYet": "Not supported yet",
@@ -838,10 +856,12 @@
   "bottomToolsSheetCamera": "Camera",
   "bottomToolsSheetPhotos": "Photos",
   "bottomToolsSheetUpload": "Upload",
-  "bottomToolsSheetClearContext": "Clear Context",
+  "bottomToolsSheetClearContext": "Temporarily Mask Context",
+  "contextManagementMaskContext": "Temporarily Mask Context",
+  "contextManagementRestoreContext": "Restore Context",
   "compressContext": "Compress Context",
   "compressContextDesc": "Summarize and start a new chat",
-  "clearContextDesc": "Mark a context boundary",
+  "clearContextDesc": "Temporarily mask earlier messages and only send messages after the boundary to the model.",
   "contextManagement": "Context Management",
   "compressingContext": "Compressing context...",
   "compressContextFailed": "Failed to compress context",
@@ -875,8 +895,8 @@
   "messageMoreSheetShare": "Share",
   "messageMoreSheetSelectMessages": "Select Messages",
   "messageMoreSheetCreateBranch": "Create Branch",
-  "messageMoreSheetDelete": "Delete This Version",
-  "messageMoreSheetDeleteAllVersions": "Delete All Versions",
+  "messageMoreSheetDelete": "Delete Message",
+  "messageMoreSheetDeleteAllVersions": "Delete Branch",
   "reasoningBudgetSheetOff": "Off",
   "reasoningBudgetSheetAuto": "Auto",
   "reasoningBudgetSheetLight": "Light Reasoning",
@@ -1034,7 +1054,7 @@
   "chatSelectionThinkingContent": "Thinking content",
   "chatSelectionDeleteSelected": "Delete Selected",
   "chatSelectionSelectMessagesToDelete": "Please select messages to delete",
-  "chatSelectionDeleteSelectedConfirm": "Delete {count} selected version(s)? This cannot be undone.",
+  "chatSelectionDeleteSelectedConfirm": "Delete {count} selected message(s)? This cannot be undone.",
   "@chatSelectionDeleteSelectedConfirm": {
     "placeholders": {
       "count": {
@@ -1042,7 +1062,7 @@
       }
     }
   },
-  "chatSelectionDeleteSelectedAllVersionsConfirm": "Delete all versions of {count} selected message(s)? This cannot be undone.",
+  "chatSelectionDeleteSelectedAllVersionsConfirm": "Delete the branches and descendants of {count} selected message(s)? This cannot be undone.",
   "@chatSelectionDeleteSelectedAllVersionsConfirm": {
     "placeholders": {
       "count": {
@@ -1660,6 +1680,11 @@
   "miniMapTitle": "Minimap",
   "miniMapTooltip": "Minimap",
   "miniMapScrollToBottomTooltip": "Scroll to bottom",
+  "treeBranchPanelTitle": "Context branches",
+  "treeBranchRootLabel": "Main branch",
+  "treeBranchDefaultLabel": "Branch",
+  "treeMapUserLabel": "User",
+  "treeMapAssistantLabel": "Assistant",
   "searchServicesPageApiKeyRequiredStatus": "API Key Required",
   "searchServicesPageUrlRequiredStatus": "URL Required",
   "searchServicesAddDialogTitle": "Add Search Service",
@@ -3242,5 +3267,32 @@
     }
   },
   "memoryTraceShowMore": "Show full text",
-  "memoryTraceShowLess": "Collapse"
+  "memoryTraceShowLess": "Collapse",
+  "sqliteMigrationTitle": "Prepare storage migration",
+  "sqliteMigrationSourceDatabaseLabel": "Linear SQLite",
+  "sqliteMigrationTargetDatabaseLabel": "Tree SQLite",
+  "sqliteMigrationSubtitle": "JO-Kelivo needs to migrate this older SQLite archive before it can start.",
+  "sqliteMigrationBackupNote": "Before migration, JO-Kelivo saves and verifies a ZIP backup containing settings, chat history, and local files.",
+  "sqliteMigrationChooseFileButton": "Save migration backup",
+  "sqliteMigrationCreateSnapshotDetail": "Creating database snapshot",
+  "sqliteMigrationPackageBackupDetail": "Packaging migration backup",
+  "sqliteMigrationValidateBackupDetail": "Validating backup",
+  "sqliteMigrationBackupReadyDetail": "Backup verified",
+  "sqliteMigrationUpgradeSchemaDetail": "Upgrading database schema",
+  "sqliteMigrationValidateDatabaseDetail": "Validating migrated database",
+  "sqliteMigrationChecklistSnapshot": "Create database snapshot",
+  "sqliteMigrationChecklistPackage": "Package settings and local files",
+  "sqliteMigrationChecklistValidateBackup": "Validate backup",
+  "sqliteMigrationChecklistUpgradeSchema": "Upgrade database schema",
+  "sqliteMigrationChecklistValidateDatabase": "Validate migrated database",
+  "sqliteMigrationBackingUpTitle": "Backing up original storage",
+  "sqliteMigrationBackingUpSubtitle": "Copying and verifying the original files. Do not close JO-Kelivo.",
+  "sqliteMigrationMigratingTitle": "Migrating storage",
+  "sqliteMigrationMigratingSubtitle": "The verified original backup is retained while the database is upgraded.",
+  "sqliteMigrationCompleteTitle": "Storage migration complete",
+  "sqliteMigrationCompleteSubtitle": "Restart JO-Kelivo to open the migrated storage.",
+  "sqliteMigrationFailedTitle": "Storage migration failed",
+  "sqliteMigrationFailedSubtitle": "The migration was stopped. Review the error and retry only after the cause is resolved.",
+  "sqliteMigrationRetryButton": "Retry migration",
+  "sqliteMigrationRestartButton": "Restart JO-Kelivo"
 }

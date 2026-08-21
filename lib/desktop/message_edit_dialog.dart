@@ -111,7 +111,7 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Header
+                  // 标题栏
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
                     child: Row(
@@ -168,7 +168,7 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  // Body
+                  // 内容区
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),

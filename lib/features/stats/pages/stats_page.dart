@@ -199,9 +199,8 @@ class _StatsPageState extends State<StatsPage> {
               '${conversation.id}:${conversation.updatedAt.microsecondsSinceEpoch}:'
               '${conversation.createdAt.microsecondsSinceEpoch}:'
               '${conversation.assistantId ?? '_default'}:'
-              // Signature-only: -1 sentinel is safe here. Real stats come from
-              // loadStatsAggregate; once counts settle, signature changes and
-              // triggers one recompute.
+              // 仅作为签名：这里使用 -1 哨兵值是安全的。真实统计来自
+              // loadStatsAggregate；一旦计数稳定，签名会变化并触发一次重新计算。
               '${chatService.getMessageCount(conversation.id)}',
         )
         .join('|');

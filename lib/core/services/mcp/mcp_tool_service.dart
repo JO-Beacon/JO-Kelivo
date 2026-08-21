@@ -76,7 +76,7 @@ class McpToolService extends ChangeNotifier {
     return mcpProvider.callTool(route.server.id, route.tool.name, arguments);
   }
 
-  // Convenience: call tool and flatten result contents to plain text
+  // 便捷方法：调用工具并将结果内容展平为纯文本
   Future<String> callToolTextForConversation(
     McpProvider mcpProvider,
     ChatService chat, {
@@ -84,7 +84,7 @@ class McpToolService extends ChangeNotifier {
     required String toolName,
     Map<String, dynamic> arguments = const {},
   }) async {
-    // Attempt call via selected server
+    // 尝试通过选中的服务器调用
     final selected = chat.getConversationMcpServers(conversationId).toSet();
     final route = _findRoute(mcpProvider, selected, toolName);
     final res = route == null
@@ -108,10 +108,10 @@ class McpToolService extends ChangeNotifier {
       return '';
     }
     final buf = StringBuffer();
-    // Be liberal in what we accept: many servers return different content variants.
+    // 在接收上保持宽松：许多服务器会返回不同的内容变体。
     for (final c in res.content) {
       try {
-        // Known types from mcp_client
+        // 来自 mcp_client 的已知类型
         if (c is mcp.TextContent) {
           if ((c.text).trim().isNotEmpty) buf.writeln(c.text);
           continue;
@@ -145,7 +145,7 @@ class McpToolService extends ChangeNotifier {
           }
           continue;
         }
-        // Try dynamic accessors that some adapters may expose
+        // 尝试部分适配器可能暴露的动态访问器
         final dyn = c as dynamic;
         try {
           final txt = (dyn.text as String?);
@@ -161,17 +161,17 @@ class McpToolService extends ChangeNotifier {
             continue;
           }
         } catch (_) {}
-        // As a last resort, serialize to JSON if available
+        // 作为最后手段，如果可用则序列化为 JSON
         try {
           final json = (dyn.toJson as dynamic).call();
           buf.writeln(const JsonEncoder.withIndent('  ').convert(json));
           continue;
         } catch (_) {}
-        // Fallback to a readable string (avoid Instance of ... when possible)
+        // 回退到可读字符串（尽量避免 Instance of ...）
         final s = c.toString();
         if (!s.startsWith('Instance of')) buf.writeln(s);
       } catch (_) {
-        // ignore single content parse errors and continue
+        // 忽略单个内容解析错误并继续
       }
     }
     return buf.toString().trim();
@@ -185,7 +185,7 @@ class McpToolService extends ChangeNotifier {
     Map<String, dynamic> arguments = const {},
     McpToolRouteSnapshot? routeSnapshot,
   }) async {
-    // try servers selected for the assistant
+    // 尝试为助手选中的服务器
     final a = (assistantId != null)
         ? assistants.getById(assistantId)
         : assistants.currentAssistant;
@@ -277,7 +277,7 @@ class McpToolService extends ChangeNotifier {
             final s = c.toString();
             if (!s.startsWith('Instance of')) buf.writeln(s);
           } catch (_) {
-            // ignore single content parse errors and continue
+            // 忽略单个内容解析错误并继续
           }
         }
         return buf.toString().trim();

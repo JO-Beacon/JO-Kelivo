@@ -21,8 +21,8 @@ class LocalToolNames {
   static const String calendarCreate = 'calendar_create';
 }
 
-/// Platform availability of the device-backed local tools (implemented over
-/// a MethodChannel in the Android/iOS host apps).
+/// 设备级本地工具的平台可用性（通过 Android/iOS
+/// 宿主 App 的 MethodChannel 实现）。
 class DeviceLocalTools {
   const DeviceLocalTools._();
 
@@ -36,7 +36,7 @@ class DeviceLocalTools {
       (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.iOS);
 
-  /// Whether Android Usage Access (PACKAGE_USAGE_STATS) is granted.
+  /// 是否已授予 Android 使用情况访问权限 (PACKAGE_USAGE_STATS)。
   static Future<bool> hasUsageStatsPermission() async {
     if (!screenTimeSupported) return false;
     try {
@@ -51,21 +51,21 @@ class DeviceLocalTools {
     }
   }
 
-  /// Opens the system Usage Access settings page (Android).
+  /// 打开系统的使用情况访问设置页（Android）。
   static Future<void> openUsageAccessSettings() async {
     if (!screenTimeSupported) return;
     try {
       await _channel.invokeMethod<void>('openUsageAccessSettings');
     } on MissingPluginException {
-      // Unsupported host.
+      // 不支持的宿主。
     } on PlatformException {
-      // Settings unavailable.
+      // 设置不可用。
     }
   }
 
-  /// Returns true when calendar full access is already granted.
-  /// Uses the native EventKit / Android calendar permission path (not
-  /// permission_handler), so it works without iOS PERMISSION_EVENTS macros.
+  /// 已授予日历完全访问权限时返回 true。
+  /// 走原生 EventKit / Android 日历权限路径（而非
+  /// permission_handler），因此在无 iOS PERMISSION_EVENTS 宏时也能工作。
   static Future<bool> hasCalendarPermission() async {
     if (!calendarSupported) return false;
     try {
@@ -78,9 +78,9 @@ class DeviceLocalTools {
     }
   }
 
-  /// Requests calendar full access via the native channel.
-  /// Returns true only when granted. On iOS, permanently denied / restricted
-  /// states open the app Settings page.
+  /// 通过原生 channel 请求日历完全访问权限。
+  /// 仅在授予时返回 true。在 iOS 上，永久拒绝 / 受限
+  /// 状态会打开 App 设置页。
   static Future<bool> requestCalendarPermission() async {
     if (!calendarSupported) return false;
     try {
@@ -420,9 +420,9 @@ class LocalToolsService {
         'times without an explicit offset are interpreted in this timezone.';
   }
 
-  /// Invokes a native device tool over the MethodChannel. The native side
-  /// returns a JSON string payload (including structured error payloads that
-  /// the model can act on, e.g. missing permissions).
+  /// 通过 MethodChannel 调用原生设备工具。原生侧
+  /// 返回 JSON 字符串载荷（包括模型可据以行动的结构化错误载荷，
+  /// 例如缺少权限）。
   static Future<String> _invokeDeviceTool(
     String method,
     Map<String, dynamic> args,

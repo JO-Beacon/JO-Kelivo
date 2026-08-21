@@ -133,7 +133,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
-        // Identity card (avatar + name) - iOS style
+        // 身份卡片（头像和名称），iOS 风格
         Container(
           decoration: BoxDecoration(
             color: context.appColors.surfaceCard,
@@ -164,12 +164,12 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
         ),
         const SizedBox(height: 16),
 
-        // iOS section card with all settings (without Use Assistant Avatar and Stream Output)
+        // 包含所有设置的 iOS 分区卡片（不含“使用助手头像”和“流式输出”）
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 0),
           child: _iosSectionCard(
             children: [
-              // Temperature
+              // 温度
               _iosNavRow(
                 context,
                 icon: Lucide.Thermometer,
@@ -180,7 +180,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                 onTap: () => _showTemperatureSheet(context, a),
               ),
               _iosDivider(context),
-              // Top P
+              // Top P 参数
               _iosNavRow(
                 context,
                 icon: Lucide.Wand2,
@@ -191,7 +191,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                 onTap: () => _showTopPSheet(context, a),
               ),
               _iosDivider(context),
-              // Context messages
+              // 上下文消息
               _iosNavRow(
                 context,
                 icon: Lucide.MessagesSquare,
@@ -202,7 +202,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                 onTap: () => _showContextMessagesSheet(context, a),
               ),
               _iosDivider(context),
-              // Thinking budget
+              // 思考预算
               _iosNavRow(
                 context,
                 icon: Lucide.Brain,
@@ -228,7 +228,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                 },
               ),
               _iosDivider(context),
-              // Max tokens
+              // 最大 token
               _iosNavRow(
                 context,
                 icon: Lucide.Hash,
@@ -238,7 +238,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                 onTap: () => _showMaxTokensSheet(context, a),
               ),
               _iosDivider(context),
-              // Use assistant avatar
+              // 使用助手头像
               _iosSwitchRow(
                 context,
                 icon: Lucide.User,
@@ -259,7 +259,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                     .updateAssistant(a.copyWith(useAssistantName: v)),
               ),
               _iosDivider(context),
-              // Stream output
+              // 流式输出
               _iosSwitchRow(
                 context,
                 icon: Lucide.Zap,
@@ -274,7 +274,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
         ),
         const SizedBox(height: 16),
 
-        // Chat model card (moved down, styled like DefaultModelPage)
+        // 聊天模型卡片（下移，样式类似 DefaultModelPage）
         Container(
           decoration: BoxDecoration(
             color: context.appColors.surfaceCard,
@@ -350,7 +350,9 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                   pressedScale: 0.98,
                   builder: (pressed) {
                     final bg = context.appColors.surfaceFill;
-                    final overlay = cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05);
+                    final overlay = cs.onSurface.withValues(
+                      alpha: isDark ? 0.06 : 0.05,
+                    );
                     final pressedBg = Color.alphaBlend(overlay, bg);
                     final l10n = AppLocalizations.of(context)!;
                     final settings = context.read<SettingsProvider>();
@@ -408,7 +410,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
         ),
         const SizedBox(height: 16),
 
-        // Chat background (separate iOS card)
+        // 聊天背景（独立 iOS 卡片）
         Container(
           decoration: BoxDecoration(
             color: context.appColors.surfaceCard,
@@ -448,13 +450,15 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                 ),
                 const SizedBox(height: 8),
                 if ((a.background ?? '').isEmpty) ...[
-                  // Single button when no background (full width)
+                  // 无背景时的单个按钮（全宽）
                   _TactileRow(
                     onTap: () => _pickBackground(context, a),
                     pressedScale: 0.98,
                     builder: (pressed) {
                       final bg = context.appColors.surfaceFill;
-                      final overlay = cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05);
+                      final overlay = cs.onSurface.withValues(
+                        alpha: isDark ? 0.06 : 0.05,
+                      );
                       final pressedBg = Color.alphaBlend(overlay, bg);
                       final iconColor = cs.onSurface.withValues(alpha: 0.75);
                       final textColor = cs.onSurface.withValues(alpha: 0.9);
@@ -478,7 +482,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                             Padding(
                               padding: const EdgeInsets.only(
                                 left: 2.0,
-                              ), // Material icon spacing
+                              ), // Material 图标间距
                               child: Icon(
                                 Icons.image,
                                 size: 18,
@@ -500,7 +504,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                     },
                   ),
                 ] else ...[
-                  // Two buttons when background exists
+                  // 有背景时的两个按钮
                   Row(
                     children: [
                       Expanded(
@@ -685,7 +689,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Drag handle
+                    // 拖动把手
                     Center(
                       child: Container(
                         width: 40,
@@ -800,7 +804,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Drag handle
+                    // 拖动把手
                     Center(
                       child: Container(
                         width: 40,
@@ -916,7 +920,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Drag handle
+                    // 拖动把手
                     Center(
                       child: Container(
                         width: 40,
@@ -1050,7 +1054,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Drag handle
+                // 拖动把手
                 Center(
                   child: Container(
                     width: 40,
@@ -1062,7 +1066,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                // Header with Close (X) and Save buttons
+                // 带关闭（X）和保存按钮的标题栏
                 Row(
                   children: [
                     _TactileIconButton(
@@ -1185,7 +1189,7 @@ class _BackgroundPreviewState extends State<_BackgroundPreview> {
   Future<void> _resolveSize() async {
     try {
       if (widget.path.startsWith('http')) {
-        // Skip network size probe; render with a sensible max height
+        // 跳过网络尺寸探测；使用合理的最大高度渲染
         setState(() => _size = null);
         return;
       }
@@ -1212,12 +1216,12 @@ class _BackgroundPreviewState extends State<_BackgroundPreview> {
             final fixed = SandboxPathResolver.fix(widget.path);
             final f = File(fixed);
             if (!f.existsSync()) {
-              // Gracefully fallback to empty box when local file missing (e.g., imported from mobile)
+              // 本地文件缺失时优雅回退为空框（例如从移动端导入的场景）
               return const SizedBox.shrink();
             }
             return Image.file(f, fit: BoxFit.contain);
           })();
-    // When size known, maintain aspect ratio; otherwise cap the height to avoid overflow
+    // 已知尺寸时保持宽高比；否则限制高度以避免溢出
     if (_size != null && _size!.width > 0 && _size!.height > 0) {
       final ratio = _size!.width / _size!.height;
       return SizedBox(
@@ -1279,13 +1283,13 @@ class _SliderTileNew extends StatelessWidget {
     final double? step = (divisions != null && divisions! > 0)
         ? (max - min) / divisions!
         : null;
-    // Compute a readable major interval and minor tick count
+    // 计算可读的主刻度和次刻度数量
     final total = (max - min).abs();
     double interval;
     if (total <= 0) {
       interval = 1;
     } else if ((divisions ?? 0) <= 20) {
-      interval = total / 4; // up to 5 major ticks inc endpoints
+      interval = total / 4; // 最多 5 个主刻度（含端点）
     } else if ((divisions ?? 0) <= 50) {
       interval = total / 5;
     } else {
@@ -1294,7 +1298,7 @@ class _SliderTileNew extends StatelessWidget {
     if (interval <= 0) interval = 1;
     int minor = 0;
     if (step != null && step > 0) {
-      // Ensure minor ticks align with the chosen step size
+      // 确保次刻度与所选步长对齐
       minor = ((interval / step) - 1).round();
       if (minor < 0) minor = 0;
       if (minor > 8) minor = 8;
@@ -1316,7 +1320,7 @@ class _SliderTileNew extends StatelessWidget {
                       overlayRadius: 14,
                       activeTrackColor: active,
                       inactiveTrackColor: inactive,
-                      // Waterdrop tooltip uses theme primary background with onPrimary text
+                      // 水滴提示使用主题主色背景和 onPrimary 文本
                       tooltipBackgroundColor: cs.primary,
                       tooltipTextStyle: TextStyle(
                         color: cs.onPrimary,
@@ -1343,7 +1347,7 @@ class _SliderTileNew extends StatelessWidget {
                       max: max,
                       stepSize: step,
                       enableTooltip: true,
-                      // Show the paddle tooltip only while interacting
+                      // 仅在交互时显示桨形提示
                       shouldAlwaysShowTooltip: false,
                       showTicks: true,
                       showLabels: !useCustomLabels,
@@ -1354,7 +1358,7 @@ class _SliderTileNew extends StatelessWidget {
                       tooltipTextFormatterCallback: (actual, text) => label,
                       tooltipShape: const SfPaddleTooltipShape(),
                       labelFormatterCallback: (actual, formattedText) {
-                        // Prefer integers for wide ranges, keep 2 decimals for 0..1
+                        // 宽范围优先整数，0..1 保留两位小数
                         if (total <= 2.0) return actual.toStringAsFixed(2);
                         if (actual == actual.roundToDouble()) {
                           return actual.toStringAsFixed(0);
@@ -1420,7 +1424,7 @@ class _SliderTileNew extends StatelessWidget {
             _ValuePill(text: label, onTap: onLabelTap),
           ],
         ),
-        // Remove explicit min/max captions since ticks already indicate range
+        // 移除显式最小值或最大值文字，因为刻度已显示范围
       ],
     );
   }
@@ -1624,7 +1628,7 @@ extension _AssistantAvatarActions on _BasicSettingsTabState {
                             : value.characters.take(1).toString(),
                         fontSize: 40,
                         optimizeEmojiAlign: true,
-                        nudge: Offset.zero, // picker preview: no extra nudge
+                        nudge: Offset.zero, // 选择器预览：无额外微调
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -1687,8 +1691,7 @@ extension _AssistantAvatarActions on _BasicSettingsTabState {
                                 e,
                                 fontSize: 20,
                                 optimizeEmojiAlign: true,
-                                nudge:
-                                    Offset.zero, // picker grid: no extra nudge
+                                nudge: Offset.zero, // 选择器网格：无额外微调
                               ),
                             ),
                           );

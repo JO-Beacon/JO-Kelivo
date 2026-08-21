@@ -5,14 +5,12 @@ import 'package:path/path.dart' as p;
 import 'restore_trace_service.dart';
 import 'restore_workspace_lock.dart';
 
-/// Trims `.kelivo_restore/completed/` archives after a few successful cold
-/// starts so each overwrite restore does not strand a full copy of the old
-/// database and assets forever.
+/// 在几次成功冷启动后清理 `.kelivo_restore/completed/` 归档，以免每次覆盖
+/// 恢复都永久遗留一份旧数据库和资源的完整副本。
 ///
-/// The cold-start counter lives in the caller-provided store (main.dart backs
-/// it with the app preference store). The counter resets only after a
-/// successful clear, so a failed cleanup retries on the next cold start;
-/// pruning never throws into startup.
+/// 冷启动计数器位于调用方提供的存储中（main.dart 以应用偏好存储作为其
+/// 后端）。计数器仅在成功清理后重置，因此失败的清理会在下次冷启动时重试；
+/// 修剪永远不会把异常抛进启动流程。
 final class RestoreArchivePruner {
   RestoreArchivePruner({
     required this.appDataDirectory,
@@ -50,7 +48,7 @@ final class RestoreArchivePruner {
       await _clearArchive();
       await _writeColdStarts(0);
     } catch (_) {
-      // Pruning is best-effort and must never affect startup.
+      // 修剪是尽力而为的，绝不能影响启动。
     }
   }
 

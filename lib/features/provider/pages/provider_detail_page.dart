@@ -59,15 +59,15 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   final _keyCtrl = TextEditingController();
   final _baseCtrl = TextEditingController();
   final _pathCtrl = TextEditingController();
-  // Google Vertex AI extras
+  // Google Vertex AI 额外字段
   final _locationCtrl = TextEditingController();
   final _projectCtrl = TextEditingController();
   final _saJsonCtrl = TextEditingController();
   bool _enabled = true;
   bool _useResp = false; // openai
   bool _vertexAI = false; // google
-  bool _showApiKey = false; // toggle visibility
-  bool _multiKeyEnabled = false; // single/multi key mode
+  bool _showApiKey = false; // 切换可见性
+  bool _multiKeyEnabled = false; // 单/多 key 模式
 
   // 模型选择模式相关
   bool _isSelectionMode = false;
@@ -276,7 +276,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                     ),
                   );
                   if (confirm == true) {
-                    // Clear assistant-level model selections that reference this provider
+                    // 清除引用此供应商的助手级模型选择
                     try {
                       for (final a in assistantProvider.assistants) {
                         if (a.chatModelProvider == widget.keyName) {
@@ -287,7 +287,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                       }
                     } catch (_) {}
 
-                    // Remove provider config and related selections/pins
+                    // 移除供应商配置及相关选择或置顶
                     await settings.removeProviderConfig(widget.keyName);
                     if (!context.mounted) return;
                     showAppSnackBar(
@@ -1028,7 +1028,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           ),
         ),
         const SizedBox(height: 6),
-        // Top iOS-style section card for key settings
+        // 顶部 iOS 风格关键设置分区卡片
         _iosSectionCard(
           children: [
             if (widget.keyName.toLowerCase() != 'kelivoin')
@@ -1579,7 +1579,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                               ),
                             );
 
-                            // Clear global and assistant-level model selections that reference the deleted model
+                            // 清除引用已删除模型的全局和助手级模型选择
                             await settings.clearSelectionsForModel(
                               widget.keyName,
                               id,
@@ -1692,7 +1692,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     );
   }
 
-  // Legacy network tab removed (replaced by ProviderNetworkPage)
+  // 旧网络标签已移除（由 ProviderNetworkPage 替代）
 
   Widget _inputRow(
     BuildContext context, {
@@ -1832,7 +1832,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     );
   }
 
-  // --- iOS style helpers (consistent with MultiKeyManagerPage) ---
+  // --- 与 MultiKeyManagerPage 一致的 iOS 风格辅助函数 ---
 
   Widget _iosSectionCard({required List<Widget> children}) {
     final theme = Theme.of(context);
@@ -2182,7 +2182,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           : _nameCtrl.text.trim(),
       apiKey: _keyCtrl.text.trim(),
       baseUrl: _baseCtrl.text.trim(),
-      providerType: _kind, // Save the selected provider type
+      providerType: _kind, // 保存选中的提供商类型
       chatPath: _kind == ProviderKind.openai
           ? _pathCtrl.text.trim()
           : old.chatPath,
@@ -2205,14 +2205,14 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       claudePromptCachingTtl: _supportsClaudePromptCaching
           ? _claudePromptCachingTtl
           : ProviderConfig.claudePromptCachingTtl5m,
-      // preserve models and modelOverrides and proxy fields implicitly via copyWith
+      // 通过 copyWith 隐式保留 models、modelOverrides 和代理字段
     );
     await settings.setProviderConfig(widget.keyName, updated);
 
-    // If provider is now disabled but was previously enabled, clear model selections
+    // 如果供应商现在被禁用但之前是启用的，清除模型选择
     if (!_enabled && old.enabled) {
       await settings.clearSelectionsForProvider(widget.keyName);
-      // Also clear assistant-level model selections referencing this provider
+      // 同时清除引用此供应商的助手级模型选择
       try {
         for (final a in assistantProvider.assistants) {
           if (a.chatModelProvider == widget.keyName) {
@@ -2225,7 +2225,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     }
 
     if (!mounted) return;
-    // Silent auto-save (no snackbar) for immediate-save UX
+    // 静默自动保存（无 Snackbar），匹配立即保存体验
   }
 
   Widget _multilineRow(
@@ -2296,15 +2296,15 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
 
   Future<void> _importServiceAccountJson() async {
     try {
-      // Lazy import to avoid hard dependency errors in web
+      // 懒加载导入，避免 Web 上的硬依赖错误
       // ignore: avoid_dynamic_calls
       // ignore: import_of_legacy_library_into_null_safe
-      // Using file_picker which is already in pubspec
-      // import placed at top-level of this file
+      // 使用 pubspec 中已有的 file_picker
+      // 导入放在本文件顶层
       final picker = await _pickJsonFile();
       if (picker == null) return;
       _saJsonCtrl.text = picker;
-      // Auto-fill projectId if available
+      // 可用时自动填充 projectId
       try {
         final obj = jsonDecode(_saJsonCtrl.text) as Map<String, dynamic>;
         final pid = (obj['project_id'] as String?)?.trim();
@@ -3164,7 +3164,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       defaultName: widget.displayName,
     );
 
-    // 顺序检测,防止并发导致API被封锁
+    // 顺序检测，防止并发导致 API 被封锁
     for (final modelId in modelsToTest) {
       if (mounted) {
         setState(() {
@@ -3263,7 +3263,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     );
   }
 
-  // _saveNetwork moved to ProviderNetworkPage
+  // _saveNetwork 已移至 ProviderNetworkPage
 
   Future<void> _showModelPicker(BuildContext context) async {
     final cs = Theme.of(context).colorScheme;
@@ -3281,7 +3281,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     List<dynamic> items = const [];
     bool loading = true;
     String error = '';
-    // Collapsed state per group in the selector dialog
+    // 选择器对话框中每个分组的折叠状态
     final Map<String, bool> collapsed = <String, bool>{};
 
     await showModalBottomSheet(
@@ -3333,7 +3333,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             }
 
             if (loading) {
-              // kick off loading once
+              // 只启动一次加载
               Future.microtask(loadModels);
             }
 
@@ -3416,7 +3416,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    // Animated toggle: Select All / Deselect All (based on current filtered state)
+                                    // 动画切换：全选或取消全选（基于当前筛选状态）
                                     Builder(
                                       builder: (_) {
                                         final allSelected =
@@ -3451,7 +3451,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                                 );
                                             if (filtered.isEmpty) return;
                                             if (allSelected) {
-                                              // Deselect all filtered
+                                              // 取消选中所有过滤结果
                                               final toRemove = filtered
                                                   .map((m) => m.id)
                                                   .toSet();
@@ -3466,7 +3466,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                                 old.copyWith(models: next),
                                               );
                                             } else {
-                                              // Select all filtered
+                                              // 选中所有过滤结果
                                               final setIds = old.models.toSet();
                                               setIds.addAll(
                                                 filtered.map((m) => m.id),
@@ -3577,7 +3577,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                   ),
                                   children: [
                                     for (final g in groupKeys) ...[
-                                      // Group header with actions
+                                      // 带操作的分组标题
                                       Padding(
                                         padding: const EdgeInsets.fromLTRB(
                                           12,
@@ -4087,7 +4087,7 @@ class _ModelCard extends StatelessWidget {
   }
 
   ModelInfo _infer(String id) {
-    // build a minimal ModelInfo and let registry infer
+    // 构建最小 ModelInfo，让注册表推断其余信息
     return ModelRegistry.infer(ModelInfo(id: id, displayName: id));
   }
 
@@ -4466,9 +4466,9 @@ ModelInfo _applyModelOverride(
   }
 }
 
-// Using flutter_slidable for reliable swipe actions with confirm + undo.
+// 使用 flutter_slidable 提供可靠的滑动操作，并带确认和撤销。
 
-// Legacy page-based implementations removed in favor of swipeable PageView tabs.
+// 已移除旧版页面式实现，改用可滑动的 PageView 标签。
 
 class _BrandAvatar extends StatelessWidget {
   const _BrandAvatar({required this.name, this.size = 20});
@@ -4515,7 +4515,7 @@ class _BrandAvatar extends StatelessWidget {
   }
 }
 
-// Top-level tactile row used by iOS-style lists here
+// 此处 iOS 风格列表使用的顶层触感行
 class _TactileRow extends StatefulWidget {
   const _TactileRow({
     required this.builder,
@@ -4531,7 +4531,7 @@ class _TactileRow extends StatefulWidget {
   State<_TactileRow> createState() => _TactileRowState();
 }
 
-// Icon-only tactile button for AppBar (no ripple, slight press scale)
+// AppBar 的纯图标触感按钮（无涟漪，轻微按压缩放）
 class _TactileIconButton extends StatefulWidget {
   const _TactileIconButton({
     required this.icon,
@@ -4625,7 +4625,7 @@ class _TactileRowState extends State<_TactileRow> {
   }
 }
 
-// Bottom tactile tabs (two items) without ripple
+// 底部触感标签（两项），无涟漪
 class _BottomTabs extends StatelessWidget {
   const _BottomTabs({
     required this.index,

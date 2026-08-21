@@ -47,10 +47,10 @@ final class StagedRestoreBundle {
   final String candidateManifestSha256;
 }
 
-/// Copies a validated v2 restore payload into the app-data filesystem.
+/// 将经过验证的 v2 恢复载荷复制到应用数据文件系统中。
 ///
-/// The candidate remains immutable under its run workspace until the startup
-/// gate either commits the whole bundle or restores the previous bundle.
+/// 候选内容在它的运行工作区中保持不可变，直到启动门
+/// 要么提交整个 bundle，要么恢复先前的 bundle。
 final class RestoreBundleStaging {
   RestoreBundleStaging._();
 
@@ -60,8 +60,8 @@ final class RestoreBundleStaging {
   static const _assetRoots = ['upload', 'images', 'avatars', 'fonts'];
   static const _databaseEntry = 'database/kelivo.db';
   static const _maximumManifestBytes = 16 * 1024 * 1024;
-  // Settings contain structured preferences, never chat rows or binary assets.
-  // Cap JSON before copying/parsing to bound UTF-8 and DOM amplification.
+  // 设置包含结构化偏好，绝不包含聊天记录或二进制资源。
+  // 在复制/解析前限制 JSON 大小，以约束 UTF-8 和 DOM 放大。
   static const _maximumSettingsBytes = 16 * 1024 * 1024;
 
   static Future<StagedRestoreBundle> create({
@@ -177,8 +177,8 @@ final class RestoreBundleStaging {
         durability: resolvedDurability,
       );
       if (!includeFiles) {
-        // Overwrite chats-only: mark local attachments unavailable before
-        // publish so target same-path files cannot be treated as restored.
+        // 仅覆盖聊天：在发布前将本地附件标记为不可用，
+        // 这样目标同路径文件就不会被当作已恢复内容。
         await ChatDatabaseRepository.recomputeAttachmentAvailabilityOnDatabaseFile(
           databaseFile: stagedDatabaseFile,
           filesRestored: false,
@@ -278,7 +278,7 @@ final class RestoreBundleStaging {
     }
   }
 
-  /// Reopens and fully validates a staged candidate without mutating it.
+  /// 重新打开并完整验证暂存候选内容，而不修改它。
   static Future<ValidatedRestoreCandidate> validateExistingCandidate({
     required Directory candidateDirectory,
     required String expectedManifestSha256,
@@ -307,8 +307,8 @@ final class RestoreBundleStaging {
     return candidate;
   }
 
-  /// Reads the immutable candidate control model without requiring selected
-  /// payload files to remain in candidate after cutover has started.
+  /// 读取不可变的候选控制模型，而不要求在切换开始后
+  /// 所选载荷文件仍保留在候选内容中。
   static Future<ValidatedRestoreCandidate> readCandidateManifest({
     required Directory candidateDirectory,
     required String expectedManifestSha256,

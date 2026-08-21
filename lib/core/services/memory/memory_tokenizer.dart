@@ -1,8 +1,8 @@
-/// Smart Add candidate tokenizer (§12.6) and LIKE escaping (§5.9).
+/// Smart Add 候选 tokenizer (§12.6) 与 LIKE 转义 (§5.9)。
 abstract final class MemoryTokenizer {
   MemoryTokenizer._();
 
-  /// Chinese stop characters / words that must be filtered from CJK 2-grams.
+  /// 必须从 CJK 二元组中过滤的中文停用字/词。
   static const Set<String> cjkStopwords = {
     '用户',
     '的',
@@ -21,7 +21,7 @@ abstract final class MemoryTokenizer {
     '它',
   };
 
-  /// English stopwords (lowercase). Includes `user` / `users` (appendix item 8).
+  /// 英文停用词（小写）。包含 `user` / `users`（附录第 8 项）。
   static const Set<String> englishStopwords = {
     'the',
     'a',
@@ -45,14 +45,14 @@ abstract final class MemoryTokenizer {
   );
   static final RegExp _latinWord = RegExp(r'[a-z0-9]{2,}');
 
-  /// Tokenize [text] for Smart Add candidate retrieval.
+  /// 为 Smart Add 候选召回对 [text] 分词。
   ///
-  /// - English/numbers: split on whitespace and punctuation; keep length ≥ 2;
-  ///   drop stopwords; lowercase.
-  /// - CJK: 2-grams; drop grams containing a stopword character/word; lowercase.
-  /// - At most 8 tokens, in left-to-right encounter order.
-  /// Tokens are deduplicated: a repeated token would be counted twice in the
-  /// `hits` sum and distort candidate ranking.
+  /// - 英文/数字：按空白与标点拆分；保留长度 ≥ 2；
+  ///   丢弃停用词；小写。
+  /// - CJK：二元组；丢弃含停用字/词的二元组；小写。
+  /// - 最多 8 个 token，按从左到右出现顺序。
+  /// token 去重：重复 token 会在 `hits` 中被计两次，
+  /// 扭曲候选排序。
   static List<String> tokenize(String text) {
     final lower = text.toLowerCase();
     final tokens = <String>{};
@@ -105,7 +105,7 @@ abstract final class MemoryTokenizer {
     }
   }
 
-  /// Escape `%`, `_`, and `\` with `\` for SQL `LIKE ... ESCAPE '\'` (§5.9).
+  /// 用 `\` 转义 `%`、`_`、`\`，用于 SQL `LIKE ... ESCAPE '\'` (§5.9)。
   static String escapeLike(String token) {
     return token
         .replaceAll(r'\', r'\\')

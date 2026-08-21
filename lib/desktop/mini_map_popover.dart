@@ -4,7 +4,13 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import '../core/models/chat_message.dart';
+import '../core/models/conversation_tree.dart';
 import '../core/models/message_part.dart';
+import '../icons/lucide_adapter.dart';
+import '../l10n/app_localizations.dart';
+import '../shared/widgets/ios_tactile.dart';
+import '../shared/widgets/conversation_tree_map.dart';
+import '../theme/app_font_weights.dart';
 
 Future<String?> showDesktopMiniMapPopover(
   BuildContext context, {
@@ -14,6 +20,10 @@ Future<String?> showDesktopMiniMapPopover(
   Set<String>? selectedMessageIds,
   Listenable? selectionListenable,
   ValueChanged<String>? onToggleSelection,
+  List<ConversationBranch>? branches,
+  ConversationTree? conversationTree,
+  String? activeBranchId,
+  ValueChanged<String>? onSelectBranch,
 }) async {
   assert(
     !selecting || (selectedMessageIds != null && onToggleSelection != null),
@@ -47,6 +57,10 @@ Future<String?> showDesktopMiniMapPopover(
       selectedMessageIds: selectedMessageIds,
       selectionListenable: selectionListenable,
       onToggleSelection: onToggleSelection,
+      branches: branches,
+      conversationTree: conversationTree,
+      activeBranchId: activeBranchId,
+      onSelectBranch: onSelectBranch,
       onSelect: selecting
           ? null
           : (id) {
@@ -77,6 +91,10 @@ class _MiniMapPopover extends StatefulWidget {
     required this.selectedMessageIds,
     required this.selectionListenable,
     required this.onToggleSelection,
+    required this.branches,
+    required this.conversationTree,
+    required this.activeBranchId,
+    required this.onSelectBranch,
     required this.onClose,
   });
 
@@ -88,6 +106,10 @@ class _MiniMapPopover extends StatefulWidget {
   final Set<String>? selectedMessageIds;
   final Listenable? selectionListenable;
   final ValueChanged<String>? onToggleSelection;
+  final List<ConversationBranch>? branches;
+  final ConversationTree? conversationTree;
+  final String? activeBranchId;
+  final ValueChanged<String>? onSelectBranch;
   final VoidCallback onClose;
 
   @override
@@ -98,7 +120,7 @@ class _MiniMapPopoverState extends State<_MiniMapPopover>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _fadeIn;
-  late final Animation<double> _slideY; // px translateY
+  late final Animation<double> _slideY; // 像素 translateY
   bool _closing = false;
 
   @override
@@ -179,19 +201,57 @@ class _MiniMapPopoverState extends State<_MiniMapPopover>
                         borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(14),
                         ),
-                        child: _MiniMapList(
-                          messages: widget.messages,
-                          selecting: widget.selecting,
-                          selectedMessageIds: widget.selectedMessageIds,
-                          selectionListenable: widget.selectionListenable,
-                          onTapMessage: (id) {
-                            if (_closing) return;
-                            if (widget.selecting) {
-                              widget.onToggleSelection?.call(id);
-                            } else {
-                              widget.onSelect?.call(id);
-                            }
-                          },
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (_shouldShowBranchPanel)
+                              Semantics(
+                                label: AppLocalizations.of(
+                                  context,
+                                )!.treeBranchPanelTitle,
+                                child: _BranchBar(
+                                  branches: _orderedBranches,
+                                  activeBranchId: widget.activeBranchId,
+                                  onSelectBranch: (id) {
+                                    if (_closing) return;
+                                    widget.onSelectBranch?.call(id);
+                                    unawaited(_close());
+                                  },
+                                ),
+                              ),
+                            if (widget.conversationTree != null &&
+                                !widget.selecting)
+                              ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxHeight: 420,
+                                ),
+                                child: ConversationTreeMap(
+                                  tree: widget.conversationTree!,
+                                  messages: widget.messages,
+                                  activeBranchId: widget.activeBranchId,
+                                  onTapMessage: (id) {
+                                    if (_closing) return;
+                                    widget.onSelect?.call(id);
+                                  },
+                                ),
+                              )
+                            else
+                              _MiniMapList(
+                                messages: widget.messages,
+                                selecting: widget.selecting,
+                                selectedMessageIds: widget.selectedMessageIds,
+                                selectionListenable: widget.selectionListenable,
+                                onTapMessage: (id) {
+                                  if (_closing) return;
+                                  if (widget.selecting) {
+                                    widget.onToggleSelection?.call(id);
+                                  } else {
+                                    widget.onSelect?.call(id);
+                                  }
+                                },
+                              ),
+                          ],
                         ),
                       ),
                     ),
@@ -203,6 +263,122 @@ class _MiniMapPopoverState extends State<_MiniMapPopover>
         ),
       ],
     );
+  }
+
+  bool get _shouldShowBranchPanel {
+    final branches = widget.branches;
+    return branches != null &&
+        branches.isNotEmpty &&
+        widget.conversationTree == null &&
+        widget.onSelectBranch != null;
+  }
+
+  List<ConversationBranch> get _orderedBranches {
+    final branches = List<ConversationBranch>.of(widget.branches ?? const [])
+      ..sort((left, right) {
+        final byTime = left.createdAt.compareTo(right.createdAt);
+        if (byTime != 0) return byTime;
+        return left.id.compareTo(right.id);
+      });
+    return branches;
+  }
+}
+
+class _BranchBar extends StatelessWidget {
+  const _BranchBar({
+    required this.branches,
+    required this.activeBranchId,
+    required this.onSelectBranch,
+  });
+
+  final List<ConversationBranch> branches;
+  final String? activeBranchId;
+  final ValueChanged<String> onSelectBranch;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return SizedBox(
+      height: 42,
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+        scrollDirection: Axis.horizontal,
+        itemCount: branches.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final branch = branches[index];
+          final active = branch.id == activeBranchId;
+          final baseColor = active
+              ? cs.primary.withValues(alpha: isDark ? 0.22 : 0.12)
+              : cs.surfaceContainerHighest.withValues(
+                  alpha: isDark ? 0.45 : 0.72,
+                );
+          final border = active
+              ? Border.all(
+                  color: cs.primary.withValues(alpha: isDark ? 0.75 : 0.55),
+                )
+              : Border.all(
+                  color: cs.outlineVariant.withValues(
+                    alpha: isDark ? 0.55 : 0.8,
+                  ),
+                );
+
+          return IosCardPress(
+            borderRadius: BorderRadius.circular(12),
+            baseColor: baseColor,
+            border: border,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            onTap: () => onSelectBranch(branch.id),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Lucide.GitFork,
+                  size: 16,
+                  color: active
+                      ? cs.primary
+                      : cs.onSurface.withValues(alpha: 0.75),
+                ),
+                const SizedBox(width: 6),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 180),
+                  child: Text(
+                    _branchLabel(context, branch, index),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: active
+                          ? AppFontWeights.emphasis
+                          : AppFontWeights.regular,
+                      color: active
+                          ? cs.primary
+                          : cs.onSurface.withValues(alpha: 0.88),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  String _branchLabel(
+    BuildContext context,
+    ConversationBranch branch,
+    int index,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    final name = branch.name.trim();
+    if (name.isNotEmpty) return name;
+    if (branch.id == 'root' || branch.id.startsWith('root-')) {
+      return l10n.treeBranchRootLabel;
+    }
+    return '${l10n.treeBranchDefaultLabel} ${index + 1}';
   }
 }
 
@@ -221,9 +397,7 @@ class _GlassPanel extends StatelessWidget {
         filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: cs.surface.withValues(
-              alpha: isDark ? 0.28 : 0.56,
-            ),
+            color: cs.surface.withValues(alpha: isDark ? 0.28 : 0.56),
             border: Border(
               top: BorderSide(
                 color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.18),
@@ -282,8 +456,7 @@ class _MiniMapListState extends State<_MiniMapList> {
   }
 
   String _oneLine(String s) {
-    // Attachment markers are no longer stripped here; summaries are built
-    // from TextPart only by callers.
+    // 此处不再剥离附件标记；摘要仅由调用方基于 TextPart 构建。
     var t = s
         .replaceAll(
           RegExp(
@@ -460,7 +633,7 @@ class _MiniMapRowState extends State<_MiniMapRow> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // User bubble
+        // 用户气泡
         Align(
           alignment: Alignment.centerRight,
           child: MouseRegion(
@@ -512,7 +685,7 @@ class _MiniMapRowState extends State<_MiniMapRow> {
           ),
         ),
         const SizedBox(height: 6),
-        // Assistant line
+        // 助手行
         Align(
           alignment: Alignment.centerLeft,
           child: MouseRegion(

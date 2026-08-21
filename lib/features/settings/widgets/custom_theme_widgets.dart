@@ -23,12 +23,12 @@ bool get _isDesktop =>
     defaultTargetPlatform == TargetPlatform.linux;
 
 // ---------------------------------------------------------------------------
-// Presentation shells (match the app's custom sheet/dialog idioms — no
-// default Material AlertDialog/FilledButton anywhere in this file).
+// 展示外壳（匹配应用自定义弹层和对话框惯例，本文件不使用默认
+// Material AlertDialog 或 FilledButton）。
 // ---------------------------------------------------------------------------
 
-/// Centered custom dialog: scrim barrier, fade+scale-in, rounded surface
-/// container with a subtle border (same look as the desktop dialogs).
+/// 居中的自定义对话框：遮罩层、淡入加缩放进入、带细微边框的圆角 surface
+/// 容器（与桌面对话框外观一致）。
 Future<T?> _showAppDialog<T>(
   BuildContext context, {
   required Widget child,
@@ -38,8 +38,7 @@ Future<T?> _showAppDialog<T>(
     context: context,
     barrierDismissible: true,
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-    barrierColor:
-        Theme.of(context).colorScheme.scrim.withValues(alpha: 0.25),
+    barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.25),
     pageBuilder: (ctx, _, __) {
       final cs = Theme.of(ctx).colorScheme;
       final isDark = Theme.of(ctx).brightness == Brightness.dark;
@@ -93,8 +92,8 @@ Future<T?> _showAppDialog<T>(
   );
 }
 
-/// Bottom sheet styled like the app's import/add sheets: drag handle,
-/// centered title, close button, keyboard-aware padding.
+/// 样式类似应用导入或添加弹层的底部弹层：拖动把手、居中标题、关闭按钮、
+/// 键盘感知内边距。
 Future<T?> _showAppSheet<T>(
   BuildContext context, {
   required String title,
@@ -182,7 +181,7 @@ Future<T?> _showAppSheet<T>(
   );
 }
 
-/// Dialog header (desktop): title + close button.
+/// 对话框标题（桌面端）：标题加关闭按钮。
 class _DialogHeader extends StatelessWidget {
   const _DialogHeader({required this.title});
   final String title;
@@ -220,7 +219,7 @@ class _DialogHeader extends StatelessWidget {
   }
 }
 
-/// Cancel/confirm action row built from [IosTileButton]s.
+/// 由 [IosTileButton] 构建的取消或确认操作行。
 class _ActionButtons extends StatelessWidget {
   const _ActionButtons({
     required this.confirmLabel,
@@ -265,8 +264,7 @@ class _ActionButtons extends StatelessWidget {
   }
 }
 
-/// Filled, rounded, bordered text-field decoration (same style as the
-/// provider import sheet fields).
+/// 带填充、圆角和边框的输入框装饰（与供应商导入弹层输入项样式一致）。
 InputDecoration _fieldDecoration(
   BuildContext context, {
   String? hintText,
@@ -275,9 +273,9 @@ InputDecoration _fieldDecoration(
   final cs = Theme.of(context).colorScheme;
   final isDark = Theme.of(context).brightness == Brightness.dark;
   OutlineInputBorder border(Color color) => OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: color),
-      );
+    borderRadius: BorderRadius.circular(12),
+    borderSide: BorderSide(color: color),
+  );
   return InputDecoration(
     hintText: hintText,
     errorText: errorText,
@@ -298,11 +296,11 @@ InputDecoration _fieldDecoration(
 }
 
 // ---------------------------------------------------------------------------
-// Theme dot
+// 主题圆点
 // ---------------------------------------------------------------------------
 
-/// Tri-color theme dot (secondary/tertiary container halves with a primary
-/// center), like RikkaHub's custom theme list icon.
+/// 三色主题圆点（左半为 secondary，右半为 tertiary，中间为 primary），
+/// 类似 RikkaHub 的自定义主题列表图标。
 class CustomThemeDot extends StatelessWidget {
   const CustomThemeDot({
     super.key,
@@ -354,7 +352,7 @@ class _ThemeDotPainter extends CustomPainter {
     final r = size.width / 2;
     canvas.save();
     canvas.clipPath(Path()..addOval(rect));
-    // Left half: secondary; right half: tertiary
+    // 左半部分：secondary；右半部分：tertiary
     canvas.drawRect(
       Rect.fromLTWH(0, 0, r, size.height),
       Paint()..color = secondary,
@@ -380,11 +378,11 @@ class _ThemeDotPainter extends CustomPainter {
 }
 
 // ---------------------------------------------------------------------------
-// HSV color picker
+// HSV 颜色选择器
 // ---------------------------------------------------------------------------
 
-/// A drag region that claims the gesture arena immediately, so vertical
-/// drags move the picker thumb instead of scrolling a surrounding sheet.
+/// 立即抢占手势竞技场的拖动区域，使垂直拖动移动选择器滑块，
+/// 而不是滚动外层弹层。
 class _DragRegion extends StatelessWidget {
   const _DragRegion({required this.onDrag, required this.child});
 
@@ -398,9 +396,9 @@ class _DragRegion extends StatelessWidget {
       gestures: {
         EagerGestureRecognizer:
             GestureRecognizerFactoryWithHandlers<EagerGestureRecognizer>(
-          EagerGestureRecognizer.new,
-          (_) {},
-        ),
+              EagerGestureRecognizer.new,
+              (_) {},
+            ),
       },
       child: Listener(
         onPointerDown: (e) => onDrag(e.localPosition),
@@ -411,7 +409,7 @@ class _DragRegion extends StatelessWidget {
   }
 }
 
-/// Full HSV color picker: saturation/value area, hue bar, hex input.
+/// 完整 HSV 颜色选择器：饱和度或明度区域、色相条、十六进制输入。
 class HsvColorPicker extends StatefulWidget {
   const HsvColorPicker({
     super.key,
@@ -471,7 +469,7 @@ class _HsvColorPickerState extends State<HsvColorPicker> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Saturation / value area
+        // 饱和度或明度区域
         LayoutBuilder(
           builder: (context, constraints) {
             final w = constraints.maxWidth;
@@ -541,7 +539,7 @@ class _HsvColorPickerState extends State<HsvColorPicker> {
           },
         ),
         const SizedBox(height: 14),
-        // Hue bar
+        // 色相条
         LayoutBuilder(
           builder: (context, constraints) {
             final w = constraints.maxWidth;
@@ -601,7 +599,7 @@ class _HsvColorPickerState extends State<HsvColorPicker> {
           },
         ),
         const SizedBox(height: 14),
-        // Preview + hex input
+        // 预览和十六进制输入
         Row(
           children: [
             Container(
@@ -623,10 +621,7 @@ class _HsvColorPickerState extends State<HsvColorPicker> {
               child: TextField(
                 controller: _hexController,
                 style: const TextStyle(fontSize: 14, fontFamily: 'monospace'),
-                decoration: _fieldDecoration(
-                  context,
-                  hintText: '#RRGGBB',
-                ),
+                decoration: _fieldDecoration(context, hintText: '#RRGGBB'),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'[#0-9a-fA-F]')),
                   LengthLimitingTextInputFormatter(7),
@@ -652,7 +647,7 @@ class _HsvColorPickerState extends State<HsvColorPicker> {
   }
 }
 
-/// Adaptive color picker (sheet on mobile, dialog on desktop).
+/// 自适应颜色选择器（移动端为弹层，桌面端为对话框）。
 Future<Color?> _showColorPicker(
   BuildContext context, {
   required String title,
@@ -661,18 +656,18 @@ Future<Color?> _showColorPicker(
   var current = initial;
   final l10n = AppLocalizations.of(context)!;
   Widget content(BuildContext ctx) => Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          HsvColorPicker(initial: initial, onChanged: (c) => current = c),
-          const SizedBox(height: 16),
-          _ActionButtons(
-            confirmLabel: l10n.customThemeSave,
-            confirmIcon: Lucide.Check,
-            onConfirm: () => Navigator.of(ctx).pop(current),
-          ),
-        ],
-      );
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      HsvColorPicker(initial: initial, onChanged: (c) => current = c),
+      const SizedBox(height: 16),
+      _ActionButtons(
+        confirmLabel: l10n.customThemeSave,
+        confirmIcon: Lucide.Check,
+        onConfirm: () => Navigator.of(ctx).pop(current),
+      ),
+    ],
+  );
 
   if (_isDesktop) {
     return _showAppDialog<Color>(
@@ -690,20 +685,20 @@ Future<Color?> _showColorPicker(
       ),
     );
   }
-  return _showAppSheet<Color>(context, title: title, child: Builder(builder: content));
+  return _showAppSheet<Color>(
+    context,
+    title: title,
+    child: Builder(builder: content),
+  );
 }
 
 // ---------------------------------------------------------------------------
-// Theme editor
+// 主题编辑器
 // ---------------------------------------------------------------------------
 
-/// Editor content (name + 3 color roles + live preview + actions).
+/// 编辑器内容（名称、三个颜色角色、实时预览和操作）。
 class CustomThemeEditor extends StatefulWidget {
-  const CustomThemeEditor({
-    super.key,
-    this.initial,
-    required this.onSave,
-  });
+  const CustomThemeEditor({super.key, this.initial, required this.onSave});
 
   final CustomTheme? initial;
   final ValueChanged<CustomTheme> onSave;
@@ -722,7 +717,8 @@ class _CustomThemeEditorState extends State<CustomThemeEditor> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.initial?.name ?? '');
-    _primaryArgb = widget.initial?.primaryArgb ??
+    _primaryArgb =
+        widget.initial?.primaryArgb ??
         ThemePalettes.defaultPalette.light.primary.toARGB32();
     _secondaryArgb = widget.initial?.secondaryArgb;
     _tertiaryArgb = widget.initial?.tertiaryArgb;
@@ -735,12 +731,12 @@ class _CustomThemeEditorState extends State<CustomThemeEditor> {
   }
 
   CustomTheme get _current => CustomTheme(
-        id: widget.initial?.id ?? '',
-        name: _nameController.text.trim(),
-        primaryArgb: _primaryArgb,
-        secondaryArgb: _secondaryArgb,
-        tertiaryArgb: _tertiaryArgb,
-      );
+    id: widget.initial?.id ?? '',
+    name: _nameController.text.trim(),
+    primaryArgb: _primaryArgb,
+    secondaryArgb: _secondaryArgb,
+    tertiaryArgb: _tertiaryArgb,
+  );
 
   Future<void> _pickColor({
     required String title,
@@ -864,12 +860,15 @@ class _CustomThemeEditorState extends State<CustomThemeEditor> {
         ),
         _colorRow(
           label: l10n.customThemeSecondaryColor,
-          color: _secondaryArgb != null ? Color(_secondaryArgb!) : scheme.secondary,
+          color: _secondaryArgb != null
+              ? Color(_secondaryArgb!)
+              : scheme.secondary,
           isAuto: _secondaryArgb == null,
           onTap: () => _pickColor(
             title: l10n.customThemeSecondaryColor,
-            initial:
-                _secondaryArgb != null ? Color(_secondaryArgb!) : scheme.secondary,
+            initial: _secondaryArgb != null
+                ? Color(_secondaryArgb!)
+                : scheme.secondary,
             onResult: (c) => _secondaryArgb = c.toARGB32(),
           ),
           onReset: _secondaryArgb != null
@@ -878,12 +877,15 @@ class _CustomThemeEditorState extends State<CustomThemeEditor> {
         ),
         _colorRow(
           label: l10n.customThemeTertiaryColor,
-          color: _tertiaryArgb != null ? Color(_tertiaryArgb!) : scheme.tertiary,
+          color: _tertiaryArgb != null
+              ? Color(_tertiaryArgb!)
+              : scheme.tertiary,
           isAuto: _tertiaryArgb == null,
           onTap: () => _pickColor(
             title: l10n.customThemeTertiaryColor,
-            initial:
-                _tertiaryArgb != null ? Color(_tertiaryArgb!) : scheme.tertiary,
+            initial: _tertiaryArgb != null
+                ? Color(_tertiaryArgb!)
+                : scheme.tertiary,
             onResult: (c) => _tertiaryArgb = c.toARGB32(),
           ),
           onReset: _tertiaryArgb != null
@@ -908,7 +910,7 @@ class _CustomThemeEditorState extends State<CustomThemeEditor> {
   }
 }
 
-/// Small mock-UI preview of a custom theme.
+/// 自定义主题的小型模拟 UI 预览。
 class _ThemePreview extends StatelessWidget {
   const _ThemePreview({required this.theme});
   final CustomTheme theme;
@@ -1011,15 +1013,16 @@ class _ThemePreview extends StatelessWidget {
   }
 }
 
-/// Show the create/edit UI adaptively (sheet on mobile, dialog on desktop).
-/// Saves via [SettingsProvider.saveCustomTheme] and selects the saved theme.
+/// 自适应显示创建或编辑 UI（移动端为弹层，桌面端为对话框）。
+/// 通过 [SettingsProvider.saveCustomTheme] 保存并选中已保存主题。
 Future<void> showCustomThemeEditor(
   BuildContext context, {
   CustomTheme? initial,
 }) async {
   final l10n = AppLocalizations.of(context)!;
-  final title =
-      initial == null ? l10n.customThemeNewTheme : l10n.customThemeEditTheme;
+  final title = initial == null
+      ? l10n.customThemeNewTheme
+      : l10n.customThemeEditTheme;
   Future<void> save(CustomTheme t) async {
     final sp = context.read<SettingsProvider>();
     final saved = await sp.saveCustomTheme(t);
@@ -1053,10 +1056,10 @@ Future<void> showCustomThemeEditor(
 }
 
 // ---------------------------------------------------------------------------
-// Import / export / confirm
+// 导入、导出、确认
 // ---------------------------------------------------------------------------
 
-/// Paste-JSON import UI (sheet on mobile, dialog on desktop).
+/// 粘贴 JSON 的导入 UI（移动端为弹层，桌面端为对话框）。
 Future<void> showImportCustomThemeDialog(BuildContext context) async {
   final l10n = AppLocalizations.of(context)!;
   final controller = TextEditingController();
@@ -1137,7 +1140,7 @@ class _ImportThemeFormState extends State<_ImportThemeForm> {
   }
 }
 
-/// Delete-confirmation dialog in the app's custom dialog style.
+/// 使用应用自定义对话框样式的删除确认对话框。
 Future<bool> showCustomThemeConfirmDialog(
   BuildContext context, {
   required String message,
@@ -1154,10 +1157,7 @@ Future<bool> showCustomThemeConfirmDialog(
         children: [
           Text(
             message,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: AppFontWeights.medium,
-            ),
+            style: TextStyle(fontSize: 15, fontWeight: AppFontWeights.medium),
           ),
           const SizedBox(height: 20),
           _ActionButtons(
@@ -1173,7 +1173,7 @@ Future<bool> showCustomThemeConfirmDialog(
   return ok ?? false;
 }
 
-/// Export a theme to the clipboard and show a confirmation.
+/// 将主题导出到剪贴板并显示确认提示。
 Future<void> exportCustomThemeToClipboard(
   BuildContext context,
   CustomTheme theme,

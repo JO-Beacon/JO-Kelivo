@@ -12,6 +12,7 @@ void main() {
       );
 
       expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
       expect(find.byType(Text), findsNothing);
       expect(find.byType(Opacity), findsNothing);
     });
@@ -24,6 +25,7 @@ void main() {
       );
 
       expect(find.byType(CupertinoActivityIndicator), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
       expect(find.text('正在加载'), findsOneWidget);
     });
   });

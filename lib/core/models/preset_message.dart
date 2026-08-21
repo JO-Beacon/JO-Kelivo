@@ -2,7 +2,7 @@ import 'package:uuid/uuid.dart';
 
 class PresetMessage {
   final String id;
-  final String role; // 'user' | 'assistant'
+  final String role; // 'user' 或 'assistant'
   final String content;
 
   PresetMessage({String? id, required this.role, required this.content})

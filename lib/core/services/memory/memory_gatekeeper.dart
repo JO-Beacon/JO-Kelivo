@@ -1,12 +1,12 @@
 import 'memory_prompts.dart';
 
-/// Gatekeeper parse outcome (§12.4 / §12.8).
+/// Gatekeeper 解析结果（§12.4 / §12.8）。
 ///
-/// A successfully parsed `false` completes the run and advances the watermark.
-/// [malformed] / request failure must **not** advance (§12.8).
+/// 成功解析为 `false` 会完成本次运行并推进 watermark。
+/// [malformed] 或请求失败**不得**推进（§12.8）。
 enum MemoryGateParseResult { worthRemembering, skip, malformed }
 
-/// Pure Gatekeeper helpers (§12.4).
+/// 纯 Gatekeeper 辅助函数（§12.4）。
 abstract final class MemoryGatekeeper {
   MemoryGatekeeper._();
 
@@ -15,7 +15,7 @@ abstract final class MemoryGatekeeper {
     caseSensitive: false,
   );
 
-  /// Resolve the prompt template: user override if non-empty, else built-in.
+  /// 解析 prompt 模板：用户覆盖项非空时使用它，否则使用内置模板。
   static String resolveTemplate({
     required MemoryPromptLang lang,
     String? overrideZh,
@@ -44,7 +44,7 @@ abstract final class MemoryGatekeeper {
     ).replaceAll('{{conversation}}', conversation);
   }
 
-  /// Parse Gatekeeper XML. Tolerates surrounding prose; unmatched → [malformed].
+  /// 解析 Gatekeeper XML。容忍周围正文；无法匹配时返回 [malformed]。
   static MemoryGateParseResult parse(String response) {
     final match = _userMemoryRe.firstMatch(response);
     if (match == null) return MemoryGateParseResult.malformed;

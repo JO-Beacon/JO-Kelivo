@@ -8,10 +8,10 @@ import '../services/mcp/mcp_oauth_service.dart';
 import '../services/mcp/stdio_command_resolver.dart';
 import 'package:uuid/uuid.dart';
 
-/// Transport type: SSE, Streamable HTTP, and STDIO (desktop-only).
+/// 传输类型：SSE、Streamable HTTP 和 STDIO（仅限桌面端）。
 enum McpTransportType { sse, http, stdio, inmemory }
 
-/// Connection status for an MCP server.
+/// MCP 服务器的连接状态。
 enum McpStatus {
   idle,
   connecting,
@@ -88,10 +88,10 @@ class McpToolConfig {
   final String name;
   final String? description;
   final List<McpParamSpec> params;
-  // Raw JSON schema for parameters, if provided by the server
+  // 参数的原始 JSON schema（如果服务器提供）
   final Map<String, dynamic>? schema;
 
-  /// Whether this tool requires user approval before execution.
+  /// 此工具在执行前是否需要用户批准。
   final bool needsApproval;
 
   McpToolConfig({
@@ -147,17 +147,17 @@ class McpToolConfig {
 }
 
 class McpServerConfig {
-  final String id; // stable id
+  final String id; // 稳定标识
   final bool enabled;
   final String name;
   final McpTransportType transport;
-  // For SSE/HTTP
-  final String url; // SSE endpoint or HTTP base URL
+  // 适用于 SSE/HTTP
+  final String url; // SSE 端点或 HTTP 基础 URL
   final List<McpToolConfig> tools;
-  final Map<String, String> headers; // custom HTTP headers
+  final Map<String, String> headers; // 自定义 HTTP 头
   final McpOAuthState? oauth;
   final McpOAuthClientRegistration? oauthClient;
-  // For STDIO (desktop-only)
+  // 适用于 STDIO（仅限桌面端）
   final String? command;
   final List<String> args;
   final Map<String, String> env;
@@ -380,22 +380,22 @@ class McpProvider extends ChangeNotifier {
         _servers = list;
       } catch (_) {}
     }
-    // Ensure built-in @kelivo/fetch is present by default
+    // 确保默认存在内置的 @kelivo/fetch
     final builtin = _builtinFetchServerIfMissing();
     if (builtin != null) {
       final next = <McpServerConfig>[..._servers, builtin];
       await _persistServers(next);
       _servers = next;
     }
-    // initialize statuses
+    // 初始化状态
     for (final s in _servers) {
       _connections.putIfAbsent(s.id, _ServerConnection.new);
     }
     _notify();
 
-    // Auto-connect enabled servers
+    // 自动连接已启用的服务器
     for (final s in _servers.where((e) => e.enabled)) {
-      // fire and forget
+      // 即发即忘
       unawaited(connect(s.id));
     }
   }
@@ -413,7 +413,7 @@ class McpProvider extends ChangeNotifier {
       enabled: true,
       name: '@kelivo/fetch',
       transport: McpTransportType.inmemory,
-      tools: const <McpToolConfig>[], // will refresh on connect
+      tools: const <McpToolConfig>[], // 将在连接时刷新
     );
   }
 
@@ -437,9 +437,9 @@ class McpProvider extends ChangeNotifier {
     await preferences.setInt(_prefsTimeoutKey, timeout.inMilliseconds);
   }
 
-  /// Export current MCP servers as a user-friendly JSON structure.
+  /// 将当前 MCP 服务器导出为易于使用的 JSON 结构。
   ///
-  /// Shape:
+  /// 结构：
   /// {
   ///   "mcpServers": {
   ///     "serverId": {
@@ -454,7 +454,7 @@ class McpProvider extends ChangeNotifier {
   ///   }
   /// }
   String exportServersAsUiJson() {
-    // On mobile, skip stdio entries in exported JSON.
+    // 在移动端，导出的 JSON 中跳过 stdio 条目。
     final isDesktop = _isDesktopPlatform();
     final map = <String, dynamic>{
       'mcpServers': {
@@ -486,9 +486,9 @@ class McpProvider extends ChangeNotifier {
                   if (s.oauthClient!.authorizationServer != null)
                     'authorizationServer': s.oauthClient!.authorizationServer,
                 },
-              // For stdio, include an optional type for compatibility
+              // 对于 stdio，包含一个可选的 type 以保持兼容性
               if (s.transport == McpTransportType.stdio) 'type': 'stdio',
-              // Include command/args/env
+              // 包含 command/args/env
               if (s.transport == McpTransportType.stdio &&
                   (s.command ?? '').isNotEmpty)
                 'command': s.command,
@@ -514,8 +514,8 @@ class McpProvider extends ChangeNotifier {
     return const JsonEncoder.withIndent('  ').convert(map);
   }
 
-  /// Replace all MCP servers from a JSON string.
-  /// Accepts either the UI JSON (with top-level `mcpServers`) or the internal list format.
+  /// 从 JSON 字符串替换所有 MCP 服务器。
+  /// 接受 UI JSON（包含顶层 `mcpServers`）或内部列表格式。
   Future<void> replaceAllFromJson(String rawJson) async {
     final existingById = {for (final server in _servers) server.id: server};
     dynamic data;
@@ -531,8 +531,8 @@ class McpProvider extends ChangeNotifier {
       if (data is Map && data.containsKey('mcpServers')) {
         serversFromMap = (data['mcpServers'] as Map).cast<String, dynamic>();
       } else if (data is Map && data.isNotEmpty) {
-        // Allow raw map format: { id: { ... } }
-        // Heuristically treat it as mcpServers format when values are maps.
+        // 允许原始 map 格式：{ id: { ... } }
+        // 当值是 map 时，启发式地将其视为 mcpServers 格式。
         final ok = data.values.every((v) => v is Map);
         if (ok) serversFromMap = data.cast<String, dynamic>();
       }
@@ -546,7 +546,7 @@ class McpProvider extends ChangeNotifier {
           final cfg = cfgAny.cast<String, dynamic>();
           final typeLower = (cfg['type'] ?? '').toString().toLowerCase();
           if (typeLower == 'inmemory') {
-            // Built-in @kelivo/fetch control via isActive; ignore name mismatches silently
+            // 通过 isActive 控制内置 @kelivo/fetch；静默忽略名称不匹配
             builtinSeen = true;
             builtinEnabled = (cfg['isActive'] as bool?) ?? true;
             return;
@@ -558,14 +558,14 @@ class McpProvider extends ChangeNotifier {
               (cfg['type']?.toString().toLowerCase() == 'stdio');
           if (hasStdioShape) {
             if (!isDesktop) {
-              // Mobile: skip stdio entries entirely
+              // 移动端：完全跳过 stdio 条目
               return;
             }
             final enabled = (cfg['isActive'] as bool?) ?? true;
             final name = (cfg['name'] as String?)?.trim();
             final cmd = (cfg['command'] as String?)?.trim();
             if (cmd == null || cmd.isEmpty) {
-              // invalid stdio entry without command
+              // 没有 command 的无效 stdio 条目
               return;
             }
             final argsAny = cfg['args'];
@@ -598,7 +598,7 @@ class McpProvider extends ChangeNotifier {
             return;
           }
 
-          // SSE/HTTP branch using legacy fields
+          // 使用旧字段的 SSE/HTTP 分支
           final typeRaw = (cfg['type'] ?? '').toString().toLowerCase();
           final transport = (typeRaw.contains('http'))
               ? McpTransportType.http
@@ -614,7 +614,7 @@ class McpProvider extends ChangeNotifier {
             );
           }
           if ((url ?? '').isEmpty) {
-            // Skip invalid entries with empty URL
+            // 跳过 URL 为空的无效条目
             return;
           }
           final serverUrl = url!;
@@ -652,7 +652,7 @@ class McpProvider extends ChangeNotifier {
           );
         });
         if (builtinSeen) {
-          // Append single built-in server with fixed id/name
+          // 添加单个具有固定 id/name 的内置服务器
           next.add(
             McpServerConfig(
               id: 'kelivo_fetch',
@@ -663,7 +663,7 @@ class McpProvider extends ChangeNotifier {
           );
         }
       } else if (data is List) {
-        // Attempt to parse internal list format. Be tolerant to transport string variants.
+        // 尝试解析内部列表格式。对 transport 字符串变体保持宽容。
         for (final item in data) {
           if (item is! Map) continue;
           final m = item.cast<String, dynamic>();
@@ -951,7 +951,7 @@ class McpProvider extends ChangeNotifier {
     });
   }
 
-  /// Set whether a tool requires user approval before execution.
+  /// 设置工具在执行前是否需要用户批准。
   Future<void> setToolNeedsApproval(
     String serverId,
     String toolName,
@@ -976,7 +976,7 @@ class McpProvider extends ChangeNotifier {
     });
   }
 
-  /// Conservative: require approval if any enabled cached tool requires it.
+  /// 保守策略：只要任一启用的缓存工具需要批准，就要求批准。
   bool toolNeedsApproval(String toolName) {
     for (final s in _servers) {
       if (!s.enabled) continue;
@@ -1851,11 +1851,11 @@ class McpProvider extends ChangeNotifier {
             rawSources.every((e) => e is String)) {
           args['sources'] = rawSources.map((e) => {'type': e}).toList();
         }
-        // Provide pragmatic defaults for commonly required fields if absent
+        // 如果缺少常用必需字段，则提供实用的默认值
         args.putIfAbsent('tbs', () => '0');
         args.putIfAbsent('filter', () => '0');
         args.putIfAbsent('location', () => 'us');
-        // If tbs/filter are present but empty, coerce to '0'
+        // 如果 tbs/filter 存在但为空，则强制设为 '0'
         if ((args['tbs'] is String) && (args['tbs'] as String).isEmpty) {
           args['tbs'] = '0';
         }
@@ -1870,7 +1870,8 @@ class McpProvider extends ChangeNotifier {
             ? (args['scrapeOptions'] as Map).cast<String, dynamic>()
             : <String, dynamic>{};
         so.putIfAbsent('waitFor', () => 0);
-        // formats normalization: server expects union of simple literals ["markdown"|"html"|"rawHtml"] OR an object only when type=="json"
+        // formats 归一化：服务端期望简单字面量的并集 ["markdown"|"html"|"rawHtml"]，
+        // 或仅在 type=="json" 时才使用对象。
         final fm = so['formats'];
         if (fm is List) {
           final norm = <dynamic>[];
@@ -1880,7 +1881,7 @@ class McpProvider extends ChangeNotifier {
               if (t == 'markdown' || t == 'html' || t == 'rawHtml') {
                 norm.add(t);
               } else if (t == 'json') {
-                norm.add(f); // keep object form for json
+                norm.add(f); // 为 json 保留对象形式
               } else if (t.isNotEmpty) {
                 norm.add(t);
               }
@@ -1908,10 +1909,10 @@ class McpProvider extends ChangeNotifier {
     String? propertyName,
   }) {
     try {
-      // Handle anyOf/oneOf by choosing first matching branch; if value is null, attempt defaults
+      // 通过选择第一个匹配分支来处理 anyOf/oneOf；如果值为 null，则尝试默认值
       final List<Map<String, dynamic>> unions = _schemaUnions(schema);
       if (unions.isNotEmpty) {
-        // Heuristic only for certain fields (e.g., sources) — DO NOT apply globally.
+        // 启发式仅用于特定字段（例如 sources），不要全局应用。
         if (value is String && propertyName == 'sources') {
           final objBranch = unions.firstWhere(
             (m) =>
@@ -1935,10 +1936,10 @@ class McpProvider extends ChangeNotifier {
               propertyName: propertyName,
             );
           } catch (_) {
-            // try next branch
+            // 尝试下一个分支
           }
         }
-        // fallthrough to first branch
+        // 回退到第一个分支
         return _normalizeBySchema(
           value,
           unions.first,
@@ -1958,7 +1959,7 @@ class McpProvider extends ChangeNotifier {
         final input = (value is Map)
             ? value.cast<String, dynamic>()
             : const <String, dynamic>{};
-        // copy passthrough unknowns
+        // 复制透传的未知项
         input.forEach((k, v) {
           if (!props.containsKey(k)) out[k] = v;
         });
@@ -1972,8 +1973,8 @@ class McpProvider extends ChangeNotifier {
             if (propSchema.containsKey('default')) {
               v = propSchema['default'];
             } else if (req.contains(key)) {
-              // Only synthesize enum / waitFor defaults for required fields; optional
-              // omitted keys should stay absent (do not pick enum.first).
+              // 仅为必需字段合成 enum / waitFor 默认值；可选字段的
+              // 被省略的键应保持不存在（不要选择 enum.first）。
               final enumVals = _schemaEnum(propSchema);
               if (enumVals.isNotEmpty) {
                 v = enumVals.first;
@@ -1981,16 +1982,16 @@ class McpProvider extends ChangeNotifier {
                   _schemaTypes(
                     propSchema,
                   ).any((t) => t == 'number' || t == 'integer')) {
-                v = 0; // pragmatic default often acceptable for waitFor
+                v = 0; // 对于 waitFor，0 通常是可接受的实用默认值
               }
             }
           }
           if (v != null) {
             out[key] = _normalizeBySchema(v, propSchema, propertyName: key);
           } else if (!req.contains(key)) {
-            // omit optional nulls
+            // 省略可选的 null 值
           } else {
-            // keep as null for required to let server validate if still missing
+            // 对于必需字段保持为 null，以便服务器在仍然缺失时进行校验
           }
         }
         return out;
@@ -2004,7 +2005,7 @@ class McpProvider extends ChangeNotifier {
         final out = [];
         for (final item in list) {
           dynamic iv = item;
-          // Heuristic only for sources array, not for other arrays like formats
+          // 启发式仅用于 sources 数组，不用于 formats 等其他数组
           final itemTypes = _schemaTypes(items);
           if (propertyName == 'sources' &&
               item is String &&
@@ -2055,14 +2056,14 @@ class McpProvider extends ChangeNotifier {
         if (value is String) {
           final enums = _schemaEnum(schema);
           if (enums.isNotEmpty && !enums.contains(value)) {
-            // keep original; server will validate
+            // 保留原始值；服务器会校验
           }
           return value;
         }
         return value.toString();
       }
 
-      // no declared type: return as-is
+      // 没有声明类型：原样返回
       return value;
     } catch (_) {
       return value;
@@ -2301,7 +2302,7 @@ class McpProvider extends ChangeNotifier {
   }
 
   Future<void> ensureConnected(String id) async {
-    // Do not attempt to connect if the server is disabled
+    // 如果服务器已禁用，不要尝试连接
     final cfg = getById(id);
     if (cfg == null || !cfg.enabled) return;
     if (isConnected(id) && cfg.oauth?.shouldRefresh() != true) return;

@@ -22,9 +22,9 @@ final class RestoreTraceSnapshot {
   final int bytes;
 }
 
-/// Inspects and deletes only cold-acknowledged restore archives.
+/// 仅检查并删除 cold-acknowledged restore 归档。
 ///
-/// Active runs and workspace control files are never counted or removed.
+/// 活动运行和工作区控制文件绝不会被计数或删除。
 final class RestoreTraceService {
   RestoreTraceService(this.appDataDirectory)
     : _workspace = RestoreWorkspaceLock(appDataDirectory: appDataDirectory);

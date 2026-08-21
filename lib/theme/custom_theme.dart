@@ -5,13 +5,11 @@ import 'package:material_color_utilities/material_color_utilities.dart';
 
 import 'palettes.dart';
 
-/// A user-defined theme: a primary color plus optional secondary/tertiary
-/// accents. Colors are stored as ARGB ints so the list can be persisted as
-/// JSON and shared between devices (copy/import).
+/// 用户自定义主题：一个主色，以及可选的次要或第三强调色。
+/// 颜色以 ARGB 整数存储，因此列表可持久化为 JSON 并在设备间共享（复制或导入）。
 ///
-/// Palette generation mirrors RikkaHub: a Material You TONAL_SPOT
-/// [DynamicScheme] whose primary (and optionally secondary/tertiary) tonal
-/// palettes are built from the picked colors via HCT.
+/// 调色板生成方式与 RikkaHub 一致：使用 Material You TONAL_SPOT
+/// [DynamicScheme]，通过 HCT 根据所选颜色构建主色（以及可选的次要或第三）色调板。
 class CustomTheme {
   final String id;
   final String name;
@@ -42,22 +40,23 @@ class CustomTheme {
       id: id ?? this.id,
       name: name ?? this.name,
       primaryArgb: primaryArgb ?? this.primaryArgb,
-      secondaryArgb:
-          secondaryArgb != null ? secondaryArgb() : this.secondaryArgb,
+      secondaryArgb: secondaryArgb != null
+          ? secondaryArgb()
+          : this.secondaryArgb,
       tertiaryArgb: tertiaryArgb != null ? tertiaryArgb() : this.tertiaryArgb,
     );
   }
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'id': id,
-        'name': name,
-        'primaryColorArgb': primaryArgb,
-        if (secondaryArgb != null) 'secondaryColorArgb': secondaryArgb,
-        if (tertiaryArgb != null) 'tertiaryColorArgb': tertiaryArgb,
-      };
+    'id': id,
+    'name': name,
+    'primaryColorArgb': primaryArgb,
+    if (secondaryArgb != null) 'secondaryColorArgb': secondaryArgb,
+    if (tertiaryArgb != null) 'tertiaryColorArgb': tertiaryArgb,
+  };
 
-  /// Accepts both this app's export format and RikkaHub's
-  /// (`primaryColorArgb` etc.; extra keys ignored, id optional).
+  /// 同时接受本应用的导出格式和 RikkaHub 格式
+  /// （`primaryColorArgb` 等；额外键会被忽略，id 可选）。
   factory CustomTheme.fromJson(Map<String, dynamic> json) {
     final primary = json['primaryColorArgb'];
     if (primary is! int) {
@@ -96,7 +95,7 @@ class CustomTheme {
       Object.hash(id, name, primaryArgb, secondaryArgb, tertiaryArgb);
 }
 
-/// Generate the light/dark [ColorScheme]s for a custom theme.
+/// 为自定义主题生成浅色或深色 [ColorScheme]。
 ColorScheme customThemeColorScheme(CustomTheme theme, {required bool dark}) {
   final sourceHct = Hct.fromInt(theme.primaryArgb);
   final scheme = DynamicScheme(
@@ -111,7 +110,9 @@ ColorScheme customThemeColorScheme(CustomTheme theme, {required bool dark}) {
     tertiaryPalette: theme.tertiaryArgb != null
         ? TonalPalette.fromHct(Hct.fromInt(theme.tertiaryArgb!))
         : TonalPalette.of(
-            MathUtils.sanitizeDegreesDouble(sourceHct.hue + 60.0), 24.0),
+            MathUtils.sanitizeDegreesDouble(sourceHct.hue + 60.0),
+            24.0,
+          ),
     neutralPalette: TonalPalette.of(sourceHct.hue, 6.0),
     neutralVariantPalette: TonalPalette.of(sourceHct.hue, 8.0),
   );
@@ -135,8 +136,9 @@ ColorScheme customThemeColorScheme(CustomTheme theme, {required bool dark}) {
     secondaryFixed: pick(MaterialDynamicColors.secondaryFixed),
     secondaryFixedDim: pick(MaterialDynamicColors.secondaryFixedDim),
     onSecondaryFixed: pick(MaterialDynamicColors.onSecondaryFixed),
-    onSecondaryFixedVariant:
-        pick(MaterialDynamicColors.onSecondaryFixedVariant),
+    onSecondaryFixedVariant: pick(
+      MaterialDynamicColors.onSecondaryFixedVariant,
+    ),
     tertiary: pick(MaterialDynamicColors.tertiary),
     onTertiary: pick(MaterialDynamicColors.onTertiary),
     tertiaryContainer: pick(MaterialDynamicColors.tertiaryContainer),
@@ -158,8 +160,9 @@ ColorScheme customThemeColorScheme(CustomTheme theme, {required bool dark}) {
     surfaceContainerLow: pick(MaterialDynamicColors.surfaceContainerLow),
     surfaceContainer: pick(MaterialDynamicColors.surfaceContainer),
     surfaceContainerHigh: pick(MaterialDynamicColors.surfaceContainerHigh),
-    surfaceContainerHighest:
-        pick(MaterialDynamicColors.surfaceContainerHighest),
+    surfaceContainerHighest: pick(
+      MaterialDynamicColors.surfaceContainerHighest,
+    ),
     outline: pick(MaterialDynamicColors.outline),
     outlineVariant: pick(MaterialDynamicColors.outlineVariant),
     shadow: pick(MaterialDynamicColors.shadow),
@@ -171,7 +174,7 @@ ColorScheme customThemeColorScheme(CustomTheme theme, {required bool dark}) {
   );
 }
 
-/// Build the runtime palette for a custom theme (resolved in main.dart).
+/// 为自定义主题构建运行时调色板（在 main.dart 中解析）。
 ThemePalette buildCustomThemePalette(CustomTheme theme) {
   return ThemePalette(
     id: ThemePalettes.customPaletteId,

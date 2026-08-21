@@ -341,6 +341,21 @@ flutter test
   - Do not write "heard this might happen" hearsay entries.
   - When adding entries, prefer "symptom -> root cause -> fix/constraint". Avoid recording conclusions without context.
 
+## 9. Context Tree Product Direction
+
+> This section locks product decisions that must not drift back into the old linear model.
+
+- Context branching is message-level `Message Fork`, not a vague tree and not a one-question-one-answer pair model. Tool, agent, and reasoning messages are ordinary nodes in the active branch.
+- The normal chat surface displays the active branch only. Side branches stay hidden except through a branch map.
+- Regenerating always creates a new branch from the message before the regenerated reply. The old setting `display_regenerate_delete_trailing_messages_v1` is obsolete and must not be reintroduced; the UI must always behave as `truncateFuture=false`.
+- Continuing from an old message creates a child branch and does not mutate the original branch.
+- Deleting a message deletes its descendants in the tree; sibling branches remain intact.
+- Persistence must explicitly store message parent relationships, branch identity, and the active branch. Chatbox's implicit "main chain plus side tails" model is not the storage source of truth.
+- Old linear conversations migrate into a single active branch; imported Chatbox forks must preserve side branches rather than flattening them.
+- Chatbox `Thread` is treated as a JO-Kelivo conversation.
+- Automatic hidden compaction is out of scope. Context compression remains explicit: generate a summary, create a new conversation, insert the summary as its first user message, and switch to it.
+- The former "Clear Context" control is a reversible context boundary toggle labeled as mask/restore, not deletion.
+
 ## Appendix: Skills Usage Rules
 
 - Before starting a task, scan available skill documents in `/.agents/skills/`.

@@ -17,7 +17,7 @@ Future<void> showAssistantTagsManagerDialog(
     barrierLabel: 'tags-manager',
     barrierColor: cs.scrim.withValues(alpha: 0.15),
     pageBuilder: (ctx, _, __) {
-      // Use a full-screen tap area to allow closing by tapping outside the dialog.
+      // 使用全屏点击区域，允许点击对话框外部关闭。
       return GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => Navigator.of(ctx).maybePop(),
@@ -26,7 +26,7 @@ Future<void> showAssistantTagsManagerDialog(
           child: Center(
             child: GestureDetector(
               behavior: HitTestBehavior.translucent,
-              onTap: () {}, // absorb taps inside the dialog
+              onTap: () {}, // 吸收对话框内的点击
               child: ConstrainedBox(
                 constraints: const BoxConstraints(
                   maxWidth: 520,
@@ -104,10 +104,10 @@ class _TagsManagerBodyState extends State<_TagsManagerBody> {
     );
     if (ok == true) {
       final name = c.text.trim();
-      if (name.isEmpty) return; // invalid; ignore silently in dialog
+      if (name.isEmpty) return; // 无效；在对话框中静默忽略
       if (!context.mounted) return;
       final tp = context.read<TagProvider>();
-      // Prevent duplicates by name
+      // 按名称防止重复
       if (tp.tags.any((t) => t.name == name)) return;
       await tp.createTag(name);
     }
@@ -185,7 +185,7 @@ class _TagsManagerBodyState extends State<_TagsManagerBody> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Top bar without bottom divider; desktop small buttons, no ripples
+        // 顶栏无底部分隔线；桌面小按钮，无涟漪
         SizedBox(
           height: 48,
           child: Padding(
@@ -221,7 +221,7 @@ class _TagsManagerBodyState extends State<_TagsManagerBody> {
             itemCount: tags.length,
             buildDefaultDragHandles: false,
             proxyDecorator: (child, index, animation) {
-              // No shadow/elevation while dragging; just return the card itself with subtle scale.
+              // 拖动时无阴影或海拔；只返回卡片本身并带细微缩放。
               return ScaleTransition(
                 scale: Tween<double>(begin: 1.0, end: 1.02).animate(animation),
                 child: child,

@@ -23,9 +23,9 @@ import '../widgets/assistant_avatar.dart';
 import '../widgets/assistant_entry_actions.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
-/// Mobile layout scaffold for the home page
-/// This widget handles only the structural layout - AppBar, drawer, body structure
-/// All message list rendering and input bar logic remain in home_page.dart
+/// 主页面移动端布局脚手架
+/// 此组件只处理结构布局：AppBar、抽屉和主体结构
+/// 所有消息列表渲染和输入栏逻辑仍保留在 home_page.dart
 class HomeMobileScaffold extends StatelessWidget {
   const HomeMobileScaffold({
     super.key,
@@ -126,9 +126,9 @@ class HomeMobileScaffold extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Keep the chat artwork at the full window size while Scaffold
-          // resizes only its body around the keyboard. Transparent IMEs can
-          // then reveal the artwork instead of Scaffold's surface color.
+          // 保持聊天背景图占满整个窗口，同时 Scaffold
+          // 只围绕键盘调整其主体大小。透明输入法随后可以
+          // 露出背景图，而不是 Scaffold 的表面颜色。
           const MobileBackgroundLayer(),
           Scaffold(
             key: scaffoldKey,
@@ -343,7 +343,7 @@ class HomeMobileScaffold extends StatelessWidget {
   }
 }
 
-/// Mobile background widget with assistant-specific image and gradient overlay
+/// 带助手专属图片和渐变叠加层的移动端背景组件
 class MobileBackgroundLayer extends StatelessWidget {
   const MobileBackgroundLayer({super.key});
 
@@ -410,7 +410,7 @@ class MobileBackgroundLayer extends StatelessWidget {
   }
 }
 
-/// Scroll navigation buttons (scroll to bottom + scroll to previous message)
+/// 滚动导航按钮（滚动到底部 + 滚动到上一条消息）
 class ScrollNavigationButtons extends StatelessWidget {
   const ScrollNavigationButtons({
     super.key,
@@ -437,7 +437,7 @@ class ScrollNavigationButtons extends StatelessWidget {
 
     return Stack(
       children: [
-        // Scroll to bottom button
+        // 滚动到底部按钮
         Align(
           alignment: Alignment.bottomRight,
           child: SafeArea(
@@ -466,7 +466,7 @@ class ScrollNavigationButtons extends StatelessWidget {
             ),
           ),
         ),
-        // Scroll to previous message button
+        // 滚动到上一条消息按钮
         Align(
           alignment: Alignment.bottomRight,
           child: SafeArea(
@@ -555,7 +555,7 @@ class _ScrollButton extends StatelessWidget {
   }
 }
 
-/// Selection mode toolbar overlay
+/// 选择模式工具栏覆盖层
 class SelectionToolbarOverlay extends StatelessWidget {
   const SelectionToolbarOverlay({
     super.key,

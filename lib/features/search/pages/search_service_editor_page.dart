@@ -1806,7 +1806,7 @@ class _SearchResultRow extends StatelessWidget {
       final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!opened) await launchUrl(uri);
     } catch (_) {
-      // The visible URL remains selectable through the platform text menu.
+      // 可见 URL 仍可通过平台文本菜单选择。
     }
   }
 }
