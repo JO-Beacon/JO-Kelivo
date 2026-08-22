@@ -166,7 +166,7 @@ END;
       ]),
     });
     final originalId = (await repository.readEntities(
-      BusinessEntityKind.assistantTag,
+      BusinessEntityKind.assistantGroup,
     )).single.id;
     final preferences = BusinessPreferences(repository);
     await preferences.load();
@@ -184,7 +184,9 @@ END;
 
     await service.merge({'theme_mode_v1': 'dark'});
 
-    final rows = await repository.readEntities(BusinessEntityKind.assistantTag);
+    final rows = await repository.readEntities(
+      BusinessEntityKind.assistantGroup,
+    );
     expect(rows.single.id, originalId);
     expect(jsonDecode(rows.single.payload), {'name': 'Renamed tag'});
     expect(
@@ -201,12 +203,13 @@ END;
         {'name': 'Original tag'},
       ]),
     });
-    final sourceRow = seeded.entities[BusinessEntityKind.assistantTag]!.single;
+    final sourceRow =
+        seeded.entities[BusinessEntityKind.assistantGroup]!.single;
     final portable = BusinessSettingsRouter.exportSnapshotWithRowIds(
       BusinessSnapshot(
         entities: {
           ...seeded.entities,
-          BusinessEntityKind.assistantTag: [
+          BusinessEntityKind.assistantGroup: [
             sourceRow.copyWith(
               payload: jsonEncode({'name': 'Renamed before backup'}),
             ),
@@ -221,7 +224,7 @@ END;
     await service.merge(portable.settings, entityRowIds: portable.entityRowIds);
 
     final restored = await repository.readEntities(
-      BusinessEntityKind.assistantTag,
+      BusinessEntityKind.assistantGroup,
     );
     expect(restored.single.id, sourceRow.id);
     expect(jsonDecode(restored.single.payload), {

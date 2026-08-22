@@ -119,7 +119,7 @@ void main() {
     });
 
     test(
-      'writes providers, assistants, tags, and relationships to SQLite',
+      'writes providers, assistants, groups, and relationships to SQLite',
       () async {
         final replacedUpload = await File(
           '${root.path}/upload/replace.txt',

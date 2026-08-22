@@ -36,7 +36,7 @@ void main() {
 
       expect(callbackUri.queryParameters['code'], 'code');
       expect(callback.redirectUri, redirectUri);
-      expect(responseBody, contains('JO-Kelivo'));
+      expect(responseBody, contains('JO-AIClient'));
       expect(responseBody, isNot(contains('kelivo://oauth-return')));
       expect(responseBody, isNot(contains('Authorization complete')));
     } finally {

@@ -543,53 +543,53 @@ class AppLocalizationsEn extends AppLocalizations {
   String get displaySettingsPageLanguageSubtitle => 'Choose interface language';
 
   @override
-  String get assistantTagsManageTitle => 'Manage Tags';
+  String get assistantGroupsManageTitle => 'Manage Groups';
 
   @override
-  String get assistantTagsCreateButton => 'Create';
+  String get assistantGroupsCreateButton => 'Create';
 
   @override
-  String get assistantTagsCreateDialogTitle => 'Create Tag';
+  String get assistantGroupsCreateDialogTitle => 'Create Group';
 
   @override
-  String get assistantTagsCreateDialogOk => 'Create';
+  String get assistantGroupsCreateDialogOk => 'Create';
 
   @override
-  String get assistantTagsCreateDialogCancel => 'Cancel';
+  String get assistantGroupsCreateDialogCancel => 'Cancel';
 
   @override
-  String get assistantTagsNameHint => 'Tag name';
+  String get assistantGroupsNameHint => 'Group name';
 
   @override
-  String get assistantTagsRenameButton => 'Rename';
+  String get assistantGroupsRenameButton => 'Rename';
 
   @override
-  String get assistantTagsRenameDialogTitle => 'Rename Tag';
+  String get assistantGroupsRenameDialogTitle => 'Rename Group';
 
   @override
-  String get assistantTagsRenameDialogOk => 'Rename';
+  String get assistantGroupsRenameDialogOk => 'Rename';
 
   @override
-  String get assistantTagsDeleteButton => 'Delete';
+  String get assistantGroupsDeleteButton => 'Delete';
 
   @override
-  String get assistantTagsDeleteConfirmTitle => 'Delete Tag';
+  String get assistantGroupsDeleteConfirmTitle => 'Delete Group';
 
   @override
-  String get assistantTagsDeleteConfirmContent =>
-      'Are you sure you want to delete this tag?';
+  String get assistantGroupsDeleteConfirmContent =>
+      'Are you sure you want to delete this group?';
 
   @override
-  String get assistantTagsDeleteConfirmOk => 'Delete';
+  String get assistantGroupsDeleteConfirmOk => 'Delete';
 
   @override
-  String get assistantTagsDeleteConfirmCancel => 'Cancel';
+  String get assistantGroupsDeleteConfirmCancel => 'Cancel';
 
   @override
-  String get assistantTagsContextMenuEditAssistant => 'Edit Assistant';
+  String get assistantGroupsContextMenuEditAssistant => 'Edit Assistant';
 
   @override
-  String get assistantTagsContextMenuManageTags => 'Manage Tags';
+  String get assistantGroupsContextMenuManageGroups => 'Manage Groups';
 
   @override
   String get mcpTransportOptionStdio => 'STDIO';
@@ -637,10 +637,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Command is required for STDIO';
 
   @override
-  String get assistantTagsContextMenuDeleteAssistant => 'Delete Assistant';
+  String get assistantGroupsContextMenuDeleteAssistant => 'Delete Assistant';
 
   @override
-  String get assistantTagsClearTag => 'Clear Tag';
+  String get assistantGroupsRemoveFromGroup => 'Remove from Group';
 
   @override
   String get displaySettingsPageLanguageChineseLabel => 'Simplified Chinese';
@@ -1039,7 +1039,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get iosBackgroundLimitNoticeBody =>
-      'These options use Apple-supported background time, BackgroundTasks, notifications, and Live Activities. They improve continuity but cannot force iOS to keep JO-Kelivo running forever.';
+      'These options use Apple-supported background time, BackgroundTasks, notifications, and Live Activities. They improve continuity but cannot force iOS to keep JO-AIClient running forever.';
 
   @override
   String get iosBackgroundUnsupportedLiveActivity =>
@@ -1067,7 +1067,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Notifications not allowed';
 
   @override
-  String get iosBackgroundGenerationActiveTitle => 'JO-Kelivo is generating';
+  String get iosBackgroundGenerationActiveTitle => 'JO-AIClient is generating';
 
   @override
   String get iosBackgroundGenerationActiveDetail =>
@@ -1126,7 +1126,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Assistant reply has been generated';
 
   @override
-  String get androidBackgroundNotificationTitle => 'JO-Kelivo is running';
+  String get androidBackgroundNotificationTitle => 'JO-AIClient is running';
 
   @override
   String get androidBackgroundNotificationText =>
@@ -1604,23 +1604,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupPageRestartContent =>
-      'Import successful. Restart JO-Kelivo to apply it safely.';
+      'Import successful. Restart JO-AIClient to apply it safely.';
 
   @override
   String backupPageRestartContentWithSkipped(int count) {
-    return 'Import completed, but $count conversations with invalid message ordering were skipped. Restart JO-Kelivo to apply the imported data safely.';
+    return 'Import completed, but $count conversations with invalid message ordering were skipped. Restart JO-AIClient to apply the imported data safely.';
   }
 
   @override
   String get restartAppFailedMessage =>
-      'JO-Kelivo could not restart automatically. Fully close it, then open it again.';
+      'JO-AIClient could not restart automatically. Fully close it, then open it again.';
 
   @override
   String get backupRestoreRolledBackTitle => 'Restore was rolled back';
 
   @override
   String get backupRestoreRolledBackContent =>
-      'The restore could not be completed. JO-Kelivo verified and kept your previous data.';
+      'The restore could not be completed. JO-AIClient verified and kept your previous data.';
 
   @override
   String get contextTreeMigrationWarningsTitle =>
@@ -1628,7 +1628,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String contextTreeMigrationWarningsContent(int count) {
-    return 'JO-Kelivo repaired $count missing selected-version records while converting legacy chat branches. The repaired choices were written to the warning log. No message text was opened or changed.';
+    return 'JO-AIClient repaired $count missing selected-version records while converting legacy chat branches. The repaired choices were written to the warning log. No message text was opened or changed.';
   }
 
   @override
@@ -1636,18 +1636,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupRestoreFailureContent =>
-      'JO-Kelivo could not verify a complete old or new data set, so chat data was not opened. Close JO-Kelivo and try again. If this repeats, keep the diagnostic code for support.';
+      'JO-AIClient could not verify a complete old or new data set, so chat data was not opened. Close JO-AIClient and try again. If this repeats, keep the diagnostic code for support.';
 
   @override
   String get backupRestoreBusinessLeaseUnavailableTitle =>
-      'JO-Kelivo is already running';
+      'JO-AIClient is already running';
 
   @override
   String get backupRestoreBusinessLeaseUnavailableContent =>
-      'JO-Kelivo\'s data is still in use by another app process. Close any other JO-Kelivo window, then restart. Your chat data has not been opened by this process.';
+      'JO-AIClient\'s data is still in use by another app process. Close any other JO-AIClient window, then restart. Your chat data has not been opened by this process.';
 
   @override
-  String get backupRestoreFailureRestartButton => 'Restart JO-Kelivo';
+  String get backupRestoreFailureRestartButton => 'Restart JO-AIClient';
 
   @override
   String get backupRestoreFailureCopyButton => 'Copy diagnostic code';
@@ -1662,7 +1662,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String backupRestoreCorruptArchiveMessage(String code) {
-    return 'The selected JO-Kelivo backup is damaged or incomplete, so it was not restored. Your current data was not modified. Diagnostic code: $code';
+    return 'The selected JO-AIClient backup is damaged or incomplete, so it was not restored. Your current data was not modified. Diagnostic code: $code';
   }
 
   @override
@@ -1693,14 +1693,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get startupRecoveryResetFailed =>
-      'Reset failed. Fully close JO-Kelivo, then open it again.';
+      'Reset failed. Fully close JO-AIClient, then open it again.';
 
   @override
   String get startupRecoveryResetDialogTitle => 'Reset all data?';
 
   @override
   String get startupRecoveryResetDialogContent =>
-      'This permanently deletes JO-Kelivo\'s database on this device and starts fresh. If you might need this data, export a copy first. This cannot be undone.';
+      'This permanently deletes JO-AIClient\'s database on this device and starts fresh. If you might need this data, export a copy first. This cannot be undone.';
 
   @override
   String get startupRecoveryResetDialogConfirm => 'Reset and restart';
@@ -1710,11 +1710,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get startupDatabaseUpdateRequiredTitle =>
-      'Update JO-Kelivo to continue';
+      'Update JO-AIClient to continue';
 
   @override
   String get startupDatabaseUpdateRequiredContent =>
-      'The chat database on this device was created by a newer version of JO-Kelivo and cannot be opened by this version. Your data has not been changed. Install the latest version of JO-Kelivo, then open it again.';
+      'The chat database on this device was created by a newer version of JO-AIClient and cannot be opened by this version. Your data has not been changed. Install the latest version of JO-AIClient, then open it again.';
 
   @override
   String backupPageRestoreFailedMessage(String error) {
@@ -1883,7 +1883,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String backupPageCherryStudioUnsupportedBackupVersion(String version) {
-    return 'This backup uses Cherry Studio format version $version, which JO-Kelivo cannot import yet. Export from Cherry Studio v1 instead, or wait for a JO-Kelivo update that supports Cherry Studio v2 backups.';
+    return 'This backup uses Cherry Studio format version $version, which JO-AIClient cannot import yet. Export from Cherry Studio v1 instead, or wait for a JO-AIClient update that supports Cherry Studio v2 backups.';
   }
 
   @override
@@ -4205,17 +4205,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutPageEasterEggButton => 'Nice!';
 
   @override
-  String get aboutPageAppName => 'JO-Kelivo';
+  String get aboutPageAppName => 'JO-AIClient';
 
   @override
   String get aboutPageKelivoSectionTitle => 'About Kelivo';
 
   @override
-  String get mcpOAuthCallbackPageTitle => 'JO-Kelivo authorization';
+  String get mcpOAuthCallbackPageTitle => 'JO-AIClient authorization';
 
   @override
   String get mcpOAuthCallbackPageMessage =>
-      'Authorization received. You may close this window and return to JO-Kelivo.';
+      'Authorization received. You may close this window and return to JO-AIClient.';
 
   @override
   String get aboutPageAppDescription =>
@@ -5272,7 +5272,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get settingsShare => 'JO-Kelivo - Open Source AI Assistant';
+  String get settingsShare => 'JO-AIClient - Open Source AI Assistant';
 
   @override
   String get searchProviderBingLocalDescription =>
@@ -6615,7 +6615,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get legacyMemoryExport => 'Export';
 
   @override
-  String get legacyMemoryExportTitle => 'JO-Kelivo legacy memory export';
+  String get legacyMemoryExportTitle => 'JO-AIClient legacy memory export';
 
   @override
   String legacyMemoryAssistantHeader(String name) {
@@ -7158,11 +7158,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get migrationIntroSubtitle =>
-      'JO-Kelivo is moving chat history to a faster SQLite database. The upgrade runs before the app opens so your data stays consistent.';
+      'JO-AIClient is moving chat history to a faster SQLite database. The upgrade runs before the app opens so your data stays consistent.';
 
   @override
   String get migrationBackupNote =>
-      'Before migration starts, JO-Kelivo exports a ZIP backup with settings, chat history, and local files.';
+      'Before migration starts, JO-AIClient exports a ZIP backup with settings, chat history, and local files.';
 
   @override
   String get migrationPerformanceNote =>
@@ -7185,14 +7185,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get migrationBackingUpSubtitle =>
-      'Exporting settings, chat history, uploaded files, images, and fonts. Keep JO-Kelivo open until this finishes.';
+      'Exporting settings, chat history, uploaded files, images, and fonts. Keep JO-AIClient open until this finishes.';
 
   @override
   String get migrationMigratingTitle => 'Migrating to SQLite';
 
   @override
   String get migrationMigratingSubtitle =>
-      'Writing conversations and messages in batches so large histories do not overload memory. Keep JO-Kelivo in the foreground until migration finishes.';
+      'Writing conversations and messages in batches so large histories do not overload memory. Keep JO-AIClient in the foreground until migration finishes.';
 
   @override
   String migrationBackingUpDetail(String fileName) {
@@ -7252,7 +7252,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get migrationCompleteSubtitle =>
-      'Your chat history is now stored in SQLite. Restart JO-Kelivo to enter the upgraded app.';
+      'Your chat history is now stored in SQLite. Restart JO-AIClient to enter the upgraded app.';
 
   @override
   String get migrationConversationCount => 'Conversations';
@@ -7270,7 +7270,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get migrationMissingFilesCount => 'Missing files';
 
   @override
-  String get migrationRestartButton => 'Restart JO-Kelivo';
+  String get migrationRestartButton => 'Restart JO-AIClient';
 
   @override
   String get migrationFailedTitle => 'Migration Failed';
@@ -7296,7 +7296,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get migrationSkipDialogMessage =>
-      'JO-Kelivo will start with an empty chat database. Your old chat history stays on disk (renamed with a .retired suffix) but will NOT be migrated and will not appear in the app. Use your backup ZIP if you need to recover it later.';
+      'JO-AIClient will start with an empty chat database. Your old chat history stays on disk (renamed with a .retired suffix) but will NOT be migrated and will not appear in the app. Use your backup ZIP if you need to recover it later.';
 
   @override
   String get migrationSkipDialogCancel => 'Cancel';
@@ -7618,11 +7618,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sqliteMigrationSubtitle =>
-      'JO-Kelivo needs to migrate this older SQLite archive before it can start.';
+      'JO-AIClient needs to migrate this older SQLite archive before it can start.';
 
   @override
   String get sqliteMigrationBackupNote =>
-      'Before migration, JO-Kelivo saves and verifies a ZIP backup containing settings, chat history, and local files.';
+      'Before migration, JO-AIClient saves and verifies a ZIP backup containing settings, chat history, and local files.';
 
   @override
   String get sqliteMigrationChooseFileButton => 'Save migration backup';
@@ -7669,7 +7669,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sqliteMigrationBackingUpSubtitle =>
-      'Copying and verifying the original files. Do not close JO-Kelivo.';
+      'Copying and verifying the original files. Do not close JO-AIClient.';
 
   @override
   String get sqliteMigrationMigratingTitle => 'Migrating storage';
@@ -7683,7 +7683,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sqliteMigrationCompleteSubtitle =>
-      'Restart JO-Kelivo to open the migrated storage.';
+      'Restart JO-AIClient to open the migrated storage.';
 
   @override
   String get sqliteMigrationFailedTitle => 'Storage migration failed';
@@ -7696,5 +7696,5 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sqliteMigrationRetryButton => 'Retry migration';
 
   @override
-  String get sqliteMigrationRestartButton => 'Restart JO-Kelivo';
+  String get sqliteMigrationRestartButton => 'Restart JO-AIClient';
 }

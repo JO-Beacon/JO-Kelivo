@@ -7,15 +7,15 @@ import '../../../core/models/assistant.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../controllers/chat_actions.dart';
-import '../../../core/providers/tag_provider.dart';
+import '../../../core/providers/assistant_group_provider.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../assistant/pages/assistant_settings_edit_page.dart';
-import '../../assistant/pages/tags_manager_page.dart';
-import '../../assistant/widgets/tags_manager_dialog.dart';
+import '../../assistant/pages/assistant_groups_manager_page.dart';
+import '../../assistant/widgets/assistant_groups_manager_dialog.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
 class AssistantEntryActions {
@@ -91,8 +91,8 @@ class AssistantEntryActions {
     VoidCallback? beforeAction,
   }) async {
     final l10n = AppLocalizations.of(context)!;
-    final tagProvider = context.read<TagProvider>();
-    final hasTag = tagProvider.tagOfAssistant(assistant.id) != null;
+    final groupProvider = context.read<AssistantGroupProvider>();
+    final hasGroup = groupProvider.groupOfAssistant(assistant.id) != null;
 
     await showDesktopContextMenuAt(
       context,
@@ -100,7 +100,7 @@ class AssistantEntryActions {
       items: [
         DesktopContextMenuItem(
           icon: Lucide.Pencil,
-          label: l10n.assistantTagsContextMenuEditAssistant,
+          label: l10n.assistantGroupsContextMenuEditAssistant,
           onTap: () => openAssistantSettings(
             context,
             assistant.id,
@@ -115,21 +115,23 @@ class AssistantEntryActions {
             await _duplicateAssistantFromMenu(context, assistant);
           },
         ),
-        if (hasTag)
+        if (hasGroup)
           DesktopContextMenuItem(
             icon: Lucide.Eraser,
-            label: l10n.assistantTagsClearTag,
+            label: l10n.assistantGroupsRemoveFromGroup,
             onTap: () async {
               beforeAction?.call();
-              await context.read<TagProvider>().unassignAssistant(assistant.id);
+              await context
+                  .read<AssistantGroupProvider>()
+                  .unassignAssistantFromGroup(assistant.id);
             },
           ),
         DesktopContextMenuItem(
           icon: Lucide.Bookmark,
-          label: l10n.assistantTagsContextMenuManageTags,
+          label: l10n.assistantGroupsContextMenuManageGroups,
           onTap: () async {
             beforeAction?.call();
-            await showAssistantTagsManagerDialog(
+            await showAssistantGroupsManagerDialog(
               context,
               assistantId: assistant.id,
             );
@@ -137,7 +139,7 @@ class AssistantEntryActions {
         ),
         DesktopContextMenuItem(
           icon: Lucide.Trash2,
-          label: l10n.assistantTagsContextMenuDeleteAssistant,
+          label: l10n.assistantGroupsContextMenuDeleteAssistant,
           danger: true,
           onTap: () async {
             beforeAction?.call();
@@ -154,8 +156,8 @@ class AssistantEntryActions {
     VoidCallback? beforeAction,
   }) async {
     final l10n = AppLocalizations.of(context)!;
-    final tagProvider = context.read<TagProvider>();
-    final hasTag = tagProvider.tagOfAssistant(assistant.id) != null;
+    final groupProvider = context.read<AssistantGroupProvider>();
+    final hasGroup = groupProvider.groupOfAssistant(assistant.id) != null;
 
     await showModalBottomSheet(
       context: context,
@@ -214,7 +216,7 @@ class AssistantEntryActions {
               mainAxisSize: MainAxisSize.min,
               children: [
                 row(
-                  l10n.assistantTagsContextMenuEditAssistant,
+                  l10n.assistantGroupsContextMenuEditAssistant,
                   Lucide.Pencil,
                   () => openAssistantSettings(
                     context,
@@ -226,28 +228,33 @@ class AssistantEntryActions {
                   beforeAction?.call();
                   await _duplicateAssistantFromMenu(context, assistant);
                 }),
-                if (hasTag)
-                  row(l10n.assistantTagsClearTag, Lucide.Eraser, () async {
-                    beforeAction?.call();
-                    await context.read<TagProvider>().unassignAssistant(
-                      assistant.id,
-                    );
-                  }),
+                if (hasGroup)
+                  row(
+                    l10n.assistantGroupsRemoveFromGroup,
+                    Lucide.Eraser,
+                    () async {
+                      beforeAction?.call();
+                      await context
+                          .read<AssistantGroupProvider>()
+                          .unassignAssistantFromGroup(assistant.id);
+                    },
+                  ),
                 row(
-                  l10n.assistantTagsContextMenuManageTags,
+                  l10n.assistantGroupsContextMenuManageGroups,
                   Lucide.Bookmark,
                   () async {
                     beforeAction?.call();
                     await Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) =>
-                            TagsManagerPage(assistantId: assistant.id),
+                        builder: (_) => AssistantGroupsManagerPage(
+                          assistantId: assistant.id,
+                        ),
                       ),
                     );
                   },
                 ),
                 row(
-                  l10n.assistantTagsContextMenuDeleteAssistant,
+                  l10n.assistantGroupsContextMenuDeleteAssistant,
                   Lucide.Trash2,
                   () async {
                     beforeAction?.call();
@@ -269,7 +276,7 @@ class AssistantEntryActions {
   ) async {
     final l10n = AppLocalizations.of(context)!;
     final assistantProvider = context.read<AssistantProvider>();
-    final tagProvider = context.read<TagProvider>();
+    final groupProvider = context.read<AssistantGroupProvider>();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -304,7 +311,7 @@ class AssistantEntryActions {
     }
 
     try {
-      await tagProvider.unassignAssistant(assistant.id);
+      await groupProvider.unassignAssistantFromGroup(assistant.id);
     } catch (_) {}
   }
 }

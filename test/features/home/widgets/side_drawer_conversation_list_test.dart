@@ -6,7 +6,7 @@ import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/update_provider.dart';
 import 'package:Kelivo/core/providers/backup_reminder_provider.dart';
-import 'package:Kelivo/core/providers/tag_provider.dart';
+import 'package:Kelivo/core/providers/assistant_group_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/features/home/widgets/side_drawer.dart';
@@ -180,7 +180,7 @@ void main() {
     final settingsPrefs = createBusinessTestPreferences();
     final assistantPrefs = createBusinessTestPreferences();
     final backupPrefs = createBusinessTestPreferences();
-    final tagPrefs = createBusinessTestPreferences();
+    final groupPrefs = createBusinessTestPreferences();
     final settings = SettingsProvider(settingsPrefs);
     Widget materialFor(Locale currentLocale) {
       final sideDrawer = SideDrawer(
@@ -228,7 +228,7 @@ void main() {
             create: (_) => BackupReminderProvider(preferences: backupPrefs),
           ),
           ChangeNotifierProvider(
-            create: (_) => TagProvider(preferences: tagPrefs),
+            create: (_) => AssistantGroupProvider(preferences: groupPrefs),
           ),
           ChangeNotifierProvider(create: (_) => UpdateProvider()),
         ],

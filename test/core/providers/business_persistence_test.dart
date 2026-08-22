@@ -10,7 +10,7 @@ import 'package:Kelivo/core/providers/backup_reminder_provider.dart';
 import 'package:Kelivo/core/providers/instruction_injection_group_provider.dart';
 import 'package:Kelivo/core/providers/instruction_injection_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
-import 'package:Kelivo/core/providers/tag_provider.dart';
+import 'package:Kelivo/core/providers/assistant_group_provider.dart';
 import 'package:Kelivo/core/providers/user_provider.dart';
 import 'package:Kelivo/core/services/instruction_injection_store.dart';
 import 'package:Kelivo/core/services/memory_store.dart';
@@ -137,7 +137,9 @@ void main() {
     await first.preferences.setString('current_assistant_id_v1', 'assistant-a');
 
     final assistants = AssistantProvider(preferences: first.preferences);
-    final tags = TagProvider(preferences: first.preferences);
+    final assistantGroups = AssistantGroupProvider(
+      preferences: first.preferences,
+    );
     final user = UserProvider(preferences: first.preferences);
     final groups = InstructionInjectionGroupProvider(
       preferences: first.preferences,
@@ -147,14 +149,14 @@ void main() {
       autoLoad: false,
     );
     addTearDown(assistants.dispose);
-    addTearDown(tags.dispose);
+    addTearDown(assistantGroups.dispose);
     addTearDown(user.dispose);
     addTearDown(groups.dispose);
     addTearDown(reminders.dispose);
 
     await Future.wait(<Future<void>>[
       assistants.loaded,
-      _nextNotification(tags),
+      _nextNotification(assistantGroups),
       _nextNotification(groups),
     ]);
     await reminders.load(startTimer: false);
@@ -163,9 +165,9 @@ void main() {
     await assistants.updateAssistant(
       assistants.getById('assistant-a')!.copyWith(searchEnabled: true),
     );
-    final tagId = await tags.createTag('Work');
-    await tags.assignAssistantToTag('assistant-a', tagId);
-    await tags.setCollapsed(tagId, true);
+    final groupId = await assistantGroups.createGroup('Work');
+    await assistantGroups.assignAssistantToGroup('assistant-a', groupId);
+    await assistantGroups.setGroupCollapsed(groupId, true);
     await user.setName('Taylor');
     await user.setAvatarEmoji('🌿');
     await groups.setCollapsed('Pinned', true);
@@ -182,7 +184,9 @@ void main() {
     final restoredAssistants = AssistantProvider(
       preferences: reopened.preferences,
     );
-    final restoredTags = TagProvider(preferences: reopened.preferences);
+    final restoredAssistantGroups = AssistantGroupProvider(
+      preferences: reopened.preferences,
+    );
     final restoredUser = UserProvider(preferences: reopened.preferences);
     final restoredGroups = InstructionInjectionGroupProvider(
       preferences: reopened.preferences,
@@ -192,14 +196,14 @@ void main() {
       autoLoad: false,
     );
     addTearDown(restoredAssistants.dispose);
-    addTearDown(restoredTags.dispose);
+    addTearDown(restoredAssistantGroups.dispose);
     addTearDown(restoredUser.dispose);
     addTearDown(restoredGroups.dispose);
     addTearDown(restoredReminders.dispose);
 
     await Future.wait(<Future<void>>[
       restoredAssistants.loaded,
-      _nextNotification(restoredTags),
+      _nextNotification(restoredAssistantGroups),
       _nextNotification(restoredUser),
       _nextNotification(restoredGroups),
     ]);
@@ -207,9 +211,9 @@ void main() {
 
     expect(restoredAssistants.currentAssistantId, 'assistant-b');
     expect(restoredAssistants.getById('assistant-a')?.searchEnabled, isTrue);
-    expect(restoredTags.tags.single.name, 'Work');
-    expect(restoredTags.tagOfAssistant('assistant-a'), tagId);
-    expect(restoredTags.isCollapsed(tagId), isTrue);
+    expect(restoredAssistantGroups.groups.single.name, 'Work');
+    expect(restoredAssistantGroups.groupOfAssistant('assistant-a'), groupId);
+    expect(restoredAssistantGroups.isGroupCollapsed(groupId), isTrue);
     expect(restoredUser.name, 'Taylor');
     expect(restoredUser.avatarType, 'emoji');
     expect(restoredUser.avatarValue, '🌿');

@@ -14,7 +14,7 @@ void main() {
     );
     final existing = BusinessSnapshot(
       entities: {
-        BusinessEntityKind.assistantTag: [localTag],
+        BusinessEntityKind.assistantGroup: [localTag],
       },
       preferences: {
         'assistant_tag_map_v1': jsonEncode({'assistant-a': localTag.id}),
@@ -33,7 +33,7 @@ void main() {
     );
 
     expect(
-      merged.entities[BusinessEntityKind.assistantTag]!.single,
+      merged.entities[BusinessEntityKind.assistantGroup]!.single,
       same(localTag),
     );
     expect(jsonDecode(merged.preferences['assistant_tag_map_v1']! as String), {
@@ -50,7 +50,7 @@ void main() {
     );
     final incoming = BusinessSnapshot(
       entities: {
-        BusinessEntityKind.assistantTag: [incomingTag],
+        BusinessEntityKind.assistantGroup: [incomingTag],
       },
       preferences: const {},
     );
@@ -61,7 +61,8 @@ void main() {
       incomingKeys: const {'assistant_tags_v1'},
     );
 
-    final mergedTag = merged.entities[BusinessEntityKind.assistantTag]!.single;
+    final mergedTag =
+        merged.entities[BusinessEntityKind.assistantGroup]!.single;
     expect(mergedTag, same(incomingTag));
     expect(mergedTag.id, incomingTag.id);
     expect(jsonDecode(mergedTag.payload), isNot(contains('id')));

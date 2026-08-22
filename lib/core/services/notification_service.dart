@@ -75,7 +75,7 @@ class NotificationService {
           enableVibration: true,
           category: AndroidNotificationCategory.message,
           visibility: NotificationVisibility.public,
-          ticker: 'JO-Kelivo',
+          ticker: 'JO-AIClient',
           styleInformation: const DefaultStyleInformation(true, true),
         ),
       ),

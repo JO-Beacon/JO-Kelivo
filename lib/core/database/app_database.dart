@@ -596,7 +596,7 @@ class InstructionInjectionRows extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
-class AssistantTagRows extends Table {
+class AssistantGroupRows extends Table {
   TextColumn get id => text()();
   IntColumn get sortOrder =>
       integer()
@@ -737,7 +737,7 @@ class MessagePromptRows extends Table {
     SearchServiceRows,
     TtsServiceRows,
     InstructionInjectionRows,
-    AssistantTagRows,
+    AssistantGroupRows,
     PreferenceRows,
     MemoryEntryRows,
     UserProfileFieldRows,

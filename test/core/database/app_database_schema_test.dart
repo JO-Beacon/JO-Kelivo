@@ -60,7 +60,7 @@ void main() {
           'search_service_rows',
           'tts_service_rows',
           'instruction_injection_rows',
-          'assistant_tag_rows',
+          'assistant_group_rows',
           'preference_rows',
           'memory_entry_rows',
           'user_profile_field_rows',

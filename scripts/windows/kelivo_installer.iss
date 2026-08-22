@@ -1,4 +1,4 @@
-#define MyAppName "JO-Kelivo"
+#define MyAppName "JO-AIClient"
 #define MyAppPublisher "Psyche"
 #define MyAppExeName "jo_kelivo.exe"
 #define MyAppId "{{D4C6D2A7-8F3E-4D7B-9D55-6B6B6D2E5A91}}"

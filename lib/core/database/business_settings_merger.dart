@@ -77,7 +77,7 @@ final class BusinessSettingsMerger {
         ),
         BusinessEntityKind.providerGroup ||
         BusinessEntityKind.mcpServer ||
-        BusinessEntityKind.assistantTag => _mergeEntityRowsById(
+        BusinessEntityKind.assistantGroup => _mergeEntityRowsById(
           localRows,
           importedRows,
         ),

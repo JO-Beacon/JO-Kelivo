@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../core/providers/tag_provider.dart';
+import '../../../core/providers/assistant_group_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
-Future<void> showAssistantTagsManagerDialog(
+Future<void> showAssistantGroupsManagerDialog(
   BuildContext context, {
   required String assistantId,
 }) async {
@@ -14,7 +14,7 @@ Future<void> showAssistantTagsManagerDialog(
   await showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
-    barrierLabel: 'tags-manager',
+    barrierLabel: 'assistant-groups-manager',
     barrierColor: cs.scrim.withValues(alpha: 0.15),
     pageBuilder: (ctx, _, __) {
       // 使用全屏点击区域，允许点击对话框外部关闭。
@@ -44,7 +44,7 @@ Future<void> showAssistantTagsManagerDialog(
                       ),
                     ),
                   ),
-                  child: _TagsManagerBody(
+                  child: _AssistantGroupsManagerBody(
                     assistantId: assistantId,
                     isDialog: true,
                   ),
@@ -68,36 +68,41 @@ Future<void> showAssistantTagsManagerDialog(
   );
 }
 
-class _TagsManagerBody extends StatefulWidget {
-  const _TagsManagerBody({required this.assistantId, required this.isDialog});
+class _AssistantGroupsManagerBody extends StatefulWidget {
+  const _AssistantGroupsManagerBody({
+    required this.assistantId,
+    required this.isDialog,
+  });
   final String assistantId;
   final bool isDialog;
 
   @override
-  State<_TagsManagerBody> createState() => _TagsManagerBodyState();
+  State<_AssistantGroupsManagerBody> createState() =>
+      _AssistantGroupsManagerBodyState();
 }
 
-class _TagsManagerBodyState extends State<_TagsManagerBody> {
-  Future<void> _createTag(BuildContext context) async {
+class _AssistantGroupsManagerBodyState
+    extends State<_AssistantGroupsManagerBody> {
+  Future<void> _createGroup(BuildContext context) async {
     final l10n = AppLocalizations.of(context)!;
     final TextEditingController c = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.assistantTagsCreateDialogTitle),
+        title: Text(l10n.assistantGroupsCreateDialogTitle),
         content: TextField(
           controller: c,
           autofocus: true,
-          decoration: InputDecoration(hintText: l10n.assistantTagsNameHint),
+          decoration: InputDecoration(hintText: l10n.assistantGroupsNameHint),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l10n.assistantTagsCreateDialogCancel),
+            child: Text(l10n.assistantGroupsCreateDialogCancel),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l10n.assistantTagsCreateDialogOk),
+            child: Text(l10n.assistantGroupsCreateDialogOk),
           ),
         ],
       ),
@@ -106,16 +111,16 @@ class _TagsManagerBodyState extends State<_TagsManagerBody> {
       final name = c.text.trim();
       if (name.isEmpty) return; // 无效；在对话框中静默忽略
       if (!context.mounted) return;
-      final tp = context.read<TagProvider>();
+      final groupProvider = context.read<AssistantGroupProvider>();
       // 按名称防止重复
-      if (tp.tags.any((t) => t.name == name)) return;
-      await tp.createTag(name);
+      if (groupProvider.groups.any((group) => group.name == name)) return;
+      await groupProvider.createGroup(name);
     }
   }
 
-  Future<void> _renameTag(
+  Future<void> _renameGroup(
     BuildContext context,
-    String tagId,
+    String groupId,
     String oldName,
   ) async {
     final l10n = AppLocalizations.of(context)!;
@@ -123,20 +128,20 @@ class _TagsManagerBodyState extends State<_TagsManagerBody> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.assistantTagsRenameDialogTitle),
+        title: Text(l10n.assistantGroupsRenameDialogTitle),
         content: TextField(
           controller: c,
           autofocus: true,
-          decoration: InputDecoration(hintText: l10n.assistantTagsNameHint),
+          decoration: InputDecoration(hintText: l10n.assistantGroupsNameHint),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l10n.assistantTagsCreateDialogCancel),
+            child: Text(l10n.assistantGroupsCreateDialogCancel),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l10n.assistantTagsRenameDialogOk),
+            child: Text(l10n.assistantGroupsRenameDialogOk),
           ),
         ],
       ),
@@ -145,42 +150,46 @@ class _TagsManagerBodyState extends State<_TagsManagerBody> {
       final name = c.text.trim();
       if (name.isEmpty) return;
       if (!context.mounted) return;
-      final tp = context.read<TagProvider>();
-      if (tp.tags.any((t) => t.name == name && t.id != tagId)) return;
-      await tp.renameTag(tagId, name);
+      final groupProvider = context.read<AssistantGroupProvider>();
+      if (groupProvider.groups.any(
+        (group) => group.name == name && group.id != groupId,
+      )) {
+        return;
+      }
+      await groupProvider.renameGroup(groupId, name);
     }
   }
 
-  Future<void> _deleteTag(BuildContext context, String tagId) async {
+  Future<void> _deleteGroup(BuildContext context, String groupId) async {
     final l10n = AppLocalizations.of(context)!;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.assistantTagsDeleteConfirmTitle),
-        content: Text(l10n.assistantTagsDeleteConfirmContent),
+        title: Text(l10n.assistantGroupsDeleteConfirmTitle),
+        content: Text(l10n.assistantGroupsDeleteConfirmContent),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l10n.assistantTagsDeleteConfirmCancel),
+            child: Text(l10n.assistantGroupsDeleteConfirmCancel),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l10n.assistantTagsDeleteConfirmOk),
+            child: Text(l10n.assistantGroupsDeleteConfirmOk),
           ),
         ],
       ),
     );
     if (ok == true) {
       if (!context.mounted) return;
-      await context.read<TagProvider>().deleteTag(tagId);
+      await context.read<AssistantGroupProvider>().deleteGroup(groupId);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final tp = context.watch<TagProvider>();
-    final tags = tp.tags;
+    final groupProvider = context.watch<AssistantGroupProvider>();
+    final groups = groupProvider.groups;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -194,7 +203,7 @@ class _TagsManagerBodyState extends State<_TagsManagerBody> {
               children: [
                 Expanded(
                   child: Text(
-                    l10n.assistantTagsManageTitle,
+                    l10n.assistantGroupsManageTitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -205,7 +214,7 @@ class _TagsManagerBodyState extends State<_TagsManagerBody> {
                 ),
                 _SmallIconBtn(
                   icon: Lucide.Plus,
-                  onTap: () => _createTag(context),
+                  onTap: () => _createGroup(context),
                 ),
                 const SizedBox(width: 6),
                 _SmallIconBtn(
@@ -218,7 +227,7 @@ class _TagsManagerBodyState extends State<_TagsManagerBody> {
         ),
         Expanded(
           child: ReorderableListView.builder(
-            itemCount: tags.length,
+            itemCount: groups.length,
             buildDefaultDragHandles: false,
             proxyDecorator: (child, index, animation) {
               // 拖动时无阴影或海拔；只返回卡片本身并带细微缩放。
@@ -228,29 +237,35 @@ class _TagsManagerBodyState extends State<_TagsManagerBody> {
               );
             },
             onReorderItem: (oldIndex, newIndex) async {
-              await context.read<TagProvider>().reorderTags(oldIndex, newIndex);
+              await context.read<AssistantGroupProvider>().reorderGroups(
+                oldIndex,
+                newIndex,
+              );
             },
             itemBuilder: (ctx, i) {
-              final t = tags[i];
+              final group = groups[i];
               return KeyedSubtree(
-                key: ValueKey('tag-${t.id}'),
+                key: ValueKey('assistant-group-${group.id}'),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
                   child: ReorderableDragStartListener(
                     index: i,
-                    child: _TagCard(
-                      title: t.name,
+                    child: _GroupCard(
+                      title: group.name,
                       onTap: () async {
-                        await context.read<TagProvider>().assignAssistantToTag(
-                          widget.assistantId,
-                          t.id,
-                        );
+                        await context
+                            .read<AssistantGroupProvider>()
+                            .assignAssistantToGroup(
+                              widget.assistantId,
+                              group.id,
+                            );
                         if (widget.isDialog && context.mounted) {
                           Navigator.of(context).pop();
                         }
                       },
-                      onRename: () => _renameTag(context, t.id, t.name),
-                      onDelete: () => _deleteTag(context, t.id),
+                      onRename: () =>
+                          _renameGroup(context, group.id, group.name),
+                      onDelete: () => _deleteGroup(context, group.id),
                     ),
                   ),
                 ),
@@ -301,8 +316,8 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
   }
 }
 
-class _TagCard extends StatefulWidget {
-  const _TagCard({
+class _GroupCard extends StatefulWidget {
+  const _GroupCard({
     required this.title,
     required this.onTap,
     required this.onRename,
@@ -313,10 +328,10 @@ class _TagCard extends StatefulWidget {
   final VoidCallback onRename;
   final VoidCallback onDelete;
   @override
-  State<_TagCard> createState() => _TagCardState();
+  State<_GroupCard> createState() => _GroupCardState();
 }
 
-class _TagCardState extends State<_TagCard> {
+class _GroupCardState extends State<_GroupCard> {
   bool _hover = false;
   @override
   Widget build(BuildContext context) {

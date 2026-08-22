@@ -1096,101 +1096,101 @@ abstract class AppLocalizations {
   /// **'Choose interface language'**
   String get displaySettingsPageLanguageSubtitle;
 
-  /// No description provided for @assistantTagsManageTitle.
+  /// No description provided for @assistantGroupsManageTitle.
   ///
   /// In en, this message translates to:
-  /// **'Manage Tags'**
-  String get assistantTagsManageTitle;
+  /// **'Manage Groups'**
+  String get assistantGroupsManageTitle;
 
-  /// No description provided for @assistantTagsCreateButton.
-  ///
-  /// In en, this message translates to:
-  /// **'Create'**
-  String get assistantTagsCreateButton;
-
-  /// No description provided for @assistantTagsCreateDialogTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Create Tag'**
-  String get assistantTagsCreateDialogTitle;
-
-  /// No description provided for @assistantTagsCreateDialogOk.
+  /// No description provided for @assistantGroupsCreateButton.
   ///
   /// In en, this message translates to:
   /// **'Create'**
-  String get assistantTagsCreateDialogOk;
+  String get assistantGroupsCreateButton;
 
-  /// No description provided for @assistantTagsCreateDialogCancel.
+  /// No description provided for @assistantGroupsCreateDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Group'**
+  String get assistantGroupsCreateDialogTitle;
+
+  /// No description provided for @assistantGroupsCreateDialogOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get assistantGroupsCreateDialogOk;
+
+  /// No description provided for @assistantGroupsCreateDialogCancel.
   ///
   /// In en, this message translates to:
   /// **'Cancel'**
-  String get assistantTagsCreateDialogCancel;
+  String get assistantGroupsCreateDialogCancel;
 
-  /// No description provided for @assistantTagsNameHint.
+  /// No description provided for @assistantGroupsNameHint.
   ///
   /// In en, this message translates to:
-  /// **'Tag name'**
-  String get assistantTagsNameHint;
+  /// **'Group name'**
+  String get assistantGroupsNameHint;
 
-  /// No description provided for @assistantTagsRenameButton.
-  ///
-  /// In en, this message translates to:
-  /// **'Rename'**
-  String get assistantTagsRenameButton;
-
-  /// No description provided for @assistantTagsRenameDialogTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Rename Tag'**
-  String get assistantTagsRenameDialogTitle;
-
-  /// No description provided for @assistantTagsRenameDialogOk.
+  /// No description provided for @assistantGroupsRenameButton.
   ///
   /// In en, this message translates to:
   /// **'Rename'**
-  String get assistantTagsRenameDialogOk;
+  String get assistantGroupsRenameButton;
 
-  /// No description provided for @assistantTagsDeleteButton.
+  /// No description provided for @assistantGroupsRenameDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename Group'**
+  String get assistantGroupsRenameDialogTitle;
+
+  /// No description provided for @assistantGroupsRenameDialogOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get assistantGroupsRenameDialogOk;
+
+  /// No description provided for @assistantGroupsDeleteButton.
   ///
   /// In en, this message translates to:
   /// **'Delete'**
-  String get assistantTagsDeleteButton;
+  String get assistantGroupsDeleteButton;
 
-  /// No description provided for @assistantTagsDeleteConfirmTitle.
+  /// No description provided for @assistantGroupsDeleteConfirmTitle.
   ///
   /// In en, this message translates to:
-  /// **'Delete Tag'**
-  String get assistantTagsDeleteConfirmTitle;
+  /// **'Delete Group'**
+  String get assistantGroupsDeleteConfirmTitle;
 
-  /// No description provided for @assistantTagsDeleteConfirmContent.
+  /// No description provided for @assistantGroupsDeleteConfirmContent.
   ///
   /// In en, this message translates to:
-  /// **'Are you sure you want to delete this tag?'**
-  String get assistantTagsDeleteConfirmContent;
+  /// **'Are you sure you want to delete this group?'**
+  String get assistantGroupsDeleteConfirmContent;
 
-  /// No description provided for @assistantTagsDeleteConfirmOk.
+  /// No description provided for @assistantGroupsDeleteConfirmOk.
   ///
   /// In en, this message translates to:
   /// **'Delete'**
-  String get assistantTagsDeleteConfirmOk;
+  String get assistantGroupsDeleteConfirmOk;
 
-  /// No description provided for @assistantTagsDeleteConfirmCancel.
+  /// No description provided for @assistantGroupsDeleteConfirmCancel.
   ///
   /// In en, this message translates to:
   /// **'Cancel'**
-  String get assistantTagsDeleteConfirmCancel;
+  String get assistantGroupsDeleteConfirmCancel;
 
-  /// No description provided for @assistantTagsContextMenuEditAssistant.
+  /// No description provided for @assistantGroupsContextMenuEditAssistant.
   ///
   /// In en, this message translates to:
   /// **'Edit Assistant'**
-  String get assistantTagsContextMenuEditAssistant;
+  String get assistantGroupsContextMenuEditAssistant;
 
-  /// No description provided for @assistantTagsContextMenuManageTags.
+  /// No description provided for @assistantGroupsContextMenuManageGroups.
   ///
   /// In en, this message translates to:
-  /// **'Manage Tags'**
-  String get assistantTagsContextMenuManageTags;
+  /// **'Manage Groups'**
+  String get assistantGroupsContextMenuManageGroups;
 
   /// No description provided for @mcpTransportOptionStdio.
   ///
@@ -1276,17 +1276,17 @@ abstract class AppLocalizations {
   /// **'Command is required for STDIO'**
   String get mcpServerEditSheetStdioCommandRequired;
 
-  /// No description provided for @assistantTagsContextMenuDeleteAssistant.
+  /// No description provided for @assistantGroupsContextMenuDeleteAssistant.
   ///
   /// In en, this message translates to:
   /// **'Delete Assistant'**
-  String get assistantTagsContextMenuDeleteAssistant;
+  String get assistantGroupsContextMenuDeleteAssistant;
 
-  /// No description provided for @assistantTagsClearTag.
+  /// No description provided for @assistantGroupsRemoveFromGroup.
   ///
   /// In en, this message translates to:
-  /// **'Clear Tag'**
-  String get assistantTagsClearTag;
+  /// **'Remove from Group'**
+  String get assistantGroupsRemoveFromGroup;
 
   /// No description provided for @displaySettingsPageLanguageChineseLabel.
   ///
@@ -2023,7 +2023,7 @@ abstract class AppLocalizations {
   /// No description provided for @iosBackgroundLimitNoticeBody.
   ///
   /// In en, this message translates to:
-  /// **'These options use Apple-supported background time, BackgroundTasks, notifications, and Live Activities. They improve continuity but cannot force iOS to keep JO-Kelivo running forever.'**
+  /// **'These options use Apple-supported background time, BackgroundTasks, notifications, and Live Activities. They improve continuity but cannot force iOS to keep JO-AIClient running forever.'**
   String get iosBackgroundLimitNoticeBody;
 
   /// No description provided for @iosBackgroundUnsupportedLiveActivity.
@@ -2071,7 +2071,7 @@ abstract class AppLocalizations {
   /// No description provided for @iosBackgroundGenerationActiveTitle.
   ///
   /// In en, this message translates to:
-  /// **'JO-Kelivo is generating'**
+  /// **'JO-AIClient is generating'**
   String get iosBackgroundGenerationActiveTitle;
 
   /// No description provided for @iosBackgroundGenerationActiveDetail.
@@ -2173,7 +2173,7 @@ abstract class AppLocalizations {
   /// No description provided for @androidBackgroundNotificationTitle.
   ///
   /// In en, this message translates to:
-  /// **'JO-Kelivo is running'**
+  /// **'JO-AIClient is running'**
   String get androidBackgroundNotificationTitle;
 
   /// No description provided for @androidBackgroundNotificationText.
@@ -3079,19 +3079,19 @@ abstract class AppLocalizations {
   /// No description provided for @backupPageRestartContent.
   ///
   /// In en, this message translates to:
-  /// **'Import successful. Restart JO-Kelivo to apply it safely.'**
+  /// **'Import successful. Restart JO-AIClient to apply it safely.'**
   String get backupPageRestartContent;
 
   /// No description provided for @backupPageRestartContentWithSkipped.
   ///
   /// In en, this message translates to:
-  /// **'Import completed, but {count} conversations with invalid message ordering were skipped. Restart JO-Kelivo to apply the imported data safely.'**
+  /// **'Import completed, but {count} conversations with invalid message ordering were skipped. Restart JO-AIClient to apply the imported data safely.'**
   String backupPageRestartContentWithSkipped(int count);
 
   /// No description provided for @restartAppFailedMessage.
   ///
   /// In en, this message translates to:
-  /// **'JO-Kelivo could not restart automatically. Fully close it, then open it again.'**
+  /// **'JO-AIClient could not restart automatically. Fully close it, then open it again.'**
   String get restartAppFailedMessage;
 
   /// No description provided for @backupRestoreRolledBackTitle.
@@ -3103,7 +3103,7 @@ abstract class AppLocalizations {
   /// No description provided for @backupRestoreRolledBackContent.
   ///
   /// In en, this message translates to:
-  /// **'The restore could not be completed. JO-Kelivo verified and kept your previous data.'**
+  /// **'The restore could not be completed. JO-AIClient verified and kept your previous data.'**
   String get backupRestoreRolledBackContent;
 
   /// No description provided for @contextTreeMigrationWarningsTitle.
@@ -3115,7 +3115,7 @@ abstract class AppLocalizations {
   /// No description provided for @contextTreeMigrationWarningsContent.
   ///
   /// In en, this message translates to:
-  /// **'JO-Kelivo repaired {count} missing selected-version records while converting legacy chat branches. The repaired choices were written to the warning log. No message text was opened or changed.'**
+  /// **'JO-AIClient repaired {count} missing selected-version records while converting legacy chat branches. The repaired choices were written to the warning log. No message text was opened or changed.'**
   String contextTreeMigrationWarningsContent(int count);
 
   /// No description provided for @backupRestoreFailureTitle.
@@ -3127,25 +3127,25 @@ abstract class AppLocalizations {
   /// No description provided for @backupRestoreFailureContent.
   ///
   /// In en, this message translates to:
-  /// **'JO-Kelivo could not verify a complete old or new data set, so chat data was not opened. Close JO-Kelivo and try again. If this repeats, keep the diagnostic code for support.'**
+  /// **'JO-AIClient could not verify a complete old or new data set, so chat data was not opened. Close JO-AIClient and try again. If this repeats, keep the diagnostic code for support.'**
   String get backupRestoreFailureContent;
 
   /// No description provided for @backupRestoreBusinessLeaseUnavailableTitle.
   ///
   /// In en, this message translates to:
-  /// **'JO-Kelivo is already running'**
+  /// **'JO-AIClient is already running'**
   String get backupRestoreBusinessLeaseUnavailableTitle;
 
   /// No description provided for @backupRestoreBusinessLeaseUnavailableContent.
   ///
   /// In en, this message translates to:
-  /// **'JO-Kelivo\'s data is still in use by another app process. Close any other JO-Kelivo window, then restart. Your chat data has not been opened by this process.'**
+  /// **'JO-AIClient\'s data is still in use by another app process. Close any other JO-AIClient window, then restart. Your chat data has not been opened by this process.'**
   String get backupRestoreBusinessLeaseUnavailableContent;
 
   /// No description provided for @backupRestoreFailureRestartButton.
   ///
   /// In en, this message translates to:
-  /// **'Restart JO-Kelivo'**
+  /// **'Restart JO-AIClient'**
   String get backupRestoreFailureRestartButton;
 
   /// No description provided for @backupRestoreFailureCopyButton.
@@ -3169,7 +3169,7 @@ abstract class AppLocalizations {
   /// No description provided for @backupRestoreCorruptArchiveMessage.
   ///
   /// In en, this message translates to:
-  /// **'The selected JO-Kelivo backup is damaged or incomplete, so it was not restored. Your current data was not modified. Diagnostic code: {code}'**
+  /// **'The selected JO-AIClient backup is damaged or incomplete, so it was not restored. Your current data was not modified. Diagnostic code: {code}'**
   String backupRestoreCorruptArchiveMessage(String code);
 
   /// No description provided for @startupRecoveryMoreOptions.
@@ -3223,7 +3223,7 @@ abstract class AppLocalizations {
   /// No description provided for @startupRecoveryResetFailed.
   ///
   /// In en, this message translates to:
-  /// **'Reset failed. Fully close JO-Kelivo, then open it again.'**
+  /// **'Reset failed. Fully close JO-AIClient, then open it again.'**
   String get startupRecoveryResetFailed;
 
   /// No description provided for @startupRecoveryResetDialogTitle.
@@ -3235,7 +3235,7 @@ abstract class AppLocalizations {
   /// No description provided for @startupRecoveryResetDialogContent.
   ///
   /// In en, this message translates to:
-  /// **'This permanently deletes JO-Kelivo\'s database on this device and starts fresh. If you might need this data, export a copy first. This cannot be undone.'**
+  /// **'This permanently deletes JO-AIClient\'s database on this device and starts fresh. If you might need this data, export a copy first. This cannot be undone.'**
   String get startupRecoveryResetDialogContent;
 
   /// No description provided for @startupRecoveryResetDialogConfirm.
@@ -3253,13 +3253,13 @@ abstract class AppLocalizations {
   /// No description provided for @startupDatabaseUpdateRequiredTitle.
   ///
   /// In en, this message translates to:
-  /// **'Update JO-Kelivo to continue'**
+  /// **'Update JO-AIClient to continue'**
   String get startupDatabaseUpdateRequiredTitle;
 
   /// No description provided for @startupDatabaseUpdateRequiredContent.
   ///
   /// In en, this message translates to:
-  /// **'The chat database on this device was created by a newer version of JO-Kelivo and cannot be opened by this version. Your data has not been changed. Install the latest version of JO-Kelivo, then open it again.'**
+  /// **'The chat database on this device was created by a newer version of JO-AIClient and cannot be opened by this version. Your data has not been changed. Install the latest version of JO-AIClient, then open it again.'**
   String get startupDatabaseUpdateRequiredContent;
 
   /// No description provided for @backupPageRestoreFailedMessage.
@@ -3577,7 +3577,7 @@ abstract class AppLocalizations {
   /// No description provided for @backupPageCherryStudioUnsupportedBackupVersion.
   ///
   /// In en, this message translates to:
-  /// **'This backup uses Cherry Studio format version {version}, which JO-Kelivo cannot import yet. Export from Cherry Studio v1 instead, or wait for a JO-Kelivo update that supports Cherry Studio v2 backups.'**
+  /// **'This backup uses Cherry Studio format version {version}, which JO-AIClient cannot import yet. Export from Cherry Studio v1 instead, or wait for a JO-AIClient update that supports Cherry Studio v2 backups.'**
   String backupPageCherryStudioUnsupportedBackupVersion(String version);
 
   /// No description provided for @backupPageImportFromChatbox.
@@ -7804,7 +7804,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutPageAppName.
   ///
   /// In en, this message translates to:
-  /// **'JO-Kelivo'**
+  /// **'JO-AIClient'**
   String get aboutPageAppName;
 
   /// No description provided for @aboutPageKelivoSectionTitle.
@@ -7816,13 +7816,13 @@ abstract class AppLocalizations {
   /// No description provided for @mcpOAuthCallbackPageTitle.
   ///
   /// In en, this message translates to:
-  /// **'JO-Kelivo authorization'**
+  /// **'JO-AIClient authorization'**
   String get mcpOAuthCallbackPageTitle;
 
   /// No description provided for @mcpOAuthCallbackPageMessage.
   ///
   /// In en, this message translates to:
-  /// **'Authorization received. You may close this window and return to JO-Kelivo.'**
+  /// **'Authorization received. You may close this window and return to JO-AIClient.'**
   String get mcpOAuthCallbackPageMessage;
 
   /// No description provided for @aboutPageAppDescription.
@@ -9724,7 +9724,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsShare.
   ///
   /// In en, this message translates to:
-  /// **'JO-Kelivo - Open Source AI Assistant'**
+  /// **'JO-AIClient - Open Source AI Assistant'**
   String get settingsShare;
 
   /// No description provided for @searchProviderBingLocalDescription.
@@ -12148,7 +12148,7 @@ abstract class AppLocalizations {
   /// No description provided for @legacyMemoryExportTitle.
   ///
   /// In en, this message translates to:
-  /// **'JO-Kelivo legacy memory export'**
+  /// **'JO-AIClient legacy memory export'**
   String get legacyMemoryExportTitle;
 
   /// No description provided for @legacyMemoryAssistantHeader.
@@ -13060,13 +13060,13 @@ abstract class AppLocalizations {
   /// No description provided for @migrationIntroSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'JO-Kelivo is moving chat history to a faster SQLite database. The upgrade runs before the app opens so your data stays consistent.'**
+  /// **'JO-AIClient is moving chat history to a faster SQLite database. The upgrade runs before the app opens so your data stays consistent.'**
   String get migrationIntroSubtitle;
 
   /// No description provided for @migrationBackupNote.
   ///
   /// In en, this message translates to:
-  /// **'Before migration starts, JO-Kelivo exports a ZIP backup with settings, chat history, and local files.'**
+  /// **'Before migration starts, JO-AIClient exports a ZIP backup with settings, chat history, and local files.'**
   String get migrationBackupNote;
 
   /// No description provided for @migrationPerformanceNote.
@@ -13108,7 +13108,7 @@ abstract class AppLocalizations {
   /// No description provided for @migrationBackingUpSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Exporting settings, chat history, uploaded files, images, and fonts. Keep JO-Kelivo open until this finishes.'**
+  /// **'Exporting settings, chat history, uploaded files, images, and fonts. Keep JO-AIClient open until this finishes.'**
   String get migrationBackingUpSubtitle;
 
   /// No description provided for @migrationMigratingTitle.
@@ -13120,7 +13120,7 @@ abstract class AppLocalizations {
   /// No description provided for @migrationMigratingSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Writing conversations and messages in batches so large histories do not overload memory. Keep JO-Kelivo in the foreground until migration finishes.'**
+  /// **'Writing conversations and messages in batches so large histories do not overload memory. Keep JO-AIClient in the foreground until migration finishes.'**
   String get migrationMigratingSubtitle;
 
   /// No description provided for @migrationBackingUpDetail.
@@ -13228,7 +13228,7 @@ abstract class AppLocalizations {
   /// No description provided for @migrationCompleteSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Your chat history is now stored in SQLite. Restart JO-Kelivo to enter the upgraded app.'**
+  /// **'Your chat history is now stored in SQLite. Restart JO-AIClient to enter the upgraded app.'**
   String get migrationCompleteSubtitle;
 
   /// No description provided for @migrationConversationCount.
@@ -13264,7 +13264,7 @@ abstract class AppLocalizations {
   /// No description provided for @migrationRestartButton.
   ///
   /// In en, this message translates to:
-  /// **'Restart JO-Kelivo'**
+  /// **'Restart JO-AIClient'**
   String get migrationRestartButton;
 
   /// No description provided for @migrationFailedTitle.
@@ -13312,7 +13312,7 @@ abstract class AppLocalizations {
   /// No description provided for @migrationSkipDialogMessage.
   ///
   /// In en, this message translates to:
-  /// **'JO-Kelivo will start with an empty chat database. Your old chat history stays on disk (renamed with a .retired suffix) but will NOT be migrated and will not appear in the app. Use your backup ZIP if you need to recover it later.'**
+  /// **'JO-AIClient will start with an empty chat database. Your old chat history stays on disk (renamed with a .retired suffix) but will NOT be migrated and will not appear in the app. Use your backup ZIP if you need to recover it later.'**
   String get migrationSkipDialogMessage;
 
   /// No description provided for @migrationSkipDialogCancel.
@@ -13906,13 +13906,13 @@ abstract class AppLocalizations {
   /// No description provided for @sqliteMigrationSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'JO-Kelivo needs to migrate this older SQLite archive before it can start.'**
+  /// **'JO-AIClient needs to migrate this older SQLite archive before it can start.'**
   String get sqliteMigrationSubtitle;
 
   /// No description provided for @sqliteMigrationBackupNote.
   ///
   /// In en, this message translates to:
-  /// **'Before migration, JO-Kelivo saves and verifies a ZIP backup containing settings, chat history, and local files.'**
+  /// **'Before migration, JO-AIClient saves and verifies a ZIP backup containing settings, chat history, and local files.'**
   String get sqliteMigrationBackupNote;
 
   /// No description provided for @sqliteMigrationChooseFileButton.
@@ -13996,7 +13996,7 @@ abstract class AppLocalizations {
   /// No description provided for @sqliteMigrationBackingUpSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Copying and verifying the original files. Do not close JO-Kelivo.'**
+  /// **'Copying and verifying the original files. Do not close JO-AIClient.'**
   String get sqliteMigrationBackingUpSubtitle;
 
   /// No description provided for @sqliteMigrationMigratingTitle.
@@ -14020,7 +14020,7 @@ abstract class AppLocalizations {
   /// No description provided for @sqliteMigrationCompleteSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Restart JO-Kelivo to open the migrated storage.'**
+  /// **'Restart JO-AIClient to open the migrated storage.'**
   String get sqliteMigrationCompleteSubtitle;
 
   /// No description provided for @sqliteMigrationFailedTitle.
@@ -14044,7 +14044,7 @@ abstract class AppLocalizations {
   /// No description provided for @sqliteMigrationRestartButton.
   ///
   /// In en, this message translates to:
-  /// **'Restart JO-Kelivo'**
+  /// **'Restart JO-AIClient'**
   String get sqliteMigrationRestartButton;
 }
 

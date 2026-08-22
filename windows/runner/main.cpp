@@ -23,7 +23,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     // after the bounded wait.
     const DWORD wait_result = ::WaitForSingleObject(instance_mutex, 2000);
     if (wait_result != WAIT_OBJECT_0 && wait_result != WAIT_ABANDONED) {
-      Win32Window::SendAppLinkToInstance(L"JO-Kelivo");
+      Win32Window::SendAppLinkToInstance(L"JO-AIClient");
       ::CloseHandle(instance_mutex);
       return 0;
     }
@@ -46,7 +46,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   FlutterWindow window(project);
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1280, 720);
-  if (!window.Create(L"JO-Kelivo", origin, size)) {
+  if (!window.Create(L"JO-AIClient", origin, size)) {
     ::CoUninitialize();
     return EXIT_FAILURE;
   }

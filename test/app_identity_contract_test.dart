@@ -23,7 +23,7 @@ void main() {
 
       final macosProject = _read('macos/Runner.xcodeproj/project.pbxproj');
       expect(macosProject, contains('com.psyche.jokelivo.RunnerTests'));
-      expect(macosProject, contains('JO-Kelivo.app'));
+      expect(macosProject, contains('JO-AIClient.app'));
       expect(macosProject, isNot(contains('com.psyche.kelivo')));
 
       _expectContains(
@@ -95,25 +95,25 @@ void main() {
               'lib/l10n/app_en.arb': (
                 checkUpdates: 'Check for Updates',
                 description: 'Open-source AI assistant based on Kelivo',
-                share: 'JO-Kelivo - Open Source AI Assistant',
+                share: 'JO-AIClient - Open Source AI Assistant',
                 title: 'About Kelivo',
               ),
               'lib/l10n/app_zh.arb': (
                 checkUpdates: '检查更新',
                 description: '基于 Kelivo 的开源 AI 助手',
-                share: 'JO-Kelivo - 开源 AI 助手',
+                share: 'JO-AIClient - 开源 AI 助手',
                 title: '关于 Kelivo',
               ),
               'lib/l10n/app_zh_Hans.arb': (
                 checkUpdates: '检查更新',
                 description: '基于 Kelivo 的开源 AI 助手',
-                share: 'JO-Kelivo - 开源 AI 助手',
+                share: 'JO-AIClient - 开源 AI 助手',
                 title: '关于 Kelivo',
               ),
               'lib/l10n/app_zh_Hant.arb': (
                 checkUpdates: '檢查更新',
                 description: '基於 Kelivo 的開源 AI 助理',
-                share: 'JO-Kelivo - 開源 AI 助理',
+                share: 'JO-AIClient - 開源 AI 助理',
                 title: '關於 Kelivo',
               ),
             };
@@ -202,10 +202,7 @@ void main() {
           export: 'Export as Kelivo Backup',
           import: 'Import from Kelivo',
         ),
-        'lib/l10n/app_zh.arb': (
-          export: '导出为 Kelivo 备份',
-          import: '从 Kelivo 导入',
-        ),
+        'lib/l10n/app_zh.arb': (export: '导出为 Kelivo 备份', import: '从 Kelivo 导入'),
         'lib/l10n/app_zh_Hans.arb': (
           export: '导出为 Kelivo 备份',
           import: '从 Kelivo 导入',

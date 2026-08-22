@@ -31,7 +31,7 @@ import 'core/providers/mcp_provider.dart';
 import 'core/providers/tts_provider.dart';
 import 'core/providers/asr_provider.dart';
 import 'core/providers/assistant_provider.dart';
-import 'core/providers/tag_provider.dart';
+import 'core/providers/assistant_group_provider.dart';
 import 'core/providers/update_provider.dart';
 import 'core/providers/quick_phrase_provider.dart';
 import 'core/providers/instruction_injection_provider.dart';
@@ -76,11 +76,7 @@ import 'shared/widgets/context_tree_migration_notice.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:system_fonts/system_fonts.dart';
 import 'dart:io'
-    show
-        Directory,
-        File,
-        Platform,
-        stderr; // 保留以便 provider 内进行全局覆盖
+    show Directory, File, Platform, stderr; // 保留以便 provider 内进行全局覆盖
 import 'core/services/android_background.dart';
 import 'core/services/notification_service.dart';
 import 'features/home/controllers/chat_actions.dart';
@@ -351,7 +347,7 @@ Future<void> _initRestoreFailureWindow() async {
       return;
     }
     await windowManager.waitUntilReadyToShow(
-      const WindowOptions(title: 'JO-Kelivo'),
+      const WindowOptions(title: 'JO-AIClient'),
       () async {
         await windowManager.show();
         await windowManager.focus();
@@ -405,7 +401,7 @@ class _StartupApp extends StatelessWidget {
     final palette = ThemePalettes.defaultPalette;
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'JO-Kelivo',
+      title: 'JO-AIClient',
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: buildLightThemeForScheme(palette.light),
@@ -436,7 +432,7 @@ class _StartupScreen extends StatelessWidget {
 }
 
 /// 当已安装数据库由更新版本的应用写入时显示；
-/// 重启无法解决问题，唯一操作是升级 JO-Kelivo。
+/// 重启无法解决问题，唯一操作是升级 JO-AIClient。
 class _UpdateRequiredScreen extends StatelessWidget {
   const _UpdateRequiredScreen({required this.diagnosticCode});
 
@@ -544,7 +540,7 @@ Future<void> _initDesktopWindow() async {
     }
     // 初始化并按持久化的大小和位置显示桌面窗口
     await DesktopWindowController.instance.initializeAndShow(
-      title: 'JO-Kelivo',
+      title: 'JO-AIClient',
     );
   } catch (_) {
     // 在不支持的平台上忽略。
@@ -604,7 +600,7 @@ class MigrationApp extends StatelessWidget {
     final palette = ThemePalettes.defaultPalette;
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'JO-Kelivo',
+      title: 'JO-AIClient',
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: buildLightThemeForScheme(palette.light),
@@ -634,7 +630,7 @@ class SqliteMigrationApp extends StatelessWidget {
     final palette = ThemePalettes.defaultPalette;
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'JO-Kelivo',
+      title: 'JO-AIClient',
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: buildLightThemeForScheme(palette.light),
@@ -698,7 +694,8 @@ class MyApp extends StatelessWidget {
           ),
         ),
         ChangeNotifierProvider(
-          create: (_) => TagProvider(preferences: businessPreferences),
+          create: (_) =>
+              AssistantGroupProvider(preferences: businessPreferences),
         ),
         ChangeNotifierProvider(
           create: (_) => TtsProvider(preferences: businessPreferences),
@@ -845,7 +842,7 @@ class MyApp extends StatelessWidget {
                 } catch (_) {}
               });
 
-          // 在受支持的平台上初始化桌面热键
+              // 在受支持的平台上初始化桌面热键
               WidgetsBinding.instance.addPostFrameCallback((_) async {
                 try {
                   final isDesktop =
@@ -859,7 +856,7 @@ class MyApp extends StatelessWidget {
                 } catch (_) {}
               });
 
-          // 仅 Android：确保后台执行状态与设置一致，并在需要时准备通知
+              // 仅 Android：确保后台执行状态与设置一致，并在需要时准备通知
               WidgetsBinding.instance.addPostFrameCallback((_) async {
                 try {
                   if (Platform.isAndroid) {
@@ -971,7 +968,7 @@ class MyApp extends StatelessWidget {
               // debugPrint('[Theme/App] Dark scaffoldBg=${dark.colorScheme.surface.value.toRadixString(16)} card≈${dark.colorScheme.surface.value.toRadixString(16)} shadow=${dark.colorScheme.shadow.value.toRadixString(16)}');
               return MaterialApp(
                 debugShowCheckedModeBanner: false,
-                title: 'JO-Kelivo',
+                title: 'JO-AIClient',
                 navigatorKey: rootNavigatorKey,
                 // 应用 UI 语言；null 表示跟随系统（遵循 iOS 的应用内语言设置）
                 locale: settings.appLocaleForMaterialApp,

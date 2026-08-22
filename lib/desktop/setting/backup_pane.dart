@@ -1004,6 +1004,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                 label: l10n.backupPageExportKelivoBackup,
                 filled: false,
                 dense: true,
+                enabled: false,
                 onTap: () =>
                     _exportLocalBackup(context, kelivoCompatible: true),
               ),
@@ -1018,6 +1019,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                 label: l10n.backupPageImportFromCherryStudio,
                 filled: false,
                 dense: true,
+                enabled: false,
                 onTap: () async {
                   final rootCtx = Navigator.of(
                     context,
@@ -1123,6 +1125,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                 label: l10n.backupPageImportFromChatbox,
                 filled: false,
                 dense: true,
+                enabled: false,
                 onTap: () async {
                   final rootCtx = Navigator.of(
                     context,
@@ -1965,11 +1968,13 @@ class _DeskIosButton extends StatefulWidget {
     required this.label,
     required this.filled,
     required this.dense,
+    this.enabled = true,
     required this.onTap,
   });
   final String label;
   final bool filled;
   final bool dense;
+  final bool enabled;
   final VoidCallback onTap;
   @override
   State<_DeskIosButton> createState() => _DeskIosButtonState();
@@ -1984,17 +1989,23 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = widget.filled
         ? cs.onPrimary
-        : cs.onSurface.withValues(alpha: 0.9);
+        : cs.onSurface.withValues(alpha: widget.enabled ? 0.9 : 0.38);
     final bg = widget.filled
-        ? (_hover ? cs.primary.withValues(alpha: 0.92) : cs.primary)
-        : (_hover
+        ? (_hover && widget.enabled
+              ? cs.primary.withValues(alpha: 0.92)
+              : cs.primary.withValues(alpha: widget.enabled ? 1.0 : 0.38))
+        : (_hover && widget.enabled
               ? (cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05))
               : Colors.transparent);
     final borderColor = widget.filled
         ? Colors.transparent
-        : cs.outlineVariant.withValues(alpha: isDark ? 0.22 : 0.18);
+        : cs.outlineVariant.withValues(
+            alpha: widget.enabled ? (isDark ? 0.22 : 0.18) : 0.10,
+          );
     return MouseRegion(
-      cursor: SystemMouseCursors.click,
+      cursor: widget.enabled
+          ? SystemMouseCursors.click
+          : SystemMouseCursors.basic,
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
       child: GestureDetector(
@@ -2002,7 +2013,7 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
         onTapDown: (_) => setState(() => _pressed = true),
         onTapUp: (_) => setState(() => _pressed = false),
         onTapCancel: () => setState(() => _pressed = false),
-        onTap: widget.onTap,
+        onTap: widget.enabled ? widget.onTap : null,
         child: AnimatedScale(
           scale: _pressed ? 0.98 : 1.0,
           duration: const Duration(milliseconds: 110),

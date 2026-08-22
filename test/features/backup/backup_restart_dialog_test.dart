@@ -29,12 +29,12 @@ void main() {
 
     expect(find.text('Restart Required'), findsOneWidget);
     expect(
-      find.text('Import successful. Restart JO-Kelivo to apply it safely.'),
+      find.text('Import successful. Restart JO-AIClient to apply it safely.'),
       findsOneWidget,
     );
     expect(find.textContaining('identical skipped'), findsNothing);
     expect(find.textContaining('conflicts remapped'), findsNothing);
-    expect(find.textContaining('Restart JO-Kelivo'), findsOneWidget);
+    expect(find.textContaining('Restart JO-AIClient'), findsOneWidget);
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();

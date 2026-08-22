@@ -101,7 +101,7 @@ class DesktopTrayController with TrayListener, WindowListener {
     // 部分 Linux 环境不支持 tooltip；与 Gopeed 保持一致，在这些环境中跳过。
     if (platform != TargetPlatform.linux) {
       try {
-        await trayManager.setToolTip('JO-Kelivo');
+        await trayManager.setToolTip('JO-AIClient');
       } catch (_) {}
     }
     try {

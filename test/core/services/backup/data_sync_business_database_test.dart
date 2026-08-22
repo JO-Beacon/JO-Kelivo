@@ -346,11 +346,11 @@ void main() {
               ]),
             });
             final original = (await sourceRepository.readEntities(
-              BusinessEntityKind.assistantTag,
+              BusinessEntityKind.assistantGroup,
             )).single;
             sourceTagRowId = original.id;
             await sourceRepository.synchronizeEntities(
-              BusinessEntityKind.assistantTag,
+              BusinessEntityKind.assistantGroup,
               [
                 original.copyWith(
                   payload: jsonEncode({'name': 'After rename'}),
@@ -387,7 +387,7 @@ void main() {
             );
 
             final restoredTag = (await targetRepository.readEntities(
-              BusinessEntityKind.assistantTag,
+              BusinessEntityKind.assistantGroup,
             )).single;
             final restored = await BusinessRestoreService(
               targetRepository,

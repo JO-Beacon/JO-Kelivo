@@ -57,6 +57,7 @@
 - Future Git commit messages must be written in Chinese, including the subject and body. Technical identifiers, paths, version numbers, command names, and quoted external text may remain in their original form when necessary.
 - Facts first. All conclusions must be based on current code, config, tests, build scripts, or git state. No guessing.
 - Debug-first. Never add silent degradation, swallowed errors, hidden fallback paths, or fake success branches just to "make it run".
+- When an external resource can reasonably be downloaded by the user through a browser or download manager, ask the user first and provide the official or required download address. Do not automatically download installers, SDKs, toolchains, archives, or other large external resources unless the user has explicitly authorized that download. This does not prohibit normal dependency commands after the user has approved the required download flow.
 - Default to KISS / YAGNI:
   - Use the most direct, most verifiable approach first.
   - Do not pre-plant extra layers, empty abstractions, or config switches for "architectural completeness" or "might need it later".
@@ -355,6 +356,12 @@ flutter test
 - Chatbox `Thread` is treated as a JO-Kelivo conversation.
 - Automatic hidden compaction is out of scope. Context compression remains explicit: generate a summary, create a new conversation, insert the summary as its first user message, and switch to it.
 - The former "Clear Context" control is a reversible context boundary toggle labeled as mask/restore, not deletion.
+
+## 9.1 Assistant Management Product Direction
+
+- Advanced assistant operations and management workflows should, by default, be placed in the assistant management page. The chat surface and sidebar should primarily handle choosing the current assistant and immediate conversation actions, rather than accumulating batch or administrative controls.
+- Before implementing or materially changing an advanced assistant management workflow, first confirm the proposed entry point, scope, and interaction with the user. Do not unilaterally introduce such operations into the chat surface, sidebar, or another location merely because it is technically convenient.
+- This is an interaction-placement principle, not a prohibition on context-specific shortcuts. A shortcut may be added elsewhere after the user has confirmed that the shortcut is necessary and its relationship with the assistant management page is clear.
 
 ## Appendix: Skills Usage Rules
 

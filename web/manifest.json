@@ -1,6 +1,6 @@
 {
-    "name": "JO-Kelivo",
-    "short_name": "JO-Kelivo",
+    "name": "JO-AIClient",
+    "short_name": "JO-AIClient",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#FFFFFF",

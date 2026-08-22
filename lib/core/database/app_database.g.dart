@@ -9959,12 +9959,12 @@ class InstructionInjectionRowsCompanion
   }
 }
 
-class $AssistantTagRowsTable extends AssistantTagRows
-    with TableInfo<$AssistantTagRowsTable, AssistantTagRow> {
+class $AssistantGroupRowsTable extends AssistantGroupRows
+    with TableInfo<$AssistantGroupRowsTable, AssistantGroupRow> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  $AssistantTagRowsTable(this.attachedDatabase, [this._alias]);
+  $AssistantGroupRowsTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
@@ -10005,17 +10005,17 @@ class $AssistantTagRowsTable extends AssistantTagRows
         false,
         type: DriftSqlType.int,
         requiredDuringInsert: true,
-      ).withConverter<DateTime>($AssistantTagRowsTable.$converterupdatedAt);
+      ).withConverter<DateTime>($AssistantGroupRowsTable.$converterupdatedAt);
   @override
   List<GeneratedColumn> get $columns => [id, sortOrder, payload, updatedAt];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
   String get actualTableName => $name;
-  static const String $name = 'assistant_tag_rows';
+  static const String $name = 'assistant_group_rows';
   @override
   VerificationContext validateIntegrity(
-    Insertable<AssistantTagRow> instance, {
+    Insertable<AssistantGroupRow> instance, {
     bool isInserting = false,
   }) {
     final context = VerificationContext();
@@ -10047,9 +10047,9 @@ class $AssistantTagRowsTable extends AssistantTagRows
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  AssistantTagRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+  AssistantGroupRow map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return AssistantTagRow(
+    return AssistantGroupRow(
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}id'],
@@ -10062,7 +10062,7 @@ class $AssistantTagRowsTable extends AssistantTagRows
         DriftSqlType.string,
         data['${effectivePrefix}payload'],
       )!,
-      updatedAt: $AssistantTagRowsTable.$converterupdatedAt.fromSql(
+      updatedAt: $AssistantGroupRowsTable.$converterupdatedAt.fromSql(
         attachedDatabase.typeMapping.read(
           DriftSqlType.int,
           data['${effectivePrefix}updated_at'],
@@ -10072,20 +10072,21 @@ class $AssistantTagRowsTable extends AssistantTagRows
   }
 
   @override
-  $AssistantTagRowsTable createAlias(String alias) {
-    return $AssistantTagRowsTable(attachedDatabase, alias);
+  $AssistantGroupRowsTable createAlias(String alias) {
+    return $AssistantGroupRowsTable(attachedDatabase, alias);
   }
 
   static TypeConverter<DateTime, int> $converterupdatedAt =
       const MicrosecondDateTimeConverter();
 }
 
-class AssistantTagRow extends DataClass implements Insertable<AssistantTagRow> {
+class AssistantGroupRow extends DataClass
+    implements Insertable<AssistantGroupRow> {
   final String id;
   final int sortOrder;
   final String payload;
   final DateTime updatedAt;
-  const AssistantTagRow({
+  const AssistantGroupRow({
     required this.id,
     required this.sortOrder,
     required this.payload,
@@ -10099,14 +10100,14 @@ class AssistantTagRow extends DataClass implements Insertable<AssistantTagRow> {
     map['payload'] = Variable<String>(payload);
     {
       map['updated_at'] = Variable<int>(
-        $AssistantTagRowsTable.$converterupdatedAt.toSql(updatedAt),
+        $AssistantGroupRowsTable.$converterupdatedAt.toSql(updatedAt),
       );
     }
     return map;
   }
 
-  AssistantTagRowsCompanion toCompanion(bool nullToAbsent) {
-    return AssistantTagRowsCompanion(
+  AssistantGroupRowsCompanion toCompanion(bool nullToAbsent) {
+    return AssistantGroupRowsCompanion(
       id: Value(id),
       sortOrder: Value(sortOrder),
       payload: Value(payload),
@@ -10114,12 +10115,12 @@ class AssistantTagRow extends DataClass implements Insertable<AssistantTagRow> {
     );
   }
 
-  factory AssistantTagRow.fromJson(
+  factory AssistantGroupRow.fromJson(
     Map<String, dynamic> json, {
     ValueSerializer? serializer,
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return AssistantTagRow(
+    return AssistantGroupRow(
       id: serializer.fromJson<String>(json['id']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
       payload: serializer.fromJson<String>(json['payload']),
@@ -10137,19 +10138,19 @@ class AssistantTagRow extends DataClass implements Insertable<AssistantTagRow> {
     };
   }
 
-  AssistantTagRow copyWith({
+  AssistantGroupRow copyWith({
     String? id,
     int? sortOrder,
     String? payload,
     DateTime? updatedAt,
-  }) => AssistantTagRow(
+  }) => AssistantGroupRow(
     id: id ?? this.id,
     sortOrder: sortOrder ?? this.sortOrder,
     payload: payload ?? this.payload,
     updatedAt: updatedAt ?? this.updatedAt,
   );
-  AssistantTagRow copyWithCompanion(AssistantTagRowsCompanion data) {
-    return AssistantTagRow(
+  AssistantGroupRow copyWithCompanion(AssistantGroupRowsCompanion data) {
+    return AssistantGroupRow(
       id: data.id.present ? data.id.value : this.id,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
       payload: data.payload.present ? data.payload.value : this.payload,
@@ -10159,7 +10160,7 @@ class AssistantTagRow extends DataClass implements Insertable<AssistantTagRow> {
 
   @override
   String toString() {
-    return (StringBuffer('AssistantTagRow(')
+    return (StringBuffer('AssistantGroupRow(')
           ..write('id: $id, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('payload: $payload, ')
@@ -10173,27 +10174,27 @@ class AssistantTagRow extends DataClass implements Insertable<AssistantTagRow> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is AssistantTagRow &&
+      (other is AssistantGroupRow &&
           other.id == this.id &&
           other.sortOrder == this.sortOrder &&
           other.payload == this.payload &&
           other.updatedAt == this.updatedAt);
 }
 
-class AssistantTagRowsCompanion extends UpdateCompanion<AssistantTagRow> {
+class AssistantGroupRowsCompanion extends UpdateCompanion<AssistantGroupRow> {
   final Value<String> id;
   final Value<int> sortOrder;
   final Value<String> payload;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
-  const AssistantTagRowsCompanion({
+  const AssistantGroupRowsCompanion({
     this.id = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.payload = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
-  AssistantTagRowsCompanion.insert({
+  AssistantGroupRowsCompanion.insert({
     required String id,
     required int sortOrder,
     required String payload,
@@ -10203,7 +10204,7 @@ class AssistantTagRowsCompanion extends UpdateCompanion<AssistantTagRow> {
        sortOrder = Value(sortOrder),
        payload = Value(payload),
        updatedAt = Value(updatedAt);
-  static Insertable<AssistantTagRow> custom({
+  static Insertable<AssistantGroupRow> custom({
     Expression<String>? id,
     Expression<int>? sortOrder,
     Expression<String>? payload,
@@ -10219,14 +10220,14 @@ class AssistantTagRowsCompanion extends UpdateCompanion<AssistantTagRow> {
     });
   }
 
-  AssistantTagRowsCompanion copyWith({
+  AssistantGroupRowsCompanion copyWith({
     Value<String>? id,
     Value<int>? sortOrder,
     Value<String>? payload,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
-    return AssistantTagRowsCompanion(
+    return AssistantGroupRowsCompanion(
       id: id ?? this.id,
       sortOrder: sortOrder ?? this.sortOrder,
       payload: payload ?? this.payload,
@@ -10249,7 +10250,7 @@ class AssistantTagRowsCompanion extends UpdateCompanion<AssistantTagRow> {
     }
     if (updatedAt.present) {
       map['updated_at'] = Variable<int>(
-        $AssistantTagRowsTable.$converterupdatedAt.toSql(updatedAt.value),
+        $AssistantGroupRowsTable.$converterupdatedAt.toSql(updatedAt.value),
       );
     }
     if (rowid.present) {
@@ -10260,7 +10261,7 @@ class AssistantTagRowsCompanion extends UpdateCompanion<AssistantTagRow> {
 
   @override
   String toString() {
-    return (StringBuffer('AssistantTagRowsCompanion(')
+    return (StringBuffer('AssistantGroupRowsCompanion(')
           ..write('id: $id, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('payload: $payload, ')
@@ -12014,9 +12015,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $TtsServiceRowsTable ttsServiceRows = $TtsServiceRowsTable(this);
   late final $InstructionInjectionRowsTable instructionInjectionRows =
       $InstructionInjectionRowsTable(this);
-  late final $AssistantTagRowsTable assistantTagRows = $AssistantTagRowsTable(
-    this,
-  );
+  late final $AssistantGroupRowsTable assistantGroupRows =
+      $AssistantGroupRowsTable(this);
   late final $PreferenceRowsTable preferenceRows = $PreferenceRowsTable(this);
   late final $MemoryEntryRowsTable memoryEntryRows = $MemoryEntryRowsTable(
     this,
@@ -12131,7 +12131,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     searchServiceRows,
     ttsServiceRows,
     instructionInjectionRows,
-    assistantTagRows,
+    assistantGroupRows,
     preferenceRows,
     memoryEntryRows,
     userProfileFieldRows,
@@ -19969,16 +19969,16 @@ typedef $$InstructionInjectionRowsTableProcessedTableManager =
       InstructionInjectionRow,
       PrefetchHooks Function()
     >;
-typedef $$AssistantTagRowsTableCreateCompanionBuilder =
-    AssistantTagRowsCompanion Function({
+typedef $$AssistantGroupRowsTableCreateCompanionBuilder =
+    AssistantGroupRowsCompanion Function({
       required String id,
       required int sortOrder,
       required String payload,
       required DateTime updatedAt,
       Value<int> rowid,
     });
-typedef $$AssistantTagRowsTableUpdateCompanionBuilder =
-    AssistantTagRowsCompanion Function({
+typedef $$AssistantGroupRowsTableUpdateCompanionBuilder =
+    AssistantGroupRowsCompanion Function({
       Value<String> id,
       Value<int> sortOrder,
       Value<String> payload,
@@ -19986,9 +19986,9 @@ typedef $$AssistantTagRowsTableUpdateCompanionBuilder =
       Value<int> rowid,
     });
 
-class $$AssistantTagRowsTableFilterComposer
-    extends Composer<_$AppDatabase, $AssistantTagRowsTable> {
-  $$AssistantTagRowsTableFilterComposer({
+class $$AssistantGroupRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $AssistantGroupRowsTable> {
+  $$AssistantGroupRowsTableFilterComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -20017,9 +20017,9 @@ class $$AssistantTagRowsTableFilterComposer
       );
 }
 
-class $$AssistantTagRowsTableOrderingComposer
-    extends Composer<_$AppDatabase, $AssistantTagRowsTable> {
-  $$AssistantTagRowsTableOrderingComposer({
+class $$AssistantGroupRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $AssistantGroupRowsTable> {
+  $$AssistantGroupRowsTableOrderingComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -20047,9 +20047,9 @@ class $$AssistantTagRowsTableOrderingComposer
   );
 }
 
-class $$AssistantTagRowsTableAnnotationComposer
-    extends Composer<_$AppDatabase, $AssistantTagRowsTable> {
-  $$AssistantTagRowsTableAnnotationComposer({
+class $$AssistantGroupRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AssistantGroupRowsTable> {
+  $$AssistantGroupRowsTableAnnotationComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -20069,41 +20069,44 @@ class $$AssistantTagRowsTableAnnotationComposer
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 }
 
-class $$AssistantTagRowsTableTableManager
+class $$AssistantGroupRowsTableTableManager
     extends
         RootTableManager<
           _$AppDatabase,
-          $AssistantTagRowsTable,
-          AssistantTagRow,
-          $$AssistantTagRowsTableFilterComposer,
-          $$AssistantTagRowsTableOrderingComposer,
-          $$AssistantTagRowsTableAnnotationComposer,
-          $$AssistantTagRowsTableCreateCompanionBuilder,
-          $$AssistantTagRowsTableUpdateCompanionBuilder,
+          $AssistantGroupRowsTable,
+          AssistantGroupRow,
+          $$AssistantGroupRowsTableFilterComposer,
+          $$AssistantGroupRowsTableOrderingComposer,
+          $$AssistantGroupRowsTableAnnotationComposer,
+          $$AssistantGroupRowsTableCreateCompanionBuilder,
+          $$AssistantGroupRowsTableUpdateCompanionBuilder,
           (
-            AssistantTagRow,
+            AssistantGroupRow,
             BaseReferences<
               _$AppDatabase,
-              $AssistantTagRowsTable,
-              AssistantTagRow
+              $AssistantGroupRowsTable,
+              AssistantGroupRow
             >,
           ),
-          AssistantTagRow,
+          AssistantGroupRow,
           PrefetchHooks Function()
         > {
-  $$AssistantTagRowsTableTableManager(
+  $$AssistantGroupRowsTableTableManager(
     _$AppDatabase db,
-    $AssistantTagRowsTable table,
+    $AssistantGroupRowsTable table,
   ) : super(
         TableManagerState(
           db: db,
           table: table,
           createFilteringComposer: () =>
-              $$AssistantTagRowsTableFilterComposer($db: db, $table: table),
+              $$AssistantGroupRowsTableFilterComposer($db: db, $table: table),
           createOrderingComposer: () =>
-              $$AssistantTagRowsTableOrderingComposer($db: db, $table: table),
+              $$AssistantGroupRowsTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
-              $$AssistantTagRowsTableAnnotationComposer($db: db, $table: table),
+              $$AssistantGroupRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
           updateCompanionCallback:
               ({
                 Value<String> id = const Value.absent(),
@@ -20111,7 +20114,7 @@ class $$AssistantTagRowsTableTableManager
                 Value<String> payload = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
-              }) => AssistantTagRowsCompanion(
+              }) => AssistantGroupRowsCompanion(
                 id: id,
                 sortOrder: sortOrder,
                 payload: payload,
@@ -20125,7 +20128,7 @@ class $$AssistantTagRowsTableTableManager
                 required String payload,
                 required DateTime updatedAt,
                 Value<int> rowid = const Value.absent(),
-              }) => AssistantTagRowsCompanion.insert(
+              }) => AssistantGroupRowsCompanion.insert(
                 id: id,
                 sortOrder: sortOrder,
                 payload: payload,
@@ -20140,21 +20143,25 @@ class $$AssistantTagRowsTableTableManager
       );
 }
 
-typedef $$AssistantTagRowsTableProcessedTableManager =
+typedef $$AssistantGroupRowsTableProcessedTableManager =
     ProcessedTableManager<
       _$AppDatabase,
-      $AssistantTagRowsTable,
-      AssistantTagRow,
-      $$AssistantTagRowsTableFilterComposer,
-      $$AssistantTagRowsTableOrderingComposer,
-      $$AssistantTagRowsTableAnnotationComposer,
-      $$AssistantTagRowsTableCreateCompanionBuilder,
-      $$AssistantTagRowsTableUpdateCompanionBuilder,
+      $AssistantGroupRowsTable,
+      AssistantGroupRow,
+      $$AssistantGroupRowsTableFilterComposer,
+      $$AssistantGroupRowsTableOrderingComposer,
+      $$AssistantGroupRowsTableAnnotationComposer,
+      $$AssistantGroupRowsTableCreateCompanionBuilder,
+      $$AssistantGroupRowsTableUpdateCompanionBuilder,
       (
-        AssistantTagRow,
-        BaseReferences<_$AppDatabase, $AssistantTagRowsTable, AssistantTagRow>,
+        AssistantGroupRow,
+        BaseReferences<
+          _$AppDatabase,
+          $AssistantGroupRowsTable,
+          AssistantGroupRow
+        >,
       ),
-      AssistantTagRow,
+      AssistantGroupRow,
       PrefetchHooks Function()
     >;
 typedef $$PreferenceRowsTableCreateCompanionBuilder =
@@ -21161,8 +21168,8 @@ class $AppDatabaseManager {
         _db,
         _db.instructionInjectionRows,
       );
-  $$AssistantTagRowsTableTableManager get assistantTagRows =>
-      $$AssistantTagRowsTableTableManager(_db, _db.assistantTagRows);
+  $$AssistantGroupRowsTableTableManager get assistantGroupRows =>
+      $$AssistantGroupRowsTableTableManager(_db, _db.assistantGroupRows);
   $$PreferenceRowsTableTableManager get preferenceRows =>
       $$PreferenceRowsTableTableManager(_db, _db.preferenceRows);
   $$MemoryEntryRowsTableTableManager get memoryEntryRows =>

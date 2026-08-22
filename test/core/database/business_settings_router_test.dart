@@ -208,13 +208,13 @@ void main() {
             {'name': 'Second'},
           ]),
         });
-        final seededRows = seeded.entities[BusinessEntityKind.assistantTag]!;
+        final seededRows = seeded.entities[BusinessEntityKind.assistantGroup]!;
         final firstId = seededRows[0].id;
         final secondId = seededRows[1].id;
         final edited = BusinessSnapshot(
           entities: {
             ...seeded.entities,
-            BusinessEntityKind.assistantTag: [
+            BusinessEntityKind.assistantGroup: [
               seededRows[1].copyWith(
                 sortOrder: 0,
                 payload: jsonEncode({'name': 'Second renamed'}),
@@ -249,7 +249,8 @@ void main() {
           portable.settings,
           entityRowIds: portable.entityRowIds,
         );
-        final restoredIds = restored.entities[BusinessEntityKind.assistantTag]!
+        final restoredIds = restored
+            .entities[BusinessEntityKind.assistantGroup]!
             .map((row) => row.id)
             .toList();
         final restoredTagMap =
@@ -302,7 +303,7 @@ void main() {
       );
 
       expect(
-        snapshot.entities[BusinessEntityKind.assistantTag]!.single.id,
+        snapshot.entities[BusinessEntityKind.assistantGroup]!.single.id,
         'portable-tag-row',
       );
     });

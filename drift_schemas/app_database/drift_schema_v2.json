@@ -2750,7 +2750,7 @@
       "references": [],
       "type": "table",
       "data": {
-        "name": "assistant_tag_rows",
+        "name": "assistant_group_rows",
         "was_declared_in_moor": false,
         "columns": [
           {
@@ -3931,11 +3931,11 @@
       ]
     },
     {
-      "name": "assistant_tag_rows",
+      "name": "assistant_group_rows",
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TABLE IF NOT EXISTS \"assistant_tag_rows\" (\"id\" TEXT NOT NULL, \"sort_order\" INTEGER NOT NULL CHECK(\"sort_order\" >= 0), \"payload\" TEXT NOT NULL, \"updated_at\" INTEGER NOT NULL, PRIMARY KEY (\"id\"));"
+          "sql": "CREATE TABLE IF NOT EXISTS \"assistant_group_rows\" (\"id\" TEXT NOT NULL, \"sort_order\" INTEGER NOT NULL CHECK(\"sort_order\" >= 0), \"payload\" TEXT NOT NULL, \"updated_at\" INTEGER NOT NULL, PRIMARY KEY (\"id\"));"
         }
       ]
     },

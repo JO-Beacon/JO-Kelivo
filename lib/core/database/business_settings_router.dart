@@ -609,7 +609,7 @@ final class BusinessSettingsRouter {
           strings: const {'id', 'title', 'prompt', 'group'},
         );
         return;
-      case BusinessEntityKind.assistantTag:
+      case BusinessEntityKind.assistantGroup:
         return;
       case BusinessEntityKind.memoryEntry:
         _validateKnownFields(

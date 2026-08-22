@@ -226,7 +226,7 @@ void main() {
             'businessEntityRowIds': {
               for (final kind in BusinessEntityKind.values)
                 if (kind != BusinessEntityKind.provider)
-                  kind.sourceKey: kind == BusinessEntityKind.assistantTag
+                  kind.sourceKey: kind == BusinessEntityKind.assistantGroup
                       ? [tagRowId]
                       : <String>[],
             },
@@ -273,7 +273,7 @@ void main() {
         try {
           final inspectionRepository = BusinessRepository(inspectionDatabase);
           final restoredTag = (await inspectionRepository.readEntities(
-            BusinessEntityKind.assistantTag,
+            BusinessEntityKind.assistantGroup,
           )).single;
           final restored = await BusinessRestoreService(
             inspectionRepository,

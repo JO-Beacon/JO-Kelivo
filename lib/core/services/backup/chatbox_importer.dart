@@ -46,11 +46,12 @@ class ChatboxImporter {
   static const String _providersKey = 'provider_configs_v1';
   static const String _providersOrderKey = 'providers_order_v1';
   static const String _assistantsKey = 'assistants_v1';
-  static const String _tagsKey = 'assistant_tags_v1';
+  // Historical settings key retained for backup compatibility.
+  static const String _groupsKey = 'assistant_tags_v1';
   static const String _assignKey =
-      'assistant_tag_map_v1'; // assistantId -> tagId
+      'assistant_tag_map_v1'; // assistantId -> groupId
   static const String _collapsedKey =
-      'assistant_tag_collapsed_v1'; // tagId -> bool
+      'assistant_tag_collapsed_v1'; // groupId -> bool
 
   static Future<ChatboxImportResult> importFromChatbox({
     required File file,
@@ -826,9 +827,9 @@ class ChatboxImporter {
     }
 
     if (assistantIds.isNotEmpty) {
-      final tags = overwrite
+      final groups = overwrite
           ? <Map<String, dynamic>>[]
-          : _jsonObjectList(settings[_tagsKey], _tagsKey);
+          : _jsonObjectList(settings[_groupsKey], _groupsKey);
       final assignment = overwrite
           ? <String, dynamic>{}
           : _jsonMap(settings[_assignKey], _assignKey);
@@ -836,20 +837,21 @@ class ChatboxImporter {
           ? <String, dynamic>{}
           : _jsonMap(settings[_collapsedKey], _collapsedKey);
 
-      String? chatboxTagId;
-      for (final tag in tags) {
-        if ((tag['name'] ?? '').toString().trim().toLowerCase() != 'chatbox') {
+      String? chatboxGroupId;
+      for (final group in groups) {
+        if ((group['name'] ?? '').toString().trim().toLowerCase() !=
+            'chatbox') {
           continue;
         }
-        final id = (tag['id'] ?? '').toString().trim();
+        final id = (group['id'] ?? '').toString().trim();
         if (id.isNotEmpty) {
-          chatboxTagId = id;
+          chatboxGroupId = id;
           break;
         }
       }
-      final tagId = chatboxTagId ?? const Uuid().v4();
-      if (!tags.any((tag) => (tag['id'] ?? '').toString() == tagId)) {
-        tags.add(<String, dynamic>{'id': tagId, 'name': 'Chatbox'});
+      final groupId = chatboxGroupId ?? const Uuid().v4();
+      if (!groups.any((group) => (group['id'] ?? '').toString() == groupId)) {
+        groups.add(<String, dynamic>{'id': groupId, 'name': 'Chatbox'});
       }
 
       final nextAssignment = <String, String>{
@@ -860,9 +862,9 @@ class ChatboxImporter {
         final id = assistantId.trim();
         if (id.isEmpty) continue;
         if (overwrite) {
-          nextAssignment[id] = tagId;
+          nextAssignment[id] = groupId;
         } else {
-          nextAssignment.putIfAbsent(id, () => tagId);
+          nextAssignment.putIfAbsent(id, () => groupId);
         }
       }
       final nextCollapsed = <String, bool>{
@@ -871,9 +873,9 @@ class ChatboxImporter {
               ? entry.value as bool
               : entry.value.toString() == 'true',
       };
-      nextCollapsed.putIfAbsent(tagId, () => false);
+      nextCollapsed.putIfAbsent(groupId, () => false);
 
-      settings[_tagsKey] = jsonEncode(tags);
+      settings[_groupsKey] = jsonEncode(groups);
       settings[_assignKey] = jsonEncode(nextAssignment);
       settings[_collapsedKey] = jsonEncode(nextCollapsed);
     }

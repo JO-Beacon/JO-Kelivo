@@ -1159,6 +1159,7 @@ class _BackupPageState extends State<BackupPage> {
             context,
             icon: Lucide.Export,
             label: l10n.backupPageExportKelivoBackup,
+            enabled: false,
             onTap: () => _doExport(context, vm),
           ),
           _iosDivider(context),
@@ -1173,6 +1174,7 @@ class _BackupPageState extends State<BackupPage> {
             context,
             icon: Lucide.Box,
             label: l10n.backupPageImportFromCherryStudio,
+            enabled: false,
             onTap: () async {
               // 1）提醒用户 Cherry 导入为实验性功能
               final acknowledged = await _confirmCherryImport(context);
@@ -1263,6 +1265,7 @@ class _BackupPageState extends State<BackupPage> {
             context,
             icon: Lucide.Box,
             label: l10n.backupPageImportFromChatbox,
+            enabled: false,
             onTap: () async {
               // 选择 Chatbox 导出的 json
               final result = await FilePicker.platform.pickFiles(
@@ -1942,15 +1945,16 @@ Widget _iosNavRow(
   required IconData icon,
   required String label,
   VoidCallback? onTap,
+  bool enabled = true,
   String? detailText,
 }) {
   final cs = Theme.of(context).colorScheme;
-  final interactive = onTap != null;
+  final interactive = enabled && onTap != null;
   return _TactileRow(
-    onTap: onTap,
+    onTap: enabled ? onTap : null,
     pressedScale: 1.00,
     builder: (pressed) {
-      final baseColor = cs.onSurface.withValues(alpha: 0.9);
+      final baseColor = cs.onSurface.withValues(alpha: enabled ? 0.9 : 0.38);
       return _AnimatedPressColor(
         pressed: pressed,
         base: baseColor,

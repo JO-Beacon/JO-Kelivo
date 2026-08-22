@@ -37,7 +37,7 @@ import '../../../desktop/desktop_context_menu.dart';
 import '../../../desktop/menu_anchor.dart';
 import '../../../shared/widgets/emoji_text.dart';
 import '../../../theme/app_font_weights.dart';
-import '../../../core/providers/tag_provider.dart';
+import '../../../core/providers/assistant_group_provider.dart';
 import '../../assistant/widgets/assistant_select_sheet.dart';
 import '../../../desktop/hotkeys/sidebar_tab_bus.dart';
 import '../../../desktop/desktop_settings_navigation_bus.dart';
@@ -3308,7 +3308,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   // 对助手名称应用搜索筛选。
   Widget _buildAssistantsList(BuildContext context, {bool inlineMode = false}) {
     final ap2 = context.watch<AssistantProvider>();
-    final tp = context.watch<TagProvider>();
+    final groupProvider = context.watch<AssistantGroupProvider>();
     final textBase2 = Theme.of(context).colorScheme.onSurface;
 
     List<Assistant> assistants = ap2.assistants;
@@ -3323,16 +3323,16 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
           .toList();
     }
 
-    final tags = tp.tags;
+    final groups = groupProvider.groups;
     final ungrouped = assistants
-        .where((a) => tp.tagOfAssistant(a.id) == null)
+        .where((a) => groupProvider.groupOfAssistant(a.id) == null)
         .toList();
-    final groupedByTag = <String, List<Assistant>>{};
-    for (final t in tags) {
+    final groupedByGroup = <String, List<Assistant>>{};
+    for (final group in groups) {
       final list = assistants
-          .where((a) => tp.tagOfAssistant(a.id) == t.id)
+          .where((a) => groupProvider.groupOfAssistant(a.id) == group.id)
           .toList();
-      if (list.isNotEmpty) groupedByTag[t.id] = list;
+      if (list.isNotEmpty) groupedByGroup[group.id] = list;
     }
 
     Widget buildTile(Assistant a) {
@@ -3420,25 +3420,27 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
               ungrouped,
               subsetIds: ungrouped.map((a) => a.id).toList(),
             ),
-          for (final t in tags)
-            if ((groupedByTag[t.id] ?? const <Assistant>[]).isNotEmpty) ...[
+          for (final group in groups)
+            if ((groupedByGroup[group.id] ?? const <Assistant>[])
+                .isNotEmpty) ...[
               const SizedBox(height: 4),
               _GroupHeader(
-                title: t.name,
-                collapsed: tp.isCollapsed(t.id),
-                onToggle: () => tp.toggleCollapsed(t.id),
+                title: group.name,
+                collapsed: groupProvider.isGroupCollapsed(group.id),
+                onToggle: () => groupProvider.toggleGroupCollapsed(group.id),
               ),
               AnimatedSize(
                 duration: const Duration(milliseconds: 260),
                 curve: Curves.easeInOutCubic,
                 alignment: Alignment.topCenter,
-                child: tp.isCollapsed(t.id)
+                child: groupProvider.isGroupCollapsed(group.id)
                     ? const SizedBox.shrink()
                     : buildReorderable(
-                        groupedByTag[t.id]!,
-                        subsetIds: (groupedByTag[t.id] ?? const <Assistant>[])
-                            .map((a) => a.id)
-                            .toList(),
+                        groupedByGroup[group.id]!,
+                        subsetIds:
+                            (groupedByGroup[group.id] ?? const <Assistant>[])
+                                .map((a) => a.id)
+                                .toList(),
                       ),
               ),
             ],

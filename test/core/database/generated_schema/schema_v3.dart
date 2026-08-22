@@ -2009,11 +2009,11 @@ class InstructionInjectionRows extends Table with TableInfo {
   bool get dontWriteConstraints => true;
 }
 
-class AssistantTagRows extends Table with TableInfo {
+class AssistantGroupRows extends Table with TableInfo {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  AssistantTagRows(this.attachedDatabase, [this._alias]);
+  AssistantGroupRows(this.attachedDatabase, [this._alias]);
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
     'id',
     aliasedName,
@@ -2052,7 +2052,7 @@ class AssistantTagRows extends Table with TableInfo {
   String get aliasedName => _alias ?? actualTableName;
   @override
   String get actualTableName => $name;
-  static const String $name = 'assistant_tag_rows';
+  static const String $name = 'assistant_group_rows';
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
@@ -2061,8 +2061,8 @@ class AssistantTagRows extends Table with TableInfo {
   }
 
   @override
-  AssistantTagRows createAlias(String alias) {
-    return AssistantTagRows(attachedDatabase, alias);
+  AssistantGroupRows createAlias(String alias) {
+    return AssistantGroupRows(attachedDatabase, alias);
   }
 
   @override
@@ -2453,7 +2453,7 @@ class DatabaseAtV3 extends GeneratedDatabase {
   late final TtsServiceRows ttsServiceRows = TtsServiceRows(this);
   late final InstructionInjectionRows instructionInjectionRows =
       InstructionInjectionRows(this);
-  late final AssistantTagRows assistantTagRows = AssistantTagRows(this);
+  late final AssistantGroupRows assistantGroupRows = AssistantGroupRows(this);
   late final PreferenceRows preferenceRows = PreferenceRows(this);
   late final MemoryEntryRows memoryEntryRows = MemoryEntryRows(this);
   late final UserProfileFieldRows userProfileFieldRows = UserProfileFieldRows(
@@ -2566,7 +2566,7 @@ class DatabaseAtV3 extends GeneratedDatabase {
     searchServiceRows,
     ttsServiceRows,
     instructionInjectionRows,
-    assistantTagRows,
+    assistantGroupRows,
     preferenceRows,
     memoryEntryRows,
     userProfileFieldRows,

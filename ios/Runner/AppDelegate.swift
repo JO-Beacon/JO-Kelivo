@@ -218,7 +218,7 @@ private final class IosBackgroundGenerationHandler {
     if refreshEnabled { scheduleBackgroundTasks() }
     if args["liveActivityEnabled"] as? Bool ?? false {
       startLiveActivity(
-        title: args["title"] as? String ?? "JO-Kelivo",
+        title: args["title"] as? String ?? "JO-AIClient",
         detail: args["detail"] as? String ?? "",
         tokenCount: args["tokenCount"] as? Int ?? 0,
         tokenLabel: args["tokenLabel"] as? String ?? ""
@@ -239,7 +239,7 @@ private final class IosBackgroundGenerationHandler {
 
   private func finish(arguments: Any?, result: @escaping FlutterResult) {
     let args = arguments as? [String: Any] ?? [:]
-    let title = args["title"] as? String ?? "JO-Kelivo"
+    let title = args["title"] as? String ?? "JO-AIClient"
     let detail = args["detail"] as? String ?? ""
     finishLiveActivity(title: title, detail: detail)
     if notificationsEnabled { showCompletionNotification(title: title, body: detail) }
@@ -251,7 +251,7 @@ private final class IosBackgroundGenerationHandler {
   private func cancel(arguments: Any?, result: @escaping FlutterResult) {
     let args = arguments as? [String: Any] ?? [:]
     finishLiveActivity(
-      title: liveActivityDisplayTitle.isEmpty ? "JO-Kelivo" : liveActivityDisplayTitle,
+      title: liveActivityDisplayTitle.isEmpty ? "JO-AIClient" : liveActivityDisplayTitle,
       detail: args["detail"] as? String ?? ""
     )
     endBackgroundTask()
