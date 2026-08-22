@@ -23,7 +23,7 @@ enum MessageMoreAction {
   edit,
   switchToUser,
   switchToAssistant,
-  fork,
+  messageFork,
   deleteCurrentVersion,
   deleteAllVersions,
   share,
@@ -141,9 +141,9 @@ Future<MessageMoreAction?> showMessageMoreSheet(
       if (canCreateBranch)
         DesktopContextMenuItem(
           icon: Lucide.GitFork,
-          label: l10n.messageMoreSheetCreateBranch,
+          label: l10n.messageMoreSheetCreateMessageBranch,
           onTap: () {
-            selected = MessageMoreAction.fork;
+            selected = MessageMoreAction.messageFork;
           },
         ),
       DesktopContextMenuItem(
@@ -368,9 +368,11 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                     if (widget.canCreateBranch)
                       _actionItem(
                         icon: Lucide.GitFork,
-                        label: l10n.messageMoreSheetCreateBranch,
+                        label: l10n.messageMoreSheetCreateMessageBranch,
                         onTap: () {
-                          Navigator.of(context).pop(MessageMoreAction.fork);
+                          Navigator.of(
+                            context,
+                          ).pop(MessageMoreAction.messageFork);
                         },
                       ),
                     _actionItem(

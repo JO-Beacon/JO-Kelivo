@@ -3159,7 +3159,8 @@ class ChatService extends ChangeNotifier {
     return updated;
   }
 
-  Future<ConversationTree> createConversationBranch({
+  /// Message Fork: create a child branch in the current conversation tree.
+  Future<ConversationTree> createMessageBranch({
     required String conversationId,
     required String? fromMessageId,
     String name = '',
@@ -3167,7 +3168,7 @@ class ChatService extends ChangeNotifier {
     if (!_initialized) await init();
     final tree = await _loadOrCreateConversationTree(conversationId);
     final branchId = 'branch-${const Uuid().v4()}';
-    final updated = tree.forkBranchFromParent(
+    final updated = tree.createMessageBranchFromParent(
       branchId: branchId,
       fromMessageId: fromMessageId,
       name: name,
@@ -3192,7 +3193,8 @@ class ChatService extends ChangeNotifier {
     );
   }
 
-  Future<Conversation> forkConversationAtRevision({
+  /// Conversation Fork: copy a message prefix into a new conversation.
+  Future<Conversation> createConversationForkAtRevision({
     required String sourceConversationId,
     required String sourceRevisionId,
     required String title,
@@ -3231,7 +3233,7 @@ class ChatService extends ChangeNotifier {
     _messageOrderIds[persisted.id] = <String>[];
     _messageCounts[persisted.id] = 0;
     for (final message in sourceMessages) {
-      final forked = ChatMessage(
+      final copied = ChatMessage(
         role: message.role,
         parts: message.parts,
         timestamp: message.timestamp,
@@ -3250,11 +3252,11 @@ class ChatService extends ChangeNotifier {
         cachedTokens: message.cachedTokens,
         durationMs: message.durationMs,
       );
-      await addMessageDirectly(persisted.id, forked);
+      await addMessageDirectly(persisted.id, copied);
       if (message.role == 'user') {
         await _inheritImageOcrArtifactsBestEffort(
           fromRevisionId: message.id,
-          toRevisionId: forked.id,
+          toRevisionId: copied.id,
         );
       }
     }

@@ -765,7 +765,7 @@
   "messageMoreSheetSwitchToAssistant": "切換為助手",
   "messageMoreSheetShare": "分享",
   "messageMoreSheetSelectMessages": "選擇訊息",
-  "messageMoreSheetCreateBranch": "建立分支",
+  "messageMoreSheetCreateMessageBranch": "建立訊息分支",
   "messageMoreSheetDelete": "刪除訊息",
   "messageMoreSheetDeleteAllVersions": "刪除分支",
   "reasoningBudgetSheetOff": "關閉",

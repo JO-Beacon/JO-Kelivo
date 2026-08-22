@@ -894,7 +894,7 @@
   "messageMoreSheetSwitchToAssistant": "Switch to Assistant",
   "messageMoreSheetShare": "Share",
   "messageMoreSheetSelectMessages": "Select Messages",
-  "messageMoreSheetCreateBranch": "Create Branch",
+  "messageMoreSheetCreateMessageBranch": "Create Message Branch",
   "messageMoreSheetDelete": "Delete Message",
   "messageMoreSheetDeleteAllVersions": "Delete Branch",
   "reasoningBudgetSheetOff": "Off",

@@ -135,7 +135,7 @@ void main() {
         role: 'assistant',
         content: 'root reply',
       );
-      final fork = await writer.createConversationBranch(
+      final messageBranch = await writer.createMessageBranch(
         conversationId: conversation.id,
         fromMessageId: user.id,
       );
@@ -144,7 +144,7 @@ void main() {
         role: 'assistant',
         content: 'fork reply',
       );
-      expect(fork.activeBranchId, isNot('root-${conversation.id}'));
+      expect(messageBranch.activeBranchId, isNot('root-${conversation.id}'));
       await writer.close();
       services.remove(writer);
 

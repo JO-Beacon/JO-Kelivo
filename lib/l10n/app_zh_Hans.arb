@@ -807,7 +807,7 @@
   "messageMoreSheetSwitchToAssistant": "切换为助手",
   "messageMoreSheetShare": "分享",
   "messageMoreSheetSelectMessages": "选择消息",
-  "messageMoreSheetCreateBranch": "创建分支",
+  "messageMoreSheetCreateMessageBranch": "创建消息分支",
   "messageMoreSheetDelete": "删除消息",
   "messageMoreSheetDeleteAllVersions": "删除分支",
   "reasoningBudgetSheetOff": "关闭",

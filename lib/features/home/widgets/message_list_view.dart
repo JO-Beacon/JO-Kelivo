@@ -41,7 +41,7 @@ typedef OnDeleteAllVersions =
       ChatMessage message,
       Map<String, List<ChatMessage>> byGroup,
     );
-typedef OnForkConversation = Future<void> Function(ChatMessage message);
+typedef OnMessageFork = Future<void> Function(ChatMessage message);
 typedef OnShareMessage =
     void Function(int messageIndex, List<ChatMessage> messages);
 typedef OnSelectMessages =
@@ -126,7 +126,7 @@ class MessageListView extends StatefulWidget {
     this.onSwitchMessageRole,
     this.onDeleteMessage,
     this.onDeleteAllVersions,
-    this.onForkConversation,
+    this.onMessageFork,
     this.onShareMessage,
     this.onSelectMessages,
     this.onSpeakMessage,
@@ -218,7 +218,7 @@ class MessageListView extends StatefulWidget {
   final OnSwitchMessageRole? onSwitchMessageRole;
   final OnDeleteMessage? onDeleteMessage;
   final OnDeleteAllVersions? onDeleteAllVersions;
-  final OnForkConversation? onForkConversation;
+  final OnMessageFork? onMessageFork;
   final OnShareMessage? onShareMessage;
   final OnSelectMessages? onSelectMessages;
   final OnSpeakMessage? onSpeakMessage;
@@ -1732,7 +1732,7 @@ class _MessageListViewState extends State<MessageListView> {
           context,
           message,
           canDeleteAllVersions: !useBranchSelector && total > 1,
-          canCreateBranch: widget.onForkConversation != null,
+          canCreateBranch: widget.onMessageFork != null,
         );
         if (action == MessageMoreAction.deleteCurrentVersion) {
           await widget.onDeleteMessage?.call(message, widget.byGroup);
@@ -1744,8 +1744,8 @@ class _MessageListViewState extends State<MessageListView> {
           await widget.onSwitchMessageRole?.call(message, 'user');
         } else if (action == MessageMoreAction.switchToAssistant) {
           await widget.onSwitchMessageRole?.call(message, 'assistant');
-        } else if (action == MessageMoreAction.fork) {
-          await widget.onForkConversation?.call(message);
+        } else if (action == MessageMoreAction.messageFork) {
+          await widget.onMessageFork?.call(message);
         } else if (action == MessageMoreAction.share) {
           widget.onShareMessage?.call(index, widget.messages);
         } else if (action == MessageMoreAction.selectMessages) {

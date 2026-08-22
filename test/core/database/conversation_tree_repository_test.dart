@@ -90,14 +90,14 @@ void main() {
       createdAt: DateTime.utc(2026, 1, 1),
     );
     tree = tree
-        .forkBranch(branchId: 'a1', fromMessageId: 'shared')
+        .createMessageBranch(branchId: 'a1', fromMessageId: 'shared')
         .appendToActiveBranch('a1-tail');
     tree = tree
         .switchBranch('root')
-        .forkBranch(branchId: 'a2', fromMessageId: 'shared')
+        .createMessageBranch(branchId: 'a2', fromMessageId: 'shared')
         .appendToActiveBranch('a2-tail')
         .switchBranch('a1')
-        .forkBranchFromParent(branchId: 'b', fromMessageId: null)
+        .createMessageBranchFromParent(branchId: 'b', fromMessageId: null)
         .appendToActiveBranch('b-tail');
 
     await repository.saveConversationTree(tree);
@@ -354,13 +354,15 @@ void main() {
           createdAt: DateTime.utc(2026, 1, 1),
         ),
       );
-      final forked = await repository
+      final messageBranchTree = await repository
           .loadConversationTree(conversation.id)
           .then(
-            (tree) =>
-                tree!.forkBranch(branchId: 'branch-new', fromMessageId: 'u1'),
+            (tree) => tree!.createMessageBranch(
+              branchId: 'branch-new',
+              fromMessageId: 'u1',
+            ),
           );
-      await repository.saveConversationTree(forked);
+      await repository.saveConversationTree(messageBranchTree);
 
       await repository.beginAssistantGeneration(
         conversation: conversation,

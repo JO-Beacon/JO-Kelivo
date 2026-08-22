@@ -72,7 +72,7 @@ void main() {
     await _openMoreSheet(tester, canDeleteAllVersions: true);
 
     expect(find.text('Select Messages'), findsOneWidget);
-    expect(find.text('Create Branch'), findsOneWidget);
+    expect(find.text('Create Message Branch'), findsOneWidget);
     expect(find.text('Delete Message'), findsOneWidget);
     expect(find.text('Delete Branch'), findsOneWidget);
   });
@@ -85,14 +85,14 @@ void main() {
     expect(find.text('Delete Branch'), findsNothing);
   });
 
-  testWidgets('临时会话消息菜单不显示创建分支', (tester) async {
+  testWidgets('临时会话消息菜单不显示创建消息分支', (tester) async {
     await _openMoreSheet(
       tester,
       canDeleteAllVersions: false,
       canCreateBranch: false,
     );
 
-    expect(find.text('Create Branch'), findsNothing);
+    expect(find.text('Create Message Branch'), findsNothing);
   });
 
   testWidgets('助手消息菜单可以切换为用户', (tester) async {

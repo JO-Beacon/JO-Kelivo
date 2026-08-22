@@ -29,7 +29,10 @@ void main() {
               conversationId: 'conversation',
               messageIds: [rootUser.id, rootAssistant.id],
             )
-            .forkBranch(branchId: 'alternate', fromMessageId: rootUser.id)
+            .createMessageBranch(
+              branchId: 'alternate',
+              fromMessageId: rootUser.id,
+            )
             .appendToActiveBranch(alternateAssistant.id);
 
     await tester.pumpWidget(

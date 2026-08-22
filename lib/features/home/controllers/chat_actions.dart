@@ -1357,7 +1357,7 @@ class ChatActions {
         }
         createdTree = existingTree;
       } else {
-        createdTree = await chatService.createConversationBranch(
+        createdTree = await chatService.createMessageBranch(
           conversationId: conversation.id,
           fromMessageId: fromMessageId,
         );

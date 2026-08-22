@@ -1421,13 +1421,13 @@ class HomePageController extends ChangeNotifier {
     );
   }
 
-  Future<void> forkConversation(ChatMessage message) async {
+  Future<void> createMessageFork(ChatMessage message) async {
     if (currentConversation == null) return;
     if (!isDesktopPlatform) {
       await _convoFadeController.reverse();
     }
 
-    await _viewModel.forkConversation(message);
+    await _viewModel.createMessageFork(message);
     notifyListeners();
     try {
       await WidgetsBinding.instance.endOfFrame;

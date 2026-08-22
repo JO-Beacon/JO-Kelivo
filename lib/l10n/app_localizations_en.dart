@@ -2211,7 +2211,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageMoreSheetSelectMessages => 'Select Messages';
 
   @override
-  String get messageMoreSheetCreateBranch => 'Create Branch';
+  String get messageMoreSheetCreateMessageBranch => 'Create Message Branch';
 
   @override
   String get messageMoreSheetDelete => 'Delete Message';

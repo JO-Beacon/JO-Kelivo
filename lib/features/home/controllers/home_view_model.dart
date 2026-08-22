@@ -1188,11 +1188,11 @@ class HomeViewModel extends ChangeNotifier {
     onScrollToBottom?.call();
   }
 
-  /// 在指定消息处分叉会话。
-  Future<void> forkConversation(ChatMessage message) async {
+  /// 在当前会话树中从指定消息创建消息分支。
+  Future<void> createMessageFork(ChatMessage message) async {
     final sourceConversation = currentConversation;
     if (sourceConversation == null) return;
-    final tree = await _chatService.createConversationBranch(
+    final tree = await _chatService.createMessageBranch(
       conversationId: sourceConversation.id,
       fromMessageId: message.id,
     );

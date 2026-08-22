@@ -367,7 +367,7 @@ class ConversationTree {
       throw ArgumentError.value(
         parentMessageId,
         'parentMessageId',
-        'Fork parent is not in the tree.',
+        'Message branch parent is not in the tree.',
       );
     }
     if (edges.containsKey(tipMessageId)) {
@@ -509,19 +509,19 @@ class ConversationTree {
     );
   }
 
-  ConversationTree forkBranch({
+  ConversationTree createMessageBranch({
     required String branchId,
     required String fromMessageId,
     String name = '',
     DateTime? createdAt,
-  }) => forkBranchFromParent(
+  }) => createMessageBranchFromParent(
     branchId: branchId,
     fromMessageId: fromMessageId,
     name: name,
     createdAt: createdAt,
   );
 
-  ConversationTree forkBranchFromParent({
+  ConversationTree createMessageBranchFromParent({
     required String branchId,
     required String? fromMessageId,
     String name = '',
@@ -537,7 +537,7 @@ class ConversationTree {
       throw ArgumentError.value(
         fromMessageId,
         'fromMessageId',
-        'Fork point is not in the tree.',
+        'Message branch point is not in the tree.',
       );
     }
     final nextBranches = Map<String, ConversationBranch>.from(branches)

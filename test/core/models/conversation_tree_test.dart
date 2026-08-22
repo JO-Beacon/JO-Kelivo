@@ -27,7 +27,7 @@ void main() {
   });
 
   group('ConversationTree branching', () {
-    test('createBranch forks from an existing message and switches to it', () {
+    test('createBranch creates a message branch from an existing message', () {
       final base = ConversationTree.linear(
         conversationId: 'conversation',
         messageIds: const ['u1', 'a1', 'u2'],
@@ -94,12 +94,12 @@ void main() {
         conversationId: 'conversation',
         messageIds: const ['u1', 'a1'],
       );
-      final firstFork = base
-          .forkBranch(branchId: 'branch-first', fromMessageId: 'u1')
+      final firstMessageBranch = base
+          .createMessageBranch(branchId: 'branch-first', fromMessageId: 'u1')
           .appendToActiveBranch('a1-first');
-      final tree = firstFork
+      final tree = firstMessageBranch
           .switchBranch('root')
-          .forkBranch(branchId: 'branch-second', fromMessageId: 'u1')
+          .createMessageBranch(branchId: 'branch-second', fromMessageId: 'u1')
           .appendToActiveBranch('a1-second');
 
       expect(tree.preferredBranchIdForMessage('a1'), 'root');
@@ -115,16 +115,16 @@ void main() {
         messageIds: const ['root', 'a'],
       );
       final a1 = base
-          .forkBranch(branchId: 'a1', fromMessageId: 'a')
+          .createMessageBranch(branchId: 'a1', fromMessageId: 'a')
           .appendToActiveBranch('a1-tail');
       final a2 = a1
           .switchBranch('root')
-          .forkBranch(branchId: 'a2', fromMessageId: 'a')
+          .createMessageBranch(branchId: 'a2', fromMessageId: 'a')
           .appendToActiveBranch('a2-tail');
       final tree = a2
           .switchBranch('a1')
           .switchBranch('root')
-          .forkBranch(branchId: 'b', fromMessageId: 'root')
+          .createMessageBranch(branchId: 'b', fromMessageId: 'root')
           .appendToActiveBranch('b-tail');
 
       expect(tree.preferredBranchIdForMessage('a'), 'a1');
@@ -136,13 +136,13 @@ void main() {
         messageIds: const ['root', 'a'],
       );
       final a1 = base
-          .forkBranch(branchId: 'a1', fromMessageId: 'a')
+          .createMessageBranch(branchId: 'a1', fromMessageId: 'a')
           .appendToActiveBranch('a1-tail');
       final withBranches = a1
           .switchBranch('root')
-          .forkBranch(branchId: 'a2', fromMessageId: 'a')
+          .createMessageBranch(branchId: 'a2', fromMessageId: 'a')
           .appendToActiveBranch('a2-tail')
-          .forkBranchFromParent(branchId: 'b', fromMessageId: null)
+          .createMessageBranchFromParent(branchId: 'b', fromMessageId: null)
           .appendToActiveBranch('b-tail');
       final activeA1WithoutMemory = ConversationTree(
         conversationId: withBranches.conversationId,
@@ -156,53 +156,59 @@ void main() {
       expect(switchedToB.preferredBranchIdForMessage('a'), 'a1');
     });
 
-    test('sibling map does not treat a branch prefix as a sibling fork', () {
-      final tree = ConversationTree(
-        conversationId: 'conversation',
-        activeBranchId: 'continuation',
-        branches: <String, ConversationBranch>{
-          'root': ConversationBranch(
-            id: 'root',
-            conversationId: 'conversation',
-            tipMessageId: 'edited-a1',
-            createdAt: DateTime(2026),
-          ),
-          'continuation': ConversationBranch(
-            id: 'continuation',
-            conversationId: 'conversation',
-            tipMessageId: 'new-a2',
-            createdAt: DateTime(2026, 1, 1),
-          ),
-        },
-        edges: const <String, MessageTreeEdge>{
-          'u1': MessageTreeEdge(messageId: 'u1', parentMessageId: null),
-          'a1': MessageTreeEdge(messageId: 'a1', parentMessageId: 'u1'),
-          'edited-a1': MessageTreeEdge(
-            messageId: 'edited-a1',
-            parentMessageId: 'a1',
-          ),
-          'new-a2': MessageTreeEdge(
-            messageId: 'new-a2',
-            parentMessageId: 'edited-a1',
-          ),
-        },
-      );
+    test(
+      'sibling map does not treat a branch prefix as a sibling message branch',
+      () {
+        final tree = ConversationTree(
+          conversationId: 'conversation',
+          activeBranchId: 'continuation',
+          branches: <String, ConversationBranch>{
+            'root': ConversationBranch(
+              id: 'root',
+              conversationId: 'conversation',
+              tipMessageId: 'edited-a1',
+              createdAt: DateTime(2026),
+            ),
+            'continuation': ConversationBranch(
+              id: 'continuation',
+              conversationId: 'conversation',
+              tipMessageId: 'new-a2',
+              createdAt: DateTime(2026, 1, 1),
+            ),
+          },
+          edges: const <String, MessageTreeEdge>{
+            'u1': MessageTreeEdge(messageId: 'u1', parentMessageId: null),
+            'a1': MessageTreeEdge(messageId: 'a1', parentMessageId: 'u1'),
+            'edited-a1': MessageTreeEdge(
+              messageId: 'edited-a1',
+              parentMessageId: 'a1',
+            ),
+            'new-a2': MessageTreeEdge(
+              messageId: 'new-a2',
+              parentMessageId: 'edited-a1',
+            ),
+          },
+        );
 
-      final siblings = tree.siblingBranchIdsByMessageId();
+        final siblings = tree.siblingBranchIdsByMessageId();
 
-      expect(siblings['new-a2'], isNull);
-      expect(siblings.containsKey('edited-a1'), isFalse);
-    });
+        expect(siblings['new-a2'], isNull);
+        expect(siblings.containsKey('edited-a1'), isFalse);
+      },
+    );
 
     test(
-      'forkBranch opens a branch at an existing message without a new edge',
+      'createMessageBranch opens a branch at an existing message without a new edge',
       () {
         final base = ConversationTree.linear(
           conversationId: 'conversation',
           messageIds: const ['u1', 'a1', 'u2'],
         );
 
-        final tree = base.forkBranch(branchId: 'alt', fromMessageId: 'u1');
+        final tree = base.createMessageBranch(
+          branchId: 'alt',
+          fromMessageId: 'u1',
+        );
 
         expect(tree.activeBranchId, 'alt');
         expect(tree.activePath(), const ['u1']);
@@ -262,7 +268,7 @@ void main() {
           messageIds: const ['u1', 'a1', 'u2', 'a2'],
         );
         final branched = base
-            .forkBranch(branchId: 'alt', fromMessageId: 'u1')
+            .createMessageBranch(branchId: 'alt', fromMessageId: 'u1')
             .appendToActiveBranch('a1-alt')
             .appendToActiveBranch('u2-alt');
 

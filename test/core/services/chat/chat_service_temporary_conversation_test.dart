@@ -1185,44 +1185,41 @@ void main() {
     });
   });
 
-  group('ChatService fork conversations', () {
-    test(
-      'fork copies selected path as plain single-version messages',
-      () async {
-        final service = createService();
-        await service.init();
+  group('ChatService Conversation Fork', () {
+    test('copies selected path as plain single-version messages', () async {
+      final service = createService();
+      await service.init();
 
-        final source = await service.createConversation(title: 'Source');
-        final original = await service.addMessage(
-          conversationId: source.id,
-          role: 'assistant',
-          content: 'original answer',
-        );
-        final edited = await service.appendMessageVersion(
-          messageId: original.id,
-          content: 'edited answer',
-        );
-        expect(edited, isNotNull);
+      final source = await service.createConversation(title: 'Source');
+      final original = await service.addMessage(
+        conversationId: source.id,
+        role: 'assistant',
+        content: 'original answer',
+      );
+      final edited = await service.appendMessageVersion(
+        messageId: original.id,
+        content: 'edited answer',
+      );
+      expect(edited, isNotNull);
 
-        final fork = await service.forkConversationAtRevision(
-          sourceConversationId: source.id,
-          sourceRevisionId: edited!.id,
-          title: 'Fork',
-        );
+      final copiedConversation = await service.createConversationForkAtRevision(
+        sourceConversationId: source.id,
+        sourceRevisionId: edited!.id,
+        title: 'Conversation Copy',
+      );
 
-        expect(fork.title, source.title);
-        final forkMessages = service.getMessages(fork.id);
-        expect(forkMessages, hasLength(1));
-        expect(forkMessages.single.conversationId, fork.id);
-        expect(forkMessages.single.content, 'edited answer');
-        expect(
-          forkMessages.single.groupId ?? forkMessages.single.id,
-          forkMessages.single.id,
-        );
-        expect(forkMessages.single.version, 0);
-        expect(service.getVersionSelections(fork.id), isEmpty);
-      },
-    );
+      expect(copiedConversation.title, source.title);
+      final copiedMessages = service.getMessages(copiedConversation.id);
+      expect(copiedMessages, hasLength(1));
+      expect(copiedMessages.single.conversationId, copiedConversation.id);
+      expect(copiedMessages.single.content, 'edited answer');
+      expect(
+        copiedMessages.single.groupId ?? copiedMessages.single.id,
+        copiedMessages.single.id,
+      );
+      expect(copiedMessages.single.version, 0);
+      expect(service.getVersionSelections(copiedConversation.id), isEmpty);
+    });
   });
 
   test('final generation commit publishes one statistics revision', () async {

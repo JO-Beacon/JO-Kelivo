@@ -2137,7 +2137,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageMoreSheetSelectMessages => '选择消息';
 
   @override
-  String get messageMoreSheetCreateBranch => '创建分支';
+  String get messageMoreSheetCreateMessageBranch => '创建消息分支';
 
   @override
   String get messageMoreSheetDelete => '删除消息';
@@ -9521,7 +9521,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get messageMoreSheetSelectMessages => '选择消息';
 
   @override
-  String get messageMoreSheetCreateBranch => '创建分支';
+  String get messageMoreSheetCreateMessageBranch => '创建消息分支';
 
   @override
   String get messageMoreSheetDelete => '删除消息';
@@ -16905,7 +16905,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get messageMoreSheetSelectMessages => '選擇訊息';
 
   @override
-  String get messageMoreSheetCreateBranch => '建立分支';
+  String get messageMoreSheetCreateMessageBranch => '建立訊息分支';
 
   @override
   String get messageMoreSheetDelete => '刪除訊息';

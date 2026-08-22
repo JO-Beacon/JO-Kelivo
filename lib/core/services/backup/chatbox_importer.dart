@@ -646,7 +646,7 @@ class ChatboxImporter {
           final branchId = 'chatbox-fork-$pivotId-$listId';
           if (tree.branches.containsKey(branchId)) continue;
 
-          tree = tree.forkBranchFromParent(
+          tree = tree.createMessageBranchFromParent(
             branchId: branchId,
             fromMessageId: pivotId,
             name: 'Chatbox fork ${position + 1}',

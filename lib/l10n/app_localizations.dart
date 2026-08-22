@@ -4198,11 +4198,11 @@ abstract class AppLocalizations {
   /// **'Select Messages'**
   String get messageMoreSheetSelectMessages;
 
-  /// No description provided for @messageMoreSheetCreateBranch.
+  /// No description provided for @messageMoreSheetCreateMessageBranch.
   ///
   /// In en, this message translates to:
-  /// **'Create Branch'**
-  String get messageMoreSheetCreateBranch;
+  /// **'Create Message Branch'**
+  String get messageMoreSheetCreateMessageBranch;
 
   /// No description provided for @messageMoreSheetDelete.
   ///

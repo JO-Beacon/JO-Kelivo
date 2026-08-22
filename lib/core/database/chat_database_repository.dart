@@ -4099,7 +4099,7 @@ class ChatDatabaseRepository {
         persistedTree ?? await _loadOrCreateConversationTree(conversationId);
     var baseTree = tree;
     if (branchId != null && !tree.branches.containsKey(branchId)) {
-      baseTree = tree.forkBranchFromParent(
+      baseTree = tree.createMessageBranchFromParent(
         branchId: branchId,
         fromMessageId: parentMessageId,
         createdAt: DateTime.now(),

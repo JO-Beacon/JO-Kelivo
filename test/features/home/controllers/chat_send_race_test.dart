@@ -404,11 +404,13 @@ void main() {
 
         final initialMessages = await service.loadMessages(convo.id);
         final rootUser = initialMessages.firstWhere((m) => m.role == 'user');
-        final forkTree = await service.createConversationBranch(
+        final messageBranchTree = await service.createMessageBranch(
           conversationId: convo.id,
           fromMessageId: rootUser.id,
         );
-        await controller.switchConversationBranch(forkTree.activeBranchId);
+        await controller.switchConversationBranch(
+          messageBranchTree.activeBranchId,
+        );
 
         await controller.sendMessage(ChatInputData(text: 'child question'));
         await waitFor(
@@ -446,7 +448,7 @@ void main() {
         final rootAssistant = rootMessages.firstWhere(
           (m) => m.role == 'assistant',
         );
-        final childTree = await service.createConversationBranch(
+        final childTree = await service.createMessageBranch(
           conversationId: convo.id,
           fromMessageId: rootUser.id,
         );
@@ -667,7 +669,7 @@ void main() {
         final rootMessages = await service.loadMessages(convo.id);
         final rootUser = rootMessages.firstWhere((m) => m.role == 'user');
         rootAssistant = rootMessages.firstWhere((m) => m.role == 'assistant');
-        final childTree = await service.createConversationBranch(
+        final childTree = await service.createMessageBranch(
           conversationId: convo.id,
           fromMessageId: rootUser.id,
         );
@@ -759,7 +761,7 @@ void main() {
       final rootMessages = await service.loadMessages(convo.id);
       rootUser = rootMessages.firstWhere((m) => m.role == 'user');
       rootAssistant = rootMessages.firstWhere((m) => m.role == 'assistant');
-      final childTree = await service.createConversationBranch(
+      final childTree = await service.createMessageBranch(
         conversationId: convo.id,
         fromMessageId: rootUser.id,
       );

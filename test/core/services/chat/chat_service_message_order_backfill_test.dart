@@ -200,7 +200,7 @@ void main() {
         role: 'assistant',
         content: 'root reply',
       );
-      final forkTree = await writer.createConversationBranch(
+      final messageBranchTree = await writer.createMessageBranch(
         conversationId: conversation.id,
         fromMessageId: user.id,
       );
@@ -221,7 +221,7 @@ void main() {
         orderedEquals([user.id, forkReply.id]),
       );
 
-      final rootBranchId = forkTree.branches.values
+      final rootBranchId = messageBranchTree.branches.values
           .singleWhere((branch) => branch.tipMessageId == rootReply.id)
           .id;
       await service.switchConversationBranch(
@@ -273,7 +273,7 @@ void main() {
         role: 'user',
         content: 'follow-up',
       );
-      await service.createConversationBranch(
+      await service.createMessageBranch(
         conversationId: conversation.id,
         fromMessageId: user.id,
       );
@@ -288,7 +288,7 @@ void main() {
       final rootBranchId = tree!.branches.values
           .singleWhere((branch) => branch.tipMessageId != forkReply.id)
           .id;
-      final forkBranchId = tree.activeBranchId;
+      final messageBranchId = tree.activeBranchId;
       await service.switchConversationBranch(
         conversationId: conversation.id,
         branchId: rootBranchId,
@@ -298,7 +298,7 @@ void main() {
 
       await service.switchConversationBranch(
         conversationId: conversation.id,
-        branchId: forkBranchId,
+        branchId: messageBranchId,
       );
 
       expect(service.getContextStartIndex(conversation.id), 2);
