@@ -1351,8 +1351,7 @@ class _MessageListViewState extends State<MessageListView> {
     final total = availableVersions.length;
     final siblingBranchIds =
         widget.siblingBranchIdsByMessageId[message.id] ?? const <String>[];
-    final useBranchSelector =
-        siblingBranchIds.length > 1 && widget.onBranchChange != null;
+    final useBranchSelector = siblingBranchIds.length > 1;
     final selectedBranchIndex = useBranchSelector
         ? siblingBranchIds.indexOf(widget.activeBranchId ?? '')
         : selectedIdx;
@@ -1637,20 +1636,13 @@ class _MessageListViewState extends State<MessageListView> {
       message: message,
       enableStreamingTextMotion: enableStreamingTextMotion,
       versionIndex: currentIdx < 0 ? selectedIdx : currentIdx,
-      versionCount: useBranchSelector
-          ? siblingBranchIds.length
-          : (total > 0 ? total : 1),
+      versionCount: useBranchSelector ? siblingBranchIds.length : 1,
       onPrevVersion: useBranchSelector
           ? (currentIdx > 0)
                 ? () => widget.onBranchChange?.call(
                     siblingBranchIds[currentIdx - 1],
                   )
                 : null
-          : (currentIdx > 0)
-          ? () => widget.onVersionChange?.call(
-              gid,
-              availableVersions[currentIdx - 1],
-            )
           : null,
       onNextVersion: useBranchSelector
           ? (currentIdx >= 0 && currentIdx < siblingBranchIds.length - 1)
@@ -1658,11 +1650,6 @@ class _MessageListViewState extends State<MessageListView> {
                     siblingBranchIds[currentIdx + 1],
                   )
                 : null
-          : (currentIdx >= 0 && currentIdx < availableVersions.length - 1)
-          ? () => widget.onVersionChange?.call(
-              gid,
-              availableVersions[currentIdx + 1],
-            )
           : null,
       modelIcon:
           (!useAssistAvatar &&
@@ -1731,7 +1718,7 @@ class _MessageListViewState extends State<MessageListView> {
         final action = await showMessageMoreSheet(
           context,
           message,
-          canDeleteAllVersions: !useBranchSelector && total > 1,
+          canDeleteAllVersions: siblingBranchIds.length > 1,
           canCreateBranch: widget.onMessageFork != null,
         );
         if (action == MessageMoreAction.deleteCurrentVersion) {

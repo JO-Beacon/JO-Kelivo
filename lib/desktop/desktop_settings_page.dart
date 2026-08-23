@@ -58,6 +58,7 @@ import 'setting/hotkeys_pane.dart';
 import 'setting/network_proxy_pane.dart';
 import 'setting/about_pane.dart';
 import 'setting/stats_pane.dart';
+import '../features/settings/pages/debug_page.dart';
 import 'package:system_fonts/system_fonts.dart';
 import 'package:flutter/gestures.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -107,6 +108,7 @@ enum _SettingsMenuItem {
   hotkeys,
   stats,
   about,
+  debug,
 }
 
 class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
@@ -181,7 +183,17 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                 _SettingsMenu(
                   width: menuWidth,
                   selected: effectiveSelected,
-                  onSelect: (it) => setState(() => _selected = it),
+                  onSelect: (it) {
+                    if (it == _SettingsMenuItem.debug) {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const DebugPage(),
+                        ),
+                      );
+                      return;
+                    }
+                    setState(() => _selected = it);
+                  },
                 ),
                 VerticalDivider(
                   width: 1,
@@ -253,6 +265,8 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                           return const DesktopStatsPane(key: ValueKey('stats'));
                         case _SettingsMenuItem.about:
                           return const DesktopAboutPane(key: ValueKey('about'));
+                        case _SettingsMenuItem.debug:
+                          return const SizedBox.shrink();
                       }
                     }(),
                   ),
@@ -350,6 +364,7 @@ class _SettingsMenu extends StatelessWidget {
         lucide.Lucide.BadgeInfo,
         l10n.settingsPageAbout,
       ),
+      (_SettingsMenuItem.debug, lucide.Lucide.Wrench, l10n.settingsPageDebug),
     ];
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;

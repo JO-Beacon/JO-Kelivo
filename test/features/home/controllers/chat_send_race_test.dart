@@ -488,7 +488,7 @@ void main() {
         );
         expect(
           controller.visibleMessages.map((message) => message.id),
-          containsAll(<String>[rootUser.id, childUser.id, childAssistant.id]),
+          containsAll(<String>[childUser.id, childAssistant.id]),
         );
       });
       expect(tester.takeException(), isNull);
@@ -861,10 +861,8 @@ void main() {
                 message.version == 1,
           );
       expect(edited.content, 'edited question');
-      expect(
-        service.getVersionSelections(convo.id),
-        containsPair(original.groupId ?? original.id, 1),
-      );
+      // versionSelections 不再被运行时写入，树是唯一真相
+      expect(service.getVersionSelections(convo.id), isEmpty);
       expect(service.isTemporaryConversation(convo.id), isTrue);
       expect(service.getAllConversations(), isEmpty);
     });
@@ -921,6 +919,45 @@ void main() {
       expect(edited.content, 'edited without sending');
       expect(streamRequestCount, 1);
       expect(messages.where((message) => message.role == 'assistant'), isEmpty);
+    });
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('duplicate edit entry shares one edit operation', (tester) async {
+    final controller = await pumpHarness(tester);
+    late Conversation convo;
+    late ChatMessage original;
+    late Future<void> firstEdit;
+    late Future<void> secondEdit;
+    await tester.runAsync(() async {
+      convo = await openConversation(controller);
+      await controller.sendMessage(ChatInputData(text: 'original question'));
+      await waitFor(
+        () => !controller.chatController.isConversationLoading(convo.id),
+        'initial streaming to finish',
+      );
+      original = (await service.loadMessages(
+        convo.id,
+      )).firstWhere((message) => message.role == 'user');
+      firstEdit = controller.editMessage(original);
+      secondEdit = controller.editMessage(original);
+    });
+
+    await tester.pumpAndSettle();
+    expect(find.text('Edit Message'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'edited once');
+    await tester.tap(find.text('Save'));
+    await tester.pump();
+
+    await tester.runAsync(() async {
+      await Future.wait([firstEdit, secondEdit]);
+      final edited = (await service.loadMessages(convo.id)).firstWhere(
+        (message) =>
+            message.role == 'user' &&
+            message.content == 'edited once' &&
+            message.id != original.id,
+      );
+      expect(edited.version, 1);
     });
     expect(tester.takeException(), isNull);
   });

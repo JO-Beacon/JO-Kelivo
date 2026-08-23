@@ -449,10 +449,8 @@ class MemoryPipelineService {
       );
     }
 
-    final all = await chatService.loadMessages(job.conversationId);
-    final selected = collapseSelectedVersions(
-      all,
-      chatService.getVersionSelections(job.conversationId),
+    final selected = await chatService.loadActiveTimelineMessages(
+      job.conversationId,
     );
 
     final watermark = convo.lastMemoryExtractedOrder;

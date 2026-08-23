@@ -76,7 +76,6 @@ class HiveToSqliteMigrationStatus {
     this.malformed = 0,
     this.missingFiles = 0,
     this.backupItems = const <HiveToSqliteBackupItem>[],
-    this.chatsExportDegraded = false,
   });
 
   final HiveToSqliteMigrationStage stage;
@@ -98,7 +97,6 @@ class HiveToSqliteMigrationStatus {
   /// 已转换但磁盘文件缺失的本地附件。
   final int missingFiles;
   final List<HiveToSqliteBackupItem> backupItems;
-  final bool chatsExportDegraded;
 
   HiveToSqliteMigrationStatus copyWith({
     HiveToSqliteMigrationStage? stage,
@@ -114,7 +112,6 @@ class HiveToSqliteMigrationStatus {
     int? malformed,
     int? missingFiles,
     List<HiveToSqliteBackupItem>? backupItems,
-    bool? chatsExportDegraded,
   }) {
     return HiveToSqliteMigrationStatus(
       stage: stage ?? this.stage,
@@ -130,7 +127,6 @@ class HiveToSqliteMigrationStatus {
       malformed: malformed ?? this.malformed,
       missingFiles: missingFiles ?? this.missingFiles,
       backupItems: backupItems ?? this.backupItems,
-      chatsExportDegraded: chatsExportDegraded ?? this.chatsExportDegraded,
     );
   }
 }
@@ -180,7 +176,6 @@ class HiveToSqliteMigrationService implements MigrationWorkflow {
   static const _toolEventsBoxName = 'tool_events_v1';
   static const _messageBatchSize = 128;
   static const _settingsBackupName = 'settings.json';
-  static const _chatsBackupName = 'chats.json';
   static const _legacyBusinessKeysNeededForRecovery = <String>{
     'instruction_injections_active_id_v1',
     'instruction_injections_active_ids_v1',
@@ -215,7 +210,6 @@ class HiveToSqliteMigrationService implements MigrationWorkflow {
   final _controller = StreamController<HiveToSqliteMigrationStatus>.broadcast();
   final _log = <String>[];
   var _lastBackupItems = const <HiveToSqliteBackupItem>[];
-  var _chatsExportDegraded = false;
   var _attemptCount = 0;
   var _converted = 0;
   var _malformed = 0;
@@ -475,7 +469,6 @@ class HiveToSqliteMigrationService implements MigrationWorkflow {
           malformed: _malformed,
           missingFiles: _missingFiles,
           backupItems: _lastBackupItems,
-          chatsExportDegraded: _chatsExportDegraded,
         ),
       );
       rethrow;
@@ -653,7 +646,7 @@ class HiveToSqliteMigrationService implements MigrationWorkflow {
                 message = message.copyWith(conversationId: conversation.id);
               }
               // 字段级修复（空 role、负 token 或 duration、越界 version、
-              // 反转的推理时间戳）与 chats.json 导入边界共享逻辑。
+              // 反转的推理时间戳）与迁移清理逻辑保持一致。
               final sanitized = sanitizeLegacyMessageFields(message);
               if (!identical(sanitized, message)) {
                 repairStats.dirtyNumericFields++;
@@ -864,7 +857,6 @@ class HiveToSqliteMigrationService implements MigrationWorkflow {
           malformed: _malformed,
           missingFiles: _missingFiles,
           backupItems: _lastBackupItems,
-          chatsExportDegraded: _chatsExportDegraded,
         ),
       );
       rethrow;
@@ -1041,7 +1033,6 @@ class HiveToSqliteMigrationService implements MigrationWorkflow {
   List<HiveToSqliteBackupItem> _backupItemsForDecision() {
     return [
       const HiveToSqliteBackupItem(name: _settingsBackupName, bytes: 0),
-      const HiveToSqliteBackupItem(name: _chatsBackupName, bytes: 0),
       for (final file in decision.hiveFiles)
         HiveToSqliteBackupItem(name: p.basename(file.path), bytes: 0),
       for (final directory in _backupDirectories)
@@ -1107,9 +1098,8 @@ class HiveToSqliteMigrationService implements MigrationWorkflow {
       ),
     );
 
-    // 在任何操作打开 Hive 前快照原始 .hive 文件：下面的 chats.json 导出
-    // 会使用 openLazyBox，后者会执行崩溃恢复，可能就地截断损坏的 box。
-    // 归档必须保留原始字节，它们是备份承诺的权威回退数据。
+    // 在任何操作打开 Hive 前快照原始 .hive 文件，确保归档保留
+    // 迁移失败时可手动恢复的权威字节。
     final hiveSnapshots = <String, File>{};
     for (final hiveFile in decision.hiveFiles) {
       final snapshot = File(
@@ -1117,75 +1107,6 @@ class HiveToSqliteMigrationService implements MigrationWorkflow {
       );
       await hiveFile.copy(snapshot.path);
       hiveSnapshots[hiveFile.path] = snapshot;
-    }
-
-    items = _updateBackupItem(
-      items,
-      _chatsBackupName,
-      state: HiveToSqliteBackupItemState.active,
-    );
-    _lastBackupItems = items;
-    _emit(
-      HiveToSqliteMigrationStage.backingUp,
-      0.03,
-      'backup',
-      _chatsBackupName,
-      backupPath: backupPath,
-      backupItems: items,
-    );
-    File? chatsFile;
-    try {
-      chatsFile = await _exportLegacyChatsToFile(
-        workDir,
-        onProgress: (progress) {
-          _lastBackupItems = _updateBackupItem(
-            _lastBackupItems.isEmpty ? items : _lastBackupItems,
-            _chatsBackupName,
-            state: HiveToSqliteBackupItemState.active,
-          );
-          _emit(
-            HiveToSqliteMigrationStage.backingUp,
-            0.03 + progress.clamp(0, 1) * 0.1,
-            'backup',
-            _chatsBackupName,
-            backupPath: backupPath,
-            backupItems: _lastBackupItems,
-          );
-        },
-      );
-    } catch (error, stackTrace) {
-      // 下方的原始 .hive 文件会留在归档中，继续作为完整回退数据；
-      // 因此损坏的 chats.json 导出只会降低备份质量，而不会让备份失败。
-      _chatsExportDegraded = true;
-      _logLine('chats.json export skipped: $error');
-      _logLine(stackTrace.toString());
-    }
-    if (chatsFile != null) {
-      final chatsBytes = await chatsFile.length();
-      items = _updateBackupItem(
-        _lastBackupItems.isEmpty ? items : _lastBackupItems,
-        _chatsBackupName,
-        bytes: chatsBytes,
-        writtenBytes: chatsBytes,
-        state: HiveToSqliteBackupItemState.done,
-      );
-      _lastBackupItems = items;
-      files.add(
-        _MigrationBackupFile(
-          file: chatsFile,
-          entryName: _chatsBackupName,
-          itemName: _chatsBackupName,
-          bytes: chatsBytes,
-        ),
-      );
-    } else {
-      // 完全删除检查清单行；否则下方的清单重置会让它永远保持待处理状态。
-      items = [
-        for (final item
-            in (_lastBackupItems.isEmpty ? items : _lastBackupItems))
-          if (item.name != _chatsBackupName) item,
-      ];
-      _lastBackupItems = items;
     }
 
     for (final hiveFile in decision.hiveFiles) {
@@ -1399,156 +1320,6 @@ class HiveToSqliteMigrationService implements MigrationWorkflow {
     final file = File(p.join(directory.path, name));
     await file.writeAsString(content);
     return file;
-  }
-
-  Future<File> _exportLegacyChatsToFile(
-    Directory directory, {
-    required void Function(double progress) onProgress,
-  }) async {
-    _registerHiveAdapters();
-    await Hive.initFlutter(decision.appDataDir.path);
-    LazyBox<Conversation>? conversationsBox;
-    LazyBox<ChatMessage>? messagesBox;
-    LazyBox<dynamic>? toolEventsBox;
-    final file = File(p.join(directory.path, '_migration_chats.json'));
-    final hasMessagesBox = decision.hiveFiles.any(
-      (file) => p.basename(file.path) == 'messages.hive',
-    );
-    final hasToolEventsBox = decision.hiveFiles.any(
-      (file) => p.basename(file.path) == 'tool_events_v1.hive',
-    );
-
-    try {
-      conversationsBox = await Hive.openLazyBox<Conversation>(
-        _conversationBoxName,
-      );
-      if (hasMessagesBox) {
-        messagesBox = await Hive.openLazyBox<ChatMessage>(_messagesBoxName);
-      }
-      if (hasToolEventsBox) {
-        toolEventsBox = await Hive.openLazyBox<dynamic>(_toolEventsBoxName);
-      }
-
-      final conversationKeys = conversationsBox.keys.toList(growable: false);
-      final sink = file.openWrite();
-      var messageRefs = 0;
-      try {
-        sink.write('{"version":1,');
-        sink.write('"conversations":[');
-        var firstConversation = true;
-        var processedConversations = 0;
-        for (final key in conversationKeys) {
-          final conversation = await conversationsBox.get(key);
-          if (conversation == null) continue;
-          if (!firstConversation) sink.write(',');
-          firstConversation = false;
-          sink.write(jsonEncode(conversation.toJson()));
-          messageRefs += conversation.messageIds.length;
-          processedConversations++;
-          if (processedConversations % 20 == 0) {
-            final progress = conversationKeys.isEmpty
-                ? 0.25
-                : (processedConversations / conversationKeys.length) * 0.25;
-            onProgress(progress);
-            await Future<void>.delayed(Duration.zero);
-          }
-        }
-        sink.write('],');
-        onProgress(0.25);
-
-        var messageWork = 0;
-        final messagePassWork = messageRefs == 0 ? 1 : messageRefs * 3;
-        double messageProgress() =>
-            0.25 + (messageWork / messagePassWork).clamp(0, 1) * 0.75;
-
-        sink.write('"messages":[');
-        var firstMessage = true;
-        if (messagesBox != null) {
-          for (final key in conversationKeys) {
-            final conversation = await conversationsBox.get(key);
-            if (conversation == null) continue;
-            for (final messageId in conversation.messageIds) {
-              final message = await messagesBox.get(messageId);
-              if (message != null) {
-                if (!firstMessage) sink.write(',');
-                firstMessage = false;
-                // 旧版 chats 备份必须保持不含 parts，以便只理解 content/markers
-                // 的恢复路径仍然兼容。
-                final json = message.toJson();
-                json.remove('parts');
-                sink.write(jsonEncode(json));
-              }
-              messageWork++;
-              if (messageWork % 64 == 0) {
-                onProgress(messageProgress());
-                await Future<void>.delayed(Duration.zero);
-              }
-            }
-          }
-        }
-        sink.write('],');
-
-        sink.write('"toolEvents":{');
-        var firstToolEvents = true;
-        if (toolEventsBox != null) {
-          for (final key in conversationKeys) {
-            final conversation = await conversationsBox.get(key);
-            if (conversation == null) continue;
-            for (final messageId in conversation.messageIds) {
-              final events = await _toolEventsFor(toolEventsBox, messageId);
-              if (events.isNotEmpty) {
-                if (!firstToolEvents) sink.write(',');
-                firstToolEvents = false;
-                sink.write(jsonEncode(messageId));
-                sink.write(':');
-                sink.write(jsonEncode(events));
-              }
-              messageWork++;
-              if (messageWork % 64 == 0) {
-                onProgress(messageProgress());
-                await Future<void>.delayed(Duration.zero);
-              }
-            }
-          }
-        }
-        sink.write('},');
-
-        sink.write('"geminiThoughtSigs":{');
-        var firstSignature = true;
-        if (toolEventsBox != null) {
-          for (final key in conversationKeys) {
-            final conversation = await conversationsBox.get(key);
-            if (conversation == null) continue;
-            for (final messageId in conversation.messageIds) {
-              final signature = await _signatureFor(toolEventsBox, messageId);
-              if (signature != null) {
-                if (!firstSignature) sink.write(',');
-                firstSignature = false;
-                sink.write(jsonEncode(messageId));
-                sink.write(':');
-                sink.write(jsonEncode(signature));
-              }
-              messageWork++;
-              if (messageWork % 64 == 0) {
-                onProgress(messageProgress());
-                await Future<void>.delayed(Duration.zero);
-              }
-            }
-          }
-        }
-        sink.write('}');
-        sink.write('}');
-      } finally {
-        await sink.flush();
-        await sink.close();
-      }
-      onProgress(1);
-      return file;
-    } finally {
-      await toolEventsBox?.close();
-      await messagesBox?.close();
-      await conversationsBox?.close();
-    }
   }
 
   double _backupProgress(int copiedBytes, int totalBytes) {
@@ -1921,7 +1692,6 @@ class HiveToSqliteMigrationService implements MigrationWorkflow {
         malformed: _malformed,
         missingFiles: _missingFiles,
         backupItems: backupItems ?? _lastBackupItems,
-        chatsExportDegraded: _chatsExportDegraded,
       ),
     );
   }

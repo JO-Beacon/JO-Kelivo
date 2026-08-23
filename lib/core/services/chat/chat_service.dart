@@ -99,6 +99,8 @@ class ChatService extends ChangeNotifier {
   final Map<String, Conversation> _conversationsCache = {};
   final Map<String, Conversation> _draftConversations = {};
   final Set<String> _temporaryConversationIds = <String>{};
+  final Map<String, ConversationTree> _temporaryConversationTrees =
+      <String, ConversationTree>{};
   // 逐出这些 id 可能会重新引入与后台工作的持久化竞争。
   final Set<String> _discardedTemporaryConversationIds = <String>{};
   final Set<String> _discardedTemporaryMessageIds = <String>{};
@@ -364,9 +366,16 @@ class ChatService extends ChangeNotifier {
   ) async {
     if (!_initialized) return const <ChatMessage>[];
     if (_temporaryConversationIds.contains(conversationId)) {
-      return List<ChatMessage>.of(
-        _messagesCache[conversationId] ?? const <ChatMessage>[],
-      );
+      final tree = await _loadOrCreateConversationTree(conversationId);
+      final byId = <String, ChatMessage>{
+        for (final message
+            in _messagesCache[conversationId] ?? const <ChatMessage>[])
+          message.id: message,
+      };
+      return [
+        for (final id in tree.activePath())
+          if (byId[id] != null) byId[id]!,
+      ];
     }
     final tree = await _loadOrCreateConversationTree(conversationId);
     final revisionIds = tree.activePath();
@@ -549,26 +558,30 @@ class ChatService extends ChangeNotifier {
     final conversation = _draftConversations[conversationId];
     if (conversation == null) return null;
     final allMessages = _messagesCache[conversationId] ?? const <ChatMessage>[];
-    final groups = <String, List<ChatMessage>>{};
-    for (final message in allMessages) {
-      groups.putIfAbsent(message.groupId ?? message.id, () => []).add(message);
-    }
+    final tree =
+        _temporaryConversationTrees[conversationId] ??
+        ConversationTree.linear(
+          conversationId: conversationId,
+          messageIds: [for (final message in allMessages) message.id],
+          activeBranchId: 'root-$conversationId',
+        );
+    _temporaryConversationTrees[conversationId] = tree;
+    final byId = <String, ChatMessage>{
+      for (final message in allMessages) message.id: message,
+    };
     final activeMessages = <ChatMessage>[];
     final versionCounts = <String, int>{};
-    for (final entry in groups.entries) {
-      final revisions = entry.value;
-      versionCounts[entry.key] = revisions.length;
-      final selection = conversation.versionSelections[entry.key];
-      ChatMessage? selected;
-      if (selection != null) {
-        for (final revision in revisions) {
-          if (revision.version == selection) {
-            selected = revision;
-            break;
-          }
-        }
+    for (final id in tree.activePath()) {
+      final message = byId[id];
+      if (message != null) {
+        activeMessages.add(message);
+        final groupId = message.groupId ?? message.id;
+        versionCounts[groupId] = allMessages
+            .where(
+              (candidate) => (candidate.groupId ?? candidate.id) == groupId,
+            )
+            .length;
       }
-      activeMessages.add(selected ?? revisions.last);
     }
 
     var start = 0;
@@ -608,18 +621,17 @@ class ChatService extends ChangeNotifier {
     final slots = <LoadedTimelineSlot>[];
     for (var index = start; index < end; index++) {
       final message = activeMessages[index];
-      final groupId = message.groupId ?? message.id;
       slots.add(
         LoadedTimelineSlot(
           identity: ActiveTimelineSlot(
-            slotId: groupId,
+            slotId: message.groupId ?? message.id,
             revisionId: message.id,
             parentRevisionId: parentRevisionId,
             role: message.role,
             createdAt: message.timestamp,
             updatedAt: message.timestamp,
             finalizedAt: message.isStreaming ? null : message.timestamp,
-            versionCount: versionCounts[groupId] ?? 1,
+            versionCount: versionCounts[message.groupId ?? message.id] ?? 1,
             logicalIndex: index,
           ),
           message: message,
@@ -878,7 +890,8 @@ class ChatService extends ChangeNotifier {
 
   int getMessageCount(String conversationId) {
     if (_temporaryConversationIds.contains(conversationId)) {
-      return _messagesCache[conversationId]?.length ?? 0;
+      return _messageOrderIds[conversationId]?.length ??
+          (_messagesCache[conversationId]?.length ?? 0);
     }
     if (!_initialized) return 0;
     final count = _messageCounts[conversationId];
@@ -911,6 +924,8 @@ class ChatService extends ChangeNotifier {
 
   int getMessageIndex(String conversationId, String messageId) {
     if (_temporaryConversationIds.contains(conversationId)) {
+      final order = _messageOrderIds[conversationId];
+      if (order != null) return order.indexOf(messageId);
       final messages = _messagesCache[conversationId];
       if (messages == null) return -1;
       return messages.indexWhere((message) => message.id == messageId);
@@ -1244,28 +1259,16 @@ class ChatService extends ChangeNotifier {
     if (!_initialized || limit <= 0) return const <ChatMessage>[];
     if (_temporaryConversationIds.contains(conversationId) ||
         _draftConversations.containsKey(conversationId)) {
-      final messages = _messagesCache[conversationId] ?? const <ChatMessage>[];
-      final groups = <String, List<ChatMessage>>{};
-      final order = <String>[];
-      for (final message in messages) {
-        final groupId = message.groupId ?? message.id;
-        if (!groups.containsKey(groupId)) order.add(groupId);
-        groups.putIfAbsent(groupId, () => <ChatMessage>[]).add(message);
-      }
-      final selections = getVersionSelections(conversationId);
-      final selected = <ChatMessage>[];
-      for (final groupId in order) {
-        final versions = groups[groupId]!
-          ..sort((a, b) => a.version.compareTo(b.version));
-        final version = selections[groupId];
-        selected.add(
-          versions.cast<ChatMessage?>().firstWhere(
-                (message) => message!.version == version,
-                orElse: () => null,
-              ) ??
-              versions.last,
-        );
-      }
+      final tree = await _loadOrCreateConversationTree(conversationId);
+      final byId = <String, ChatMessage>{
+        for (final message
+            in _messagesCache[conversationId] ?? const <ChatMessage>[])
+          message.id: message,
+      };
+      final selected = <ChatMessage>[
+        for (final id in tree.activePath())
+          if (byId[id] != null) byId[id]!,
+      ];
       var end = selected.length;
       if (throughRevisionId != null) {
         final target = selected.indexWhere(
@@ -1598,6 +1601,11 @@ class ChatService extends ChangeNotifier {
     if (temporary) {
       _temporaryConversationIds.add(conversation.id);
       _messagesCache[conversation.id] = <ChatMessage>[];
+      _temporaryConversationTrees[conversation.id] = ConversationTree.linear(
+        conversationId: conversation.id,
+        messageIds: const <String>[],
+        activeBranchId: 'root-${conversation.id}',
+      );
     }
     _currentConversationId = conversation.id;
     _enforceMessageCacheLimits();
@@ -1621,6 +1629,7 @@ class ChatService extends ChangeNotifier {
     }
     _draftConversations.remove(id);
     _messagesCache.remove(id);
+    _temporaryConversationTrees.remove(id);
     _groupMessagesCache.remove(id);
     if (_currentConversationId == id) {
       _currentConversationId = null;
@@ -1667,6 +1676,7 @@ class ChatService extends ChangeNotifier {
       _temporaryGeminiThoughtSigs.remove(message.id);
     }
     _messagesCache.remove(id);
+    _temporaryConversationTrees.remove(id);
     _groupMessagesCache.remove(id);
     if (_currentConversationId == id) {
       _currentConversationId = null;
@@ -2183,6 +2193,7 @@ class ChatService extends ChangeNotifier {
     _messagesCache.clear();
     _draftConversations.clear();
     _temporaryConversationIds.clear();
+    _temporaryConversationTrees.clear();
     _temporaryToolEvents.clear();
     _temporaryGeminiThoughtSigs.clear();
     _toolEventsCache.clear();
@@ -2424,6 +2435,8 @@ class ChatService extends ChangeNotifier {
     String? groupId,
     int? version,
     bool selectVersion = false,
+    String? parentMessageId,
+    String? branchId,
   }) async {
     if (!_initialized) await init();
 
@@ -2468,11 +2481,44 @@ class ChatService extends ChangeNotifier {
     }
 
     if (temporary) {
+      var tree = await _loadOrCreateConversationTree(conversationId);
+      var effectiveParentMessageId = parentMessageId;
+      var effectiveBranchId = branchId;
+      // 旧调用方可能仍通过 selectVersion 写入一条版本。把它转换为
+      // 树上的兄弟节点，字段只作为兼容元数据，不参与活动路径计算。
+      if (selectVersion &&
+          groupId != null &&
+          parentMessageId == null &&
+          branchId == null) {
+        final source = (_messagesCache[conversationId] ?? const <ChatMessage>[])
+            .where(
+              (candidate) => (candidate.groupId ?? candidate.id) == groupId,
+            )
+            .lastOrNull;
+        final sourceEdge = source == null ? null : tree.edges[source.id];
+        if (sourceEdge != null) {
+          effectiveParentMessageId = sourceEdge.parentMessageId;
+          effectiveBranchId = 'branch-${const Uuid().v4()}';
+          tree = tree.createMessageBranchFromParent(
+            branchId: effectiveBranchId,
+            fromMessageId: effectiveParentMessageId,
+          );
+        }
+      }
+      final updatedTree = tree.appendToActiveBranch(
+        message.id,
+        parentMessageId: effectiveParentMessageId,
+        branchId: effectiveBranchId,
+        createdAt: message.timestamp,
+        activate: effectiveBranchId != null,
+      );
+      _temporaryConversationTrees[conversationId] = updatedTree;
+      _messageOrderIds[conversationId] = updatedTree.activePath();
+      _messageCounts[conversationId] = updatedTree.activePath().length;
       conversation.messageIds.add(message.id);
       conversation.updatedAt = DateTime.now();
       if (selectVersion) {
-        conversation.versionSelections[message.groupId ?? message.id] =
-            message.version;
+        conversation.versionSelections[groupId ?? message.id] = message.version;
       }
       _messagesCache.putIfAbsent(conversationId, () => <ChatMessage>[]);
     } else {
@@ -3051,6 +3097,10 @@ class ChatService extends ChangeNotifier {
 
   Future<ConversationTree?> loadConversationTree(String conversationId) async {
     if (!_initialized) await init();
+    if (_temporaryConversationIds.contains(conversationId) ||
+        _draftConversations.containsKey(conversationId)) {
+      return _loadOrCreateConversationTree(conversationId);
+    }
     return _repo.loadConversationTree(conversationId);
   }
 
@@ -3098,6 +3148,19 @@ class ChatService extends ChangeNotifier {
   Future<ConversationTree> _loadOrCreateConversationTree(
     String conversationId,
   ) async {
+    if (_temporaryConversationIds.contains(conversationId) ||
+        _draftConversations.containsKey(conversationId)) {
+      final existing = _temporaryConversationTrees[conversationId];
+      if (existing != null) return existing;
+      final messages = _messagesCache[conversationId] ?? const <ChatMessage>[];
+      final created = ConversationTree.linear(
+        conversationId: conversationId,
+        messageIds: [for (final message in messages) message.id],
+        activeBranchId: 'root-$conversationId',
+      );
+      _temporaryConversationTrees[conversationId] = created;
+      return created;
+    }
     var tree = await _repo.loadConversationTree(conversationId);
     if (tree != null) return tree;
     await _repo.syncLinearConversationTree(conversationId);
@@ -3114,11 +3177,11 @@ class ChatService extends ChangeNotifier {
   /// 位置的同时替换旧兄弟消息内容。当前路径是正常聊天界面唯一的权威窗口。
   Future<void> reloadActiveTimelineCache(String conversationId) async {
     if (!_initialized) await init();
-    if (_temporaryConversationIds.contains(conversationId)) return;
-
     final tree = await _loadOrCreateConversationTree(conversationId);
     final activeIds = tree.activePath();
-    final messages = await _repo.getMessagesByIds(activeIds);
+    final messages = _temporaryConversationIds.contains(conversationId)
+        ? (_messagesCache[conversationId] ?? const <ChatMessage>[])
+        : await _repo.getMessagesByIds(activeIds);
     final byId = <String, ChatMessage>{
       for (final message in messages) message.id: message,
     };
@@ -3129,7 +3192,9 @@ class ChatService extends ChangeNotifier {
     if (activeMessages.length != activeIds.length) {
       throw StateError('active_timeline_message_missing');
     }
-    _messagesCache[conversationId] = activeMessages;
+    if (!_temporaryConversationIds.contains(conversationId)) {
+      _messagesCache[conversationId] = activeMessages;
+    }
     _messageOrderIds[conversationId] = List<String>.of(activeIds);
     _messageCounts[conversationId] = activeIds.length;
     final firstIndices = <String, int>{};
@@ -3152,15 +3217,111 @@ class ChatService extends ChangeNotifier {
       throw StateError('conversation_branch_missing');
     }
     final updated = tree.switchBranch(branchId);
-    await _repo.saveConversationTree(updated);
-    await _syncContextBoundaryToActivePath(conversationId, updated);
+    if (_temporaryConversationIds.contains(conversationId)) {
+      _temporaryConversationTrees[conversationId] = updated;
+    } else {
+      await _repo.saveConversationTree(updated);
+      await _syncContextBoundaryToActivePath(conversationId, updated);
+    }
     await reloadActiveTimelineCache(conversationId);
     notifyListeners();
     return updated;
   }
 
-  /// Message Fork: create a child branch in the current conversation tree.
+  /// Message Fork: clone the selected message as a sibling branch node.
   Future<ConversationTree> createMessageBranch({
+    required String conversationId,
+    required String? fromMessageId,
+    String name = '',
+  }) async {
+    if (!_initialized) await init();
+    // A null message is only used by low-level callers to open an empty root
+    // branch; the user-facing Message Fork always supplies a message to clone.
+    if (fromMessageId == null) {
+      return createMessageContinuationBranch(
+        conversationId: conversationId,
+        fromMessageId: null,
+        name: name,
+      );
+    }
+
+    if (_temporaryConversationIds.contains(conversationId)) {
+      final original = _cachedTemporaryMessage(fromMessageId);
+      final tree = await _loadOrCreateConversationTree(conversationId);
+      final edge = tree.edges[fromMessageId];
+      if (original == null || edge == null) {
+        throw StateError('message_branch_source_missing');
+      }
+      final cloneGroupId = original.groupId ?? original.id;
+      final cloneVersion =
+          (_messagesCache[conversationId] ?? const <ChatMessage>[])
+              .where(
+                (candidate) =>
+                    (candidate.groupId ?? candidate.id) == cloneGroupId,
+              )
+              .fold<int>(-1, (max, candidate) {
+                return candidate.version > max ? candidate.version : max;
+              }) +
+          1;
+      final clone = ChatMessage(
+        role: original.role,
+        parts: original.parts,
+        timestamp: original.timestamp,
+        modelId: original.modelId,
+        providerId: original.providerId,
+        totalTokens: original.totalTokens,
+        conversationId: conversationId,
+        isStreaming: false,
+        reasoningText: original.reasoningText,
+        reasoningStartAt: original.reasoningStartAt,
+        reasoningFinishedAt: original.reasoningFinishedAt,
+        translation: original.translation,
+        reasoningSegmentsJson: original.reasoningSegmentsJson,
+        promptTokens: original.promptTokens,
+        completionTokens: original.completionTokens,
+        cachedTokens: original.cachedTokens,
+        durationMs: original.durationMs,
+        groupId: cloneGroupId,
+        version: cloneVersion,
+      );
+      final branchId = 'branch-${const Uuid().v4()}';
+      final updated = tree.createBranchFromParent(
+        branchId: branchId,
+        parentMessageId: edge.parentMessageId,
+        tipMessageId: clone.id,
+        name: name,
+        createdAt: clone.timestamp,
+      );
+      _messagesCache
+          .putIfAbsent(conversationId, () => <ChatMessage>[])
+          .add(clone);
+      _draftConversations[conversationId]?.messageIds.add(clone.id);
+      _temporaryConversationTrees[conversationId] = updated;
+      await reloadActiveTimelineCache(conversationId);
+      notifyListeners();
+      return updated;
+    }
+
+    final result = await _repo.cloneMessageAsBranch(
+      conversationId: conversationId,
+      messageId: fromMessageId,
+    );
+    if (result == null) {
+      throw StateError('message_branch_source_missing');
+    }
+    _conversationsCache[conversationId] = result.conversation;
+    await reloadActiveTimelineCache(conversationId);
+    final updated = await _loadOrCreateConversationTree(conversationId);
+    await _syncContextBoundaryToActivePath(conversationId, updated);
+    notifyListeners();
+    return updated;
+  }
+
+  /// 为重新生成或继续对话创建一个空的分支锚点。
+  ///
+  /// 这不是用户菜单中的 Message Fork：调用方随后会把一条新消息挂到
+  /// [fromMessageId] 下，因此此处不能预先克隆消息。
+  Future<ConversationTree> createMessageContinuationBranch({
     required String conversationId,
     required String? fromMessageId,
     String name = '',
@@ -3173,8 +3334,12 @@ class ChatService extends ChangeNotifier {
       fromMessageId: fromMessageId,
       name: name,
     );
-    await _repo.saveConversationTree(updated);
-    await _syncContextBoundaryToActivePath(conversationId, updated);
+    if (_temporaryConversationIds.contains(conversationId)) {
+      _temporaryConversationTrees[conversationId] = updated;
+    } else {
+      await _repo.saveConversationTree(updated);
+      await _syncContextBoundaryToActivePath(conversationId, updated);
+    }
     await reloadActiveTimelineCache(conversationId);
     notifyListeners();
     return updated;
@@ -3277,14 +3442,14 @@ class ChatService extends ChangeNotifier {
       final conversation = _draftConversations[conversationId];
       final messages = _messagesCache[conversationId];
       if (conversation == null || messages == null) return null;
-
+      // 保留旧字段仅用于导出/兼容检查；活动分支仍完全由树决定。
       final groupId = temporaryOriginal.groupId ?? temporaryOriginal.id;
-      final versions = messages
-          .where((message) => (message.groupId ?? message.id) == groupId)
-          .map((message) => message.version);
-      final nextVersion = versions.isEmpty
-          ? 0
-          : versions.reduce((a, b) => a > b ? a : b) + 1;
+      final nextVersion =
+          messages
+              .where((message) => (message.groupId ?? message.id) == groupId)
+              .map((message) => message.version)
+              .fold<int>(-1, (max, value) => value > max ? value : max) +
+          1;
       // 仅追加内容时必须保留先前的 ImagePart/FilePart 附件，
       // 并保持顺序（[Image, Text] 保持为 [Image, Text(new)]）。
       final resolvedParts =
@@ -3299,11 +3464,21 @@ class ChatService extends ChangeNotifier {
         groupId: groupId,
         version: nextVersion,
       );
-
+      final tree = await _loadOrCreateConversationTree(conversationId);
+      final edge = tree.edges[temporaryOriginal.id];
+      if (edge == null) return null;
+      final branchId = 'branch-${const Uuid().v4()}';
+      final updatedTree = tree.createBranchFromParent(
+        branchId: branchId,
+        parentMessageId: edge.parentMessageId,
+        tipMessageId: newMsg.id,
+        createdAt: newMsg.timestamp,
+      );
+      _temporaryConversationTrees[conversationId] = updatedTree;
       messages.add(newMsg);
       conversation.messageIds.add(newMsg.id);
-      conversation.versionSelections[groupId] = nextVersion;
       conversation.updatedAt = DateTime.now();
+      await reloadActiveTimelineCache(conversationId);
       notifyListeners();
       return newMsg;
     }
@@ -3496,13 +3671,7 @@ class ChatService extends ChangeNotifier {
     if (selectedTarget == null) {
       throw StateError('message_version_missing');
     }
-    final conversation = await _repo.setSelectedVersion(
-      conversationId: conversationId,
-      groupId: groupId,
-      version: version,
-    );
-    if (conversation == null) return;
-    _conversationsCache[conversationId] = conversation;
+    // 不再写入 versionSelections，树是唯一真相
     var tree = await _loadOrCreateConversationTree(conversationId);
     final matchingBranches =
         tree.branches.values
@@ -3544,13 +3713,7 @@ class ChatService extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    final conversation = await _repo.setSelectedVersion(
-      conversationId: conversationId,
-      groupId: groupId,
-      version: null,
-    );
-    if (conversation == null) return;
-    _conversationsCache[conversationId] = conversation;
+    // 不再写入 versionSelections，树是唯一真相
     await reloadActiveTimelineCache(conversationId);
     _bumpConversationListRevision();
     notifyListeners();
@@ -3599,14 +3762,11 @@ class ChatService extends ChangeNotifier {
     if (message == null) return;
 
     if (isTemporaryConversation(message.conversationId)) {
-      final conversation = _draftConversations[message.conversationId];
-      conversation?.messageIds.remove(messageId);
-      conversation?.chatSuggestions = const <String>[];
-      final messages = _messagesCache[message.conversationId];
-      messages?.removeWhere((m) => m.id == messageId);
-      _temporaryToolEvents.remove(messageId);
-      _temporaryGeminiThoughtSigs.remove(messageId);
-      notifyListeners();
+      await deleteMessages(
+        conversationId: message.conversationId,
+        messageIds: {messageId},
+        versionSelectionChanges: const {},
+      );
       return;
     }
     final conversation = _conversationsCache[message.conversationId];
@@ -3628,27 +3788,37 @@ class ChatService extends ChangeNotifier {
       final conversation = _draftConversations[conversationId];
       final messages = _messagesCache[conversationId];
       if (conversation == null || messages == null) return const <String>{};
-      final deletedIds = messages
-          .where((message) => messageIds.contains(message.id))
-          .map((message) => message.id)
-          .toSet();
+      final tree = await _loadOrCreateConversationTree(conversationId);
+      final deletedIds = <String>{};
+      final pending = <String>[...messageIds];
+      while (pending.isNotEmpty) {
+        final current = pending.removeLast();
+        if (!deletedIds.add(current)) continue;
+        for (final child in tree.childrenOf(current)) {
+          pending.add(child);
+        }
+      }
+      deletedIds.removeWhere((id) => !tree.edges.containsKey(id));
       if (deletedIds.isEmpty) return const <String>{};
       messages.removeWhere((message) => deletedIds.contains(message.id));
       conversation.messageIds.removeWhere(deletedIds.contains);
       conversation.chatSuggestions = const <String>[];
-      for (final entry in versionSelectionChanges.entries) {
-        final version = entry.value;
-        if (version == null) {
-          conversation.versionSelections.remove(entry.key);
-        } else {
-          conversation.versionSelections[entry.key] = version;
+      _temporaryConversationTrees[conversationId] = tree.deleteSubtree(
+        messageIds.first,
+      );
+      if (messageIds.length > 1) {
+        var updatedTree = _temporaryConversationTrees[conversationId]!;
+        for (final id in messageIds.skip(1)) {
+          updatedTree = updatedTree.deleteSubtree(id);
         }
+        _temporaryConversationTrees[conversationId] = updatedTree;
       }
       conversation.updatedAt = DateTime.now();
       for (final id in deletedIds) {
         _temporaryToolEvents.remove(id);
         _temporaryGeminiThoughtSigs.remove(id);
       }
+      await reloadActiveTimelineCache(conversationId);
       notifyListeners();
       return Set<String>.unmodifiable(deletedIds);
     }
@@ -3706,6 +3876,7 @@ class ChatService extends ChangeNotifier {
     _conversationsCache.clear();
     _draftConversations.clear();
     _temporaryConversationIds.clear();
+    _temporaryConversationTrees.clear();
     _temporaryToolEvents.clear();
     _temporaryGeminiThoughtSigs.clear();
     _toolEventsCache.clear();

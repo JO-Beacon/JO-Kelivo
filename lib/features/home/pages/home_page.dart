@@ -1163,9 +1163,6 @@ class _HomePageState extends State<HomePage>
         showUserAvatar: settings.showUserAvatar,
         showTokenStats: settings.showTokenStats,
         assistant: assistant,
-        onVersionChange: (groupId, version) async {
-          await _controller.setSelectedVersion(groupId, version);
-        },
         onRegenerateMessage: (message) =>
             _controller.regenerateAtMessage(message),
         onResendMessage: (message) => _controller.regenerateAtMessage(message),
@@ -1181,9 +1178,7 @@ class _HomePageState extends State<HomePage>
           byGroup,
           deleteAllVersions: true,
         ),
-        onMessageFork: _controller.isTemporaryConversation
-            ? null
-            : (message) => _controller.createMessageFork(message),
+        onMessageFork: (message) => _controller.createMessageFork(message),
         onShareMessage: (index, messages) =>
             _controller.shareMessage(index, messages),
         onSelectMessages: (index, messages) =>

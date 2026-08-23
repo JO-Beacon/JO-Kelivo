@@ -139,6 +139,7 @@ void main() {
         conversationId: conversation.id,
         fromMessageId: user.id,
       );
+      final forkMessageId = messageBranch.activePath().last;
       final forkReply = await writer.addMessage(
         conversationId: conversation.id,
         role: 'assistant',
@@ -150,7 +151,7 @@ void main() {
 
       final reader = createService();
       await reader.init();
-      final expectedActive = [user.id, forkReply.id];
+      final expectedActive = [forkMessageId, forkReply.id];
       expect(
         (await reader.loadMessages(
           conversation.id,

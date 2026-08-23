@@ -15,7 +15,6 @@ import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../core/services/haptics.dart';
-import 'debug_page.dart';
 import 'log_viewer_page.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
@@ -389,13 +388,6 @@ class _AboutPageState extends State<AboutPage> {
     );
   }
 
-  void _openDebugPage() {
-    Haptics.medium();
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const DebugPage()));
-  }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -429,18 +421,14 @@ class _AboutPageState extends State<AboutPage> {
                 ),
                 child: Row(
                   children: [
-                    GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onLongPress: _openDebugPage,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: SizedBox(
-                          width: 54,
-                          height: 54,
-                          child: Image.asset(
-                            'assets/app_icon.png',
-                            fit: BoxFit.cover,
-                          ),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: SizedBox(
+                        width: 54,
+                        height: 54,
+                        child: Image.asset(
+                          'assets/app_icon.png',
+                          fit: BoxFit.cover,
                         ),
                       ),
                     ),

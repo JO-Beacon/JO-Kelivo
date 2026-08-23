@@ -100,6 +100,33 @@ void main() {
     },
   );
 
+  test('cloning a message branch creates a visible sibling message', () async {
+    await seed();
+
+    final result = await repository.cloneMessageAsBranch(
+      conversationId: conversation.id,
+      messageId: 'user-0',
+    );
+    final clone = result!.message;
+    final tree = await repository.loadConversationTree(conversation.id);
+
+    expect(clone.id, isNot('user-0'));
+    expect(clone.content, 'question');
+    expect(tree!.activePath(), [clone.id]);
+    final rootBranch = tree.branches.values.singleWhere(
+      (branch) => branch.tipMessageId == 'assistant-1',
+    );
+    expect(tree.branchPath(rootBranch.id), [
+      'user-0',
+      'assistant-v0',
+      'user-1',
+      'assistant-1',
+    ]);
+    expect(tree.edges[clone.id]?.parentMessageId, isNull);
+    expect(tree.siblingBranchIdsByMessageId()[clone.id], hasLength(2));
+    expect(tree.siblingBranchIdsByMessageId()['user-0'], hasLength(2));
+  });
+
   test('default assistant regeneration creates a sibling branch', () async {
     await seed();
 

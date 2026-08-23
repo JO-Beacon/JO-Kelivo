@@ -197,6 +197,30 @@ void main() {
       },
     );
 
+    test('sibling map does not flatten nested descendants into a fork', () {
+      final base = ConversationTree.linear(
+        conversationId: 'conversation',
+        messageIds: const ['root', 'fork'],
+      );
+      final first = base
+          .createMessageBranch(branchId: 'first', fromMessageId: 'fork')
+          .appendToActiveBranch('first-child');
+      final second = first
+          .switchBranch('root')
+          .createMessageBranch(branchId: 'second', fromMessageId: 'fork')
+          .appendToActiveBranch('second-child');
+      final nested = second
+          .switchBranch('first')
+          .createMessageBranch(branchId: 'nested', fromMessageId: 'first-child')
+          .appendToActiveBranch('nested-child');
+
+      final siblings = nested.siblingBranchIdsByMessageId();
+
+      expect(siblings['first-child'], hasLength(2));
+      expect(siblings['second-child'], hasLength(2));
+      expect(siblings['first-child'], isNot(contains('first')));
+    });
+
     test(
       'createMessageBranch opens a branch at an existing message without a new edge',
       () {

@@ -171,7 +171,7 @@ class MessageBuilderService {
 
   /// 从当前会话状态构建 API 消息列表。
   ///
-  /// 应用截断和版本折叠。附件来自消息部分。
+  /// 应用截断。调用方必须传入当前消息树活动路径；附件来自消息部分。
   List<Map<String, dynamic>> buildApiMessages({
     required List<ChatMessage> messages,
     required Map<String, int> versionSelections,
@@ -183,10 +183,9 @@ class MessageBuilderService {
         (tIndex >= 0 && tIndex <= messages.length)
         ? messages.sublist(tIndex)
         : List.of(messages);
-    final List<ChatMessage> source = collapseVersions(
-      sourceAll,
-      versionSelections,
-    );
+    // 版本选择已由 ConversationTree.activePath() 完成。这里不能再按
+    // groupId/version 折叠，否则会把树上的兄弟节点重新混入上下文。
+    final List<ChatMessage> source = sourceAll;
 
     final out = <Map<String, dynamic>>[];
 

@@ -132,6 +132,10 @@ class HomePageController extends ChangeNotifier {
   McpProvider? _mcpProvider;
   StreamSubscription<ChatAction>? _chatActionSub;
 
+  /// 编辑面板关闭后仍会继续执行持久化和分支刷新；同一时间只允许一条
+  /// 编辑提交链路，避免重复点击或旧回调并发改写同一棵会话树。
+  Future<void>? _editMessageInFlight;
+
   // ============================================================================
   // 动画控制器
   // ============================================================================
@@ -268,7 +272,11 @@ class HomePageController extends ChangeNotifier {
   List<ChatMessage> get messages => _chatController.messages;
   ConversationTree? get conversationTree => _viewModel.conversationTree;
   String? get activeBranchId => _viewModel.activeBranchId;
-  Map<String, int> get versionSelections => _chatController.versionSelections;
+
+  /// 废弃：版本选择不再被运行时使用，树是唯一真相。
+  @Deprecated('Version selections are no longer used at runtime')
+  Map<String, int> get versionSelections => const <String, int>{};
+
   Set<String> get loadingConversationIds => _viewModel.loadingConversationIds;
   Map<String, StreamSubscription<dynamic>> get conversationStreams =>
       _chatController.conversationStreams;
@@ -319,12 +327,9 @@ class HomePageController extends ChangeNotifier {
     return MessageRenderModelProjector.project(
       messages: visible,
       byGroup: grouped,
-      versionSelections: <String, int>{
-        for (final message in visible)
-          message.groupId ?? message.id: message.version,
-      },
+      versionSelections: const <String, int>{},
       versionCounts: <String, int>{
-        for (final entry in grouped.entries) entry.key: entry.value.length,
+        for (final entry in grouped.entries) entry.key: 1,
       },
       contextDividerIndex: _treeContextDividerIndex(visible),
     );
@@ -1389,7 +1394,7 @@ class HomePageController extends ChangeNotifier {
       _translations.remove(id);
     }
     await _viewModel.deleteMessages(
-      messageIds: selectedMessageIds,
+      messageIds: deleteAllVersions ? deletedMessageIds : selectedMessageIds,
       deleteAllVersions: deleteAllVersions,
     );
     _selecting = false;
@@ -1405,20 +1410,30 @@ class HomePageController extends ChangeNotifier {
   }) async {
     if (!deleteAllVersions) return selectedMessageIds;
 
-    final conversation = currentConversation;
-    if (conversation == null) return const <String>{};
-    final selectedGroupIds = <String>{};
-    final projections = await _chatController
-        .loadAllCollapsedMessagesForCurrentConversation();
-    for (final message in projections) {
-      if (selectedMessageIds.contains(message.id)) {
-        selectedGroupIds.add(message.groupId ?? message.id);
-      }
+    final tree = _viewModel.conversationTree;
+    if (tree == null) {
+      // 仅兼容尚未加载树的旧导入/测试服务；正常会话始终走树路径。
+      final conversation = currentConversation;
+      if (conversation == null) return selectedMessageIds;
+      final selected = await _chatService.loadMessagesByIds(
+        selectedMessageIds.toList(growable: false),
+      );
+      final groupIds = selected
+          .map((message) => message.groupId ?? message.id)
+          .toSet();
+      if (groupIds.isEmpty) return selectedMessageIds;
+      return _chatService.loadMessageIdsForGroups(conversation.id, groupIds);
     }
-    return _chatService.loadMessageIdsForGroups(
-      conversation.id,
-      selectedGroupIds,
-    );
+    final result = <String>{};
+    for (final messageId in selectedMessageIds) {
+      final edge = tree.edges[messageId];
+      if (edge == null) {
+        result.add(messageId);
+        continue;
+      }
+      result.addAll(tree.childrenOf(edge.parentMessageId));
+    }
+    return result.isEmpty ? selectedMessageIds : result;
   }
 
   Future<void> createMessageFork(ChatMessage message) async {
@@ -1453,6 +1468,40 @@ class HomePageController extends ChangeNotifier {
   }
 
   Future<void> editMessage(ChatMessage message) async {
+    final inFlight = _editMessageInFlight;
+    if (inFlight != null) return inFlight;
+
+    late final Future<void> operation;
+    operation = _editMessageInternal(message)
+        .then<void>(
+          (_) {},
+          onError: (Object error, StackTrace stackTrace) {
+            // 编辑入口由消息菜单以 VoidCallback 触发，不能把异步持久化异常
+            // 留给 Flutter 根区处理，否则 Android release 可能直接退出。
+            debugPrint('Message edit save failed: $error\n$stackTrace');
+            if (_context.mounted) {
+              final l10n = AppLocalizations.of(_context)!;
+              showAppSnackBar(
+                _context,
+                message: l10n.backgroundTaskFailed(
+                  l10n.messageEditPageTitle,
+                  error.toString(),
+                ),
+                type: NotificationType.error,
+              );
+            }
+          },
+        )
+        .whenComplete(() {
+          if (identical(_editMessageInFlight, operation)) {
+            _editMessageInFlight = null;
+          }
+        });
+    _editMessageInFlight = operation;
+    return operation;
+  }
+
+  Future<void> _editMessageInternal(ChatMessage message) async {
     final ctx = _context;
     if (!ctx.mounted) return;
     final isDesktop = isDesktopPlatform;
@@ -1461,6 +1510,16 @@ class HomePageController extends ChangeNotifier {
         : showMessageEditSheet(ctx, message: message);
     final MessageEditResult? result = await future;
     if (result == null) return;
+
+    // 编辑正在生成中的会话时先完成取消和 checkpoint，避免编辑分支与
+    // 流式终结同时写入会话树和消息部件。
+    if (_chatController.isCurrentConversationLoading && ctx.mounted) {
+      await _viewModel.cancelStreaming();
+    }
+
+    if (!ctx.mounted || currentConversation?.id != message.conversationId) {
+      return;
+    }
 
     if (currentConversation != null) {
       await _chatService.clearConversationSuggestions(currentConversation!.id);
@@ -1481,8 +1540,6 @@ class HomePageController extends ChangeNotifier {
       _viewModel.restoreMessageUiState();
     }
     final existingBranchId = _viewModel.activeBranchId;
-    final gid = (newMsg.groupId ?? newMsg.id);
-    versionSelections[gid] = newMsg.version;
     notifyListeners();
 
     if (!result.shouldSend) return;

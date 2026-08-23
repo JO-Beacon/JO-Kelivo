@@ -4612,6 +4612,138 @@ class ChatDatabaseRepository {
     );
   }
 
+  /// 克隆消息并从其原父节点创建一个新的消息分支。
+  ///
+  /// 克隆保留消息元数据、所有结构化部件、工具调用、提供商产物和资源引用，
+  /// 但使用新的消息 ID 和版本号。原消息及其后续分支保持不变。
+  Future<AppendedMessageVersion?> cloneMessageAsBranch({
+    required String conversationId,
+    required String messageId,
+  }) {
+    return _observer.measure(
+      ChatDatabaseOperation.commandAppendVersion,
+      () => _cloneMessageAsBranch(
+        conversationId: conversationId,
+        messageId: messageId,
+      ),
+    );
+  }
+
+  Future<AppendedMessageVersion?> _cloneMessageAsBranch({
+    required String conversationId,
+    required String messageId,
+  }) async {
+    return _db.transaction(() async {
+      final originalRow = await (_db.select(
+        _db.messageRows,
+      )..where((row) => row.id.equals(messageId))).getSingleOrNull();
+      if (originalRow == null) return null;
+      if (originalRow.conversationId != conversationId) return null;
+      final conversationRow =
+          await (_db.select(_db.conversationRows)
+                ..where((row) => row.id.equals(originalRow.conversationId)))
+              .getSingleOrNull();
+      if (conversationRow == null) return null;
+
+      final original = await _messageFromRowWithParts(originalRow);
+      final groupId = originalRow.groupId ?? originalRow.id;
+      final maxVersion = _db.messageRows.version.max();
+      final maxVersionRow =
+          await (_db.selectOnly(_db.messageRows)
+                ..addColumns([maxVersion])
+                ..where(
+                  _db.messageRows.conversationId.equals(
+                        originalRow.conversationId,
+                      ) &
+                      (_db.messageRows.groupId.equals(groupId) |
+                          (_db.messageRows.groupId.isNull() &
+                              _db.messageRows.id.equals(groupId))),
+                ))
+              .getSingle();
+      final nextVersion = (maxVersionRow.read(maxVersion) ?? -1) + 1;
+      final clone = ChatMessage(
+        role: original.role,
+        parts: original.parts,
+        timestamp: original.timestamp,
+        modelId: original.modelId,
+        providerId: original.providerId,
+        totalTokens: original.totalTokens,
+        conversationId: original.conversationId,
+        isStreaming: false,
+        reasoningText: original.reasoningText,
+        reasoningStartAt: original.reasoningStartAt,
+        reasoningFinishedAt: original.reasoningFinishedAt,
+        translation: original.translation,
+        reasoningSegmentsJson: original.reasoningSegmentsJson,
+        groupId: groupId,
+        version: nextVersion,
+        promptTokens: original.promptTokens,
+        completionTokens: original.completionTokens,
+        cachedTokens: original.cachedTokens,
+        durationMs: original.durationMs,
+      );
+
+      final currentConversation = await _conversationFromRow(
+        conversationRow,
+        includeMessageIds: false,
+      );
+      final conversation = currentConversation.copyWith(
+        updatedAt: DateTime.now(),
+      );
+      final originalTree = await _loadOrCreateConversationTree(conversation.id);
+      final originalEdge = originalTree.edges[messageId];
+      if (originalEdge == null) {
+        throw StateError('cloned_message_tree_edge_missing');
+      }
+      final branchId = 'branch-${const Uuid().v4()}';
+      final updatedTree = originalTree.createBranchFromParent(
+        branchId: branchId,
+        parentMessageId: originalEdge.parentMessageId,
+        tipMessageId: clone.id,
+        createdAt: clone.timestamp,
+      );
+
+      final order = await _nextMessageOrder(conversation.id);
+      await _db
+          .into(_db.messageRows)
+          .insert(_messageCompanion(clone, order), mode: InsertMode.insert);
+      await _db.customStatement(
+        'INSERT INTO message_part_rows '
+        '(conversation_id, revision_id, ordinal, kind, payload, '
+        'created_at, updated_at) '
+        'SELECT ?, ?, ordinal, kind, payload, created_at, updated_at '
+        'FROM message_part_rows WHERE revision_id = ?;',
+        [conversation.id, clone.id, original.id],
+      );
+      await _db.customStatement(
+        'INSERT INTO provider_artifact_rows '
+        '(conversation_id, revision_id, kind, payload, created_at, '
+        'updated_at) '
+        'SELECT ?, ?, kind, payload, created_at, updated_at '
+        'FROM provider_artifact_rows WHERE revision_id = ?;',
+        [conversation.id, clone.id, original.id],
+      );
+      await _db.customStatement(
+        'INSERT INTO message_asset_rows '
+        '(conversation_id, revision_id, asset_id, kind) '
+        'SELECT ?, ?, asset_id, kind FROM message_asset_rows '
+        'WHERE revision_id = ?;',
+        [conversation.id, clone.id, original.id],
+      );
+      await _db.customStatement(
+        'INSERT OR IGNORE INTO asset_reference_dirty_rows(revision_id) '
+        'SELECT ? WHERE EXISTS '
+        '(SELECT 1 FROM message_asset_rows WHERE revision_id = ?);',
+        [clone.id, clone.id],
+      );
+      await _writeConversationTree(updatedTree);
+      await (_db.update(_db.conversationRows)
+            ..where((row) => row.id.equals(conversation.id)))
+          .write(_conversationCompanion(conversation));
+      return (conversation: conversation, message: clone);
+    });
+  }
+
   Future<AppendedMessageVersion?> _appendMessageVersion({
     required String messageId,
     required String content,
@@ -4672,11 +4804,7 @@ class ChatDatabaseRepository {
         conversationRow,
         includeMessageIds: false,
       );
-      final selections = Map<String, int>.from(
-        currentConversation.versionSelections,
-      )..[groupId] = nextVersion;
       final conversation = currentConversation.copyWith(
-        versionSelections: selections,
         updatedAt: DateTime.now(),
       );
       final order = await _nextMessageOrder(conversation.id);
@@ -4704,6 +4832,9 @@ class ChatDatabaseRepository {
     });
   }
 
+  /// 废弃：改用 [saveConversationTree] 来持久化分支切换。
+  /// 此方法仅保留用于兼容层，运行时不再依赖 versionSelections。
+  @Deprecated('Use saveConversationTree() instead')
   Future<Conversation?> setSelectedVersion({
     required String conversationId,
     required String groupId,

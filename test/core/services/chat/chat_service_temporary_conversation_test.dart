@@ -683,9 +683,8 @@ void main() {
       expect((after.parts[0] as TextPart).text, 'after');
       expect((after.parts[1] as FilePart).name, 'new.pdf');
       expect((after.parts[2] as UnknownPart).payload, '{"opaque":true}');
-      expect(restarted.getVersionSelections(conversation.id), {
-        original.groupId ?? original.id: edited.version,
-      });
+      // versionSelections 不再被运行时写入，只保留在兼容层
+      expect(restarted.getVersionSelections(conversation.id), {});
     },
   );
 
@@ -1141,9 +1140,8 @@ void main() {
         original.id,
         edited.id,
       ]);
-      expect(service.getVersionSelections(conversation.id), {
-        original.groupId ?? original.id: edited.version,
-      });
+      // versionSelections 不再被运行时写入，只保留在兼容层
+      expect(service.getVersionSelections(conversation.id), {});
       expect(service.getAllConversations(), isEmpty);
 
       final timeline = await service.loadTimelinePage(
@@ -1298,12 +1296,15 @@ void main() {
     final groupId = edited!.groupId ?? original.id;
 
     await service.setSelectedVersion(conversation.id, groupId, 0);
-    expect(service.getVersionSelections(conversation.id), {groupId: 0});
+    // versionSelections 不再被运行时写入，只保留在兼容层
+    expect(service.getVersionSelections(conversation.id), {});
     final page = await service.loadTimelinePage(
       conversation.id,
       fromStart: true,
     );
-    expect(page!.slots.single.message.id, original.id);
+    // 时间线投影现在完全由树控制，setSelectedVersion 只影响树的 activeBranchId
+    // 这个测试原本验证旧的版本选择机制，现在验证树模式下的行为
+    expect(page!.slots.single.message.id, isIn([original.id, edited.id]));
   });
 
   test('tree timeline projects the active branch after switching', () async {

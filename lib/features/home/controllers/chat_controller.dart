@@ -94,10 +94,7 @@ class ChatController extends ChangeNotifier {
   Map<String, int> get versionSelections => _versionSelections;
 
   /// 缓存的折叠消息（在 notifyListeners 时失效）。
-  List<ChatMessage>? _collapsedCache;
-  Map<String, int>? _collapsedIdToIndex;
   Map<String, List<ChatMessage>>? _groupCache;
-  List<ChatMessage>? _messagesWithVisibleGroupsCache;
   List<MessageRenderModel>? _renderModelsCache;
 
   /// 当前正在生成（流式处理）的会话 ID。
@@ -263,21 +260,15 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 加载当前会话的版本选择。
+  /// 废弃：版本选择不再被运行时使用，树是唯一真相。
+  @Deprecated('Version selections are no longer used at runtime')
   void _loadVersionSelections() {
-    final cid = _currentConversation?.id;
-    if (cid == null) {
-      _versionSelections = <String, int>{};
-      return;
-    }
-    try {
-      _versionSelections = _chatService.getVersionSelections(cid);
-    } catch (_) {
-      _versionSelections = <String, int>{};
-    }
+    // 不再加载 versionSelections，树的 activeBranchId 是唯一真相
+    _versionSelections = <String, int>{};
   }
 
-  /// 重新加载版本选择（供外部使用的公共方法）。
+  /// 废弃：版本选择不再被运行时使用。
+  @Deprecated('Version selections are no longer used at runtime')
   void loadVersionSelections() {
     _loadVersionSelections();
     notifyListeners();
@@ -855,12 +846,7 @@ class ChatController extends ChangeNotifier {
 
   Future<List<ChatMessage>> messagesForCompleteHistoryContext(
     Conversation conversation,
-  ) {
-    if (_chatService.isTemporaryConversation(conversation.id)) {
-      return _chatService.loadMessages(conversation.id);
-    }
-    return _chatService.loadActiveTimelineMessages(conversation.id);
-  }
+  ) => _chatService.loadActiveTimelineMessages(conversation.id);
 
   Future<List<ChatMessage>> messagesForGenerationContext(
     Conversation conversation, {
@@ -1016,7 +1002,6 @@ class ChatController extends ChangeNotifier {
             visibleSnapshot.length,
           );
         }
-        _messagesWithVisibleGroupsCache = visibleSnapshot;
       }
       _loadVersionSelections();
       await _preloadVisibleGroupData();
@@ -1218,28 +1203,22 @@ class ChatController extends ChangeNotifier {
   // 版本选择
   // ============================================================================
 
-  /// 获取消息组的已选真实版本号。
+  /// 废弃：版本选择不再被运行时使用，树是唯一真相。
+  @Deprecated('Version selections are no longer used at runtime')
   int getSelectedVersion(String groupId) {
-    return _versionSelections[groupId] ?? -1;
+    return -1; // 版本选择已废弃
   }
 
-  /// 设置消息组的已选真实版本号。
+  /// 废弃：版本选择不再被运行时使用，树是唯一真相。
+  @Deprecated('Version selections are no longer used at runtime')
   Future<void> setSelectedVersion(String groupId, int version) async {
-    _versionSelections[groupId] = version;
-    if (_currentConversation != null) {
-      await _chatService.setSelectedVersion(
-        _currentConversation!.id,
-        groupId,
-        version,
-      );
-    }
-    notifyListeners();
+    // 不再写入 versionSelections
   }
 
-  /// 移除组的版本选择。
+  /// 废弃：版本选择不再被运行时使用。
+  @Deprecated('Version selections are no longer used at runtime')
   void removeVersionSelection(String groupId) {
-    _versionSelections.remove(groupId);
-    notifyListeners();
+    // 不再写入 versionSelections
   }
 
   // ============================================================================
@@ -1305,163 +1284,29 @@ class ChatController extends ChangeNotifier {
   // 版本折叠逻辑
   // ============================================================================
 
-  /// 折叠消息版本，每组只显示已选版本。
-  ///
-  /// 此方法按 groupId 对消息分组，并只返回每个组
-  /// 已选版本索引处的消息。
+  /// 废弃：版本折叠不再需要，树模式下活动路径就是投影。
+  // ignore: deprecated_member_use_from_same_package
+  @Deprecated('Version collapsing is no longer used with tree mode')
   List<ChatMessage> collapseVersions(List<ChatMessage> items) {
-    final Map<String, List<ChatMessage>> byGroup =
-        <String, List<ChatMessage>>{};
-    final List<String> order = <String>[];
-
-    for (final m in items) {
-      final gid = (m.groupId ?? m.id);
-      final list = byGroup.putIfAbsent(gid, () {
-        order.add(gid);
-        return <ChatMessage>[];
-      });
-      list.add(m);
-    }
-
-    // 按版本对每个组排序
-    for (final e in byGroup.entries) {
-      e.value.sort((a, b) => a.version.compareTo(b.version));
-    }
-
-    // 从每个组中选择合适的版本
-    final out = <ChatMessage>[];
-    for (final gid in order) {
-      final vers = byGroup[gid]!;
-      final sel = _versionSelections[gid];
-      ChatMessage? selected;
-      if (sel != null) {
-        for (final candidate in vers) {
-          if (candidate.version == sel) {
-            selected = candidate;
-            break;
-          }
-        }
-      }
-      out.add(selected ?? vers.last);
-    }
-
-    return out;
+    return items;
   }
 
-  /// 获取按版本折叠后的消息（缓存）。
+  /// 废弃：版本折叠不再需要，树模式下活动路径就是投影。
+  @Deprecated('Version collapsing is no longer used with tree mode')
   List<ChatMessage> get collapsedMessages {
-    if (_collapsedCache != null) return _collapsedCache!;
-    _collapsedCache = collapseVersions(_messagesWithVisibleGroups());
-    _collapsedIdToIndex = <String, int>{};
-    for (int i = 0; i < _collapsedCache!.length; i++) {
-      _collapsedIdToIndex![_collapsedCache![i].id] = i;
-    }
-    return _collapsedCache!;
+    return _messages;
   }
 
+  /// 废弃：版本折叠不再需要，树模式下活动路径就是投影。
+  @Deprecated('Version collapsing is no longer used with tree mode')
   List<ChatMessage> _messagesWithVisibleGroups() {
-    if (_messagesWithVisibleGroupsCache != null) {
-      return _messagesWithVisibleGroupsCache!;
-    }
-
-    final conversation = _currentConversation;
-    if (conversation == null || _messages.isEmpty) {
-      return _messagesWithVisibleGroupsCache = _messages;
-    }
-
-    final targetGroupIds = <String>{};
-    final versionedGroupIds = <String>{};
-    for (final message in _messages) {
-      final groupId = message.groupId ?? message.id;
-      if (_versionSelections.containsKey(groupId)) {
-        targetGroupIds.add(groupId);
-      }
-      if (message.version > 0) {
-        targetGroupIds.add(groupId);
-        versionedGroupIds.add(groupId);
-      }
-    }
-    if (targetGroupIds.isEmpty) {
-      return _messagesWithVisibleGroupsCache = _messages;
-    }
-
-    final visibleVersions = _chatService.getMessagesForGroups(
-      conversation.id,
-      targetGroupIds,
-    );
-    if (visibleVersions.isEmpty) {
-      return _messagesWithVisibleGroupsCache = _messages;
-    }
-
-    final windowMessagesById = {
-      for (final message in _messages) message.id: message,
-    };
-    final visibleIds = windowMessagesById.keys;
-    final byGroup = <String, List<ChatMessage>>{};
-    for (final cachedMessage in visibleVersions) {
-      final message = windowMessagesById[cachedMessage.id] ?? cachedMessage;
-      final groupId = message.groupId ?? message.id;
-      byGroup.putIfAbsent(groupId, () => <ChatMessage>[]).add(message);
-    }
-
-    Map<String, int> firstIndices = const <String, int>{};
-    if (_loadedStartIndex > 0 && versionedGroupIds.isNotEmpty) {
-      firstIndices = _chatService.getFirstMessageIndicesForGroups(
-        conversation.id,
-        versionedGroupIds,
-      );
-    }
-    final firstLoadedGroupId = _messages.isEmpty
-        ? null
-        : (_messages.first.groupId ?? _messages.first.id);
-    final previousLoadedGroupId = _previousLoadedMessageGroupId(
-      conversation.id,
-    );
-
-    final result = <ChatMessage>[];
-    final emitted = <String>{};
-    for (final message in _messages) {
-      final groupId = message.groupId ?? message.id;
-      final groupMessages = byGroup[groupId] ?? <ChatMessage>[message];
-      final groupAnchorIndex = firstIndices[groupId] ?? _loadedStartIndex;
-      final startsInsideGroup =
-          groupId == firstLoadedGroupId && groupId == previousLoadedGroupId;
-      if (groupAnchorIndex < _loadedStartIndex &&
-          message.version > 0 &&
-          !startsInsideGroup) {
-        continue;
-      }
-      if (emitted.add(groupId)) {
-        for (final candidate in groupMessages) {
-          result.add(candidate);
-          emitted.add(candidate.id);
-        }
-      } else if (!visibleIds.contains(message.id) && emitted.add(message.id)) {
-        result.add(message);
-      }
-    }
-
-    return _messagesWithVisibleGroupsCache = result;
+    return _messages;
   }
 
-  String? _previousLoadedMessageGroupId(String conversationId) {
-    if (_loadedStartIndex <= 0) return null;
-
-    final previous = _chatService.getMessagesRange(
-      conversationId,
-      start: _loadedStartIndex - 1,
-      limit: 1,
-    );
-    if (previous.isEmpty) return null;
-
-    final message = previous.single;
-    return message.groupId ?? message.id;
-  }
-
-  /// O(1) 查找消息在折叠列表中的索引。
+  /// 废弃：折叠消息缓存已废弃，树模式下直接使用活动路径。
+  @Deprecated('Use active path from ConversationTree instead')
   int indexOfCollapsedMessageId(String id) {
-    collapsedMessages; // 确保缓存已构建
-    return _collapsedIdToIndex?[id] ?? -1;
+    return _messages.indexWhere((m) => m.id == id);
   }
 
   static List<ChatMessage> selectedCollapsedMessagesForExport({
@@ -1533,10 +1378,7 @@ class ChatController extends ChangeNotifier {
   /// 当 _messages 被外部修改（例如由 ChatActions）且调用方会自行
   /// 触发 notifyListeners() 时调用此方法。
   void invalidateCache() {
-    _collapsedCache = null;
-    _collapsedIdToIndex = null;
     _groupCache = null;
-    _messagesWithVisibleGroupsCache = null;
     _renderModelsCache = null;
   }
 

@@ -2,8 +2,7 @@ import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
 
 /// 对脏的旧版（1.1.17 / Hive 时代）记录做字段级修复，使其
-/// 满足 SQLite CHECK 约束。由 Hive 转 SQLite 迁移
-/// 和 chats.json 导入边界共享：二者都读取旧运行时写入的数据，
+/// 满足 SQLite CHECK 约束。Hive 转 SQLite 迁移读取旧运行时写入的数据，
 /// 旧运行时容忍新 schema 拒绝的形态（设备时钟回拨可能持久化负时长，
 /// 损坏记录可能携带空角色或越界计数器）。
 ///

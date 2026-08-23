@@ -608,28 +608,14 @@ class HomeViewModel extends ChangeNotifier {
     required ChatMessage message,
     required Map<String, List<ChatMessage>> byGroup,
   }) async {
-    final gid = (message.groupId ?? message.id);
-    final versBefore = List<ChatMessage>.of(
-      byGroup[gid] ?? const <ChatMessage>[],
-    )..sort((a, b) => a.version.compareTo(b.version));
-    await _deleteMessageVersions(
-      gid: gid,
-      versionsBefore: versBefore,
-      deletedMessageIds: <String>{message.id},
-    );
+    await deleteMessages(messageIds: {message.id});
   }
 
   Future<void> deleteAllMessageVersions({
     required ChatMessage message,
     required Map<String, List<ChatMessage>> byGroup,
   }) async {
-    final gid = (message.groupId ?? message.id);
-    final versBefore = <ChatMessage>[message];
-    await _deleteMessageVersions(
-      gid: gid,
-      versionsBefore: versBefore,
-      deletedMessageIds: versBefore.map((m) => m.id).toSet(),
-    );
+    await deleteBranchSiblings(message);
   }
 
   Future<Set<String>> deleteBranchSiblings(ChatMessage message) async {
@@ -774,8 +760,6 @@ class HomeViewModel extends ChangeNotifier {
   }) async {
     if (messageIds.isEmpty) return;
 
-    // 只有所选组对该计划重要；从所选修订中解析其组 ID，
-    // 然后仅加载这些组的版本。
     final selected = await _chatService.loadMessagesByIds(
       messageIds.toList(growable: false),
     );
@@ -785,28 +769,7 @@ class HomeViewModel extends ChangeNotifier {
     // 对当前会话执行删除会静默地不生效。
     final conversationId = selected.first.conversationId;
     bool isCurrentConversation() => currentConversation?.id == conversationId;
-    final groupIds = selected
-        .map((message) => message.groupId ?? message.id)
-        .toSet();
-    final scopedMessages = await _chatService.loadMessagesForGroups(
-      conversationId,
-      groupIds,
-    );
-    Map<String, int> selections = const <String, int>{};
-    if (isCurrentConversation()) {
-      selections = _chatController.versionSelections;
-    } else {
-      try {
-        selections = _chatService.getVersionSelections(conversationId);
-      } catch (_) {}
-    }
-    final plan = buildBatchDeletePlan(
-      messages: scopedMessages,
-      selectedMessageIds: messageIds,
-      versionSelections: selections,
-      deleteAllVersions: deleteAllVersions,
-    );
-    if (plan.isEmpty) return;
+    final deletedCandidates = messageIds;
 
     // 删除活动生成写入检查点的行会使下一次流式写入命中
     // 已删除消息上的外键；因此先停止生成。
@@ -814,7 +777,7 @@ class HomeViewModel extends ChangeNotifier {
       conversationId,
     );
     if (streamingMessageId != null &&
-        plan.deletedMessageIds.contains(streamingMessageId)) {
+        deletedCandidates.contains(streamingMessageId)) {
       await _chatActions.cancelStreaming(
         _chatService.getConversation(conversationId),
       );
@@ -822,12 +785,8 @@ class HomeViewModel extends ChangeNotifier {
 
     final deletedMessageIds = await _chatService.deleteMessages(
       conversationId: conversationId,
-      messageIds: plan.deletedMessageIds,
-      versionSelectionChanges: {
-        for (final groupId in plan.clearedVersionSelectionGroupIds)
-          groupId: null,
-        ...plan.nextVersionSelections,
-      },
+      messageIds: deletedCandidates,
+      versionSelectionChanges: const <String, int?>{},
     );
     for (final id in deletedMessageIds) {
       _streamController.clearMessageState(id);
@@ -837,108 +796,13 @@ class HomeViewModel extends ChangeNotifier {
       _chatController.updateCurrentConversation(
         _chatService.getConversation(conversationId),
       );
+      _conversationTreeReloadSerial++;
+      _conversationTree = await _chatService.loadConversationTree(
+        conversationId,
+      );
 
-      // scopedMessages 保存每个受影响组的每个删除前版本，
-      // 因此各组的幸存者是完整的。
-      final survivingVersionsByGroup = <String, List<ChatMessage>>{};
-      for (final message in scopedMessages) {
-        final groupId = message.groupId ?? message.id;
-        final survivors = survivingVersionsByGroup.putIfAbsent(
-          groupId,
-          () => <ChatMessage>[],
-        );
-        if (!deletedMessageIds.contains(message.id)) survivors.add(message);
-      }
       await _chatController.refreshTimelineAfterMutation(
         removedRevisionIds: deletedMessageIds,
-        survivingVersionsByGroup: survivingVersionsByGroup,
-      );
-    }
-    notifyListeners();
-  }
-
-  Future<void> _deleteMessageVersions({
-    required String gid,
-    required List<ChatMessage> versionsBefore,
-    required Set<String> deletedMessageIds,
-  }) async {
-    if (deletedMessageIds.isEmpty) return;
-
-    // 动画删除流程会在调用此方法前等待移除动画，因此用户可能
-    // 在此期间切换了会话。对当前会话执行删除会静默不生效
-    // （这些 ID 属于另一个会话），因此应针对修订所属的会话，
-    // 并且只在它仍是当前会话时修改已加载时间线。
-    final targetConversationId = versionsBefore.isNotEmpty
-        ? versionsBefore.first.conversationId
-        : currentConversation?.id;
-    final conversation = targetConversationId == currentConversation?.id
-        ? currentConversation
-        : (targetConversationId == null
-              ? null
-              : _chatService.getConversation(targetConversationId));
-    bool isCurrentConversation() =>
-        conversation != null && conversation.id == currentConversation?.id;
-
-    Map<String, int> selections = const <String, int>{};
-    if (isCurrentConversation()) {
-      selections = versionSelections;
-    } else if (conversation != null) {
-      try {
-        selections = _chatService.getVersionSelections(conversation.id);
-      } catch (_) {}
-    }
-    final oldSel =
-        selections[gid] ??
-        (versionsBefore.isNotEmpty ? versionsBefore.last.version : 0);
-    final newSel = computeNextVersionSelection(
-      versionsBefore: versionsBefore,
-      deletedMessageIds: deletedMessageIds,
-      oldSelection: oldSel,
-    );
-    final treeBeforeDelete = isCurrentConversation() ? _conversationTree : null;
-    final forceBranchReload = treeBeforeDelete != null;
-
-    var removedRevisionIds = deletedMessageIds;
-    if (conversation != null) {
-      // 删除活动生成写入检查点的行会使下一次流式写入命中
-      // 已删除消息上的外键；因此先停止生成。
-      final streamingMessageId = _chatActions.activeStreamingMessageId(
-        conversation.id,
-      );
-      if (streamingMessageId != null &&
-          deletedMessageIds.contains(streamingMessageId)) {
-        await _chatActions.cancelStreaming(conversation);
-      }
-      removedRevisionIds = await _chatService.deleteMessages(
-        conversationId: conversation.id,
-        messageIds: deletedMessageIds,
-        versionSelectionChanges: {gid: newSel},
-      );
-      if (isCurrentConversation()) {
-        _conversationTreeReloadSerial++;
-        _conversationTree = await _chatService.loadConversationTree(
-          conversation.id,
-        );
-        _chatController.updateCurrentConversation(
-          _chatService.getConversation(conversation.id),
-        );
-      }
-    }
-    for (final id in removedRevisionIds) {
-      _streamController.clearMessageState(id);
-    }
-    if (isCurrentConversation()) {
-      _chatController.loadVersionSelections();
-      await _chatController.refreshTimelineAfterMutation(
-        removedRevisionIds: removedRevisionIds,
-        survivingVersionsByGroup: forceBranchReload
-            ? const <String, List<ChatMessage>>{}
-            : {
-                gid: [
-                  for (final candidate in versionsBefore)
-                    if (!removedRevisionIds.contains(candidate.id)) candidate,
-                ],
-              },
       );
     }
     notifyListeners();
@@ -1039,12 +903,8 @@ class HomeViewModel extends ChangeNotifier {
     if (_disposed) return;
     final serial = ++_conversationTreeReloadSerial;
     try {
-      final tree = _chatService.isTemporaryConversation(conversationId)
-          ? await _chatService.loadConversationTree(conversationId)
-          : await (() async {
-              await _chatService.ensureConversationTree(conversationId);
-              return _chatService.loadConversationTree(conversationId);
-            })();
+      await _chatService.ensureConversationTree(conversationId);
+      final tree = await _chatService.loadConversationTree(conversationId);
       if (_disposed ||
           serial != _conversationTreeReloadSerial ||
           currentConversation?.id != conversationId) {
@@ -1075,10 +935,7 @@ class HomeViewModel extends ChangeNotifier {
   Future<void> ensureConversationTreeForCurrentConversation() async {
     if (_disposed) return;
     final conversation = currentConversation;
-    if (conversation == null ||
-        _chatService.isTemporaryConversation(conversation.id)) {
-      return;
-    }
+    if (conversation == null) return;
     await _chatService.ensureConversationTree(conversation.id);
     final tree = await _chatService.loadConversationTree(conversation.id);
     if (tree != null) installConversationTree(tree);
@@ -1258,14 +1115,13 @@ class HomeViewModel extends ChangeNotifier {
         ? ap.getById(convo.assistantId!)
         : ap.currentAssistant;
 
-    // 获取消息并折叠到已选版本
-    final allMsgs = await _chatController
+    // 当前上下文由消息树活动路径定义。
+    final activeMessages = await _chatController
         .allMessagesForCurrentConversationContext();
-    final collapsed = collapseVersions(allMsgs);
-    if (collapsed.isEmpty) return 'no_messages';
+    if (activeMessages.isEmpty) return 'no_messages';
 
     // 构建用于压缩的会话文本
-    final joined = buildConversationTextForCompression(collapsed);
+    final joined = buildConversationTextForCompression(activeMessages);
     if (joined.trim().isEmpty) return 'no_messages';
 
     final content = buildCompressContextContent(joined, options);
@@ -1625,7 +1481,7 @@ class HomeViewModel extends ChangeNotifier {
     final cfg = settings.getProviderConfig(provKey);
 
     // 获取所有消息并筛选用户消息
-    final msgs = await _chatService.loadMessages(convo.id);
+    final msgs = await _chatService.loadActiveTimelineMessages(convo.id);
     final allUserMsgs = msgs
         .where((m) => m.role == 'user' && m.content.trim().isNotEmpty)
         .toList();
@@ -1776,11 +1632,13 @@ class HomeViewModel extends ChangeNotifier {
       assistant?.thinkingBudget,
     );
 
-    final loadedMessages = await _chatService.loadMessages(convo.id);
+    final loadedMessages = await _chatService.loadActiveTimelineMessages(
+      convo.id,
+    );
     // 用于生成后新鲜度检查的原始修订计数快照：
     // getMessageCount 统计每个修订，而折叠列表不是。
     final loadedMessageCount = loadedMessages.length;
-    final msgs = collapseVersions(loadedMessages);
+    final msgs = loadedMessages;
     final lastAssistant = msgs.cast<ChatMessage?>().lastWhere(
       (m) =>
           m != null &&

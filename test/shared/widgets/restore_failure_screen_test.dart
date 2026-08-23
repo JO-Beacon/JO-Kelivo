@@ -51,10 +51,10 @@ void main() {
       find.text('Diagnostic code: restore_startup_receipt'),
       findsOneWidget,
     );
-    expect(find.text('Restart JO-Kelivo'), findsOneWidget);
+    expect(find.text('Restart JO-AIClient'), findsOneWidget);
     expect(find.byTooltip('Copy diagnostic code'), findsOneWidget);
 
-    await tester.tap(find.text('Restart JO-Kelivo'));
+    await tester.tap(find.text('Restart JO-AIClient'));
     await tester.pump();
     expect(restartCalls, 1);
   });
@@ -75,8 +75,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('JO-Kelivo is already running'), findsOneWidget);
+    expect(find.text('JO-AIClient is already running'), findsOneWidget);
     expect(find.textContaining('another app process'), findsOneWidget);
-    expect(find.text('Restart JO-Kelivo'), findsOneWidget);
+    expect(find.text('Restart JO-AIClient'), findsOneWidget);
   });
 }

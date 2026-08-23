@@ -322,6 +322,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPageAbout => '关于';
 
   @override
+  String get settingsPageDebug => '调试';
+
+  @override
   String get settingsPageStatistics => '统计';
 
   @override
@@ -7012,10 +7015,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get migrationSkipDialogConfirm => '跳过并全新开始';
 
   @override
-  String get migrationChatsExportDegradedNote =>
-      'chats.json 导出因出错而被跳过。备份 ZIP 仍包含原始 Hive 文件，完整聊天记录未丢失。';
-
-  @override
   String get timelineJumpToLatest => '跳到最新';
 
   @override
@@ -7704,6 +7703,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get settingsPageAbout => '关于';
+
+  @override
+  String get settingsPageDebug => '调试';
 
   @override
   String get settingsPageStatistics => '统计';
@@ -14396,10 +14398,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get migrationSkipDialogConfirm => '跳过并全新开始';
 
   @override
-  String get migrationChatsExportDegradedNote =>
-      'chats.json 导出因出错而被跳过。备份 ZIP 仍包含原始 Hive 文件，完整聊天记录未丢失。';
-
-  @override
   String get timelineJumpToLatest => '跳到最新';
 
   @override
@@ -15088,6 +15086,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get settingsPageAbout => '關於';
+
+  @override
+  String get settingsPageDebug => '調試';
 
   @override
   String get settingsPageStatistics => '統計';
@@ -21779,10 +21780,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get migrationSkipDialogConfirm => '跳過並全新開始';
-
-  @override
-  String get migrationChatsExportDegradedNote =>
-      'chats.json 匯出因出錯而被跳過。備份 ZIP 仍包含原始 Hive 檔案，完整聊天記錄未遺失。';
 
   @override
   String get timelineJumpToLatest => '跳到最新';

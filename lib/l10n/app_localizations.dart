@@ -676,6 +676,12 @@ abstract class AppLocalizations {
   /// **'About'**
   String get settingsPageAbout;
 
+  /// No description provided for @settingsPageDebug.
+  ///
+  /// In en, this message translates to:
+  /// **'Debug'**
+  String get settingsPageDebug;
+
   /// No description provided for @settingsPageStatistics.
   ///
   /// In en, this message translates to:
@@ -13326,12 +13332,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Skip and Start Fresh'**
   String get migrationSkipDialogConfirm;
-
-  /// No description provided for @migrationChatsExportDegradedNote.
-  ///
-  /// In en, this message translates to:
-  /// **'The chats.json export was skipped because of an error. The backup ZIP still contains the raw Hive files with your complete chat history.'**
-  String get migrationChatsExportDegradedNote;
 
   /// No description provided for @timelineJumpToLatest.
   ///

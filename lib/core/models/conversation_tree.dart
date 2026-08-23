@@ -214,10 +214,12 @@ class ConversationTree {
   bool isMessageInActivePath(String messageId) =>
       activePath().contains(messageId);
 
-  /// 将每个子节点映射到包含该节点的分支。
+  /// 将每个直接子节点映射到该分叉点的代表分支。
   ///
-  /// 结果基于直接父子关系。分支可能在分叉点结束，也可能延续到不同长度，
-  /// 因此无法从路径索引直接推断。
+  /// 同一个直接子节点下可能继续存在更深的分支。不能把这些后代分支
+  /// 全部暴露在当前分叉点，否则树会被投影成扁平的全局分支列表。每个
+  /// 子节点只保留一个代表：优先当前活动分支，其次是该分叉点记忆的选择，
+  /// 最后按路径深度和创建时间取稳定结果。
   Map<String, List<String>> siblingBranchIdsByMessageId() {
     final childrenByParent = <String?, List<String>>{};
     for (final edge in edges.values) {
@@ -226,13 +228,48 @@ class ConversationTree {
           .add(edge.messageId);
     }
     final result = <String, List<String>>{};
-    for (final children in childrenByParent.values) {
+    for (final entry in childrenByParent.entries) {
+      final parentMessageId = entry.key;
+      final children = entry.value;
       if (children.length < 2) continue;
-      final branchIds = <String>{};
-      for (final branch in branches.values) {
-        final path = branchPath(branch.id);
-        if (children.any(path.contains)) branchIds.add(branch.id);
+
+      final representativeByChild = <String, String>{};
+      for (final childId in children) {
+        final candidates = <ConversationBranch>[];
+        for (final branch in branches.values) {
+          final path = branchPath(branch.id);
+          final childIndex = path.indexOf(childId);
+          final isDirectChild = parentMessageId == null
+              ? childIndex == 0
+              : childIndex > 0 && path[childIndex - 1] == parentMessageId;
+          if (isDirectChild) candidates.add(branch);
+        }
+        if (candidates.isEmpty) continue;
+
+        final active = branches[activeBranchId];
+        final rememberedId = parentMessageId == null
+            ? null
+            : branchSelections[parentMessageId];
+        final preferred = candidates.firstWhere(
+          (branch) => branch.id == active?.id,
+          orElse: () => candidates.firstWhere(
+            (branch) => branch.id == rememberedId,
+            orElse: () => candidates.reduce((left, right) {
+              final leftPathLength = branchPath(left.id).length;
+              final rightPathLength = branchPath(right.id).length;
+              if (leftPathLength != rightPathLength) {
+                return leftPathLength < rightPathLength ? left : right;
+              }
+              final byTime = left.createdAt.compareTo(right.createdAt);
+              if (byTime != 0) return byTime < 0 ? left : right;
+              return left.id.compareTo(right.id) <= 0 ? left : right;
+            }),
+          ),
+        );
+        representativeByChild[childId] = preferred.id;
       }
+
+      final branchIds = representativeByChild.values.toSet();
       if (branchIds.length < 2) continue;
       final sorted = branchIds.toList(growable: false)
         ..sort((leftId, rightId) {
@@ -243,8 +280,10 @@ class ConversationTree {
           return left.id.compareTo(right.id);
         });
       final siblings = List<String>.unmodifiable(sorted);
-      for (final childId in children) {
-        result[childId] = siblings;
+      for (final childId in representativeByChild.keys) {
+        if (siblings.contains(representativeByChild[childId])) {
+          result[childId] = siblings;
+        }
       }
     }
     return Map<String, List<String>>.unmodifiable(result);

@@ -204,6 +204,7 @@ void main() {
         conversationId: conversation.id,
         fromMessageId: user.id,
       );
+      final forkMessageId = messageBranchTree.activePath().last;
       final forkReply = await writer.addMessage(
         conversationId: conversation.id,
         role: 'assistant',
@@ -218,7 +219,7 @@ void main() {
       await service.loadTimelinePage(conversation.id);
       expect(
         service.getMessages(conversation.id).map((message) => message.id),
-        orderedEquals([user.id, forkReply.id]),
+        orderedEquals([forkMessageId, forkReply.id]),
       );
 
       final rootBranchId = messageBranchTree.branches.values

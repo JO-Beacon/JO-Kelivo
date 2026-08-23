@@ -328,6 +328,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPageAbout => 'About';
 
   @override
+  String get settingsPageDebug => 'Debug';
+
+  @override
   String get settingsPageStatistics => 'Statistics';
 
   @override
@@ -7303,10 +7306,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get migrationSkipDialogConfirm => 'Skip and Start Fresh';
-
-  @override
-  String get migrationChatsExportDegradedNote =>
-      'The chats.json export was skipped because of an error. The backup ZIP still contains the raw Hive files with your complete chat history.';
 
   @override
   String get timelineJumpToLatest => 'Jump to latest';

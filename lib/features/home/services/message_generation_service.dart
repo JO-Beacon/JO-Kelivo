@@ -328,6 +328,8 @@ class MessageGenerationService {
         providerKey: providerKey,
         groupId: groupId,
         version: version,
+        parentMessageId: parentMessageId,
+        branchId: branchId,
       );
       return (assistantMessage: assistantMessage, runId: null);
     }
@@ -359,6 +361,8 @@ class MessageGenerationService {
         conversationId: conversationId,
         modelId: modelId,
         providerKey: providerKey,
+        parentMessageId: parentMessageId,
+        branchId: branchId,
       );
       return (assistantMessage: assistantMessage, runId: null);
     }
@@ -433,6 +437,8 @@ class MessageGenerationService {
     required String providerKey,
     String? groupId,
     int version = 0,
+    String? parentMessageId,
+    String? branchId,
   }) async {
     return chatService.addMessage(
       conversationId: conversationId,
@@ -443,7 +449,8 @@ class MessageGenerationService {
       isStreaming: true,
       groupId: groupId,
       version: version,
-      selectVersion: groupId != null,
+      parentMessageId: parentMessageId,
+      branchId: branchId,
     );
   }
 

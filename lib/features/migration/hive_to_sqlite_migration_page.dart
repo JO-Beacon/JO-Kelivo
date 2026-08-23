@@ -467,7 +467,6 @@ class _ProgressStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
     final inMigration = status.stage == HiveToSqliteMigrationStage.migrating;
     final backupFileReady =
         status.stage == HiveToSqliteMigrationStage.backupReady || inMigration;
@@ -512,14 +511,6 @@ class _ProgressStep extends StatelessWidget {
         _ChecklistCard(
           items: inMigration ? _migrationItems(l10n) : _backupItems(l10n),
         ),
-        if (status.chatsExportDegraded) ...[
-          const SizedBox(height: 12),
-          _NoteCard(
-            icon: Lucide.TriangleAlert,
-            color: cs.error,
-            text: l10n.migrationChatsExportDegradedNote,
-          ),
-        ],
         if (backupFileReady && status.backupPath != null) ...[
           const SizedBox(height: 12),
           _BackupFileCard(path: status.backupPath!),
@@ -715,14 +706,6 @@ class _CompleteStep extends StatelessWidget {
         const SizedBox(height: 12),
         if (status.backupPath != null)
           _BackupFileCard(path: status.backupPath!),
-        if (status.chatsExportDegraded) ...[
-          const SizedBox(height: 12),
-          _NoteCard(
-            icon: Lucide.TriangleAlert,
-            color: cs.error,
-            text: l10n.migrationChatsExportDegradedNote,
-          ),
-        ],
         const Spacer(),
         _PrimaryButton(
           icon: Lucide.RefreshCw,
@@ -771,14 +754,6 @@ class _FailedStep extends StatelessWidget {
         const SizedBox(height: 12),
         if (status.backupPath != null)
           _BackupFileCard(path: status.backupPath!),
-        if (status.chatsExportDegraded) ...[
-          const SizedBox(height: 12),
-          _NoteCard(
-            icon: Lucide.TriangleAlert,
-            color: cs.error,
-            text: l10n.migrationChatsExportDegradedNote,
-          ),
-        ],
         const SizedBox(height: 12),
         _LogCard(lines: status.log),
         const Spacer(),

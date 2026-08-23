@@ -60,8 +60,21 @@ class GlobalSessionSearchService {
     }
 
     for (final matches in grouped.values) {
+      final tree = await chatService.loadConversationTree(
+        matches.first.conversationId,
+      );
+      final activeIds = tree?.activePath().toSet();
+      final visibleMatches = activeIds == null
+          ? matches
+          : matches
+                .where(
+                  (match) =>
+                      match.messageId == null ||
+                      activeIds.contains(match.messageId),
+                )
+                .toList(growable: false);
       final result = _matchConversationFromSqliteCandidates(
-        matches: matches,
+        matches: visibleMatches,
         tokens: tokens,
       );
       if (result != null) out.add(result);
@@ -88,7 +101,6 @@ class GlobalSessionSearchService {
 
     final contentItems = <_ContentRef>[];
     for (final m in matches) {
-      if (!_isVisibleVersion(m)) continue;
       // 只搜索可见会话正文：用户和助手消息。
       // 排除工具或系统类消息以及隐藏的推理或思考块。
       if (m.messageRole != 'user' && m.messageRole != 'assistant') continue;
@@ -164,17 +176,6 @@ class GlobalSessionSearchService {
       score: score,
       titleMatched: hasTitleMatch,
     );
-  }
-
-  static bool _isVisibleVersion(ConversationSearchMatch match) {
-    final messageId = match.messageId;
-    if (messageId == null) return false;
-    final groupId = match.groupId ?? messageId;
-    final selected = match.versionSelections[groupId];
-    final version = match.version ?? 0;
-    if (selected != null) return selected == version;
-    final maxVersion = match.maxVersion;
-    return maxVersion == null || version == maxVersion;
   }
 
   static List<String> _tokensOf(String query) {

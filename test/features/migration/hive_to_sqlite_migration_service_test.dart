@@ -143,7 +143,7 @@ void main() {
     addTearDown(archive.clearSync);
     final entryNames = archive.files.map((file) => file.name);
     expect(entryNames, contains('settings.json'));
-    expect(entryNames, contains('chats.json'));
+    expect(entryNames, isNot(contains('chats.json')));
     expect(entryNames, isNot(contains('manifest.json')));
     expect(entryNames, isNot(contains('database/kelivo.db')));
     expect(entryNames, contains('conversations.hive'));
@@ -160,11 +160,6 @@ void main() {
     expect(settingsJson, contains('test-key'));
     expect(settingsJson, isNot(contains('display_chat_font_scale_v1')));
     expect(settingsJson, isNot(contains('pinned_chat_ids')));
-    final chatsEntry = archive.findFile('chats.json');
-    expect(chatsEntry, isNotNull);
-    final chatsJson = String.fromCharCodes(chatsEntry!.readBytes()!);
-    expect(chatsJson, contains('Migration Source'));
-    expect(chatsJson, contains('hello from sqlite'));
     await Future<void>.delayed(Duration.zero);
     final firstBackupStatus = statuses.firstWhere(
       (status) => status.stage == HiveToSqliteMigrationStage.backingUp,

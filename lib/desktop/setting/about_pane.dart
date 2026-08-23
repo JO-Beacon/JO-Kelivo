@@ -9,7 +9,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/providers/update_provider.dart';
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
-import '../../features/settings/pages/debug_page.dart';
 import '../../shared/widgets/ios_tile_button.dart';
 import '../../shared/widgets/snackbar.dart';
 import '../../theme/app_font_weights.dart';
@@ -178,11 +177,6 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
                     : l10n.aboutPageCheckForUpdates,
                 updateEnabled: !updateProvider.checking,
                 onCheckForUpdates: _checkForUpdates,
-                onIconLongPress: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(builder: (_) => const DebugPage()),
-                  );
-                },
               ),
 
               const SizedBox(height: 16),
@@ -269,14 +263,12 @@ class _AppHeaderCard extends StatefulWidget {
     required this.updateLabel,
     required this.updateEnabled,
     required this.onCheckForUpdates,
-    this.onIconLongPress,
   });
 
   final String description;
   final String updateLabel;
   final bool updateEnabled;
   final VoidCallback onCheckForUpdates;
-  final VoidCallback? onIconLongPress;
 
   @override
   State<_AppHeaderCard> createState() => _AppHeaderCardState();
@@ -324,18 +316,14 @@ class _AppHeaderCardState extends State<_AppHeaderCard> {
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
               child: Row(
                 children: [
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onLongPress: widget.onIconLongPress,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: SizedBox(
-                        width: 54,
-                        height: 54,
-                        child: Image.asset(
-                          'assets/app_icon.png',
-                          fit: BoxFit.cover,
-                        ),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(
+                      width: 54,
+                      height: 54,
+                      child: Image.asset(
+                        'assets/app_icon.png',
+                        fit: BoxFit.cover,
                       ),
                     ),
                   ),

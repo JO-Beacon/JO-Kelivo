@@ -78,3 +78,7 @@ internationalization.md
 
 /参考文件/
 /plans/
+
+# Local agent instruction mirrors; keep AGENTS.md and CLAUDE.md out of Git.
+/AGENTS.md
+/CLAUDE.md

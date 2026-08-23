@@ -369,7 +369,6 @@ class ChatActions {
       _cancelStreamingFutures.containsKey(conversationId);
 
   List<ChatMessage> get _messages => chatController.messages;
-  Map<String, int> get _versionSelections => chatController.versionSelections;
   Conversation? get _currentConversation => chatController.currentConversation;
   Set<String> get _loadingConversationIds =>
       chatController.loadingConversationIds;
@@ -800,7 +799,7 @@ class ChatActions {
     final apiMessages = messageGenerationService.messageBuilderService
         .buildApiMessages(
           messages: messages,
-          versionSelections: _versionSelections,
+          versionSelections: const <String, int>{},
           currentConversation: _conversationForMessageContext(
             conversation,
             messages,
@@ -1030,7 +1029,7 @@ class ChatActions {
       final prepared = await messageGenerationService
           .prepareApiMessagesWithInjections(
             messages: apiContextMessages,
-            versionSelections: _versionSelections,
+            versionSelections: const <String, int>{},
             currentConversation: conversation.copyWith(truncateIndex: -1),
             settings: settings,
             assistant: assistant,
@@ -1200,43 +1199,27 @@ class ChatActions {
     final isTemporaryConversation = chatService.isTemporaryConversation(
       conversation.id,
     );
-    late final List<ChatMessage> completeMessages;
-    late final ({String? targetGroupId, int nextVersion, int lastKeep})
-    versioning;
-    if (isTemporaryConversation) {
-      completeMessages = await chatController.messagesForCompleteHistoryContext(
-        conversation,
-      );
-      versioning = messageGenerationService.calculateRegenerationVersioning(
-        message: message,
-        messages: completeMessages,
-        assistantAsNewReply: assistantAsNewReply,
-      );
-      if (versioning.lastKeep < 0) {
-        return ChatActionResult.error('invalid_versioning');
-      }
-    } else {
-      final tree = await chatService.loadConversationTree(conversation.id);
-      final edge = tree?.edges[message.id];
-      if (tree == null || edge == null) {
-        return ChatActionResult.error('message_not_found');
-      }
-      final contextTargetId =
-          message.role == 'assistant' && !assistantAsNewReply
-          ? edge.parentMessageId
-          : message.id;
-      completeMessages = contextTargetId == null
-          ? const <ChatMessage>[]
-          : await chatController.messagesForGenerationContext(
-              conversation,
-              maxMessages: await _contextReadLimit(assistant, conversation),
-              throughRevisionId: contextTargetId,
-            );
-      versioning = (
-        targetGroupId: null,
-        nextVersion: 0,
-        lastKeep: completeMessages.length - 1,
-      );
+    await chatService.ensureConversationTree(conversation.id);
+    final tree = await chatService.loadConversationTree(conversation.id);
+    final edge = tree?.edges[message.id];
+    if (tree == null || edge == null) {
+      return ChatActionResult.error('message_not_found');
+    }
+    final contextTargetId = message.role == 'assistant' && !assistantAsNewReply
+        ? edge.parentMessageId
+        : message.id;
+    final completeMessages = contextTargetId == null
+        ? const <ChatMessage>[]
+        : await chatController.messagesForGenerationContext(
+            conversation,
+            maxMessages: await _contextReadLimit(assistant, conversation),
+            throughRevisionId: contextTargetId,
+          );
+    if (contextTargetId != null &&
+        completeMessages.every(
+          (candidate) => candidate.id != contextTargetId,
+        )) {
+      return ChatActionResult.error('message_not_found');
     }
 
     // 获取模型配置
@@ -1252,127 +1235,52 @@ class ChatActions {
     final providerKey = modelConfig.providerKey!;
     final modelId = modelConfig.modelId!;
 
-    final projectedMessages = isTemporaryConversation
-        ? ChatActions.projectMessagesForRegenerationContext(
-            messages: completeMessages,
-            lastKeep: versioning.lastKeep,
-            targetGroupId: versioning.targetGroupId,
-          )
-        : completeMessages;
     if (_hasUnsupportedAudioAttachments(
-      messages: projectedMessages,
-      conversation: isTemporaryConversation
-          ? conversation
-          : conversation.copyWith(truncateIndex: -1),
+      messages: completeMessages,
+      conversation: conversation.copyWith(truncateIndex: -1),
       settings: settings,
       providerKey: providerKey,
       modelId: modelId,
-      maxRawTruncateIndex: isTemporaryConversation ? versioning.lastKeep : -1,
+      maxRawTruncateIndex: -1,
     )) {
       return ChatActionResult.error('audio_attachment_unsupported');
     }
 
-    if (shouldPhysicallyRemoveRegenerationTail(
-      deleteTrailingEnabled: truncateFuture,
-      isTemporaryConversation: isTemporaryConversation,
-    )) {
-      final removeIds = await messageGenerationService.removeTrailingMessages(
-        messages: completeMessages,
-        lastKeep: versioning.lastKeep,
-        targetGroupId: versioning.targetGroupId,
-      );
-      if (removeIds.isNotEmpty) {
-        await chatController.refreshTimelineAfterMutation(
-          removedRevisionIds: removeIds.toSet(),
-        );
-        viewModel.restoreMessageUiState();
-        onMessagesChanged?.call();
-      }
-    }
-
-    late final ({ChatMessage assistantMessage, String? runId}) begin;
-    final targetGroupId = versioning.targetGroupId;
-    if (isTemporaryConversation) {
-      if (shouldBeginNewAssistantReply(
-        role: message.role,
-        targetGroupId: targetGroupId,
-        assistantAsNewReply: assistantAsNewReply,
-      )) {
-        begin = await messageGenerationService.beginAssistantGeneration(
-          conversationId: conversation.id,
-          modelId: modelId,
-          providerKey: providerKey,
-          anchorGroupId: message.groupId ?? message.id,
-          truncateFuture: truncateFuture,
-        );
-      } else {
-        if (targetGroupId == null) {
-          return ChatActionResult.error('invalid_versioning');
-        }
-        final nextVersion = versioning.nextVersion;
-        begin = await messageGenerationService.beginRegeneration(
-          conversationId: conversation.id,
-          modelId: modelId,
-          providerKey: providerKey,
-          groupId: targetGroupId,
-          version: nextVersion,
-          truncateFuture: truncateFuture,
-        );
-      }
+    final String? fromMessageId;
+    final String? parentMessageId;
+    if (message.role == 'assistant' && !assistantAsNewReply) {
+      fromMessageId = edge.parentMessageId;
+      parentMessageId = edge.parentMessageId;
     } else {
-      await chatService.ensureConversationTree(conversation.id);
-      final tree = await chatService.loadConversationTree(conversation.id);
-      if (tree == null) {
-        return ChatActionResult.error('conversation_tree_missing');
+      fromMessageId = message.id;
+      parentMessageId = message.id;
+    }
+    final ConversationTree createdTree;
+    if (existingBranchId != null) {
+      final existingBranch = tree.branches[existingBranchId];
+      if (existingBranch == null) {
+        return ChatActionResult.error('existing_branch_not_found');
       }
-      final oldEdge = tree.edges[message.id];
-      final newReply = shouldBeginNewAssistantReply(
-        role: message.role,
-        targetGroupId: targetGroupId,
-        assistantAsNewReply: assistantAsNewReply,
-      );
-      final String? fromMessageId;
-      final String? parentMessageId;
-      if (message.role == 'user') {
-        fromMessageId = message.id;
-        parentMessageId = message.id;
-      } else if (newReply) {
-        fromMessageId = message.id;
-        parentMessageId = message.id;
-      } else {
-        fromMessageId = oldEdge?.parentMessageId;
-        parentMessageId = oldEdge?.parentMessageId;
+      if (existingBranch.tipMessageId != message.id) {
+        return ChatActionResult.error('existing_branch_tip_mismatch');
       }
-      final ConversationTree createdTree;
-      if (existingBranchId != null) {
-        final existingTree = await chatService.loadConversationTree(
-          conversation.id,
-        );
-        final existingBranch = existingTree?.branches[existingBranchId];
-        if (existingTree == null || existingBranch == null) {
-          return ChatActionResult.error('existing_branch_not_found');
-        }
-        if (existingBranch.tipMessageId != message.id) {
-          return ChatActionResult.error('existing_branch_tip_mismatch');
-        }
-        createdTree = existingTree;
-      } else {
-        createdTree = await chatService.createMessageBranch(
-          conversationId: conversation.id,
-          fromMessageId: fromMessageId,
-        );
-      }
-      viewModel.installConversationTree(createdTree);
-      begin = await messageGenerationService.beginAssistantGeneration(
+      createdTree = tree;
+    } else {
+      createdTree = await chatService.createMessageContinuationBranch(
         conversationId: conversation.id,
-        modelId: modelId,
-        providerKey: providerKey,
-        anchorGroupId: message.groupId ?? message.id,
-        truncateFuture: truncateFuture,
-        parentMessageId: parentMessageId,
-        branchId: createdTree.activeBranchId,
+        fromMessageId: fromMessageId,
       );
     }
+    viewModel.installConversationTree(createdTree);
+    final begin = await messageGenerationService.beginAssistantGeneration(
+      conversationId: conversation.id,
+      modelId: modelId,
+      providerKey: providerKey,
+      anchorGroupId: message.groupId ?? message.id,
+      truncateFuture: truncateFuture,
+      parentMessageId: parentMessageId,
+      branchId: createdTree.activeBranchId,
+    );
     final assistantMessage = begin.assistantMessage;
     _registerGenerationRun(assistantMessage.id, begin.runId);
     _activeAssistantMessages.put(assistantMessage);
@@ -1381,16 +1289,10 @@ class ChatActions {
     // 使 MessageListView 在首次渲染时就能识别到流式状态。
     streamController.markStreamingStarted(assistantMessage.id);
 
-    if (assistantMessage.groupId case final groupId?) {
-      _versionSelections[groupId] = assistantMessage.version;
-    }
-
-    final regenerationMessages = ChatActions.buildRegenerationMessages(
-      messages: completeMessages,
-      lastKeep: versioning.lastKeep,
-      targetGroupId: versioning.targetGroupId,
-      assistantPlaceholder: assistantMessage,
-    );
+    final regenerationMessages = <ChatMessage>[
+      ...completeMessages,
+      assistantMessage,
+    ];
 
     // 将已加载窗口保持在持久化生成消息附近，而不是用会话尾部
     // 替换较远的阅读位置（长会话中这可能会排除此流式版本）。
@@ -1423,14 +1325,8 @@ class ChatActions {
       final prepared = await messageGenerationService
           .prepareApiMessagesWithInjections(
             messages: regenerationMessages,
-            versionSelections: _versionSelections,
-            currentConversation: isTemporaryConversation
-                ? _conversationForMessageContext(
-                    conversation,
-                    regenerationMessages,
-                    maxRawTruncateIndex: versioning.lastKeep,
-                  )
-                : conversation.copyWith(truncateIndex: -1),
+            versionSelections: const <String, int>{},
+            currentConversation: conversation.copyWith(truncateIndex: -1),
             settings: settings,
             assistant: assistant,
             assistantId: assistantId,
@@ -1552,7 +1448,7 @@ class ChatActions {
       final prepared = await messageGenerationService
           .prepareApiMessagesWithInjections(
             messages: apiContextMessages,
-            versionSelections: _versionSelections,
+            versionSelections: const <String, int>{},
             currentConversation: conversation.copyWith(truncateIndex: -1),
             settings: settings,
             assistant: assistant,
