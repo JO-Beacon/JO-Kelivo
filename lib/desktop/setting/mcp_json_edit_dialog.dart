@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../core/providers/mcp_provider.dart';
@@ -11,6 +10,7 @@ import '../../l10n/app_localizations.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../widgets/desktop_dialog_style.dart';
 
 Future<void> showDesktopMcpJsonEditDialog(BuildContext context) async {
   final cs = Theme.of(context).colorScheme;
@@ -20,7 +20,7 @@ Future<void> showDesktopMcpJsonEditDialog(BuildContext context) async {
     builder: (ctx) => Dialog(
       backgroundColor: cs.surface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: DesktopDialogStyle.shape(ctx),
       child: const _DesktopMcpJsonEditDialog(),
     ),
   );
@@ -84,25 +84,21 @@ class _DesktopMcpJsonEditDialogState extends State<_DesktopMcpJsonEditDialog> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    // 解析用户首选的代码字体（Google、本地或系统）
+    // 解析用户首选的代码字体（本地或系统）
     final settings = context.watch<SettingsProvider>();
     String resolveCodeFont() {
       final fam = settings.codeFontFamily;
       if (fam == null || fam.isEmpty) return 'monospace';
-      if (settings.codeFontIsGoogle) {
-        try {
-          final s = GoogleFonts.getFont(fam);
-          return s.fontFamily ?? fam;
-        } catch (_) {
-          return fam;
-        }
-      }
       return fam;
     }
 
     final codeFontFamily = resolveCodeFont();
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 860, maxHeight: 720),
+      constraints: DesktopDialogStyle.proportionalConstraints(
+        context,
+        maxWidth: 860,
+        maxHeight: 720,
+      ),
       child: SizedBox(
         width: 860,
         height: 720,

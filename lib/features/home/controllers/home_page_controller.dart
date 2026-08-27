@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/models/chat_input_data.dart';
+import '../../../core/database/chat_database_repository.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/conversation_tree.dart';
@@ -43,6 +44,7 @@ import '../services/ask_user_interaction_service.dart';
 import '../services/ocr_service.dart';
 import '../services/translation_service.dart';
 import '../services/file_upload_service.dart';
+import '../services/chat_read_position_store.dart';
 import '../utils/chat_layout_constants.dart';
 import '../widgets/chat_input_bar.dart';
 import '../../model/widgets/model_select_sheet.dart';
@@ -76,6 +78,7 @@ class HomePageController extends ChangeNotifier {
     required TextEditingController inputController,
     required ChatInputBarController mediaController,
     required ScrollController scrollController,
+    ChatReadPositionStore? readPositionStore,
   }) : this._(
          context,
          vsync,
@@ -85,6 +88,7 @@ class HomePageController extends ChangeNotifier {
          inputController,
          mediaController,
          scrollController,
+         readPositionStore,
        );
 
   HomePageController._(
@@ -96,6 +100,7 @@ class HomePageController extends ChangeNotifier {
     this._inputController,
     this._mediaController,
     this._scrollController,
+    this._readPositionStore,
   ) {
     _initialize();
   }
@@ -112,6 +117,7 @@ class HomePageController extends ChangeNotifier {
   final TextEditingController _inputController;
   final ChatInputBarController _mediaController;
   ScrollController _scrollController;
+  final ChatReadPositionStore? _readPositionStore;
 
   // ============================================================================
   // 服务和控制器（内部创建）
@@ -149,6 +155,7 @@ class HomePageController extends ChangeNotifier {
   /// 最新动画会话切换的序列号；被取代的切换会检查它，
   /// 以丢弃自己的预提交工作。
   int _switchSerial = 0;
+  bool _restoreReadPositionOnNextSwitch = true;
 
   // 启动预热（缓存方案第 14 项）：初始恢复完成后，
   // 在空闲时间串行预取最近的会话。
@@ -598,7 +605,7 @@ class HomePageController extends ChangeNotifier {
         };
     _viewModel.onConversationSwitched = () {
       _restoreMessageUiState();
-      _scrollCtrl.positionAtBottomOnNextLayout();
+      _positionCurrentConversationAfterOpen();
     };
     _viewModel.onStreamFinished = (conversationId) {
       // 流结束时触发 UI 更新
@@ -614,6 +621,8 @@ class HomePageController extends ChangeNotifier {
     switch (error) {
       case 'audio_attachment_unsupported':
         return l10n.homePageAudioAttachmentUnsupported;
+      case 'conversation_fork_failed':
+        return l10n.conversationForkFailed;
       default:
         return '${l10n.generationInterrupted}: $error';
     }
@@ -640,7 +649,7 @@ class HomePageController extends ChangeNotifier {
     _scrollCtrl.dispose();
     _scrollController = controller;
     _initializeScrollController();
-    _scrollCtrl.positionAtBottomOnNextLayout();
+    _positionCurrentConversationAfterOpen();
   }
 
   void _initializeProviders() {
@@ -753,7 +762,10 @@ class HomePageController extends ChangeNotifier {
     required String conversationId,
     required String messageId,
   }) async {
-    await switchConversationAnimated(conversationId);
+    await switchConversationAnimated(
+      conversationId,
+      restoreReadPosition: false,
+    );
     // 多等待一帧，让新会话的索引消息列表在解析目标前完成挂载。
     try {
       await WidgetsBinding.instance.endOfFrame;
@@ -770,6 +782,10 @@ class HomePageController extends ChangeNotifier {
     final prefs = _context.read<SettingsProvider>();
     final assistantProvider = _context.read<AssistantProvider>();
     try {
+      final readPositionStore = _readPositionStore;
+      if (readPositionStore != null) {
+        await readPositionStore.load();
+      }
       // 这两个启动流程彼此独立。
       await Future.wait([assistantProvider.loaded, _chatService.init()]);
       if (prefs.newChatOnLaunch) {
@@ -799,7 +815,7 @@ class HomePageController extends ChangeNotifier {
           await _viewModel.ensureConversationTreeForCurrentConversation();
           _streamController.clearGeminiThoughtSigs();
           _restoreMessageUiState();
-          _scrollCtrl.positionAtBottomOnNextLayout();
+          _positionCurrentConversationAfterOpen();
           notifyListeners();
           _scheduleStartupWarmup();
         } else {
@@ -1038,7 +1054,10 @@ class HomePageController extends ChangeNotifier {
   // 公共方法 - 会话管理
   // ============================================================================
 
-  Future<void> switchConversationAnimated(String id) async {
+  Future<void> switchConversationAnimated(
+    String id, {
+    bool restoreReadPosition = true,
+  }) async {
     final serial = ++_switchSerial;
     _warmupSerial++;
     if (currentConversation?.id == id) {
@@ -1050,6 +1069,8 @@ class HomePageController extends ChangeNotifier {
       }
       return;
     }
+    _restoreReadPositionOnNextSwitch = restoreReadPosition;
+    unawaited(_flushReadPosition());
     // 使先前聊天的进行中全选/切换/反选失效。
     _selectionEpoch++;
     if (!isDesktopPlatform) {
@@ -1161,6 +1182,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   Future<void> _createNewConversation() async {
+    unawaited(_flushReadPosition());
     _translations.clear();
     final previousId = currentConversation?.id;
     await _viewModel.createNewConversation();
@@ -1189,11 +1211,16 @@ class HomePageController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<List<ChatMessage>> loadCompressContextMessages() {
+    return _chatController.allMessagesForCurrentConversationContext();
+  }
+
   /// 压缩上下文：通过 LLM 生成摘要，创建新会话。
   /// 成功返回 null，失败返回错误字符串。
   Future<String?> compressContext({
     required CompressContextOptions options,
   }) async {
+    unawaited(_flushReadPosition());
     final result = await _viewModel.compressContext(options: options);
     if (result == null) {
       // 成功 - 已切换到新会话
@@ -1227,6 +1254,33 @@ class HomePageController extends ChangeNotifier {
     _translations.remove(message.id);
     try {
       await _viewModel.deleteMessage(message: message, byGroup: byGroup);
+    } finally {
+      _settleAfterSlotRemoval(
+        gid,
+        conversationId: message.conversationId,
+        keepAtBottom: keepAtBottom,
+        preserveRequest: preserveRequest,
+      );
+    }
+  }
+
+  Future<void> deleteMessageOnly({
+    required ChatMessage message,
+    required Map<String, List<ChatMessage>> byGroup,
+  }) async {
+    final keepAtBottom = _scrollCtrl.isNearBottom();
+    final gid = (message.groupId ?? message.id);
+    final slotDisappears = (byGroup[gid] ?? const <ChatMessage>[]).length <= 1;
+    int? preserveRequest;
+    if (slotDisappears && _shouldAnimateSlotRemoval(message)) {
+      preserveRequest = await _playSlotRemovalAnimation(
+        gid,
+        keepAtBottom: keepAtBottom,
+      );
+    }
+    _translations.remove(message.id);
+    try {
+      await _viewModel.deleteMessageOnly(message: message, byGroup: byGroup);
     } finally {
       _settleAfterSlotRemoval(
         gid,
@@ -1453,6 +1507,15 @@ class HomePageController extends ChangeNotifier {
     }
   }
 
+  Future<void> createConversationFork(
+    ChatMessage message,
+    ConversationForkMode mode,
+  ) async {
+    if (currentConversation == null) return;
+    await _viewModel.createConversationFork(message, mode);
+    notifyListeners();
+  }
+
   Future<void> switchConversationBranch(String branchId) {
     return _viewModel.switchConversationBranch(branchId);
   }
@@ -1528,29 +1591,39 @@ class HomePageController extends ChangeNotifier {
       );
     }
 
-    final newMsg = await _chatService.appendMessageVersion(
-      messageId: message.id,
-      parts: result.parts,
-    );
-    if (newMsg == null) return;
+    final savedMessage = switch (result.saveMode) {
+      MessageEditSaveMode.newBranch => _chatService.appendMessageVersion(
+        messageId: message.id,
+        parts: result.parts,
+      ),
+      MessageEditSaveMode.overwrite => _chatService.overwriteMessage(
+        messageId: message.id,
+        parts: result.parts,
+      ),
+    };
+    final savedMsg = await savedMessage;
+    if (savedMsg == null) return;
 
-    await _viewModel.refreshConversationTree(newMsg.conversationId);
+    await _viewModel.refreshConversationTree(savedMsg.conversationId);
 
-    if (await _chatController.openAroundPersistedMessage(newMsg)) {
+    if (await _chatController.openAroundPersistedMessage(savedMsg)) {
       _viewModel.restoreMessageUiState();
     }
     final existingBranchId = _viewModel.activeBranchId;
     notifyListeners();
 
-    if (!result.shouldSend) return;
+    if (result.saveMode == MessageEditSaveMode.overwrite ||
+        !result.shouldSend) {
+      return;
+    }
     if (message.role == 'assistant') {
       await regenerateAtMessage(
-        newMsg,
+        savedMsg,
         assistantAsNewReply: true,
         existingBranchId: existingBranchId,
       );
     } else if (message.role == 'user') {
-      await regenerateAtMessage(newMsg, existingBranchId: existingBranchId);
+      await regenerateAtMessage(savedMsg, existingBranchId: existingBranchId);
     }
   }
 
@@ -2311,6 +2384,71 @@ class HomePageController extends ChangeNotifier {
   Future<List<ChatMessage>> loadAllCollapsedMessagesForCurrentConversation() =>
       _chatController.loadAllCollapsedMessagesForCurrentConversation();
 
+  Future<List<MiniMapSearchHit>> searchMiniMapMatches(String query) =>
+      _chatController.searchMiniMapMatches(query);
+
+  /// 在会话窗口完成加载后定位到默认底部，或恢复上一次阅读位置。
+  ///
+  /// 这里的恢复请求会等待列表实际附着后再执行，避免冷启动阶段
+  /// `scrollToMessageId` 因为还没有客户端而静默丢失。
+  void _positionCurrentConversationAfterOpen() {
+    final shouldRestore = _restoreReadPositionOnNextSwitch;
+    _restoreReadPositionOnNextSwitch = true;
+    final conversationId = currentConversation?.id;
+    if (!shouldRestore) {
+      _scrollCtrl.positionAtBottomOnNextLayout();
+      return;
+    }
+    final targetId = conversationId == null
+        ? null
+        : _readPositionStore?.read(conversationId);
+    if (targetId == null || targetId.isEmpty) {
+      _scrollCtrl.positionAtBottomOnNextLayout();
+      return;
+    }
+    unawaited(_restoreReadPositionAfterOpen(conversationId!, targetId));
+  }
+
+  Future<void> _restoreReadPositionAfterOpen(
+    String conversationId,
+    String targetId,
+  ) async {
+    for (var pass = 0; pass < 3; pass++) {
+      if (_scrollCtrl.hasClients &&
+          _scrollCtrl.messageListController.isAttached) {
+        break;
+      }
+      try {
+        await WidgetsBinding.instance.endOfFrame;
+      } catch (_) {}
+    }
+    if (currentConversation?.id != conversationId) return;
+
+    await scrollToMessageId(targetId);
+    if (currentConversation?.id != conversationId) return;
+    if (!_scrollCtrl.hasClients ||
+        _chatController.indexOfCollapsedMessageId(targetId) < 0) {
+      _scrollCtrl.positionAtBottomOnNextLayout();
+    }
+  }
+
+  String? _currentReadAnchor() {
+    final conversationId = currentConversation?.id;
+    if (conversationId == null || _scrollCtrl.isNearBottom(24)) return null;
+    final index = _scrollCtrl.firstVisibleMessageIndex();
+    final messages = visibleCollapsedMessages;
+    if (index == null || index < 0 || index >= messages.length) return null;
+    return messages[index].id;
+  }
+
+  Future<void> _flushReadPosition() async {
+    final store = _readPositionStore;
+    if (store == null) return;
+    final conversationId = currentConversation?.id;
+    if (conversationId == null || conversationId.isEmpty) return;
+    await store.write(conversationId, _currentReadAnchor());
+  }
+
   // 问题 7 审计：仅通过折叠索引 + loadUntilMessageVisible 跳转。
   // 不调用 ChatService.getMessageIndex，因此在 loadTimelinePage
   // 回填期间缺少 message-order 骨架也不需要在此处保护。
@@ -2520,6 +2658,9 @@ class HomePageController extends ChangeNotifier {
 
   void onAppLifecycleStateChanged(AppLifecycleState state) {
     _appInForeground = (state == AppLifecycleState.resumed);
+    if (state != AppLifecycleState.resumed) {
+      unawaited(_flushReadPosition());
+    }
   }
 
   void onDidPopNext() {
@@ -2644,6 +2785,7 @@ class HomePageController extends ChangeNotifier {
 
   @override
   void dispose() {
+    unawaited(_flushReadPosition());
     _viewModel.onBackgroundTaskError = null;
     _ocrService.onError = null;
     _convoFadeController.dispose();

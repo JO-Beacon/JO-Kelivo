@@ -20,7 +20,6 @@ import 'package:Kelivo/core/services/memory/memory_pipeline.dart';
 import 'package:Kelivo/core/services/memory/memory_repository.dart';
 import 'package:Kelivo/core/services/tts/tts_playback_models.dart';
 import 'package:Kelivo/features/assistant/pages/assistant_settings_edit_page.dart';
-import 'package:Kelivo/features/settings/pages/legacy_memory_page.dart';
 import 'package:Kelivo/features/settings/pages/memory_settings_page.dart';
 import 'package:Kelivo/features/settings/widgets/memory_ui.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -286,31 +285,49 @@ void main() {
     expect(memoryV2.entries, isEmpty);
   });
 
-  testWidgets('memory tab links to this assistant\'s legacy memories', (
-    tester,
-  ) async {
-    final (ap, chat, memoryV2, pipeline) = await _createProviders(tester);
-    _setLargeSurface(tester);
+  testWidgets(
+    'add memory defaults to assistant scope when the write policy does',
+    (tester) async {
+      final (ap, chat, memoryV2, pipeline) = await _createProviders(tester);
+      _setLargeSurface(tester);
+      await ap.updateAssistant(
+        ap
+            .getById(_assistantId)!
+            .copyWith(
+              enableMemory: true,
+              memoryWriteScope: MemoryWriteScope.alwaysAssistant,
+            ),
+      );
 
-    await tester.pumpWidget(
-      _buildHarness(
-        assistantProvider: ap,
-        chatService: chat,
-        memoryV2: memoryV2,
-        pipeline: pipeline,
-        child: const AssistantSettingsEditPage(assistantId: _assistantId),
-      ),
-    );
-    await _openMemoryTab(tester);
+      await tester.pumpWidget(
+        _buildHarness(
+          assistantProvider: ap,
+          chatService: chat,
+          memoryV2: memoryV2,
+          pipeline: pipeline,
+          child: const AssistantSettingsEditPage(assistantId: _assistantId),
+        ),
+      );
+      await _openMemoryTab(tester);
 
-    final legacyRow = find.text('Legacy memories (read-only)').hitTestable();
-    await tester.ensureVisible(legacyRow);
-    await tester.tap(legacyRow);
-    await tester.pumpAndSettle();
+      final addButton = find.text('Add memory').hitTestable();
+      await tester.ensureVisible(addButton);
+      await tester.tap(addButton);
+      await tester.pumpAndSettle();
 
-    final page = tester.widget<LegacyMemoryPage>(find.byType(LegacyMemoryPage));
-    expect(page.assistantId, _assistantId);
-  });
+      final chips = tester.widgetList<MemorySelectChip>(
+        find.byType(MemorySelectChip),
+      );
+      expect(
+        chips.any((chip) => chip.label == 'This assistant' && chip.selected),
+        isTrue,
+      );
+      expect(
+        chips.any((chip) => chip.label == 'Global' && chip.selected),
+        isFalse,
+      );
+    },
+  );
 
   testWidgets('write scope and dedupe sheet choices persist', (tester) async {
     final (ap, chat, memoryV2, pipeline) = await _createProviders(tester);
@@ -374,7 +391,7 @@ void main() {
 
     // Title "Memory" also appears on the tab; use the row subtitle.
     final settingsRow = find
-        .text('Browse, edit, archive, and delete memories')
+        .text('Memory mode, model, and prompts')
         .hitTestable();
     await tester.ensureVisible(settingsRow);
     await tester.tap(settingsRow);
@@ -382,33 +399,36 @@ void main() {
     expect(find.byType(MemorySettingsPage), findsOneWidget);
   });
 
-  testWidgets('legacy memory mode hides new-only rows', (tester) async {
-    final (ap, chat, memoryV2, pipeline) = await _createProviders(tester);
-    _setLargeSurface(tester);
+  testWidgets(
+    'legacy mode is controlled globally, not from the assistant tab',
+    (tester) async {
+      final (ap, chat, memoryV2, pipeline) = await _createProviders(tester);
+      _setLargeSurface(tester);
 
-    await tester.pumpWidget(
-      _buildHarness(
-        assistantProvider: ap,
-        chatService: chat,
-        memoryV2: memoryV2,
-        pipeline: pipeline,
-        child: const AssistantSettingsEditPage(assistantId: _assistantId),
-      ),
-    );
-    await _openMemoryTab(tester);
+      await tester.pumpWidget(
+        _buildHarness(
+          assistantProvider: ap,
+          chatService: chat,
+          memoryV2: memoryV2,
+          pipeline: pipeline,
+          child: const AssistantSettingsEditPage(assistantId: _assistantId),
+        ),
+      );
+      await _openMemoryTab(tester);
 
-    expect(find.text('Use legacy memory'), findsOneWidget);
-    expect(find.text('Recent Chats Reference'), findsNothing);
-    expect(find.text('Legacy memories (read-only)'), findsOneWidget);
+      final settings = tester
+          .element(find.byType(AssistantSettingsEditPage))
+          .read<SettingsProvider>();
+      await settings.setLegacyMemoryMode(true);
+      await tester.pumpAndSettle();
 
-    await _tapSwitchNearLabel(tester, 'Use legacy memory');
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 350));
-
-    expect(find.text('Recent Chats Reference'), findsOneWidget);
-    expect(find.text('Auto-organize memory'), findsNothing);
-    expect(find.text('Memory write scope'), findsNothing);
-    expect(find.text('Legacy memories (read-only)'), findsNothing);
-    expect(find.text('Use long-term memory'), findsOneWidget);
-  });
+      expect(find.text('Use legacy memory'), findsNothing);
+      expect(find.text('Recent Chats Reference'), findsOneWidget);
+      expect(find.text('Auto-organize memory'), findsNothing);
+      expect(find.text('Memory write scope'), findsNothing);
+      expect(find.text('Legacy memories (read-only)'), findsNothing);
+      expect(find.text('Use long-term memory'), findsOneWidget);
+      expect(find.text('Memory mode, model, and prompts'), findsOneWidget);
+    },
+  );
 }

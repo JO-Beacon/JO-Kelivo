@@ -10,6 +10,7 @@ import '../icons/lucide_adapter.dart' as lucide;
 import '../core/providers/settings_provider.dart';
 import '../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'widgets/desktop_dialog_style.dart';
 
 Future<String?> showDesktopAddProviderDialog(BuildContext context) async {
   String? result;
@@ -325,17 +326,15 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
     final l10n = AppLocalizations.of(context)!;
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
+        constraints: DesktopDialogStyle.proportionalConstraints(
+          context,
           minWidth: 580,
           maxWidth: 700,
           maxHeight: 640,
         ),
         child: Material(
           color: cs.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.25)),
-          ),
+          shape: DesktopDialogStyle.shape(context),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: Column(

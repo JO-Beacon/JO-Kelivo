@@ -18,6 +18,7 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
+import '../../../core/database/business_preferences.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
@@ -27,7 +28,6 @@ import '../../../utils/platform_utils.dart';
 import '../../../desktop/search_provider_popover.dart';
 import '../../../desktop/reasoning_budget_popover.dart';
 import '../../../desktop/mcp_servers_popover.dart';
-import '../../../desktop/mini_map_popover.dart';
 import '../../../desktop/quick_phrase_popover.dart';
 import '../../../desktop/instruction_injection_popover.dart';
 import '../../../desktop/world_book_popover.dart';
@@ -57,6 +57,7 @@ import '../widgets/chat_selection_export_bar.dart';
 import '../utils/model_display_helper.dart';
 import '../utils/chat_layout_constants.dart';
 import '../controllers/home_page_controller.dart';
+import '../services/chat_read_position_store.dart';
 import '../controllers/home_view_model.dart';
 import '../controllers/scroll_controller.dart' as scroll_ctrl;
 import 'home_mobile_layout.dart';
@@ -132,7 +133,9 @@ String _compressContextErrorMessage(AppLocalizations l10n, String error) {
 }
 
 class _CompressContextOptionsDialog extends StatefulWidget {
-  const _CompressContextOptionsDialog();
+  const _CompressContextOptionsDialog({required this.collapsedMessages});
+
+  final List<ChatMessage> collapsedMessages;
 
   @override
   State<_CompressContextOptionsDialog> createState() =>
@@ -143,25 +146,79 @@ class _CompressContextOptionsDialogState
     extends State<_CompressContextOptionsDialog> {
   CompressContextLimitMode _mode = CompressContextLimitMode.start;
   late final TextEditingController _maxCharsController;
+  late final TextEditingController _keepCountController;
+  late final String _totalTextForEstimate;
   String? _error;
+
+  int get _userMessageCount => countUserMessages(widget.collapsedMessages);
+  int? get _keepCount => int.tryParse(_keepCountController.text.trim());
+  bool get _keepCoversAll =>
+      _userMessageCount == 0 || (_keepCount ?? 0) >= _userMessageCount;
 
   @override
   void initState() {
     super.initState();
+    final settings = context.read<SettingsProvider>();
+    _mode = settings.compressLimitMode;
     _maxCharsController = TextEditingController(
-      text: CompressContextOptions.defaultMaxChars.toString(),
+      text: settings.compressMaxChars.toString(),
+    );
+    _keepCountController = TextEditingController(
+      text:
+          (settings.compressKeepUserMessages ??
+                  defaultKeepUserMessageCountFor(_userMessageCount))
+              .toString(),
+    );
+    _totalTextForEstimate = buildConversationTextForCompression(
+      widget.collapsedMessages,
     );
   }
 
   @override
   void dispose() {
     _maxCharsController.dispose();
+    _keepCountController.dispose();
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _persistSelections({
+    int? maxChars,
+    int? keepUserMessages,
+  }) async {
+    final settings = context.read<SettingsProvider>();
+    await settings.setCompressLimitMode(_mode);
+    if (keepUserMessages != null) {
+      await settings.setCompressKeepUserMessages(keepUserMessages);
+    } else if (_keepCount != null && _keepCount! > 0) {
+      await settings.setCompressKeepUserMessages(_keepCount);
+    }
+    final persistedMaxChars =
+        maxChars ?? int.tryParse(_maxCharsController.text.trim());
+    if (persistedMaxChars != null && persistedMaxChars > 0) {
+      await settings.setCompressMaxChars(persistedMaxChars);
+    }
+  }
+
+  Future<void> _submit() async {
+    if (_mode == CompressContextLimitMode.keepRecent) {
+      if (_keepCount == null || _keepCount! <= 0) {
+        setState(() {
+          _error = AppLocalizations.of(context)!.compressContextInvalidLimit;
+        });
+        return;
+      }
+      if (_keepCoversAll) return;
+      await _persistSelections(keepUserMessages: _keepCount);
+      if (!mounted) return;
+      Navigator.of(
+        context,
+      ).pop(CompressContextOptions(mode: _mode, keepUserMessages: _keepCount));
+      return;
+    }
+
     int? maxChars;
-    if (_mode != CompressContextLimitMode.unlimited) {
+    if (_mode == CompressContextLimitMode.start ||
+        _mode == CompressContextLimitMode.recent) {
       maxChars = int.tryParse(_maxCharsController.text.trim());
       if (maxChars == null || maxChars <= 0) {
         setState(() {
@@ -171,9 +228,31 @@ class _CompressContextOptionsDialogState
       }
     }
 
+    await _persistSelections(maxChars: maxChars);
+    if (!mounted) return;
     Navigator.of(
       context,
     ).pop(CompressContextOptions(mode: _mode, maxChars: maxChars));
+  }
+
+  String _keepEstimateText(AppLocalizations l10n) {
+    final keptText = buildConversationTextForCompression(
+      selectKeepRecentMessages(widget.collapsedMessages, _keepCount ?? 0),
+    );
+    final summarizedChars = (_totalTextForEstimate.length - keptText.length)
+        .clamp(0, _totalTextForEstimate.length)
+        .toInt();
+    final estimate = estimateCompressionTokens(
+      totalText: _totalTextForEstimate,
+      keptText: keptText,
+    );
+    return l10n.compressContextEstimatePreview(
+      summarizedChars,
+      keptText.length,
+      estimate.minResultTokens,
+      estimate.maxResultTokens,
+      estimate.totalTokens,
+    );
   }
 
   @override
@@ -189,7 +268,10 @@ class _CompressContextOptionsDialogState
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       backgroundColor: Colors.transparent,
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: constrainedWidth),
+        constraints: BoxConstraints(
+          maxWidth: constrainedWidth,
+          maxHeight: MediaQuery.sizeOf(context).height,
+        ),
         child: Material(
           color: panelColor,
           borderRadius: BorderRadius.circular(18),
@@ -199,66 +281,109 @@ class _CompressContextOptionsDialogState
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  children: [
-                    Icon(Lucide.package2, size: 20, color: cs.primary),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        l10n.compressContextOptionsTitle,
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: AppFontWeights.emphasis,
-                          color: cs.onSurface,
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Lucide.package2, size: 20, color: cs.primary),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                l10n.compressContextOptionsTitle,
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: AppFontWeights.emphasis,
+                                  color: cs.onSurface,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
+                        const SizedBox(height: 8),
+                        Text(
+                          l10n.compressContextOptionsDesc,
+                          style: TextStyle(
+                            fontSize: 13,
+                            height: 1.35,
+                            color: cs.onSurface.withValues(alpha: 0.62),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const _CompressModelPickerRow(),
+                        const SizedBox(height: 16),
+                        _CompressModeSegmented(
+                          mode: _mode,
+                          keepRecentDisabled: _userMessageCount <= 1,
+                          onChanged: (mode) {
+                            setState(() {
+                              _mode = mode;
+                              _error = null;
+                            });
+                          },
+                        ),
+                        if (_mode == CompressContextLimitMode.start ||
+                            _mode == CompressContextLimitMode.recent) ...[
+                          const SizedBox(height: 10),
+                          IosFormTextField(
+                            label: l10n.compressContextMaxCharsLabel,
+                            controller: _maxCharsController,
+                            keyboardType: TextInputType.number,
+                            textInputAction: TextInputAction.done,
+                            selectAllOnFocus: true,
+                            fieldWidth: 120,
+                            onChanged: (_) {
+                              if (_error != null) {
+                                setState(() => _error = null);
+                              }
+                            },
+                          ),
+                        ],
+                        if (_mode == CompressContextLimitMode.keepRecent) ...[
+                          const SizedBox(height: 10),
+                          IosFormTextField(
+                            label: l10n.compressContextKeepCountLabel,
+                            controller: _keepCountController,
+                            keyboardType: TextInputType.number,
+                            textInputAction: TextInputAction.done,
+                            selectAllOnFocus: true,
+                            fieldWidth: 120,
+                            onChanged: (_) {
+                              setState(() => _error = null);
+                            },
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            _keepCoversAll
+                                ? l10n.compressContextKeepAllMessages
+                                : _keepEstimateText(l10n),
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.35,
+                              color: _keepCoversAll
+                                  ? cs.error
+                                  : cs.onSurface.withValues(alpha: 0.62),
+                            ),
+                          ),
+                        ],
+                        if (_error != null) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            _error!,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: cs.error,
+                              fontWeight: AppFontWeights.medium,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  l10n.compressContextOptionsDesc,
-                  style: TextStyle(
-                    fontSize: 13,
-                    height: 1.35,
-                    color: cs.onSurface.withValues(alpha: 0.62),
                   ),
                 ),
-                const SizedBox(height: 16),
-                _CompressModeSegmented(
-                  mode: _mode,
-                  onChanged: (mode) {
-                    setState(() {
-                      _mode = mode;
-                      _error = null;
-                    });
-                  },
-                ),
-                if (_mode != CompressContextLimitMode.unlimited) ...[
-                  const SizedBox(height: 10),
-                  IosFormTextField(
-                    label: l10n.compressContextMaxCharsLabel,
-                    controller: _maxCharsController,
-                    keyboardType: TextInputType.number,
-                    textInputAction: TextInputAction.done,
-                    selectAllOnFocus: true,
-                    fieldWidth: 120,
-                    onChanged: (_) {
-                      if (_error != null) setState(() => _error = null);
-                    },
-                  ),
-                ],
-                if (_error != null) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    _error!,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: cs.error,
-                      fontWeight: AppFontWeights.medium,
-                    ),
-                  ),
-                ],
                 const SizedBox(height: 18),
                 Row(
                   children: [
@@ -287,39 +412,171 @@ class _CompressContextOptionsDialogState
   }
 }
 
-class _CompressModeSegmented extends StatelessWidget {
-  const _CompressModeSegmented({required this.mode, required this.onChanged});
+String? _compressModelDisplayName(
+  SettingsProvider settings, {
+  required String? providerKey,
+  required String? modelId,
+}) {
+  if (providerKey == null || modelId == null) return null;
+  try {
+    final cfg = settings.getProviderConfig(providerKey);
+    final raw = cfg.modelOverrides[modelId];
+    final ov = raw is Map ? raw : null;
+    if (ov != null) {
+      final overrideName = (ov['name'] as String?)?.trim();
+      if (overrideName != null && overrideName.isNotEmpty) {
+        return overrideName;
+      }
+      final apiId = (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
+      if (apiId != null && apiId.isNotEmpty) return apiId;
+    }
+    return modelId;
+  } catch (_) {
+    return modelId;
+  }
+}
 
-  final CompressContextLimitMode mode;
-  final ValueChanged<CompressContextLimitMode> onChanged;
+class _CompressModelPickerRow extends StatelessWidget {
+  const _CompressModelPickerRow();
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return Row(
+    final cs = Theme.of(context).colorScheme;
+    final settings = context.watch<SettingsProvider>();
+    final assistant = context.watch<AssistantProvider>().currentAssistant;
+    final resolved = resolveCompressContextModel(
+      compressProvider: settings.compressModelProvider,
+      compressModelId: settings.compressModelId,
+      summaryProvider: settings.summaryModelProvider,
+      summaryModelId: settings.summaryModelId,
+      titleProvider: settings.titleModelProvider,
+      titleModelId: settings.titleModelId,
+      assistantProvider: assistant?.chatModelProvider,
+      assistantModelId: assistant?.chatModelId,
+      currentProvider: settings.currentModelProvider,
+      currentModelId: settings.currentModelId,
+    );
+    final display =
+        _compressModelDisplayName(
+          settings,
+          providerKey: resolved.providerKey,
+          modelId: resolved.modelId,
+        ) ??
+        l10n.compressContextModelUnset;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: _SegmentButton(
-            label: l10n.compressContextKeepStart,
-            selected: mode == CompressContextLimitMode.start,
-            onTap: () => onChanged(CompressContextLimitMode.start),
+        Text(
+          l10n.compressContextModelLabel,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: AppFontWeights.semibold,
+            color: cs.onSurface.withValues(alpha: 0.85),
           ),
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _SegmentButton(
-            label: l10n.compressContextKeepRecent,
-            selected: mode == CompressContextLimitMode.recent,
-            onTap: () => onChanged(CompressContextLimitMode.recent),
+        const SizedBox(height: 6),
+        IosCardPress(
+          baseColor: context.appColors.surfaceFill,
+          borderRadius: BorderRadius.circular(12),
+          pressedScale: 0.98,
+          haptics: false,
+          onTap: () async {
+            final selection = await showModelSelector(
+              context,
+              initialProviderKey: resolved.providerKey,
+              initialModelId: resolved.modelId,
+            );
+            if (selection == null || !context.mounted) return;
+            await context.read<SettingsProvider>().setCompressModel(
+              selection.providerKey,
+              selection.modelId,
+            );
+          },
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  display,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: AppFontWeights.medium,
+                    color: cs.onSurface.withValues(alpha: 0.92),
+                  ),
+                ),
+              ),
+              Icon(
+                Lucide.ChevronRight,
+                size: 16,
+                color: cs.onSurface.withValues(alpha: 0.45),
+              ),
+            ],
           ),
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _SegmentButton(
-            label: l10n.compressContextUnlimited,
-            selected: mode == CompressContextLimitMode.unlimited,
-            onTap: () => onChanged(CompressContextLimitMode.unlimited),
-          ),
+      ],
+    );
+  }
+}
+
+class _CompressModeSegmented extends StatelessWidget {
+  const _CompressModeSegmented({
+    required this.mode,
+    required this.onChanged,
+    this.keepRecentDisabled = false,
+  });
+
+  final CompressContextLimitMode mode;
+  final ValueChanged<CompressContextLimitMode> onChanged;
+  final bool keepRecentDisabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _SegmentButton(
+                label: l10n.compressContextKeepStart,
+                selected: mode == CompressContextLimitMode.start,
+                onTap: () => onChanged(CompressContextLimitMode.start),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _SegmentButton(
+                label: l10n.compressContextKeepRecent,
+                selected: mode == CompressContextLimitMode.recent,
+                onTap: () => onChanged(CompressContextLimitMode.recent),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _SegmentButton(
+                label: l10n.compressContextUnlimited,
+                selected: mode == CompressContextLimitMode.unlimited,
+                onTap: () => onChanged(CompressContextLimitMode.unlimited),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _SegmentButton(
+                label: l10n.compressContextKeepRecentMessages,
+                selected: mode == CompressContextLimitMode.keepRecent,
+                enabled: !keepRecentDisabled,
+                onTap: () => onChanged(CompressContextLimitMode.keepRecent),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -331,11 +588,13 @@ class _SegmentButton extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.enabled = true,
   });
 
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -350,7 +609,7 @@ class _SegmentButton extends StatelessWidget {
       baseColor: selected ? selectedBg : baseBg,
       borderRadius: BorderRadius.circular(10),
       pressedScale: 0.98,
-      onTap: onTap,
+      onTap: enabled ? onTap : null,
       haptics: false,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       child: Center(
@@ -361,7 +620,11 @@ class _SegmentButton extends StatelessWidget {
           style: TextStyle(
             fontSize: 13,
             fontWeight: AppFontWeights.emphasis,
-            color: selected ? cs.primary : cs.onSurface.withValues(alpha: 0.78),
+            color: !enabled
+                ? cs.onSurface.withValues(alpha: 0.3)
+                : selected
+                ? cs.primary
+                : cs.onSurface.withValues(alpha: 0.78),
           ),
         ),
       ),
@@ -428,7 +691,12 @@ class _HomePageState extends State<HomePage>
   final GlobalKey _inputBarKey = GlobalKey();
   final GlobalKey _selectionMiniMapKey = GlobalKey();
   final GlobalKey _selectionActionBarKey = GlobalKey();
+  final GlobalKey<NavigatorState> _miniMapNavigatorKey =
+      GlobalKey<NavigatorState>();
   bool _scrollNavHovering = false;
+  bool _miniMapRouteActive = false;
+  String? _miniMapConversationId;
+  int _miniMapRouteGeneration = 0;
   double _lastViewInsetBottom = 0;
   StreamSubscription<String>? _processTextSub;
 
@@ -458,6 +726,9 @@ class _HomePageState extends State<HomePage>
       inputController: _inputController,
       mediaController: _mediaController,
       scrollController: _scrollController,
+      readPositionStore: ChatReadPositionStore(
+        context.read<BusinessPreferences>(),
+      ),
     );
 
     _controller.addListener(_onControllerChanged);
@@ -528,6 +799,9 @@ class _HomePageState extends State<HomePage>
 
   void _onControllerChanged() {
     final conversationId = _controller.currentConversation?.id;
+    if (_miniMapRouteActive && conversationId != _miniMapConversationId) {
+      _closeMiniMapRoute();
+    }
     if (conversationId != null && conversationId != _scrollConversationId) {
       _scrollConversationId = conversationId;
       final previous = _scrollController;
@@ -647,13 +921,16 @@ class _HomePageState extends State<HomePage>
       onToggleDrawer: () => _drawerController.toggle(),
       onDismissKeyboard: _controller.dismissKeyboard,
       onSelectConversation: (id) {
+        _closeMiniMapRoute();
         _controller.switchConversationAnimated(id);
       },
       onNewConversation: () async {
+        _closeMiniMapRoute();
         await _controller.createNewConversationAnimated();
       },
       onOpenMiniMap: _openMiniMap,
       onCreateNewConversation: () async {
+        _closeMiniMapRoute();
         await _controller.createNewConversationAnimated();
         if (mounted) {
           _controller.forceScrollToBottomSoon(animate: false);
@@ -676,8 +953,13 @@ class _HomePageState extends State<HomePage>
           _controller.enterGlobalSearchMode(preserveQuery: false),
       onExitGlobalSearch: () =>
           _controller.exitGlobalSearchMode(clearQuery: true),
-      onOpenGlobalSearchResult: (convId, msgId) => _controller
-          .openGlobalSearchResult(conversationId: convId, messageId: msgId),
+      onOpenGlobalSearchResult: (convId, msgId) {
+        _closeMiniMapRoute();
+        return _controller.openGlobalSearchResult(
+          conversationId: convId,
+          messageId: msgId,
+        );
+      },
       appBarOverride: _controller.selecting
           ? ChatSelectionAppBar(
               selectedCount: _controller.selectedCount,
@@ -702,9 +984,6 @@ class _HomePageState extends State<HomePage>
 
     return ChatInputOverlayLayout(
       topInset: _chatTopOverlayInset(context),
-      background: backgroundImageActive
-          ? _buildChatBackground(context, cs)
-          : null,
       topBackground: backgroundImageActive
           ? _buildChatBackground(context, cs)
           : null,
@@ -778,12 +1057,15 @@ class _HomePageState extends State<HomePage>
       onToggleSidebar: _controller.toggleTabletSidebar,
       onToggleRightSidebar: _controller.toggleRightSidebar,
       onSelectConversation: (id) {
+        _closeMiniMapRoute();
         _controller.switchConversationAnimated(id);
       },
       onNewConversation: () async {
+        _closeMiniMapRoute();
         await _controller.createNewConversationAnimated();
       },
       onCreateNewConversation: () async {
+        _closeMiniMapRoute();
         await _controller.createNewConversationAnimated();
         if (mounted) _controller.forceScrollToBottomSoon(animate: false);
       },
@@ -797,8 +1079,13 @@ class _HomePageState extends State<HomePage>
       globalSearchMode: _controller.isGlobalSearchMode,
       globalSearchQuery: _controller.globalSearchQuery,
       onGlobalSearchQueryChanged: _controller.setGlobalSearchQuery,
-      onOpenGlobalSearchResult: (convId, msgId) => _controller
-          .openGlobalSearchResult(conversationId: convId, messageId: msgId),
+      onOpenGlobalSearchResult: (convId, msgId) {
+        _closeMiniMapRoute();
+        return _controller.openGlobalSearchResult(
+          conversationId: convId,
+          messageId: msgId,
+        );
+      },
       onSelectModel: () => showModelSelectSheet(context),
       onSidebarWidthChanged: _controller.updateSidebarWidth,
       onSidebarWidthChangeEnd: _controller.saveSidebarWidth,
@@ -818,45 +1105,92 @@ class _HomePageState extends State<HomePage>
               onInvertSelection: _controller.invertSelection,
             )
           : null,
-      body: _wrapWithDropTarget(_buildTabletBody(context, cs)),
+      body: Stack(
+        children: [
+          _wrapWithDropTarget(_buildTabletBody(context, cs)),
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: !_miniMapRouteActive,
+              child: Navigator(
+                key: _miniMapNavigatorKey,
+                onGenerateRoute: (_) => PageRouteBuilder<void>(
+                  opaque: false,
+                  pageBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Future<void> _openSelectionMiniMap() async {
+    final openingConversationId = _controller.currentConversation?.id;
     final collapsed = _messagesOnActivePath(
       await _controller.loadAllCollapsedMessagesForCurrentConversation(),
     );
-    if (!mounted) return;
-    if (collapsed.isEmpty) return;
-
-    if (PlatformUtils.isDesktop &&
-        _selectionActionBarKey.currentContext != null) {
-      await showDesktopMiniMapPopover(
-        context,
-        anchorKey: _selectionActionBarKey,
-        messages: collapsed,
-        selecting: true,
-        selectedMessageIds: _controller.selectedItems,
-        selectionListenable: _controller,
-        onToggleSelection: (id) => _controller.toggleSelection(
-          id,
-          !_controller.selectedItems.contains(id),
-        ),
-      );
+    if (!mounted ||
+        _controller.currentConversation?.id != openingConversationId) {
       return;
     }
+    if (collapsed.isEmpty) return;
 
-    await showMiniMapSheet(
-      context,
-      collapsed,
-      selecting: true,
-      selectedMessageIds: _controller.selectedItems,
-      selectionListenable: _controller,
-      onToggleSelection: (id) => _controller.toggleSelection(
-        id,
-        !_controller.selectedItems.contains(id),
-      ),
-    );
+    final navigator = PlatformUtils.isDesktop
+        ? _miniMapNavigatorKey.currentState
+        : Navigator.of(context);
+    if (navigator == null) return;
+    final routeGeneration = ++_miniMapRouteGeneration;
+    if (mounted) {
+      setState(() {
+        _miniMapRouteActive = true;
+        _miniMapConversationId = openingConversationId;
+      });
+    }
+    try {
+      await navigator.push<void>(
+        PageRouteBuilder<void>(
+          pageBuilder: (_, __, ___) => MiniMapPage(
+            messages: collapsed,
+            selecting: true,
+            selectedMessageIds: _controller.selectedItems,
+            selectionListenable: _controller,
+            onToggleSelection: (id) => _controller.toggleSelection(
+              id,
+              !_controller.selectedItems.contains(id),
+            ),
+          ),
+          transitionDuration: const Duration(milliseconds: 200),
+          reverseTransitionDuration: const Duration(milliseconds: 200),
+          transitionsBuilder: (_, animation, __, child) =>
+              FadeTransition(opacity: animation, child: child),
+        ),
+      );
+    } finally {
+      if (mounted && routeGeneration == _miniMapRouteGeneration) {
+        setState(() {
+          _miniMapRouteActive = false;
+          _miniMapConversationId = null;
+        });
+      }
+    }
+  }
+
+  void _closeMiniMapRoute() {
+    if (!_miniMapRouteActive) return;
+    _miniMapRouteGeneration++;
+    final navigator = PlatformUtils.isDesktop
+        ? _miniMapNavigatorKey.currentState
+        : Navigator.of(context);
+    if (navigator?.canPop() ?? false) {
+      navigator!.pop();
+    }
+    if (mounted) {
+      setState(() {
+        _miniMapRouteActive = false;
+        _miniMapConversationId = null;
+      });
+    }
   }
 
   Widget _buildSelectionActionBar(BuildContext context) {
@@ -1170,6 +1504,8 @@ class _HomePageState extends State<HomePage>
         onEditMessage: (message) => _controller.editMessage(message),
         onSwitchMessageRole: (message, role) =>
             _controller.switchMessageRole(message, role),
+        onDeleteMessageOnly: (message, byGroup) =>
+            _handleDeleteMessageOnly(context, message, byGroup),
         onDeleteMessage: (message, byGroup) =>
             _handleDeleteMessage(context, message, byGroup),
         onDeleteAllVersions: (message, byGroup) => _handleDeleteMessage(
@@ -1179,6 +1515,10 @@ class _HomePageState extends State<HomePage>
           deleteAllVersions: true,
         ),
         onMessageFork: (message) => _controller.createMessageFork(message),
+        onConversationFork: _controller.isTemporaryConversation
+            ? null
+            : (message, mode) =>
+                  _controller.createConversationFork(message, mode),
         onShareMessage: (index, messages) =>
             _controller.shareMessage(index, messages),
         onSelectMessages: (index, messages) =>
@@ -1365,6 +1705,7 @@ class _HomePageState extends State<HomePage>
   }
 
   Future<void> _openMiniMap() async {
+    final openingConversationId = _controller.currentConversation?.id;
     var tree = _controller.conversationTree;
     if (tree == null) {
       await _controller.ensureConversationTreeForCurrentConversation();
@@ -1375,33 +1716,50 @@ class _HomePageState extends State<HomePage>
             await _controller.loadAllCollapsedMessagesForCurrentConversation(),
           )
         : await _controller.loadAllConversationMessages();
-    if (!mounted) return;
+    if (!mounted ||
+        _controller.currentConversation?.id != openingConversationId) {
+      return;
+    }
     if (collapsed.isEmpty) return;
 
     String? selectedId;
-    if (PlatformUtils.isDesktop) {
-      selectedId = await showDesktopMiniMapPopover(
-        context,
-        anchorKey: _inputBarKey,
-        messages: collapsed,
-        conversationTree: tree,
-        branches: _controller.conversationTree?.branches.values.toList(
-          growable: false,
+    final navigator = PlatformUtils.isDesktop
+        ? _miniMapNavigatorKey.currentState
+        : Navigator.of(context);
+    if (navigator == null) return;
+    final routeGeneration = ++_miniMapRouteGeneration;
+    if (mounted) {
+      setState(() {
+        _miniMapRouteActive = true;
+        _miniMapConversationId = openingConversationId;
+      });
+    }
+    try {
+      selectedId = await navigator.push<String>(
+        PageRouteBuilder<String>(
+          pageBuilder: (_, __, ___) => MiniMapPage(
+            messages: collapsed,
+            conversationTree: tree,
+            branches: _controller.conversationTree?.branches.values.toList(
+              growable: false,
+            ),
+            activeBranchId: _controller.activeBranchId,
+            onSelectBranch: _controller.switchConversationBranch,
+            onSearch: (query) => _controller.searchMiniMapMatches(query),
+          ),
+          transitionDuration: const Duration(milliseconds: 200),
+          reverseTransitionDuration: const Duration(milliseconds: 200),
+          transitionsBuilder: (_, animation, __, child) =>
+              FadeTransition(opacity: animation, child: child),
         ),
-        activeBranchId: _controller.activeBranchId,
-        onSelectBranch: _controller.switchConversationBranch,
       );
-    } else {
-      selectedId = await showMiniMapSheet(
-        context,
-        collapsed,
-        conversationTree: tree,
-        branches: _controller.conversationTree?.branches.values.toList(
-          growable: false,
-        ),
-        activeBranchId: _controller.activeBranchId,
-        onSelectBranch: _controller.switchConversationBranch,
-      );
+    } finally {
+      if (mounted && routeGeneration == _miniMapRouteGeneration) {
+        setState(() {
+          _miniMapRouteActive = false;
+          _miniMapConversationId = null;
+        });
+      }
     }
     if (!mounted) return;
     if (selectedId != null && selectedId.isNotEmpty) {
@@ -1630,10 +1988,13 @@ class _HomePageState extends State<HomePage>
   }
 
   Future<void> _showCompressContextOptions() async {
+    final collapsedMessages = await _controller.loadCompressContextMessages();
+    if (!mounted) return;
     final options = await showDialog<CompressContextOptions>(
       context: context,
       barrierDismissible: true,
-      builder: (_) => const _CompressContextOptionsDialog(),
+      builder: (_) =>
+          _CompressContextOptionsDialog(collapsedMessages: collapsedMessages),
     );
     if (options == null || !mounted) return;
 
@@ -1705,6 +2066,37 @@ class _HomePageState extends State<HomePage>
     if (selected != null && mounted) {
       await _controller.handleQuickPhraseSelection(selected);
     }
+  }
+
+  Future<void> _handleDeleteMessageOnly(
+    BuildContext context,
+    ChatMessage message,
+    Map<String, List<ChatMessage>> byGroup,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.homePageDeleteMessageOnly),
+        content: Text(l10n.homePageDeleteMessageOnlyConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.homePageCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              l10n.homePageDelete,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    await _controller.deleteMessageOnly(message: message, byGroup: byGroup);
   }
 
   Future<void> _handleDeleteMessage(

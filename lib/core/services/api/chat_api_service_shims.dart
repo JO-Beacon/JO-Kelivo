@@ -127,5 +127,10 @@ bool _claudeShouldOmitSamplingParams(String modelId, int? budget) =>
 double? _claudeCompatibleTopP(String modelId, int? budget, double? topP) =>
     ChatApiService._claudeCompatibleTopP(modelId, budget, topP);
 
-Map<String, dynamic> _cleanSchemaForGemini(Map<String, dynamic> schema) =>
-    ChatApiService._cleanSchemaForGemini(schema);
+Map<String, dynamic> _cleanSchemaForGemini(
+  Map<String, dynamic> schema, {
+  bool stringEnumOnly = false,
+}) => ChatApiService._cleanSchemaForGemini(
+  schema,
+  stringEnumOnly: stringEnumOnly,
+);

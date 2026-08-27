@@ -279,8 +279,9 @@ class MemorySmartAdd {
   /// 依据 [candidateIds] 校验/降级单个决策 (§12.6)。
   static SmartAddDecision normalizeDecision(
     SmartAddDecision decision,
-    Set<String> candidateIds,
-  ) {
+    Set<String> candidateIds, {
+    Set<String>? mergeableIds,
+  }) {
     var action = decision.action;
     var targetId = decision.targetId;
     var merged = decision.mergedContent;
@@ -288,9 +289,10 @@ class MemorySmartAdd {
       for (final id in decision.relatedIds)
         if (candidateIds.contains(id)) id,
     ];
+    final mergeTargets = mergeableIds ?? candidateIds;
 
     if (action == SmartAddAction.merge || action == SmartAddAction.conflict) {
-      if (targetId == null || !candidateIds.contains(targetId)) {
+      if (targetId == null || !mergeTargets.contains(targetId)) {
         action = SmartAddAction.neu;
         targetId = null;
         merged = null;
@@ -416,8 +418,13 @@ class MemorySmartAdd {
     required Set<String> candidateIds,
     required MemorySource source,
     MemoryTraceStep? traceStep,
+    Set<String>? mergeableIds,
   }) async {
-    final normalized = normalizeDecision(decision, candidateIds);
+    final normalized = normalizeDecision(
+      decision,
+      candidateIds,
+      mergeableIds: mergeableIds,
+    );
     final typeLabel = MemoryEntry.typeToString(item.type);
     switch (normalized.action) {
       case SmartAddAction.skip:
@@ -557,6 +564,11 @@ class MemorySmartAdd {
       newInfo: item.content,
     );
     final candidateIds = {for (final e in candidates) e.id};
+    final mergeableIds = {
+      for (final entry in candidates)
+        if (entry.scope == item.scope && entry.assistantId == item.assistantId)
+          entry.id,
+    };
 
     SmartAddDecision decision;
     if (llmCall == null) {
@@ -600,6 +612,7 @@ class MemorySmartAdd {
       item: item,
       decision: decision,
       candidateIds: candidateIds,
+      mergeableIds: mergeableIds,
       source: source,
       traceStep: traceStep,
     );
@@ -746,6 +759,12 @@ class MemorySmartAdd {
     for (var i = 0; i < items.length; i++) {
       final item = items[i];
       final candidateIds = {for (final e in perItemCandidates[i]) e.id};
+      final mergeableIds = {
+        for (final entry in perItemCandidates[i])
+          if (entry.scope == item.scope &&
+              entry.assistantId == item.assistantId)
+            entry.id,
+      };
       // 批量模式下也允许来自并集的 relatedIds / targetId
       // （entriesText 即并集）。§12.6：relatedIds 不在该项的*候选集*内
       // ——使用该项的逐项候选。
@@ -760,6 +779,7 @@ class MemorySmartAdd {
         item: item,
         decision: decision,
         candidateIds: candidateIds,
+        mergeableIds: mergeableIds,
         source: source,
         traceStep: traceStep,
       );

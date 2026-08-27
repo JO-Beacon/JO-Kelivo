@@ -10,6 +10,7 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/platform_utils.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../widgets/memory_ui.dart';
@@ -70,113 +71,283 @@ class MemorySettingsContent extends StatelessWidget {
       return '$providerName / $m';
     }();
 
+    final languageSection = _SettingsSection(
+      title: l10n.memorySettingsPromptLangSection,
+      children: [
+        for (final lang in const ['auto', 'zh', 'en'])
+          _LangRow(
+            lang: lang,
+            selected: settings.memoryPromptLang == lang,
+            onTap: () =>
+                context.read<SettingsProvider>().setMemoryPromptLang(lang),
+          ),
+      ],
+    );
+
+    final currentMemorySections = <Widget>[
+      if (!modelSet) ...[
+        MemoryInfoBanner(body: l10n.memorySettingsModelTip),
+        const SizedBox(height: 12),
+      ],
+      _SettingsSection(
+        title: l10n.memorySettingsModelSection,
+        titleTrailing: modelSet
+            ? _ModelTipInfoIcon(tip: l10n.memorySettingsModelTip)
+            : null,
+        children: [
+          _NavRow(
+            title: l10n.memorySettingsModelTitle,
+            subtitle: modelLabel,
+            onTap: () async {
+              final settingsApi = context.read<SettingsProvider>();
+              final selection = await showModelSelector(
+                context,
+                initialProviderKey: settings.memoryModelProvider,
+                initialModelId: settings.memoryModelId,
+              );
+              if (selection == null || !context.mounted) return;
+              await settingsApi.setMemoryModel(
+                selection.providerKey,
+                selection.modelId,
+              );
+            },
+          ),
+          _SettingsRow(
+            title: l10n.memorySettingsThinkingTitle,
+            subtitle: l10n.memorySettingsThinkingSubtitle,
+            trailing: IosSwitch(
+              value: settings.memoryModelThinkingEnabled,
+              semanticLabel: l10n.memorySettingsThinkingTitle,
+              onChanged: (value) => context
+                  .read<SettingsProvider>()
+                  .setMemoryModelThinkingEnabled(value),
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 18),
+      _SettingsSection(
+        title: l10n.memorySettingsInjectionSection,
+        children: [
+          _NavRow(
+            title: l10n.memorySettingsInjectionMaxItemsTitle,
+            subtitle: l10n.memorySettingsInjectionMaxItemsSubtitle,
+            detailText: '${settings.memoryInjectionMaxItems}',
+            onTap: () => _pickMemoryInjectionMaxItems(context),
+          ),
+        ],
+      ),
+      const SizedBox(height: 18),
+      languageSection,
+      const SizedBox(height: 18),
+      _SettingsSection(
+        title: l10n.memorySettingsPromptsSection,
+        children: [
+          for (final entry in _promptEntries(l10n))
+            _NavRow(
+              title: entry.title,
+              subtitle: entry.subtitle,
+              onTap: () => _openPromptEditor(context, entry),
+            ),
+          _NavRow(
+            title: l10n.legacyMemoryMigrationBatchSize,
+            subtitle: l10n.memorySettingsMigrationBatchSizeSubtitle,
+            detailText: '${settings.memoryMigrationBatchSize}',
+            onTap: () => _pickMemoryMigrationBatchSize(context),
+          ),
+        ],
+      ),
+      const SizedBox(height: 18),
+      _SettingsSection(
+        title: l10n.memorySettingsEntriesSection,
+        children: [
+          _NavRow(
+            title: l10n.memorySettingsEntriesTitle,
+            subtitle: l10n.memorySettingsEntriesSubtitle,
+            onTap: () => _openMemoryEntries(context),
+          ),
+          _NavRow(
+            title: l10n.memorySettingsProfileTitle,
+            subtitle: l10n.memorySettingsProfileSubtitle,
+            onTap: () => _openUserProfile(context),
+          ),
+          _NavRow(
+            title: l10n.memorySettingsLegacyTitle,
+            subtitle: l10n.memorySettingsLegacySubtitle,
+            onTap: () => _openLegacyMemory(context),
+          ),
+          _NavRow(
+            title: l10n.memoryTraceSettingsTitle,
+            subtitle: l10n.memoryTraceSettingsSubtitle,
+            onTap: () => _openMemoryTrace(context),
+          ),
+        ],
+      ),
+      const SizedBox(height: 18),
+      MemorySectionCard(
+        padding: EdgeInsets.zero,
+        children: [
+          _NavRow(
+            title: l10n.memorySettingsAboutTitle,
+            subtitle: l10n.memorySettingsAboutSubtitle,
+            onTap: () => _openMemoryAbout(context),
+          ),
+        ],
+      ),
+    ];
+
     return ListView(
       padding: padding ?? const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        if (!modelSet) ...[
-          MemoryInfoBanner(body: l10n.memorySettingsModelTip),
-          const SizedBox(height: 12),
-        ],
         _SettingsSection(
-          title: l10n.memorySettingsModelSection,
-          titleTrailing: modelSet
-              ? _ModelTipInfoIcon(tip: l10n.memorySettingsModelTip)
-              : null,
+          title: l10n.memorySettingsModeSection,
           children: [
-            _NavRow(
-              title: l10n.memorySettingsModelTitle,
-              subtitle: modelLabel,
-              onTap: () async {
-                final navigator = Navigator.of(context);
-                final settingsApi = context.read<SettingsProvider>();
-                final sel = await showModelSelector(
-                  context,
-                  initialProviderKey: settings.memoryModelProvider,
-                  initialModelId: settings.memoryModelId,
-                );
-                if (sel == null) return;
-                if (!navigator.mounted) return;
-                await settingsApi.setMemoryModel(sel.providerKey, sel.modelId);
-              },
-            ),
             _SettingsRow(
-              title: l10n.memorySettingsThinkingTitle,
-              subtitle: l10n.memorySettingsThinkingSubtitle,
+              title: l10n.legacyMemoryModeTitle,
+              subtitle: l10n.legacyMemoryModeSubtitle,
               trailing: IosSwitch(
-                value: settings.memoryModelThinkingEnabled,
-                semanticLabel: l10n.memorySettingsThinkingTitle,
-                onChanged: (v) => context
-                    .read<SettingsProvider>()
-                    .setMemoryModelThinkingEnabled(v),
+                value: settings.legacyMemoryMode,
+                semanticLabel: l10n.legacyMemoryModeTitle,
+                onChanged: (value) =>
+                    context.read<SettingsProvider>().setLegacyMemoryMode(value),
               ),
             ),
           ],
         ),
         const SizedBox(height: 18),
-        _SettingsSection(
-          title: l10n.memorySettingsPromptLangSection,
-          children: [
-            for (final lang in const ['auto', 'zh', 'en'])
-              _LangRow(
-                lang: lang,
-                selected: settings.memoryPromptLang == lang,
-                onTap: () =>
-                    context.read<SettingsProvider>().setMemoryPromptLang(lang),
-              ),
-          ],
-        ),
-        const SizedBox(height: 18),
-        _SettingsSection(
-          title: l10n.memorySettingsPromptsSection,
-          children: [
-            for (final entry in _promptEntries(l10n))
+        if (settings.legacyMemoryMode) ...[
+          languageSection,
+          const SizedBox(height: 18),
+          _SettingsSection(
+            title: l10n.memorySettingsPromptsSection,
+            children: [
               _NavRow(
-                title: entry.title,
-                subtitle: entry.subtitle,
-                onTap: () => _openPromptEditor(context, entry),
+                title: l10n.memorySettingsLegacyPromptTitle,
+                subtitle: l10n.memoryPromptEditRulesSubtitle,
+                onTap: () =>
+                    _openPromptEditor(context, _legacyPromptEntry(l10n)),
               ),
-          ],
-        ),
-        const SizedBox(height: 18),
-        _SettingsSection(
-          title: l10n.memorySettingsEntriesSection,
-          children: [
-            _NavRow(
-              title: l10n.memorySettingsEntriesTitle,
-              subtitle: l10n.memorySettingsEntriesSubtitle,
-              onTap: () => _openMemoryEntries(context),
-            ),
-            _NavRow(
-              title: l10n.memorySettingsProfileTitle,
-              subtitle: l10n.memorySettingsProfileSubtitle,
-              onTap: () => _openUserProfile(context),
-            ),
-            _NavRow(
-              title: l10n.memorySettingsLegacyTitle,
-              subtitle: l10n.memorySettingsLegacySubtitle,
-              onTap: () => _openLegacyMemory(context),
-            ),
-            _NavRow(
-              title: l10n.memoryTraceSettingsTitle,
-              subtitle: l10n.memoryTraceSettingsSubtitle,
-              onTap: () => _openMemoryTrace(context),
-            ),
-          ],
-        ),
-        const SizedBox(height: 18),
-        MemorySectionCard(
-          padding: EdgeInsets.zero,
-          children: [
-            _NavRow(
-              title: l10n.memorySettingsAboutTitle,
-              subtitle: l10n.memorySettingsAboutSubtitle,
-              onTap: () => _openMemoryAbout(context),
-            ),
-          ],
-        ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          _SettingsSection(
+            title: l10n.memorySettingsLegacySection,
+            children: [
+              _NavRow(
+                title: l10n.memorySettingsLegacyTitle,
+                subtitle: l10n.memorySettingsLegacySubtitle,
+                onTap: () => _openLegacyMemory(context),
+              ),
+            ],
+          ),
+        ] else
+          ...currentMemorySections,
       ],
     );
   }
+}
+
+const int _customInjectionCount = -1;
+
+Future<void> _pickMemoryInjectionMaxItems(BuildContext context) async {
+  final l10n = AppLocalizations.of(context)!;
+  final settings = context.read<SettingsProvider>();
+  final selected = settings.memoryInjectionMaxItems;
+  final options = <int>{5, 10, 20, 30, selected}.toList()..sort();
+  final choice = await showMemoryOptionPicker<int>(
+    context,
+    title: l10n.memorySettingsInjectionMaxItemsTitle,
+    selected: selected,
+    options: [
+      for (final value in options)
+        MemoryPickerOption(value: value, label: '$value'),
+      MemoryPickerOption(
+        value: _customInjectionCount,
+        label: l10n.memorySettingsInjectionMaxItemsCustomButton,
+      ),
+    ],
+  );
+  if (choice == null || !context.mounted) return;
+  if (choice != _customInjectionCount) {
+    await context.read<SettingsProvider>().setMemoryInjectionMaxItems(choice);
+    return;
+  }
+
+  final controller = TextEditingController(text: '$selected');
+  final input = await showDialog<String>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(l10n.memorySettingsInjectionMaxItemsCustomTitle),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: controller,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: l10n.memorySettingsInjectionMaxItemsCustomLabel,
+              hintText: l10n.memorySettingsInjectionMaxItemsCustomHint,
+            ),
+            onSubmitted: (value) =>
+                Navigator.of(dialogContext).pop(value.trim()),
+          ),
+          const SizedBox(height: 8),
+          Text(l10n.memorySettingsInjectionMaxItemsCustomDescription),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: Text(l10n.homePageCancel),
+        ),
+        TextButton(
+          onPressed: () =>
+              Navigator.of(dialogContext).pop(controller.text.trim()),
+          child: Text(l10n.userProfileSave),
+        ),
+      ],
+    ),
+  );
+  controller.dispose();
+  final value = input == null ? null : int.tryParse(input);
+  if (value == null) return;
+  if (value < SettingsProvider.minMemoryInjectionMaxItems ||
+      value > SettingsProvider.maxMemoryInjectionMaxItems) {
+    if (context.mounted) {
+      showAppSnackBar(
+        context,
+        message: l10n.memorySettingsInjectionMaxItemsCustomInvalid,
+        type: NotificationType.error,
+      );
+    }
+    return;
+  }
+  if (context.mounted) {
+    await context.read<SettingsProvider>().setMemoryInjectionMaxItems(value);
+  }
+}
+
+Future<void> _pickMemoryMigrationBatchSize(BuildContext context) async {
+  final l10n = AppLocalizations.of(context)!;
+  final settings = context.read<SettingsProvider>();
+  final selected = settings.memoryMigrationBatchSize;
+  final choice = await showMemoryOptionPicker<int>(
+    context,
+    title: l10n.legacyMemoryMigrationBatchSize,
+    selected: selected,
+    options: [
+      for (
+        var value = SettingsProvider.minMemoryMigrationBatchSize;
+        value <= SettingsProvider.maxMemoryMigrationBatchSize;
+        value++
+      )
+        MemoryPickerOption(value: value, label: '$value'),
+    ],
+  );
+  if (choice == null || !context.mounted) return;
+  await context.read<SettingsProvider>().setMemoryMigrationBatchSize(choice);
 }
 
 Future<void> _openMemoryEntries(BuildContext context) async {
@@ -241,7 +412,21 @@ class _PromptEntry {
   final _PromptKind kind;
 }
 
-enum _PromptKind { rules, gate, extract, smartAdd, distill }
+enum _PromptKind {
+  rules,
+  gate,
+  extract,
+  smartAdd,
+  distill,
+  migrate,
+  legacyRules,
+}
+
+_PromptEntry _legacyPromptEntry(AppLocalizations l10n) => _PromptEntry(
+  title: l10n.memorySettingsLegacyPromptTitle,
+  subtitle: l10n.memoryPromptEditRulesSubtitle,
+  kind: _PromptKind.legacyRules,
+);
 
 List<_PromptEntry> _promptEntries(AppLocalizations l10n) => [
   _PromptEntry(
@@ -268,6 +453,11 @@ List<_PromptEntry> _promptEntries(AppLocalizations l10n) => [
     title: l10n.memoryPromptEditDistillTitle,
     subtitle: l10n.memoryPromptEditDistillSubtitle,
     kind: _PromptKind.distill,
+  ),
+  _PromptEntry(
+    title: l10n.memoryPromptEditMigrateTitle,
+    subtitle: l10n.memoryPromptEditMigrateSubtitle,
+    kind: _PromptKind.migrate,
   ),
 ];
 
@@ -359,6 +549,10 @@ class _MemoryPromptEditPageState extends State<_MemoryPromptEditPage> {
         return _isZh
             ? s.memoryProfileDistillPromptZh
             : s.memoryProfileDistillPromptEn;
+      case _PromptKind.migrate:
+        return _isZh ? s.memoryMigratePromptZh : s.memoryMigratePromptEn;
+      case _PromptKind.legacyRules:
+        return _isZh ? s.legacyMemoryPromptZh : s.legacyMemoryPromptEn;
     }
   }
 
@@ -393,6 +587,16 @@ class _MemoryPromptEditPageState extends State<_MemoryPromptEditPage> {
         await (_isZh
             ? s.setMemoryProfileDistillPromptZh(text)
             : s.setMemoryProfileDistillPromptEn(text));
+        break;
+      case _PromptKind.migrate:
+        await (_isZh
+            ? s.setMemoryMigratePromptZh(text)
+            : s.setMemoryMigratePromptEn(text));
+        break;
+      case _PromptKind.legacyRules:
+        await (_isZh
+            ? s.setLegacyMemoryPromptZh(text)
+            : s.setLegacyMemoryPromptEn(text));
         break;
     }
     if (mounted) Navigator.of(context).maybePop();
@@ -440,6 +644,20 @@ class _MemoryPromptEditPageState extends State<_MemoryPromptEditPage> {
         _main.text = _isZh
             ? MemoryPrompts.profileDistillZh
             : MemoryPrompts.profileDistillEn;
+        break;
+      case _PromptKind.migrate:
+        await (_isZh
+            ? s.resetMemoryMigratePromptZh()
+            : s.resetMemoryMigratePromptEn());
+        _main.text = _isZh ? MemoryPrompts.migrateZh : MemoryPrompts.migrateEn;
+        break;
+      case _PromptKind.legacyRules:
+        await (_isZh
+            ? s.resetLegacyMemoryPromptZh()
+            : s.resetLegacyMemoryPromptEn());
+        _main.text = _isZh
+            ? MemoryPrompts.legacyRulesZh
+            : MemoryPrompts.legacyRulesEn;
         break;
     }
     setState(() {});
@@ -777,11 +995,13 @@ class _NavRow extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.detailText,
   });
 
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final String? detailText;
 
   @override
   Widget build(BuildContext context) {
@@ -799,6 +1019,16 @@ class _NavRow extends StatelessWidget {
               child: _RowText(title: title, subtitle: subtitle),
             ),
             const SizedBox(width: 8),
+            if (detailText != null) ...[
+              Text(
+                detailText!,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: cs.onSurface.withValues(alpha: 0.58),
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
             Icon(
               Lucide.ChevronRight,
               size: 18,

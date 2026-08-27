@@ -116,6 +116,115 @@ void main() {
     });
   });
 
+  group('compression safety helpers', () {
+    test(
+      'keep-recent selects from the last user turn and preserves its tail',
+      () {
+        final messages = [
+          _message(id: 'u1', role: 'user', content: 'old question'),
+          _message(id: 'a1', role: 'assistant', content: 'old answer'),
+          _message(id: 'u2', role: 'user', content: 'recent question'),
+          _message(id: 'a2', role: 'assistant', content: 'recent answer'),
+          _message(id: 'tool2', role: 'tool', content: 'tool output'),
+        ];
+
+        final kept = selectKeepRecentMessages(messages, 1);
+
+        expect(kept.map((message) => message.id), ['u2', 'a2', 'tool2']);
+        expect(countUserMessages(messages), 2);
+        expect(defaultKeepUserMessageCountFor(2), 1);
+      },
+    );
+
+    test('keep-recent token estimate is bounded by original tokens', () {
+      final estimate = estimateCompressionTokens(
+        totalText: '用户问题很长\n\nAssistant: answer',
+        keptText: '用户问题很长',
+      );
+
+      expect(estimate.totalTokens, greaterThan(0));
+      expect(estimate.keptTokens, lessThanOrEqualTo(estimate.totalTokens));
+      expect(
+        estimate.minResultTokens,
+        lessThanOrEqualTo(estimate.maxResultTokens),
+      );
+    });
+
+    test('压缩模型按上游优先级解析', () {
+      final resolved = resolveCompressContextModel(
+        compressProvider: 'OpenAI',
+        compressModelId: 'gpt-4o-mini',
+        summaryProvider: 'Gemini',
+        summaryModelId: 'gemini-2.5-flash',
+        currentProvider: 'DeepSeek',
+        currentModelId: 'deepseek-chat',
+      );
+      expect(resolved.providerKey, 'OpenAI');
+      expect(resolved.modelId, 'gpt-4o-mini');
+    });
+
+    test('未设置压缩模型时按现有回退链解析', () {
+      final resolved = resolveCompressContextModel(
+        titleProvider: 'OpenAI',
+        titleModelId: 'gpt-4o-mini',
+        assistantProvider: 'Claude',
+        assistantModelId: 'claude-sonnet',
+        currentProvider: 'DeepSeek',
+        currentModelId: 'deepseek-chat',
+      );
+      expect(resolved, (providerKey: 'OpenAI', modelId: 'gpt-4o-mini'));
+    });
+
+    test('model context override produces a bounded request budget', () {
+      expect(parseContextWindow({'context_window': '8192'}), 8192);
+      final budget = compressionRequestCharBudget(
+        options: const CompressContextOptions(
+          mode: CompressContextLimitMode.unlimited,
+        ),
+        contextWindow: 2048,
+      );
+      expect(budget, 636);
+    });
+
+    test('unlimited input is chunked at message boundaries', () {
+      final chunks = buildCompressRequestContents(
+        [
+          _message(id: 'u1', role: 'user', content: 'a' * 4),
+          _message(id: 'a1', role: 'assistant', content: 'b' * 4),
+        ],
+        options: const CompressContextOptions(
+          mode: CompressContextLimitMode.unlimited,
+        ),
+        maxCodeUnits: 16,
+      );
+      expect(chunks, ['User: aaaa', 'Assistant: bbbb']);
+    });
+
+    test('context length errors are retried with safe halves', () async {
+      final seen = <String>[];
+      final result = await summarizeWithContextRetry(
+        content: 'abcdefgh',
+        generate: (content) async {
+          seen.add(content);
+          if (content.length > 2) throw Exception('maximum context length');
+          return content.toUpperCase();
+        },
+      );
+      expect(result, 'AB\n\nCD\n\nEF\n\nGH');
+      expect(seen.first, 'abcdefgh');
+    });
+
+    test('non-context errors are not swallowed', () async {
+      expect(
+        () => summarizeWithContextRetry(
+          content: 'abcdef',
+          generate: (_) async => throw Exception('network unavailable'),
+        ),
+        throwsA(isA<Exception>()),
+      );
+    });
+  });
+
   group('HomeViewModel.computeClearContextRemainingMessageCount', () {
     test('计数来自持久化总数，与窗口缓存无关', () {
       final count = HomeViewModel.computeClearContextRemainingMessageCount(

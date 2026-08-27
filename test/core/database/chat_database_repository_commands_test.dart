@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/message_part.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -52,7 +53,7 @@ void main() {
     );
   }
 
-  test('append version selects the new row in the linear group', () async {
+  test('append version creates and activates a tree branch', () async {
     await repository.appendLinearMessageToConversation(
       conversation: conversation(),
       message: message(id: 'message-0', groupId: 'group-1'),
@@ -69,9 +70,48 @@ void main() {
       fromStart: true,
     );
     expect(timeline.slots.single.revisionId, result!.message.id);
+    final tree = await repository.loadConversationTree('conversation-1');
+    expect(tree, isNotNull);
+    expect(tree!.activePath(), contains(result.message.id));
     expect(
       (await repository.getConversation('conversation-1'))?.versionSelections,
-      const {'group-1': 1},
+      isEmpty,
+    );
+  });
+
+  test('overwriting a message keeps its identity and tree position', () async {
+    final original = message(id: 'message-0', groupId: 'group-1');
+    await repository.appendLinearMessageToConversation(
+      conversation: conversation(),
+      message: original,
+    );
+
+    await repository.updateMessage(
+      original.copyWith(
+        parts: const [
+          TextPart('edited'),
+          ImagePart(uri: 'image.png'),
+        ],
+      ),
+    );
+
+    final persisted = await repository.getMessage(original.id);
+    expect(persisted, isNotNull);
+    expect(persisted!.id, original.id);
+    expect(persisted.groupId, original.groupId);
+    expect(persisted.version, original.version);
+    expect(persisted.parts.map((part) => part.kind), ['text', 'image']);
+
+    final timeline = await repository.loadLinearMessageWindow(
+      conversationId: original.conversationId,
+      fromStart: true,
+    );
+    expect(timeline.slots.map((slot) => slot.revisionId), [original.id]);
+    expect(
+      (await repository.loadConversationTree(
+        original.conversationId,
+      ))!.activePath(),
+      [original.id],
     );
   });
 

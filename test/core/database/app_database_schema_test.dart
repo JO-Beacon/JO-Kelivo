@@ -20,9 +20,9 @@ void main() {
     verifier = SchemaVerifier(GeneratedHelper());
   });
 
-  test('frozen schema includes and matches current schema 3', () async {
-    expect(AppDatabase.currentSchemaVersion, 3);
-    expect(GeneratedHelper.versions, const [1, 2, 3]);
+  test('frozen schema includes and matches current schema 4', () async {
+    expect(AppDatabase.currentSchemaVersion, 4);
+    expect(GeneratedHelper.versions, const [1, 2, 3, 4]);
     final database = AppDatabase(NativeDatabase.memory());
     try {
       await database.customSelect('SELECT 1;').getSingle();
@@ -36,7 +36,7 @@ void main() {
     }
   });
 
-  test('schema 3 creates every business and tree persistence table', () async {
+  test('schema 4 creates every business and tree persistence table', () async {
     final database = AppDatabase(NativeDatabase.memory());
     try {
       final rows = await database
@@ -86,7 +86,7 @@ void main() {
     });
     final file = File(p.join(directory.path, AppDatabase.databaseFileName));
     final raw = sqlite.sqlite3.open(file.path);
-    raw.userVersion = 4;
+    raw.userVersion = AppDatabase.currentSchemaVersion + 1;
     raw.close();
 
     final database = AppDatabase.open(file: file);

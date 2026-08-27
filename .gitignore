@@ -64,14 +64,15 @@ pubspec.lock
 internationalization.md
 /macos/Podfile.lock
 /desiredFileName.txt
-/lib/secrets/fallback.dart
 .claude/settings.local.json
 /.codex/
 /.agent/
 /.agents/
 /skills-lock.json
+/.grok/
 
 # Local release artifacts
+/dist/
 /JO-Kelivo-v*-windows-*-portable.zip
 /JO-Kelivo-v*-windows-*-setup.exe
 /build/installer-languages/

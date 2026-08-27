@@ -78,6 +78,79 @@ Stream<ChatStreamChunk> _sendOpenAIImagesStream(
   );
 }
 
+/// OpenAI Images 的事件化入口；请求和图片存储逻辑复用旧实现。
+Stream<StreamChunk> _sendOpenAIImagesEvents(
+  http.Client client,
+  ProviderConfig config,
+  String modelId,
+  List<Map<String, dynamic>> messages, {
+  List<String>? userImagePaths,
+  Map<String, String>? extraHeaders,
+  Map<String, dynamic>? extraBody,
+}) async* {
+  final input = await _openAIImagesInput(messages, userImagePaths);
+  final outputMime = _openAIImagesOutputMime(config, modelId, extraBody);
+  final upstreamModelId = _apiModelId(config, modelId);
+  if (input.imageRefs.isNotEmpty &&
+      !_supportsOpenAIImageEdits(upstreamModelId)) {
+    throw UnsupportedError(
+      'OpenAI Images API model $upstreamModelId does not support image edits with input images.',
+    );
+  }
+  final response = input.imageRefs.isEmpty
+      ? await _sendOpenAIImageGeneration(
+          client,
+          config,
+          modelId,
+          input.prompt,
+          extraHeaders: extraHeaders,
+          extraBody: extraBody,
+        )
+      : await _sendOpenAIImageEdit(
+          client,
+          config,
+          modelId,
+          input.prompt,
+          input.imageRefs,
+          extraHeaders: extraHeaders,
+          extraBody: extraBody,
+        );
+  final ids = StreamChunkIds('images');
+  final data = response['data'];
+  if (data is List) {
+    for (final item in data) {
+      if (item is! Map) continue;
+      final url = (item['url'] ?? '').toString().trim();
+      if (url.isNotEmpty) {
+        final id = ids.next('image');
+        yield ImageStart(id: id, mimeType: outputMime);
+        yield ImageSnapshot(id: id, data: url);
+        yield ImageEnd(id);
+        continue;
+      }
+      final b64 = (item['b64_json'] ?? '').toString().trim();
+      if (b64.isEmpty) continue;
+      final path = await AppDirectories.saveBase64Image(outputMime, b64);
+      if (path == null || path.isEmpty) {
+        throw const FileSystemException(
+          'Failed to save OpenAI Images API base64 image.',
+        );
+      }
+      final uri = SandboxPathResolver.canonicalize(path);
+      final id = ids.next('image');
+      yield ImageStart(id: id, mimeType: outputMime);
+      yield ImageSnapshot(id: id, data: uri);
+      yield ImageEnd(id);
+    }
+  }
+  final usage = _openAIImagesUsage(response);
+  yield* emitFinish(
+    ids: ids,
+    usage: usage,
+    totalTokens: usage?.totalTokens ?? 0,
+  );
+}
+
 Future<Map<String, dynamic>> _sendOpenAIImageGeneration(
   http.Client client,
   ProviderConfig config,

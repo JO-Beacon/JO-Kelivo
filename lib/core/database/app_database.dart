@@ -752,9 +752,9 @@ class AppDatabase extends _$AppDatabase {
       'context_tree_migration_warnings_v1';
 
   // Schema 1 是第一个发布的 SQLite 契约。模式 2 添加显式消息树边、
-  // 分支和活动分支状态，而不改变现有消息/会话行。模式 3 存储每个共享
-  // 树前缀下最后选择的分支。
-  static const currentSchemaVersion = 3;
+  // 分支和活动分支状态，模式 3 存储每个共享树前缀下最后选择的分支，
+  // 模式 4 将 Kelivo 的助手标签表迁移为 JO-Kelivo 的助手分组表。
+  static const currentSchemaVersion = 4;
   // 保持 SQLite 既定的 1000 页节奏显式声明。按通常 4 KiB 页大小计算，
   // 这大约在 4 MiB 时触发一次检查点，但页大小仍是实际依据。
   static const walAutoCheckpointPages = 1000;
@@ -1053,10 +1053,31 @@ FROM probe;
           conversationTreeStateRows.branchSelectionsJson,
         );
       }
+      if (from < 4) {
+        await _renameLegacyAssistantTagRows();
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON;');
       await customStatement('PRAGMA busy_timeout = 5000;');
     },
   );
+
+  Future<void> _renameLegacyAssistantTagRows() async {
+    final rows = await customSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' "
+      "AND name IN ('assistant_tag_rows', 'assistant_group_rows');",
+    ).get();
+    final tables = rows.map((row) => row.read<String>('name')).toSet();
+    final hasLegacyTable = tables.contains('assistant_tag_rows');
+    final hasCurrentTable = tables.contains('assistant_group_rows');
+    if (hasLegacyTable && hasCurrentTable) {
+      throw StateError('assistant_group_table_conflict');
+    }
+    if (hasLegacyTable) {
+      await customStatement(
+        'ALTER TABLE assistant_tag_rows RENAME TO assistant_group_rows;',
+      );
+    }
+  }
 }

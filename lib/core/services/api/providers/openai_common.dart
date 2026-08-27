@@ -59,6 +59,27 @@ void _applyCompatibleBuiltInSearch(
 
   if (BuiltInToolsHelper.isOpenRouterProvider(config)) {
     if (config.useResponseApi == true) return;
+    final serverTools = <String, Map<String, dynamic>>{
+      BuiltInToolNames.search: {'type': 'openrouter:web_search'},
+      BuiltInToolNames.webFetch: {'type': 'openrouter:web_fetch'},
+      BuiltInToolNames.imageGeneration: {'type': 'openrouter:image_generation'},
+    };
+    var addedServerTool = false;
+    for (final name in builtIns) {
+      final tool = serverTools[BuiltInToolNames.normalize(name)];
+      if (tool == null) continue;
+      _appendChatTool(body, tool);
+      addedServerTool = true;
+    }
+    if (addedServerTool) {
+      final plugins = body['plugins'];
+      if (plugins is List) {
+        plugins.removeWhere(
+          (plugin) => plugin is Map && plugin['id']?.toString() == 'web',
+        );
+      }
+      return;
+    }
     final plugins = <Map<String, dynamic>>[];
     final existingPlugins = body['plugins'];
     if (existingPlugins is List) {
@@ -504,6 +525,75 @@ bool _isClaudeModelId(String modelId) {
   return normalized.contains('claude') || normalized.contains('anthropic/');
 }
 
+List<Map<String, dynamic>>? _normalizeClaudeReasoningDetails(dynamic raw) {
+  if (raw is! List || raw.isEmpty) return null;
+  final merged = <Map<String, dynamic>>[];
+  for (final item in raw) {
+    if (item is! Map) continue;
+    final entry = item.map((key, value) => MapEntry(key.toString(), value));
+    final type = (entry['type'] ?? 'reasoning.text').toString();
+    final textKey = type == 'reasoning.summary' && entry['summary'] is String
+        ? 'summary'
+        : (type == 'reasoning.text' || entry['text'] is String)
+        ? 'text'
+        : null;
+    if (textKey == null) {
+      merged.add(entry);
+      continue;
+    }
+    final text = entry[textKey] is String ? entry[textKey] as String : '';
+    final previous = merged.isEmpty ? null : merged.last;
+    final previousType = previous == null
+        ? null
+        : (previous['type'] ?? 'reasoning.text').toString();
+    final previousTextKey = previous == null
+        ? null
+        : (previousType == 'reasoning.summary' && previous['summary'] is String
+              ? 'summary'
+              : (previousType == 'reasoning.text' || previous['text'] is String)
+              ? 'text'
+              : null);
+    final sameBlock =
+        previous != null &&
+        previousType == type &&
+        previousTextKey == textKey &&
+        _sameOptionalReasoningField(previous['id'], entry['id']) &&
+        _sameOptionalReasoningField(previous['index'], entry['index']) &&
+        _sameOptionalReasoningField(previous['format'], entry['format']) &&
+        (_nonEmptyReasoningSignature(previous['signature']) == null ||
+            _nonEmptyReasoningSignature(entry['signature']) ==
+                _nonEmptyReasoningSignature(previous['signature']) ||
+            text.isEmpty);
+    if (sameBlock) {
+      previous[textKey] = '${previous[textKey] ?? ''}$text';
+      if (_nonEmptyReasoningSignature(entry['signature']) != null) {
+        previous['signature'] = entry['signature'];
+      }
+    } else {
+      merged.add(entry);
+    }
+  }
+  final result = <Map<String, dynamic>>[];
+  for (final entry in merged) {
+    final type = (entry['type'] ?? 'reasoning.text').toString();
+    final textKey = type == 'reasoning.summary' && entry['summary'] is String
+        ? 'summary'
+        : (type == 'reasoning.text' || entry['text'] is String)
+        ? 'text'
+        : null;
+    if (textKey != null && (entry[textKey] ?? '').toString().isEmpty) continue;
+    result.add(entry);
+  }
+  return result.isEmpty ? null : result;
+}
+
+bool _sameOptionalReasoningField(dynamic a, dynamic b) =>
+    a == null || b == null || a == b;
+
+String? _nonEmptyReasoningSignature(dynamic value) {
+  return value is String && value.isNotEmpty ? value : null;
+}
+
 bool _shouldCacheClaudeSystemPrompt(
   ProviderConfig config,
   String upstreamModelId,
@@ -593,7 +683,9 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
   required bool canImageInput,
   required bool allowRemoteImages,
   required _ReasoningContentReplayPolicy reasoningContentReplayPolicy,
+  bool supportsGoogleOpenAIThoughtSignatures = false,
   bool stripReasoningContent = false,
+  bool normalizeReasoningDetails = false,
 }) async {
   final out = <Map<String, dynamic>>[];
   // 助手轮次不能携带 image_url/video_url；暂存到最后一个用户消息
@@ -639,6 +731,15 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
     outMsg.remove(multimodalInternalMediaPathsKey);
     outMsg.remove(multimodalInternalRevisionIdKey);
     outMsg['role'] = role;
+    if (isAssistant && outMsg['tool_calls'] is List) {
+      outMsg['tool_calls'] = [
+        for (final toolCall in (outMsg['tool_calls'] as List).whereType<Map>())
+          _openAIToolCallForRequest(
+            toolCall.cast<String, dynamic>(),
+            includeGoogleExtraContent: supportsGoogleOpenAIThoughtSignatures,
+          ),
+      ];
+    }
 
     if (isAssistant) {
       final keepReasoningContent =
@@ -650,6 +751,16 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
       if (!keepReasoningContent) {
         outMsg.remove('reasoning_content');
         outMsg.remove('reasoning');
+      }
+      if (normalizeReasoningDetails && outMsg['reasoning_details'] != null) {
+        final normalized = _normalizeClaudeReasoningDetails(
+          outMsg['reasoning_details'],
+        );
+        if (normalized == null) {
+          outMsg.remove('reasoning_details');
+        } else {
+          outMsg['reasoning_details'] = normalized;
+        }
       }
     }
 
@@ -1192,6 +1303,14 @@ class _OpenAIProviderInfo {
       host.contains('intern-ai') ||
       host.contains('intern') ||
       host.contains('chat.intern-ai.org.cn');
+  bool get supportsGoogleOpenAIThoughtSignatures {
+    final model = upstreamModelId.toLowerCase();
+    final googleHost =
+        host == 'generativelanguage.googleapis.com' ||
+        host.endsWith('aiplatform.googleapis.com');
+    return googleHost && model.contains('gemini');
+  }
+
   bool get isKimiThinkingModel => _isKimiThinkingModel(upstreamModelId);
 
   bool get needsReasoningEcho =>
@@ -1208,6 +1327,26 @@ class _OpenAIProviderInfo {
 
   String get completionTokensKey =>
       (isAzureOpenAI || isMimo) ? 'max_completion_tokens' : 'max_tokens';
+}
+
+Map<String, dynamic>? _openAIExtraContent(dynamic value) {
+  if (value is! Map || value.isEmpty) return null;
+  return value.map((key, item) => MapEntry(key.toString(), item));
+}
+
+Map<String, dynamic> _openAIToolCallForRequest(
+  Map<String, dynamic> toolCall, {
+  required bool includeGoogleExtraContent,
+}) {
+  final copy = Map<String, dynamic>.from(toolCall);
+  final extra = _openAIExtraContent(copy['extra_content']);
+  copy.remove('metadata');
+  if (extra != null && includeGoogleExtraContent) {
+    copy['extra_content'] = extra;
+  } else {
+    copy.remove('extra_content');
+  }
+  return copy;
 }
 
 void _applyVendorReasoningKnobs(
@@ -1427,9 +1566,33 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
       addResponsesBuiltInTool({'type': 'image_generation'});
     }
 
+    if (BuiltInToolsHelper.isOpenRouterProvider(config)) {
+      for (final name in builtIns) {
+        final serverTool = switch (BuiltInToolNames.normalize(name)) {
+          BuiltInToolNames.search => {'type': 'openrouter:web_search'},
+          BuiltInToolNames.webFetch => {'type': 'openrouter:web_fetch'},
+          BuiltInToolNames.imageGeneration => {
+            'type': 'openrouter:image_generation',
+          },
+          BuiltInToolNames.shell => {
+            'type': 'openrouter:shell',
+            'parameters': {'engine': 'openrouter'},
+          },
+          _ => null,
+        };
+        if (serverTool != null) addResponsesBuiltInTool(serverTool);
+      }
+    }
+
     // 在支持的模型上启用时，用于 Responses API 的内置网络搜索
     bool isResponsesWebSearchSupported(String id) {
       if (BuiltInToolsHelper.isOpenAIResponsesBuiltInSearchSupportedModel(id)) {
+        return true;
+      }
+      if (BuiltInToolsHelper.isDeepSeekProvider(config) &&
+          BuiltInToolsHelper.isDeepSeekResponsesBuiltInSearchSupportedModel(
+            id,
+          )) {
         return true;
       }
       if (BuiltInToolsHelper.isDashScopeProvider(config)) {
@@ -1819,7 +1982,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
       canImageInput: canImageInput,
       allowRemoteImages: allowRemoteImages,
       reasoningContentReplayPolicy: info.reasoningContentReplayPolicy,
+      supportsGoogleOpenAIThoughtSignatures:
+          info.supportsGoogleOpenAIThoughtSignatures,
       stripReasoningContent: isClaudeUpstream,
+      normalizeReasoningDetails: isClaudeUpstream,
     );
     body = {
       'model': upstreamModelId,
@@ -2024,7 +2190,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               cachedTokens: cached,
               totalTokens: prompt + completion,
             );
-            aggUsage = (aggUsage ?? const TokenUsage()).merge(round);
+            aggUsage = (aggUsage ?? const TokenUsage()).accumulate(round);
           }
         } catch (_) {}
 
@@ -2057,6 +2223,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               'id': id,
               'type': 'function',
               'function': {'name': name, 'arguments': jsonEncode(args)},
+              if (_openAIExtraContent(t['extra_content']) != null)
+                'extra_content': _openAIExtraContent(t['extra_content']),
             });
           }
           if (callInfos.isNotEmpty) {
@@ -2142,7 +2310,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             canImageInput: canImageInput,
             allowRemoteImages: allowRemoteImages,
             reasoningContentReplayPolicy: info.reasoningContentReplayPolicy,
+            supportsGoogleOpenAIThoughtSignatures:
+                info.supportsGoogleOpenAIThoughtSignatures,
             stripReasoningContent: isClaudeUpstream,
+            normalizeReasoningDetails: isClaudeUpstream,
           );
           reqBody.remove('stream');
           req.body = jsonEncode(reqBody);
@@ -2222,14 +2393,14 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
   String assistantContentBuffer = '';
 
   // 跟踪潜在工具调用（OpenAI Chat Completions）
-  final Map<int, Map<String, String>> toolAcc =
-      <int, Map<String, String>>{}; // index -> {id,name,args}
+  final Map<int, Map<String, dynamic>> toolAcc =
+      <int, Map<String, dynamic>>{}; // index -> {id,name,args,extra_content}
   // 跟踪潜在工具调用（OpenAI Responses API）
-  final Map<String, Map<String, String>> toolAccResp =
-      <String, Map<String, String>>{}; // id/name -> {name,args}
+  final Map<String, Map<String, dynamic>> toolAccResp =
+      <String, Map<String, dynamic>>{}; // id/name -> {name,args}
   // Responses API：按 output_index 跟踪，以便可靠地捕获 call_id
-  final Map<int, Map<String, String>> respToolCallsByIndex =
-      <int, Map<String, String>>{}; // index -> {call_id,name,args}
+  final Map<int, Map<String, dynamic>> respToolCallsByIndex =
+      <int, Map<String, dynamic>>{}; // index -> {call_id,name,args}
   final Map<int, _ResponsesImageGenerationResult> responsesImagesByIndex =
       <int, _ResponsesImageGenerationResult>{};
   List<Map<String, dynamic>> lastResponseOutputItems =
@@ -2268,6 +2439,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               'id': id,
               'type': 'function',
               'function': {'name': name, 'arguments': jsonEncode(args)},
+              if (_openAIExtraContent(m['extra_content']) != null)
+                'extra_content': _openAIExtraContent(m['extra_content']),
             });
             toolMsgs.add({'__name': name, '__id': id, '__args': args});
           });
@@ -2348,7 +2521,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 canImageInput: canImageInput,
                 allowRemoteImages: allowRemoteImages,
                 reasoningContentReplayPolicy: info.reasoningContentReplayPolicy,
+                supportsGoogleOpenAIThoughtSignatures:
+                    info.supportsGoogleOpenAIThoughtSignatures,
                 stripReasoningContent: isClaudeUpstream,
+                normalizeReasoningDetails: isClaudeUpstream,
               ),
               'stream': true,
               if (temperature != null) 'temperature': temperature,
@@ -2420,9 +2596,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             }
             final s2 = resp2.stream.transform(utf8.decoder);
             String buf2 = '';
+            TokenUsage? followUpUsage;
             // 跟踪可能出现的后续工具调用
-            final Map<int, Map<String, String>> toolAcc2 =
-                <int, Map<String, String>>{};
+            final Map<int, Map<String, dynamic>> toolAcc2 =
+                <int, Map<String, dynamic>>{};
             String? finishReason2;
             String contentAccum = ''; // 累积本轮内容
             String reasoningAccum = '';
@@ -2445,8 +2622,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 try {
                   final o = jsonDecode(d);
                   if (o is Map) {
-                    usage = _mergeOpenAICompatibleUsage(usage, o['usage']);
-                    if (usage != null) totalTokens = usage.totalTokens;
+                    followUpUsage = _mergeOpenAICompatibleUsage(
+                      followUpUsage,
+                      o['usage'],
+                    );
                   }
                   if (o is Map &&
                       o['choices'] is List &&
@@ -2596,6 +2775,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                         final func = t['function'] as Map<String, dynamic>?;
                         final name = func?['name'] as String?;
                         final argsDelta = func?['arguments'] as String?;
+                        final extraContent = _openAIExtraContent(
+                          t['extra_content'],
+                        );
                         final entry = toolAcc2.putIfAbsent(
                           idx,
                           () => {'id': '', 'name': '', 'args': ''},
@@ -2607,11 +2789,19 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                         if (argsDelta != null && argsDelta.isNotEmpty) {
                           entry['args'] = (entry['args'] ?? '') + argsDelta;
                         }
+                        if (extraContent != null) {
+                          entry['extra_content'] = extraContent;
+                        }
                       }
                     }
                   }
                 } catch (_) {}
               }
+            }
+
+            if (followUpUsage != null) {
+              usage = (usage ?? const TokenUsage()).accumulate(followUpUsage);
+              totalTokens = usage.totalTokens;
             }
 
             // 本轮后续处理完成后：如果再次出现工具调用，则执行并循环
@@ -2636,6 +2826,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   'id': id,
                   'type': 'function',
                   'function': {'name': name, 'arguments': jsonEncode(args)},
+                  if (_openAIExtraContent(m['extra_content']) != null)
+                    'extra_content': _openAIExtraContent(m['extra_content']),
                 });
                 toolMsgs2.add({'__name': name, '__id': id, '__args': args});
               });
@@ -3164,8 +3356,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   resp2.stream.transform(utf8.decoder),
                 );
                 String buf2 = '';
-                final Map<int, Map<String, String>> respCalls2 =
-                    <int, Map<String, String>>{};
+                TokenUsage? followUpUsage;
+                final Map<int, Map<String, dynamic>> respCalls2 =
+                    <int, Map<String, dynamic>>{};
                 List<Map<String, dynamic>> outItems2 =
                     const <Map<String, dynamic>>[];
                 await for (final ch in _ensureTrailingNewline(s2)) {
@@ -3238,8 +3431,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                         // 用量
                         final u2 = o['response']?['usage'];
                         if (u2 != null) {
-                          usage = _mergeOpenAICompatibleUsage(usage, u2);
-                          totalTokens = usage?.totalTokens ?? totalTokens;
+                          followUpUsage = _mergeOpenAICompatibleUsage(
+                            followUpUsage,
+                            u2,
+                          );
                         }
                         // 捕获输出项
                         final out2 = o['response']?['output'];
@@ -3254,6 +3449,12 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   }
                 }
 
+                if (followUpUsage != null) {
+                  usage = (usage ?? const TokenUsage()).accumulate(
+                    followUpUsage,
+                  );
+                  totalTokens = usage.totalTokens;
+                }
                 if (respCalls2.isEmpty) {
                   // 没有更多工具调用；完成收尾
                   final approxTotal2 =
@@ -3491,6 +3692,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   final func = t['function'] as Map<String, dynamic>?;
                   final name = func?['name'] as String?;
                   final argsDelta = func?['arguments'] as String?;
+                  final extraContent = _openAIExtraContent(t['extra_content']);
                   final entry = toolAcc.putIfAbsent(
                     idx,
                     () => {'id': '', 'name': '', 'args': ''},
@@ -3499,6 +3701,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   if (name != null && name.isNotEmpty) entry['name'] = name;
                   if (argsDelta != null && argsDelta.isNotEmpty) {
                     entry['args'] = (entry['args'] ?? '') + argsDelta;
+                  }
+                  if (extraContent != null) {
+                    entry['extra_content'] = extraContent;
                   }
                 }
               }
@@ -3592,6 +3797,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               if (func == null) continue;
               final name = (func['name'] ?? '').toString();
               final argsStr = (func['arguments'] ?? '').toString();
+              final extraContent = _openAIExtraContent(t['extra_content']);
               if (name.isEmpty) continue;
               // print('[ChatApi/XinLiu] Tool call: id=$id, name=$name, args=${argsStr.length} chars');
               final idx = toolAcc.length;
@@ -3606,6 +3812,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               if (id.isNotEmpty) entry['id'] = id;
               entry['name'] = name;
               entry['args'] = argsStr;
+              if (extraContent != null) entry['extra_content'] = extraContent;
             }
             // 当存在根级别 tool_calls 时，始终视为 tool_calls 结束原因
             // （覆盖提供方返回的任何其他 finish_reason）
@@ -3663,6 +3870,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               'id': id,
               'type': 'function',
               'function': {'name': name, 'arguments': jsonEncode(args)},
+              if (_openAIExtraContent(m['extra_content']) != null)
+                'extra_content': _openAIExtraContent(m['extra_content']),
             });
             toolMsgs.add({'__name': name, '__id': id, '__args': args});
           });
@@ -3739,7 +3948,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 canImageInput: canImageInput,
                 allowRemoteImages: allowRemoteImages,
                 reasoningContentReplayPolicy: info.reasoningContentReplayPolicy,
+                supportsGoogleOpenAIThoughtSignatures:
+                    info.supportsGoogleOpenAIThoughtSignatures,
                 stripReasoningContent: isClaudeUpstream,
+                normalizeReasoningDetails: isClaudeUpstream,
               ),
               'stream': true,
               if (temperature != null) 'temperature': temperature,
@@ -3815,8 +4027,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               resp2.stream.transform(utf8.decoder),
             );
             String buf2 = '';
-            final Map<int, Map<String, String>> toolAcc2 =
-                <int, Map<String, String>>{};
+            TokenUsage? followUpUsage;
+            final Map<int, Map<String, dynamic>> toolAcc2 =
+                <int, Map<String, dynamic>>{};
             String? finishReason2;
             String contentAccum = '';
             String reasoningAccum = '';
@@ -3838,8 +4051,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 try {
                   final o = jsonDecode(d);
                   if (o is Map) {
-                    usage = _mergeOpenAICompatibleUsage(usage, o['usage']);
-                    if (usage != null) totalTokens = usage.totalTokens;
+                    followUpUsage = _mergeOpenAICompatibleUsage(
+                      followUpUsage,
+                      o['usage'],
+                    );
                   }
                   if (o is Map &&
                       o['choices'] is List &&
@@ -3953,6 +4168,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                         final func = t['function'] as Map<String, dynamic>?;
                         final name = func?['name'] as String?;
                         final argsDelta = func?['arguments'] as String?;
+                        final extraContent = _openAIExtraContent(
+                          t['extra_content'],
+                        );
                         final entry = toolAcc2.putIfAbsent(
                           idx,
                           () => {'id': '', 'name': '', 'args': ''},
@@ -3963,6 +4181,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                         }
                         if (argsDelta != null && argsDelta.isNotEmpty) {
                           entry['args'] = (entry['args'] ?? '') + argsDelta;
+                        }
+                        if (extraContent != null) {
+                          entry['extra_content'] = extraContent;
                         }
                       }
                     }
@@ -4011,6 +4232,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                       if (func == null) continue;
                       final name = (func['name'] ?? '').toString();
                       final argsStr = (func['arguments'] ?? '').toString();
+                      final extraContent = _openAIExtraContent(
+                        t['extra_content'],
+                      );
                       if (name.isEmpty) continue;
                       final idx = toolAcc2.length;
                       final entry = toolAcc2.putIfAbsent(
@@ -4024,6 +4248,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                       if (id.isNotEmpty) entry['id'] = id;
                       entry['name'] = name;
                       entry['args'] = argsStr;
+                      if (extraContent != null) {
+                        entry['extra_content'] = extraContent;
+                      }
                     }
                     if (rootToolCalls2.isNotEmpty) {
                       finishReason2 = 'tool_calls';
@@ -4031,6 +4258,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   }
                 } catch (_) {}
               }
+            }
+            if (followUpUsage != null) {
+              usage = (usage ?? const TokenUsage()).accumulate(followUpUsage);
+              totalTokens = usage.totalTokens;
             }
             if (finishReason2 == 'tool_calls' || toolAcc2.isNotEmpty) {
               final calls2 = <Map<String, dynamic>>[];
@@ -4053,6 +4284,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   'id': id,
                   'type': 'function',
                   'function': {'name': name, 'arguments': jsonEncode(args)},
+                  if (_openAIExtraContent(m['extra_content']) != null)
+                    'extra_content': _openAIExtraContent(m['extra_content']),
                 });
                 toolMsgs2.add({'__name': name, '__id': id, '__args': args});
               });
@@ -4164,6 +4397,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   'id': id,
                   'type': 'function',
                   'function': {'name': name, 'arguments': jsonEncode(args)},
+                  if (_openAIExtraContent(m['extra_content']) != null)
+                    'extra_content': _openAIExtraContent(m['extra_content']),
                 });
                 toolMsgs.add({'__name': name, '__id': id, '__args': args});
               });
@@ -4250,7 +4485,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     allowRemoteImages: allowRemoteImages,
                     reasoningContentReplayPolicy:
                         info.reasoningContentReplayPolicy,
+                    supportsGoogleOpenAIThoughtSignatures:
+                        info.supportsGoogleOpenAIThoughtSignatures,
                     stripReasoningContent: isClaudeUpstream,
+                    normalizeReasoningDetails: isClaudeUpstream,
                   ),
                   'stream': true,
                   if (temperature != null) 'temperature': temperature,
@@ -4327,8 +4565,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   resp2.stream.transform(utf8.decoder),
                 );
                 String buf2 = '';
-                final Map<int, Map<String, String>> toolAcc2 =
-                    <int, Map<String, String>>{};
+                TokenUsage? followUpUsage;
+                final Map<int, Map<String, dynamic>> toolAcc2 =
+                    <int, Map<String, dynamic>>{};
                 String? finishReason2;
                 String contentAccum = '';
                 String reasoningAccum = '';
@@ -4350,8 +4589,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     try {
                       final o = jsonDecode(d);
                       if (o is Map) {
-                        usage = _mergeOpenAICompatibleUsage(usage, o['usage']);
-                        if (usage != null) totalTokens = usage.totalTokens;
+                        followUpUsage = _mergeOpenAICompatibleUsage(
+                          followUpUsage,
+                          o['usage'],
+                        );
                       }
                       if (o is Map &&
                           o['choices'] is List &&
@@ -4439,6 +4680,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                             final func = t['function'] as Map<String, dynamic>?;
                             final name = func?['name'] as String?;
                             final argsDelta = func?['arguments'] as String?;
+                            final extraContent = _openAIExtraContent(
+                              t['extra_content'],
+                            );
                             final entry = toolAcc2.putIfAbsent(
                               idx,
                               () => {'id': '', 'name': '', 'args': ''},
@@ -4449,6 +4693,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                             }
                             if (argsDelta != null && argsDelta.isNotEmpty) {
                               entry['args'] = (entry['args'] ?? '') + argsDelta;
+                            }
+                            if (extraContent != null) {
+                              entry['extra_content'] = extraContent;
                             }
                           }
                         }
@@ -4498,6 +4745,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                           if (func == null) continue;
                           final name = (func['name'] ?? '').toString();
                           final argsStr = (func['arguments'] ?? '').toString();
+                          final extraContent = _openAIExtraContent(
+                            t['extra_content'],
+                          );
                           if (name.isEmpty) continue;
                           final idx = toolAcc2.length;
                           final entry = toolAcc2.putIfAbsent(
@@ -4511,6 +4761,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                           if (id.isNotEmpty) entry['id'] = id;
                           entry['name'] = name;
                           entry['args'] = argsStr;
+                          if (extraContent != null) {
+                            entry['extra_content'] = extraContent;
+                          }
                         }
                         if (rootToolCalls2.isNotEmpty &&
                             finishReason2 == null) {
@@ -4519,6 +4772,12 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                       }
                     } catch (_) {}
                   }
+                }
+                if (followUpUsage != null) {
+                  usage = (usage ?? const TokenUsage()).accumulate(
+                    followUpUsage,
+                  );
+                  totalTokens = usage.totalTokens;
                 }
                 if (finishReason2 == 'tool_calls' || toolAcc2.isNotEmpty) {
                   final calls2 = <Map<String, dynamic>>[];

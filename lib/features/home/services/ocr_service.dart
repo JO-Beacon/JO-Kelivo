@@ -42,6 +42,8 @@ class OcrService {
 
   static const String artifactKind = 'image_ocr_v1';
   static const String memoryKeyPrefix = 'image_ocr_v1:';
+  static const String defaultOcrUserPrompt =
+      'Please perform OCR on the attached image(s) and return only the extracted text and visual descriptions.';
 
   /// LRU 缓存最大条目数
   final int maxCacheEntries;
@@ -86,6 +88,15 @@ class OcrService {
     return '$memoryKeyPrefix$contentHash';
   }
 
+  /// Builds OCR messages without sending a system message when the prompt is empty.
+  static List<Map<String, dynamic>> buildOcrRequestMessages(String prompt) {
+    final trimmed = prompt.trim();
+    return <Map<String, dynamic>>[
+      if (trimmed.isNotEmpty) {'role': 'system', 'content': trimmed},
+      {'role': 'user', 'content': defaultOcrUserPrompt},
+    ];
+  }
+
   /// 运行 OCR 识别图片内容
   ///
   /// [imagePaths] 图片路径列表
@@ -109,14 +120,7 @@ class OcrService {
 
     final cfg = settings.getProviderConfig(prov);
 
-    final messages = <Map<String, dynamic>>[
-      {'role': 'system', 'content': settings.ocrPrompt},
-      {
-        'role': 'user',
-        'content':
-            'Please perform OCR on the attached image(s) and return only the extracted text and visual descriptions.',
-      },
-    ];
+    final messages = buildOcrRequestMessages(settings.ocrPrompt);
 
     final stream = ChatApiService.sendMessageStream(
       config: cfg,

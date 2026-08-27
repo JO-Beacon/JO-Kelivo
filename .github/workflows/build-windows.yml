@@ -46,14 +46,6 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Inject fallback secrets
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path lib/secrets | Out-Null
-          @"
-          const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';
-          "@ | Set-Content -LiteralPath lib/secrets/fallback.dart -Encoding utf8
-
       - name: Resolve version
         shell: pwsh
         env:

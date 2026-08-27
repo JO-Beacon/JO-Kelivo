@@ -2,6 +2,7 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:mcp_client/mcp_client.dart';
@@ -128,6 +129,68 @@ void main() {
         await receivedContentType.future.timeout(const Duration(seconds: 1)),
         'application/json',
       );
+      await send.done;
+    });
+
+    test('sends Unicode tool arguments as UTF-8 JSON', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final received =
+          Completer<({String? contentType, int? length, String body})>();
+      SseClientTransport? transport;
+      HttpResponse? sseResponse;
+
+      addTearDown(() async {
+        transport?.close();
+        await sseResponse?.close();
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        if (request.method == 'GET') {
+          sseResponse = request.response;
+          request.response.bufferOutput = false;
+          request.response.contentLength = -1;
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+          );
+          request.response.write(
+            'event: endpoint\n'
+            'data: /messages/?session_id=server-session\n\n',
+          );
+          await request.response.flush();
+          return;
+        }
+
+        final body = await utf8.decoder.bind(request).join();
+        received.complete((
+          contentType: request.headers.value(HttpHeaders.contentTypeHeader),
+          length: request.headers.contentLength,
+          body: body,
+        ));
+        request.response.statusCode = HttpStatus.accepted;
+        await request.response.close();
+      });
+
+      transport = await SseClientTransport.create(
+        serverUrl: 'http://${server.address.address}:${server.port}/sse',
+      );
+      const query = '中文搜索';
+      final message = {
+        'jsonrpc': '2.0',
+        'id': 1,
+        'method': 'tools/call',
+        'params': {
+          'name': 'diary_write',
+          'arguments': {'content': query},
+        },
+      };
+      final send = transport.send(message);
+
+      final posted = await received.future.timeout(const Duration(seconds: 1));
+      expect(posted.contentType, 'application/json');
+      expect(posted.length, utf8.encode(posted.body).length);
+      expect(jsonDecode(posted.body), message);
       await send.done;
     });
   });

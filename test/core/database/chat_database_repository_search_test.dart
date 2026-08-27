@@ -545,6 +545,74 @@ void main() {
     expect(matches.every((m) => m.conversationId == 'wanted'), isTrue);
   });
 
+  test(
+    'assistant scope keeps owned and unowned conversations isolated',
+    () async {
+      final root = await Directory.systemTemp.createTemp(
+        'chat_search_assistant_scope_',
+      );
+      final repository = ChatDatabaseRepository.open(
+        file: File('${root.path}/search.sqlite'),
+      );
+      addTearDown(() async {
+        await repository.close();
+        await root.delete(recursive: true);
+      });
+
+      Future<void> seed(String id, String? assistantId) {
+        final stamp = DateTime.utc(2026, 7, 12);
+        return repository.putMigrationBatch(
+          conversations: [
+            Conversation(
+              id: id,
+              title: id,
+              createdAt: stamp,
+              updatedAt: stamp,
+              assistantId: assistantId,
+              messageIds: ['$id-message'],
+            ),
+          ],
+          messages: [
+            (
+              message: ChatMessage(
+                id: '$id-message',
+                role: 'user',
+                content: 'shared-assistant-search-token $id',
+                timestamp: stamp,
+                conversationId: id,
+              ),
+              messageOrder: 0,
+            ),
+          ],
+          toolEventsByMessageId: const {},
+          geminiSignaturesByMessageId: const {},
+        );
+      }
+
+      await seed('owned-a', 'assistant-a');
+      await seed('owned-b', 'assistant-b');
+      await seed('unowned', null);
+
+      final unscoped = await repository.searchConversationMatches(
+        tokens: const ['shared-assistant-search-token'],
+      );
+      expect(unscoped.map((match) => match.conversationId).toSet(), {
+        'owned-a',
+        'owned-b',
+        'unowned',
+      });
+
+      final scoped = await repository.searchConversationMatches(
+        tokens: const ['shared-assistant-search-token'],
+        assistantId: 'assistant-a',
+      );
+      expect(scoped.map((match) => match.conversationId).toSet(), {
+        'owned-a',
+        'unowned',
+      });
+    },
+  );
+
   test('tool_call payloads are not indexed for search', () async {
     final root = await Directory.systemTemp.createTemp('chat_search_tool_');
     final repository = ChatDatabaseRepository.open(

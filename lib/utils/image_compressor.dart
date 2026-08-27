@@ -4,6 +4,8 @@ import 'package:downsize/downsize.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
+import 'upload_dedupe.dart';
+
 class ImageCompressConfig {
   const ImageCompressConfig({
     required this.enabled,
@@ -25,7 +27,7 @@ class ImageCompressor {
   ///
   /// 被跳过、解码失败或压缩后会变大的图片会原样复制。
   /// 仅当源文件无法持久化时才返回 `null`。
-  static Future<String?> compressToUploadDir(
+  static Future<UploadWrite?> compressToUploadDir(
     String srcPath,
     Directory dir,
     ImageCompressConfig config,
@@ -87,7 +89,7 @@ class ImageCompressor {
     }
   }
 
-  static Future<String> _writeToUploadDir(
+  static Future<UploadWrite> _writeToUploadDir(
     String srcPath,
     Directory dir,
     Uint8List bytes, {
@@ -102,45 +104,18 @@ class ImageCompressor {
     final outputName = asJpeg
         ? '${baseName.isEmpty ? 'image' : baseName}.jpg'
         : (originalName.isEmpty ? 'image' : originalName);
-    final sourceAbsolute = p.normalize(p.absolute(srcPath));
-    final destination = File(p.join(dir.path, outputName));
-    final destinationAbsolute = p.normalize(p.absolute(destination.path));
+    final existing = await UploadDedupe.findIdentical(dir, bytes, outputName);
+    if (existing != null) return UploadWrite(existing, reused: true);
 
-    if (p.equals(sourceAbsolute, destinationAbsolute) && !asJpeg) {
-      return destination.path;
-    }
-
-    final reserved = await _reserveUniqueFile(dir, outputName);
+    final reserved = await UploadDedupe.reserveUniqueFile(dir, outputName);
     try {
       await reserved.writeAsBytes(bytes, flush: true);
-      return reserved.path;
+      return UploadWrite(reserved.path, reused: false);
     } catch (_) {
       try {
         await reserved.delete();
       } catch (_) {}
       rethrow;
-    }
-  }
-
-  static Future<File> _reserveUniqueFile(
-    Directory dir,
-    String outputName,
-  ) async {
-    final outputBase = p.basenameWithoutExtension(outputName);
-    final outputExtension = p.extension(outputName);
-    var counter = 0;
-
-    while (true) {
-      final suffix = counter == 0 ? '' : '($counter)';
-      final candidate = File(
-        p.join(dir.path, '$outputBase$suffix$outputExtension'),
-      );
-      try {
-        return await candidate.create(exclusive: true);
-      } on FileSystemException {
-        if (!await candidate.exists()) rethrow;
-        counter++;
-      }
     }
   }
 }

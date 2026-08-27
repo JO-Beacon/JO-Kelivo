@@ -82,6 +82,9 @@ class InteractiveDrawerController extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// 返回 true 时，系统返回键由抽屉内容消费，抽屉保持打开。
+  bool Function()? handleBack;
 }
 
 /// 交互式抽屉：
@@ -155,6 +158,26 @@ class InteractiveDrawer extends StatefulWidget {
 
   @override
   State<InteractiveDrawer> createState() => _InteractiveDrawerState();
+
+  static InteractiveDrawerController? maybeControllerOf(BuildContext context) {
+    return context
+        .dependOnInheritedWidgetOfExactType<_InteractiveDrawerScope>()
+        ?.controller;
+  }
+}
+
+class _InteractiveDrawerScope extends InheritedWidget {
+  const _InteractiveDrawerScope({
+    required this.controller,
+    required super.child,
+  });
+
+  final InteractiveDrawerController controller;
+
+  @override
+  bool updateShouldNotify(_InteractiveDrawerScope oldWidget) {
+    return controller != oldWidget.controller;
+  }
 }
 
 class _InteractiveDrawerState extends State<InteractiveDrawer>
@@ -366,48 +389,57 @@ class _InteractiveDrawerState extends State<InteractiveDrawer>
                 math.max(300.0, constraints.maxWidth * 0.80);
           }
 
-          return PopScope(
-            canPop: !_controllerProxy.isOpen,
-            onPopInvokedWithResult: (didPop, _) {
-              if (didPop) return;
-              if (_controllerProxy.isOpen) {
-                _controllerProxy.close();
-              }
-            },
-            child: AnimatedBuilder(
-              animation: _anim,
-              builder: (context, _) {
-                if (widget.tabletMode) {
-                  // Stack：带动态 padding 的主内容，以及顶部对齐的滑动抽屉。
-                  final sidePadding = _drawerWidth * _anim.value;
-                  EdgeInsets mainPadding;
-                  if (_isLeft) {
-                    mainPadding = EdgeInsets.only(left: sidePadding);
-                  } else {
-                    mainPadding = EdgeInsets.only(right: sidePadding);
+          return AnimatedBuilder(
+            animation: _anim,
+            builder: (context, _) {
+              return PopScope(
+                canPop: !_controllerProxy.isOpen,
+                onPopInvokedWithResult: (didPop, _) {
+                  if (didPop) return;
+                  if (_controllerProxy.handleBack?.call() == true) return;
+                  if (_controllerProxy.isOpen) {
+                    _controllerProxy.close();
                   }
-                  return Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      // 抽屉显现时，主内容通过 padding 移动以腾出空间。
-                      AnimatedContainer(
-                        duration: const Duration(
-                          milliseconds: 16,
-                        ), // 接近帧间隔以保证流畅度
-                        curve: Curves.linear,
-                        padding: mainPadding,
-                        child: _buildDraggableChild(),
-                      ),
-                      _buildDraggableDrawer(),
-                    ],
-                  );
-                }
-                return Stack(
-                  fit: StackFit.expand,
-                  children: [_buildDraggableChild(), _buildDraggableDrawer()],
-                );
-              },
-            ),
+                },
+                child: _InteractiveDrawerScope(
+                  controller: _controllerProxy,
+                  child: Builder(
+                    builder: (context) {
+                      if (widget.tabletMode) {
+                        // Stack：带动态 padding 的主内容，以及顶部对齐的滑动抽屉。
+                        final sidePadding = _drawerWidth * _anim.value;
+                        EdgeInsets mainPadding;
+                        if (_isLeft) {
+                          mainPadding = EdgeInsets.only(left: sidePadding);
+                        } else {
+                          mainPadding = EdgeInsets.only(right: sidePadding);
+                        }
+                        return Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            // 抽屉显现时，主内容通过 padding 移动以腾出空间。
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 16),
+                              curve: Curves.linear,
+                              padding: mainPadding,
+                              child: _buildDraggableChild(),
+                            ),
+                            _buildDraggableDrawer(),
+                          ],
+                        );
+                      }
+                      return Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          _buildDraggableChild(),
+                          _buildDraggableDrawer(),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              );
+            },
           );
         },
       ),

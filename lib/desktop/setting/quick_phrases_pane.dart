@@ -8,6 +8,7 @@ import '../../core/models/quick_phrase.dart';
 import '../../core/providers/quick_phrase_provider.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../widgets/desktop_dialog_style.dart';
 
 class DesktopQuickPhrasesPane extends StatefulWidget {
   const DesktopQuickPhrasesPane({super.key});
@@ -298,7 +299,7 @@ class _QuickPhraseEditDialogState extends State<_QuickPhraseEditDialog> {
     return Dialog(
       backgroundColor: cs.surface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: DesktopDialogStyle.shape(context),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),
         child: Stack(

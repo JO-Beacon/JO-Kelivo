@@ -117,6 +117,8 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
   bool _googleYoutubeTool = false;
   bool _openaiCodeInterpreterTool = false;
   bool _openaiImageGenerationTool = false;
+  bool _openRouterWebFetchTool = false;
+  bool _openRouterShellTool = false;
 
   @override
   void initState() {
@@ -229,6 +231,8 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
       _openaiImageGenerationTool = builtInSet.contains(
         BuiltInToolNames.imageGeneration,
       );
+      _openRouterWebFetchTool = builtInSet.contains(BuiltInToolNames.webFetch);
+      _openRouterShellTool = builtInSet.contains(BuiltInToolNames.shell);
 
       final rawTools = ov['tools'];
       final tools = rawTools is Map ? rawTools : const <dynamic, dynamic>{};
@@ -762,6 +766,30 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
                       : null),
           ),
         ),
+        if (BuiltInToolsHelper.isOpenRouterProvider(cfg)) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: _ToolTile(
+              title: l10n.modelDetailSheetOpenRouterWebFetchTool,
+              desc: l10n.modelDetailSheetOpenRouterWebFetchToolDescription,
+              value: _openRouterWebFetchTool,
+              onChanged: disableTools
+                  ? null
+                  : (v) => setState(() => _openRouterWebFetchTool = v),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: _ToolTile(
+              title: l10n.modelDetailSheetOpenRouterShellTool,
+              desc: l10n.modelDetailSheetOpenRouterShellToolDescription,
+              value: _openRouterShellTool,
+              onChanged: disableTools || cfg.useResponseApi != true
+                  ? null
+                  : (v) => setState(() => _openRouterShellTool = v),
+            ),
+          ),
+        ],
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           child: _ToolTile(
@@ -885,6 +913,12 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
       }
       if (_openaiImageGenerationTool) {
         builtInSet.add(BuiltInToolNames.imageGeneration);
+      }
+      if (BuiltInToolsHelper.isOpenRouterProvider(old)) {
+        builtInSet.remove(BuiltInToolNames.webFetch);
+        builtInSet.remove(BuiltInToolNames.shell);
+        if (_openRouterWebFetchTool) builtInSet.add(BuiltInToolNames.webFetch);
+        if (_openRouterShellTool) builtInSet.add(BuiltInToolNames.shell);
       }
     }
     final builtInTools = BuiltInToolNames.orderedForStorage(builtInSet);

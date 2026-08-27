@@ -73,16 +73,18 @@ void main() {
 
     expect(find.text('Select Messages'), findsOneWidget);
     expect(find.text('Create Message Branch'), findsOneWidget);
-    expect(find.text('Delete Message'), findsOneWidget);
-    expect(find.text('Delete Branch'), findsOneWidget);
+    expect(find.text('Delete This Message'), findsOneWidget);
+    expect(find.text('Delete Current Branch'), findsOneWidget);
+    expect(find.text('Delete All Branches'), findsOneWidget);
   });
 
   testWidgets('单版本消息菜单不显示删除全部版本', (tester) async {
     await _openMoreSheet(tester, canDeleteAllVersions: false);
 
     expect(find.text('Select Messages'), findsOneWidget);
-    expect(find.text('Delete Message'), findsOneWidget);
-    expect(find.text('Delete Branch'), findsNothing);
+    expect(find.text('Delete This Message'), findsOneWidget);
+    expect(find.text('Delete Current Branch'), findsOneWidget);
+    expect(find.text('Delete All Branches'), findsNothing);
   });
 
   testWidgets('临时会话消息菜单不显示创建消息分支', (tester) async {
@@ -103,6 +105,16 @@ void main() {
     );
 
     expect(action, MessageMoreAction.switchToUser);
+  });
+
+  testWidgets('消息菜单可以触发删除当前消息', (tester) async {
+    final action = await _openMoreSheet(
+      tester,
+      canDeleteAllVersions: false,
+      tapLabel: 'Delete This Message',
+    );
+
+    expect(action, MessageMoreAction.deleteMessageOnly);
   });
 
   testWidgets('用户消息菜单可以切换为助手', (tester) async {

@@ -8,6 +8,7 @@ import '../l10n/app_localizations.dart';
 import '../icons/lucide_adapter.dart';
 import '../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'widgets/desktop_dialog_style.dart';
 
 Future<MessageEditResult?> showMessageEditDesktopDialog(
   BuildContext context, {
@@ -48,13 +49,17 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
     super.dispose();
   }
 
-  MessageEditResult _result({required bool shouldSend}) {
-    final text = _controller.text.trim();
+  MessageEditResult _result({
+    required bool shouldSend,
+    MessageEditSaveMode saveMode = MessageEditSaveMode.newBranch,
+  }) {
+    final text = _controller.text;
     _draft.replaceText(text);
     return MessageEditResult(
       content: text,
       parts: _draft.parts,
       shouldSend: shouldSend,
+      saveMode: saveMode,
     );
   }
 
@@ -67,21 +72,47 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
     });
   }
 
+  bool get _hasChanges =>
+      _controller.text != widget.message.content ||
+      !_draft.isSameAs(widget.message.parts);
+
+  void _trimWhitespace() {
+    final trimmed = _controller.text.trim();
+    if (trimmed == _controller.text) return;
+    _controller.value = TextEditingValue(
+      text: trimmed,
+      selection: TextSelection.collapsed(offset: trimmed.length),
+      composing: TextRange.empty,
+    );
+    setState(() {});
+  }
+
   Future<void> _confirmClose() async {
     if (_confirmingClose || _allowClose) return;
+    if (!_hasChanges) {
+      _closeWithResult(null);
+      return;
+    }
     _confirmingClose = true;
     final action = await showMessageEditCloseConfirmation(context);
     _confirmingClose = false;
     if (!mounted) return;
     switch (action) {
-      case MessageEditCloseAction.save:
-        _closeWithResult(_result(shouldSend: false));
-      case MessageEditCloseAction.discard:
+      case MessageEditCloseAction.confirm:
         _closeWithResult(null);
       case MessageEditCloseAction.cancel:
       case null:
         break;
     }
+  }
+
+  BoxConstraints _dialogConstraints(BuildContext context) {
+    return DesktopDialogStyle.proportionalConstraints(
+      context,
+      minWidth: 520,
+      maxWidth: 720,
+      maxHeight: 680,
+    );
   }
 
   @override
@@ -97,13 +128,9 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
       child: Dialog(
         elevation: 12,
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: DesktopDialogStyle.shape(context),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            minWidth: 520,
-            maxWidth: 720,
-            maxHeight: 680,
-          ),
+          constraints: _dialogConstraints(context),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: Material(
@@ -114,55 +141,93 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                   // 标题栏
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
-                    child: Row(
+                    child: Column(
                       children: [
-                        Text(
-                          l10n.messageEditPageTitle,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: AppFontWeights.emphasis,
-                          ),
-                        ),
-                        const Spacer(),
-                        TextButton.icon(
-                          onPressed: () {
-                            _closeWithResult(_result(shouldSend: true));
-                          },
-                          icon: Icon(
-                            Lucide.MessageCirclePlus,
-                            size: 18,
-                            color: cs.primary,
-                          ),
-                          label: Text(
-                            l10n.messageEditPageSaveAndSend,
-                            style: TextStyle(
-                              color: cs.primary,
-                              fontWeight: AppFontWeights.semibold,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                l10n.messageEditPageTitle,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: AppFontWeights.emphasis,
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        TextButton.icon(
-                          onPressed: () {
-                            _closeWithResult(_result(shouldSend: false));
-                          },
-                          icon: Icon(Lucide.Check, size: 18, color: cs.primary),
-                          label: Text(
-                            l10n.messageEditPageSave,
-                            style: TextStyle(
-                              color: cs.primary,
-                              fontWeight: AppFontWeights.semibold,
+                            IconButton(
+                              tooltip: l10n.mcpPageClose,
+                              onPressed: _confirmClose,
+                              icon: Icon(
+                                Lucide.X,
+                                size: 18,
+                                color: cs.onSurface.withValues(alpha: 0.75),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
-                        IconButton(
-                          tooltip: l10n.mcpPageClose,
-                          onPressed: _confirmClose,
-                          icon: Icon(
-                            Lucide.X,
-                            size: 18,
-                            color: cs.onSurface.withValues(alpha: 0.75),
-                          ),
+                        const SizedBox(height: 4),
+                        Wrap(
+                          alignment: WrapAlignment.end,
+                          spacing: 4,
+                          runSpacing: 2,
+                          children: [
+                            TextButton.icon(
+                              onPressed: () {
+                                _closeWithResult(_result(shouldSend: true));
+                              },
+                              icon: Icon(
+                                Lucide.MessageCirclePlus,
+                                size: 18,
+                                color: cs.primary,
+                              ),
+                              label: Text(
+                                l10n.messageEditPageSaveAsBranchAndSend,
+                                style: TextStyle(
+                                  color: cs.primary,
+                                  fontWeight: AppFontWeights.semibold,
+                                ),
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: () {
+                                _closeWithResult(_result(shouldSend: false));
+                              },
+                              icon: Icon(
+                                Lucide.Check,
+                                size: 18,
+                                color: cs.primary,
+                              ),
+                              label: Text(
+                                l10n.messageEditPageSaveAsBranch,
+                                style: TextStyle(
+                                  color: cs.primary,
+                                  fontWeight: AppFontWeights.semibold,
+                                ),
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: () {
+                                _closeWithResult(
+                                  _result(
+                                    shouldSend: false,
+                                    saveMode: MessageEditSaveMode.overwrite,
+                                  ),
+                                );
+                              },
+                              icon: Icon(
+                                Lucide.Edit,
+                                size: 18,
+                                color: cs.primary,
+                              ),
+                              label: Text(
+                                l10n.messageEditPageOverwriteSave,
+                                style: TextStyle(
+                                  color: cs.primary,
+                                  fontWeight: AppFontWeights.semibold,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -176,6 +241,25 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton.icon(
+                                onPressed: _trimWhitespace,
+                                icon: Icon(
+                                  Lucide.Eraser,
+                                  size: 18,
+                                  color: cs.primary,
+                                ),
+                                label: Text(
+                                  l10n.messageEditTrimWhitespace,
+                                  style: TextStyle(
+                                    color: cs.primary,
+                                    fontWeight: AppFontWeights.semibold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
                             TextField(
                               controller: _controller,
                               autofocus: true,

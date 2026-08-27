@@ -14,7 +14,6 @@ import '../../utils/openai_model_compat.dart';
 import '../network/dio_http_client.dart';
 import 'google_service_account_auth.dart';
 import '../../services/api_key_manager.dart';
-import 'package:Kelivo/secrets/fallback.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
 import '../../../utils/unicode_sanitizer.dart';
 import 'builtin_tools.dart';
@@ -27,6 +26,16 @@ import '../model_override_payload_parser.dart';
 import '../custom_request_merger.dart';
 import 'provider_request_headers.dart';
 import '../../utils/multimodal_input_utils.dart';
+import 'stream/legacy_stream_chunk_adapter.dart';
+import 'stream/stream_chunk.dart';
+import 'stream/stream_chunk_emit.dart';
+import 'stream/stream_chunk_ids.dart';
+import 'providers/claude/claude_provider.dart';
+import 'providers/google/google_provider.dart';
+import 'providers/openai/openai_provider.dart';
+
+export 'generation/tool_loop_runner.dart';
+export 'stream/stream_chunk_emit.dart';
 
 part 'chat_api_service_shims.dart';
 part 'providers/openai_common.dart';
@@ -37,6 +46,7 @@ part 'providers/google_common.dart';
 part 'providers/google_gemini.dart';
 part 'providers/google_vertex.dart';
 part 'providers/claude_official.dart';
+part 'providers/zhipu_layout_parsing.dart';
 
 typedef ToolCallHandler =
     Future<String> Function(
@@ -75,6 +85,20 @@ class ChatApiService {
   static bool shouldIncludeStreamingUsageOptionsForTest(String host) =>
       _shouldIncludeStreamingUsageOptions(host);
 
+  @visibleForTesting
+  static List<Map<String, dynamic>>? normalizeClaudeReasoningDetailsForTest(
+    dynamic raw,
+  ) => _normalizeClaudeReasoningDetails(raw);
+
+  @visibleForTesting
+  static Map<String, dynamic> normalizeOpenAIToolCallForTest(
+    Map<String, dynamic> toolCall, {
+    required bool includeGoogleExtraContent,
+  }) => _openAIToolCallForRequest(
+    toolCall,
+    includeGoogleExtraContent: includeGoogleExtraContent,
+  );
+
   static bool supportsOpenAIImagesApiRouting(
     ProviderConfig config,
     String modelId,
@@ -108,20 +132,8 @@ class ChatApiService {
     return modelId;
   }
 
-  static String _apiKeyForRequest(ProviderConfig cfg, String modelId) {
-    final orig = _effectiveApiKey(cfg).trim();
-    if (orig.isNotEmpty) return orig;
-    if ((cfg.id) == 'SiliconFlow') {
-      final host = Uri.tryParse(cfg.baseUrl)?.host.toLowerCase() ?? '';
-      if (!host.contains('siliconflow')) return orig;
-      final m = _apiModelId(cfg, modelId).toLowerCase();
-      final allowed = m == 'thudm/glm-4-9b-0414' || m == 'qwen/qwen3-8b';
-      final fallback = siliconflowFallbackKey.trim();
-      if (allowed && fallback.isNotEmpty) {
-        return fallback;
-      }
-    }
-    return orig;
+  static String _apiKeyForRequest(ProviderConfig cfg, String _) {
+    return _effectiveApiKey(cfg).trim();
   }
 
   static String _effectiveApiKey(ProviderConfig cfg) {
@@ -588,10 +600,12 @@ class ChatApiService {
         kind == ProviderKind.openai &&
         allowImagesApiRouting &&
         _shouldUseOpenAIImagesApi(config, modelId);
+    final useZhipuLayoutParsing = shouldUseZhipuLayoutParsing(config, modelId);
     final unicodeSafeMessages = _sanitizeMessages(messages);
     final stripUnsupportedImageInputs =
         !ocrActive &&
         !useOpenAIImagesApi &&
+        !useZhipuLayoutParsing &&
         !_supportsImageInput(config, modelId);
     final safeMessages = stripUnsupportedImageInputs
         ? await _stripImageInputsFromMessages(unicodeSafeMessages)
@@ -602,7 +616,16 @@ class ChatApiService {
     final client = _clientFor(config, cancelToken);
 
     try {
-      if (kind == ProviderKind.openai) {
+      if (useZhipuLayoutParsing) {
+        yield* sendZhipuLayoutParsingStream(
+          client,
+          config,
+          modelId,
+          safeMessages,
+          userImagePaths: safeUserImagePaths,
+          extraHeaders: extraHeaders,
+        );
+      } else if (kind == ProviderKind.openai) {
         if (useOpenAIImagesApi) {
           yield* _sendOpenAIImagesStream(
             client,
@@ -733,6 +756,242 @@ class ChatApiService {
     }
   }
 
+  /// 兼容入口：把现有供应商流式结果转换为 provider-independent 事件。
+  ///
+  /// 请求和旧版 `ChatStreamChunk` 管线保持不变，便于下游逐步迁移到
+  /// [StreamChunkHandler]，同时保留 JO-Kelivo 当前工具循环和上下文树契约。
+  static Stream<StreamChunk> sendMessageStreamEvents({
+    required ProviderConfig config,
+    required String modelId,
+    required List<Map<String, dynamic>> messages,
+    List<String>? userImagePaths,
+    int? thinkingBudget,
+    double? temperature,
+    double? topP,
+    int? maxTokens,
+    List<Map<String, dynamic>>? tools,
+    ToolCallHandler? onToolCall,
+    Map<String, String>? extraHeaders,
+    Map<String, dynamic>? extraBody,
+    bool stream = true,
+    String? requestId,
+    bool allowImagesApiRouting = true,
+    bool ocrActive = false,
+  }) async* {
+    final kind = ProviderConfig.classify(
+      config.id,
+      explicitType: config.providerType,
+    );
+    final useImagesApi =
+        kind == ProviderKind.openai &&
+        allowImagesApiRouting &&
+        _shouldUseOpenAIImagesApi(config, modelId);
+    final useZhipuLayoutParsing = shouldUseZhipuLayoutParsing(config, modelId);
+
+    // Images 和 GLM-OCR 是一次性 JSON 特殊路由，直接转换为统一事件。
+    if ((kind == ProviderKind.openai && useImagesApi) ||
+        useZhipuLayoutParsing) {
+      final cancelToken = CancelToken();
+      final rid = (requestId ?? '').trim();
+      if (rid.isNotEmpty) {
+        final previous = _activeCancelTokens.remove(rid);
+        try {
+          previous?.cancel('replaced');
+        } catch (_) {}
+        _activeCancelTokens[rid] = cancelToken;
+      }
+      final safeMessages = _sanitizeMessages(messages);
+      final client = _clientFor(config, cancelToken);
+      try {
+        if (useZhipuLayoutParsing) {
+          yield* sendZhipuLayoutParsingEvents(
+            client,
+            config,
+            modelId,
+            safeMessages,
+            userImagePaths: userImagePaths,
+            extraHeaders: extraHeaders,
+          );
+        } else {
+          yield* _sendOpenAIImagesEvents(
+            client,
+            config,
+            modelId,
+            safeMessages,
+            userImagePaths: userImagePaths,
+            extraHeaders: extraHeaders,
+            extraBody: extraBody,
+          );
+        }
+      } finally {
+        client.close();
+        if (rid.isNotEmpty) {
+          final current = _activeCancelTokens[rid];
+          if (identical(current, cancelToken)) {
+            _activeCancelTokens.remove(rid);
+          }
+        }
+      }
+      return;
+    }
+
+    // 标准 OpenAI 请求已经直接产出 provider-independent 事件。
+    // Images API、智谱布局解析和仍依赖旧契约的特殊 provider 继续走旧桥接。
+    if (kind == ProviderKind.openai &&
+        !useImagesApi &&
+        !useZhipuLayoutParsing) {
+      final cancelToken = CancelToken();
+      final rid = (requestId ?? '').trim();
+      if (rid.isNotEmpty) {
+        final previous = _activeCancelTokens.remove(rid);
+        try {
+          previous?.cancel('replaced');
+        } catch (_) {}
+        _activeCancelTokens[rid] = cancelToken;
+      }
+
+      final unicodeSafeMessages = _sanitizeMessages(messages);
+      final stripUnsupportedImageInputs =
+          !ocrActive && !_supportsImageInput(config, modelId);
+      final safeMessages = stripUnsupportedImageInputs
+          ? await _stripImageInputsFromMessages(unicodeSafeMessages)
+          : unicodeSafeMessages;
+      final safeUserImagePaths = stripUnsupportedImageInputs
+          ? const <String>[]
+          : userImagePaths;
+      final client = _clientFor(config, cancelToken);
+      try {
+        yield* sendOpenAIStream(
+          client,
+          config,
+          modelId,
+          safeMessages,
+          userImagePaths: safeUserImagePaths,
+          thinkingBudget: thinkingBudget,
+          temperature: temperature,
+          topP: topP,
+          maxTokens: maxTokens,
+          tools: tools,
+          onToolCall: onToolCall,
+          extraHeaders: extraHeaders,
+          extraBody: extraBody,
+          stream: stream,
+        );
+      } finally {
+        client.close();
+        if (rid.isNotEmpty) {
+          final current = _activeCancelTokens[rid];
+          if (identical(current, cancelToken)) {
+            _activeCancelTokens.remove(rid);
+          }
+        }
+      }
+      return;
+    }
+
+    // 标准 Claude/Gemini 以及 Vertex Claude/Gemini 均直接产出统一事件。
+    final upstreamModelId = _apiModelId(config, modelId).toLowerCase();
+    final isVertexClaude =
+        kind == ProviderKind.google &&
+        config.vertexAI == true &&
+        upstreamModelId.startsWith('claude-');
+    final useClaudeEvents = kind == ProviderKind.claude || isVertexClaude;
+    final useGoogleEvents = kind == ProviderKind.google && !isVertexClaude;
+    if (useClaudeEvents || useGoogleEvents) {
+      final cancelToken = CancelToken();
+      final rid = (requestId ?? '').trim();
+      if (rid.isNotEmpty) {
+        final previous = _activeCancelTokens.remove(rid);
+        try {
+          previous?.cancel('replaced');
+        } catch (_) {}
+        _activeCancelTokens[rid] = cancelToken;
+      }
+
+      final unicodeSafeMessages = _sanitizeMessages(messages);
+      final stripUnsupportedImageInputs =
+          !ocrActive && !_supportsImageInput(config, modelId);
+      final safeMessages = stripUnsupportedImageInputs
+          ? await _stripImageInputsFromMessages(unicodeSafeMessages)
+          : unicodeSafeMessages;
+      final safeUserImagePaths = stripUnsupportedImageInputs
+          ? const <String>[]
+          : userImagePaths;
+      final client = _clientFor(config, cancelToken);
+      try {
+        if (useClaudeEvents) {
+          yield* sendClaudeStreamEvents(
+            client,
+            config,
+            modelId,
+            safeMessages,
+            userImagePaths: safeUserImagePaths,
+            thinkingBudget: thinkingBudget,
+            temperature: temperature,
+            topP: topP,
+            maxTokens: maxTokens,
+            tools: tools,
+            onToolCall: onToolCall,
+            extraHeaders: extraHeaders,
+            extraBody: extraBody,
+            stream: stream,
+            skipImageParsing: false,
+          );
+        } else {
+          yield* sendGoogleStreamEvents(
+            client,
+            config,
+            modelId,
+            safeMessages,
+            userImagePaths: safeUserImagePaths,
+            thinkingBudget: thinkingBudget,
+            temperature: temperature,
+            topP: topP,
+            maxTokens: maxTokens,
+            tools: tools,
+            onToolCall: onToolCall,
+            extraHeaders: extraHeaders,
+            extraBody: extraBody,
+            stream: stream,
+            skipImageParsing: false,
+          );
+        }
+      } finally {
+        client.close();
+        if (rid.isNotEmpty) {
+          final current = _activeCancelTokens[rid];
+          if (identical(current, cancelToken)) {
+            _activeCancelTokens.remove(rid);
+          }
+        }
+      }
+      return;
+    }
+
+    await for (final chunk in sendMessageStream(
+      config: config,
+      modelId: modelId,
+      messages: messages,
+      userImagePaths: userImagePaths,
+      thinkingBudget: thinkingBudget,
+      temperature: temperature,
+      topP: topP,
+      maxTokens: maxTokens,
+      tools: tools,
+      onToolCall: onToolCall,
+      extraHeaders: extraHeaders,
+      extraBody: extraBody,
+      stream: stream,
+      requestId: requestId,
+      allowImagesApiRouting: allowImagesApiRouting,
+      ocrActive: ocrActive,
+    )) {
+      for (final event in legacyChunkToEvents(chunk)) {
+        yield event;
+      }
+    }
+  }
+
   // 用于标题摘要等工具的非流式文本生成
   static Future<String> generateText({
     required ProviderConfig config,
@@ -741,6 +1000,9 @@ class ChatApiService {
     Map<String, String>? extraHeaders,
     Map<String, dynamic>? extraBody,
     int? thinkingBudget,
+
+    /// 工具提示（标题、摘要、压缩）只处理文本；保留 Markdown 图片语法，不执行媒体发现。
+    bool skipImageParsing = false,
   }) async {
     final kind = ProviderConfig.classify(
       config.id,
@@ -748,6 +1010,8 @@ class ChatApiService {
     );
     final client = _clientFor(config, CancelToken());
     final upstreamModelId = _apiModelId(config, modelId);
+    // [generateText] 不接收结构化消息分片；调用方可明确标记纯文本提示，说明有意跳过图片解析。
+    // 两种模式都会继续执行清洗。
     final safePrompt = UnicodeSanitizer.sanitize(prompt);
     try {
       if (kind == ProviderKind.openai) {
@@ -1393,60 +1657,102 @@ class ChatApiService {
   // 清理 JSON Schema，以满足 Google Gemini API 的严格校验
   // Google 要求数组类型必须包含 'items' 字段
   static Map<String, dynamic> _cleanSchemaForGemini(
-    Map<String, dynamic> schema,
-  ) {
-    final result = Map<String, dynamic>.from(schema);
+    Map<String, dynamic> schema, {
+    bool stringEnumOnly = false,
+  }) {
+    return _cleanGeminiSchemaNode(schema, stringEnumOnly)
+        as Map<String, dynamic>;
+  }
 
-    // 如果存在 'properties'，则递归修复
+  static dynamic _cleanGeminiSchemaNode(dynamic node, bool stringEnumOnly) {
+    if (node is! Map) return node;
+    final result = Map<String, dynamic>.from(node);
+    final declaredType = (result['type'] ?? '').toString();
+    if (stringEnumOnly && result['enum'] is List) {
+      final values = result['enum'] as List;
+      final inferred = declaredType.isEmpty
+          ? _inferGeminiEnumType(values)
+          : null;
+      if (declaredType == 'string' || inferred == 'string') {
+        result['type'] = 'string';
+        result['enum'] = values
+            .map((value) => value?.toString() ?? '')
+            .toList();
+      } else if (declaredType.isNotEmpty || inferred != null) {
+        if (declaredType.isEmpty) result['type'] = inferred;
+        result.remove('enum');
+      } else {
+        final strings = values.whereType<String>().toList();
+        if (strings.isNotEmpty) {
+          result['type'] = 'string';
+          result['enum'] = strings;
+        } else {
+          result['type'] =
+              values
+                  .map(_geminiScalarType)
+                  .firstWhere((type) => type != null, orElse: () => null) ??
+              'string';
+          result.remove('enum');
+        }
+      }
+    }
+
     Map<String, dynamic> props = const <String, dynamic>{};
     if (result['properties'] is Map) {
       props = Map<String, dynamic>.from(result['properties'] as Map);
     } else if ((result['type'] ?? '').toString() == 'object') {
-      // 确保对象始终具有 properties 映射，以满足 Gemini 校验
       props = <String, dynamic>{};
     }
     if (props.isNotEmpty || result['type'] == 'object') {
-      props.forEach((key, value) {
-        if (value is Map) {
-          final propMap = Map<String, dynamic>.from(value);
-          // print('[ChatApi/Schema] Property $key: type=${propMap['type']}, hasItems=${propMap.containsKey('items')}');
-          // 如果类型是 array 但缺少 items，则添加一个宽松的 items schema
-          if (propMap['type'] == 'array' && !propMap.containsKey('items')) {
-            // print('[ChatApi/Schema] 将项目添加到数组属性：$key');
-            propMap['items'] = {'type': 'string'}; // 默认字符串数组
-          }
-          // 递归清理嵌套对象
-          if (propMap['type'] == 'object' &&
-              propMap.containsKey('properties')) {
-            propMap['properties'] = _cleanSchemaForGemini({
-              'properties': propMap['properties'],
-            })['properties'];
-          }
-          props[key] = propMap;
-        }
-      });
+      props.updateAll(
+        (key, value) => _cleanGeminiSchemaNode(value, stringEnumOnly),
+      );
 
-      // Gemini 要求 `required` 中的每一项都必须存在于 `properties` 中
       final req = result['required'];
       if (req is List) {
         for (final r in req) {
           final name = r.toString();
-          if (!props.containsKey(name)) {
-            props[name] = {'type': 'string'}; // 回退到简单字符串字段
-          }
+          if (!props.containsKey(name)) props[name] = {'type': 'string'};
         }
       }
       result['properties'] = props;
     }
 
-    // 递归处理数组项
     if (result['items'] is Map) {
-      result['items'] = _cleanSchemaForGemini(
-        result['items'] as Map<String, dynamic>,
-      );
+      result['items'] = _cleanGeminiSchemaNode(result['items'], stringEnumOnly);
+    } else if ((result['type'] ?? '').toString() == 'array' &&
+        !result.containsKey('items')) {
+      result['items'] = {'type': 'string'};
     }
-
     return result;
+  }
+
+  static String? _geminiScalarType(dynamic value) {
+    if (value is String) return 'string';
+    if (value is bool) return 'boolean';
+    if (value is int) return 'integer';
+    if (value is num) return 'number';
+    return null;
+  }
+
+  static String? _inferGeminiEnumType(List<dynamic> values) {
+    if (values.isEmpty) return null;
+    String? type;
+    for (final value in values) {
+      final next = _geminiScalarType(value);
+      if (next == null) return null;
+      if (type == null) {
+        type = next;
+      } else if (type != next) {
+        if ((type == 'integer' && next == 'number') ||
+            (type == 'number' && next == 'integer')) {
+          type = 'number';
+        } else {
+          return null;
+        }
+      }
+    }
+    return type;
   }
 }
 

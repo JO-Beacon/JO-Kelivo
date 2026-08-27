@@ -7,6 +7,7 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/memory/memory_prompts.dart';
 import 'package:Kelivo/features/settings/pages/memory_settings_page.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/ios_switch.dart';
 
 import '../../../support/business_test_harness.dart';
 
@@ -32,12 +33,40 @@ Widget _wrap(SettingsProvider settings, {required Locale locale}) {
 
 /// Opens the "memory rules" template editor from the settings list.
 Future<void> _openRulesEditor(WidgetTester tester, String title) async {
-  await tester.tap(find.text(title));
+  final target = find.text(title);
+  await tester.scrollUntilVisible(
+    target,
+    300,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.tap(target.hitTestable());
   await tester.pumpAndSettle();
 }
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('legacy mode switch is owned by global memory settings', (
+    tester,
+  ) async {
+    final settings = await _createSettings();
+
+    await tester.pumpWidget(_wrap(settings, locale: const Locale('en')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Use legacy memory'), findsOneWidget);
+    expect(settings.legacyMemoryMode, isFalse);
+
+    final legacySwitch = find.byWidgetPredicate(
+      (widget) =>
+          widget is IosSwitch && widget.semanticLabel == 'Use legacy memory',
+    );
+    await tester.tap(legacySwitch);
+    await tester.pumpAndSettle();
+
+    expect(settings.legacyMemoryMode, isTrue);
+    expect(find.text('Legacy memory rules'), findsOneWidget);
+  });
 
   testWidgets('editor shows one field, in the language the model is sent', (
     tester,
@@ -94,5 +123,72 @@ void main() {
 
     expect(settings.memoryRulesPromptZh, '自定义规则');
     expect(settings.memoryRulesPromptEn, MemoryPrompts.rulesEn);
+  });
+
+  testWidgets('legacy mode exposes and saves the legacy rules template', (
+    tester,
+  ) async {
+    final settings = await _createSettings();
+    await settings.setLegacyMemoryMode(true);
+    await settings.setMemoryPromptLang('zh');
+
+    await tester.pumpWidget(_wrap(settings, locale: const Locale('zh')));
+    await tester.pumpAndSettle();
+
+    final l10n = await AppLocalizations.delegate.load(const Locale('zh'));
+    await _openRulesEditor(tester, l10n.memorySettingsLegacyPromptTitle);
+
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.controller!.text, MemoryPrompts.legacyRulesZh);
+
+    await tester.enterText(find.byType(TextField), '自定义旧版规则');
+    await tester.tap(find.byTooltip(l10n.memoryPromptEditSave));
+    await tester.pumpAndSettle();
+
+    expect(settings.legacyMemoryPromptZh, '自定义旧版规则');
+    expect(settings.legacyMemoryPromptEn, MemoryPrompts.legacyRulesEn);
+  });
+
+  testWidgets('legacy mode hides settings for the new memory system', (
+    tester,
+  ) async {
+    final settings = await _createSettings();
+    await settings.setLegacyMemoryMode(true);
+
+    await tester.pumpWidget(_wrap(settings, locale: const Locale('zh')));
+    await tester.pumpAndSettle();
+
+    final l10n = await AppLocalizations.delegate.load(const Locale('zh'));
+    expect(find.text(l10n.memorySettingsLegacyPromptTitle), findsOneWidget);
+    expect(find.text(l10n.memorySettingsModelSection), findsNothing);
+    expect(find.text(l10n.memorySettingsPromptLangSection), findsOneWidget);
+    expect(find.text(l10n.memoryPromptEditRulesTitle), findsNothing);
+    expect(find.text(l10n.memorySettingsEntriesTitle), findsNothing);
+    expect(find.text(l10n.memorySettingsProfileTitle), findsNothing);
+    expect(find.text(l10n.memoryTraceSettingsTitle), findsNothing);
+  });
+
+  testWidgets('legacy editor follows the selected prompt language', (
+    tester,
+  ) async {
+    final settings = await _createSettings();
+    await settings.setLegacyMemoryMode(true);
+    await settings.setMemoryPromptLang('en');
+
+    await tester.pumpWidget(_wrap(settings, locale: const Locale('zh')));
+    await tester.pumpAndSettle();
+
+    final l10n = await AppLocalizations.delegate.load(const Locale('zh'));
+    await _openRulesEditor(tester, l10n.memorySettingsLegacyPromptTitle);
+
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.controller!.text, MemoryPrompts.legacyRulesEn);
+
+    await tester.enterText(find.byType(TextField), 'Custom legacy rules');
+    await tester.tap(find.byTooltip(l10n.memoryPromptEditSave));
+    await tester.pumpAndSettle();
+
+    expect(settings.legacyMemoryPromptEn, 'Custom legacy rules');
+    expect(settings.legacyMemoryPromptZh, MemoryPrompts.legacyRulesZh);
   });
 }

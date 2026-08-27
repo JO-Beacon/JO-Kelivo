@@ -53,4 +53,26 @@ void main() {
     expect((draft.parts[1] as ImagePart).uri, 'new.png');
     expect((draft.parts[3] as FilePart).name, 'new.pdf');
   });
+
+  test('isSameAs compares structured part values', () {
+    final draft = MessagePartsEditDraft(const <MessagePart>[
+      TextPart('body'),
+      ImagePart(uri: 'image.png'),
+    ]);
+
+    expect(
+      draft.isSameAs(const <MessagePart>[
+        TextPart('body'),
+        ImagePart(uri: 'image.png'),
+      ]),
+      isTrue,
+    );
+    expect(
+      draft.isSameAs(const <MessagePart>[
+        TextPart('body'),
+        ImagePart(uri: 'other.png'),
+      ]),
+      isFalse,
+    );
+  });
 }

@@ -33,4 +33,21 @@ class TokenUsage {
       totalTokens: total,
     );
   }
+
+  /// 累加已经结束的不同工具调用轮次；与同一轮流式快照的 [merge] 相反，
+  /// 这里的 prompt/completion/cached token 都代表新增消耗。
+  TokenUsage accumulate(TokenUsage other) {
+    final prompt = promptTokens + other.promptTokens;
+    final completion = completionTokens + other.completionTokens;
+    final cached = cachedTokens + other.cachedTokens;
+    final splitTotal = prompt + completion;
+    return TokenUsage(
+      promptTokens: prompt,
+      completionTokens: completion,
+      cachedTokens: cached,
+      totalTokens: splitTotal > 0
+          ? splitTotal
+          : totalTokens + other.totalTokens,
+    );
+  }
 }

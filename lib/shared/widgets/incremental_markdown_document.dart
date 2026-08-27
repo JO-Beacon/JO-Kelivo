@@ -1,64 +1,150 @@
-/// 追加式流式 Markdown 文档中的稳定源块。
+import 'markdown_line_lexer.dart';
+
+/// A source block in an append-only streaming Markdown document.
 final class IncrementalMarkdownBlock {
-  const IncrementalMarkdownBlock({required this.start, required this.text});
+  const IncrementalMarkdownBlock({
+    required this.start,
+    required this.text,
+    required this.stable,
+  });
 
   final int start;
+
+  /// The block's source, without the blank run that separates it from the
+  /// next block. The splitter skips that run on its own; the widget inserts
+  /// one separator in its place.
   final String text;
+
+  /// Whether the scanner has committed this block. The unfinished tail —
+  /// and a temporary indent merge of that tail with the last committed
+  /// block — are not stable. Only the tail may receive streaming
+  /// stabilization (tables, unfinished math).
+  final bool stable;
 }
 
-/// 在安全的空行边界拆分流式 Markdown，并在追加内容时只重新扫描最后一个
-/// （可能不完整）的块。
+/// Splits streaming Markdown at safe blank-line boundaries and only rescans
+/// the last (possibly incomplete) block when content is appended.
 final class IncrementalMarkdownDocument {
   static final _listMarker = RegExp(
     r'^(?:[*+-](?:\s+\[[ xX]\])?|\d{1,9}[.)])(?:\s|$)',
   );
-  static final _detailsOpen = RegExp(r'<details\b', caseSensitive: false);
-  static final _detailsClose = RegExp(r'</details>', caseSensitive: false);
 
+  String _rawSource = '';
   String _source = '';
+  bool _rawEndsWithCR = false;
   List<IncrementalMarkdownBlock> _blocks = const [];
   final List<IncrementalMarkdownBlock> _stableBlocks = [];
+  final MarkdownLineLexer _lexer = MarkdownLineLexer();
+  final MarkdownDisplayMathScanner _mathScanner = MarkdownDisplayMathScanner();
   int _rescannedCodeUnits = 0;
   int _scanCursor = 0;
   int _lineStart = 0;
   int _blockStart = 0;
-  String? _fence;
-  String? _math;
-  int _detailsDepth = 0;
   int? _pendingListBlankEnd;
+  bool _blankRunCarriesWhitespace = false;
 
   List<IncrementalMarkdownBlock> get blocks => _blocks;
   int get rescannedCodeUnits => _rescannedCodeUnits;
 
+  /// Whether [_source] is still the caller's raw string. False after a CR
+  /// forced a normalized copy.
+  bool get debugReusesCallerSource => identical(_source, _rawSource);
+
   List<IncrementalMarkdownBlock> update(String source) {
-    if (source == _source) return _blocks;
-    if (!source.startsWith(_source)) {
+    if (source == _rawSource) return _blocks;
+    if (!source.startsWith(_rawSource)) {
       _stableBlocks.clear();
       _scanCursor = 0;
       _lineStart = 0;
       _blockStart = 0;
-      _fence = null;
-      _math = null;
-      _detailsDepth = 0;
+      _lexer.reset();
+      _mathScanner.reset();
       _pendingListBlankEnd = null;
-      _rescannedCodeUnits += source.length;
+      _blankRunCarriesWhitespace = false;
+      final normalized = _normalizeNewlines(source);
+      _rescannedCodeUnits += normalized.length;
+      _source = normalized;
     } else {
-      _rescannedCodeUnits += source.length - _source.length;
+      final rawSuffix = source.substring(_rawSource.length);
+      if (_canReuseCallerSource(rawSuffix)) {
+        _rescannedCodeUnits += rawSuffix.length;
+        _source = source;
+      } else {
+        final suffix = _normalizeAppendedSuffix(rawSuffix);
+        _rescannedCodeUnits += suffix.length;
+        _source += suffix;
+      }
     }
-    _source = source;
+    _rawSource = source;
+    _rawEndsWithCR =
+        source.isNotEmpty && source.codeUnitAt(source.length - 1) == 0x0D;
     _scanCompletedLines();
-    final tail = IncrementalMarkdownBlock(
-      start: _blockStart,
-      text: source.substring(_blockStart),
-    );
-    _blocks = List<IncrementalMarkdownBlock>.unmodifiable([
-      ..._stableBlocks,
-      tail,
-    ]);
+    _blocks = List<IncrementalMarkdownBlock>.unmodifiable(_visibleBlocks());
     return _blocks;
   }
 
+  /// The common path never contained a CR, so [source] is already the
+  /// accumulated document. Reuse it instead of copying `_source + suffix`.
+  bool _canReuseCallerSource(String rawSuffix) {
+    return identical(_source, _rawSource) &&
+        !_rawEndsWithCR &&
+        !rawSuffix.contains('\r');
+  }
+
+  /// CRLF and bare CR become LF, the same way `GptMarkdown` rewrites them
+  /// before it parses. U+2028 / U+2029 stay as content: `NewLines` only
+  /// matches `\n\n+`.
+  static String _normalizeNewlines(String source) {
+    if (!source.contains('\r')) return source;
+    return source.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+  }
+
+  /// Only the newly appended raw suffix is rewritten. A CR that closed the
+  /// previous chunk plus an LF that opens this one is one newline, not two.
+  String _normalizeAppendedSuffix(String suffix) {
+    if (suffix.isEmpty) return '';
+    var rest = suffix;
+    if (_rawEndsWithCR && rest.codeUnitAt(0) == 0x0A) {
+      rest = rest.substring(1);
+    }
+    return _normalizeNewlines(rest);
+  }
+
+  /// Completed blocks plus the unfinished tail. A non-empty indented tail
+  /// is folded into the last block for the returned list only — the scanner
+  /// itself is left alone until that line is finished. A tail of only
+  /// whitespace is dropped: `GptMarkdown` trims it, so merging would only
+  /// rebuild a block that lays out the same.
+  ///
+  /// A real indented tail re-parses the last committed block on each token
+  /// of that one unfinished line. That is the cost of keeping indent as
+  /// syntax; the alternative is a layout jump when the line completes.
+  List<IncrementalMarkdownBlock> _visibleBlocks() {
+    final tailText = _source.substring(_blockStart);
+    if (tailText.trim().isEmpty) return List.of(_stableBlocks);
+    if (_stableBlocks.isNotEmpty && _startsWithIndent(tailText)) {
+      final last = _stableBlocks.last;
+      return [
+        ..._stableBlocks.sublist(0, _stableBlocks.length - 1),
+        IncrementalMarkdownBlock(
+          start: last.start,
+          text: _source.substring(last.start),
+          stable: false,
+        ),
+      ];
+    }
+    return [
+      ..._stableBlocks,
+      IncrementalMarkdownBlock(
+        start: _blockStart,
+        text: tailText,
+        stable: false,
+      ),
+    ];
+  }
+
   void _scanCompletedLines() {
+    final mathScan = _mathScanner.synchronize(_source);
     while (_scanCursor < _source.length) {
       final newline = _source.indexOf('\n', _scanCursor);
       if (newline < 0) {
@@ -67,26 +153,48 @@ final class IncrementalMarkdownDocument {
       }
       final rawLine = _source.substring(_lineStart, newline);
       final line = rawLine.trimLeft();
-      _updateFence(line);
-      if (_fence == null) {
-        if (_math == null) _updateDetails(line);
-        if (_detailsDepth == 0) _updateMath(line);
-      }
-      final protected = _fence != null || _math != null || _detailsDepth > 0;
+      _lexer.consumePhysicalLine(rawLine);
+      final protected = _lexer.protected || mathScan.covers(_lineStart);
       final isBlank = line.trim().isEmpty;
-      if (!protected && isBlank && _lineStart > _blockStart) {
+      if (!protected && isBlank) {
         final end = newline + 1;
-        if (_currentBlockIsList()) {
-          _pendingListBlankEnd = end;
+        if (_hasWhitespaceContent(rawLine)) _blankRunCarriesWhitespace = true;
+        if (_blankRunCarriesWhitespace) {
+          // A blank line carrying whitespace is content to the renderers around
+          // it: a rule, a heading and a display-math block each absorb it into
+          // their own match, and plain text lays it out as a line of its own.
+          // Rather than model all of that, refuse the boundary and leave the
+          // run inside one block, which renders the way the document reads.
+          _clearPendingList();
+          if (_lineStart == _blockStart) _mergeLastBlockBack();
+        } else if (_lineStart > _blockStart) {
+          if (_currentBlockIsList()) {
+            _pendingListBlankEnd = end;
+          } else {
+            _emitStableBlock(end);
+          }
         } else {
-          _emitStableBlock(end);
+          // A blank line with no content behind it continues the run that
+          // ended the block before it. `NewLines` collapses the whole run
+          // to one gap, so the completed block stays as it is.
+          _extendLastBlock(end);
         }
-      } else if (!protected && !isBlank && _pendingListBlankEnd != null) {
-        if (_isListContinuation(rawLine, line)) {
-          _pendingListBlankEnd = null;
-        } else {
-          _emitStableBlock(_pendingListBlankEnd!);
-          _pendingListBlankEnd = null;
+      } else if (!protected && !isBlank) {
+        _blankRunCarriesWhitespace = false;
+        if (_pendingListBlankEnd != null) {
+          if (_isListContinuation(rawLine, line)) {
+            _clearPendingList();
+          } else {
+            _emitStableBlock(_pendingListBlankEnd!);
+            _clearPendingList();
+          }
+        } else if (_lineStart == _blockStart &&
+            (_isIndented(rawLine) || _isBareHashRun(line))) {
+          // Indentation is part of the syntax — four spaces stop a heading
+          // from being one — and a block-by-block render trims the leading
+          // whitespace off every block. Keep the line with the block above
+          // so both reach the renderer the way they read in the document.
+          _mergeLastBlockBack();
         }
       }
       _lineStart = newline + 1;
@@ -95,131 +203,86 @@ final class IncrementalMarkdownDocument {
   }
 
   void _emitStableBlock(int end) {
+    if (end > _blockStart) {
+      _stableBlocks.add(
+        IncrementalMarkdownBlock(
+          start: _blockStart,
+          text: _source.substring(_blockStart, end),
+          stable: true,
+        ),
+      );
+    }
+    _blockStart = end;
+  }
+
+  void _extendLastBlock(int end) {
+    if (_stableBlocks.isEmpty) {
+      _blockStart = end;
+      return;
+    }
+    final last = _stableBlocks.removeLast();
     _stableBlocks.add(
       IncrementalMarkdownBlock(
-        start: _blockStart,
-        text: _source.substring(_blockStart, end),
+        start: last.start,
+        text: _source.substring(last.start, end),
+        stable: true,
       ),
     );
     _blockStart = end;
   }
 
-  void _updateFence(String line) {
-    final marker = line.startsWith('```')
-        ? '```'
-        : line.startsWith('~~~')
-        ? '~~~'
-        : null;
-    if (marker == null) return;
-    _fence = _fence == null
-        ? marker
-        : _fence == marker
-        ? null
-        : _fence;
+  /// Reopens the last block so the line just scanned joins it.
+  void _mergeLastBlockBack() {
+    if (_stableBlocks.isEmpty) return;
+    _blockStart = _stableBlocks.removeLast().start;
   }
 
-  void _updateMath(String line) {
-    var i = 0;
-    while (i < line.length) {
-      if (line.codeUnitAt(i) == 0x60) {
-        i = _advancePastInlineCodeOrBackticks(line, i);
-        continue;
-      }
-      if (_math == r'$$') {
-        if (_atDoubleDollar(line, i)) {
-          _math = null;
-          i += 2;
-        } else {
-          i++;
-        }
-        continue;
-      }
-      if (_math == r'\[') {
-        if (_atEscaped(line, i, 0x5D)) {
-          _math = null;
-          i += 2;
-        } else {
-          i++;
-        }
-        continue;
-      }
-      if (_atDoubleDollar(line, i)) {
-        _math = r'$$';
-        i += 2;
-        continue;
-      }
-      if (_atEscaped(line, i, 0x5B)) {
-        _math = r'\[';
-        i += 2;
-        continue;
-      }
-      i++;
-    }
+  void _clearPendingList() {
+    _pendingListBlankEnd = null;
   }
 
-  void _updateDetails(String line) {
-    if (_detailsOpen.matchAsPrefix(line) == null &&
-        _detailsClose.matchAsPrefix(line) == null) {
-      return;
+  static bool _isIndented(String rawLine) =>
+      rawLine.isNotEmpty && _isWhitespace(rawLine.codeUnitAt(0));
+
+  static bool _isBareHashRun(String line) {
+    final run = line.trimRight();
+    if (run.isEmpty || run.length > 6) return false;
+    for (var i = 0; i < run.length; i++) {
+      if (run.codeUnitAt(i) != 0x23) return false;
     }
-    var i = 0;
-    while (i < line.length) {
-      if (line.codeUnitAt(i) == 0x60) {
-        i = _advancePastInlineCodeOrBackticks(line, i);
-        continue;
-      }
-      if (line.codeUnitAt(i) != 0x3C) {
-        i++;
-        continue;
-      }
-      final open = _detailsOpen.matchAsPrefix(line, i);
-      if (open != null) {
-        _detailsDepth++;
-        i = open.end;
-        continue;
-      }
-      final close = _detailsClose.matchAsPrefix(line, i);
-      if (close != null) {
-        if (_detailsDepth > 0) _detailsDepth--;
-        i = close.end;
-        continue;
-      }
-      i++;
-    }
+    return true;
   }
 
-  int _advancePastInlineCodeOrBackticks(String line, int start) {
-    var n = 0;
-    while (start + n < line.length && line.codeUnitAt(start + n) == 0x60) {
-      n++;
+  static bool _startsWithIndent(String text) =>
+      text.isNotEmpty && _isWhitespace(text.codeUnitAt(0));
+
+  /// Whether a blank [rawLine] carries something other than a line break.
+  /// After CRLF normalization the only break left in a raw line is a stray
+  /// CR; U+2028 / U+2029 / NBSP / spaces are content, not a `NewLines` gap.
+  static bool _hasWhitespaceContent(String rawLine) {
+    for (var i = 0; i < rawLine.length; i++) {
+      final unit = rawLine.codeUnitAt(i);
+      if (unit != 0x0A && unit != 0x0D) return true;
     }
-    var i = start + n;
-    while (i < line.length) {
-      if (line.codeUnitAt(i) != 0x60) {
-        i++;
-        continue;
-      }
-      var m = 0;
-      while (i + m < line.length && line.codeUnitAt(i + m) == 0x60) {
-        m++;
-      }
-      if (m == n) return i + m;
-      i += m;
-    }
-    return start + n;
+    return false;
   }
 
-  bool _atDoubleDollar(String line, int i) {
-    return i + 1 < line.length &&
-        line.codeUnitAt(i) == 0x24 &&
-        line.codeUnitAt(i + 1) == 0x24;
-  }
+  static bool _isWhitespace(int unit) =>
+      unit == 0x20 ||
+      (unit >= 0x09 && unit <= 0x0D) ||
+      (unit >= 0x80 && _isWideWhitespace(unit));
 
-  bool _atEscaped(String line, int i, int unit) {
-    return i + 1 < line.length &&
-        line.codeUnitAt(i) == 0x5C &&
-        line.codeUnitAt(i + 1) == unit;
-  }
+  static bool _isWideWhitespace(int unit) =>
+      unit == 0x85 ||
+      unit == 0xA0 ||
+      unit == 0x1680 ||
+      (unit >= 0x2000 && unit <= 0x200A) ||
+      unit == 0x2028 ||
+      unit == 0x2029 ||
+      unit == 0x202F ||
+      unit == 0x205F ||
+      unit == 0x3000 ||
+      unit == 0xFEFF;
 
   bool _currentBlockIsList() {
     var i = _blockStart;

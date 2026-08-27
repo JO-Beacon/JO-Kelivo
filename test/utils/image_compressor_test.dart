@@ -190,7 +190,7 @@ void main() {
     );
   });
 
-  test('writes unique JPEG names and preserves existing uploads', () async {
+  test('reuses stored uploads and keeps differing images apart', () async {
     final temp = await Directory.systemTemp.createTemp(
       'kelivo_image_compressor_test_',
     );
@@ -207,23 +207,35 @@ void main() {
       config,
     );
     expect(first, isNotNull);
-    final firstPath = first!;
-    final concurrent = await Future.wait([
-      ImageCompressor.compressToUploadDir(source.path, uploadDir, config),
-      ImageCompressor.compressToUploadDir(source.path, uploadDir, config),
-    ]);
-    expect(concurrent, everyElement(isNotNull));
-    final paths = {firstPath, ...concurrent.whereType<String>()};
-    expect(paths.length, 3);
-    expect(paths.map(p.basename).toSet(), {
-      'photo.jpg',
-      'photo(1).jpg',
-      'photo(2).jpg',
-    });
+    final firstWrite = first!;
+    final firstPath = firstWrite.path;
+    expect(firstWrite.reused, isFalse);
+    expect(p.basename(firstPath), 'photo.jpg');
+
+    final again = await ImageCompressor.compressToUploadDir(
+      source.path,
+      uploadDir,
+      config,
+    );
+    expect(again?.path, firstPath);
+    expect(again?.reused, isTrue);
+    expect(uploadDir.listSync().whereType<File>(), hasLength(1));
 
     final firstBytes = await File(firstPath).readAsBytes();
-    await ImageCompressor.compressToUploadDir(firstPath, uploadDir, config);
+    await source.writeAsBytes(img.encodePng(_noiseImage(480, 480)));
+    final second = await ImageCompressor.compressToUploadDir(
+      source.path,
+      uploadDir,
+      config,
+    );
+    expect(second, isNotNull);
+    expect(second!.reused, isFalse);
+    expect(p.basename(second.path), 'photo(1).jpg');
     expect(await File(firstPath).readAsBytes(), orderedEquals(firstBytes));
+    expect(
+      await ImageCompressor.compressToUploadDir(firstPath, uploadDir, config),
+      isNotNull,
+    );
     expect(
       await ImageCompressor.compressToUploadDir(
         p.join(sourceDir.path, 'missing.png'),

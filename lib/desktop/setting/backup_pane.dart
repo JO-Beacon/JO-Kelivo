@@ -26,6 +26,7 @@ import '../../features/backup/widgets/backup_reminder_helpers.dart';
 import '../../utils/platform_utils.dart';
 import '../../utils/app_directories.dart';
 import '../widgets/desktop_select_dropdown.dart';
+import '../widgets/desktop_dialog_style.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
@@ -276,7 +277,9 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
       if (!context.mounted) return;
       showAppSnackBar(
         context,
-        message: e.toString(),
+        message: l10n.backupPageExportFailedMessage(
+          backupRestoreErrorMessage(l10n, e),
+        ),
         type: NotificationType.error,
       );
     } finally {
@@ -1053,9 +1056,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                       barrierDismissible: false,
                       builder: (dctx) => AlertDialog(
                         backgroundColor: cs.surface,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
+                        shape: DesktopDialogStyle.shape(dctx),
                         title: Text(l10n.backupPageRestartRequired),
                         content: Text(l10n.backupPageRestartContent),
                         actions: [
@@ -1081,9 +1082,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                       barrierDismissible: false,
                       builder: (dctx) => AlertDialog(
                         backgroundColor: cs.surface,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
+                        shape: DesktopDialogStyle.shape(dctx),
                         title: Text(l10n.backupPageImportFromCherryStudio),
                         content: Text(
                           l10n.backupPageCherryStudioUnsupportedBackupVersion(
@@ -1105,9 +1104,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                       barrierDismissible: false,
                       builder: (dctx) => AlertDialog(
                         backgroundColor: cs.surface,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
+                        shape: DesktopDialogStyle.shape(dctx),
                         title: Text(l10n.backupPageImportFromCherryStudio),
                         content: Text(e.toString()),
                         actions: [
@@ -1159,9 +1156,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                       context: rootCtx,
                       builder: (dctx) => AlertDialog(
                         backgroundColor: cs.surface,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
+                        shape: DesktopDialogStyle.shape(dctx),
                         title: Text(l10n.backupPageRestartRequired),
                         content: Text(
                           '${l10n.backupPageImportFromChatbox}:\n'
@@ -1193,9 +1188,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                       context: rootCtx,
                       builder: (dctx) => AlertDialog(
                         backgroundColor: cs.surface,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
+                        shape: DesktopDialogStyle.shape(dctx),
                         title: Text(l10n.backupPageImportFromChatbox),
                         content: Text(e.toString()),
                         actions: [
@@ -1599,9 +1592,14 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
     return Dialog(
       backgroundColor: cs.surface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: DesktopDialogStyle.shape(context),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 760, maxHeight: 540),
+        constraints: DesktopDialogStyle.proportionalConstraints(
+          context,
+          maxWidth: 760,
+          maxHeight: 540,
+          verticalInset: 18,
+        ),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
           child: Column(
@@ -1669,9 +1667,7 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
                                   context: context,
                                   builder: (dctx) => AlertDialog(
                                     backgroundColor: cs.surface,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
+                                    shape: DesktopDialogStyle.shape(dctx),
                                     title: Text(
                                       l10n.backupPageDeleteConfirmTitle,
                                     ),
@@ -1803,7 +1799,7 @@ class _RestoreModeDialog extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     return Dialog(
       backgroundColor: cs.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: DesktopDialogStyle.shape(context),
       child: ConstrainedBox(
         constraints: const BoxConstraints(minWidth: 320, maxWidth: 420),
         child: Padding(

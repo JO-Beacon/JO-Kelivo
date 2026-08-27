@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
@@ -111,7 +112,72 @@ void main() {
       },
     );
 
-    test('fails immediately while another process owns the lease', () async {
+    test(
+      'fails without waiting once the foreign lock grace is spent',
+      () async {
+        final helper = File(p.join(root.path, 'business_lease_helper.dart'));
+        await helper.writeAsString(_helperSource, flush: true);
+        final packageConfig = p.join(
+          Directory.current.path,
+          '.dart_tool',
+          'package_config.json',
+        );
+        final releaseFile = File(p.join(root.path, 'release_helper'));
+        final process = await Process.start(_dartExecutable(), [
+          '--packages=$packageConfig',
+          helper.path,
+          appData.path,
+          releaseFile.path,
+        ], workingDirectory: Directory.current.path);
+        addTearDown(() async {
+          process.kill();
+          await process.stdin.close();
+        });
+        final errors = StringBuffer();
+        final errorSubscription = process.stderr
+            .transform(utf8.decoder)
+            .listen(errors.write);
+        addTearDown(errorSubscription.cancel);
+        final ready = await process.stdout
+            .transform(utf8.decoder)
+            .transform(const LineSplitter())
+            .first
+            .timeout(const Duration(seconds: 15));
+        expect(ready, 'ready', reason: errors.toString());
+
+        final stopwatch = Stopwatch()..start();
+        await expectLater(
+          RestoreBusinessLease.acquire(
+            appDataDirectory: appData,
+            foreignLockGrace: Duration.zero,
+          ),
+          throwsA(isA<RestoreBusinessLeaseUnavailable>()),
+        );
+        stopwatch.stop();
+        expect(stopwatch.elapsed, lessThan(const Duration(seconds: 2)));
+
+        final leaseDirectory = Directory(
+          p.join(appData.path, RestoreBusinessLease.leaseDirectoryName),
+        );
+        final ownerNames = await leaseDirectory
+            .list(followLinks: false)
+            .map((entry) => p.basename(entry.path))
+            .where((name) => name.startsWith('owner_'))
+            .toList();
+        expect(ownerNames, hasLength(1));
+        expect(ownerNames.single, isNot('owner_$pid'));
+
+        expect(process.kill(), isTrue);
+        await process.exitCode.timeout(const Duration(seconds: 15));
+
+        final lease = await RestoreBusinessLease.acquire(
+          appDataDirectory: appData,
+        );
+        await lease.close();
+      },
+    );
+
+    test('waits out a previous process that is still dying', () async {
       final helper = File(p.join(root.path, 'business_lease_helper.dart'));
       await helper.writeAsString(_helperSource, flush: true);
       final packageConfig = p.join(
@@ -130,33 +196,22 @@ void main() {
         process.kill();
         await process.stdin.close();
       });
-      final errors = StringBuffer();
-      final errorSubscription = process.stderr
-          .transform(utf8.decoder)
-          .listen(errors.write);
-      addTearDown(errorSubscription.cancel);
       final ready = await process.stdout
           .transform(utf8.decoder)
           .transform(const LineSplitter())
           .first
           .timeout(const Duration(seconds: 15));
-      expect(ready, 'ready', reason: errors.toString());
+      expect(ready, 'ready');
 
-      final stopwatch = Stopwatch()..start();
-      await expectLater(
-        RestoreBusinessLease.acquire(appDataDirectory: appData),
-        throwsA(isA<RestoreBusinessLeaseUnavailable>()),
-      );
-      stopwatch.stop();
-      expect(stopwatch.elapsed, lessThan(const Duration(seconds: 2)));
-
-      expect(process.kill(), isTrue);
-      await process.exitCode.timeout(const Duration(seconds: 15));
+      Timer(const Duration(milliseconds: 400), () => releaseFile.createSync());
 
       final lease = await RestoreBusinessLease.acquire(
         appDataDirectory: appData,
+        foreignLockGrace: const Duration(seconds: 10),
       );
-      await lease.close();
+      addTearDown(lease.close);
+      expect(lease.isClosed, isFalse);
+      await process.exitCode.timeout(const Duration(seconds: 15));
     });
 
     test(
@@ -181,6 +236,111 @@ void main() {
       },
     );
 
+    test(
+      'waits out a same-process owner that is still shutting down',
+      () async {
+        final leaseDirectory = Directory(
+          p.join(appData.path, RestoreBusinessLease.leaseDirectoryName),
+        );
+        await leaseDirectory.create(recursive: true);
+        final outgoingOwner = File(p.join(leaseDirectory.path, 'owner_$pid'));
+        final outgoing = await _FakeOwnerProbe.open(outgoingOwner);
+        addTearDown(outgoing.close);
+        Timer(const Duration(milliseconds: 400), outgoing.close);
+
+        final elapsed = Stopwatch()..start();
+        final lease = await RestoreBusinessLease.acquire(
+          appDataDirectory: appData,
+        );
+        elapsed.stop();
+        addTearDown(lease.close);
+
+        expect(elapsed.elapsed, greaterThan(const Duration(milliseconds: 300)));
+        expect(lease.processId, pid);
+        final ownerIdentity =
+            jsonDecode(await outgoingOwner.readAsString())
+                as Map<String, dynamic>;
+        expect(ownerIdentity['instanceId'], lease.instanceId);
+      },
+    );
+
+    test('keeps a same-process owner that only stalls its probe', () async {
+      final leaseDirectory = Directory(
+        p.join(appData.path, RestoreBusinessLease.leaseDirectoryName),
+      );
+      await leaseDirectory.create(recursive: true);
+      final outgoingOwner = File(p.join(leaseDirectory.path, 'owner_$pid'));
+      final outgoing = await _FakeOwnerProbe.open(
+        outgoingOwner,
+        silentReplies: 2,
+      );
+      addTearDown(outgoing.close);
+
+      await expectLater(
+        RestoreBusinessLease.acquire(
+          appDataDirectory: appData,
+          sameProcessOwnerGrace: const Duration(milliseconds: 600),
+        ),
+        throwsA(isA<RestoreBusinessLeaseUnavailable>()),
+      );
+      expect(await outgoingOwner.exists(), isTrue);
+      expect(outgoing.probeCount, greaterThan(2));
+    });
+
+    test('fails once a same-process owner outlives the grace window', () async {
+      final leaseDirectory = Directory(
+        p.join(appData.path, RestoreBusinessLease.leaseDirectoryName),
+      );
+      await leaseDirectory.create(recursive: true);
+      final outgoingOwner = File(p.join(leaseDirectory.path, 'owner_$pid'));
+      final outgoing = await _FakeOwnerProbe.open(outgoingOwner);
+      addTearDown(outgoing.close);
+
+      await expectLater(
+        RestoreBusinessLease.acquire(
+          appDataDirectory: appData,
+          sameProcessOwnerGrace: const Duration(milliseconds: 200),
+        ),
+        throwsA(isA<RestoreBusinessLeaseUnavailable>()),
+      );
+
+      await outgoing.close();
+      final lease = await RestoreBusinessLease.acquire(
+        appDataDirectory: appData,
+      );
+      await lease.close();
+    });
+
+    test(
+      'reacquires after an engine restart left the lock descriptor open',
+      () async {
+        final leaseDirectory = Directory(
+          p.join(appData.path, RestoreBusinessLease.leaseDirectoryName),
+        );
+        await leaseDirectory.create(recursive: true);
+        final appDataPath = appData.path;
+        final acquired = await Isolate.run(() async {
+          final previous = await RestoreBusinessLease.acquire(
+            appDataDirectory: Directory(appDataPath),
+          );
+          return previous.processId;
+        });
+        expect(acquired, pid);
+        final leftoverOwner = File(p.join(leaseDirectory.path, 'owner_$pid'));
+        expect(await leftoverOwner.exists(), isTrue);
+
+        final lease = await RestoreBusinessLease.acquire(
+          appDataDirectory: appData,
+        );
+        addTearDown(lease.close);
+        expect(lease.isClosed, isFalse);
+        expect(lease.processId, pid);
+      },
+      skip: Platform.isWindows
+          ? 'Windows file locks are handle-scoped, unlike the POSIX lock used by this restart case.'
+          : false,
+    );
+
     test('rejects a duplicate acquire from another isolate', () async {
       final lease = await RestoreBusinessLease.acquire(
         appDataDirectory: appData,
@@ -192,6 +352,7 @@ void main() {
         try {
           final duplicate = await RestoreBusinessLease.acquire(
             appDataDirectory: Directory(appDataPath),
+            sameProcessOwnerGrace: const Duration(milliseconds: 200),
           );
           await duplicate.close();
           return false;
@@ -281,6 +442,59 @@ void main() {
           : false,
     );
   });
+}
+
+final class _FakeOwnerProbe {
+  _FakeOwnerProbe._(this._server, this._token, this._silentReplies);
+
+  final ServerSocket _server;
+  final String _token;
+  int _silentReplies;
+  var _closed = false;
+  var probeCount = 0;
+
+  static Future<_FakeOwnerProbe> open(
+    File ownerFile, {
+    int silentReplies = 0,
+  }) async {
+    final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    const token = 'outgoing-engine-instance';
+    final probe = _FakeOwnerProbe._(server, token, silentReplies);
+    server.listen(probe._answer, onError: (_) {});
+    await ownerFile.writeAsString(
+      jsonEncode({'instanceId': token, 'probePort': server.port}),
+      flush: true,
+    );
+    return probe;
+  }
+
+  Future<void> _answer(Socket socket) async {
+    probeCount++;
+    if (_silentReplies > 0) {
+      _silentReplies--;
+      await socket.close();
+      return;
+    }
+    try {
+      final request = await socket
+          .cast<List<int>>()
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .first;
+      socket.writeln(request == _token ? 'alive' : 'denied');
+      await socket.flush();
+    } catch (_) {
+      // A malformed probe is not part of what these tests assert.
+    } finally {
+      await socket.close();
+    }
+  }
+
+  Future<void> close() async {
+    if (_closed) return;
+    _closed = true;
+    await _server.close();
+  }
 }
 
 String _dartExecutable() {

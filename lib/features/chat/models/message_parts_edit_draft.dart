@@ -12,6 +12,21 @@ class MessagePartsEditDraft {
 
   List<MessagePart> get parts => List<MessagePart>.unmodifiable(_parts);
 
+  bool isSameAs(Iterable<MessagePart> other) {
+    final left = _parts.iterator;
+    final right = other.iterator;
+    while (true) {
+      final leftHasValue = left.moveNext();
+      final rightHasValue = right.moveNext();
+      if (leftHasValue != rightHasValue) return false;
+      if (!leftHasValue) return true;
+      if (left.current.kind != right.current.kind ||
+          left.current.encodePayload() != right.current.encodePayload()) {
+        return false;
+      }
+    }
+  }
+
   List<int> get editableAttachmentIndexes => <int>[
     for (var index = 0; index < _parts.length; index++)
       if (_parts[index] is ImagePart || _parts[index] is FilePart) index,

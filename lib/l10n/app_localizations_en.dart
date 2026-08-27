@@ -256,6 +256,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageSpaceClearLegacyChatDataButton => 'Clear Old Chat Records';
 
   @override
+  String get storageSpaceExportLegacyChatFileButton => 'Export';
+
+  @override
+  String storageSpaceExportDone(String fileName) {
+    return '$fileName exported';
+  }
+
+  @override
+  String storageSpaceExportFailed(String error) {
+    return 'Export failed: $error';
+  }
+
+  @override
   String get storageSpaceClearLegacyChatDataConfirmMessage =>
       'Clear the retained old chat files? Your current SQLite chat records will remain available.';
 
@@ -677,18 +690,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get userProviderDefaultUserName => 'User';
 
   @override
-  String get homePageDeleteMessage => 'Delete Message';
+  String get homePageDeleteMessage => 'Delete Current Branch';
 
   @override
   String get homePageDeleteMessageConfirm =>
-      'Are you sure you want to delete this message and its following branch? This cannot be undone.';
+      'Are you sure you want to delete the current branch and its following messages? Other branches will remain.';
 
   @override
-  String get homePageDeleteAllVersions => 'Delete Branch';
+  String get homePageDeleteMessageOnly => 'Delete This Message';
+
+  @override
+  String get homePageDeleteMessageOnlyConfirm =>
+      'Are you sure you want to delete this message? Following messages will remain.';
+
+  @override
+  String get homePageDeleteAllVersions => 'Delete All Branches';
 
   @override
   String get homePageDeleteAllVersionsConfirm =>
-      'Are you sure you want to delete this branch and its descendants? Other branches will remain.';
+      'Are you sure you want to delete all branches at this fork and their following messages? This cannot be undone.';
 
   @override
   String get homePageCancel => 'Cancel';
@@ -1725,6 +1745,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String backupPageExportFailedMessage(String error) {
+    return 'Export failed: $error';
+  }
+
+  @override
   String get backupPageOK => 'OK';
 
   @override
@@ -2023,13 +2048,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageEditPageTitle => 'Edit Message';
 
   @override
-  String get messageEditPageSave => 'Save';
+  String get messageEditPageSaveAsBranch => 'Save as New Branch';
 
   @override
-  String get messageEditPageSaveAndSend => 'Save & Send';
+  String get messageEditPageSaveAsBranchAndSend => 'Save as New Branch & Send';
+
+  @override
+  String get messageEditPageOverwriteSave => 'Overwrite Save';
 
   @override
   String get messageEditPageHint => 'Enter message…';
+
+  @override
+  String get messageEditTrimWhitespace => 'Trim whitespace';
 
   @override
   String get messageEditAttachmentsTitle => 'Attachments';
@@ -2062,20 +2093,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not copy the selected attachment';
 
   @override
-  String get messageEditCloseConfirmTitle => 'Save changes?';
+  String get messageEditCloseConfirmTitle => 'Close without saving?';
 
   @override
-  String get messageEditCloseConfirmContent =>
-      'Do you want to save your edits before closing?';
+  String get messageEditCloseConfirmContent => 'Your edits will be discarded.';
 
   @override
   String get messageEditCloseConfirmCancel => 'Cancel';
 
   @override
-  String get messageEditCloseConfirmDiscard => 'Don\'t Save';
-
-  @override
-  String get messageEditCloseConfirmSave => 'Save';
+  String get messageEditCloseConfirmConfirm => 'Confirm';
 
   @override
   String get selectCopyPageTitle => 'Select & Copy';
@@ -2162,6 +2189,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get compressContextStartButton => 'Compress';
 
   @override
+  String get compressContextModelLabel => 'Model';
+
+  @override
+  String get compressContextModelUnset => 'Select a model';
+
+  @override
+  String get compressContextKeepRecentMessages => 'Keep N';
+
+  @override
+  String get compressContextKeepCountLabel => 'Keep recent messages';
+
+  @override
+  String get compressContextKeepAllMessages =>
+      'Keeping that many covers all messages — nothing to compress';
+
+  @override
+  String compressContextEstimatePreview(
+    int summarized,
+    int kept,
+    int minTokens,
+    int maxTokens,
+    int totalTokens,
+  ) {
+    return 'Summarize $summarized chars, keep $kept chars verbatim → about $minTokens–$maxTokens tokens (original about $totalTokens tokens)';
+  }
+
+  @override
   String get bottomToolsSheetLearningMode => 'Learning Mode';
 
   @override
@@ -2217,10 +2271,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageMoreSheetCreateMessageBranch => 'Create Message Branch';
 
   @override
-  String get messageMoreSheetDelete => 'Delete Message';
+  String get messageMoreSheetCopyFromHereWithBranches =>
+      'Copy from Here to New Conversation (Keep Branches)';
 
   @override
-  String get messageMoreSheetDeleteAllVersions => 'Delete Branch';
+  String get messageMoreSheetCopyFromHereCurrentBranchOnly =>
+      'Copy from Here to New Conversation (Current Branch Only)';
+
+  @override
+  String get conversationForkFailed => 'Could not copy the conversation';
+
+  @override
+  String get messageMoreSheetDeleteMessageOnly => 'Delete This Message';
+
+  @override
+  String get messageMoreSheetDelete => 'Delete Current Branch';
+
+  @override
+  String get messageMoreSheetDeleteAllVersions => 'Delete All Branches';
 
   @override
   String get reasoningBudgetSheetOff => 'Off';
@@ -2609,6 +2677,55 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String imagePreviewSheetSaveFailed(String error) {
     return 'Save failed: $error';
+  }
+
+  @override
+  String get sideDrawerMenuSelect => 'Select';
+
+  @override
+  String sideDrawerSelectionTitle(int count) {
+    return 'Selected $count items';
+  }
+
+  @override
+  String get sideDrawerSelectionSelectAll => 'Select all';
+
+  @override
+  String get sideDrawerSelectionDeselectAll => 'Deselect all';
+
+  @override
+  String get sideDrawerSelectionPin => 'Pin';
+
+  @override
+  String get sideDrawerSelectionUnpin => 'Unpin';
+
+  @override
+  String get sideDrawerSelectionMove => 'Move';
+
+  @override
+  String get sideDrawerSelectionDelete => 'Delete';
+
+  @override
+  String get sideDrawerSelectionDeleteConfirmTitle => 'Delete conversations';
+
+  @override
+  String sideDrawerSelectionDeleteConfirmContent(int count) {
+    return 'Delete $count conversations?';
+  }
+
+  @override
+  String sideDrawerDeleteSelectedSnackbar(int count) {
+    return 'Deleted $count conversations';
+  }
+
+  @override
+  String sideDrawerMoveSelectedSnackbar(int count) {
+    return 'Moved $count conversations';
+  }
+
+  @override
+  String sideDrawerMoveSelectedWithSkippedSnackbar(int moved, int skipped) {
+    return 'Moved $moved conversations; skipped $skipped that are generating';
   }
 
   @override
@@ -3363,6 +3480,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enable image generation tool';
 
   @override
+  String get modelDetailSheetOpenRouterWebFetchTool => 'Web Fetch';
+
+  @override
+  String get modelDetailSheetOpenRouterWebFetchToolDescription =>
+      'Allow OpenRouter to fetch web pages for the model.';
+
+  @override
+  String get modelDetailSheetOpenRouterShellTool => 'Shell';
+
+  @override
+  String get modelDetailSheetOpenRouterShellToolDescription =>
+      'Allow OpenRouter\'s server-side shell tool in Responses mode.';
+
+  @override
   String get modelDetailSheetCancelButton => 'Cancel';
 
   @override
@@ -3928,6 +4059,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get miniMapScrollToBottomTooltip => 'Scroll to bottom';
+
+  @override
+  String miniMapSearchMatchCount(int count) {
+    return '$count';
+  }
+
+  @override
+  String get miniMapSearchNoResults => 'No matching messages';
+
+  @override
+  String get miniMapFullWindow => 'Show in full window';
+
+  @override
+  String get miniMapRestoreWindow => 'Restore window size';
+
+  @override
+  String get miniMapActualSizeTooltip => '100%';
+
+  @override
+  String get miniMapFitHorizontalTooltip => 'Fit horizontal';
 
   @override
   String get treeBranchPanelTitle => 'Context branches';
@@ -4512,6 +4663,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get displaySettingsPageEnterToSendTitle => 'Enter Key to Send';
 
   @override
+  String get displaySettingsPageLongPasteAsFileTitle =>
+      'Paste long text as file';
+
+  @override
+  String get displaySettingsPageLongPasteAsFileThresholdTitle =>
+      'Conversion threshold';
+
+  @override
+  String get displaySettingsPageLongPasteAsFileThresholdUnit => 'characters';
+
+  @override
   String get displaySettingsPageSendShortcutTitle => 'Send Shortcut';
 
   @override
@@ -4608,12 +4770,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fontPickerChooseLocalFile => 'Choose Local File';
-
-  @override
-  String get fontPickerGetFromGoogleFonts => 'Browse Google Fonts';
-
-  @override
-  String get fontPickerFilterHint => 'Filter fonts...';
 
   @override
   String get desktopFontLoading => 'Loading fonts…';
@@ -6008,6 +6164,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get contextLogSourceToolResult => 'Tool result';
 
   @override
+  String get contextLogTokensEstimateHint =>
+      'Token counts are estimates only; use the model\'s actual usage as the source of truth.';
+
+  @override
   String contextLogSnapshotsCount(int count) {
     return '$count snapshots';
   }
@@ -6173,24 +6333,84 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homePageProcessingFiles => 'Processing files...';
 
   @override
-  String get fileUploadDuplicateTitle => 'File already exists';
-
-  @override
-  String fileUploadDuplicateContent(String fileName) {
-    return 'A file named $fileName already exists. Use the existing file?';
-  }
-
-  @override
-  String get fileUploadDuplicateUseExisting => 'Use existing';
-
-  @override
-  String get fileUploadDuplicateUploadNew => 'Upload new';
-
-  @override
   String get settingsPageWorldBook => 'World Book';
 
   @override
   String get settingsPageMemory => 'Memory';
+
+  @override
+  String get memorySettingsModeSection => 'Memory mode';
+
+  @override
+  String get memorySettingsGlobalSubtitle => 'Memory mode, model, and prompts';
+
+  @override
+  String get memorySettingsLegacyPromptTitle => 'Legacy memory rules';
+
+  @override
+  String get memorySettingsLegacySection => 'Legacy memory';
+
+  @override
+  String get memorySettingsInjectionSection => 'Memory injection';
+
+  @override
+  String get memorySettingsInjectionMaxItemsTitle => 'Items injected per type';
+
+  @override
+  String get memorySettingsInjectionMaxItemsSubtitle =>
+      'When a type exceeds this limit, only the newest items are injected. The rest can be fetched with memory_search_profile. A larger number is more complete but uses more tokens.';
+
+  @override
+  String get memorySettingsInjectionMaxItemsCustomButton => 'Custom';
+
+  @override
+  String get memorySettingsInjectionMaxItemsCustomTitle =>
+      'Custom injection count';
+
+  @override
+  String get memorySettingsInjectionMaxItemsCustomLabel => 'Count';
+
+  @override
+  String get memorySettingsInjectionMaxItemsCustomHint => '1-100';
+
+  @override
+  String get memorySettingsInjectionMaxItemsCustomDescription =>
+      'Enter a number between 1 and 100.';
+
+  @override
+  String get memorySettingsInjectionMaxItemsCustomInvalid =>
+      'Enter a number between 1 and 100';
+
+  @override
+  String get memoryPromptEditMigrateTitle => 'Legacy migration';
+
+  @override
+  String get memoryPromptEditMigrateSubtitle =>
+      'Used when migration rewrites memory wording';
+
+  @override
+  String get memorySettingsMigrationBatchSizeSubtitle =>
+      'Number of legacy memories processed in each model request (1-24)';
+
+  @override
+  String get legacyMemoryMigrationContentMode => 'Content';
+
+  @override
+  String get legacyMemoryMigrationContentPreserve => 'Keep original';
+
+  @override
+  String get legacyMemoryMigrationContentPreserveDescription =>
+      'The model only assigns a type. The original wording is saved as-is.';
+
+  @override
+  String get legacyMemoryMigrationContentOrganize => 'Rewrite with model';
+
+  @override
+  String get legacyMemoryMigrationContentOrganizeDescription =>
+      'The model classifies and rewrites each memory using the editable migration prompt.';
+
+  @override
+  String get legacyMemoryMigrationBatchSize => 'Batch size';
 
   @override
   String get memorySettingsPageTitle => 'Memory';
@@ -6217,6 +6437,59 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get memorySettingsAboutBody =>
       'How memory works\nMemories are organized as Identity / Workflow / Voice / Instruction, with global or assistant scope. Relevant memories are injected into the model context; when there are many, a summary is shown first and the model can query for more.\n\nBackground processing and triggers\nThe processing model powers the background pipeline: decide whether to remember, extract candidates, dedupe/merge, and distill the user profile when needed. With Auto-organize on, it runs every N turns after chats; you can also run Organize manually on the assistant Memory tab. That is why this model is called often.\n\nKeep caching healthy\nKeep the injected memory prefix stable and avoid pointless bulk edits or reshuffles so prompt cache can hit more often, lowering cost and latency. Day-to-day single-entry edits usually have limited impact.';
+
+  @override
+  String get memoryAboutQuickstartTitle => 'Get started';
+
+  @override
+  String get memoryAboutQuickstartBody =>
+      '1. In Settings → Memory, choose a processing model.\n2. On the assistant Memory tab, turn on long-term memory and Auto-organize.\n3. Chat for a few turns or tap Organize, then open All memories to see what was saved.';
+
+  @override
+  String get memoryAboutTypesTitle => 'Memory types';
+
+  @override
+  String get memoryAboutTypesBody =>
+      'Identity: stable facts about the user, such as how to address them, role, language, and long-term preferences. Write complete third-person statements.\n\nWorkflow: how they like to get work done — tools, formats, and review habits.\n\nVoice: how they want the assistant to sound — tone, length, and language style.\n\nInstruction: standing rules the assistant should follow, not one-off tasks from this chat.';
+
+  @override
+  String get memoryAboutScopeTitle => 'Global vs assistant';
+
+  @override
+  String get memoryAboutScopeBody =>
+      'Global memories are injected for every assistant. Assistant-scope memories are only visible to that assistant. Use global for facts that should follow the user everywhere; use assistant scope for rules or context that belong to one persona.';
+
+  @override
+  String get memoryAboutInjectionTitle => 'How memories are injected';
+
+  @override
+  String get memoryAboutInjectionBody =>
+      'At the start of a chat, the newest items of each type are placed in the model context. If a type exceeds the injection limit, the block is marked mode=\"summary\" with total and shown counts; the rest can be fetched with memory_search_profile. Raise the limit in Settings → Memory for more completeness at a higher token cost.';
+
+  @override
+  String get memoryAboutPipelineTitle => 'Background pipeline';
+
+  @override
+  String get memoryAboutPipelineBody =>
+      'Auto-organize runs after chats: decide whether anything is worth remembering, extract candidates, dedupe and merge, then distill identity items into the user profile when needed. You can also tap Organize on the assistant Memory tab. That is why the processing model is called often.';
+
+  @override
+  String get memoryAboutCacheTitle => 'Keep caching healthy';
+
+  @override
+  String get memoryAboutCacheBody =>
+      'The injected memory prefix is kept stable so unchanged chats can reuse the prompt cache, lowering cost and latency. Avoid pointless bulk edits or reshuffles. Day-to-day single-entry edits usually have limited impact.';
+
+  @override
+  String get memoryAboutFaqTitle => 'FAQ';
+
+  @override
+  String get memoryAboutFaqWhyNotRememberedTitle =>
+      'Why wasn\'t this remembered?';
+
+  @override
+  String get memoryAboutFaqWhyNotRememberedBody =>
+      'Organize is skipped when there are not enough new messages to organize, no new messages to organize, or no memory processing model selected. Temporary chats are not saved to memory. You can also turn memory or Auto-organize off per assistant.';
 
   @override
   String get memorySettingsThinkingTitle => 'Enable thinking';
@@ -6513,6 +6786,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get memoryOrganizeStatusSkipped => 'nothing to remember';
 
   @override
+  String memoryOrganizeStatusSkippedReason(String reason) {
+    return 'skipped: $reason';
+  }
+
+  @override
   String memoryOrganizeStatusFailed(String reason) {
     return 'Failed: $reason';
   }
@@ -6597,6 +6875,91 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get userProfileEmptyValue => 'Not set';
+
+  @override
+  String get memoryOutcomeAssistantMissing => 'Assistant not found';
+
+  @override
+  String get memoryOutcomeAutoOrganizeOff => 'Auto-organize is off';
+
+  @override
+  String get memoryOutcomeBelowThreshold =>
+      'Not enough new messages to organize';
+
+  @override
+  String get memoryOutcomeChatSearchUnavailable => 'Chat search is unavailable';
+
+  @override
+  String get memoryOutcomeConversationMissing => 'Conversation not found';
+
+  @override
+  String get memoryOutcomeDistillFailed => 'Could not distill the user profile';
+
+  @override
+  String get memoryOutcomeEmptyWindow => 'No new messages to organize';
+
+  @override
+  String get memoryOutcomeExtractParseFailed =>
+      'The memory extract reply could not be parsed';
+
+  @override
+  String get memoryOutcomeExtractRequestFailed =>
+      'Could not reach the memory model to extract memories';
+
+  @override
+  String get memoryOutcomeGateParseFailed =>
+      'The remember/skip check returned an unreadable reply';
+
+  @override
+  String get memoryOutcomeGateRequestFailed =>
+      'Could not reach the memory model for the remember/skip check';
+
+  @override
+  String get memoryOutcomeInvalidMemoryContent => 'Invalid memory content';
+
+  @override
+  String get memoryOutcomeInvalidMemoryId => 'Invalid memory id';
+
+  @override
+  String get memoryOutcomeInvalidMemoryType => 'Invalid memory type';
+
+  @override
+  String get memoryOutcomeInvalidProfileFields => 'Invalid profile fields';
+
+  @override
+  String get memoryOutcomeInvalidQuery => 'Invalid search query';
+
+  @override
+  String get memoryOutcomeMemoryDisabled => 'Memory is off for this assistant';
+
+  @override
+  String get memoryOutcomeMemoryExecutionError => 'A memory tool failed to run';
+
+  @override
+  String get memoryOutcomeMemoryModelMissing =>
+      'The selected memory model is no longer available';
+
+  @override
+  String get memoryOutcomeMemoryModelUnset =>
+      'No memory processing model selected';
+
+  @override
+  String get memoryOutcomeMemoryNotFound => 'Memory not found';
+
+  @override
+  String get memoryOutcomeQueueOverflow =>
+      'The organize queue was full, so this run was dropped';
+
+  @override
+  String get memoryOutcomeStreaming =>
+      'Skipped while a reply is still streaming';
+
+  @override
+  String get memoryOutcomeTemporaryConversation =>
+      'Temporary chats are not saved to memory';
+
+  @override
+  String get memoryOutcomeUnsupportedTool => 'Unsupported memory tool';
 
   @override
   String get legacyMemoryPageTitle => 'Legacy memories';
@@ -6695,6 +7058,31 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get legacyMemoryMigrationFailed =>
       'Migration stopped. You can retry; memories already saved will be skipped.';
+
+  @override
+  String get legacyMemoryMigrationContinue => 'Continue migration';
+
+  @override
+  String get legacyMemoryMigrationErrorAuth =>
+      'Authentication failed. Check the API key.';
+
+  @override
+  String get legacyMemoryMigrationErrorFormat =>
+      'The model returned an invalid response.';
+
+  @override
+  String get legacyMemoryMigrationErrorNetwork =>
+      'Network error. Check the connection and try again.';
+
+  @override
+  String legacyMemoryMigrationErrorOther(String message) {
+    return 'Migration failed: $message';
+  }
+
+  @override
+  String legacyMemoryMigrationPartial(int created, int skipped, int failed) {
+    return '$created migrated · $skipped skipped · $failed failed';
+  }
 
   @override
   String get legacyMemoryMigrationRetry => 'Retry';
@@ -7696,4 +8084,76 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sqliteMigrationRestartButton => 'Restart JO-AIClient';
+
+  @override
+  String get messageStyleSettingsPageTitle => 'Message Style';
+
+  @override
+  String get messageStyleSettingsPageReset => 'Reset';
+
+  @override
+  String get messageStyleSettingsPageResetConfirm =>
+      'Reset all message style customizations?';
+
+  @override
+  String get messageStyleSettingsPageCancel => 'Cancel';
+
+  @override
+  String get messageStyleSettingsPageLight => 'Light';
+
+  @override
+  String get messageStyleSettingsPageDark => 'Dark';
+
+  @override
+  String get messageStyleSettingsPageDefaultHint =>
+      'Default style follows the current theme and has no extra controls.';
+
+  @override
+  String get messageStyleSettingsPageStyleDefaultSubtitle =>
+      'Follows the theme; not customizable';
+
+  @override
+  String get messageStyleSettingsPageStyleFrostedSubtitle =>
+      'Translucent frosted glass';
+
+  @override
+  String get messageStyleSettingsPageStyleSolidSubtitle => 'Opaque solid fill';
+
+  @override
+  String get messageStyleSettingsPageBlur => 'Blur';
+
+  @override
+  String get messageStyleSettingsPageBlurHint =>
+      'Blur applies to content behind the bubble. It is barely visible without a chat wallpaper.';
+
+  @override
+  String get messageStyleSettingsPageBackgroundColor => 'Background';
+
+  @override
+  String get messageStyleSettingsPageBackgroundOpacity => 'Background Opacity';
+
+  @override
+  String get messageStyleSettingsPageBorderColor => 'Border';
+
+  @override
+  String get messageStyleSettingsPageBorderOpacity => 'Border Opacity';
+
+  @override
+  String get messageStyleSettingsPageBorderWidth => 'Border Width';
+
+  @override
+  String get messageStyleSettingsPageTextColor => 'Text';
+
+  @override
+  String get messageStyleSettingsPageCornerRadius => 'Corner Radius';
+
+  @override
+  String get messageStyleSettingsPagePreviewUser => 'This is a user message';
+
+  @override
+  String get messageStyleSettingsPagePreviewAssistant =>
+      'This is an assistant reply.';
+
+  @override
+  String get messageStyleSettingsPagePreviewThinking => 'Thinking';
 }

@@ -55,6 +55,20 @@ final class LoadedTimelinePage {
 
 typedef AssetContentHash = Future<String> Function(File file);
 
+enum ConversationForkMode { preserveBranches, activeBranchOnly }
+
+final class ConversationBatchMoveResult {
+  const ConversationBatchMoveResult({
+    required this.moved,
+    required this.skippedBusy,
+  });
+
+  final int moved;
+  final int skippedBusy;
+}
+
+enum _MoveConversationResult { moved, unchanged, busy, missing }
+
 class ChatService extends ChangeNotifier {
   ChatService({
     ChatDatabaseGateway? databaseGateway,
@@ -1042,6 +1056,7 @@ class ChatService extends ChangeNotifier {
     bool includeAllRevisions = false,
     String? conversationId,
     String? excludeConversationId,
+    String? assistantId,
   }) async {
     if (!_initialized) return const <ConversationSearchMatch>[];
     return _repo.searchConversationMatches(
@@ -1050,7 +1065,94 @@ class ChatService extends ChangeNotifier {
       includeAllRevisions: includeAllRevisions,
       conversationId: conversationId,
       excludeConversationId: excludeConversationId,
+      assistantId: assistantId,
     );
+  }
+
+  Future<List<MiniMapSearchHit>> searchMiniMapMatches(
+    String conversationId,
+    String query, {
+    int snippetRadius = 40,
+    int snippetLength = 120,
+  }) async {
+    if (!_initialized) return const <MiniMapSearchHit>[];
+    if (_temporaryConversationIds.contains(conversationId) ||
+        _draftConversations.containsKey(conversationId)) {
+      return _miniMapHitsFromCachedMessages(
+        conversationId,
+        query,
+        snippetRadius: snippetRadius,
+        snippetLength: snippetLength,
+      );
+    }
+    return _repo.searchMiniMapMatches(
+      conversationId,
+      query,
+      snippetRadius: snippetRadius,
+      snippetLength: snippetLength,
+    );
+  }
+
+  List<MiniMapSearchHit> _miniMapHitsFromCachedMessages(
+    String conversationId,
+    String query, {
+    required int snippetRadius,
+    required int snippetLength,
+  }) {
+    final needle = query.trim().toLowerCase();
+    if (needle.isEmpty) return const <MiniMapSearchHit>[];
+    final radius = snippetRadius < 0 ? 0 : snippetRadius;
+    final length = miniMapSnippetLength(
+      needleLength: needle.length,
+      snippetRadius: snippetRadius,
+      snippetLength: snippetLength,
+    );
+    final messages = _messagesCache[conversationId] ?? const <ChatMessage>[];
+    final groups = <String, List<ChatMessage>>{};
+    final order = <String>[];
+    for (final message in messages) {
+      final groupId = message.groupId ?? message.id;
+      if (!groups.containsKey(groupId)) order.add(groupId);
+      groups.putIfAbsent(groupId, () => <ChatMessage>[]).add(message);
+    }
+    final selections = getVersionSelections(conversationId);
+    final hits = <MiniMapSearchHit>[];
+    for (final groupId in order) {
+      final versions = groups[groupId]!
+        ..sort((a, b) => a.version.compareTo(b.version));
+      final selected =
+          versions.cast<ChatMessage?>().firstWhere(
+            (message) => message!.version == selections[groupId],
+            orElse: () => null,
+          ) ??
+          versions.last;
+      if (selected.role != 'user' && selected.role != 'assistant') continue;
+      final text = selected.content;
+      final lower = text.toLowerCase();
+      final first = lower.indexOf(needle);
+      if (first < 0) continue;
+      var matchCount = 0;
+      var position = 0;
+      while (true) {
+        final index = lower.indexOf(needle, position);
+        if (index < 0) break;
+        matchCount++;
+        position = index + needle.length;
+      }
+      final snippetStart = first < radius ? 0 : first - radius;
+      final snippetEnd = snippetStart + length > text.length
+          ? text.length
+          : snippetStart + length;
+      hits.add(
+        MiniMapSearchHit(
+          messageId: selected.id,
+          matchCount: matchCount,
+          snippet: text.substring(snippetStart, snippetEnd),
+          snippetStart: snippetStart,
+        ),
+      );
+    }
+    return hits;
   }
 
   Future<ChatStatsAggregate> loadStatsAggregate({
@@ -1684,7 +1786,10 @@ class ChatService extends ChangeNotifier {
     return true;
   }
 
-  Future<bool> _deletePersistedConversation(String id) async {
+  Future<bool> _deletePersistedConversation(
+    String id, {
+    bool bumpRevision = true,
+  }) async {
     final conversation = _conversationsCache[id];
     if (conversation == null) return false;
 
@@ -1710,7 +1815,9 @@ class ChatService extends ChangeNotifier {
     if (_currentConversationId == id) {
       _currentConversationId = null;
     }
-    _bumpConversationListRevision();
+    if (bumpRevision) {
+      _bumpConversationListRevision();
+    }
     return true;
   }
 
@@ -1734,12 +1841,38 @@ class ChatService extends ChangeNotifier {
       deleted = await _deleteDraftConversation(conversationId) || deleted;
     }
     for (final conversationId in persistedConversationIds) {
-      deleted = await _deletePersistedConversation(conversationId) || deleted;
+      deleted =
+          await _deletePersistedConversation(
+            conversationId,
+            bumpRevision: false,
+          ) ||
+          deleted;
     }
 
     if (!deleted) return;
     await _cleanupOrphanUploads();
+    _bumpConversationListRevision();
     notifyListeners();
+  }
+
+  /// 删除每个非空 ID 一次，并且整批最多刷新和通知一次。
+  Future<int> deleteConversations(Iterable<String> ids) async {
+    if (!_initialized) await init();
+
+    var deleted = 0;
+    final seen = <String>{};
+    for (final id in ids) {
+      if (id.isEmpty || !seen.add(id)) continue;
+      if (await _deleteDraftConversation(id) ||
+          await _deletePersistedConversation(id, bumpRevision: false)) {
+        deleted++;
+      }
+    }
+    if (deleted == 0) return 0;
+    await _cleanupOrphanUploads();
+    _bumpConversationListRevision();
+    notifyListeners();
+    return deleted;
   }
 
   List<({String path, String kind})> _extractLocalAttachmentsFromMessage(
@@ -2420,6 +2553,33 @@ class ChatService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 把每个会话的置顶状态设为 [pinned]，跳过无变化和不存在的 ID。
+  Future<int> setConversationsPinned(Iterable<String> ids, bool pinned) async {
+    if (!_initialized) await init();
+
+    var changed = 0;
+    final seen = <String>{};
+    for (final id in ids) {
+      if (id.isEmpty || !seen.add(id)) continue;
+      final draft = _draftConversations[id];
+      if (draft != null) {
+        if (draft.isPinned == pinned) continue;
+        draft.isPinned = pinned;
+        changed++;
+        continue;
+      }
+      final conversation = _conversationsCache[id];
+      if (conversation == null || conversation.isPinned == pinned) continue;
+      conversation.isPinned = pinned;
+      await _saveConversation(conversation);
+      changed++;
+    }
+    if (changed == 0) return 0;
+    _bumpConversationListRevision();
+    notifyListeners();
+    return changed;
+  }
+
   Future<ChatMessage> addMessage({
     required String conversationId,
     required String role,
@@ -2428,6 +2588,12 @@ class ChatService extends ChangeNotifier {
     String? modelId,
     String? providerId,
     int? totalTokens,
+    String? translation,
+    String? reasoningSegmentsJson,
+    int? promptTokens,
+    int? completionTokens,
+    int? cachedTokens,
+    int? durationMs,
     bool isStreaming = false,
     String? reasoningText,
     DateTime? reasoningStartAt,
@@ -2467,6 +2633,12 @@ class ChatService extends ChangeNotifier {
       modelId: modelId,
       providerId: providerId,
       totalTokens: totalTokens,
+      translation: translation,
+      reasoningSegmentsJson: reasoningSegmentsJson,
+      promptTokens: promptTokens,
+      completionTokens: completionTokens,
+      cachedTokens: cachedTokens,
+      durationMs: durationMs,
       isStreaming: isStreaming,
       reasoningText: reasoningText,
       reasoningStartAt: reasoningStartAt,
@@ -2752,6 +2924,42 @@ class ChatService extends ChangeNotifier {
       cachedTokens: cachedTokens,
       durationMs: durationMs,
     );
+  }
+
+  /// 用编辑器提供的完整结构化部件覆盖原消息，保留消息 ID、版本和树位置。
+  ///
+  /// 这条路径与流式消息的部分字段更新分开，避免把编辑器中的附件或未知
+  /// 部件折叠成纯文本，也避免创建新的消息分支。
+  Future<ChatMessage?> overwriteMessage({
+    required String messageId,
+    required List<MessagePart> parts,
+  }) async {
+    if (!_initialized) await init();
+
+    final temporaryOriginal = _cachedTemporaryMessage(messageId);
+    if (temporaryOriginal != null) {
+      final updated = temporaryOriginal.copyWith(
+        parts: parts,
+        isStreaming: false,
+      );
+      _replaceCachedMessage(updated);
+      notifyListeners();
+      return updated;
+    }
+
+    final original = await _repo.getMessage(messageId);
+    if (original == null) return null;
+
+    // 即使新部件不含附件，也要让旧消息的资产引用进入清理队列。
+    await _repo.markMessageAssetReferencesDirty(messageId);
+    final updated = original.copyWith(parts: parts, isStreaming: false);
+    await _repo.updateMessage(updated);
+    if (_messageCanOwnAssets(updated)) {
+      await _synchronizeMessageAssetsBestEffort(updated);
+    }
+    _replaceCachedMessage(updated);
+    notifyListeners();
+    return updated;
   }
 
   Future<bool> switchMessageRole(String messageId, String role) async {
@@ -3350,21 +3558,86 @@ class ChatService extends ChangeNotifier {
     required String messageId,
   }) async {
     if (!_initialized) await init();
-    final targetIds = <String>{messageId};
+    final tree = await _loadOrCreateConversationTree(conversationId);
+    final target = tree.edges[messageId];
+    final siblingIds = target == null
+        ? <String>{messageId}
+        : (tree.childrenByParent[target.parentMessageId] ?? <String>[]).toSet();
     return deleteMessages(
       conversationId: conversationId,
-      messageIds: targetIds,
+      messageIds: siblingIds.isEmpty ? <String>{messageId} : siblingIds,
       versionSelectionChanges: const {},
     );
   }
 
+  /// 只删除 [messageId]，保留其后续消息并重挂到父节点。
+  Future<Set<String>> deleteMessageOnly({
+    required String conversationId,
+    required String messageId,
+  }) async {
+    if (!_initialized) await init();
+    if (_temporaryConversationIds.contains(conversationId)) {
+      final conversation = _draftConversations[conversationId];
+      final messages = _messagesCache[conversationId];
+      if (conversation == null || messages == null) return const <String>{};
+      final tree = await _loadOrCreateConversationTree(conversationId);
+      if (!tree.edges.containsKey(messageId)) return const <String>{};
+      _temporaryConversationTrees[conversationId] = tree.removeMessageOnly(
+        messageId,
+      );
+      messages.removeWhere((message) => message.id == messageId);
+      conversation.messageIds.remove(messageId);
+      conversation.updatedAt = DateTime.now();
+      _temporaryToolEvents.remove(messageId);
+      _temporaryGeminiThoughtSigs.remove(messageId);
+      await reloadActiveTimelineCache(conversationId);
+      notifyListeners();
+      return <String>{messageId};
+    }
+
+    final result = await _repo.deleteMessageOnly(
+      conversationId: conversationId,
+      messageId: messageId,
+    );
+    if (result == null) return const <String>{};
+
+    _conversationsCache[conversationId] = result.conversation;
+    _toolEventsCache.remove(messageId);
+    _geminiThoughtSigsCache.remove(messageId);
+    _messagesCache.remove(conversationId);
+    final groupMessages = _groupMessagesCache[conversationId];
+    if (groupMessages != null) {
+      groupMessages.removeWhere((message) => message.id == messageId);
+      if (groupMessages.isEmpty) _groupMessagesCache.remove(conversationId);
+    }
+    _messageOrderIds.remove(conversationId);
+    _firstGroupIndicesCache.remove(conversationId);
+    final tree = await _repo.loadConversationTree(conversationId);
+    if (tree != null) {
+      await _syncContextBoundaryToActivePath(conversationId, tree);
+    }
+    await reloadActiveTimelineCache(conversationId);
+    await _cleanupOrphanUploads();
+    _bumpConversationListRevision();
+    notifyListeners();
+    return <String>{messageId};
+  }
+
   /// Conversation Fork: copy a message prefix into a new conversation.
+  ///
+  /// [ConversationForkMode.preserveBranches] keeps every sibling subtree that
+  /// branches from the copied active prefix. [ConversationForkMode
+  /// .activeBranchOnly] keeps only the active prefix.
   Future<Conversation> createConversationForkAtRevision({
     required String sourceConversationId,
     required String sourceRevisionId,
     required String title,
+    ConversationForkMode mode = ConversationForkMode.activeBranchOnly,
   }) async {
     if (!_initialized) await init();
+    if (_temporaryConversationIds.contains(sourceConversationId)) {
+      throw StateError('conversation_fork_temporary_source');
+    }
     final source = _conversationsCache[sourceConversationId];
     if (source == null) throw StateError('conversation_missing');
     final targetMessage = await _repo.getMessage(sourceRevisionId);
@@ -3378,56 +3651,260 @@ class ChatService extends ChangeNotifier {
     if (targetIndex < 0) {
       throw StateError('conversation_fork_target_not_in_active_path');
     }
-    final sourceIds = activePath.take(targetIndex + 1).toList(growable: false);
-    final loaded = await _repo.getMessagesByIds(sourceIds);
-    final sourceById = <String, ChatMessage>{
-      for (final message in loaded) message.id: message,
+    final selectedSourceIds = _conversationForkSourceIds(
+      tree,
+      activePath,
+      targetIndex,
+      mode,
+    );
+    final allMessages = await _repo.getMessagesRange(
+      sourceConversationId,
+      start: 0,
+      limit: await _repo.getMessageCount(sourceConversationId),
+    );
+    final loadedById = <String, ChatMessage>{
+      for (final message in allMessages) message.id: message,
     };
-    final sourceMessages = <ChatMessage>[
-      for (final id in sourceIds)
-        if (sourceById[id] != null) sourceById[id]!,
+    final sourceIds = [
+      for (final message in allMessages)
+        if (selectedSourceIds.contains(message.id)) message.id,
     ];
-    if (sourceMessages.length != sourceIds.length) {
+    final loaded = [
+      for (final id in sourceIds)
+        if (loadedById[id] != null) loadedById[id]!,
+    ];
+    if (loaded.length != sourceIds.length) {
       throw StateError('conversation_fork_path_message_missing');
     }
-    final persisted = await createConversation(
+    final targetIdBySourceId = <String, String>{
+      for (final id in sourceIds) id: const Uuid().v4(),
+    };
+    final targetMessages = [
+      for (final message in loaded)
+        ChatMessage(
+          id: targetIdBySourceId[message.id],
+          role: message.role,
+          parts: message.parts,
+          timestamp: message.timestamp,
+          modelId: message.modelId,
+          providerId: message.providerId,
+          totalTokens: message.totalTokens,
+          conversationId: '', // replaced below after target creation
+          isStreaming: false,
+          reasoningText: message.reasoningText,
+          reasoningStartAt: message.reasoningStartAt,
+          reasoningFinishedAt: message.reasoningFinishedAt,
+          translation: message.translation,
+          reasoningSegmentsJson: message.reasoningSegmentsJson,
+          promptTokens: message.promptTokens,
+          completionTokens: message.completionTokens,
+          cachedTokens: message.cachedTokens,
+          durationMs: message.durationMs,
+        ),
+    ];
+    final persisted = Conversation(
       title: source.title,
       assistantId: source.assistantId,
+      mcpServerIds: List<String>.of(source.mcpServerIds),
     );
-    _messagesCache[persisted.id] = <ChatMessage>[];
-    _messageOrderIds[persisted.id] = <String>[];
-    _messageCounts[persisted.id] = 0;
-    for (final message in sourceMessages) {
-      final copied = ChatMessage(
-        role: message.role,
-        parts: message.parts,
-        timestamp: message.timestamp,
-        modelId: message.modelId,
-        providerId: message.providerId,
-        totalTokens: message.totalTokens,
+    final remappedMessages = [
+      for (final message in targetMessages)
+        message.copyWith(conversationId: persisted.id),
+    ];
+    final targetTree = _remapConversationForkTree(
+      tree,
+      sourceIds.toSet(),
+      targetIdBySourceId,
+      persisted.id,
+      mode,
+    );
+    await _repo.putConversationTreeClone(
+      conversation: persisted,
+      messages: remappedMessages,
+      sourceMessageIdByTargetId: {
+        for (final entry in targetIdBySourceId.entries) entry.value: entry.key,
+      },
+      tree: targetTree,
+    );
+    _conversationsCache[persisted.id] = persisted;
+    _messagesCache[persisted.id] = remappedMessages;
+    _messageOrderIds[persisted.id] = targetTree.activePath();
+    _messageCounts[persisted.id] = targetTree.activePath().length;
+    _currentConversationId = persisted.id;
+    _bumpConversationListRevision();
+    notifyListeners();
+    return persisted;
+  }
+
+  /// 从给定消息顺序创建一个新的线性会话。
+  ///
+  /// 用于上下文压缩的“保留最近消息”模式：摘要消息由调用方创建，
+  /// 其余消息通过结构化 parts 原样写入新会话。
+  Future<Conversation> forkConversationFromMessages({
+    required String title,
+    required String? assistantId,
+    required List<ChatMessage> sourceMessages,
+  }) async {
+    if (!_initialized) await init();
+    final persisted = await createConversation(
+      title: title,
+      assistantId: assistantId,
+    );
+    final sourceIds = sourceMessages
+        .map((message) => message.id)
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    final toolEventsBySourceId = sourceIds.isEmpty
+        ? const <String, List<Map<String, dynamic>>>{}
+        : await _repo.getToolEventsForMessages(sourceIds);
+    final signaturesBySourceId = sourceIds.isEmpty
+        ? const <String, String>{}
+        : await _repo.getGeminiThoughtSignaturesForMessages(sourceIds);
+    for (final source in sourceMessages) {
+      final cloned = await addMessage(
         conversationId: persisted.id,
-        isStreaming: false,
-        reasoningText: message.reasoningText,
-        reasoningStartAt: message.reasoningStartAt,
-        reasoningFinishedAt: message.reasoningFinishedAt,
-        translation: message.translation,
-        reasoningSegmentsJson: message.reasoningSegmentsJson,
-        promptTokens: message.promptTokens,
-        completionTokens: message.completionTokens,
-        cachedTokens: message.cachedTokens,
-        durationMs: message.durationMs,
+        role: source.role,
+        parts: source.parts,
+        modelId: source.modelId,
+        providerId: source.providerId,
+        totalTokens: source.totalTokens,
+        translation: source.translation,
+        reasoningSegmentsJson: source.reasoningSegmentsJson,
+        promptTokens: source.promptTokens,
+        completionTokens: source.completionTokens,
+        cachedTokens: source.cachedTokens,
+        durationMs: source.durationMs,
+        reasoningText: source.reasoningText,
+        reasoningStartAt: source.reasoningStartAt,
+        reasoningFinishedAt: source.reasoningFinishedAt,
+        groupId: source.groupId,
+        version: source.version,
       );
-      await addMessageDirectly(persisted.id, copied);
-      if (message.role == 'user') {
-        await _inheritImageOcrArtifactsBestEffort(
-          fromRevisionId: message.id,
-          toRevisionId: copied.id,
-        );
+      final toolEvents =
+          toolEventsBySourceId[source.id] ?? getToolEvents(source.id);
+      if (toolEvents.isNotEmpty) {
+        await setToolEvents(cloned.id, toolEvents);
+      }
+      final signature =
+          signaturesBySourceId[source.id] ??
+          getGeminiThoughtSignature(source.id);
+      if (signature != null && signature.trim().isNotEmpty) {
+        await setGeminiThoughtSignature(cloned.id, signature);
       }
     }
     _currentConversationId = persisted.id;
     notifyListeners();
-    return persisted;
+    return _conversationsCache[persisted.id] ?? persisted;
+  }
+
+  List<String> _conversationForkSourceIds(
+    ConversationTree tree,
+    List<String> activePath,
+    int targetIndex,
+    ConversationForkMode mode,
+  ) {
+    final included = activePath.take(targetIndex + 1).toSet();
+    if (mode == ConversationForkMode.preserveBranches) {
+      for (var index = 0; index <= targetIndex; index++) {
+        final parent = index == 0 ? null : activePath[index - 1];
+        final activeChild = activePath[index];
+        for (final child in tree.childrenOf(parent)) {
+          if (child == activeChild) continue;
+          _addConversationForkSubtree(tree, child, included);
+        }
+      }
+    }
+    final ordered = <String>[];
+    for (final edge in tree.edges.values) {
+      if (included.contains(edge.messageId)) ordered.add(edge.messageId);
+    }
+    return ordered;
+  }
+
+  void _addConversationForkSubtree(
+    ConversationTree tree,
+    String messageId,
+    Set<String> included,
+  ) {
+    if (!included.add(messageId)) return;
+    for (final child in tree.childrenOf(messageId)) {
+      _addConversationForkSubtree(tree, child, included);
+    }
+  }
+
+  ConversationTree _remapConversationForkTree(
+    ConversationTree source,
+    Set<String> included,
+    Map<String, String> messageIdMap,
+    String targetConversationId,
+    ConversationForkMode mode,
+  ) {
+    final edges = <String, MessageTreeEdge>{};
+    for (final edge in source.edges.values) {
+      if (!included.contains(edge.messageId)) continue;
+      final targetId = messageIdMap[edge.messageId]!;
+      final parent = edge.parentMessageId;
+      edges[targetId] = MessageTreeEdge(
+        messageId: targetId,
+        parentMessageId: parent == null || !included.contains(parent)
+            ? null
+            : messageIdMap[parent],
+      );
+    }
+    final branchIdMap = <String, String>{};
+    final branches = <String, ConversationBranch>{};
+    if (mode == ConversationForkMode.activeBranchOnly) {
+      final targetBranchId = 'root-$targetConversationId';
+      branches[targetBranchId] = ConversationBranch(
+        id: targetBranchId,
+        conversationId: targetConversationId,
+        tipMessageId: messageIdMap[_activePathLastIncluded(source, included)],
+        createdAt: DateTime.now(),
+      );
+      branchIdMap[source.activeBranchId] = targetBranchId;
+    } else {
+      for (final branch in source.branches.values) {
+        final path = source
+            .branchPath(branch.id)
+            .where(included.contains)
+            .toList(growable: false);
+        if (path.isEmpty) continue;
+        final targetBranchId = 'branch-${const Uuid().v4()}';
+        branchIdMap[branch.id] = targetBranchId;
+        branches[targetBranchId] = ConversationBranch(
+          id: targetBranchId,
+          conversationId: targetConversationId,
+          tipMessageId: messageIdMap[path.last],
+          name: branch.name,
+          createdAt: branch.createdAt,
+        );
+      }
+    }
+    final activeBranchId = branchIdMap[source.activeBranchId];
+    if (activeBranchId == null) {
+      throw StateError('conversation_fork_active_branch_missing');
+    }
+    final selections = mode == ConversationForkMode.activeBranchOnly
+        ? const <String, String>{}
+        : <String, String>{
+            for (final entry in source.branchSelections.entries)
+              if (included.contains(entry.key) &&
+                  branchIdMap[entry.value] != null)
+                messageIdMap[entry.key]!: branchIdMap[entry.value]!,
+          };
+    return ConversationTree(
+      conversationId: targetConversationId,
+      activeBranchId: activeBranchId,
+      branches: branches,
+      edges: edges,
+      branchSelections: selections,
+    );
+  }
+
+  String _activePathLastIncluded(ConversationTree tree, Set<String> included) {
+    final path = tree.activePath().where(included.contains);
+    if (path.isEmpty) throw StateError('conversation_fork_active_path_missing');
+    return path.last;
   }
 
   Future<ChatMessage?> appendMessageVersion({
@@ -3926,33 +4403,87 @@ class ChatService extends ChangeNotifier {
     required String conversationId,
     required String assistantId,
   }) async {
+    final result = await _moveConversationToAssistantInternal(
+      conversationId: conversationId,
+      assistantId: assistantId,
+      notify: true,
+    );
+    return result == _MoveConversationResult.moved ||
+        result == _MoveConversationResult.unchanged;
+  }
+
+  Future<_MoveConversationResult> _moveConversationToAssistantInternal({
+    required String conversationId,
+    required String assistantId,
+    required bool notify,
+  }) async {
     if (!_initialized) await init();
 
-    // 草稿会话情况
-    if (_draftConversations.containsKey(conversationId)) {
-      final draft = _draftConversations[conversationId]!;
+    final draft = _draftConversations[conversationId];
+    if (draft != null) {
+      if (draft.assistantId == assistantId) {
+        return _MoveConversationResult.unchanged;
+      }
       draft.assistantId = assistantId;
       draft.updatedAt = DateTime.now();
-      notifyListeners();
-      return true;
+      if (notify) notifyListeners();
+      return _MoveConversationResult.moved;
     }
 
     final c = _conversationsCache[conversationId];
-    if (c == null) return false;
-    if (c.assistantId == assistantId) return true;
+    if (c == null) return _MoveConversationResult.missing;
+    if (c.assistantId == assistantId) {
+      return _MoveConversationResult.unchanged;
+    }
     final updatedAt = DateTime.now();
     final moved = await _repo.moveConversationToAssistant(
       conversationId: conversationId,
       assistantId: assistantId,
       updatedAt: updatedAt,
     );
-    if (!moved) return false;
+    if (!moved) return _MoveConversationResult.busy;
     c.assistantId = assistantId;
     c.updatedAt = updatedAt;
     c.injectedMemoryHash = null;
-    _bumpConversationListRevision();
-    notifyListeners();
-    return true;
+    if (notify) {
+      _bumpConversationListRevision();
+      notifyListeners();
+    }
+    return _MoveConversationResult.moved;
+  }
+
+  /// 批量移动会话。生成中的会话保持原归属并计入 [skippedBusy]。
+  Future<ConversationBatchMoveResult> moveConversationsToAssistant({
+    required Iterable<String> conversationIds,
+    required String assistantId,
+  }) async {
+    if (!_initialized) await init();
+
+    var moved = 0;
+    var skippedBusy = 0;
+    final seen = <String>{};
+    for (final id in conversationIds) {
+      if (id.isEmpty || !seen.add(id)) continue;
+      final result = await _moveConversationToAssistantInternal(
+        conversationId: id,
+        assistantId: assistantId,
+        notify: false,
+      );
+      switch (result) {
+        case _MoveConversationResult.moved:
+          moved++;
+        case _MoveConversationResult.busy:
+          skippedBusy++;
+        case _MoveConversationResult.unchanged:
+        case _MoveConversationResult.missing:
+          break;
+      }
+    }
+    if (moved > 0) {
+      _bumpConversationListRevision();
+      notifyListeners();
+    }
+    return ConversationBatchMoveResult(moved: moved, skippedBusy: skippedBusy);
   }
 }
 

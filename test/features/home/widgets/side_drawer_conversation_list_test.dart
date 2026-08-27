@@ -8,10 +8,13 @@ import 'package:Kelivo/core/providers/update_provider.dart';
 import 'package:Kelivo/core/providers/backup_reminder_provider.dart';
 import 'package:Kelivo/core/providers/assistant_group_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/features/home/widgets/side_drawer.dart';
 import 'package:Kelivo/features/home/widgets/sidebar_presentation.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/interactive_drawer.dart';
+import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -45,6 +48,8 @@ class _TestChatService extends ChatService {
   List<Conversation>? _stubConversations;
   int? _stubRevision;
   bool? _stubInitialized;
+  ConversationBatchMoveResult? batchMoveResult;
+  List<String>? batchMoveIds;
 
   void poke() => notifyListeners();
 
@@ -93,6 +98,22 @@ class _TestChatService extends ChatService {
   }
 
   @override
+  Future<ConversationBatchMoveResult> moveConversationsToAssistant({
+    required Iterable<String> conversationIds,
+    required String assistantId,
+  }) async {
+    final result = batchMoveResult;
+    if (result == null) {
+      return super.moveConversationsToAssistant(
+        conversationIds: conversationIds,
+        assistantId: assistantId,
+      );
+    }
+    batchMoveIds = List<String>.of(conversationIds);
+    return result;
+  }
+
+  @override
   Future<LoadedTimelinePage?> loadTimelinePage(
     String conversationId, {
     String? beforeRevisionId,
@@ -113,6 +134,42 @@ class _TestChatService extends ChatService {
   }
 }
 
+class _TestAssistantProvider extends AssistantProvider {
+  _TestAssistantProvider({required super.preferences});
+
+  List<Assistant> _stubAssistants = const <Assistant>[];
+  String? _stubCurrentAssistantId;
+
+  void seedAssistants(
+    List<Assistant> assistants, {
+    required String currentAssistantId,
+  }) {
+    _stubAssistants = List<Assistant>.unmodifiable(assistants);
+    _stubCurrentAssistantId = currentAssistantId;
+  }
+
+  @override
+  List<Assistant> get assistants => _stubAssistants;
+
+  @override
+  String? get currentAssistantId => _stubCurrentAssistantId;
+
+  @override
+  Assistant? get currentAssistant {
+    for (final assistant in _stubAssistants) {
+      if (assistant.id == _stubCurrentAssistantId) return assistant;
+    }
+    return _stubAssistants.isEmpty ? null : _stubAssistants.first;
+  }
+
+  @override
+  Future<void> setCurrentAssistant(String id) async {
+    if (_stubCurrentAssistantId == id) return;
+    _stubCurrentAssistantId = id;
+    notifyListeners();
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -127,6 +184,7 @@ void main() {
     SideDrawer.debugConversationListBuildCount = 0;
     SideDrawer.debugSidebarRowsComputeCount = 0;
     SideDrawer.debugRequestConversationListHostRebuild = null;
+    SideDrawer.debugEnterSelectionMode = null;
   });
 
   tearDown(() async {
@@ -170,6 +228,8 @@ void main() {
     Locale locale = const Locale('en'),
     ValueNotifier<Locale>? localeListenable,
     bool showChatListDate = false,
+    InteractiveDrawerController? interactiveDrawerController,
+    AssistantProvider? assistantProvider,
     FutureOr<void> Function(String id, {bool closeDrawer})?
     onSelectConversation,
   }) async {
@@ -201,18 +261,26 @@ void main() {
         showBottomBar: false,
         onSelectConversation: onSelectConversation,
       );
+      final home = interactiveDrawerController == null
+          ? Scaffold(
+              drawer: presentation == SidebarPresentation.overlay
+                  ? sideDrawer
+                  : null,
+              body: presentation == SidebarPresentation.docked
+                  ? sideDrawer
+                  : const SizedBox.shrink(),
+            )
+          : InteractiveDrawer(
+              controller: interactiveDrawerController,
+              drawer: sideDrawer,
+              drawerWidth: 360,
+              child: const Scaffold(body: SizedBox.expand()),
+            );
       return MaterialApp(
         locale: currentLocale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          drawer: presentation == SidebarPresentation.overlay
-              ? sideDrawer
-              : null,
-          body: presentation == SidebarPresentation.docked
-              ? sideDrawer
-              : const SizedBox.shrink(),
-        ),
+        home: home,
       );
     }
 
@@ -221,9 +289,14 @@ void main() {
         providers: [
           ChangeNotifierProvider<ChatService>.value(value: service),
           ChangeNotifierProvider<SettingsProvider>.value(value: settings),
-          ChangeNotifierProvider(
-            create: (_) => AssistantProvider(preferences: assistantPrefs),
-          ),
+          if (assistantProvider != null)
+            ChangeNotifierProvider<AssistantProvider>.value(
+              value: assistantProvider,
+            )
+          else
+            ChangeNotifierProvider(
+              create: (_) => AssistantProvider(preferences: assistantPrefs),
+            ),
           ChangeNotifierProvider(
             create: (_) => BackupReminderProvider(preferences: backupPrefs),
           ),
@@ -308,6 +381,231 @@ void main() {
       await tester.pump();
 
       expect(SideDrawer.debugConversationListBuildCount, builds);
+    });
+  });
+
+  testWidgets('entering selection reuses memoized sidebar rows', (
+    tester,
+  ) async {
+    await asDesktop(() async {
+      final service = createService();
+      late final String alphaId;
+      await tester.runAsync(() async {
+        await service.init();
+        alphaId = (await service.createConversation(title: 'Alpha')).id;
+        await service.createConversation(title: 'Beta');
+      });
+      await pumpDrawer(tester, service);
+
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(SideDrawer)),
+      )!;
+      final computes = SideDrawer.debugSidebarRowsComputeCount;
+      expect(SideDrawer.debugEnterSelectionMode, isNotNull);
+
+      SideDrawer.debugEnterSelectionMode!(alphaId);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(SideDrawer.debugSidebarRowsComputeCount, computes);
+      expect(find.text(l10n.sideDrawerSelectionTitle(1)), findsOneWidget);
+      expect(find.text(l10n.sideDrawerSelectionSelectAll), findsOneWidget);
+    });
+  });
+
+  testWidgets('external delete refreshes the selected count', (tester) async {
+    await asDesktop(() async {
+      final service = createService();
+      late final String alphaId;
+      late final String betaId;
+      await tester.runAsync(() async {
+        await service.init();
+        alphaId = (await service.createConversation(title: 'Alpha')).id;
+        betaId = (await service.createConversation(title: 'Beta')).id;
+      });
+      await pumpDrawer(tester, service);
+
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(SideDrawer)),
+      )!;
+      SideDrawer.debugEnterSelectionMode!(alphaId);
+      await tester.pump();
+      await tester.tap(find.text('Beta'));
+      await tester.pump();
+      expect(find.text(l10n.sideDrawerSelectionTitle(2)), findsOneWidget);
+
+      await tester.runAsync(() => service.deleteConversation(betaId));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text(l10n.sideDrawerSelectionTitle(1)), findsOneWidget);
+      expect(find.text(l10n.sideDrawerSelectionTitle(2)), findsNothing);
+    });
+  });
+
+  testWidgets('select all only selects visible search results', (tester) async {
+    await asDesktop(() async {
+      final service = createService();
+      late final String alphaId;
+      await tester.runAsync(() async {
+        await service.init();
+        alphaId = (await service.createConversation(title: 'Alpha One')).id;
+        await service.createConversation(title: 'Alpha Two');
+        await service.createConversation(title: 'Beta');
+      });
+      await pumpDrawer(tester, service);
+
+      await tester.enterText(find.byType(TextField).first, 'Alpha');
+      await tester.pump();
+      SideDrawer.debugEnterSelectionMode!(alphaId);
+      await tester.pump();
+
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(SideDrawer)),
+      )!;
+      await tester.tap(find.text(l10n.sideDrawerSelectionSelectAll));
+      await tester.pump();
+
+      expect(find.text(l10n.sideDrawerSelectionTitle(2)), findsOneWidget);
+      expect(find.text(l10n.sideDrawerSelectionTitle(3)), findsNothing);
+      await tester.pump(const Duration(milliseconds: 400));
+    });
+  });
+
+  testWidgets('switching assistants exits conversation selection', (
+    tester,
+  ) async {
+    await asDesktop(() async {
+      final service = createService();
+      await tester.runAsync(service.init);
+      final provider = _TestAssistantProvider(
+        preferences: createBusinessTestPreferences(),
+      );
+      addTearDown(provider.dispose);
+      provider.seedAssistants(const <Assistant>[
+        Assistant(id: 'first-assistant', name: 'First'),
+        Assistant(id: 'second-assistant', name: 'Second'),
+      ], currentAssistantId: 'first-assistant');
+      late final String conversationId;
+      await tester.runAsync(() async {
+        conversationId = (await service.createConversation(
+          title: 'Alpha',
+          assistantId: 'first-assistant',
+        )).id;
+      });
+      await pumpDrawer(tester, service, assistantProvider: provider);
+      await tester.pump();
+
+      SideDrawer.debugEnterSelectionMode!(conversationId);
+      await tester.pump();
+      expect(SideDrawer.debugEnterSelectionMode, isNotNull);
+
+      await provider.setCurrentAssistant('second-assistant');
+      await tester.pump();
+
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(SideDrawer)),
+      )!;
+      expect(find.text(l10n.sideDrawerSelectionTitle(1)), findsNothing);
+      expect(find.byType(TextField), findsWidgets);
+    });
+  });
+
+  testWidgets('back exits selection while interactive drawer stays open', (
+    tester,
+  ) async {
+    final service = createService();
+    late final String conversationId;
+    await tester.runAsync(() async {
+      await service.init();
+      conversationId = (await service.createConversation(title: 'Alpha')).id;
+    });
+    final drawerController = InteractiveDrawerController();
+    addTearDown(drawerController.dispose);
+    await pumpDrawer(
+      tester,
+      service,
+      presentation: SidebarPresentation.overlay,
+      capabilities: const SidebarCapabilities(
+        topicsOnly: true,
+        pointerInteractions: false,
+      ),
+      desktopTopicsOnly: false,
+      interactiveDrawerController: drawerController,
+    );
+    drawerController.open();
+    await tester.pumpAndSettle();
+
+    SideDrawer.debugEnterSelectionMode!(conversationId);
+    await tester.pump();
+    final l10n = AppLocalizations.of(tester.element(find.byType(SideDrawer)))!;
+    expect(find.text(l10n.sideDrawerSelectionTitle(1)), findsOneWidget);
+    expect(drawerController.handleBack, isNotNull);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.text(l10n.sideDrawerSelectionTitle(1)), findsNothing);
+    expect(drawerController.isOpen, isTrue);
+  });
+
+  testWidgets('partial batch move reports moved and generating counts', (
+    tester,
+  ) async {
+    await asDesktop(() async {
+      final service = createService();
+      await tester.runAsync(service.init);
+      final provider = _TestAssistantProvider(
+        preferences: createBusinessTestPreferences(),
+      );
+      addTearDown(provider.dispose);
+      const sourceAssistantId = 'source-assistant';
+      provider.seedAssistants(const <Assistant>[
+        Assistant(id: sourceAssistantId, name: 'Source'),
+        Assistant(id: 'target-assistant', name: 'Target'),
+      ], currentAssistantId: sourceAssistantId);
+      late final String firstConversationId;
+      late final String secondConversationId;
+      await tester.runAsync(() async {
+        firstConversationId = (await service.createConversation(
+          title: 'Alpha',
+          assistantId: sourceAssistantId,
+        )).id;
+        secondConversationId = (await service.createConversation(
+          title: 'Beta',
+          assistantId: sourceAssistantId,
+        )).id;
+      });
+      await pumpDrawer(tester, service, assistantProvider: provider);
+      service.batchMoveResult = const ConversationBatchMoveResult(
+        moved: 1,
+        skippedBusy: 1,
+      );
+      await tester.pump();
+
+      SideDrawer.debugEnterSelectionMode!(firstConversationId);
+      await tester.pump();
+      await tester.tap(find.text('Beta'));
+      await tester.pump();
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(SideDrawer)),
+      )!;
+      await tester.tap(find.text(l10n.sideDrawerSelectionMove).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Target').last);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(
+        service.batchMoveIds,
+        containsAll(<String>[firstConversationId, secondConversationId]),
+      );
+      expect(
+        AppSnackBarManager().activeToasts.first.notification.message,
+        l10n.sideDrawerMoveSelectedWithSkippedSnackbar(1, 1),
+      );
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pump(const Duration(milliseconds: 350));
     });
   });
 

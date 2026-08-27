@@ -11,9 +11,9 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/update_provider.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../shared/widgets/update_status_label.dart';
 import '../../../core/services/haptics.dart';
 import 'log_viewer_page.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
@@ -26,8 +26,8 @@ class AboutPage extends StatefulWidget {
 }
 
 class _AboutPageState extends State<AboutPage> {
-  static const String _upstreamKelivoVersion = '1.2.2';
-  static const String _upstreamKelivoBuildNumber = '66';
+  static const String _upstreamKelivoVersion = '1.2.3';
+  static const String _upstreamKelivoBuildNumber = '67';
 
   String _version = '';
   String _buildNumber = '';
@@ -414,73 +414,73 @@ class _AboutPageState extends State<AboutPage> {
           // 标题卡片：左侧图标，右侧标题或描述
           _iosSectionCard(
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-                child: Row(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: SizedBox(
-                        width: 54,
-                        height: 54,
-                        child: Image.asset(
-                          'assets/app_icon.png',
-                          fit: BoxFit.cover,
+              _TactileRow(
+                onTap: updateProvider.checking ? null : _checkForUpdates,
+                pressedScale: 0.995,
+                builder: (_) => Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: SizedBox(
+                          width: 54,
+                          height: 54,
+                          child: Image.asset(
+                            'assets/app_icon.png',
+                            fit: BoxFit.cover,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  l10n.aboutPageAppName,
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: AppFontWeights.semibold,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    l10n.aboutPageAppName,
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: AppFontWeights.semibold,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              IosTileButton(
-                                label: updateProvider.checking
-                                    ? l10n.aboutPageCheckingForUpdates
-                                    : l10n.aboutPageCheckForUpdates,
-                                icon: Lucide.RefreshCw,
-                                enabled: !updateProvider.checking,
-                                fontSize: 12,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 9,
-                                  vertical: 7,
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: UpdateStatusLabel(
+                                    label: updateProvider.checking
+                                        ? l10n.aboutPageCheckingForUpdates
+                                        : l10n.aboutPageCheckForUpdates,
+                                    icon: Lucide.RefreshCw,
+                                    enabled: !updateProvider.checking,
+                                  ),
                                 ),
-                                onTap: _checkForUpdates,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            l10n.aboutPageAppDescription,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: cs.onSurface.withValues(alpha: 0.65),
-                              height: 1.2,
+                              ],
                             ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+                            const SizedBox(height: 4),
+                            Text(
+                              l10n.aboutPageAppDescription,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: cs.onSurface.withValues(alpha: 0.65),
+                                height: 1.2,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -545,13 +545,6 @@ class _AboutPageState extends State<AboutPage> {
                   ),
                 ),
                 onTap: null,
-              ),
-              _iosDivider(context),
-              _iosNavRow(
-                context,
-                icon: Lucide.Earth,
-                label: l10n.aboutPageWebsite,
-                onTap: () => _openUrl('https://kelivo.psycheas.top/'),
               ),
               _iosDivider(context),
               _iosNavRowSvgLeading(

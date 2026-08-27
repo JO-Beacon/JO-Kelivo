@@ -15,6 +15,7 @@ import '../shared/widgets/snackbar.dart';
 import '../utils/sandbox_path_resolver.dart';
 import '../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'widgets/desktop_dialog_style.dart';
 
 Future<void> showUserProfileDialog(BuildContext context) async {
   await showGeneralDialog<void>(
@@ -330,9 +331,7 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
         return StatefulBuilder(
           builder: (ctx, setLocal) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+              shape: DesktopDialogStyle.shape(ctx),
               backgroundColor: cs.surface,
               title: Text(l10n.sideDrawerImageUrlDialogTitle),
               content: TextField(
@@ -451,9 +450,7 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
         return StatefulBuilder(
           builder: (ctx, setLocal) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+              shape: DesktopDialogStyle.shape(ctx),
               backgroundColor: cs.surface,
               title: Text(l10n.sideDrawerQQAvatarDialogTitle),
               content: TextField(

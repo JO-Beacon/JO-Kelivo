@@ -32,6 +32,8 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/avatar_cache.dart';
 import 'dart:ui' as ui;
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/interactive_drawer.dart';
+import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../core/services/haptics.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../desktop/menu_anchor.dart';
@@ -43,10 +45,12 @@ import '../../../desktop/hotkeys/sidebar_tab_bus.dart';
 import '../../../desktop/desktop_settings_navigation_bus.dart';
 import 'dart:async';
 import '../../../features/search/services/global_session_search_service.dart';
+import '../../../utils/search_highlight.dart';
 import '../controllers/chat_actions.dart';
 import 'assistant_avatar.dart';
 import 'assistant_entry_actions.dart';
 import 'sidebar_presentation.dart';
+import 'sidebar_selection_bars.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 class SideDrawer extends StatefulWidget {
@@ -110,6 +114,10 @@ class SideDrawer extends StatefulWidget {
   @visibleForTesting
   static Type get debugChatTileType => _ChatTile;
 
+  /// 测试钩子：进入多选模式，并预先选中 [seedId]。
+  @visibleForTesting
+  static void Function(String seedId)? debugEnterSelectionMode;
+
   /// 位于 [indexInSection] 的侧边栏块的入场动画延迟。
   ///
   /// 限制绝对索引交错，使虚拟化深层行不会等待数秒。
@@ -169,11 +177,17 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   String? _cachedSidebarRowsAssistantId;
   List<_SidebarRow>? _cachedSidebarRows;
 
+  bool _selectionMode = false;
+  final Set<String> _selectedConversationIds = <String>{};
+  String? _selectionAssistantId;
+  InteractiveDrawerController? _hostDrawer;
+
   @override
   void initState() {
     super.initState();
     SideDrawer.debugRequestConversationListHostRebuild =
         _debugRequestConversationListHostRebuild;
+    SideDrawer.debugEnterSelectionMode = _enterSelectionMode;
     _attachCloseTicker(widget.closePickerTicker);
     _mobileSearchFocusNode.addListener(() {
       if (_pointerInteractions) return;
@@ -235,6 +249,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     ChatItem chat, {
     Offset? anchor,
   }) async {
+    if (_selectionMode) return;
     final l10n = AppLocalizations.of(context)!;
     final chatService = context.read<ChatService>();
     final isPinned = chat.isPinned;
@@ -246,6 +261,11 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
         context,
         globalPosition: pos,
         items: [
+          DesktopContextMenuItem(
+            icon: Lucide.ListChecks,
+            label: l10n.sideDrawerMenuSelect,
+            onTap: () => _enterSelectionMode(chat.id),
+          ),
           DesktopContextMenuItem(
             icon: Lucide.Edit,
             label: l10n.sideDrawerMenuRename,
@@ -439,6 +459,11 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                     ),
                     const SizedBox(height: 10),
                     row(
+                      icon: Lucide.ListChecks,
+                      label: l10n.sideDrawerMenuSelect,
+                      action: () async => _enterSelectionMode(chat.id),
+                    ),
+                    row(
                       icon: Lucide.Edit,
                       label: l10n.sideDrawerMenuRename,
                       action: () async {
@@ -607,6 +632,196 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       },
     );
     return confirmed == true;
+  }
+
+  Future<bool> _confirmDeleteConversations(
+    BuildContext context,
+    int count,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.sideDrawerSelectionDeleteConfirmTitle),
+        content: Text(l10n.sideDrawerSelectionDeleteConfirmContent(count)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.sideDrawerCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              l10n.sideDrawerSelectionDelete,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
+  }
+
+  void _enterSelectionMode(String seedId) {
+    Haptics.light();
+    if (!mounted) return;
+    setState(() {
+      _selectionMode = true;
+      _selectedConversationIds
+        ..clear()
+        ..add(seedId);
+      _selectionAssistantId = context
+          .read<AssistantProvider>()
+          .currentAssistantId;
+    });
+  }
+
+  void _exitSelectionMode() {
+    if (!_selectionMode && _selectedConversationIds.isEmpty) return;
+    setState(() {
+      _selectionMode = false;
+      _selectedConversationIds.clear();
+      _selectionAssistantId = null;
+    });
+  }
+
+  void _toggleConversationSelected(String id) {
+    setState(() {
+      if (!_selectedConversationIds.add(id)) {
+        _selectedConversationIds.remove(id);
+      }
+    });
+  }
+
+  void _toggleSelectAll(List<_SidebarRow> rows) {
+    final ids = <String>[
+      for (final row in rows)
+        if (row is _SidebarTileRow) row.chat.id,
+    ];
+    if (ids.isEmpty) return;
+    final allSelected = ids.every(_selectedConversationIds.contains);
+    setState(() {
+      if (allSelected) {
+        _selectedConversationIds.removeAll(ids);
+      } else {
+        _selectedConversationIds.addAll(ids);
+      }
+    });
+  }
+
+  Future<void> _deleteSelected() async {
+    final ids = List<String>.of(_selectedConversationIds);
+    if (ids.isEmpty) return;
+    final confirmed = await _confirmDeleteConversations(context, ids.length);
+    if (!mounted || !confirmed) return;
+
+    final chatService = context.read<ChatService>();
+    final l10n = AppLocalizations.of(context)!;
+    final deletingCurrent = ids.contains(chatService.currentConversationId);
+    final nextId = _nextRecentConversationExcluding(chatService, ids.toSet());
+    for (final id in ids) {
+      await ChatActions.cancelActiveGenerationFor(id);
+    }
+    final deleted = await chatService.deleteConversations(ids);
+    if (!mounted) return;
+    showAppSnackBar(
+      context,
+      message: l10n.sideDrawerDeleteSelectedSnackbar(deleted),
+      type: NotificationType.success,
+      duration: const Duration(seconds: 3),
+    );
+    _handlePostDeleteNavigation(
+      chatService: chatService,
+      deletingCurrent: deletingCurrent,
+      nextConversationId: nextId,
+    );
+    _exitSelectionMode();
+  }
+
+  Future<void> _moveSelected() async {
+    final ids = List<String>.of(_selectedConversationIds);
+    if (ids.isEmpty) return;
+
+    final chatService = context.read<ChatService>();
+    final currentId = chatService.currentConversationId;
+    final movingCurrent = currentId != null && ids.contains(currentId);
+    final currentBeforeAssistantId = currentId == null
+        ? null
+        : chatService.getConversation(currentId)?.assistantId;
+    final nextId = _nextRecentConversationExcluding(chatService, ids.toSet());
+    final targetId = await showAssistantMoveSelector(
+      context,
+      excludeAssistantId: _selectionAssistantId,
+    );
+    if (!mounted || targetId == null) return;
+
+    final result = await chatService.moveConversationsToAssistant(
+      conversationIds: ids,
+      assistantId: targetId,
+    );
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+    final message = result.skippedBusy > 0
+        ? l10n.sideDrawerMoveSelectedWithSkippedSnackbar(
+            result.moved,
+            result.skippedBusy,
+          )
+        : l10n.sideDrawerMoveSelectedSnackbar(result.moved);
+    showAppSnackBar(context, message: message, type: NotificationType.success);
+
+    final currentAfter = currentId == null
+        ? null
+        : chatService.getConversation(currentId);
+    final currentMoved =
+        movingCurrent &&
+        (currentAfter == null ||
+            currentAfter.assistantId != currentBeforeAssistantId);
+    if (currentMoved || chatService.currentConversationId == null) {
+      final closeDrawer = !context
+          .read<SettingsProvider>()
+          .keepSidebarOpenOnTopicTap;
+      if (nextId != null) {
+        widget.onSelectConversation?.call(nextId, closeDrawer: closeDrawer);
+      } else {
+        widget.onNewConversation?.call(closeDrawer: closeDrawer);
+      }
+    }
+    _exitSelectionMode();
+  }
+
+  Future<void> _pinSelected() async {
+    final ids = List<String>.of(_selectedConversationIds);
+    if (ids.isEmpty) return;
+    final chatService = context.read<ChatService>();
+    final allPinned = ids.every(
+      (id) => chatService.getConversation(id)?.isPinned == true,
+    );
+    await chatService.setConversationsPinned(ids, !allPinned);
+    Haptics.light();
+    if (mounted) setState(() {});
+  }
+
+  String? _nextRecentConversationExcluding(
+    ChatService chatService,
+    Set<String> excludeIds,
+  ) {
+    try {
+      final currentAid = context.read<AssistantProvider>().currentAssistantId;
+      if (currentAid == null) return null;
+      final candidates =
+          chatService
+              .getAllConversations()
+              .where(
+                (conversation) =>
+                    conversation.assistantId == currentAid &&
+                    !excludeIds.contains(conversation.id),
+              )
+              .toList()
+            ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      return candidates.isEmpty ? null : candidates.first.id;
+    } catch (_) {
+      return null;
+    }
   }
 
   String? _nextRecentConversation(ChatService chatService, String excludeId) {
@@ -783,6 +998,10 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     )) {
       SideDrawer.debugRequestConversationListHostRebuild = null;
     }
+    if (identical(SideDrawer.debugEnterSelectionMode, _enterSelectionMode)) {
+      SideDrawer.debugEnterSelectionMode = null;
+    }
+    _unbindHostDrawer();
     _assistantPickerEntry?.remove();
     _assistantPickerEntry = null;
     _closeTicker?.removeListener(_handleCloseTick);
@@ -801,6 +1020,33 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   void deactivate() {
     _closeAssistantPicker();
     super.deactivate();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final host = InteractiveDrawer.maybeControllerOf(context);
+    if (!identical(_hostDrawer, host)) {
+      _unbindHostDrawer();
+      _hostDrawer = host;
+      _bindHostDrawer();
+    }
+  }
+
+  void _bindHostDrawer() {
+    _hostDrawer?.handleBack = _handleHostDrawerBack;
+  }
+
+  void _unbindHostDrawer() {
+    if (identical(_hostDrawer?.handleBack, _handleHostDrawerBack)) {
+      _hostDrawer?.handleBack = null;
+    }
+  }
+
+  bool _handleHostDrawerBack() {
+    if (!_selectionMode) return false;
+    _exitSelectionMode();
+    return true;
   }
 
   @override
@@ -923,46 +1169,6 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       size: 16,
       color: color,
     );
-  }
-
-  List<TextSpan> _highlightText(
-    String text,
-    List<String> tokens,
-    TextStyle base,
-    TextStyle highlight,
-  ) {
-    if (tokens.isEmpty || text.isEmpty) {
-      return [TextSpan(text: text, style: base)];
-    }
-    final spans = <TextSpan>[];
-    final lower = text.toLowerCase();
-    int pos = 0;
-    while (pos < text.length) {
-      int earliest = -1;
-      int earliestLen = 0;
-      for (final t in tokens) {
-        final idx = lower.indexOf(t, pos);
-        if (idx >= 0 && (earliest < 0 || idx < earliest)) {
-          earliest = idx;
-          earliestLen = t.length;
-        }
-      }
-      if (earliest < 0) {
-        spans.add(TextSpan(text: text.substring(pos), style: base));
-        break;
-      }
-      if (earliest > pos) {
-        spans.add(TextSpan(text: text.substring(pos, earliest), style: base));
-      }
-      spans.add(
-        TextSpan(
-          text: text.substring(earliest, earliest + earliestLen),
-          style: highlight,
-        ),
-      );
-      pos = earliest + earliestLen;
-    }
-    return spans;
   }
 
   Widget _buildGlobalSearchResultsList(BuildContext context) {
@@ -1118,31 +1324,31 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          RichText(
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            text: TextSpan(
-                              children: _highlightText(
+                          Text.rich(
+                            TextSpan(
+                              children: highlightSearchText(
                                 result.conversationTitle,
                                 tokens,
                                 titleStyle,
                                 titleHighlight,
                               ),
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                           if (result.snippet.isNotEmpty) ...[
                             const SizedBox(height: 2),
-                            RichText(
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                              text: TextSpan(
-                                children: _highlightText(
+                            Text.rich(
+                              TextSpan(
+                                children: highlightSearchText(
                                   result.snippet,
                                   tokens,
                                   snippetStyle,
                                   snippetHighlight,
                                 ),
                               ),
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ],
@@ -1414,6 +1620,49 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     final textBase = cs.onSurface; // 纯黑（白天），夜间自动适配
     final ap = context.watch<AssistantProvider>();
     final currentAssistantId = ap.currentAssistantId;
+    final chatServiceForSelection = context.read<ChatService>();
+    if (_selectionMode) {
+      // 计数栏和操作栏位于列表 Selector 外，外部删除也必须刷新它们。
+      context.select<ChatService, int>(
+        (service) => service.conversationListRevision,
+      );
+      if (_selectionAssistantId != currentAssistantId) {
+        _selectionMode = false;
+        _selectedConversationIds.clear();
+        _selectionAssistantId = null;
+      } else {
+        final liveIds = <String>{
+          for (final conversation
+              in chatServiceForSelection.getAllConversations())
+            conversation.id,
+        };
+        _selectedConversationIds.removeWhere((id) => !liveIds.contains(id));
+      }
+    }
+    var allVisibleSelected = false;
+    var allSelectedPinned = false;
+    if (_selectionMode) {
+      final selectionRows = _sidebarRowsFor(
+        revision: chatServiceForSelection.conversationListRevision,
+        initialized: chatServiceForSelection.initialized,
+        query: _query,
+        assistantId: currentAssistantId,
+        chatService: chatServiceForSelection,
+      );
+      final visibleIds = <String>[
+        for (final row in selectionRows)
+          if (row is _SidebarTileRow) row.chat.id,
+      ];
+      allVisibleSelected =
+          visibleIds.isNotEmpty &&
+          visibleIds.every(_selectedConversationIds.contains);
+      allSelectedPinned =
+          _selectedConversationIds.isNotEmpty &&
+          _selectedConversationIds.every(
+            (id) =>
+                chatServiceForSelection.getConversation(id)?.isPinned == true,
+          );
+    }
 
     // 头像渲染器：emoji / URL / 文件 / 默认首字母
     Widget avatarWidget(String name, UserProvider up, {double size = 40}) {
@@ -1517,7 +1766,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     final bool topicsOnly = _topicsOnly;
     final bool useTabs = _showTabs && !assistOnly && !topicsOnly;
 
-    final inner = SafeArea(
+    final drawerBody = SafeArea(
       child: Stack(
         children: [
           // 主列内容
@@ -1534,13 +1783,36 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _buildBackupReminderBanner(
-                      context,
-                      textBase,
-                      topicsOnly: topicsOnly,
-                    ),
+                    if (!_selectionMode)
+                      _buildBackupReminderBanner(
+                        context,
+                        textBase,
+                        topicsOnly: topicsOnly,
+                      ),
                     // 1. 搜索框 + 历史按钮（固定头部）
-                    if (_pointerInteractions)
+                    if (_selectionMode)
+                      SizedBox(
+                        height: _pointerInteractions ? 42 : 44,
+                        width: double.infinity,
+                        child: SidebarSelectionHeader(
+                          selectedCount: _selectedConversationIds.length,
+                          allSelected: allVisibleSelected,
+                          onCancel: _exitSelectionMode,
+                          onToggleSelectAll: () {
+                            final service = context.read<ChatService>();
+                            _toggleSelectAll(
+                              _sidebarRowsFor(
+                                revision: service.conversationListRevision,
+                                initialized: service.initialized,
+                                query: _query,
+                                assistantId: currentAssistantId,
+                                chatService: service,
+                              ),
+                            );
+                          },
+                        ),
+                      )
+                    else if (_pointerInteractions)
                       // 桌面端
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -2090,7 +2362,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                         ],
                       ),
 
-                    if (!widget.globalSearchMode) ...[
+                    if (!_selectionMode && !widget.globalSearchMode) ...[
                       SizedBox(height: _pointerInteractions ? 8 : 12),
 
                       // 桌面端：替换为 Tab（助手 / 话题）
@@ -2305,7 +2577,17 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                 }(),
               ),
 
-              if (widget.showBottomBar && (!_docked || !_pointerInteractions))
+              if (_selectionMode)
+                SidebarSelectionActionBar(
+                  key: const ValueKey<String>('sidebar-selection-action-bar'),
+                  selectedCount: _selectedConversationIds.length,
+                  allSelectedPinned: allSelectedPinned,
+                  onPin: _pinSelected,
+                  onMove: _moveSelected,
+                  onDelete: _deleteSelected,
+                )
+              else if (widget.showBottomBar &&
+                  (!_docked || !_pointerInteractions))
                 Container(
                   padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
                   decoration: BoxDecoration(
@@ -2406,7 +2688,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
           ),
 
           // 用户区域上方的 iOS 风格模糊/淡出效果
-          if (!_docked)
+          if (!_docked && !_selectionMode)
             Positioned(
               left: 0,
               right: 0,
@@ -2432,6 +2714,19 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
         ],
       ),
     );
+
+    // InteractiveDrawer 自己持有系统返回键；嵌入式侧栏则在本地先退出多选。
+    final inner = _hostDrawer != null
+        ? drawerBody
+        : PopScope(
+            canPop: !_selectionMode,
+            onPopInvokedWithResult: (didPop, _) {
+              if (!didPop && _selectionMode) {
+                _exitSelectionMode();
+              }
+            },
+            child: drawerBody,
+          );
 
     if (_docked) {
       return ClipRect(
@@ -3649,6 +3944,10 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                     loading: widget.loadingConversationIds.contains(
                       tile.chat.id,
                     ),
+                    selectionMode: _selectionMode,
+                    selected: _selectedConversationIds.contains(tile.chat.id),
+                    onToggleSelect: () =>
+                        _toggleConversationSelected(tile.chat.id),
                     onTap: () {
                       final keepOpen = context
                           .read<SettingsProvider>()
@@ -3759,6 +4058,9 @@ class _ChatTile extends StatefulWidget {
     this.onLongPress,
     this.onSecondaryTap,
     this.loading = false,
+    this.selectionMode = false,
+    this.selected = false,
+    this.onToggleSelect,
   });
 
   final ChatItem chat;
@@ -3769,6 +4071,9 @@ class _ChatTile extends StatefulWidget {
   final VoidCallback? onLongPress;
   final void Function(Offset globalPosition)? onSecondaryTap;
   final bool loading;
+  final bool selectionMode;
+  final bool selected;
+  final VoidCallback? onToggleSelect;
 
   @override
   State<_ChatTile> createState() => _ChatTileState();
@@ -3782,6 +4087,7 @@ class _ChatTileState extends State<_ChatTile> {
   /// 使后续点击命中内存快速路径。仅缓存；
   /// loadTimelinePage 不通知任何监听器。
   void _prefetchOnHover() {
+    if (widget.selectionMode) return;
     if (_prefetchTriggered) return;
     _prefetchTriggered = true;
     final chatService = context.read<ChatService>();
@@ -3804,20 +4110,28 @@ class _ChatTileState extends State<_ChatTile> {
     final cs = Theme.of(context).colorScheme;
     // 逐块选择订阅（缓存方案第 16 项）：切换当前会话
     // 只重建受影响的块，而不是整个列表。
-    final selected = context.select<ChatService, bool>(
+    final isCurrent = context.select<ChatService, bool>(
       (service) => service.currentConversationId == widget.chat.id,
     );
     final embedded = widget.docked;
     final Color tileColor;
-    if (embedded) {
+    if (widget.selectionMode) {
+      tileColor = widget.selected
+          ? cs.primary.withValues(alpha: embedded ? 0.20 : 0.16)
+          : (embedded ? Colors.transparent : cs.surface);
+    } else if (embedded) {
       // 在平板嵌入模式下，保持选中项高亮，其他项透明
-      tileColor = selected
+      tileColor = isCurrent
           ? cs.primary.withValues(alpha: 0.16)
           : Colors.transparent;
     } else {
-      tileColor = selected ? cs.primary.withValues(alpha: 0.12) : cs.surface;
+      tileColor = isCurrent ? cs.primary.withValues(alpha: 0.12) : cs.surface;
     }
-    final base = widget.pointerInteractions && !selected && _hovered
+    final base =
+        widget.pointerInteractions &&
+            !widget.selectionMode &&
+            !isCurrent &&
+            _hovered
         ? (embedded
               ? cs.primary.withValues(alpha: 0.08)
               : cs.surface.withValues(alpha: 0.9))
@@ -3827,12 +4141,12 @@ class _ChatTileState extends State<_ChatTile> {
       padding: EdgeInsets.only(bottom: vGap),
       child: GestureDetector(
         onSecondaryTapDown: (details) {
-          if (widget.pointerInteractions) {
+          if (widget.pointerInteractions && !widget.selectionMode) {
             widget.onSecondaryTap?.call(details.globalPosition);
           }
         },
         onLongPress: () {
-          if (widget.pointerInteractions) return;
+          if (widget.pointerInteractions || widget.selectionMode) return;
           widget.onLongPress?.call();
         },
         child: MouseRegion(
@@ -3852,33 +4166,67 @@ class _ChatTileState extends State<_ChatTile> {
             baseColor: base,
             borderRadius: BorderRadius.circular(16),
             haptics: false,
-            onTap: widget.onTap,
-            onLongPress: widget.pointerInteractions ? null : widget.onLongPress,
+            onTap: widget.selectionMode
+                ? () {
+                    Haptics.light();
+                    widget.onToggleSelect?.call();
+                  }
+                : widget.onTap,
+            onLongPress: (widget.pointerInteractions || widget.selectionMode)
+                ? null
+                : widget.onLongPress,
             padding: EdgeInsets.fromLTRB(
               widget.pointerInteractions ? 14 : 14,
               widget.pointerInteractions ? 9 : 10,
               8,
               widget.pointerInteractions ? 9 : 10,
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    widget.chat.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: widget.pointerInteractions ? 14 : 15,
-                      color: widget.textColor,
-                      fontWeight: AppFontWeights.regular,
+            child: TweenAnimationBuilder<double>(
+              tween: Tween<double>(end: widget.selectionMode ? 1 : 0),
+              duration: const Duration(milliseconds: 240),
+              curve: Curves.easeOutCubic,
+              builder: (context, t, child) {
+                return Row(
+                  children: [
+                    ClipRect(
+                      child: SizedBox(
+                        width: 28 * t,
+                        child: Opacity(
+                          opacity: t,
+                          child: Transform.scale(
+                            scale: 0.8 + 0.2 * t,
+                            child: IgnorePointer(
+                              child: IosCheckbox(
+                                value: widget.selected,
+                                size: 20,
+                                hitTestSize: 20,
+                                enableHaptics: false,
+                                onChanged: (_) {},
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                if (widget.loading) ...[
-                  const SizedBox(width: 8),
-                  _LoadingDot(),
-                ],
-              ],
+                    Expanded(
+                      child: Text(
+                        widget.chat.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: widget.pointerInteractions ? 14 : 15,
+                          color: widget.textColor,
+                          fontWeight: AppFontWeights.regular,
+                        ),
+                      ),
+                    ),
+                    if (widget.loading) ...[
+                      const SizedBox(width: 8),
+                      _LoadingDot(),
+                    ],
+                  ],
+                );
+              },
             ),
           ),
         ),

@@ -28,7 +28,7 @@ void main() {
         ids: const [7],
       );
 
-      expect(prompt, contains('Keep the original language.'));
+      expect(prompt, contains('original wording'));
       expect(prompt, contains('用户喜欢'));
       expect(prompt, contains('"id":7'));
     });
@@ -49,6 +49,80 @@ void main() {
       expect(outputs.last.type, MemoryType.voice);
     });
 
+    test('parseResponse allows type-only output when preserving original', () {
+      final outputs = LegacyMemoryMigrationService.parseResponse(
+        '[{"id":1,"type":"instruction"}]',
+        expectedIds: const [1],
+        expectContent: false,
+      );
+
+      expect(outputs.single.type, MemoryType.instruction);
+      expect(outputs.single.content, isEmpty);
+    });
+
+    test('migration preserves original wording by default', () async {
+      final harness = await createBusinessTestHarness();
+      addTearDown(harness.close);
+      final repository = MemoryRepository(harness.preferences);
+      final service = LegacyMemoryMigrationService(
+        repository: repository,
+        generateText:
+            ({
+              required ProviderConfig config,
+              required String modelId,
+              required String prompt,
+              int? thinkingBudget,
+            }) async => '[{"id":1,"type":"identity"}]',
+      );
+
+      await service.migrate(
+        inputs: const [
+          LegacyMemoryMigrationInput(
+            legacyId: 1,
+            assistantId: 'assistant-1',
+            content: '  保留原来的空格和措辞。  ',
+          ),
+        ],
+        target: LegacyMemoryMigrationTarget.global,
+        config: _config(),
+        modelId: 'test-model',
+      );
+
+      expect((await repository.readAll()).single.content, '  保留原来的空格和措辞。  ');
+    });
+
+    test('migration can use model-organized wording', () async {
+      final harness = await createBusinessTestHarness();
+      addTearDown(harness.close);
+      final repository = MemoryRepository(harness.preferences);
+      final service = LegacyMemoryMigrationService(
+        repository: repository,
+        generateText:
+            ({
+              required ProviderConfig config,
+              required String modelId,
+              required String prompt,
+              int? thinkingBudget,
+            }) async => '[{"id":1,"type":"workflow","content":"整理后的措辞"}]',
+      );
+
+      await service.migrate(
+        inputs: const [
+          LegacyMemoryMigrationInput(
+            legacyId: 1,
+            assistantId: 'assistant-1',
+            content: '旧措辞',
+          ),
+        ],
+        target: LegacyMemoryMigrationTarget.global,
+        config: _config(),
+        modelId: 'test-model',
+        preserveOriginal: false,
+      );
+
+      expect((await repository.readAll()).single.content, '整理后的措辞');
+    });
+
     test('parseResponse rejects missing source items', () {
       expect(
         () => LegacyMemoryMigrationService.parseResponse(
@@ -56,6 +130,22 @@ void main() {
           expectedIds: const [1, 2],
         ),
         throwsFormatException,
+      );
+    });
+
+    test('parseResponse treats unknown migrate type as invalid item', () {
+      expect(
+        () => LegacyMemoryMigrationService.parseResponse(
+          '[{"id":1,"type":"mystery","content":"One"}]',
+          expectedIds: const [1],
+        ),
+        throwsA(
+          isA<FormatException>().having(
+            (error) => error.message,
+            'message',
+            'legacy_memory_response_item_invalid',
+          ),
+        ),
       );
     });
 
@@ -162,12 +252,14 @@ void main() {
           target: LegacyMemoryMigrationTarget.global,
           config: _config(),
           modelId: 'test-model',
+          preserveOriginal: false,
         );
         final second = await service.migrate(
           inputs: inputs,
           target: LegacyMemoryMigrationTarget.global,
           config: _config(),
           modelId: 'test-model',
+          preserveOriginal: false,
         );
 
         expect(first.created, 1);
@@ -226,12 +318,14 @@ void main() {
           target: LegacyMemoryMigrationTarget.global,
           config: _config(),
           modelId: 'test-model',
+          preserveOriginal: false,
         );
         final second = await service.migrate(
           inputs: inputs,
           target: LegacyMemoryMigrationTarget.global,
           config: _config(),
           modelId: 'test-model',
+          preserveOriginal: false,
         );
 
         expect(first.created, 0);
@@ -242,6 +336,168 @@ void main() {
         expect(entries, hasLength(1));
         expect(entries.single.source, MemorySource.manual);
         expect(entries.single.migrationIds, hasLength(1));
+      },
+    );
+
+    test('persists completed batches and retries only unfinished items', () async {
+      final harness = await createBusinessTestHarness();
+      final repository = MemoryRepository(harness.preferences);
+      var failSecond = true;
+      var firstCalls = 0;
+      var secondCalls = 0;
+      final service = LegacyMemoryMigrationService(
+        repository: repository,
+        batchSize: 1,
+        delay: (_) async {},
+        generateText:
+            ({
+              required ProviderConfig config,
+              required String modelId,
+              required String prompt,
+              int? thinkingBudget,
+            }) async {
+              if (prompt.contains('First legacy memory')) {
+                firstCalls++;
+                return '[{"id":1,"type":"identity","content":"First converted"}]';
+              }
+              secondCalls++;
+              if (failSecond) {
+                throw Exception('ClientException: connection refused');
+              }
+              return '[{"id":2,"type":"workflow","content":"Second converted"}]';
+            },
+      );
+      const inputs = <LegacyMemoryMigrationInput>[
+        LegacyMemoryMigrationInput(
+          legacyId: 1,
+          assistantId: 'assistant-1',
+          content: 'First legacy memory',
+        ),
+        LegacyMemoryMigrationInput(
+          legacyId: 2,
+          assistantId: 'assistant-1',
+          content: 'Second legacy memory',
+        ),
+      ];
+
+      final partial = await service.migrate(
+        inputs: inputs,
+        target: LegacyMemoryMigrationTarget.global,
+        config: _config(),
+        modelId: 'test-model',
+      );
+      expect(partial.created, 1);
+      expect(partial.failed, 1);
+      expect(await repository.readAll(), hasLength(1));
+
+      failSecond = false;
+      final resumed = await service.migrate(
+        inputs: inputs,
+        target: LegacyMemoryMigrationTarget.global,
+        config: _config(),
+        modelId: 'test-model',
+      );
+      expect(resumed.created, 1);
+      expect(resumed.skipped, 1);
+      expect(resumed.failed, 0);
+      expect(firstCalls, 1);
+      expect(secondCalls, 4);
+      expect(await repository.readAll(), hasLength(2));
+    });
+
+    test('incomplete model batch splits and preserves every item', () async {
+      final harness = await createBusinessTestHarness();
+      final repository = MemoryRepository(harness.preferences);
+      var calls = 0;
+      final service = LegacyMemoryMigrationService(
+        repository: repository,
+        batchSize: 2,
+        delay: (_) async {},
+        generateText:
+            ({
+              required ProviderConfig config,
+              required String modelId,
+              required String prompt,
+              int? thinkingBudget,
+            }) async {
+              calls++;
+              final hasFirst = prompt.contains('First split memory');
+              final hasSecond = prompt.contains('Second split memory');
+              if (hasFirst && hasSecond) {
+                return '[{"id":1,"type":"identity","content":"First"}]';
+              }
+              if (hasFirst) {
+                return '[{"id":1,"type":"identity","content":"First"}]';
+              }
+              return '[{"id":2,"type":"workflow","content":"Second"}]';
+            },
+      );
+
+      final result = await service.migrate(
+        inputs: const [
+          LegacyMemoryMigrationInput(
+            legacyId: 1,
+            assistantId: 'assistant-1',
+            content: 'First split memory',
+          ),
+          LegacyMemoryMigrationInput(
+            legacyId: 2,
+            assistantId: 'assistant-1',
+            content: 'Second split memory',
+          ),
+        ],
+        target: LegacyMemoryMigrationTarget.global,
+        config: _config(),
+        modelId: 'test-model',
+      );
+
+      expect(result.created, 2);
+      expect(result.failed, 0);
+      expect(calls, 4);
+      expect(await repository.readAll(), hasLength(2));
+    });
+
+    test(
+      'authentication failure does not split or start later batches',
+      () async {
+        final harness = await createBusinessTestHarness();
+        final repository = MemoryRepository(harness.preferences);
+        var calls = 0;
+        final service = LegacyMemoryMigrationService(
+          repository: repository,
+          batchSize: 2,
+          delay: (_) async {},
+          generateText:
+              ({
+                required ProviderConfig config,
+                required String modelId,
+                required String prompt,
+                int? thinkingBudget,
+              }) async {
+                calls++;
+                throw Exception('HTTP 401: invalid api key');
+              },
+        );
+
+        final result = await service.migrate(
+          inputs: [
+            for (var i = 1; i <= 4; i++)
+              LegacyMemoryMigrationInput(
+                legacyId: i,
+                assistantId: 'assistant-1',
+                content: 'Authentication memory $i',
+              ),
+          ],
+          target: LegacyMemoryMigrationTarget.global,
+          config: _config(),
+          modelId: 'test-model',
+        );
+
+        expect(result.created, 0);
+        expect(result.failed, 4);
+        expect(result.errorMessage, contains('401'));
+        expect(calls, 3);
+        expect(await repository.readAll(), isEmpty);
       },
     );
   });

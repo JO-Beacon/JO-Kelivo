@@ -282,30 +282,11 @@ _ExportReasoningPayload _exportReasoningPayloadForMessage(
       final decoded = jsonDecode(segJson);
       if (decoded is Map<String, dynamic>) {
         final rawSegments = (decoded['segments'] as List? ?? const <dynamic>[]);
-        final contentSplits = (decoded['contentSplits'] as Map?)
-            ?.cast<String, dynamic>();
-        if (contentSplits != null) {
-          offsets = (contentSplits['offsets'] as List? ?? const <dynamic>[])
-              .map((item) => item as int)
-              .toList();
-          reasoningCounts =
-              (contentSplits['reasoningCounts'] as List? ?? const <dynamic>[])
-                  .map((item) => item as int)
-                  .toList();
-          toolCounts =
-              (contentSplits['toolCounts'] as List? ?? const <dynamic>[])
-                  .map((item) => item as int)
-                  .toList();
-          final normalizedLength = [
-            offsets.length,
-            reasoningCounts.length,
-            toolCounts.length,
-          ].reduce((a, b) => a < b ? a : b);
-          offsets = List<int>.of(offsets.take(normalizedLength));
-          reasoningCounts = List<int>.of(
-            reasoningCounts.take(normalizedLength),
-          );
-          toolCounts = List<int>.of(toolCounts.take(normalizedLength));
+        final parsedSplits = tryParseContentSplits(decoded['contentSplits']);
+        if (parsedSplits != null) {
+          offsets = parsedSplits.offsets;
+          reasoningCounts = parsedSplits.reasoningCounts;
+          toolCounts = parsedSplits.toolCounts;
         }
         for (final item in rawSegments) {
           if (item is! Map) continue;
@@ -785,6 +766,20 @@ const int _exportImageBlankColorTolerance = 3;
   required bool isDesktop,
 }) {
   return _exportImageRenderConfig(isDesktop: isDesktop);
+}
+
+@visibleForTesting
+({List<int>? offsets, List<int>? reasoningCounts, List<int>? toolCounts})
+exportContentSplitsForTesting(ChatMessage message) {
+  final payload = _exportReasoningPayloadForMessage(
+    message,
+    expandThinkingContent: true,
+  );
+  return (
+    offsets: payload.contentSplitOffsets,
+    reasoningCounts: payload.reasoningCountAtSplit,
+    toolCounts: payload.toolCountAtSplit,
+  );
 }
 
 // 不分页的直接渲染方案

@@ -147,6 +147,8 @@ final class BusinessKeyRegistry {
     'memory_prompt_lang_v1',
     'memory_trace_enabled_v1',
     'memory_legacy_mode_v1',
+    'memory_legacy_prompt_zh_v1',
+    'memory_legacy_prompt_en_v1',
     'memory_rules_prompt_zh_v1',
     'memory_rules_prompt_en_v1',
     'memory_gate_prompt_zh_v1',
@@ -159,6 +161,11 @@ final class BusinessKeyRegistry {
     'memory_smart_add_batch_prompt_en_v1',
     'memory_profile_distill_prompt_zh_v1',
     'memory_profile_distill_prompt_en_v1',
+    'memory_migrate_prompt_zh_v1',
+    'memory_migrate_prompt_en_v1',
+    'memory_migration_batch_size_v1',
+    'memory_injection_max_items_v1',
+    'chat_bubble_style_overrides_v1',
   };
 
   static BusinessKeyDisposition classify(String key) {

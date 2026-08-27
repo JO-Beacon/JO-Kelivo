@@ -12,6 +12,7 @@ import '../../shared/widgets/snackbar.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../widgets/desktop_dialog_style.dart';
 
 Future<void> showDesktopMcpEditDialog(
   BuildContext context, {
@@ -24,9 +25,13 @@ Future<void> showDesktopMcpEditDialog(
     builder: (ctx) => Dialog(
       backgroundColor: cs.surface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: DesktopDialogStyle.shape(ctx),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 720, maxHeight: 640),
+        constraints: DesktopDialogStyle.proportionalConstraints(
+          ctx,
+          maxWidth: 720,
+          maxHeight: 640,
+        ),
         child: _DesktopMcpEditDialog(serverId: serverId),
       ),
     ),

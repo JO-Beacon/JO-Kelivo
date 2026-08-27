@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/database/generation_run.dart';
@@ -12,6 +13,8 @@ import '../../../core/models/token_usage.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/stream/stream_chunk.dart';
+import '../../../core/services/api/stream/stream_chunk_handler.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/ios_background_generation.dart';
 import '../../../l10n/app_localizations.dart';
@@ -58,6 +61,22 @@ final class _BarrierStreamSubscription<T> implements StreamSubscription<T> {
 
   @override
   Future<E> asFuture<E>([E? futureValue]) => _delegate.asFuture(futureValue);
+}
+
+final class _EventToolBuffer {
+  _EventToolBuffer({this.name = '', this.metadata});
+
+  String name;
+  String input = '';
+  Map<String, dynamic>? metadata;
+
+  Map<String, dynamic> get arguments {
+    try {
+      final decoded = jsonDecode(input);
+      if (decoded is Map) return decoded.cast<String, dynamic>();
+    } catch (_) {}
+    return const <String, dynamic>{};
+  }
 }
 
 class _StreamingCheckpoint {
@@ -347,6 +366,10 @@ class ChatActions {
       <String, LatestWinsCheckpointWriter<_StreamingCheckpoint>>{};
   final Map<String, List<Map<String, dynamic>>> _streamingToolEvents =
       <String, List<Map<String, dynamic>>>{};
+  final Map<String, StreamChunkHandler> _streamEventHandlers =
+      <String, StreamChunkHandler>{};
+  final Map<String, Map<String, _EventToolBuffer>> _streamEventTools =
+      <String, Map<String, _EventToolBuffer>>{};
   final Map<String, _GenerationCheckpointCursor> _generationCheckpointCursors =
       <String, _GenerationCheckpointCursor>{};
   final ActiveStreamingMessageStore _activeAssistantMessages =
@@ -450,8 +473,10 @@ class ChatActions {
     final base = _messageWithCurrentReasoning(
       index < 0 ? state.ctx.assistantMessage : _messages[index],
     );
+    final eventParts = _streamEventHandlers[messageId]?.parts;
     return base.copyWith(
       content: _transformAssistantContent(state),
+      parts: eventParts == null || eventParts.isEmpty ? null : eventParts,
       totalTokens: state.totalTokens,
       promptTokens: state.usage?.promptTokens,
       completionTokens: state.usage?.completionTokens,
@@ -547,6 +572,8 @@ class ChatActions {
   void _clearGenerationRuntimeState(ChatMessage message) {
     _generationCheckpointCursors.remove(message.id);
     _streamingToolEvents.remove(message.id);
+    _streamEventHandlers.remove(message.id);
+    _streamEventTools.remove(message.id);
     _activeAssistantMessages.removeIfMatches(message);
   }
 
@@ -1643,6 +1670,8 @@ class ChatActions {
 
     // 将此消息标记为正在流式处理，以抑制 UI 重建
     streamController.markStreamingStarted(state.messageId);
+    _streamEventHandlers[state.messageId] = StreamChunkHandler();
+    _streamEventTools[state.messageId] = <String, _EventToolBuffer>{};
     _activeAssistantMessages.put(state.ctx.assistantMessage);
     _streamingToolEvents[state.messageId] = chatService
         .getToolEvents(state.messageId)
@@ -1686,7 +1715,7 @@ class ChatActions {
           ..stateRevision = run.stateRevision
           ..nextSeq = run.checkpointSeq + 1;
       }
-      final stream = ChatApiService.sendMessageStream(
+      final stream = ChatApiService.sendMessageStreamEvents(
         config: ctx.config,
         modelId: ctx.modelId,
         messages: ctx.apiMessages,
@@ -1714,9 +1743,9 @@ class ChatActions {
         ChatApiService.cancelRequest(conversationId);
         await _cancelSubscriptionWithTimeout(previousSub);
       }
-      final sub = listenSequentiallyToStream<ChatStreamChunk>(
+      final sub = listenSequentiallyToStream<StreamChunk>(
         stream: stream,
-        onData: (chunk) => _handleStreamChunk(chunk, state),
+        onData: (chunk) => _handleStreamEvent(chunk, state),
         onError: (error, stackTrace) => _handleStreamError(error, state),
         onDone: () => _handleStreamDone(state),
       );
@@ -1729,6 +1758,157 @@ class ChatActions {
   // ============================================================================
   // 流式分块处理器
   // ============================================================================
+
+  /// 将统一事件投影到现有流式 UI，同时由 StreamChunkHandler 保留结构化结果。
+  Future<void> _handleStreamEvent(
+    StreamChunk event,
+    stream_ctrl.StreamingState state,
+  ) async {
+    final handler = _streamEventHandlers.putIfAbsent(
+      state.messageId,
+      StreamChunkHandler.new,
+    );
+    handler.handle(event);
+
+    final legacy = _legacyChunkFromEvent(event, state.messageId);
+    if (legacy != null) {
+      await _handleStreamChunk(legacy, state);
+    }
+  }
+
+  ChatStreamChunk? _legacyChunkFromEvent(StreamChunk event, String messageId) {
+    final tools = _streamEventTools.putIfAbsent(
+      messageId,
+      () => <String, _EventToolBuffer>{},
+    );
+    ChatStreamChunk chunk({
+      String content = '',
+      String? reasoning,
+      dynamic reasoningDetails,
+      bool isDone = false,
+      TokenUsage? usage,
+      List<ToolCallInfo>? toolCalls,
+      List<ToolResultInfo>? toolResults,
+    }) {
+      return ChatStreamChunk(
+        content: content,
+        reasoning: reasoning,
+        reasoningDetails: reasoningDetails,
+        isDone: isDone,
+        totalTokens: usage?.totalTokens ?? 0,
+        usage: usage,
+        toolCalls: toolCalls,
+        toolResults: toolResults,
+      );
+    }
+
+    switch (event) {
+      case TextDelta(:final text):
+        return chunk(content: text);
+      case ReasoningDelta(:final text, :final details):
+        return chunk(reasoning: text, reasoningDetails: details);
+      case ToolCallStart(:final id, :final toolName, :final metadata):
+        tools[id] = _EventToolBuffer(name: toolName, metadata: metadata);
+        return null;
+      case ToolCallDelta(
+        :final id,
+        :final toolNameDelta,
+        :final inputDelta,
+        :final metadata,
+      ):
+        final buffer = tools.putIfAbsent(id, _EventToolBuffer.new);
+        if (toolNameDelta.isNotEmpty) buffer.name += toolNameDelta;
+        if (inputDelta.isNotEmpty) buffer.input += inputDelta;
+        if (metadata != null) buffer.metadata = metadata;
+        return null;
+      case ToolCallEnd(:final id):
+        final buffer = tools[id] ?? _EventToolBuffer();
+        return chunk(
+          toolCalls: [
+            ToolCallInfo(
+              id: id,
+              name: buffer.name,
+              arguments: buffer.arguments,
+              metadata: buffer.metadata,
+            ),
+          ],
+        );
+      case ToolCallResult(:final id, :final output, :final metadata):
+        final buffer = tools[id] ?? _EventToolBuffer();
+        return chunk(
+          toolResults: [
+            ToolResultInfo(
+              id: id,
+              name: buffer.name,
+              arguments: buffer.arguments,
+              content: (output ?? '').toString(),
+              metadata: metadata ?? buffer.metadata,
+            ),
+          ],
+        );
+      case ServerToolStart(
+        :final id,
+        :final toolName,
+        :final input,
+        :final metadata,
+      ):
+        final buffer = _EventToolBuffer(name: toolName, metadata: metadata);
+        if (input is Map) buffer.input = jsonEncode(input);
+        tools[id] = buffer;
+        return chunk(
+          toolCalls: [
+            ToolCallInfo(
+              id: id,
+              name: toolName,
+              arguments: buffer.arguments,
+              metadata: metadata,
+            ),
+          ],
+        );
+      case ServerToolInputDelta(:final id, :final inputDelta):
+        tools.putIfAbsent(id, _EventToolBuffer.new).input += inputDelta;
+        return null;
+      case ServerToolInputEnd():
+        return null;
+      case ServerToolEnd(
+        :final id,
+        :final input,
+        :final output,
+        :final status,
+        :final metadata,
+      ):
+        final buffer = tools[id] ?? _EventToolBuffer();
+        final arguments = input is Map
+            ? input.cast<String, dynamic>()
+            : buffer.arguments;
+        return chunk(
+          toolResults: [
+            ToolResultInfo(
+              id: id,
+              name: buffer.name,
+              arguments: arguments,
+              content: output?.toString() ?? status.name,
+              metadata: metadata ?? buffer.metadata,
+            ),
+          ],
+        );
+      case Usage(:final usage):
+        return chunk(usage: usage);
+      case Finish():
+        final usage = _streamEventHandlers[messageId]?.usage;
+        return chunk(isDone: true, usage: usage);
+      case TextStart() ||
+          TextEnd() ||
+          ReasoningStart() ||
+          ReasoningEnd() ||
+          ImageStart() ||
+          ImageDelta() ||
+          ImageSnapshot() ||
+          ImageEnd() ||
+          Annotations():
+        return null;
+    }
+  }
 
   /// 将流式分块分发到合适的处理器。
   Future<void> _handleStreamChunk(
@@ -2094,6 +2274,9 @@ class ChatActions {
     // 标记流式结束，以允许 UI 再次重建
     streamController.markStreamingEnded(messageId);
 
+    // 先让平滑缓冲按正常节奏追上，避免 cleanup 在结束帧一次性倾倒尾部。
+    await streamController.drainSmoothStream(messageId);
+
     // 清理流式节流计时器并刷新最终内容
     streamController.cleanupTimers(messageId);
 
@@ -2244,6 +2427,8 @@ class ChatActions {
     // 确保流式状态被标记为已结束
     streamController.markStreamingEnded(messageId);
 
+    // 如果 onDone 直接接管完成流程，也先排空平滑缓冲。
+    await streamController.drainSmoothStream(messageId);
     streamController.cleanupTimers(messageId);
 
     // 如果 _finishStreaming 已在执行中（由 _handleStreamFinish 启动），

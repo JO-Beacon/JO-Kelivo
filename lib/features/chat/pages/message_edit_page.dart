@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
@@ -27,6 +28,16 @@ class _MessageEditPageState extends State<MessageEditPage> {
     super.dispose();
   }
 
+  void _trimWhitespace() {
+    final trimmed = _controller.text.trim();
+    if (trimmed == _controller.text) return;
+    _controller.value = TextEditingValue(
+      text: trimmed,
+      selection: TextSelection.collapsed(offset: trimmed.length),
+      composing: TextRange.empty,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -35,13 +46,24 @@ class _MessageEditPageState extends State<MessageEditPage> {
       appBar: AppBar(
         title: Text(l10n.messageEditPageTitle),
         actions: [
+          TextButton.icon(
+            onPressed: _trimWhitespace,
+            icon: Icon(Lucide.Eraser, size: 18, color: cs.primary),
+            label: Text(
+              l10n.messageEditTrimWhitespace,
+              style: TextStyle(
+                color: cs.primary,
+                fontWeight: AppFontWeights.emphasis,
+              ),
+            ),
+          ),
           TextButton(
             onPressed: () {
-              final text = _controller.text.trim();
+              final text = _controller.text;
               Navigator.of(context).pop<String>(text);
             },
             child: Text(
-              l10n.messageEditPageSave,
+              l10n.messageEditPageSaveAsBranch,
               style: TextStyle(
                 color: cs.primary,
                 fontWeight: AppFontWeights.emphasis,

@@ -13,8 +13,11 @@ import '../../core/services/migration/migration_backup_file_name.dart';
 import '../../desktop/window_title_bar.dart';
 import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
+import '../../shared/widgets/ios_tile_button.dart';
 import '../../shared/widgets/restart_app_action.dart';
+import '../../shared/widgets/snackbar.dart';
 import '../../theme/app_font_weights.dart';
+import '../../utils/app_directories.dart';
 import '../../utils/platform_utils.dart';
 import 'hive_to_sqlite_migration_service.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
@@ -48,6 +51,7 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
   bool _mobileBackupSaved = false;
   bool _busy = false;
   bool _canOfferSkip = false;
+  bool _openingUserDataDirectory = false;
 
   bool get _usesMobileBackupFlow =>
       widget.mobileBackupSaver != null || Platform.isAndroid || Platform.isIOS;
@@ -273,6 +277,32 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
     }
   }
 
+  Future<void> _openUserDataDirectory() async {
+    if (_openingUserDataDirectory) return;
+    setState(() => _openingUserDataDirectory = true);
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final opened = await AppDirectories.openDirectory(
+        widget.service.appDataDirectory,
+      );
+      if (opened || !mounted) return;
+      debugPrint('Migration user data directory was not opened.');
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Failed to open migration user data directory: $error\n$stackTrace',
+      );
+      if (!mounted) return;
+    } finally {
+      if (mounted) setState(() => _openingUserDataDirectory = false);
+    }
+    if (!mounted) return;
+    showAppSnackBar(
+      context,
+      message: l10n.backupPageOpenUserDataFailed,
+      type: NotificationType.error,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -342,6 +372,9 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
 
   Widget _bodyForStatus(AppLocalizations l10n, {required Key key}) {
     final onSkip = !_busy && _canOfferSkip ? _confirmSkipMigration : null;
+    final onOpenUserDataDirectory = _openingUserDataDirectory
+        ? null
+        : () => unawaited(_openUserDataDirectory());
     return switch (_status.stage) {
       HiveToSqliteMigrationStage.intro => _IntroStep(
         key: key,
@@ -350,6 +383,7 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
         sqliteMode: widget.sqliteMode,
         onStart: _busy ? null : _pickBackupAndStart,
         onSkip: onSkip,
+        onOpenUserDataDirectory: onOpenUserDataDirectory,
       ),
       HiveToSqliteMigrationStage.backupReady ||
       HiveToSqliteMigrationStage.backingUp ||
@@ -357,6 +391,7 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
         key: key,
         status: _status,
         sqliteMode: widget.sqliteMode,
+        onOpenUserDataDirectory: onOpenUserDataDirectory,
       ),
       HiveToSqliteMigrationStage.complete => _CompleteStep(
         key: key,
@@ -365,6 +400,7 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
         onRestart: () async {
           await requestAppRestart(context, PlatformUtils.restartApp);
         },
+        onOpenUserDataDirectory: onOpenUserDataDirectory,
       ),
       HiveToSqliteMigrationStage.failed => _FailedStep(
         key: key,
@@ -372,6 +408,7 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
         sqliteMode: widget.sqliteMode,
         onRetry: _busy ? null : _retry,
         onSkip: onSkip,
+        onOpenUserDataDirectory: onOpenUserDataDirectory,
       ),
     };
   }
@@ -384,6 +421,7 @@ class _IntroStep extends StatelessWidget {
     required this.mobileBackupFlow,
     required this.sqliteMode,
     required this.onStart,
+    required this.onOpenUserDataDirectory,
     this.onSkip,
   });
 
@@ -392,6 +430,7 @@ class _IntroStep extends StatelessWidget {
   final bool sqliteMode;
   final VoidCallback? onStart;
   final VoidCallback? onSkip;
+  final VoidCallback? onOpenUserDataDirectory;
 
   @override
   Widget build(BuildContext context) {
@@ -401,6 +440,7 @@ class _IntroStep extends StatelessWidget {
       key: key,
       showStepper: false,
       activeStep: 0,
+      onOpenUserDataDirectory: onOpenUserDataDirectory,
       children: [
         _Header(
           title: sqliteMode
@@ -459,10 +499,12 @@ class _ProgressStep extends StatelessWidget {
     super.key,
     required this.status,
     required this.sqliteMode,
+    required this.onOpenUserDataDirectory,
   });
 
   final HiveToSqliteMigrationStatus status;
   final bool sqliteMode;
+  final VoidCallback? onOpenUserDataDirectory;
 
   @override
   Widget build(BuildContext context) {
@@ -473,6 +515,7 @@ class _ProgressStep extends StatelessWidget {
     return _StepShell(
       key: key,
       activeStep: inMigration ? 1 : 0,
+      onOpenUserDataDirectory: onOpenUserDataDirectory,
       children: [
         _Header(
           title: inMigration
@@ -656,11 +699,13 @@ class _CompleteStep extends StatelessWidget {
     required this.status,
     required this.sqliteMode,
     required this.onRestart,
+    required this.onOpenUserDataDirectory,
   });
 
   final HiveToSqliteMigrationStatus status;
   final bool sqliteMode;
   final Future<void> Function() onRestart;
+  final VoidCallback? onOpenUserDataDirectory;
 
   @override
   Widget build(BuildContext context) {
@@ -669,6 +714,7 @@ class _CompleteStep extends StatelessWidget {
     return _StepShell(
       key: key,
       activeStep: 2,
+      onOpenUserDataDirectory: onOpenUserDataDirectory,
       children: [
         const Spacer(),
         TweenAnimationBuilder<double>(
@@ -724,12 +770,14 @@ class _FailedStep extends StatelessWidget {
     required this.sqliteMode,
     required this.onRetry,
     required this.onSkip,
+    required this.onOpenUserDataDirectory,
   });
 
   final HiveToSqliteMigrationStatus status;
   final bool sqliteMode;
   final VoidCallback? onRetry;
   final VoidCallback? onSkip;
+  final VoidCallback? onOpenUserDataDirectory;
 
   @override
   Widget build(BuildContext context) {
@@ -738,6 +786,7 @@ class _FailedStep extends StatelessWidget {
     return _StepShell(
       key: key,
       activeStep: 1,
+      onOpenUserDataDirectory: onOpenUserDataDirectory,
       children: [
         Icon(Lucide.TriangleAlert, color: cs.error, size: 58),
         const SizedBox(height: 16),
@@ -785,31 +834,53 @@ class _StepShell extends StatelessWidget {
     super.key,
     required this.children,
     required this.activeStep,
+    required this.onOpenUserDataDirectory,
     this.showStepper = true,
   });
 
   final List<Widget> children;
   final int activeStep;
   final bool showStepper;
+  final VoidCallback? onOpenUserDataDirectory;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: double.infinity,
-      child: Column(
-        children: [
-          if (showStepper) ...[
-            _DotSteps(activeStep: activeStep),
-            const SizedBox(height: 22),
-          ],
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: children,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: IntrinsicHeight(
+              child: Column(
+                children: [
+                  if (showStepper) ...[
+                    _DotSteps(activeStep: activeStep),
+                    const SizedBox(height: 22),
+                  ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: children,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: IosTileButton(
+                      label: AppLocalizations.of(
+                        context,
+                      )!.backupPageOpenUserDataDirectory,
+                      icon: Lucide.FolderOpen,
+                      enabled: onOpenUserDataDirectory != null,
+                      onTap: onOpenUserDataDirectory ?? () {},
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

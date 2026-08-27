@@ -11,6 +11,7 @@ import '../shared/widgets/snackbar.dart';
 import '../shared/widgets/ios_tactile.dart';
 import 'dart:convert';
 import '../theme/app_font_weights.dart';
+import 'widgets/desktop_dialog_style.dart';
 
 Future<void> showHtmlPreviewDesktopDialog(
   BuildContext context, {
@@ -183,9 +184,10 @@ class _HtmlPreviewDialogState extends State<_HtmlPreviewDialog> {
     return Dialog(
       elevation: 12,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: DesktopDialogStyle.shape(context),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
+        constraints: DesktopDialogStyle.proportionalConstraints(
+          context,
           minWidth: 520,
           maxWidth: 900,
           maxHeight: 740,
@@ -311,9 +313,10 @@ class _ConsoleDialog extends StatelessWidget {
     return Dialog(
       elevation: 12,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: DesktopDialogStyle.shape(context),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
+        constraints: DesktopDialogStyle.proportionalConstraints(
+          context,
           minWidth: 520,
           maxWidth: 700,
           maxHeight: 620,

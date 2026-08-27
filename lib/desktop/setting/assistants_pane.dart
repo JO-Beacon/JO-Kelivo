@@ -161,7 +161,7 @@ Future<String?> _showAddAssistantDesktopDialog(BuildContext context) async {
     builder: (ctx) {
       return Dialog(
         backgroundColor: cs.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: DesktopDialogStyle.shape(ctx),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 440),

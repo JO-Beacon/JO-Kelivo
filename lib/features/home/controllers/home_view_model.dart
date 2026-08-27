@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../core/models/compress_context_options.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/conversation_tree.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -13,6 +14,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/logging/flutter_logger.dart';
 import '../../../core/services/memory/memory_pipeline.dart';
 import '../../../core/services/memory/memory_trace.dart';
+import '../../../core/services/model_override_payload_parser.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../chat/widgets/chat_message_widget.dart' show ToolUIPart;
 import '../services/message_builder_service.dart';
@@ -23,43 +25,9 @@ import 'chat_controller.dart';
 import 'generation_controller.dart';
 import 'stream_controller.dart' as stream_ctrl;
 
-enum CompressContextLimitMode { start, recent, unlimited }
+export '../../../core/models/compress_context_options.dart';
 
 enum BackgroundTaskKind { ocr, title, summary, suggestions, memory }
-
-class CompressContextOptions {
-  const CompressContextOptions({required this.mode, this.maxChars});
-
-  static const int defaultMaxChars = 6000;
-
-  final CompressContextLimitMode mode;
-  final int? maxChars;
-}
-
-String buildCompressContextContent(
-  String joined,
-  CompressContextOptions options,
-) {
-  if (options.mode == CompressContextLimitMode.unlimited) return joined;
-  final maxChars = options.maxChars ?? CompressContextOptions.defaultMaxChars;
-  if (maxChars <= 0 || joined.length <= maxChars) return joined;
-  return switch (options.mode) {
-    CompressContextLimitMode.start => joined.substring(0, maxChars),
-    CompressContextLimitMode.recent => joined.substring(
-      joined.length - maxChars,
-    ),
-    CompressContextLimitMode.unlimited => joined,
-  };
-}
-
-String buildConversationTextForCompression(List<ChatMessage> messages) {
-  return messages
-      .where((m) => m.content.trim().isNotEmpty)
-      .map(
-        (m) => '${m.role == "assistant" ? "Assistant" : "User"}: ${m.content}',
-      )
-      .join('\n\n');
-}
 
 class BatchDeleteGroupPlan {
   const BatchDeleteGroupPlan({
@@ -611,6 +579,44 @@ class HomeViewModel extends ChangeNotifier {
     await deleteMessages(messageIds: {message.id});
   }
 
+  Future<void> deleteMessageOnly({
+    required ChatMessage message,
+    required Map<String, List<ChatMessage>> byGroup,
+  }) async {
+    final targetConversationId = message.conversationId;
+    final streamingMessageId = _chatActions.activeStreamingMessageId(
+      targetConversationId,
+    );
+    if (streamingMessageId == message.id) {
+      await _chatActions.cancelStreaming(
+        _chatService.getConversation(targetConversationId),
+      );
+    }
+
+    final deletedIds = await _chatService.deleteMessageOnly(
+      conversationId: targetConversationId,
+      messageId: message.id,
+    );
+    for (final id in deletedIds) {
+      _streamController.clearMessageState(id);
+    }
+
+    if (targetConversationId == currentConversation?.id) {
+      _conversationTreeReloadSerial++;
+      _conversationTree = await _chatService.loadConversationTree(
+        targetConversationId,
+      );
+      _chatController.loadVersionSelections();
+      _chatController.updateCurrentConversation(
+        _chatService.getConversation(targetConversationId),
+      );
+      await _chatController.refreshTimelineAfterMutation(
+        removedRevisionIds: deletedIds,
+      );
+    }
+    notifyListeners();
+  }
+
   Future<void> deleteAllMessageVersions({
     required ChatMessage message,
     required Map<String, List<ChatMessage>> byGroup,
@@ -1060,6 +1066,29 @@ class HomeViewModel extends ChangeNotifier {
     onScrollToBottom?.call();
   }
 
+  /// 将当前消息复制到新的独立会话。
+  Future<void> createConversationFork(
+    ChatMessage message,
+    ConversationForkMode mode,
+  ) async {
+    final sourceConversation = currentConversation;
+    if (sourceConversation == null ||
+        _chatService.isTemporaryConversation(sourceConversation.id)) {
+      return;
+    }
+    try {
+      final copied = await _chatService.createConversationForkAtRevision(
+        sourceConversationId: sourceConversation.id,
+        sourceRevisionId: message.id,
+        title: sourceConversation.title,
+        mode: mode,
+      );
+      await switchConversation(copied.id);
+    } catch (error) {
+      onError?.call('conversation_fork_failed');
+    }
+  }
+
   Future<void> switchConversationBranch(String branchId) async {
     final sourceConversation = currentConversation;
     if (sourceConversation == null) return;
@@ -1120,24 +1149,35 @@ class HomeViewModel extends ChangeNotifier {
         .allMessagesForCurrentConversationContext();
     if (activeMessages.isEmpty) return 'no_messages';
 
-    // 构建用于压缩的会话文本
-    final joined = buildConversationTextForCompression(activeMessages);
-    if (joined.trim().isEmpty) return 'no_messages';
+    List<ChatMessage>? keptMessages;
+    var summarizeMessages = activeMessages;
+    if (options.mode == CompressContextLimitMode.keepRecent) {
+      final keepCount =
+          options.keepUserMessages ??
+          CompressContextOptions.defaultKeepUserMessages;
+      keptMessages = selectKeepRecentMessages(activeMessages, keepCount);
+      if (keptMessages.length >= activeMessages.length) return 'no_messages';
+      summarizeMessages = activeMessages.sublist(
+        0,
+        activeMessages.length - keptMessages.length,
+      );
+    }
 
-    final content = buildCompressContextContent(joined, options);
     // 解析模型：压缩模型 → 摘要模型 → 标题模型 → 助手模型 → 全局默认
-    final provKey =
-        settings.compressModelProvider ??
-        settings.summaryModelProvider ??
-        settings.titleModelProvider ??
-        assistant?.chatModelProvider ??
-        settings.currentModelProvider;
-    final mdlId =
-        settings.compressModelId ??
-        settings.summaryModelId ??
-        settings.titleModelId ??
-        assistant?.chatModelId ??
-        settings.currentModelId;
+    final resolvedModel = resolveCompressContextModel(
+      compressProvider: settings.compressModelProvider,
+      compressModelId: settings.compressModelId,
+      summaryProvider: settings.summaryModelProvider,
+      summaryModelId: settings.summaryModelId,
+      titleProvider: settings.titleModelProvider,
+      titleModelId: settings.titleModelId,
+      assistantProvider: assistant?.chatModelProvider,
+      assistantModelId: assistant?.chatModelId,
+      currentProvider: settings.currentModelProvider,
+      currentModelId: settings.currentModelId,
+    );
+    final provKey = resolvedModel.providerKey;
+    final mdlId = resolvedModel.modelId;
     if (provKey == null || mdlId == null) return 'no_model';
 
     final cfg = settings.getProviderConfig(provKey);
@@ -1145,20 +1185,76 @@ class HomeViewModel extends ChangeNotifier {
       assistant?.thinkingBudget,
     );
 
-    // 根据设置模板构建压缩提示词
-    final prompt = settings.compressPrompt
-        .replaceAll('{content}', content)
-        .replaceAll('{locale}', locale);
+    final modelOverride = ModelOverridePayloadParser.modelOverride(
+      cfg.modelOverrides,
+      mdlId,
+    );
+    final requestBudget = compressionRequestCharBudget(
+      options: options,
+      contextWindow: parseContextWindow(modelOverride),
+    );
+    final chunks = buildCompressRequestContents(
+      summarizeMessages,
+      options: options,
+      maxCodeUnits: requestBudget,
+    );
+    if (chunks.isEmpty) return 'no_messages';
 
-    try {
-      final summary = (await ChatApiService.generateText(
+    Future<String> generateSummary(String content) {
+      final prompt = settings.compressPrompt
+          .replaceAll('{content}', content)
+          .replaceAll('{locale}', locale);
+      return ChatApiService.generateText(
         config: cfg,
         modelId: mdlId,
         prompt: prompt,
         thinkingBudget: budget,
-      )).trim();
+        skipImageParsing: true,
+      );
+    }
+
+    try {
+      final summaries = <String>[];
+      for (final chunk in chunks) {
+        summaries.add(
+          (await summarizeWithContextRetry(
+            content: chunk,
+            generate: generateSummary,
+          )).trim(),
+        );
+      }
+      var summary = summaries.where((part) => part.isNotEmpty).join('\n\n');
+      if (summaries.length > 1 && summary.isNotEmpty) {
+        summary = (await summarizeWithContextRetry(
+          content: summary,
+          generate: generateSummary,
+        )).trim();
+      }
 
       if (summary.isEmpty) return 'empty_summary';
+
+      if (keptMessages != null) {
+        final summaryMessage = ChatMessage(
+          role: 'user',
+          content: summary,
+          conversationId: convo.id,
+        );
+        final newConvo = await _chatService.forkConversationFromMessages(
+          title: convo.title,
+          assistantId: convo.assistantId,
+          sourceMessages: [summaryMessage, ...keptMessages],
+        );
+
+        _chatService.setCurrentConversation(newConvo.id);
+        await _chatController.setCurrentConversationAndLoad(
+          _chatService.getConversation(newConvo.id) ?? newConvo,
+        );
+        _streamController.clearAllState();
+        onConversationSwitched?.call();
+        notifyListeners();
+        onScrollToBottom?.call();
+        return null;
+      }
 
       // 以摘要作为第一条用户消息创建新会话
       final newConvo = await _chatService.createDraftConversation(

@@ -11,6 +11,7 @@ import '../utils/model_grouping.dart';
 import '../shared/widgets/model_tag_wrap.dart';
 import '../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'widgets/desktop_dialog_style.dart';
 
 Future<void> showModelFetchDialog(
   BuildContext context, {
@@ -133,7 +134,6 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
     final settingsWatch = context.watch<SettingsProvider>();
 
@@ -159,7 +159,8 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
 
     final dialog = Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
+        constraints: DesktopDialogStyle.proportionalConstraints(
+          context,
           minWidth: 520,
           maxWidth: 860,
           maxHeight: 720,
@@ -167,15 +168,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
         child: Material(
           color: cs.surface,
           elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(
-              color: isDark
-                  ? cs.onSurface.withValues(alpha: 0.08)
-                  : cs.outlineVariant.withValues(alpha: 0.25),
-              width: 1,
-            ),
-          ),
+          shape: DesktopDialogStyle.shape(context),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: Column(

@@ -133,6 +133,34 @@ void main() {
       expect(service.conversationListRevision, last);
     });
 
+    test('overwriteMessage keeps the active revision identity', () async {
+      final service = createService();
+      await service.init();
+      final conversation = await service.createConversation(title: 'A');
+      final message = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'before',
+      );
+      final originalIds = await service.getMessageIds(conversation.id);
+
+      final overwritten = await service.overwriteMessage(
+        messageId: message.id,
+        parts: const [
+          TextPart('after'),
+          ImagePart(uri: 'image.png'),
+        ],
+      );
+
+      expect(overwritten, isNotNull);
+      expect(overwritten!.id, message.id);
+      expect(overwritten.version, message.version);
+      expect(await service.getMessageIds(conversation.id), originalIds);
+      final active = await service.loadMessages(conversation.id);
+      expect(active.single.id, message.id);
+      expect(active.single.parts.map((part) => part.kind), ['text', 'image']);
+    });
+
     test('assistant move invalidates only memory snapshot prompts', () async {
       final service = createService();
       await service.init();
@@ -235,6 +263,112 @@ void main() {
         content: 'secret',
       );
       expect(service.conversationListRevision, beforeTemporary);
+    });
+  });
+
+  group('batch conversation mutations', () {
+    test('deleteConversations deduplicates ids and notifies once', () async {
+      final service = createService();
+      await service.init();
+      final a = await service.createConversation(title: 'A');
+      final b = await service.createConversation(title: 'B');
+      final last = service.conversationListRevision;
+      var notifications = 0;
+      service.addListener(() => notifications++);
+
+      final count = await service.deleteConversations([
+        a.id,
+        b.id,
+        a.id,
+        'missing',
+      ]);
+
+      expect(count, 2);
+      expect(service.conversationListRevision, last + 1);
+      expect(notifications, 1);
+      expect(service.getConversation(a.id), isNull);
+      expect(service.getConversation(b.id), isNull);
+    });
+
+    test('setConversationsPinned skips unchanged and missing ids', () async {
+      final service = createService();
+      await service.init();
+      final a = await service.createConversation(title: 'A');
+      final b = await service.createConversation(title: 'B');
+      await service.togglePinConversation(b.id);
+      final last = service.conversationListRevision;
+      var notifications = 0;
+      service.addListener(() => notifications++);
+
+      final count = await service.setConversationsPinned([
+        a.id,
+        b.id,
+        'missing',
+      ], true);
+
+      expect(count, 1);
+      expect(service.getConversation(a.id)?.isPinned, isTrue);
+      expect(service.getConversation(b.id)?.isPinned, isTrue);
+      expect(service.conversationListRevision, last + 1);
+      expect(notifications, 1);
+    });
+
+    test('moveConversations reports active-generation skips', () async {
+      final service = createService();
+      await service.init();
+      final busy = await service.createConversation(
+        title: 'Busy',
+        assistantId: 'assistant-a',
+      );
+      final idle = await service.createConversation(
+        title: 'Idle',
+        assistantId: 'assistant-a',
+      );
+      await service.beginSendGeneration(
+        conversationId: busy.id,
+        userParts: const [TextPart('hello')],
+        modelId: 'model',
+        providerId: 'provider',
+      );
+      final last = service.conversationListRevision;
+      var notifications = 0;
+      service.addListener(() => notifications++);
+
+      final result = await service.moveConversationsToAssistant(
+        conversationIds: [busy.id, idle.id],
+        assistantId: 'assistant-b',
+      );
+
+      expect(result.moved, 1);
+      expect(result.skippedBusy, 1);
+      expect(service.getConversation(busy.id)?.assistantId, 'assistant-a');
+      expect(service.getConversation(idle.id)?.assistantId, 'assistant-b');
+      expect(service.conversationListRevision, last + 1);
+      expect(notifications, 1);
+    });
+
+    test('batch no-ops do not notify or bump revision', () async {
+      final service = createService();
+      await service.init();
+      final conversation = await service.createConversation(
+        title: 'A',
+        assistantId: 'assistant-a',
+      );
+      final last = service.conversationListRevision;
+      var notifications = 0;
+      service.addListener(() => notifications++);
+
+      expect(await service.deleteConversations(['missing']), 0);
+      expect(await service.setConversationsPinned([conversation.id], false), 0);
+      final move = await service.moveConversationsToAssistant(
+        conversationIds: [conversation.id],
+        assistantId: 'assistant-a',
+      );
+
+      expect(move.moved, 0);
+      expect(move.skippedBusy, 0);
+      expect(service.conversationListRevision, last);
+      expect(notifications, 0);
     });
   });
 

@@ -62,7 +62,7 @@ final class RestoreBundleStaging {
   static const _maximumManifestBytes = 16 * 1024 * 1024;
   // 设置包含结构化偏好，绝不包含聊天记录或二进制资源。
   // 在复制/解析前限制 JSON 大小，以约束 UTF-8 和 DOM 放大。
-  static const _maximumSettingsBytes = 16 * 1024 * 1024;
+  static const _maximumSettingsBytes = 1024 * 1024 * 1024;
 
   static Future<StagedRestoreBundle> create({
     required Directory appDataDirectory,

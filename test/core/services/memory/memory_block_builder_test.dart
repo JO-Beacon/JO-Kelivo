@@ -205,7 +205,7 @@ void main() {
 ''');
     });
 
-    test('exactly 30 entries are full; 31 trigger summary of 10', () {
+    test('configured limit controls full and summary output', () {
       MemoryEntry make(int i) => _entry(
         id: 'mem_${i.toString().padLeft(8, '0')}',
         type: MemoryType.identity,
@@ -214,34 +214,35 @@ void main() {
         updatedAt: DateTime(2026, 1, 1).add(Duration(days: i)),
       );
 
-      final thirty = List.generate(30, make);
+      const maxItems = 10;
+      final atLimit = List.generate(maxItems, make);
       final full = MemoryBlockBuilder.buildMemoryBlock(
-        visible: thirty,
-        totalByType: {MemoryType.identity: 30},
+        visible: atLimit,
+        totalByType: {MemoryType.identity: maxItems},
         lang: MemoryPromptLang.zh,
+        maxItems: maxItems,
       );
       expect(full.contains('mode="summary"'), isFalse);
-      expect('\n- ['.allMatches(full).length, 30);
+      expect('\n- ['.allMatches(full).length, maxItems);
 
-      final thirtyOne = List.generate(31, make);
+      final overLimit = List.generate(maxItems + 1, make);
       final summary = MemoryBlockBuilder.buildMemoryBlock(
-        visible: thirtyOne,
-        totalByType: {MemoryType.identity: 31},
+        visible: overLimit,
+        totalByType: {MemoryType.identity: maxItems + 1},
         lang: MemoryPromptLang.zh,
+        maxItems: maxItems,
       );
       expect(
         summary.startsWith(
-          '<user_memory type="identity" mode="summary" total="31">\n',
+          '<user_memory type="identity" mode="summary" total="11" shown="10">\n',
         ),
         isTrue,
       );
-      expect('\n- ['.allMatches(summary).length, 10);
+      expect('\n- ['.allMatches(summary).length, maxItems);
       expect(summary.contains(MemoryPrompts.moreHintZh), isTrue);
-      // Most recently updated among 0..30 is index 30; take 10 newest = 21..30
-      // then re-sort by createdAt ASC → still 21..30 chronologically.
-      expect(summary.contains('entry 21'), isTrue);
-      expect(summary.contains('entry 30'), isTrue);
-      expect(summary.contains('entry 20'), isFalse);
+      expect(summary.contains('entry 1'), isTrue);
+      expect(summary.contains('entry 10'), isTrue);
+      expect(summary.contains('entry 0'), isFalse);
     });
   });
 

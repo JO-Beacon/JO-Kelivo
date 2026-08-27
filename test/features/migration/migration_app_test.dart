@@ -136,6 +136,7 @@ void main() {
 
     expect(service.backupCalls, 1);
     expect(saveCalls, 1);
+    expect(service.externalBackupSavedCalls, 1);
     expect(service.migrationBackupPaths, <String?>[null]);
     expect(service.temporaryBackup.existsSync(), isFalse);
     expect(find.byIcon(Lucide.RotateCcw), findsOneWidget);
@@ -149,6 +150,7 @@ void main() {
 
     expect(service.backupCalls, 1);
     expect(saveCalls, 1);
+    expect(service.externalBackupSavedCalls, 1);
     expect(service.migrationBackupPaths, <String?>[null, null]);
 
     await tester.pumpWidget(const SizedBox.shrink());
@@ -208,6 +210,108 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
     messenger.setMockMethodCallHandler(restartChannel, null);
   });
+
+  testWidgets('migration page opens the migration user data directory', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    const launcherChannel = MethodChannel('plugins.flutter.io/url_launcher');
+    String? launchedUrl;
+    var launchCalls = 0;
+    messenger.setMockMethodCallHandler(launcherChannel, (call) async {
+      if (call.method == 'launch') {
+        launchCalls++;
+        launchedUrl = (call.arguments as Map)['url'] as String?;
+        return true;
+      }
+      return false;
+    });
+    final appDataDirectory = Directory.systemTemp.createTempSync(
+      'kelivo_migration_open_data_',
+    );
+    addTearDown(() {
+      debugDefaultTargetPlatformOverride = null;
+      messenger.setMockMethodCallHandler(launcherChannel, null);
+      if (appDataDirectory.existsSync()) {
+        appDataDirectory.deleteSync(recursive: true);
+      }
+    });
+    tester.binding.platformDispatcher.localesTestValue = const <Locale>[
+      Locale('zh'),
+    ];
+    addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+
+    await tester.pumpWidget(
+      MigrationApp(service: _completeServiceAt(appDataDirectory)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('打开用户数据目录'), findsOneWidget);
+    final openButton = _buttonForIcon(tester, Lucide.FolderOpen);
+    await tester.runAsync(() async {
+      openButton.onTap!();
+      await _waitUntil(() => launchCalls == 1);
+    });
+    await tester.pump();
+
+    expect(launchedUrl, Uri.file(appDataDirectory.path).toString());
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    debugDefaultTargetPlatformOverride = null;
+    messenger.setMockMethodCallHandler(launcherChannel, null);
+  });
+
+  testWidgets('migration page reports a user data directory open failure', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    const launcherChannel = MethodChannel('plugins.flutter.io/url_launcher');
+    var launchCalls = 0;
+    messenger.setMockMethodCallHandler(launcherChannel, (call) async {
+      if (call.method == 'launch') launchCalls++;
+      return false;
+    });
+    final appDataDirectory = Directory.systemTemp.createTempSync(
+      'kelivo_migration_open_data_failure_',
+    );
+    addTearDown(() {
+      debugDefaultTargetPlatformOverride = null;
+      messenger.setMockMethodCallHandler(launcherChannel, null);
+      if (appDataDirectory.existsSync()) {
+        appDataDirectory.deleteSync(recursive: true);
+      }
+    });
+    tester.binding.platformDispatcher.localesTestValue = const <Locale>[
+      Locale('zh'),
+    ];
+    addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+
+    await tester.pumpWidget(
+      MigrationApp(service: _completeServiceAt(appDataDirectory)),
+    );
+    await tester.pumpAndSettle();
+
+    final openButton = _buttonForIcon(tester, Lucide.FolderOpen);
+    await tester.runAsync(() async {
+      openButton.onTap!();
+      await _waitUntil(() => launchCalls == 1);
+    });
+    await tester.pump();
+
+    expect(find.text('打开用户数据目录失败'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    debugDefaultTargetPlatformOverride = null;
+    messenger.setMockMethodCallHandler(launcherChannel, null);
+  });
 }
 
 GestureDetector _buttonForIcon(WidgetTester tester, IconData icon) {
@@ -227,11 +331,15 @@ Future<void> _waitUntil(bool Function() condition) async {
 }
 
 HiveToSqliteMigrationService _completeService() {
+  return _completeServiceAt(Directory.systemTemp);
+}
+
+HiveToSqliteMigrationService _completeServiceAt(Directory appDataDirectory) {
   return _CompleteMigrationService(
     HiveToSqliteMigrationDecision(
       needsMigration: true,
-      appDataDir: Directory.systemTemp,
-      sqliteFile: File('${Directory.systemTemp.path}/kelivo-test.sqlite'),
+      appDataDir: appDataDirectory,
+      sqliteFile: File('${appDataDirectory.path}/kelivo-test.sqlite'),
       hiveFiles: const <File>[],
     ),
   );
@@ -258,6 +366,21 @@ final class _RetryMigrationService extends HiveToSqliteMigrationService {
   final File temporaryBackup;
   final List<String?> migrationBackupPaths = <String?>[];
   int backupCalls = 0;
+  int externalBackupSavedCalls = 0;
+
+  @override
+  Future<int> loadAttemptState() async => 0;
+
+  @override
+  Future<String?> existingBackupPath() async => null;
+
+  @override
+  Future<bool> hasExternallySavedBackup() async => false;
+
+  @override
+  Future<void> recordExternalBackupSaved() async {
+    externalBackupSavedCalls++;
+  }
 
   @override
   Future<File> backupToTemporaryFile() async {

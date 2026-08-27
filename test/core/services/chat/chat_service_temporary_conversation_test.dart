@@ -71,6 +71,36 @@ void main() {
     return service;
   }
 
+  test(
+    'keep-recent fork writes summary and retained structured messages',
+    () async {
+      final service = createService();
+      await service.init();
+      final forked = await service.forkConversationFromMessages(
+        title: 'compressed',
+        assistantId: null,
+        sourceMessages: [
+          ChatMessage(
+            role: 'user',
+            content: 'summary',
+            conversationId: 'source',
+          ),
+          ChatMessage(
+            role: 'assistant',
+            parts: const [TextPart('verbatim answer')],
+            conversationId: 'source',
+          ),
+        ],
+      );
+
+      final messages = await service.loadActiveTimelineMessages(forked.id);
+      expect(messages.map((message) => message.content), [
+        'summary',
+        'verbatim answer',
+      ]);
+    },
+  );
+
   Future<({ChatDatabaseRepository repository, ChatService service})>
   createBranchedService(String fileName) async {
     final repository = ChatDatabaseRepository.open(
@@ -1181,6 +1211,29 @@ void main() {
       expect(edited.parts[1], isA<TextPart>());
       expect((edited.parts[1] as TextPart).text, 'edited caption');
     });
+
+    test('temporary conversations cannot be copied', () async {
+      final service = createService();
+      await service.init();
+      final conversation = await service.createDraftConversation(
+        title: 'Temporary Chat',
+        temporary: true,
+      );
+      final message = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'temporary',
+      );
+
+      await expectLater(
+        service.createConversationForkAtRevision(
+          sourceConversationId: conversation.id,
+          sourceRevisionId: message.id,
+          title: 'Copy',
+        ),
+        throwsStateError,
+      );
+    });
   });
 
   group('ChatService Conversation Fork', () {
@@ -1218,6 +1271,99 @@ void main() {
       expect(copiedMessages.single.version, 0);
       expect(service.getVersionSelections(copiedConversation.id), isEmpty);
     });
+
+    test(
+      'preserves sibling subtrees or keeps only the active branch',
+      () async {
+        final service = createService();
+        await service.init();
+
+        final source = await service.createConversation(title: 'Tree Source');
+        final root = await service.addMessage(
+          conversationId: source.id,
+          role: 'user',
+          content: 'root',
+        );
+        final selected = await service.addMessage(
+          conversationId: source.id,
+          role: 'assistant',
+          content: 'selected',
+        );
+        final sourceTree = await service.loadConversationTree(source.id);
+        final originalBranch = sourceTree!.activeBranchId;
+
+        final branchedTree = await service.createMessageBranch(
+          conversationId: source.id,
+          fromMessageId: selected.id,
+        );
+        final sibling = service.getMessages(source.id).last;
+        await service.addMessage(
+          conversationId: source.id,
+          role: 'assistant',
+          content: 'sibling child',
+        );
+        await service.addMessage(
+          conversationId: source.id,
+          role: 'user',
+          content: 'sibling grandchild',
+        );
+        await service.switchConversationBranch(
+          conversationId: source.id,
+          branchId: originalBranch,
+        );
+        await service.addMessage(
+          conversationId: source.id,
+          role: 'assistant',
+          content: 'active child',
+        );
+
+        final preserved = await service.createConversationForkAtRevision(
+          sourceConversationId: source.id,
+          sourceRevisionId: selected.id,
+          title: 'Preserved',
+          mode: ConversationForkMode.preserveBranches,
+        );
+        final preservedTree = await service.loadConversationTree(preserved.id);
+        final preservedMessages = service.getMessages(preserved.id);
+        expect(
+          preservedMessages.map((message) => message.content),
+          containsAll([
+            root.content,
+            selected.content,
+            sibling.content,
+            'sibling child',
+            'sibling grandchild',
+          ]),
+        );
+        expect(preservedTree!.branches.length, greaterThan(1));
+        expect(preservedTree.edges.length, preservedMessages.length);
+
+        final activeBranchOnly = await service.createConversationForkAtRevision(
+          sourceConversationId: source.id,
+          sourceRevisionId: selected.id,
+          title: 'Active Branch Only',
+          mode: ConversationForkMode.activeBranchOnly,
+        );
+        final activeBranchOnlyTree = await service.loadConversationTree(
+          activeBranchOnly.id,
+        );
+        expect(
+          service
+              .getMessages(activeBranchOnly.id)
+              .map((message) => message.content),
+          ['root', 'selected'],
+        );
+        expect(
+          service
+              .getMessages(activeBranchOnly.id)
+              .map((message) => message.content),
+          isNot(contains('active child')),
+        );
+        expect(activeBranchOnlyTree!.branches, hasLength(1));
+        expect(activeBranchOnlyTree.activePath(), hasLength(2));
+        expect(branchedTree.activeBranchId, isNot(originalBranch));
+      },
+    );
   });
 
   test('final generation commit publishes one statistics revision', () async {
@@ -1343,7 +1489,7 @@ void main() {
   });
 
   test(
-    'deleteBranchSiblings deletes the selected subtree and keeps its sibling',
+    'deleteBranchSiblings deletes every sibling branch and keeps ancestors',
     () async {
       final branched = await createBranchedService('branch-siblings.sqlite');
       final repository = branched.repository;
@@ -1354,16 +1500,41 @@ void main() {
         messageId: 'a1-v1',
       );
 
-      expect(deleted, containsAll(<String>['a1-v1', 'u2-v1']));
-      expect(deleted, isNot(containsAll(<String>['u1', 'a1-v0', 'u2-v0'])));
+      expect(
+        deleted,
+        containsAll(<String>['a1-v0', 'u2-v0', 'a1-v1', 'u2-v1']),
+      );
       expect(await repository.getMessage('u1'), isNotNull);
-      expect(await repository.getMessage('a1-v0'), isNotNull);
+      expect(await repository.getMessage('a1-v0'), isNull);
       expect(await repository.getMessage('a1-v1'), isNull);
-      expect(await repository.getMessage('u2-v0'), isNotNull);
+      expect(await repository.getMessage('u2-v0'), isNull);
       expect(await repository.getMessage('u2-v1'), isNull);
       final tree = await repository.loadConversationTree('conversation-branch');
       expect(tree, isNotNull);
-      expect(tree!.activePath(), const ['u1', 'a1-v0', 'u2-v0']);
+      expect(tree!.activePath(), const ['u1']);
+    },
+  );
+
+  test(
+    'deleteMessageOnly removes one message and reconnects its descendants',
+    () async {
+      final branched = await createBranchedService('message-only.sqlite');
+      final repository = branched.repository;
+      final service = branched.service;
+
+      final deleted = await service.deleteMessageOnly(
+        conversationId: 'conversation-branch',
+        messageId: 'a1-v0',
+      );
+
+      expect(deleted, const {'a1-v0'});
+      expect(await repository.getMessage('a1-v0'), isNull);
+      expect(await repository.getMessage('u2-v0'), isNotNull);
+      expect(await repository.getMessage('a1-v1'), isNotNull);
+      expect(await repository.getMessage('u2-v1'), isNotNull);
+      final tree = await repository.loadConversationTree('conversation-branch');
+      expect(tree!.edges['u2-v0']?.parentMessageId, 'u1');
+      expect(tree.branchPath('old'), const ['u1', 'u2-v0']);
     },
   );
 }

@@ -141,41 +141,42 @@ class _VersionedChatService extends ChatService {
 }
 
 void main() {
-  testWidgets('switching versions restores reasoning and tool cards', (
-    tester,
-  ) async {
-    final service = _VersionedChatService();
-    HomePageController? controller;
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider(
-            create: (_) => SettingsProvider(createBusinessTestPreferences()),
+  testWidgets(
+    'deprecated version selection does not mutate tree runtime state',
+    (tester) async {
+      final service = _VersionedChatService();
+      HomePageController? controller;
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(
+              create: (_) => SettingsProvider(createBusinessTestPreferences()),
+            ),
+            ChangeNotifierProvider<ChatService>.value(value: service),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: _ControllerHarness(onCreated: (value) => controller = value),
           ),
-          ChangeNotifierProvider<ChatService>.value(value: service),
-        ],
-        child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: _ControllerHarness(onCreated: (value) => controller = value),
         ),
-      ),
-    );
-    await controller!.chatController.setCurrentConversationAndLoad(
-      service.conversation,
-    );
-    await tester.pumpAndSettle();
+      );
+      await controller!.chatController.setCurrentConversationAndLoad(
+        service.conversation,
+      );
+      await tester.pumpAndSettle();
 
-    expect(controller!.reasoning[service.older.id], isNull);
-    expect(controller!.toolParts[service.older.id], isNull);
+      expect(controller!.reasoning[service.older.id], isNull);
+      expect(controller!.toolParts[service.older.id], isNull);
 
-    await controller!.setSelectedVersion('answer', 0);
+      await controller!.setSelectedVersion('answer', 0);
 
-    expect(controller!.reasoning[service.older.id]?.text, 'old reasoning');
-    expect(controller!.toolParts[service.older.id]?.single.toolName, 'search');
+      expect(controller!.reasoning[service.older.id], isNull);
+      expect(controller!.toolParts[service.older.id], isNull);
 
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 }
 
 class _ControllerHarness extends StatefulWidget {

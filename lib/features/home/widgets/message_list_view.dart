@@ -10,6 +10,7 @@ import 'package:super_sliver_list/super_sliver_list.dart';
 
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/assistant.dart';
+import '../../../core/services/chat/chat_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../chat/widgets/chat_message_widget.dart';
@@ -42,6 +43,8 @@ typedef OnDeleteAllVersions =
       Map<String, List<ChatMessage>> byGroup,
     );
 typedef OnMessageFork = Future<void> Function(ChatMessage message);
+typedef OnConversationFork =
+    Future<void> Function(ChatMessage message, ConversationForkMode mode);
 typedef OnShareMessage =
     void Function(int messageIndex, List<ChatMessage> messages);
 typedef OnSelectMessages =
@@ -124,9 +127,11 @@ class MessageListView extends StatefulWidget {
     this.onTranslateMessage,
     this.onEditMessage,
     this.onSwitchMessageRole,
+    this.onDeleteMessageOnly,
     this.onDeleteMessage,
     this.onDeleteAllVersions,
     this.onMessageFork,
+    this.onConversationFork,
     this.onShareMessage,
     this.onSelectMessages,
     this.onSpeakMessage,
@@ -216,9 +221,11 @@ class MessageListView extends StatefulWidget {
   final OnTranslateMessage? onTranslateMessage;
   final OnEditMessage? onEditMessage;
   final OnSwitchMessageRole? onSwitchMessageRole;
+  final OnDeleteMessage? onDeleteMessageOnly;
   final OnDeleteMessage? onDeleteMessage;
   final OnDeleteAllVersions? onDeleteAllVersions;
   final OnMessageFork? onMessageFork;
+  final OnConversationFork? onConversationFork;
   final OnShareMessage? onShareMessage;
   final OnSelectMessages? onSelectMessages;
   final OnSpeakMessage? onSpeakMessage;
@@ -1720,9 +1727,12 @@ class _MessageListViewState extends State<MessageListView> {
           message,
           canDeleteAllVersions: siblingBranchIds.length > 1,
           canCreateBranch: widget.onMessageFork != null,
+          canCreateConversationFork: widget.onConversationFork != null,
         );
         if (action == MessageMoreAction.deleteCurrentVersion) {
           await widget.onDeleteMessage?.call(message, widget.byGroup);
+        } else if (action == MessageMoreAction.deleteMessageOnly) {
+          await widget.onDeleteMessageOnly?.call(message, widget.byGroup);
         } else if (action == MessageMoreAction.deleteAllVersions) {
           await widget.onDeleteAllVersions?.call(message, widget.byGroup);
         } else if (action == MessageMoreAction.edit) {
@@ -1733,6 +1743,18 @@ class _MessageListViewState extends State<MessageListView> {
           await widget.onSwitchMessageRole?.call(message, 'assistant');
         } else if (action == MessageMoreAction.messageFork) {
           await widget.onMessageFork?.call(message);
+        } else if (action ==
+            MessageMoreAction.conversationForkPreserveBranches) {
+          await widget.onConversationFork?.call(
+            message,
+            ConversationForkMode.preserveBranches,
+          );
+        } else if (action ==
+            MessageMoreAction.conversationForkActiveBranchOnly) {
+          await widget.onConversationFork?.call(
+            message,
+            ConversationForkMode.activeBranchOnly,
+          );
         } else if (action == MessageMoreAction.share) {
           widget.onShareMessage?.call(index, widget.messages);
         } else if (action == MessageMoreAction.selectMessages) {

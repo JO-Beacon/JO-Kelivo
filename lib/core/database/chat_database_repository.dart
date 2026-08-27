@@ -2719,6 +2719,8 @@ class ChatDatabaseRepository {
   /// [excludeConversationId] 则排除一个对话。两者都在 SQL 中应用，而不是由
   /// 调用方应用，因为候选 `LIMIT` 是全局的：匹配项排名低于截断值的对话
   /// 否则会被过滤到一条不剩。
+  ///
+  /// [assistantId] 非空时，只包含该助手拥有的会话和未归属的旧会话。
   Future<List<ConversationSearchMatch>> searchConversationMatches({
     required List<String> tokens,
     int limit = 200,
@@ -2726,6 +2728,7 @@ class ChatDatabaseRepository {
     bool includeAllRevisions = false,
     String? conversationId,
     String? excludeConversationId,
+    String? assistantId,
   }) {
     return _observer.measure(
       ChatDatabaseOperation.querySearch,
@@ -2736,9 +2739,142 @@ class ChatDatabaseRepository {
         includeAllRevisions: includeAllRevisions,
         conversationId: conversationId,
         excludeConversationId: excludeConversationId,
+        assistantId: assistantId,
       ),
       resultCount: (rows) => rows.length,
     );
+  }
+
+  /// 搜索会话当前可见版本，并返回用于 Mini Map 展示的文本片段。
+  Future<List<MiniMapSearchHit>> searchMiniMapMatches(
+    String conversationId,
+    String query, {
+    int snippetRadius = 40,
+    int snippetLength = 120,
+  }) {
+    return _observer.measure(
+      ChatDatabaseOperation.querySearch,
+      () => _searchMiniMapMatches(
+        conversationId,
+        query,
+        snippetRadius: snippetRadius,
+        snippetLength: snippetLength,
+      ),
+      resultCount: (rows) => rows.length,
+    );
+  }
+
+  Future<List<MiniMapSearchHit>> _searchMiniMapMatches(
+    String conversationId,
+    String query, {
+    required int snippetRadius,
+    required int snippetLength,
+  }) async {
+    final needle = query.trim().toLowerCase();
+    if (needle.isEmpty) return const <MiniMapSearchHit>[];
+    final radius = snippetRadius < 0 ? 0 : snippetRadius;
+    final length = miniMapSnippetLength(
+      needleLength: needle.length,
+      snippetRadius: snippetRadius,
+      snippetLength: snippetLength,
+    );
+    final rows = await _db
+        .customSelect(
+          '''
+          WITH group_rows AS (
+            SELECT
+              COALESCE(m.group_id, m.id) AS group_id,
+              MIN(m.message_order) AS anchor_order,
+              MAX(m.version) AS latest_version
+            FROM message_rows m
+            WHERE m.conversation_id = ?
+            GROUP BY COALESCE(m.group_id, m.id)
+          ),
+          selections AS (
+            SELECT j.key AS group_id, CAST(j.value AS INTEGER) AS version
+            FROM conversation_rows c, json_each(c.version_selections_json) j
+            WHERE c.id = ?
+          ),
+          ranked AS (
+            SELECT
+              m.id,
+              m.role,
+              COALESCE(m.group_id, m.id) AS group_id,
+              g.anchor_order,
+              ROW_NUMBER() OVER (
+                PARTITION BY g.group_id
+                ORDER BY
+                  CASE
+                    WHEN m.version = COALESCE(s.version, g.latest_version)
+                    THEN 0 ELSE 1
+                  END,
+                  m.version DESC,
+                  m.message_order DESC,
+                  m.id DESC
+              ) AS version_rank
+            FROM group_rows g
+            JOIN message_rows m
+              ON m.conversation_id = ?
+             AND COALESCE(m.group_id, m.id) = g.group_id
+            LEFT JOIN selections s ON s.group_id = g.group_id
+          ),
+          text_bodies AS (
+            SELECT revision_id, GROUP_CONCAT(payload, '') AS txt
+            FROM (
+              SELECT p.revision_id AS revision_id, p.payload AS payload
+              FROM message_part_rows p
+              WHERE p.conversation_id = ?
+                AND p.kind = 'text'
+              ORDER BY p.revision_id, p.ordinal
+            )
+            GROUP BY revision_id
+          ),
+          params AS (
+            SELECT ? AS needle, ? AS radius, ? AS snippet_len
+          )
+          SELECT
+            ranked.id AS message_id,
+            (LENGTH(t.txt) - LENGTH(REPLACE(LOWER(t.txt), p.needle, '')))
+              / LENGTH(p.needle) AS match_count,
+            SUBSTR(
+              t.txt,
+              MAX(1, INSTR(LOWER(t.txt), p.needle) - p.radius),
+              p.snippet_len
+            ) AS snippet,
+            MAX(1, INSTR(LOWER(t.txt), p.needle) - p.radius) AS snippet_start
+          FROM ranked
+          JOIN text_bodies t ON t.revision_id = ranked.id
+          CROSS JOIN params p
+          WHERE ranked.version_rank = 1
+            AND ranked.role IN ('user', 'assistant')
+            AND INSTR(LOWER(t.txt), p.needle) > 0
+          ORDER BY ranked.anchor_order, ranked.group_id;
+          ''',
+          variables: [
+            Variable<String>(conversationId),
+            Variable<String>(conversationId),
+            Variable<String>(conversationId),
+            Variable<String>(conversationId),
+            Variable<String>(needle),
+            Variable<int>(radius),
+            Variable<int>(length),
+          ],
+          readsFrom: {
+            _db.conversationRows,
+            _db.messageRows,
+            _db.messagePartRows,
+          },
+        )
+        .get();
+    return [
+      for (final row in rows)
+        MiniMapSearchHit(
+          messageId: row.read<String>('message_id'),
+          matchCount: row.read<int>('match_count'),
+          snippet: row.readNullable<String>('snippet') ?? '',
+          snippetStart: row.read<int>('snippet_start') - 1,
+        ),
+    ];
   }
 
   Future<List<ConversationSearchMatch>> _searchConversationMatches({
@@ -2748,6 +2884,7 @@ class ChatDatabaseRepository {
     required bool includeAllRevisions,
     String? conversationId,
     String? excludeConversationId,
+    String? assistantId,
   }) async {
     final cleanTokens = tokens
         .map((token) => token.trim().toLowerCase())
@@ -2834,6 +2971,10 @@ class ChatDatabaseRepository {
         excludeConversationId.isNotEmpty) {
       scopeSql = 'AND c.id <> ?';
       scopeArgs.add(excludeConversationId);
+    }
+    if (assistantId != null && assistantId.isNotEmpty) {
+      scopeSql += ' AND (c.assistant_id = ? OR c.assistant_id IS NULL)';
+      scopeArgs.add(assistantId);
     }
 
     final candidateLimit = (limit * candidateMultiplier)
@@ -3913,6 +4054,91 @@ class ChatDatabaseRepository {
           .insertOnConflictUpdate(_messageCompanion(message, order));
       await _replaceMessageParts(message);
       await _appendMessageToTree(message.conversationId, message.id);
+    });
+  }
+
+  /// 原子地复制一组消息和其上下文树到新会话。
+  ///
+  /// [sourceMessageIdByTargetId] 用于把结构化 parts、提供商产物、资源引用
+  /// 和提示词快照从旧修订映射到新修订。所有写入都在同一个事务中完成，复制
+  /// 中途失败时不会留下不完整的目标会话。
+  Future<void> putConversationTreeClone({
+    required Conversation conversation,
+    required List<ChatMessage> messages,
+    required Map<String, String> sourceMessageIdByTargetId,
+    required ConversationTree tree,
+  }) async {
+    if (conversation.id != tree.conversationId) {
+      throw ArgumentError('conversation_tree_clone_id_mismatch');
+    }
+    await _db.transaction(() async {
+      await _db
+          .into(_db.conversationRows)
+          .insert(_conversationCompanion(conversation));
+      for (var index = 0; index < conversation.mcpServerIds.length; index++) {
+        await _db
+            .into(_db.conversationMcpServerRows)
+            .insert(
+              ConversationMcpServerRowsCompanion.insert(
+                conversationId: conversation.id,
+                serverId: conversation.mcpServerIds[index],
+                ordinal: index,
+              ),
+            );
+      }
+
+      for (var index = 0; index < messages.length; index++) {
+        final message = messages[index];
+        if (message.conversationId != conversation.id) {
+          throw ArgumentError('conversation_tree_clone_message_id_mismatch');
+        }
+        await _db
+            .into(_db.messageRows)
+            .insert(_messageCompanion(message, index));
+      }
+
+      for (final message in messages) {
+        final sourceId = sourceMessageIdByTargetId[message.id];
+        if (sourceId == null) {
+          throw StateError('conversation_tree_clone_source_message_missing');
+        }
+        await _db.customStatement(
+          'INSERT INTO message_part_rows '
+          '(conversation_id, revision_id, ordinal, kind, payload, '
+          'created_at, updated_at) '
+          'SELECT ?, ?, ordinal, kind, payload, created_at, updated_at '
+          'FROM message_part_rows WHERE revision_id = ?;',
+          [conversation.id, message.id, sourceId],
+        );
+        await _db.customStatement(
+          'INSERT INTO provider_artifact_rows '
+          '(conversation_id, revision_id, kind, payload, created_at, updated_at) '
+          'SELECT ?, ?, kind, payload, created_at, updated_at '
+          'FROM provider_artifact_rows WHERE revision_id = ?;',
+          [conversation.id, message.id, sourceId],
+        );
+        await _db.customStatement(
+          'INSERT INTO message_asset_rows '
+          '(conversation_id, revision_id, asset_id, kind) '
+          'SELECT ?, ?, asset_id, kind FROM message_asset_rows '
+          'WHERE revision_id = ?;',
+          [conversation.id, message.id, sourceId],
+        );
+        await _db.customStatement(
+          'INSERT INTO message_prompt_rows '
+          '(revision_id, conversation_id, payload, carries_memory_snapshot, created_at) '
+          'SELECT ?, ?, payload, carries_memory_snapshot, created_at '
+          'FROM message_prompt_rows WHERE revision_id = ?;',
+          [message.id, conversation.id, sourceId],
+        );
+      }
+      await _db.customStatement(
+        'INSERT OR IGNORE INTO asset_reference_dirty_rows(revision_id) '
+        'SELECT DISTINCT revision_id FROM message_part_rows '
+        "WHERE conversation_id = ? AND kind IN ('image', 'file');",
+        [conversation.id],
+      );
+      await _writeConversationTree(tree);
     });
   }
 
@@ -6016,6 +6242,25 @@ class ChatDatabaseRepository {
     );
   }
 
+  /// 只删除 [messageId] 这一条消息，并把它的直接子节点重新挂到其父节点。
+  ///
+  /// 与 [deleteMessages] 不同，此方法不会级联删除后续消息。用于消息菜单中的
+  /// “删除此条消息”局部删除。
+  Future<DeletedMessagesResult?> deleteMessageOnly({
+    required String conversationId,
+    required String messageId,
+  }) {
+    return _observer.measure(
+      ChatDatabaseOperation.commandDeleteMessages,
+      () => _deleteMessages(
+        conversationId: conversationId,
+        messageIds: {messageId},
+        versionSelectionChanges: const {},
+        preserveDescendants: true,
+      ),
+    );
+  }
+
   Future<DeletedMessagesResult?> deleteMessages({
     required String conversationId,
     required Set<String> messageIds,
@@ -6037,6 +6282,7 @@ class ChatDatabaseRepository {
     required String conversationId,
     required Set<String> messageIds,
     required Map<String, int?> versionSelectionChanges,
+    bool preserveDescendants = false,
   }) async {
     if (messageIds.isEmpty) return null;
     for (final entry in versionSelectionChanges.entries) {
@@ -6071,7 +6317,9 @@ class ChatDatabaseRepository {
       );
       var treeAfterDelete = treeBeforeDelete;
       for (final row in requestedRows) {
-        treeAfterDelete = treeAfterDelete.deleteSubtree(row.id);
+        treeAfterDelete = preserveDescendants
+            ? treeAfterDelete.removeMessageOnly(row.id)
+            : treeAfterDelete.deleteSubtree(row.id);
       }
       final survivingEdges = treeAfterDelete.edges.keys.toSet();
       final effectiveMessageIds = treeBeforeDelete.edges.keys
@@ -7501,6 +7749,32 @@ class ConversationSearchMatch {
   final String? groupId;
   final int? version;
   final int? maxVersion;
+}
+
+class MiniMapSearchHit {
+  const MiniMapSearchHit({
+    required this.messageId,
+    required this.matchCount,
+    required this.snippet,
+    required this.snippetStart,
+  });
+
+  final String messageId;
+  final int matchCount;
+  final String snippet;
+  final int snippetStart;
+}
+
+/// 保证首个命中不会因为片段窗口太短而被截断。
+int miniMapSnippetLength({
+  required int needleLength,
+  int snippetRadius = 40,
+  int snippetLength = 120,
+}) {
+  final radius = snippetRadius < 0 ? 0 : snippetRadius;
+  final length = snippetLength < 0 ? 0 : snippetLength;
+  final needed = radius + needleLength;
+  return length < needed ? needed : length;
 }
 
 final class ChatStatsTotals {

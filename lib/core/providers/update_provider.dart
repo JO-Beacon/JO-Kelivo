@@ -95,9 +95,17 @@ class UpdateInfo {
     const prefix = r'jo-kelivo-v\d+\.\d+\.\d+(?:\+\d+)?';
     if (expectedVersion != null) {
       final match = RegExp(
-        r'^jo-kelivo-v(\d+\.\d+\.\d+)(?:\+\d+)?-',
+        r'^jo-kelivo-v(\d+\.\d+\.\d+(?:\+\d+)?)-',
       ).firstMatch(name);
-      if (match == null || match.group(1) != expectedVersion.toLowerCase()) {
+      if (match == null) {
+        return null;
+      }
+      final assetVersion = match.group(1)!;
+      final normalizedExpectedVersion = expectedVersion.toLowerCase();
+      final versionMatches = normalizedExpectedVersion.contains('+')
+          ? assetVersion == normalizedExpectedVersion
+          : assetVersion.split('+').first == normalizedExpectedVersion;
+      if (!versionMatches) {
         return null;
       }
     }

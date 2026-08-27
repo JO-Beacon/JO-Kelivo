@@ -6,7 +6,6 @@ class ChatInputOverlayLayout extends StatelessWidget {
     required this.topInset,
     required this.content,
     required this.bottomOverlay,
-    this.background,
     this.topBackground,
     this.foreground,
     this.backgroundImageActive = false,
@@ -18,7 +17,6 @@ class ChatInputOverlayLayout extends StatelessWidget {
   final double topInset;
   final Widget content;
   final Widget bottomOverlay;
-  final Widget? background;
   final Widget? topBackground;
   final Widget? foreground;
   final bool backgroundImageActive;
@@ -27,7 +25,6 @@ class ChatInputOverlayLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        if (background != null) Positioned.fill(child: background!),
         Positioned.fill(
           child: Stack(
             children: [
@@ -42,7 +39,7 @@ class ChatInputOverlayLayout extends StatelessWidget {
                       height: topInset + _topOverlayTailHeight,
                       child: IgnorePointer(
                         key: const Key('chat-input-overlay-top-background'),
-                        child: topBackground!,
+                        child: _KeyboardStableBackground(child: topBackground!),
                       ),
                     ),
                   ),
@@ -65,7 +62,7 @@ class ChatInputOverlayLayout extends StatelessWidget {
                       height: _bottomOverlayFadeHeight,
                       child: IgnorePointer(
                         key: const Key('chat-input-overlay-bottom-background'),
-                        child: topBackground!,
+                        child: _KeyboardStableBackground(child: topBackground!),
                       ),
                     ),
                   ),
@@ -91,6 +88,36 @@ class ChatInputOverlayLayout extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Keeps background artwork laid out at the pre-keyboard height. The Scaffold
+/// body shrinks when the IME opens; allowing the extra height to overflow
+/// prevents a BoxFit.cover image from being re-cropped and jumping upward.
+class _KeyboardStableBackground extends StatelessWidget {
+  const _KeyboardStableBackground({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (!constraints.hasBoundedHeight) return child;
+          final view = View.of(context);
+          final bottomInset = view.viewInsets.bottom / view.devicePixelRatio;
+          if (bottomInset <= 0) return child;
+          final height = constraints.maxHeight + bottomInset;
+          return OverflowBox(
+            alignment: Alignment.topCenter,
+            minHeight: height,
+            maxHeight: height,
+            child: child,
+          );
+        },
+      ),
     );
   }
 }

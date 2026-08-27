@@ -479,7 +479,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
       try {
         final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
         if (u != null) {
-          totalUsage = (totalUsage ?? const TokenUsage()).merge(
+          totalUsage = (totalUsage ?? const TokenUsage()).accumulate(
             _claudeUsageFromMap(u),
           );
         }
@@ -972,7 +972,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
     }
 
     if (usage != null) {
-      totalUsage = (totalUsage ?? const TokenUsage()).merge(usage);
+      totalUsage = (totalUsage ?? const TokenUsage()).accumulate(usage);
     }
 
     if (anthToolUse.isEmpty) {

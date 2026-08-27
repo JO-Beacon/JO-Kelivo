@@ -11,7 +11,10 @@ import '../services/debug_conversation_factory.dart';
 import '../../../theme/app_font_weights.dart';
 
 class DebugPage extends StatefulWidget {
-  const DebugPage({super.key});
+  const DebugPage({super.key, this.embedded = false});
+
+  /// 桌面设置页将调试工具嵌入右侧内容区；移动端仍使用独立页面。
+  final bool embedded;
 
   @override
   State<DebugPage> createState() => _DebugPageState();
@@ -154,6 +157,86 @@ class _DebugPageState extends State<DebugPage> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
+    final section = _DebugSectionCard(
+      title: l10n.debugPageConversationToolsTitle,
+      children: [
+        IosTileButton(
+          key: debugCreateOversizedConversationButtonKey,
+          label: _runningAction == _DebugAction.oversized
+              ? l10n.debugPageCreatingButton
+              : l10n.debugPageCreateOversizedConversationButton,
+          icon: Lucide.Database,
+          backgroundColor: cs.primary,
+          enabled: !_isBusy,
+          onTap: _createOversizedConversation,
+        ),
+        const SizedBox(height: 12),
+        IosTileButton(
+          key: debugCreateManyMessagesConversationButtonKey,
+          label: _runningAction == _DebugAction.manyMessages
+              ? l10n.debugPageCreatingButton
+              : l10n.debugPageCreateManyMessagesConversationButton,
+          icon: Lucide.MessagesSquare,
+          backgroundColor: cs.primary,
+          enabled: !_isBusy,
+          onTap: _createManyMessagesConversation,
+        ),
+        const SizedBox(height: 12),
+        IosTileButton(
+          key: debugCreateDailyMixedMarkdownConversationButtonKey,
+          label: _runningAction == _DebugAction.dailyMixedMarkdown
+              ? l10n.debugPageCreatingButton
+              : l10n.debugPageCreateDailyMixedMarkdownConversationButton,
+          icon: Lucide.FileText,
+          backgroundColor: cs.primary,
+          enabled: !_isBusy,
+          onTap: _createDailyMixedMarkdownConversation,
+        ),
+        const SizedBox(height: 12),
+        IosTileButton(
+          key: debugCreateLongReasoningConversationButtonKey,
+          label: _runningAction == _DebugAction.longReasoning
+              ? l10n.debugPageCreatingButton
+              : l10n.debugPageCreateLongReasoningConversationButton,
+          icon: Lucide.Brain,
+          backgroundColor: cs.primary,
+          enabled: !_isBusy,
+          onTap: _createLongReasoningConversation,
+        ),
+      ],
+    );
+
+    if (widget.embedded) {
+      return Container(
+        alignment: Alignment.topCenter,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 960),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  height: 36,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      l10n.debugPageTitle,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: cs.onSurface.withValues(alpha: 0.9),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                section,
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -166,56 +249,7 @@ class _DebugPageState extends State<DebugPage> {
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
-        children: [
-          _DebugSectionCard(
-            title: l10n.debugPageConversationToolsTitle,
-            children: [
-              IosTileButton(
-                key: debugCreateOversizedConversationButtonKey,
-                label: _runningAction == _DebugAction.oversized
-                    ? l10n.debugPageCreatingButton
-                    : l10n.debugPageCreateOversizedConversationButton,
-                icon: Lucide.Database,
-                backgroundColor: cs.primary,
-                enabled: !_isBusy,
-                onTap: _createOversizedConversation,
-              ),
-              const SizedBox(height: 12),
-              IosTileButton(
-                key: debugCreateManyMessagesConversationButtonKey,
-                label: _runningAction == _DebugAction.manyMessages
-                    ? l10n.debugPageCreatingButton
-                    : l10n.debugPageCreateManyMessagesConversationButton,
-                icon: Lucide.MessagesSquare,
-                backgroundColor: cs.primary,
-                enabled: !_isBusy,
-                onTap: _createManyMessagesConversation,
-              ),
-              const SizedBox(height: 12),
-              IosTileButton(
-                key: debugCreateDailyMixedMarkdownConversationButtonKey,
-                label: _runningAction == _DebugAction.dailyMixedMarkdown
-                    ? l10n.debugPageCreatingButton
-                    : l10n.debugPageCreateDailyMixedMarkdownConversationButton,
-                icon: Lucide.FileText,
-                backgroundColor: cs.primary,
-                enabled: !_isBusy,
-                onTap: _createDailyMixedMarkdownConversation,
-              ),
-              const SizedBox(height: 12),
-              IosTileButton(
-                key: debugCreateLongReasoningConversationButtonKey,
-                label: _runningAction == _DebugAction.longReasoning
-                    ? l10n.debugPageCreatingButton
-                    : l10n.debugPageCreateLongReasoningConversationButton,
-                icon: Lucide.Brain,
-                backgroundColor: cs.primary,
-                enabled: !_isBusy,
-                onTap: _createLongReasoningConversation,
-              ),
-            ],
-          ),
-        ],
+        children: [section],
       ),
     );
   }

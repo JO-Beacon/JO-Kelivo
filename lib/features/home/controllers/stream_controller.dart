@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../core/models/message_part.dart';
 import '../../../core/models/token_usage.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
@@ -344,29 +345,20 @@ class StreamController {
         )
         .toList();
 
-    if (contentSplitOffsets == null &&
-        reasoningCountAtSplit == null &&
-        toolCountAtSplit == null &&
-        reasoningDetails == null) {
+    final splits = validateContentSplits(
+      contentSplitOffsets,
+      reasoningCountAtSplit,
+      toolCountAtSplit,
+    );
+
+    if (splits == null && reasoningDetails == null) {
       return _encodeJson(list);
     }
-
-    final normalized = _normalizeContentSplitData(
-      ContentSplitData(
-        offsets: List<int>.of(contentSplitOffsets ?? const <int>[]),
-        reasoningCounts: List<int>.of(reasoningCountAtSplit ?? const <int>[]),
-        toolCounts: List<int>.of(toolCountAtSplit ?? const <int>[]),
-      ),
-    );
 
     return _encodeJson({
       'v': 2,
       'segments': list,
-      'contentSplits': {
-        'offsets': normalized.offsets,
-        'reasoningCounts': normalized.reasoningCounts,
-        'toolCounts': normalized.toolCounts,
-      },
+      if (splits != null) 'contentSplits': splits.toJson(),
       if (reasoningDetails != null) 'reasoningDetails': reasoningDetails,
     });
   }
@@ -387,14 +379,21 @@ class StreamController {
   }
 
   static ContentSplitData _normalizeContentSplitData(ContentSplitData data) {
-    final length = math.min(
-      data.offsets.length,
-      math.min(data.reasoningCounts.length, data.toolCounts.length),
-    );
+    if (!contentSplitsAreUsable(
+      data.offsets,
+      data.reasoningCounts,
+      data.toolCounts,
+    )) {
+      return const ContentSplitData(
+        offsets: <int>[],
+        reasoningCounts: <int>[],
+        toolCounts: <int>[],
+      );
+    }
     return ContentSplitData(
-      offsets: List<int>.of(data.offsets.take(length)),
-      reasoningCounts: List<int>.of(data.reasoningCounts.take(length)),
-      toolCounts: List<int>.of(data.toolCounts.take(length)),
+      offsets: List<int>.of(data.offsets),
+      reasoningCounts: List<int>.of(data.reasoningCounts),
+      toolCounts: List<int>.of(data.toolCounts),
     );
   }
 
@@ -618,6 +617,26 @@ class StreamController {
       return;
     }
     if (hadDirtyReasoning) onStreamTick?.call();
+  }
+
+  /// 在流结束前让平滑缓冲按正常节奏追上，避免 cleanup 时一次性倾倒尾部。
+  Future<void> drainSmoothStream(
+    String messageId, {
+    Duration budget = const Duration(milliseconds: 400),
+  }) async {
+    final state = _streamSmoothStates[messageId];
+    if (state == null) return;
+    _applyContentBuilder(state);
+    if (getCurrentConversationId() != state.conversationId) return;
+    final maxTicks =
+        budget.inMicroseconds ~/ _streamThrottleInterval.inMicroseconds;
+    for (var tick = 0; tick < maxTicks; tick++) {
+      if (state.targetContent == state.visibleContent) return;
+      await Future<void>.delayed(_streamThrottleInterval);
+      if (!identical(_streamSmoothStates[messageId], state)) return;
+      if (_streamThrottleTimers[messageId] == null) return;
+      if (getCurrentConversationId() != state.conversationId) return;
+    }
   }
 
   void _publishSmoothStreamContent(
@@ -1455,6 +1474,27 @@ class ContentSplitData {
   final List<int> offsets;
   final List<int> reasoningCounts;
   final List<int> toolCounts;
+
+  Map<String, List<int>> toJson() => {
+    'offsets': offsets,
+    'reasoningCounts': reasoningCounts,
+    'toolCounts': toolCounts,
+  };
+}
+
+ContentSplitData? validateContentSplits(
+  List<int>? offsets,
+  List<int>? reasoningCounts,
+  List<int>? toolCounts,
+) {
+  if (!contentSplitsAreUsable(offsets, reasoningCounts, toolCounts)) {
+    return null;
+  }
+  return ContentSplitData(
+    offsets: List<int>.of(offsets!),
+    reasoningCounts: List<int>.of(reasoningCounts!),
+    toolCounts: List<int>.of(toolCounts!),
+  );
 }
 
 /// 对持久化 reasoningSegmentsJson 负载的所有视图，
@@ -1480,13 +1520,11 @@ class _DecodedReasoningPayload {
       final decoded = _jsonDecode(source);
       if (decoded is Map<String, dynamic>) {
         final list = decoded['segments'] as List? ?? const [];
-        final contentSplits = (decoded['contentSplits'] as Map?)
-            ?.cast<String, dynamic>();
         final details = decoded['reasoningDetails'];
         return _DecodedReasoningPayload._(
           source,
           _parseSegments(list),
-          contentSplits == null ? null : _parseContentSplits(contentSplits),
+          _tryParseContentSplits(decoded['contentSplits']),
           details is List && details.isNotEmpty ? details : null,
         );
       }
@@ -1526,19 +1564,13 @@ class _DecodedReasoningPayload {
     }).toList();
   }
 
-  static ContentSplitData _parseContentSplits(Map<String, dynamic> json) {
-    return StreamController._normalizeContentSplitData(
-      ContentSplitData(
-        offsets: (json['offsets'] as List? ?? const [])
-            .map((item) => item as int)
-            .toList(),
-        reasoningCounts: (json['reasoningCounts'] as List? ?? const [])
-            .map((item) => item as int)
-            .toList(),
-        toolCounts: (json['toolCounts'] as List? ?? const [])
-            .map((item) => item as int)
-            .toList(),
-      ),
+  static ContentSplitData? _tryParseContentSplits(dynamic raw) {
+    final parsed = tryParseContentSplits(raw);
+    if (parsed == null) return null;
+    return ContentSplitData(
+      offsets: parsed.offsets,
+      reasoningCounts: parsed.reasoningCounts,
+      toolCounts: parsed.toolCounts,
     );
   }
 }
@@ -1565,6 +1597,7 @@ class _StreamSmoothState {
   void Function(String messageId, String content, int totalTokens)?
   updateMessageInList;
   final List<int> _recentPickCounts = <int>[];
+  int _lastPickCount = 0;
 
   String? takeNextContentSlice({
     required int minCount,
@@ -1577,6 +1610,7 @@ class _StreamSmoothState {
     if (!targetContent.startsWith(visibleContent)) {
       visibleContent = targetContent;
       _recentPickCounts.clear();
+      _lastPickCount = 0;
       return visibleContent;
     }
 
@@ -1602,6 +1636,7 @@ class _StreamSmoothState {
     if (targetContent == visibleContent) return null;
     visibleContent = targetContent;
     _recentPickCounts.clear();
+    _lastPickCount = 0;
     return visibleContent;
   }
 
@@ -1629,7 +1664,17 @@ class _StreamSmoothState {
 
     final average =
         _recentPickCounts.reduce((a, b) => a + b) / _recentPickCounts.length;
-    return average.round().clamp(minCount, backlog).toInt();
+    final previous = _lastPickCount;
+    final accelerationLimit = previous <= minCount
+        ? maxCount
+        : math.max(minCount, (previous * 1.5).round());
+    final limit = math.min(maxCount, accelerationLimit);
+    final next = math
+        .min(average.round(), limit)
+        .clamp(minCount, backlog)
+        .toInt();
+    _lastPickCount = next;
+    return next;
   }
 
   int _rawPickCount({

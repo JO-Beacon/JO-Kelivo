@@ -250,6 +250,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceClearLegacyChatDataButton => '清理旧聊天记录';
 
   @override
+  String get storageSpaceExportLegacyChatFileButton => '导出';
+
+  @override
+  String storageSpaceExportDone(String fileName) {
+    return '已导出 $fileName';
+  }
+
+  @override
+  String storageSpaceExportFailed(String error) {
+    return '导出失败：$error';
+  }
+
+  @override
   String get storageSpaceClearLegacyChatDataConfirmMessage =>
       '确定清理保留的旧聊天文件吗？当前 SQLite 聊天记录不会受到影响。';
 
@@ -665,16 +678,23 @@ class AppLocalizationsZh extends AppLocalizations {
   String get userProviderDefaultUserName => '用户';
 
   @override
-  String get homePageDeleteMessage => '删除消息';
+  String get homePageDeleteMessage => '删除当前分支';
 
   @override
-  String get homePageDeleteMessageConfirm => '确定要删除这条消息及其后续分支吗？此操作不可撤销。';
+  String get homePageDeleteMessageConfirm => '确定要删除当前分支及其后续消息吗？其他分支会保留。';
 
   @override
-  String get homePageDeleteAllVersions => '删除分支';
+  String get homePageDeleteMessageOnly => '删除此条消息';
 
   @override
-  String get homePageDeleteAllVersionsConfirm => '确定要删除这条分支及其后代吗？其他分支会保留。';
+  String get homePageDeleteMessageOnlyConfirm => '确定要删除这条消息吗？后续消息会保留。';
+
+  @override
+  String get homePageDeleteAllVersions => '删除所有分支';
+
+  @override
+  String get homePageDeleteAllVersionsConfirm =>
+      '确定要删除该分叉点的所有分支及其后续消息吗？此操作不可撤销。';
 
   @override
   String get homePageCancel => '取消';
@@ -1663,6 +1683,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String backupPageExportFailedMessage(String error) {
+    return '导出失败：$error';
+  }
+
+  @override
   String get backupPageOK => '好的';
 
   @override
@@ -1955,13 +1980,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageEditPageTitle => '编辑消息';
 
   @override
-  String get messageEditPageSave => '保存';
+  String get messageEditPageSaveAsBranch => '保存为新分支';
 
   @override
-  String get messageEditPageSaveAndSend => '保存并发送';
+  String get messageEditPageSaveAsBranchAndSend => '保存为新分支并发送';
+
+  @override
+  String get messageEditPageOverwriteSave => '覆盖保存';
 
   @override
   String get messageEditPageHint => '输入消息内容…';
+
+  @override
+  String get messageEditTrimWhitespace => '清理首尾空白';
 
   @override
   String get messageEditAttachmentsTitle => '附件';
@@ -1993,19 +2024,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageEditAttachmentCopyFailed => '无法复制所选附件';
 
   @override
-  String get messageEditCloseConfirmTitle => '要保存修改吗？';
+  String get messageEditCloseConfirmTitle => '关闭而不保存？';
 
   @override
-  String get messageEditCloseConfirmContent => '关闭前要保存这次编辑吗？';
+  String get messageEditCloseConfirmContent => '当前修改将被丢弃。';
 
   @override
   String get messageEditCloseConfirmCancel => '取消';
 
   @override
-  String get messageEditCloseConfirmDiscard => '不保存';
-
-  @override
-  String get messageEditCloseConfirmSave => '保存';
+  String get messageEditCloseConfirmConfirm => '确认';
 
   @override
   String get selectCopyPageTitle => '选择复制';
@@ -2089,6 +2117,32 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compressContextStartButton => '开始压缩';
 
   @override
+  String get compressContextModelLabel => '压缩模型';
+
+  @override
+  String get compressContextModelUnset => '选择模型';
+
+  @override
+  String get compressContextKeepRecentMessages => '保留N条';
+
+  @override
+  String get compressContextKeepCountLabel => '保留最近条数';
+
+  @override
+  String get compressContextKeepAllMessages => '保留条数覆盖全部消息，无内容可压缩';
+
+  @override
+  String compressContextEstimatePreview(
+    int summarized,
+    int kept,
+    int minTokens,
+    int maxTokens,
+    int totalTokens,
+  ) {
+    return '总结 $summarized 字符，原样保留 $kept 字符 → 压缩后约 $minTokens–$maxTokens tokens（原文约 $totalTokens tokens）';
+  }
+
+  @override
   String get bottomToolsSheetLearningMode => '学习模式';
 
   @override
@@ -2143,10 +2197,23 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageMoreSheetCreateMessageBranch => '创建消息分支';
 
   @override
-  String get messageMoreSheetDelete => '删除消息';
+  String get messageMoreSheetCopyFromHereWithBranches => '从此处复制到新会话（保留分支）';
 
   @override
-  String get messageMoreSheetDeleteAllVersions => '删除分支';
+  String get messageMoreSheetCopyFromHereCurrentBranchOnly =>
+      '从此处复制到新会话（仅当前分支）';
+
+  @override
+  String get conversationForkFailed => '无法复制会话';
+
+  @override
+  String get messageMoreSheetDeleteMessageOnly => '删除此条消息';
+
+  @override
+  String get messageMoreSheetDelete => '删除当前分支';
+
+  @override
+  String get messageMoreSheetDeleteAllVersions => '删除所有分支';
 
   @override
   String get reasoningBudgetSheetOff => '关闭';
@@ -2513,6 +2580,55 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String imagePreviewSheetSaveFailed(String error) {
     return '保存失败: $error';
+  }
+
+  @override
+  String get sideDrawerMenuSelect => '多选';
+
+  @override
+  String sideDrawerSelectionTitle(int count) {
+    return '已选 $count 项';
+  }
+
+  @override
+  String get sideDrawerSelectionSelectAll => '全选';
+
+  @override
+  String get sideDrawerSelectionDeselectAll => '取消全选';
+
+  @override
+  String get sideDrawerSelectionPin => '置顶';
+
+  @override
+  String get sideDrawerSelectionUnpin => '取消置顶';
+
+  @override
+  String get sideDrawerSelectionMove => '移动';
+
+  @override
+  String get sideDrawerSelectionDelete => '删除';
+
+  @override
+  String get sideDrawerSelectionDeleteConfirmTitle => '删除话题';
+
+  @override
+  String sideDrawerSelectionDeleteConfirmContent(int count) {
+    return '确定删除 $count 个话题？';
+  }
+
+  @override
+  String sideDrawerDeleteSelectedSnackbar(int count) {
+    return '已删除 $count 个话题';
+  }
+
+  @override
+  String sideDrawerMoveSelectedSnackbar(int count) {
+    return '已移动 $count 个话题';
+  }
+
+  @override
+  String sideDrawerMoveSelectedWithSkippedSnackbar(int moved, int skipped) {
+    return '已移动 $moved 个话题，跳过 $skipped 个正在生成的话题';
   }
 
   @override
@@ -3237,6 +3353,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelDetailSheetOpenaiImageGenerationToolDescription => '启用图像生成工具';
 
   @override
+  String get modelDetailSheetOpenRouterWebFetchTool => '网页获取';
+
+  @override
+  String get modelDetailSheetOpenRouterWebFetchToolDescription =>
+      '允许 OpenRouter 代模型获取网页内容。';
+
+  @override
+  String get modelDetailSheetOpenRouterShellTool => 'Shell';
+
+  @override
+  String get modelDetailSheetOpenRouterShellToolDescription =>
+      '在 Responses 模式中允许 OpenRouter 服务端 Shell 工具。';
+
+  @override
   String get modelDetailSheetCancelButton => '取消';
 
   @override
@@ -3793,6 +3923,26 @@ class AppLocalizationsZh extends AppLocalizations {
   String get miniMapScrollToBottomTooltip => '滚动到底部';
 
   @override
+  String miniMapSearchMatchCount(int count) {
+    return '$count 处';
+  }
+
+  @override
+  String get miniMapSearchNoResults => '没有匹配的消息';
+
+  @override
+  String get miniMapFullWindow => '全窗口显示';
+
+  @override
+  String get miniMapRestoreWindow => '恢复窗口大小';
+
+  @override
+  String get miniMapActualSizeTooltip => '100%';
+
+  @override
+  String get miniMapFitHorizontalTooltip => '横向全览';
+
+  @override
   String get treeBranchPanelTitle => '上下文分支';
 
   @override
@@ -4331,6 +4481,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageEnterToSendTitle => '回车键发送消息';
 
   @override
+  String get displaySettingsPageLongPasteAsFileTitle => '超长粘贴转为文件';
+
+  @override
+  String get displaySettingsPageLongPasteAsFileThresholdTitle => '转换阈值';
+
+  @override
+  String get displaySettingsPageLongPasteAsFileThresholdUnit => '字符';
+
+  @override
   String get displaySettingsPageSendShortcutTitle => '发送快捷键';
 
   @override
@@ -4419,12 +4578,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get fontPickerChooseLocalFile => '选择本地文件';
-
-  @override
-  String get fontPickerGetFromGoogleFonts => '从 Google Fonts 获取';
-
-  @override
-  String get fontPickerFilterHint => '输入以过滤字体…';
 
   @override
   String get desktopFontLoading => '正在加载字体…';
@@ -5771,6 +5924,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get contextLogSourceToolResult => '工具结果';
 
   @override
+  String get contextLogTokensEstimateHint => 'tokens 仅为预估值，请以模型实际消耗为准。';
+
+  @override
   String contextLogSnapshotsCount(int count) {
     return '$count 条快照';
   }
@@ -5934,24 +6090,82 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homePageProcessingFiles => '正在解析文件……';
 
   @override
-  String get fileUploadDuplicateTitle => '文件已存在';
-
-  @override
-  String fileUploadDuplicateContent(String fileName) {
-    return '检测到同名文件 $fileName，是否使用已有文件？';
-  }
-
-  @override
-  String get fileUploadDuplicateUseExisting => '使用已有';
-
-  @override
-  String get fileUploadDuplicateUploadNew => '重新上传';
-
-  @override
   String get settingsPageWorldBook => '世界书';
 
   @override
   String get settingsPageMemory => '记忆';
+
+  @override
+  String get memorySettingsModeSection => '记忆模式';
+
+  @override
+  String get memorySettingsGlobalSubtitle => '记忆模式、模型与提示词';
+
+  @override
+  String get memorySettingsLegacyPromptTitle => '旧版记忆规则';
+
+  @override
+  String get memorySettingsLegacySection => '旧版记忆';
+
+  @override
+  String get memorySettingsInjectionSection => '记忆注入';
+
+  @override
+  String get memorySettingsInjectionMaxItemsTitle => '每类注入条数';
+
+  @override
+  String get memorySettingsInjectionMaxItemsSubtitle =>
+      '某类记忆超过此上限时，只注入最新条目，其余内容可通过 memory_search_profile 查询。数值越大越完整，但会占用更多 token。';
+
+  @override
+  String get memorySettingsInjectionMaxItemsCustomButton => '自定义';
+
+  @override
+  String get memorySettingsInjectionMaxItemsCustomTitle => '自定义注入条数';
+
+  @override
+  String get memorySettingsInjectionMaxItemsCustomLabel => '条数';
+
+  @override
+  String get memorySettingsInjectionMaxItemsCustomHint => '1-100';
+
+  @override
+  String get memorySettingsInjectionMaxItemsCustomDescription =>
+      '请输入 1 到 100 之间的整数。';
+
+  @override
+  String get memorySettingsInjectionMaxItemsCustomInvalid =>
+      '请输入 1 到 100 之间的整数';
+
+  @override
+  String get memoryPromptEditMigrateTitle => '旧版记忆迁移';
+
+  @override
+  String get memoryPromptEditMigrateSubtitle => '迁移时使用模型整理记忆措辞';
+
+  @override
+  String get memorySettingsMigrationBatchSizeSubtitle =>
+      '每次模型请求处理的旧版记忆数量（1-24）';
+
+  @override
+  String get legacyMemoryMigrationContentMode => '内容处理';
+
+  @override
+  String get legacyMemoryMigrationContentPreserve => '保留原文';
+
+  @override
+  String get legacyMemoryMigrationContentPreserveDescription =>
+      '模型只负责分类，保存时完整保留原来的措辞。';
+
+  @override
+  String get legacyMemoryMigrationContentOrganize => '模型整理';
+
+  @override
+  String get legacyMemoryMigrationContentOrganizeDescription =>
+      '模型使用可编辑的迁移提示词，对每条记忆分类并重新整理措辞。';
+
+  @override
+  String get legacyMemoryMigrationBatchSize => '每批条数';
 
   @override
   String get memorySettingsPageTitle => '记忆';
@@ -5977,6 +6191,58 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get memorySettingsAboutBody =>
       '记忆如何运作\n记忆按「身份 / 工作流 / 语气 / 指令」分类，并区分全局与助手范围。对话时，相关记忆会注入模型上下文；条目较多时先展示摘要，模型可用工具继续查询更多内容。\n\n后台如何处理、如何触发\n处理模型用于后台整理管线：判断是否值得记忆、提取候选、去重合并，必要时再提炼用户画像。助手开启「自动整理」后，会按设定轮数在对话结束后自动触发；也可在助手「记忆」页手动整理。因此该模型会被较频繁调用。\n\n如何保持缓存良好\n尽量让注入对话的记忆前缀保持稳定，避免无意义的大批量改动或频繁重排，有助于 Prompt 缓存命中，从而降低费用与延迟。日常增删改单条记忆通常影响有限。';
+
+  @override
+  String get memoryAboutQuickstartTitle => '三步上手';
+
+  @override
+  String get memoryAboutQuickstartBody =>
+      '① 在「设置 → 记忆」里选择处理模型。\n② 在助手的「记忆」页打开长期记忆和自动整理。\n③ 聊几轮，或点「整理记忆」，再到「全部记忆」查看结果。';
+
+  @override
+  String get memoryAboutTypesTitle => '记忆类型';
+
+  @override
+  String get memoryAboutTypesBody =>
+      '身份：用户的稳定信息，例如称呼、职业、语言、长期偏好。写成完整的第三人称陈述。\n\n工作流：用户习惯怎么做事，例如工具、格式、审阅方式。\n\n语气：用户希望助手怎么说话，例如语气、篇幅、语言风格。\n\n指令：助手应长期遵守的规则，而不是本次对话里的一次性任务。';
+
+  @override
+  String get memoryAboutScopeTitle => '全局与助手范围';
+
+  @override
+  String get memoryAboutScopeBody =>
+      '全局记忆会对所有助手注入。助手范围的记忆只对该助手可见。跨助手都该知道的事实用全局；只属于某一个助手的规则或上下文用助手范围。';
+
+  @override
+  String get memoryAboutInjectionTitle => '记忆如何注入';
+
+  @override
+  String get memoryAboutInjectionBody =>
+      '开对话时，每类会把最近的若干条放进模型上下文。某类超过注入上限时，块会标上 mode=\"summary\"，并用 total / shown 标明总数与展示条数，其余由模型用 memory_search_profile 按需查询。可在「设置 → 记忆」调大上限，更全面但更费 token。';
+
+  @override
+  String get memoryAboutPipelineTitle => '后台整理';
+
+  @override
+  String get memoryAboutPipelineBody =>
+      '开启自动整理后，对话结束会走：判断是否值得记 → 提取候选 → 去重合并 → 必要时把身份类记忆提炼进用户画像。也可以在助手「记忆」页点「整理记忆」。因此处理模型会被较频繁调用。';
+
+  @override
+  String get memoryAboutCacheTitle => '保持缓存良好';
+
+  @override
+  String get memoryAboutCacheBody =>
+      '注入前缀会保持稳定，未改动时可复用 Prompt 缓存，从而降低费用与延迟。避免无意义的大批量改动或重排。日常增删改单条通常影响有限。';
+
+  @override
+  String get memoryAboutFaqTitle => '常见问题';
+
+  @override
+  String get memoryAboutFaqWhyNotRememberedTitle => '为什么没记住？';
+
+  @override
+  String get memoryAboutFaqWhyNotRememberedBody =>
+      '整理会被跳过，常见原因包括：新消息不足，暂不整理；没有新消息需要整理；尚未选择记忆处理模型。临时对话不会写入记忆。也可以按助手关闭记忆或自动整理。';
 
   @override
   String get memorySettingsThinkingTitle => '启用思考';
@@ -6255,6 +6521,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get memoryOrganizeStatusSkipped => '无需记忆';
 
   @override
+  String memoryOrganizeStatusSkippedReason(String reason) {
+    return '已跳过：$reason';
+  }
+
+  @override
   String memoryOrganizeStatusFailed(String reason) {
     return '失败：$reason';
   }
@@ -6336,6 +6607,81 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get userProfileEmptyValue => '未设置';
+
+  @override
+  String get memoryOutcomeAssistantMissing => '找不到助手';
+
+  @override
+  String get memoryOutcomeAutoOrganizeOff => '自动整理已关闭';
+
+  @override
+  String get memoryOutcomeBelowThreshold => '新消息不足，暂不整理';
+
+  @override
+  String get memoryOutcomeChatSearchUnavailable => '对话搜索不可用';
+
+  @override
+  String get memoryOutcomeConversationMissing => '找不到对话';
+
+  @override
+  String get memoryOutcomeDistillFailed => '用户画像提炼失败';
+
+  @override
+  String get memoryOutcomeEmptyWindow => '没有新消息需要整理';
+
+  @override
+  String get memoryOutcomeExtractParseFailed => '提取记忆的回复无法解析';
+
+  @override
+  String get memoryOutcomeExtractRequestFailed => '提取记忆时，无法请求记忆模型';
+
+  @override
+  String get memoryOutcomeGateParseFailed => '判断是否值得记忆的回复无法解析';
+
+  @override
+  String get memoryOutcomeGateRequestFailed => '判断是否值得记忆时，无法请求记忆模型';
+
+  @override
+  String get memoryOutcomeInvalidMemoryContent => '记忆内容无效';
+
+  @override
+  String get memoryOutcomeInvalidMemoryId => '记忆 ID 无效';
+
+  @override
+  String get memoryOutcomeInvalidMemoryType => '记忆类型无效';
+
+  @override
+  String get memoryOutcomeInvalidProfileFields => '画像字段无效';
+
+  @override
+  String get memoryOutcomeInvalidQuery => '查询无效';
+
+  @override
+  String get memoryOutcomeMemoryDisabled => '该助手已关闭记忆';
+
+  @override
+  String get memoryOutcomeMemoryExecutionError => '记忆工具执行失败';
+
+  @override
+  String get memoryOutcomeMemoryModelMissing => '所选记忆模型已不可用';
+
+  @override
+  String get memoryOutcomeMemoryModelUnset => '尚未选择记忆处理模型';
+
+  @override
+  String get memoryOutcomeMemoryNotFound => '找不到这条记忆';
+
+  @override
+  String get memoryOutcomeQueueOverflow => '整理队列已满，本次任务被丢弃';
+
+  @override
+  String get memoryOutcomeStreaming => '回复仍在生成，已跳过整理';
+
+  @override
+  String get memoryOutcomeTemporaryConversation => '临时对话不会写入记忆';
+
+  @override
+  String get memoryOutcomeUnsupportedTool => '不支持的记忆工具';
 
   @override
   String get legacyMemoryPageTitle => '旧版记忆';
@@ -6428,6 +6774,28 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get legacyMemoryMigrationFailed => '迁移已停止。可以重试，已保存的记忆会自动跳过。';
+
+  @override
+  String get legacyMemoryMigrationContinue => '继续迁移';
+
+  @override
+  String get legacyMemoryMigrationErrorAuth => '鉴权失败，请检查 API 密钥。';
+
+  @override
+  String get legacyMemoryMigrationErrorFormat => '模型返回格式不正确。';
+
+  @override
+  String get legacyMemoryMigrationErrorNetwork => '网络异常，请检查连接后重试。';
+
+  @override
+  String legacyMemoryMigrationErrorOther(String message) {
+    return '迁移失败：$message';
+  }
+
+  @override
+  String legacyMemoryMigrationPartial(int created, int skipped, int failed) {
+    return '已迁移 $created · 跳过 $skipped · 失败 $failed';
+  }
 
   @override
   String get legacyMemoryMigrationRetry => '重试';
@@ -7385,6 +7753,72 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get sqliteMigrationRestartButton => '重启 JO-AIClient';
+
+  @override
+  String get messageStyleSettingsPageTitle => '消息样式';
+
+  @override
+  String get messageStyleSettingsPageReset => '重置';
+
+  @override
+  String get messageStyleSettingsPageResetConfirm => '恢复全部消息样式自定义？';
+
+  @override
+  String get messageStyleSettingsPageCancel => '取消';
+
+  @override
+  String get messageStyleSettingsPageLight => '浅色';
+
+  @override
+  String get messageStyleSettingsPageDark => '深色';
+
+  @override
+  String get messageStyleSettingsPageDefaultHint => '默认样式跟随当前主题，没有可调参数。';
+
+  @override
+  String get messageStyleSettingsPageStyleDefaultSubtitle => '跟随主题，不可调节';
+
+  @override
+  String get messageStyleSettingsPageStyleFrostedSubtitle => '半透明毛玻璃';
+
+  @override
+  String get messageStyleSettingsPageStyleSolidSubtitle => '不透明纯色底';
+
+  @override
+  String get messageStyleSettingsPageBlur => '模糊强度';
+
+  @override
+  String get messageStyleSettingsPageBlurHint => '模糊作用于气泡背后的内容，未设置聊天壁纸时效果不明显';
+
+  @override
+  String get messageStyleSettingsPageBackgroundColor => '背景颜色';
+
+  @override
+  String get messageStyleSettingsPageBackgroundOpacity => '背景不透明度';
+
+  @override
+  String get messageStyleSettingsPageBorderColor => '边框颜色';
+
+  @override
+  String get messageStyleSettingsPageBorderOpacity => '边框不透明度';
+
+  @override
+  String get messageStyleSettingsPageBorderWidth => '边框宽度';
+
+  @override
+  String get messageStyleSettingsPageTextColor => '文字颜色';
+
+  @override
+  String get messageStyleSettingsPageCornerRadius => '圆角半径';
+
+  @override
+  String get messageStyleSettingsPagePreviewUser => '这是一条用户消息';
+
+  @override
+  String get messageStyleSettingsPagePreviewAssistant => '这是一条助手回复。';
+
+  @override
+  String get messageStyleSettingsPagePreviewThinking => '思考中';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -7631,6 +8065,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get storageSpaceClearLegacyChatDataButton => '清理旧聊天记录';
+
+  @override
+  String get storageSpaceExportLegacyChatFileButton => '导出';
+
+  @override
+  String storageSpaceExportDone(String fileName) {
+    return '已导出 $fileName';
+  }
+
+  @override
+  String storageSpaceExportFailed(String error) {
+    return '导出失败：$error';
+  }
 
   @override
   String get storageSpaceClearLegacyChatDataConfirmMessage =>
@@ -8048,16 +8495,23 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get userProviderDefaultUserName => '用户';
 
   @override
-  String get homePageDeleteMessage => '删除消息';
+  String get homePageDeleteMessage => '删除当前分支';
 
   @override
-  String get homePageDeleteMessageConfirm => '确定要删除这条消息及其后续分支吗？此操作不可撤销。';
+  String get homePageDeleteMessageConfirm => '确定要删除当前分支及其后续消息吗？其他分支会保留。';
 
   @override
-  String get homePageDeleteAllVersions => '删除分支';
+  String get homePageDeleteMessageOnly => '删除此条消息';
 
   @override
-  String get homePageDeleteAllVersionsConfirm => '确定要删除这条分支及其后代吗？其他分支会保留。';
+  String get homePageDeleteMessageOnlyConfirm => '确定要删除这条消息吗？后续消息会保留。';
+
+  @override
+  String get homePageDeleteAllVersions => '删除所有分支';
+
+  @override
+  String get homePageDeleteAllVersionsConfirm =>
+      '确定要删除该分叉点的所有分支及其后续消息吗？此操作不可撤销。';
 
   @override
   String get homePageCancel => '取消';
@@ -9046,6 +9500,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
+  String backupPageExportFailedMessage(String error) {
+    return '导出失败：$error';
+  }
+
+  @override
   String get backupPageOK => '好的';
 
   @override
@@ -9338,13 +9797,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get messageEditPageTitle => '编辑消息';
 
   @override
-  String get messageEditPageSave => '保存';
+  String get messageEditPageSaveAsBranch => '保存为新分支';
 
   @override
-  String get messageEditPageSaveAndSend => '保存并发送';
+  String get messageEditPageSaveAsBranchAndSend => '保存为新分支并发送';
+
+  @override
+  String get messageEditPageOverwriteSave => '覆盖保存';
 
   @override
   String get messageEditPageHint => '输入消息内容…';
+
+  @override
+  String get messageEditTrimWhitespace => '清理首尾空白';
 
   @override
   String get messageEditAttachmentsTitle => '附件';
@@ -9376,19 +9841,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get messageEditAttachmentCopyFailed => '无法复制所选附件';
 
   @override
-  String get messageEditCloseConfirmTitle => '要保存修改吗？';
+  String get messageEditCloseConfirmTitle => '关闭而不保存？';
 
   @override
-  String get messageEditCloseConfirmContent => '关闭前要保存这次编辑吗？';
+  String get messageEditCloseConfirmContent => '当前修改将被丢弃。';
 
   @override
   String get messageEditCloseConfirmCancel => '取消';
 
   @override
-  String get messageEditCloseConfirmDiscard => '不保存';
-
-  @override
-  String get messageEditCloseConfirmSave => '保存';
+  String get messageEditCloseConfirmConfirm => '确认';
 
   @override
   String get selectCopyPageTitle => '选择复制';
@@ -9472,6 +9934,32 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get compressContextStartButton => '开始压缩';
 
   @override
+  String get compressContextModelLabel => '压缩模型';
+
+  @override
+  String get compressContextModelUnset => '选择模型';
+
+  @override
+  String get compressContextKeepRecentMessages => '保留N条';
+
+  @override
+  String get compressContextKeepCountLabel => '保留最近条数';
+
+  @override
+  String get compressContextKeepAllMessages => '保留条数覆盖全部消息，无内容可压缩';
+
+  @override
+  String compressContextEstimatePreview(
+    int summarized,
+    int kept,
+    int minTokens,
+    int maxTokens,
+    int totalTokens,
+  ) {
+    return '总结 $summarized 字符，原样保留 $kept 字符 → 压缩后约 $minTokens–$maxTokens tokens（原文约 $totalTokens tokens）';
+  }
+
+  @override
   String get bottomToolsSheetLearningMode => '学习模式';
 
   @override
@@ -9526,10 +10014,23 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get messageMoreSheetCreateMessageBranch => '创建消息分支';
 
   @override
-  String get messageMoreSheetDelete => '删除消息';
+  String get messageMoreSheetCopyFromHereWithBranches => '从此处复制到新会话（保留分支）';
 
   @override
-  String get messageMoreSheetDeleteAllVersions => '删除分支';
+  String get messageMoreSheetCopyFromHereCurrentBranchOnly =>
+      '从此处复制到新会话（仅当前分支）';
+
+  @override
+  String get conversationForkFailed => '无法复制会话';
+
+  @override
+  String get messageMoreSheetDeleteMessageOnly => '删除此条消息';
+
+  @override
+  String get messageMoreSheetDelete => '删除当前分支';
+
+  @override
+  String get messageMoreSheetDeleteAllVersions => '删除所有分支';
 
   @override
   String get reasoningBudgetSheetOff => '关闭';
@@ -9896,6 +10397,55 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String imagePreviewSheetSaveFailed(String error) {
     return '保存失败: $error';
+  }
+
+  @override
+  String get sideDrawerMenuSelect => '多选';
+
+  @override
+  String sideDrawerSelectionTitle(int count) {
+    return '已选 $count 项';
+  }
+
+  @override
+  String get sideDrawerSelectionSelectAll => '全选';
+
+  @override
+  String get sideDrawerSelectionDeselectAll => '取消全选';
+
+  @override
+  String get sideDrawerSelectionPin => '置顶';
+
+  @override
+  String get sideDrawerSelectionUnpin => '取消置顶';
+
+  @override
+  String get sideDrawerSelectionMove => '移动';
+
+  @override
+  String get sideDrawerSelectionDelete => '删除';
+
+  @override
+  String get sideDrawerSelectionDeleteConfirmTitle => '删除话题';
+
+  @override
+  String sideDrawerSelectionDeleteConfirmContent(int count) {
+    return '确定删除 $count 个话题？';
+  }
+
+  @override
+  String sideDrawerDeleteSelectedSnackbar(int count) {
+    return '已删除 $count 个话题';
+  }
+
+  @override
+  String sideDrawerMoveSelectedSnackbar(int count) {
+    return '已移动 $count 个话题';
+  }
+
+  @override
+  String sideDrawerMoveSelectedWithSkippedSnackbar(int moved, int skipped) {
+    return '已移动 $moved 个话题，跳过 $skipped 个正在生成的话题';
   }
 
   @override
@@ -10620,6 +11170,20 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get modelDetailSheetOpenaiImageGenerationToolDescription => '启用图像生成工具';
 
   @override
+  String get modelDetailSheetOpenRouterWebFetchTool => '网页获取';
+
+  @override
+  String get modelDetailSheetOpenRouterWebFetchToolDescription =>
+      '允许 OpenRouter 代模型获取网页内容。';
+
+  @override
+  String get modelDetailSheetOpenRouterShellTool => 'Shell';
+
+  @override
+  String get modelDetailSheetOpenRouterShellToolDescription =>
+      '在 Responses 模式中允许 OpenRouter 服务端 Shell 工具。';
+
+  @override
   String get modelDetailSheetCancelButton => '取消';
 
   @override
@@ -11176,6 +11740,26 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get miniMapScrollToBottomTooltip => '滚动到底部';
 
   @override
+  String miniMapSearchMatchCount(int count) {
+    return '$count 处';
+  }
+
+  @override
+  String get miniMapSearchNoResults => '没有匹配的消息';
+
+  @override
+  String get miniMapFullWindow => '全窗口显示';
+
+  @override
+  String get miniMapRestoreWindow => '恢复窗口大小';
+
+  @override
+  String get miniMapActualSizeTooltip => '100%';
+
+  @override
+  String get miniMapFitHorizontalTooltip => '横向全览';
+
+  @override
   String get treeBranchPanelTitle => '上下文分支';
 
   @override
@@ -11714,6 +12298,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageEnterToSendTitle => '回车键发送消息';
 
   @override
+  String get displaySettingsPageLongPasteAsFileTitle => '超长粘贴转为文件';
+
+  @override
+  String get displaySettingsPageLongPasteAsFileThresholdTitle => '转换阈值';
+
+  @override
+  String get displaySettingsPageLongPasteAsFileThresholdUnit => '字符';
+
+  @override
   String get displaySettingsPageSendShortcutTitle => '发送快捷键';
 
   @override
@@ -11802,12 +12395,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get fontPickerChooseLocalFile => '选择本地文件';
-
-  @override
-  String get fontPickerGetFromGoogleFonts => '从 Google Fonts 获取';
-
-  @override
-  String get fontPickerFilterHint => '输入以过滤字体…';
 
   @override
   String get desktopFontLoading => '正在加载字体…';
@@ -13154,6 +13741,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get contextLogSourceToolResult => '工具结果';
 
   @override
+  String get contextLogTokensEstimateHint => 'tokens 仅为预估值，请以模型实际消耗为准。';
+
+  @override
   String contextLogSnapshotsCount(int count) {
     return '$count 条快照';
   }
@@ -13317,24 +13907,82 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get homePageProcessingFiles => '正在解析文件……';
 
   @override
-  String get fileUploadDuplicateTitle => '文件已存在';
-
-  @override
-  String fileUploadDuplicateContent(String fileName) {
-    return '检测到同名文件 $fileName，是否使用现有文件？';
-  }
-
-  @override
-  String get fileUploadDuplicateUseExisting => '使用现有';
-
-  @override
-  String get fileUploadDuplicateUploadNew => '重新上传';
-
-  @override
   String get settingsPageWorldBook => '世界书';
 
   @override
   String get settingsPageMemory => '记忆';
+
+  @override
+  String get memorySettingsModeSection => '记忆模式';
+
+  @override
+  String get memorySettingsGlobalSubtitle => '记忆模式、模型与提示词';
+
+  @override
+  String get memorySettingsLegacyPromptTitle => '旧版记忆规则';
+
+  @override
+  String get memorySettingsLegacySection => '旧版记忆';
+
+  @override
+  String get memorySettingsInjectionSection => '记忆注入';
+
+  @override
+  String get memorySettingsInjectionMaxItemsTitle => '每类注入条数';
+
+  @override
+  String get memorySettingsInjectionMaxItemsSubtitle =>
+      '某类记忆超过此上限时，只注入最新条目，其余内容可通过 memory_search_profile 查询。数值越大越完整，但会占用更多 token。';
+
+  @override
+  String get memorySettingsInjectionMaxItemsCustomButton => '自定义';
+
+  @override
+  String get memorySettingsInjectionMaxItemsCustomTitle => '自定义注入条数';
+
+  @override
+  String get memorySettingsInjectionMaxItemsCustomLabel => '条数';
+
+  @override
+  String get memorySettingsInjectionMaxItemsCustomHint => '1-100';
+
+  @override
+  String get memorySettingsInjectionMaxItemsCustomDescription =>
+      '请输入 1 到 100 之间的整数。';
+
+  @override
+  String get memorySettingsInjectionMaxItemsCustomInvalid =>
+      '请输入 1 到 100 之间的整数';
+
+  @override
+  String get memoryPromptEditMigrateTitle => '旧版记忆迁移';
+
+  @override
+  String get memoryPromptEditMigrateSubtitle => '迁移时使用模型整理记忆措辞';
+
+  @override
+  String get memorySettingsMigrationBatchSizeSubtitle =>
+      '每次模型请求处理的旧版记忆数量（1-24）';
+
+  @override
+  String get legacyMemoryMigrationContentMode => '内容处理';
+
+  @override
+  String get legacyMemoryMigrationContentPreserve => '保留原文';
+
+  @override
+  String get legacyMemoryMigrationContentPreserveDescription =>
+      '模型只负责分类，保存时完整保留原来的措辞。';
+
+  @override
+  String get legacyMemoryMigrationContentOrganize => '模型整理';
+
+  @override
+  String get legacyMemoryMigrationContentOrganizeDescription =>
+      '模型使用可编辑的迁移提示词，对每条记忆分类并重新整理措辞。';
+
+  @override
+  String get legacyMemoryMigrationBatchSize => '每批条数';
 
   @override
   String get memorySettingsPageTitle => '记忆';
@@ -13360,6 +14008,58 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get memorySettingsAboutBody =>
       '记忆如何运作\n记忆按「身份 / 工作流 / 语气 / 指令」分类，并区分全局与助手范围。对话时，相关记忆会注入模型上下文；条目较多时先展示摘要，模型可用工具继续查询更多内容。\n\n后台如何处理、如何触发\n处理模型用于后台整理管线：判断是否值得记忆、提取候选、去重合并，必要时再提炼用户画像。助手开启「自动整理」后，会按设定轮数在对话结束后自动触发；也可在助手「记忆」页手动整理。因此该模型会被较频繁调用。\n\n如何保持缓存良好\n尽量让注入对话的记忆前缀保持稳定，避免无意义的大批量改动或频繁重排，有助于 Prompt 缓存命中，从而降低费用与延迟。日常增删改单条记忆通常影响有限。';
+
+  @override
+  String get memoryAboutQuickstartTitle => '三步上手';
+
+  @override
+  String get memoryAboutQuickstartBody =>
+      '① 在「设置 → 记忆」里选择处理模型。\n② 在助手的「记忆」页打开长期记忆和自动整理。\n③ 聊几轮，或点「整理记忆」，再到「全部记忆」查看结果。';
+
+  @override
+  String get memoryAboutTypesTitle => '记忆类型';
+
+  @override
+  String get memoryAboutTypesBody =>
+      '身份：用户的稳定信息，例如称呼、职业、语言、长期偏好。写成完整的第三人称陈述。\n\n工作流：用户习惯怎么做事，例如工具、格式、审阅方式。\n\n语气：用户希望助手怎么说话，例如语气、篇幅、语言风格。\n\n指令：助手应长期遵守的规则，而不是本次对话里的一次性任务。';
+
+  @override
+  String get memoryAboutScopeTitle => '全局与助手范围';
+
+  @override
+  String get memoryAboutScopeBody =>
+      '全局记忆会对所有助手注入。助手范围的记忆只对该助手可见。跨助手都该知道的事实用全局；只属于某一个助手的规则或上下文用助手范围。';
+
+  @override
+  String get memoryAboutInjectionTitle => '记忆如何注入';
+
+  @override
+  String get memoryAboutInjectionBody =>
+      '开对话时，每类会把最近的若干条放进模型上下文。某类超过注入上限时，块会标上 mode=\"summary\"，并用 total / shown 标明总数与展示条数，其余由模型用 memory_search_profile 按需查询。可在「设置 → 记忆」调大上限，更全面但更费 token。';
+
+  @override
+  String get memoryAboutPipelineTitle => '后台整理';
+
+  @override
+  String get memoryAboutPipelineBody =>
+      '开启自动整理后，对话结束会走：判断是否值得记 → 提取候选 → 去重合并 → 必要时把身份类记忆提炼进用户画像。也可以在助手「记忆」页点「整理记忆」。因此处理模型会被较频繁调用。';
+
+  @override
+  String get memoryAboutCacheTitle => '保持缓存良好';
+
+  @override
+  String get memoryAboutCacheBody =>
+      '注入前缀会保持稳定，未改动时可复用 Prompt 缓存，从而降低费用与延迟。避免无意义的大批量改动或重排。日常增删改单条通常影响有限。';
+
+  @override
+  String get memoryAboutFaqTitle => '常见问题';
+
+  @override
+  String get memoryAboutFaqWhyNotRememberedTitle => '为什么没记住？';
+
+  @override
+  String get memoryAboutFaqWhyNotRememberedBody =>
+      '整理会被跳过，常见原因包括：新消息不足，暂不整理；没有新消息需要整理；尚未选择记忆处理模型。临时对话不会写入记忆。也可以按助手关闭记忆或自动整理。';
 
   @override
   String get memorySettingsThinkingTitle => '启用思考';
@@ -13638,6 +14338,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get memoryOrganizeStatusSkipped => '无需记忆';
 
   @override
+  String memoryOrganizeStatusSkippedReason(String reason) {
+    return '已跳过：$reason';
+  }
+
+  @override
   String memoryOrganizeStatusFailed(String reason) {
     return '失败：$reason';
   }
@@ -13719,6 +14424,81 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get userProfileEmptyValue => '未设置';
+
+  @override
+  String get memoryOutcomeAssistantMissing => '找不到助手';
+
+  @override
+  String get memoryOutcomeAutoOrganizeOff => '自动整理已关闭';
+
+  @override
+  String get memoryOutcomeBelowThreshold => '新消息不足，暂不整理';
+
+  @override
+  String get memoryOutcomeChatSearchUnavailable => '对话搜索不可用';
+
+  @override
+  String get memoryOutcomeConversationMissing => '找不到对话';
+
+  @override
+  String get memoryOutcomeDistillFailed => '用户画像提炼失败';
+
+  @override
+  String get memoryOutcomeEmptyWindow => '没有新消息需要整理';
+
+  @override
+  String get memoryOutcomeExtractParseFailed => '提取记忆的回复无法解析';
+
+  @override
+  String get memoryOutcomeExtractRequestFailed => '提取记忆时，无法请求记忆模型';
+
+  @override
+  String get memoryOutcomeGateParseFailed => '判断是否值得记忆的回复无法解析';
+
+  @override
+  String get memoryOutcomeGateRequestFailed => '判断是否值得记忆时，无法请求记忆模型';
+
+  @override
+  String get memoryOutcomeInvalidMemoryContent => '记忆内容无效';
+
+  @override
+  String get memoryOutcomeInvalidMemoryId => '记忆 ID 无效';
+
+  @override
+  String get memoryOutcomeInvalidMemoryType => '记忆类型无效';
+
+  @override
+  String get memoryOutcomeInvalidProfileFields => '画像字段无效';
+
+  @override
+  String get memoryOutcomeInvalidQuery => '查询无效';
+
+  @override
+  String get memoryOutcomeMemoryDisabled => '该助手已关闭记忆';
+
+  @override
+  String get memoryOutcomeMemoryExecutionError => '记忆工具执行失败';
+
+  @override
+  String get memoryOutcomeMemoryModelMissing => '所选记忆模型已不可用';
+
+  @override
+  String get memoryOutcomeMemoryModelUnset => '尚未选择记忆处理模型';
+
+  @override
+  String get memoryOutcomeMemoryNotFound => '找不到这条记忆';
+
+  @override
+  String get memoryOutcomeQueueOverflow => '整理队列已满，本次任务被丢弃';
+
+  @override
+  String get memoryOutcomeStreaming => '回复仍在生成，已跳过整理';
+
+  @override
+  String get memoryOutcomeTemporaryConversation => '临时对话不会写入记忆';
+
+  @override
+  String get memoryOutcomeUnsupportedTool => '不支持的记忆工具';
 
   @override
   String get legacyMemoryPageTitle => '旧版记忆';
@@ -13811,6 +14591,28 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get legacyMemoryMigrationFailed => '迁移已停止。可以重试，已保存的记忆会自动跳过。';
+
+  @override
+  String get legacyMemoryMigrationContinue => '继续迁移';
+
+  @override
+  String get legacyMemoryMigrationErrorAuth => '鉴权失败，请检查 API 密钥。';
+
+  @override
+  String get legacyMemoryMigrationErrorFormat => '模型返回格式不正确。';
+
+  @override
+  String get legacyMemoryMigrationErrorNetwork => '网络异常，请检查连接后重试。';
+
+  @override
+  String legacyMemoryMigrationErrorOther(String message) {
+    return '迁移失败：$message';
+  }
+
+  @override
+  String legacyMemoryMigrationPartial(int created, int skipped, int failed) {
+    return '已迁移 $created · 跳过 $skipped · 失败 $failed';
+  }
 
   @override
   String get legacyMemoryMigrationRetry => '重试';
@@ -14768,6 +15570,72 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get sqliteMigrationRestartButton => '重启 JO-AIClient';
+
+  @override
+  String get messageStyleSettingsPageTitle => '消息样式';
+
+  @override
+  String get messageStyleSettingsPageReset => '重置';
+
+  @override
+  String get messageStyleSettingsPageResetConfirm => '恢复全部消息样式自定义？';
+
+  @override
+  String get messageStyleSettingsPageCancel => '取消';
+
+  @override
+  String get messageStyleSettingsPageLight => '浅色';
+
+  @override
+  String get messageStyleSettingsPageDark => '深色';
+
+  @override
+  String get messageStyleSettingsPageDefaultHint => '默认样式跟随当前主题，没有可调参数。';
+
+  @override
+  String get messageStyleSettingsPageStyleDefaultSubtitle => '跟随主题，不可调节';
+
+  @override
+  String get messageStyleSettingsPageStyleFrostedSubtitle => '半透明毛玻璃';
+
+  @override
+  String get messageStyleSettingsPageStyleSolidSubtitle => '不透明纯色底';
+
+  @override
+  String get messageStyleSettingsPageBlur => '模糊强度';
+
+  @override
+  String get messageStyleSettingsPageBlurHint => '模糊作用于气泡背后的内容，未设置聊天壁纸时效果不明显';
+
+  @override
+  String get messageStyleSettingsPageBackgroundColor => '背景颜色';
+
+  @override
+  String get messageStyleSettingsPageBackgroundOpacity => '背景不透明度';
+
+  @override
+  String get messageStyleSettingsPageBorderColor => '边框颜色';
+
+  @override
+  String get messageStyleSettingsPageBorderOpacity => '边框不透明度';
+
+  @override
+  String get messageStyleSettingsPageBorderWidth => '边框宽度';
+
+  @override
+  String get messageStyleSettingsPageTextColor => '文字颜色';
+
+  @override
+  String get messageStyleSettingsPageCornerRadius => '圆角半径';
+
+  @override
+  String get messageStyleSettingsPagePreviewUser => '这是一条用户消息';
+
+  @override
+  String get messageStyleSettingsPagePreviewAssistant => '这是一条助手回复。';
+
+  @override
+  String get messageStyleSettingsPagePreviewThinking => '思考中';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -15014,6 +15882,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceClearLegacyChatDataButton => '清理舊聊天記錄';
+
+  @override
+  String get storageSpaceExportLegacyChatFileButton => '匯出';
+
+  @override
+  String storageSpaceExportDone(String fileName) {
+    return '已匯出 $fileName';
+  }
+
+  @override
+  String storageSpaceExportFailed(String error) {
+    return '匯出失敗：$error';
+  }
 
   @override
   String get storageSpaceClearLegacyChatDataConfirmMessage =>
@@ -15431,16 +16312,23 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get userProviderDefaultUserName => '使用者';
 
   @override
-  String get homePageDeleteMessage => '刪除訊息';
+  String get homePageDeleteMessage => '刪除目前分支';
 
   @override
-  String get homePageDeleteMessageConfirm => '確定要刪除這則訊息及其後續分支嗎？此操作不可撤銷。';
+  String get homePageDeleteMessageConfirm => '確定要刪除目前分支及其後續訊息嗎？其他分支會保留。';
 
   @override
-  String get homePageDeleteAllVersions => '刪除分支';
+  String get homePageDeleteMessageOnly => '刪除此則訊息';
 
   @override
-  String get homePageDeleteAllVersionsConfirm => '確定要刪除這條分支及其後代嗎？其他分支會保留。';
+  String get homePageDeleteMessageOnlyConfirm => '確定要刪除這則訊息嗎？後續訊息會保留。';
+
+  @override
+  String get homePageDeleteAllVersions => '刪除所有分支';
+
+  @override
+  String get homePageDeleteAllVersionsConfirm =>
+      '確定要刪除該分叉點的所有分支及其後續訊息嗎？此操作不可撤銷。';
 
   @override
   String get homePageCancel => '取消';
@@ -16430,6 +17318,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
+  String backupPageExportFailedMessage(String error) {
+    return '匯出失敗：$error';
+  }
+
+  @override
   String get backupPageOK => '好的';
 
   @override
@@ -16721,13 +17614,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get messageEditPageTitle => '編輯訊息';
 
   @override
-  String get messageEditPageSave => '儲存';
+  String get messageEditPageSaveAsBranch => '儲存為新分支';
 
   @override
-  String get messageEditPageSaveAndSend => '儲存並發送';
+  String get messageEditPageSaveAsBranchAndSend => '儲存為新分支並發送';
+
+  @override
+  String get messageEditPageOverwriteSave => '覆蓋儲存';
 
   @override
   String get messageEditPageHint => '輸入訊息內容…';
+
+  @override
+  String get messageEditTrimWhitespace => '清理首尾空白';
 
   @override
   String get messageEditAttachmentsTitle => '附件';
@@ -16759,19 +17658,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get messageEditAttachmentCopyFailed => '無法複製所選附件';
 
   @override
-  String get messageEditCloseConfirmTitle => '要儲存修改嗎？';
+  String get messageEditCloseConfirmTitle => '關閉而不儲存？';
 
   @override
-  String get messageEditCloseConfirmContent => '關閉前要儲存這次編輯嗎？';
+  String get messageEditCloseConfirmContent => '目前的修改將被捨棄。';
 
   @override
   String get messageEditCloseConfirmCancel => '取消';
 
   @override
-  String get messageEditCloseConfirmDiscard => '不儲存';
-
-  @override
-  String get messageEditCloseConfirmSave => '儲存';
+  String get messageEditCloseConfirmConfirm => '確認';
 
   @override
   String get selectCopyPageTitle => '選擇複製';
@@ -16855,6 +17751,32 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get compressContextStartButton => '開始壓縮';
 
   @override
+  String get compressContextModelLabel => '壓縮模型';
+
+  @override
+  String get compressContextModelUnset => '選擇模型';
+
+  @override
+  String get compressContextKeepRecentMessages => '保留N條';
+
+  @override
+  String get compressContextKeepCountLabel => '保留最近條數';
+
+  @override
+  String get compressContextKeepAllMessages => '保留條數涵蓋全部訊息，無內容可壓縮';
+
+  @override
+  String compressContextEstimatePreview(
+    int summarized,
+    int kept,
+    int minTokens,
+    int maxTokens,
+    int totalTokens,
+  ) {
+    return '總結 $summarized 字元，原樣保留 $kept 字元 → 壓縮後約 $minTokens–$maxTokens tokens（原文約 $totalTokens tokens）';
+  }
+
+  @override
   String get bottomToolsSheetLearningMode => '學習模式';
 
   @override
@@ -16909,10 +17831,23 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get messageMoreSheetCreateMessageBranch => '建立訊息分支';
 
   @override
-  String get messageMoreSheetDelete => '刪除訊息';
+  String get messageMoreSheetCopyFromHereWithBranches => '從此處複製到新會話（保留分支）';
 
   @override
-  String get messageMoreSheetDeleteAllVersions => '刪除分支';
+  String get messageMoreSheetCopyFromHereCurrentBranchOnly =>
+      '從此處複製到新會話（僅當前分支）';
+
+  @override
+  String get conversationForkFailed => '無法複製會話';
+
+  @override
+  String get messageMoreSheetDeleteMessageOnly => '刪除此則訊息';
+
+  @override
+  String get messageMoreSheetDelete => '刪除目前分支';
+
+  @override
+  String get messageMoreSheetDeleteAllVersions => '刪除所有分支';
 
   @override
   String get reasoningBudgetSheetOff => '關閉';
@@ -17279,6 +18214,55 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String imagePreviewSheetSaveFailed(String error) {
     return '保存失敗: $error';
+  }
+
+  @override
+  String get sideDrawerMenuSelect => '多選';
+
+  @override
+  String sideDrawerSelectionTitle(int count) {
+    return '已選 $count 項';
+  }
+
+  @override
+  String get sideDrawerSelectionSelectAll => '全選';
+
+  @override
+  String get sideDrawerSelectionDeselectAll => '取消全選';
+
+  @override
+  String get sideDrawerSelectionPin => '置頂';
+
+  @override
+  String get sideDrawerSelectionUnpin => '取消置頂';
+
+  @override
+  String get sideDrawerSelectionMove => '移動';
+
+  @override
+  String get sideDrawerSelectionDelete => '刪除';
+
+  @override
+  String get sideDrawerSelectionDeleteConfirmTitle => '刪除話題';
+
+  @override
+  String sideDrawerSelectionDeleteConfirmContent(int count) {
+    return '確定刪除 $count 個話題？';
+  }
+
+  @override
+  String sideDrawerDeleteSelectedSnackbar(int count) {
+    return '已刪除 $count 個話題';
+  }
+
+  @override
+  String sideDrawerMoveSelectedSnackbar(int count) {
+    return '已移動 $count 個話題';
+  }
+
+  @override
+  String sideDrawerMoveSelectedWithSkippedSnackbar(int moved, int skipped) {
+    return '已移動 $moved 個話題，跳過 $skipped 個正在生成的話題';
   }
 
   @override
@@ -18003,6 +18987,20 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get modelDetailSheetOpenaiImageGenerationToolDescription => '啟用圖像生成工具';
 
   @override
+  String get modelDetailSheetOpenRouterWebFetchTool => '網頁擷取';
+
+  @override
+  String get modelDetailSheetOpenRouterWebFetchToolDescription =>
+      '允許 OpenRouter 代模型擷取網頁內容。';
+
+  @override
+  String get modelDetailSheetOpenRouterShellTool => 'Shell';
+
+  @override
+  String get modelDetailSheetOpenRouterShellToolDescription =>
+      '在 Responses 模式中允許 OpenRouter 伺服器端 Shell 工具。';
+
+  @override
   String get modelDetailSheetCancelButton => '取消';
 
   @override
@@ -18558,6 +19556,26 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get miniMapScrollToBottomTooltip => '捲動到底部';
 
   @override
+  String miniMapSearchMatchCount(int count) {
+    return '$count 處';
+  }
+
+  @override
+  String get miniMapSearchNoResults => '沒有匹配的訊息';
+
+  @override
+  String get miniMapFullWindow => '全視窗顯示';
+
+  @override
+  String get miniMapRestoreWindow => '恢復視窗大小';
+
+  @override
+  String get miniMapActualSizeTooltip => '100%';
+
+  @override
+  String get miniMapFitHorizontalTooltip => '橫向全覽';
+
+  @override
   String get treeBranchPanelTitle => '上下文分支';
 
   @override
@@ -19096,6 +20114,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get displaySettingsPageEnterToSendTitle => '回車鍵發送訊息';
 
   @override
+  String get displaySettingsPageLongPasteAsFileTitle => '超長貼上轉為檔案';
+
+  @override
+  String get displaySettingsPageLongPasteAsFileThresholdTitle => '轉換閾值';
+
+  @override
+  String get displaySettingsPageLongPasteAsFileThresholdUnit => '字元';
+
+  @override
   String get displaySettingsPageSendShortcutTitle => '發送快捷鍵';
 
   @override
@@ -19184,12 +20211,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get fontPickerChooseLocalFile => '選擇本機檔案';
-
-  @override
-  String get fontPickerGetFromGoogleFonts => '從 Google Fonts 取得';
-
-  @override
-  String get fontPickerFilterHint => '輸入以過濾字體…';
 
   @override
   String get desktopFontLoading => '正在載入字體…';
@@ -20538,6 +21559,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get contextLogSourceToolResult => '工具結果';
 
   @override
+  String get contextLogTokensEstimateHint => 'tokens 僅為預估值，請以模型實際消耗為準。';
+
+  @override
   String contextLogSnapshotsCount(int count) {
     return '$count 則快照';
   }
@@ -20701,24 +21725,82 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get homePageProcessingFiles => '正在解析檔案……';
 
   @override
-  String get fileUploadDuplicateTitle => '檔案已存在';
-
-  @override
-  String fileUploadDuplicateContent(String fileName) {
-    return '偵測到同名檔案 $fileName，是否使用現有檔案？';
-  }
-
-  @override
-  String get fileUploadDuplicateUseExisting => '使用現有';
-
-  @override
-  String get fileUploadDuplicateUploadNew => '重新上傳';
-
-  @override
   String get settingsPageWorldBook => '世界書';
 
   @override
   String get settingsPageMemory => '記憶';
+
+  @override
+  String get memorySettingsModeSection => '記憶模式';
+
+  @override
+  String get memorySettingsGlobalSubtitle => '記憶模式、模型與提示詞';
+
+  @override
+  String get memorySettingsLegacyPromptTitle => '舊版記憶規則';
+
+  @override
+  String get memorySettingsLegacySection => '舊版記憶';
+
+  @override
+  String get memorySettingsInjectionSection => '記憶注入';
+
+  @override
+  String get memorySettingsInjectionMaxItemsTitle => '每類注入條數';
+
+  @override
+  String get memorySettingsInjectionMaxItemsSubtitle =>
+      '某類記憶超過此上限時，只注入最新條目，其餘內容可透過 memory_search_profile 查詢。數值越大越完整，但會佔用更多 token。';
+
+  @override
+  String get memorySettingsInjectionMaxItemsCustomButton => '自訂';
+
+  @override
+  String get memorySettingsInjectionMaxItemsCustomTitle => '自訂注入條數';
+
+  @override
+  String get memorySettingsInjectionMaxItemsCustomLabel => '條數';
+
+  @override
+  String get memorySettingsInjectionMaxItemsCustomHint => '1-100';
+
+  @override
+  String get memorySettingsInjectionMaxItemsCustomDescription =>
+      '請輸入 1 到 100 之間的整數。';
+
+  @override
+  String get memorySettingsInjectionMaxItemsCustomInvalid =>
+      '請輸入 1 到 100 之間的整數';
+
+  @override
+  String get memoryPromptEditMigrateTitle => '舊版記憶遷移';
+
+  @override
+  String get memoryPromptEditMigrateSubtitle => '遷移時使用模型整理記憶措辭';
+
+  @override
+  String get memorySettingsMigrationBatchSizeSubtitle =>
+      '每次模型請求處理的舊版記憶數量（1-24）';
+
+  @override
+  String get legacyMemoryMigrationContentMode => '內容處理';
+
+  @override
+  String get legacyMemoryMigrationContentPreserve => '保留原文';
+
+  @override
+  String get legacyMemoryMigrationContentPreserveDescription =>
+      '模型只負責分類，儲存時完整保留原來的措辭。';
+
+  @override
+  String get legacyMemoryMigrationContentOrganize => '模型整理';
+
+  @override
+  String get legacyMemoryMigrationContentOrganizeDescription =>
+      '模型使用可編輯的遷移提示詞，對每條記憶分類並重新整理措辭。';
+
+  @override
+  String get legacyMemoryMigrationBatchSize => '每批條數';
 
   @override
   String get memorySettingsPageTitle => '記憶';
@@ -20744,6 +21826,58 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get memorySettingsAboutBody =>
       '記憶如何運作\n記憶按「身分 / 工作流 / 語氣 / 指令」分類，並區分全域與助手範圍。對話時，相關記憶會注入模型上下文；條目較多時先展示摘要，模型可用工具繼續查詢更多內容。\n\n後台如何處理、如何觸發\n處理模型用於後台整理管線：判斷是否值得記憶、提取候選、去重合併，必要時再提煉使用者畫像。助手開啟「自動整理」後，會按設定輪數在對話結束後自動觸發；也可在助手「記憶」頁手動整理。因此該模型會被較頻繁呼叫。\n\n如何保持快取良好\n盡量讓注入對話的記憶前綴保持穩定，避免無意義的大批量改動或頻繁重排，有助於 Prompt 快取命中，從而降低費用與延遲。日常增刪改單條記憶通常影響有限。';
+
+  @override
+  String get memoryAboutQuickstartTitle => '三步上手';
+
+  @override
+  String get memoryAboutQuickstartBody =>
+      '① 在「設定 → 記憶」裡選擇處理模型。\n② 在助手的「記憶」頁打開長期記憶和自動整理。\n③ 聊幾輪，或點「整理記憶」，再到「全部記憶」查看結果。';
+
+  @override
+  String get memoryAboutTypesTitle => '記憶類型';
+
+  @override
+  String get memoryAboutTypesBody =>
+      '身分：使用者的穩定資訊，例如稱呼、職業、語言、長期偏好。寫成完整的第三人稱陳述。\n\n工作流：使用者習慣怎麼做事，例如工具、格式、審閱方式。\n\n語氣：使用者希望助手怎麼說話，例如語氣、篇幅、語言風格。\n\n指令：助手應長期遵守的規則，而不是本次對話裡的一次性任務。';
+
+  @override
+  String get memoryAboutScopeTitle => '全域與助手範圍';
+
+  @override
+  String get memoryAboutScopeBody =>
+      '全域記憶會對所有助手注入。助手範圍的記憶只對該助手可見。跨助手都該知道的事實用全域；只屬於某一個助手的規則或上下文用助手範圍。';
+
+  @override
+  String get memoryAboutInjectionTitle => '記憶如何注入';
+
+  @override
+  String get memoryAboutInjectionBody =>
+      '開對話時，每類會把最近的若干條放進模型上下文。某類超過注入上限時，塊會標上 mode=\"summary\"，並用 total / shown 標明總數與展示條數，其餘由模型用 memory_search_profile 按需查詢。可在「設定 → 記憶」調大上限，更全面但更費 token。';
+
+  @override
+  String get memoryAboutPipelineTitle => '後台整理';
+
+  @override
+  String get memoryAboutPipelineBody =>
+      '開啟自動整理後，對話結束會走：判斷是否值得記 → 擷取候選 → 去重合併 → 必要時把身分類記憶提煉進使用者畫像。也可以在助手「記憶」頁點「整理記憶」。因此處理模型會被較頻繁呼叫。';
+
+  @override
+  String get memoryAboutCacheTitle => '保持快取良好';
+
+  @override
+  String get memoryAboutCacheBody =>
+      '注入前綴會保持穩定，未改動時可復用 Prompt 快取，從而降低費用與延遲。避免無意義的大批量改動或重排。日常增刪改單條通常影響有限。';
+
+  @override
+  String get memoryAboutFaqTitle => '常見問題';
+
+  @override
+  String get memoryAboutFaqWhyNotRememberedTitle => '為什麼沒記住？';
+
+  @override
+  String get memoryAboutFaqWhyNotRememberedBody =>
+      '整理會被跳過，常見原因包括：新訊息不足，暫不整理；沒有新訊息需要整理；尚未選擇記憶處理模型。臨時對話不會寫入記憶。也可以按助手關閉記憶或自動整理。';
 
   @override
   String get memorySettingsThinkingTitle => '啟用思考';
@@ -21022,6 +22156,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get memoryOrganizeStatusSkipped => '無需記憶';
 
   @override
+  String memoryOrganizeStatusSkippedReason(String reason) {
+    return '已略過：$reason';
+  }
+
+  @override
   String memoryOrganizeStatusFailed(String reason) {
     return '失敗：$reason';
   }
@@ -21103,6 +22242,81 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get userProfileEmptyValue => '未設定';
+
+  @override
+  String get memoryOutcomeAssistantMissing => '找不到助手';
+
+  @override
+  String get memoryOutcomeAutoOrganizeOff => '自動整理已關閉';
+
+  @override
+  String get memoryOutcomeBelowThreshold => '新訊息不足，暫不整理';
+
+  @override
+  String get memoryOutcomeChatSearchUnavailable => '對話搜尋不可用';
+
+  @override
+  String get memoryOutcomeConversationMissing => '找不到對話';
+
+  @override
+  String get memoryOutcomeDistillFailed => '使用者畫像提煉失敗';
+
+  @override
+  String get memoryOutcomeEmptyWindow => '沒有新訊息需要整理';
+
+  @override
+  String get memoryOutcomeExtractParseFailed => '擷取記憶的回覆無法解析';
+
+  @override
+  String get memoryOutcomeExtractRequestFailed => '擷取記憶時，無法請求記憶模型';
+
+  @override
+  String get memoryOutcomeGateParseFailed => '判斷是否值得記憶的回覆無法解析';
+
+  @override
+  String get memoryOutcomeGateRequestFailed => '判斷是否值得記憶時，無法請求記憶模型';
+
+  @override
+  String get memoryOutcomeInvalidMemoryContent => '記憶內容無效';
+
+  @override
+  String get memoryOutcomeInvalidMemoryId => '記憶 ID 無效';
+
+  @override
+  String get memoryOutcomeInvalidMemoryType => '記憶類型無效';
+
+  @override
+  String get memoryOutcomeInvalidProfileFields => '畫像欄位無效';
+
+  @override
+  String get memoryOutcomeInvalidQuery => '查詢無效';
+
+  @override
+  String get memoryOutcomeMemoryDisabled => '此助手已關閉記憶';
+
+  @override
+  String get memoryOutcomeMemoryExecutionError => '記憶工具執行失敗';
+
+  @override
+  String get memoryOutcomeMemoryModelMissing => '所選記憶模型已不可用';
+
+  @override
+  String get memoryOutcomeMemoryModelUnset => '尚未選擇記憶處理模型';
+
+  @override
+  String get memoryOutcomeMemoryNotFound => '找不到這條記憶';
+
+  @override
+  String get memoryOutcomeQueueOverflow => '整理佇列已滿，本次任務被捨棄';
+
+  @override
+  String get memoryOutcomeStreaming => '回覆仍在產生，已跳過整理';
+
+  @override
+  String get memoryOutcomeTemporaryConversation => '臨時對話不會寫入記憶';
+
+  @override
+  String get memoryOutcomeUnsupportedTool => '不支援的記憶工具';
 
   @override
   String get legacyMemoryPageTitle => '舊版記憶';
@@ -21195,6 +22409,28 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get legacyMemoryMigrationFailed => '遷移已停止。可以重試，已儲存的記憶會自動略過。';
+
+  @override
+  String get legacyMemoryMigrationContinue => '繼續遷移';
+
+  @override
+  String get legacyMemoryMigrationErrorAuth => '鑑權失敗，請檢查 API 金鑰。';
+
+  @override
+  String get legacyMemoryMigrationErrorFormat => '模型回傳格式不正確。';
+
+  @override
+  String get legacyMemoryMigrationErrorNetwork => '網路異常，請檢查連線後重試。';
+
+  @override
+  String legacyMemoryMigrationErrorOther(String message) {
+    return '遷移失敗：$message';
+  }
+
+  @override
+  String legacyMemoryMigrationPartial(int created, int skipped, int failed) {
+    return '已遷移 $created · 略過 $skipped · 失敗 $failed';
+  }
 
   @override
   String get legacyMemoryMigrationRetry => '重試';
@@ -22152,4 +23388,70 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get sqliteMigrationRestartButton => '重新啟動 JO-AIClient';
+
+  @override
+  String get messageStyleSettingsPageTitle => '訊息樣式';
+
+  @override
+  String get messageStyleSettingsPageReset => '重設';
+
+  @override
+  String get messageStyleSettingsPageResetConfirm => '恢復全部訊息樣式自訂？';
+
+  @override
+  String get messageStyleSettingsPageCancel => '取消';
+
+  @override
+  String get messageStyleSettingsPageLight => '淺色';
+
+  @override
+  String get messageStyleSettingsPageDark => '深色';
+
+  @override
+  String get messageStyleSettingsPageDefaultHint => '預設樣式跟隨目前主題，沒有可調參數。';
+
+  @override
+  String get messageStyleSettingsPageStyleDefaultSubtitle => '跟隨主題，不可調節';
+
+  @override
+  String get messageStyleSettingsPageStyleFrostedSubtitle => '半透明毛玻璃';
+
+  @override
+  String get messageStyleSettingsPageStyleSolidSubtitle => '不透明純色底';
+
+  @override
+  String get messageStyleSettingsPageBlur => '模糊強度';
+
+  @override
+  String get messageStyleSettingsPageBlurHint => '模糊作用於氣泡背後的內容，未設定聊天桌布時效果不明顯';
+
+  @override
+  String get messageStyleSettingsPageBackgroundColor => '背景顏色';
+
+  @override
+  String get messageStyleSettingsPageBackgroundOpacity => '背景不透明度';
+
+  @override
+  String get messageStyleSettingsPageBorderColor => '邊框顏色';
+
+  @override
+  String get messageStyleSettingsPageBorderOpacity => '邊框不透明度';
+
+  @override
+  String get messageStyleSettingsPageBorderWidth => '邊框寬度';
+
+  @override
+  String get messageStyleSettingsPageTextColor => '文字顏色';
+
+  @override
+  String get messageStyleSettingsPageCornerRadius => '圓角半徑';
+
+  @override
+  String get messageStyleSettingsPagePreviewUser => '這是一則使用者訊息';
+
+  @override
+  String get messageStyleSettingsPagePreviewAssistant => '這是一則助手回覆。';
+
+  @override
+  String get messageStyleSettingsPagePreviewThinking => '思考中';
 }

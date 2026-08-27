@@ -355,16 +355,13 @@ void main() {
           ),
         );
         await tester.pump();
-        await tester.pump(const Duration(milliseconds: 120));
-        // The pin animates instead of jumping; partway through it should be
-        // strictly between the old offset and the bottom.
+        // The layout pin absorbs terminal height changes before paint.
         await tester.pump(const Duration(milliseconds: 50));
         expect(
           scrollController.offset,
-          lessThan(scrollController.position.maxScrollExtent),
+          scrollController.position.maxScrollExtent,
         );
-        await tester.pump(const Duration(milliseconds: 600));
-        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 250));
         expect(
           scrollController.offset,
           scrollController.position.maxScrollExtent,
@@ -374,6 +371,35 @@ void main() {
         scrollController.dispose();
       },
     );
+
+    testWidgets('held generation pin yields to an upward user drag', (
+      tester,
+    ) async {
+      var generating = true;
+      final scrollController = ChatAutoFollowScrollController();
+      final chatScrollController = ChatScrollController(
+        scrollController: scrollController,
+        onStateChanged: () {},
+        getAutoScrollEnabled: () => true,
+        getAutoScrollIdleSeconds: () => 8,
+        isGenerating: () => generating,
+      );
+      await tester.pumpWidget(
+        _ScrollHarness(scrollController: scrollController, itemCount: 40),
+      );
+      scrollController.jumpTo(scrollController.position.maxScrollExtent);
+      generating = false;
+      chatScrollController.stickToBottomAfterGeneration();
+      chatScrollController.handleUserScrollIntent();
+      scrollController.jumpTo(scrollController.position.maxScrollExtent - 180);
+      await tester.pump();
+      expect(
+        scrollController.offset,
+        lessThan(scrollController.position.maxScrollExtent),
+      );
+      chatScrollController.dispose();
+      scrollController.dispose();
+    });
 
     testWidgets('generation finish does not pin after the user scrolls up', (
       tester,

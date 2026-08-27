@@ -126,6 +126,23 @@
   "storageSpaceClearCacheButton": "Clear Cache",
   "storageSpaceClearLogsButton": "Clear Logs",
   "storageSpaceClearLegacyChatDataButton": "Clear Old Chat Records",
+  "storageSpaceExportLegacyChatFileButton": "Export",
+  "storageSpaceExportDone": "{fileName} exported",
+  "@storageSpaceExportDone": {
+    "placeholders": {
+      "fileName": {
+        "type": "String"
+      }
+    }
+  },
+  "storageSpaceExportFailed": "Export failed: {error}",
+  "@storageSpaceExportFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "storageSpaceClearLegacyChatDataConfirmMessage": "Clear the retained old chat files? Your current SQLite chat records will remain available.",
   "storageSpaceViewLogsButton": "View Logs",
   "storageSpaceDeleteConfirmTitle": "Confirm deletion",
@@ -311,10 +328,12 @@
   },
   "chatServiceDefaultConversationTitle": "New Chat",
   "userProviderDefaultUserName": "User",
-  "homePageDeleteMessage": "Delete Message",
-  "homePageDeleteMessageConfirm": "Are you sure you want to delete this message and its following branch? This cannot be undone.",
-  "homePageDeleteAllVersions": "Delete Branch",
-  "homePageDeleteAllVersionsConfirm": "Are you sure you want to delete this branch and its descendants? Other branches will remain.",
+  "homePageDeleteMessage": "Delete Current Branch",
+  "homePageDeleteMessageConfirm": "Are you sure you want to delete the current branch and its following messages? Other branches will remain.",
+  "homePageDeleteMessageOnly": "Delete This Message",
+  "homePageDeleteMessageOnlyConfirm": "Are you sure you want to delete this message? Following messages will remain.",
+  "homePageDeleteAllVersions": "Delete All Branches",
+  "homePageDeleteAllVersionsConfirm": "Are you sure you want to delete all branches at this fork and their following messages? This cannot be undone.",
   "homePageCancel": "Cancel",
   "homePageDelete": "Delete",
   "homePageSelectMessagesToShare": "Please select messages to share",
@@ -719,6 +738,14 @@
       }
     }
   },
+  "backupPageExportFailedMessage": "Export failed: {error}",
+  "@backupPageExportFailedMessage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "backupPageOK": "OK",
   "backupPageCancel": "Cancel",
   "backupPageSelectImportMode": "Select Import Mode",
@@ -827,9 +854,11 @@
   "chatHistoryPagePin": "Pin",
   "chatHistoryPagePinned": "Pinned",
   "messageEditPageTitle": "Edit Message",
-  "messageEditPageSave": "Save",
-  "messageEditPageSaveAndSend": "Save & Send",
+  "messageEditPageSaveAsBranch": "Save as New Branch",
+  "messageEditPageSaveAsBranchAndSend": "Save as New Branch & Send",
+  "messageEditPageOverwriteSave": "Overwrite Save",
   "messageEditPageHint": "Enter message…",
+  "messageEditTrimWhitespace": "Trim whitespace",
   "messageEditAttachmentsTitle": "Attachments",
   "messageEditAddImage": "Add image",
   "messageEditAddFile": "Add file",
@@ -846,11 +875,10 @@
       }
     }
   },
-  "messageEditCloseConfirmTitle": "Save changes?",
-  "messageEditCloseConfirmContent": "Do you want to save your edits before closing?",
+  "messageEditCloseConfirmTitle": "Close without saving?",
+  "messageEditCloseConfirmContent": "Your edits will be discarded.",
   "messageEditCloseConfirmCancel": "Cancel",
-  "messageEditCloseConfirmDiscard": "Don't Save",
-  "messageEditCloseConfirmSave": "Save",
+  "messageEditCloseConfirmConfirm": "Confirm",
   "selectCopyPageTitle": "Select & Copy",
   "selectCopyPageCopyAll": "Copy All",
   "selectCopyPageCopiedAll": "Copied all",
@@ -878,6 +906,22 @@
   "compressContextMaxCharsLabel": "Characters",
   "compressContextInvalidLimit": "Enter a positive character count",
   "compressContextStartButton": "Compress",
+  "compressContextModelLabel": "Model",
+  "compressContextModelUnset": "Select a model",
+  "compressContextKeepRecentMessages": "Keep N",
+  "compressContextKeepCountLabel": "Keep recent messages",
+  "compressContextKeepAllMessages": "Keeping that many covers all messages — nothing to compress",
+  "compressContextEstimatePreview": "Summarize {summarized} chars, keep {kept} chars verbatim → about {minTokens}–{maxTokens} tokens (original about {totalTokens} tokens)",
+  "@compressContextEstimatePreview": {
+    "description": "Keep-recent compression preview: summarized/kept char counts and the estimated result token band",
+    "placeholders": {
+      "summarized": {"type": "int"},
+      "kept": {"type": "int"},
+      "minTokens": {"type": "int"},
+      "maxTokens": {"type": "int"},
+      "totalTokens": {"type": "int"}
+    }
+  },
   "bottomToolsSheetLearningMode": "Learning Mode",
   "bottomToolsSheetLearningModeDescription": "Help you learn step by step",
   "bottomToolsSheetConfigurePrompt": "Configure prompt",
@@ -896,8 +940,12 @@
   "messageMoreSheetShare": "Share",
   "messageMoreSheetSelectMessages": "Select Messages",
   "messageMoreSheetCreateMessageBranch": "Create Message Branch",
-  "messageMoreSheetDelete": "Delete Message",
-  "messageMoreSheetDeleteAllVersions": "Delete Branch",
+  "messageMoreSheetCopyFromHereWithBranches": "Copy from Here to New Conversation (Keep Branches)",
+  "messageMoreSheetCopyFromHereCurrentBranchOnly": "Copy from Here to New Conversation (Current Branch Only)",
+  "conversationForkFailed": "Could not copy the conversation",
+  "messageMoreSheetDeleteMessageOnly": "Delete This Message",
+  "messageMoreSheetDelete": "Delete Current Branch",
+  "messageMoreSheetDeleteAllVersions": "Delete All Branches",
   "reasoningBudgetSheetOff": "Off",
   "reasoningBudgetSheetAuto": "Auto",
   "reasoningBudgetSheetLight": "Light Reasoning",
@@ -1123,6 +1171,57 @@
     "placeholders": {
       "error": {
         "type": "String"
+      }
+    }
+  },
+  "sideDrawerMenuSelect": "Select",
+  "sideDrawerSelectionTitle": "Selected {count} items",
+  "@sideDrawerSelectionTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sideDrawerSelectionSelectAll": "Select all",
+  "sideDrawerSelectionDeselectAll": "Deselect all",
+  "sideDrawerSelectionPin": "Pin",
+  "sideDrawerSelectionUnpin": "Unpin",
+  "sideDrawerSelectionMove": "Move",
+  "sideDrawerSelectionDelete": "Delete",
+  "sideDrawerSelectionDeleteConfirmTitle": "Delete conversations",
+  "sideDrawerSelectionDeleteConfirmContent": "Delete {count} conversations?",
+  "@sideDrawerSelectionDeleteConfirmContent": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sideDrawerDeleteSelectedSnackbar": "Deleted {count} conversations",
+  "@sideDrawerDeleteSelectedSnackbar": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sideDrawerMoveSelectedSnackbar": "Moved {count} conversations",
+  "@sideDrawerMoveSelectedSnackbar": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sideDrawerMoveSelectedWithSkippedSnackbar": "Moved {moved} conversations; skipped {skipped} that are generating",
+  "@sideDrawerMoveSelectedWithSkippedSnackbar": {
+    "placeholders": {
+      "moved": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
       }
     }
   },
@@ -1473,6 +1572,10 @@
   "modelDetailSheetOpenaiCodeInterpreterToolDescription": "Enable code interpreter tool (container auto, memory limit 4g)",
   "modelDetailSheetOpenaiImageGenerationTool": "Image Generation",
   "modelDetailSheetOpenaiImageGenerationToolDescription": "Enable image generation tool",
+  "modelDetailSheetOpenRouterWebFetchTool": "Web Fetch",
+  "modelDetailSheetOpenRouterWebFetchToolDescription": "Allow OpenRouter to fetch web pages for the model.",
+  "modelDetailSheetOpenRouterShellTool": "Shell",
+  "modelDetailSheetOpenRouterShellToolDescription": "Allow OpenRouter's server-side shell tool in Responses mode.",
   "modelDetailSheetCancelButton": "Cancel",
   "modelDetailSheetAddButton": "Add",
   "modelDetailSheetConfirmButton": "Confirm",
@@ -1681,6 +1784,17 @@
   "miniMapTitle": "Minimap",
   "miniMapTooltip": "Minimap",
   "miniMapScrollToBottomTooltip": "Scroll to bottom",
+  "miniMapSearchMatchCount": "{count}",
+  "@miniMapSearchMatchCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "miniMapSearchNoResults": "No matching messages",
+  "miniMapFullWindow": "Show in full window",
+  "miniMapRestoreWindow": "Restore window size",
+  "miniMapActualSizeTooltip": "100%",
+  "miniMapFitHorizontalTooltip": "Fit horizontal",
   "treeBranchPanelTitle": "Context branches",
   "treeBranchRootLabel": "Main branch",
   "treeBranchDefaultLabel": "Branch",
@@ -1922,6 +2036,9 @@
   "displaySettingsPageNewChatOnAssistantSwitchTitle": "New chat when switching assistants",
   "displaySettingsPageNewChatOnLaunchTitle": "New Chat on Launch",
   "displaySettingsPageEnterToSendTitle": "Enter Key to Send",
+  "displaySettingsPageLongPasteAsFileTitle": "Paste long text as file",
+  "displaySettingsPageLongPasteAsFileThresholdTitle": "Conversion threshold",
+  "displaySettingsPageLongPasteAsFileThresholdUnit": "characters",
   "displaySettingsPageSendShortcutTitle": "Send Shortcut",
   "displaySettingsPageSendShortcutEnter": "Enter",
   "displaySettingsPageSendShortcutCtrlEnter": "Ctrl/Cmd + Enter",
@@ -1952,8 +2069,6 @@
   "displaySettingsPageAppFontTitle": "App Font",
   "displaySettingsPageCodeFontTitle": "Code Font",
   "fontPickerChooseLocalFile": "Choose Local File",
-  "fontPickerGetFromGoogleFonts": "Browse Google Fonts",
-  "fontPickerFilterHint": "Filter fonts...",
   "desktopFontLoading": "Loading fonts…",
   "displaySettingsPageFontLocalFileLabel": "Local file",
   "displaySettingsPageFontResetLabel": "Reset font settings",
@@ -2505,6 +2620,7 @@
   "contextLogSourceChatHistory": "Chat history",
   "contextLogSourceToolCall": "Tool call",
   "contextLogSourceToolResult": "Tool result",
+  "contextLogTokensEstimateHint": "Token counts are estimates only; use the model's actual usage as the source of truth.",
   "contextLogSnapshotsCount": "{count} snapshots",
   "@contextLogSnapshotsCount": {
     "placeholders": {
@@ -2584,19 +2700,30 @@
   "assistantEditDeleteSummaryTitle": "Clear Summary",
   "assistantEditDeleteSummaryContent": "Are you sure you want to clear this summary?",
   "homePageProcessingFiles": "Processing files...",
-  "fileUploadDuplicateTitle": "File already exists",
-  "fileUploadDuplicateContent": "A file named {fileName} already exists. Use the existing file?",
-  "@fileUploadDuplicateContent": {
-    "placeholders": {
-      "fileName": {
-        "type": "String"
-      }
-    }
-  },
-  "fileUploadDuplicateUseExisting": "Use existing",
-  "fileUploadDuplicateUploadNew": "Upload new",
   "settingsPageWorldBook": "World Book",
   "settingsPageMemory": "Memory",
+  "memorySettingsModeSection": "Memory mode",
+  "memorySettingsGlobalSubtitle": "Memory mode, model, and prompts",
+  "memorySettingsLegacyPromptTitle": "Legacy memory rules",
+  "memorySettingsLegacySection": "Legacy memory",
+  "memorySettingsInjectionSection": "Memory injection",
+  "memorySettingsInjectionMaxItemsTitle": "Items injected per type",
+  "memorySettingsInjectionMaxItemsSubtitle": "When a type exceeds this limit, only the newest items are injected. The rest can be fetched with memory_search_profile. A larger number is more complete but uses more tokens.",
+  "memorySettingsInjectionMaxItemsCustomButton": "Custom",
+  "memorySettingsInjectionMaxItemsCustomTitle": "Custom injection count",
+  "memorySettingsInjectionMaxItemsCustomLabel": "Count",
+  "memorySettingsInjectionMaxItemsCustomHint": "1-100",
+  "memorySettingsInjectionMaxItemsCustomDescription": "Enter a number between 1 and 100.",
+  "memorySettingsInjectionMaxItemsCustomInvalid": "Enter a number between 1 and 100",
+  "memoryPromptEditMigrateTitle": "Legacy migration",
+  "memoryPromptEditMigrateSubtitle": "Used when migration rewrites memory wording",
+  "memorySettingsMigrationBatchSizeSubtitle": "Number of legacy memories processed in each model request (1-24)",
+  "legacyMemoryMigrationContentMode": "Content",
+  "legacyMemoryMigrationContentPreserve": "Keep original",
+  "legacyMemoryMigrationContentPreserveDescription": "The model only assigns a type. The original wording is saved as-is.",
+  "legacyMemoryMigrationContentOrganize": "Rewrite with model",
+  "legacyMemoryMigrationContentOrganizeDescription": "The model classifies and rewrites each memory using the editable migration prompt.",
+  "legacyMemoryMigrationBatchSize": "Batch size",
   "memorySettingsPageTitle": "Memory",
   "memorySettingsModelSection": "Memory model",
   "memorySettingsModelTitle": "Processing model",
@@ -2605,6 +2732,21 @@
   "memorySettingsAboutTitle": "About memory",
   "memorySettingsAboutSubtitle": "How memory works and when it runs",
   "memorySettingsAboutBody": "How memory works\nMemories are organized as Identity / Workflow / Voice / Instruction, with global or assistant scope. Relevant memories are injected into the model context; when there are many, a summary is shown first and the model can query for more.\n\nBackground processing and triggers\nThe processing model powers the background pipeline: decide whether to remember, extract candidates, dedupe/merge, and distill the user profile when needed. With Auto-organize on, it runs every N turns after chats; you can also run Organize manually on the assistant Memory tab. That is why this model is called often.\n\nKeep caching healthy\nKeep the injected memory prefix stable and avoid pointless bulk edits or reshuffles so prompt cache can hit more often, lowering cost and latency. Day-to-day single-entry edits usually have limited impact.",
+  "memoryAboutQuickstartTitle": "Get started",
+  "memoryAboutQuickstartBody": "1. In Settings → Memory, choose a processing model.\n2. On the assistant Memory tab, turn on long-term memory and Auto-organize.\n3. Chat for a few turns or tap Organize, then open All memories to see what was saved.",
+  "memoryAboutTypesTitle": "Memory types",
+  "memoryAboutTypesBody": "Identity: stable facts about the user, such as how to address them, role, language, and long-term preferences. Write complete third-person statements.\n\nWorkflow: how they like to get work done — tools, formats, and review habits.\n\nVoice: how they want the assistant to sound — tone, length, and language style.\n\nInstruction: standing rules the assistant should follow, not one-off tasks from this chat.",
+  "memoryAboutScopeTitle": "Global vs assistant",
+  "memoryAboutScopeBody": "Global memories are injected for every assistant. Assistant-scope memories are only visible to that assistant. Use global for facts that should follow the user everywhere; use assistant scope for rules or context that belong to one persona.",
+  "memoryAboutInjectionTitle": "How memories are injected",
+  "memoryAboutInjectionBody": "At the start of a chat, the newest items of each type are placed in the model context. If a type exceeds the injection limit, the block is marked mode=\"summary\" with total and shown counts; the rest can be fetched with memory_search_profile. Raise the limit in Settings → Memory for more completeness at a higher token cost.",
+  "memoryAboutPipelineTitle": "Background pipeline",
+  "memoryAboutPipelineBody": "Auto-organize runs after chats: decide whether anything is worth remembering, extract candidates, dedupe and merge, then distill identity items into the user profile when needed. You can also tap Organize on the assistant Memory tab. That is why the processing model is called often.",
+  "memoryAboutCacheTitle": "Keep caching healthy",
+  "memoryAboutCacheBody": "The injected memory prefix is kept stable so unchanged chats can reuse the prompt cache, lowering cost and latency. Avoid pointless bulk edits or reshuffles. Day-to-day single-entry edits usually have limited impact.",
+  "memoryAboutFaqTitle": "FAQ",
+  "memoryAboutFaqWhyNotRememberedTitle": "Why wasn't this remembered?",
+  "memoryAboutFaqWhyNotRememberedBody": "Organize is skipped when there are not enough new messages to organize, no new messages to organize, or no memory processing model selected. Temporary chats are not saved to memory. You can also turn memory or Auto-organize off per assistant.",
   "memorySettingsThinkingTitle": "Enable thinking",
   "memorySettingsThinkingSubtitle": "Allow the memory model to use reasoning when supported",
   "memorySettingsPromptLangSection": "Prompt language",
@@ -2727,6 +2869,8 @@
     }
   },
   "memoryOrganizeStatusSkipped": "nothing to remember",
+  "memoryOrganizeStatusSkippedReason": "skipped: {reason}",
+  "@memoryOrganizeStatusSkippedReason": {"placeholders": {"reason": {"type": "String"}}},
   "memoryOrganizeStatusFailed": "Failed: {reason}",
   "@memoryOrganizeStatusFailed": {
     "placeholders": {
@@ -2772,6 +2916,31 @@
   "userProfileClear": "Clear",
   "userProfileSave": "Save",
   "userProfileEmptyValue": "Not set",
+  "memoryOutcomeAssistantMissing": "Assistant not found",
+  "memoryOutcomeAutoOrganizeOff": "Auto-organize is off",
+  "memoryOutcomeBelowThreshold": "Not enough new messages to organize",
+  "memoryOutcomeChatSearchUnavailable": "Chat search is unavailable",
+  "memoryOutcomeConversationMissing": "Conversation not found",
+  "memoryOutcomeDistillFailed": "Could not distill the user profile",
+  "memoryOutcomeEmptyWindow": "No new messages to organize",
+  "memoryOutcomeExtractParseFailed": "The memory extract reply could not be parsed",
+  "memoryOutcomeExtractRequestFailed": "Could not reach the memory model to extract memories",
+  "memoryOutcomeGateParseFailed": "The remember/skip check returned an unreadable reply",
+  "memoryOutcomeGateRequestFailed": "Could not reach the memory model for the remember/skip check",
+  "memoryOutcomeInvalidMemoryContent": "Invalid memory content",
+  "memoryOutcomeInvalidMemoryId": "Invalid memory id",
+  "memoryOutcomeInvalidMemoryType": "Invalid memory type",
+  "memoryOutcomeInvalidProfileFields": "Invalid profile fields",
+  "memoryOutcomeInvalidQuery": "Invalid search query",
+  "memoryOutcomeMemoryDisabled": "Memory is off for this assistant",
+  "memoryOutcomeMemoryExecutionError": "A memory tool failed to run",
+  "memoryOutcomeMemoryModelMissing": "The selected memory model is no longer available",
+  "memoryOutcomeMemoryModelUnset": "No memory processing model selected",
+  "memoryOutcomeMemoryNotFound": "Memory not found",
+  "memoryOutcomeQueueOverflow": "The organize queue was full, so this run was dropped",
+  "memoryOutcomeStreaming": "Skipped while a reply is still streaming",
+  "memoryOutcomeTemporaryConversation": "Temporary chats are not saved to memory",
+  "memoryOutcomeUnsupportedTool": "Unsupported memory tool",
   "legacyMemoryPageTitle": "Legacy memories",
   "legacyMemoryBanner": "These memories came from an older version and are not used in chats. You can migrate them into the current memory system.",
   "legacyMemoryEmpty": "No legacy memories",
@@ -2822,6 +2991,14 @@
     }
   },
   "legacyMemoryMigrationFailed": "Migration stopped. You can retry; memories already saved will be skipped.",
+  "legacyMemoryMigrationContinue": "Continue migration",
+  "legacyMemoryMigrationErrorAuth": "Authentication failed. Check the API key.",
+  "legacyMemoryMigrationErrorFormat": "The model returned an invalid response.",
+  "legacyMemoryMigrationErrorNetwork": "Network error. Check the connection and try again.",
+  "legacyMemoryMigrationErrorOther": "Migration failed: {message}",
+  "@legacyMemoryMigrationErrorOther": {"placeholders": {"message": {"type": "String"}}},
+  "legacyMemoryMigrationPartial": "{created} migrated · {skipped} skipped · {failed} failed",
+  "@legacyMemoryMigrationPartial": {"placeholders": {"created": {"type": "int"}, "skipped": {"type": "int"}, "failed": {"type": "int"}}},
   "legacyMemoryMigrationRetry": "Retry",
   "legacyMemoryMigrationClose": "Done",
   "legacyMemoryModeTitle": "Use legacy memory",
@@ -3294,5 +3471,27 @@
   "sqliteMigrationFailedTitle": "Storage migration failed",
   "sqliteMigrationFailedSubtitle": "The migration was stopped. Review the error and retry only after the cause is resolved.",
   "sqliteMigrationRetryButton": "Retry migration",
-  "sqliteMigrationRestartButton": "Restart JO-AIClient"
+  "sqliteMigrationRestartButton": "Restart JO-AIClient",
+  "messageStyleSettingsPageTitle": "Message Style",
+  "messageStyleSettingsPageReset": "Reset",
+  "messageStyleSettingsPageResetConfirm": "Reset all message style customizations?",
+  "messageStyleSettingsPageCancel": "Cancel",
+  "messageStyleSettingsPageLight": "Light",
+  "messageStyleSettingsPageDark": "Dark",
+  "messageStyleSettingsPageDefaultHint": "Default style follows the current theme and has no extra controls.",
+  "messageStyleSettingsPageStyleDefaultSubtitle": "Follows the theme; not customizable",
+  "messageStyleSettingsPageStyleFrostedSubtitle": "Translucent frosted glass",
+  "messageStyleSettingsPageStyleSolidSubtitle": "Opaque solid fill",
+  "messageStyleSettingsPageBlur": "Blur",
+  "messageStyleSettingsPageBlurHint": "Blur applies to content behind the bubble. It is barely visible without a chat wallpaper.",
+  "messageStyleSettingsPageBackgroundColor": "Background",
+  "messageStyleSettingsPageBackgroundOpacity": "Background Opacity",
+  "messageStyleSettingsPageBorderColor": "Border",
+  "messageStyleSettingsPageBorderOpacity": "Border Opacity",
+  "messageStyleSettingsPageBorderWidth": "Border Width",
+  "messageStyleSettingsPageTextColor": "Text",
+  "messageStyleSettingsPageCornerRadius": "Corner Radius",
+  "messageStyleSettingsPagePreviewUser": "This is a user message",
+  "messageStyleSettingsPagePreviewAssistant": "This is an assistant reply.",
+  "messageStyleSettingsPagePreviewThinking": "Thinking"
 }

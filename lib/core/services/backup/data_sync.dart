@@ -45,7 +45,7 @@ class DataSync {
   // 16 MiB 的元数据上限可让清单解析和条目元数据保持有界。
   static const _maxManifestBytes = 16 * 1024 * 1024;
   // 设置会被解析为单个 JSON 对象，因此要保持其解码输入有界。
-  static const _maxSettingsBytes = 16 * 1024 * 1024;
+  static const _maxSettingsBytes = 1024 * 1024 * 1024;
   // ZIP64 支持更大的条目。恢复过程保持明确且可诊断的边界。
   static const _maxRestoreEntryBytes = 8 * 1024 * 1024 * 1024;
   static const _maxRestoreTotalBytes = 16 * 1024 * 1024 * 1024;
@@ -89,6 +89,37 @@ class DataSync {
       restoreFiles: restoreFiles,
     );
   });
+
+  // 这些 isolate 入口刻意放在恢复方法作用域之外。恢复方法持有的界面进度
+  // 回调可能保留 ValueNotifier/Completer，即使后台工作只需要路径，也不能
+  // 让这个闭包跨越 isolate 边界。
+  static Future<void> _extractZipInIsolate({
+    required String zipPath,
+    required String extractDirPath,
+    required SendPort progressPort,
+  }) => Isolate.run(() {
+    _extractZipSync(
+      zipPath,
+      extractDirPath,
+      onProgress: (processed, total) {
+        progressPort.send([processed, total]);
+      },
+    );
+  });
+
+  static Future<_VersionedBackupInfo> _preflightVersionedBackupInIsolate({
+    required String manifestPath,
+    required String extractDirPath,
+  }) => Isolate.run(
+    () => _preflightVersionedBackup(
+      manifestPath: manifestPath,
+      extractDirPath: extractDirPath,
+    ),
+  );
+
+  static Future<Map<String, dynamic>> _readSettingsJsonInIsolate(
+    String settingsPath,
+  ) => Isolate.run(() => _readSettingsJsonSync(settingsPath));
 
   // ===== WebDAV 辅助方法 =====
   Uri _collectionUri(WebDavConfig cfg) {
@@ -612,15 +643,11 @@ class DataSync {
       }
     });
     try {
-      await Isolate.run(() {
-        _extractZipSync(
-          zipPath,
-          extractDirPath,
-          onProgress: (processed, total) {
-            sendPort.send([processed, total]);
-          },
-        );
-      });
+      await _extractZipInIsolate(
+        zipPath: zipPath,
+        extractDirPath: extractDirPath,
+        progressPort: sendPort,
+      );
     } finally {
       await subscription.cancel();
       progressPort.close();
@@ -1096,10 +1123,11 @@ class DataSync {
         '${p.basenameWithoutExtension(zipFile.path)}.joaiclient',
       ),
     );
+    final stagingFile = File('${outputFile.path}.part');
     try {
       await JoaiclientArchive.wrapZipPayload(
         zipFile: zipFile,
-        outputFile: outputFile,
+        outputFile: stagingFile,
         onProgress: (update) => onProgress?.call(
           ProgressUpdate(
             value: update.fraction == null
@@ -1108,10 +1136,16 @@ class DataSync {
           ),
         ),
       );
+      // Publish only after the complete header and payload are closed. This
+      // prevents concurrent scanners or cleanup code from observing a partial
+      // .joaiclient file on platforms with delayed filesystem visibility.
+      if (await outputFile.exists()) await outputFile.delete();
+      await stagingFile.rename(outputFile.path);
       await zipFile.delete();
       onProgress?.call(const ProgressUpdate(value: 1));
       return outputFile;
     } catch (_) {
+      await _deleteFileQuietly(stagingFile);
       await _deleteFileQuietly(outputFile);
       rethrow;
     }
@@ -1552,19 +1586,15 @@ class DataSync {
       if (await manifestFile.exists()) {
         final manifestPath = manifestFile.path;
         final extractDirPath = extractDir.path;
-        versionedBackup = await Isolate.run(
-          () => _preflightVersionedBackup(
-            manifestPath: manifestPath,
-            extractDirPath: extractDirPath,
-          ),
+        versionedBackup = await _preflightVersionedBackupInIsolate(
+          manifestPath: manifestPath,
+          extractDirPath: extractDirPath,
         );
       } else {
         versionedBackup = null;
       }
       final settingsPath = settingsFile.path;
-      final settings = await Isolate.run(
-        () => _readSettingsJsonSync(settingsPath),
-      );
+      final settings = await _readSettingsJsonInIsolate(settingsPath);
       BackupSettingsValidator.normalizeAndValidate(settings);
       final businessRestore = BusinessRestoreService(businessRepository);
       Future<void> Function()? pendingBusinessRestore;

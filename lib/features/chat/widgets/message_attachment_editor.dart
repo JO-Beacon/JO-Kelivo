@@ -417,7 +417,6 @@ Future<List<MessagePart>> _pickAndImportAttachments(
       final savedPath = await FileImportHelper.copyXFile(
         XFile(sourcePath),
         uploadDirectory,
-        context,
       );
       if (savedPath == null) continue;
       final name = p.basename(savedPath);

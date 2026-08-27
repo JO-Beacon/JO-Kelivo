@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import "../../../support/business_test_harness.dart";
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
@@ -121,6 +123,43 @@ void main() {
     expect(restoredSplits.toolCounts, const [2]);
   });
 
+  test(
+    'empty or malformed content splits are omitted and do not hide details',
+    () {
+      final controller = buildController();
+      final segment = ReasoningSegmentData()
+        ..text = 'thinking'
+        ..expanded = true;
+
+      final emptyJson = controller.serializeReasoningSegmentsWithSplits(
+        [segment],
+        contentSplitOffsets: const [],
+        reasoningCountAtSplit: const [],
+        toolCountAtSplit: const [],
+        reasoningDetails: const [
+          {'type': 'reasoning.encrypted', 'data': 'sig'},
+        ],
+      );
+      expect(
+        (jsonDecode(emptyJson) as Map<String, dynamic>).containsKey(
+          'contentSplits',
+        ),
+        isFalse,
+      );
+      expect(controller.deserializeContentSplits(emptyJson), isNull);
+      expect(controller.deserializeReasoningDetails(emptyJson), isNotEmpty);
+
+      const malformed =
+          '{"v":2,"segments":[{"text":"keep","expanded":true,"toolStartIndex":0}],"contentSplits":{"offsets":[1],"reasoningCounts":[1,2],"toolCounts":[0]},"reasoningDetails":[{"type":"reasoning.encrypted","data":"sig"}]}';
+      expect(controller.deserializeContentSplits(malformed), isNull);
+      expect(
+        controller.deserializeReasoningSegments(malformed).single.text,
+        'keep',
+      );
+      expect(controller.deserializeReasoningDetails(malformed), isNotEmpty);
+    },
+  );
+
   test('v1 reasoning payload remains compatible without content splits', () {
     final controller = buildController();
     final segment = ReasoningSegmentData()
@@ -220,42 +259,38 @@ void main() {
     );
   });
 
-  test(
-    'restoreMessageUiState restores tool parts and empty v2 split metadata',
-    () {
-      final controller = buildController();
-      final message = ChatMessage(
-        id: 'assistant-1',
-        role: 'assistant',
-        content: '让我帮你搜索一下',
-        conversationId: 'conversation-1',
-        reasoningSegmentsJson: controller.serializeReasoningSegmentsWithSplits(
-          const [],
-          contentSplitOffsets: const [],
-          reasoningCountAtSplit: const [],
-          toolCountAtSplit: const [],
-        ),
-      );
+  test('restoreMessageUiState treats empty v2 split metadata as absent', () {
+    final controller = buildController();
+    final message = ChatMessage(
+      id: 'assistant-1',
+      role: 'assistant',
+      content: '让我帮你搜索一下',
+      conversationId: 'conversation-1',
+      reasoningSegmentsJson: controller.serializeReasoningSegmentsWithSplits(
+        const [],
+        contentSplitOffsets: const [],
+        reasoningCountAtSplit: const [],
+        toolCountAtSplit: const [],
+      ),
+    );
 
-      controller.restoreMessageUiState(
-        message,
-        getToolEventsFromDb: (_) => const [
-          {
-            'id': 'tool-1',
-            'name': 'search_web',
-            'arguments': {'query': 'Kelivo'},
-            'content': null,
-          },
-        ],
-        getGeminiThoughtSigFromDb: (_) => null,
-      );
+    controller.restoreMessageUiState(
+      message,
+      getToolEventsFromDb: (_) => const [
+        {
+          'id': 'tool-1',
+          'name': 'search_web',
+          'arguments': {'query': 'Kelivo'},
+          'content': null,
+        },
+      ],
+      getGeminiThoughtSigFromDb: (_) => null,
+    );
 
-      expect(controller.contentSplits[message.id], isNotNull);
-      expect(controller.contentSplits[message.id]!.offsets, isEmpty);
-      expect(controller.toolParts[message.id], hasLength(1));
-      expect(controller.toolParts[message.id]!.single.loading, isTrue);
-    },
-  );
+    expect(controller.contentSplits[message.id], isNull);
+    expect(controller.toolParts[message.id], hasLength(1));
+    expect(controller.toolParts[message.id]!.single.loading, isTrue);
+  });
 
   test(
     'dedupeToolPartsList keeps completed no-id tool results with different content',

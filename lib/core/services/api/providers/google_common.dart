@@ -587,7 +587,9 @@ Stream<ChatStreamChunk> _sendGoogleStream(
           'name': name,
           if (desc.isNotEmpty) 'description': desc,
         };
-        if (params != null) d['parameters'] = _cleanSchemaForGemini(params);
+        if (params != null) {
+          d['parameters'] = _cleanSchemaForGemini(params, stringEnumOnly: true);
+        }
         decls.add(d);
       }
       if (decls.isNotEmpty) {
@@ -682,7 +684,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         if (u != null) {
           final prompt = (u['promptTokenCount'] ?? 0) as int? ?? 0;
           final completion = (u['candidatesTokenCount'] ?? 0) as int? ?? 0;
-          totalUsage = (totalUsage ?? const TokenUsage()).merge(
+          totalUsage = (totalUsage ?? const TokenUsage()).accumulate(
             TokenUsage(
               promptTokens: prompt,
               completionTokens: completion,
@@ -1084,7 +1086,10 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       if (params != null) {
         // Google Gemini 要求严格符合 JSON Schema
         // 修复缺少 'items' 字段的数组属性
-        final cleanedParams = _cleanSchemaForGemini(params);
+        final cleanedParams = _cleanSchemaForGemini(
+          params,
+          stringEnumOnly: true,
+        );
         d['parameters'] = cleanedParams;
       }
       decls.add(d);

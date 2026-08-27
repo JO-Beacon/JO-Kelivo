@@ -8,6 +8,7 @@ import '../../l10n/app_localizations.dart';
 import '../../shared/widgets/snackbar.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../widgets/desktop_dialog_style.dart';
 
 Future<void> showDesktopMcpTimeoutDialog(BuildContext context) async {
   final cs = Theme.of(context).colorScheme;
@@ -17,7 +18,7 @@ Future<void> showDesktopMcpTimeoutDialog(BuildContext context) async {
     builder: (ctx) => Dialog(
       backgroundColor: cs.surface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: DesktopDialogStyle.shape(ctx),
       child: const _DesktopMcpTimeoutDialog(),
     ),
   );
@@ -140,7 +141,9 @@ class _DesktopMcpTimeoutDialogState extends State<_DesktopMcpTimeoutDialog> {
                   onTap: () => Navigator.of(context).maybePop(),
                   background: Colors.transparent,
                   foreground: cs.onSurface,
-                  hoverBackground: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05),
+                  hoverBackground: cs.onSurface.withValues(
+                    alpha: isDark ? 0.06 : 0.05,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 _ActionBtn(

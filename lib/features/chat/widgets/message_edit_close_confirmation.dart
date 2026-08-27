@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../desktop/widgets/desktop_dialog_style.dart';
 import '../../../l10n/app_localizations.dart';
 
-enum MessageEditCloseAction { cancel, discard, save }
+enum MessageEditCloseAction { cancel, confirm }
 
 Future<MessageEditCloseAction?> showMessageEditCloseConfirmation(
   BuildContext context,
@@ -11,6 +12,7 @@ Future<MessageEditCloseAction?> showMessageEditCloseConfirmation(
   return showDialog<MessageEditCloseAction>(
     context: context,
     builder: (dialogContext) => AlertDialog(
+      shape: DesktopDialogStyle.shape(dialogContext),
       title: Text(l10n.messageEditCloseConfirmTitle),
       content: Text(l10n.messageEditCloseConfirmContent),
       actions: [
@@ -21,13 +23,8 @@ Future<MessageEditCloseAction?> showMessageEditCloseConfirmation(
         ),
         TextButton(
           onPressed: () =>
-              Navigator.of(dialogContext).pop(MessageEditCloseAction.discard),
-          child: Text(l10n.messageEditCloseConfirmDiscard),
-        ),
-        TextButton(
-          onPressed: () =>
-              Navigator.of(dialogContext).pop(MessageEditCloseAction.save),
-          child: Text(l10n.messageEditCloseConfirmSave),
+              Navigator.of(dialogContext).pop(MessageEditCloseAction.confirm),
+          child: Text(l10n.messageEditCloseConfirmConfirm),
         ),
       ],
     ),

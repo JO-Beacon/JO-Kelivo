@@ -26,6 +26,113 @@ ProviderConfig _openAIConfig(String baseUrl) {
 
 void main() {
   group('Claude via OpenAI-compatible proxy thinking signature', () {
+    test('preserves Gemini extra_content only on the Google replay route', () {
+      final toolCall = <String, dynamic>{
+        'id': 'call-1',
+        'type': 'function',
+        'function': <String, dynamic>{'name': 'lookup', 'arguments': '{}'},
+        'extra_content': <String, dynamic>{
+          'google': <String, dynamic>{'thought_signature': 'sig'},
+        },
+      };
+
+      final google = ChatApiService.normalizeOpenAIToolCallForTest(
+        toolCall,
+        includeGoogleExtraContent: true,
+      );
+      final ordinary = ChatApiService.normalizeOpenAIToolCallForTest(
+        toolCall,
+        includeGoogleExtraContent: false,
+      );
+
+      expect(google['extra_content'], isNotNull);
+      expect(ordinary.containsKey('extra_content'), isFalse);
+    });
+
+    test('accumulates usage across streamed tool-call rounds', () async {
+      final requestBodies = <Map<String, dynamic>>[];
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        requestBodies.add(
+          (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
+              .cast<String, dynamic>(),
+        );
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType(
+          'text',
+          'event-stream',
+          charset: 'utf-8',
+        );
+        if (requestBodies.length == 1) {
+          request.response.write(
+            'data: ${jsonEncode({
+              'choices': [
+                {
+                  'delta': {
+                    'tool_calls': [
+                      {
+                        'index': 0,
+                        'id': 'call_lookup',
+                        'function': {'name': 'lookup', 'arguments': '{}'},
+                      },
+                    ],
+                  },
+                  'finish_reason': 'tool_calls',
+                },
+              ],
+              'usage': {'prompt_tokens': 10, 'completion_tokens': 2},
+            })}\n\n',
+          );
+        } else {
+          request.response.write(
+            'data: ${jsonEncode({
+              'choices': [
+                {
+                  'delta': {'content': 'done'},
+                  'finish_reason': 'stop',
+                },
+              ],
+              'usage': {'prompt_tokens': 20, 'completion_tokens': 4},
+            })}\n\n',
+          );
+        }
+        request.response.write('data: [DONE]\n\n');
+        await request.response.close();
+      });
+
+      final chunks = await ChatApiService.sendMessageStream(
+        config: _openAIConfig(
+          'http://${server.address.address}:${server.port}/v1',
+        ),
+        modelId: 'gpt-4o-mini',
+        messages: const [
+          {'role': 'user', 'content': 'look this up'},
+        ],
+        onToolCall: (name, args, {toolCallId}) async => 'result',
+      ).toList();
+
+      expect(requestBodies, hasLength(2));
+      expect(chunks.last.usage?.promptTokens, 30);
+      expect(chunks.last.usage?.completionTokens, 6);
+      expect(chunks.last.usage?.totalTokens, 36);
+    });
+
+    test('merges reasoning fragments and drops signature-only leftovers', () {
+      final normalized = ChatApiService.normalizeClaudeReasoningDetailsForTest([
+        {'type': 'reasoning.text', 'text': 'part A'},
+        {'type': 'reasoning.text', 'text': 'part B', 'signature': 'sig-1'},
+        {'type': 'reasoning.text', 'text': '', 'signature': 'sig-1'},
+      ]);
+
+      expect(normalized, hasLength(1));
+      expect(normalized!.single['text'], 'part Apart B');
+      expect(normalized.single['signature'], 'sig-1');
+    });
+
     test('stream emits captured reasoning_details for persistence', () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() async {

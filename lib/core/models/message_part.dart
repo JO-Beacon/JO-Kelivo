@@ -243,3 +243,130 @@ bool _optionalBool(Map<String, dynamic> map, String key) {
   }
   return value;
 }
+
+/// 判断持久化的 content split 三元组是否足以驱动历史交错渲染。
+///
+/// 空数组、长度不一致、负数和计数倒退都不能安全地重建消息时间线，
+/// 这类数据必须回退到 [MessagePart] 的到达顺序。
+bool contentSplitsAreUsable(
+  List<int>? offsets,
+  List<int>? reasoningCounts,
+  List<int>? toolCounts,
+) {
+  if (offsets == null || reasoningCounts == null || toolCounts == null) {
+    return false;
+  }
+  if (offsets.isEmpty ||
+      offsets.length != reasoningCounts.length ||
+      offsets.length != toolCounts.length) {
+    return false;
+  }
+
+  var previousOffset = 0;
+  var previousReasoning = 0;
+  var previousTool = 0;
+  for (var i = 0; i < offsets.length; i++) {
+    final offset = offsets[i];
+    final reasoning = reasoningCounts[i];
+    final tool = toolCounts[i];
+    if (offset < 0 || reasoning < 0 || tool < 0) return false;
+    if (i > 0 &&
+        (offset < previousOffset ||
+            reasoning < previousReasoning ||
+            tool < previousTool)) {
+      return false;
+    }
+    previousOffset = offset;
+    previousReasoning = reasoning;
+    previousTool = tool;
+  }
+  return true;
+}
+
+/// 只解析通过结构校验的持久化 content split 三元组。
+///
+/// 长度不一致时不能像旧逻辑一样截短到最短数组，否则损坏数据会被误判为有效。
+({List<int> offsets, List<int> reasoningCounts, List<int> toolCounts})?
+tryParseContentSplits(dynamic raw) {
+  if (raw is! Map) return null;
+  final json = raw is Map<String, dynamic> ? raw : raw.cast<String, dynamic>();
+  final offsets = _tryContentSplitIntList(json['offsets']);
+  final reasoningCounts = _tryContentSplitIntList(json['reasoningCounts']);
+  final toolCounts = _tryContentSplitIntList(json['toolCounts']);
+  if (!contentSplitsAreUsable(offsets, reasoningCounts, toolCounts)) {
+    return null;
+  }
+  return (
+    offsets: offsets!,
+    reasoningCounts: reasoningCounts!,
+    toolCounts: toolCounts!,
+  );
+}
+
+List<int>? _tryContentSplitIntList(dynamic value) {
+  if (value == null) return const <int>[];
+  if (value is! List) return null;
+  final result = <int>[];
+  for (final item in value) {
+    if (item is int) {
+      result.add(item);
+    } else if (item is num && item == item.roundToDouble()) {
+      result.add(item.toInt());
+    } else {
+      return null;
+    }
+  }
+  return result;
+}
+
+/// 判断有效的 split 三元组是否完整覆盖当前思考/工具时间线。
+bool contentSplitsMatchTimeline({
+  required List<int> offsets,
+  required List<int> reasoningCounts,
+  required List<int> toolCounts,
+  required int contentLength,
+  required List<int> stepReasoningCounts,
+  required List<int> stepToolCounts,
+}) {
+  if (!contentSplitsAreUsable(offsets, reasoningCounts, toolCounts)) {
+    return false;
+  }
+  if (stepReasoningCounts.length != stepToolCounts.length ||
+      stepReasoningCounts.isEmpty) {
+    return false;
+  }
+
+  var stepIndex = 0;
+  for (var i = 0; i < offsets.length; i++) {
+    if (offsets[i] > contentLength) return false;
+    final targetReasoning = reasoningCounts[i];
+    final targetTool = toolCounts[i];
+    var found = false;
+    while (stepIndex < stepReasoningCounts.length) {
+      final reasoningAfter = stepReasoningCounts[stepIndex];
+      final toolAfter = stepToolCounts[stepIndex];
+      stepIndex++;
+      if (reasoningAfter == targetReasoning && toolAfter == targetTool) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) return false;
+  }
+  return stepIndex == stepReasoningCounts.length;
+}
+
+/// 判断是否应该按结构化 parts 的到达顺序渲染助手消息。
+///
+/// 有有效 split 的历史消息继续使用历史交错渲染；没有有效 split 时，
+/// 新消息中的思考、工具调用和图片必须保持 parts 顺序。
+bool renderAssistantFromParts({
+  required List<MessagePart> parts,
+  required bool hasContentSplits,
+}) {
+  if (hasContentSplits) return false;
+  for (final part in parts) {
+    if (part is ReasoningPart || part is ToolCallPart) return true;
+  }
+  return parts.any((part) => part is ImagePart);
+}

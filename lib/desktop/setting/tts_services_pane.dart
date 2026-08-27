@@ -16,6 +16,7 @@ import '../../shared/widgets/ios_switch.dart';
 import '../../shared/widgets/snackbar.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../widgets/desktop_dialog_style.dart';
 
 /// 桌面 TTS（语音服务）右侧面板。
 /// 将移动端 TTS 页面适配为桌面端，使用类似 DesktopSearchServicesPane
@@ -307,7 +308,7 @@ void _showErrorDialog(BuildContext context, String message) {
     context: context,
     builder: (ctx) => Dialog(
       backgroundColor: cs.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: DesktopDialogStyle.shape(ctx),
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 560),
@@ -372,10 +373,15 @@ void _showTtsSettingsDialog(BuildContext context) {
     context: context,
     builder: (ctx) => Dialog(
       backgroundColor: cs.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: DesktopDialogStyle.shape(ctx),
       insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 620, maxHeight: 720),
+        constraints: DesktopDialogStyle.proportionalConstraints(
+          ctx,
+          maxWidth: 620,
+          maxHeight: 720,
+          verticalInset: 24,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -580,9 +586,7 @@ class _SystemTtsCardState extends State<_SystemTtsCard> {
       builder: (ctx) {
         return Dialog(
           backgroundColor: cs.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+          shape: DesktopDialogStyle.shape(ctx),
           insetPadding: const EdgeInsets.symmetric(
             horizontal: 20,
             vertical: 18,
@@ -1085,7 +1089,7 @@ Future<TtsServiceOptions?> _showNetworkDialog(
     builder: (ctx) {
       return Dialog(
         backgroundColor: cs.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: DesktopDialogStyle.shape(ctx),
         insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),

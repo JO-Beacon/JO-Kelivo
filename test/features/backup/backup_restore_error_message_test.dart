@@ -29,6 +29,30 @@ void main() {
     );
   });
 
+  testWidgets('formats local export failures with the export prefix', (
+    tester,
+  ) async {
+    late BuildContext context;
+    await tester.pumpWidget(
+      WidgetsApp(
+        color: const Color(0xFFFFFFFF),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        builder: (buildContext, child) {
+          context = buildContext;
+          return const SizedBox.shrink();
+        },
+      ),
+    );
+
+    final l10n = AppLocalizations.of(context)!;
+    final message = l10n.backupPageExportFailedMessage(
+      backupRestoreErrorMessage(l10n, const FormatException('disk_full')),
+    );
+
+    expect(message, 'Export failed: FormatException: disk_full');
+  });
+
   testWidgets(
     'explains damaged JO-Kelivo archives and keeps the diagnostic code',
     (tester) async {

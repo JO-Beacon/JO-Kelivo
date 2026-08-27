@@ -93,6 +93,23 @@ void main() {
       );
       expect(d.relatedIds, ['mem_a1b2c3d4']);
     });
+
+    test('MERGE target outside mergeable scope degrades to NEW', () {
+      final decision = MemorySmartAdd.normalizeDecision(
+        const SmartAddDecision(
+          action: SmartAddAction.merge,
+          targetId: 'mem_global01',
+          mergedContent: 'merged',
+          relatedIds: ['mem_global01'],
+        ),
+        {'mem_global01'},
+        mergeableIds: const <String>{},
+      );
+
+      expect(decision.action, SmartAddAction.neu);
+      expect(decision.targetId, isNull);
+      expect(decision.relatedIds, ['mem_global01']);
+    });
   });
 
   group('parse batch / per-item (§18.1 item 12)', () {
@@ -308,5 +325,47 @@ Sure:
       expect(r.action, SmartAddAction.neu);
       expect(r.id, isNotNull);
     });
+
+    test(
+      'assistant-scoped item cannot merge into a global candidate',
+      () async {
+        await seedAssistant('a1');
+        final global = await memoryRepository.create(
+          scope: MemoryScope.global,
+          type: MemoryType.identity,
+          content: '用户住在上海。',
+          source: MemorySource.manual,
+        );
+
+        final result = await smartAdd.addOne(
+          item: const SmartAddItem(
+            type: MemoryType.identity,
+            content: '用户住在杭州。',
+            scope: MemoryScope.assistant,
+            assistantId: 'a1',
+          ),
+          visibilityAssistantId: 'a1',
+          source: MemorySource.tool,
+          lang: MemoryPromptLang.zh,
+          llmCall: (_) async => jsonEncode({
+            'action': 'MERGE',
+            'targetId': global.id,
+            'mergedContent': '用户住在上海和杭州。',
+            'relatedIds': <String>[],
+          }),
+        );
+
+        expect(result.action, SmartAddAction.neu);
+        expect(result.id, isNot(global.id));
+        final entries = await memoryRepository.readAll();
+        expect(
+          entries.singleWhere((entry) => entry.id == global.id).content,
+          '用户住在上海。',
+        );
+        final created = entries.singleWhere((entry) => entry.id == result.id);
+        expect(created.scope, MemoryScope.assistant);
+        expect(created.assistantId, 'a1');
+      },
+    );
   });
 }

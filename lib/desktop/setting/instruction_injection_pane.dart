@@ -14,6 +14,7 @@ import '../../core/providers/instruction_injection_provider.dart';
 import '../../shared/widgets/snackbar.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../widgets/desktop_dialog_style.dart';
 
 class DesktopInstructionInjectionPane extends StatefulWidget {
   const DesktopInstructionInjectionPane({super.key});
@@ -457,7 +458,7 @@ class _InstructionInjectionEditDialogState
     return Dialog(
       backgroundColor: cs.surface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: DesktopDialogStyle.shape(context),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),
         child: Stack(

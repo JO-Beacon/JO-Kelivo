@@ -35,6 +35,10 @@ final class SqliteSchemaMigrationService implements MigrationWorkflow {
   SqliteSchemaMigrationService(this.decision);
 
   final SqliteSchemaMigrationDecision decision;
+
+  @override
+  Directory get appDataDirectory => decision.appDataDirectory;
+
   final _statusController =
       StreamController<HiveToSqliteMigrationStatus>.broadcast();
   final _log = <String>[];
@@ -452,14 +456,20 @@ final class SqliteSchemaMigrationService implements MigrationWorkflow {
           .whereType<String>()
           .toSet();
       for (final kind in BusinessEntityKind.values) {
-        if (!tables.contains(kind.tableName)) {
+        final tableName =
+            kind == BusinessEntityKind.assistantGroup &&
+                !tables.contains(kind.tableName) &&
+                tables.contains('assistant_tag_rows')
+            ? 'assistant_tag_rows'
+            : kind.tableName;
+        if (!tables.contains(tableName)) {
           entities[kind] = const <BusinessEntityValue>[];
           continue;
         }
         final isMemory = kind == BusinessEntityKind.assistantMemory;
         final rows = database.select(
           'SELECT ${kind.idColumn} AS entity_id, sort_order, payload'
-          '${isMemory ? ', assistant_id' : ''} FROM ${kind.tableName} '
+          '${isMemory ? ', assistant_id' : ''} FROM $tableName '
           'ORDER BY sort_order, ${kind.idColumn};',
         );
         entities[kind] = [

@@ -6,6 +6,7 @@ import 'dart:math';
 import 'package:path/path.dart' as p;
 
 import 'restore_durability.dart';
+import 'restore_lease_lock.dart';
 
 /// 当另一个业务进程或此 Dart 进程已拥有恢复业务租约时抛出。
 final class RestoreBusinessLeaseUnavailable implements Exception {
@@ -30,12 +31,17 @@ final class RestoreBusinessLease {
     required this._processOwnerFile,
     required this._processOwnerProbe,
     required this._registryKey,
-    required this._handle,
+    required this._lock,
   });
 
   static const leaseDirectoryName = '.kelivo_business_lease';
   static const lockFileName = 'lease.lock';
   static const _processOwnerPrefix = 'owner_';
+
+  static const _contentionPoll = Duration(milliseconds: 100);
+  static const _defaultOwnerGrace = Duration(seconds: 8);
+  static const _defaultForeignLockGrace = Duration(seconds: 5);
+  static const _ownerDeathConfirmations = 3;
 
   static final Map<String, RestoreBusinessLease?> _processLeases = {};
 
@@ -50,18 +56,22 @@ final class RestoreBusinessLease {
   final File _processOwnerFile;
   final _ProcessOwnerProbe _processOwnerProbe;
   final String _registryKey;
-  RandomAccessFile? _handle;
+  RestoreLeaseLock? _lock;
 
-  bool get isClosed => _handle == null;
+  bool get isClosed => _lock == null;
 
-  /// 以非等待方式获取固定的 AppData 业务租约。
+  /// 获取固定的 AppData 业务租约，并在有限窗口内等待租约争用消退。
   ///
   /// [RestoreBusinessLeaseUnavailable] 表示该租约已被持有。
   /// 其他文件系统或持久性故障会原样传播。
   static Future<RestoreBusinessLease> acquire({
     required Directory appDataDirectory,
     RestoreDurability? durability,
+    Duration? sameProcessOwnerGrace,
+    Duration? foreignLockGrace,
   }) async {
+    final ownerGrace = sameProcessOwnerGrace ?? _defaultOwnerGrace;
+    final lockGrace = foreignLockGrace ?? _defaultForeignLockGrace;
     final leaseDirectory = Directory(
       p.join(appDataDirectory.path, leaseDirectoryName),
     );
@@ -73,8 +83,8 @@ final class RestoreBusinessLease {
     _processLeases[registryKey] = null;
 
     final resolvedDurability = durability ?? RestorePlatformDurability();
-    RandomAccessFile? handle;
-    var locked = false;
+    final elapsed = Stopwatch()..start();
+    RestoreLeaseLock? lock;
     var ownsProcessMarker = false;
     _ProcessOwnerProbe? processOwnerProbe;
     final instanceId = _newInstanceId();
@@ -85,33 +95,34 @@ final class RestoreBusinessLease {
         leaseDirectory: leaseDirectory,
         durability: resolvedDurability,
       );
+      processOwnerFile = File(
+        p.join(leaseDirectory.path, '$_processOwnerPrefix$pid'),
+      );
+      await _retireProcessPredecessor(
+        ownerFile: processOwnerFile,
+        registryKey: registryKey,
+        grace: ownerGrace,
+        elapsed: elapsed,
+      );
+
       final initialLockType = await FileSystemEntity.type(
         lockFile.path,
         followLinks: false,
       );
-      if (initialLockType != FileSystemEntityType.notFound &&
-          initialLockType != FileSystemEntityType.file) {
+      if (initialLockType == FileSystemEntityType.notFound) {
+        await lockFile.create();
+      } else if (initialLockType != FileSystemEntityType.file) {
         throw StateError('restore_business_lease_lock_file');
       }
-
-      handle = await lockFile.open(mode: FileMode.append);
       if (await FileSystemEntity.type(lockFile.path, followLinks: false) !=
           FileSystemEntityType.file) {
         throw StateError('restore_business_lease_lock_file');
       }
       await resolvedDurability.restrictFile(lockFile);
-      try {
-        await handle.lock(FileLock.exclusive);
-        locked = true;
-      } on FileSystemException catch (error) {
-        if (_isLockUnavailable(error)) {
-          throw RestoreBusinessLeaseUnavailable(registryKey, cause: error);
-        }
-        rethrow;
-      }
-
-      processOwnerFile = File(
-        p.join(leaseDirectory.path, '$_processOwnerPrefix$pid'),
+      lock = await _lockLeaseFile(
+        lockFile: lockFile,
+        registryKey: registryKey,
+        grace: lockGrace,
       );
       processOwnerProbe = await _ProcessOwnerProbe.open(instanceId);
       await _claimProcessOwner(
@@ -120,6 +131,8 @@ final class RestoreBusinessLease {
         instanceId: instanceId,
         processOwnerProbe: processOwnerProbe,
         durability: resolvedDurability,
+        grace: ownerGrace,
+        elapsed: elapsed,
       );
       ownsProcessMarker = true;
 
@@ -135,19 +148,13 @@ final class RestoreBusinessLease {
         processOwnerFile: processOwnerFile,
         processOwnerProbe: processOwnerProbe,
         registryKey: registryKey,
-        handle: handle,
+        lock: lock,
       );
-      handle = null;
+      lock = null;
       _processLeases[registryKey] = lease;
       return lease;
     } catch (_) {
-      if (handle != null) {
-        try {
-          if (locked) await handle.unlock();
-        } finally {
-          await handle.close();
-        }
-      }
+      await lock?.release();
       await processOwnerProbe?.close();
       if (ownsProcessMarker) {
         await _deleteProcessOwner(processOwnerFile);
@@ -157,22 +164,73 @@ final class RestoreBusinessLease {
     }
   }
 
+  static Future<RestoreLeaseLock> _lockLeaseFile({
+    required File lockFile,
+    required String registryKey,
+    required Duration grace,
+  }) async {
+    final waited = Stopwatch()..start();
+    while (true) {
+      final lock = await RestoreLeaseLock.tryAcquire(lockFile);
+      if (lock != null) return lock;
+      if (waited.elapsed >= grace) {
+        throw RestoreBusinessLeaseUnavailable(registryKey);
+      }
+      await Future<void>.delayed(_contentionPoll);
+    }
+  }
+
+  static Future<void> _retireProcessPredecessor({
+    required File ownerFile,
+    required String registryKey,
+    required Duration grace,
+    required Stopwatch elapsed,
+  }) async {
+    final type = await FileSystemEntity.type(
+      ownerFile.path,
+      followLinks: false,
+    );
+    if (type == FileSystemEntityType.notFound) return;
+    if (type != FileSystemEntityType.file) {
+      throw StateError('restore_business_lease_process_owner');
+    }
+    if (await _awaitProcessOwnerRelease(
+      ownerFile: ownerFile,
+      grace: grace,
+      elapsed: elapsed,
+    )) {
+      throw RestoreBusinessLeaseUnavailable(registryKey);
+    }
+    await _deleteProcessOwner(ownerFile);
+  }
+
+  static Future<bool> _awaitProcessOwnerRelease({
+    required File ownerFile,
+    required Duration grace,
+    required Stopwatch elapsed,
+  }) async {
+    var silentProbes = 0;
+    while (true) {
+      if (await _ProcessOwnerProbe.isLive(ownerFile)) {
+        silentProbes = 0;
+      } else if (++silentProbes >= _ownerDeathConfirmations) {
+        return false;
+      }
+      if (elapsed.elapsed >= grace) return true;
+      await Future<void>.delayed(_contentionPoll);
+    }
+  }
+
   /// 释放此租约。重复调用是无害的。
   Future<void> close() async {
-    final handle = _handle;
-    if (handle == null) return;
-    _handle = null;
+    final lock = _lock;
+    if (lock == null) return;
+    _lock = null;
 
     Object? firstError;
     StackTrace? firstStackTrace;
     try {
-      await handle.unlock();
-    } catch (error, stackTrace) {
-      firstError = error;
-      firstStackTrace = stackTrace;
-    }
-    try {
-      await handle.close();
+      await lock.release();
     } catch (error, stackTrace) {
       firstError ??= error;
       firstStackTrace ??= stackTrace;
@@ -244,6 +302,8 @@ final class RestoreBusinessLease {
     required String instanceId,
     required _ProcessOwnerProbe processOwnerProbe,
     required RestoreDurability durability,
+    required Duration grace,
+    required Stopwatch elapsed,
   }) async {
     for (var attempt = 0; attempt < 2; attempt++) {
       final type = await FileSystemEntity.type(
@@ -252,11 +312,13 @@ final class RestoreBusinessLease {
       );
       if (type != FileSystemEntityType.notFound) {
         if (type == FileSystemEntityType.file) {
-          if (await _ProcessOwnerProbe.isLive(ownerFile)) {
+          if (await _awaitProcessOwnerRelease(
+            ownerFile: ownerFile,
+            grace: grace,
+            elapsed: elapsed,
+          )) {
             throw RestoreBusinessLeaseUnavailable(registryKey);
           }
-          // OS 锁已获取，同 PID 的 isolate 探针也不再存活。这是热重启或
-          // Android 引擎重建留下的孤儿，因此每种构建模式都可以回收它。
           await _deleteProcessOwner(ownerFile);
         } else {
           throw StateError('restore_business_lease_process_owner');
@@ -424,13 +486,4 @@ final class _ProcessOwnerProbe {
   }
 
   Future<void> close() => _server.close();
-}
-
-bool _isLockUnavailable(FileSystemException error) {
-  final code = error.osError?.errorCode;
-  if (code == null) return false;
-  if (Platform.isWindows) {
-    return code == 32 || code == 33;
-  }
-  return code == 11 || code == 13 || code == 35;
 }

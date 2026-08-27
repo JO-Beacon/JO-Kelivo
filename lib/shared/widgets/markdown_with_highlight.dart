@@ -32,18 +32,35 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/theme_factory.dart' show getPlatformFontFallback;
 import 'package:provider/provider.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import '../../core/providers/settings_provider.dart';
 import 'package:Kelivo/desktop/html_preview_dialog.dart';
 import '../cache/byte_lru_cache.dart';
 import 'incremental_markdown_document.dart';
+import 'markdown_line_lexer.dart';
 
 // 行内数学公式在 UI 线程解析。限制前瞻窗口，避免包含大量未匹配开启符的
 // 长行触发反复整行扫描。
 const int _maxInlineMathBodyLength = 512;
 const String _codeDollarMask = '___CODE_DOLLAR_MASK___';
 const String _fencedHtmlTagStartMask = '\uE002';
+
+/// Ink used by regular markdown text that inherits the surrounding bubble.
+///
+/// Dedicated surfaces such as fenced code blocks, tables, and diagrams keep
+/// their own theme palette. Fall back to the theme when nothing was inherited.
+Color _markdownInkColor(BuildContext context, [double alpha = 1]) {
+  final inherited = DefaultTextStyle.of(context).style.color;
+  final base = inherited ?? Theme.of(context).colorScheme.onSurface;
+  return alpha >= 1 ? base : base.withValues(alpha: alpha);
+}
+
+/// 半透明填充，让聊天壁纸透出 Markdown chrome。
+/// 行内代码与 details 最轻，表格居中，围栏代码保持更实。
+const double kBlockFillAlphaDetails = 0.55;
+const double kBlockFillAlphaInline = 0.40;
+const double kBlockFillAlphaTable = 0.72;
+const double kBlockFillAlphaContent = 0.80;
 
 /// 已解析高亮节点树的全局 LRU 缓存，按语言和源码作为键。
 /// 节点树与主题无关（主题在节点转换为 span 时应用），因此缓存可在主题切换
@@ -101,7 +118,7 @@ class MarkdownWithCodeHighlight extends StatefulWidget {
 class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
   static const int _streamingDebounceThresholdChars = 8000;
   static const Duration _streamingLongRenderDebounce = Duration(
-    milliseconds: 120,
+    milliseconds: 50,
   );
 
   late String _renderText;
@@ -158,16 +175,16 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
     final cs = Theme.of(context).colorScheme;
     final sanitizedText = _sanitizeImageLinks(_renderText);
     final imageUrls = _extractImageUrls(sanitizedText);
-    String normalize(String source) {
+    String normalize(String source, {required bool streaming}) {
       final cacheKey =
-          '${settings.enableMathRendering}:${settings.enableDollarLatex}:${widget.streaming}:$source';
+          '${settings.enableMathRendering}:${settings.enableDollarLatex}:$streaming:$source';
       final cached = _normalizedBlockCache.get(cacheKey);
       if (cached != null) return cached;
       final value = _preprocessFences(
         source,
         enableMath: settings.enableMathRendering,
         enableDollarLatex: settings.enableDollarLatex,
-        streaming: widget.streaming,
+        streaming: streaming,
       );
       _normalizedBlockCache.put(cacheKey, value);
       return value;
@@ -178,22 +195,25 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
     final sourceBlocks = useIncrementalBlocks
         ? _incrementalDocument.update(sanitizedText)
         : const <IncrementalMarkdownBlock>[];
-    final normalized = useIncrementalBlocks ? null : normalize(sanitizedText);
+    final normalized = useIncrementalBlocks
+        ? null
+        : normalize(sanitizedText, streaming: widget.streaming);
     // 基础文本样式（可被调用方覆盖）
+    final inkColor = _markdownInkColor(context);
     final baseTextStyle =
         (widget.baseStyle ?? Theme.of(context).textTheme.bodyMedium)?.copyWith(
           fontSize: widget.baseStyle?.fontSize ?? 15.5,
           height: widget.baseStyle?.height ?? 1.55,
           letterSpacing:
               widget.baseStyle?.letterSpacing ?? (_isZh(context) ? 0.0 : 0.05),
-          color: null,
+          color: inkColor,
         );
 
     // 替换默认组件，并在需要处添加自定义组件
     final components = List<MarkdownComponent>.from(
       MarkdownComponent.globalComponents,
     );
-    components.removeWhere((c) => c is LatexMathMultiLine);
+    components.removeWhere((c) => c is LatexMathMultiLine || c is HTag);
     final hrIdx = components.indexWhere((c) => c is HrLine);
     if (hrIdx != -1) components[hrIdx] = SoftHrLine();
     components.removeWhere((c) => c is BlockQuote);
@@ -217,7 +237,6 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
     // 避免代码围栏中的 "# comment" 之类内容被解析为标题。
     components.insert(0, ModernBlockQuote());
     components.insert(0, FencedCodeBlockMd(streaming: widget.streaming));
-    components.insert(0, DetailsHtmlMd());
     // 行内组件：保留默认行为，但让链接解析限制在当前行内
     final inlineComponents = List<MarkdownComponent>.from(
       MarkdownComponent.inlineComponents,
@@ -271,14 +290,6 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
     String resolveCodeFont() {
       final fam = settings.codeFontFamily;
       if (fam == null || fam.isEmpty) return 'monospace';
-      if (settings.codeFontIsGoogle) {
-        try {
-          final s = GoogleFonts.getFont(fam);
-          return s.fontFamily ?? fam;
-        } catch (_) {
-          return fam;
-        }
-      }
       return fam;
     }
 
@@ -288,14 +299,6 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
     String resolveAppFont() {
       final fam = settings.appFontFamily;
       if (fam == null || fam.isEmpty) return '';
-      if (settings.appFontIsGoogle) {
-        try {
-          final s = GoogleFonts.getFont(fam);
-          return s.fontFamily ?? fam;
-        } catch (_) {
-          return fam;
-        }
-      }
       return fam;
     }
 
@@ -304,297 +307,333 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
     // 所有被记忆化 Markdown widget 使用的值都必须纳入此签名
     // （主题颜色、数学公式开关、字体、字体度量、流式模式），
     // 否则主题或设置变化后仍会保留过期渲染。
+    final documentRevision =
+        '${_imageRevision(imageUrls)}\u0002${_citationRevision(sanitizedText, widget.citationIndexResolver)}';
     final themeSignature =
-        '${Theme.of(context).brightness.index}-${cs.surface.toARGB32()}-${cs.onSurface.toARGB32()}-${cs.primary.toARGB32()}-${cs.outlineVariant.toARGB32()}-${settings.enableMathRendering}-${settings.enableDollarLatex}-${widget.streaming}-${baseTextStyle?.fontSize}-${baseTextStyle?.height}-${baseTextStyle?.letterSpacing}-${baseTextStyle?.fontFamily}-$codeFontFamily-$appFontFamily';
+        '${Theme.of(context).brightness.index}-${cs.surface.toARGB32()}-${inkColor.toARGB32()}-${cs.primary.toARGB32()}-${cs.outlineVariant.toARGB32()}-${settings.enableMathRendering}-${settings.enableDollarLatex}-${widget.streaming}-${baseTextStyle?.fontSize}-${baseTextStyle?.height}-${baseTextStyle?.letterSpacing}-${baseTextStyle?.fontFamily}-$codeFontFamily-$appFontFamily-$documentRevision';
 
-    Widget buildMarkdown(String markdown, Key key) => GptMarkdown(
-      key: key,
-      markdown,
-      style: baseTextStyle,
-      followLinkColor: true,
-      // 禁用内置 $...$ LaTeX，以便自定义可滚动处理器接管
-      useDollarSignsForLatex: false,
-      onLinkTap: (url, title) => _handleLinkTap(context, url),
-      components: components,
-      inlineComponents: inlineComponents,
-      imageBuilder: (ctx, url, width, height) {
-        final imgs = imageUrls.isNotEmpty ? imageUrls : <String>[url];
-        final idx = imgs.indexOf(url);
-        final initial = idx >= 0 ? idx : 0;
-        final provider = _imageProviderFor(url);
-        return GestureDetector(
-          onTap: () {
-            Navigator.of(ctx).push(
-              PageRouteBuilder(
-                pageBuilder: (_, __, ___) =>
-                    ImageViewerPage(images: imgs, initialIndex: initial),
-                transitionDuration: const Duration(milliseconds: 360),
-                reverseTransitionDuration: const Duration(milliseconds: 280),
-                transitionsBuilder: (context, anim, sec, child) {
-                  final curved = CurvedAnimation(
-                    parent: anim,
-                    curve: Curves.easeOutCubic,
-                    reverseCurve: Curves.easeInCubic,
-                  );
-                  return FadeTransition(
-                    opacity: curved,
-                    child: SlideTransition(
-                      position: Tween<Offset>(
-                        begin: const Offset(0, 0.02),
-                        end: Offset.zero,
-                      ).animate(curved),
-                      child: child,
-                    ),
-                  );
-                },
-              ),
-            );
-          },
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: () {
-                  if (provider == null) {
-                    // 缺失或不支持的来源：显示损坏图片指示
-                    return const Icon(Icons.broken_image);
-                  }
-                  final displayWidth = width ?? constraints.maxWidth;
-                  final devicePixelRatio = MediaQuery.devicePixelRatioOf(
-                    context,
-                  );
-                  final cacheWidth = displayWidth.isFinite
-                      ? math.max(1, (displayWidth * devicePixelRatio).ceil())
-                      : null;
-                  final cacheHeight = height == null
-                      ? null
-                      : math.max(1, (height * devicePixelRatio).ceil());
-                  final resized = ResizeImage.resizeIfNeeded(
-                    cacheWidth,
-                    cacheHeight,
-                    provider,
-                  );
-                  return Image(
-                    image: resized,
-                    width: displayWidth,
-                    height: height,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stack) =>
-                        const Icon(Icons.broken_image),
-                  );
-                }(),
+    Widget buildMarkdown(String markdown, Key key) {
+      final detailsRegistry = MarkdownDetailsRegistry(
+        enableMath: settings.enableMathRendering,
+      );
+      return GptMarkdown(
+        key: key,
+        markdown,
+        style: baseTextStyle,
+        followLinkColor: true,
+        // 禁用内置 $...$ LaTeX，以便自定义可滚动处理器接管
+        useDollarSignsForLatex: false,
+        onLinkTap: (url, title) => _handleLinkTap(context, url),
+        preprocessBlocks: detailsRegistry.rewrite,
+        generation: themeSignature,
+        components: [DetailsHtmlMd(detailsRegistry), ...components],
+        inlineComponents: inlineComponents,
+        imageBuilder: (ctx, url, width, height) {
+          final imgs = imageUrls.isNotEmpty ? imageUrls : <String>[url];
+          final idx = imgs.indexOf(url);
+          final initial = idx >= 0 ? idx : 0;
+          final provider = _imageProviderFor(url);
+          return GestureDetector(
+            onTap: () {
+              Navigator.of(ctx).push(
+                PageRouteBuilder(
+                  pageBuilder: (_, __, ___) =>
+                      ImageViewerPage(images: imgs, initialIndex: initial),
+                  transitionDuration: const Duration(milliseconds: 360),
+                  reverseTransitionDuration: const Duration(milliseconds: 280),
+                  transitionsBuilder: (context, anim, sec, child) {
+                    final curved = CurvedAnimation(
+                      parent: anim,
+                      curve: Curves.easeOutCubic,
+                      reverseCurve: Curves.easeInCubic,
+                    );
+                    return FadeTransition(
+                      opacity: curved,
+                      child: SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0, 0.02),
+                          end: Offset.zero,
+                        ).animate(curved),
+                        child: child,
+                      ),
+                    );
+                  },
+                ),
               );
             },
-          ),
-        );
-      },
-      linkBuilder: (ctx, span, url, style) {
-        final label = span.toPlainText().trim();
-        // 特殊处理：[citation](id) 和旧式 [citation](index:id)
-        if (label.toLowerCase() == 'citation') {
-          final citation = _parseCitationRef(url);
-          if (citation != null) {
-            final cs = Theme.of(ctx).colorScheme;
-            // 优先使用从本消息搜索结果解析出的序号；
-            // 旧式 `index:id` 标记回退到行内序号。
-            final resolved = widget.citationIndexResolver?.call(citation.id);
-            final String display;
-            if (resolved != null && resolved.isNotEmpty) {
-              display = resolved;
-            } else if (citation.indexText != citation.id) {
-              display = citation.indexText; // 旧版 index:id 标记
-            } else if (int.tryParse(citation.indexText) != null) {
-              display = citation.indexText; // 旧版纯索引简写
-            } else {
-              display = '?'; // 仅有 id、无匹配结果的标记
-            }
-            // gpt_markdown 会按基线对齐嵌入此 widget。胶囊比文本上伸部分更高，
-            // 若不校正就会悬挂在基线下方。向上平移（不影响布局）使其视觉居中，
-            // 并添加水平内边距，避免相邻胶囊贴在一起。
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 1.5),
-              child: Transform.translate(
-                offset: const Offset(0, -2),
-                child: GestureDetector(
-                  onTap: () {
-                    if (widget.onCitationTap != null &&
-                        citation.id.isNotEmpty) {
-                      widget.onCitationTap!(citation.id);
-                    } else {
-                      // 回退：不处理
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: () {
+                    if (provider == null) {
+                      // 缺失或不支持的来源：显示损坏图片指示
+                      return const Icon(Icons.broken_image);
                     }
-                  },
-                  child: Container(
-                    constraints: const BoxConstraints(minWidth: 20),
-                    height: 20,
-                    padding: const EdgeInsets.symmetric(horizontal: 5),
-                    decoration: BoxDecoration(
-                      color: cs.primary.withValues(alpha: 0.20),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Center(
-                      widthFactor: 1.0,
-                      child: Text(
-                        display,
-                        style: TextStyle(fontSize: 12, height: 1.0),
+                    final displayWidth = width ?? constraints.maxWidth;
+                    final devicePixelRatio = MediaQuery.devicePixelRatioOf(
+                      context,
+                    );
+                    final cacheWidth = displayWidth.isFinite
+                        ? math.max(1, (displayWidth * devicePixelRatio).ceil())
+                        : null;
+                    final cacheHeight = height == null
+                        ? null
+                        : math.max(1, (height * devicePixelRatio).ceil());
+                    final resized = ResizeImage.resizeIfNeeded(
+                      cacheWidth,
+                      cacheHeight,
+                      provider,
+                    );
+                    return Image(
+                      image: resized,
+                      width: displayWidth,
+                      height: height,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stack) =>
+                          const Icon(Icons.broken_image),
+                    );
+                  }(),
+                );
+              },
+            ),
+          );
+        },
+        linkBuilder: (ctx, span, url, style) {
+          final label = span.toPlainText().trim();
+          // 特殊处理：[citation](id) 和旧式 [citation](index:id)
+          if (label.toLowerCase() == 'citation') {
+            final citation = _parseCitationRef(url);
+            if (citation != null) {
+              final cs = Theme.of(ctx).colorScheme;
+              // 优先使用从本消息搜索结果解析出的序号；
+              // 旧式 `index:id` 标记回退到行内序号。
+              final resolved = widget.citationIndexResolver?.call(citation.id);
+              final String display;
+              if (resolved != null && resolved.isNotEmpty) {
+                display = resolved;
+              } else if (citation.indexText != citation.id) {
+                display = citation.indexText; // 旧版 index:id 标记
+              } else if (int.tryParse(citation.indexText) != null) {
+                display = citation.indexText; // 旧版纯索引简写
+              } else {
+                display = '?'; // 仅有 id、无匹配结果的标记
+              }
+              // gpt_markdown 会按基线对齐嵌入此 widget。胶囊比文本上伸部分更高，
+              // 若不校正就会悬挂在基线下方。向上平移（不影响布局）使其视觉居中，
+              // 并添加水平内边距，避免相邻胶囊贴在一起。
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 1.5),
+                child: Transform.translate(
+                  offset: const Offset(0, -2),
+                  child: GestureDetector(
+                    onTap: () {
+                      if (widget.onCitationTap != null &&
+                          citation.id.isNotEmpty) {
+                        widget.onCitationTap!(citation.id);
+                      } else {
+                        // 回退：不处理
+                      }
+                    },
+                    child: Container(
+                      constraints: const BoxConstraints(minWidth: 20),
+                      height: 20,
+                      padding: const EdgeInsets.symmetric(horizontal: 5),
+                      decoration: BoxDecoration(
+                        color: cs.primary.withValues(alpha: 0.20),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Center(
+                        widthFactor: 1.0,
+                        child: Text(
+                          display,
+                          style: TextStyle(fontSize: 12, height: 1.0),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            );
+              );
+            }
           }
-        }
-        // 默认链接外观
-        final cs = Theme.of(ctx).colorScheme;
-        return Text(
-          span.toPlainText(),
-          style: style.copyWith(
-            color: cs.primary,
-            decoration: TextDecoration.none,
-          ),
-          textAlign: TextAlign.start,
-        );
-      },
-      orderedListBuilder: (ctx, no, child, cfg) {
-        final style = (cfg.style ?? TextStyle()).copyWith(
-          fontWeight: AppFontWeights.regular,
-        );
-        // 应用柔和补偿，使聊天缩放不等于 100% 时，
-        // 列表项不会明显比正文更大或更小。
-        final double kListComp =
-            MarkdownWithCodeHighlight.kMarkdownListScaleCompensation;
-        final mediaQuery = MediaQuery.of(ctx);
-        final double s = mediaQuery.textScaler.scale(1);
-        final double comp = math.pow(s == 0 ? 1.0 : s, -kListComp).toDouble();
-        final double newScale = (s * comp).clamp(0.5, 3.0);
-        return MediaQuery(
-          data: mediaQuery.copyWith(textScaler: TextScaler.linear(newScale)),
-          child: Directionality(
-            textDirection: cfg.textDirection,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              textBaseline: TextBaseline.alphabetic,
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              children: [
-                Padding(
-                  padding: const EdgeInsetsDirectional.only(start: 6, end: 6),
-                  child: Text("$no.", style: style),
-                ),
-                // 保持子组件原样，使其只继承一次上下文 MediaQuery 缩放
-                Flexible(child: child),
-              ],
+          // 默认链接外观
+          final cs = Theme.of(ctx).colorScheme;
+          return Text(
+            span.toPlainText(),
+            style: style.copyWith(
+              color: cs.primary,
+              decoration: TextDecoration.none,
             ),
-          ),
-        );
-      },
-      // 注意：属性名是 unOrderedListBuilder（驼峰命名，O 大写）。
-      // gpt_markdown 1.1.4 中的签名：
-      // (BuildContext ctx, Widget child, GptMarkdownConfig cfg) -> Widget
-      // 这里组合项目符号和内容，以控制缩放和间距。
-      unOrderedListBuilder: (ctx, child, cfg) {
-        final style = (cfg.style ?? TextStyle()).copyWith(
-          fontWeight: AppFontWeights.regular,
-        );
-        final double kListComp =
-            MarkdownWithCodeHighlight.kMarkdownListScaleCompensation;
-        final mediaQuery = MediaQuery.of(ctx);
-        final double s = mediaQuery.textScaler.scale(1);
-        final double comp = math.pow(s == 0 ? 1.0 : s, -kListComp).toDouble();
-        final double newScale = (s * comp).clamp(0.5, 3.0);
-        return MediaQuery(
-          data: mediaQuery.copyWith(textScaler: TextScaler.linear(newScale)),
-          child: Directionality(
-            textDirection: cfg.textDirection,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              textBaseline: TextBaseline.alphabetic,
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              children: [
-                Padding(
-                  padding: const EdgeInsetsDirectional.only(start: 6, end: 6),
-                  child: Text('•', style: style),
-                ),
-                // 保持子组件不变，使其只精确跟随一次上下文缩放
-                Flexible(child: child),
-              ],
-            ),
-          ),
-        );
-      },
-      tableBuilder: (ctx, rows, style, cfg) {
-        return _MarkdownTableBlock(
-          rows: _MarkdownTableData.fromRows(
-            rows,
-            maxBodyRows: widget.streaming
-                ? MarkdownWithCodeHighlight._streamingTableMaxRows
-                : null,
-          ),
-          style: style,
-          config: cfg,
-          appFontFamily: appFontFamily.isEmpty ? null : appFontFamily,
-        );
-      },
-      // 通过 gpt_markdown 的 highlightBuilder 设置行内 `code` 样式
-      highlightBuilder: (ctx, inline, style) {
-        // 还原在预处理期间被保护的美元符号
-        String unmasked = inline.replaceAll(_codeDollarMask, r'$');
-        String softened = _softBreakInline(unmasked);
-        final bool isDarkCtx = Theme.of(ctx).brightness == Brightness.dark;
-        final csCtx = Theme.of(ctx).colorScheme;
-        final bg = isDarkCtx ? Colors.white12 : const Color(0xFFF1F3F5);
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: csCtx.outlineVariant.withValues(alpha: 0.22),
-            ),
-          ),
-          child: Text(
-            softened,
-            style: TextStyle(
-              fontFamily: codeFontFamily,
-              fontSize: 13,
-              height: 1.4,
-            ).copyWith(color: csCtx.onSurface),
-            softWrap: true,
-            overflow: TextOverflow.visible,
-          ),
-        );
-      },
-      // 通过 codeBuilder 设置围栏代码块样式（带折叠或展开）
-      codeBuilder: (ctx, name, code, closed) {
-        final lang = name.trim();
-        final restoredCode = _unmaskHtmlTagStartsInsideFencedCode(code);
-        if (lang.toLowerCase() == 'mermaid') {
-          return _MermaidBlock(
-            code: restoredCode,
-            streaming: widget.streaming && !closed,
+            textAlign: TextAlign.start,
           );
-        } else if (lang.toLowerCase() == 'plantuml') {
-          return PlantUMLBlock(code: restoredCode);
-        }
-        return _CollapsibleCodeBlock(
-          language: lang,
-          code: restoredCode,
-          streaming: widget.streaming,
-          closed: closed,
-        );
-      },
-    );
+        },
+        orderedListBuilder: (ctx, no, child, cfg) {
+          final style = (cfg.style ?? TextStyle()).copyWith(
+            fontWeight: AppFontWeights.regular,
+          );
+          // 应用柔和补偿，使聊天缩放不等于 100% 时，
+          // 列表项不会明显比正文更大或更小。
+          final double kListComp =
+              MarkdownWithCodeHighlight.kMarkdownListScaleCompensation;
+          final mediaQuery = MediaQuery.of(ctx);
+          final double s = mediaQuery.textScaler.scale(1);
+          final double comp = math.pow(s == 0 ? 1.0 : s, -kListComp).toDouble();
+          final double newScale = (s * comp).clamp(0.5, 3.0);
+          return MediaQuery(
+            data: mediaQuery.copyWith(textScaler: TextScaler.linear(newScale)),
+            child: Directionality(
+              textDirection: cfg.textDirection,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                textBaseline: TextBaseline.alphabetic,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                children: [
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(start: 6, end: 6),
+                    child: Text("$no.", style: style),
+                  ),
+                  // 保持子组件原样，使其只继承一次上下文 MediaQuery 缩放
+                  Flexible(child: child),
+                ],
+              ),
+            ),
+          );
+        },
+        // 注意：属性名是 unOrderedListBuilder（驼峰命名，O 大写）。
+        // gpt_markdown 1.1.4 中的签名：
+        // (BuildContext ctx, Widget child, GptMarkdownConfig cfg) -> Widget
+        // 这里组合项目符号和内容，以控制缩放和间距。
+        unOrderedListBuilder: (ctx, child, cfg) {
+          final style = (cfg.style ?? TextStyle()).copyWith(
+            fontWeight: AppFontWeights.regular,
+          );
+          final double kListComp =
+              MarkdownWithCodeHighlight.kMarkdownListScaleCompensation;
+          final mediaQuery = MediaQuery.of(ctx);
+          final double s = mediaQuery.textScaler.scale(1);
+          final double comp = math.pow(s == 0 ? 1.0 : s, -kListComp).toDouble();
+          final double newScale = (s * comp).clamp(0.5, 3.0);
+          return MediaQuery(
+            data: mediaQuery.copyWith(textScaler: TextScaler.linear(newScale)),
+            child: Directionality(
+              textDirection: cfg.textDirection,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                textBaseline: TextBaseline.alphabetic,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                children: [
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(start: 6, end: 6),
+                    child: Text('•', style: style),
+                  ),
+                  // 保持子组件不变，使其只精确跟随一次上下文缩放
+                  Flexible(child: child),
+                ],
+              ),
+            ),
+          );
+        },
+        tableBuilder: (ctx, rows, style, cfg) {
+          return _MarkdownTableBlock(
+            rows: _MarkdownTableData.fromRows(
+              rows,
+              maxBodyRows: widget.streaming
+                  ? MarkdownWithCodeHighlight._streamingTableMaxRows
+                  : null,
+            ),
+            style: style,
+            config: cfg,
+            appFontFamily: appFontFamily.isEmpty ? null : appFontFamily,
+          );
+        },
+        // 通过 gpt_markdown 的 highlightBuilder 设置行内 `code` 样式
+        highlightBuilder: (ctx, inline, style) {
+          // 还原在预处理期间被保护的美元符号
+          String unmasked = inline.replaceAll(_codeDollarMask, r'$');
+          String softened = _softBreakInline(unmasked);
+          final bool isDarkCtx = Theme.of(ctx).brightness == Brightness.dark;
+          final csCtx = Theme.of(ctx).colorScheme;
+          final bg = isDarkCtx
+              ? Colors.white12
+              : const Color(
+                  0xFFF1F3F5,
+                ).withValues(alpha: kBlockFillAlphaInline);
+          return Container(
+            key: const ValueKey('inline-code-surface'),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: csCtx.outlineVariant.withValues(alpha: 0.22),
+              ),
+            ),
+            child: Text(
+              softened,
+              style: TextStyle(
+                fontFamily: codeFontFamily,
+                fontSize: 13,
+                height: 1.4,
+              ).copyWith(color: _markdownInkColor(ctx)),
+              softWrap: true,
+              overflow: TextOverflow.visible,
+            ),
+          );
+        },
+        // 通过 codeBuilder 设置围栏代码块样式（带折叠或展开）
+        codeBuilder: (ctx, name, code, closed) {
+          final lang = name.trim();
+          final restoredCode = _unmaskHtmlTagStartsInsideFencedCode(code);
+          if (lang.toLowerCase() == 'mermaid') {
+            return _MermaidBlock(
+              code: restoredCode,
+              streaming: widget.streaming && !closed,
+            );
+          } else if (lang.toLowerCase() == 'plantuml') {
+            return PlantUMLBlock(code: restoredCode);
+          }
+          return _CollapsibleCodeBlock(
+            language: lang,
+            code: restoredCode,
+            streaming: widget.streaming,
+            closed: closed,
+          );
+        },
+      );
+    }
 
+    // A whole-document render trims a whitespace-only tail. Omit that tail in
+    // the block renderer as well so a paused paragraph break cannot add height.
+    final blockContents = <String>[];
+    final blockStarts = <int>[];
+    if (useIncrementalBlocks) {
+      for (final block in sourceBlocks) {
+        final content = normalize(
+          block.text,
+          streaming: widget.streaming && !block.stable,
+        );
+        if (_isBlank(content)) continue;
+        blockContents.add(content);
+        blockStarts.add(block.start);
+      }
+    }
     final markdownWidget = useIncrementalBlocks
         ? _MarkdownBlockColumn(
             children: [
-              for (final block in sourceBlocks)
+              for (var i = 0; i < blockContents.length; i++) ...[
+                if (i > 0 &&
+                    !_swallowsTrailingBlankLine(
+                      blockContents[i - 1],
+                      mathEnabled: settings.enableMathRendering,
+                    ))
+                  _MarkdownBlockSeparator(style: baseTextStyle),
                 _CachedMarkdownBlock(
-                  key: ValueKey('markdown-source-block-${block.start}'),
-                  content: normalize(block.text),
+                  key: ValueKey('markdown-source-block-${blockStarts[i]}'),
+                  content: blockContents[i],
                   signature: themeSignature,
                   builder: buildMarkdown,
                 ),
+              ],
             ],
           )
         : _CachedMarkdownBlock(
@@ -665,6 +704,8 @@ class _CachedMarkdownBlock extends StatefulWidget {
 
 class _CachedMarkdownBlockState extends State<_CachedMarkdownBlock> {
   Widget? _rendered;
+  String? _identityContent;
+  int _identityEpoch = 0;
 
   @override
   void didUpdateWidget(covariant _CachedMarkdownBlock oldWidget) {
@@ -675,11 +716,128 @@ class _CachedMarkdownBlockState extends State<_CachedMarkdownBlock> {
     }
   }
 
+  Key _parseIdentity(String content) {
+    final previous = _identityContent;
+    if (previous != null &&
+        (content.length < previous.length || !content.startsWith(previous))) {
+      _identityEpoch++;
+    }
+    _identityContent = content;
+    return ValueKey('parsed-markdown-$_identityEpoch');
+  }
+
   @override
   Widget build(BuildContext context) {
     return _rendered ??= widget.builder(
       widget.content,
-      ValueKey('parsed-markdown-${widget.signature}'),
+      _parseIdentity(widget.content),
+    );
+  }
+}
+
+bool _swallowsTrailingBlankLine(String content, {required bool mathEnabled}) {
+  final end = _lastNonWhitespace(content);
+  if (end == 0) return false;
+  final lineStart = _lineStartBefore(content, end);
+  if (_isSoftHrLine(content, lineStart, end)) return true;
+  if (_isAtxHeadingWithClosingHashes(content, lineStart, end)) return true;
+  return mathEnabled && markdownEndsWithDisplayMath(content, end);
+}
+
+int _lastNonWhitespace(String content) {
+  var end = content.length;
+  while (end > 0 && _isWhitespace(content.codeUnitAt(end - 1))) {
+    end--;
+  }
+  return end;
+}
+
+int _lineStartBefore(String content, int end) {
+  var i = end;
+  while (i > 0 && !_isLineBreak(content.codeUnitAt(i - 1))) {
+    i--;
+  }
+  return i;
+}
+
+bool _isSoftHrLine(String content, int start, int end) {
+  var i = start;
+  while (i < end && _isWhitespace(content.codeUnitAt(i))) {
+    i++;
+  }
+  if (i >= end) return false;
+  final marker = content.codeUnitAt(i);
+  if (marker == 0x2E3B) return i + 1 == end;
+  if (marker != 0x2D && marker != 0x2A && marker != 0x5F) return false;
+  var run = 0;
+  while (i < end && content.codeUnitAt(i) == marker) {
+    i++;
+    run++;
+  }
+  return run >= 3 && i == end;
+}
+
+bool _isAtxHeadingWithClosingHashes(String content, int start, int end) {
+  var i = start;
+  while (i < end && _isWhitespace(content.codeUnitAt(i))) {
+    i++;
+  }
+  var opening = 0;
+  while (i < end && content.codeUnitAt(i) == 0x23) {
+    i++;
+    opening++;
+  }
+  if (opening < 1 || opening > 6) return false;
+  if (i >= end || !_isWhitespace(content.codeUnitAt(i))) return false;
+  var j = end;
+  var closing = 0;
+  while (j > i && content.codeUnitAt(j - 1) == 0x23) {
+    j--;
+    closing++;
+  }
+  if (closing < 1) return false;
+  if (j <= i || !_isWhitespace(content.codeUnitAt(j - 1))) return false;
+  while (j > i && _isWhitespace(content.codeUnitAt(j - 1))) {
+    j--;
+  }
+  return j > i;
+}
+
+bool _isBlank(String content) => _lastNonWhitespace(content) == 0;
+
+bool _isWhitespace(int unit) {
+  if (unit == 0x20) return true;
+  if (unit >= 0x09 && unit <= 0x0D) return true;
+  if (unit < 0x80) return false;
+  return unit == 0xA0 ||
+      unit == 0x1680 ||
+      (unit >= 0x2000 && unit <= 0x200A) ||
+      unit == 0x2028 ||
+      unit == 0x2029 ||
+      unit == 0x202F ||
+      unit == 0x205F ||
+      unit == 0x3000 ||
+      unit == 0xFEFF;
+}
+
+bool _isLineBreak(int unit) =>
+    unit == 0x0A || unit == 0x0D || unit == 0x2028 || unit == 0x2029;
+
+class _MarkdownBlockSeparator extends StatelessWidget {
+  const _MarkdownBlockSeparator({required this.style});
+
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    return SelectionContainer.disabled(
+      child: Text.rich(
+        const TextSpan(text: ' '),
+        style: (style ?? const TextStyle()).copyWith(
+          fontSize: style?.fontSize ?? 14,
+          height: 1.15,
+        ),
+      ),
     );
   }
 }
@@ -2071,6 +2229,36 @@ List<String> _extractImageUrls(String md) {
       .toList();
 }
 
+int _imageRevision(List<String> urls) =>
+    Object.hash(urls.length, Object.hashAll(urls));
+
+int _citationRevision(String md, String? Function(String id)? resolver) {
+  final ids = <String>[];
+  for (final match in RegExp(
+    r'\[cite:\s*([^\]]+)\]',
+    caseSensitive: false,
+  ).allMatches(md)) {
+    ids.addAll(
+      (match.group(1) ?? '')
+          .split(',')
+          .map((id) => id.trim())
+          .where((id) => id.isNotEmpty),
+    );
+  }
+  for (final match in RegExp(
+    r'\[citation\]\(([^)]+)\)',
+    caseSensitive: false,
+  ).allMatches(md)) {
+    final ref = _parseCitationRef(match.group(1) ?? '');
+    if (ref != null && ref.id.isNotEmpty) ids.add(ref.id);
+  }
+  var hash = ids.length;
+  for (final id in ids) {
+    hash = Object.hash(hash, id, resolver?.call(id));
+  }
+  return hash;
+}
+
 String _sanitizeImageLinks(String input) {
   final re = RegExp(r'!\[([^\]]*)\]\(([^)]+)\)', multiLine: true);
   return input.replaceAllMapped(re, (m) {
@@ -2246,14 +2434,6 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
     String resolveCodeFont() {
       final fam = settings.codeFontFamily;
       if (fam == null || fam.isEmpty) return 'monospace';
-      if (settings.codeFontIsGoogle) {
-        try {
-          final s = GoogleFonts.getFont(fam);
-          return s.fontFamily ?? fam;
-        } catch (_) {
-          return fam;
-        }
-      }
       return fam;
     }
 
@@ -2262,6 +2442,7 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
       fontFamily: codeFontFamily,
       fontSize: 13,
       height: 1.5,
+      color: cs.onSurface,
     );
     final codeLanguage = _normalizeLanguage(widget.language) ?? 'plaintext';
     final codeTheme = _transparentBgTheme(
@@ -2302,8 +2483,12 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
       );
     }
 
-    final Color bodyBg = cs.surfaceContainer;
-    final Color headerBg = cs.surfaceContainerHighest;
+    final Color bodyBg = cs.surfaceContainer.withValues(
+      alpha: kBlockFillAlphaContent,
+    );
+    final Color headerBg = cs.surfaceContainerHighest.withValues(
+      alpha: kBlockFillAlphaContent,
+    );
     final borderColor = _codeBlockBorderColor(cs, isDark);
     final isEffectivelyExpanded = _isEffectivelyExpanded(settings);
     final isCollapsed = !isEffectivelyExpanded;
@@ -2311,6 +2496,7 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
         isCollapsed && _hasCollapsedHiddenLines(settings);
 
     return Container(
+      key: const ValueKey('code-block-surface'),
       width: double.infinity,
       margin: const EdgeInsets.symmetric(vertical: 6),
       decoration: BoxDecoration(
@@ -2395,7 +2581,8 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
           ),
           Container(
             width: double.infinity,
-            color: bodyBg,
+            // 外层已经绘制 [bodyBg]；第二层填充会叠加并挡住壁纸。
+            color: Colors.transparent,
             // 保持代码顶部和底部内边距相等：由于标题现在与正文视觉分离，
             // 0 的顶部内边距会与 8px 的底部内边距显得不均衡。
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -3027,11 +3214,11 @@ class _MarkdownTableBlockState extends State<_MarkdownTableBlock> {
     final headerBg = Color.alphaBlend(
       cs.primary.withValues(alpha: isDark ? 0.15 : 0.07),
       cs.surface,
-    );
+    ).withValues(alpha: kBlockFillAlphaTable);
     final bodyBg = Color.alphaBlend(
       cs.primary.withValues(alpha: isDark ? 0.04 : 0.015),
       cs.surface,
-    );
+    ).withValues(alpha: kBlockFillAlphaTable);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -3069,7 +3256,8 @@ class _MarkdownTableBlockState extends State<_MarkdownTableBlock> {
         final tableSurface = _buildTableSurface(
           context,
           table: table,
-          bodyBg: bodyBg,
+          // 紧凑表格已经在外层绘制卡片填充；第二层填充会叠加并挡住壁纸。
+          bodyBg: useCompactTable ? Colors.transparent : bodyBg,
           borderColor: borderColor,
           compact: useCompactTable,
         );
@@ -3098,7 +3286,7 @@ class _MarkdownTableBlockState extends State<_MarkdownTableBlock> {
               color: Color.alphaBlend(
                 cs.primary.withValues(alpha: isDark ? 0.045 : 0.018),
                 cs.surface,
-              ),
+              ).withValues(alpha: kBlockFillAlphaTable),
               borderRadius: BorderRadius.circular(12),
             ),
             foregroundDecoration: BoxDecoration(
@@ -4953,18 +5141,11 @@ class AtxHeadingMd extends BlockMd {
     GptMarkdownConfig cfg,
     int level,
   ) {
-    final cs = Theme.of(ctx).colorScheme;
     final isZh = _isZh(ctx);
     final settings = ctx.read<SettingsProvider>();
     String? appFamily;
     if ((settings.appFontFamily ?? '').isNotEmpty) {
       appFamily = settings.appFontFamily;
-      if (settings.appFontIsGoogle) {
-        try {
-          final s = GoogleFonts.getFont(appFamily!);
-          appFamily = s.fontFamily ?? appFamily;
-        } catch (_) {}
-      }
     }
     // 从 Material 样式出发，但收紧字号以与正文保持平衡
     TextStyle base;
@@ -5008,7 +5189,7 @@ class AtxHeadingMd extends BlockMd {
       fontWeight: weight,
       height: h,
       letterSpacing: ls,
-      color: cs.onSurface,
+      color: _markdownInkColor(ctx),
       fontFamily: appFamily,
       fontFamilyFallback: getPlatformFontFallback(),
     );
@@ -5075,16 +5256,15 @@ class LabelValueLineMd extends InlineMd {
     rawLabel = rawLabel.replaceFirst(RegExp(r"[：:]+$"), '');
 
     final t = Theme.of(context).textTheme;
-    final cs = Theme.of(context).colorScheme;
     // 继承基础样式，确保字间距/行高一致
     final base = (config.style ?? t.bodyMedium ?? TextStyle(fontSize: 14));
     final labelStyle = base.copyWith(
       fontWeight: AppFontWeights.strong,
-      color: cs.onSurface,
+      color: _markdownInkColor(context),
     );
     final valueStyle = base.copyWith(
       fontWeight: AppFontWeights.regular,
-      color: cs.onSurface.withValues(alpha: 0.92),
+      color: _markdownInkColor(context, 0.92),
     );
 
     // 将值部分继续按 markdown 解析，保证链接/引用等语法正常
@@ -5575,53 +5755,35 @@ class BackslashEscapeMd extends InlineMd {
 }
 
 class DetailsHtmlMd extends BlockMd {
+  DetailsHtmlMd([this.registry]);
+
+  final MarkdownDetailsRegistry? registry;
+
   @override
   RegExp get exp => RegExp(
-    r'^\ *?(?:' + expString + r")$",
+    r'^\ *?(?:' + expString + r')[ \t]*$',
     dotAll: true,
     multiLine: true,
     caseSensitive: false,
   );
 
   @override
-  String get expString => _detailsPattern(6);
+  String get expString =>
+      registry?.placeholderSource ?? MarkdownDetailsWalker.blockPattern();
 
   @override
   Widget build(BuildContext context, String text, GptMarkdownConfig config) {
-    final match = RegExp(
-      r"^<details(?<attrs>[^>]*)>\s*<summary(?:\s+[^>]*)?>(?<summary>[\s\S]*?)<\/summary>(?<body>[\s\S]*)<\/details>$",
-      caseSensitive: false,
-      dotAll: true,
-    ).firstMatch(text.trim());
-
-    if (match == null) {
+    final parsed = registry?.lookup(text) ?? markdownParseDetails(text);
+    if (parsed == null) {
       return config.getRich(TextSpan(text: text, style: config.style));
     }
-
-    final attrs = match.namedGroup('attrs') ?? '';
-    final summary = _plainHtmlText(match.namedGroup('summary') ?? '').trim();
-    final body = (match.namedGroup('body') ?? '').trim();
-    final initiallyExpanded = RegExp(
-      r"(?:^|\s)open(?:\s|$|=)",
-      caseSensitive: false,
-    ).hasMatch(attrs);
-
+    final body = parsed.body.trim();
     return _DetailsHtmlBlock(
-      summary: summary,
-      body: body,
-      initiallyExpanded: initiallyExpanded,
+      summary: _plainHtmlText(parsed.summary).trim(),
+      body: registry?.rewrite(body) ?? body,
+      initiallyExpanded: parsed.initiallyExpanded,
       config: config,
     );
-  }
-
-  static String _detailsPattern(int depth) {
-    final open = r"<details(?:\s+[^>]*)?>";
-    final summary = r"\s*<summary(?:\s+[^>]*)?>[\s\S]*?<\/summary>";
-    if (depth <= 1) {
-      return '$open$summary(?:(?!<details\\b|<\\/details>)[\\s\\S])*<\\/details>';
-    }
-    final nested = _detailsPattern(depth - 1);
-    return '$open$summary(?:(?!<details\\b|<\\/details>)[\\s\\S]|$nested)*<\\/details>';
   }
 
   static String _plainHtmlText(String input) {
@@ -5659,25 +5821,26 @@ class _DetailsHtmlBlockState extends State<_DetailsHtmlBlock> {
     final surface = Color.alphaBlend(
       cs.onSurface.withValues(alpha: isDark ? 0.05 : 0.025),
       cs.surface,
-    );
+    ).withValues(alpha: kBlockFillAlphaDetails);
     final borderColor = cs.outlineVariant.withValues(
       alpha: isDark ? 0.18 : 0.30,
     );
     final summaryStyle = (widget.config.style ?? TextStyle()).copyWith(
-      color: cs.onSurface,
+      color: _markdownInkColor(context),
       fontWeight: AppFontWeights.medium,
     );
     final bodyStyle = (widget.config.style ?? TextStyle()).copyWith(
-      color: cs.onSurface,
+      color: _markdownInkColor(context),
     );
     final bodyConfig = widget.config.copyWith(style: bodyStyle);
 
     return Container(
+      key: const ValueKey('details-surface'),
       width: double.infinity,
       margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: surface,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: borderColor, width: 0.8),
       ),
       clipBehavior: Clip.antiAlias,
@@ -5688,7 +5851,7 @@ class _DetailsHtmlBlockState extends State<_DetailsHtmlBlock> {
           IosCardPress(
             onTap: () => setState(() => _expanded = !_expanded),
             baseColor: Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(16),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             haptics: false,
             child: Row(

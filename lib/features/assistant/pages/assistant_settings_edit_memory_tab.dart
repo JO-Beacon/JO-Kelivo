@@ -1,126 +1,24 @@
 part of 'assistant_settings_edit_page.dart';
 
-class _LegacyMemoryModeToggleCard extends StatelessWidget {
-  const _LegacyMemoryModeToggleCard();
+class _MemorySettingsNavCard extends StatelessWidget {
+  const _MemorySettingsNavCard({required this.onTap});
+
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final settings = context.watch<SettingsProvider>();
-    final tip =
-        '${l10n.legacyMemoryModeSubtitle}\n\n${l10n.legacyMemoryModeCacheWarning}';
-
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Container(
-        decoration: BoxDecoration(
-          color: context.appColors.surfaceCard,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-            width: 0.6,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: MemorySectionCard(
+        padding: EdgeInsets.zero,
+        children: [
+          MemoryNavRow(
+            title: l10n.settingsPageMemory,
+            subtitle: l10n.memorySettingsGlobalSubtitle,
+            onTap: onTap,
           ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Row(
-            children: [
-              Expanded(
-                child: _TactileRow(
-                  onTap: () {
-                    context.read<SettingsProvider>().setLegacyMemoryMode(
-                      !settings.legacyMemoryMode,
-                    );
-                  },
-                  builder: (pressed) {
-                    final baseColor = cs.onSurface.withValues(alpha: 0.9);
-                    return _AnimatedPressColor(
-                      pressed: pressed,
-                      base: baseColor,
-                      builder: (c) {
-                        return Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 4, 0, 4),
-                          child: Row(
-                            children: [
-                              SizedBox(
-                                width: 36,
-                                child: Icon(Lucide.Globe, size: 20, color: c),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  l10n.legacyMemoryModeTitle,
-                                  style: TextStyle(fontSize: 15, color: c),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
-              _LegacyMemoryModeTipIcon(message: tip),
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: IosSwitch(
-                  value: settings.legacyMemoryMode,
-                  onChanged: (v) {
-                    context.read<SettingsProvider>().setLegacyMemoryMode(v);
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LegacyMemoryModeTipIcon extends StatefulWidget {
-  const _LegacyMemoryModeTipIcon({required this.message});
-
-  final String message;
-
-  @override
-  State<_LegacyMemoryModeTipIcon> createState() =>
-      _LegacyMemoryModeTipIconState();
-}
-
-class _LegacyMemoryModeTipIconState extends State<_LegacyMemoryModeTipIcon> {
-  final _tooltipKey = GlobalKey<TooltipState>();
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Tooltip(
-      key: _tooltipKey,
-      message: widget.message,
-      triggerMode: TooltipTriggerMode.tap,
-      waitDuration: const Duration(milliseconds: 250),
-      showDuration: const Duration(seconds: 8),
-      preferBelow: true,
-      constraints: const BoxConstraints(maxWidth: 280),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onLongPress: () => _tooltipKey.currentState?.ensureTooltipVisible(),
-        child: SizedBox(
-          width: 28,
-          height: 28,
-          child: Center(
-            child: Icon(
-              Lucide.BadgeInfo,
-              size: 16,
-              color: cs.onSurface.withValues(alpha: 0.45),
-              semanticLabel: widget.message,
-            ),
-          ),
-        ),
+        ],
       ),
     );
   }
@@ -149,10 +47,20 @@ class _MemoryTabState extends State<_MemoryTab> {
   }
 
   Future<void> _showAddEditSheet({MemoryEntry? existing}) {
+    final assistant = context.read<AssistantProvider>().getById(
+      widget.assistantId,
+    );
+    final writeScope = assistant?.memoryWriteScope;
+    final prefersAssistant =
+        writeScope == MemoryWriteScope.alwaysAssistant ||
+        writeScope == MemoryWriteScope.toolDefaultAssistant;
     return showMemoryEntryEditor(
       context,
       existing: existing,
       defaultAssistantId: widget.assistantId,
+      defaultScope: existing == null && prefersAssistant
+          ? MemoryScope.assistant
+          : MemoryScope.global,
     );
   }
 
@@ -220,7 +128,13 @@ class _MemoryTabState extends State<_MemoryTab> {
     final when = _formatRelative(l10n, lastAt);
     final parts = <String>[l10n.memoryOrganizeStatusLast(when)];
     if (result.error != null && result.error!.isNotEmpty) {
-      parts.add(l10n.memoryOrganizeStatusFailed(result.error!));
+      final code = result.error!;
+      final label = memoryOutcomeLabel(l10n, code);
+      if (MemoryPipelineService.skipReasonCodes.contains(code)) {
+        parts.add(l10n.memoryOrganizeStatusSkippedReason(label));
+      } else {
+        parts.add(l10n.memoryOrganizeStatusFailed(label));
+      }
     } else if (result.gate == MemoryGateParseResult.skip ||
         (result.extractedCount == 0 && result.advanced)) {
       parts.add(l10n.memoryOrganizeStatusSkipped);
@@ -262,11 +176,10 @@ class _MemoryTabState extends State<_MemoryTab> {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
-    const toggleCard = _LegacyMemoryModeToggleCard();
     if (settings.legacyMemoryMode) {
       return _LegacyMemoryTabBody(
         assistantId: widget.assistantId,
-        header: toggleCard,
+        header: _MemorySettingsNavCard(onTap: _goMemorySettings),
       );
     }
 
@@ -313,7 +226,6 @@ class _MemoryTabState extends State<_MemoryTab> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(0, 8, 0, 16),
       children: [
-        toggleCard,
         sectionCard(
           child: Column(
             children: [
@@ -440,6 +352,8 @@ class _MemoryTabState extends State<_MemoryTab> {
             ],
           ),
         ),
+
+        _MemorySettingsNavCard(onTap: _goMemorySettings),
 
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),

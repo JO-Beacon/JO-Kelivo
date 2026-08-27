@@ -1394,7 +1394,9 @@ class _BackupPageState extends State<BackupPage> {
       if (!context.mounted) return;
       showAppSnackBar(
         context,
-        message: e.toString(),
+        message: l10n.backupPageExportFailedMessage(
+          backupRestoreErrorMessage(l10n, e),
+        ),
         type: NotificationType.error,
       );
     } finally {

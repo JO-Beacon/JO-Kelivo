@@ -5,7 +5,6 @@ import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/chat/models/message_edit_result.dart';
 import 'package:Kelivo/features/chat/widgets/message_edit_sheet.dart';
-import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -57,21 +56,75 @@ void main() {
 
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'after');
-    await tester.tap(find.byIcon(Lucide.X));
+    await tester.enterText(find.byType(TextField), '  after  ');
+    await tester.tap(find.text('Trim whitespace'));
     await tester.pump();
-    await tester.tap(find.text('Save'));
+    await tester.tap(find.text('Save as New Branch'));
     await tester.pumpAndSettle();
 
     expect(result, isNotNull);
     expect(result!.content, 'after');
     expect(result!.shouldSend, isFalse);
-    expect(result!.parts.map((part) => part.kind), <String>['text', 'future']);
+    expect(result!.saveMode, MessageEditSaveMode.newBranch);
+    expect(result!.parts.map((part) => part.kind), <String>[
+      'text',
+      'image',
+      'future',
+    ]);
     expect((result!.parts.first as TextPart).text, 'after');
     expect(identical(result!.parts.last, opaque), isTrue);
   });
 
-  testWidgets('dismissing sheet asks whether to save changes', (tester) async {
+  testWidgets('overwrite save returns overwrite mode', (tester) async {
+    MessageEditResult? result;
+    await tester.pumpWidget(
+      harness(
+        message: ChatMessage(
+          role: 'user',
+          content: 'before',
+          conversationId: 'conversation',
+        ),
+        onResult: (value) => result = value,
+      ),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'after');
+    await tester.tap(find.text('Overwrite Save'));
+    await tester.pumpAndSettle();
+
+    expect(result, isNotNull);
+    expect(result!.saveMode, MessageEditSaveMode.overwrite);
+    expect(result!.shouldSend, isFalse);
+    expect(result!.content, 'after');
+  });
+
+  testWidgets('unchanged sheet closes without asking to save', (tester) async {
+    var completed = false;
+    await tester.pumpWidget(
+      harness(
+        message: ChatMessage(
+          role: 'assistant',
+          content: 'before',
+          conversationId: 'conversation',
+        ),
+        onResult: (_) => completed = true,
+      ),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Close without saving?'), findsNothing);
+    expect(completed, isTrue);
+  });
+
+  testWidgets('dismissing sheet asks before discarding changes', (
+    tester,
+  ) async {
     MessageEditResult? result;
     var completed = false;
     await tester.pumpWidget(
@@ -94,7 +147,7 @@ void main() {
     await tester.tapAt(const Offset(10, 10));
     await tester.pumpAndSettle();
 
-    expect(find.text('Save changes?'), findsOneWidget);
+    expect(find.text('Close without saving?'), findsOneWidget);
     expect(completed, isFalse);
 
     await tester.tap(find.text('Cancel'));
@@ -104,14 +157,14 @@ void main() {
 
     await tester.tapAt(const Offset(10, 10));
     await tester.pumpAndSettle();
-    await tester.tap(find.text("Don't Save"));
+    await tester.tap(find.text('Confirm'));
     await tester.pumpAndSettle();
 
     expect(completed, isTrue);
     expect(result, isNull);
   });
 
-  testWidgets('dismiss confirmation can save the current structured draft', (
+  testWidgets('dismiss confirmation discards the current structured draft', (
     tester,
   ) async {
     const opaque = UnknownPart(rawKind: 'future', payload: '{"v":1}');
@@ -136,19 +189,10 @@ void main() {
     await tester.enterText(find.byType(TextField), 'after');
     await tester.tapAt(const Offset(10, 10));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Save').last);
+    await tester.tap(find.text('Confirm'));
     await tester.pumpAndSettle();
 
-    expect(result, isNotNull);
-    expect(result!.content, 'after');
-    expect(result!.shouldSend, isFalse);
-    expect(result!.parts.map((part) => part.kind), <String>[
-      'text',
-      'future',
-      'file',
-    ]);
-    expect(identical(result!.parts[1], opaque), isTrue);
-    expect((result!.parts[2] as FilePart).unavailable, isTrue);
+    expect(result, isNull);
   });
 
   testWidgets('dragging the sheet down asks before discarding', (tester) async {
@@ -170,7 +214,7 @@ void main() {
     await tester.fling(find.text('Edit Message'), const Offset(0, 500), 2400);
     await tester.pumpAndSettle();
 
-    expect(find.text('Save changes?'), findsOneWidget);
+    expect(find.text('Close without saving?'), findsOneWidget);
     expect(completed, isFalse);
   });
 }

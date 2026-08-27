@@ -73,7 +73,6 @@ import 'shared/widgets/snackbar.dart';
 import 'shared/widgets/restore_failure_screen.dart';
 import 'shared/widgets/restore_outcome_notice.dart';
 import 'shared/widgets/context_tree_migration_notice.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:system_fonts/system_fonts.dart';
 import 'dart:io'
     show Directory, File, Platform, stderr; // 保留以便 provider 内进行全局覆盖
@@ -780,15 +779,13 @@ class MyApp extends StatelessWidget {
                       defaultTargetPlatform == TargetPlatform.macOS ||
                       defaultTargetPlatform == TargetPlatform.linux);
               if (!isDesktop) return;
-              // 已选择的系统应用或代码字体（非 Google 字体，也非本地别名）
+              // 已选择的系统应用或代码字体（非本地别名）
               final wantsAppSystem =
                   (settings.appFontFamily?.isNotEmpty == true) &&
-                  !settings.appFontIsGoogle &&
                   (settings.appFontLocalAlias == null ||
                       settings.appFontLocalAlias!.isEmpty);
               final wantsCodeSystem =
                   (settings.codeFontFamily?.isNotEmpty == true) &&
-                  !settings.codeFontIsGoogle &&
                   (settings.codeFontLocalAlias == null ||
                       settings.codeFontLocalAlias!.isEmpty);
               if (wantsAppSystem || wantsCodeSystem) {
@@ -905,18 +902,10 @@ class MyApp extends StatelessWidget {
                 dynamicScheme: useDyn ? darkDynamic : null,
                 pureBackground: settings.usePureBackground,
               );
-              // 解析实际生效的应用字体（系统、Google 或本地别名）
+              // 解析实际生效的应用字体（系统或本地别名）
               String? effectiveAppFontFamily() {
                 final fam = settings.appFontFamily;
                 if (fam == null || fam.isEmpty) return null;
-                if (settings.appFontIsGoogle) {
-                  try {
-                    final s = GoogleFonts.getFont(fam);
-                    return s.fontFamily ?? fam;
-                  } catch (_) {
-                    return fam;
-                  }
-                }
                 return fam;
               }
 

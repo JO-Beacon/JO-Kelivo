@@ -64,14 +64,6 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Inject fallback secrets
-        shell: bash
-        run: |
-          mkdir -p lib/secrets
-          cat > lib/secrets/fallback.dart <<'EOF'
-          const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';
-          EOF
-
       - name: Resolve version
         shell: bash
         env:

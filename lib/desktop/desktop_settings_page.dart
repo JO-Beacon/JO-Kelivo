@@ -17,6 +17,7 @@ import '../core/services/model_override_resolver.dart';
 import '../core/services/provider_balance_service.dart';
 import 'model_fetch_dialog.dart' show showModelFetchDialog;
 import 'widgets/desktop_select_dropdown.dart';
+import 'widgets/desktop_dialog_style.dart';
 import '../shared/widgets/ios_switch.dart';
 import '../shared/widgets/ios_checkbox.dart';
 // 桌面助手面板依赖
@@ -74,6 +75,7 @@ import '../utils/provider_grouping_logic.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../theme/custom_theme.dart';
 import '../features/settings/widgets/custom_theme_widgets.dart';
+import '../features/settings/pages/message_style_settings_page.dart';
 
 part 'setting/assistants_pane.dart';
 part 'setting/providers_pane.dart';
@@ -184,14 +186,6 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                   width: menuWidth,
                   selected: effectiveSelected,
                   onSelect: (it) {
-                    if (it == _SettingsMenuItem.debug) {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const DebugPage(),
-                        ),
-                      );
-                      return;
-                    }
                     setState(() => _selected = it);
                   },
                 ),
@@ -266,7 +260,10 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                         case _SettingsMenuItem.about:
                           return const DesktopAboutPane(key: ValueKey('about'));
                         case _SettingsMenuItem.debug:
-                          return const SizedBox.shrink();
+                          return const DebugPage(
+                            key: ValueKey('debug'),
+                            embedded: true,
+                          );
                       }
                     }(),
                   ),

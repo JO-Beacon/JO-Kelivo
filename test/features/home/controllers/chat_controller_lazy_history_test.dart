@@ -940,7 +940,7 @@ void main() {
     );
 
     test(
-      'opening preloads the persisted selected version before first paint',
+      'opening keeps the activity-projected tree node before first paint',
       () async {
         messages = <ChatMessage>[
           _versionedMessage(
@@ -972,8 +972,8 @@ void main() {
         await controller.setCurrentConversationAndLoad(conversation);
 
         expect(chatService.groupsLoaded, isTrue);
-        expect(controller.collapsedMessages.single.id, 'answer-v1');
-        expect(controller.groupedMessages['answer'], hasLength(2));
+        expect(controller.collapsedMessages.single.id, 'answer-v0');
+        expect(controller.groupedMessages['answer'], hasLength(1));
       },
     );
 
@@ -1583,14 +1583,14 @@ void main() {
         expect(chatService.groupLoadRequests.single, {'answer-a', 'answer-b'});
         expect(
           controller.messageRenderModels.map((model) => model.versionCount),
-          [3, 2],
+          [2, 2],
         );
 
         chatService.groupLoadGate!.complete();
         expect(await opening, isTrue);
         expect(
           controller.messageRenderModels.map((model) => model.versionCount),
-          [3, 2],
+          [2, 2],
         );
       },
     );

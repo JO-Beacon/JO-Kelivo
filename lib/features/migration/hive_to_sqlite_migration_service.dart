@@ -134,6 +134,7 @@ class HiveToSqliteMigrationStatus {
 /// 迁移屏幕的共享工作流契约。底层存储引擎不同，但备份闸门、进度报告、
 /// 重试和重启行为必须保持一致。
 abstract interface class MigrationWorkflow {
+  Directory get appDataDirectory;
   Stream<HiveToSqliteMigrationStatus> get statusStream;
   HiveToSqliteMigrationStatus initialStatus();
   bool get canOfferSkip;
@@ -191,6 +192,9 @@ class HiveToSqliteMigrationService implements MigrationWorkflow {
       ];
 
   final HiveToSqliteMigrationDecision decision;
+
+  @override
+  Directory get appDataDirectory => decision.appDataDir;
 
   /// 在所有批次写入完成且即将执行 [_validate] 前调用。
   /// 测试可用此钩子破坏临时数据库并断言回滚。

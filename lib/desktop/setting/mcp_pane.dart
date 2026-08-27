@@ -8,6 +8,7 @@ import '../../shared/widgets/snackbar.dart';
 import 'mcp_edit_dialog.dart' show showDesktopMcpEditDialog;
 import 'mcp_json_edit_dialog.dart' show showDesktopMcpJsonEditDialog;
 import 'mcp_timeout_dialog.dart' show showDesktopMcpTimeoutDialog;
+import '../widgets/desktop_dialog_style.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
@@ -389,7 +390,10 @@ class _ServerCardState extends State<_ServerCard> {
                           Expanded(
                             child: Text(
                               l10n.mcpPageConnectionFailed,
-                              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.error),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(context).colorScheme.error,
+                              ),
                             ),
                           ),
                           TextButton(
@@ -502,10 +506,14 @@ Future<void> _showErrorDetails(
     builder: (ctx) {
       return Dialog(
         backgroundColor: cs.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: DesktopDialogStyle.shape(ctx),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 640),
+          constraints: DesktopDialogStyle.proportionalConstraints(
+            ctx,
+            maxWidth: 640,
+            maxHeight: 640,
+          ),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
             child: Column(
@@ -593,7 +601,7 @@ Future<bool?> _confirmDelete(BuildContext context) async {
     builder: (ctx) {
       return Dialog(
         backgroundColor: cs.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: DesktopDialogStyle.shape(ctx),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 360),
@@ -642,7 +650,9 @@ Future<bool?> _confirmDelete(BuildContext context) async {
                               states,
                             ) {
                               if (states.contains(WidgetState.hovered)) {
-                                return cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05);
+                                return cs.onSurface.withValues(
+                                  alpha: isDark ? 0.06 : 0.05,
+                                );
                               }
                               return Colors.transparent;
                             }),

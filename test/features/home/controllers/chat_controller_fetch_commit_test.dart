@@ -62,7 +62,15 @@ class _ControlledChatService extends ChatService {
                 createdAt: timestamp,
                 updatedAt: timestamp,
                 finalizedAt: timestamp,
-                versionCount: 1,
+                versionCount:
+                    _messagesByConversation[request.conversationId]
+                        ?.where(
+                          (candidate) =>
+                              (candidate.groupId ?? candidate.id) ==
+                              (message.groupId ?? message.id),
+                        )
+                        .length ??
+                    1,
                 logicalIndex: startIndex + offset,
               ),
               message: message,
@@ -298,10 +306,10 @@ void main() {
         onDeferredGroupDataLoaded: () => deferredRefreshCount++,
       );
 
-      expect(observedVersionCounts, [1]);
+      expect(observedVersionCounts, [2]);
       await Future<void>.delayed(Duration.zero);
       expect(service.groupLoadCalls, 2);
-      expect(observedVersionCounts, [1, 2]);
+      expect(observedVersionCounts, [2, 2]);
       expect(deferredRefreshCount, 1);
     });
 

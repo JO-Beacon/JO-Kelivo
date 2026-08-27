@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/models/chat_message.dart';
 import '../../core/models/conversation_tree.dart';
@@ -12,7 +14,7 @@ import 'ios_tactile.dart';
 /// 会话消息树的紧凑可滚动投影。
 ///
 /// 树按消息深度布局。共同祖先占用一个节点，只有分叉子节点才会额外占用水平空间。
-class ConversationTreeMap extends StatelessWidget {
+class ConversationTreeMap extends StatefulWidget {
   const ConversationTreeMap({
     super.key,
     required this.tree,
@@ -35,73 +37,459 @@ class ConversationTreeMap extends StatelessWidget {
   final ValueChanged<String>? onToggleSelection;
 
   @override
+  State<ConversationTreeMap> createState() => ConversationTreeMapState();
+}
+
+class ConversationTreeMapState extends State<ConversationTreeMap> {
+  final TransformationController _transformationController =
+      TransformationController();
+
+  static const double _minScale = 0.2;
+  static const double _maxScale = 4.0;
+  Size _viewportSize = Size.zero;
+  Size _contentSize = Size.zero;
+
+  @override
+  void dispose() {
+    _transformationController.dispose();
+    super.dispose();
+  }
+
+  /// 恢复为 1:1 实际大小，并保留当前平移位置。
+  void resetToActualSize() {
+    if (_viewportSize.isEmpty || _contentSize.isEmpty) return;
+    final translation = _transformationController.value.getTranslation();
+    _setScale(
+      1.0,
+      translation: Offset(translation.x, translation.y),
+      centerHorizontally: false,
+    );
+  }
+
+  /// 横向适配当前视口：缩小到能完整显示树宽，并水平居中。
+  void fitHorizontal() {
+    if (_viewportSize.isEmpty || _contentSize.isEmpty) return;
+    final scale = math.min(1.0, _viewportSize.width / _contentSize.width);
+    final translation = _transformationController.value.getTranslation();
+    _setScale(
+      scale,
+      translation: Offset(translation.x, translation.y),
+      centerHorizontally: true,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final layout = _ConversationTreeMapLayout.build(
-      tree: tree,
-      messages: messages,
-      query: query,
+      tree: widget.tree,
+      messages: widget.messages,
+      query: widget.query,
     );
     if (layout.nodes.isEmpty) return const SizedBox.shrink();
 
-    final activeIds = tree.activePath().toSet();
+    final activeIds = widget.tree.activePath().toSet();
     final l10n = AppLocalizations.of(context)!;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = math.max(layout.width, constraints.maxWidth);
-        return SingleChildScrollView(
-          primary: false,
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            primary: false,
-            child: SizedBox(
-              width: width,
-              height: layout.height,
-              child: CustomPaint(
-                painter: _ConversationTreeMapEdgePainter(
-                  layout.nodes,
-                  activeMessageIds: activeIds,
-                  activeColor: Theme.of(context).colorScheme.primary,
-                ),
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    for (final node in layout.nodes)
-                      Positioned(
-                        left: node.centerX - _TreeMapNodeCard.width / 2,
-                        top: node.top,
-                        child: _TreeMapNodeCard(
-                          message: node.message,
-                          isActive: activeIds.contains(node.message.id),
-                          isSelected:
-                              selectedMessageIds?.contains(node.message.id) ??
-                              false,
-                          isDimmed: node.isDimmed,
-                          selecting: selecting,
-                          userLabel: l10n.treeMapUserLabel,
-                          assistantLabel: l10n.treeMapAssistantLabel,
-                          onTap: () {
-                            if (selecting) {
-                              onToggleSelection?.call(node.message.id);
-                            } else {
-                              onTapMessage(node.message.id);
-                            }
+        final viewport = constraints.biggest;
+        final contentWidth = math.max(layout.width, viewport.width);
+        final contentHeight = math.max(layout.height, viewport.height);
+        final contentSize = Size(contentWidth, contentHeight);
+        _viewportSize = viewport;
+        _contentSize = contentSize;
+
+        return ClipRect(
+          child: Listener(
+            onPointerSignal: _handlePointerSignal,
+            child: Stack(
+              clipBehavior: Clip.hardEdge,
+              children: [
+                Positioned.fill(
+                  child: InteractiveViewer(
+                    transformationController: _transformationController,
+                    constrained: false,
+                    boundaryMargin: EdgeInsets.zero,
+                    minScale: _minScale,
+                    maxScale: _maxScale,
+                    scaleEnabled: false,
+                    panAxis: PanAxis.free,
+                    clipBehavior: Clip.hardEdge,
+                    child: SizedBox(
+                      width: contentWidth,
+                      height: contentHeight,
+                      child: CustomPaint(
+                        painter: _ConversationTreeMapEdgePainter(
+                          layout.nodes,
+                          activeMessageIds: activeIds,
+                          activeColor: Theme.of(context).colorScheme.primary,
+                        ),
+                        child: AnimatedBuilder(
+                          animation: _transformationController,
+                          builder: (context, child) {
+                            final visibleNodes = _visibleNodes(
+                              layout,
+                              viewport,
+                            );
+                            return Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                for (final node in visibleNodes)
+                                  Positioned(
+                                    left:
+                                        node.centerX -
+                                        _TreeMapNodeCard.width / 2,
+                                    top: node.top,
+                                    child: _TreeMapNodeCard(
+                                      key: ValueKey(
+                                        'conversationTreeMapNode-${node.message.id}',
+                                      ),
+                                      message: node.message,
+                                      isActive: activeIds.contains(
+                                        node.message.id,
+                                      ),
+                                      isSelected:
+                                          widget.selectedMessageIds?.contains(
+                                            node.message.id,
+                                          ) ??
+                                          false,
+                                      isDimmed: node.isDimmed,
+                                      selecting: widget.selecting,
+                                      userLabel: l10n.treeMapUserLabel,
+                                      assistantLabel:
+                                          l10n.treeMapAssistantLabel,
+                                      onTap: () {
+                                        if (widget.selecting) {
+                                          widget.onToggleSelection?.call(
+                                            node.message.id,
+                                          );
+                                        } else {
+                                          widget.onTapMessage(node.message.id);
+                                        }
+                                      },
+                                    ),
+                                  ),
+                              ],
+                            );
                           },
                         ),
                       ),
-                  ],
+                    ),
+                  ),
                 ),
-              ),
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  bottom: 10,
+                  width: 10,
+                  child: _TreeMapScrollbar(
+                    key: const ValueKey('conversationTreeMapVerticalScrollbar'),
+                    axis: Axis.vertical,
+                    controller: _transformationController,
+                    viewportSize: viewport,
+                    contentSize: contentSize,
+                  ),
+                ),
+                Positioned(
+                  left: 0,
+                  right: 10,
+                  bottom: 0,
+                  height: 10,
+                  child: _TreeMapScrollbar(
+                    key: const ValueKey(
+                      'conversationTreeMapHorizontalScrollbar',
+                    ),
+                    axis: Axis.horizontal,
+                    controller: _transformationController,
+                    viewportSize: viewport,
+                    contentSize: contentSize,
+                  ),
+                ),
+              ],
             ),
           ),
         );
       },
     );
   }
+
+  List<_ConversationTreeMapNode> _visibleNodes(
+    _ConversationTreeMapLayout layout,
+    Size viewport,
+  ) {
+    if (viewport.isEmpty) return layout.nodes;
+    final matrix = _transformationController.value;
+    final scale = matrix.getMaxScaleOnAxis();
+    final translation = matrix.getTranslation();
+    const margin = 64.0;
+    final minX = (0 - translation.x) / scale - margin;
+    final maxX = (viewport.width - translation.x) / scale + margin;
+    final minY = (0 - translation.y) / scale - margin;
+    final maxY = (viewport.height - translation.y) / scale + margin;
+    final halfWidth = _TreeMapNodeCard.width / 2;
+    return [
+      for (final node in layout.nodes)
+        if (node.centerX + halfWidth >= minX &&
+            node.centerX - halfWidth <= maxX &&
+            node.top + _TreeMapNodeCard.height >= minY &&
+            node.top <= maxY)
+          node,
+    ];
+  }
+
+  void _handlePointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent ||
+        _viewportSize.isEmpty ||
+        _contentSize.isEmpty) {
+      return;
+    }
+
+    final scrollDelta = event.scrollDelta;
+    if (HardwareKeyboard.instance.isControlPressed &&
+        scrollDelta.dy != 0 &&
+        scrollDelta.dx == 0) {
+      _zoomAt(event.localPosition, scrollDelta.dy);
+    } else {
+      _scrollBy(scrollDelta.dx, scrollDelta.dy);
+    }
+  }
+
+  void _scrollBy(double deltaX, double deltaY) {
+    if (deltaX == 0 && deltaY == 0) return;
+    final matrix = _transformationController.value;
+    final scale = matrix.getMaxScaleOnAxis();
+    final translation = matrix.getTranslation();
+    final nextX = _clampAxis(
+      translation.x - deltaX,
+      _viewportSize.width,
+      _contentSize.width * scale,
+    );
+    final nextY = _clampAxis(
+      translation.y - deltaY,
+      _viewportSize.height,
+      _contentSize.height * scale,
+    );
+    _transformationController.value = _matrixFor(Offset(nextX, nextY), scale);
+  }
+
+  void _setScale(
+    double scale, {
+    required Offset translation,
+    required bool centerHorizontally,
+  }) {
+    final clampedScale = scale.clamp(_minScale, _maxScale).toDouble();
+    final scaledWidth = _contentSize.width * clampedScale;
+    final scaledHeight = _contentSize.height * clampedScale;
+    final nextX = centerHorizontally
+        ? _clampAxis(
+            -(scaledWidth - _viewportSize.width) / 2,
+            _viewportSize.width,
+            scaledWidth,
+          )
+        : _clampAxis(translation.dx, _viewportSize.width, scaledWidth);
+    final nextY = _clampAxis(
+      translation.dy,
+      _viewportSize.height,
+      scaledHeight,
+    );
+    _transformationController.value = _matrixFor(
+      Offset(nextX, nextY),
+      clampedScale,
+    );
+  }
+
+  void _zoomAt(Offset localPosition, double scrollDelta) {
+    if (scrollDelta == 0) return;
+    final matrix = _transformationController.value;
+    final oldScale = matrix.getMaxScaleOnAxis();
+    final factor = math.exp(-scrollDelta / 200.0);
+    final newScale = (oldScale * factor).clamp(_minScale, _maxScale).toDouble();
+    if ((newScale - oldScale).abs() < 0.0001) return;
+
+    final ratio = newScale / oldScale;
+    final translation = matrix.getTranslation();
+    final nextX = localPosition.dx * (1 - ratio) + translation.x * ratio;
+    final nextY = localPosition.dy * (1 - ratio) + translation.y * ratio;
+    _transformationController.value = _matrixFor(
+      Offset(
+        _clampAxis(nextX, _viewportSize.width, _contentSize.width * newScale),
+        _clampAxis(nextY, _viewportSize.height, _contentSize.height * newScale),
+      ),
+      newScale,
+    );
+  }
+
+  double _clampAxis(double value, double viewportExtent, double scaledExtent) {
+    final maxScroll = math.max(0.0, scaledExtent - viewportExtent);
+    return value.clamp(-maxScroll, 0.0).toDouble();
+  }
+
+  Matrix4 _matrixFor(Offset translation, double scale) {
+    return Matrix4.identity()
+      ..translateByDouble(translation.dx, translation.dy, 0, 1)
+      ..scaleByDouble(scale, scale, scale, 1);
+  }
+}
+
+class _TreeMapScrollbar extends StatelessWidget {
+  const _TreeMapScrollbar({
+    super.key,
+    required this.axis,
+    required this.controller,
+    required this.viewportSize,
+    required this.contentSize,
+  });
+
+  final Axis axis;
+  final TransformationController controller;
+  final Size viewportSize;
+  final Size contentSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, child) {
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final vertical = axis == Axis.vertical;
+            final trackLength = vertical
+                ? constraints.maxHeight
+                : constraints.maxWidth;
+            if (!trackLength.isFinite || trackLength <= 0) {
+              return const SizedBox.shrink();
+            }
+
+            final matrix = controller.value;
+            final scale = matrix.getMaxScaleOnAxis();
+            final contentExtent = vertical
+                ? contentSize.height
+                : contentSize.width;
+            final viewportExtent = vertical
+                ? viewportSize.height
+                : viewportSize.width;
+            final scaledContentExtent = contentExtent * scale;
+            final maxScroll = math.max(
+              0.0,
+              scaledContentExtent - viewportExtent,
+            );
+            if (maxScroll <= 0) {
+              return const SizedBox.shrink();
+            }
+
+            final thumbExtent = math.max(
+              24.0,
+              viewportExtent / scaledContentExtent * trackLength,
+            );
+            final translation = matrix.getTranslation();
+            final scrollOffset = vertical
+                ? (-translation.y).clamp(0.0, maxScroll).toDouble()
+                : (-translation.x).clamp(0.0, maxScroll).toDouble();
+            final thumbStart =
+                (trackLength - thumbExtent) * scrollOffset / maxScroll;
+
+            return MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onVerticalDragUpdate: vertical
+                    ? (details) => _dragBy(
+                        details.delta.dy,
+                        scale,
+                        maxScroll,
+                        trackLength,
+                        thumbExtent,
+                      )
+                    : null,
+                onHorizontalDragUpdate: vertical
+                    ? null
+                    : (details) => _dragBy(
+                        details.delta.dx,
+                        scale,
+                        maxScroll,
+                        trackLength,
+                        thumbExtent,
+                      ),
+                child: SizedBox.expand(
+                  child: Stack(
+                    children: [
+                      Positioned.fill(child: _track(context)),
+                      Positioned(
+                        left: vertical ? 1 : thumbStart,
+                        top: vertical ? thumbStart : 1,
+                        width: vertical
+                            ? math.max(0, constraints.maxWidth - 2)
+                            : thumbExtent,
+                        height: vertical
+                            ? thumbExtent
+                            : math.max(0, constraints.maxHeight - 2),
+                        child: _thumb(context),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _dragBy(
+    double delta,
+    double scale,
+    double maxScroll,
+    double trackLength,
+    double thumbExtent,
+  ) {
+    if (trackLength <= thumbExtent) return;
+    final scrollDelta = delta * maxScroll / (trackLength - thumbExtent);
+    final matrix = controller.value;
+    final translation = matrix.getTranslation();
+    final scaledWidth = contentSize.width * scale;
+    final scaledHeight = contentSize.height * scale;
+    final minX = viewportSize.width - scaledWidth;
+    final minY = viewportSize.height - scaledHeight;
+
+    final nextX = axis == Axis.horizontal
+        ? (translation.x - scrollDelta).clamp(minX, 0.0).toDouble()
+        : translation.x;
+    final nextY = axis == Axis.vertical
+        ? (translation.y - scrollDelta).clamp(minY, 0.0).toDouble()
+        : translation.y;
+
+    controller.value = Matrix4.identity()
+      ..translateByDouble(nextX, nextY, 0, 1)
+      ..scaleByDouble(scale, scale, scale, 1);
+  }
+
+  Widget _track(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(4),
+      ),
+    );
+  }
+
+  Widget _thumb(BuildContext context) {
+    return Container(
+      key: ValueKey(
+        axis == Axis.vertical
+            ? 'conversationTreeMapVerticalThumb'
+            : 'conversationTreeMapHorizontalThumb',
+      ),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.34),
+        borderRadius: BorderRadius.circular(4),
+      ),
+    );
+  }
 }
 
 class _TreeMapNodeCard extends StatelessWidget {
   const _TreeMapNodeCard({
+    super.key,
     required this.message,
     required this.isActive,
     required this.isSelected,

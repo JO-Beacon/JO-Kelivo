@@ -40,6 +40,13 @@ void main() {
     schema.close();
     final timestamp = DateTime.utc(2026, 1, 1).microsecondsSinceEpoch;
     raw.execute(
+      'ALTER TABLE assistant_group_rows RENAME TO assistant_tag_rows;',
+    );
+    raw.execute('''
+      INSERT INTO assistant_tag_rows (id, sort_order, payload, updated_at)
+      VALUES ('tag-1', 0, '{"id":"tag-1","name":"Legacy tag"}', 1);
+    ''');
+    raw.execute(
       'INSERT INTO conversation_rows '
       '(id, title, created_at, updated_at) '
       "VALUES ('c1', 'legacy', $timestamp, $timestamp);",
@@ -200,6 +207,21 @@ void main() {
               )
               .single['count'],
           1,
+        );
+        expect(
+          raw
+              .select(
+                'SELECT COUNT(*) AS count FROM assistant_group_rows '
+                "WHERE id = 'tag-1';",
+              )
+              .single['count'],
+          1,
+        );
+        expect(
+          raw.select(
+            "SELECT name FROM sqlite_master WHERE name = 'assistant_tag_rows';",
+          ),
+          isEmpty,
         );
         expect(
           raw

@@ -17,7 +17,7 @@ abstract final class MemoryPrompts {
 
 - <user_profile> 是用户的稳定身份信息，例如希望你怎么称呼他、语言偏好、时区。
 - <user_memory type="..."> 是分四类的长期记忆。每行形如 `- [2026-08-07] 内容`，方括号里是这条记忆最后更新的日期。带 `(assistant) ` 前缀的条目只属于当前助手，其余对所有助手可见。
-- 标了 mode="summary" total="N" 的块表示该类型共有 N 条，只列出了最近 10 条；需要更多时用 memory_search_profile 查询。
+- 标了 mode="summary" 的块表示该类型共有 total 属性标明的条数，只列出了 shown 属性指明的最近若干条；需要更多时用 memory_search_profile 查询。
 - 形如 <user_memory type="voice"/> 的空标签表示该类型目前没有记忆。
 - 对话进行中出现的 <user_memory_update> 是记忆的最新完整快照，用它替换你之前看到的记忆内容。
 
@@ -41,7 +41,7 @@ The conversation may contain memory information provided by the system. It is no
 
 - <user_profile> holds stable facts about the user, such as how they want to be addressed, language preference and timezone.
 - <user_memory type="..."> holds long-term memory in four categories. Each line looks like `- [2026-08-07] content`, where the bracket is the date this entry was last updated. Entries prefixed with `(assistant) ` belong only to the current assistant; the rest are visible to all assistants.
-- A block marked mode="summary" total="N" means the category has N entries in total and only the 10 most recent are listed. Use memory_search_profile when you need more.
+- A block marked mode="summary" means the category has the number of entries given by the total attribute, and only the most recent ones indicated by the shown attribute are listed. Use memory_search_profile when you need more.
 - An empty tag such as <user_memory type="voice"/> means the category currently has no entries.
 - A <user_memory_update> appearing mid-conversation is the latest complete snapshot. Replace the memory you saw earlier with it.
 
@@ -56,6 +56,60 @@ Write complete third-person statements about the user. Do not use words like "th
 When the user says an entry is wrong, use memory_edit to fix it or memory_delete to archive it.
 '''
           .trim();
+
+  static final String legacyRulesZh =
+      '''
+## Memory Tool
+你是一个无状态的大模型，你无法存储记忆，因此为了记住信息，你需要使用**记忆工具**。
+你可以使用 `create_memory`, `edit_memory`, `delete_memory` 工具创建、更新或删除记忆。
+- 如果记忆中没有相关信息，请使用 create_memory 创建一条新的记录。
+- 如果已有相关记录，请使用 edit_memory 更新内容。
+- 若记忆过时或无用，请使用 delete_memory 删除。
+这些记忆会自动包含在未来的对话上下文中，在<memories>标签内。
+请勿在记忆中存储敏感信息，敏感信息包括：用户的民族、宗教信仰、性取向、政治观点及党派归属、性生活、犯罪记录等。
+在与用户聊天过程中，你可以像一个私人秘书一样**主动的**记录用户相关的信息到记忆里，包括但不限于：
+- 用户昵称/姓名
+- 年龄/性别/兴趣爱好
+- 计划事项等
+- 聊天风格偏好
+- 工作相关
+- 首次聊天时间
+- ...
+请主动调用工具记录，而不是需要用户要求。
+记忆如果包含日期信息，请包含在内，请使用绝对时间格式，并且当前时间是{{currentTime}}。
+无需告知用户你已更改记忆记录，也不要在对话中直接显示记忆内容，除非用户主动要求。
+相似或相关的记忆应合并为一条记录，而不要重复记录，过时记录应删除。
+你可以在和用户闲聊的时候暗示用户你能记住东西。
+'''
+          .trim();
+
+  static final String legacyRulesEn =
+      '''
+## Memory Tool
+You are a stateless model and cannot retain memories on your own; to remember something, use the **memory tools**.
+Use the `create_memory`, `edit_memory`, and `delete_memory` tools to create, update, or delete memories.
+- If nothing relevant is stored yet, use create_memory to add a new entry.
+- If a related entry already exists, use edit_memory to update it.
+- If an entry is outdated or useless, use delete_memory to remove it.
+These memories are automatically included in future conversation context, inside the <memories> tag.
+Never store sensitive information, which includes the user's ethnicity, religious beliefs, sexual orientation, political views and party affiliation, sex life, and criminal record.
+While chatting with the user, act like a personal secretary and **proactively** record information about them, including but not limited to:
+- Nickname / name
+- Age / gender / interests
+- Plans and scheduled items
+- Preferred chat style
+- Work-related details
+- Time of the first conversation
+- ...
+Call the tools on your own initiative rather than waiting for the user to ask.
+When an entry involves dates, include them in an absolute time format; the current time is {{currentTime}}.
+There is no need to tell the user you changed an entry, and do not show memory contents in the conversation unless the user asks.
+Similar or related memories should be merged into one entry instead of duplicated, and outdated entries should be deleted.
+You may hint during casual chat that you are able to remember things.
+'''
+          .trim();
+
+  static const String legacyCurrentTimePlaceholder = '{{currentTime}}';
 
   /// 当允许过去对话召回时，在 [rulesZh] 中附加。
   static const String rulesPastConversationRecallZh =
@@ -324,6 +378,92 @@ Output JSON only, no explanation:
 '''
           .trim();
 
+  // ── 旧版记忆迁移 ───────────────────────────────────────────────────────
+
+  static final String migrateZh =
+      '''
+你正在把旧版长期记忆迁入带类型的记忆系统。
+
+对每一条输入，返回一条 id 相同的输出。保留全部事实、偏好、否定、限定和不确定表述。保持原文语言。只做让记忆简洁、自包含、脱离对话上下文也能看懂的改写。适合时用第三人称描述用户。
+
+只选一个类型：
+- identity：稳定事实、偏好、背景、人际关系、兴趣或个人上下文
+- workflow：用户做事、决策、规划或使用工具的惯常方式
+- voice：偏好的语气、措辞、语言、格式或沟通风格
+- instruction：对助手应如何表现或回复的持久规则
+
+不要编造、翻译、合并、拆分、省略、去重、解释或添加建议。
+
+只返回这种形状的 JSON 数组：
+[{"id":1,"type":"identity","content":"..."}]
+
+输入：
+{{items}}
+'''
+          .trim();
+
+  static final String migrateEn =
+      '''
+You are migrating legacy long-term memories into a typed memory system.
+
+For every input item, return exactly one output item with the same integer id. Preserve every fact, preference, negation, qualification, and uncertainty. Keep the original language. Rewrite only enough to make the memory concise, self-contained, and understandable without conversation context. When appropriate, phrase it as a third-person statement about the user.
+
+Choose exactly one type:
+- identity: stable facts, preferences, background, relationships, interests, or personal context
+- workflow: recurring ways the user works, decides, plans, or uses tools
+- voice: preferred tone, wording, language, formatting, or communication style
+- instruction: durable rules for how an assistant should behave or respond
+
+Do not invent, translate, merge, split, omit, deduplicate, explain, or add advice.
+
+Return only a JSON array in this exact shape:
+[{"id":1,"type":"identity","content":"..."}]
+
+Input:
+{{items}}
+'''
+          .trim();
+
+  static final String migratePreserveZh =
+      '''
+你正在把旧版长期记忆分类到带类型的记忆系统。内容由系统原样保留，你只负责分类。
+
+对每一条输入，返回一条 id 相同的输出。只选一个类型：
+- identity：稳定事实、偏好、背景、人际关系、兴趣或个人上下文
+- workflow：用户做事、决策、规划或使用工具的惯常方式
+- voice：偏好的语气、措辞、语言、格式或沟通风格
+- instruction：对助手应如何表现或回复的持久规则
+
+不要改写、翻译、编造、合并、拆分或省略。不要输出 content。
+
+只返回这种形状的 JSON 数组：
+[{"id":1,"type":"identity"}]
+
+输入：
+{{items}}
+'''
+          .trim();
+
+  static final String migratePreserveEn =
+      '''
+You are classifying legacy long-term memories into a typed memory system. The system will keep each memory's original wording. You only assign a type.
+
+For every input item, return exactly one output item with the same integer id. Choose exactly one type:
+- identity: stable facts, preferences, background, relationships, interests, or personal context
+- workflow: recurring ways the user works, decides, plans, or uses tools
+- voice: preferred tone, wording, language, formatting, or communication style
+- instruction: durable rules for how an assistant should behave or respond
+
+Do not rewrite, translate, invent, merge, split, or omit items. Do not output content.
+
+Return only a JSON array in this exact shape:
+[{"id":1,"type":"identity"}]
+
+Input:
+{{items}}
+'''
+          .trim();
+
   // ── §7.5 注入开场语 ─────────────────────────────────────────────────────
 
   static const String introFullZh = '以下内容由系统提供，不是用户本轮发送的内容。';
@@ -402,6 +542,12 @@ Output JSON only, no explanation:
 
   static String profileDistillFor(MemoryPromptLang lang) =>
       lang == MemoryPromptLang.zh ? profileDistillZh : profileDistillEn;
+
+  static String migrateFor(MemoryPromptLang lang) =>
+      lang == MemoryPromptLang.zh ? migrateZh : migrateEn;
+
+  static String migratePreserveFor(MemoryPromptLang lang) =>
+      lang == MemoryPromptLang.zh ? migratePreserveZh : migratePreserveEn;
 
   static String introFullFor(MemoryPromptLang lang) =>
       lang == MemoryPromptLang.zh ? introFullZh : introFullEn;

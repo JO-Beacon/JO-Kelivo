@@ -32,6 +32,27 @@ void main() {
     },
   );
 
+  test('release tag with build number accepts only the matching build', () {
+    final info = UpdateInfo.fromGitHubRelease({
+      'tag_name': 'v0.1.6+6',
+      'assets': [
+        _asset('JO-Kelivo-v0.1.6+5-android-arm64-v8a-release.apk'),
+        _asset('JO-Kelivo-v0.1.6+6-android-arm64-v8a-release.apk'),
+        _asset('JO-Kelivo-v0.1.6+5-windows-x64-setup.exe'),
+        _asset('JO-Kelivo-v0.1.6+6-windows-x64-setup.exe'),
+        _asset('JO-Kelivo-v0.1.6+5-linux-x64-appimage.AppImage'),
+        _asset('JO-Kelivo-v0.1.6+6-linux-x64-appimage.AppImage'),
+      ],
+    });
+
+    expect(info.version, '0.1.6+6');
+    expect(info.downloads, {
+      'android': _url('JO-Kelivo-v0.1.6+6-android-arm64-v8a-release.apk'),
+      'windows': _url('JO-Kelivo-v0.1.6+6-windows-x64-setup.exe'),
+      'linux': _url('JO-Kelivo-v0.1.6+6-linux-x64-appimage.AppImage'),
+    });
+  });
+
   test('release asset matcher rejects unsupported and checksum files', () {
     expect(
       UpdateInfo.assetPlatformMatch('kelivo-v1.2.1-linux.AppImage'),
@@ -54,6 +75,13 @@ void main() {
       UpdateInfo.assetPlatformMatch(
         'JO-Kelivo-v0.1.5+5-windows-x64-setup.exe',
         expectedVersion: '0.1.6',
+      ),
+      isNull,
+    );
+    expect(
+      UpdateInfo.assetPlatformMatch(
+        'JO-Kelivo-v0.1.6+5-windows-x64-setup.exe',
+        expectedVersion: '0.1.6+6',
       ),
       isNull,
     );

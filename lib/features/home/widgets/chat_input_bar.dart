@@ -11,6 +11,7 @@ import '../../../l10n/app_localizations.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../utils/file_import_helper.dart';
 import '../../../utils/image_compressor.dart';
+import '../../../utils/upload_dedupe.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import '../../../shared/responsive/breakpoints.dart';
@@ -240,7 +241,6 @@ class _ChatInputBarState extends State<ChatInputBar>
   static const double _documentPreviewHeight = 48;
   static const double _imagePreviewHeight = 64;
   static const double _imageRemoveButtonSize = 18;
-  static const int _maxInlinePasteCharacters = 5000;
   // 应用恢复后短暂抑制上下文菜单，避免闪烁
   bool _suppressContextMenu = false;
   bool _isSubmitting = false;
@@ -368,17 +368,18 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   Future<void> _processImage(_ImageProcessingTask task) async {
-    String? savedPath;
+    UploadWrite? saved;
     try {
       final dir = await AppDirectories.getUploadDirectory();
-      savedPath = await ImageCompressor.compressToUploadDir(
+      saved = await ImageCompressor.compressToUploadDir(
         task.sourcePath,
         dir,
         task.config,
       );
     } catch (_) {
-      savedPath = null;
+      saved = null;
     } finally {
+      final savedPath = saved?.path;
       if (task.deleteSourceAfterProcessing &&
           (savedPath == null ||
               !p.equals(
@@ -390,12 +391,17 @@ class _ChatInputBarState extends State<ChatInputBar>
       _activeImageTasks--;
     }
 
+    final savedPath = saved?.path;
+
     final index = mounted
         ? _images.indexWhere((image) => image.id == task.id)
         : -1;
     final taskIsActive = index >= 0 && _processingImageIds.contains(task.id);
     if (!taskIsActive &&
         savedPath != null &&
+        saved != null &&
+        !saved.reused &&
+        !UploadDedupe.isShared(savedPath) &&
         !p.equals(
           p.normalize(p.absolute(task.sourcePath)),
           p.normalize(p.absolute(savedPath)),
@@ -1537,9 +1543,12 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   Future<void> _handlePastedText(String text) async {
+    if (!mounted) return;
+    final settings = context.read<SettingsProvider>();
+    final threshold = settings.longPasteAsFileThreshold;
     final isLongPaste =
-        text.characters.take(_maxInlinePasteCharacters + 1).length >
-        _maxInlinePasteCharacters;
+        settings.longPasteAsFile &&
+        text.characters.take(threshold + 1).length > threshold;
     if (!isLongPaste) {
       _insertPastedText(text);
       return;
@@ -1654,11 +1663,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           images.add(src);
           continue;
         }
-        final savedPath = await FileImportHelper.copyXFile(
-          XFile(src),
-          dir,
-          context,
-        );
+        final savedPath = await FileImportHelper.copyXFile(XFile(src), dir);
         if (savedPath != null) {
           final savedName = p.basename(savedPath);
           if (_isImageExtension(savedName)) {

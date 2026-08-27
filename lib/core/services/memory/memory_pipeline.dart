@@ -326,14 +326,16 @@ class MemoryPipelineService {
     }
   }
 
-  static bool _isTaskFailure(String error) => !const {
+  static const Set<String> skipReasonCodes = {
     'temporary_conversation',
     'memory_disabled',
     'auto_organize_off',
     'streaming',
     'below_threshold',
     'empty_window',
-  }.contains(error);
+  };
+
+  static bool _isTaskFailure(String error) => !skipReasonCodes.contains(error);
 
   /// 为 [job] 打开一个追踪记录。录制关闭或失败时返回 null。
   MemoryTraceHandle? _beginJobTrace(_PipelineJob job) {
@@ -671,6 +673,7 @@ class MemoryPipelineService {
       visible: visible,
       totalByType: totals,
       lang: lang,
+      maxItems: settings.memoryInjectionMaxItems,
     );
     final extractPrompt = MemoryExtractor.buildPrompt(
       lang: lang,

@@ -65,5 +65,25 @@ void main() {
         isNot(contains('additionalProperties')),
       );
     });
+
+    test('preserves scalar types when converting const to enum', () {
+      final output = ToolHandlerService.sanitizeToolParametersForProvider({
+        'type': 'object',
+        'properties': {
+          'enabled': {'const': true},
+          'retries': {'const': 2},
+        },
+      }, ProviderKind.google);
+
+      final properties = output['properties'] as Map<String, dynamic>;
+      expect(properties['enabled'], {
+        'type': 'boolean',
+        'enum': [true],
+      });
+      expect(properties['retries'], {
+        'type': 'integer',
+        'enum': [2],
+      });
+    });
   });
 }

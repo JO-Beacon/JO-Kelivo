@@ -60,7 +60,7 @@ void main() {
       );
     });
 
-    test('support matrix keeps OpenRouter Responses path unsupported', () {
+    test('support matrix enables OpenRouter Responses server tools', () {
       final cfg = _openRouterConfig(
         modelId: 'deepseek/deepseek-chat',
         useResponseApi: true,
@@ -71,68 +71,73 @@ void main() {
           cfg: cfg,
           modelId: 'deepseek/deepseek-chat',
         ),
-        isFalse,
+        isTrue,
       );
     });
 
-    test('Chat Completions request injects default web plugin', () async {
-      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      addTearDown(() async {
-        await server.close(force: true);
-      });
+    test(
+      'Chat Completions request injects OpenRouter server search tool',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
 
-      Map<String, dynamic>? receivedBody;
-      server.listen((request) async {
-        receivedBody =
-            jsonDecode(await utf8.decoder.bind(request).join())
-                as Map<String, dynamic>;
-        request.response.statusCode = HttpStatus.ok;
-        request.response.headers.contentType = ContentType.json;
-        request.response.write(
-          jsonEncode({
-            'choices': [
-              {
-                'message': {'role': 'assistant', 'content': 'ok'},
-                'finish_reason': 'stop',
+        Map<String, dynamic>? receivedBody;
+        server.listen((request) async {
+          receivedBody =
+              jsonDecode(await utf8.decoder.bind(request).join())
+                  as Map<String, dynamic>;
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode({
+              'choices': [
+                {
+                  'message': {'role': 'assistant', 'content': 'ok'},
+                  'finish_reason': 'stop',
+                },
+              ],
+              'usage': {
+                'prompt_tokens': 1,
+                'completion_tokens': 1,
+                'total_tokens': 2,
               },
-            ],
-            'usage': {
-              'prompt_tokens': 1,
-              'completion_tokens': 1,
-              'total_tokens': 2,
-            },
-          }),
+            }),
+          );
+          await request.response.close();
+        });
+
+        await HttpOverrides.runZoned(
+          () async {
+            final chunks = await ChatApiService.sendMessageStream(
+              config: _openRouterConfig(modelId: 'deepseek/deepseek-chat'),
+              modelId: 'deepseek/deepseek-chat',
+              messages: const <Map<String, dynamic>>[
+                {'role': 'user', 'content': 'latest AI news'},
+              ],
+              stream: false,
+            ).toList();
+
+            expect(chunks.last.isDone, isTrue);
+          },
+          createHttpClient: (context) {
+            return _ProxyHttpOverrides(server.port).createHttpClient(context);
+          },
         );
-        await request.response.close();
-      });
 
-      await HttpOverrides.runZoned(
-        () async {
-          final chunks = await ChatApiService.sendMessageStream(
-            config: _openRouterConfig(modelId: 'deepseek/deepseek-chat'),
-            modelId: 'deepseek/deepseek-chat',
-            messages: const <Map<String, dynamic>>[
-              {'role': 'user', 'content': 'latest AI news'},
-            ],
-            stream: false,
-          ).toList();
-
-          expect(chunks.last.isDone, isTrue);
-        },
-        createHttpClient: (context) {
-          return _ProxyHttpOverrides(server.port).createHttpClient(context);
-        },
-      );
-
-      expect(receivedBody, isNotNull);
-      expect(receivedBody!['model'], 'deepseek/deepseek-chat');
-      expect(
-        receivedBody!['plugins'],
-        contains(
-          predicate<Map<String, dynamic>>((plugin) => plugin['id'] == 'web'),
-        ),
-      );
-    });
+        expect(receivedBody, isNotNull);
+        expect(receivedBody!['model'], 'deepseek/deepseek-chat');
+        expect(
+          receivedBody!['tools'],
+          contains(
+            predicate<Map<String, dynamic>>(
+              (tool) => tool['type'] == 'openrouter:web_search',
+            ),
+          ),
+        );
+      },
+    );
 
     test(
       'Chat Completions request leaves plugins absent when disabled',

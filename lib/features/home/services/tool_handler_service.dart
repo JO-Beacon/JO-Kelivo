@@ -14,9 +14,11 @@ import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
 import '../../../core/services/memory/memory_pipeline.dart';
+import '../../../core/services/memory/memory_prompts.dart';
 import '../../../core/services/memory/memory_tools.dart';
 import '../../../core/services/search/search_tool_service.dart';
 import 'ask_user_interaction_service.dart';
+import 'built_in_tool_names.dart';
 import 'local_tools_service.dart';
 import 'tool_approval_service.dart';
 
@@ -64,6 +66,14 @@ class ToolHandlerService {
       final v = m['const'];
       if (v is String || v is num || v is bool) {
         m['enum'] = [v];
+        if (m['type'] == null) {
+          m['type'] = switch (v) {
+            bool _ => 'boolean',
+            int _ => 'integer',
+            num _ => 'number',
+            _ => 'string',
+          };
+        }
       }
       m.remove('const');
     }
@@ -176,6 +186,7 @@ class ToolHandlerService {
       contextProvider.read<McpProvider>(),
       contextProvider.read<AssistantProvider>(),
       assistantId: assistant?.id,
+      reservedNames: BuiltInToolNames.all,
     );
   }
 
@@ -222,7 +233,9 @@ class ToolHandlerService {
     // Memory 工具 (§10.1)
     if (settings.legacyMemoryMode) {
       if (assistant?.enableMemory == true && supportsTools) {
-        toolDefs.addAll(_buildLegacyMemoryToolDefinitions());
+        toolDefs.addAll(
+          _buildLegacyMemoryToolDefinitions(settings.resolvedMemoryPromptLang),
+        );
       }
     } else if (supportsTools && assistant != null) {
       toolDefs.addAll(
@@ -258,19 +271,24 @@ class ToolHandlerService {
   }
 
   /// 旧版 create/edit/delete_memory 工具 schema（v2 之前的记忆系统）。
-  List<Map<String, dynamic>> _buildLegacyMemoryToolDefinitions() {
+  List<Map<String, dynamic>> _buildLegacyMemoryToolDefinitions(
+    MemoryPromptLang lang,
+  ) {
+    final zh = lang == MemoryPromptLang.zh;
     return [
       {
         'type': 'function',
         'function': {
           'name': 'create_memory',
-          'description': 'create a memory record',
+          'description': zh ? '新增一条记忆记录。' : 'Create a memory record.',
           'parameters': {
             'type': 'object',
             'properties': {
               'content': {
                 'type': 'string',
-                'description': 'The content of the memory record',
+                'description': zh
+                    ? '记忆记录的内容。'
+                    : 'The content of the memory record.',
               },
             },
             'required': ['content'],
@@ -281,17 +299,23 @@ class ToolHandlerService {
         'type': 'function',
         'function': {
           'name': 'edit_memory',
-          'description': 'update a memory record',
+          'description': zh
+              ? '更新一条已有的记忆记录。'
+              : 'Update an existing memory record.',
           'parameters': {
             'type': 'object',
             'properties': {
               'id': {
                 'type': 'integer',
-                'description': 'The id of the memory record',
+                'description': zh
+                    ? '记忆记录的 id。'
+                    : 'The id of the memory record.',
               },
               'content': {
                 'type': 'string',
-                'description': 'The content of the memory record',
+                'description': zh
+                    ? '记忆记录的内容。'
+                    : 'The content of the memory record.',
               },
             },
             'required': ['id', 'content'],
@@ -302,13 +326,15 @@ class ToolHandlerService {
         'type': 'function',
         'function': {
           'name': 'delete_memory',
-          'description': 'delete a memory record',
+          'description': zh ? '删除一条记忆记录。' : 'Delete a memory record.',
           'parameters': {
             'type': 'object',
             'properties': {
               'id': {
                 'type': 'integer',
-                'description': 'The id of the memory record',
+                'description': zh
+                    ? '记忆记录的 id。'
+                    : 'The id of the memory record.',
               },
             },
             'required': ['id'],
@@ -335,6 +361,7 @@ class ToolHandlerService {
       contextProvider.read<AssistantProvider>(),
       assistant?.id,
       routeSnapshot: mcpRouteSnapshot,
+      reservedNames: BuiltInToolNames.all,
     );
 
     if (tools.isEmpty) return [];
@@ -407,10 +434,54 @@ class ToolHandlerService {
           mcp,
           assistantProvider,
           assistantId: assistant?.id,
+          reservedNames: BuiltInToolNames.all,
         );
+
+    Future<String> approveAndExecuteMcp(
+      String name,
+      Map<String, dynamic> args,
+    ) async {
+      if (approvalService != null &&
+          toolSvc.toolNeedsApprovalForAssistant(
+            mcp,
+            assistantProvider,
+            assistantId: assistant?.id,
+            toolName: name,
+            routeSnapshot: routes,
+            reservedNames: BuiltInToolNames.all,
+          )) {
+        final approvalId = '${name}_${DateTime.now().microsecondsSinceEpoch}';
+        final result = await approvalService.requestApproval(
+          toolCallId: approvalId,
+          toolName: name,
+          arguments: args,
+          conversationId: conversationId,
+        );
+        if (!result.approved) {
+          return _toolError(
+            error: 'approval_denied',
+            message: result.denyReason ?? 'User denied the tool call',
+            tool: name,
+          );
+        }
+      }
+      return toolSvc.callToolTextForAssistant(
+        mcp,
+        assistantProvider,
+        assistantId: assistant?.id,
+        toolName: name,
+        arguments: args,
+        routeSnapshot: routes,
+        reservedNames: BuiltInToolNames.all,
+      );
+    }
 
     return (name, args, {toolCallId}) async {
       try {
+        if (routes.containsExposedName(name)) {
+          return await approveAndExecuteMcp(name, args);
+        }
+
         // Search 工具
         if (name == SearchToolService.toolName &&
             assistant?.searchEnabled == true) {
@@ -517,6 +588,7 @@ class ToolHandlerService {
               assistantId: assistant?.id,
               toolName: name,
               routeSnapshot: routes,
+              reservedNames: BuiltInToolNames.all,
             )) {
           // 为本次工具调用审批请求生成唯一 id
           final toolCallId = '${name}_${DateTime.now().microsecondsSinceEpoch}';
@@ -543,6 +615,7 @@ class ToolHandlerService {
           toolName: name,
           arguments: args,
           routeSnapshot: routes,
+          reservedNames: BuiltInToolNames.all,
         );
         return text;
       } catch (e) {

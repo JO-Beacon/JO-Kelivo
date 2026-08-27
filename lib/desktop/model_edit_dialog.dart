@@ -14,6 +14,7 @@ import '../shared/widgets/snackbar.dart';
 import '../features/model/widgets/model_edit_state_helper.dart';
 import '../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'widgets/desktop_dialog_style.dart';
 
 Future<bool?> showDesktopModelEditDialog(
   BuildContext context, {
@@ -116,6 +117,8 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
   // OpenAI 内置工具
   bool _openaiCodeInterpreterTool = false;
   bool _openaiImageGenerationTool = false;
+  bool _openRouterWebFetchTool = false;
+  bool _openRouterShellTool = false;
 
   @override
   void initState() {
@@ -230,6 +233,8 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
       _openaiImageGenerationTool = builtInSet.contains(
         BuiltInToolNames.imageGeneration,
       );
+      _openRouterWebFetchTool = builtInSet.contains(BuiltInToolNames.webFetch);
+      _openRouterShellTool = builtInSet.contains(BuiltInToolNames.shell);
     }
   }
 
@@ -329,21 +334,15 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
     final l10n = AppLocalizations.of(context)!;
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
+        constraints: DesktopDialogStyle.proportionalConstraints(
+          context,
           minWidth: 540,
           maxWidth: 700,
           maxHeight: 650,
         ),
         child: Material(
           color: cs.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? cs.onSurface.withValues(alpha: 0.08)
-                  : cs.outlineVariant.withValues(alpha: 0.25),
-            ),
-          ),
+          shape: DesktopDialogStyle.shape(context),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: Column(
@@ -751,6 +750,26 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
               ? null
               : (v) => setState(() => _googleUrlContextTool = v),
         ),
+        if (BuiltInToolsHelper.isOpenRouterProvider(cfg)) ...[
+          const SizedBox(height: 8),
+          _ToolTile(
+            title: l10n.modelDetailSheetOpenRouterWebFetchTool,
+            desc: l10n.modelDetailSheetOpenRouterWebFetchToolDescription,
+            value: _openRouterWebFetchTool,
+            onChanged: disableTools
+                ? null
+                : (v) => setState(() => _openRouterWebFetchTool = v),
+          ),
+          const SizedBox(height: 8),
+          _ToolTile(
+            title: l10n.modelDetailSheetOpenRouterShellTool,
+            desc: l10n.modelDetailSheetOpenRouterShellToolDescription,
+            value: _openRouterShellTool,
+            onChanged: disableTools || cfg.useResponseApi != true
+                ? null
+                : (v) => setState(() => _openRouterShellTool = v),
+          ),
+        ],
         const SizedBox(height: 8),
         _ToolTile(
           title: l10n.modelDetailSheetCodeExecutionTool,
@@ -871,6 +890,12 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
       }
       if (_openaiImageGenerationTool) {
         builtInSet.add(BuiltInToolNames.imageGeneration);
+      }
+      if (BuiltInToolsHelper.isOpenRouterProvider(old)) {
+        builtInSet.remove(BuiltInToolNames.webFetch);
+        builtInSet.remove(BuiltInToolNames.shell);
+        if (_openRouterWebFetchTool) builtInSet.add(BuiltInToolNames.webFetch);
+        if (_openRouterShellTool) builtInSet.add(BuiltInToolNames.shell);
       }
     }
     final builtInTools = BuiltInToolNames.orderedForStorage(builtInSet);

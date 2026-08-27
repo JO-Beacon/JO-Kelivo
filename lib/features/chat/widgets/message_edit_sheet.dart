@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../icons/lucide_adapter.dart';
 import '../models/message_edit_result.dart';
 import '../models/message_parts_edit_draft.dart';
 import '../../../l10n/app_localizations.dart';
@@ -57,13 +58,17 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
     super.dispose();
   }
 
-  MessageEditResult _result({required bool shouldSend}) {
-    final text = _controller.text.trim();
+  MessageEditResult _result({
+    required bool shouldSend,
+    MessageEditSaveMode saveMode = MessageEditSaveMode.newBranch,
+  }) {
+    final text = _controller.text;
     _draft.replaceText(text);
     return MessageEditResult(
       content: text,
       parts: _draft.parts,
       shouldSend: shouldSend,
+      saveMode: saveMode,
     );
   }
 
@@ -76,16 +81,33 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
     });
   }
 
+  bool get _hasChanges =>
+      _controller.text != widget.message.content ||
+      !_draft.isSameAs(widget.message.parts);
+
+  void _trimWhitespace() {
+    final trimmed = _controller.text.trim();
+    if (trimmed == _controller.text) return;
+    _controller.value = TextEditingValue(
+      text: trimmed,
+      selection: TextSelection.collapsed(offset: trimmed.length),
+      composing: TextRange.empty,
+    );
+    setState(() {});
+  }
+
   Future<void> _confirmClose() async {
     if (_confirmingClose || _allowClose) return;
+    if (!_hasChanges) {
+      _closeWithResult(null);
+      return;
+    }
     _confirmingClose = true;
     final action = await showMessageEditCloseConfirmation(context);
     _confirmingClose = false;
     if (!mounted) return;
     switch (action) {
-      case MessageEditCloseAction.save:
-        _closeWithResult(_result(shouldSend: false));
-      case MessageEditCloseAction.discard:
+      case MessageEditCloseAction.confirm:
         _closeWithResult(null);
       case MessageEditCloseAction.cancel:
       case null:
@@ -152,82 +174,128 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
                         ),
                       ),
                       const SizedBox(height: 10),
-                      SizedBox(
-                        height: 32,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: IosCardPress(
-                                onTap: () {
-                                  Haptics.light();
-                                  _closeWithResult(_result(shouldSend: true));
-                                },
-                                borderRadius: BorderRadius.circular(20),
-                                baseColor: Colors.transparent,
-                                pressedBlendStrength:
-                                    Theme.of(context).brightness ==
-                                        Brightness.dark
-                                    ? 0.10
-                                    : 0.06,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 6,
-                                ),
-                                child: Text(
-                                  l10n.messageEditPageSaveAndSend,
-                                  style: TextStyle(
-                                    color: cs.primary,
-                                    fontWeight: AppFontWeights.emphasis,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Center(
-                              child: Text(
-                                l10n.messageEditPageTitle,
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: AppFontWeights.semibold,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: IosCardPress(
-                                onTap: () {
-                                  Haptics.light();
-                                  _closeWithResult(_result(shouldSend: false));
-                                },
-                                borderRadius: BorderRadius.circular(20),
-                                baseColor: Colors.transparent,
-                                pressedBlendStrength:
-                                    Theme.of(context).brightness ==
-                                        Brightness.dark
-                                    ? 0.10
-                                    : 0.06,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 6,
-                                ),
-                                child: Text(
-                                  l10n.messageEditPageSave,
-                                  style: TextStyle(
-                                    color: cs.primary,
-                                    fontWeight: AppFontWeights.emphasis,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                      Text(
+                        l10n.messageEditPageTitle,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: AppFontWeights.semibold,
                         ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 4),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 4,
+                        runSpacing: 2,
+                        children: [
+                          IosCardPress(
+                            onTap: () {
+                              Haptics.light();
+                              _closeWithResult(_result(shouldSend: true));
+                            },
+                            borderRadius: BorderRadius.circular(20),
+                            baseColor: Colors.transparent,
+                            pressedBlendStrength:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? 0.10
+                                : 0.06,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 6,
+                            ),
+                            child: Text(
+                              l10n.messageEditPageSaveAsBranchAndSend,
+                              style: TextStyle(
+                                color: cs.primary,
+                                fontWeight: AppFontWeights.emphasis,
+                              ),
+                            ),
+                          ),
+                          IosCardPress(
+                            onTap: () {
+                              Haptics.light();
+                              _closeWithResult(_result(shouldSend: false));
+                            },
+                            borderRadius: BorderRadius.circular(20),
+                            baseColor: Colors.transparent,
+                            pressedBlendStrength:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? 0.10
+                                : 0.06,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 6,
+                            ),
+                            child: Text(
+                              l10n.messageEditPageSaveAsBranch,
+                              style: TextStyle(
+                                color: cs.primary,
+                                fontWeight: AppFontWeights.emphasis,
+                              ),
+                            ),
+                          ),
+                          IosCardPress(
+                            onTap: () {
+                              Haptics.light();
+                              _closeWithResult(
+                                _result(
+                                  shouldSend: false,
+                                  saveMode: MessageEditSaveMode.overwrite,
+                                ),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(20),
+                            baseColor: Colors.transparent,
+                            pressedBlendStrength:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? 0.10
+                                : 0.06,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 6,
+                            ),
+                            child: Text(
+                              l10n.messageEditPageOverwriteSave,
+                              style: TextStyle(
+                                color: cs.primary,
+                                fontWeight: AppFontWeights.emphasis,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: IosCardPress(
+                    onTap: _trimWhitespace,
+                    borderRadius: BorderRadius.circular(16),
+                    baseColor: Colors.transparent,
+                    pressedBlendStrength:
+                        Theme.of(context).brightness == Brightness.dark
+                        ? 0.10
+                        : 0.06,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Lucide.Eraser, size: 16, color: cs.primary),
+                        const SizedBox(width: 6),
+                        Text(
+                          l10n.messageEditTrimWhitespace,
+                          style: TextStyle(color: cs.primary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
                 Expanded(
                   child: SingleChildScrollView(
                     controller: sc,

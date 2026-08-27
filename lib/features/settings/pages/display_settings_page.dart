@@ -10,13 +10,13 @@ import 'package:syncfusion_flutter_sliders/sliders.dart';
 import 'package:syncfusion_flutter_core/theme.dart';
 import '../../../core/providers/settings_provider.dart';
 import 'image_settings_page.dart';
+import 'message_style_settings_page.dart';
 import 'theme_settings_page.dart';
 import '../../../theme/palettes.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../core/services/haptics.dart';
 import 'package:file_picker/file_picker.dart';
-import 'google_fonts_picker_page.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
@@ -149,6 +149,17 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
               _iosDivider(context),
               _iosNavRow(
                 context,
+                icon: Lucide.MessageSquare,
+                label: l10n.messageStyleSettingsPageTitle,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const MessageStyleSettingsPage(),
+                  ),
+                ),
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
                 icon: Lucide.Vibrate,
                 label: l10n.displaySettingsPageHapticsSettingsTitle,
                 onTap: () => Navigator.of(context).push(
@@ -231,37 +242,6 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                   ),
                 ),
               if (Platform.isIOS) _iosDivider(context),
-              _iosNavRow(
-                context,
-                icon: Lucide.MessageSquare,
-                label: l10n.displaySettingsPageChatMessageBackgroundTitle,
-                detailBuilder: (ctx) {
-                  final sp = ctx.watch<SettingsProvider>();
-                  String labelOf() {
-                    switch (sp.chatMessageBackgroundStyle) {
-                      case ChatMessageBackgroundStyle.frosted:
-                        return l10n
-                            .displaySettingsPageChatMessageBackgroundFrosted;
-                      case ChatMessageBackgroundStyle.solid:
-                        return l10n
-                            .displaySettingsPageChatMessageBackgroundSolid;
-                      case ChatMessageBackgroundStyle.defaultStyle:
-                        return l10n
-                            .displaySettingsPageChatMessageBackgroundDefault;
-                    }
-                  }
-
-                  return Text(
-                    labelOf(),
-                    style: TextStyle(
-                      color: cs.onSurface.withValues(alpha: 0.6),
-                      fontSize: 13,
-                    ),
-                  );
-                },
-                onTap: () => _showChatMessageBackgroundSheet(context),
-              ),
-              _iosDivider(context),
               _iosNavRow(
                 context,
                 icon: Lucide.Type,
@@ -439,12 +419,6 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
               _sheetDividerNoIcon(ctx),
               _sheetOption(
                 ctx,
-                label: l10n.fontPickerGetFromGoogleFonts,
-                onTap: () => Navigator.of(ctx).pop('google'),
-              ),
-              _sheetDividerNoIcon(ctx),
-              _sheetOption(
-                ctx,
                 label: l10n.displaySettingsPageFontResetLabel,
                 onTap: () => Navigator.of(ctx).pop('reset'),
               ),
@@ -472,87 +446,12 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
       }
       return;
     }
-    if (choice == 'google') {
-      final title = target == _FontTarget.app
-          ? l10n.displaySettingsPageAppFontTitle
-          : l10n.displaySettingsPageCodeFontTitle;
-      final selected = await Navigator.of(context).push<String>(
-        MaterialPageRoute(builder: (_) => GoogleFontsPickerPage(title: title)),
-      );
-      if (selected == null || selected.isEmpty) return;
-      if (!context.mounted) return;
-      if (target == _FontTarget.app) {
-        await settings.setAppFontFromGoogle(selected);
-      } else {
-        await settings.setCodeFontFromGoogle(selected);
-      }
-      return;
-    }
     if (choice == 'reset') {
       if (target == _FontTarget.app) {
         await settings.clearAppFont();
       } else {
         await settings.clearCodeFont();
       }
-    }
-  }
-
-  Future<void> _showChatMessageBackgroundSheet(BuildContext context) async {
-    final cs = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context)!;
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: cs.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _sheetOption(
-                ctx,
-                label: l10n.displaySettingsPageChatMessageBackgroundDefault,
-                onTap: () => Navigator.of(ctx).pop('default'),
-              ),
-              _sheetDividerNoIcon(ctx),
-              _sheetOption(
-                ctx,
-                label: l10n.displaySettingsPageChatMessageBackgroundFrosted,
-                onTap: () => Navigator.of(ctx).pop('frosted'),
-              ),
-              _sheetDividerNoIcon(ctx),
-              _sheetOption(
-                ctx,
-                label: l10n.displaySettingsPageChatMessageBackgroundSolid,
-                onTap: () => Navigator.of(ctx).pop('solid'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (choice == null) return;
-    if (!context.mounted) return;
-
-    final sp = context.read<SettingsProvider>();
-    switch (choice) {
-      case 'frosted':
-        await sp.setChatMessageBackgroundStyle(
-          ChatMessageBackgroundStyle.frosted,
-        );
-        break;
-      case 'solid':
-        await sp.setChatMessageBackgroundStyle(
-          ChatMessageBackgroundStyle.solid,
-        );
-        break;
-      default:
-        await sp.setChatMessageBackgroundStyle(
-          ChatMessageBackgroundStyle.defaultStyle,
-        );
     }
   }
 
@@ -2280,7 +2179,148 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                 onChanged: (v) =>
                     context.read<SettingsProvider>().setEnterToSendOnMobile(v),
               ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.Clipboard,
+                label: l10n.displaySettingsPageLongPasteAsFileTitle,
+                value: sp.longPasteAsFile,
+                onChanged: (v) =>
+                    context.read<SettingsProvider>().setLongPasteAsFile(v),
+              ),
+              if (sp.longPasteAsFile) ...[
+                _iosDivider(context),
+                const _LongPasteAsFileThresholdRow(),
+              ],
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LongPasteAsFileThresholdRow extends StatefulWidget {
+  const _LongPasteAsFileThresholdRow();
+
+  @override
+  State<_LongPasteAsFileThresholdRow> createState() =>
+      _LongPasteAsFileThresholdRowState();
+}
+
+class _LongPasteAsFileThresholdRowState
+    extends State<_LongPasteAsFileThresholdRow> {
+  late final SettingsProvider _settings;
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _settings = context.read<SettingsProvider>();
+    _controller = TextEditingController(
+      text: '${_settings.longPasteAsFileThreshold}',
+    );
+    _focusNode = FocusNode()..addListener(_handleFocusChange);
+  }
+
+  @override
+  void dispose() {
+    _commit(syncField: false);
+    _focusNode
+      ..removeListener(_handleFocusChange)
+      ..dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleFocusChange() {
+    if (!_focusNode.hasFocus) _commit();
+  }
+
+  void _commit({bool syncField = true}) {
+    final next = SettingsProvider.resolveLongPasteAsFileThreshold(
+      _controller.text,
+      fallback: _settings.longPasteAsFileThreshold,
+    );
+    _settings.setLongPasteAsFileThreshold(next);
+    if (syncField) {
+      final text = '$next';
+      if (_controller.text != text) {
+        _controller.value = _controller.value.copyWith(
+          text: text,
+          selection: TextSelection.collapsed(offset: text.length),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    if (!_focusNode.hasFocus) {
+      final text = '${sp.longPasteAsFileThreshold}';
+      if (_controller.text != text) _controller.text = text;
+    }
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 36,
+            child: Icon(
+              Lucide.ListOrdered,
+              size: 20,
+              color: cs.onSurface.withValues(alpha: 0.9),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              l10n.displaySettingsPageLongPasteAsFileThresholdTitle,
+              style: TextStyle(
+                fontSize: 15,
+                color: cs.onSurface.withValues(alpha: 0.9),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          SizedBox(
+            width: 72,
+            child: TextField(
+              controller: _controller,
+              focusNode: _focusNode,
+              textAlign: TextAlign.center,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: InputDecoration(
+                isDense: true,
+                filled: true,
+                fillColor: context.appColors.surfaceCard,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 8,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(
+                    color: cs.outlineVariant.withValues(alpha: 0.28),
+                  ),
+                ),
+              ),
+              onSubmitted: (_) => _commit(),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            l10n.displaySettingsPageLongPasteAsFileThresholdUnit,
+            style: TextStyle(
+              fontSize: 13,
+              color: cs.onSurface.withValues(alpha: 0.6),
+            ),
           ),
         ],
       ),

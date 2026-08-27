@@ -15,6 +15,7 @@ import '../../shared/widgets/ios_form_text_field.dart';
 import '../../shared/widgets/ios_tactile.dart';
 import '../../shared/widgets/ios_tile_button.dart';
 import '../../theme/app_font_weights.dart';
+import '../widgets/desktop_dialog_style.dart';
 
 /// 记忆相关桌面对话框的共享外壳（与 MCP 或助手对话框外壳一致：
 /// surface Dialog 加标题行加关闭按钮）。
@@ -38,9 +39,13 @@ Future<T?> showDesktopMemoryDialog<T>(
       return Dialog(
         backgroundColor: cs.surface,
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: DesktopDialogStyle.shape(ctx),
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
+          constraints: DesktopDialogStyle.proportionalConstraints(
+            ctx,
+            maxWidth: maxWidth,
+            maxHeight: maxHeight,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -112,7 +117,7 @@ Future<T?> showDesktopMemoryFormDialog<T>(
       return Dialog(
         backgroundColor: cs.surface,
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: DesktopDialogStyle.shape(ctx),
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
           child: Column(
@@ -408,7 +413,7 @@ class _DesktopMemoryTextInputDialogState
     return Dialog(
       backgroundColor: cs.surface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: DesktopDialogStyle.shape(context),
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: 480, maxHeight: maxHeight),
         child: Column(
@@ -551,7 +556,7 @@ Future<bool> showDesktopMemoryConfirmDialog(
       return Dialog(
         backgroundColor: localCs.surface,
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: DesktopDialogStyle.shape(context),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
           child: Padding(

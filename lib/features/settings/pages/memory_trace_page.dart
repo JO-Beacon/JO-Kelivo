@@ -15,6 +15,7 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/platform_utils.dart';
+import '../widgets/memory_ui.dart';
 
 /// 后台记忆管线的调试查看器（Gatekeeper → Extract → Smart Add → Distiller，
 /// 以及摘要、召回和记忆工具调用）。
@@ -362,7 +363,7 @@ class _TraceCard extends StatelessWidget {
             ),
             if (trace.hasError) ...[
               const SizedBox(height: 10),
-              _ErrorLine(text: trace.error!),
+              _ErrorLine(text: memoryOutcomeLabel(l10n, trace.error!)),
             ],
           ],
         ),
@@ -413,7 +414,8 @@ class _OverviewCard extends StatelessWidget {
         trace.watermark == null ? '—' : '#${trace.watermark}',
       ),
       _Kv(l10n.memoryTraceFieldOutcome, _outcomeLabel(l10n, trace)),
-      if (trace.hasError) _Kv(l10n.memoryTraceFieldError, trace.error!),
+      if (trace.hasError)
+        _Kv(l10n.memoryTraceFieldError, memoryOutcomeLabel(l10n, trace.error!)),
     ];
 
     return _SectionCard(
@@ -463,7 +465,7 @@ class _StepCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if ((step.error ?? '').isNotEmpty) ...[
-            _ErrorLine(text: step.error!),
+            _ErrorLine(text: memoryOutcomeLabel(l10n, step.error!)),
             const SizedBox(height: 12),
           ],
           if (prompt.isNotEmpty) ...[

@@ -240,6 +240,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
               final ok = await showDialog<bool>(
                 context: context,
                 builder: (ctx) => AlertDialog(
+                  shape: DesktopDialogStyle.shape(ctx),
                   title: Text(l10n.providerDetailPageDeleteProviderTitle),
                   content: Text(l10n.providerDetailPageDeleteProviderContent),
                   actions: [
@@ -296,7 +297,6 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
       (name: 'Tensdaq', key: 'Tensdaq'),
       (name: 'DeepSeek', key: 'DeepSeek'),
       (name: 'AIhubmix', key: 'AIhubmix'),
-      (name: '随想AI中转站', key: '随想AI中转站'),
       (name: l10n.providersPageAliyunName, key: 'Aliyun'),
       (name: l10n.providersPageZhipuName, key: 'Zhipu AI'),
       (name: 'Claude', key: 'Claude'),
@@ -1064,7 +1064,7 @@ class _DesktopProviderDetailPaneState
       barrierDismissible: true,
       builder: (ctx) => Dialog(
         backgroundColor: cs.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: DesktopDialogStyle.shape(ctx),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 460),
@@ -1342,69 +1342,6 @@ class _DesktopProviderDetailPaneState
                                 ..onTap = () async {
                                   final uri = Uri.parse(
                                     'https://siliconflow.cn',
-                                  );
-                                  try {
-                                    final ok = await launchUrl(
-                                      uri,
-                                      mode: LaunchMode.externalApplication,
-                                    );
-                                    if (!ok) {
-                                      await launchUrl(uri);
-                                    }
-                                  } catch (_) {
-                                    await launchUrl(uri);
-                                  }
-                                },
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-
-              if (widget.providerKey.toLowerCase() == '随想ai中转站') ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: cs.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: cs.primary.withValues(alpha: 0.35),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '可靠高效的 API 中继服务，提供 Claude、Codex、Gemini 等中继服务。注重隐私·无数据倒卖·无模型掺水，充值额度 1:1，按量付费。多线路冗余、跨区域容灾、自动故障切换，长链路 SSE 不中断。',
-                        style: TextStyle(
-                          color: cs.onSurface.withValues(alpha: 0.8),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text.rich(
-                        TextSpan(
-                          text: '官网：',
-                          style: TextStyle(
-                            color: cs.onSurface.withValues(alpha: 0.8),
-                          ),
-                          children: [
-                            TextSpan(
-                              text: 'https://sui-xiang.com',
-                              style: TextStyle(
-                                color: cs.primary,
-                                fontWeight: AppFontWeights.emphasis,
-                              ),
-                              recognizer: TapGestureRecognizer()
-                                ..onTap = () async {
-                                  final uri = Uri.parse(
-                                    'https://sui-xiang.com',
                                   );
                                   try {
                                     final ok = await launchUrl(
@@ -2349,9 +2286,7 @@ class _DesktopProviderDetailPaneState
         return Dialog(
           key: const ValueKey('desktop-provider-settings-dialog'),
           backgroundColor: cs.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
+          shape: DesktopDialogStyle.shape(ctx),
           insetPadding: const EdgeInsets.symmetric(
             horizontal: 24,
             vertical: 24,
@@ -2715,6 +2650,7 @@ class _DesktopProviderDetailPaneState
                                           alpha: 0.12,
                                         ),
                                         builder: (dctx) => AlertDialog(
+                                          shape: DesktopDialogStyle.shape(dctx),
                                           title: Text(
                                             l10n.providerGroupsCreateDialogTitle,
                                           ),
@@ -3557,9 +3493,7 @@ class _DesktopProviderDetailPaneState
         return StatefulBuilder(
           builder: (ctx2, setLocal) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+              shape: DesktopDialogStyle.shape(ctx2),
               backgroundColor: cs.surface,
               title: Text(l10n.sideDrawerImageUrlDialogTitle),
               content: TextField(
@@ -3640,9 +3574,7 @@ class _DesktopProviderDetailPaneState
           builder: (ctx2, setLocal) {
             return Dialog(
               key: const ValueKey('desktop-provider-lobehub-icon-dialog'),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
+              shape: DesktopDialogStyle.shape(ctx2),
               insetPadding: const EdgeInsets.symmetric(
                 horizontal: 24,
                 vertical: 24,
@@ -3752,6 +3684,7 @@ class _DesktopProviderDetailPaneState
       builder: (ctx) {
         return AlertDialog(
           backgroundColor: cs.surface,
+          shape: DesktopDialogStyle.shape(ctx),
           title: Text(l10n.providerAvatarIconDialogTitle),
           content: SizedBox(
             width: 360,
@@ -4073,6 +4006,7 @@ class _DesktopProviderDetailPaneState
           final ok = await showDialog<bool>(
             context: dctx,
             builder: (ctx2) => AlertDialog(
+              shape: DesktopDialogStyle.shape(ctx2),
               title: Text(l10nX.multiKeyPageDeleteErrorsConfirmTitle),
               content: Text(l10nX.multiKeyPageDeleteErrorsConfirmContent),
               actions: [
@@ -4119,9 +4053,7 @@ class _DesktopProviderDetailPaneState
             barrierDismissible: true,
             builder: (c2) => Dialog(
               backgroundColor: cs2.surface,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
+              shape: DesktopDialogStyle.shape(c2),
               insetPadding: const EdgeInsets.symmetric(
                 horizontal: 24,
                 vertical: 24,
@@ -4284,15 +4216,17 @@ class _DesktopProviderDetailPaneState
 
         return Dialog(
           backgroundColor: cs.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
+          shape: DesktopDialogStyle.shape(context),
           insetPadding: const EdgeInsets.symmetric(
             horizontal: 24,
             vertical: 24,
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 680, maxHeight: 620),
+            constraints: DesktopDialogStyle.proportionalConstraints(
+              context,
+              maxWidth: 680,
+              maxHeight: 620,
+            ),
             child: StatefulBuilder(
               builder: (dctx, setD) {
                 setDRef = setD;
@@ -4638,9 +4572,7 @@ class _DesktopProviderDetailPaneState
           builder: (ctx, setState) {
             return Dialog(
               backgroundColor: cs.surface,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+              shape: DesktopDialogStyle.shape(ctx),
               insetPadding: const EdgeInsets.symmetric(
                 horizontal: 24,
                 vertical: 24,
@@ -4865,7 +4797,7 @@ class _DesktopProviderDetailPaneState
       barrierDismissible: true,
       builder: (ctx) => Dialog(
         backgroundColor: cs.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: DesktopDialogStyle.shape(ctx),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 520),
@@ -4984,7 +4916,7 @@ class _DesktopProviderDetailPaneState
       barrierDismissible: true,
       builder: (ctx) => Dialog(
         backgroundColor: cs.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: DesktopDialogStyle.shape(ctx),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 520),
@@ -5572,6 +5504,7 @@ class _DesktopProviderGroupsDialogState
       context: context,
       barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.12),
       builder: (ctx) => AlertDialog(
+        shape: DesktopDialogStyle.shape(ctx),
         title: Text(title),
         content: TextField(
           controller: controller,
@@ -5639,6 +5572,7 @@ class _DesktopProviderGroupsDialogState
       context: context,
       barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.12),
       builder: (ctx) => AlertDialog(
+        shape: DesktopDialogStyle.shape(ctx),
         title: Text(l10n.providerGroupsDeleteConfirmTitle),
         content: Text(l10n.providerGroupsDeleteConfirmContent),
         actions: [
@@ -5703,7 +5637,7 @@ class _DesktopProviderGroupsDialogState
 
     return Dialog(
       backgroundColor: cs.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: DesktopDialogStyle.shape(context),
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520, maxHeight: 560),
@@ -6051,7 +5985,7 @@ class _DesktopProviderShareDialogState
     final l10n = AppLocalizations.of(context)!;
     return Dialog(
       backgroundColor: cs.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: DesktopDialogStyle.shape(context),
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),

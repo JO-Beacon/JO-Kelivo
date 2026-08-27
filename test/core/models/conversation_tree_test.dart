@@ -306,6 +306,43 @@ void main() {
         expect(afterRemove.branchPath('alt'), const ['u1', 'a1-alt', 'u2-alt']);
       },
     );
+
+    test(
+      'removeMessageOnly switches an active fork tip to its selected continuation',
+      () {
+        final base = ConversationTree.linear(
+          conversationId: 'conversation',
+          messageIds: const ['u1', 'fork'],
+        );
+        final withContinuation = base
+            .createMessageBranch(
+              branchId: 'continuation',
+              fromMessageId: 'fork',
+            )
+            .appendToActiveBranch('child');
+        final withSibling = withContinuation
+            .switchBranch('root')
+            .createMessageBranch(branchId: 'sibling', fromMessageId: 'fork')
+            .appendToActiveBranch('sibling-child');
+        final withEmptyActive = withSibling
+            .switchBranch('root')
+            .createMessageBranch(branchId: 'empty', fromMessageId: 'fork')
+            .switchBranch('continuation')
+            .switchBranch('empty');
+
+        final afterRemove = withEmptyActive.removeMessageOnly('fork');
+
+        expect(afterRemove.activeBranchId, 'continuation');
+        expect(afterRemove.activePath(), const ['u1', 'child']);
+        expect(afterRemove.edges['child']?.parentMessageId, 'u1');
+        expect(afterRemove.branchPath('sibling'), const [
+          'u1',
+          'sibling-child',
+        ]);
+        expect(afterRemove.branchPath('empty'), const ['u1']);
+        expect(afterRemove.branchSelections['u1'], 'continuation');
+      },
+    );
   });
 
   group('ConversationTree validation', () {

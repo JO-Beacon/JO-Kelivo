@@ -9,8 +9,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/providers/update_provider.dart';
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
-import '../../shared/widgets/ios_tile_button.dart';
 import '../../shared/widgets/snackbar.dart';
+import '../../shared/widgets/update_status_label.dart';
 import '../../theme/app_font_weights.dart';
 
 class DesktopAboutPane extends StatefulWidget {
@@ -23,8 +23,8 @@ class DesktopAboutPane extends StatefulWidget {
 enum _InfoLoadState { loading, loaded, failed }
 
 class _DesktopAboutPaneState extends State<DesktopAboutPane> {
-  static const String _upstreamKelivoVersion = '1.2.2';
-  static const String _upstreamKelivoBuildNumber = '66';
+  static const String _upstreamKelivoVersion = '1.2.3';
+  static const String _upstreamKelivoBuildNumber = '67';
 
   String _version = '';
   String _buildNumber = '';
@@ -227,12 +227,6 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
                     ),
                   ),
                   const _DeskRowDivider(),
-                  _DeskNavRow(
-                    icon: lucide.Lucide.Earth,
-                    label: l10n.aboutPageWebsite,
-                    onTap: () => _openUrl('https://kelivo.psycheas.top/'),
-                  ),
-                  const _DeskRowDivider(),
                   _DeskNavRowSvg(
                     svgAsset: 'assets/icons/github.svg',
                     label: l10n.aboutPageGithub,
@@ -287,14 +281,23 @@ class _AppHeaderCardState extends State<_AppHeaderCard> {
     final hoverBg = cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04);
     final overlay = _hover ? hoverBg : Colors.transparent;
     return MouseRegion(
+      cursor: widget.updateEnabled
+          ? SystemMouseCursors.click
+          : SystemMouseCursors.basic,
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTapDown: (_) => setState(() => _pressed = true),
-        onTapUp: (_) => setState(() => _pressed = false),
-        onTapCancel: () => setState(() => _pressed = false),
-        onTap: () {},
+        onTapDown: widget.updateEnabled
+            ? (_) => setState(() => _pressed = true)
+            : null,
+        onTapUp: widget.updateEnabled
+            ? (_) => setState(() => _pressed = false)
+            : null,
+        onTapCancel: widget.updateEnabled
+            ? () => setState(() => _pressed = false)
+            : null,
+        onTap: widget.updateEnabled ? widget.onCheckForUpdates : null,
         child: AnimatedScale(
           scale: _pressed ? 0.995 : 1.0,
           duration: const Duration(milliseconds: 110),
@@ -347,16 +350,12 @@ class _AppHeaderCardState extends State<_AppHeaderCard> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            IosTileButton(
-                              label: widget.updateLabel,
-                              icon: lucide.Lucide.RefreshCw,
-                              enabled: widget.updateEnabled,
-                              fontSize: 12,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 9,
-                                vertical: 7,
+                            Flexible(
+                              child: UpdateStatusLabel(
+                                label: widget.updateLabel,
+                                icon: lucide.Lucide.RefreshCw,
+                                enabled: widget.updateEnabled,
                               ),
-                              onTap: widget.onCheckForUpdates,
                             ),
                           ],
                         ),

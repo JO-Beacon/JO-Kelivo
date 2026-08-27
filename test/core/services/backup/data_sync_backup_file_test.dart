@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
@@ -469,6 +470,39 @@ void main() {
     });
 
     test(
+      'keeps a UI-owned progress callback out of joaiclient restore isolates',
+      () async {
+        final zipFile = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'progress_backup',
+          settings: const <String, dynamic>{},
+          includeFiles: true,
+        );
+        final backupFile = File('${root.path}/progress_backup.joaiclient');
+        await JoaiclientArchive.wrapZipPayload(
+          zipFile: zipFile,
+          outputFile: backupFile,
+        );
+
+        final progressSignal = Completer<void>();
+        final chatService = ChatService();
+        addTearDown(chatService.dispose);
+        await DataSync(
+          businessRepository: businessRepository,
+          chatService: chatService,
+        ).restoreFromLocalFile(
+          backupFile,
+          const WebDavConfig(includeChats: true, includeFiles: true),
+          onProgress: (_) {
+            if (!progressSignal.isCompleted) progressSignal.complete();
+          },
+        );
+
+        await progressSignal.future;
+      },
+    );
+
+    test(
       'restores a legacy linear SQLite backup after migrating its database',
       () async {
         final legacyAppData = Directory(p.join(root.path, 'legacy-app-data'))
@@ -482,6 +516,14 @@ void main() {
         await schema.rawDatabase.backup(raw).drain<void>();
         schema.close();
         final timestamp = DateTime.utc(2026, 1, 1).microsecondsSinceEpoch;
+        raw.execute(
+          'ALTER TABLE assistant_group_rows RENAME TO assistant_tag_rows;',
+        );
+        raw.execute(
+          'INSERT INTO assistant_tag_rows '
+          '(id, sort_order, payload, updated_at) '
+          "VALUES ('kelivo-tag', 0, '{\"name\":\"Imported tag\"}', 1);",
+        );
         raw.execute(
           'INSERT INTO conversation_rows '
           '(id, title, created_at, updated_at) '
@@ -544,6 +586,22 @@ void main() {
                 )
                 .single['count'],
             1,
+          );
+          expect(
+            candidateDatabase
+                .select(
+                  'SELECT COUNT(*) AS count FROM assistant_group_rows '
+                  "WHERE id = 'kelivo-tag';",
+                )
+                .single['count'],
+            1,
+          );
+          expect(
+            candidateDatabase.select(
+              "SELECT name FROM sqlite_master WHERE name = "
+              "'assistant_tag_rows';",
+            ),
+            isEmpty,
           );
         } finally {
           candidateDatabase.close();
@@ -1906,16 +1964,20 @@ void main() {
     test(
       'rejects oversized settings before extraction or JSON parsing',
       () async {
-        const maximumSettingsBytes = 16 * 1024 * 1024;
+        const maximumSettingsBytes = 1024 * 1024 * 1024;
         final settingsFile = File('${root.path}/oversized_settings.json');
         await settingsFile.writeAsString(
-          jsonEncode({'oversized_future_key': 'x' * maximumSettingsBytes}),
+          jsonEncode({'preserved_setting': 'imported'}),
         );
         final zipFile = File('${root.path}/oversized_settings.zip');
         final encoder = ZipFileEncoder();
         encoder.create(zipFile.path);
         encoder.addFileSync(settingsFile, 'settings.json');
         encoder.closeSync();
+        await _overwriteCentralDirectoryUncompressedSize(
+          zipFile,
+          maximumSettingsBytes + 1,
+        );
         final before = await BusinessRestoreService(
           businessRepository,
         ).exportSettings();

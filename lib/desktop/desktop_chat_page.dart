@@ -9,7 +9,6 @@ class DesktopChatPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 复用现有聊天体验（平板分支），不修改移动端实现。
     return const HomePage();
   }
 }

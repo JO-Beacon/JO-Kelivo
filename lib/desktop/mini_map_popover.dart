@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import '../core/database/chat_database_repository.dart';
 import '../core/models/chat_message.dart';
 import '../core/models/conversation_tree.dart';
 import '../core/models/message_part.dart';
@@ -11,6 +12,7 @@ import '../l10n/app_localizations.dart';
 import '../shared/widgets/ios_tactile.dart';
 import '../shared/widgets/conversation_tree_map.dart';
 import '../theme/app_font_weights.dart';
+import '../utils/search_highlight.dart';
 
 Future<String?> showDesktopMiniMapPopover(
   BuildContext context, {
@@ -24,6 +26,7 @@ Future<String?> showDesktopMiniMapPopover(
   ConversationTree? conversationTree,
   String? activeBranchId,
   ValueChanged<String>? onSelectBranch,
+  Future<List<MiniMapSearchHit>> Function(String query)? onSearch,
 }) async {
   assert(
     !selecting || (selectedMessageIds != null && onToggleSelection != null),
@@ -61,6 +64,7 @@ Future<String?> showDesktopMiniMapPopover(
       conversationTree: conversationTree,
       activeBranchId: activeBranchId,
       onSelectBranch: onSelectBranch,
+      onSearch: onSearch,
       onSelect: selecting
           ? null
           : (id) {
@@ -95,6 +99,7 @@ class _MiniMapPopover extends StatefulWidget {
     required this.conversationTree,
     required this.activeBranchId,
     required this.onSelectBranch,
+    required this.onSearch,
     required this.onClose,
   });
 
@@ -110,6 +115,7 @@ class _MiniMapPopover extends StatefulWidget {
   final ConversationTree? conversationTree;
   final String? activeBranchId;
   final ValueChanged<String>? onSelectBranch;
+  final Future<List<MiniMapSearchHit>> Function(String query)? onSearch;
   final VoidCallback onClose;
 
   @override
@@ -121,11 +127,22 @@ class _MiniMapPopoverState extends State<_MiniMapPopover>
   late final AnimationController _controller;
   late final Animation<double> _fadeIn;
   late final Animation<double> _slideY; // 像素 translateY
+  late final TextEditingController _searchController;
+  late final FocusNode _searchFocusNode;
   bool _closing = false;
+  bool _isSearching = true;
+  bool _fullWindow = false;
+  bool _searchLoading = false;
+  String _query = '';
+  Map<String, MiniMapSearchHit> _hits = const <String, MiniMapSearchHit>{};
+  Timer? _searchDebounce;
+  int _searchSerial = 0;
 
   @override
   void initState() {
     super.initState();
+    _searchController = TextEditingController();
+    _searchFocusNode = FocusNode();
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 260),
@@ -145,8 +162,48 @@ class _MiniMapPopoverState extends State<_MiniMapPopover>
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
     _controller.dispose();
     super.dispose();
+  }
+
+  void _startSearch() {
+    if (widget.onSearch == null) return;
+    setState(() => _isSearching = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _searchFocusNode.requestFocus();
+    });
+  }
+
+  Future<void> _toggleFullWindow() async {
+    setState(() => _fullWindow = !_fullWindow);
+  }
+
+  void _onQueryChanged(String value) {
+    _searchDebounce?.cancel();
+    final trimmed = value.trim();
+    _searchSerial++;
+    setState(() {
+      _query = value;
+      _searchLoading = trimmed.isNotEmpty;
+      if (trimmed.isEmpty) {
+        _hits = const <String, MiniMapSearchHit>{};
+      }
+    });
+    if (trimmed.isEmpty || widget.onSearch == null) return;
+    final serial = _searchSerial;
+    _searchDebounce = Timer(const Duration(milliseconds: 250), () async {
+      if (!mounted) return;
+      setState(() => _searchLoading = true);
+      final results = await widget.onSearch!(trimmed);
+      if (!mounted || serial != _searchSerial) return;
+      setState(() {
+        _hits = {for (final hit in results) hit.messageId: hit};
+        _searchLoading = false;
+      });
+    });
   }
 
   Future<void> _close() async {
@@ -161,17 +218,23 @@ class _MiniMapPopoverState extends State<_MiniMapPopover>
   @override
   Widget build(BuildContext context) {
     final screen = MediaQuery.of(context).size;
-    final width = (widget.anchorWidth - 16).clamp(320.0, 800.0);
-    final left =
-        (widget.anchorRect.left + (widget.anchorRect.width - width) / 2).clamp(
-          8.0,
-          screen.width - width - 8.0,
-        );
+    final fullLeft = widget.anchorRect.left.clamp(0.0, screen.width - 320.0);
+    final width = _fullWindow
+        ? screen.width - fullLeft - 8.0
+        : (widget.anchorWidth - 16).clamp(320.0, 800.0);
+    final left = _fullWindow
+        ? fullLeft
+        : (widget.anchorRect.left + (widget.anchorRect.width - width) / 2)
+              .clamp(8.0, screen.width - width - 8.0);
     final clipHeight = widget.anchorRect.top.clamp(0.0, screen.height);
 
     return Stack(
       children: [
-        Positioned.fill(
+        Positioned(
+          left: _fullWindow ? fullLeft : 0,
+          right: 0,
+          top: 0,
+          bottom: 0,
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
             onTap: _close,
@@ -181,14 +244,16 @@ class _MiniMapPopoverState extends State<_MiniMapPopover>
           left: 0,
           right: 0,
           top: 0,
-          height: clipHeight,
+          height: _fullWindow ? screen.height : clipHeight,
           child: ClipRect(
             child: Stack(
               children: [
                 Positioned(
                   left: left,
                   width: width,
-                  bottom: 0,
+                  bottom: _fullWindow ? null : 0,
+                  top: _fullWindow ? 0 : null,
+                  height: _fullWindow ? screen.height : null,
                   child: FadeTransition(
                     opacity: _fadeIn,
                     child: AnimatedBuilder(
@@ -198,13 +263,16 @@ class _MiniMapPopoverState extends State<_MiniMapPopover>
                         child: child,
                       ),
                       child: _GlassPanel(
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(14),
-                        ),
+                        borderRadius: _fullWindow
+                            ? BorderRadius.zero
+                            : const BorderRadius.vertical(
+                                top: Radius.circular(14),
+                              ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            _buildHeader(context),
                             if (_shouldShowBranchPanel)
                               Semantics(
                                 label: AppLocalizations.of(
@@ -220,8 +288,40 @@ class _MiniMapPopoverState extends State<_MiniMapPopover>
                                   },
                                 ),
                               ),
-                            if (widget.conversationTree != null &&
-                                !widget.selecting)
+                            if (_searchLoading)
+                              Padding(
+                                padding: const EdgeInsets.all(20),
+                                child: Center(
+                                  child: SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            else if (_query.trim().isNotEmpty && _hits.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  20,
+                                  16,
+                                  24,
+                                ),
+                                child: Text(
+                                  AppLocalizations.of(
+                                    context,
+                                  )!.miniMapSearchNoResults,
+                                  textAlign: TextAlign.center,
+                                ),
+                              )
+                            else if (widget.conversationTree != null &&
+                                !widget.selecting &&
+                                _query.trim().isEmpty)
                               ConstrainedBox(
                                 constraints: const BoxConstraints(
                                   maxHeight: 420,
@@ -242,6 +342,8 @@ class _MiniMapPopoverState extends State<_MiniMapPopover>
                                 selecting: widget.selecting,
                                 selectedMessageIds: widget.selectedMessageIds,
                                 selectionListenable: widget.selectionListenable,
+                                hits: _hits,
+                                searchNeedle: _query.trim().toLowerCase(),
                                 onTapMessage: (id) {
                                   if (_closing) return;
                                   if (widget.selecting) {
@@ -262,6 +364,79 @@ class _MiniMapPopoverState extends State<_MiniMapPopover>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    if (_isSearching) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 8, 4),
+        child: Row(
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: 34,
+                child: TextField(
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  onChanged: _onQueryChanged,
+                  autofocus: false,
+                  textInputAction: TextInputAction.search,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: MaterialLocalizations.of(
+                      context,
+                    ).searchFieldLabel,
+                    prefixIcon: const Icon(Lucide.Search, size: 17),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            IconButton(
+              tooltip: _fullWindow
+                  ? l10n.miniMapRestoreWindow
+                  : l10n.miniMapFullWindow,
+              icon: Icon(Lucide.Maximize2, size: 18),
+              onPressed: _toggleFullWindow,
+            ),
+          ],
+        ),
+      );
+    }
+    return SizedBox(
+      height: 42,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 6, 8, 0),
+        child: Row(
+          children: [
+            Icon(Lucide.Map, size: 17, color: cs.primary),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                l10n.miniMapTitle,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: AppFontWeights.emphasis,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (widget.onSearch != null)
+              IconButton(
+                tooltip: MaterialLocalizations.of(context).searchFieldLabel,
+                icon: const Icon(Lucide.Search, size: 18),
+                onPressed: _startSearch,
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -427,12 +602,16 @@ class _MiniMapList extends StatefulWidget {
     required this.selecting,
     this.selectedMessageIds,
     this.selectionListenable,
+    this.hits = const <String, MiniMapSearchHit>{},
+    this.searchNeedle = '',
   });
   final List<ChatMessage> messages;
   final ValueChanged<String> onTapMessage;
   final bool selecting;
   final Set<String>? selectedMessageIds;
   final Listenable? selectionListenable;
+  final Map<String, MiniMapSearchHit> hits;
+  final String searchNeedle;
 
   @override
   State<_MiniMapList> createState() => _MiniMapListState();
@@ -471,6 +650,18 @@ class _MiniMapListState extends State<_MiniMapList> {
     return t;
   }
 
+  List<_QaPair> _visiblePairs() {
+    if (widget.searchNeedle.trim().isEmpty) return _pairs;
+    return _pairs
+        .where((pair) {
+          return (pair.user != null &&
+                  widget.hits.containsKey(pair.user!.id)) ||
+              (pair.assistant != null &&
+                  widget.hits.containsKey(pair.assistant!.id));
+        })
+        .toList(growable: false);
+  }
+
   List<_QaPair> _buildPairs(List<ChatMessage> items) {
     final pairs = <_QaPair>[];
     ChatMessage? pendingUser;
@@ -498,6 +689,7 @@ class _MiniMapListState extends State<_MiniMapList> {
   @override
   Widget build(BuildContext context) {
     Widget buildList(List<_QaPair> pairs) {
+      final visiblePairs = _visiblePairs();
       return Padding(
         padding: const EdgeInsets.only(bottom: 2),
         child: ConstrainedBox(
@@ -506,9 +698,9 @@ class _MiniMapListState extends State<_MiniMapList> {
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
             primary: false,
             shrinkWrap: true,
-            itemCount: pairs.length,
+            itemCount: visiblePairs.length,
             itemBuilder: (context, index) {
-              final p = pairs[index];
+              final p = visiblePairs[index];
               final userSelected =
                   widget.selecting &&
                   widget.selectedMessageIds != null &&
@@ -528,6 +720,11 @@ class _MiniMapListState extends State<_MiniMapList> {
                   userSelected: userSelected,
                   assistantSelected: assistantSelected,
                   toOneLine: _oneLine,
+                  userHit: p.user == null ? null : widget.hits[p.user!.id],
+                  assistantHit: p.assistant == null
+                      ? null
+                      : widget.hits[p.assistant!.id],
+                  searchNeedle: widget.searchNeedle,
                   onTapMessage: widget.onTapMessage,
                 ),
               );
@@ -552,9 +749,9 @@ class _MiniMapListState extends State<_MiniMapList> {
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
           primary: false,
           shrinkWrap: true,
-          itemCount: _pairs.length,
+          itemCount: _visiblePairs().length,
           itemBuilder: (context, index) {
-            final p = _pairs[index];
+            final p = _visiblePairs()[index];
             return Padding(
               padding: const EdgeInsets.only(bottom: 6),
               child: _MiniMapRow(
@@ -563,6 +760,11 @@ class _MiniMapListState extends State<_MiniMapList> {
                 userSelected: false,
                 assistantSelected: false,
                 toOneLine: _oneLine,
+                userHit: p.user == null ? null : widget.hits[p.user!.id],
+                assistantHit: p.assistant == null
+                    ? null
+                    : widget.hits[p.assistant!.id],
+                searchNeedle: widget.searchNeedle,
                 onTapMessage: widget.onTapMessage,
               ),
             );
@@ -587,6 +789,9 @@ class _MiniMapRow extends StatefulWidget {
     required this.onTapMessage,
     required this.userSelected,
     required this.assistantSelected,
+    this.userHit,
+    this.assistantHit,
+    this.searchNeedle = '',
   });
   final ChatMessage? user;
   final ChatMessage? assistant;
@@ -594,6 +799,9 @@ class _MiniMapRow extends StatefulWidget {
   final ValueChanged<String> onTapMessage;
   final bool userSelected;
   final bool assistantSelected;
+  final MiniMapSearchHit? userHit;
+  final MiniMapSearchHit? assistantHit;
+  final String searchNeedle;
 
   @override
   State<_MiniMapRow> createState() => _MiniMapRowState();
@@ -602,6 +810,60 @@ class _MiniMapRow extends StatefulWidget {
 class _MiniMapRowState extends State<_MiniMapRow> {
   bool _hoverUser = false;
   bool _hoverAssistant = false;
+
+  String _displaySnippet(MiniMapSearchHit hit) {
+    final text = widget.toOneLine(hit.snippet);
+    return '${hit.snippetStart > 0 ? '…' : ''}$text';
+  }
+
+  Widget _messageLabel(
+    BuildContext context,
+    String fallback,
+    MiniMapSearchHit? hit,
+    TextStyle style,
+  ) {
+    if (hit == null) {
+      return Text(
+        fallback.isNotEmpty ? fallback : ' ',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: style,
+        textAlign: TextAlign.left,
+      );
+    }
+    final cs = Theme.of(context).colorScheme;
+    final highlightStyle = style.copyWith(
+      backgroundColor: cs.primary.withValues(alpha: 0.24),
+    );
+    final text = _displaySnippet(hit);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: Text.rich(
+            TextSpan(
+              children: highlightSearchText(
+                text,
+                [widget.searchNeedle],
+                style,
+                highlightStyle,
+              ),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          AppLocalizations.of(context)!.miniMapSearchMatchCount(hit.matchCount),
+          style: style.copyWith(
+            fontSize: (style.fontSize ?? 14) - 1.5,
+            color: (style.color ?? cs.onSurface).withValues(alpha: 0.55),
+          ),
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -668,17 +930,16 @@ class _MiniMapRowState extends State<_MiniMapRow> {
                       ? Border.all(color: userBorder, width: 1)
                       : null,
                 ),
-                child: Text(
-                  userText.isNotEmpty ? userText : ' ',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
+                child: _messageLabel(
+                  context,
+                  userText,
+                  widget.userHit,
+                  TextStyle(
                     fontSize: 15,
                     height: 1.35,
                     color: cs.onSurface,
                     decoration: TextDecoration.none,
                   ),
-                  textAlign: TextAlign.left,
                 ),
               ),
             ),
@@ -717,16 +978,15 @@ class _MiniMapRowState extends State<_MiniMapRow> {
                       ? Border.all(color: assistantBorder, width: 1)
                       : null,
                 ),
-                child: Text(
-                  asstText.isNotEmpty ? asstText : ' ',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                child: _messageLabel(
+                  context,
+                  asstText,
+                  widget.assistantHit,
+                  const TextStyle(
                     fontSize: 15.2,
                     height: 1.4,
                     decoration: TextDecoration.none,
                   ),
-                  textAlign: TextAlign.left,
                 ),
               ),
             ),

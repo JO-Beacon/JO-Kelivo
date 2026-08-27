@@ -195,6 +195,21 @@ class MemoryRepository extends JsonBlobStore<MemoryEntry> {
     });
   }
 
+  Future<MemoryEntry?> updateType(String id, MemoryType type) {
+    return runExclusive(() async {
+      final all = await readAll();
+      final index = all.indexWhere((entry) => entry.id == id);
+      if (index == -1) return null;
+      final updated = all[index].copyWith(
+        type: type,
+        updatedAt: DateTime.now().toUtc(),
+      );
+      all[index] = updated;
+      await writeAll(all);
+      return updated;
+    });
+  }
+
   /// 将条目从全局（global）移动到辅助器（assistant）的scope中。
   Future<MemoryEntry?> updateScope(
     String id, {

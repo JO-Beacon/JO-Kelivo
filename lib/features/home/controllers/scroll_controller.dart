@@ -22,6 +22,9 @@ class ChatAutoFollowScrollController extends ScrollController {
   /// 与帧后 `jumpTo` 不同，它在新列表布局期间由滚动位置消费，
   /// 因此旧会话偏移绝不会为新会话绘制。
   bool _positionAtBottomDuringLayout = false;
+
+  /// 跨多帧保持尾部时，真实用户拖动可以令该请求让位。
+  bool _bottomRequestYieldsToUserScroll = false;
   int _layoutBottomRequest = 0;
   bool _preserveDistanceFromEndDuringLayout = false;
   double _preservedDistanceFromEnd = 0;
@@ -34,8 +37,9 @@ class ChatAutoFollowScrollController extends ScrollController {
   bool get hasActiveLayoutPositioningRequest =>
       _positionAtBottomDuringLayout || _preserveDistanceFromEndDuringLayout;
 
-  int requestPositionAtBottomDuringLayout() {
+  int requestPositionAtBottomDuringLayout({bool yieldsToUserScroll = false}) {
     _positionAtBottomDuringLayout = true;
+    _bottomRequestYieldsToUserScroll = yieldsToUserScroll;
     return ++_layoutBottomRequest;
   }
 
@@ -114,7 +118,9 @@ class _AutoFollowScrollPosition extends ScrollPositionWithSingleContext {
     // 没有此检查，correctPixels 会在一帧内覆盖用户拖动，
     // 产生“卡住/无法向上滚动”的感觉。
     final shouldPositionAtBottom =
-        controller._positionAtBottomDuringLayout ||
+        (controller._positionAtBottomDuringLayout &&
+            (!controller._bottomRequestYieldsToUserScroll ||
+                userScrollDirection == ScrollDirection.idle)) ||
         (controller.shouldAutoFollow() &&
             userScrollDirection == ScrollDirection.idle);
     if (shouldPositionAtBottom) {
@@ -245,6 +251,10 @@ class ChatScrollController {
   /// 检测用户滚动结束的计时器。
   Timer? _userScrollTimer;
 
+  /// 生成结束后短暂保持布局阶段的尾部固定，吸收终态控件高度变化。
+  Timer? _bottomHoldTimer;
+  int? _bottomHoldRequest;
+
   /// 当前为下一帧底部滚动排队的请求。
   int? _scheduledBottomScrollRequest;
 
@@ -288,6 +298,12 @@ class ChatScrollController {
     final pos = _scrollController.position;
     return (pos.maxScrollExtent - pos.pixels) <= tolerance;
   }
+
+  /// 返回当前视口顶部遮罩下方第一条可见消息的索引。
+  ///
+  /// 用于持久化“浏览位置”。当列表尚未附着时返回 null，调用方应回退到
+  /// 默认的底部定位。
+  int? firstVisibleMessageIndex() => _firstVisibleMessageBelowTopOverlay();
 
   /// 在视口缩小时（例如软键盘打开时），保持已对齐底部的移动时间线固定。
   ///
@@ -499,9 +515,36 @@ class ChatScrollController {
   void stickToBottomAfterGeneration() {
     if (!_getAutoScrollEnabled()) return;
     if (!_autoStickToBottom || _isUserScrolling) return;
-    // 使用动画：用户正在看此位置，立即跳转会显得像闪烁，
-    // 而短暂缓动滚动会像回复正在就位。
-    scrollToBottomSoon(animate: true);
+    _holdBottomDuringLayout(_postGenerationPinWindow);
+  }
+
+  static const Duration _postGenerationPinWindow = Duration(milliseconds: 450);
+
+  void _holdBottomDuringLayout(Duration duration) {
+    final controller = _scrollController;
+    if (controller is! ChatAutoFollowScrollController) {
+      _scheduleExplicitScrollToBottom(animate: false);
+      return;
+    }
+    _cancelProgrammaticNavigation();
+    final request = controller.requestPositionAtBottomDuringLayout(
+      yieldsToUserScroll: true,
+    );
+    _bottomHoldRequest = request;
+    _bottomHoldTimer?.cancel();
+    _bottomHoldTimer = Timer(duration, _releaseBottomHold);
+  }
+
+  void _releaseBottomHold() {
+    _bottomHoldTimer?.cancel();
+    _bottomHoldTimer = null;
+    final request = _bottomHoldRequest;
+    if (request == null) return;
+    _bottomHoldRequest = null;
+    final controller = _scrollController;
+    if (controller is ChatAutoFollowScrollController) {
+      controller.finishPositionAtBottomDuringLayout(request);
+    }
   }
 
   /// 确保在控件树切换后滚动仍到达底部。
@@ -1050,6 +1093,7 @@ class ChatScrollController {
   }
 
   void _cancelProgrammaticNavigation({bool stopDrivenScroll = false}) {
+    _releaseBottomHold();
     _bottomScrollRequest++;
     _deferredBottomRequest++;
     _scheduledBottomScrollRequest = null;
@@ -1092,6 +1136,7 @@ class ChatScrollController {
     _scrollController.removeListener(_onScrollControllerChanged);
     _userScrollTimer?.cancel();
     _navButtonsHideTimer?.cancel();
+    _bottomHoldTimer?.cancel();
     _cancelIndexedNavigation();
     _messageListController.dispose();
   }

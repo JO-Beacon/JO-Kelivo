@@ -517,6 +517,33 @@ class ConversationTree {
   ConversationTree removeMessageOnly(String messageId) {
     final removed = edges[messageId];
     if (removed == null) return this;
+
+    // 删除分叉点时，活动分支可能正好停在被删节点。先根据删除前
+    // 记录的分支选择找到一个仍包含后续消息的分支，避免活动路径退回
+    // 父节点后把后续内容全部留在主聊天区之外。
+    String? continuationBranchId;
+    final rememberedContinuation = branchSelections[messageId];
+    if (rememberedContinuation != null) {
+      final path = _branchPathFor(rememberedContinuation, branches, edges);
+      final index = path.indexOf(messageId);
+      if (index >= 0 && index + 1 < path.length) {
+        continuationBranchId = rememberedContinuation;
+      }
+    }
+    if (continuationBranchId == null) {
+      final candidates = <ConversationBranch>[];
+      for (final branch in branches.values) {
+        final path = _branchPathFor(branch.id, branches, edges);
+        final index = path.indexOf(messageId);
+        if (index >= 0 && index + 1 < path.length) {
+          candidates.add(branch);
+        }
+      }
+      continuationBranchId = _chooseFallbackBranch({
+        for (final branch in candidates) branch.id: branch,
+      })?.id;
+    }
+
     final nextEdges = Map<String, MessageTreeEdge>.from(edges)
       ..remove(messageId);
     for (final edge in nextEdges.values.toList(growable: false)) {
@@ -536,14 +563,27 @@ class ConversationTree {
         );
       }
     }
+
+    final nextSelections = Map<String, String>.from(branchSelections)
+      ..remove(messageId);
+    if (removed.parentMessageId != null && continuationBranchId != null) {
+      nextSelections[removed.parentMessageId!] = continuationBranchId;
+    }
+    final nextActiveBranchId = activeBranchId == continuationBranchId
+        ? activeBranchId
+        : (branches[activeBranchId]?.tipMessageId == messageId &&
+              continuationBranchId != null)
+        ? continuationBranchId
+        : activeBranchId;
     return ConversationTree(
       conversationId: conversationId,
-      activeBranchId: activeBranchId,
+      activeBranchId: nextActiveBranchId,
       branches: nextBranches,
       edges: nextEdges,
       branchSelections: _pruneBranchSelections(
         branches: nextBranches,
         edges: nextEdges,
+        baseSelections: nextSelections,
       ),
     );
   }
@@ -629,9 +669,10 @@ class ConversationTree {
   Map<String, String> _pruneBranchSelections({
     required Map<String, ConversationBranch> branches,
     required Map<String, MessageTreeEdge> edges,
+    Map<String, String>? baseSelections,
   }) {
     final result = <String, String>{};
-    for (final entry in branchSelections.entries) {
+    for (final entry in (baseSelections ?? branchSelections).entries) {
       final branch = branches[entry.value];
       if (branch == null || !edges.containsKey(entry.key)) continue;
       final path = _branchPathFor(entry.value, branches, edges);

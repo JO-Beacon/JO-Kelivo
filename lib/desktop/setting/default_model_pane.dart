@@ -11,6 +11,7 @@ import '../../utils/brand_assets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../widgets/desktop_dialog_style.dart';
 
 class DesktopDefaultModelPane extends StatelessWidget {
   const DesktopDefaultModelPane({super.key});
@@ -302,9 +303,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
           builder: (context, sp, _) {
             return Dialog(
               backgroundColor: cs.surface,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+              shape: DesktopDialogStyle.shape(context),
               insetPadding: const EdgeInsets.symmetric(
                 horizontal: 24,
                 vertical: 24,
@@ -393,9 +392,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
       builder: (ctx) {
         return Dialog(
           backgroundColor: cs.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+          shape: DesktopDialogStyle.shape(ctx),
           insetPadding: const EdgeInsets.symmetric(
             horizontal: 24,
             vertical: 24,
@@ -492,9 +489,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
       builder: (ctx) {
         return Dialog(
           backgroundColor: cs.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+          shape: DesktopDialogStyle.shape(ctx),
           insetPadding: const EdgeInsets.symmetric(
             horizontal: 24,
             vertical: 24,
@@ -580,9 +575,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
       builder: (ctx) {
         return Dialog(
           backgroundColor: cs.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+          shape: DesktopDialogStyle.shape(ctx),
           insetPadding: const EdgeInsets.symmetric(
             horizontal: 24,
             vertical: 24,
@@ -679,9 +672,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
       builder: (ctx) {
         return Dialog(
           backgroundColor: cs.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+          shape: DesktopDialogStyle.shape(ctx),
           insetPadding: const EdgeInsets.symmetric(
             horizontal: 24,
             vertical: 24,
@@ -775,9 +766,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
       builder: (ctx) {
         return Dialog(
           backgroundColor: cs.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+          shape: DesktopDialogStyle.shape(ctx),
           insetPadding: const EdgeInsets.symmetric(
             horizontal: 24,
             vertical: 24,

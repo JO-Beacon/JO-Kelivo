@@ -13,6 +13,7 @@ import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/conversation_tree.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/home/controllers/chat_controller.dart';
@@ -192,6 +193,10 @@ class _SelectionFakeChatService extends ChatService {
       Map<String, int>.from(versionSelections);
 
   @override
+  Future<ConversationTree?> loadConversationTree(String conversationId) async =>
+      null;
+
+  @override
   List<ChatMessage> getMessagesForGroups(
     String conversationId,
     Iterable<String> groupIds,
@@ -363,8 +368,11 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(find.text('Delete Message'), findsOneWidget);
-        expect(find.text('Delete Branch'), findsOneWidget);
+        final l10n = AppLocalizations.of(
+          tester.element(find.byType(ChatSelectionDeleteBar)),
+        )!;
+        expect(find.text(l10n.homePageDeleteMessage), findsOneWidget);
+        expect(find.text(l10n.homePageDeleteAllVersions), findsOneWidget);
 
         await tester.pumpWidget(const SizedBox.shrink());
       },
@@ -429,9 +437,12 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Delete'), findsOneWidget);
-      expect(find.text('Delete Message'), findsNothing);
-      expect(find.text('Delete Branch'), findsNothing);
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(ChatSelectionDeleteBar)),
+      )!;
+      expect(find.text(l10n.homePageDelete), findsOneWidget);
+      expect(find.text(l10n.homePageDeleteMessage), findsNothing);
+      expect(find.text(l10n.homePageDeleteAllVersions), findsNothing);
 
       await tester.pumpWidget(const SizedBox.shrink());
     });

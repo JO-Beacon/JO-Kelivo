@@ -1,6 +1,7 @@
-import 'dart:math';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../../core/database/chat_database_repository.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation_tree.dart';
 import '../../../core/models/message_part.dart';
@@ -9,6 +10,8 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/conversation_tree_map.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
+import '../../../utils/search_highlight.dart';
 
 Future<String?> showMiniMapSheet(
   BuildContext context,
@@ -21,6 +24,7 @@ Future<String?> showMiniMapSheet(
   ConversationTree? conversationTree,
   String? activeBranchId,
   ValueChanged<String>? onSelectBranch,
+  Future<List<MiniMapSearchHit>> Function(String query)? onSearch,
 }) async {
   assert(
     !selecting || (selectedMessageIds != null && onToggleSelection != null),
@@ -43,22 +47,15 @@ Future<String?> showMiniMapSheet(
       conversationTree: conversationTree,
       activeBranchId: activeBranchId,
       onSelectBranch: onSelectBranch,
+      onSearch: onSearch,
     ),
   );
 }
 
-class _MiniMapSheet extends StatefulWidget {
-  final List<ChatMessage> messages;
-  final bool selecting;
-  final Set<String>? selectedMessageIds;
-  final Listenable? selectionListenable;
-  final ValueChanged<String>? onToggleSelection;
-  final List<ConversationBranch>? branches;
-  final ConversationTree? conversationTree;
-  final String? activeBranchId;
-  final ValueChanged<String>? onSelectBranch;
-
-  const _MiniMapSheet({
+/// 全屏小地图页面。路由压在聊天页上方，返回时聊天页不会被销毁。
+class MiniMapPage extends StatelessWidget {
+  const MiniMapPage({
+    super.key,
     required this.messages,
     this.selecting = false,
     this.selectedMessageIds,
@@ -68,6 +65,66 @@ class _MiniMapSheet extends StatefulWidget {
     this.conversationTree,
     this.activeBranchId,
     this.onSelectBranch,
+    this.onSearch,
+  });
+
+  final List<ChatMessage> messages;
+  final bool selecting;
+  final Set<String>? selectedMessageIds;
+  final Listenable? selectionListenable;
+  final ValueChanged<String>? onToggleSelection;
+  final List<ConversationBranch>? branches;
+  final ConversationTree? conversationTree;
+  final String? activeBranchId;
+  final ValueChanged<String>? onSelectBranch;
+  final Future<List<MiniMapSearchHit>> Function(String query)? onSearch;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      body: _MiniMapSheet(
+        fullPage: true,
+        messages: messages,
+        selecting: selecting,
+        selectedMessageIds: selectedMessageIds,
+        selectionListenable: selectionListenable,
+        onToggleSelection: onToggleSelection,
+        branches: branches,
+        conversationTree: conversationTree,
+        activeBranchId: activeBranchId,
+        onSelectBranch: onSelectBranch,
+        onSearch: onSearch,
+      ),
+    );
+  }
+}
+
+class _MiniMapSheet extends StatefulWidget {
+  final List<ChatMessage> messages;
+  final bool fullPage;
+  final bool selecting;
+  final Set<String>? selectedMessageIds;
+  final Listenable? selectionListenable;
+  final ValueChanged<String>? onToggleSelection;
+  final List<ConversationBranch>? branches;
+  final ConversationTree? conversationTree;
+  final String? activeBranchId;
+  final ValueChanged<String>? onSelectBranch;
+  final Future<List<MiniMapSearchHit>> Function(String query)? onSearch;
+
+  const _MiniMapSheet({
+    required this.messages,
+    this.fullPage = false,
+    this.selecting = false,
+    this.selectedMessageIds,
+    this.selectionListenable,
+    this.onToggleSelection,
+    this.branches,
+    this.conversationTree,
+    this.activeBranchId,
+    this.onSelectBranch,
+    this.onSearch,
   });
 
   @override
@@ -76,11 +133,20 @@ class _MiniMapSheet extends StatefulWidget {
 
 class _MiniMapSheetState extends State<_MiniMapSheet>
     with TickerProviderStateMixin {
+  final DraggableScrollableController _sheetController =
+      DraggableScrollableController();
+  final GlobalKey<ConversationTreeMapState> _treeMapKey =
+      GlobalKey<ConversationTreeMapState>();
   late final TextEditingController _searchController;
   late final FocusNode _searchFocusNode;
   late List<_QaPair> _pairs;
+  late List<_QaPair> _visiblePairs;
   String _query = '';
-  bool _isSearching = false;
+  bool _isFullWindow = false;
+  bool _searchLoading = false;
+  Map<String, MiniMapSearchHit> _hits = const <String, MiniMapSearchHit>{};
+  Timer? _searchDebounce;
+  int _searchSerial = 0;
 
   @override
   void initState() {
@@ -88,6 +154,7 @@ class _MiniMapSheetState extends State<_MiniMapSheet>
     _searchController = TextEditingController();
     _searchFocusNode = FocusNode();
     _pairs = _buildPairs(widget.messages);
+    _visiblePairs = _pairs;
   }
 
   @override
@@ -95,75 +162,141 @@ class _MiniMapSheetState extends State<_MiniMapSheet>
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.messages, widget.messages)) {
       _pairs = _buildPairs(widget.messages);
+      _syncVisiblePairs();
     }
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
+    _sheetController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
   }
 
-  void _startSearch() {
-    setState(() {
-      _isSearching = true;
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _searchFocusNode.requestFocus();
-      }
+  void _resetSearchResults() {
+    _searchDebounce?.cancel();
+    _searchSerial++;
+    _query = '';
+    _hits = const <String, MiniMapSearchHit>{};
+    _searchLoading = false;
+    _syncVisiblePairs();
+  }
+
+  void _onQueryChanged(String value) {
+    _searchDebounce?.cancel();
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      setState(() {
+        _resetSearchResults();
+        _query = value;
+      });
+      return;
+    }
+    if (widget.onSearch == null) {
+      setState(() {
+        _query = value;
+        _syncVisiblePairs();
+      });
+      return;
+    }
+    _searchSerial++;
+    setState(() => _query = value);
+    _searchDebounce = Timer(const Duration(milliseconds: 250), () {
+      unawaited(_runSearch(trimmed));
     });
   }
 
-  void _clearOrCloseSearch({bool close = false}) {
+  Future<void> _runSearch(String needle) async {
+    final onSearch = widget.onSearch;
+    if (onSearch == null) return;
+    final serial = _searchSerial;
+    if (mounted) setState(() => _searchLoading = true);
+    final results = await onSearch(needle);
+    if (!mounted || serial != _searchSerial) return;
     setState(() {
-      _query = '';
-      _searchController.clear();
-      _isSearching = close ? false : _isSearching;
+      _hits = {for (final hit in results) hit.messageId: hit};
+      _searchLoading = false;
+      _syncVisiblePairs();
     });
-    if (close) {
-      _searchFocusNode.unfocus();
-    } else {
-      _searchFocusNode.requestFocus();
-    }
+  }
+
+  void _syncVisiblePairs() {
+    _visiblePairs = _filteredPairs(_pairs);
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final searchWidth = min(MediaQuery.sizeOf(context).width * 0.6, 260.0);
-
-    return SafeArea(
-      top: false,
-      child: DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.55,
-        minChildSize: 0.35,
-        maxChildSize: 0.9,
-        builder: (ctx, controller) {
-          final pairs = _filteredPairs(_pairs);
-          Widget buildList() {
-            return ListView.builder(
-              controller: controller,
-              itemCount: pairs.length,
-              itemBuilder: (context, index) {
-                return _MiniMapRow(
-                  pair: pairs[index],
-                  selecting: widget.selecting,
-                  selectedMessageIds: widget.selectedMessageIds,
-                  onToggleSelection: widget.onToggleSelection,
-                );
-              },
+    final sheet = DraggableScrollableSheet(
+      controller: _sheetController,
+      expand: widget.fullPage,
+      initialChildSize: widget.fullPage ? 1.0 : 0.55,
+      minChildSize: widget.fullPage ? 1.0 : 0.35,
+      maxChildSize: widget.fullPage ? 1.0 : 0.98,
+      builder: (ctx, controller) {
+        Widget buildList() {
+          if (_searchLoading) {
+            return Align(
+              alignment: Alignment.topCenter,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 28),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: cs.primary,
+                  ),
+                ),
+              ),
             );
           }
+          if (_query.trim().isNotEmpty && _visiblePairs.isEmpty) {
+            return Align(
+              alignment: Alignment.topCenter,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
+                child: Text(
+                  AppLocalizations.of(context)!.miniMapSearchNoResults,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: cs.onSurface.withValues(alpha: 0.45),
+                  ),
+                ),
+              ),
+            );
+          }
+          final pairs = _visiblePairs;
+          return ListView.builder(
+            controller: controller,
+            itemCount: pairs.length,
+            itemBuilder: (context, index) {
+              final pair = pairs[index];
+              return _MiniMapRow(
+                pair: pair,
+                selecting: widget.selecting,
+                selectedMessageIds: widget.selectedMessageIds,
+                onToggleSelection: widget.onToggleSelection,
+                userHit: pair.user == null ? null : _hits[pair.user!.id],
+                assistantHit: pair.assistant == null
+                    ? null
+                    : _hits[pair.assistant!.id],
+                searchNeedle: _query.trim().toLowerCase(),
+              );
+            },
+          );
+        }
 
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // 固定拖拽把手
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (!widget.fullPage) ...[
+                // 仅底部 Sheet 保留拖拽把手；路由页面不需要它。
                 Center(
                   child: Container(
                     width: 40,
@@ -175,21 +308,72 @@ class _MiniMapSheetState extends State<_MiniMapSheet>
                   ),
                 ),
                 const SizedBox(height: 10),
-                // 固定标题
-                Row(
-                  children: [
-                    Icon(Lucide.Map, size: 18, color: cs.primary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        AppLocalizations.of(context)!.miniMapTitle,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: AppFontWeights.emphasis,
+              ],
+              // 固定标题
+              Row(
+                children: [
+                  if (widget.fullPage)
+                    SizedBox(
+                      height: 36,
+                      width: 36,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: Icon(
+                          Lucide.ArrowLeft,
+                          size: 19,
+                          color: cs.onSurface,
                         ),
-                        overflow: TextOverflow.ellipsis,
+                        tooltip: AppLocalizations.of(
+                          context,
+                        )!.settingsPageBackButton,
+                        onPressed: () => Navigator.of(context).pop(),
                       ),
                     ),
+                  Icon(Lucide.Map, size: 18, color: cs.primary),
+                  const SizedBox(width: 8),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 120),
+                    child: Text(
+                      AppLocalizations.of(context)!.miniMapTitle,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: AppFontWeights.emphasis,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  if (_showTreeMapControls) ...[
+                    _buildTreeMapControlButton(
+                      tooltip: AppLocalizations.of(
+                        context,
+                      )!.miniMapActualSizeTooltip,
+                      onTap: () =>
+                          _treeMapKey.currentState?.resetToActualSize(),
+                      builder: (color) => Text(
+                        '100%',
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 13,
+                          fontWeight: AppFontWeights.emphasis,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    _buildTreeMapControlButton(
+                      tooltip: AppLocalizations.of(
+                        context,
+                      )!.miniMapFitHorizontalTooltip,
+                      onTap: () => _treeMapKey.currentState?.fitHorizontal(),
+                      builder: (color) => Icon(
+                        Lucide.RectangleHorizontal,
+                        size: 18,
+                        color: color,
+                      ),
+                    ),
+                  ],
+                  Expanded(child: _buildSearchField(context)),
+                  if (!widget.fullPage) ...[
                     const SizedBox(width: 4),
                     SizedBox(
                       height: 36,
@@ -197,55 +381,74 @@ class _MiniMapSheetState extends State<_MiniMapSheet>
                       child: IconButton(
                         padding: EdgeInsets.zero,
                         icon: Icon(
-                          Lucide.ChevronsDown,
+                          Lucide.Maximize2,
                           size: 18,
                           color: cs.onSurface,
                         ),
-                        tooltip: AppLocalizations.of(
-                          context,
-                        )!.miniMapScrollToBottomTooltip,
-                        onPressed: () {
-                          if (controller.hasClients &&
-                              controller.position.maxScrollExtent > 0) {
-                            controller.jumpTo(
-                              controller.position.maxScrollExtent,
-                            );
-                          }
-                        },
+                        tooltip: _isFullWindow
+                            ? AppLocalizations.of(context)!.miniMapRestoreWindow
+                            : AppLocalizations.of(context)!.miniMapFullWindow,
+                        onPressed: _toggleFullWindow,
                       ),
                     ),
-                    _buildSearchToggle(context, searchWidth),
                   ],
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (_shouldShowBranchPanel) ...[
+                Semantics(
+                  label: AppLocalizations.of(context)!.treeBranchPanelTitle,
+                  child: _buildBranchPanel(context),
                 ),
                 const SizedBox(height: 12),
-                if (_shouldShowBranchPanel) ...[
-                  Semantics(
-                    label: AppLocalizations.of(context)!.treeBranchPanelTitle,
-                    child: _buildBranchPanel(context),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                // 可滚动内容
-                Expanded(
-                  child: widget.conversationTree != null && !widget.selecting
-                      ? ConversationTreeMap(
-                          tree: widget.conversationTree!,
-                          messages: widget.messages,
-                          query: _query,
-                          activeBranchId: widget.activeBranchId,
-                          onTapMessage: (id) => Navigator.of(context).pop(id),
-                        )
-                      : widget.selecting && widget.selectionListenable != null
-                      ? AnimatedBuilder(
-                          animation: widget.selectionListenable!,
-                          builder: (context, child) => buildList(),
-                        )
-                      : buildList(),
-                ),
               ],
-            ),
-          );
-        },
+              // 可滚动内容
+              Expanded(
+                child:
+                    widget.conversationTree != null &&
+                        !widget.selecting &&
+                        _query.trim().isEmpty
+                    ? ConversationTreeMap(
+                        key: _treeMapKey,
+                        tree: widget.conversationTree!,
+                        messages: widget.messages,
+                        query: _query,
+                        activeBranchId: widget.activeBranchId,
+                        onTapMessage: (id) => Navigator.of(context).pop(id),
+                      )
+                    : widget.selecting && widget.selectionListenable != null
+                    ? AnimatedBuilder(
+                        animation: widget.selectionListenable!,
+                        builder: (context, child) => buildList(),
+                      )
+                    : buildList(),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    return SafeArea(top: widget.fullPage, child: sheet);
+  }
+
+  bool get _showTreeMapControls =>
+      widget.conversationTree != null &&
+      !widget.selecting &&
+      _query.trim().isEmpty;
+
+  Widget _buildTreeMapControlButton({
+    required String tooltip,
+    required VoidCallback onTap,
+    required Widget Function(Color color) builder,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: IosIconButton(
+        builder: builder,
+        onTap: onTap,
+        padding: const EdgeInsets.all(8),
+        minSize: 36,
+        semanticLabel: tooltip,
       ),
     );
   }
@@ -358,101 +561,56 @@ class _MiniMapSheetState extends State<_MiniMapSheet>
     return '${l10n.treeBranchDefaultLabel} ${index + 1}';
   }
 
-  Widget _buildSearchToggle(BuildContext context, double maxWidth) {
+  Future<void> _toggleFullWindow() async {
+    final next = !_isFullWindow;
+    setState(() => _isFullWindow = next);
+    if (!_sheetController.isAttached) return;
+    await _sheetController.animateTo(
+      next ? 0.98 : 0.55,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  Widget _buildSearchField(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final borderColor = cs.outlineVariant.withValues(alpha: isDark ? 0.5 : 0.8);
 
-    return AnimatedSize(
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeInOut,
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 150),
-        switchInCurve: Curves.easeInOut,
-        switchOutCurve: Curves.easeInOut,
-        transitionBuilder: (child, animation) {
-          return SizeTransition(
-            sizeFactor: animation,
-            axis: Axis.horizontal,
-            child: FadeTransition(opacity: animation, child: child),
-          );
-        },
-        child: _isSearching
-            ? ConstrainedBox(
-                key: const ValueKey('miniMapSearchField'),
-                constraints: BoxConstraints(maxWidth: maxWidth),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Expanded(
-                      child: SizedBox(
-                        height: 36,
-                        child: TextField(
-                          controller: _searchController,
-                          focusNode: _searchFocusNode,
-                          onChanged: (value) => setState(() => _query = value),
-                          textInputAction: TextInputAction.search,
-                          textAlignVertical: TextAlignVertical.center,
-                          decoration: InputDecoration(
-                            isDense: true,
-                            hintText: MaterialLocalizations.of(
-                              context,
-                            ).searchFieldLabel,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 8,
-                            ),
-                            filled: true,
-                            fillColor: cs.surfaceContainerHighest.withValues(
-                              alpha: isDark ? 0.35 : 0.6,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide(color: borderColor),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide(color: borderColor),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide(color: cs.primary),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      height: 36,
-                      width: 36,
-                      child: IconButton(
-                        padding: EdgeInsets.zero,
-                        icon: Icon(
-                          Lucide.X,
-                          size: 18,
-                          color: cs.onSurface.withValues(alpha: 0.7),
-                        ),
-                        onPressed: () => _clearOrCloseSearch(close: true),
-                        tooltip: MaterialLocalizations.of(
-                          context,
-                        ).closeButtonLabel,
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            : SizedBox(
-                key: const ValueKey('miniMapSearchButton'),
-                height: 36,
-                width: 36,
-                child: IconButton(
-                  padding: EdgeInsets.zero,
-                  icon: Icon(Lucide.Search, size: 20, color: cs.onSurface),
-                  onPressed: _startSearch,
-                  tooltip: MaterialLocalizations.of(context).searchFieldLabel,
-                ),
-              ),
+    return SizedBox(
+      height: 36,
+      child: TextField(
+        key: const ValueKey('miniMapSearchField'),
+        controller: _searchController,
+        focusNode: _searchFocusNode,
+        onChanged: _onQueryChanged,
+        textInputAction: TextInputAction.search,
+        textAlignVertical: TextAlignVertical.center,
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: MaterialLocalizations.of(context).searchFieldLabel,
+          prefixIcon: const Icon(Lucide.Search, size: 17),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 8,
+            vertical: 8,
+          ),
+          filled: true,
+          fillColor: cs.surfaceContainerHighest.withValues(
+            alpha: isDark ? 0.35 : 0.6,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: borderColor),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: borderColor),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: cs.primary),
+          ),
+        ),
       ),
     );
   }
@@ -486,6 +644,14 @@ class _MiniMapSheetState extends State<_MiniMapSheet>
   List<_QaPair> _filteredPairs(List<_QaPair> base) {
     final needle = _query.trim().toLowerCase();
     if (needle.isEmpty) return base;
+    if (widget.onSearch != null) {
+      return base.where((pair) {
+        final userId = pair.user?.id;
+        final assistantId = pair.assistant?.id;
+        return (userId != null && _hits.containsKey(userId)) ||
+            (assistantId != null && _hits.containsKey(assistantId));
+      }).toList();
+    }
     return base.where((pair) {
       final user = pair.user?.content.toLowerCase() ?? '';
       final asst = pair.assistant?.content.toLowerCase() ?? '';
@@ -505,12 +671,18 @@ class _MiniMapRow extends StatelessWidget {
   final bool selecting;
   final Set<String>? selectedMessageIds;
   final ValueChanged<String>? onToggleSelection;
+  final MiniMapSearchHit? userHit;
+  final MiniMapSearchHit? assistantHit;
+  final String searchNeedle;
 
   const _MiniMapRow({
     required this.pair,
     this.selecting = false,
     this.selectedMessageIds,
     this.onToggleSelection,
+    this.userHit,
+    this.assistantHit,
+    this.searchNeedle = '',
   });
 
   String _summaryText(ChatMessage? message) {
@@ -537,15 +709,85 @@ class _MiniMapRow extends StatelessWidget {
         .replaceAll('\n', ' ')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
-    return t;
+    return _flattenWhitespace(t);
+  }
+
+  String _flattenWhitespace(String s) {
+    return s.replaceAll('\n', ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
+
+  String _snippetDisplay(MiniMapSearchHit hit) {
+    final prefix = hit.snippetStart > 0 ? '…' : '';
+    return '$prefix${_flattenWhitespace(hit.snippet)}';
+  }
+
+  Widget _bubbleLabel({
+    required BuildContext context,
+    required ChatMessage? message,
+    required MiniMapSearchHit? hit,
+    required TextStyle style,
+    required TextAlign textAlign,
+  }) {
+    if (hit != null) {
+      final display = _snippetDisplay(hit);
+      final flattenedNeedle = _flattenWhitespace(searchNeedle);
+      final tokens = flattenedNeedle.isEmpty
+          ? const <String>[]
+          : <String>[flattenedNeedle];
+      final highlight = style.copyWith(
+        backgroundColor: context.appColors.searchHighlight,
+      );
+      final l10n = AppLocalizations.of(context)!;
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text.rich(
+              TextSpan(
+                children: highlightSearchText(
+                  display,
+                  tokens,
+                  style,
+                  highlight,
+                ),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: textAlign,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            l10n.miniMapSearchMatchCount(hit.matchCount),
+            style: style.copyWith(
+              fontSize: (style.fontSize ?? 14) - 1.5,
+              color: (style.color ?? Theme.of(context).colorScheme.onSurface)
+                  .withValues(alpha: 0.55),
+            ),
+          ),
+        ],
+      );
+    }
+    final text = _summaryText(message);
+    return Text(
+      text.isNotEmpty ? text : ' ',
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: style,
+      textAlign: textAlign,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final userText = _summaryText(pair.user);
-    final asstText = _summaryText(pair.assistant);
+    final userStyle = TextStyle(
+      fontSize: 15.5,
+      height: 1.4,
+      color: cs.onSurface,
+    );
+    final assistantStyle = TextStyle(fontSize: 15.7, height: 1.5);
 
     final bool userSelected =
         selectedMessageIds != null &&
@@ -604,15 +846,11 @@ class _MiniMapRow extends StatelessWidget {
                                 ? Border.all(color: userBorder, width: 1)
                                 : null,
                           ),
-                          child: Text(
-                            userText.isNotEmpty ? userText : ' ',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 15.5,
-                              height: 1.4,
-                              color: cs.onSurface,
-                            ),
+                          child: _bubbleLabel(
+                            context: context,
+                            message: pair.user,
+                            hit: userHit,
+                            style: userStyle,
                             textAlign: TextAlign.left,
                           ),
                         ),
@@ -631,15 +869,11 @@ class _MiniMapRow extends StatelessWidget {
                             color: userBg,
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          child: Text(
-                            userText.isNotEmpty ? userText : ' ',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 15.5,
-                              height: 1.4,
-                              color: cs.onSurface,
-                            ),
+                          child: _bubbleLabel(
+                            context: context,
+                            message: pair.user,
+                            hit: userHit,
+                            style: userStyle,
                             textAlign: TextAlign.left,
                           ),
                         ),
@@ -679,11 +913,11 @@ class _MiniMapRow extends StatelessWidget {
                                 ? Border.all(color: assistantBorder, width: 1)
                                 : null,
                           ),
-                          child: Text(
-                            asstText.isNotEmpty ? asstText : ' ',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 15.7, height: 1.5),
+                          child: _bubbleLabel(
+                            context: context,
+                            message: pair.assistant,
+                            hit: assistantHit,
+                            style: assistantStyle,
                             textAlign: TextAlign.left,
                           ),
                         ),
@@ -703,11 +937,11 @@ class _MiniMapRow extends StatelessWidget {
                             color: assistantBg,
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          child: Text(
-                            asstText.isNotEmpty ? asstText : ' ',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 15.7, height: 1.5),
+                          child: _bubbleLabel(
+                            context: context,
+                            message: pair.assistant,
+                            hit: assistantHit,
+                            style: assistantStyle,
                             textAlign: TextAlign.left,
                           ),
                         ),

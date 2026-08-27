@@ -33,6 +33,7 @@ import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/models/memory_entry.dart';
 import '../../../core/providers/memory_provider.dart';
+import '../../../desktop/widgets/desktop_dialog_style.dart';
 import '../../../core/providers/memory_provider_v2.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -200,9 +201,7 @@ Future<int?> _showContextMessageInputDialog(
             }
 
             return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+              shape: DesktopDialogStyle.shape(ctx),
               title: Text(l10n.assistantEditContextMessagesTitle),
               content: SizedBox(
                 width: 360,
@@ -1497,10 +1496,14 @@ Future<void> showAssistantDesktopDialog(
     builder: (ctx) {
       return Dialog(
         backgroundColor: cs.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: DesktopDialogStyle.shape(ctx),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 860, maxHeight: 640),
+          constraints: DesktopDialogStyle.proportionalConstraints(
+            ctx,
+            maxWidth: 860,
+            maxHeight: 640,
+          ),
           child: _DesktopAssistantDialogShell(assistantId: assistantId),
         ),
       );
@@ -2612,9 +2615,7 @@ class _DesktopAssistantBasicPaneState
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+          shape: DesktopDialogStyle.shape(ctx),
           backgroundColor: cs.surface,
           title: Text(l10n.assistantEditImageUrlDialogTitle),
           content: TextField(
@@ -2716,9 +2717,7 @@ class _DesktopAssistantBasicPaneState
         return StatefulBuilder(
           builder: (ctx, setLocal) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+              shape: DesktopDialogStyle.shape(ctx),
               backgroundColor: cs.surface,
               title: Text(l10n.assistantEditQQAvatarDialogTitle),
               content: TextField(

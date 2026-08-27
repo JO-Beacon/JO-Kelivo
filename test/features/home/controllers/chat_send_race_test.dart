@@ -569,7 +569,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Edit Message'), findsOneWidget);
       await tester.enterText(find.byType(TextField), 'edited answer');
-      await tester.tap(find.text('Save & Send'));
+      await tester.tap(find.text('Save as New Branch & Send'));
       await tester.pump();
 
       await tester.runAsync(() async {
@@ -620,7 +620,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Edit Message'), findsOneWidget);
       await tester.enterText(find.byType(TextField), 'edited question');
-      await tester.tap(find.text('Save & Send'));
+      await tester.tap(find.text('Save as New Branch & Send'));
       await tester.pump();
 
       await tester.runAsync(() async {
@@ -694,7 +694,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Edit Message'), findsOneWidget);
       await tester.enterText(find.byType(TextField), 'edited branch answer');
-      await tester.tap(find.text('Save & Send'));
+      await tester.tap(find.text('Save as New Branch & Send'));
       await tester.pump();
 
       await tester.runAsync(() async {
@@ -786,7 +786,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Edit Message'), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'edited root question');
-    await tester.tap(find.text('Save & Send'));
+    await tester.tap(find.text('Save as New Branch & Send'));
     await tester.pump();
 
     await tester.runAsync(() async {
@@ -842,7 +842,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Edit Message'), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'edited question');
-    await tester.tap(find.text('Save & Send'));
+    await tester.tap(find.text('Save as New Branch & Send'));
     await tester.pump();
 
     await tester.runAsync(() async {
@@ -891,7 +891,7 @@ void main() {
 
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'edited without sending');
-    await tester.tap(find.text('Save'));
+    await tester.tap(find.text('Save as New Branch'));
     await tester.pump();
 
     await tester.runAsync(() async {
@@ -946,7 +946,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Edit Message'), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'edited once');
-    await tester.tap(find.text('Save'));
+    await tester.tap(find.text('Save as New Branch'));
     await tester.pump();
 
     await tester.runAsync(() async {

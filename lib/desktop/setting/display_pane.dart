@@ -25,7 +25,7 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ToggleRowPureBackground(),
                   _RowDivider(),
-                  _ChatMessageBackgroundRow(),
+                  _MessageStyleRow(),
                   _RowDivider(),
                   _TopicPositionRow(),
                 ],
@@ -129,6 +129,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _ToggleRowMsgNavButtons(),
                   _RowDivider(),
                   _SendShortcutRow(),
+                  _RowDivider(),
+                  _LongPasteAsFileSection(),
                 ],
               ),
               const SizedBox(height: 16),
@@ -808,14 +810,26 @@ class _ToggleRowPureBackground extends StatelessWidget {
   }
 }
 
-class _ChatMessageBackgroundRow extends StatelessWidget {
-  const _ChatMessageBackgroundRow();
+class _MessageStyleRow extends StatelessWidget {
+  const _MessageStyleRow();
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    final styleLabel = switch (sp.chatMessageBackgroundStyle) {
+      ChatMessageBackgroundStyle.frosted =>
+        l10n.displaySettingsPageChatMessageBackgroundFrosted,
+      ChatMessageBackgroundStyle.solid =>
+        l10n.displaySettingsPageChatMessageBackgroundSolid,
+      ChatMessageBackgroundStyle.defaultStyle =>
+        l10n.displaySettingsPageChatMessageBackgroundDefault,
+    };
     return _LabeledRow(
-      label: l10n.displaySettingsPageChatMessageBackgroundTitle,
-      trailing: const _BackgroundStyleDropdown(),
+      label: l10n.messageStyleSettingsPageTitle,
+      trailing: _DesktopFontDropdownButton(
+        display: styleLabel,
+        onTap: () => showMessageStyleSettingsDialog(context),
+      ),
     );
   }
 }
@@ -894,42 +908,6 @@ class _TopicPositionDropdownState extends State<_TopicPositionDropdown> {
       options: options,
       onSelected: (pos) =>
           context.read<SettingsProvider>().setDesktopTopicPosition(pos),
-    );
-  }
-}
-
-class _BackgroundStyleDropdown extends StatefulWidget {
-  const _BackgroundStyleDropdown();
-  @override
-  State<_BackgroundStyleDropdown> createState() =>
-      _BackgroundStyleDropdownState();
-}
-
-class _BackgroundStyleDropdownState extends State<_BackgroundStyleDropdown> {
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final sp = context.watch<SettingsProvider>();
-    final options = <DesktopSelectOption<ChatMessageBackgroundStyle>>[
-      DesktopSelectOption(
-        value: ChatMessageBackgroundStyle.defaultStyle,
-        label: l10n.displaySettingsPageChatMessageBackgroundDefault,
-      ),
-      DesktopSelectOption(
-        value: ChatMessageBackgroundStyle.frosted,
-        label: l10n.displaySettingsPageChatMessageBackgroundFrosted,
-      ),
-      DesktopSelectOption(
-        value: ChatMessageBackgroundStyle.solid,
-        label: l10n.displaySettingsPageChatMessageBackgroundSolid,
-      ),
-    ];
-
-    return DesktopSelectDropdown<ChatMessageBackgroundStyle>(
-      value: sp.chatMessageBackgroundStyle,
-      options: options,
-      onSelected: (style) =>
-          context.read<SettingsProvider>().setChatMessageBackgroundStyle(style),
     );
   }
 }
@@ -1973,9 +1951,7 @@ Future<String?> _showDesktopFontChooserDialog(
         return Dialog(
           elevation: 0,
           backgroundColor: bg,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
+          shape: DesktopDialogStyle.shape(ctx),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
             child: Column(
@@ -2018,10 +1994,14 @@ Future<String?> _showDesktopFontChooserDialog(
     builder: (ctx) {
       return Dialog(
         backgroundColor: cs.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: DesktopDialogStyle.shape(ctx),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520, maxHeight: 520),
+          constraints: DesktopDialogStyle.proportionalConstraints(
+            ctx,
+            maxWidth: 520,
+            maxHeight: 520,
+          ),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
             child: StatefulBuilder(
@@ -2840,6 +2820,113 @@ class _ToggleRowNewChatOnLaunch extends StatelessWidget {
       label: l10n.displaySettingsPageNewChatOnLaunchTitle,
       value: sp.newChatOnLaunch,
       onChanged: (v) => context.read<SettingsProvider>().setNewChatOnLaunch(v),
+    );
+  }
+}
+
+class _LongPasteAsFileSection extends StatelessWidget {
+  const _LongPasteAsFileSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _ToggleRowLongPasteAsFile(),
+        if (settings.longPasteAsFile) ...[
+          const _RowDivider(),
+          _LongPasteAsFileThresholdRow(),
+        ],
+      ],
+    );
+  }
+}
+
+class _ToggleRowLongPasteAsFile extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageLongPasteAsFileTitle,
+      value: settings.longPasteAsFile,
+      onChanged: (value) =>
+          context.read<SettingsProvider>().setLongPasteAsFile(value),
+    );
+  }
+}
+
+class _LongPasteAsFileThresholdRow extends StatefulWidget {
+  @override
+  State<_LongPasteAsFileThresholdRow> createState() =>
+      _LongPasteAsFileThresholdRowState();
+}
+
+class _LongPasteAsFileThresholdRowState
+    extends State<_LongPasteAsFileThresholdRow> {
+  late final SettingsProvider _settings;
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _settings = context.read<SettingsProvider>();
+    _controller = TextEditingController(
+      text: '${_settings.longPasteAsFileThreshold}',
+    );
+  }
+
+  @override
+  void dispose() {
+    _commit(_controller.text);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _commit(String value) {
+    final next = SettingsProvider.resolveLongPasteAsFileThreshold(
+      value,
+      fallback: _settings.longPasteAsFileThreshold,
+    );
+    _settings.setLongPasteAsFileThreshold(next);
+    final text = '$next';
+    if (_controller.text != text) _controller.text = text;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.watch<SettingsProvider>();
+    if (_controller.text != '${settings.longPasteAsFileThreshold}') {
+      _controller.text = '${settings.longPasteAsFileThreshold}';
+    }
+    return _LabeledRow(
+      label: l10n.displaySettingsPageLongPasteAsFileThresholdTitle,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 72,
+            child: _BorderInput(
+              controller: _controller,
+              onSubmitted: _commit,
+              onFocusLost: _commit,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            l10n.displaySettingsPageLongPasteAsFileThresholdUnit,
+            style: TextStyle(
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.7),
+              fontSize: 14,
+              decoration: TextDecoration.none,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

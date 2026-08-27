@@ -105,25 +105,45 @@ void main() {
         'Grok',
         'ByteDance',
       ];
-      const migratedOrder = <String>[...legacyOrder, '随想AI中转站'];
+      const persistedOrder = <String>[...legacyOrder, '随想AI中转站'];
       await repository.replaceSnapshot(
         BusinessSettingsRouter.normalizeAndRoute({
-          'providers_order_v1': legacyOrder,
+          'providers_order_v1': persistedOrder,
         }),
       );
 
       final settings = SettingsProvider(BusinessPreferences(repository));
       await settings.loaded;
-      expect(settings.providersOrder, migratedOrder);
-
-      final suixiang = settings.getProviderConfig('随想AI中转站');
-      expect(suixiang.enabled, isFalse);
-      expect(suixiang.providerType, ProviderKind.openai);
-      expect(suixiang.baseUrl, 'https://sui-xiang.com/v1');
+      expect(settings.providersOrder, legacyOrder);
+      expect(settings.providersOrder, isNot(contains('随想AI中转站')));
 
       final reloaded = SettingsProvider(BusinessPreferences(repository));
       await reloaded.loaded;
-      expect(reloaded.providersOrder, migratedOrder);
+      expect(reloaded.providersOrder, legacyOrder);
+    },
+  );
+
+  test(
+    'preserves existing retired provider configs as user providers',
+    () async {
+      final settings = SettingsProvider(BusinessPreferences(repository));
+      await settings.loaded;
+
+      const retiredKey = '随想AI中转站';
+      await settings.setProviderConfig(
+        retiredKey,
+        settings.getProviderConfig(retiredKey),
+      );
+      await settings.setProvidersOrder([
+        ...settings.providersOrder,
+        retiredKey,
+      ]);
+
+      final reloaded = SettingsProvider(BusinessPreferences(repository));
+      await reloaded.loaded;
+
+      expect(reloaded.providerConfigs.containsKey(retiredKey), isTrue);
+      expect(reloaded.providersOrder, contains(retiredKey));
     },
   );
 
@@ -183,6 +203,11 @@ void main() {
 
     expect(settings.insertNewAssistantAtTop, isFalse);
     expect(settings.wideChatLayout, isFalse);
+    expect(settings.longPasteAsFile, isFalse);
+    expect(
+      settings.longPasteAsFileThreshold,
+      SettingsProvider.defaultLongPasteAsFileThreshold,
+    );
   });
 
   test('JO-Kelivo display preferences persist across a cold reload', () async {
@@ -198,6 +223,23 @@ void main() {
     expect(reloaded.insertNewAssistantAtTop, isTrue);
     expect(reloaded.wideChatLayout, isTrue);
   });
+
+  test(
+    'long paste file conversion setting persists and clamps threshold',
+    () async {
+      final settings = SettingsProvider(BusinessPreferences(repository));
+      await settings.loaded;
+
+      await settings.setLongPasteAsFile(true);
+      await settings.setLongPasteAsFileThreshold(0);
+      expect(settings.longPasteAsFileThreshold, 1);
+
+      final reloaded = SettingsProvider(BusinessPreferences(repository));
+      await reloaded.loaded;
+      expect(reloaded.longPasteAsFile, isTrue);
+      expect(reloaded.longPasteAsFileThreshold, 1);
+    },
+  );
 
   test('wide chat layout falls back to the legacy desktop key', () async {
     await repository.setPreference('display_desktop_wide_chat_layout_v1', true);

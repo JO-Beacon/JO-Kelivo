@@ -24,8 +24,11 @@ enum MessageMoreAction {
   switchToUser,
   switchToAssistant,
   messageFork,
+  deleteMessageOnly,
   deleteCurrentVersion,
   deleteAllVersions,
+  conversationForkPreserveBranches,
+  conversationForkActiveBranchOnly,
   share,
   selectMessages,
 }
@@ -35,6 +38,7 @@ Future<MessageMoreAction?> showMessageMoreSheet(
   ChatMessage message, {
   required bool canDeleteAllVersions,
   required bool canCreateBranch,
+  bool canCreateConversationFork = false,
 }) async {
   final isDesktop =
       defaultTargetPlatform == TargetPlatform.macOS ||
@@ -54,6 +58,7 @@ Future<MessageMoreAction?> showMessageMoreSheet(
         parentContext: context,
         canDeleteAllVersions: canDeleteAllVersions,
         canCreateBranch: canCreateBranch,
+        canCreateConversationFork: canCreateConversationFork,
       ),
     );
   }
@@ -146,6 +151,30 @@ Future<MessageMoreAction?> showMessageMoreSheet(
             selected = MessageMoreAction.messageFork;
           },
         ),
+      if (canCreateConversationFork) ...[
+        DesktopContextMenuItem(
+          icon: Lucide.GitFork,
+          label: l10n.messageMoreSheetCopyFromHereWithBranches,
+          onTap: () {
+            selected = MessageMoreAction.conversationForkPreserveBranches;
+          },
+        ),
+        DesktopContextMenuItem(
+          icon: Lucide.Copy,
+          label: l10n.messageMoreSheetCopyFromHereCurrentBranchOnly,
+          onTap: () {
+            selected = MessageMoreAction.conversationForkActiveBranchOnly;
+          },
+        ),
+      ],
+      DesktopContextMenuItem(
+        icon: Lucide.X,
+        label: l10n.messageMoreSheetDeleteMessageOnly,
+        danger: true,
+        onTap: () {
+          selected = MessageMoreAction.deleteMessageOnly;
+        },
+      ),
       DesktopContextMenuItem(
         icon: Lucide.Trash2,
         label: l10n.messageMoreSheetDelete,
@@ -177,11 +206,13 @@ class _MessageMoreSheet extends StatefulWidget {
     required this.parentContext,
     required this.canDeleteAllVersions,
     required this.canCreateBranch,
+    required this.canCreateConversationFork,
   });
   final ChatMessage message;
   final BuildContext parentContext;
   final bool canDeleteAllVersions;
   final bool canCreateBranch;
+  final bool canCreateConversationFork;
 
   @override
   State<_MessageMoreSheet> createState() => _MessageMoreSheetState();
@@ -375,6 +406,37 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                           ).pop(MessageMoreAction.messageFork);
                         },
                       ),
+                    if (widget.canCreateConversationFork) ...[
+                      _actionItem(
+                        icon: Lucide.GitFork,
+                        label: l10n.messageMoreSheetCopyFromHereWithBranches,
+                        onTap: () {
+                          Navigator.of(context).pop(
+                            MessageMoreAction.conversationForkPreserveBranches,
+                          );
+                        },
+                      ),
+                      _actionItem(
+                        icon: Lucide.Copy,
+                        label:
+                            l10n.messageMoreSheetCopyFromHereCurrentBranchOnly,
+                        onTap: () {
+                          Navigator.of(context).pop(
+                            MessageMoreAction.conversationForkActiveBranchOnly,
+                          );
+                        },
+                      ),
+                    ],
+                    _actionItem(
+                      icon: Lucide.X,
+                      label: l10n.messageMoreSheetDeleteMessageOnly,
+                      danger: true,
+                      onTap: () {
+                        Navigator.of(
+                          context,
+                        ).pop(MessageMoreAction.deleteMessageOnly);
+                      },
+                    ),
                     _actionItem(
                       icon: Lucide.Trash2,
                       label: l10n.messageMoreSheetDelete,

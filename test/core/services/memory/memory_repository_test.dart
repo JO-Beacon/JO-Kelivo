@@ -204,6 +204,29 @@ void main() {
       );
     });
 
+    test('updateType preserves content and scope', () async {
+      final created = await memoryRepository.create(
+        scope: MemoryScope.global,
+        type: MemoryType.workflow,
+        content: 'Typed content',
+        source: MemorySource.manual,
+      );
+
+      final updated = await memoryRepository.updateType(
+        created.id,
+        MemoryType.voice,
+      );
+
+      expect(updated, isNotNull);
+      expect(updated!.type, MemoryType.voice);
+      expect(updated.content, created.content);
+      expect(updated.scope, created.scope);
+      expect(
+        await memoryRepository.updateType('missing', MemoryType.identity),
+        isNull,
+      );
+    });
+
     test('createMany deduplicates and persists migration receipts', () async {
       final existing = await memoryRepository.create(
         scope: MemoryScope.global,

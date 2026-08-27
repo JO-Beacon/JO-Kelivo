@@ -150,7 +150,7 @@ void main() {
 
       expect(appended, isNotNull);
       expect(appended!.message.version, 1);
-      expect(appended.conversation.versionSelections, {original.id: 1});
+      expect(appended.conversation.versionSelections, isEmpty);
       expect(window.slots.map((slot) => slot.revisionId), [
         appended.message.id,
         later.id,

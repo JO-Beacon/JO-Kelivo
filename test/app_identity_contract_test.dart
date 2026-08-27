@@ -46,8 +46,8 @@ void main() {
           'lib/features/settings/pages/about_page.dart',
           'lib/desktop/setting/about_pane.dart',
         ]) {
-          _expectContains(path, "_upstreamKelivoVersion = '1.2.2'");
-          _expectContains(path, "_upstreamKelivoBuildNumber = '66'");
+          _expectContains(path, "_upstreamKelivoVersion = '1.2.3'");
+          _expectContains(path, "_upstreamKelivoBuildNumber = '67'");
           _expectContains(path, 'https://github.com/JO-Beacon/JO-Kelivo');
           _expectContains(path, 'https://github.com/Chevey339/kelivo');
         }
@@ -356,20 +356,23 @@ void main() {
       expect(workflow, contains('flutter build apk --release --split-per-abi'));
     });
 
-    test('creates only an empty fallback key in PR checks', () {
-      final prWorkflow = _read('.github/workflows/pr-check.yml');
-      expect(prWorkflow, contains('lib/secrets/fallback.dart'));
-      expect(prWorkflow, contains("const String siliconflowFallbackKey = '';"));
-      expect(prWorkflow, isNot(contains('secrets.SILICONFLOW_KEY')));
-
+    test('does not inject or use a SiliconFlow fallback key', () {
       for (final path in [
+        '.github/workflows/pr-check.yml',
         '.github/workflows/build-android.yml',
         '.github/workflows/build-windows.yml',
         '.github/workflows/build-linux.yml',
+        'lib/core/providers/model_provider.dart',
+        'lib/core/services/api/chat_api_service.dart',
       ]) {
-        final workflow = _read(path);
-        expect(workflow, contains('lib/secrets/fallback.dart'), reason: path);
-        expect(workflow, contains('secrets.SILICONFLOW_KEY'), reason: path);
+        final source = _read(path);
+        expect(source, isNot(contains('siliconflowFallbackKey')), reason: path);
+        expect(source, isNot(contains('SILICONFLOW_KEY')), reason: path);
+        expect(
+          source,
+          isNot(contains('lib/secrets/fallback.dart')),
+          reason: path,
+        );
       }
     });
 

@@ -37,7 +37,7 @@ void main() {
   test(
     'installation gate rejects every unpublished SQLite schema without mutation',
     () async {
-      for (final schemaVersion in <int>[4, 5, 6, 7, 8, 9, 10, 11, 42]) {
+      for (final schemaVersion in <int>[5, 6, 7, 8, 9, 10, 11, 42]) {
         final directory = await Directory.systemTemp.createTemp(
           'kelivo_reject_schema_${schemaVersion}_',
         );
@@ -113,6 +113,110 @@ void main() {
       );
     },
   );
+
+  test('schema 3 assistant tags migrate to groups without data loss', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'kelivo_assistant_tag_migration_',
+    );
+    addTearDown(() async {
+      if (await directory.exists()) await directory.delete(recursive: true);
+    });
+    final file = File(p.join(directory.path, AppDatabase.databaseFileName));
+    final database = AppDatabase.open(file: file);
+    await database.customSelect('SELECT 1;').getSingle();
+    await database.close();
+
+    final raw = sqlite.sqlite3.open(file.path);
+    raw.execute(
+      'ALTER TABLE assistant_group_rows RENAME TO assistant_tag_rows;',
+    );
+    raw.execute(
+      'INSERT INTO assistant_tag_rows (id, sort_order, payload, updated_at) '
+      "VALUES ('legacy-tag', 0, '{\"name\":\"Legacy\"}', 1);",
+    );
+    raw.userVersion = 3;
+    raw.close();
+
+    expect(await ChatDatabaseRepository.migrateInstalledDatabase(file), isTrue);
+
+    final migrated = sqlite.sqlite3.open(
+      file.path,
+      mode: sqlite.OpenMode.readOnly,
+    );
+    try {
+      expect(migrated.userVersion, AppDatabase.currentSchemaVersion);
+      expect(
+        migrated.select(
+          "SELECT name FROM sqlite_master WHERE name = 'assistant_tag_rows';",
+        ),
+        isEmpty,
+      );
+      expect(
+        migrated
+            .select(
+              'SELECT id, sort_order, payload, updated_at '
+              'FROM assistant_group_rows;',
+            )
+            .single,
+        containsPair('id', 'legacy-tag'),
+      );
+    } finally {
+      migrated.close();
+    }
+  });
+
+  test('assistant tag and group table conflict aborts migration', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'kelivo_assistant_group_conflict_',
+    );
+    addTearDown(() async {
+      if (await directory.exists()) await directory.delete(recursive: true);
+    });
+    final file = File(p.join(directory.path, AppDatabase.databaseFileName));
+    final database = AppDatabase.open(file: file);
+    await database.customSelect('SELECT 1;').getSingle();
+    await database.close();
+
+    final raw = sqlite.sqlite3.open(file.path);
+    raw.execute(
+      'CREATE TABLE assistant_tag_rows ('
+      'id TEXT NOT NULL PRIMARY KEY, '
+      'sort_order INTEGER NOT NULL CHECK(sort_order >= 0), '
+      'payload TEXT NOT NULL, updated_at INTEGER NOT NULL);',
+    );
+    raw.userVersion = 3;
+    raw.close();
+
+    await expectLater(
+      ChatDatabaseRepository.migrateInstalledDatabase(file),
+      throwsA(
+        predicate<Object>(
+          (error) =>
+              error.toString().contains('assistant_group_table_conflict'),
+          'keeps the assistant table conflict diagnostic',
+        ),
+      ),
+    );
+
+    final unchanged = sqlite.sqlite3.open(
+      file.path,
+      mode: sqlite.OpenMode.readOnly,
+    );
+    try {
+      expect(unchanged.userVersion, 3);
+      expect(
+        unchanged
+            .select(
+              "SELECT name FROM sqlite_master WHERE name IN "
+              "('assistant_tag_rows', 'assistant_group_rows');",
+            )
+            .map((row) => row['name']),
+        containsAll({'assistant_tag_rows', 'assistant_group_rows'}),
+      );
+    } finally {
+      unchanged.close();
+    }
+  });
 
   test(
     'schema 1 linear conversations migrate into populated tree tables',

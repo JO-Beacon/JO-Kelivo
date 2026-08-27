@@ -11,6 +11,7 @@ import '../core/models/conversation.dart';
 import '../theme/app_font_weights.dart';
 import '../features/home/controllers/chat_actions.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'widgets/desktop_dialog_style.dart';
 
 Future<String?> showChatHistoryDesktopDialog(
   BuildContext context, {
@@ -70,11 +71,12 @@ class _ChatHistoryDesktopDialogState extends State<_ChatHistoryDesktopDialog> {
     return Dialog(
       elevation: 12,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: DesktopDialogStyle.shape(context),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxWidth: 560,
+        constraints: DesktopDialogStyle.proportionalConstraints(
+          context,
           minWidth: 420,
+          maxWidth: 560,
           maxHeight: 640,
         ),
         child: ClipRRect(
@@ -120,6 +122,7 @@ class _ChatHistoryDesktopDialogState extends State<_ChatHistoryDesktopDialog> {
                           final confirm = await showDialog<bool>(
                             context: context,
                             builder: (ctx) => AlertDialog(
+                              shape: DesktopDialogStyle.shape(ctx),
                               title: Text(
                                 l10n.chatHistoryPageDeleteAllDialogTitle,
                               ),

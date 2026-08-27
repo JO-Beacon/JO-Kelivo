@@ -16,6 +16,7 @@ import '../../shared/widgets/snackbar.dart';
 import '../widgets/desktop_select_dropdown.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../widgets/desktop_dialog_style.dart';
 
 class DesktopWorldBookPane extends StatefulWidget {
   const DesktopWorldBookPane({super.key});
@@ -238,6 +239,7 @@ class _DesktopWorldBookPaneState extends State<DesktopWorldBookPane> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
+          shape: DesktopDialogStyle.shape(ctx),
           title: Text(l10n.worldBookDeleteTitle),
           content: Text(
             l10n.worldBookDeleteMessage(
@@ -696,9 +698,7 @@ class _EntryRowState extends State<_EntryRow> {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final hoverBg = cs.onSurface.withValues(
-      alpha: isDark ? 0.08 : 0.04,
-    );
+    final hoverBg = cs.onSurface.withValues(alpha: isDark ? 0.08 : 0.04);
 
     final title = widget.entry.name.trim().isEmpty
         ? l10n.worldBookUnnamedEntry
@@ -853,7 +853,7 @@ class _WorldBookEditDialogState extends State<_WorldBookEditDialog> {
     return Dialog(
       backgroundColor: cs.surface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: DesktopDialogStyle.shape(context),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 560),
         child: Stack(
@@ -1191,17 +1191,20 @@ class _WorldBookEntryEditDialogState extends State<_WorldBookEntryEditDialog> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
-    final size = MediaQuery.sizeOf(context);
-    final maxHeight = size.height * 0.9;
     final positionOptions = _positionOptions(l10n);
     final roleOptions = _roleOptions(l10n);
 
     return Dialog(
       backgroundColor: cs.surface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: DesktopDialogStyle.shape(context),
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: 760, maxHeight: maxHeight),
+        constraints: DesktopDialogStyle.proportionalConstraints(
+          context,
+          maxWidth: 760,
+          maxHeight: 760,
+          verticalInset: 18,
+        ),
         child: Stack(
           children: [
             Padding(

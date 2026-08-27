@@ -1,10 +1,12 @@
 import 'dart:typed_data';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as image_lib;
 
 import 'package:Kelivo/features/chat/widgets/message_export_sheet.dart';
+import 'package:Kelivo/core/models/chat_message.dart';
 
 Uint8List _solidPng({
   required int width,
@@ -47,6 +49,31 @@ Uint8List _blankPaddedPng({
 }
 
 void main() {
+  test('export ignores malformed content split metadata', () {
+    final message = ChatMessage(
+      id: 'export-invalid-splits',
+      role: 'assistant',
+      content: 'answer',
+      conversationId: 'conversation-1',
+      reasoningSegmentsJson: jsonEncode({
+        'v': 2,
+        'segments': [
+          {'text': 'thinking', 'expanded': true, 'toolStartIndex': 0},
+        ],
+        'contentSplits': {
+          'offsets': [0, 6],
+          'reasoningCounts': [1],
+          'toolCounts': [0, 1],
+        },
+      }),
+    );
+
+    final exported = exportContentSplitsForTesting(message);
+    expect(exported.offsets, isNull);
+    expect(exported.reasoningCounts, isNull);
+    expect(exported.toolCounts, isNull);
+  });
+
   testWidgets('export capture root keeps the captured theme', (tester) async {
     final exportTheme = ThemeData(
       colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),

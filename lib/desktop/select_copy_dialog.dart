@@ -6,6 +6,7 @@ import '../shared/widgets/snackbar.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'widgets/desktop_dialog_style.dart';
 
 Future<void> showSelectCopyDesktopDialog(
   BuildContext context, {
@@ -40,9 +41,10 @@ class _SelectCopyDesktopDialog extends StatelessWidget {
     return Dialog(
       elevation: 12,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: DesktopDialogStyle.shape(context),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
+        constraints: DesktopDialogStyle.proportionalConstraints(
+          context,
           minWidth: 420,
           maxWidth: 720,
           maxHeight: 640,

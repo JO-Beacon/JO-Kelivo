@@ -183,6 +183,44 @@ void main() {
     },
   );
 
+  test('whitespace-only blank lines stay in the same source block', () {
+    final document = IncrementalMarkdownDocument();
+    final blocks = document.update('before\n \n\t\nafter');
+
+    expect(blocks, hasLength(1));
+    expect(blocks.single.text, 'before\n \n\t\nafter');
+  });
+
+  test('extra bare blank lines do not create an empty streaming block', () {
+    final document = IncrementalMarkdownDocument();
+    final blocks = document.update('before\n\n\nafter\n');
+
+    expect(blocks, hasLength(2));
+    expect(blocks.first.text, 'before\n\n\n');
+    expect(blocks.last.text, 'after\n');
+  });
+
+  test(
+    'indented content after a blank line stays with the preceding block',
+    () {
+      final document = IncrementalMarkdownDocument();
+      final blocks = document.update('before\n\n    # not a heading\n\nafter');
+
+      expect(blocks, hasLength(2));
+      expect(blocks.first.text, contains('    # not a heading'));
+      expect(blocks.last.text, 'after');
+    },
+  );
+
+  test('a bare hash line after a blank line stays with the heading block', () {
+    final document = IncrementalMarkdownDocument();
+    final blocks = document.update('#\n\n###\n\nafter');
+
+    expect(blocks, hasLength(2));
+    expect(blocks.first.text, '#\n\n###\n\n');
+    expect(blocks.last.text, 'after');
+  });
+
   test('1 MiB append stream scans each source code unit once', () {
     final document = IncrementalMarkdownDocument();
     var source = '';

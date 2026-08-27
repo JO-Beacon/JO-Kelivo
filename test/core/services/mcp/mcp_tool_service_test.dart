@@ -228,25 +228,118 @@ void main() {
     },
   );
 
-  test('unavailable tools are not reported as invalid arguments', () async {
-    final provider = _RecordingMcpProvider(
-      [
+  test(
+    'qualifies reserved built-in names and still routes the MCP tool',
+    () async {
+      final provider = _RecordingMcpProvider([
         McpServerConfig(
-          id: 'server-id',
+          id: 'srv-id',
           enabled: true,
-          name: 'Remote MCP',
+          name: 'srv',
           transport: McpTransportType.http,
-          tools: [
-            McpToolConfig(
-              enabled: true,
-              name: 'get_self',
-              schema: const {'type': 'object', 'properties': {}},
-            ),
-          ],
+          tools: [McpToolConfig(enabled: true, name: 'memory_read')],
         ),
-      ],
-      errorMessage: 'connection failed',
+      ]);
+      final assistants = AssistantProvider(
+        preferences: createBusinessTestPreferences(),
+      );
+      final service = McpToolService();
+      addTearDown(provider.dispose);
+      addTearDown(assistants.dispose);
+      addTearDown(service.dispose);
+
+      await assistants.loaded;
+      final assistantId = await assistants.addAssistant(name: 'Test');
+      await assistants.updateAssistant(
+        assistants
+            .getById(assistantId)!
+            .copyWith(mcpServerIds: const ['srv-id']),
+      );
+
+      const reservedNames = {'memory_read'};
+      final tools = service.listAvailableToolsForAssistant(
+        provider,
+        assistants,
+        assistantId,
+        reservedNames: reservedNames,
+      );
+      expect(tools.single.name, 'srv__memory_read');
+      expect(
+        await service.callToolTextForAssistant(
+          provider,
+          assistants,
+          assistantId: assistantId,
+          toolName: 'srv__memory_read',
+          reservedNames: reservedNames,
+        ),
+        'srv-id:memory_read',
+      );
+      expect(provider.calls, [(serverId: 'srv-id', toolName: 'memory_read')]);
+    },
+  );
+
+  test('snapshot reserves built-in names for stable MCP routing', () async {
+    final provider = _RecordingMcpProvider([
+      McpServerConfig(
+        id: 'srv-id',
+        enabled: true,
+        name: 'srv',
+        transport: McpTransportType.http,
+        tools: [
+          McpToolConfig(enabled: true, name: 'calculate', needsApproval: true),
+        ],
+      ),
+    ]);
+    final assistants = AssistantProvider(
+      preferences: createBusinessTestPreferences(),
     );
+    final service = McpToolService();
+    addTearDown(provider.dispose);
+    addTearDown(assistants.dispose);
+    addTearDown(service.dispose);
+
+    await assistants.loaded;
+    final assistantId = await assistants.addAssistant(name: 'Test');
+    await assistants.updateAssistant(
+      assistants.getById(assistantId)!.copyWith(mcpServerIds: const ['srv-id']),
+    );
+    const reservedNames = {'calculate'};
+    final snapshot = service.captureRoutesForAssistant(
+      provider,
+      assistants,
+      assistantId: assistantId,
+      reservedNames: reservedNames,
+    );
+    expect(snapshot.containsExposedName('srv__calculate'), isTrue);
+    expect(snapshot.containsExposedName('calculate'), isFalse);
+    expect(
+      service.toolNeedsApprovalForAssistant(
+        provider,
+        assistants,
+        assistantId: assistantId,
+        toolName: 'srv__calculate',
+        routeSnapshot: snapshot,
+      ),
+      isTrue,
+    );
+  });
+
+  test('unavailable tools are not reported as invalid arguments', () async {
+    final provider = _RecordingMcpProvider([
+      McpServerConfig(
+        id: 'server-id',
+        enabled: true,
+        name: 'Remote MCP',
+        transport: McpTransportType.http,
+        tools: [
+          McpToolConfig(
+            enabled: true,
+            name: 'get_self',
+            schema: const {'type': 'object', 'properties': {}},
+          ),
+        ],
+      ),
+    ], errorMessage: 'connection failed');
     final assistants = AssistantProvider(
       preferences: createBusinessTestPreferences(),
     );

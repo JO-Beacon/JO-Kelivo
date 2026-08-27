@@ -883,6 +883,45 @@ void main() {
       expect(results, isNotEmpty);
       expect(results.every((r) => r['conversationId'] == wanted.id), isTrue);
     });
+
+    test('results stay inside the current assistant visibility', () async {
+      final chatService = ChatService(existingRepository: chatRepository);
+      addTearDown(chatService.close);
+      await chatService.init();
+
+      Future<String> seed(String title, String? assistantId) async {
+        final conversation = await chatService.createConversation(
+          title: title,
+          assistantId: assistantId,
+        );
+        await chatService.addMessage(
+          conversationId: conversation.id,
+          role: 'user',
+          content: 'assistant-isolation-tool-token $title',
+        );
+        return conversation.id;
+      }
+
+      final ownedA = await seed('owned-a', 'assistant-a');
+      await seed('owned-b', 'assistant-b');
+      final unowned = await seed('unowned', null);
+
+      final raw = await call(
+        MemoryTools.chatSearch,
+        {'query': 'assistant-isolation-tool-token'},
+        a: assistant(
+          id: 'assistant-a',
+          enableMemory: false,
+          allowPastConversationRecall: true,
+        ),
+        chatService: chatService,
+      );
+      final results = decode(raw!)['results'] as List;
+      expect(results.map((result) => result['conversationId']).toSet(), {
+        ownedA,
+        unowned,
+      });
+    });
   });
 
   group('temporary conversations', () {
@@ -995,6 +1034,43 @@ void main() {
       expect(zhDesc, contains('长期记忆'));
       expect(enDesc, contains('long-term memory'));
       expect(zhDesc, isNot(equals(enDesc)));
+    });
+
+    test('chat_search descriptions state assistant-scoped visibility', () {
+      final zh = MemoryTools.buildDefinitions(
+        lang: MemoryPromptLang.zh,
+        writeScope: MemoryWriteScope.alwaysGlobal,
+        enableMemory: false,
+        allowPastConversationRecall: true,
+      ).single;
+      final en = MemoryTools.buildDefinitions(
+        lang: MemoryPromptLang.en,
+        writeScope: MemoryWriteScope.alwaysGlobal,
+        enableMemory: false,
+        allowPastConversationRecall: true,
+      ).single;
+
+      final zhFunction = zh['function'] as Map;
+      final enFunction = en['function'] as Map;
+      expect(zhFunction['description'], contains('仅当前助手的会话，以及没有归属助手的旧会话'));
+      expect(zhFunction['description'], isNot(contains('跨全部会话')));
+      expect(
+        enFunction['description'],
+        contains("this assistant's past conversations"),
+      );
+
+      final zhProperties =
+          (zhFunction['parameters'] as Map)['properties'] as Map;
+      final enProperties =
+          (enFunction['parameters'] as Map)['properties'] as Map;
+      expect(
+        (zhProperties['conversation_id'] as Map)['description'],
+        contains('当前助手可见的会话'),
+      );
+      expect(
+        (enProperties['conversation_id'] as Map)['description'],
+        contains("this assistant's visible conversations"),
+      );
     });
   });
 }

@@ -125,15 +125,26 @@ void main() {
     required Future<ChatInputSubmissionResult> Function(ChatInputData input)
     onSend,
     ChatInputBarController? mediaController,
+    bool longPasteAsFile = false,
   }) {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider.value(
-          value: SettingsProvider(createBusinessTestPreferences()),
+          value: SettingsProvider(
+            createBusinessTestPreferences(
+              localInitial: longPasteAsFile
+                  ? {'display_long_paste_as_file_v1': true}
+                  : const {},
+            ),
+          ),
         ),
         ChangeNotifierProvider.value(
           value: AssistantProvider(
-            preferences: createBusinessTestPreferences(),
+            preferences: createBusinessTestPreferences(
+              localInitial: longPasteAsFile
+                  ? {'display_long_paste_as_file_v1': true}
+                  : const {},
+            ),
           ),
         ),
       ],
@@ -187,12 +198,18 @@ void main() {
         controller: controller,
         focusNode: focusNode,
         mediaController: mediaController,
+        longPasteAsFile: true,
         onSend: (input) async {
           submitted = input;
           return ChatInputSubmissionResult.rejected;
         },
       ),
     );
+    await tester.pump(const Duration(milliseconds: 100));
+    final settings = tester
+        .element(find.byType(ChatInputBar))
+        .read<SettingsProvider>();
+    await settings.setLongPasteAsFile(true);
     await tester.tap(find.byType(TextField));
     await tester.pump();
 

@@ -6,6 +6,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart' as lucide;
 // 适配器，用于按需求使用 `Lucide.*` 风格。
 class Lucide {
   static const IconData ListTree = lucide.LucideIcons.listTree;
+  static const IconData ListChecks = lucide.LucideIcons.listChecks;
   static const IconData Menu = lucide.LucideIcons.menu;
   static const IconData MessageCirclePlus =
       lucide.LucideIcons.messageCirclePlus;
