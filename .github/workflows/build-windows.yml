@@ -81,7 +81,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          Compress-Archive -Path 'build/windows/x64/runner/Release/*' -DestinationPath "JO-Kelivo-v$env:VERSION-windows-x64-portable.zip"
+          Compress-Archive -Path 'build/windows/x64/runner/Release/*' -DestinationPath "JO-AIClient-v$env:VERSION-windows-x64-portable.zip"
 
       - name: Package setup EXE
         shell: pwsh
@@ -92,7 +92,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          Get-ChildItem -File "JO-Kelivo-v$env:VERSION-windows-x64-*" | ForEach-Object {
+          Get-ChildItem -File "JO-AIClient-v$env:VERSION-windows-x64-*" | ForEach-Object {
             $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash.ToLowerInvariant()
             "$hash  $($_.Name)" | Set-Content -LiteralPath "$($_.FullName).sha256" -Encoding ascii
           }
@@ -102,10 +102,10 @@ jobs:
         with:
           name: Windows-x64
           path: |
-            JO-Kelivo-v*-windows-x64-portable.zip
-            JO-Kelivo-v*-windows-x64-portable.zip.sha256
-            JO-Kelivo-v*-windows-x64-setup.exe
-            JO-Kelivo-v*-windows-x64-setup.exe.sha256
+            JO-AIClient-v*-windows-x64-portable.zip
+            JO-AIClient-v*-windows-x64-portable.zip.sha256
+            JO-AIClient-v*-windows-x64-setup.exe
+            JO-AIClient-v*-windows-x64-setup.exe.sha256
           if-no-files-found: error
 
       - name: Upload assets to draft GitHub Release
@@ -118,7 +118,7 @@ jobs:
           draft: true
           prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || false }}
           files: |
-            JO-Kelivo-v*-windows-x64-portable.zip
-            JO-Kelivo-v*-windows-x64-portable.zip.sha256
-            JO-Kelivo-v*-windows-x64-setup.exe
-            JO-Kelivo-v*-windows-x64-setup.exe.sha256
+            JO-AIClient-v*-windows-x64-portable.zip
+            JO-AIClient-v*-windows-x64-portable.zip.sha256
+            JO-AIClient-v*-windows-x64-setup.exe
+            JO-AIClient-v*-windows-x64-setup.exe.sha256

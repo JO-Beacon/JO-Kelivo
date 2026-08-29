@@ -121,14 +121,14 @@ jobs:
           set -euo pipefail
           for abi in arm64-v8a armeabi-v7a x86_64; do
             cp "build/app/outputs/flutter-apk/app-${abi}-release.apk" \
-              "JO-Kelivo-v${VERSION}-android-${abi}-release.apk"
+              "JO-AIClient-v${VERSION}-android-${abi}-release.apk"
           done
 
       - name: Generate SHA-256 checksums
         shell: bash
         run: |
           set -euo pipefail
-          for file in JO-Kelivo-v${VERSION}-android-*-release.apk; do
+          for file in JO-AIClient-v${VERSION}-android-*-release.apk; do
             sha256sum "$file" > "$file.sha256"
           done
 
@@ -137,8 +137,8 @@ jobs:
         with:
           name: Android-APKs
           path: |
-            JO-Kelivo-v*-android-*-release.apk
-            JO-Kelivo-v*-android-*-release.apk.sha256
+            JO-AIClient-v*-android-*-release.apk
+            JO-AIClient-v*-android-*-release.apk.sha256
           if-no-files-found: error
 
       - name: Upload assets to draft GitHub Release
@@ -151,5 +151,5 @@ jobs:
           draft: true
           prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || false }}
           files: |
-            JO-Kelivo-v*-android-*-release.apk
-            JO-Kelivo-v*-android-*-release.apk.sha256
+            JO-AIClient-v*-android-*-release.apk
+            JO-AIClient-v*-android-*-release.apk.sha256

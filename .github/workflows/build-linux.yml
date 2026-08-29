@@ -102,7 +102,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tar -C build/linux/x64/release/bundle -czf "JO-Kelivo-v${VERSION}-linux-x64-archive.tar.gz" .
+          tar -C build/linux/x64/release/bundle -czf "JO-AIClient-v${VERSION}-linux-x64-archive.tar.gz" .
 
       - name: Package AppImage
         shell: bash
@@ -137,7 +137,7 @@ jobs:
           install -Dm644 assets/app_icon.png AppDir/jo_kelivo.png
           install -Dm644 assets/app_icon.png AppDir/usr/share/icons/hicolor/256x256/apps/jo_kelivo.png
 
-          ARCH=x86_64 ./appimagetool AppDir "JO-Kelivo-v${VERSION}-linux-x64-appimage.AppImage"
+          ARCH=x86_64 ./appimagetool AppDir "JO-AIClient-v${VERSION}-linux-x64-appimage.AppImage"
 
       - name: Package DEB
         shell: bash
@@ -174,13 +174,13 @@ jobs:
            A cross-platform Flutter LLM chat client.
           EOF
 
-          dpkg-deb --build deb "JO-Kelivo-v${VERSION}-linux-x64-deb.deb"
+          dpkg-deb --build deb "JO-AIClient-v${VERSION}-linux-x64-deb.deb"
 
       - name: Generate SHA-256 checksums
         shell: bash
         run: |
           set -euo pipefail
-          for file in JO-Kelivo-v${VERSION}-linux-x64-*; do
+          for file in JO-AIClient-v${VERSION}-linux-x64-*; do
             sha256sum "$file" > "$file.sha256"
           done
 
@@ -189,12 +189,12 @@ jobs:
         with:
           name: Linux-x64
           path: |
-            JO-Kelivo-v*-linux-x64-archive.tar.gz
-            JO-Kelivo-v*-linux-x64-archive.tar.gz.sha256
-            JO-Kelivo-v*-linux-x64-appimage.AppImage
-            JO-Kelivo-v*-linux-x64-appimage.AppImage.sha256
-            JO-Kelivo-v*-linux-x64-deb.deb
-            JO-Kelivo-v*-linux-x64-deb.deb.sha256
+            JO-AIClient-v*-linux-x64-archive.tar.gz
+            JO-AIClient-v*-linux-x64-archive.tar.gz.sha256
+            JO-AIClient-v*-linux-x64-appimage.AppImage
+            JO-AIClient-v*-linux-x64-appimage.AppImage.sha256
+            JO-AIClient-v*-linux-x64-deb.deb
+            JO-AIClient-v*-linux-x64-deb.deb.sha256
           if-no-files-found: error
 
       - name: Upload assets to draft GitHub Release
@@ -207,9 +207,9 @@ jobs:
           draft: true
           prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || false }}
           files: |
-            JO-Kelivo-v*-linux-x64-archive.tar.gz
-            JO-Kelivo-v*-linux-x64-archive.tar.gz.sha256
-            JO-Kelivo-v*-linux-x64-appimage.AppImage
-            JO-Kelivo-v*-linux-x64-appimage.AppImage.sha256
-            JO-Kelivo-v*-linux-x64-deb.deb
-            JO-Kelivo-v*-linux-x64-deb.deb.sha256
+            JO-AIClient-v*-linux-x64-archive.tar.gz
+            JO-AIClient-v*-linux-x64-archive.tar.gz.sha256
+            JO-AIClient-v*-linux-x64-appimage.AppImage
+            JO-AIClient-v*-linux-x64-appimage.AppImage.sha256
+            JO-AIClient-v*-linux-x64-deb.deb
+            JO-AIClient-v*-linux-x64-deb.deb.sha256
