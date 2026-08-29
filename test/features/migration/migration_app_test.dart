@@ -211,29 +211,48 @@ void main() {
     messenger.setMockMethodCallHandler(restartChannel, null);
   });
 
-  testWidgets('migration page opens the migration user data directory', (
+  for (final platform in const [TargetPlatform.android, TargetPlatform.iOS]) {
+    testWidgets(
+      'migration page hides the user data directory on ${platform.name}',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = platform;
+        final appDataDirectory = Directory.systemTemp.createTempSync(
+          'kelivo_migration_hidden_data_',
+        );
+        addTearDown(() {
+          debugDefaultTargetPlatformOverride = null;
+          if (appDataDirectory.existsSync()) {
+            appDataDirectory.deleteSync(recursive: true);
+          }
+        });
+        tester.binding.platformDispatcher.localesTestValue = const <Locale>[
+          Locale('zh'),
+        ];
+        addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+
+        await tester.pumpWidget(
+          MigrationApp(service: _completeServiceAt(appDataDirectory)),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('打开用户数据目录'), findsNothing);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        debugDefaultTargetPlatformOverride = null;
+      },
+    );
+  }
+
+  testWidgets('migration page keeps the user data directory on desktop', (
     tester,
   ) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    final messenger =
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-    const launcherChannel = MethodChannel('plugins.flutter.io/url_launcher');
-    String? launchedUrl;
-    var launchCalls = 0;
-    messenger.setMockMethodCallHandler(launcherChannel, (call) async {
-      if (call.method == 'launch') {
-        launchCalls++;
-        launchedUrl = (call.arguments as Map)['url'] as String?;
-        return true;
-      }
-      return false;
-    });
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     final appDataDirectory = Directory.systemTemp.createTempSync(
-      'kelivo_migration_open_data_',
+      'kelivo_migration_desktop_data_',
     );
     addTearDown(() {
       debugDefaultTargetPlatformOverride = null;
-      messenger.setMockMethodCallHandler(launcherChannel, null);
       if (appDataDirectory.existsSync()) {
         appDataDirectory.deleteSync(recursive: true);
       }
@@ -249,68 +268,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('打开用户数据目录'), findsOneWidget);
-    final openButton = _buttonForIcon(tester, Lucide.FolderOpen);
-    await tester.runAsync(() async {
-      openButton.onTap!();
-      await _waitUntil(() => launchCalls == 1);
-    });
-    await tester.pump();
-
-    expect(launchedUrl, Uri.file(appDataDirectory.path).toString());
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
     debugDefaultTargetPlatformOverride = null;
-    messenger.setMockMethodCallHandler(launcherChannel, null);
-  });
-
-  testWidgets('migration page reports a user data directory open failure', (
-    tester,
-  ) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    final messenger =
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-    const launcherChannel = MethodChannel('plugins.flutter.io/url_launcher');
-    var launchCalls = 0;
-    messenger.setMockMethodCallHandler(launcherChannel, (call) async {
-      if (call.method == 'launch') launchCalls++;
-      return false;
-    });
-    final appDataDirectory = Directory.systemTemp.createTempSync(
-      'kelivo_migration_open_data_failure_',
-    );
-    addTearDown(() {
-      debugDefaultTargetPlatformOverride = null;
-      messenger.setMockMethodCallHandler(launcherChannel, null);
-      if (appDataDirectory.existsSync()) {
-        appDataDirectory.deleteSync(recursive: true);
-      }
-    });
-    tester.binding.platformDispatcher.localesTestValue = const <Locale>[
-      Locale('zh'),
-    ];
-    addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
-
-    await tester.pumpWidget(
-      MigrationApp(service: _completeServiceAt(appDataDirectory)),
-    );
-    await tester.pumpAndSettle();
-
-    final openButton = _buttonForIcon(tester, Lucide.FolderOpen);
-    await tester.runAsync(() async {
-      openButton.onTap!();
-      await _waitUntil(() => launchCalls == 1);
-    });
-    await tester.pump();
-
-    expect(find.text('打开用户数据目录失败'), findsOneWidget);
-
-    await tester.pump(const Duration(seconds: 4));
-    await tester.pumpAndSettle();
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump();
-    debugDefaultTargetPlatformOverride = null;
-    messenger.setMockMethodCallHandler(launcherChannel, null);
   });
 }
 

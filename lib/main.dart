@@ -57,6 +57,7 @@ import 'core/services/chat/chat_service.dart';
 import 'core/services/migration/migration_chain_state.dart';
 import 'core/services/app_exit_flush.dart';
 import 'core/services/backup/restore_archive_pruner.dart';
+import 'core/services/backup/associated_backup_path.dart';
 import 'core/services/backup/restore_business_lease.dart';
 import 'core/services/backup/restore_startup_gate.dart';
 import 'core/services/backup/restore_receipt.dart';
@@ -73,6 +74,7 @@ import 'shared/widgets/snackbar.dart';
 import 'shared/widgets/restore_failure_screen.dart';
 import 'shared/widgets/restore_outcome_notice.dart';
 import 'shared/widgets/context_tree_migration_notice.dart';
+import 'features/backup/widgets/associated_backup_import_launcher.dart';
 import 'package:system_fonts/system_fonts.dart';
 import 'dart:io'
     show Directory, File, Platform, stderr; // 保留以便 provider 内进行全局覆盖
@@ -86,11 +88,21 @@ final RouteObserver<ModalRoute<dynamic>> routeObserver =
 bool _didCheckUpdates = false; // 一次性更新检查标记
 bool _didEnsureAssistants = false; // 在 l10n 就绪后确保默认值
 
-Future<void> main() async {
+Future<void> main(List<String> arguments) async {
+  final commandLineAssociatedJoaiclientPath = Platform.isWindows
+      ? associatedJoaiclientPathFromArguments(arguments)
+      : null;
   final startupProgress = ValueNotifier<ProgressUpdate?>(null);
   await runZoned(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+      if (Platform.isWindows) AssociatedBackupPathEvents.instance.initialize();
+      // 启动阶段只注册通知点击回调，不申请运行时通知权限。
+      if (Platform.isAndroid) {
+        try {
+          await NotificationService.ensureInitialized();
+        } catch (_) {}
+      }
       // 在恢复或数据库准入前渲染一个不依赖持久化数据的启动外壳。
       // 恢复切换会在真正构建应用之前校验并移动可能很大的数据包；
       // 在此过程中，原生桌面窗口不能显示成无响应的白屏。
@@ -105,6 +117,33 @@ Future<void> main() async {
       await _initDesktopWindow();
       reportStartupProgress(0.08);
       final appDataDirectory = await AppDirectories.getAppDataDirectory();
+      String? associatedJoaiclientPath = commandLineAssociatedJoaiclientPath;
+      final suppressAssociatedPathOnRestart = Platform.isWindows
+          ? await AssociatedBackupPathEvents.consumeRestartSuppression(
+              appDataDirectory,
+            )
+          : false;
+      final associatedPathWasConsumed =
+          Platform.isWindows &&
+          associatedJoaiclientPath != null &&
+          await AssociatedBackupPathEvents.hasConsumedPath(
+            appDataDirectory,
+            associatedJoaiclientPath,
+          );
+      if (associatedJoaiclientPath != null) {
+        if (suppressAssociatedPathOnRestart || associatedPathWasConsumed) {
+          associatedJoaiclientPath = null;
+        } else {
+          await AssociatedBackupPathEvents.persistPendingPath(
+            appDataDirectory,
+            associatedJoaiclientPath,
+          );
+        }
+      } else if (Platform.isWindows) {
+        await AssociatedBackupPathEvents.clearConsumedPath(appDataDirectory);
+        associatedJoaiclientPath =
+            await AssociatedBackupPathEvents.readPendingPath(appDataDirectory);
+      }
       final RestoreReceipt? restoreOutcome;
       try {
         // 租约通过其内部注册表在进程退出前始终由进程持有，
@@ -206,6 +245,16 @@ Future<void> main() async {
             processDatabaseLease = databaseLease;
             businessPreferences = loadedBusinessPreferences;
             await MigrationChainStateStore(appDataDirectory).clear();
+            if (associatedJoaiclientPath != null) {
+              await AssociatedBackupPathEvents.clearPendingPath(
+                appDataDirectory,
+              );
+            }
+            if (associatedPathWasConsumed) {
+              await AssociatedBackupPathEvents.clearConsumedPath(
+                appDataDirectory,
+              );
+            }
           } catch (_) {
             await databaseLease.release();
             rethrow;
@@ -256,6 +305,7 @@ Future<void> main() async {
         MyApp(
           databaseLease: processDatabaseLease,
           businessPreferences: businessPreferences,
+          initialJoaiclientPath: associatedJoaiclientPath,
           restoreOutcome: restoreOutcome?.state,
         ),
       );
@@ -649,11 +699,13 @@ class MyApp extends StatelessWidget {
     super.key,
     required this.databaseLease,
     required this.businessPreferences,
+    this.initialJoaiclientPath,
     this.restoreOutcome,
   });
 
   final ChatDatabaseLease databaseLease;
   final BusinessPreferences businessPreferences;
+  final String? initialJoaiclientPath;
   final RestoreReceiptState? restoreOutcome;
 
   @override
@@ -876,7 +928,6 @@ class MyApp extends StatelessWidget {
                         }
                       } catch (_) {}
                       if (mode == AndroidBackgroundChatMode.onNotify) {
-                        await NotificationService.ensureInitialized();
                         await NotificationService.ensureAndroidNotificationsPermission();
                       }
                     }
@@ -969,7 +1020,14 @@ class MyApp extends StatelessWidget {
                 navigatorObservers: <NavigatorObserver>[routeObserver],
                 home: RestoreOutcomeNotice(
                   outcome: restoreOutcome,
-                  child: ContextTreeMigrationNotice(child: _selectHome()),
+                  child: ContextTreeMigrationNotice(
+                    child: Platform.isWindows
+                        ? AssociatedBackupImportLauncher(
+                            path: initialJoaiclientPath,
+                            child: _selectHome(),
+                          )
+                        : _selectHome(),
+                  ),
                 ),
                 builder: (ctx, child) {
                   final bright = Theme.of(ctx).brightness;

@@ -12,6 +12,7 @@ import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/database/business_restore_service.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/backup.dart';
+import 'package:Kelivo/core/models/backup_task_progress.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/conversation.dart';
@@ -65,6 +66,7 @@ Map<String, dynamic> _chatboxFixture() => {
         'id': 'message-1',
         'role': 'user',
         'content': 'Hello',
+        'aiProvider': 'openai',
         'timestamp': 1784332800000,
         'contentParts': [
           {'type': 'text', 'text': 'Hello'},
@@ -82,6 +84,8 @@ Map<String, dynamic> _chatboxFixture() => {
     'threads': <dynamic>[],
   },
 };
+
+String _legacyId(String suffix) => 'chatbox_legacy_1_21_1_$suffix';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -140,12 +144,34 @@ void main() {
         ).exportSettings();
         final providers =
             jsonDecode(exported['provider_configs_v1'] as String) as Map;
-        expect((providers['openai'] as Map)['apiKey'], 'chatbox-secret');
-        expect(exported['providers_order_v1'], ['openai']);
-        expect(exported['assistants_v1'], contains('assistant-1'));
-        expect(exported['assistant_tags_v1'], contains('Chatbox'));
-        expect(exported['assistant_tag_map_v1'], contains('assistant-1'));
+        expect(
+          (providers[_legacyId('provider_openai')] as Map)['apiKey'],
+          'chatbox-secret',
+        );
+        expect(
+          (providers[_legacyId('provider_openai')] as Map)['name'],
+          'OpenAI',
+        );
+        expect(exported['providers_order_v1'], [_legacyId('provider_openai')]);
+        expect(exported['assistants_v1'], contains(_legacyId('assistant-1')));
+        final assistants =
+            jsonDecode(exported['assistants_v1'] as String) as List;
+        expect(
+          (assistants.single as Map)['chatModelProvider'],
+          _legacyId('provider_openai'),
+        );
+        expect(exported['assistant_tags_v1'], contains('Chatbox 导入（<1.22）'));
+        expect(
+          exported['assistant_tag_map_v1'],
+          contains(_legacyId('assistant-1')),
+        );
         expect(chatService.getAllConversations(), hasLength(1));
+        expect(
+          (await chatService.loadMessages(
+            _legacyId('default_assistant-1'),
+          )).single.providerId,
+          _legacyId('provider_openai'),
+        );
         expect(await replacedUpload.exists(), isFalse);
 
         final prefs = await SharedPreferences.getInstance();
@@ -154,6 +180,337 @@ void main() {
         expect(prefs.getString('assistant_tags_v1'), isNull);
       },
     );
+
+    test(
+      'maps Chatbox starred sessions to an ordered assistant group without pinning conversations',
+      () async {
+        final fixture = _chatboxFixture();
+        const sessionIds = [
+          'starred-old',
+          'regular-old',
+          'starred-new',
+          'regular-new',
+        ];
+        fixture['chat-sessions-list'] = [
+          {'id': sessionIds[0], 'name': 'Starred old', 'starred': true},
+          {'id': sessionIds[1], 'name': 'Regular old', 'starred': false},
+          {'id': sessionIds[2], 'name': 'Starred new', 'starred': true},
+          {'id': sessionIds[3], 'name': 'Regular new', 'starred': false},
+        ];
+        for (final id in sessionIds) {
+          fixture['session:$id'] = {
+            'settings': {'provider': 'openai', 'modelId': 'gpt-test'},
+            'messages': const <dynamic>[],
+            'threads': const <dynamic>[],
+          };
+        }
+        await backup.writeAsString(jsonEncode(fixture), flush: true);
+
+        await ChatboxImporter.importFromChatbox(
+          file: backup,
+          mode: RestoreMode.overwrite,
+          businessRepository: businessRepository,
+          chatService: chatService,
+        );
+
+        final exported = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
+        final assistants =
+            jsonDecode(exported['assistants_v1'] as String) as List;
+        expect(assistants.map((item) => (item as Map)['id']).toList(), [
+          _legacyId('starred-old'),
+          _legacyId('starred-new'),
+          _legacyId('regular-new'),
+          _legacyId('regular-old'),
+        ]);
+
+        final groups =
+            jsonDecode(exported['assistant_tags_v1'] as String) as List;
+        expect(groups.map((group) => (group as Map)['name']).toList(), [
+          'Chatbox 导入（<1.22）·置顶',
+          'Chatbox 导入（<1.22）',
+        ]);
+        final starredGroupId = (groups.first as Map)['id'];
+        final regularGroupId = (groups.last as Map)['id'];
+        final assignment =
+            jsonDecode(exported['assistant_tag_map_v1'] as String) as Map;
+        expect(assignment[_legacyId('starred-old')], starredGroupId);
+        expect(assignment[_legacyId('starred-new')], starredGroupId);
+        expect(assignment[_legacyId('regular-old')], regularGroupId);
+        expect(assignment[_legacyId('regular-new')], regularGroupId);
+        expect(
+          chatService.getAllConversations().every((c) => !c.isPinned),
+          isTrue,
+        );
+      },
+    );
+
+    test(
+      'imports custom provider metadata without using its source ID as name',
+      () async {
+        final fixture = _chatboxFixture();
+        final settings = Map<String, dynamic>.from(fixture['settings'] as Map);
+        final providers = Map<String, dynamic>.from(
+          settings['providers'] as Map,
+        );
+        providers['my-gateway'] = {
+          'apiKey': 'custom-secret',
+          'apiHost': 'https://gateway.example.test',
+          'models': [
+            {'modelId': 'custom-model'},
+          ],
+        };
+        settings['providers'] = providers;
+        settings['customProviders'] = [
+          {'id': 'my-gateway', 'name': '我的网关', 'type': 'openai'},
+        ];
+        fixture['settings'] = settings;
+        final session = Map<String, dynamic>.from(
+          fixture['session:assistant-1'] as Map,
+        );
+        session['settings'] = {
+          ...(session['settings'] as Map),
+          'provider': 'my-gateway',
+          'modelId': 'custom-model',
+        };
+        final messages = List<dynamic>.from(session['messages'] as List);
+        messages[1] = {...(messages[1] as Map), 'aiProvider': 'my-gateway'};
+        session['messages'] = messages;
+        fixture['session:assistant-1'] = session;
+        await backup.writeAsString(jsonEncode(fixture), flush: true);
+
+        await ChatboxImporter.importFromChatbox(
+          file: backup,
+          mode: RestoreMode.overwrite,
+          businessRepository: businessRepository,
+          chatService: chatService,
+        );
+
+        final exported = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
+        final providersOut =
+            jsonDecode(exported['provider_configs_v1'] as String) as Map;
+        expect(
+          (providersOut[_legacyId('provider_my-gateway')] as Map)['name'],
+          '我的网关',
+        );
+        expect(providersOut.keys, contains(_legacyId('provider_openai')));
+        final assistants =
+            jsonDecode(exported['assistants_v1'] as String) as List;
+        expect(
+          (assistants.single as Map)['chatModelProvider'],
+          _legacyId('provider_my-gateway'),
+        );
+        expect(
+          (await chatService.loadMessages(
+            _legacyId('default_assistant-1'),
+          )).single.providerId,
+          _legacyId('provider_my-gateway'),
+        );
+      },
+    );
+
+    test(
+      'imports orphan provider references into a separate disabled group',
+      () async {
+        final fixture = _chatboxFixture();
+        final session = Map<String, dynamic>.from(
+          fixture['session:assistant-1'] as Map,
+        );
+        session['settings'] = {
+          ...(session['settings'] as Map),
+          'provider': 'removed-provider',
+          'modelId': 'removed-model',
+        };
+        final messages = List<dynamic>.from(session['messages'] as List);
+        messages[1] = {
+          ...(messages[1] as Map),
+          'aiProvider': 'removed-provider',
+        };
+        session['messages'] = messages;
+        fixture['session:assistant-1'] = session;
+        await backup.writeAsString(jsonEncode(fixture), flush: true);
+
+        await ChatboxImporter.importFromChatbox(
+          file: backup,
+          mode: RestoreMode.overwrite,
+          businessRepository: businessRepository,
+          chatService: chatService,
+        );
+
+        final exported = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
+        final providers =
+            jsonDecode(exported['provider_configs_v1'] as String) as Map;
+        final removed =
+            providers[_legacyId('provider_removed-provider')] as Map;
+        expect(removed['name'], 'removed-provider');
+        expect(removed['enabled'], isFalse);
+        expect(removed['apiKey'], isEmpty);
+        expect(
+          (await chatService.loadMessages(
+            _legacyId('default_assistant-1'),
+          )).single.providerId,
+          _legacyId('provider_removed-provider'),
+        );
+
+        final groups =
+            jsonDecode(exported['provider_groups_v1'] as String) as List;
+        expect(groups.map((group) => (group as Map)['name']).toList(), [
+          'Chatbox 导入（<1.22）',
+          'Chatbox 导入（<1.22）·已删除',
+        ]);
+        final groupByName = <String, String>{
+          for (final group in groups)
+            (group as Map)['name'].toString(): group['id'].toString(),
+        };
+        final assignment =
+            jsonDecode(exported['provider_group_map_v1'] as String) as Map;
+        expect(
+          assignment[_legacyId('provider_openai')],
+          groupByName['Chatbox 导入（<1.22）'],
+        );
+        expect(
+          assignment[_legacyId('provider_removed-provider')],
+          groupByName['Chatbox 导入（<1.22）·已删除'],
+        );
+      },
+    );
+
+    test(
+      'puts configured providers with only an unknown ID into the deleted group',
+      () async {
+        final fixture = _chatboxFixture();
+        final settings = Map<String, dynamic>.from(fixture['settings'] as Map);
+        final providers = Map<String, dynamic>.from(
+          settings['providers'] as Map,
+        );
+        providers['id-only-provider'] = {
+          'apiKey': 'orphan-secret',
+          'apiHost': 'https://orphan.example.test',
+        };
+        settings['providers'] = providers;
+        fixture['settings'] = settings;
+        await backup.writeAsString(jsonEncode(fixture), flush: true);
+
+        await ChatboxImporter.importFromChatbox(
+          file: backup,
+          mode: RestoreMode.overwrite,
+          businessRepository: businessRepository,
+          chatService: chatService,
+        );
+
+        final exported = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
+        final providersOut =
+            jsonDecode(exported['provider_configs_v1'] as String) as Map;
+        expect(
+          (providersOut[_legacyId('provider_id-only-provider')] as Map)['name'],
+          'id-only-provider',
+        );
+
+        final groups =
+            jsonDecode(exported['provider_groups_v1'] as String) as List;
+        expect(groups.map((group) => (group as Map)['name']).toList(), [
+          'Chatbox 导入（<1.22）',
+          'Chatbox 导入（<1.22）·已删除',
+        ]);
+        final groupByName = <String, String>{
+          for (final group in groups)
+            (group as Map)['name'].toString(): group['id'].toString(),
+        };
+        final assignment =
+            jsonDecode(exported['provider_group_map_v1'] as String) as Map;
+        expect(
+          assignment[_legacyId('provider_id-only-provider')],
+          groupByName['Chatbox 导入（<1.22）·已删除'],
+        );
+        expect(
+          assignment[_legacyId('provider_openai')],
+          groupByName['Chatbox 导入（<1.22）'],
+        );
+      },
+    );
+
+    test('imports used Chatbox AI as disabled provider', () async {
+      final fixture = _chatboxFixture();
+      final settings = Map<String, dynamic>.from(fixture['settings'] as Map);
+      final providers = Map<String, dynamic>.from(settings['providers'] as Map);
+      providers['chatbox-ai'] = {
+        'apiKey': 'license-like-value',
+        'models': [
+          {'modelId': 'chatbox-model'},
+        ],
+      };
+      settings['providers'] = providers;
+      fixture['settings'] = settings;
+      final session = Map<String, dynamic>.from(
+        fixture['session:assistant-1'] as Map,
+      );
+      session['settings'] = {
+        ...(session['settings'] as Map),
+        'provider': 'chatbox-ai',
+        'modelId': 'chatbox-model',
+      };
+      fixture['session:assistant-1'] = session;
+      await backup.writeAsString(jsonEncode(fixture), flush: true);
+
+      await ChatboxImporter.importFromChatbox(
+        file: backup,
+        mode: RestoreMode.overwrite,
+        businessRepository: businessRepository,
+        chatService: chatService,
+      );
+
+      final exported = await BusinessRestoreService(
+        businessRepository,
+      ).exportSettings();
+      final providersOut =
+          jsonDecode(exported['provider_configs_v1'] as String) as Map;
+      final chatboxAi = providersOut[_legacyId('provider_chatbox-ai')] as Map;
+      expect(chatboxAi['name'], 'Chatbox AI');
+      expect(chatboxAi['enabled'], isFalse);
+      expect(chatboxAi['apiKey'], isEmpty);
+      expect(chatboxAi['baseUrl'], 'https://api.openai.com/v1');
+      final assistants =
+          jsonDecode(exported['assistants_v1'] as String) as List;
+      expect(
+        (assistants.single as Map)['chatModelProvider'],
+        _legacyId('provider_chatbox-ai'),
+      );
+      expect((assistants.single as Map)['chatModelId'], 'chatbox-model');
+    });
+
+    test('does not import unused Chatbox AI provider', () async {
+      final fixture = _chatboxFixture();
+      final settings = Map<String, dynamic>.from(fixture['settings'] as Map);
+      final providers = Map<String, dynamic>.from(settings['providers'] as Map);
+      providers['chatbox-ai'] = {'apiKey': 'unused'};
+      settings['providers'] = providers;
+      fixture['settings'] = settings;
+      await backup.writeAsString(jsonEncode(fixture), flush: true);
+
+      await ChatboxImporter.importFromChatbox(
+        file: backup,
+        mode: RestoreMode.overwrite,
+        businessRepository: businessRepository,
+        chatService: chatService,
+      );
+
+      final exported = await BusinessRestoreService(
+        businessRepository,
+      ).exportSettings();
+      final providersOut =
+          jsonDecode(exported['provider_configs_v1'] as String) as Map;
+      expect(
+        providersOut.keys,
+        isNot(contains(_legacyId('provider_chatbox-ai'))),
+      );
+    });
 
     test('imports Chatbox message forks as active-tree branches', () async {
       final fixture = _chatboxFixture();
@@ -171,6 +528,7 @@ void main() {
                   'id': 'fork-answer',
                   'role': 'assistant',
                   'content': 'Alternative answer',
+                  'aiProvider': 'openai',
                   'timestamp': 1784332801000,
                 },
               ],
@@ -191,16 +549,124 @@ void main() {
       expect(result.conversations, 1);
       expect(result.messages, 2);
       final tree = await chatService.loadConversationTree(
-        'chatbox_default_assistant-1',
+        _legacyId('default_assistant-1'),
       );
       expect(tree, isNotNull);
-      expect(tree!.activePath(), ['message-1']);
-      expect(tree.edges['fork-answer']?.parentMessageId, 'message-1');
-      final branchId = tree.branches.keys.singleWhere(
-        (id) => id == 'chatbox-fork-message-1-alternative',
+      expect(tree!.activePath(), [_legacyId('message-1')]);
+      expect(
+        tree.edges[_legacyId('fork-answer')]?.parentMessageId,
+        _legacyId('message-1'),
       );
-      expect(tree.branchPath(branchId), ['message-1', 'fork-answer']);
+      final branchId = tree.branches.keys.singleWhere(
+        (id) => id == _legacyId('fork_${_legacyId('message-1')}_alternative'),
+      );
+      expect(tree.branchPath(branchId), [
+        _legacyId('message-1'),
+        _legacyId('fork-answer'),
+      ]);
     });
+
+    test(
+      'preserves nested fork selections from the legacy tree archive',
+      () async {
+        final fixture = _chatboxFixture();
+        final session = Map<String, dynamic>.from(
+          fixture['session:assistant-1'] as Map,
+        );
+        session['messages'] = [
+          ...(session['messages'] as List),
+          {
+            'id': 'current-answer',
+            'role': 'assistant',
+            'content': 'Current answer',
+            'timestamp': 1784332801000,
+          },
+        ];
+        session['messageForksHash'] = {
+          'message-1': {
+            'position': 1,
+            'lists': [
+              {
+                'id': 'outer-alternative',
+                'messages': [
+                  {
+                    'id': 'outer-answer',
+                    'role': 'assistant',
+                    'content': 'Outer answer',
+                    'timestamp': 1784332801000,
+                  },
+                ],
+              },
+              {'id': 'outer-active', 'messages': []},
+            ],
+            'createdAt': 1784332800000,
+          },
+          'outer-answer': {
+            'position': 1,
+            'lists': [
+              {
+                'id': 'nested-alternative',
+                'messages': [
+                  {
+                    'id': 'nested-answer',
+                    'role': 'assistant',
+                    'content': 'Nested answer',
+                    'timestamp': 1784332802000,
+                  },
+                ],
+              },
+              {'id': 'nested-active', 'messages': []},
+            ],
+            'createdAt': 1784332801000,
+          },
+        };
+        fixture['session:assistant-1'] = session;
+        await backup.writeAsString(jsonEncode(fixture), flush: true);
+
+        await ChatboxImporter.importFromChatbox(
+          file: backup,
+          mode: RestoreMode.overwrite,
+          businessRepository: businessRepository,
+          chatService: chatService,
+        );
+
+        final tree = await chatService.loadConversationTree(
+          _legacyId('default_assistant-1'),
+        );
+        expect(tree, isNotNull);
+        expect(tree!.activePath(), [
+          _legacyId('message-1'),
+          _legacyId('current-answer'),
+        ]);
+        final outerBranch =
+            tree.branches[_legacyId(
+              'fork_${_legacyId('message-1')}_outer-alternative',
+            )];
+        final nestedBranch =
+            tree.branches[_legacyId(
+              'fork_${_legacyId('outer-answer')}_nested-alternative',
+            )];
+        expect(outerBranch, isNotNull);
+        expect(nestedBranch, isNotNull);
+        expect(tree.branchPath(outerBranch!.id), [
+          _legacyId('message-1'),
+          _legacyId('outer-answer'),
+        ]);
+        expect(tree.branchPath(nestedBranch!.id), [
+          _legacyId('message-1'),
+          _legacyId('outer-answer'),
+          _legacyId('nested-answer'),
+        ]);
+        expect(
+          tree.branchSelections[_legacyId('message-1')],
+          _legacyId('root_${_legacyId('default_assistant-1')}'),
+        );
+        expect(
+          tree.branchSelections[_legacyId('outer-answer')],
+          outerBranch.id,
+        );
+      },
+    );
 
     test(
       'rolls back all business rows when a later table write fails',
@@ -319,7 +785,7 @@ void main() {
       );
 
       expect(
-        chatService.getConversation('chatbox_default_assistant-1'),
+        chatService.getConversation(_legacyId('default_assistant-1')),
         isNull,
       );
       expect(
@@ -330,13 +796,13 @@ void main() {
 
     test('merge skips conversations and messages that already exist', () async {
       await chatService.restoreConversation(
-        Conversation(id: 'chatbox_default_assistant-1', title: 'Existing'),
+        Conversation(id: _legacyId('default_assistant-1'), title: 'Existing'),
         <ChatMessage>[
           ChatMessage(
-            id: 'message-1',
+            id: _legacyId('message-1'),
             role: 'user',
             content: 'Hello',
-            conversationId: 'chatbox_default_assistant-1',
+            conversationId: _legacyId('default_assistant-1'),
           ),
         ],
       );
@@ -353,11 +819,62 @@ void main() {
       expect(result.messages, 0);
       expect(
         (await chatService.loadMessages(
-          'chatbox_default_assistant-1',
+          _legacyId('default_assistant-1'),
         )).map((message) => message.id),
-        ['message-1'],
+        [_legacyId('message-1')],
       );
     });
+
+    test(
+      'merge keeps group/version conflicts as a separate conversation',
+      () async {
+        await chatService.restoreConversation(
+          Conversation(id: _legacyId('default_assistant-1'), title: 'Existing'),
+          <ChatMessage>[
+            ChatMessage(
+              id: 'local-revision',
+              role: 'user',
+              content: 'Local revision',
+              conversationId: _legacyId('default_assistant-1'),
+              groupId: _legacyId('message-1'),
+              version: 0,
+            ),
+          ],
+        );
+
+        final result = await ChatboxImporter.importFromChatbox(
+          file: backup,
+          mode: RestoreMode.merge,
+          businessRepository: businessRepository,
+          chatService: chatService,
+        );
+
+        expect(result.conversations, 1);
+        expect(result.messages, 1);
+        expect(chatService.getAllConversations(), hasLength(2));
+      },
+    );
+
+    test(
+      'cancellation stops the Chatbox worker before any database write',
+      () async {
+        final cancelToken = BackupCancelToken();
+        addTearDown(cancelToken.dispose);
+        cancelToken.cancel();
+
+        await expectLater(
+          ChatboxImporter.importFromChatbox(
+            file: backup,
+            mode: RestoreMode.overwrite,
+            businessRepository: businessRepository,
+            chatService: chatService,
+            cancelToken: cancelToken,
+          ),
+          throwsA(isA<BackupCancelledException>()),
+        );
+        expect(chatService.getAllConversations(), isEmpty);
+      },
+    );
 
     test('fails closed when chat and business repositories differ', () async {
       await chatService.restoreConversation(
@@ -389,7 +906,7 @@ void main() {
 
         expect(chatService.getConversation('local-chat'), isNotNull);
         expect(
-          chatService.getConversation('chatbox_default_assistant-1'),
+          chatService.getConversation(_legacyId('default_assistant-1')),
           isNull,
         );
         expect(
@@ -461,15 +978,72 @@ void main() {
       );
 
       final messages = await chatService.loadMessages(
-        'chatbox_default_assistant-r',
+        _legacyId('default_assistant-r'),
       );
-      final assistant = messages.singleWhere((m) => m.id == 'assistant-r-msg');
+      final assistant = messages.singleWhere(
+        (m) => m.id == _legacyId('assistant-r-msg'),
+      );
       expect(assistant.reasoningText, 'first thought\nsecond thought');
       expect(assistant.content, 'Because.');
       expect(
         assistant.parts.whereType<ReasoningPart>().single.text,
         'first thought\nsecond thought',
       );
+    });
+
+    test('preserves legacy reasoning and storage-backed attachments', () async {
+      final legacyBackup = await File('${root.path}/chatbox_legacy_fields.json')
+          .writeAsString(
+            jsonEncode({
+              ..._chatboxFixture(),
+              'session:assistant-1': {
+                'settings': {'provider': 'openai', 'modelId': 'gpt-test'},
+                'messages': [
+                  {
+                    'id': 'legacy-fields',
+                    'role': 'assistant',
+                    'model': 'OpenAI (gpt-legacy)',
+                    'content': 'Legacy answer',
+                    'reasoningContent': 'Legacy thought',
+                    'timestamp': 1784332800000,
+                    'files': [
+                      {
+                        'id': 'stored-file',
+                        'name': 'report.pdf',
+                        'fileType': 'application/pdf',
+                        'storageKey': 'file:report.pdf',
+                      },
+                    ],
+                    'pictures': [
+                      {'storageKey': 'picture:answer.png'},
+                    ],
+                  },
+                ],
+                'threads': <dynamic>[],
+              },
+            }),
+            flush: true,
+          );
+
+      await ChatboxImporter.importFromChatbox(
+        file: legacyBackup,
+        mode: RestoreMode.overwrite,
+        businessRepository: businessRepository,
+        chatService: chatService,
+      );
+
+      final message = (await chatService.loadMessages(
+        _legacyId('default_assistant-1'),
+      )).single;
+      expect(message.modelId, 'gpt-legacy');
+      expect(message.reasoningText, 'Legacy thought');
+      expect(message.content, 'Legacy answer');
+      final filePart = message.parts.whereType<FilePart>().single;
+      expect(filePart.uri, 'file:report.pdf');
+      expect(filePart.unavailable, isTrue);
+      final imagePart = message.parts.whereType<ImagePart>().single;
+      expect(imagePart.uri, 'picture:answer.png');
+      expect(imagePart.unavailable, isTrue);
     });
 
     test('preserves newline across attachment boundary', () async {
@@ -506,9 +1080,11 @@ void main() {
       );
 
       final messages = await chatService.loadMessages(
-        'chatbox_default_assistant-1',
+        _legacyId('default_assistant-1'),
       );
-      final user = messages.singleWhere((m) => m.id == 'message-split');
+      final user = messages.singleWhere(
+        (m) => m.id == _legacyId('message-split'),
+      );
       expect(
         user.parts.whereType<ImagePart>().single.uri,
         'https://example.com/mid.png',
@@ -531,9 +1107,11 @@ void main() {
         );
         expect(result.messages, 1);
         final messages = await chatService.loadMessages(
-          'chatbox_default_assistant-1',
+          _legacyId('default_assistant-1'),
         );
-        final user = messages.singleWhere((m) => m.id == 'message-1');
+        final user = messages.singleWhere(
+          (m) => m.id == _legacyId('message-1'),
+        );
         expect(user.content, 'Hello');
         expect(user.content.contains('[image:'), isFalse);
         expect(user.content.contains('[file:'), isFalse);
@@ -562,6 +1140,7 @@ void main() {
                   {
                     'id': 'tool-with-image',
                     'role': 'tool',
+                    'aiProvider': 'openai',
                     'name': 'screenshot',
                     'content': 'tool result',
                     'timestamp': 1784332800000,
@@ -591,10 +1170,13 @@ void main() {
       );
 
       final messages = await chatService.loadMessages(
-        'chatbox_default_assistant-1',
+        _legacyId('default_assistant-1'),
       );
-      final tool = messages.singleWhere((m) => m.id == 'tool-with-image');
+      final tool = messages.singleWhere(
+        (m) => m.id == _legacyId('tool-with-image'),
+      );
       expect(tool.role, 'tool');
+      expect(tool.providerId, _legacyId('provider_openai'));
       final image = tool.parts.whereType<ImagePart>().single;
       expect(image.uri, 'https://example.com/tool.png');
       final payload = jsonDecode(tool.content) as Map<String, dynamic>;
@@ -636,10 +1218,10 @@ void main() {
       );
 
       final messages = await chatService.loadMessages(
-        'chatbox_default_assistant-1',
+        _legacyId('default_assistant-1'),
       );
       final assistant = messages.singleWhere(
-        (m) => m.id == 'assistant-reasoning-split',
+        (m) => m.id == _legacyId('assistant-reasoning-split'),
       );
       expect(assistant.reasoningText, 'think');
       expect(

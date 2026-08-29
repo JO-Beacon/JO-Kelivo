@@ -104,7 +104,7 @@ class DeviceLocalToolsHandler(private val activity: Activity) {
         }
     }
 
-    /** Used by the assistant settings toggle — returns a boolean grant result. */
+    /** Explicit method-channel permission request for callers that need it. */
     private fun requestCalendarPermission(result: MethodChannel.Result) {
         val missing = calendarPermissions().filter {
             ContextCompat.checkSelfPermission(activity, it) != PackageManager.PERMISSION_GRANTED
@@ -527,6 +527,7 @@ class DeviceLocalToolsHandler(private val activity: Activity) {
 
         val description = params.optString("description")
         val location = params.optString("location")
+        val reminderMinutes = parseReminderMinutes(params.opt("reminders"))
 
         val eventStartMillis: Long
         val eventEndMillis: Long
@@ -569,7 +570,20 @@ class DeviceLocalToolsHandler(private val activity: Activity) {
             ?: return errorPayload("INSERT_FAILED", "Failed to insert calendar event.")
 
         val eventId = ContentUris.parseId(uri)
-        return JSONObject()
+        val savedReminders = insertReminders(eventId, reminderMinutes)
+        if (savedReminders.isNotEmpty()) {
+            // 只有提醒真的写进去了才置 HAS_ALARM, 否则事件行会谎称有闹钟.
+            runCatching {
+                activity.contentResolver.update(
+                    ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, eventId),
+                    ContentValues().apply { put(CalendarContract.Events.HAS_ALARM, 1) },
+                    null,
+                    null,
+                )
+            }
+        }
+
+        val payload = JSONObject()
             .put("success", true)
             .put("event_id", eventId)
             .put("title", title)
@@ -577,7 +591,56 @@ class DeviceLocalToolsHandler(private val activity: Activity) {
             .put("end", endTime.withNano(0).toString())
             .put("all_day", allDay)
             .put("location", location)
-            .toString()
+            .put("reminders", JSONArray(savedReminders))
+        if (savedReminders.size < reminderMinutes.size) {
+            payload
+                .put("reminders_requested", JSONArray(reminderMinutes))
+                .put(
+                    "warning",
+                    "The event was created, but the calendar account rejected some reminders. " +
+                        "Tell the user which reminders were actually saved.",
+                )
+        }
+        return payload.toString()
+    }
+
+    /** 提醒偏移（事件开始前多少分钟），兼容数组或单个数字/字符串。 */
+    private fun parseReminderMinutes(raw: Any?): List<Int> {
+        if (raw == null || raw == JSONObject.NULL) return emptyList()
+        val items: List<Any?> = when (raw) {
+            is JSONArray -> (0 until raw.length()).map { raw.opt(it) }
+            else -> listOf(raw)
+        }
+        val minutes = LinkedHashSet<Int>()
+        for (item in items) {
+            val value = when (item) {
+                is Number -> item.toDouble()
+                is String -> item.trim().toDoubleOrNull()
+                else -> null
+            } ?: continue
+            if (value.isNaN() || value.isInfinite()) continue
+            minutes.add(kotlin.math.abs(value).coerceAtMost(40320.0).toInt())
+            if (minutes.size == 5) break
+        }
+        return minutes.toList()
+    }
+
+    /** 写入提醒，返回实际成功写入的偏移分钟数。 */
+    private fun insertReminders(eventId: Long, minutes: List<Int>): List<Int> {
+        if (minutes.isEmpty()) return emptyList()
+        val saved = mutableListOf<Int>()
+        for (minute in minutes) {
+            val values = ContentValues().apply {
+                put(CalendarContract.Reminders.EVENT_ID, eventId)
+                put(CalendarContract.Reminders.MINUTES, minute)
+                put(CalendarContract.Reminders.METHOD, CalendarContract.Reminders.METHOD_ALERT)
+            }
+            val inserted = runCatching {
+                activity.contentResolver.insert(CalendarContract.Reminders.CONTENT_URI, values)
+            }.getOrNull()
+            if (inserted != null) saved.add(minute)
+        }
+        return saved
     }
 
     private fun getDefaultCalendarId(): Long? {

@@ -132,12 +132,33 @@ void main() {
     final source = File(
       'lib/features/home/controllers/chat_actions.dart',
     ).readAsStringSync();
+    final runSendGeneration = RegExp(
+      r'Future<void> _runSendGeneration[\s\S]*?'
+      r'final contextLimit = await _contextReadLimit\(assistant, conversation\);',
+    );
+    final regenerate = RegExp(
+      r'Future<ChatActionResult> _regenerateAtMessageClaimed[\s\S]*?'
+      r'maxMessages: await _contextReadLimit\(assistant, conversation\),',
+    );
+    final continueAfterToolAnswer = RegExp(
+      r'Future<ChatActionResult> continueAssistantMessageAfterToolAnswer[\s\S]*?'
+      r'maxMessages: await _contextReadLimit\(assistant, conversation\),',
+    );
     expect(
-      'maxMessages: await _contextReadLimit(assistant, conversation),'
-          .allMatches(source)
-          .length,
-      3,
-      reason: 'send, regenerate, and continue must each await resolved counts',
+      runSendGeneration.hasMatch(source),
+      isTrue,
+      reason:
+          'send must await the resolved context limit before reading history',
+    );
+    expect(
+      regenerate.hasMatch(source),
+      isTrue,
+      reason: 'regenerate must await the resolved context limit',
+    );
+    expect(
+      continueAfterToolAnswer.hasMatch(source),
+      isTrue,
+      reason: 'continue must await the resolved context limit',
     );
     expect(source.contains('maxMessages: _contextReadLimit('), isFalse);
   });

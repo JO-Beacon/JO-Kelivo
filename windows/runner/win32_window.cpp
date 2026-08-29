@@ -271,7 +271,8 @@ RECT Win32Window::GetClientArea() {
 }
 
 // static
-bool Win32Window::SendAppLinkToInstance(const std::wstring& title) {
+bool Win32Window::SendAppLinkToInstance(const std::wstring& title,
+                                        const std::wstring& backup_path) {
   // 1. Look for a window that matches the Flutter runner window class and the
   //    given title.
   HWND hwnd = ::FindWindow(kWindowClassName, title.c_str());
@@ -301,6 +302,16 @@ bool Win32Window::SendAppLinkToInstance(const std::wstring& title) {
     ::SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0,
                    SWP_SHOWWINDOW | SWP_NOSIZE | SWP_NOMOVE);
     ::SetForegroundWindow(hwnd);
+
+    if (!backup_path.empty()) {
+      COPYDATASTRUCT data{};
+      data.dwData = 0x4A4F4149;
+      data.cbData = static_cast<DWORD>(
+          (backup_path.size() + 1) * sizeof(wchar_t));
+      data.lpData = const_cast<wchar_t*>(backup_path.c_str());
+      ::SendMessage(hwnd, WM_COPYDATA, 0,
+                    reinterpret_cast<LPARAM>(&data));
+    }
 
     return true;
   }

@@ -1,44 +1,77 @@
 import 'package:flutter/material.dart';
 
-import '../../theme/app_font_weights.dart';
-
-class UpdateStatusLabel extends StatelessWidget {
+class UpdateStatusLabel extends StatefulWidget {
   const UpdateStatusLabel({
     super.key,
     required this.label,
     required this.icon,
-    required this.enabled,
+    required this.checking,
   });
 
   final String label;
   final IconData icon;
-  final bool enabled;
+  final bool checking;
+
+  @override
+  State<UpdateStatusLabel> createState() => _UpdateStatusLabelState();
+}
+
+class _UpdateStatusLabelState extends State<UpdateStatusLabel>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _rotationController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _syncRotation();
+  }
+
+  @override
+  void didUpdateWidget(covariant UpdateStatusLabel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.checking != widget.checking) _syncRotation();
+  }
+
+  void _syncRotation() {
+    if (widget.checking) {
+      _rotationController.repeat();
+    } else {
+      _rotationController
+        ..stop()
+        ..value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _rotationController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(
-      context,
-    ).colorScheme.onSurface.withValues(alpha: enabled ? 0.72 : 0.45);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        Icon(icon, size: 16, color: color),
-        const SizedBox(width: 6),
-        Flexible(
-          child: Text(
-            label,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.right,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: AppFontWeights.semibold,
-              color: color,
+    final cs = Theme.of(context).colorScheme;
+    final color = widget.checking
+        ? cs.primary.withValues(alpha: 0.9)
+        : cs.onSurface.withValues(alpha: 0.58);
+    return Semantics(
+      label: widget.label,
+      child: Tooltip(
+        message: widget.label,
+        excludeFromSemantics: true,
+        child: SizedBox.square(
+          dimension: 32,
+          child: Center(
+            child: RotationTransition(
+              turns: _rotationController,
+              child: Icon(widget.icon, size: 20, color: color),
             ),
           ),
         ),
-      ],
+      ),
     );
   }
 }

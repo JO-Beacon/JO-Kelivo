@@ -420,7 +420,15 @@ void main() {
         messageList: collapsed,
         mode: ChatSelectionMode.delete,
       );
+      expect(controller!.selectedItems, {'assistant-1'});
       expect(controller!.selectedMessagesIncludeMultipleVersions, isFalse);
+
+      controller!.startMessageSelection(
+        messageIndex: 0,
+        messageList: collapsed,
+        mode: ChatSelectionMode.delete,
+      );
+      expect(controller!.selectedItems, {'user-1'});
 
       await tester.pumpWidget(
         MaterialApp(
@@ -494,9 +502,7 @@ void main() {
           messageList: collapsed,
           mode: ChatSelectionMode.delete,
         );
-        // startMessageSelection pairs the prior user turn; isolate the
-        // multi-version assistant group so delete paths exercise group APIs.
-        controller!.toggleSelection('user-1', false);
+        expect(controller!.selectedItems, {'a-v1'});
 
         await controller!.deleteSelectedMessages(deleteAllVersions: false);
         expect(service.lastDeletedIds, {'a-v1'});
@@ -506,7 +512,7 @@ void main() {
           messageList: collapsed,
           mode: ChatSelectionMode.delete,
         );
-        controller!.toggleSelection('user-1', false);
+        expect(controller!.selectedItems, {'a-v1'});
         await controller!.deleteSelectedMessages(deleteAllVersions: true);
         expect(service.lastDeletedIds, {'a-v0', 'a-v1'});
         expect(service.rangeQueries.where((q) => q.limit < 0), isEmpty);
@@ -672,10 +678,7 @@ void main() {
           messageList: collapsed,
           mode: ChatSelectionMode.delete,
         );
-        // Anchor pairing may select user+assistant; isolate a known baseline.
-        controller!.toggleSelection('assistant-1', false);
-        controller!.toggleSelection('user-2', false);
-        controller!.toggleSelection('assistant-2', false);
+        // Entering selection selects only the tapped message.
         expect(controller!.selectedItems, {'user-1'});
 
         controller!.selectAll();
@@ -693,8 +696,8 @@ void main() {
           messageList: collapsed,
           mode: ChatSelectionMode.delete,
         );
-        // New selection: only the newly chosen pair (user-2 + assistant-2).
-        expect(controller!.selectedItems.contains('user-2'), isTrue);
+        // New selection: only the newly tapped message.
+        expect(controller!.selectedItems, {'user-2'});
         expect(controller!.selectedItems.contains('user-1'), isFalse);
         final newSelection = Set<String>.of(controller!.selectedItems);
 

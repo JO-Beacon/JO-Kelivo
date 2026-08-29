@@ -66,6 +66,12 @@ bool _isGemini36FlashModel(String modelId) {
   );
 }
 
+bool _isGemini37FlashModel(String modelId) {
+  return modelId.contains(
+    RegExp(r'gemini-3\.7-flash([._:@/-]|$)', caseSensitive: false),
+  );
+}
+
 bool _isGemini3TextModel(String modelId) {
   return modelId.contains(
     RegExp(r'gemini-3(?:\.\d+)?-(?!pro-image)', caseSensitive: false),
@@ -105,6 +111,7 @@ Map<String, dynamic> _googleThinkingConfig(
   final isGemini35Flash = _isGemini35FlashModel(upstreamModelId);
   final isGemini35FlashLite = _isGemini35FlashLiteModel(upstreamModelId);
   final isGemini36Flash = _isGemini36FlashModel(upstreamModelId);
+  final isGemini37Flash = _isGemini37FlashModel(upstreamModelId);
   if (isGemini3ProImage) {
     return {
       'includeThoughts': true,
@@ -131,6 +138,22 @@ Map<String, dynamic> _googleThinkingConfig(
     if (off || (budget != null && budget > 0 && budget < 8000)) {
       // Off 或 Light (1024) -> low
       level = 'low';
+    }
+    return {'includeThoughts': true, 'thinkingLevel': level};
+  }
+  // Gemini 3.7 Flash only accepts LOW / MEDIUM / HIGH; MINIMAL is rejected.
+  if (isGemini37Flash) {
+    String level = 'medium';
+    if (off) {
+      level = 'low';
+    } else if (budget != null && budget > 0) {
+      if (budget < 8000) {
+        level = 'low';
+      } else if (budget < 24000) {
+        level = 'medium';
+      } else {
+        level = 'high';
+      }
     }
     return {'includeThoughts': true, 'thinkingLevel': level};
   }
@@ -266,7 +289,8 @@ Map<String, dynamic> _googleApiPart(Map part) {
 
 int? _defaultGeminiMaxOutputTokens(String upstreamModelId) {
   if (_isGemini35FlashModel(upstreamModelId) ||
-      _isGemini36FlashModel(upstreamModelId)) {
+      _isGemini36FlashModel(upstreamModelId) ||
+      _isGemini37FlashModel(upstreamModelId)) {
     return 65536;
   }
   return null;

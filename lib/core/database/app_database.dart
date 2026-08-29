@@ -694,6 +694,9 @@ class MessagePromptRows extends Table {
   TextColumn get revisionId => text()();
   TextColumn get conversationId => text()();
   TextColumn get payload => text()();
+  // 消息语义哈希用于判断冻结提示词是否仍对应当前 revision。
+  // 旧 schema 迁移时会清理没有该绑定关系的历史缓存。
+  TextColumn get sourceContentHash => text().nullable()();
   BoolColumn get carriesMemorySnapshot =>
       boolean().withDefault(const Constant(false))();
   IntColumn get createdAt =>
@@ -753,8 +756,9 @@ class AppDatabase extends _$AppDatabase {
 
   // Schema 1 是第一个发布的 SQLite 契约。模式 2 添加显式消息树边、
   // 分支和活动分支状态，模式 3 存储每个共享树前缀下最后选择的分支，
-  // 模式 4 将 Kelivo 的助手标签表迁移为 JO-Kelivo 的助手分组表。
-  static const currentSchemaVersion = 4;
+  // 模式 4 将 Kelivo 的助手标签表迁移为 JO-Kelivo 的助手分组表，模式 5
+  // 为冻结提示词绑定消息正文哈希。
+  static const currentSchemaVersion = 5;
   // 保持 SQLite 既定的 1000 页节奏显式声明。按通常 4 KiB 页大小计算，
   // 这大约在 4 MiB 时触发一次检查点，但页大小仍是实际依据。
   static const walAutoCheckpointPages = 1000;
@@ -1055,6 +1059,30 @@ FROM probe;
       }
       if (from < 4) {
         await _renameLegacyAssistantTagRows();
+      }
+      if (from < 5) {
+        // SQLite 的 ADD COLUMN 只能把新列追加到表尾，而原始 schema
+        // 契约要求 source_content_hash 位于 payload 后面。提示词是可重建
+        // 缓存，直接重建空表既保持列序，也不会错误复用旧缓存。
+        await customStatement('DROP TABLE message_prompt_rows;');
+        await customStatement('''
+          CREATE TABLE message_prompt_rows (
+            revision_id TEXT NOT NULL,
+            conversation_id TEXT NOT NULL,
+            payload TEXT NOT NULL,
+            source_content_hash TEXT NULL,
+            carries_memory_snapshot INTEGER NOT NULL DEFAULT 0
+              CHECK (carries_memory_snapshot IN (0, 1)),
+            created_at INTEGER NOT NULL,
+            PRIMARY KEY (revision_id),
+            FOREIGN KEY (revision_id) REFERENCES message_rows (id)
+              ON DELETE CASCADE
+          );
+        ''');
+        await customStatement(
+          'CREATE INDEX idx_message_prompts_conversation_snapshot '
+          'ON message_prompt_rows (conversation_id, carries_memory_snapshot);',
+        );
       }
     },
     beforeOpen: (details) async {

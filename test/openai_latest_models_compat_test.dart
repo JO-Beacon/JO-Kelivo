@@ -4,7 +4,9 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/providers/model_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'package:Kelivo/core/services/api/providers/openai/openai_vendor_compat.dart';
 import 'package:Kelivo/core/utils/openai_model_compat.dart';
 
 ProviderConfig _openAIConfig(
@@ -81,6 +83,45 @@ Future<Map<String, dynamic>> _captureChatBody({
 }
 
 void main() {
+  test('Laguna models advertise reasoning, vision, and tool capability', () {
+    final info = ModelRegistry.infer(
+      ModelInfo(id: 'laguna-1', displayName: 'Laguna 1'),
+    );
+    expect(info.abilities, contains(ModelAbility.reasoning));
+    expect(info.abilities, contains(ModelAbility.tool));
+    expect(info.input, contains(Modality.text));
+  });
+
+  test('Laguna reasoning uses chat_template_kwargs thinking switch', () {
+    final info = OpenAIProviderInfo(
+      host: 'api.example.test',
+      providerId: 'laguna',
+      upstreamModelId: 'laguna-1',
+    );
+    expect(info.isLaguna, isTrue);
+    expect(info.needsReasoningEcho, isTrue);
+
+    final enabled = <String, dynamic>{'reasoning_effort': 'high'};
+    applyVendorReasoningKnobs(
+      enabled,
+      info: info,
+      isReasoning: true,
+      thinkingBudget: 1024,
+    );
+    expect(enabled['chat_template_kwargs'], {'enable_thinking': true});
+    expect(enabled.containsKey('reasoning_effort'), isFalse);
+
+    final disabled = <String, dynamic>{'reasoning_effort': 'low'};
+    applyVendorReasoningKnobs(
+      disabled,
+      info: info,
+      isReasoning: true,
+      thinkingBudget: 0,
+    );
+    expect(disabled['chat_template_kwargs'], {'enable_thinking': false});
+    expect(disabled.containsKey('reasoning_effort'), isFalse);
+  });
+
   group('latest OpenAI-compatible model compatibility', () {
     test('normalizes only officially supported reasoning efforts', () {
       for (final modelId in const [
@@ -105,6 +146,22 @@ void main() {
       expect(openAINormalizeReasoningEffort('off', 'grok-4.5'), 'low');
       expect(openAINormalizeReasoningEffort('max', 'grok-4.5'), 'high');
       expect(openAINormalizeReasoningEffort('off', 'x-ai/grok-4.5'), 'low');
+      expect(openAINormalizeReasoningEffort('off', 'grok-4.6'), 'low');
+      expect(openAINormalizeReasoningEffort('xhigh', 'grok-4.6'), 'xhigh');
+      expect(openAINormalizeReasoningEffort('max', 'x-ai/grok-4.6'), 'xhigh');
+      expect(openAINormalizeReasoningEffort('off', 'deepseek-v4-pro'), 'off');
+      expect(
+        openAINormalizeReasoningEffort('medium', 'deepseek-v4-flash'),
+        'high',
+      );
+      expect(
+        openAINormalizeReasoningEffort('xhigh', 'deepseek-v4-pro'),
+        'high',
+      );
+      expect(
+        openAINormalizeReasoningEffort('max', 'deepseek-v4-flash-vision-exp'),
+        'max',
+      );
       expect(
         openAINormalizeReasoningEffort('high', 'meta/muse-spark-1.1'),
         'auto',

@@ -23,6 +23,10 @@ void main() {
           for (final message in seed.messages) message.id,
         ]);
         expect(
+          seed.conversationTree.activePath(),
+          seed.conversation.messageIds,
+        );
+        expect(
           seed.messages.every(
             (message) =>
                 message.conversationId == seed.conversation.id &&
@@ -48,6 +52,10 @@ void main() {
         expect(seed.conversation.messageIds, [
           for (final message in seed.messages) message.id,
         ]);
+        expect(
+          seed.conversationTree.activePath(),
+          seed.conversation.messageIds,
+        );
 
         for (var index = 0; index < seed.messages.length; index++) {
           final message = seed.messages[index];
@@ -70,6 +78,7 @@ void main() {
       expect(seed.conversation.messageIds, [
         for (final message in seed.messages) message.id,
       ]);
+      expect(seed.conversationTree.activePath(), seed.conversation.messageIds);
 
       final assistantMessages = seed.messages.where(
         (message) => message.role == 'assistant',
@@ -108,6 +117,7 @@ void main() {
         for (final message in seed.messages) message.id,
       ]);
       expect(seed.totalContentBytes, greaterThan(0));
+      expect(seed.conversationTree.activePath(), seed.conversation.messageIds);
 
       final userMessages = seed.messages.where(
         (message) => message.role == 'user',

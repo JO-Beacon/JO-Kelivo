@@ -719,8 +719,8 @@ private final class NativeFileSaveHandler: NSObject, UIDocumentPickerDelegate {
      return status == .authorized
    }
 
-   /// Used by the assistant settings toggle. Prompts when undetermined; opens
-   /// Settings when previously denied/restricted/write-only.
+   /// Explicit method-channel permission request. Prompts when undetermined;
+   /// opens Settings when previously denied/restricted/write-only.
    private func requestCalendarPermission(result: @escaping FlutterResult) {
      let finish: (Bool) -> Void = { granted in
        DispatchQueue.main.async { result(granted) }
@@ -942,6 +942,13 @@ private final class NativeFileSaveHandler: NSObject, UIDocumentPickerDelegate {
        event.endDate = endDate
      }
 
+     // Reminders are minutes before the event start; EventKit uses a negative
+     // relative offset in seconds.
+     let reminderMinutes = Self.reminderMinutesArg(args["reminders"])
+     for minutes in reminderMinutes {
+       event.addAlarm(EKAlarm(relativeOffset: TimeInterval(-minutes * 60)))
+     }
+
      do {
        try eventStore.save(event, span: .thisEvent, commit: true)
      } catch {
@@ -954,6 +961,7 @@ private final class NativeFileSaveHandler: NSObject, UIDocumentPickerDelegate {
        "title": title,
        "all_day": allDay,
        "location": event.location ?? "",
+       "reminders": reminderMinutes,
      ]
      if allDay {
        payload["start"] = Self.formatDateOnly(allDayStart, calendar: calendar)
@@ -963,6 +971,41 @@ private final class NativeFileSaveHandler: NSObject, UIDocumentPickerDelegate {
        payload["end"] = Self.formatDateTime(endDate)
      }
      return Self.jsonString(payload)
+   }
+
+   private static func reminderMinutesArg(_ value: Any?) -> [Int] {
+     let raw: [Any]
+     if let list = value as? [Any] {
+       raw = list
+     } else if let value, !(value is NSNull) {
+       raw = [value]
+     } else {
+       return []
+     }
+     var seen = Set<Int>()
+     var minutes: [Int] = []
+     for item in raw {
+       guard let normalized = clampedMinutes(item) else { continue }
+       if seen.insert(normalized).inserted {
+         minutes.append(normalized)
+       }
+       if minutes.count == 5 { break }
+     }
+     return minutes
+   }
+
+   private static func clampedMinutes(_ value: Any?) -> Int? {
+     let raw: Double
+     if let number = value as? NSNumber {
+       raw = number.doubleValue
+     } else if let text = (value as? String)?.trimmingCharacters(in: .whitespaces),
+               let parsed = Double(text) {
+       raw = parsed
+     } else {
+       return nil
+     }
+     guard raw.isFinite else { return nil }
+     return Int(min(abs(raw), 40320))
    }
 
    // MARK: - Argument/JSON helpers

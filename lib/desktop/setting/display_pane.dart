@@ -77,6 +77,10 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _ToggleRowShowProviderInChatMessage(),
                   _RowDivider(),
                   _ToggleRowShowTokenStats(),
+                  _RowDivider(),
+                  _ToggleRowShowThinkingCards(),
+                  _RowDivider(),
+                  _ToggleRowShowToolCards(),
                 ],
               ),
               const SizedBox(height: 16),
@@ -107,6 +111,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _ToggleRowCollapseThinkingSteps(),
                   _RowDivider(),
                   _ToggleRowShowToolResultSummary(),
+                  _RowDivider(),
+                  _ToggleRowHideToolResultImages(),
                   _RowDivider(),
                   _ToggleRowInsertSuggestionOnly(),
                   _RowDivider(),
@@ -2486,6 +2492,50 @@ class _ToggleRowShowToolResultSummary extends StatelessWidget {
       value: sp.showToolResultSummary,
       onChanged: (v) =>
           context.read<SettingsProvider>().setShowToolResultSummary(v),
+    );
+  }
+}
+
+class _ToggleRowShowThinkingCards extends StatelessWidget {
+  const _ToggleRowShowThinkingCards();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageShowThinkingCardsTitle,
+      value: sp.showThinkingCards,
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setShowThinkingCards(v),
+    );
+  }
+}
+
+class _ToggleRowShowToolCards extends StatelessWidget {
+  const _ToggleRowShowToolCards();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageShowToolCardsTitle,
+      value: sp.showToolCards,
+      onChanged: (v) => context.read<SettingsProvider>().setShowToolCards(v),
+    );
+  }
+}
+
+class _ToggleRowHideToolResultImages extends StatelessWidget {
+  const _ToggleRowHideToolResultImages();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageHideToolResultImagesTitle,
+      value: sp.hideToolResultImages,
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setHideToolResultImages(v),
     );
   }
 }

@@ -21,6 +21,7 @@ import '../services/message_builder_service.dart';
 import '../services/message_generation_service.dart';
 import '../services/chat_suggestion_service.dart';
 import 'chat_actions.dart';
+import 'file_processing_indicator_controller.dart';
 import 'chat_controller.dart';
 import 'generation_controller.dart';
 import 'stream_controller.dart' as stream_ctrl;
@@ -240,6 +241,15 @@ class HomeViewModel extends ChangeNotifier {
     return queued;
   }
 
+  final FileProcessingIndicatorController _fileProcessingIndicator =
+      FileProcessingIndicatorController();
+
+  /// 所属助手消息正在解析附件的 ID；没有解析时为 null。
+  ValueNotifier<String?> get processingFilesMessageId =>
+      _fileProcessingIndicator.messageId;
+
+  /// 兼容旧的列表调用方；生产列表使用 [processingFilesMessageId]。
+  @Deprecated('Use processingFilesMessageId')
   final ValueNotifier<bool> isProcessingFiles = ValueNotifier<bool>(false);
 
   // ============================================================================
@@ -353,12 +363,16 @@ class HomeViewModel extends ChangeNotifier {
     }
   }
 
-  void _onFileProcessingStarted() {
-    isProcessingFiles.value = true;
+  void resetFileProcessingIndicator() {
+    _fileProcessingIndicator.reset();
   }
 
-  void _onFileProcessingFinished() {
-    isProcessingFiles.value = false;
+  void _onFileProcessingStarted(String messageId) {
+    _fileProcessingIndicator.start(messageId);
+  }
+
+  void _onFileProcessingFinished(String? messageId) {
+    _fileProcessingIndicator.finish(messageId);
   }
 
   // ============================================================================
@@ -427,10 +441,6 @@ class HomeViewModel extends ChangeNotifier {
 
     await _clearSuggestionsFor(conversation.id);
 
-    if (input.documents.isNotEmpty) {
-      isProcessingFiles.value = true;
-    }
-
     onHapticFeedback?.call();
 
     final result = await _chatActions.sendMessage(
@@ -439,11 +449,6 @@ class HomeViewModel extends ChangeNotifier {
     );
 
     if (!result.success) {
-      // 在任何提前返回前清除本次调用设置的标志；并发胜者只会在自己
-      // 拥有文件时清除指示器，因此携带文档的失败方否则会泄漏它。
-      if (input.documents.isNotEmpty) {
-        isProcessingFiles.value = false;
-      }
       // 并发发送已拥有此会话；它也拥有 UI 状态，
       // 因此失败方静默退出。
       if (result.errorMessage == 'in_flight') return false;
@@ -826,7 +831,7 @@ class HomeViewModel extends ChangeNotifier {
     final assistantProvider = _contextProvider.read<AssistantProvider>();
 
     // 切换时重置处理状态
-    isProcessingFiles.value = false;
+    resetFileProcessingIndicator();
 
     if (currentConversation?.id == id) return;
 
@@ -863,7 +868,7 @@ class HomeViewModel extends ChangeNotifier {
     String id,
   ) async {
     // 切换时重置处理状态
-    isProcessingFiles.value = false;
+    resetFileProcessingIndicator();
 
     if (currentConversation?.id == id) return null;
 
@@ -967,7 +972,7 @@ class HomeViewModel extends ChangeNotifier {
     if (!_contextProvider.mounted) return;
 
     // 创建时重置处理状态
-    isProcessingFiles.value = false;
+    resetFileProcessingIndicator();
 
     final ap = _contextProvider.read<AssistantProvider>();
     try {
@@ -1024,7 +1029,7 @@ class HomeViewModel extends ChangeNotifier {
     await _chatActions.flushConversationProgress(currentConversation);
     if (!_contextProvider.mounted) return;
 
-    isProcessingFiles.value = false;
+    resetFileProcessingIndicator();
 
     if (_chatService.isTemporaryConversation(convo.id)) {
       await createNewConversation();
@@ -1449,6 +1454,11 @@ class HomeViewModel extends ChangeNotifier {
     }
 
     final settings = _contextProvider.read<SettingsProvider>();
+    final titleModelProvider = settings.titleModelProvider;
+    final titleModelId = settings.titleModelId;
+    // 标题生成是显式配置的可选功能，不回退到聊天模型，避免用户未启用时
+    // 每次回复都额外发起标题请求。
+    if (titleModelProvider == null || titleModelId == null) return;
     final assistantProvider = _contextProvider.read<AssistantProvider>();
 
     // 获取此会话的助手
@@ -1456,17 +1466,7 @@ class HomeViewModel extends ChangeNotifier {
         ? assistantProvider.getById(convo.assistantId!)
         : assistantProvider.currentAssistant;
 
-    // 决定模型：优先标题模型，否则回退到助手模型，再到全局默认
-    final provKey =
-        settings.titleModelProvider ??
-        assistant?.chatModelProvider ??
-        settings.currentModelProvider;
-    final mdlId =
-        settings.titleModelId ??
-        assistant?.chatModelId ??
-        settings.currentModelId;
-    if (provKey == null || mdlId == null) return;
-    final cfg = settings.getProviderConfig(provKey);
+    final cfg = settings.getProviderConfig(titleModelProvider);
     final budget = settings.titleGenerationThinkingBudgetFor(
       assistant?.thinkingBudget,
     );
@@ -1483,7 +1483,7 @@ class HomeViewModel extends ChangeNotifier {
     try {
       final title = (await ChatApiService.generateText(
         config: cfg,
-        modelId: mdlId,
+        modelId: titleModelId,
         prompt: prompt,
         thinkingBudget: budget,
       )).trim();
@@ -1827,6 +1827,7 @@ class HomeViewModel extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _conversationTreeReloadSerial++;
+    _fileProcessingIndicator.dispose();
     isProcessingFiles.dispose();
     super.dispose();
   }

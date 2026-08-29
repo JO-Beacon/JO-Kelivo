@@ -34,6 +34,8 @@ enum HiveToSqliteMigrationStage {
 
 enum HiveToSqliteBackupItemState { pending, active, done }
 
+typedef MigrationBackupChunkWriter = Future<void> Function(Uint8List bytes);
+
 class HiveToSqliteBackupItem {
   const HiveToSqliteBackupItem({
     required this.name,
@@ -335,6 +337,15 @@ class HiveToSqliteMigrationService implements MigrationWorkflow {
     );
   }
 
+  /// 将 ZIP 直接写入平台拥有的目标，避免移动端再创建一份完整临时文件。
+  Future<void> backupToWritableSink(MigrationBackupChunkWriter writeChunk) {
+    return _backupToDestination(
+      createOutput: () async => _MigrationZipOutput.toSink(writeChunk),
+      managedOutputFile: null,
+      visibleBackupPath: null,
+    );
+  }
+
   @override
   Future<String?> existingBackupPath() async {
     final state = await MigrationChainStateStore(decision.appDataDir).read();
@@ -364,6 +375,19 @@ class HiveToSqliteMigrationService implements MigrationWorkflow {
   }
 
   Future<File> _backupToFile(File backupFile) async {
+    await _backupToDestination(
+      createOutput: () => _MigrationZipOutput.openFile(backupFile.path),
+      managedOutputFile: backupFile,
+      visibleBackupPath: backupFile.path,
+    );
+    return backupFile;
+  }
+
+  Future<void> _backupToDestination({
+    required Future<_MigrationZipOutput> Function() createOutput,
+    required File? managedOutputFile,
+    required String? visibleBackupPath,
+  }) async {
     Directory? workDir;
     final plannedItems = _updateBackupItem(
       _backupItemsForDecision(),
@@ -378,7 +402,7 @@ class HiveToSqliteMigrationService implements MigrationWorkflow {
       0,
       'backup',
       _settingsBackupName,
-      backupPath: backupFile.path,
+      backupPath: visibleBackupPath,
       backupItems: plannedItems,
     );
 
@@ -389,17 +413,19 @@ class HiveToSqliteMigrationService implements MigrationWorkflow {
       );
       final manifest = await _buildBackupManifest(
         workDir,
-        backupFile.path,
+        visibleBackupPath,
         plannedItems,
       );
       _lastBackupItems = manifest.items;
       totalBytes = manifest.totalBytes;
 
-      await backupFile.parent.create(recursive: true);
-      if (await backupFile.exists()) {
-        await backupFile.delete();
+      if (managedOutputFile != null) {
+        await managedOutputFile.parent.create(recursive: true);
+        if (await managedOutputFile.exists()) {
+          await managedOutputFile.delete();
+        }
       }
-      writer = _MigrationZipWriter(backupFile.path);
+      writer = _MigrationZipWriter(await createOutput());
       for (final entry in manifest.entries) {
         final name = entry.itemName;
         _lastBackupItems = _updateBackupItem(
@@ -413,7 +439,7 @@ class HiveToSqliteMigrationService implements MigrationWorkflow {
           _backupProgress(copiedBytes, totalBytes),
           'backup',
           entry.entryName,
-          backupPath: backupFile.path,
+          backupPath: visibleBackupPath,
           backupItems: _lastBackupItems,
         );
         final written = await writer.addFile(
@@ -433,7 +459,7 @@ class HiveToSqliteMigrationService implements MigrationWorkflow {
               _backupProgress(currentTotal, totalBytes),
               'backup',
               entry.entryName,
-              backupPath: backupFile.path,
+              backupPath: visibleBackupPath,
               backupItems: _lastBackupItems,
             );
           },
@@ -451,13 +477,15 @@ class HiveToSqliteMigrationService implements MigrationWorkflow {
               : HiveToSqliteBackupItemState.active,
         );
       }
-      writer.closeSync();
+      await writer.close();
     } catch (error, stackTrace) {
       _logLine('$error');
       _logLine(stackTrace.toString());
-      writer?.closeIfNeededSync();
-      if (await backupFile.exists()) {
-        await backupFile.delete();
+      try {
+        await writer?.closeIfNeeded();
+      } catch (_) {}
+      if (managedOutputFile != null && await managedOutputFile.exists()) {
+        await managedOutputFile.delete();
       }
       _controller.add(
         HiveToSqliteMigrationStatus(
@@ -477,7 +505,7 @@ class HiveToSqliteMigrationService implements MigrationWorkflow {
       );
       rethrow;
     } finally {
-      writer?.closeIfNeededSync();
+      await writer?.closeIfNeeded();
       await _deleteDirectoryQuietly(workDir);
     }
 
@@ -486,10 +514,9 @@ class HiveToSqliteMigrationService implements MigrationWorkflow {
       1,
       'backup',
       'done',
-      backupPath: backupFile.path,
+      backupPath: visibleBackupPath,
       backupItems: _lastBackupItems,
     );
-    return backupFile;
   }
 
   @override
@@ -1059,7 +1086,7 @@ class HiveToSqliteMigrationService implements MigrationWorkflow {
 
   Future<_MigrationBackupManifest> _buildBackupManifest(
     Directory workDir,
-    String backupPath,
+    String? backupPath,
     List<HiveToSqliteBackupItem> plannedItems,
   ) async {
     final files = <_MigrationBackupFile>[];
@@ -1825,7 +1852,7 @@ class _MigrationBackupFileEntry {
 }
 
 class _MigrationZipWriter {
-  _MigrationZipWriter(String outPath) : _output = OutputFileStream(outPath);
+  _MigrationZipWriter(this._output);
 
   static const int _localFileHeaderSignature = 0x04034b50;
   static const int _centralDirectoryHeaderSignature = 0x02014b50;
@@ -1839,7 +1866,7 @@ class _MigrationZipWriter {
   static const int _maxZipEntries = 0xffff;
   static const int _chunkSize = 1024 * 1024;
 
-  final OutputFileStream _output;
+  final _MigrationZipOutput _output;
   final List<_MigrationZipEntry> _entries = <_MigrationZipEntry>[];
   bool _closed = false;
 
@@ -1854,10 +1881,6 @@ class _MigrationZipWriter {
     if (entryName.isEmpty) return 0;
 
     final stat = await file.stat();
-    final uncompressedSize = stat.size;
-    _checkZip32(uncompressedSize, 'file size');
-    _checkZip32(_output.length, 'local header offset');
-
     final modified = stat.modified;
     final modTime = _zipTime(modified);
     final modDate = _zipDate(modified);
@@ -1871,6 +1894,7 @@ class _MigrationZipWriter {
     _checkZip32(written.uncompressedSize, 'uncompressed size');
 
     _writeDataDescriptor(written);
+    if (_output.shouldFlush) await _output.flush();
 
     _entries.add(
       _MigrationZipEntry(
@@ -1887,7 +1911,7 @@ class _MigrationZipWriter {
     return written.uncompressedSize;
   }
 
-  void closeSync() {
+  Future<void> close() async {
     if (_closed) return;
     _checkEntryCount();
 
@@ -1903,13 +1927,13 @@ class _MigrationZipWriter {
       centralDirectoryOffset: centralDirectoryOffset,
       centralDirectorySize: centralDirectorySize,
     );
-    _output.closeSync();
+    await _output.close();
     _closed = true;
   }
 
-  void closeIfNeededSync() {
+  Future<void> closeIfNeeded() async {
     if (!_closed) {
-      _output.closeSync();
+      await _output.close(discardPending: true);
       _closed = true;
     }
   }
@@ -1937,35 +1961,40 @@ class _MigrationZipWriter {
     File file, {
     required void Function(int writtenBytes) onProgress,
   }) async {
-    final compressedSink = _CountingOutputSink(_output);
-    final inputSink = ZLibCodec(
-      level: 1,
-      raw: true,
-    ).encoder.startChunkedConversion(compressedSink);
-
-    final raf = await file.open();
-    final buffer = Uint8List(_chunkSize);
     var crc32 = 0;
+    var compressedSize = 0;
     var uncompressedSize = 0;
-    try {
-      while (true) {
-        final read = await raf.readInto(buffer);
-        if (read == 0) break;
-        final chunk = Uint8List.sublistView(buffer, 0, read);
-        crc32 = getCrc32(chunk, crc32);
-        uncompressedSize += read;
-        inputSink.add(chunk);
-        onProgress(uncompressedSize);
-        await Future<void>.delayed(Duration.zero);
+
+    Stream<List<int>> sourceChunks() async* {
+      final raf = await file.open();
+      try {
+        while (true) {
+          final chunk = await raf.read(_chunkSize);
+          if (chunk.isEmpty) break;
+          crc32 = getCrc32(chunk, crc32);
+          uncompressedSize += chunk.length;
+          onProgress(uncompressedSize);
+          yield chunk;
+        }
+      } finally {
+        await raf.close();
       }
-      inputSink.close();
-    } finally {
-      await raf.close();
+    }
+
+    final compressed = sourceChunks().transform(
+      ZLibCodec(level: 1, raw: true).encoder,
+    );
+    await for (final chunk in compressed) {
+      if (chunk.isNotEmpty) {
+        compressedSize += chunk.length;
+        _output.writeBytes(chunk);
+        if (_output.shouldFlush) await _output.flush();
+      }
     }
 
     return _MigrationZipWrittenFile(
       crc32: crc32,
-      compressedSize: compressedSink.bytesWritten,
+      compressedSize: compressedSize,
       uncompressedSize: uncompressedSize,
     );
   }
@@ -2038,21 +2067,87 @@ class _MigrationZipWriter {
   }
 }
 
-class _CountingOutputSink implements Sink<List<int>> {
-  _CountingOutputSink(this._output);
+/// 缓冲顺序输出，每达到 1 MiB 才等待平台 sink，保持大文件回压。
+class _MigrationZipOutput {
+  _MigrationZipOutput.toSink(this._writeChunk) : _closeSink = null;
 
-  final OutputFileStream _output;
-  int bytesWritten = 0;
+  _MigrationZipOutput._(this._writeChunk, this._closeSink);
 
-  @override
-  void add(List<int> data) {
-    if (data.isEmpty) return;
-    _output.writeBytes(data);
-    bytesWritten += data.length;
+  static Future<_MigrationZipOutput> openFile(String path) async {
+    final file = await File(path).open(mode: FileMode.write);
+    return _MigrationZipOutput._(
+      (bytes) async {
+        await file.writeFrom(bytes);
+      },
+      () async {
+        await file.close();
+      },
+    );
   }
 
-  @override
-  void close() {}
+  static const _flushThreshold = 1024 * 1024;
+
+  final MigrationBackupChunkWriter _writeChunk;
+  final Future<void> Function()? _closeSink;
+  final BytesBuilder _pending = BytesBuilder(copy: true);
+  var length = 0;
+  var _closed = false;
+
+  bool get shouldFlush => _pending.length >= _flushThreshold;
+
+  void writeByte(int value) {
+    _pending.addByte(value);
+    length++;
+  }
+
+  void writeBytes(List<int> bytes) {
+    if (bytes.isEmpty) return;
+    _pending.add(bytes);
+    length += bytes.length;
+  }
+
+  void writeUint16(int value) {
+    writeByte(value & 0xff);
+    writeByte((value >> 8) & 0xff);
+  }
+
+  void writeUint32(int value) {
+    writeByte(value & 0xff);
+    writeByte((value >> 8) & 0xff);
+    writeByte((value >> 16) & 0xff);
+    writeByte((value >> 24) & 0xff);
+  }
+
+  Future<void> flush() async {
+    if (_pending.isEmpty) return;
+    await _writeChunk(_pending.takeBytes());
+  }
+
+  Future<void> close({bool discardPending = false}) async {
+    if (_closed) return;
+    _closed = true;
+    Object? firstError;
+    StackTrace? firstStack;
+    try {
+      if (discardPending) {
+        _pending.clear();
+      } else {
+        await flush();
+      }
+    } catch (error, stackTrace) {
+      firstError = error;
+      firstStack = stackTrace;
+    }
+    try {
+      await _closeSink?.call();
+    } catch (error, stackTrace) {
+      firstError ??= error;
+      firstStack ??= stackTrace;
+    }
+    if (firstError != null) {
+      Error.throwWithStackTrace(firstError, firstStack!);
+    }
+  }
 }
 
 class _MigrationZipEntry {

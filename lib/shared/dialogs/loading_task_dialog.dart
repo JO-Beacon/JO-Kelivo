@@ -3,16 +3,22 @@ import 'package:flutter/foundation.dart'
 import 'package:flutter/material.dart';
 
 import '../../core/models/progress_update.dart';
+import '../../core/models/backup_task_progress.dart';
 import '../widgets/loading_dialog_card.dart';
 
 /// 只有在不可关闭的加载对话框绘制完成后才运行 [task]。
 Future<T> runWithLoadingTaskDialog<T>({
   required BuildContext context,
-  required Future<T> Function(ProgressCallback onProgress) task,
+  Future<T> Function(ProgressCallback onProgress)? task,
+  Future<T> Function(ProgressCallback onProgress, BackupCancelToken token)?
+  cancellableTask,
   String? label,
+  String? cancelLabel,
 }) async {
+  assert(task != null || cancellableTask != null);
   final overlay = Overlay.of(context, rootOverlay: true);
   final progress = ValueNotifier<ProgressUpdate?>(null);
+  final cancelToken = BackupCancelToken();
   late final OverlayEntry entry;
   entry = OverlayEntry(
     builder: (_) {
@@ -22,8 +28,12 @@ Future<T> runWithLoadingTaskDialog<T>({
           const ModalBarrier(dismissible: false, color: Colors.black54),
           ValueListenableBuilder<ProgressUpdate?>(
             valueListenable: progress,
-            builder: (context, update, child) =>
-                LoadingDialogCard(label: label, progress: update?.fraction),
+            builder: (context, update, child) => LoadingDialogCard(
+              label: label,
+              progress: update?.fraction,
+              onCancel: cancellableTask == null ? null : cancelToken.cancel,
+              cancelLabel: cancelLabel,
+            ),
           ),
         ],
       );
@@ -40,9 +50,20 @@ Future<T> runWithLoadingTaskDialog<T>({
   await WidgetsBinding.instance.endOfFrame;
 
   try {
-    return await task((update) => progress.value = update);
+    if (cancellableTask != null) {
+      return await cancellableTask(
+        (update) => progress.value = update,
+        cancelToken,
+      );
+    }
+    final regularTask = task;
+    if (regularTask == null) {
+      throw StateError('missing_loading_task');
+    }
+    return await regularTask((update) => progress.value = update);
   } finally {
     if (entry.mounted) entry.remove();
+    cancelToken.dispose();
     progress.dispose();
   }
 }

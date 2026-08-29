@@ -1,7 +1,22 @@
+import 'dart:convert';
+
 import 'package:Kelivo/core/providers/update_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 void main() {
+  setUpAll(() {
+    PackageInfo.setMockInitialValues(
+      appName: 'JO-AIClient',
+      packageName: 'com.jobeacon.joaiclient',
+      version: '9.9.9',
+      buildNumber: '99',
+      buildSignature: '',
+    );
+  });
+
   test(
     'JO-Kelivo GitHub release parser keeps only supported JO-Kelivo assets',
     () {
@@ -87,7 +102,7 @@ void main() {
     );
   });
 
-  test('version comparison ignores build number and handles boundaries', () {
+  test('version comparison includes build number and handles boundaries', () {
     expect(
       UpdateProvider.isRemoteNewerForTest(
         remoteVersion: '0.1.6',
@@ -98,9 +113,49 @@ void main() {
     expect(
       UpdateProvider.isRemoteNewerForTest(
         remoteVersion: '0.1.6+7',
-        currentVersion: '0.1.6+6',
+        currentVersion: '0.1.6',
+        currentBuildNumber: '6',
+      ),
+      isTrue,
+    );
+    expect(
+      UpdateProvider.isRemoteNewerForTest(
+        remoteVersion: '0.1.6+6',
+        currentVersion: '0.1.6',
+        currentBuildNumber: '6',
       ),
       isFalse,
+    );
+    expect(
+      UpdateProvider.isRemoteNewerForTest(
+        remoteVersion: '0.1.6+5',
+        currentVersion: '0.1.6',
+        currentBuildNumber: '6',
+      ),
+      isFalse,
+    );
+    expect(
+      UpdateProvider.isRemoteNewerForTest(
+        remoteVersion: '0.1.7+1',
+        currentVersion: '0.1.6',
+        currentBuildNumber: '99',
+      ),
+      isTrue,
+    );
+    expect(
+      UpdateProvider.isRemoteNewerForTest(
+        remoteVersion: '0.1.6+1',
+        currentVersion: '0.1.7',
+        currentBuildNumber: '0',
+      ),
+      isFalse,
+    );
+    expect(
+      UpdateProvider.isRemoteNewerForTest(
+        remoteVersion: '0.1.6+1',
+        currentVersion: '0.1.6',
+      ),
+      isTrue,
     );
     expect(
       UpdateProvider.isRemoteNewerForTest(
@@ -117,6 +172,97 @@ void main() {
       isFalse,
     );
   });
+
+  test(
+    'JO-AIClient release bypasses version comparison and short-circuits fallback',
+    () async {
+      final requestedPaths = <String>[];
+      final provider = UpdateProvider(
+        httpClient: MockClient((request) async {
+          requestedPaths.add(request.url.path);
+          if (request.url.path.contains('/JO-AIClient/')) {
+            return _releaseResponse(appName: 'JO-AIClient', version: '0.0.1+1');
+          }
+          fail('JO-Kelivo fallback must not run after JO-AIClient succeeds');
+        }),
+      );
+      addTearDown(provider.dispose);
+
+      await provider.checkForUpdates();
+
+      expect(provider.error, isNull);
+      expect(provider.available?.app, 'JO-AIClient');
+      expect(provider.available?.version, '0.0.1+1');
+      expect(requestedPaths, ['/repos/JO-Beacon/JO-AIClient/releases/latest']);
+    },
+  );
+
+  test('JO-AIClient failure is silent and falls back to JO-Kelivo', () async {
+    final requestedPaths = <String>[];
+    final provider = UpdateProvider(
+      httpClient: MockClient((request) async {
+        requestedPaths.add(request.url.path);
+        if (request.url.path.contains('/JO-AIClient/')) {
+          return http.Response('not found', 404);
+        }
+        return _releaseResponse(appName: 'JO-Kelivo', version: '10.0.0+1');
+      }),
+    );
+    addTearDown(provider.dispose);
+
+    await provider.checkForUpdates();
+
+    expect(provider.error, isNull);
+    expect(provider.available?.app, 'JO-Kelivo');
+    expect(requestedPaths, [
+      '/repos/JO-Beacon/JO-AIClient/releases/latest',
+      '/repos/JO-Beacon/JO-Kelivo/releases/latest',
+    ]);
+  });
+
+  test('JO-AIClient release without supported assets falls back', () async {
+    final requestedPaths = <String>[];
+    final provider = UpdateProvider(
+      httpClient: MockClient((request) async {
+        requestedPaths.add(request.url.path);
+        if (request.url.path.contains('/JO-AIClient/')) {
+          return http.Response(
+            jsonEncode({
+              'tag_name': 'v0.0.1+1',
+              'assets': [_asset('JO-AIClient-v0.0.1+1-source.zip')],
+            }),
+            200,
+          );
+        }
+        return _releaseResponse(appName: 'JO-Kelivo', version: '10.0.0+1');
+      }),
+    );
+    addTearDown(provider.dispose);
+
+    await provider.checkForUpdates();
+
+    expect(provider.error, isNull);
+    expect(provider.available?.app, 'JO-Kelivo');
+    expect(requestedPaths, hasLength(2));
+  });
+
+  test('only JO-Kelivo failure is exposed when both paths fail', () async {
+    final provider = UpdateProvider(
+      httpClient: MockClient((request) async {
+        if (request.url.path.contains('/JO-AIClient/')) {
+          return http.Response('not found', 404);
+        }
+        return http.Response('unavailable', 503);
+      }),
+    );
+    addTearDown(provider.dispose);
+
+    await provider.checkForUpdates();
+
+    expect(provider.available, isNull);
+    expect(provider.error, contains('HTTP 503'));
+    expect(provider.error, isNot(contains('404')));
+  });
 }
 
 Map<String, String> _asset(String name) => {
@@ -125,3 +271,21 @@ Map<String, String> _asset(String name) => {
 };
 
 String _url(String name) => 'https://example.invalid/$name';
+
+http.Response _releaseResponse({
+  required String appName,
+  required String version,
+}) {
+  return http.Response(
+    jsonEncode({
+      'tag_name': 'v$version',
+      'body': '$appName release notes',
+      'assets': [
+        _asset('$appName-v$version-android-arm64-v8a-release.apk'),
+        _asset('$appName-v$version-windows-x64-setup.exe'),
+        _asset('$appName-v$version-linux-x64-appimage.AppImage'),
+      ],
+    }),
+    200,
+  );
+}

@@ -366,6 +366,8 @@ class ChatDatabaseRepository {
   static Future<ChatDatabaseSnapshotInfo> createConsistentSnapshot({
     required File sourceFile,
     required File destinationFile,
+    void Function(int handleAddress)? registerSourceHandle,
+    Future<void> Function()? waitForSourceCloseAck,
   }) async {
     final sourcePath = sourceFile.absolute.path;
     final destinationPath = destinationFile.absolute.path;
@@ -384,38 +386,25 @@ class ChatDatabaseRepository {
     await _deleteDatabaseFamily(destinationFile);
 
     try {
-      late final ChatDatabaseSnapshotInfo initialInfo;
       final source = sqlite.sqlite3.open(sourcePath);
       try {
-        source.execute('PRAGMA query_only = ON;');
-        final destination = sqlite.sqlite3.open(destinationPath);
-        try {
-          final pageSizeRows = source.select('PRAGMA page_size;');
-          final pageSize = pageSizeRows.first.values.first as int;
-          final pagesPerStep = (8 * 1024 * 1024 ~/ pageSize).clamp(1, 1 << 20);
-          await source.backup(destination, nPage: pagesPerStep).drain<void>();
-          initialInfo = _validateRawSnapshot(destination);
-          destination.execute('PRAGMA wal_checkpoint(TRUNCATE);');
-          destination.select('PRAGMA journal_mode = DELETE;');
-        } finally {
-          destination.close();
-        }
+        // VACUUM INTO requires the destination path to be absent.
+        source.execute('PRAGMA busy_timeout = 5000;');
+        registerSourceHandle?.call(source.handle.address);
+        final escapedDestination = destinationPath.replaceAll("'", "''");
+        source.execute("VACUUM INTO '$escapedDestination';");
       } finally {
+        if (waitForSourceCloseAck != null) await waitForSourceCloseAck();
         source.close();
       }
 
       await _deleteDatabaseSidecars(destinationFile);
       final reopened = sqlite.sqlite3.open(destinationPath);
       try {
-        final reopenedInfo = _validateRawSnapshot(reopened);
-        if (reopenedInfo != initialInfo) {
-          throw StateError('snapshot_reopen_mismatch');
-        }
+        return _validateRawSnapshot(reopened);
       } finally {
         reopened.close();
       }
-      await _deleteDatabaseSidecars(destinationFile);
-      return initialInfo;
     } catch (_) {
       await _deleteDatabaseFamily(destinationFile);
       rethrow;
@@ -790,6 +779,7 @@ class ChatDatabaseRepository {
         'revision_id',
         'conversation_id',
         'payload',
+        'source_content_hash',
         'carries_memory_snapshot',
         'created_at',
       ],
@@ -5117,12 +5107,37 @@ class ChatDatabaseRepository {
     required List<({ChatMessage message, int messageOrder})> messages,
     required Map<String, List<Map<String, dynamic>>> toolEventsByMessageId,
     required Map<String, String> geminiSignaturesByMessageId,
+
+    /// When supplied, replace the compatibility tree projection with this
+    /// already-resolved message tree in the same transaction.
+    ConversationTree? conversationTree,
   }) async {
     if (conversations.isEmpty &&
         messages.isEmpty &&
         toolEventsByMessageId.isEmpty &&
         geminiSignaturesByMessageId.isEmpty) {
       return;
+    }
+    if (conversationTree != null) {
+      final conversation = conversations
+          .where((candidate) => candidate.id == conversationTree.conversationId)
+          .firstOrNull;
+      if (conversation == null) {
+        throw ArgumentError('migration_tree_conversation_missing');
+      }
+      final messageIds = messages
+          .where((entry) => entry.message.conversationId == conversation.id)
+          .map((entry) => entry.message.id)
+          .toSet();
+      if (conversationTree.edges.keys
+              .toSet()
+              .difference(messageIds)
+              .isNotEmpty ||
+          messageIds
+              .difference(conversationTree.edges.keys.toSet())
+              .isNotEmpty) {
+        throw ArgumentError('migration_tree_message_mismatch');
+      }
     }
 
     await _db.transaction(() async {
@@ -5133,6 +5148,9 @@ class ChatDatabaseRepository {
         geminiSignaturesByMessageId: geminiSignaturesByMessageId,
         freshParts: true,
       );
+      if (conversationTree != null) {
+        await _writeConversationTree(conversationTree);
+      }
     });
   }
 
@@ -5286,6 +5304,7 @@ class ChatDatabaseRepository {
           if (sourceFingerprint == null) {
             throw StateError('merge_source_conversation');
           }
+          final sourceMessageIds = await _messageIds('merge_source', sourceId);
           final existingFingerprint = await _conversationFingerprint(
             'main',
             sourceId,
@@ -5295,7 +5314,28 @@ class ChatDatabaseRepository {
             continue;
           }
 
-          final sourceMessageIds = await _messageIds('merge_source', sourceId);
+          final targetMessageIdsBefore = existingFingerprint == null
+              ? const <String>[]
+              : await _messageIds('main', sourceId);
+          final hadMissingMessages = sourceMessageIds.any(
+            (messageId) => !targetMessageIdsBefore.contains(messageId),
+          );
+          if (existingFingerprint != null &&
+              await _tryMergeConversationDelta(
+                sourceId: sourceId,
+                sourceMessageIds: sourceMessageIds,
+              )) {
+            // 同一会话的备份可能只包含本地尚未拥有的后续消息。只有
+            // 重叠修订完全一致时才并入原会话；冲突仍走下方整会话重映射。
+            if (!hadMissingMessages) {
+              deduplicated += 1;
+            } else {
+              imported += 1;
+              importedIds.add(sourceId);
+            }
+            continue;
+          }
+
           final hasConversationConflict = existingFingerprint != null;
           final hasMessageConflict = await _anyMessageIdExists(
             sourceMessageIds,
@@ -5491,6 +5531,470 @@ class ChatDatabaseRepository {
         db.close();
       }
     });
+  }
+
+  /// 尝试把 source 会话中目标尚未拥有的修订并入同 ID 的本地会话。
+  ///
+  /// 这是智能合并的安全边界：重叠修订必须逐条相同，且新增修订不能
+  /// 占用其他会话的 ID；否则返回 false，由调用方创建独立的重映射会话。
+  Future<bool> _tryMergeConversationDelta({
+    required String sourceId,
+    required List<String> sourceMessageIds,
+  }) async {
+    final targetRows = await _db
+        .customSelect(
+          'SELECT id, message_order FROM main.message_rows '
+          'WHERE conversation_id = ? ORDER BY message_order, id;',
+          variables: [Variable<String>(sourceId)],
+        )
+        .get();
+    final targetIds = {for (final row in targetRows) row.read<String>('id')};
+    final sourceRows = await _db
+        .customSelect(
+          'SELECT id, group_id, version, message_order FROM '
+          'merge_source.message_rows WHERE conversation_id = ? '
+          'ORDER BY message_order, id;',
+          variables: [Variable<String>(sourceId)],
+        )
+        .get();
+    final missingIds = <String>[];
+    var overlappingCount = 0;
+    for (final sourceMessageId in sourceMessageIds) {
+      if (targetIds.contains(sourceMessageId)) {
+        overlappingCount += 1;
+        final sourceFingerprint = await _messageFingerprint(
+          'merge_source',
+          sourceMessageId,
+        );
+        final targetFingerprint = await _messageFingerprint(
+          'main',
+          sourceMessageId,
+        );
+        if (sourceFingerprint == null ||
+            targetFingerprint != sourceFingerprint) {
+          return false;
+        }
+      } else {
+        missingIds.add(sourceMessageId);
+      }
+    }
+    // 没有任何共同修订时，conversation ID 重用并不足以证明这是同一
+    // 会话；将其视为冲突并沿用整会话重映射，避免把两个独立会话拼接。
+    if (overlappingCount == 0) return false;
+    if (missingIds.isEmpty) return true;
+    if (await _anyMessageIdExists(missingIds)) return false;
+    final sourceTreeState = await _db
+        .customSelect(
+          'SELECT 1 AS found FROM merge_source.conversation_tree_state_rows '
+          'WHERE conversation_id = ? LIMIT 1;',
+          variables: [Variable<String>(sourceId)],
+        )
+        .getSingleOrNull();
+    final sourceEdgeCount = await _db
+        .customSelect(
+          'SELECT COUNT(*) AS count FROM merge_source.message_tree_edge_rows '
+          'WHERE conversation_id = ?;',
+          variables: [Variable<String>(sourceId)],
+        )
+        .getSingle()
+        .then((row) => row.read<int>('count'));
+    // 增量路径必须有完整树投影；旧的线性快照交给现有整会话导入逻辑
+    // 重建树，避免新消息落库后无法沿父子关系访问。
+    if (sourceTreeState == null || sourceEdgeCount != sourceMessageIds.length) {
+      return false;
+    }
+
+    final occupiedOrders = {
+      for (final row in targetRows) row.read<int>('message_order'),
+    };
+    var nextOrder = occupiedOrders.isEmpty
+        ? 0
+        : (occupiedOrders.reduce((left, right) => left > right ? left : right) +
+              1);
+    final orderById = <String, int>{};
+    for (final row in sourceRows) {
+      final id = row.read<String>('id');
+      if (!missingIds.contains(id)) continue;
+      final sourceOrder = row.read<int>('message_order');
+      final order = occupiedOrders.contains(sourceOrder)
+          ? nextOrder
+          : sourceOrder;
+      occupiedOrders.add(order);
+      if (order >= nextOrder) nextOrder = order + 1;
+      orderById[id] = order;
+    }
+
+    // group/version 是会话内的唯一约束。若缺失修订会与本地不同 ID 的
+    // 版本发生碰撞，继续整会话重映射比猜测版本归属更安全。
+    for (final row in sourceRows) {
+      final id = row.read<String>('id');
+      if (!missingIds.contains(id)) continue;
+      final groupId = row.data['group_id']?.toString();
+      if (groupId == null) continue;
+      final collision = await _db
+          .customSelect(
+            'SELECT 1 AS found FROM main.message_rows '
+            'WHERE conversation_id = ? AND group_id = ? AND version = ? '
+            'AND id <> ? LIMIT 1;',
+            variables: [
+              Variable<String>(sourceId),
+              Variable<String>(groupId),
+              Variable<int>(row.read<int>('version')),
+              Variable<String>(id),
+            ],
+          )
+          .getSingleOrNull();
+      if (collision != null) return false;
+    }
+
+    for (final id in missingIds) {
+      await _db.customStatement(
+        'INSERT INTO main.message_rows '
+        '(id, conversation_id, role, timestamp, model_id, provider_id, '
+        'total_tokens, is_streaming, reasoning_start_at, '
+        'reasoning_finished_at, translation, reasoning_segments_json, group_id, '
+        'version, prompt_tokens, completion_tokens, cached_tokens, duration_ms, '
+        'message_order) '
+        'SELECT ?, ?, role, timestamp, model_id, provider_id, total_tokens, 0, '
+        'reasoning_start_at, reasoning_finished_at, translation, '
+        'reasoning_segments_json, group_id, version, prompt_tokens, '
+        'completion_tokens, cached_tokens, duration_ms, ? '
+        'FROM merge_source.message_rows WHERE id = ?;',
+        [id, sourceId, orderById[id]!, id],
+      );
+      await _db.customStatement(
+        'INSERT INTO main.message_part_rows '
+        '(conversation_id, revision_id, ordinal, kind, payload, created_at, updated_at) '
+        'SELECT ?, ?, ordinal, kind, payload, created_at, updated_at '
+        'FROM merge_source.message_part_rows WHERE revision_id = ?;',
+        [sourceId, id, id],
+      );
+      await _db.customStatement(
+        'INSERT INTO main.provider_artifact_rows '
+        '(conversation_id, revision_id, kind, payload, created_at, updated_at) '
+        'SELECT ?, ?, kind, payload, created_at, updated_at '
+        'FROM merge_source.provider_artifact_rows WHERE revision_id = ?;',
+        [sourceId, id, id],
+      );
+    }
+
+    await _mergeConversationTreeDelta(
+      conversationId: sourceId,
+      missingMessageIds: missingIds.toSet(),
+    );
+    await _mergeConversationMcpServersDelta(sourceId);
+    await _mergeConversationMetadataDelta(sourceId);
+    await _db.customStatement(
+      'INSERT OR IGNORE INTO asset_reference_dirty_rows(revision_id) '
+      'SELECT DISTINCT revision_id FROM main.message_part_rows '
+      "WHERE conversation_id = ? AND revision_id IN (${List.filled(missingIds.length, '?').join(',')}) "
+      "AND kind IN ('image', 'file');",
+      [sourceId, ...missingIds],
+    );
+    return true;
+  }
+
+  Future<void> _mergeConversationMcpServersDelta(String conversationId) async {
+    final existing = await _db
+        .customSelect(
+          'SELECT server_id FROM main.conversation_mcp_server_rows '
+          'WHERE conversation_id = ?;',
+          variables: [Variable<String>(conversationId)],
+        )
+        .get();
+    final serverIds = {
+      for (final row in existing) row.read<String>('server_id'),
+    };
+    final maxOrdinalRow = await _db
+        .customSelect(
+          'SELECT COALESCE(MAX(ordinal), -1) AS max_ordinal '
+          'FROM main.conversation_mcp_server_rows WHERE conversation_id = ?;',
+          variables: [Variable<String>(conversationId)],
+        )
+        .getSingle();
+    var nextOrdinal = maxOrdinalRow.read<int>('max_ordinal') + 1;
+    final incoming = await _db
+        .customSelect(
+          'SELECT server_id FROM merge_source.conversation_mcp_server_rows '
+          'WHERE conversation_id = ? ORDER BY ordinal, server_id;',
+          variables: [Variable<String>(conversationId)],
+        )
+        .get();
+    for (final row in incoming) {
+      final serverId = row.read<String>('server_id');
+      if (!serverIds.add(serverId)) continue;
+      await _db.customStatement(
+        'INSERT INTO main.conversation_mcp_server_rows '
+        '(conversation_id, server_id, ordinal) VALUES (?, ?, ?);',
+        [conversationId, serverId, nextOrdinal++],
+      );
+    }
+  }
+
+  Future<void> _mergeConversationMetadataDelta(String conversationId) async {
+    await _db.customStatement(
+      'UPDATE main.conversation_rows SET '
+      'updated_at = MAX(updated_at, (SELECT updated_at FROM '
+      'merge_source.conversation_rows WHERE id = ?)), '
+      'last_memory_extracted_order = MAX(last_memory_extracted_order, '
+      '(SELECT last_memory_extracted_order FROM merge_source.conversation_rows '
+      'WHERE id = ?)) WHERE id = ?;',
+      [conversationId, conversationId, conversationId],
+    );
+    final sourceSelections = await _db
+        .customSelect(
+          'SELECT version_selections_json FROM merge_source.conversation_rows '
+          'WHERE id = ?;',
+          variables: [Variable<String>(conversationId)],
+        )
+        .getSingle();
+    final target = await _db
+        .customSelect(
+          'SELECT version_selections_json FROM main.conversation_rows '
+          'WHERE id = ?;',
+          variables: [Variable<String>(conversationId)],
+        )
+        .getSingle();
+    final merged = _decodeStringIntMap(
+      target.read<String>('version_selections_json'),
+    );
+    for (final entry in _decodeStringIntMap(
+      sourceSelections.read<String>('version_selections_json'),
+    ).entries) {
+      merged.putIfAbsent(entry.key, () => entry.value);
+    }
+    await _db.customStatement(
+      'UPDATE main.conversation_rows SET version_selections_json = ? '
+      'WHERE id = ?;',
+      [jsonEncode(merged), conversationId],
+    );
+  }
+
+  Future<void> _mergeConversationTreeDelta({
+    required String conversationId,
+    required Set<String> missingMessageIds,
+  }) async {
+    final sourceState = await _db
+        .customSelect(
+          'SELECT active_branch_id, branch_selections_json FROM '
+          'merge_source.conversation_tree_state_rows WHERE conversation_id = ?;',
+          variables: [Variable<String>(conversationId)],
+        )
+        .getSingleOrNull();
+    final sourceEdges = await _db
+        .customSelect(
+          'SELECT message_id, parent_message_id FROM merge_source.message_tree_edge_rows '
+          'WHERE conversation_id = ?;',
+          variables: [Variable<String>(conversationId)],
+        )
+        .get();
+    for (final edge in sourceEdges) {
+      final messageId = edge.read<String>('message_id');
+      if (!missingMessageIds.contains(messageId)) continue;
+      await _db.customStatement(
+        'INSERT OR IGNORE INTO main.message_tree_edge_rows '
+        '(conversation_id, message_id, parent_message_id) VALUES (?, ?, ?);',
+        [
+          conversationId,
+          messageId,
+          edge.readNullable<String>('parent_message_id'),
+        ],
+      );
+    }
+    final targetBranches = await _db
+        .customSelect(
+          'SELECT id FROM main.conversation_branch_rows WHERE conversation_id = ?;',
+          variables: [Variable<String>(conversationId)],
+        )
+        .get();
+    final branchIds = {
+      for (final row in targetBranches) row.read<String>('id'),
+    };
+    final targetState = await _db
+        .customSelect(
+          'SELECT active_branch_id FROM main.conversation_tree_state_rows '
+          'WHERE conversation_id = ?;',
+          variables: [Variable<String>(conversationId)],
+        )
+        .getSingleOrNull();
+    final sourceActiveBranchId = sourceState?.read<String>('active_branch_id');
+    final sourceBranches = await _db
+        .customSelect(
+          'SELECT id, tip_message_id, name, created_at FROM merge_source.conversation_branch_rows '
+          'WHERE conversation_id = ? ORDER BY id;',
+          variables: [Variable<String>(conversationId)],
+        )
+        .get();
+    final branchMap = <String, String>{};
+    for (final branch in sourceBranches) {
+      final sourceBranchId = branch.read<String>('id');
+      var targetBranchId = sourceBranchId;
+      if (branchIds.contains(targetBranchId)) {
+        final tip = branch.readNullable<String>('tip_message_id');
+        final extendsActiveBranch =
+            sourceBranchId == sourceActiveBranchId &&
+            targetState?.read<String>('active_branch_id') == sourceBranchId &&
+            missingMessageIds.contains(tip);
+        final same = extendsActiveBranch
+            ? const <String, Object?>{}
+            : tip == null
+            ? await _db
+                  .customSelect(
+                    'SELECT 1 AS found FROM main.conversation_branch_rows '
+                    'WHERE id = ? AND conversation_id = ? AND tip_message_id IS NULL '
+                    'LIMIT 1;',
+                    variables: [
+                      Variable<String>(targetBranchId),
+                      Variable<String>(conversationId),
+                    ],
+                  )
+                  .getSingleOrNull()
+            : await _db
+                  .customSelect(
+                    'SELECT 1 AS found FROM main.conversation_branch_rows '
+                    'WHERE id = ? AND conversation_id = ? AND tip_message_id = ? '
+                    'LIMIT 1;',
+                    variables: [
+                      Variable<String>(targetBranchId),
+                      Variable<String>(conversationId),
+                      Variable<String>(tip),
+                    ],
+                  )
+                  .getSingleOrNull();
+        if (same == null) {
+          targetBranchId = _deterministicMergeId(
+            'branch',
+            sourceBranchId,
+            conversationId,
+          );
+        }
+      }
+      branchMap[sourceBranchId] = targetBranchId;
+      if (branchIds.contains(targetBranchId)) continue;
+      await _db.customStatement(
+        'INSERT INTO main.conversation_branch_rows '
+        '(id, conversation_id, tip_message_id, name, created_at) VALUES (?, ?, ?, ?, ?);',
+        [
+          targetBranchId,
+          conversationId,
+          branch.readNullable<String>('tip_message_id'),
+          branch.read<String>('name'),
+          branch.read<int>('created_at'),
+        ],
+      );
+      branchIds.add(targetBranchId);
+    }
+    if (sourceActiveBranchId != null && targetState != null) {
+      final targetActiveBranchId = targetState.read<String>('active_branch_id');
+      if (sourceActiveBranchId == targetActiveBranchId) {
+        final sourceTip = sourceBranches
+            .firstWhere(
+              (row) => row.read<String>('id') == sourceActiveBranchId,
+              orElse: () =>
+                  throw StateError('merge_source_active_branch_missing'),
+            )
+            .readNullable<String>('tip_message_id');
+        if (sourceTip != null && missingMessageIds.contains(sourceTip)) {
+          await _db.customStatement(
+            'UPDATE main.conversation_branch_rows SET tip_message_id = ? '
+            'WHERE id = ? AND conversation_id = ?;',
+            [sourceTip, targetActiveBranchId, conversationId],
+          );
+        }
+      }
+    }
+    if (sourceState == null) return;
+    final selections = await _db
+        .customSelect(
+          'SELECT branch_selections_json FROM main.conversation_tree_state_rows '
+          'WHERE conversation_id = ?;',
+          variables: [Variable<String>(conversationId)],
+        )
+        .getSingleOrNull();
+    if (selections == null) return;
+    final merged = _decodeBranchSelections(
+      selections.read<String>('branch_selections_json'),
+    );
+    for (final entry in _decodeBranchSelections(
+      sourceState.read<String>('branch_selections_json'),
+    ).entries) {
+      if (!missingMessageIds.contains(entry.key)) continue;
+      final branchId = branchMap[entry.value];
+      if (branchId != null) merged[entry.key] = branchId;
+    }
+    await _db.customStatement(
+      'UPDATE main.conversation_tree_state_rows SET branch_selections_json = ? '
+      'WHERE conversation_id = ?;',
+      [jsonEncode(merged), conversationId],
+    );
+  }
+
+  Future<String?> _messageFingerprint(String schema, String id) async {
+    final row = await _db
+        .customSelect(
+          'SELECT role, timestamp, model_id, provider_id, total_tokens, '
+          'reasoning_start_at, reasoning_finished_at, translation, '
+          'reasoning_segments_json, group_id, version, prompt_tokens, '
+          'completion_tokens, cached_tokens, duration_ms FROM $schema.message_rows '
+          'WHERE id = ?;',
+          variables: [Variable<String>(id)],
+        )
+        .getSingleOrNull();
+    if (row == null) return null;
+    final parts = await _db
+        .customSelect(
+          'SELECT kind, payload FROM $schema.message_part_rows '
+          'WHERE revision_id = ? ORDER BY ordinal;',
+          variables: [Variable<String>(id)],
+        )
+        .get();
+    final artifacts = await _db
+        .customSelect(
+          'SELECT kind, payload FROM $schema.provider_artifact_rows '
+          'WHERE revision_id = ? ORDER BY kind;',
+          variables: [Variable<String>(id)],
+        )
+        .get();
+    final data = Map<String, Object?>.from(row.data);
+    for (final field in const [
+      'timestamp',
+      'reasoning_start_at',
+      'reasoning_finished_at',
+    ]) {
+      data[field] = _fingerprintTimestamp(data[field]);
+    }
+    return sha256
+        .convert(
+          utf8.encode(
+            jsonEncode([
+              data,
+              parts
+                  .map(
+                    (part) =>
+                        part.read<String>('kind') == 'image' ||
+                            part.read<String>('kind') == 'file'
+                        ? _fingerprintAttachmentPayload(
+                            part.read<String>('kind'),
+                            part.read<String>('payload'),
+                          )
+                        : [
+                            part.read<String>('kind'),
+                            part.read<String>('payload'),
+                          ],
+                  )
+                  .toList(),
+              artifacts
+                  .map(
+                    (artifact) => [
+                      artifact.read<String>('kind'),
+                      artifact.read<String>('payload'),
+                    ],
+                  )
+                  .toList(),
+            ]),
+          ),
+        )
+        .toString();
   }
 
   Future<String?> _conversationFingerprint(String schema, String id) async {
@@ -7529,6 +8033,12 @@ class ChatDatabaseRepository {
     )..where((t) => t.revisionId.equals(revisionId))).getSingleOrNull();
   }
 
+  Future<void> deleteMessagePrompt(String revisionId) {
+    return (_db.delete(
+      _db.messagePromptRows,
+    )..where((row) => row.revisionId.equals(revisionId))).go();
+  }
+
   Future<Map<String, MessagePromptRow>> getMessagePrompts(
     Iterable<String> revisionIds,
   ) async {
@@ -7545,8 +8055,11 @@ class ChatDatabaseRepository {
     required String conversationId,
     required String payload,
     required bool carriesMemorySnapshot,
+    String? sourceContentHash,
   }) async {
     final now = DateTime.now().toUtc();
+    final resolvedSourceContentHash =
+        sourceContentHash ?? await _readMessageContentHash(revisionId);
     await _db
         .into(_db.messagePromptRows)
         .insertOnConflictUpdate(
@@ -7554,6 +8067,7 @@ class ChatDatabaseRepository {
             revisionId: revisionId,
             conversationId: conversationId,
             payload: payload,
+            sourceContentHash: Value(resolvedSourceContentHash),
             carriesMemorySnapshot: Value(carriesMemorySnapshot),
             createdAt: now,
           ),
@@ -7572,6 +8086,7 @@ class ChatDatabaseRepository {
     required String payload,
     required bool carriesMemorySnapshot,
     String? injectedMemoryHash,
+    String? sourceContentHash,
   }) {
     return _db.transaction(() async {
       await putMessagePrompt(
@@ -7579,6 +8094,7 @@ class ChatDatabaseRepository {
         conversationId: conversationId,
         payload: payload,
         carriesMemorySnapshot: carriesMemorySnapshot,
+        sourceContentHash: sourceContentHash,
       );
       if (carriesMemorySnapshot) {
         await setConversationInjectedMemoryHash(
@@ -7587,6 +8103,12 @@ class ChatDatabaseRepository {
         );
       }
     });
+  }
+
+  Future<String?> _readMessageContentHash(String revisionId) async {
+    final message = await getMessage(revisionId);
+    if (message == null) return null;
+    return message.semanticContentHash;
   }
 
   Future<bool> anyPromptCarriesMemorySnapshot(List<String> revisionIds) async {

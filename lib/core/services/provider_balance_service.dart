@@ -105,12 +105,19 @@ class ProviderBalanceService {
       throw const ProviderBalanceException('Balance query is disabled');
     }
 
-    final apiPath = (config.balanceApiPath ?? '/credits').trim();
     final kind = ProviderConfig.classify(
       config.id,
       explicitType: config.providerType,
     );
-    if (kind != ProviderKind.openai && !_isAbsoluteUrl(apiPath)) {
+    final isDeepSeekAnthropic =
+        kind == ProviderKind.claude && ProviderConfig.isDeepSeek(config);
+    final configuredApiPath = (config.balanceApiPath ?? '').trim();
+    final apiPath = configuredApiPath.isEmpty && isDeepSeekAnthropic
+        ? '/user/balance'
+        : (config.balanceApiPath ?? '/credits').trim();
+    if (kind != ProviderKind.openai &&
+        !isDeepSeekAnthropic &&
+        !_isAbsoluteUrl(apiPath)) {
       throw const ProviderBalanceException(
         'Non-OpenAI-compatible providers require a full balance API URL',
         code: 'full_balance_api_url_required',
@@ -118,7 +125,7 @@ class ProviderBalanceService {
     }
 
     final resultPath = (config.balanceResultPath ?? 'data.total_usage').trim();
-    final uri = _balanceUri(config.baseUrl, apiPath);
+    final uri = _balanceUri(config, apiPath);
     final client = _clientFor(config);
     try {
       final apiKey = _effectiveApiKey(config);
@@ -147,16 +154,25 @@ class ProviderBalanceService {
     }
   }
 
-  static Uri _balanceUri(String baseUrl, String apiPath) {
+  static Uri _balanceUri(ProviderConfig config, String apiPath) {
     if (apiPath.isEmpty) {
       throw const ProviderBalanceException('Balance API path is empty');
     }
     final absolute = Uri.tryParse(apiPath);
     if (absolute != null && absolute.hasScheme) return absolute;
 
-    final base = baseUrl.endsWith('/')
-        ? baseUrl.substring(0, baseUrl.length - 1)
-        : baseUrl;
+    final isDeepSeekAnthropic =
+        ProviderConfig.classify(config.id, explicitType: config.providerType) ==
+            ProviderKind.claude &&
+        ProviderConfig.isDeepSeek(config);
+    if (isDeepSeekAnthropic && apiPath == '/user/balance') {
+      final baseUri = Uri.parse(config.baseUrl.trim());
+      return baseUri.replace(path: '/user/balance', query: null, fragment: '');
+    }
+
+    final base = config.baseUrl.endsWith('/')
+        ? config.baseUrl.substring(0, config.baseUrl.length - 1)
+        : config.baseUrl;
     final path = apiPath.startsWith('/') ? apiPath : '/$apiPath';
     return Uri.parse('$base$path');
   }

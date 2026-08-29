@@ -17,8 +17,11 @@ import '../../models/chat_message.dart';
 import '../../models/message_part.dart';
 import '../../models/conversation.dart';
 import '../../models/conversation_tree.dart';
+import '../../models/backup_task_progress.dart';
+import '../../models/progress_update.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/app_directories.dart';
+import '../backup/backup_isolate_runner.dart';
 
 final class LoadedTimelineSlot {
   const LoadedTimelineSlot({required this.identity, required this.message});
@@ -2177,8 +2180,12 @@ class ChatService extends ChangeNotifier {
 
   Future<void> restoreConversation(
     Conversation conversation,
-    List<ChatMessage> messages,
-  ) async {
+    List<ChatMessage> messages, {
+
+    /// Used by structured imports and debug fixtures that already know the
+    /// message-level tree. Omitted callers retain legacy linear projection.
+    ConversationTree? conversationTree,
+  }) async {
     if (!_initialized) await init();
     // 确保 messageIds 保持相同的顺序
     final ids = messages.map((m) => m.id).toList();
@@ -2205,6 +2212,7 @@ class ChatService extends ChangeNotifier {
       ],
       toolEventsByMessageId: const {},
       geminiSignaturesByMessageId: const {},
+      conversationTree: conversationTree,
     );
     await _backfillAssetReferencesForCurrentRoot();
     await _refreshConversation(restored.id);
@@ -2279,16 +2287,49 @@ class ChatService extends ChangeNotifier {
   }
 
   Future<ChatDatabaseSnapshotInfo> createBackupDatabaseSnapshot(
-    File destinationFile,
-  ) async {
+    File destinationFile, {
+    ProgressCallback? onProgress,
+    BackupCancelToken? cancelToken,
+    Duration timeout = const Duration(minutes: 10),
+  }) async {
     if (!_initialized) await init();
     final sourcePath = _databaseFile.path;
     final destinationPath = destinationFile.path;
-    return Isolate.run(
-      () => ChatDatabaseRepository.createConsistentSnapshot(
-        sourceFile: File(sourcePath),
-        destinationFile: File(destinationPath),
-      ),
+    try {
+      return await runBackupIsolate<ChatDatabaseSnapshotInfo, List<String>>(
+        body: _createBackupSnapshotInIsolate,
+        payload: [sourcePath, destinationPath],
+        cancelToken: cancelToken,
+        onProgress: onProgress,
+        timeout: timeout,
+      );
+    } catch (error) {
+      Future<void> deleteDestination() async {
+        try {
+          if (await destinationFile.exists()) await destinationFile.delete();
+        } catch (_) {}
+      }
+
+      if (error is BackupCancelledException && !error.isolateExited) {
+        final exit = error.isolateExit;
+        if (exit != null) unawaited(exit.then((_) => deleteDestination()));
+      } else {
+        await deleteDestination();
+      }
+      rethrow;
+    }
+  }
+
+  static Future<ChatDatabaseSnapshotInfo> _createBackupSnapshotInIsolate(
+    BackupIsolateContext context,
+    List<String> paths,
+  ) {
+    context.throwIfCancelled();
+    return ChatDatabaseRepository.createConsistentSnapshot(
+      sourceFile: File(paths[0]),
+      destinationFile: File(paths[1]),
+      registerSourceHandle: context.registerSqliteHandle,
+      waitForSourceCloseAck: context.waitForSqliteClose,
     );
   }
 
@@ -2980,6 +3021,9 @@ class ChatService extends ChangeNotifier {
     if (current == null || current.role == role) return false;
     final updated = await _repo.updateMessageFields(messageId, role: role);
     if (updated == null) return false;
+    // Changing role changes the prompt semantics; a frozen prompt can no
+    // longer be reused for this revision.
+    await _repo.deleteMessagePrompt(messageId);
     _replaceCachedMessage(updated);
     notifyListeners();
     return true;

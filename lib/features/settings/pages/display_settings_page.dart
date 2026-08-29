@@ -1742,6 +1742,26 @@ class ChatItemDisplaySettingsPage extends StatelessWidget {
                 onChanged: (v) =>
                     context.read<SettingsProvider>().setShowTokenStats(v),
               ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.Sparkles,
+                label: l10n.displaySettingsPageShowThinkingCardsTitle,
+                subtitle: l10n.displaySettingsPageShowThinkingCardsSubtitle,
+                value: sp.showThinkingCards,
+                onChanged: (v) =>
+                    context.read<SettingsProvider>().setShowThinkingCards(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.Wrench,
+                label: l10n.displaySettingsPageShowToolCardsTitle,
+                subtitle: l10n.displaySettingsPageShowToolCardsSubtitle,
+                value: sp.showToolCards,
+                onChanged: (v) =>
+                    context.read<SettingsProvider>().setShowToolCards(v),
+              ),
             ],
           ),
         ],
@@ -2039,6 +2059,16 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosSwitchRow(
                 context,
+                icon: Lucide.ImageOff,
+                label: l10n.displaySettingsPageHideToolResultImagesTitle,
+                subtitle: l10n.displaySettingsPageHideToolResultImagesSubtitle,
+                value: sp.hideToolResultImages,
+                onChanged: (v) =>
+                    context.read<SettingsProvider>().setHideToolResultImages(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
                 icon: Lucide.TextSelect,
                 label: l10n.displaySettingsPageInsertSuggestionOnlyTitle,
                 value: sp.insertSuggestionOnTapOnly,
@@ -2085,6 +2115,21 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                 onChanged: (v) =>
                     context.read<SettingsProvider>().setShowAppUpdates(v),
               ),
+              if (Platform.isAndroid || Platform.isIOS) ...[
+                _iosDivider(context),
+                _iosSwitchRow(
+                  context,
+                  icon: Lucide.Sun,
+                  label:
+                      l10n.displaySettingsPageKeepScreenOnDuringGenerationTitle,
+                  subtitle: l10n
+                      .displaySettingsPageKeepScreenOnDuringGenerationSubtitle,
+                  value: sp.keepScreenOnDuringGeneration,
+                  onChanged: (v) => context
+                      .read<SettingsProvider>()
+                      .setKeepScreenOnDuringGeneration(v),
+                ),
+              ],
               _iosDivider(context),
               _iosNavRow(
                 context,

@@ -15,6 +15,7 @@ import '../../../core/services/haptics.dart';
 import '../../../core/database/business_preferences.dart';
 import '../../../core/database/business_repository.dart';
 import '../../../core/models/backup.dart';
+import '../../../core/models/backup_task_progress.dart';
 import '../../../core/models/progress_update.dart';
 import '../../../core/providers/backup_provider.dart';
 import '../../../core/providers/backup_reminder_provider.dart';
@@ -189,20 +190,35 @@ class _BackupPageState extends State<BackupPage> {
 
   Future<T> _runWithExportingOverlay<T>(
     BuildContext context,
-    Future<T> Function(ProgressCallback onProgress) task,
-  ) async {
+    Future<T> Function(ProgressCallback onProgress) task, {
+    Future<T> Function(ProgressCallback onProgress, BackupCancelToken token)?
+    cancellableTask,
+  }) async {
     final l10n = AppLocalizations.of(context)!;
     return runWithLoadingTaskDialog(
       context: context,
       task: task,
+      cancellableTask: cancellableTask,
       label: l10n.backupPageExporting,
+      cancelLabel: l10n.backupPageCancel,
     );
   }
 
   Future<T> _runWithImportingOverlay<T>(
     BuildContext context,
-    Future<T> Function(ProgressCallback onProgress) task,
-  ) => runWithLoadingTaskDialog(context: context, task: task);
+    Future<T> Function(ProgressCallback onProgress)? task, {
+    Future<T> Function(ProgressCallback onProgress, BackupCancelToken token)?
+    cancellableTask,
+  }) {
+    final l10n = AppLocalizations.of(context)!;
+    return runWithLoadingTaskDialog(
+      context: context,
+      task: task,
+      cancellableTask: cancellableTask,
+      label: l10n.backupPageRestore,
+      cancelLabel: l10n.backupPageCancel,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1155,12 +1171,35 @@ class _BackupPageState extends State<BackupPage> {
       header(l10n.backupPageLocalBackup),
       _iosSectionCard(
         children: [
+          Row(
+            children: [
+              Expanded(
+                child: _iosNavRow(
+                  context,
+                  key: const ValueKey('mobile-local-backup-action'),
+                  icon: Lucide.Export,
+                  label: l10n.backupPageLocalBackupAction,
+                  onTap: () => _doExport(context, vm),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _iosNavRow(
+                  context,
+                  key: const ValueKey('mobile-local-restore-action'),
+                  icon: Lucide.Import,
+                  label: l10n.backupPageRestore,
+                  onTap: () => _doImportLocal(context, vm, joaiclient: true),
+                ),
+              ),
+            ],
+          ),
+          _iosDivider(context),
           _iosNavRow(
             context,
             icon: Lucide.Export,
             label: l10n.backupPageExportKelivoBackup,
             enabled: false,
-            onTap: () => _doExport(context, vm),
           ),
           _iosDivider(context),
           _iosNavRow(
@@ -1266,73 +1305,16 @@ class _BackupPageState extends State<BackupPage> {
             icon: Lucide.Box,
             label: l10n.backupPageImportFromChatbox,
             enabled: false,
-            onTap: () async {
-              // 选择 Chatbox 导出的 json
-              final result = await FilePicker.platform.pickFiles(
-                type: FileType.custom,
-                allowedExtensions: ['json'],
-              );
-              final path = result?.files.single.path;
-              if (path == null) return;
-              if (!context.mounted) return;
-
-              final mode = await _chooseImportModeDialog(context);
-              if (mode == null) return;
-              if (!context.mounted) return;
-
-              await _runWithImportingOverlay(context, (_) async {
-                try {
-                  final cs = context.read<ChatService>();
-                  final file = File(path);
-                  final res = await ChatboxImporter.importFromChatbox(
-                    file: file,
-                    mode: mode,
-                    businessRepository: context.read<BusinessRepository>(),
-                    chatService: cs,
-                  );
-                  if (!context.mounted) return;
-                  await showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (dctx) => PopScope(
-                      canPop: false,
-                      child: AlertDialog(
-                        title: Text(l10n.backupPageRestartRequired),
-                        content: Text(
-                          '${l10n.backupPageImportFromChatbox}:\n'
-                          ' • Providers: ${res.providers}\n'
-                          ' • Assistants: ${res.assistants}\n'
-                          ' • Conversations: ${res.conversations}\n'
-                          ' • Messages: ${res.messages}\n\n'
-                          '${l10n.backupPageRestartContent}',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () async {
-                              if (await requestAppRestart(
-                                    dctx,
-                                    PlatformUtils.restartApp,
-                                  ) &&
-                                  dctx.mounted) {
-                                Navigator.of(dctx).pop();
-                              }
-                            },
-                            child: Text(l10n.backupPageOK),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                } catch (e) {
-                  if (!context.mounted) return;
-                  showAppSnackBar(
-                    context,
-                    message: e.toString(),
-                    type: NotificationType.error,
-                  );
-                }
-              });
-            },
+          ),
+          _iosDivider(context),
+          _iosNavRow(
+            context,
+            icon: Lucide.Box,
+            label: l10n.backupPageImportFromChatboxLegacy,
+            onTap: () => _doImportChatbox(
+              context,
+              label: l10n.backupPageImportFromChatboxLegacy,
+            ),
           ),
           _iosDivider(context),
           _iosNavRow(
@@ -1356,40 +1338,49 @@ class _BackupPageState extends State<BackupPage> {
     final l10n = AppLocalizations.of(context)!;
     File? file;
     try {
-      await _runWithExportingOverlay(context, (onProgress) async {
-        file = await vm.exportToFile(onProgress: onProgress);
-        if (!context.mounted) return;
-        final exportFile = file!;
-        final isMobile = Platform.isAndroid || Platform.isIOS;
-        if (isMobile) {
-          final saved = await NativeFileSave.saveFileFromPath(
-            sourcePath: exportFile.path,
-            fileName: exportFile.uri.pathSegments.last,
+      await _runWithExportingOverlay(
+        context,
+        (onProgress) => vm.exportToFile(onProgress: onProgress),
+        cancellableTask: (onProgress, cancelToken) async {
+          file = await vm.exportToFile(
+            onProgress: onProgress,
+            cancelToken: cancelToken,
           );
-          if (saved && context.mounted) {
-            await context
-                .read<BackupReminderProvider>()
-                .recordBackupCompleted();
-          }
-        } else {
-          final savePath = await FilePicker.platform.saveFile(
-            dialogTitle: l10n.backupPageExportKelivoBackup,
-            fileName: exportFile.uri.pathSegments.last,
-            type: FileType.custom,
-            allowedExtensions: ['zip'],
-          );
-          if (savePath != null) {
-            await File(savePath).parent.create(recursive: true);
-            await exportFile.copy(savePath);
-            if (context.mounted) {
+          if (!context.mounted) return;
+          final exportFile = file!;
+          final isMobile = Platform.isAndroid || Platform.isIOS;
+          if (isMobile) {
+            final saved = await NativeFileSave.saveFileFromPath(
+              sourcePath: exportFile.path,
+              fileName: exportFile.uri.pathSegments.last,
+              mimeType: NativeFileSave.joaiclientMimeType,
+            );
+            if (saved && context.mounted) {
               await context
                   .read<BackupReminderProvider>()
                   .recordBackupCompleted();
             }
+          } else {
+            final savePath = await FilePicker.platform.saveFile(
+              dialogTitle: l10n.backupPageExportKelivoBackup,
+              fileName: exportFile.uri.pathSegments.last,
+              type: FileType.custom,
+              allowedExtensions: ['zip'],
+            );
+            if (savePath != null) {
+              await File(savePath).parent.create(recursive: true);
+              await exportFile.copy(savePath);
+              if (context.mounted) {
+                await context
+                    .read<BackupReminderProvider>()
+                    .recordBackupCompleted();
+              }
+            }
           }
-        }
-      });
+        },
+      );
     } catch (e) {
+      if (e is BackupCancelledException) return;
       // 失败的归档或不可写目标不能显示为成功。
       if (!context.mounted) return;
       showAppSnackBar(
@@ -1404,11 +1395,15 @@ class _BackupPageState extends State<BackupPage> {
     }
   }
 
-  Future<void> _doImportLocal(BuildContext context, BackupProvider vm) async {
+  Future<void> _doImportLocal(
+    BuildContext context,
+    BackupProvider vm, {
+    bool joaiclient = false,
+  }) async {
     final l10n = AppLocalizations.of(context)!;
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['zip'],
+      allowedExtensions: [joaiclient ? 'joaiclient' : 'zip'],
     );
     final path = result?.files.single.path;
     if (path == null) return;
@@ -1426,8 +1421,15 @@ class _BackupPageState extends State<BackupPage> {
           mode: mode,
           onProgress: onProgress,
         ),
+        cancellableTask: (onProgress, cancelToken) => vm.restoreFromLocalFile(
+          File(path),
+          mode: mode,
+          onProgress: onProgress,
+          cancelToken: cancelToken,
+        ),
       );
     } catch (error) {
+      if (error is BackupCancelledException) return;
       if (!context.mounted) return;
       showBackupRestoreErrorSnackBar(
         context,
@@ -1442,6 +1444,84 @@ class _BackupPageState extends State<BackupPage> {
     await showBackupRestartRequiredDialog(
       context,
       skippedConversations: vm.skippedConversations,
+    );
+  }
+
+  Future<void> _doImportChatbox(
+    BuildContext context, {
+    required String label,
+  }) async {
+    final l10n = AppLocalizations.of(context)!;
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+    );
+    final path = result?.files.single.path;
+    if (path == null) return;
+    if (!context.mounted) return;
+
+    final mode = await _chooseImportModeDialog(context);
+    if (mode == null) return;
+    if (!context.mounted) return;
+
+    final businessRepository = context.read<BusinessRepository>();
+    final chatService = context.read<ChatService>();
+    late ChatboxImportResult imported;
+    try {
+      imported = await _runWithImportingOverlay<ChatboxImportResult>(
+        context,
+        null,
+        cancellableTask: (onProgress, cancelToken) =>
+            ChatboxImporter.importFromChatbox(
+              file: File(path),
+              mode: mode,
+              businessRepository: businessRepository,
+              chatService: chatService,
+              starredGroupName: l10n.backupPageChatboxLegacyStarredGroupName,
+              cancelToken: cancelToken,
+              onProgress: onProgress,
+            ),
+      );
+    } catch (error) {
+      if (error is BackupCancelledException) return;
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: error.toString(),
+        type: NotificationType.error,
+      );
+      return;
+    }
+    if (!context.mounted) return;
+    final res = imported;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: Text(l10n.backupPageRestartRequired),
+          content: Text(
+            '$label:\n'
+            ' • Providers: ${res.providers}\n'
+            ' • Assistants: ${res.assistants}\n'
+            ' • Conversations: ${res.conversations}\n'
+            ' • Messages: ${res.messages}\n\n'
+            '${l10n.backupPageRestartContent}',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                if (await requestAppRestart(dctx, PlatformUtils.restartApp) &&
+                    dctx.mounted) {
+                  Navigator.of(dctx).pop();
+                }
+              },
+              child: Text(l10n.backupPageOK),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1803,6 +1883,7 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
 
 class _TactileRow extends StatefulWidget {
   const _TactileRow({
+    super.key,
     required this.builder,
     this.onTap,
     this.pressedScale = 1.0,
@@ -1944,6 +2025,7 @@ class _AnimatedPressColor extends StatelessWidget {
 
 Widget _iosNavRow(
   BuildContext context, {
+  Key? key,
   required IconData icon,
   required String label,
   VoidCallback? onTap,
@@ -1953,6 +2035,7 @@ Widget _iosNavRow(
   final cs = Theme.of(context).colorScheme;
   final interactive = enabled && onTap != null;
   return _TactileRow(
+    key: key,
     onTap: enabled ? onTap : null,
     pressedScale: 1.00,
     builder: (pressed) {

@@ -6,6 +6,7 @@ import '../../../core/database/chat_database_repository.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/screen_wakelock.dart';
 import 'message_render_model.dart';
 
 /// 会话切换的初始窗口，由
@@ -101,6 +102,7 @@ class ChatController extends ChangeNotifier {
   /// 当前正在生成（流式处理）的会话 ID。
   final Set<String> _loadingConversationIds = <String>{};
   Set<String> get loadingConversationIds => _loadingConversationIds;
+  bool _screenWakelockAcquired = false;
 
   /// 每个会话的活动流订阅。
   final Map<String, StreamSubscription<dynamic>> _conversationStreams =
@@ -1249,6 +1251,15 @@ class ChatController extends ChangeNotifier {
     }
     if (prev != loading) {
       notifyListeners();
+      if (loading && !_screenWakelockAcquired) {
+        _screenWakelockAcquired = true;
+        ScreenWakelock.acquire();
+      } else if (!loading &&
+          _loadingConversationIds.isEmpty &&
+          _screenWakelockAcquired) {
+        _screenWakelockAcquired = false;
+        ScreenWakelock.release();
+      }
       if (!loading &&
           _currentConversation?.id == conversationId &&
           !_chatService.isConversationFullyCached(conversationId)) {
@@ -1402,6 +1413,10 @@ class ChatController extends ChangeNotifier {
   void dispose() {
     _chatService.removeListener(_syncCurrentConversationWithService);
     cancelAllStreams();
+    if (_screenWakelockAcquired) {
+      _screenWakelockAcquired = false;
+      ScreenWakelock.release();
+    }
     super.dispose();
   }
 }

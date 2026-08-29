@@ -1176,7 +1176,8 @@ class _DesktopProviderDetailPaneState
                       icon: lucide.Lucide.Settings,
                       onTap: () => _showProviderSettingsDialog(context),
                     ),
-                    if (kind == ProviderKind.openai &&
+                    if ((kind == ProviderKind.openai ||
+                            ProviderConfig.isDeepSeek(cfg)) &&
                         cfg.balanceEnabled == true) ...[
                       const SizedBox(width: 8),
                       ConstrainedBox(
@@ -2815,7 +2816,8 @@ class _DesktopProviderDetailPaneState
                               }(),
                             ),
                             const SizedBox(height: 4),
-                            if (kindNow == ProviderKind.openai) ...[
+                            if (kindNow == ProviderKind.openai ||
+                                ProviderConfig.isDeepSeek(cfgNow)) ...[
                               row(
                                 l10n.providerDetailPageBalanceInfo,
                                 Align(

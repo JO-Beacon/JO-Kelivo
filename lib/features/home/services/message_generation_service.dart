@@ -97,11 +97,11 @@ class MessageGenerationService {
   OnShowWarning? onShowWarning;
   OnHapticFeedback? onHapticFeedback;
 
-  /// 文件处理开始时调用。
-  VoidCallback? onFileProcessingStarted;
+  /// 文件处理开始时调用，参数为所属助手消息 ID。
+  void Function(String messageId)? onFileProcessingStarted;
 
-  /// 文件处理结束时调用。
-  VoidCallback? onFileProcessingFinished;
+  /// 文件处理结束时调用，参数为所属助手消息 ID。
+  void Function(String? messageId)? onFileProcessingFinished;
 
   /// 检查给定预算下是否启用推理
   bool isReasoningEnabled(int? budget) {
@@ -122,6 +122,7 @@ class MessageGenerationService {
     required String modelId,
     ToolApprovalService? approvalService,
     AskUserInteractionService? askUserService,
+    String? processingMessageId,
   }) async {
     final cfg = settings.getProviderConfig(providerKey);
     final kind = ProviderConfig.classify(
@@ -131,8 +132,6 @@ class MessageGenerationService {
     final includeToolMessages = switch (kind) {
       ProviderKind.openai || ProviderKind.claude || ProviderKind.google => true,
     };
-
-    onFileProcessingStarted?.call();
 
     // 构建 API 消息
     final apiMessages = messageBuilderService.buildApiMessages(
@@ -194,16 +193,34 @@ class MessageGenerationService {
     // 永不处理 (#769)。
     messageBuilderService.applyContextLimit(apiMessages, assistant);
 
-    final lastUserImagePaths = await messageBuilderService
-        .processUserMessagesForApi(
-          apiMessages,
-          settings,
-          assistant,
-          conversation: currentConversation,
-          sourceMessages: messages,
-        );
-
-    onFileProcessingFinished?.call();
+    final indicatorMessageId =
+        processingMessageId != null &&
+            messageBuilderService.hasPendingAttachmentWork(
+              apiMessages,
+              settings,
+              conversation: currentConversation,
+              sourceMessages: messages,
+            )
+        ? processingMessageId
+        : null;
+    if (indicatorMessageId != null) {
+      onFileProcessingStarted?.call(indicatorMessageId);
+    }
+    late final List<String> lastUserImagePaths;
+    try {
+      lastUserImagePaths = await messageBuilderService
+          .processUserMessagesForApi(
+            apiMessages,
+            settings,
+            assistant,
+            conversation: currentConversation,
+            sourceMessages: messages,
+          );
+    } finally {
+      if (indicatorMessageId != null) {
+        onFileProcessingFinished?.call(indicatorMessageId);
+      }
+    }
 
     await messageBuilderService.inlineLocalImages(apiMessages);
     if (ContextLogger.enabled) {

@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 
 import '../../models/progress_update.dart';
+import '../../models/backup_task_progress.dart';
 
 /// JO-Kelivo 外部归档的隐式外层容器。
 ///
@@ -22,6 +23,7 @@ final class JoaiclientArchive {
     required File zipFile,
     required File outputFile,
     ProgressCallback? onProgress,
+    BackupCancelToken? cancelToken,
   }) async {
     if (zipFile.absolute.path == outputFile.absolute.path) {
       throw ArgumentError('zipFile and outputFile must differ');
@@ -32,6 +34,7 @@ final class JoaiclientArchive {
     final digest = await sha256
         .bind(
           zipFile.openRead().map((chunk) {
+            cancelToken?.throwIfCancelled();
             hashed += chunk.length;
             onProgress?.call(
               ProgressUpdate(
@@ -50,6 +53,7 @@ final class JoaiclientArchive {
       output.add(header);
       var copied = 0;
       await for (final chunk in zipFile.openRead()) {
+        cancelToken?.throwIfCancelled();
         output.add(chunk);
         copied += chunk.length;
         onProgress?.call(
@@ -86,6 +90,7 @@ final class JoaiclientArchive {
     required File sourceFile,
     required File zipFile,
     ProgressCallback? onProgress,
+    BackupCancelToken? cancelToken,
   }) async {
     if (sourceFile.absolute.path == zipFile.absolute.path) {
       throw ArgumentError('sourceFile and zipFile must differ');
@@ -106,6 +111,7 @@ final class JoaiclientArchive {
         await handle.setPosition(headerLength);
         var remaining = parsed.payloadLength;
         while (remaining > 0) {
+          cancelToken?.throwIfCancelled();
           final chunk = await handle.read(remaining.clamp(1, 1024 * 1024));
           if (chunk.isEmpty) {
             throw const FormatException('joaiclient_payload_truncated');
@@ -136,6 +142,7 @@ final class JoaiclientArchive {
     final digest = await sha256
         .bind(
           zipFile.openRead().map((chunk) {
+            cancelToken?.throwIfCancelled();
             hashed += chunk.length;
             onProgress?.call(
               ProgressUpdate(

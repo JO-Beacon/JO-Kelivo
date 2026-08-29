@@ -14,18 +14,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-Widget _harness(Widget child) {
+Widget _harness(Widget child, {SettingsProvider? settings}) {
+  final effectiveSettings =
+      settings ?? SettingsProvider(createBusinessTestPreferences());
   return MultiProvider(
     providers: [
-      ChangeNotifierProvider(
-        create: (_) => SettingsProvider(createBusinessTestPreferences()),
-      ),
+      ChangeNotifierProvider<SettingsProvider>.value(value: effectiveSettings),
       ChangeNotifierProvider(
         create: (_) =>
             UserProvider(preferences: createBusinessTestPreferences()),
       ),
       ChangeNotifierProvider(
-        create: (_) => TtsProvider(preferences: createBusinessTestPreferences()),
+        create: (_) =>
+            TtsProvider(preferences: createBusinessTestPreferences()),
       ),
       ChangeNotifierProvider(create: (_) => ToolApprovalService()),
       ChangeNotifierProvider(create: (_) => AskUserInteractionService()),
@@ -52,10 +53,7 @@ more text
 ![shot](https://example.com/a.png)
 ''';
       final (clean, images) = parseMcpImagePathsForTesting(content);
-      expect(images, [
-        '/tmp/mcp_img_1.png',
-        'https://example.com/a.png',
-      ]);
+      expect(images, ['/tmp/mcp_img_1.png', 'https://example.com/a.png']);
       expect(clean.contains('!['), isFalse);
       expect(clean.contains('result ok'), isTrue);
       expect(clean.contains('more text'), isTrue);
@@ -135,6 +133,44 @@ more text
     );
   });
 
+  testWidgets('hide tool result images removes MCP thumbnail list', (
+    tester,
+  ) async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    addTearDown(settings.dispose);
+    await settings.loaded;
+    await settings.setHideToolResultImages(true);
+
+    await tester.pumpWidget(
+      _harness(
+        ChatMessageWidget(
+          showModelIcon: false,
+          message: ChatMessage(
+            id: 'assistant-mcp-thumbs-hidden',
+            role: 'assistant',
+            content: 'tool ran',
+            conversationId: 'conversation-mcp-thumbs-hidden',
+          ),
+          toolParts: const [
+            ToolUIPart(
+              id: 'tool-hidden-1',
+              toolName: 'screenshot',
+              arguments: {'target': 'desk'},
+              content: 'captured\n![](https://example.com/mcp.png)',
+            ),
+          ],
+        ),
+        settings: settings,
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('tool-image-thumbnails:tool-hidden-1')),
+      findsNothing,
+    );
+  });
+
   testWidgets('MCP markdown images appear in tool detail sheet', (
     tester,
   ) async {
@@ -207,6 +243,33 @@ more text
       ),
       isTrue,
     );
+  });
+
+  testWidgets('hide tool result images removes tool-role thumbnails', (
+    tester,
+  ) async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    addTearDown(settings.dispose);
+    await settings.loaded;
+    await settings.setHideToolResultImages(true);
+
+    await tester.pumpWidget(
+      _harness(
+        ChatMessageWidget(
+          message: ChatMessage(
+            id: 'tool-role-mcp-hidden',
+            role: 'tool',
+            conversationId: 'conversation-tool-role-mcp-hidden',
+            content:
+                '{"tool":"screenshot","arguments":{},"result":"ok\\n![](https://example.com/tool-role.png)"}',
+          ),
+        ),
+        settings: settings,
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byType(Image), findsNothing);
   });
 
   testWidgets('assistant ImagePart/FilePart previews render in parts order', (

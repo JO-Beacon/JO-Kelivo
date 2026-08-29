@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/shared/dialogs/loading_task_dialog.dart';
+import 'package:Kelivo/core/models/backup_task_progress.dart';
 
 void main() {
   testWidgets(
@@ -123,5 +124,40 @@ void main() {
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }
+  });
+
+  testWidgets('exposes cancellation to a cancellable task', (tester) async {
+    final task = Completer<void>();
+    BackupCancelToken? receivedToken;
+    Future<void>? invocation;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => TextButton(
+            onPressed: () {
+              invocation = runWithLoadingTaskDialog<void>(
+                context: context,
+                task: (_) => task.future,
+                cancellableTask: (_, token) {
+                  receivedToken = token;
+                  return task.future;
+                },
+                cancelLabel: 'Cancel',
+              );
+            },
+            child: const Text('Start'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Start'));
+    await tester.pump();
+    await tester.tap(find.text('Cancel'));
+    expect(receivedToken?.isCancelled, isTrue);
+
+    task.completeError(const BackupCancelledException());
+    await expectLater(invocation, throwsA(isA<BackupCancelledException>()));
   });
 }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
@@ -6,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 
 import '../../../core/models/chat_message.dart';
@@ -14,6 +16,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../chat/widgets/chat_message_widget.dart';
+import '../../chat/widgets/timeline_visibility.dart';
 import '../../chat/utils/thinking_tag_parser.dart';
 import '../../chat/widgets/message_more_sheet.dart';
 import '../controllers/stream_controller.dart' as stream_ctrl;
@@ -21,6 +24,8 @@ import '../controllers/streaming_content_notifier.dart';
 import '../controllers/message_render_model.dart';
 import '../controllers/scroll_controller.dart' as scroll_ctrl;
 import '../services/ask_user_interaction_service.dart';
+import '../services/local_tools_service.dart';
+import '../services/tool_approval_service.dart';
 import '../utils/chat_layout_constants.dart';
 import 'model_icon.dart';
 
@@ -114,6 +119,7 @@ class MessageListView extends StatefulWidget {
     this.pinnedStreamingMessageId,
     this.isPinnedIndicatorActive = false,
     required this.isProcessingFiles,
+    this.processingFilesMessageId,
     this.streamingContentNotifier,
     this.spotlightMessageId,
     this.spotlightToken = 0,
@@ -151,6 +157,11 @@ class MessageListView extends StatefulWidget {
     this.onUserScrollIntent,
     this.chatFontScale = 1,
     this.collapseThinking = true,
+    this.collapseThinkingSteps = false,
+    this.showThinkingCards = true,
+    this.showToolCards = true,
+    this.showToolResultSummary = false,
+    this.hideToolResultImages = false,
     this.collapsedCodeLines,
     this.wrapCodeBlocks = false,
     this.showModelIcon = true,
@@ -191,6 +202,10 @@ class MessageListView extends StatefulWidget {
   final String? pinnedStreamingMessageId;
   final bool isPinnedIndicatorActive;
   final ValueNotifier<bool> isProcessingFiles;
+
+  /// Assistant message currently parsing attachments, or null. When omitted,
+  /// [isProcessingFiles] remains available for legacy test callers.
+  final ValueNotifier<String?>? processingFilesMessageId;
 
   /// 用于流式内容更新的轻量 notifier。
   /// 提供后，流式消息会使用 ValueListenableBuilder，避免整页重建。
@@ -251,6 +266,11 @@ class MessageListView extends StatefulWidget {
 
   /// 已完成的思考块是否折叠显示（显示设置）。
   final bool collapseThinking;
+  final bool collapseThinkingSteps;
+  final bool showThinkingCards;
+  final bool showToolCards;
+  final bool showToolResultSummary;
+  final bool hideToolResultImages;
 
   /// 长代码块折叠到的行数；为 null 时保持展开。
   final int? collapsedCodeLines;
@@ -287,6 +307,10 @@ class _MessageListViewState extends State<MessageListView> {
   bool _pointerScrollActivityCheckScheduled = false;
   late List<MessageRenderModel> _effectiveRenderModels;
   late Map<String, int> _slotIndexById;
+  late Map<String, int> _messageIndexById;
+  final Map<String, int> _lastToolSignatures = <String, int>{};
+  final Set<String> _pendingToolExtentIds = <String>{};
+  var _toolExtentFlushScheduled = false;
   final FocusNode _keyboardFocusNode = FocusNode(
     debugLabel: 'timeline-keyboard-scroll-region',
   );
@@ -297,14 +321,27 @@ class _MessageListViewState extends State<MessageListView> {
   void initState() {
     super.initState();
     _refreshRenderModels();
+    _snapshotToolSignatures();
+    widget.streamingContentNotifier?.toolHeightEvents.addListener(
+      _handleToolHeightEvent,
+    );
   }
 
   @override
   void didUpdateWidget(covariant MessageListView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.streamingContentNotifier != widget.streamingContentNotifier) {
+      oldWidget.streamingContentNotifier?.toolHeightEvents.removeListener(
+        _handleToolHeightEvent,
+      );
+      widget.streamingContentNotifier?.toolHeightEvents.addListener(
+        _handleToolHeightEvent,
+      );
+    }
     final oldRenderModels = _effectiveRenderModels;
     _refreshRenderModels();
     _synchronizeExtentCache(oldWidget, oldRenderModels);
+    _snapshotToolSignatures();
   }
 
   void _refreshRenderModels() {
@@ -320,6 +357,70 @@ class _MessageListViewState extends State<MessageListView> {
       for (var index = 0; index < _effectiveRenderModels.length; index++)
         _effectiveRenderModels[index].slotId: index,
     };
+    _messageIndexById = <String, int>{
+      for (var index = 0; index < _effectiveRenderModels.length; index++)
+        _effectiveRenderModels[index].message.id: index,
+    };
+  }
+
+  void _snapshotToolSignatures() {
+    _lastToolSignatures
+      ..clear()
+      ..addAll({
+        for (final model in _effectiveRenderModels)
+          model.message.id: _toolEstimateSignature(
+            widget.toolParts[model.message.id],
+          ),
+      });
+  }
+
+  void _handleToolHeightEvent() {
+    final event = widget.streamingContentNotifier?.toolHeightEvents.value;
+    if (event == null) return;
+    _invalidateToolExtentForMessage(event.messageId);
+  }
+
+  void _invalidateToolExtentForMessage(String messageId) {
+    _extentEstimateCache.remove(messageId);
+    final controller = widget.listController;
+    if (!controller.isAttached) return;
+    if (controller.isLocked) {
+      _pendingToolExtentIds.add(messageId);
+      if (_toolExtentFlushScheduled) return;
+      _toolExtentFlushScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _toolExtentFlushScheduled = false;
+        if (!mounted) return;
+        final ids = List<String>.of(_pendingToolExtentIds);
+        _pendingToolExtentIds.clear();
+        for (final id in ids) {
+          _applyToolExtentInvalidation(id);
+        }
+      });
+      return;
+    }
+    _applyToolExtentInvalidation(messageId);
+  }
+
+  void _applyToolExtentInvalidation(String messageId) {
+    final controller = widget.listController;
+    if (!controller.isAttached || controller.isLocked) return;
+    final index = _messageIndexById[messageId];
+    if (index == null) return;
+    final visible = controller.visibleRange;
+    final scrollController = widget.scrollController;
+    if (visible != null &&
+        index < visible.$1 &&
+        scrollController is scroll_ctrl.ChatAutoFollowScrollController) {
+      final request = scrollController
+          .requestPreserveDistanceFromEndDuringLayout();
+      if (request != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          scrollController.finishPreserveDistanceFromEndDuringLayout(request);
+        });
+      }
+    }
+    controller.invalidateExtent(index);
   }
 
   /// 消息气泡周围的标题行、操作栏和垂直边距。
@@ -327,6 +428,9 @@ class _MessageListViewState extends State<MessageListView> {
 
   /// 折叠行内思考卡片的高度。
   static const double _estimateCollapsedCard = 44.0;
+
+  /// 折叠时间线显示的展开行高度。
+  static const double _estimateExpandRow = 36.0;
 
   /// 在按观察密度外推前扫描的字符数。
   static const int _estimateScanLimit = 8000;
@@ -348,8 +452,14 @@ class _MessageListViewState extends State<MessageListView> {
   /// 估算所依赖的显示设置，在 [build] 中刷新。
   _EstimateSettings _estimateSettings = const _EstimateSettings(
     collapseThinking: true,
+    collapseThinkingSteps: false,
+    showThinkingCards: true,
+    showToolCards: true,
+    showToolResultSummary: false,
+    hideToolResultImages: false,
     collapsedCodeLines: null,
     wrapCodeBlocks: false,
+    pendingApprovalIds: <String>{},
   );
 
   /// 当前已存储范围估算时的字体缩放。
@@ -388,6 +498,12 @@ class _MessageListViewState extends State<MessageListView> {
 
     final message = models[index].message;
     final text = message.content;
+    final settings = _estimateSettings;
+    if (message.role == 'tool' &&
+        !settings.showToolCards &&
+        !_hiddenStandaloneToolMessageRemainsVisible(text)) {
+      return 0;
+    }
     final reasoning = message.role == 'assistant'
         ? widget.reasoning[message.id]
         : null;
@@ -397,24 +513,29 @@ class _MessageListViewState extends State<MessageListView> {
     final hasReasoning =
         (reasoning?.text.isNotEmpty ?? false) ||
         (reasoningSegments?.isNotEmpty ?? false);
-    if (text.isEmpty && !hasReasoning) return _estimateChrome;
+    final toolParts = message.role == 'assistant'
+        ? widget.toolParts[message.id]
+        : null;
+    final hasTools = toolParts != null && toolParts.isNotEmpty;
+    if (text.isEmpty && !hasReasoning && !hasTools) return _estimateChrome;
 
     // 布局会反复查询同一个项目（每次调整大小、窗口变化都会），而下方扫描
     // 随消息长度线性增长，因此按结果依赖的全部因素缓存，可保持布局阶段廉价。
     // 内容按对象身份比较：编辑或流式消息总会携带新字符串，等长重写不能命中缓存。
     final fontScale = widget.chatFontScale * _systemTextScale;
-    final settings = _estimateSettings;
     final reasoningSignature = _reasoningEstimateSignature(
       reasoning,
       reasoningSegments,
     );
+    final toolSignature = _toolEstimateSignature(toolParts);
     final cached = _extentEstimateCache[message.id];
     if (cached != null &&
         identical(cached.content, text) &&
         cached.crossAxisExtent == crossAxisExtent &&
         cached.fontScale == fontScale &&
         cached.settings == settings &&
-        cached.reasoningSignature == reasoningSignature) {
+        cached.reasoningSignature == reasoningSignature &&
+        cached.toolSignature == toolSignature) {
       return cached.extent;
     }
 
@@ -422,14 +543,16 @@ class _MessageListViewState extends State<MessageListView> {
     // 因此使用渲染器同样的解析器解析，而不是猜测标签语法。
     var body = text;
     var collapsedCards = 0;
-    if (settings.collapseThinking &&
+    if ((settings.collapseThinking || !settings.showThinkingCards) &&
         message.role != 'user' &&
         text.length <= _estimateParseLimit &&
         text.contains('<')) {
       final parsed = ThinkingTagParser.parseLegacyInlineBlocks(text);
       if (parsed.hasThinking) {
         body = parsed.visibleContent;
-        collapsedCards = parsed.thinkingTexts.length;
+        if (settings.showThinkingCards) {
+          collapsedCards = parsed.thinkingTexts.length;
+        }
       }
     }
 
@@ -444,22 +567,30 @@ class _MessageListViewState extends State<MessageListView> {
     // 代码使用固定 13px 等宽字体渲染，因此换行列数和行高与正文不同。
     final codeFontSize = _estimateCodeFontSize * fontScale;
     final codeCharsPerLine = math.max(1.0, textWidth / (codeFontSize * 0.6));
+    final bodyLines = body.isEmpty
+        ? 0.0
+        : _wrappedLineCount(
+            body,
+            charsPerLine: charsPerLine,
+            codeCharsPerLine: settings.wrapCodeBlocks ? codeCharsPerLine : null,
+            codeLineRatio: codeFontSize / fontSize,
+            collapsedCodeLines: settings.collapsedCodeLines,
+          );
     final extent =
-        _wrappedLineCount(
-              body,
-              charsPerLine: charsPerLine,
-              codeCharsPerLine: settings.wrapCodeBlocks
-                  ? codeCharsPerLine
-                  : null,
-              codeLineRatio: codeFontSize / fontSize,
-              collapsedCodeLines: settings.collapsedCodeLines,
-            ) *
-            lineHeight +
+        bodyLines * lineHeight +
         _estimateChrome +
         collapsedCards * _estimateCollapsedCard +
-        _estimateReasoningExtent(
-          reasoning,
-          reasoningSegments,
+        (settings.showThinkingCards
+            ? _estimateReasoningExtent(
+                reasoning,
+                reasoningSegments,
+                textWidth: textWidth,
+                fontScale: fontScale,
+              )
+            : 0) +
+        _estimateToolExtent(
+          toolParts,
+          messageId: message.id,
           textWidth: textWidth,
           fontScale: fontScale,
         );
@@ -473,6 +604,7 @@ class _MessageListViewState extends State<MessageListView> {
       fontScale: fontScale,
       settings: settings,
       reasoningSignature: reasoningSignature,
+      toolSignature: toolSignature,
       extent: extent,
     );
     return extent;
@@ -517,6 +649,65 @@ class _MessageListViewState extends State<MessageListView> {
       addCard(reasoning.text, reasoning.expanded);
     }
     return extent;
+  }
+
+  double _estimateToolExtent(
+    List<ToolUIPart>? parts, {
+    required String messageId,
+    required double textWidth,
+    required double fontScale,
+  }) {
+    if (parts == null || parts.isEmpty) return 0;
+    final settings = _estimateSettings;
+    final cardTools = [
+      for (final part in parts)
+        if (toolCreatesTimelineCard(part.toolName)) part,
+    ];
+    if (cardTools.isEmpty) return 0;
+    final splits = widget.contentSplits[messageId];
+    final blocks = splitToolsIntoTimelineBlocks(
+      cardTools,
+      toolCounts: splits?.toolCounts,
+    );
+    var extent = 0.0;
+    for (final block in blocks) {
+      final visible = [
+        for (final part in block)
+          if (isTimelineToolVisible(
+            toolName: part.toolName,
+            loading: part.loading,
+            showToolCards: settings.showToolCards,
+            pendingApproval: settings.pendingApprovalIds.contains(part.id),
+          ))
+            part,
+      ];
+      if (visible.isEmpty) continue;
+      final collapsed = collapseTimelineSteps(
+        visible,
+        collapseThinkingSteps: settings.collapseThinkingSteps,
+      );
+      if (collapsed.hasExpandRow) extent += _estimateExpandRow;
+      for (final part in collapsed.visibleSteps) {
+        extent += _estimateCollapsedCard;
+        extent += estimateToolExtraHeight(
+          toolName: part.toolName,
+          arguments: part.arguments,
+          content: part.content,
+          showToolResultSummary: settings.showToolResultSummary,
+          hideToolResultImages: settings.hideToolResultImages,
+          pendingApproval: settings.pendingApprovalIds.contains(part.id),
+          textWidth: textWidth,
+          fontScale: fontScale,
+          wrappedLineCount: _wrappedLineCount,
+        );
+      }
+    }
+    return extent;
+  }
+
+  int _toolEstimateSignature(List<ToolUIPart>? parts) {
+    if (parts == null || parts.isEmpty) return 0;
+    return Object.hashAll([for (final part in parts) identityHashCode(part)]);
   }
 
   /// 估算所依据的推理输入身份。
@@ -679,6 +870,11 @@ class _MessageListViewState extends State<MessageListView> {
         oldWidget.showUserAvatar != widget.showUserAvatar ||
         oldWidget.showTokenStats != widget.showTokenStats ||
         oldWidget.collapseThinking != widget.collapseThinking ||
+        oldWidget.collapseThinkingSteps != widget.collapseThinkingSteps ||
+        oldWidget.showThinkingCards != widget.showThinkingCards ||
+        oldWidget.showToolCards != widget.showToolCards ||
+        oldWidget.showToolResultSummary != widget.showToolResultSummary ||
+        oldWidget.hideToolResultImages != widget.hideToolResultImages ||
         oldWidget.collapsedCodeLines != widget.collapsedCodeLines ||
         oldWidget.wrapCodeBlocks != widget.wrapCodeBlocks ||
         !identical(oldWidget.assistant, widget.assistant);
@@ -766,6 +962,12 @@ class _MessageListViewState extends State<MessageListView> {
           newModels[index].message,
         )) {
           changedIndices.add(index);
+        } else {
+          final messageId = newModels[index].message.id;
+          if (_lastToolSignatures[messageId] !=
+              _toolEstimateSignature(widget.toolParts[messageId])) {
+            changedIndices.add(index);
+          }
         }
       }
       if (slotsMatch) {
@@ -1019,6 +1221,9 @@ class _MessageListViewState extends State<MessageListView> {
 
   @override
   void dispose() {
+    widget.streamingContentNotifier?.toolHeightEvents.removeListener(
+      _handleToolHeightEvent,
+    );
     _scrollIdleTimer?.cancel();
     _deferStreamingMessageUpdates.dispose();
     _keyboardFocusNode.dispose();
@@ -1067,8 +1272,14 @@ class _MessageListViewState extends State<MessageListView> {
     _systemTextScale = MediaQuery.textScalerOf(context).scale(1);
     _estimateSettings = _EstimateSettings(
       collapseThinking: widget.collapseThinking,
+      collapseThinkingSteps: widget.collapseThinkingSteps,
+      showThinkingCards: widget.showThinkingCards,
+      showToolCards: widget.showToolCards,
+      showToolResultSummary: widget.showToolResultSummary,
+      hideToolResultImages: widget.hideToolResultImages,
       collapsedCodeLines: widget.collapsedCodeLines,
       wrapCodeBlocks: widget.wrapCodeBlocks,
+      pendingApprovalIds: _readPendingApprovalIds(context),
     );
     _invalidateEstimatesIfScaleChanged();
     final presentation = _MessagePresentation(
@@ -1398,7 +1609,7 @@ class _MessageListViewState extends State<MessageListView> {
               ),
             Expanded(
               child: (() {
-                Widget content = Builder(
+                Widget buildContent(bool processing) => Builder(
                   builder: (context) {
                     final baseMediaQuery = context
                         .getInheritedWidgetOfExactType<MediaQuery>();
@@ -1430,7 +1641,7 @@ class _MessageListViewState extends State<MessageListView> {
                               siblingBranchIds: siblingBranchIds,
                               selectedBranchIndex: selectedBranchIndex,
                               useBranchSelector: useBranchSelector,
-                              isProcessingFiles: isProcessingFiles,
+                              isProcessingFiles: processing,
                               suggestions: messageSuggestions,
                               presentation: presentation,
                             )
@@ -1451,13 +1662,23 @@ class _MessageListViewState extends State<MessageListView> {
                               siblingBranchIds: siblingBranchIds,
                               selectedBranchIndex: selectedBranchIndex,
                               useBranchSelector: useBranchSelector,
-                              isProcessingFiles: isProcessingFiles,
+                              isProcessingFiles: processing,
                               suggestions: messageSuggestions,
                               presentation: presentation,
                             ),
                     );
                   },
                 );
+
+                Widget content =
+                    message.role == 'assistant' &&
+                        widget.processingFilesMessageId != null
+                    ? ValueListenableBuilder<String?>(
+                        valueListenable: widget.processingFilesMessageId!,
+                        builder: (context, processingId, _) =>
+                            buildContent(processingId == message.id),
+                      )
+                    : buildContent(isProcessingFiles);
 
                 final canSelect =
                     (message.role == 'user' || message.role == 'assistant');
@@ -1807,37 +2028,103 @@ class _MessageListViewState extends State<MessageListView> {
           ? null
           : (part, result) =>
                 widget.onRecoveredAskUserAnswer!(message, part, result),
+      showThinkingCards: widget.showThinkingCards,
+      showToolCards: widget.showToolCards,
     );
   }
+
+  bool _hiddenStandaloneToolMessageRemainsVisible(String content) {
+    try {
+      final obj = jsonDecode(content);
+      return obj is Map && obj['tool']?.toString() == LocalToolNames.askUser;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Set<String> _readPendingApprovalIds(BuildContext context) {
+    try {
+      return context
+          .select<ToolApprovalService, _EstimateIdSet>(
+            (approval) => _EstimateIdSet({
+              for (final request in approval.pendingRequests)
+                request.toolCallId,
+            }),
+          )
+          .ids;
+    } on ProviderNotFoundException {
+      return const <String>{};
+    }
+  }
+}
+
+final class _EstimateIdSet {
+  const _EstimateIdSet(this.ids);
+
+  final Set<String> ids;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _EstimateIdSet && setEquals(other.ids, ids);
+
+  @override
+  int get hashCode => Object.hashAllUnordered(ids);
 }
 
 /// 影响消息渲染高度的显示设置。
 final class _EstimateSettings {
   const _EstimateSettings({
     required this.collapseThinking,
+    required this.collapseThinkingSteps,
+    required this.showThinkingCards,
+    required this.showToolCards,
+    required this.showToolResultSummary,
+    required this.hideToolResultImages,
     required this.collapsedCodeLines,
     required this.wrapCodeBlocks,
+    required this.pendingApprovalIds,
   });
 
   /// 已完成的思考块是否折叠为卡片渲染。
   final bool collapseThinking;
+  final bool collapseThinkingSteps;
+  final bool showThinkingCards;
+  final bool showToolCards;
+  final bool showToolResultSummary;
+  final bool hideToolResultImages;
 
   /// 长代码块折叠到的行数；保持展开时为 null。
   final int? collapsedCodeLines;
 
   /// 代码块是否换行而非水平滚动。
   final bool wrapCodeBlocks;
+  final Set<String> pendingApprovalIds;
 
   @override
   bool operator ==(Object other) =>
       other is _EstimateSettings &&
       other.collapseThinking == collapseThinking &&
+      other.collapseThinkingSteps == collapseThinkingSteps &&
+      other.showThinkingCards == showThinkingCards &&
+      other.showToolCards == showToolCards &&
+      other.showToolResultSummary == showToolResultSummary &&
+      other.hideToolResultImages == hideToolResultImages &&
       other.collapsedCodeLines == collapsedCodeLines &&
-      other.wrapCodeBlocks == wrapCodeBlocks;
+      other.wrapCodeBlocks == wrapCodeBlocks &&
+      setEquals(other.pendingApprovalIds, pendingApprovalIds);
 
   @override
-  int get hashCode =>
-      Object.hash(collapseThinking, collapsedCodeLines, wrapCodeBlocks);
+  int get hashCode => Object.hash(
+    collapseThinking,
+    collapseThinkingSteps,
+    showThinkingCards,
+    showToolCards,
+    showToolResultSummary,
+    hideToolResultImages,
+    collapsedCodeLines,
+    wrapCodeBlocks,
+    Object.hashAllUnordered(pendingApprovalIds),
+  );
 }
 
 /// 记忆化的范围估算及其全部推导依据。
@@ -1848,6 +2135,7 @@ final class _ExtentEstimate {
     required this.fontScale,
     required this.settings,
     required this.reasoningSignature,
+    required this.toolSignature,
     required this.extent,
   });
 
@@ -1856,6 +2144,7 @@ final class _ExtentEstimate {
   final double fontScale;
   final _EstimateSettings settings;
   final int reasoningSignature;
+  final int toolSignature;
   final double extent;
 }
 

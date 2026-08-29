@@ -37,7 +37,7 @@ void main() {
   test(
     'installation gate rejects every unpublished SQLite schema without mutation',
     () async {
-      for (final schemaVersion in <int>[5, 6, 7, 8, 9, 10, 11, 42]) {
+      for (final schemaVersion in <int>[6, 7, 8, 9, 10, 11, 42]) {
         final directory = await Directory.systemTemp.createTemp(
           'kelivo_reject_schema_${schemaVersion}_',
         );
@@ -217,6 +217,64 @@ void main() {
       unchanged.close();
     }
   });
+
+  test(
+    'schema 5 adds prompt source hashes and clears legacy prompt cache',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'kelivo_prompt_cache_migration_',
+      );
+      addTearDown(() async {
+        if (await directory.exists()) {
+          await directory.delete(recursive: true);
+        }
+      });
+      final file = File(p.join(directory.path, AppDatabase.databaseFileName));
+      final database = AppDatabase.open(file: file);
+      await database.customSelect('SELECT 1;').getSingle();
+      await database.close();
+
+      final raw = sqlite.sqlite3.open(file.path);
+      final now = DateTime.utc(2026, 1, 1).microsecondsSinceEpoch;
+      raw.execute(
+        'INSERT INTO conversation_rows (id, title, created_at, updated_at) '
+        "VALUES ('prompt-conversation', 'prompt', $now, $now);",
+      );
+      raw.execute(
+        'INSERT INTO message_rows '
+        '(id, conversation_id, role, timestamp, message_order) VALUES '
+        "('prompt-message', 'prompt-conversation', 'user', $now, 0);",
+      );
+      raw.execute(
+        'INSERT INTO message_prompt_rows '
+        '(revision_id, conversation_id, payload, carries_memory_snapshot, '
+        'created_at) VALUES '
+        "('prompt-message', 'prompt-conversation', 'stale', 0, $now);",
+      );
+      raw.userVersion = 4;
+      raw.close();
+
+      expect(
+        await ChatDatabaseRepository.migrateInstalledDatabase(file),
+        isTrue,
+      );
+
+      final migrated = sqlite.sqlite3.open(
+        file.path,
+        mode: sqlite.OpenMode.readOnly,
+      );
+      try {
+        expect(migrated.userVersion, 5);
+        expect(
+          migrated.select('PRAGMA table_info(message_prompt_rows);'),
+          anyElement(containsPair('name', 'source_content_hash')),
+        );
+        expect(migrated.select('SELECT * FROM message_prompt_rows;'), isEmpty);
+      } finally {
+        migrated.close();
+      }
+    },
+  );
 
   test(
     'schema 1 linear conversations migrate into populated tree tables',

@@ -94,6 +94,26 @@ void main() {
     }
   });
 
+  test(
+    'does not route an already tree SQLite schema to the migration page',
+    () async {
+      final verifier = SchemaVerifier(GeneratedHelper());
+      final schema = await verifier.schemaAt(4);
+      final raw = sqlite.sqlite3.open(database.path);
+      try {
+        await schema.rawDatabase.backup(raw).drain<void>();
+      } finally {
+        schema.close();
+        raw.close();
+      }
+
+      final decision = await SqliteSchemaMigrationService.check(appData);
+
+      expect(decision.schemaVersion, 4);
+      expect(decision.needsMigration, isFalse);
+    },
+  );
+
   test('creates and validates the 0.1.8 SQLite export payload', () async {
     final decision = await SqliteSchemaMigrationService.check(appData);
     final service = SqliteSchemaMigrationService(decision);

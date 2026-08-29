@@ -48,7 +48,10 @@ class UpdateInfo {
     return downloads['universal'] ?? downloads['android'] ?? downloads['ios'];
   }
 
-  factory UpdateInfo.fromGitHubRelease(Map<String, dynamic> json) {
+  factory UpdateInfo.fromGitHubRelease(
+    Map<String, dynamic> json, {
+    String appName = 'JO-Kelivo',
+  }) {
     final tagName = json['tag_name']?.toString() ?? '';
     final version = tagName.startsWith('v') || tagName.startsWith('V')
         ? tagName.substring(1)
@@ -61,7 +64,11 @@ class UpdateInfo {
       if (name == null || name.isEmpty || url == null || url.isEmpty) {
         continue;
       }
-      final match = assetPlatformMatch(name, expectedVersion: version);
+      final match = assetPlatformMatch(
+        name,
+        expectedVersion: version,
+        appName: appName,
+      );
       if (match == null) continue;
       final current = candidates[match.platform];
       if (current == null || match.priority < current.priority) {
@@ -76,7 +83,7 @@ class UpdateInfo {
       } catch (_) {}
     }
     return UpdateInfo(
-      app: 'JO-Kelivo',
+      app: appName,
       version: version,
       releasedAt: released,
       notes: json['body']?.toString(),
@@ -90,12 +97,16 @@ class UpdateInfo {
   static ({String platform, int priority})? assetPlatformMatch(
     String assetName, {
     String? expectedVersion,
+    String appName = 'JO-Kelivo',
   }) {
     final name = assetName.toLowerCase();
-    const prefix = r'jo-kelivo-v\d+\.\d+\.\d+(?:\+\d+)?';
+    final normalizedAppName = appName.toLowerCase();
+    if (!RegExp(r'^[a-z0-9-]+$').hasMatch(normalizedAppName)) return null;
+    final escapedAppName = RegExp.escape(normalizedAppName);
+    final prefix = '$escapedAppName-v\\d+\\.\\d+\\.\\d+(?:\\+\\d+)?';
     if (expectedVersion != null) {
       final match = RegExp(
-        r'^jo-kelivo-v(\d+\.\d+\.\d+(?:\+\d+)?)-',
+        '^$escapedAppName-v(\\d+\\.\\d+\\.\\d+(?:\\+\\d+)?)-',
       ).firstMatch(name);
       if (match == null) {
         return null;
@@ -138,6 +149,22 @@ class UpdateInfo {
 }
 
 class UpdateProvider extends ChangeNotifier {
+  UpdateProvider({http.Client? httpClient})
+    : _httpClient = httpClient ?? http.Client(),
+      _ownsHttpClient = httpClient == null;
+
+  static const _joAiClientReleaseUrl =
+      'https://api.github.com/repos/JO-Beacon/JO-AIClient/releases/latest';
+  static const _joKelivoReleaseUrl =
+      'https://api.github.com/repos/JO-Beacon/JO-Kelivo/releases/latest';
+  static const _githubHeaders = {
+    'Accept': 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+
+  final http.Client _httpClient;
+  final bool _ownsHttpClient;
+
   UpdateInfo? _available;
   UpdateInfo? get available => _available;
   bool _checking = false;
@@ -151,30 +178,22 @@ class UpdateProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      final url = Uri.parse(
-        'https://api.github.com/repos/JO-Beacon/JO-Kelivo/releases/latest',
-      );
-      final resp = await http.get(
-        url,
-        headers: const {
-          'Accept': 'application/vnd.github+json',
-          'X-GitHub-Api-Version': '2022-11-28',
-        },
-      );
-      if (resp.statusCode != 200) {
-        throw Exception('HTTP ${resp.statusCode}');
+      final joAiClientRelease = await _probeJoAiClientRelease();
+      if (joAiClientRelease != null) {
+        _available = joAiClientRelease;
+        return;
       }
-      final data =
-          jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
-      final info = UpdateInfo.fromGitHubRelease(data);
+
+      final info = await _fetchLatestRelease(
+        url: _joKelivoReleaseUrl,
+        appName: 'JO-Kelivo',
+      );
 
       final pkg = await PackageInfo.fromPlatform();
-      final currentVer = pkg.version; // 例如：1.0.0
-
-      // 仅按版本号比较，忽略构建号
       final hasNew = isRemoteNewerForTest(
         remoteVersion: info.version,
-        currentVersion: currentVer,
+        currentVersion: pkg.version,
+        currentBuildNumber: pkg.buildNumber,
       );
       _available = hasNew ? info : null;
     } catch (e) {
@@ -185,27 +204,79 @@ class UpdateProvider extends ChangeNotifier {
     }
   }
 
+  Future<UpdateInfo?> _probeJoAiClientRelease() async {
+    try {
+      final info = await _fetchLatestRelease(
+        url: _joAiClientReleaseUrl,
+        appName: 'JO-AIClient',
+      );
+      if (info.bestDownloadUrl() == null) {
+        debugPrint('[UpdateProvider] JO-AIClient 预埋更新路径尚无当前平台资产');
+        return null;
+      }
+      return info;
+    } catch (error) {
+      // 预埋迁移入口尚未启用时允许静默回落到现有 JO-Kelivo 更新源。
+      debugPrint('[UpdateProvider] JO-AIClient 预埋更新路径不可用：$error');
+      return null;
+    }
+  }
+
+  Future<UpdateInfo> _fetchLatestRelease({
+    required String url,
+    required String appName,
+  }) async {
+    final response = await _httpClient.get(
+      Uri.parse(url),
+      headers: _githubHeaders,
+    );
+    if (response.statusCode != 200) {
+      throw Exception('HTTP ${response.statusCode}');
+    }
+    final data =
+        jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    return UpdateInfo.fromGitHubRelease(data, appName: appName);
+  }
+
   @visibleForTesting
   static bool isRemoteNewerForTest({
     required String remoteVersion,
     required String currentVersion,
+    String? currentBuildNumber,
   }) {
     final a = _parseVersion(remoteVersion);
-    final b = _parseVersion(currentVersion);
+    final b = _parseVersion(
+      currentVersion,
+      fallbackBuildNumber: currentBuildNumber,
+    );
     if (a == null || b == null) return false;
-    if (a[0] != b[0]) return a[0] > b[0];
-    if (a[1] != b[1]) return a[1] > b[1];
-    if (a[2] != b[2]) return a[2] > b[2];
+    for (var index = 0; index < a.length; index++) {
+      if (a[index] != b[index]) return a[index] > b[index];
+    }
     return false;
   }
 
-  static List<int>? _parseVersion(String value) {
-    final match = RegExp(r'^(\d+)\.(\d+)\.(\d+)(?:\+\d+)?$').firstMatch(value);
+  static List<int>? _parseVersion(String value, {String? fallbackBuildNumber}) {
+    final match = RegExp(
+      r'^(\d+)\.(\d+)\.(\d+)(?:\+(\d+))?$',
+    ).firstMatch(value);
     if (match == null) return null;
+    final buildNumberText = match.group(4) ?? fallbackBuildNumber;
+    final buildNumber = buildNumberText == null || buildNumberText.isEmpty
+        ? 0
+        : int.tryParse(buildNumberText);
+    if (buildNumber == null) return null;
     return [
       int.parse(match.group(1)!),
       int.parse(match.group(2)!),
       int.parse(match.group(3)!),
+      buildNumber,
     ];
+  }
+
+  @override
+  void dispose() {
+    if (_ownsHttpClient) _httpClient.close();
+    super.dispose();
   }
 }

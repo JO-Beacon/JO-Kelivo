@@ -78,6 +78,14 @@ void main() {
     expect(find.text('Blur'), findsOneWidget);
     expect(find.text('Background'), findsOneWidget);
     expect(find.text('This is a user message'), findsWidgets);
+    expect(find.text('User'), findsOneWidget);
+    expect(find.text('Assistant'), findsOneWidget);
+    expect(
+      find.text(
+        'Assistant settings also apply to thinking, tool-call, and translation cards.',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('light and dark preview labels stay after switching', (

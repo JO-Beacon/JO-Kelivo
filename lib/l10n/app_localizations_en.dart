@@ -122,6 +122,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageSpaceCategoryFiles => 'Files';
 
   @override
+  String get storageSpaceCategoryFonts => 'Fonts';
+
+  @override
+  String get storageSpaceCategoryLocalModels => 'Local Models';
+
+  @override
+  String get storageSpaceOtherHint =>
+      'Fonts, downloaded local models, and other app files.';
+
+  @override
+  String get storageSpaceSubOtherApp => 'App files';
+
+  @override
   String get storageSpaceCategoryChatData => 'Chat Records';
 
   @override
@@ -155,7 +168,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageSpaceCategoryLogs => 'Logs';
 
   @override
-  String get storageSpaceCategoryOther => 'App';
+  String get storageSpaceCategoryOther => 'Other';
 
   @override
   String storageSpaceFilesCount(int count) {
@@ -1770,11 +1783,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Replace the selected components; keep unselected components and unrelated local settings';
 
   @override
-  String get backupPageMergeMode => 'Merge';
+  String get backupPageMergeMode => 'Smart merge';
 
   @override
   String get backupPageMergeModeDescription =>
-      'Keep local data and add backup data. Identical conversations are skipped and conflicting conversations receive new IDs.';
+      'Keep local data while merging the backup. Matching messages are deduplicated, new messages join the existing conversation, and conflicts stay separate.';
 
   @override
   String get backupPageRestore => 'Restore';
@@ -1915,7 +1928,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get backupPageImportFromChatbox => 'Import from Chatbox';
+  String get backupPageImportFromChatbox => 'Import from Chatbox (>=1.22)';
+
+  @override
+  String get backupPageImportFromChatboxLegacy => 'Import from Chatbox (<1.22)';
+
+  @override
+  String get backupPageChatboxLegacyStarredGroupName =>
+      'Chatbox Import (<1.22) · Pinned';
 
   @override
   String get backupPageImportFromDeepSeek => 'Import from DeepSeek Web/App';
@@ -2827,12 +2847,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String sideDrawerUpdateTitle(String version) {
-    return 'New version: $version';
+    return 'Update: $version';
   }
 
   @override
   String sideDrawerUpdateTitleWithBuild(String version, int build) {
-    return 'New version: $version ($build)';
+    return 'Update: $version ($build)';
   }
 
   @override
@@ -3172,7 +3192,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get defaultModelPageTitleModelSubtitle =>
-      'Used for summarizing conversation titles; prefer fast & cheap models';
+      'Used for summarizing conversation titles; prefer fast & cheap models. Disabled until a model is selected.';
 
   @override
   String get titleModelThinkingTitle => 'Enable Thinking';
@@ -4503,6 +4523,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Show token usage and message count';
 
   @override
+  String get displaySettingsPageShowThinkingCardsTitle => 'Show Thinking Cards';
+
+  @override
+  String get displaySettingsPageShowThinkingCardsSubtitle =>
+      'When off, thinking-process cards are hidden in chat';
+
+  @override
+  String get displaySettingsPageShowToolCardsTitle => 'Show Tool Cards';
+
+  @override
+  String get displaySettingsPageShowToolCardsSubtitle =>
+      'When off, tool-use cards are hidden in chat';
+
+  @override
   String get displaySettingsPageAutoCollapseThinkingTitle =>
       'Auto-collapse Thinking';
 
@@ -4529,6 +4563,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get displaySettingsPageShowToolResultSummarySubtitle =>
       'Display the summary text below tool steps';
+
+  @override
+  String get displaySettingsPageHideToolResultImagesTitle =>
+      'Hide Tool Result Images';
+
+  @override
+  String get displaySettingsPageHideToolResultImagesSubtitle =>
+      'Hide Markdown images displayed in tool results';
 
   @override
   String get displaySettingsPageRegenerateDeleteTrailingMessagesTitle =>
@@ -4579,6 +4621,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get displaySettingsPageShowUpdatesSubtitle =>
       'Show app update notifications';
+
+  @override
+  String get displaySettingsPageKeepScreenOnDuringGenerationTitle =>
+      'Keep Screen On While Generating';
+
+  @override
+  String get displaySettingsPageKeepScreenOnDuringGenerationSubtitle =>
+      'Prevents the lock screen from interrupting generation. Increases battery use.';
 
   @override
   String get displaySettingsPageMessageNavButtonsTitle =>
@@ -8156,4 +8206,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get messageStyleSettingsPagePreviewThinking => 'Thinking';
+
+  @override
+  String get messageStyleSettingsPageRoleUser => 'User';
+
+  @override
+  String get messageStyleSettingsPageRoleAssistant => 'Assistant';
+
+  @override
+  String get messageStyleSettingsPageRoleAssistantHint =>
+      'Assistant settings also apply to thinking, tool-call, and translation cards.';
 }

@@ -492,6 +492,98 @@ void main() {
       expect(await live.getAllConversations(), hasLength(2));
     });
 
+    test('同会话新增消息按消息级智能合并，重复导入保持幂等', () async {
+      final anchor = DateTime.utc(2026, 8, 7, 12);
+      await live.putMigrationBatch(
+        conversations: [
+          Conversation(
+            id: 'incremental',
+            title: 'Local',
+            createdAt: anchor,
+            updatedAt: anchor,
+            messageIds: const ['incremental-a'],
+          ),
+        ],
+        messages: [
+          (
+            message: ChatMessage(
+              id: 'incremental-a',
+              role: 'user',
+              content: 'first',
+              conversationId: 'incremental',
+              timestamp: anchor,
+            ),
+            messageOrder: 0,
+          ),
+        ],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+      await source.putMigrationBatch(
+        conversations: [
+          Conversation(
+            id: 'incremental',
+            title: 'Imported newer title',
+            createdAt: anchor,
+            updatedAt: anchor.add(const Duration(minutes: 1)),
+            messageIds: const ['incremental-a', 'incremental-b'],
+            mcpServerIds: const ['server'],
+          ),
+        ],
+        messages: [
+          (
+            message: ChatMessage(
+              id: 'incremental-a',
+              role: 'user',
+              content: 'first',
+              conversationId: 'incremental',
+              timestamp: anchor,
+            ),
+            messageOrder: 0,
+          ),
+          (
+            message: ChatMessage(
+              id: 'incremental-b',
+              role: 'assistant',
+              content: 'second',
+              conversationId: 'incremental',
+              timestamp: anchor.add(const Duration(minutes: 1)),
+            ),
+            messageOrder: 1,
+          ),
+        ],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+      await source.close();
+      sourceClosed = true;
+
+      final first = await live.mergeBackupSnapshot(sourceFile);
+      expect(first.importedConversations, 1);
+      expect(first.remappedConversations, 0);
+      expect(first.deduplicatedConversations, 0);
+      expect(
+        (await live.getMessagesRange(
+          'incremental',
+          start: 0,
+          limit: 10,
+        )).map((message) => message.content).toList(),
+        const ['first', 'second'],
+      );
+      expect(
+        (await live.loadConversationTree('incremental'))?.activePath(),
+        const ['incremental-a', 'incremental-b'],
+      );
+      expect((await live.getConversation('incremental'))?.mcpServerIds, [
+        'server',
+      ]);
+
+      final second = await live.mergeBackupSnapshot(sourceFile);
+      expect(second.importedConversations, 0);
+      expect(second.deduplicatedConversations, 1);
+      expect(await live.getAllConversations(), hasLength(1));
+    });
+
     test('conversation ID 可用但 message ID 冲突时整会话 remap', () async {
       await putConversation(
         live,

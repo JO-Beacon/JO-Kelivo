@@ -1021,7 +1021,15 @@ class ChatApiService {
         final isReasoning = effectiveInfo.abilities.contains(
           ModelAbility.reasoning,
         );
-        final effort = _openAIEffortForBudget(thinkingBudget, upstreamModelId);
+        var effort = _openAIEffortForBudget(thinkingBudget, upstreamModelId);
+        // 标题生成走 DeepSeek 的非流式兼容接口；该接口接受 xhigh，
+        // 而普通聊天请求仍按 chat-completions 兼容矩阵归一化。
+        if (_isDeepSeekClaudeCompatible(upstreamModelId, config: config) &&
+            thinkingBudget != null &&
+            thinkingBudget >= 64000 &&
+            effort == 'high') {
+          effort = 'xhigh';
+        }
         final info = _OpenAIProviderInfo(
           host: Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '',
           providerId: config.id.toLowerCase(),
@@ -1604,9 +1612,13 @@ class ChatApiService {
       if (!_isClaudeReasoningEnabled(budget)) return null;
       final effort = _claudeEffortForBudget(budget);
       if (effort == 'auto' || effort == 'off') return null;
-      return <String, dynamic>{
-        'effort': (effort == 'xhigh' || effort == 'max') ? 'max' : 'high',
+      final mapped = switch (effort) {
+        'low' => 'low',
+        'xhigh' => 'xhigh',
+        'max' => 'max',
+        _ => 'high',
       };
+      return <String, dynamic>{'effort': mapped};
     }
     if (!_supportsClaudeAdaptiveThinking(modelId) ||
         !_isClaudeReasoningEnabled(budget)) {

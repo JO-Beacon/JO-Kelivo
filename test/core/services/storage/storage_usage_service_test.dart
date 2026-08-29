@@ -31,6 +31,7 @@ class _FakePathProviderPlatform extends PathProviderPlatform {
 
 Future<void> _writeSizedFile(Directory root, String name, int size) async {
   final file = File(p.join(root.path, name));
+  await file.parent.create(recursive: true);
   await file.writeAsBytes(List<int>.filled(size, 1), flush: true);
 }
 
@@ -233,6 +234,30 @@ void main() {
       ),
       isEmpty,
     );
+  });
+
+  test('fonts and local models are listed under other', () async {
+    await _writeSizedFile(tempDir, p.join('fonts', 'Custom.ttf'), 40);
+    await _writeSizedFile(
+      tempDir,
+      p.join('asr_models', 'paraformer', 'model.onnx'),
+      80,
+    );
+    await _writeSizedFile(tempDir, p.join('asr_models', '.part'), 16);
+    await _writeSizedFile(tempDir, 'settings.json', 8);
+
+    final report = await StorageUsageService.computeReport();
+    final other = report.categories.singleWhere(
+      (category) => category.key == StorageUsageCategoryKey.other,
+    );
+    expect(other.stats.bytes, 144);
+    expect(other.stats.fileCount, 4);
+    expect(other.subcategories.map((subcategory) => subcategory.id), [
+      'fonts',
+      'local_models',
+      'app',
+    ]);
+    expect(report.totalBytes, 144);
   });
 
   test('restore traces stay hidden while a restore run is active', () async {

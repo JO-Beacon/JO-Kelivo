@@ -6,6 +6,8 @@
 #include <windows.h>
 
 #include <iostream>
+#include <algorithm>
+#include <cwctype>
 
 void CreateAndAttachConsole() {
   if (::AllocConsole()) {
@@ -41,6 +43,18 @@ std::vector<std::string> GetCommandLineArguments() {
   return command_line_arguments;
 }
 
+std::wstring GetAssociatedBackupPath(
+    const std::vector<std::string>& arguments) {
+  for (const auto& argument : arguments) {
+    const auto path = Utf8ToWide(argument);
+    if (path.size() < 11) continue;
+    auto suffix = path.substr(path.size() - 11);
+    std::transform(suffix.begin(), suffix.end(), suffix.begin(), towlower);
+    if (suffix == L".joaiclient") return path;
+  }
+  return std::wstring();
+}
+
 std::string Utf8FromUtf16(const wchar_t* utf16_string) {
   if (utf16_string == nullptr) {
     return std::string();
@@ -62,4 +76,19 @@ std::string Utf8FromUtf16(const wchar_t* utf16_string) {
     return std::string();
   }
   return utf8_string;
+}
+
+std::wstring Utf8ToWide(const std::string& utf8_string) {
+  if (utf8_string.empty()) return std::wstring();
+  const int length = ::MultiByteToWideChar(
+      CP_UTF8, MB_ERR_INVALID_CHARS, utf8_string.data(),
+      static_cast<int>(utf8_string.size()), nullptr, 0);
+  if (length <= 0) return std::wstring();
+  std::wstring result(length, L'\0');
+  if (::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, utf8_string.data(),
+                            static_cast<int>(utf8_string.size()), result.data(),
+                            length) != length) {
+    return std::wstring();
+  }
+  return result;
 }

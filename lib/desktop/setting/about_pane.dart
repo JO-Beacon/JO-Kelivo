@@ -10,6 +10,7 @@ import '../../core/providers/update_provider.dart';
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
 import '../../shared/widgets/snackbar.dart';
+import '../../shared/widgets/update_release_notes_card.dart';
 import '../../shared/widgets/update_status_label.dart';
 import '../../theme/app_font_weights.dart';
 
@@ -23,8 +24,8 @@ class DesktopAboutPane extends StatefulWidget {
 enum _InfoLoadState { loading, loaded, failed }
 
 class _DesktopAboutPaneState extends State<DesktopAboutPane> {
-  static const String _upstreamKelivoVersion = '1.2.3';
-  static const String _upstreamKelivoBuildNumber = '67';
+  static const String _upstreamKelivoVersion = '1.2.4';
+  static const String _upstreamKelivoBuildNumber = '68';
 
   String _version = '';
   String _buildNumber = '';
@@ -179,6 +180,16 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
                 onCheckForUpdates: _checkForUpdates,
               ),
 
+              if (updateProvider.available case final update?) ...[
+                const SizedBox(height: 16),
+                UpdateReleaseNotesCard(
+                  key: const ValueKey('about-update-release-notes'),
+                  title: l10n.sideDrawerUpdateTitle(update.version),
+                  notes: update.notes ?? '',
+                  onLinkTap: _openUrl,
+                ),
+              ],
+
               const SizedBox(height: 16),
 
               // JO-Kelivo 信息和链接
@@ -318,6 +329,7 @@ class _AppHeaderCardState extends State<_AppHeaderCard> {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
@@ -349,14 +361,6 @@ class _AppHeaderCardState extends State<_AppHeaderCard> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: UpdateStatusLabel(
-                                label: widget.updateLabel,
-                                icon: lucide.Lucide.RefreshCw,
-                                enabled: widget.updateEnabled,
-                              ),
-                            ),
                           ],
                         ),
                         const SizedBox(height: 4),
@@ -372,6 +376,12 @@ class _AppHeaderCardState extends State<_AppHeaderCard> {
                         ),
                       ],
                     ),
+                  ),
+                  const SizedBox(width: 8),
+                  UpdateStatusLabel(
+                    label: widget.updateLabel,
+                    icon: lucide.Lucide.RefreshCw,
+                    checking: !widget.updateEnabled,
                   ),
                 ],
               ),

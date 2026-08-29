@@ -3198,6 +3198,7 @@ class _MarkdownTableBlockState extends State<_MarkdownTableBlock> {
   static const int _rowPageSize = 100;
   final GlobalKey _tableBoundaryKey = GlobalKey();
   int _visibleRows = _initialRows;
+  bool _capturingTableImage = false;
 
   _MarkdownTableData get rows => widget.rows;
   TextStyle get style => widget.style;
@@ -3211,14 +3212,21 @@ class _MarkdownTableBlockState extends State<_MarkdownTableBlock> {
     final borderColor = cs.outlineVariant.withValues(
       alpha: isDark ? 0.22 : 0.30,
     );
-    final headerBg = Color.alphaBlend(
+    final headerFill = Color.alphaBlend(
       cs.primary.withValues(alpha: isDark ? 0.15 : 0.07),
       cs.surface,
-    ).withValues(alpha: kBlockFillAlphaTable);
-    final bodyBg = Color.alphaBlend(
+    );
+    final bodyFill = Color.alphaBlend(
       cs.primary.withValues(alpha: isDark ? 0.04 : 0.015),
       cs.surface,
-    ).withValues(alpha: kBlockFillAlphaTable);
+    );
+    // 壁纸模式下屏幕保持半透明；导出时必须不透明，避免 Android JPEG 将透明区转黑。
+    final headerBg = _capturingTableImage
+        ? headerFill
+        : headerFill.withValues(alpha: kBlockFillAlphaTable);
+    final bodyBg = _capturingTableImage
+        ? bodyFill
+        : bodyFill.withValues(alpha: kBlockFillAlphaTable);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -3257,7 +3265,9 @@ class _MarkdownTableBlockState extends State<_MarkdownTableBlock> {
           context,
           table: table,
           // 紧凑表格已经在外层绘制卡片填充；第二层填充会叠加并挡住壁纸。
-          bodyBg: useCompactTable ? Colors.transparent : bodyBg,
+          bodyBg: useCompactTable && !_capturingTableImage
+              ? Colors.transparent
+              : bodyBg,
           borderColor: borderColor,
           compact: useCompactTable,
         );
@@ -3628,14 +3638,23 @@ class _MarkdownTableBlockState extends State<_MarkdownTableBlock> {
   }
 
   Future<Uint8List?> _captureTablePngBytes() async {
-    await WidgetsBinding.instance.endOfFrame;
-    final boundary =
-        _tableBoundaryKey.currentContext?.findRenderObject()
-            as RenderRepaintBoundary?;
-    if (boundary == null) return null;
-    final image = await boundary.toImage(pixelRatio: 3.0);
-    final data = await image.toByteData(format: ui.ImageByteFormat.png);
-    return data?.buffer.asUint8List();
+    setState(() => _capturingTableImage = true);
+    try {
+      await WidgetsBinding.instance.endOfFrame;
+      final boundary =
+          _tableBoundaryKey.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
+      if (boundary == null) return null;
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      try {
+        final data = await image.toByteData(format: ui.ImageByteFormat.png);
+        return data?.buffer.asUint8List();
+      } finally {
+        image.dispose();
+      }
+    } finally {
+      if (mounted) setState(() => _capturingTableImage = false);
+    }
   }
 
   Future<File> _writeTableImageTempFile(Uint8List bytes) async {

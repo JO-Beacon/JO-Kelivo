@@ -1,12 +1,18 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
+import '../../core/services/backup/associated_backup_path.dart';
 import '../../l10n/app_localizations.dart';
 import '../../shared/widgets/restart_app_action.dart';
+import '../../utils/app_directories.dart';
 import '../../utils/platform_utils.dart';
 
 Future<void> showBackupRestartRequiredDialog(
   BuildContext context, {
   int skippedConversations = 0,
+  bool suppressAssociatedPathOnRestart = false,
+  String? associatedBackupPath,
 }) {
   final l10n = AppLocalizations.of(context)!;
   return showDialog<void>(
@@ -26,10 +32,35 @@ Future<void> showBackupRestartRequiredDialog(
         actions: [
           TextButton(
             onPressed: () async {
-              if (await requestAppRestart(
-                    dialogContext,
-                    PlatformUtils.restartApp,
-                  ) &&
+              Directory? appDataDirectory;
+              Future<void> restart() async {
+                if (suppressAssociatedPathOnRestart ||
+                    associatedBackupPath != null) {
+                  appDataDirectory = await AppDirectories.getAppDataDirectory();
+                }
+                if (suppressAssociatedPathOnRestart) {
+                  await AssociatedBackupPathEvents.persistRestartSuppression(
+                    appDataDirectory!,
+                  );
+                }
+                try {
+                  await PlatformUtils.restartApp();
+                } catch (_) {
+                  if (appDataDirectory != null) {
+                    await AssociatedBackupPathEvents.clearRestartSuppression(
+                      appDataDirectory!,
+                    );
+                    if (associatedBackupPath != null) {
+                      await AssociatedBackupPathEvents.clearConsumedPath(
+                        appDataDirectory!,
+                      );
+                    }
+                  }
+                  rethrow;
+                }
+              }
+
+              if (await requestAppRestart(dialogContext, restart) &&
                   dialogContext.mounted) {
                 Navigator.of(dialogContext).pop();
               }

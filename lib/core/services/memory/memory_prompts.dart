@@ -491,18 +491,17 @@ Input:
     'Sun',
   ];
 
-  /// 将时间戳包裹在 `<当前时间>EEEE 年 MM 月 DD 日 HH:MM:SS</当前时间>` 中
-  /// 在本地时区，无UTC偏移量（§9.1）。
+  /// 将时间戳按本地时区包裹为四位年份的 `<current_time>` 标签（§9.1）。
   static String formatCurrentTimeTag(DateTime timestamp) {
     final local = timestamp.isUtc ? timestamp.toLocal() : timestamp;
     final eee = _weekdayAbbrev[local.weekday - 1];
-    final yy = (local.year % 100).toString().padLeft(2, '0');
+    final yyyy = local.year.toString().padLeft(4, '0');
     final mm = local.month.toString().padLeft(2, '0');
     final dd = local.day.toString().padLeft(2, '0');
     final hh = local.hour.toString().padLeft(2, '0');
     final min = local.minute.toString().padLeft(2, '0');
     final ss = local.second.toString().padLeft(2, '0');
-    return '<current_time>$eee $yy-$mm-$dd $hh:$min:$ss</current_time>';
+    return '<current_time>$eee $yyyy-$mm-$dd $hh:$min:$ss</current_time>';
   }
 
   /// 返回哪些日期、时间和时间戳在

@@ -13,6 +13,7 @@ import '../../../support/business_test_harness.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/chat_input_data.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
@@ -59,6 +60,8 @@ void main() {
   late SettingsProvider settings;
   late AssistantProvider assistantProvider;
   var streamRequestCount = 0;
+  final streamRequestBodies = <Map<String, dynamic>>[];
+  Completer<void>? streamResponseGate;
 
   Future<void> handleApiRequest(HttpRequest request) async {
     final body =
@@ -66,6 +69,9 @@ void main() {
             as Map<String, dynamic>;
     if (body['stream'] == true) {
       streamRequestCount++;
+      streamRequestBodies.add(body);
+      final gate = streamResponseGate;
+      if (gate != null) await gate.future;
       request.response.statusCode = HttpStatus.ok;
       request.response.headers.contentType = ContentType(
         'text',
@@ -119,6 +125,8 @@ void main() {
     service = ChatService(existingRepository: repository);
     await service.init();
     streamRequestCount = 0;
+    streamRequestBodies.clear();
+    streamResponseGate = null;
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen(handleApiRequest);
   });
@@ -258,6 +266,31 @@ void main() {
       );
     });
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('发送调用在回复完成前于消息对落库后返回', (tester) async {
+    final controller = await pumpHarness(tester);
+    await tester.runAsync(() async {
+      final convo = await openConversation(controller);
+      streamResponseGate = Completer<void>();
+      final resultFuture = controller.sendMessage(
+        const ChatInputData(text: 'early return'),
+      );
+      await waitFor(() => streamRequestCount == 1, 'stream request to fire');
+      final result = await resultFuture;
+      expect(result, ChatInputSubmissionResult.sent);
+      expect(controller.chatController.isConversationLoading(convo.id), isTrue);
+      expect(
+        (await service.loadMessages(convo.id)).where((m) => m.role == 'user'),
+        hasLength(1),
+      );
+      streamResponseGate!.complete();
+      streamResponseGate = null;
+      await waitFor(
+        () => !controller.chatController.isConversationLoading(convo.id),
+        'streaming to finish',
+      );
+    });
   });
 
   testWidgets('single-flight cancel hides loading before slow teardown', (
@@ -922,6 +955,67 @@ void main() {
     });
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'regeneration after deleting the reply and overwriting the user message uses new content',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      await tester.runAsync(() async {
+        final convo = await openConversation(controller);
+        await controller.sendMessage(ChatInputData(text: 'A'));
+        await waitFor(() => streamRequestCount == 1, 'initial stream to fire');
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(convo.id),
+          'initial streaming to finish',
+        );
+
+        final initial = await service.loadMessages(convo.id);
+        final user = initial.firstWhere((message) => message.role == 'user');
+        final assistant = initial.firstWhere(
+          (message) => message.role == 'assistant',
+        );
+        expect(await repository.getMessagePrompt(user.id), isNotNull);
+        await controller.deleteMessageOnly(
+          message: assistant,
+          byGroup: controller.visibleGroupedMessages,
+        );
+        await service.overwriteMessage(
+          messageId: user.id,
+          parts: const [TextPart('B')],
+        );
+        // 模拟旧版本编辑路径留下的持久化冻结提示词：即使消息正文已经
+        // 覆盖为 B，重启后该行仍可能被新一轮生成优先命中。
+        await repository.putMessagePrompt(
+          revisionId: user.id,
+          conversationId: convo.id,
+          payload: 'A',
+          carriesMemorySnapshot: false,
+          sourceContentHash: 'stale-hash-for-A',
+        );
+        expect((await repository.getMessagePrompt(user.id))?.payload, 'A');
+        final contextBeforeRegeneration = await controller.chatController
+            .messagesForGenerationContext(convo, maxMessages: 20);
+        expect(contextBeforeRegeneration.single.content, 'B');
+
+        // Pass the pre-edit UI snapshot, matching a stale row callback.
+        await controller.regenerateAtMessage(user);
+        await waitFor(() => streamRequestCount == 2, 'regeneration stream');
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(convo.id),
+          'regeneration streaming to finish',
+        );
+
+        final body = streamRequestBodies.last;
+        final requestMessages = (body['messages'] as List)
+            .whereType<Map>()
+            .map((message) => message['content']?.toString() ?? '')
+            .toList();
+        expect(requestMessages, contains('B'));
+        expect(requestMessages, isNot(contains('A')));
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('duplicate edit entry shares one edit operation', (tester) async {
     final controller = await pumpHarness(tester);

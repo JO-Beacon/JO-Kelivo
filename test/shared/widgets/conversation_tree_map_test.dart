@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
@@ -151,6 +152,7 @@ void main() {
   });
 
   testWidgets('mouse wheel scrolls vertically without zooming', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     final fixture = _branchingFixture();
     final messages = fixture.messages;
     final tree = fixture.tree;
@@ -174,6 +176,7 @@ void main() {
         ),
       ),
     );
+    debugDefaultTargetPlatformOverride = null;
 
     final viewer = tester.widget<InteractiveViewer>(
       find.byType(InteractiveViewer),
@@ -195,6 +198,7 @@ void main() {
   testWidgets('horizontal mouse wheel scrolls horizontally without zooming', (
     tester,
   ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     final fixture = _branchingFixture();
     final messages = fixture.messages;
     final tree = fixture.tree;
@@ -218,6 +222,7 @@ void main() {
         ),
       ),
     );
+    debugDefaultTargetPlatformOverride = null;
 
     final viewer = tester.widget<InteractiveViewer>(
       find.byType(InteractiveViewer),
@@ -239,6 +244,7 @@ void main() {
   testWidgets('horizontal mouse wheel scrolls over the horizontal scrollbar', (
     tester,
   ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     final fixture = _branchingFixture();
 
     await tester.pumpWidget(
@@ -260,6 +266,7 @@ void main() {
         ),
       ),
     );
+    debugDefaultTargetPlatformOverride = null;
 
     final controller = tester
         .widget<InteractiveViewer>(find.byType(InteractiveViewer))
@@ -359,6 +366,7 @@ void main() {
   testWidgets('ctrl plus mouse wheel zooms the interactive tree map', (
     tester,
   ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     final fixture = _branchingFixture();
     final messages = fixture.messages;
     final tree = fixture.tree;
@@ -382,6 +390,7 @@ void main() {
         ),
       ),
     );
+    debugDefaultTargetPlatformOverride = null;
 
     final viewer = tester.widget<InteractiveViewer>(
       find.byType(InteractiveViewer),
@@ -401,6 +410,64 @@ void main() {
     }
 
     expect(controller.value.getMaxScaleOnAxis(), greaterThan(before));
+  });
+
+  testWidgets('two-finger pinch zooms the interactive tree map', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    try {
+      final fixture = _branchingFixture();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 180,
+                height: 140,
+                child: ConversationTreeMap(
+                  tree: fixture.tree,
+                  messages: fixture.messages,
+                  onTapMessage: (_) {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final viewer = tester.widget<InteractiveViewer>(
+        find.byType(InteractiveViewer),
+      );
+      final controller = viewer.transformationController!;
+      final before = controller.value.getMaxScaleOnAxis();
+      final center = tester.getCenter(find.byType(InteractiveViewer));
+      final firstFinger = await tester.createGesture(
+        pointer: 1,
+        kind: PointerDeviceKind.touch,
+      );
+      final secondFinger = await tester.createGesture(
+        pointer: 2,
+        kind: PointerDeviceKind.touch,
+      );
+
+      await firstFinger.down(center + const Offset(-24, 0));
+      await secondFinger.down(center + const Offset(24, 0));
+      await tester.pump();
+      await firstFinger.moveTo(center + const Offset(-96, 0));
+      await secondFinger.moveTo(center + const Offset(96, 0));
+      await tester.pump();
+      await firstFinger.up();
+      await secondFinger.up();
+      await tester.pumpAndSettle();
+
+      expect(controller.value.getMaxScaleOnAxis(), greaterThan(before));
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 
   testWidgets('dragging the map and scrollbars pans the same viewport', (

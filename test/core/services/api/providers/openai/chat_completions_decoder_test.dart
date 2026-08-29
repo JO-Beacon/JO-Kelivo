@@ -146,6 +146,64 @@ void main() {
     expect(root.chunks.whereType<ToolCallEnd>().single.id, 'root_1');
   });
 
+  test('malformed optional tool fields do not discard streamed text', () {
+    final decoder = ChatCompletionsStreamDecoder();
+    final result = decoder.accept(
+      _event(
+        _choice(
+          delta: <String, dynamic>{
+            'content': '正文仍然保留。',
+            'tool_calls': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'index': 'invalid',
+                'id': 7,
+                'function': <String, dynamic>{
+                  'name': 9,
+                  'arguments': <String, dynamic>{},
+                },
+              },
+            ],
+          },
+        ),
+      ),
+    );
+
+    expect(result.chunks.whereType<TextDelta>().single.text, '正文仍然保留。');
+    expect(result.chunks.whereType<ToolCallStart>(), isEmpty);
+    expect(decoder.toolCalls, isEmpty);
+  });
+
+  test('null streamed tool index uses the default slot', () {
+    final decoder = ChatCompletionsStreamDecoder();
+    final result = decoder.accept(
+      _event(
+        _choice(
+          delta: <String, dynamic>{
+            'tool_calls': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'index': null,
+                'id': 'call_null',
+                'function': <String, dynamic>{
+                  'name': 'lookup',
+                  'arguments': '{}',
+                },
+              },
+            ],
+          },
+          finishReason: 'tool_calls',
+        ),
+      ),
+    );
+
+    expect(decoder.toolCalls[0], <String, String>{
+      'id': 'call_null',
+      'name': 'lookup',
+      'args': '{}',
+    });
+    expect(result.chunks.whereType<ToolCallStart>().single.id, 'call_null');
+    expect(result.chunks.whereType<ToolCallEnd>().single.id, 'call_null');
+  });
+
   test('uses StreamChunkIds when a tool call has no vendor id', () {
     final decoder = ChatCompletionsStreamDecoder(sourceId: 'round-0');
     final first = decoder.accept(

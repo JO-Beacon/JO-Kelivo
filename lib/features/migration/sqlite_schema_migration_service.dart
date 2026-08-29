@@ -110,9 +110,10 @@ final class SqliteSchemaMigrationService implements MigrationWorkflow {
     }
     final schemaVersion = _readUserVersion(databaseFile);
     return SqliteSchemaMigrationDecision(
-      needsMigration:
-          schemaVersion >= 1 &&
-          schemaVersion < AppDatabase.currentSchemaVersion,
+      // 该页面只负责 0.1.8 的线性 SQLite -> 树化 SQLite 迁移。
+      // 已进入新契约的 schema 2+ 应由 Drift 在启动准入时自动升级，
+      // 不能因为新增普通 schema 版本就再次拦截到人工迁移页面。
+      needsMigration: schemaVersion == 1,
       appDataDirectory: appDataDirectory,
       databaseFile: databaseFile,
       schemaVersion: schemaVersion,

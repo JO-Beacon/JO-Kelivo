@@ -13,6 +13,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     CreateAndAttachConsole();
   }
 
+  std::vector<std::string> command_line_arguments =
+      GetCommandLineArguments();
+  const std::wstring associated_backup_path =
+      GetAssociatedBackupPath(command_line_arguments);
+
   // Enforce a single running instance on Windows using a named mutex.
   HANDLE instance_mutex =
       ::CreateMutexW(nullptr, TRUE, L"JOKelivoMutex");
@@ -23,7 +28,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     // after the bounded wait.
     const DWORD wait_result = ::WaitForSingleObject(instance_mutex, 2000);
     if (wait_result != WAIT_OBJECT_0 && wait_result != WAIT_ABANDONED) {
-      Win32Window::SendAppLinkToInstance(L"JO-AIClient");
+      for (int attempt = 0; attempt < 20; ++attempt) {
+        if (Win32Window::SendAppLinkToInstance(
+                L"JO-AIClient", associated_backup_path)) {
+          break;
+        }
+        ::Sleep(100);
+      }
       ::CloseHandle(instance_mutex);
       return 0;
     }
@@ -37,9 +48,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   // https://github.com/flutter/flutter/issues/175135
   project.set_ui_thread_policy(flutter::UIThreadPolicy::RunOnSeparateThread);
-
-  std::vector<std::string> command_line_arguments =
-      GetCommandLineArguments();
 
   project.set_dart_entrypoint_arguments(std::move(command_line_arguments));
 

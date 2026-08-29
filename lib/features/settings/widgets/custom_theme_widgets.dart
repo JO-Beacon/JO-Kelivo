@@ -33,6 +33,10 @@ Future<T?> showAppDialog<T>(
   BuildContext context, {
   required Widget child,
   double maxWidth = 420,
+  EdgeInsets insetPadding = const EdgeInsets.symmetric(
+    horizontal: 24,
+    vertical: 24,
+  ),
 }) {
   return showGeneralDialog<T>(
     context: context,
@@ -48,29 +52,32 @@ Future<T?> showAppDialog<T>(
         child: Material(
           type: MaterialType.transparency,
           child: Center(
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTap: () {},
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: maxWidth,
-                  maxHeight: MediaQuery.of(ctx).size.height * 0.85,
-                ),
-                child: DecoratedBox(
-                  decoration: ShapeDecoration(
-                    color: cs.surface,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      side: BorderSide(
-                        color: isDark
-                            ? cs.onSurface.withValues(alpha: 0.08)
-                            : cs.outlineVariant.withValues(alpha: 0.25),
+            child: Padding(
+              padding: insetPadding,
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () {},
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: maxWidth,
+                    maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+                  ),
+                  child: DecoratedBox(
+                    decoration: ShapeDecoration(
+                      color: cs.surface,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        side: BorderSide(
+                          color: isDark
+                              ? cs.onSurface.withValues(alpha: 0.08)
+                              : cs.outlineVariant.withValues(alpha: 0.25),
+                        ),
                       ),
                     ),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
-                    child: child,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: child,
+                    ),
                   ),
                 ),
               ),

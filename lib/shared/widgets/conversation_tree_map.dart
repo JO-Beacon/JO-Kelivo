@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -111,7 +113,11 @@ class ConversationTreeMapState extends State<ConversationTreeMap> {
                     boundaryMargin: EdgeInsets.zero,
                     minScale: _minScale,
                     maxScale: _maxScale,
-                    scaleEnabled: false,
+                    // 仅在移动端启用 InteractiveViewer 的触摸缩放；桌面端
+                    // 的 Ctrl+滚轮仍由外层 PointerSignal 处理。
+                    scaleEnabled:
+                        defaultTargetPlatform == TargetPlatform.android ||
+                        defaultTargetPlatform == TargetPlatform.iOS,
                     panAxis: PanAxis.free,
                     clipBehavior: Clip.hardEdge,
                     child: SizedBox(

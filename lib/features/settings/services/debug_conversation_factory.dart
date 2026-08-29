@@ -4,17 +4,20 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
+import '../../../core/models/conversation_tree.dart';
 
 class DebugConversationSeed {
   const DebugConversationSeed({
     required this.conversation,
     required this.messages,
     required this.totalContentBytes,
+    required this.conversationTree,
   });
 
   final Conversation conversation;
   final List<ChatMessage> messages;
   final int totalContentBytes;
+  final ConversationTree conversationTree;
 }
 
 class DebugConversationFactory {
@@ -74,6 +77,7 @@ class DebugConversationFactory {
       conversation: conversation,
       messages: messages,
       totalContentBytes: totalBytes,
+      conversationTree: _linearTree(conversation, messages),
     );
   }
 
@@ -117,6 +121,7 @@ class DebugConversationFactory {
       conversation: conversation,
       messages: messages,
       totalContentBytes: totalBytes,
+      conversationTree: _linearTree(conversation, messages),
     );
   }
 
@@ -189,6 +194,19 @@ class DebugConversationFactory {
       conversation: conversation,
       messages: messages,
       totalContentBytes: totalBytes,
+      conversationTree: _linearTree(conversation, messages),
+    );
+  }
+
+  static ConversationTree _linearTree(
+    Conversation conversation,
+    List<ChatMessage> messages,
+  ) {
+    return ConversationTree.linear(
+      conversationId: conversation.id,
+      messageIds: [for (final message in messages) message.id],
+      activeBranchId: 'root-${conversation.id}',
+      createdAt: conversation.createdAt,
     );
   }
 

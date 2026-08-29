@@ -8,6 +8,7 @@ import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
 import '../../core/database/business_repository.dart';
 import '../../core/models/backup.dart';
+import '../../core/models/backup_task_progress.dart';
 import '../../core/providers/backup_provider.dart';
 import '../../core/providers/backup_reminder_provider.dart';
 import '../../core/providers/s3_backup_provider.dart';
@@ -310,6 +311,89 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
         ),
       );
     });
+  }
+
+  Future<void> _importLegacyChatbox() async {
+    final l10n = AppLocalizations.of(context)!;
+    final rootCtx = Navigator.of(context, rootNavigator: true).context;
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+      allowMultiple: false,
+    );
+    final path = result?.files.single.path;
+    if (path == null || !mounted) return;
+    final mode = await showDialog<RestoreMode>(
+      context: context,
+      builder: (_) => _RestoreModeDialog(),
+    );
+    if (mode == null || !mounted) return;
+
+    final businessRepository = context.read<BusinessRepository>();
+    final chatService = context.read<ChatService>();
+    try {
+      final imported = await runWithLoadingTaskDialog<ChatboxImportResult>(
+        context: context,
+        cancellableTask: (onProgress, cancelToken) =>
+            ChatboxImporter.importFromChatbox(
+              file: File(path),
+              mode: mode,
+              businessRepository: businessRepository,
+              chatService: chatService,
+              starredGroupName: l10n.backupPageChatboxLegacyStarredGroupName,
+              cancelToken: cancelToken,
+              onProgress: onProgress,
+            ),
+        label: l10n.backupPageRestore,
+        cancelLabel: l10n.backupPageCancel,
+      );
+      if (!rootCtx.mounted) return;
+      await showDialog(
+        context: rootCtx,
+        builder: (dctx) => AlertDialog(
+          title: Text(l10n.backupPageRestartRequired),
+          content: Text(
+            '${l10n.backupPageImportFromChatboxLegacy}:\n'
+            ' • Providers: ${imported.providers}\n'
+            ' • Assistants: ${imported.assistants}\n'
+            ' • Conversations: ${imported.conversations}\n'
+            ' • Messages: ${imported.messages}\n\n'
+            '${l10n.backupPageRestartContent}',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                if (await requestAppRestart(
+                      rootCtx,
+                      PlatformUtils.restartApp,
+                    ) &&
+                    rootCtx.mounted) {
+                  Navigator.of(rootCtx).pop();
+                }
+              },
+              child: Text(l10n.backupPageOK),
+            ),
+          ],
+        ),
+      );
+    } on BackupCancelledException {
+      return;
+    } catch (e) {
+      if (!rootCtx.mounted) return;
+      await showDialog(
+        context: rootCtx,
+        builder: (dctx) => AlertDialog(
+          title: Text(l10n.backupPageImportFromChatboxLegacy),
+          content: Text(e.toString()),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dctx).pop(),
+              child: Text(l10n.backupPageOK),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   Future<void> _openUserDataDirectory() async {
@@ -991,17 +1075,26 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
             spacing: 6,
             runSpacing: 6,
             children: [
-              _DeskIosButton(
-                label: l10n.backupPageLocalBackupAction,
-                filled: false,
-                dense: true,
-                onTap: () => _exportLocalBackup(context),
-              ),
-              _DeskIosButton(
-                label: l10n.backupPageRestore,
-                filled: false,
-                dense: true,
-                onTap: () => _restoreLocalBackup(context),
+              Row(
+                children: [
+                  Expanded(
+                    child: _DeskIosButton(
+                      label: l10n.backupPageLocalBackupAction,
+                      filled: false,
+                      dense: true,
+                      onTap: () => _exportLocalBackup(context),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: _DeskIosButton(
+                      label: l10n.backupPageRestore,
+                      filled: false,
+                      dense: true,
+                      onTap: () => _restoreLocalBackup(context),
+                    ),
+                  ),
+                ],
               ),
               _DeskIosButton(
                 label: l10n.backupPageExportKelivoBackup,
@@ -1123,84 +1216,15 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                 filled: false,
                 dense: true,
                 enabled: false,
-                onTap: () async {
-                  final rootCtx = Navigator.of(
-                    context,
-                    rootNavigator: true,
-                  ).context;
-                  final result = await FilePicker.platform.pickFiles(
-                    type: FileType.custom,
-                    allowedExtensions: ['json'],
-                    allowMultiple: false,
-                  );
-                  final path = result?.files.single.path;
-                  if (path == null) return;
-                  final f = File(path);
-                  if (!context.mounted) return;
-                  final mode = await showDialog<RestoreMode>(
-                    context: context,
-                    builder: (_) => _RestoreModeDialog(),
-                  );
-                  if (mode == null) return;
-                  if (!context.mounted) return;
-                  final chat = context.read<ChatService>();
-                  try {
-                    final res = await ChatboxImporter.importFromChatbox(
-                      file: f,
-                      mode: mode,
-                      businessRepository: context.read<BusinessRepository>(),
-                      chatService: chat,
-                    );
-                    if (!rootCtx.mounted) return;
-                    await showDialog(
-                      context: rootCtx,
-                      builder: (dctx) => AlertDialog(
-                        backgroundColor: cs.surface,
-                        shape: DesktopDialogStyle.shape(dctx),
-                        title: Text(l10n.backupPageRestartRequired),
-                        content: Text(
-                          '${l10n.backupPageImportFromChatbox}:\n'
-                          ' • Providers: ${res.providers}\n'
-                          ' • Assistants: ${res.assistants}\n'
-                          ' • Conversations: ${res.conversations}\n'
-                          ' • Messages: ${res.messages}\n\n'
-                          '${l10n.backupPageRestartContent}',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () async {
-                              if (await requestAppRestart(
-                                    rootCtx,
-                                    PlatformUtils.restartApp,
-                                  ) &&
-                                  rootCtx.mounted) {
-                                Navigator.of(rootCtx).pop();
-                              }
-                            },
-                            child: Text(l10n.backupPageOK),
-                          ),
-                        ],
-                      ),
-                    );
-                  } catch (e) {
-                    if (!rootCtx.mounted) return;
-                    await showDialog(
-                      context: rootCtx,
-                      builder: (dctx) => AlertDialog(
-                        backgroundColor: cs.surface,
-                        shape: DesktopDialogStyle.shape(dctx),
-                        title: Text(l10n.backupPageImportFromChatbox),
-                        content: Text(e.toString()),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(dctx).pop(),
-                            child: Text(l10n.backupPageOK),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-                },
+              ),
+              SizedBox(
+                width: double.infinity,
+                child: _DeskIosButton(
+                  label: l10n.backupPageImportFromChatboxLegacy,
+                  filled: false,
+                  dense: true,
+                  onTap: _importLegacyChatbox,
+                ),
               ),
               _DeskIosButton(
                 label: l10n.backupPageImportFromDeepSeek,
@@ -1965,13 +1989,13 @@ class _DeskIosButton extends StatefulWidget {
     required this.filled,
     required this.dense,
     this.enabled = true,
-    required this.onTap,
+    this.onTap,
   });
   final String label;
   final bool filled;
   final bool dense;
   final bool enabled;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   @override
   State<_DeskIosButton> createState() => _DeskIosButtonState();
 }

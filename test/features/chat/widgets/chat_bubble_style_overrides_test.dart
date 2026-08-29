@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
+import 'package:Kelivo/core/providers/user_provider.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
@@ -27,6 +28,7 @@ void main() {
     final settings = SettingsProvider(harness.preferences);
     await settings.loaded;
     await settings.setEnableAssistantMarkdown(false);
+    await settings.setEnableUserMarkdown(false);
     await settings.setChatBubbleStyleOverrides(
       const ChatBubbleStyleOverrides(
         cornerRadius: 4,
@@ -39,6 +41,10 @@ void main() {
       MultiProvider(
         providers: [
           ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+          ChangeNotifierProvider(
+            create: (_) =>
+                UserProvider(preferences: createBusinessTestPreferences()),
+          ),
           ChangeNotifierProvider(
             create: (_) =>
                 TtsProvider(preferences: createBusinessTestPreferences()),
@@ -93,6 +99,10 @@ void main() {
           ChangeNotifierProvider<SettingsProvider>.value(value: settings),
           ChangeNotifierProvider(
             create: (_) =>
+                UserProvider(preferences: createBusinessTestPreferences()),
+          ),
+          ChangeNotifierProvider(
+            create: (_) =>
                 TtsProvider(preferences: createBusinessTestPreferences()),
           ),
           ChangeNotifierProvider(create: (_) => ToolApprovalService()),
@@ -119,6 +129,80 @@ void main() {
 
     expect(
       tester.widget<Text>(find.text('Translated answer')).style?.color,
+      const Color(0xFF224466),
+    );
+  });
+
+  testWidgets('user and assistant messages use separate text overrides', (
+    tester,
+  ) async {
+    final harness = await createBusinessTestHarness(
+      initial: {'display_chat_message_background_style_v1': 'solid'},
+    );
+    final settings = SettingsProvider(harness.preferences);
+    await settings.loaded;
+    await settings.setEnableAssistantMarkdown(false);
+    await settings.setEnableUserMarkdown(false);
+    await settings.setChatBubbleStyleOverridesForRole(
+      isUser: true,
+      value: const ChatBubbleStyleOverrides(textArgbLight: 0xFFAA2200),
+    );
+    await settings.setChatBubbleStyleOverridesForRole(
+      isUser: false,
+      value: const ChatBubbleStyleOverrides(textArgbLight: 0xFF224466),
+    );
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+          ChangeNotifierProvider(
+            create: (_) =>
+                UserProvider(preferences: createBusinessTestPreferences()),
+          ),
+          ChangeNotifierProvider(
+            create: (_) =>
+                TtsProvider(preferences: createBusinessTestPreferences()),
+          ),
+          ChangeNotifierProvider(create: (_) => ToolApprovalService()),
+          ChangeNotifierProvider(create: (_) => AskUserInteractionService()),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Column(
+              children: [
+                ChatMessageWidget(
+                  message: ChatMessage(
+                    role: 'user',
+                    content: 'User override text',
+                    conversationId: 'conversation-role-overrides',
+                  ),
+                  showModelIcon: false,
+                ),
+                ChatMessageWidget(
+                  message: ChatMessage(
+                    role: 'assistant',
+                    content: 'Assistant override text',
+                    conversationId: 'conversation-role-overrides',
+                  ),
+                  showModelIcon: false,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      tester.widget<Text>(find.text('User override text')).style?.color,
+      const Color(0xFFAA2200),
+    );
+    expect(
+      tester.widget<Text>(find.text('Assistant override text')).style?.color,
       const Color(0xFF224466),
     );
   });

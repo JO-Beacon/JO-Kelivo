@@ -58,6 +58,10 @@
   },
   "storageSpaceCategoryImages": "Images",
   "storageSpaceCategoryFiles": "Files",
+  "storageSpaceCategoryFonts": "Fonts",
+  "storageSpaceCategoryLocalModels": "Local Models",
+  "storageSpaceOtherHint": "Fonts, downloaded local models, and other app files.",
+  "storageSpaceSubOtherApp": "App files",
   "storageSpaceCategoryChatData": "Chat Records",
   "storageSpaceCategoryLegacyChatData": "Chat Records (Old)",
   "storageSpaceCategoryRestoreTraces": "Restore Traces",
@@ -68,7 +72,7 @@
   "storageSpaceCategoryAssistantData": "Assistants",
   "storageSpaceCategoryCache": "Cache",
   "storageSpaceCategoryLogs": "Logs",
-  "storageSpaceCategoryOther": "App",
+  "storageSpaceCategoryOther": "Other",
   "storageSpaceFilesCount": "{count} files",
   "@storageSpaceFilesCount": {
     "placeholders": {
@@ -752,8 +756,8 @@
   "backupPageSelectImportModeDescription": "Choose a restore mode. The chat and file switches determine which components are included.",
   "backupPageOverwriteMode": "Complete Overwrite",
   "backupPageOverwriteModeDescription": "Replace the selected components; keep unselected components and unrelated local settings",
-  "backupPageMergeMode": "Merge",
-  "backupPageMergeModeDescription": "Keep local data and add backup data. Identical conversations are skipped and conflicting conversations receive new IDs.",
+  "backupPageMergeMode": "Smart merge",
+  "backupPageMergeModeDescription": "Keep local data while merging the backup. Matching messages are deduplicated, new messages join the existing conversation, and conflicts stay separate.",
   "backupPageRestore": "Restore",
   "backupPageBackupUploaded": "Backup uploaded",
   "backupPageBackup": "Backup",
@@ -805,7 +809,9 @@
       }
     }
   },
-  "backupPageImportFromChatbox": "Import from Chatbox",
+  "backupPageImportFromChatbox": "Import from Chatbox (>=1.22)",
+  "backupPageImportFromChatboxLegacy": "Import from Chatbox (<1.22)",
+  "backupPageChatboxLegacyStarredGroupName": "Chatbox Import (<1.22) · Pinned",
   "backupPageImportFromDeepSeek": "Import from DeepSeek Web/App",
   "backupReminderSectionTitle": "Backup Reminder",
   "backupReminderEnableTitle": "Remind me to back up",
@@ -1269,7 +1275,7 @@
       }
     }
   },
-  "sideDrawerUpdateTitle": "New version: {version}",
+  "sideDrawerUpdateTitle": "Update: {version}",
   "@sideDrawerUpdateTitle": {
     "placeholders": {
       "version": {
@@ -1277,7 +1283,7 @@
       }
     }
   },
-  "sideDrawerUpdateTitleWithBuild": "New version: {version} ({build})",
+  "sideDrawerUpdateTitleWithBuild": "Update: {version} ({build})",
   "@sideDrawerUpdateTitleWithBuild": {
     "placeholders": {
       "version": {
@@ -1416,7 +1422,7 @@
   "defaultModelPageChatModelTitle": "Chat Model",
   "defaultModelPageChatModelSubtitle": "Global default chat model",
   "defaultModelPageTitleModelTitle": "Title Summary Model",
-  "defaultModelPageTitleModelSubtitle": "Used for summarizing conversation titles; prefer fast & cheap models",
+  "defaultModelPageTitleModelSubtitle": "Used for summarizing conversation titles; prefer fast & cheap models. Disabled until a model is selected.",
   "titleModelThinkingTitle": "Enable Thinking",
   "defaultModelPageSummaryModelTitle": "Summary Model",
   "defaultModelPageSummaryModelSubtitle": "Used for generating conversation summaries; prefer fast and cheap models",
@@ -1986,6 +1992,10 @@
   "displaySettingsPageChatModelIconSubtitle": "Show model icon in chat messages",
   "displaySettingsPageShowTokenStatsTitle": "Show Token & Context Stats",
   "displaySettingsPageShowTokenStatsSubtitle": "Show token usage and message count",
+  "displaySettingsPageShowThinkingCardsTitle": "Show Thinking Cards",
+  "displaySettingsPageShowThinkingCardsSubtitle": "When off, thinking-process cards are hidden in chat",
+  "displaySettingsPageShowToolCardsTitle": "Show Tool Cards",
+  "displaySettingsPageShowToolCardsSubtitle": "When off, tool-use cards are hidden in chat",
   "displaySettingsPageAutoCollapseThinkingTitle": "Auto-collapse Thinking",
   "displaySettingsPageAutoCollapseThinkingSubtitle": "Collapse reasoning after finish",
   "displaySettingsPageCollapseThinkingStepsTitle": "Collapse Thinking Steps",
@@ -1993,6 +2003,8 @@
   "displaySettingsPageShowToolResultSummaryTitle": "Show Tool Result Summary",
   "displaySettingsPageInsertSuggestionOnlyTitle": "Insert suggestions without sending",
   "displaySettingsPageShowToolResultSummarySubtitle": "Display the summary text below tool steps",
+  "displaySettingsPageHideToolResultImagesTitle": "Hide Tool Result Images",
+  "displaySettingsPageHideToolResultImagesSubtitle": "Hide Markdown images displayed in tool results",
   "displaySettingsPageRegenerateDeleteTrailingMessagesTitle": "Delete messages below when regenerating",
   "displaySettingsPageShowRegenerateConfirmDialogTitle": "Confirm before regenerating",
   "chainOfThoughtExpandSteps": "Show {count} more steps",
@@ -2013,6 +2025,8 @@
   "displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle": "Don't collapse assistant list when closing sidebar",
   "displaySettingsPageShowUpdatesTitle": "Show Updates",
   "displaySettingsPageShowUpdatesSubtitle": "Show app update notifications",
+  "displaySettingsPageKeepScreenOnDuringGenerationTitle": "Keep Screen On While Generating",
+  "displaySettingsPageKeepScreenOnDuringGenerationSubtitle": "Prevents the lock screen from interrupting generation. Increases battery use.",
   "displaySettingsPageMessageNavButtonsTitle": "Message Navigation Buttons",
   "displaySettingsPageMessageNavButtonsSubtitle": "Choose when quick jump buttons appear",
   "displaySettingsPageMessageNavButtonsModeAlways": "Always show",
@@ -3493,5 +3507,8 @@
   "messageStyleSettingsPageCornerRadius": "Corner Radius",
   "messageStyleSettingsPagePreviewUser": "This is a user message",
   "messageStyleSettingsPagePreviewAssistant": "This is an assistant reply.",
-  "messageStyleSettingsPagePreviewThinking": "Thinking"
+  "messageStyleSettingsPagePreviewThinking": "Thinking",
+  "messageStyleSettingsPageRoleUser": "User",
+  "messageStyleSettingsPageRoleAssistant": "Assistant",
+  "messageStyleSettingsPageRoleAssistantHint": "Assistant settings also apply to thinking, tool-call, and translation cards."
 }

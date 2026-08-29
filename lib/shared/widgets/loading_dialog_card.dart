@@ -4,10 +4,18 @@ import 'package:flutter/material.dart';
 import '../animations/widgets.dart';
 
 class LoadingDialogCard extends StatelessWidget {
-  const LoadingDialogCard({super.key, this.label, this.progress});
+  const LoadingDialogCard({
+    super.key,
+    this.label,
+    this.progress,
+    this.onCancel,
+    this.cancelLabel,
+  });
 
   final String? label;
   final double? progress;
+  final VoidCallback? onCancel;
+  final String? cancelLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -64,6 +72,13 @@ class LoadingDialogCard extends StatelessWidget {
                           fontSize: 14,
                           color: cs.onSurface.withValues(alpha: 0.8),
                         ),
+                      ),
+                    ],
+                    if (onCancel != null && cancelLabel != null) ...[
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: onCancel,
+                        child: Text(cancelLabel!),
                       ),
                     ],
                   ],

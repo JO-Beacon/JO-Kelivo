@@ -12,6 +12,7 @@
 #include <flutter/standard_method_codec.h>
 
 #include "flutter/generated_plugin_registrant.h"
+#include "utils.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -34,6 +35,17 @@ bool FlutterWindow::OnCreate() {
   }
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
+
+  associated_backup_channel_ =
+      std::make_shared<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(),
+          "app.associated_backup",
+          &flutter::StandardMethodCodec::GetInstance());
+  associated_backup_channel_->SetMethodCallHandler(
+      [](const flutter::MethodCall<flutter::EncodableValue>&,
+         std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+        result->NotImplemented();
+      });
 
   // Method channel for clipboard images.
   auto channel = std::make_shared<flutter::MethodChannel<flutter::EncodableValue>>(
@@ -284,6 +296,7 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  associated_backup_channel_.reset();
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
@@ -304,6 +317,22 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   }
 
   switch (message) {
+    case WM_COPYDATA: {
+      const auto* data = reinterpret_cast<const COPYDATASTRUCT*>(lparam);
+      if (data != nullptr && data->dwData == 0x4A4F4149 &&
+          data->lpData != nullptr && data->cbData >= sizeof(wchar_t)) {
+        const auto char_count = data->cbData / sizeof(wchar_t);
+        const auto* path = static_cast<const wchar_t*>(data->lpData);
+        if (path[char_count - 1] == L'\0' && associated_backup_channel_) {
+          associated_backup_channel_->InvokeMethod(
+              "open",
+              std::make_unique<flutter::EncodableValue>(
+                  Utf8FromUtf16(path)));
+          return 1;
+        }
+      }
+      break;
+    }
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
       break;

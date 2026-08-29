@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../database/business_preferences.dart';
 import '../database/business_repository.dart';
 import '../models/backup.dart';
+import '../models/backup_task_progress.dart';
 import '../models/progress_update.dart';
 import '../services/chat/chat_service.dart';
 import '../services/backup/data_sync.dart';
@@ -105,8 +106,14 @@ class BackupProvider extends ChangeNotifier {
     return _dataSync.listBackupFiles(_cfg);
   }
 
-  Future<File> exportToFile({ProgressCallback? onProgress}) =>
-      _dataSync.exportToFile(_cfg, onProgress: onProgress);
+  Future<File> exportToFile({
+    ProgressCallback? onProgress,
+    BackupCancelToken? cancelToken,
+  }) => _dataSync.prepareJoaiclientFile(
+    _cfg,
+    onProgress: onProgress,
+    cancelToken: cancelToken,
+  );
 
   Future<File> exportKelivoBackupToFile() => _dataSync.prepareBackupFile(_cfg);
 
@@ -114,10 +121,12 @@ class BackupProvider extends ChangeNotifier {
     File file, {
     RestoreMode mode = RestoreMode.overwrite,
     ProgressCallback? onProgress,
+    BackupCancelToken? cancelToken,
   }) => _dataSync.restoreFromLocalFile(
     file,
     _cfg,
     mode: mode,
     onProgress: onProgress,
+    cancelToken: cancelToken,
   );
 }

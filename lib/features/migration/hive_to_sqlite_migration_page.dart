@@ -163,6 +163,15 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
   }
 
   Future<bool> _createAndSaveMobileBackup() async {
+    final directService = widget.service;
+    if (Platform.isAndroid && directService is HiveToSqliteMigrationService) {
+      final saved = await NativeFileSave.saveFileWithWriter(
+        fileName: migrationBackupFileName(),
+        write: (writeChunk) => directService.backupToWritableSink(writeChunk),
+      );
+      if (saved) await widget.service.recordExternalBackupSaved();
+      return saved;
+    }
     _savingTemporaryBackup = true;
     try {
       final backupFile = await widget.service.backupToTemporaryFile();
@@ -863,18 +872,20 @@ class _StepShell extends StatelessWidget {
                       children: children,
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: IosTileButton(
-                      label: AppLocalizations.of(
-                        context,
-                      )!.backupPageOpenUserDataDirectory,
-                      icon: Lucide.FolderOpen,
-                      enabled: onOpenUserDataDirectory != null,
-                      onTap: onOpenUserDataDirectory ?? () {},
+                  if (PlatformUtils.isDesktopTarget) ...[
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: IosTileButton(
+                        label: AppLocalizations.of(
+                          context,
+                        )!.backupPageOpenUserDataDirectory,
+                        icon: Lucide.FolderOpen,
+                        enabled: onOpenUserDataDirectory != null,
+                        onTap: onOpenUserDataDirectory ?? () {},
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),

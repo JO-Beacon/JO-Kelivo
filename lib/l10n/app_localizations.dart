@@ -310,6 +310,30 @@ abstract class AppLocalizations {
   /// **'Files'**
   String get storageSpaceCategoryFiles;
 
+  /// No description provided for @storageSpaceCategoryFonts.
+  ///
+  /// In en, this message translates to:
+  /// **'Fonts'**
+  String get storageSpaceCategoryFonts;
+
+  /// No description provided for @storageSpaceCategoryLocalModels.
+  ///
+  /// In en, this message translates to:
+  /// **'Local Models'**
+  String get storageSpaceCategoryLocalModels;
+
+  /// No description provided for @storageSpaceOtherHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fonts, downloaded local models, and other app files.'**
+  String get storageSpaceOtherHint;
+
+  /// No description provided for @storageSpaceSubOtherApp.
+  ///
+  /// In en, this message translates to:
+  /// **'App files'**
+  String get storageSpaceSubOtherApp;
+
   /// No description provided for @storageSpaceCategoryChatData.
   ///
   /// In en, this message translates to:
@@ -373,7 +397,7 @@ abstract class AppLocalizations {
   /// No description provided for @storageSpaceCategoryOther.
   ///
   /// In en, this message translates to:
-  /// **'App'**
+  /// **'Other'**
   String get storageSpaceCategoryOther;
 
   /// No description provided for @storageSpaceFilesCount.
@@ -3349,13 +3373,13 @@ abstract class AppLocalizations {
   /// No description provided for @backupPageMergeMode.
   ///
   /// In en, this message translates to:
-  /// **'Merge'**
+  /// **'Smart merge'**
   String get backupPageMergeMode;
 
   /// No description provided for @backupPageMergeModeDescription.
   ///
   /// In en, this message translates to:
-  /// **'Keep local data and add backup data. Identical conversations are skipped and conflicting conversations receive new IDs.'**
+  /// **'Keep local data while merging the backup. Matching messages are deduplicated, new messages join the existing conversation, and conflicts stay separate.'**
   String get backupPageMergeModeDescription;
 
   /// No description provided for @backupPageRestore.
@@ -3625,8 +3649,20 @@ abstract class AppLocalizations {
   /// No description provided for @backupPageImportFromChatbox.
   ///
   /// In en, this message translates to:
-  /// **'Import from Chatbox'**
+  /// **'Import from Chatbox (>=1.22)'**
   String get backupPageImportFromChatbox;
+
+  /// No description provided for @backupPageImportFromChatboxLegacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from Chatbox (<1.22)'**
+  String get backupPageImportFromChatboxLegacy;
+
+  /// No description provided for @backupPageChatboxLegacyStarredGroupName.
+  ///
+  /// In en, this message translates to:
+  /// **'Chatbox Import (<1.22) · Pinned'**
+  String get backupPageChatboxLegacyStarredGroupName;
 
   /// No description provided for @backupPageImportFromDeepSeek.
   ///
@@ -5245,13 +5281,13 @@ abstract class AppLocalizations {
   /// No description provided for @sideDrawerUpdateTitle.
   ///
   /// In en, this message translates to:
-  /// **'New version: {version}'**
+  /// **'Update: {version}'**
   String sideDrawerUpdateTitle(String version);
 
   /// No description provided for @sideDrawerUpdateTitleWithBuild.
   ///
   /// In en, this message translates to:
-  /// **'New version: {version} ({build})'**
+  /// **'Update: {version} ({build})'**
   String sideDrawerUpdateTitleWithBuild(String version, int build);
 
   /// No description provided for @sideDrawerLinkCopied.
@@ -5905,7 +5941,7 @@ abstract class AppLocalizations {
   /// No description provided for @defaultModelPageTitleModelSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Used for summarizing conversation titles; prefer fast & cheap models'**
+  /// **'Used for summarizing conversation titles; prefer fast & cheap models. Disabled until a model is selected.'**
   String get defaultModelPageTitleModelSubtitle;
 
   /// No description provided for @titleModelThinkingTitle.
@@ -8299,6 +8335,30 @@ abstract class AppLocalizations {
   /// **'Show token usage and message count'**
   String get displaySettingsPageShowTokenStatsSubtitle;
 
+  /// No description provided for @displaySettingsPageShowThinkingCardsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Thinking Cards'**
+  String get displaySettingsPageShowThinkingCardsTitle;
+
+  /// No description provided for @displaySettingsPageShowThinkingCardsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When off, thinking-process cards are hidden in chat'**
+  String get displaySettingsPageShowThinkingCardsSubtitle;
+
+  /// No description provided for @displaySettingsPageShowToolCardsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Tool Cards'**
+  String get displaySettingsPageShowToolCardsTitle;
+
+  /// No description provided for @displaySettingsPageShowToolCardsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When off, tool-use cards are hidden in chat'**
+  String get displaySettingsPageShowToolCardsSubtitle;
+
   /// No description provided for @displaySettingsPageAutoCollapseThinkingTitle.
   ///
   /// In en, this message translates to:
@@ -8340,6 +8400,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Display the summary text below tool steps'**
   String get displaySettingsPageShowToolResultSummarySubtitle;
+
+  /// No description provided for @displaySettingsPageHideToolResultImagesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide Tool Result Images'**
+  String get displaySettingsPageHideToolResultImagesTitle;
+
+  /// No description provided for @displaySettingsPageHideToolResultImagesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide Markdown images displayed in tool results'**
+  String get displaySettingsPageHideToolResultImagesSubtitle;
 
   /// No description provided for @displaySettingsPageRegenerateDeleteTrailingMessagesTitle.
   ///
@@ -8418,6 +8490,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Show app update notifications'**
   String get displaySettingsPageShowUpdatesSubtitle;
+
+  /// No description provided for @displaySettingsPageKeepScreenOnDuringGenerationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep Screen On While Generating'**
+  String get displaySettingsPageKeepScreenOnDuringGenerationTitle;
+
+  /// No description provided for @displaySettingsPageKeepScreenOnDuringGenerationSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Prevents the lock screen from interrupting generation. Increases battery use.'**
+  String get displaySettingsPageKeepScreenOnDuringGenerationSubtitle;
 
   /// No description provided for @displaySettingsPageMessageNavButtonsTitle.
   ///
@@ -14826,6 +14910,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Thinking'**
   String get messageStyleSettingsPagePreviewThinking;
+
+  /// No description provided for @messageStyleSettingsPageRoleUser.
+  ///
+  /// In en, this message translates to:
+  /// **'User'**
+  String get messageStyleSettingsPageRoleUser;
+
+  /// No description provided for @messageStyleSettingsPageRoleAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant'**
+  String get messageStyleSettingsPageRoleAssistant;
+
+  /// No description provided for @messageStyleSettingsPageRoleAssistantHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant settings also apply to thinking, tool-call, and translation cards.'**
+  String get messageStyleSettingsPageRoleAssistantHint;
 }
 
 class _AppLocalizationsDelegate

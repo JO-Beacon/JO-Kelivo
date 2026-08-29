@@ -572,6 +572,52 @@ class MessageBuilderService {
     return resolveDocumentAttachmentMime(attachment);
   }
 
+  /// 判断保留的用户消息是否仍需要文档抽取或 OCR。
+  bool hasPendingAttachmentWork(
+    List<Map<String, dynamic>> apiMessages,
+    SettingsProvider settings, {
+    Conversation? conversation,
+    List<ChatMessage>? sourceMessages,
+  }) {
+    final ocrActive =
+        settings.ocrEnabled &&
+        settings.ocrModelProvider != null &&
+        settings.ocrModelId != null &&
+        ocrHandler != null;
+
+    for (final message in apiMessages) {
+      if (message['role'] != 'user') continue;
+      final revisionId = (message[internalRevisionIdKey] ?? '')
+          .toString()
+          .trim();
+      if (revisionId.isEmpty) continue;
+      final chatMessage = _resolveChatMessage(
+        revisionId: revisionId,
+        conversation: conversation,
+        sourceMessages: sourceMessages,
+      );
+      final parsed = chatMessage != null
+          ? parseInputFromMessage(chatMessage)
+          : parseInputFromApiMap(message);
+      final mediaPaths = <String>{};
+      for (final document in parsed.documents) {
+        final mime = _effectiveAttachmentMime(document);
+        if (isVideoMime(mime) || isAudioMime(mime)) {
+          final path = document.path.trim();
+          if (path.isNotEmpty) mediaPaths.add(path);
+          continue;
+        }
+        return true;
+      }
+      if (!ocrActive) continue;
+      for (final rawPath in parsed.imagePaths) {
+        final path = rawPath.trim();
+        if (path.isNotEmpty && !mediaPaths.contains(path)) return true;
+      }
+    }
+    return false;
+  }
+
   /// 处理 apiMessages 中的用户消息：优先使用已冻结的 `promptContent`，
   /// 否则组装（文档/OCR → 记忆前缀 → 模板 → 时间）并冻结（§8）。
   ///
@@ -820,9 +866,13 @@ class MessageBuilderService {
         lastUserImagePaths = List<String>.of(parsedUser.imagePaths);
       }
 
-      // 优先使用已冻结的 promptContent，绝不重新计算（§8.3）。
+      // 仅复用仍绑定当前消息语义的冻结 promptContent（§8.3）。旧版本
+      // 记录没有 sourceContentHash，或消息 parts 已被覆盖编辑时，走重建路径。
       final existing = frozenPrompts?[revisionId];
-      if (existing != null) {
+      final currentSourceHash = chatMessageForParts?.semanticContentHash;
+      if (existing != null &&
+          currentSourceHash != null &&
+          existing.sourceContentHash == currentSourceHash) {
         final sendPayload = _legacyAwareFrozenPayload(
           payload: existing.payload,
           carriesMemorySnapshot: existing.carriesMemorySnapshot,
@@ -992,7 +1042,8 @@ class MessageBuilderService {
         !chatService.isTemporaryConversation(message.conversationId);
     if (persist && readFrozenPrompt) {
       final existing = await repo.getMessagePrompt(message.id);
-      if (existing != null) {
+      if (existing != null &&
+          existing.sourceContentHash == message.semanticContentHash) {
         return _legacyAwareFrozenPayload(
           payload: existing.payload,
           carriesMemorySnapshot: existing.carriesMemorySnapshot,
@@ -1069,6 +1120,7 @@ class MessageBuilderService {
         payload: finalContent,
         carriesMemorySnapshot: memory.prefix.isNotEmpty,
         injectedMemoryHash: memory.hash,
+        sourceContentHash: message.semanticContentHash,
       );
     }
 

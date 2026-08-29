@@ -13,6 +13,7 @@ import '../../../core/providers/update_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../shared/widgets/update_release_notes_card.dart';
 import '../../../shared/widgets/update_status_label.dart';
 import '../../../core/services/haptics.dart';
 import 'log_viewer_page.dart';
@@ -26,8 +27,8 @@ class AboutPage extends StatefulWidget {
 }
 
 class _AboutPageState extends State<AboutPage> {
-  static const String _upstreamKelivoVersion = '1.2.3';
-  static const String _upstreamKelivoBuildNumber = '67';
+  static const String _upstreamKelivoVersion = '1.2.4';
+  static const String _upstreamKelivoBuildNumber = '68';
 
   String _version = '';
   String _buildNumber = '';
@@ -423,6 +424,7 @@ class _AboutPageState extends State<AboutPage> {
                     vertical: 10,
                   ),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(12),
@@ -453,16 +455,6 @@ class _AboutPageState extends State<AboutPage> {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: UpdateStatusLabel(
-                                    label: updateProvider.checking
-                                        ? l10n.aboutPageCheckingForUpdates
-                                        : l10n.aboutPageCheckForUpdates,
-                                    icon: Lucide.RefreshCw,
-                                    enabled: !updateProvider.checking,
-                                  ),
-                                ),
                               ],
                             ),
                             const SizedBox(height: 4),
@@ -479,6 +471,14 @@ class _AboutPageState extends State<AboutPage> {
                           ],
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      UpdateStatusLabel(
+                        label: updateProvider.checking
+                            ? l10n.aboutPageCheckingForUpdates
+                            : l10n.aboutPageCheckForUpdates,
+                        icon: Lucide.RefreshCw,
+                        checking: updateProvider.checking,
+                      ),
                     ],
                   ),
                 ),
@@ -487,6 +487,16 @@ class _AboutPageState extends State<AboutPage> {
           ),
 
           const SizedBox(height: 12),
+
+          if (updateProvider.available case final update?) ...[
+            UpdateReleaseNotesCard(
+              key: const ValueKey('about-update-release-notes'),
+              title: l10n.sideDrawerUpdateTitle(update.version),
+              notes: update.notes ?? '',
+              onLinkTap: _openUrl,
+            ),
+            const SizedBox(height: 12),
+          ],
 
           // iOS 风格列表卡片
           _iosSectionCard(

@@ -170,6 +170,18 @@ class _TestAssistantProvider extends AssistantProvider {
   }
 }
 
+class _AvailableUpdateProvider extends UpdateProvider {
+  static const _update = UpdateInfo(
+    app: 'JO-Kelivo',
+    version: '0.1.7+7',
+    notes: 'Release notes must stay out of the conversation list.',
+    downloads: {'universal': 'https://example.invalid/download'},
+  );
+
+  @override
+  UpdateInfo? get available => _update;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -230,6 +242,7 @@ void main() {
     bool showChatListDate = false,
     InteractiveDrawerController? interactiveDrawerController,
     AssistantProvider? assistantProvider,
+    UpdateProvider? updateProvider,
     FutureOr<void> Function(String id, {bool closeDrawer})?
     onSelectConversation,
   }) async {
@@ -303,7 +316,10 @@ void main() {
           ChangeNotifierProvider(
             create: (_) => AssistantGroupProvider(preferences: groupPrefs),
           ),
-          ChangeNotifierProvider(create: (_) => UpdateProvider()),
+          if (updateProvider != null)
+            ChangeNotifierProvider<UpdateProvider>.value(value: updateProvider)
+          else
+            ChangeNotifierProvider(create: (_) => UpdateProvider()),
         ],
         child: localeListenable == null
             ? materialFor(locale)
@@ -1055,6 +1071,28 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.text('Topic A'), findsOneWidget);
       expect(find.byType(SideDrawer), findsOneWidget);
+    });
+  });
+
+  testWidgets('available update banner omits release notes', (tester) async {
+    await asDesktop(() async {
+      final service = createService();
+      await tester.runAsync(() async {
+        await service.init();
+        await service.createConversation(title: 'Topic A');
+      });
+      await pumpDrawer(
+        tester,
+        service,
+        desktopTopicsOnly: true,
+        updateProvider: _AvailableUpdateProvider(),
+      );
+
+      expect(find.text('Update: 0.1.7+7'), findsOneWidget);
+      expect(
+        find.text('Release notes must stay out of the conversation list.'),
+        findsNothing,
+      );
     });
   });
 

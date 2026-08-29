@@ -19,7 +19,7 @@ class ModelRegistry {
   // 每个 Qwen 3.7 Max id 都是多模态。
   static final RegExp vision = RegExp(
     // GPT 系列，包括 4o、4.1、5（排除 gpt-5-chat），以及 OpenAI o* 系列
-    r'(gpt-4o|gpt-4\.1|gpt-5(?!-chat)|o\d|gemini|claude|kimi-k2([-.])(?:5|6|7)|kimi-k3(?:$|[/_:@.-])|muse-spark-1\.1(?:$|[/_:@.-])|doubao.+(?:1([-.])(?:6|8)|seed-2|seed-evolving)|grok-4|step-3|intern-s1|minimax-m3(?:$|[/_:@])|mimo-v2(?:-omni(?:$|[/_:@])|\.5(?:$|[/_:@]))|sensenova-6\.7-flash-lite)',
+    r'(gpt-4o|gpt-4\.1|gpt-5(?!-chat)|o\d|gemini|claude|kimi-k2([-.])(?:5|6|7)|kimi-k3(?:$|[/_:@.-])|muse-spark-1\.1(?:$|[/_:@.-])|doubao.+(?:1([-.])(?:6|8)|seed-2|seed-evolving)|grok-4|step-3|intern-s1|minimax-m3(?:$|[/_:@])|mimo-v2(?:-omni(?:$|[/_:@])|\.5(?:$|[/_:@]))|sensenova-6\.7-flash-lite|deepseek.+vision|laguna)',
     caseSensitive: false,
   );
   // 可使用工具的模型
@@ -32,7 +32,7 @@ class ModelRegistry {
             r'deepseek-(?:r1|v3|chat|v3\.1|v3\.2|v4)|'
             r'deepseek-reasoner|'
             r'mimo-v2|'
-            r'sensenova-6\.7-flash-lite'
+            r'sensenova-6\.7-flash-lite|laguna'
             r')')
         .replaceAll(' ', ''),
     caseSensitive: false,
@@ -48,7 +48,7 @@ class ModelRegistry {
             r'step-3|intern-s1|glm-4([-.])(?:5|6|7)|glm-5|minimax-(?:m2|m3)|'
             r'deepseek-(?:r1|v3\.1|v3\.2|v4)|'
             r'deepseek-reasoner|'
-            r'mimo-v2'
+            r'mimo-v2|laguna'
             r')')
         .replaceAll(' ', ''),
     caseSensitive: false,
@@ -171,13 +171,46 @@ class _Http {
   }
 }
 
+String _appendPath(String baseUrl, String path) {
+  final base = baseUrl.endsWith('/')
+      ? baseUrl.substring(0, baseUrl.length - 1)
+      : baseUrl;
+  return '$base/$path';
+}
+
+String _responseErrorSummary(String body) {
+  final trimmed = body.trim();
+  if (trimmed.isEmpty) return 'empty response body';
+  const maxLength = 4096;
+  if (trimmed.length <= maxLength) return trimmed;
+  return '${trimmed.substring(0, maxLength)}...';
+}
+
+Never _throwForNon2xx(http.Response response) {
+  throw HttpException(
+    'HTTP ${response.statusCode}: ${_responseErrorSummary(response.body)}',
+  );
+}
+
+bool _isDeepSeekProvider(ProviderConfig cfg) {
+  return ProviderConfig.isDeepSeek(cfg);
+}
+
+Uri _modelListUri(ProviderConfig cfg, {required bool anthropic}) {
+  if (anthropic && _isDeepSeekProvider(cfg)) {
+    final baseUri = Uri.parse(cfg.baseUrl.trim());
+    return baseUri.replace(path: '/models', query: null, fragment: '');
+  }
+  return Uri.parse(_appendPath(cfg.baseUrl, 'models'));
+}
+
 class OpenAIProvider extends BaseProvider {
   @override
   Future<List<ModelInfo>> listModels(ProviderConfig cfg) async {
     final key = ProviderManager._effectiveApiKey(cfg);
     final client = _Http.clientFor(cfg);
     try {
-      final uri = Uri.parse('${cfg.baseUrl}/models');
+      final uri = _modelListUri(cfg, anthropic: false);
       final headers = <String, String>{};
       if (key.isNotEmpty) headers['Authorization'] = 'Bearer $key';
       final res = await client.get(uri, headers: headers);
@@ -194,7 +227,7 @@ class OpenAIProvider extends BaseProvider {
               ),
         ];
       }
-      return [];
+      _throwForNon2xx(res);
     } finally {
       client.close();
     }
@@ -208,9 +241,15 @@ class ClaudeProvider extends BaseProvider {
     final key = ProviderManager._effectiveApiKey(cfg);
     final client = _Http.clientFor(cfg);
     try {
-      final uri = Uri.parse('${cfg.baseUrl}/models');
-      final headers = <String, String>{'anthropic-version': anthropicVersion};
-      if (key.isNotEmpty) headers['x-api-key'] = key;
+      final isDeepSeek = _isDeepSeekProvider(cfg);
+      final uri = _modelListUri(cfg, anthropic: true);
+      final headers = <String, String>{};
+      if (isDeepSeek) {
+        if (key.isNotEmpty) headers['Authorization'] = 'Bearer $key';
+      } else {
+        headers['anthropic-version'] = anthropicVersion;
+        if (key.isNotEmpty) headers['x-api-key'] = key;
+      }
       final res = await client.get(uri, headers: headers);
       if (res.statusCode >= 200 && res.statusCode < 300) {
         final obj = jsonDecode(res.body) as Map<String, dynamic>;
@@ -227,7 +266,7 @@ class ClaudeProvider extends BaseProvider {
               ),
         ];
       }
-      return [];
+      _throwForNon2xx(res);
     } finally {
       client.close();
     }
@@ -280,42 +319,41 @@ class GoogleProvider extends BaseProvider {
         }
       }
       final out = <ModelInfo>[];
-      try {
-        final res = await client.get(Uri.parse(url), headers: headers);
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          final obj = jsonDecode(res.body) as Map<String, dynamic>;
-          final arr = (obj['models'] as List?) ?? [];
-          for (final e in arr) {
-            if (e is Map) {
-              final name = (e['name'] as String?) ?? '';
-              final id = name.startsWith('models/')
-                  ? name.substring('models/'.length)
-                  : name;
-              final displayName = (e['displayName'] as String?) ?? id;
-              final methods =
-                  (e['supportedGenerationMethods'] as List?)
-                      ?.map((m) => m.toString())
-                      .toSet() ??
-                  {};
-              if (!(methods.contains('generateContent') ||
-                  methods.contains('embedContent'))) {
-                continue;
-              }
-              out.add(
-                ModelRegistry.infer(
-                  ModelInfo(
-                    id: id,
-                    displayName: displayName,
-                    type: methods.contains('generateContent')
-                        ? ModelType.chat
-                        : ModelType.embedding,
-                  ),
-                ),
-              );
-            }
+      final res = await client.get(Uri.parse(url), headers: headers);
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        _throwForNon2xx(res);
+      }
+      final obj = jsonDecode(res.body) as Map<String, dynamic>;
+      final arr = (obj['models'] as List?) ?? [];
+      for (final e in arr) {
+        if (e is Map) {
+          final name = (e['name'] as String?) ?? '';
+          final id = name.startsWith('models/')
+              ? name.substring('models/'.length)
+              : name;
+          final displayName = (e['displayName'] as String?) ?? id;
+          final methods =
+              (e['supportedGenerationMethods'] as List?)
+                  ?.map((m) => m.toString())
+                  .toSet() ??
+              {};
+          if (!(methods.contains('generateContent') ||
+              methods.contains('embedContent'))) {
+            continue;
           }
+          out.add(
+            ModelRegistry.infer(
+              ModelInfo(
+                id: id,
+                displayName: displayName,
+                type: methods.contains('generateContent')
+                    ? ModelType.chat
+                    : ModelType.embedding,
+              ),
+            ),
+          );
         }
-      } catch (_) {}
+      }
 
       // 如果是 Vertex AI，则补充已知的 Anthropic 模型
       // 由于 Google listModels API 在 publishers/google 下通常只返回 Gemini 模型，

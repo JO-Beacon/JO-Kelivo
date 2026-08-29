@@ -161,6 +161,11 @@ abstract final class StorageUsageService {
     };
 
     final assistantSubs = <String, _MutableStats>{'avatars': _MutableStats()};
+    final otherSubs = <String, _MutableStats>{
+      'fonts': _MutableStats(),
+      'local_models': _MutableStats(),
+      'app': _MutableStats(),
+    };
 
     final cacheSubs = <String, _MutableStats>{
       'avatar_cache': _MutableStats(),
@@ -209,6 +214,7 @@ abstract final class StorageUsageService {
         final parts = p.split(rel);
         if (parts.isEmpty) {
           byCat[StorageUsageCategoryKey.other]!.add(bytes);
+          otherSubs['app']!.add(bytes);
           continue;
         }
 
@@ -227,6 +233,7 @@ abstract final class StorageUsageService {
             legacyChatSubs[name]!.add(bytes);
           } else {
             byCat[StorageUsageCategoryKey.other]!.add(bytes);
+            otherSubs['app']!.add(bytes);
           }
           continue;
         }
@@ -252,6 +259,14 @@ abstract final class StorageUsageService {
           case 'avatars':
             byCat[StorageUsageCategoryKey.assistantData]!.add(bytes);
             assistantSubs['avatars']!.add(bytes);
+            break;
+          case 'fonts':
+            byCat[StorageUsageCategoryKey.other]!.add(bytes);
+            otherSubs['fonts']!.add(bytes);
+            break;
+          case 'asr_models':
+            byCat[StorageUsageCategoryKey.other]!.add(bytes);
+            otherSubs['local_models']!.add(bytes);
             break;
           case 'images':
             // 内联/生成的图片存储在 appData/images 下。
@@ -281,6 +296,7 @@ abstract final class StorageUsageService {
             break;
           default:
             byCat[StorageUsageCategoryKey.other]!.add(bytes);
+            otherSubs['app']!.add(bytes);
             break;
         }
       }
@@ -289,6 +305,8 @@ abstract final class StorageUsageService {
     }
 
     final avatarsDir = await AppDirectories.getAvatarsDirectory();
+    final fontsDir = await AppDirectories.getFontsDirectory();
+    final localModelsDir = Directory(p.join(root.path, 'asr_models'));
     final cacheDir = await AppDirectories.getCacheDirectory();
     final systemCacheDir = await AppDirectories.getSystemCacheDirectory();
     final avatarCacheDir = await AppDirectories.getAvatarCacheDirectory();
@@ -436,6 +454,30 @@ abstract final class StorageUsageService {
               id: 'other_logs',
               stats: logsSubs['other_logs']!.toStats(),
               path: logsDir.path,
+            ),
+        ],
+      ),
+      StorageUsageCategory(
+        key: StorageUsageCategoryKey.other,
+        stats: byCat[StorageUsageCategoryKey.other]!.toStats(),
+        subcategories: [
+          if (otherSubs['fonts']!.fileCount > 0)
+            StorageUsageSubcategory(
+              id: 'fonts',
+              stats: otherSubs['fonts']!.toStats(),
+              path: fontsDir.path,
+            ),
+          if (otherSubs['local_models']!.fileCount > 0)
+            StorageUsageSubcategory(
+              id: 'local_models',
+              stats: otherSubs['local_models']!.toStats(),
+              path: localModelsDir.path,
+            ),
+          if (otherSubs['app']!.fileCount > 0)
+            StorageUsageSubcategory(
+              id: 'app',
+              stats: otherSubs['app']!.toStats(),
+              path: root.path,
             ),
         ],
       ),
@@ -695,4 +737,5 @@ const List<StorageUsageCategoryKey> _categoryOrder = <StorageUsageCategoryKey>[
   StorageUsageCategoryKey.assistantData,
   StorageUsageCategoryKey.cache,
   StorageUsageCategoryKey.logs,
+  StorageUsageCategoryKey.other,
 ];

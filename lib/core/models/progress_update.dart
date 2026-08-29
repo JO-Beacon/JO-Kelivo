@@ -1,11 +1,14 @@
+import 'backup_task_progress.dart';
+
 typedef ProgressCallback = void Function(ProgressUpdate update);
 
 final class ProgressUpdate {
-  const ProgressUpdate({this.value, this.processed, this.total});
+  const ProgressUpdate({this.value, this.processed, this.total, this.phase});
 
   final double? value;
   final int? processed;
   final int? total;
+  final BackupPhase? phase;
 
   double? get fraction {
     final explicit = value;

@@ -161,6 +161,27 @@ void main() {
       expect(active.single.parts.map((part) => part.kind), ['text', 'image']);
     });
 
+    test('switching a message role invalidates its frozen prompt', () async {
+      final service = createService();
+      await service.init();
+      final conversation = await service.createConversation(title: 'A');
+      final message = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'hello',
+      );
+      final repository = service.chatRepositoryOrNull!;
+      await repository.putMessagePrompt(
+        revisionId: message.id,
+        conversationId: conversation.id,
+        payload: 'frozen hello',
+        carriesMemorySnapshot: false,
+      );
+
+      expect(await service.switchMessageRole(message.id, 'assistant'), isTrue);
+      expect(await repository.getMessagePrompt(message.id), isNull);
+    });
+
     test('assistant move invalidates only memory snapshot prompts', () async {
       final service = createService();
       await service.init();

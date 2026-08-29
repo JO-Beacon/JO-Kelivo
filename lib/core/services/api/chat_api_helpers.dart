@@ -567,9 +567,14 @@ Map<String, dynamic>? claudeOutputConfig(
     if (!isClaudeReasoningEnabled(budget)) return null;
     final effort = _claudeEffortForBudget(budget);
     if (effort == 'auto' || effort == 'off') return null;
-    return <String, dynamic>{
-      'effort': (effort == 'xhigh' || effort == 'max') ? 'max' : 'high',
+    // DeepSeek's Anthropic-compatible endpoint accepts the full effort scale.
+    final mapped = switch (effort) {
+      'low' => 'low',
+      'xhigh' => 'xhigh',
+      'max' => 'max',
+      _ => 'high',
     };
+    return <String, dynamic>{'effort': mapped};
   }
   if (!_supportsClaudeAdaptiveThinking(modelId) ||
       !isClaudeReasoningEnabled(budget)) {

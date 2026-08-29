@@ -70,21 +70,6 @@ class _LocalToolsTab extends StatelessWidget {
         return;
       }
 
-      if ((toolId == LocalToolNames.calendarQuery ||
-              toolId == LocalToolNames.calendarCreate) &&
-          DeviceLocalTools.calendarSupported) {
-        final granted = await DeviceLocalTools.hasCalendarPermission();
-        if (!granted) {
-          final requested = await DeviceLocalTools.requestCalendarPermission();
-          if (!requested) {
-            // 在用户授予日历访问权限前不要启用。
-            return;
-          }
-        }
-        await updateTool(toolId, true);
-        return;
-      }
-
       await updateTool(toolId, true);
     }
 

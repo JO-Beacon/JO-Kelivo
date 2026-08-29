@@ -17,6 +17,7 @@ import '../../../core/services/api/stream/stream_chunk.dart';
 import '../../../core/services/api/stream/stream_chunk_handler.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/ios_background_generation.dart';
+import '../../../core/services/logging/flutter_logger.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
@@ -30,6 +31,13 @@ import 'generation_controller.dart';
 import 'home_view_model.dart';
 import 'latest_wins_checkpoint_writer.dart';
 import 'stream_controller.dart' as stream_ctrl;
+
+final class UnsupportedAudioAttachmentException implements Exception {
+  const UnsupportedAudioAttachmentException();
+
+  @override
+  String toString() => 'audio_attachment_unsupported';
+}
 
 final class _BarrierStreamSubscription<T> implements StreamSubscription<T> {
   _BarrierStreamSubscription(this._delegate, this._cancelWithBarrier);
@@ -267,11 +275,11 @@ class ChatActions {
   /// 成功的助手回复最终化时调用。
   void Function(ChatMessage message)? onAssistantMessageFinished;
 
-  /// 文件处理开始时调用。
-  VoidCallback? onFileProcessingStarted;
+  /// 文件处理开始时调用，参数为所属助手消息 ID。
+  void Function(String messageId)? onFileProcessingStarted;
 
-  /// 文件处理结束时调用。
-  VoidCallback? onFileProcessingFinished;
+  /// 文件处理结束时调用，参数为所属助手消息 ID。
+  void Function(String? messageId)? onFileProcessingFinished;
 
   // ============================================================================
   // 私有辅助方法
@@ -978,20 +986,14 @@ class ChatActions {
       }
     }
 
-    final existingContextMessages = await chatController
-        .messagesForGenerationContext(
-          conversation,
-          maxMessages: await _contextReadLimit(assistant, conversation),
-        );
-    if (_hasUnsupportedAudioAttachments(
-      messages: existingContextMessages,
-      conversation: conversation,
-      settings: settings,
-      providerKey: providerKey,
-      modelId: modelId,
-      pendingInput: input,
-      maxRawTruncateIndex: null,
-    )) {
+    // 当前输入无需读取数据库即可检查；历史消息的检查移到后台生成阶段，
+    // 让消息对先落库并显示。
+    if (!_supportsAudioAttachmentsForProvider(
+          settings,
+          providerKey: providerKey,
+          modelId: modelId,
+        ) &&
+        messageGenerationService.inputContainsAudioAttachments(input)) {
       return ChatActionResult.error('audio_attachment_unsupported');
     }
 
@@ -1031,19 +1033,71 @@ class ChatActions {
     onMessagesChanged?.call();
     onSendPairAppended?.call();
 
-    // 重置工具部分并初始化推理
-    streamController.toolParts.remove(assistantMessage.id);
-    final supportsReasoning = _isReasoningModel(providerKey, modelId);
-    final enableReasoning =
-        supportsReasoning &&
-        _isReasoningEnabled(
-          assistant?.thinkingBudget ?? settings.thinkingBudget,
-        );
-    // 准备 API 消息
-    messageGenerationService.onFileProcessingStarted = onFileProcessingStarted;
-    messageGenerationService.onFileProcessingFinished =
-        onFileProcessingFinished;
+    // 消息对已可见；准备上下文和生成在后台继续，输入框无需等待整段回复。
+    unawaited(
+      _runSendGeneration(
+        input: input,
+        conversation: conversation,
+        settings: settings,
+        assistant: assistant,
+        assistantId: assistantId,
+        providerKey: providerKey,
+        modelId: modelId,
+        userMessage: userMessage,
+        assistantMessage: assistantMessage,
+        generationRunId: generationRunId,
+        approvalService: approvalService,
+        askUserService: askUserService,
+      ),
+    );
+    return ChatActionResult.success(assistantMessage);
+  }
+
+  Future<void> _runSendGeneration({
+    required ChatInputData input,
+    required Conversation conversation,
+    required SettingsProvider settings,
+    required Assistant? assistant,
+    required String? assistantId,
+    required String providerKey,
+    required String modelId,
+    required ChatMessage userMessage,
+    required ChatMessage assistantMessage,
+    required String? generationRunId,
+    required ToolApprovalService? approvalService,
+    required AskUserInteractionService? askUserService,
+  }) async {
     try {
+      final contextLimit = await _contextReadLimit(assistant, conversation);
+      final persistedContext = await chatController
+          .messagesForGenerationContext(
+            conversation,
+            maxMessages: contextLimit + 2,
+          );
+      final existingContextMessages = <ChatMessage>[
+        for (final message in persistedContext)
+          if (message.id != userMessage.id && message.id != assistantMessage.id)
+            message,
+      ];
+      if (_hasUnsupportedAudioAttachments(
+        messages: existingContextMessages,
+        conversation: conversation,
+        settings: settings,
+        providerKey: providerKey,
+        modelId: modelId,
+        maxRawTruncateIndex: null,
+      )) {
+        throw const UnsupportedAudioAttachmentException();
+      }
+
+      streamController.toolParts.remove(assistantMessage.id);
+      final supportsReasoning = _isReasoningModel(providerKey, modelId);
+      final enableReasoning =
+          supportsReasoning &&
+          _isReasoningEnabled(
+            assistant?.thinkingBudget ?? settings.thinkingBudget,
+          );
+      _bindFileProcessingCallbacks();
       await messageGenerationService.initializeReasoningState(
         messageId: assistantMessage.id,
         enableReasoning: enableReasoning,
@@ -1065,9 +1119,8 @@ class ChatActions {
             modelId: modelId,
             approvalService: approvalService,
             askUserService: askUserService,
+            processingMessageId: assistantMessage.id,
           );
-
-      // 构建用户图片路径
       final userImagePaths = messageGenerationService.buildUserImagePaths(
         input: input,
         lastUserImagePaths: prepared.lastUserImagePaths,
@@ -1075,8 +1128,6 @@ class ChatActions {
         providerKey: providerKey,
         modelId: modelId,
       );
-
-      // 执行生成
       final ctx = messageGenerationService.buildGenerationContext(
         assistantMessage: assistantMessage,
         prepared: prepared,
@@ -1091,18 +1142,40 @@ class ChatActions {
         generateTitleOnFinish: true,
         generationRunId: generationRunId,
       );
-
-      if (!_activeAssistantMessages.isActive(assistantMessage)) {
-        return ChatActionResult.success(assistantMessage);
-      }
+      if (!_activeAssistantMessages.isActive(assistantMessage)) return;
       await _executeGeneration(ctx);
-      return ChatActionResult.success(assistantMessage);
-    } catch (e) {
-      // 出错时确保清除文件处理指示器
-      onFileProcessingFinished?.call();
-      await _finishPreparingMessage(conversation.id, assistantMessage);
-      return ChatActionResult.error(e.toString());
+    } catch (error) {
+      await handleSendGenerationFailure(
+        error: error,
+        conversationId: conversation.id,
+        assistantMessage: assistantMessage,
+      );
     }
+  }
+
+  @visibleForTesting
+  Future<void> handleSendGenerationFailure({
+    required Object error,
+    required String conversationId,
+    required ChatMessage assistantMessage,
+  }) async {
+    onFileProcessingFinished?.call(assistantMessage.id);
+    try {
+      await _finishPreparingMessage(conversationId, assistantMessage);
+    } catch (cleanupError, stackTrace) {
+      FlutterLogger.log(
+        '[ChatActions] finishPreparingMessage failed after send error: '
+        '$cleanupError\n$stackTrace',
+        tag: 'ChatActions',
+      );
+    }
+    onStreamError?.call(error.toString());
+  }
+
+  void _bindFileProcessingCallbacks() {
+    messageGenerationService.onFileProcessingStarted = onFileProcessingStarted;
+    messageGenerationService.onFileProcessingFinished =
+        onFileProcessingFinished;
   }
 
   Future<int> _contextReadLimit(
@@ -1342,6 +1415,7 @@ class ChatActions {
         _isReasoningEnabled(
           assistant?.thinkingBudget ?? settings.thinkingBudget,
         );
+    _bindFileProcessingCallbacks();
     try {
       await messageGenerationService.initializeReasoningState(
         messageId: assistantMessage.id,
@@ -1361,6 +1435,7 @@ class ChatActions {
             modelId: modelId,
             approvalService: regenApprovalService,
             askUserService: regenAskUserService,
+            processingMessageId: assistantMessage.id,
           );
 
       // 构建用户图片路径
@@ -1469,6 +1544,7 @@ class ChatActions {
           assistant?.thinkingBudget ?? settings.thinkingBudget,
         );
 
+    _bindFileProcessingCallbacks();
     try {
       final apiContextMessages = List<ChatMessage>.of(completeMessages);
       apiContextMessages[contextIndex] = streamingMessage.copyWith(content: '');
@@ -1484,6 +1560,7 @@ class ChatActions {
             modelId: modelId,
             approvalService: approvalService,
             askUserService: askUserService,
+            processingMessageId: streamingMessage.id,
           );
 
       final userImagePaths = messageGenerationService.buildUserImagePaths(
@@ -1566,8 +1643,14 @@ class ChatActions {
       // AskUserInteractionService 可能尚未注册
     }
 
-    // 取消时重置文件处理状态
-    onFileProcessingFinished?.call();
+    // 取消时只清理本会话当前生成消息的处理指示器。
+    final cancelIndicatorTarget = _activeAssistantMessages.cancellationTarget(
+      cid,
+      _messages,
+    );
+    if (cancelIndicatorTarget != null) {
+      onFileProcessingFinished?.call(cancelIndicatorTarget.id);
+    }
 
     // 在等待订阅前中止 HTTP 请求：屏障取消只有在生成器
     // 离开网络 await 后才完成；停滞连接否则会无限期阻塞。
@@ -2373,8 +2456,8 @@ class ChatActions {
     final conversationId = state.conversationId;
     final errorText = e.toString();
 
-    // 出错时重置文件处理状态
-    onFileProcessingFinished?.call();
+    // 出错时只清理当前助手消息的处理指示器。
+    onFileProcessingFinished?.call(messageId);
 
     // 标记流式结束，以允许 UI 再次重建
     streamController.markStreamingEnded(messageId);
@@ -2418,11 +2501,11 @@ class ChatActions {
 
   /// 处理流完成回调。
   Future<void> _handleStreamDone(stream_ctrl.StreamingState state) async {
-    // 完成时重置文件处理状态（以防万一）
-    onFileProcessingFinished?.call();
-
     final conversationId = state.conversationId;
     final messageId = state.messageId;
+
+    // 完成时只清理当前助手消息的处理指示器（以防准备阶段未收尾）。
+    onFileProcessingFinished?.call(messageId);
 
     // 确保流式状态被标记为已结束
     streamController.markStreamingEnded(messageId);

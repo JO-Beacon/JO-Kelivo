@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 /// 用于流式消息内容更新的轻量 notifier。
@@ -11,11 +13,25 @@ import 'package:flutter/foundation.dart';
 /// 1. StreamController 通过 updateContent() 更新内容
 /// 2. ChatMessageWidget 用 ValueListenableBuilder 监听 contentNotifier
 /// 3. 只有流式消息 widget 重建，而非整页
+@immutable
+class ToolHeightEvent {
+  const ToolHeightEvent({required this.messageId, required this.version});
+
+  final String messageId;
+  final int version;
+}
+
 class StreamingContentNotifier {
   /// 消息 ID 到其 content notifier 的映射。
   /// 每条流式消息都有自己的 `ValueNotifier<String>`。
   final Map<String, ValueNotifier<StreamingContentData>> _notifiers =
       <String, ValueNotifier<StreamingContentData>>{};
+
+  final ValueNotifier<ToolHeightEvent?> toolHeightEvents =
+      ValueNotifier<ToolHeightEvent?>(null);
+  int _toolHeightVersion = 0;
+  final Set<String> _pendingHeightIds = <String>{};
+  var _heightFlushScheduled = false;
 
   /// 获取或为消息创建 notifier。
   ValueNotifier<StreamingContentData> getNotifier(String messageId) {
@@ -100,6 +116,26 @@ class StreamingContentNotifier {
     }
   }
 
+  void notifyToolHeightChanged(String messageId) {
+    if (!_pendingHeightIds.add(messageId)) return;
+    if (_heightFlushScheduled) return;
+    _heightFlushScheduled = true;
+    scheduleMicrotask(_flushToolHeightEvents);
+  }
+
+  void _flushToolHeightEvents() {
+    _heightFlushScheduled = false;
+    final ids = List<String>.of(_pendingHeightIds);
+    _pendingHeightIds.clear();
+    for (final id in ids) {
+      _toolHeightVersion++;
+      toolHeightEvents.value = ToolHeightEvent(
+        messageId: id,
+        version: _toolHeightVersion,
+      );
+    }
+  }
+
   /// 通知工具 parts 已更新。
   /// 使用版本计数触发重建而无需复制工具数据。
   void notifyToolPartsUpdated(
@@ -129,6 +165,7 @@ class StreamingContentNotifier {
         durationMs: current.durationMs,
       );
     }
+    notifyToolHeightChanged(messageId);
   }
 
   /// 强制重建流式消息 widget。
@@ -170,6 +207,7 @@ class StreamingContentNotifier {
   /// 释放所有资源。
   void dispose() {
     clear();
+    toolHeightEvents.dispose();
   }
 }
 

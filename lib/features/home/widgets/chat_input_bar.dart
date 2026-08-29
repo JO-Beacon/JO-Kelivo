@@ -931,7 +931,15 @@ class _ChatInputBarState extends State<ChatInputBar>
     final submittedDocuments = List<DocumentAttachment>.of(_docs);
     final submittedDraftRevision = _draftReplacementRevision;
     _isSubmitting = true;
-    setState(_controller.clear);
+    // 发送调用现在在消息对落库后就返回，附件应随本次提交立即离开输入框。
+    // 如果提交被拒绝，下面会把本次快照恢复，同时保留用户期间新增的内容。
+    setState(() {
+      _controller.clear();
+      _images.removeWhere((image) => submittedImageIds.contains(image.id));
+      for (final document in submittedDocuments) {
+        _docs.remove(document);
+      }
+    });
     try {
       final result =
           await widget.onSend?.call(
@@ -948,10 +956,6 @@ class _ChatInputBarState extends State<ChatInputBar>
           result == ChatInputSubmissionResult.queued) {
         if (_draftReplacementRevision != submittedDraftRevision) return;
         _discardImageState(submittedImageIds);
-        _images.removeWhere((image) => submittedImageIds.contains(image.id));
-        for (final document in submittedDocuments) {
-          _docs.remove(document);
-        }
         setState(() {});
         // 桌面端保持焦点，使用户可以继续输入
         try {
@@ -960,16 +964,45 @@ class _ChatInputBarState extends State<ChatInputBar>
           }
         } catch (_) {}
       } else if (_draftReplacementRevision == submittedDraftRevision) {
-        setState(() => _restoreSubmittedText(submittedValue));
+        setState(
+          () => _restoreSubmittedDraft(
+            submittedValue,
+            submittedImages,
+            submittedDocuments,
+          ),
+        );
       }
     } catch (_) {
       if (mounted && _draftReplacementRevision == submittedDraftRevision) {
-        setState(() => _restoreSubmittedText(submittedValue));
+        setState(
+          () => _restoreSubmittedDraft(
+            submittedValue,
+            submittedImages,
+            submittedDocuments,
+          ),
+        );
       }
       rethrow;
     } finally {
       _isSubmitting = false;
     }
+  }
+
+  void _restoreSubmittedDraft(
+    TextEditingValue submittedValue,
+    List<_DraftImage> submittedImages,
+    List<DocumentAttachment> submittedDocuments,
+  ) {
+    _restoreSubmittedText(submittedValue);
+    final existingImageIds = _images.map((image) => image.id).toSet();
+    _images.insertAll(
+      0,
+      submittedImages.where((image) => !existingImageIds.contains(image.id)),
+    );
+    _docs.insertAll(
+      0,
+      submittedDocuments.where((document) => !_docs.contains(document)),
+    );
   }
 
   void _restoreSubmittedText(TextEditingValue submittedValue) {

@@ -252,6 +252,9 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     if (_selectionMode) return;
     final l10n = AppLocalizations.of(context)!;
     final chatService = context.read<ChatService>();
+    final titleGenerationEnabled = context
+        .read<SettingsProvider>()
+        .isTitleGenerationEnabled;
     final isPinned = chat.isPinned;
 
     if (_pointerInteractions) {
@@ -280,13 +283,14 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
               await chatService.togglePinConversation(chat.id);
             },
           ),
-          DesktopContextMenuItem(
-            icon: Lucide.RefreshCw,
-            label: l10n.sideDrawerMenuRegenerateTitle,
-            onTap: () async {
-              await _regenerateTitle(context, chat.id);
-            },
-          ),
+          if (titleGenerationEnabled)
+            DesktopContextMenuItem(
+              icon: Lucide.RefreshCw,
+              label: l10n.sideDrawerMenuRegenerateTitle,
+              onTap: () async {
+                await _regenerateTitle(context, chat.id);
+              },
+            ),
           DesktopContextMenuItem(
             icon: Lucide.Copy,
             label: l10n.sideDrawerMenuCopy,
@@ -479,13 +483,14 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                         await chatService.togglePinConversation(chat.id);
                       },
                     ),
-                    row(
-                      icon: Lucide.RefreshCw,
-                      label: l10n.sideDrawerMenuRegenerateTitle,
-                      action: () async {
-                        await _regenerateTitle(context, chat.id);
-                      },
-                    ),
+                    if (titleGenerationEnabled)
+                      row(
+                        icon: Lucide.RefreshCw,
+                        label: l10n.sideDrawerMenuRegenerateTitle,
+                        action: () async {
+                          await _regenerateTitle(context, chat.id);
+                        },
+                      ),
                     row(
                       icon: Lucide.Copy,
                       label: l10n.sideDrawerMenuCopy,
@@ -918,24 +923,16 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     final assistantProvider = context.read<AssistantProvider>();
     final convo = chatService.getConversation(conversationId);
     if (convo == null) return;
+    final titleModelProvider = settings.titleModelProvider;
+    final titleModelId = settings.titleModelId;
+    if (titleModelProvider == null || titleModelId == null) return;
 
     // 获取此会话的助手
     final assistant = convo.assistantId != null
         ? assistantProvider.getById(convo.assistantId!)
         : assistantProvider.currentAssistant;
 
-    // 决定模型：优先标题模型，否则回退到助手模型，再到全局默认
-    final provKey =
-        settings.titleModelProvider ??
-        assistant?.chatModelProvider ??
-        settings.currentModelProvider;
-    final mdlId =
-        settings.titleModelId ??
-        assistant?.chatModelId ??
-        settings.currentModelId;
-
-    if (provKey == null || mdlId == null) return;
-    final cfg = settings.getProviderConfig(provKey);
+    final cfg = settings.getProviderConfig(titleModelProvider);
     final budget = settings.titleGenerationThinkingBudgetFor(
       assistant?.thinkingBudget,
     );
@@ -950,7 +947,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
           .replaceAll('{content}', content);
       final title = (await ChatApiService.generateText(
         config: cfg,
-        modelId: mdlId,
+        modelId: titleModelId,
         prompt: prompt,
         thinkingBudget: budget,
       )).trim();
@@ -3833,16 +3830,6 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                               ),
                             ],
                           ),
-                          if ((info.notes ?? '').trim().isNotEmpty) ...[
-                            const SizedBox(height: 6),
-                            Text(
-                              info.notes!,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: cs2.onSurface.withValues(alpha: 0.8),
-                              ),
-                            ),
-                          ],
                         ],
                       ),
                     ),

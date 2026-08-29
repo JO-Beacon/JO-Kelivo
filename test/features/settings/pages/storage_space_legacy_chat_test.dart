@@ -121,10 +121,37 @@ void main() {
     }
   });
 
-  testWidgets('storage page exposes the JO-Kelivo user data directory entry', (
+  for (final platform in const [TargetPlatform.android, TargetPlatform.iOS]) {
+    testWidgets(
+      'storage page hides the user data directory entry on ${platform.name}',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = platform;
+        try {
+          await tester.pumpWidget(
+            ChangeNotifierProvider(
+              create: (_) => SettingsProvider(createBusinessTestPreferences()),
+              child: const MaterialApp(
+                locale: Locale('en'),
+                supportedLocales: AppLocalizations.supportedLocales,
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                home: StorageSpacePage(),
+              ),
+            ),
+          );
+          await _pumpUntilFound(tester, find.text('Chat Records (Old)'));
+
+          expect(find.text('Open User Data Directory'), findsNothing);
+        } finally {
+          debugDefaultTargetPlatformOverride = null;
+        }
+      },
+    );
+  }
+
+  testWidgets('storage page keeps the user data directory entry on desktop', (
     tester,
   ) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     try {
       await tester.pumpWidget(
         ChangeNotifierProvider(

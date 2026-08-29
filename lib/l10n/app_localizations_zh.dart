@@ -120,6 +120,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceCategoryFiles => '文件';
 
   @override
+  String get storageSpaceCategoryFonts => '字体';
+
+  @override
+  String get storageSpaceCategoryLocalModels => '本地模型';
+
+  @override
+  String get storageSpaceOtherHint => '包括导入字体、本地下载模型和其他应用文件。';
+
+  @override
+  String get storageSpaceSubOtherApp => '其他文件';
+
+  @override
   String get storageSpaceCategoryChatData => '聊天记录';
 
   @override
@@ -151,7 +163,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceCategoryLogs => '日志';
 
   @override
-  String get storageSpaceCategoryOther => '应用';
+  String get storageSpaceCategoryOther => '其他';
 
   @override
   String storageSpaceFilesCount(int count) {
@@ -1707,11 +1719,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageOverwriteModeDescription => '仅替换已选组件；保留未选组件及无关本地设置';
 
   @override
-  String get backupPageMergeMode => '合并';
+  String get backupPageMergeMode => '智能合并';
 
   @override
   String get backupPageMergeModeDescription =>
-      '保留本地数据并加入备份数据；相同会话会跳过，冲突会话会重新分配 ID。';
+      '保留本地数据并智能合并备份；相同消息自动去重，新消息并入原会话，内容冲突则保留为独立会话。';
 
   @override
   String get backupPageRestore => '恢复';
@@ -1851,7 +1863,13 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get backupPageImportFromChatbox => '从 Chatbox 导入';
+  String get backupPageImportFromChatbox => '从 Chatbox 导入（≥1.22）';
+
+  @override
+  String get backupPageImportFromChatboxLegacy => '从 Chatbox 导入（<1.22）';
+
+  @override
+  String get backupPageChatboxLegacyStarredGroupName => 'Chatbox 导入（<1.22）·置顶';
 
   @override
   String get backupPageImportFromDeepSeek => '从 DeepSeek 网页版/App 导入';
@@ -2727,12 +2745,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String sideDrawerUpdateTitle(String version) {
-    return '发现新版本：$version';
+    return '新版：$version';
   }
 
   @override
   String sideDrawerUpdateTitleWithBuild(String version, int build) {
-    return '发现新版本：$version ($build)';
+    return '新版：$version ($build)';
   }
 
   @override
@@ -3065,7 +3083,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get defaultModelPageTitleModelTitle => '标题总结模型';
 
   @override
-  String get defaultModelPageTitleModelSubtitle => '用于总结对话标题的模型，推荐使用快速且便宜的模型';
+  String get defaultModelPageTitleModelSubtitle =>
+      '用于总结对话标题的模型，推荐使用快速且便宜的模型。选择模型后才会启用。';
 
   @override
   String get titleModelThinkingTitle => '是否开启思考';
@@ -3914,10 +3933,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchServicesPageConfiguredStatus => '已配置';
 
   @override
-  String get miniMapTitle => '迷你地图';
+  String get miniMapTitle => '小地图';
 
   @override
-  String get miniMapTooltip => '迷你地图';
+  String get miniMapTooltip => '小地图';
 
   @override
   String get miniMapScrollToBottomTooltip => '滚动到底部';
@@ -4340,6 +4359,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageShowTokenStatsSubtitle => '显示 token 用量与消息数量';
 
   @override
+  String get displaySettingsPageShowThinkingCardsTitle => '显示思考卡片';
+
+  @override
+  String get displaySettingsPageShowThinkingCardsSubtitle => '关闭后，聊天中隐藏思考过程卡片';
+
+  @override
+  String get displaySettingsPageShowToolCardsTitle => '显示工具卡片';
+
+  @override
+  String get displaySettingsPageShowToolCardsSubtitle => '关闭后，聊天中隐藏工具调用卡片';
+
+  @override
   String get displaySettingsPageAutoCollapseThinkingTitle => '自动折叠思考';
 
   @override
@@ -4362,6 +4393,13 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get displaySettingsPageShowToolResultSummarySubtitle =>
       '在工具步骤下方显示摘要文本';
+
+  @override
+  String get displaySettingsPageHideToolResultImagesTitle => '隐藏工具结果图片';
+
+  @override
+  String get displaySettingsPageHideToolResultImagesSubtitle =>
+      '隐藏工具结果中显示的 Markdown 图片';
 
   @override
   String get displaySettingsPageRegenerateDeleteTrailingMessagesTitle =>
@@ -4408,6 +4446,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get displaySettingsPageShowUpdatesSubtitle => '显示应用更新通知';
+
+  @override
+  String get displaySettingsPageKeepScreenOnDuringGenerationTitle =>
+      '生成时保持屏幕常亮';
+
+  @override
+  String get displaySettingsPageKeepScreenOnDuringGenerationSubtitle =>
+      '防止生成中途锁屏导致中断，会增加耗电';
 
   @override
   String get displaySettingsPageMessageNavButtonsTitle => '消息导航按钮';
@@ -7819,6 +7865,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get messageStyleSettingsPagePreviewThinking => '思考中';
+
+  @override
+  String get messageStyleSettingsPageRoleUser => '用户';
+
+  @override
+  String get messageStyleSettingsPageRoleAssistant => '助手';
+
+  @override
+  String get messageStyleSettingsPageRoleAssistantHint =>
+      '助手设定同时作用于思考、工具调用和翻译卡片。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -7937,6 +7993,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceCategoryFiles => '文件';
 
   @override
+  String get storageSpaceCategoryFonts => '字体';
+
+  @override
+  String get storageSpaceCategoryLocalModels => '本地模型';
+
+  @override
+  String get storageSpaceOtherHint => '包括导入字体、本地下载模型和其他应用文件。';
+
+  @override
+  String get storageSpaceSubOtherApp => '其他文件';
+
+  @override
   String get storageSpaceCategoryChatData => '聊天记录';
 
   @override
@@ -7968,7 +8036,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceCategoryLogs => '日志';
 
   @override
-  String get storageSpaceCategoryOther => '应用';
+  String get storageSpaceCategoryOther => '其他';
 
   @override
   String storageSpaceFilesCount(int count) {
@@ -9524,11 +9592,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageOverwriteModeDescription => '仅替换已选组件；保留未选组件及无关本地设置';
 
   @override
-  String get backupPageMergeMode => '合并';
+  String get backupPageMergeMode => '智能合并';
 
   @override
   String get backupPageMergeModeDescription =>
-      '保留本地数据并加入备份数据；相同会话会跳过，冲突会话会重新分配 ID。';
+      '保留本地数据并智能合并备份；相同消息自动去重，新消息并入原会话，内容冲突则保留为独立会话。';
 
   @override
   String get backupPageRestore => '恢复';
@@ -9668,7 +9736,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
-  String get backupPageImportFromChatbox => '从 Chatbox 导入';
+  String get backupPageImportFromChatbox => '从 Chatbox 导入（≥1.22）';
+
+  @override
+  String get backupPageImportFromChatboxLegacy => '从 Chatbox 导入（<1.22）';
+
+  @override
+  String get backupPageChatboxLegacyStarredGroupName => 'Chatbox 导入（<1.22）·置顶';
 
   @override
   String get backupPageImportFromDeepSeek => '从 DeepSeek 网页版/App 导入';
@@ -10544,12 +10618,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String sideDrawerUpdateTitle(String version) {
-    return '发现新版本：$version';
+    return '新版：$version';
   }
 
   @override
   String sideDrawerUpdateTitleWithBuild(String version, int build) {
-    return '发现新版本：$version ($build)';
+    return '新版：$version ($build)';
   }
 
   @override
@@ -10882,7 +10956,8 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get defaultModelPageTitleModelTitle => '标题总结模型';
 
   @override
-  String get defaultModelPageTitleModelSubtitle => '用于总结对话标题的模型，推荐使用快速且便宜的模型';
+  String get defaultModelPageTitleModelSubtitle =>
+      '用于总结对话标题的模型，推荐使用快速且便宜的模型。选择模型后才会启用。';
 
   @override
   String get titleModelThinkingTitle => '是否开启思考';
@@ -11731,10 +11806,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get searchServicesPageConfiguredStatus => '已配置';
 
   @override
-  String get miniMapTitle => '迷你地图';
+  String get miniMapTitle => '小地图';
 
   @override
-  String get miniMapTooltip => '迷你地图';
+  String get miniMapTooltip => '小地图';
 
   @override
   String get miniMapScrollToBottomTooltip => '滚动到底部';
@@ -12157,6 +12232,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageShowTokenStatsSubtitle => '显示 token 用量与消息数量';
 
   @override
+  String get displaySettingsPageShowThinkingCardsTitle => '显示思考卡片';
+
+  @override
+  String get displaySettingsPageShowThinkingCardsSubtitle => '关闭后，聊天中隐藏思考过程卡片';
+
+  @override
+  String get displaySettingsPageShowToolCardsTitle => '显示工具卡片';
+
+  @override
+  String get displaySettingsPageShowToolCardsSubtitle => '关闭后，聊天中隐藏工具调用卡片';
+
+  @override
   String get displaySettingsPageAutoCollapseThinkingTitle => '自动折叠思考';
 
   @override
@@ -12179,6 +12266,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get displaySettingsPageShowToolResultSummarySubtitle =>
       '在工具步骤下方显示摘要文本';
+
+  @override
+  String get displaySettingsPageHideToolResultImagesTitle => '隐藏工具结果图片';
+
+  @override
+  String get displaySettingsPageHideToolResultImagesSubtitle =>
+      '隐藏工具结果中显示的 Markdown 图片';
 
   @override
   String get displaySettingsPageRegenerateDeleteTrailingMessagesTitle =>
@@ -12225,6 +12319,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageShowUpdatesSubtitle => '显示应用更新通知';
+
+  @override
+  String get displaySettingsPageKeepScreenOnDuringGenerationTitle =>
+      '生成时保持屏幕常亮';
+
+  @override
+  String get displaySettingsPageKeepScreenOnDuringGenerationSubtitle =>
+      '防止生成中途锁屏导致中断，会增加耗电';
 
   @override
   String get displaySettingsPageMessageNavButtonsTitle => '消息导航按钮';
@@ -15636,6 +15738,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get messageStyleSettingsPagePreviewThinking => '思考中';
+
+  @override
+  String get messageStyleSettingsPageRoleUser => '用户';
+
+  @override
+  String get messageStyleSettingsPageRoleAssistant => '助手';
+
+  @override
+  String get messageStyleSettingsPageRoleAssistantHint =>
+      '助手设定同时作用于思考、工具调用和翻译卡片。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -15754,6 +15866,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageSpaceCategoryFiles => '檔案';
 
   @override
+  String get storageSpaceCategoryFonts => '字體';
+
+  @override
+  String get storageSpaceCategoryLocalModels => '本地模型';
+
+  @override
+  String get storageSpaceOtherHint => '包括匯入字體、本地下載模型和其他應用程式檔案。';
+
+  @override
+  String get storageSpaceSubOtherApp => '其他檔案';
+
+  @override
   String get storageSpaceCategoryChatData => '聊天記錄';
 
   @override
@@ -15785,7 +15909,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageSpaceCategoryLogs => '日誌';
 
   @override
-  String get storageSpaceCategoryOther => '應用';
+  String get storageSpaceCategoryOther => '其他';
 
   @override
   String storageSpaceFilesCount(int count) {
@@ -17342,11 +17466,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageOverwriteModeDescription => '僅替換已選元件；保留未選元件及無關的本機設定';
 
   @override
-  String get backupPageMergeMode => '合併';
+  String get backupPageMergeMode => '智慧合併';
 
   @override
   String get backupPageMergeModeDescription =>
-      '保留本機資料並加入備份資料；相同對話會略過，衝突對話會重新分配 ID。';
+      '保留本機資料並智慧合併備份；相同訊息會自動去重，新訊息併入原對話，內容衝突則保留為獨立對話。';
 
   @override
   String get backupPageRestore => '還原';
@@ -17486,7 +17610,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get backupPageImportFromChatbox => '從 Chatbox 匯入';
+  String get backupPageImportFromChatbox => '從 Chatbox 匯入（≥1.22）';
+
+  @override
+  String get backupPageImportFromChatboxLegacy => '從 Chatbox 匯入（<1.22）';
+
+  @override
+  String get backupPageChatboxLegacyStarredGroupName => 'Chatbox 匯入（<1.22）·置頂';
 
   @override
   String get backupPageImportFromDeepSeek => '從 DeepSeek 網頁版/App 匯入';
@@ -18361,12 +18491,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String sideDrawerUpdateTitle(String version) {
-    return '發現新版本：$version';
+    return '新版：$version';
   }
 
   @override
   String sideDrawerUpdateTitleWithBuild(String version, int build) {
-    return '發現新版本：$version ($build)';
+    return '新版：$version ($build)';
   }
 
   @override
@@ -18699,7 +18829,8 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get defaultModelPageTitleModelTitle => '標題總結模型';
 
   @override
-  String get defaultModelPageTitleModelSubtitle => '用於總結對話標題的模型，推薦使用快速且便宜的模型';
+  String get defaultModelPageTitleModelSubtitle =>
+      '用於總結對話標題的模型，推薦使用快速且便宜的模型。選擇模型後才會啟用。';
 
   @override
   String get titleModelThinkingTitle => '是否開啟思考';
@@ -19547,10 +19678,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get searchServicesPageConfiguredStatus => '已設定';
 
   @override
-  String get miniMapTitle => '迷你地圖';
+  String get miniMapTitle => '小地圖';
 
   @override
-  String get miniMapTooltip => '迷你地圖';
+  String get miniMapTooltip => '小地圖';
 
   @override
   String get miniMapScrollToBottomTooltip => '捲動到底部';
@@ -19973,6 +20104,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get displaySettingsPageShowTokenStatsSubtitle => '顯示 token 用量與訊息數量';
 
   @override
+  String get displaySettingsPageShowThinkingCardsTitle => '顯示思考卡片';
+
+  @override
+  String get displaySettingsPageShowThinkingCardsSubtitle => '關閉後，聊天中隱藏思考過程卡片';
+
+  @override
+  String get displaySettingsPageShowToolCardsTitle => '顯示工具卡片';
+
+  @override
+  String get displaySettingsPageShowToolCardsSubtitle => '關閉後，聊天中隱藏工具呼叫卡片';
+
+  @override
   String get displaySettingsPageAutoCollapseThinkingTitle => '自動折疊思考';
 
   @override
@@ -19995,6 +20138,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get displaySettingsPageShowToolResultSummarySubtitle =>
       '在工具步驟下方顯示摘要文字';
+
+  @override
+  String get displaySettingsPageHideToolResultImagesTitle => '隱藏工具結果圖片';
+
+  @override
+  String get displaySettingsPageHideToolResultImagesSubtitle =>
+      '隱藏工具結果中顯示的 Markdown 圖片';
 
   @override
   String get displaySettingsPageRegenerateDeleteTrailingMessagesTitle =>
@@ -20041,6 +20191,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageShowUpdatesSubtitle => '顯示應用程式更新通知';
+
+  @override
+  String get displaySettingsPageKeepScreenOnDuringGenerationTitle =>
+      '生成時保持螢幕常亮';
+
+  @override
+  String get displaySettingsPageKeepScreenOnDuringGenerationSubtitle =>
+      '防止生成中途鎖屏導致中斷，會增加耗電';
 
   @override
   String get displaySettingsPageMessageNavButtonsTitle => '訊息導航按鈕';
@@ -23454,4 +23612,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get messageStyleSettingsPagePreviewThinking => '思考中';
+
+  @override
+  String get messageStyleSettingsPageRoleUser => '使用者';
+
+  @override
+  String get messageStyleSettingsPageRoleAssistant => '助手';
+
+  @override
+  String get messageStyleSettingsPageRoleAssistantHint =>
+      '助手設定同時作用於思考、工具呼叫和翻譯卡片。';
 }

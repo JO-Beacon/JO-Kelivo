@@ -1,5 +1,6 @@
 import "../../support/business_test_harness.dart";
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
@@ -314,6 +315,18 @@ Widget _markdownHarness(
 void _overrideMarkdownTablePlatform(TargetPlatform platform) {
   markdownTableTargetPlatformOverride = platform;
   addTearDown(() => markdownTableTargetPlatformOverride = null);
+}
+
+Future<Uint8List> _pngRgbaPixels(Uint8List pngBytes) async {
+  final codec = await ui.instantiateImageCodec(pngBytes);
+  final frame = await codec.getNextFrame();
+  final image = frame.image;
+  try {
+    final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    return data!.buffer.asUint8List();
+  } finally {
+    image.dispose();
+  }
 }
 
 Widget _streamingMarkdownHarness(
@@ -891,6 +904,76 @@ Inline ***strong emphasis*** text.
       expect(savedToGallery, isTrue);
     },
   );
+
+  testWidgets('MarkdownWithCodeHighlight saves an opaque table image', (
+    tester,
+  ) async {
+    _overrideMarkdownTablePlatform(TargetPlatform.android);
+    Uint8List? savedBytes;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('image_gallery_saver_plus'),
+          (call) async {
+            if (call.method == 'saveImageToGallery') {
+              final raw = call.arguments['imageBytes'];
+              if (raw is Uint8List) {
+                savedBytes = raw;
+              } else if (raw is List<int>) {
+                savedBytes = Uint8List.fromList(raw);
+              }
+              return <String, Object>{'isSuccess': true};
+            }
+            return null;
+          },
+        );
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('image_gallery_saver_plus'),
+            null,
+          );
+    });
+
+    await tester.pumpWidget(
+      _markdownHarness('''
+| Name | Value |
+| - | - |
+| Alpha | 42 |
+''', width: 360),
+    );
+    await tester.pump();
+
+    double toolbarFillAlpha() {
+      final toolbar = find.byWidgetPredicate(
+        (widget) => widget.runtimeType.toString() == '_MarkdownTableToolbar',
+      );
+      final container = find
+          .descendant(of: toolbar, matching: find.byType(Container))
+          .first;
+      final decoration = tester.widget<Container>(container).decoration;
+      return (decoration! as BoxDecoration).color!.a;
+    }
+
+    final initialToolbarAlpha = toolbarFillAlpha();
+    expect(initialToolbarAlpha, closeTo(kBlockFillAlphaTable, 0.01));
+
+    await tester.tap(find.byTooltip('Save to Gallery'));
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pump(const Duration(seconds: 4));
+
+    expect(savedBytes, isNotNull);
+    await tester.runAsync(() async {
+      final pixels = await _pngRgbaPixels(savedBytes!);
+      expect(pixels, isNotEmpty);
+      for (var i = 3; i < pixels.length; i += 4) {
+        expect(pixels[i], 255);
+      }
+    });
+    expect(toolbarFillAlpha(), closeTo(initialToolbarAlpha, 0.001));
+  });
 
   testWidgets('MarkdownWithCodeHighlight scrolls only overflowing table', (
     tester,

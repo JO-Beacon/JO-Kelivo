@@ -19,11 +19,13 @@ import '../../database/business_settings_router.dart';
 import '../../database/app_database.dart';
 import '../../database/chat_database_repository.dart';
 import '../../models/backup.dart';
+import '../../models/backup_task_progress.dart';
 import '../../models/progress_update.dart';
 import '../chat/chat_service.dart';
 import '../migration/migration_backup_file_name.dart';
 import '../../../utils/app_directories.dart';
 import 'backup_settings_validator.dart';
+import 'backup_isolate_runner.dart';
 import 'joaiclient_archive.dart';
 import 'restore_bundle_preparation.dart';
 import 'temporary_restore_file.dart';
@@ -36,6 +38,40 @@ typedef _VersionedBackupInfo = ({
   Map<String, Object?>? businessEntityRowIds,
   String normalizedManifestSha256,
 });
+
+final class _BackupPackArgs {
+  const _BackupPackArgs({
+    required this.outPath,
+    required this.manifestPath,
+    required this.settingsPath,
+    required this.databasePath,
+    required this.snapshotInfo,
+    required this.includeChats,
+    required this.includeFiles,
+    required this.appVersion,
+    required this.businessEntityRowIds,
+    required this.uploadDirPath,
+    required this.avatarsDirPath,
+    required this.imagesDirPath,
+    required this.fontsDirPath,
+    required this.verifyDirPath,
+  });
+
+  final String outPath;
+  final String manifestPath;
+  final String settingsPath;
+  final String? databasePath;
+  final ChatDatabaseSnapshotInfo? snapshotInfo;
+  final bool includeChats;
+  final bool includeFiles;
+  final String appVersion;
+  final Map<String, List<String>> businessEntityRowIds;
+  final String uploadDirPath;
+  final String avatarsDirPath;
+  final String imagesDirPath;
+  final String fontsDirPath;
+  final String verifyDirPath;
+}
 
 class DataSync {
   static const _backupFormat = 'kelivo-backup';
@@ -90,22 +126,57 @@ class DataSync {
     );
   });
 
-  // 这些 isolate 入口刻意放在恢复方法作用域之外。恢复方法持有的界面进度
-  // 回调可能保留 ValueNotifier/Completer，即使后台工作只需要路径，也不能
-  // 让这个闭包跨越 isolate 边界。
-  static Future<void> _extractZipInIsolate({
-    required String zipPath,
-    required String extractDirPath,
-    required SendPort progressPort,
-  }) => Isolate.run(() {
+  // isolate 入口刻意放在恢复方法作用域之外，避免把 UI 回调闭包传入 worker。
+  static void _extractZipInIsolate(
+    BackupIsolateContext context,
+    List<String> paths,
+  ) {
     _extractZipSync(
-      zipPath,
-      extractDirPath,
-      onProgress: (processed, total) {
-        progressPort.send([processed, total]);
-      },
+      paths[0],
+      paths[1],
+      onProgress: (processed, total) => context.reportProgress(
+        ProgressUpdate(processed: processed, total: total),
+      ),
+      checkCancelled: context.throwIfCancelled,
     );
-  });
+  }
+
+  static Future<void> _packAndVerifyInIsolate(
+    BackupIsolateContext context,
+    _BackupPackArgs args,
+  ) async {
+    _packZipSync(
+      outPath: args.outPath,
+      manifestPath: args.manifestPath,
+      settingsPath: args.settingsPath,
+      databasePath: args.databasePath,
+      snapshotInfo: args.snapshotInfo,
+      includeChats: args.includeChats,
+      includeFiles: args.includeFiles,
+      appVersion: args.appVersion,
+      businessEntityRowIds: args.businessEntityRowIds,
+      uploadDirPath: args.uploadDirPath,
+      avatarsDirPath: args.avatarsDirPath,
+      imagesDirPath: args.imagesDirPath,
+      fontsDirPath: args.fontsDirPath,
+      checkCancelled: context.throwIfCancelled,
+    );
+    final verifyDir = Directory(args.verifyDirPath);
+    try {
+      verifyDir.createSync(recursive: true);
+      _extractZipSync(
+        args.outPath,
+        args.verifyDirPath,
+        checkCancelled: context.throwIfCancelled,
+      );
+      await _preflightVersionedBackup(
+        manifestPath: p.join(args.verifyDirPath, _manifestEntryName),
+        extractDirPath: args.verifyDirPath,
+      );
+    } finally {
+      if (verifyDir.existsSync()) verifyDir.deleteSync(recursive: true);
+    }
+  }
 
   static Future<_VersionedBackupInfo> _preflightVersionedBackupInIsolate({
     required String manifestPath,
@@ -231,7 +302,15 @@ class DataSync {
     }
   }
 
-  Future<File> prepareBackupFile(WebDavConfig cfg) async {
+  Future<File> prepareBackupFile(
+    WebDavConfig cfg, {
+    ProgressCallback? onProgress,
+    BackupCancelToken? cancelToken,
+  }) async {
+    cancelToken?.throwIfCancelled();
+    onProgress?.call(
+      const ProgressUpdate(phase: BackupPhase.preparing, value: 0),
+    );
     final tmp = await _ensureTempDir();
     await _cleanupPreviousBackupTempFiles(tmp);
     final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
@@ -249,6 +328,7 @@ class DataSync {
       // --- 第 1 步：准备需要 ChatService 的临时文件（主 isolate）---
       // settings.json
       final businessExport = await _exportBusinessSettings();
+      cancelToken?.throwIfCancelled();
       final settingsFile = await _writeTempText(
         workDir,
         '_bk_settings.json',
@@ -258,10 +338,19 @@ class DataSync {
 
       ChatDatabaseSnapshotInfo? snapshotInfo;
       if (cfg.includeChats) {
+        onProgress?.call(
+          const ProgressUpdate(phase: BackupPhase.snapshot, value: 0.1),
+        );
         final databaseFile = File(p.join(workDir.path, '_bk_kelivo.db'));
         databaseTmp = databaseFile;
         snapshotInfo = await chatService.createBackupDatabaseSnapshot(
           databaseFile,
+          onProgress: onProgress,
+          cancelToken: cancelToken,
+        );
+        cancelToken?.throwIfCancelled();
+        onProgress?.call(
+          const ProgressUpdate(phase: BackupPhase.snapshot, value: 0.35),
         );
       }
 
@@ -284,8 +373,13 @@ class DataSync {
       final verifyDirPath = p.join(workDir.path, '_verify');
 
       // --- 第 2 步：在独立 isolate 中执行 CPU 密集的 ZIP 打包 ---
-      await Isolate.run(() async {
-        _packZipSync(
+      cancelToken?.throwIfCancelled();
+      onProgress?.call(
+        const ProgressUpdate(phase: BackupPhase.packing, value: 0.4),
+      );
+      await runBackupIsolate<void, _BackupPackArgs>(
+        body: _packAndVerifyInIsolate,
+        payload: _BackupPackArgs(
           outPath: outPath,
           manifestPath: manifestPath,
           settingsPath: settingsPath,
@@ -299,21 +393,18 @@ class DataSync {
           avatarsDirPath: avatarsDirPath,
           imagesDirPath: imagesDirPath,
           fontsDirPath: fontsDirPath,
-        );
-        final verifyDir = Directory(verifyDirPath);
-        try {
-          verifyDir.createSync(recursive: true);
-          _extractZipSync(outPath, verifyDirPath);
-          await _preflightVersionedBackup(
-            manifestPath: p.join(verifyDirPath, _manifestEntryName),
-            extractDirPath: verifyDirPath,
-          );
-        } finally {
-          if (verifyDir.existsSync()) {
-            verifyDir.deleteSync(recursive: true);
-          }
-        }
-      });
+          verifyDirPath: verifyDirPath,
+        ),
+        cancelToken: cancelToken,
+        onProgress: onProgress,
+      );
+      cancelToken?.throwIfCancelled();
+      onProgress?.call(
+        const ProgressUpdate(phase: BackupPhase.verifying, value: 0.95),
+      );
+      onProgress?.call(
+        const ProgressUpdate(phase: BackupPhase.finalizing, value: 1),
+      );
 
       return outFile;
     } catch (_) {
@@ -483,12 +574,14 @@ class DataSync {
     required String avatarsDirPath,
     required String imagesDirPath,
     required String fontsDirPath,
+    void Function()? checkCancelled,
   }) {
     if (includeChats != (databasePath != null && snapshotInfo != null)) {
       throw StateError('backup_database_component');
     }
     final writer = _StreamingZipWriter(outPath);
     try {
+      checkCancelled?.call();
       final entries = <String, _BackupEntryMetadata>{};
       final collisionKeys = <String>{};
       _addFileToZip(
@@ -500,6 +593,7 @@ class DataSync {
       );
 
       if (databasePath != null) {
+        checkCancelled?.call();
         _addFileToZip(
           writer,
           databasePath,
@@ -510,6 +604,7 @@ class DataSync {
       }
 
       if (includeFiles) {
+        checkCancelled?.call();
         _addDirectoryToZip(
           writer,
           uploadDirPath,
@@ -517,6 +612,7 @@ class DataSync {
           entries,
           collisionKeys,
         );
+        checkCancelled?.call();
         _addDirectoryToZip(
           writer,
           avatarsDirPath,
@@ -524,6 +620,7 @@ class DataSync {
           entries,
           collisionKeys,
         );
+        checkCancelled?.call();
         _addDirectoryToZip(
           writer,
           imagesDirPath,
@@ -531,6 +628,7 @@ class DataSync {
           entries,
           collisionKeys,
         );
+        checkCancelled?.call();
         _addDirectoryToZip(
           writer,
           fontsDirPath,
@@ -538,6 +636,7 @@ class DataSync {
           entries,
           collisionKeys,
         );
+        checkCancelled?.call();
       }
 
       final manifestJson = _buildBackupManifestJson(
@@ -551,6 +650,7 @@ class DataSync {
       final manifestFile = File(manifestPath)
         ..writeAsStringSync(manifestJson, flush: true);
       writer.addFile(manifestFile, _manifestEntryName);
+      checkCancelled?.call();
       writer.closeSync();
     } finally {
       writer.closeIfNeededSync();
@@ -630,27 +730,23 @@ class DataSync {
     required String zipPath,
     required String extractDirPath,
     required void Function(int processed, int total) onProgress,
+    BackupCancelToken? cancelToken,
   }) async {
-    final progressPort = ReceivePort();
-    final sendPort = progressPort.sendPort;
-    final subscription = progressPort.listen((message) {
-      if (message is List && message.length == 2) {
-        final processed = message[0];
-        final total = message[1];
-        if (processed is int && total is int) {
-          onProgress(processed, total);
-        }
-      }
-    });
+    cancelToken?.throwIfCancelled();
     try {
-      await _extractZipInIsolate(
-        zipPath: zipPath,
-        extractDirPath: extractDirPath,
-        progressPort: sendPort,
+      await runBackupIsolate<void, List<String>>(
+        body: _extractZipInIsolate,
+        payload: [zipPath, extractDirPath],
+        cancelToken: cancelToken,
+        onProgress: (update) {
+          final processed = update.processed;
+          final total = update.total;
+          if (processed != null && total != null) onProgress(processed, total);
+        },
       );
-    } finally {
-      await subscription.cancel();
-      progressPort.close();
+    } catch (error) {
+      cancelToken?.throwIfCancelled();
+      rethrow;
     }
   }
 
@@ -661,6 +757,7 @@ class DataSync {
     String zipPath,
     String extractDirPath, {
     void Function(int processed, int total)? onProgress,
+    void Function()? checkCancelled,
   }) {
     final inputStream = InputFileStream(zipPath);
     try {
@@ -675,6 +772,7 @@ class DataSync {
         }
         final seenNames = <String>{};
         for (final rawName in rawEntryNames) {
+          checkCancelled?.call();
           final canonical = _validatedZipEntryName(rawName);
           if (!seenNames.add(canonical.toLowerCase())) {
             throw FormatException('duplicate_zip_entry:$canonical');
@@ -684,6 +782,7 @@ class DataSync {
         final archiveFiles = <String, ArchiveFile>{};
         final allEntryNames = <String>[];
         for (final entry in archive) {
+          checkCancelled?.call();
           if (entry.isSymbolicLink) {
             throw FormatException('symbolic_link:${entry.name}');
           }
@@ -759,6 +858,7 @@ class DataSync {
         var extractedBytes = 0;
         onProgress?.call(extractedBytes, extractionTotal);
         for (final entry in archive) {
+          checkCancelled?.call();
           final canonical = _validatedZipEntryName(entry.name);
           if (canonical == _manifestEntryName) continue;
           final parts = canonical.split('/');
@@ -998,10 +1098,10 @@ class DataSync {
           ? disp.first.trim()
           : Uri.parse(href).pathSegments.last;
 
-      // 如果 mtime 为 null，则尝试从文件名中提取（格式：kelivo_backup_2025-01-19T12-34-56.123456.zip）
+      // 如果 mtime 为 null，则尝试从文件名中提取备份时间。
       if (mtime == null) {
         final match = RegExp(
-          r'kelivo_backup_(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d+)\.(?:joaiclient|zip)$',
+          r'(?:kelivo|joaiclient)_backup_(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d+)\.(?:joaiclient|zip)$',
         ).firstMatch(name);
         if (match != null) {
           try {
@@ -1112,15 +1212,26 @@ class DataSync {
   Future<File> prepareJoaiclientFile(
     WebDavConfig cfg, {
     ProgressCallback? onProgress,
+    BackupCancelToken? cancelToken,
   }) async {
     final zipFile = await prepareBackupFile(
       cfg.copyWith(includeChats: true, includeFiles: true),
+      onProgress: onProgress,
+      cancelToken: cancelToken,
     );
-    onProgress?.call(const ProgressUpdate(value: 0.5));
+    cancelToken?.throwIfCancelled();
+    onProgress?.call(
+      const ProgressUpdate(phase: BackupPhase.wrapping, value: 0.5),
+    );
+    final zipBaseName = p.basenameWithoutExtension(zipFile.path);
+    const kelivoBackupPrefix = 'kelivo_backup_';
+    final timestampPart = zipBaseName.startsWith(kelivoBackupPrefix)
+        ? zipBaseName.substring(kelivoBackupPrefix.length)
+        : zipBaseName;
     final outputFile = File(
       p.join(
         zipFile.parent.path,
-        '${p.basenameWithoutExtension(zipFile.path)}.joaiclient',
+        'joaiclient_backup_$timestampPart.joaiclient',
       ),
     );
     final stagingFile = File('${outputFile.path}.part');
@@ -1130,11 +1241,13 @@ class DataSync {
         outputFile: stagingFile,
         onProgress: (update) => onProgress?.call(
           ProgressUpdate(
+            phase: BackupPhase.wrapping,
             value: update.fraction == null
                 ? null
                 : 0.5 + update.fraction! * 0.5,
           ),
         ),
+        cancelToken: cancelToken,
       );
       // Publish only after the complete header and payload are closed. This
       // prevents concurrent scanners or cleanup code from observing a partial
@@ -1156,9 +1269,17 @@ class DataSync {
     WebDavConfig cfg, {
     RestoreMode mode = RestoreMode.overwrite,
     ProgressCallback? onProgress,
+    BackupCancelToken? cancelToken,
   }) async {
+    cancelToken?.throwIfCancelled();
     if (!await file.exists()) throw Exception('备份文件不存在');
-    await _restoreFromBackupFile(file, cfg, mode: mode, onProgress: onProgress);
+    await _restoreFromBackupFile(
+      file,
+      cfg,
+      mode: mode,
+      onProgress: onProgress,
+      cancelToken: cancelToken,
+    );
   }
 
   // ===== 内部辅助方法 =====
@@ -1481,8 +1602,9 @@ class DataSync {
   /// 将备份的资源负载目录（upload/images/avatars/fonts）复制到实时目录，
   /// 不删除任何已有内容，以便未改动的聊天数据库所引用的文件仍能保留。
   Future<void> _restoreAssetDirectoriesAdditive(
-    Directory payloadDirectory,
-  ) async {
+    Directory payloadDirectory, {
+    BackupCancelToken? cancelToken,
+  }) async {
     final targets =
         <({String entryName, Future<Directory> Function() resolveTarget})>[
           (entryName: 'upload', resolveTarget: _getUploadDir),
@@ -1491,6 +1613,7 @@ class DataSync {
           (entryName: 'fonts', resolveTarget: _getFontsDir),
         ];
     for (final target in targets) {
+      cancelToken?.throwIfCancelled();
       final src = Directory(p.join(payloadDirectory.path, target.entryName));
       if (!await src.exists()) continue;
       final dst = await target.resolveTarget();
@@ -1498,6 +1621,7 @@ class DataSync {
         await dst.create(recursive: true);
       }
       for (final ent in src.listSync(recursive: true)) {
+        cancelToken?.throwIfCancelled();
         if (ent is File) {
           final rel = p.relative(ent.path, from: src.path);
           final targetFile = File(p.join(dst.path, rel));
@@ -1528,7 +1652,9 @@ class DataSync {
     WebDavConfig cfg, {
     RestoreMode mode = RestoreMode.overwrite,
     ProgressCallback? onProgress,
+    BackupCancelToken? cancelToken,
   }) async {
+    cancelToken?.throwIfCancelled();
     _lastMergeReport = null;
     // 使用文件流解码提取到临时目录，避免将整个 ZIP 加载到
     // RAM（旧方法调用 file.readAsBytes()，对于 600-800 MB 的
@@ -1558,6 +1684,7 @@ class DataSync {
               value: update.fraction == null ? null : update.fraction! * 0.2,
             ),
           ),
+          cancelToken: cancelToken,
         );
       }
       final zipSource = payloadFile ?? file;
@@ -1573,8 +1700,15 @@ class DataSync {
                       processed / total * (isJoaiclient ? 0.35 : 0.55),
           ),
         ),
+        cancelToken: cancelToken,
       );
-      onProgress?.call(ProgressUpdate(value: isJoaiclient ? 0.55 : 0.55));
+      cancelToken?.throwIfCancelled();
+      onProgress?.call(
+        ProgressUpdate(
+          phase: BackupPhase.extracting,
+          value: isJoaiclient ? 0.55 : 0.55,
+        ),
+      );
 
       final manifestFile = File(p.join(extractDir.path, _manifestEntryName));
       final restorePayloadDirectory = extractDir;
@@ -1595,11 +1729,15 @@ class DataSync {
       }
       final settingsPath = settingsFile.path;
       final settings = await _readSettingsJsonInIsolate(settingsPath);
+      cancelToken?.throwIfCancelled();
       BackupSettingsValidator.normalizeAndValidate(settings);
       final businessRestore = BusinessRestoreService(businessRepository);
       Future<void> Function()? pendingBusinessRestore;
       if (versionedBackup != null) {
-        onProgress?.call(const ProgressUpdate(value: 0.65));
+        cancelToken?.throwIfCancelled();
+        onProgress?.call(
+          const ProgressUpdate(phase: BackupPhase.restoring, value: 0.65),
+        );
         final entityRowIds = versionedBackup.businessEntityRowIds;
         final preserveExplicitEmptyInstructionList = entityRowIds == null;
         final includeChats = versionedBackup.includeChats;
@@ -1620,12 +1758,17 @@ class DataSync {
           );
         }
         if (effectiveMode == RestoreMode.overwrite) {
+          cancelToken?.throwIfCancelled();
           if (!restoreChats) {
             if (restoreFiles) {
               // 文件恢复独立于聊天恢复。这里的实时数据库保持不变，因此以
               // 追加方式复制负载（绝不删除它所引用的现有文件），最后再持久化
               // 业务数据，与旧路径保持一致。
-              await _restoreAssetDirectoriesAdditive(extractDir);
+              await _restoreAssetDirectoriesAdditive(
+                extractDir,
+                cancelToken: cancelToken,
+              );
+              cancelToken?.throwIfCancelled();
             }
             await _runLiveBusinessRestore(
               () => businessRestore.overwrite(
@@ -1649,10 +1792,12 @@ class DataSync {
             restoreChats: restoreChats,
             restoreFiles: restoreFiles,
           );
+          cancelToken?.throwIfCancelled();
           onProgress?.call(const ProgressUpdate(value: 1));
           return;
         }
         if (restoreChats) {
+          cancelToken?.throwIfCancelled();
           _lastMergeReport = await chatService.mergeDatabaseSnapshot(
             File(p.join(extractDir.path, _databaseEntryName)),
           );
@@ -1673,7 +1818,11 @@ class DataSync {
         );
         if (!restoreChats) {
           if (restoreFiles) {
-            await _restoreAssetDirectoriesAdditive(extractDir);
+            await _restoreAssetDirectoriesAdditive(
+              extractDir,
+              cancelToken: cancelToken,
+            );
+            cancelToken?.throwIfCancelled();
           }
           await _runLiveBusinessRestore(pendingBusinessRestore);
           return;
@@ -1720,6 +1869,7 @@ class DataSync {
                 final rel = p.relative(ent.path, from: uploadSrc.path);
                 final target = File(p.join(dst.path, rel));
                 await _copyRestoredFile(ent, target);
+                cancelToken?.throwIfCancelled();
               }
             }
           }
@@ -1739,6 +1889,7 @@ class DataSync {
                 final rel = p.relative(ent.path, from: imagesSrc.path);
                 final target = File(p.join(dst.path, rel));
                 await _copyRestoredFile(ent, target);
+                cancelToken?.throwIfCancelled();
               }
             }
           }
@@ -1758,6 +1909,7 @@ class DataSync {
                 final rel = p.relative(ent.path, from: avatarsSrc.path);
                 final target = File(p.join(dst.path, rel));
                 await _copyRestoredFile(ent, target);
+                cancelToken?.throwIfCancelled();
               }
             }
           }
@@ -1777,12 +1929,16 @@ class DataSync {
                 final rel = p.relative(ent.path, from: fontsSrc.path);
                 final target = File(p.join(dst.path, rel));
                 await _copyRestoredFile(ent, target);
+                cancelToken?.throwIfCancelled();
               }
             }
           }
         } else {
           // 合并模式：仅复制不存在的文件
-          await _restoreAssetDirectoriesAdditive(restorePayloadDirectory);
+          await _restoreAssetDirectoriesAdditive(
+            restorePayloadDirectory,
+            cancelToken: cancelToken,
+          );
         }
       }
       final restoreBusiness = pendingBusinessRestore;

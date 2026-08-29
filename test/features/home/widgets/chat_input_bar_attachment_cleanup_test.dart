@@ -375,6 +375,7 @@ void main() {
     expect(submitted?.text, 'send with image');
     expect(submitted?.imagePaths, [imagePath]);
     expect(controller.text, isEmpty);
+    expect(mediaController.snapshotInput('').imagePaths, isEmpty);
 
     controller.text = 'send with image';
     const lateDocument = DocumentAttachment(
@@ -399,14 +400,12 @@ void main() {
         tester,
         () =>
             !mediaController.hasUnreadyImages &&
-            mediaController.snapshotInput('').imagePaths.length == 2,
+            mediaController.snapshotInput('').imagePaths.length == 1,
       ),
       isTrue,
     );
-    final lateImagePath = mediaController
-        .snapshotInput('')
-        .imagePaths
-        .singleWhere((path) => path != imagePath);
+    final lateImagePath = mediaController.snapshotInput('').imagePaths.single;
+    expect(lateImagePath, isNot(imagePath));
     submissionGate.complete(ChatInputSubmissionResult.sent);
     submissionGate = null;
     await tester.pumpAndSettle();
@@ -417,6 +416,8 @@ void main() {
     submissionGate = Completer<ChatInputSubmissionResult>();
     await tester.tap(find.byIcon(Lucide.ArrowUp));
     await tester.pump();
+    expect(mediaController.snapshotInput('').imagePaths, isEmpty);
+    expect(mediaController.snapshotInput('').documents, isEmpty);
     controller.value = const TextEditingValue(
       text: '下一条',
       selection: TextSelection.collapsed(offset: 3),
@@ -428,6 +429,8 @@ void main() {
     expect(controller.text, 'send with image下一条');
     expect(controller.selection, const TextSelection.collapsed(offset: 18));
     expect(controller.value.composing, const TextRange(start: 15, end: 17));
+    expect(mediaController.snapshotInput('').imagePaths, [lateImagePath]);
+    expect(mediaController.snapshotInput('').documents, [lateDocument]);
 
     controller.text = 'discarded';
     submissionGate = Completer<ChatInputSubmissionResult>();

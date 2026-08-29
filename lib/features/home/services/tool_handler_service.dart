@@ -11,6 +11,7 @@ import '../../../core/providers/memory_provider_v2.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/tts_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/json_schema_utils.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
 import '../../../core/services/memory/memory_pipeline.dart';
@@ -47,6 +48,10 @@ class ToolHandlerService {
     ProviderKind kind,
   ) {
     Map<String, dynamic> clone = _deepCloneMap(schema);
+    clone = resolveJsonSchemaRefs(
+      clone,
+      expandAdditionalProperties: kind != ProviderKind.google,
+    );
     clone = _sanitizeNode(clone, kind) as Map<String, dynamic>;
     return clone;
   }
@@ -439,8 +444,9 @@ class ToolHandlerService {
 
     Future<String> approveAndExecuteMcp(
       String name,
-      Map<String, dynamic> args,
-    ) async {
+      Map<String, dynamic> args, {
+      String? toolCallId,
+    }) async {
       if (approvalService != null &&
           toolSvc.toolNeedsApprovalForAssistant(
             mcp,
@@ -450,7 +456,9 @@ class ToolHandlerService {
             routeSnapshot: routes,
             reservedNames: BuiltInToolNames.all,
           )) {
-        final approvalId = '${name}_${DateTime.now().microsecondsSinceEpoch}';
+        final approvalId = (toolCallId?.trim().isNotEmpty == true)
+            ? toolCallId!.trim()
+            : '${name}_${DateTime.now().microsecondsSinceEpoch}';
         final result = await approvalService.requestApproval(
           toolCallId: approvalId,
           toolName: name,
@@ -479,7 +487,7 @@ class ToolHandlerService {
     return (name, args, {toolCallId}) async {
       try {
         if (routes.containsExposedName(name)) {
-          return await approveAndExecuteMcp(name, args);
+          return await approveAndExecuteMcp(name, args, toolCallId: toolCallId);
         }
 
         // Search 工具
@@ -590,10 +598,11 @@ class ToolHandlerService {
               routeSnapshot: routes,
               reservedNames: BuiltInToolNames.all,
             )) {
-          // 为本次工具调用审批请求生成唯一 id
-          final toolCallId = '${name}_${DateTime.now().microsecondsSinceEpoch}';
+          final approvalId = (toolCallId?.trim().isNotEmpty == true)
+              ? toolCallId!.trim()
+              : '${name}_${DateTime.now().microsecondsSinceEpoch}';
           final result = await approvalService.requestApproval(
-            toolCallId: toolCallId,
+            toolCallId: approvalId,
             toolName: name,
             arguments: args,
             conversationId: conversationId,

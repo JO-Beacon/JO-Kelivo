@@ -22,6 +22,7 @@ import '../models/backup.dart';
 import '../models/compress_context_options.dart';
 import '../models/provider_group.dart';
 import '../services/haptics.dart';
+import '../services/screen_wakelock.dart';
 import '../../utils/app_directories.dart';
 import '../../utils/sandbox_path_resolver.dart';
 import '../../utils/avatar_cache.dart';
@@ -179,12 +180,17 @@ class SettingsProvider extends ChangeNotifier {
       'display_show_model_timestamp_v1';
   static const String _displayShowUserMessageActionsKey =
       'display_show_user_message_actions_v1';
+  static const String _displayShowThinkingCardsKey =
+      'display_show_thinking_cards_v1';
+  static const String _displayShowToolCardsKey = 'display_show_tool_cards_v1';
   static const String _displayAutoCollapseThinkingKey =
       'display_auto_collapse_thinking_v1';
   static const String _displayCollapseThinkingStepsKey =
       'display_collapse_thinking_steps_v1';
   static const String _displayShowToolResultSummaryKey =
       'display_show_tool_result_summary_v1';
+  static const String _displayHideToolResultImagesKey =
+      'display_hide_tool_result_images_v1';
   static const String _displayShowRegenerateConfirmDialogKey =
       'display_show_regenerate_confirm_dialog_v1';
   static const String _displayShowMessageNavKey = 'display_show_message_nav_v1';
@@ -215,6 +221,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_haptics_on_list_item_tap_v1';
   static const String _displayHapticsOnCardTapKey =
       'display_haptics_on_card_tap_v1';
+  static const String _displayKeepScreenOnDuringGenerationKey =
+      'display_keep_screen_on_during_generation_v1';
   static const String _displayShowAppUpdatesKey = 'display_show_app_updates_v1';
   static const String _displayKeepSidebarOpenOnAssistantTapKey =
       'display_keep_sidebar_open_on_assistant_tap_v1';
@@ -282,6 +290,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_chat_message_background_style_v1';
   static const String _chatBubbleStyleOverridesKey =
       'chat_bubble_style_overrides_v1';
+  static const String _userChatBubbleStyleOverridesKey =
+      'chat_bubble_style_overrides_user_v1';
   static const String _mobileAssistantEditTabOrderKey =
       'mobile_assistant_edit_tab_order_v1';
   static const String _mobileAssistantEditTabHiddenKey =
@@ -540,7 +550,7 @@ class SettingsProvider extends ChangeNotifier {
         final rawOv = cfg.modelOverrides[modelId];
         final ov = rawOv is Map ? rawOv.cast<String, dynamic>() : null;
         final modelForCheck = resolveApiModelIdOverride(ov, modelId);
-        return _isDeepSeekClaudeCompatible(cfg, modelForCheck) ||
+        return !_isDeepSeekClaudeCompatible(cfg, modelForCheck) &&
             _claudeSupportsXhighReasoning(modelForCheck);
       case ProviderKind.google:
         return false;
@@ -1036,12 +1046,16 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayShowModelTimestampKey) ?? legacyModelNameTs;
     _showUserMessageActions =
         prefs.getBool(_displayShowUserMessageActionsKey) ?? true;
+    _showThinkingCards = prefs.getBool(_displayShowThinkingCardsKey) ?? true;
+    _showToolCards = prefs.getBool(_displayShowToolCardsKey) ?? true;
     _autoCollapseThinking =
         prefs.getBool(_displayAutoCollapseThinkingKey) ?? true;
     _collapseThinkingSteps =
         prefs.getBool(_displayCollapseThinkingStepsKey) ?? false;
     _showToolResultSummary =
         prefs.getBool(_displayShowToolResultSummaryKey) ?? false;
+    _hideToolResultImages =
+        prefs.getBool(_displayHideToolResultImagesKey) ?? false;
     _showRegenerateConfirmDialog =
         prefs.getBool(_displayShowRegenerateConfirmDialogKey) ?? true;
     _showMessageNavButtons = prefs.getBool(_displayShowMessageNavKey) ?? true;
@@ -1069,6 +1083,9 @@ class SettingsProvider extends ChangeNotifier {
     _hapticsOnCardTap = prefs.getBool(_displayHapticsOnCardTapKey) ?? true;
     // 将全局触觉反馈应用到服务层
     Haptics.setEnabled(_hapticsGlobalEnabled);
+    _keepScreenOnDuringGeneration =
+        prefs.getBool(_displayKeepScreenOnDuringGenerationKey) ?? false;
+    ScreenWakelock.setEnabled(_keepScreenOnDuringGeneration);
     _showAppUpdates = prefs.getBool(_displayShowAppUpdatesKey) ?? true;
     _keepSidebarOpenOnAssistantTap =
         prefs.getBool(_displayKeepSidebarOpenOnAssistantTapKey) ?? false;
@@ -1255,6 +1272,25 @@ class SettingsProvider extends ChangeNotifier {
         }
       } catch (_) {
         _chatBubbleStyleOverrides = const ChatBubbleStyleOverrides();
+      }
+    }
+    final userBubbleOverridesRaw = prefs.getString(
+      _userChatBubbleStyleOverridesKey,
+    );
+    if (userBubbleOverridesRaw != null && userBubbleOverridesRaw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(userBubbleOverridesRaw);
+        if (decoded is Map<String, dynamic>) {
+          _userChatBubbleStyleOverrides = ChatBubbleStyleOverrides.fromJson(
+            decoded,
+          );
+        } else if (decoded is Map) {
+          _userChatBubbleStyleOverrides = ChatBubbleStyleOverrides.fromJson(
+            Map<String, dynamic>.from(decoded),
+          );
+        }
+      } catch (_) {
+        // Keep null so a corrupt user key still follows the assistant style.
       }
     }
     _mobileAssistantEditTabOrder = List.unmodifiable(
@@ -2696,14 +2732,75 @@ class SettingsProvider extends ChangeNotifier {
 
   ChatBubbleStyleOverrides _chatBubbleStyleOverrides =
       const ChatBubbleStyleOverrides();
+  ChatBubbleStyleOverrides? _userChatBubbleStyleOverrides;
   ChatBubbleStyleOverrides get chatBubbleStyleOverrides =>
       _chatBubbleStyleOverrides;
+  ChatBubbleStyleOverrides get assistantChatBubbleStyleOverrides =>
+      _chatBubbleStyleOverrides;
+  ChatBubbleStyleOverrides get userChatBubbleStyleOverrides =>
+      _userChatBubbleStyleOverrides ?? _chatBubbleStyleOverrides;
+  ChatBubbleStyleOverrides chatBubbleStyleOverridesFor({
+    required bool isUser,
+  }) =>
+      isUser ? userChatBubbleStyleOverrides : assistantChatBubbleStyleOverrides;
   Future<void> setChatBubbleStyleOverrides(ChatBubbleStyleOverrides v) async {
-    if (_chatBubbleStyleOverrides == v) return;
+    final assistantChanged = _chatBubbleStyleOverrides != v;
+    final hadUserSplit = _userChatBubbleStyleOverrides != null;
+    if (!assistantChanged && !hadUserSplit) return;
     _chatBubbleStyleOverrides = v;
+    _userChatBubbleStyleOverrides = null;
     notifyListeners();
-    final prefs = _preferences;
-    await prefs.setString(_chatBubbleStyleOverridesKey, jsonEncode(v.toJson()));
+    if (assistantChanged) {
+      await _preferences.setString(
+        _chatBubbleStyleOverridesKey,
+        jsonEncode(v.toJson()),
+      );
+    }
+    if (hadUserSplit) {
+      await _preferences.remove(_userChatBubbleStyleOverridesKey);
+    }
+  }
+
+  Future<void> setChatBubbleStyleOverridesForRole({
+    required bool isUser,
+    required ChatBubbleStyleOverrides value,
+  }) async {
+    if (isUser) {
+      if (_userChatBubbleStyleOverrides == value) return;
+      _userChatBubbleStyleOverrides = value;
+      notifyListeners();
+      await _preferences.setString(
+        _userChatBubbleStyleOverridesKey,
+        jsonEncode(value.toJson()),
+      );
+      return;
+    }
+    if (_chatBubbleStyleOverrides == value) return;
+    if (_userChatBubbleStyleOverrides == null) {
+      final previous = _chatBubbleStyleOverrides;
+      _userChatBubbleStyleOverrides = previous;
+      _chatBubbleStyleOverrides = value;
+      notifyListeners();
+      // Submit both writes before awaiting so a later edit cannot queue ahead
+      // of the first edit's assistant value.
+      final userWrite = _preferences.setString(
+        _userChatBubbleStyleOverridesKey,
+        jsonEncode(previous.toJson()),
+      );
+      final assistantWrite = _preferences.setString(
+        _chatBubbleStyleOverridesKey,
+        jsonEncode(value.toJson()),
+      );
+      await userWrite;
+      await assistantWrite;
+      return;
+    }
+    _chatBubbleStyleOverrides = value;
+    notifyListeners();
+    await _preferences.setString(
+      _chatBubbleStyleOverridesKey,
+      jsonEncode(value.toJson()),
+    );
   }
 
   List<String> _mobileAssistantEditTabOrder = const <String>[];
@@ -3263,6 +3360,8 @@ class SettingsProvider extends ChangeNotifier {
   String? _titleModelId;
   String? get titleModelProvider => _titleModelProvider;
   String? get titleModelId => _titleModelId;
+  bool get isTitleGenerationEnabled =>
+      _titleModelProvider != null && _titleModelId != null;
   String? get titleModelKey =>
       (_titleModelProvider != null && _titleModelId != null)
       ? '${_titleModelProvider!}::${_titleModelId!}'
@@ -4309,6 +4408,33 @@ Requirements:
     await prefs.setBool(_displayShowToolResultSummaryKey, v);
   }
 
+  bool _showThinkingCards = true;
+  bool get showThinkingCards => _showThinkingCards;
+  Future<void> setShowThinkingCards(bool v) async {
+    if (_showThinkingCards == v) return;
+    _showThinkingCards = v;
+    notifyListeners();
+    await _preferences.setBool(_displayShowThinkingCardsKey, v);
+  }
+
+  bool _showToolCards = true;
+  bool get showToolCards => _showToolCards;
+  Future<void> setShowToolCards(bool v) async {
+    if (_showToolCards == v) return;
+    _showToolCards = v;
+    notifyListeners();
+    await _preferences.setBool(_displayShowToolCardsKey, v);
+  }
+
+  bool _hideToolResultImages = false;
+  bool get hideToolResultImages => _hideToolResultImages;
+  Future<void> setHideToolResultImages(bool v) async {
+    if (_hideToolResultImages == v) return;
+    _hideToolResultImages = v;
+    notifyListeners();
+    await _preferences.setBool(_displayHideToolResultImagesKey, v);
+  }
+
   bool _showRegenerateConfirmDialog = true;
   bool get showRegenerateConfirmDialog => _showRegenerateConfirmDialog;
   Future<void> setShowRegenerateConfirmDialog(bool v) async {
@@ -4904,6 +5030,18 @@ Requirements:
     await prefs.setBool(_displayHapticsOnGenerateKey, v);
   }
 
+  // 显示：生成时保持移动端屏幕常亮
+  bool _keepScreenOnDuringGeneration = false;
+  bool get keepScreenOnDuringGeneration => _keepScreenOnDuringGeneration;
+  Future<void> setKeepScreenOnDuringGeneration(bool v) async {
+    if (_keepScreenOnDuringGeneration == v) return;
+    _keepScreenOnDuringGeneration = v;
+    ScreenWakelock.setEnabled(v);
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.setBool(_displayKeepScreenOnDuringGenerationKey, v);
+  }
+
   // 显示：抽屉打开/关闭时触发触感反馈
   bool _hapticsOnDrawer = true;
   bool get hapticsOnDrawer => _hapticsOnDrawer;
@@ -5260,6 +5398,8 @@ Requirements:
     copy._showTokenStats = _showTokenStats;
     copy._showUserNameTimestamp = _showUserNameTimestamp;
     copy._showUserMessageActions = _showUserMessageActions;
+    copy._showThinkingCards = _showThinkingCards;
+    copy._showToolCards = _showToolCards;
     copy._showUserName = _showUserName;
     copy._showUserTimestamp = _showUserTimestamp;
     copy._showModelName = _showModelName;
@@ -5267,6 +5407,7 @@ Requirements:
     copy._autoCollapseThinking = _autoCollapseThinking;
     copy._collapseThinkingSteps = _collapseThinkingSteps;
     copy._showToolResultSummary = _showToolResultSummary;
+    copy._hideToolResultImages = _hideToolResultImages;
     copy._showRegenerateConfirmDialog = _showRegenerateConfirmDialog;
     copy._showMessageNavButtons = _showMessageNavButtons;
     copy._mobileMessageNavButtonsMode = _mobileMessageNavButtonsMode;
@@ -5274,6 +5415,7 @@ Requirements:
     copy._showProviderInModelCapsule = _showProviderInModelCapsule;
     copy._showProviderInChatMessage = _showProviderInChatMessage;
     copy._hapticsOnGenerate = _hapticsOnGenerate;
+    copy._keepScreenOnDuringGeneration = _keepScreenOnDuringGeneration;
     copy._hapticsOnDrawer = _hapticsOnDrawer;
     copy._hapticsGlobalEnabled = _hapticsGlobalEnabled;
     copy._hapticsIosSwitch = _hapticsIosSwitch;
@@ -5323,6 +5465,7 @@ Requirements:
     copy._usePureBackground = _usePureBackground;
     copy._chatMessageBackgroundStyle = _chatMessageBackgroundStyle;
     copy._chatBubbleStyleOverrides = _chatBubbleStyleOverrides;
+    copy._userChatBubbleStyleOverrides = _userChatBubbleStyleOverrides;
     copy._mobileAssistantEditTabOrder = _mobileAssistantEditTabOrder;
     copy._hiddenMobileAssistantEditTabs = _hiddenMobileAssistantEditTabs;
     copy._mobileAssistantDetailOutlineEnabled =
@@ -5888,6 +6031,15 @@ class ProviderConfig {
     return ProviderKind.openai;
   }
 
+  static bool isDeepSeek(ProviderConfig config) {
+    final baseUri = Uri.tryParse(config.baseUrl.trim());
+    final host = baseUri?.host.toLowerCase();
+    if (host == 'api.deepseek.com') return true;
+    final id = config.id.trim().toLowerCase();
+    final name = config.name.trim().toLowerCase();
+    return id.contains('deepseek') || name.contains('deepseek');
+  }
+
   static String _defaultBase(String key) {
     final k = key.toLowerCase();
     if (k.contains('tensdaq')) return 'https://tensdaq-api.x-aio.com/v1';
@@ -5984,10 +6136,8 @@ class ProviderConfig {
           apiKeys: const [],
           keyManagement: const KeyManagementConfig(),
           aihubmixAppCodeEnabled: false,
-          balanceEnabled: false,
-          balanceApiPath: lowerKey.contains('deepseek')
-              ? ''
-              : _defaultBalanceApiPath(key),
+          balanceEnabled: _defaultBalanceEnabled(key),
+          balanceApiPath: _defaultBalanceApiPath(key),
           balanceResultPath: _defaultBalanceResultPath(key),
           claudePromptCachingEnabled: false,
         );

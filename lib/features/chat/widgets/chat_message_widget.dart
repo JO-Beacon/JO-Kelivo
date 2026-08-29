@@ -39,6 +39,7 @@ import '../../../core/models/assistant_regex.dart';
 import '../../../shared/widgets/custom_bottom_sheet.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/thinking_sheen.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../desktop/menu_anchor.dart';
 import '../../../shared/widgets/emoji_text.dart';
@@ -52,6 +53,7 @@ import 'chat_suggestion_bubbles.dart';
 import 'token_display_widget.dart';
 import 'screen_time_tool_ui.dart';
 import 'tool_detail_text_section.dart';
+import 'frosted/frosted_surface.dart';
 import '../../../theme/app_font_weights.dart';
 
 final RegExp _urlSchemeRe = RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*:');
@@ -733,6 +735,8 @@ class ChatMessageWidget extends StatefulWidget {
   final ValueChanged<String>? onSuggestionTap;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAskUserAnswer;
+  final bool? showThinkingCards;
+  final bool? showToolCards;
 
   const ChatMessageWidget({
     super.key,
@@ -776,6 +780,8 @@ class ChatMessageWidget extends StatefulWidget {
     this.suggestions = const <String>[],
     this.onSuggestionTap,
     this.onRecoveredAskUserAnswer,
+    this.showThinkingCards,
+    this.showToolCards,
   });
 
   @override
@@ -1349,10 +1355,16 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       content: result,
       loading: false,
     );
+    final showToolCards =
+        widget.showToolCards ?? context.read<SettingsProvider>().showToolCards;
+    if (!showToolCards && part.toolName != LocalToolNames.askUser) {
+      return const SizedBox.shrink();
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: _ToolCallItem(
         part: part,
+        conversationId: widget.message.conversationId,
         onRecoveredAnswer: widget.onRecoveredAskUserAnswer,
       ),
     );
@@ -1713,7 +1725,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         style: TextStyle(
           fontSize: baseUser,
           height: 1.4,
-          color: _chatSurfacePlainTextColor(context),
+          color: _chatSurfacePlainTextColor(context, isUser: true),
         ),
       );
     }
@@ -2050,6 +2062,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 : cs.primary.withValues(alpha: 0.08))
           : null,
       bareOnDefault: !isUser,
+      isUser: isUser,
       child: child,
     );
   }
@@ -2612,6 +2625,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             }
 
             final widgets = <Widget>[];
+            final showThinkingCards =
+                widget.showThinkingCards ?? settings.showThinkingCards;
+            final showToolCards =
+                widget.showToolCards ?? settings.showToolCards;
             for (int i = 0; i < renderBlocks.length; i++) {
               final block = renderBlocks[i];
               if (block.type == _RenderBlockType.text && block.text != null) {
@@ -2624,9 +2641,17 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   ),
                 );
               } else if (block.steps.isNotEmpty) {
+                final visibleSteps = block.steps.where((step) {
+                  if (step.isReasoning) return showThinkingCards;
+                  if (showToolCards) return true;
+                  return step.tool?.toolName == LocalToolNames.askUser ||
+                      step.tool?.loading == true;
+                }).toList();
+                if (visibleSteps.isEmpty) continue;
                 widgets.add(
                   _ChainOfThoughtCard(
-                    steps: block.steps,
+                    steps: visibleSteps,
+                    conversationId: widget.message.conversationId,
                     onRecoveredAnswer: widget.onRecoveredAskUserAnswer,
                   ),
                 );
@@ -3351,22 +3376,22 @@ class _AnimatedPopupState extends State<_AnimatedPopup> {
 }
 
 ({ChatMessageBackgroundStyle style, ChatBubbleStyleOverrides overrides})
-_chatSurfaceStyleSelection(BuildContext context) {
+_chatSurfaceStyleSelection(BuildContext context, {bool isUser = false}) {
   return context.select<
     SettingsProvider,
     ({ChatMessageBackgroundStyle style, ChatBubbleStyleOverrides overrides})
   >(
     (s) => (
       style: s.chatMessageBackgroundStyle,
-      overrides: s.chatBubbleStyleOverrides,
+      overrides: s.chatBubbleStyleOverridesFor(isUser: isUser),
     ),
   );
 }
 
-Color _chatSurfacePlainTextColor(BuildContext context) {
+Color _chatSurfacePlainTextColor(BuildContext context, {bool isUser = false}) {
   final theme = Theme.of(context);
   final cs = theme.colorScheme;
-  final selection = _chatSurfaceStyleSelection(context);
+  final selection = _chatSurfaceStyleSelection(context, isUser: isUser);
   if (selection.style == ChatMessageBackgroundStyle.defaultStyle) {
     return cs.onSurface;
   }
@@ -3385,10 +3410,11 @@ Widget _buildSharedChatSurface(
   required EdgeInsetsGeometry padding,
   Color? defaultColor,
   bool bareOnDefault = false,
+  bool isUser = false,
 }) {
   final theme = Theme.of(context);
   final cs = theme.colorScheme;
-  final selection = _chatSurfaceStyleSelection(context);
+  final selection = _chatSurfaceStyleSelection(context, isUser: isUser);
   final style = selection.style;
   final overrides = selection.overrides;
   final resolved = resolveBubbleStyle(cs, theme.brightness, style, overrides);
@@ -3404,25 +3430,11 @@ Widget _buildSharedChatSurface(
   switch (style) {
     case ChatMessageBackgroundStyle.frosted:
       final radius = BorderRadius.circular(resolved.radius);
-      return ClipRRect(
+      return FrostedSurface(
+        style: resolved,
         borderRadius: radius,
-        child: BackdropFilter.grouped(
-          filter: ui.ImageFilter.blur(
-            sigmaX: resolved.blurSigma,
-            sigmaY: resolved.blurSigma,
-          ),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: resolved.background,
-              borderRadius: radius,
-              border: Border.all(
-                color: resolved.border,
-                width: resolved.borderWidth,
-              ),
-            ),
-            child: paddedChild,
-          ),
-        ),
+        isUser: isUser,
+        child: paddedChild,
       );
     case ChatMessageBackgroundStyle.solid:
       final radius = BorderRadius.circular(resolved.radius);
@@ -3473,11 +3485,12 @@ class _ChatSurfaceForegroundPalette {
 }
 
 _ChatSurfaceForegroundPalette _chatSurfaceForegroundPalette(
-  BuildContext context,
-) {
+  BuildContext context, {
+  bool isUser = false,
+}) {
   final theme = Theme.of(context);
   final cs = theme.colorScheme;
-  final selection = _chatSurfaceStyleSelection(context);
+  final selection = _chatSurfaceStyleSelection(context, isUser: isUser);
   if (selection.style == ChatMessageBackgroundStyle.defaultStyle) {
     return _ChatSurfaceForegroundPalette(
       strong: cs.secondary,
@@ -3868,9 +3881,14 @@ const double _timelineLineGap = 3;
 const double _timelineLineX = (_timelineIconColumnWidth - 1) / 2;
 
 class _ChainOfThoughtCard extends StatefulWidget {
-  const _ChainOfThoughtCard({required this.steps, this.onRecoveredAnswer});
+  const _ChainOfThoughtCard({
+    required this.steps,
+    required this.conversationId,
+    this.onRecoveredAnswer,
+  });
 
   final List<_TimelineStepData> steps;
+  final String conversationId;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAnswer;
 
@@ -3973,6 +3991,7 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
               }
               return _ChainOfThoughtToolStep(
                 part: step.tool!,
+                conversationId: widget.conversationId,
                 isFirst: index == 0,
                 isLast: index == visibleSteps.length - 1,
                 onRecoveredAnswer: widget.onRecoveredAnswer,
@@ -4263,11 +4282,13 @@ class _ChainOfThoughtReasoningStepState
     );
     final state = _stepState;
     final display = _sanitize(widget.step.text);
-    final label = Row(
-      children: [
-        _Shimmer(
-          enabled: widget.step.loading,
-          child: Text(
+    final label = ThinkingSheen(
+      enabled: widget.step.loading,
+      color: fg.strong,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
             l10n.chatMessageWidgetDeepThinking,
             style: TextStyle(
               fontSize: 13,
@@ -4275,31 +4296,25 @@ class _ChainOfThoughtReasoningStepState
               color: fg.strong,
             ),
           ),
-        ),
-        if (widget.step.startAt != null) ...[
-          const SizedBox(width: 6),
-          ValueListenableBuilder<int>(
-            valueListenable: _elapsedTick,
-            builder: (context, _, __) => _Shimmer(
-              enabled: widget.step.loading,
-              child: Text(
+          if (widget.step.startAt != null) ...[
+            const SizedBox(width: 6),
+            ValueListenableBuilder<int>(
+              valueListenable: _elapsedTick,
+              builder: (context, _, __) => Text(
                 _elapsed(),
                 style: TextStyle(fontSize: 13, color: fg.medium),
               ),
             ),
-          ),
+          ],
         ],
-      ],
+      ),
     );
 
     final icon = SizedBox(
       width: 18,
       height: 18,
       child: Center(
-        child: _Shimmer(
-          enabled: widget.step.loading,
-          child: ReasoningIcons.thinkingCardIcon(size: 18, color: fg.strong),
-        ),
+        child: ReasoningIcons.thinkingCardIcon(size: 18, color: fg.strong),
       ),
     );
 
@@ -4384,12 +4399,14 @@ class _ChainOfThoughtReasoningStepState
 class _ChainOfThoughtToolStep extends StatefulWidget {
   const _ChainOfThoughtToolStep({
     required this.part,
+    required this.conversationId,
     required this.isFirst,
     required this.isLast,
     this.onRecoveredAnswer,
   });
 
   final ToolUIPart part;
+  final String conversationId;
   final bool isFirst;
   final bool isLast;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
@@ -4469,8 +4486,9 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
   void _showDenyDialog(
     BuildContext context,
     ToolApprovalService approvalService,
-    String toolCallId,
-  ) {
+    String toolCallId, {
+    String? conversationId,
+  }) {
     final l10n = AppLocalizations.of(context)!;
     final reasonCtrl = TextEditingController();
     showDialog<void>(
@@ -4492,7 +4510,7 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
               final reason = reasonCtrl.text.trim().isEmpty
                   ? null
                   : reasonCtrl.text.trim();
-              approvalService.deny(toolCallId, reason);
+              approvalService.deny(toolCallId, reason, conversationId);
               Navigator.of(ctx).pop();
             },
             child: Text(l10n.toolApprovalDeny),
@@ -4513,19 +4531,16 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
     final showToolResultSummary = context.select<SettingsProvider, bool>(
       (s) => s.showToolResultSummary,
     );
+    final hideToolResultImages = context.select<SettingsProvider, bool>(
+      (s) => s.hideToolResultImages,
+    );
     final approvalService = context.watch<ToolApprovalService>();
-    ToolApprovalRequest? pendingRequest;
-    if (widget.part.id.isNotEmpty &&
-        approvalService.isPending(widget.part.id)) {
-      pendingRequest = approvalService.pendingRequests[widget.part.id];
-    } else {
-      for (final request in approvalService.pendingRequests.values) {
-        if (request.toolName == widget.part.toolName) {
-          pendingRequest = request;
-          break;
-        }
-      }
-    }
+    ToolApprovalRequest? pendingRequest = widget.part.id.isNotEmpty
+        ? approvalService.pendingFor(
+            toolCallId: widget.part.id,
+            conversationId: widget.conversationId,
+          )
+        : null;
     final isPendingApproval = pendingRequest != null;
     final approvalRequest = pendingRequest;
 
@@ -4549,8 +4564,9 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
       widget.part.arguments,
       isResult: !widget.part.loading && !isPendingApproval,
     );
-    final label = _Shimmer(
+    final label = ThinkingSheen(
       enabled: widget.part.loading && !_isAskUser,
+      color: fg.strong,
       child: Text(
         title,
         maxLines: 2,
@@ -4616,7 +4632,8 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
               color: fg.body,
             ),
           );
-    final Widget? imageThumbnails = (!_isAskUser && imagePaths.isNotEmpty)
+    final Widget? imageThumbnails =
+        (!_isAskUser && !hideToolResultImages && imagePaths.isNotEmpty)
         ? SizedBox(
             key: ValueKey('tool-image-thumbnails:${widget.part.id}'),
             height: 120,
@@ -4663,6 +4680,7 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
                   context,
                   approvalService,
                   approvalRequest.toolCallId,
+                  conversationId: widget.conversationId,
                 ),
               ),
               const SizedBox(width: 6),
@@ -4674,8 +4692,10 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
                   context,
                 )!.toolApprovalApprove,
                 builder: (color) => Icon(Lucide.Check, size: 14, color: color),
-                onTap: () =>
-                    approvalService.approve(approvalRequest.toolCallId),
+                onTap: () => approvalService.approve(
+                  approvalRequest.toolCallId,
+                  conversationId: widget.conversationId,
+                ),
               ),
             ],
           )
@@ -4704,8 +4724,13 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
 }
 
 class _ToolCallItem extends StatefulWidget {
-  const _ToolCallItem({required this.part, this.onRecoveredAnswer});
+  const _ToolCallItem({
+    required this.part,
+    required this.conversationId,
+    this.onRecoveredAnswer,
+  });
   final ToolUIPart part;
+  final String conversationId;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAnswer;
 
@@ -4781,7 +4806,10 @@ class _ToolCallItemState extends State<_ToolCallItem> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final fg = _chatSurfaceForegroundPalette(context);
-    final hasImages = _imagePaths.isNotEmpty;
+    final hideToolResultImages = context.select<SettingsProvider, bool>(
+      (s) => s.hideToolResultImages,
+    );
+    final hasImages = !hideToolResultImages && _imagePaths.isNotEmpty;
     final l10n = AppLocalizations.of(context)!;
     final ttsText = widget.part.toolName == LocalToolNames.textToSpeech
         ? _textToSpeechToolText(widget.part.arguments)
@@ -4796,21 +4824,15 @@ class _ToolCallItemState extends State<_ToolCallItem> {
 
     // 检查此工具调用是否等待审批
     final approvalService = context.watch<ToolApprovalService>();
-    final isPendingApproval =
-        widget.part.loading &&
-        approvalService.pendingRequests.values.any(
-          (req) => req.toolName == widget.part.toolName,
-        );
+    final pendingRequest = widget.part.loading
+        ? approvalService.pendingFor(
+            toolCallId: widget.part.id,
+            conversationId: widget.conversationId,
+          )
+        : null;
+    final isPendingApproval = pendingRequest != null;
     // 查找匹配的审批请求
-    String? pendingToolCallId;
-    if (isPendingApproval) {
-      try {
-        final req = approvalService.pendingRequests.values.firstWhere(
-          (req) => req.toolName == widget.part.toolName,
-        );
-        pendingToolCallId = req.toolCallId;
-      } catch (_) {}
-    }
+    final pendingToolCallId = pendingRequest?.toolCallId;
 
     return IosCardPress(
       borderRadius: BorderRadius.circular(16),
@@ -4868,17 +4890,22 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // 标题：始终显示工具名；等待时添加"等待中"徽标
-                      Text(
-                        _titleFor(
-                          context,
-                          widget.part.toolName,
-                          widget.part.arguments,
-                          isResult: !widget.part.loading && !isPendingApproval,
-                        ),
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: AppFontWeights.emphasis,
-                          color: isPendingApproval ? fg.accent : fg.strong,
+                      ThinkingSheen(
+                        enabled: widget.part.loading && !isPendingApproval,
+                        color: fg.strong,
+                        child: Text(
+                          _titleFor(
+                            context,
+                            widget.part.toolName,
+                            widget.part.arguments,
+                            isResult:
+                                !widget.part.loading && !isPendingApproval,
+                          ),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: AppFontWeights.emphasis,
+                            color: isPendingApproval ? fg.accent : fg.strong,
+                          ),
                         ),
                       ),
                       // "等待审批"副标题
@@ -4969,7 +4996,8 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                       onTap: () => _showDenyDialog(
                         context,
                         approvalService,
-                        pendingToolCallId!,
+                        pendingToolCallId,
+                        conversationId: widget.conversationId,
                       ),
                     ),
                   ),
@@ -4979,7 +5007,10 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                       label: l10n.toolApprovalApprove,
                       color: fg.accent,
                       filled: true,
-                      onTap: () => approvalService.approve(pendingToolCallId!),
+                      onTap: () => approvalService.approve(
+                        pendingToolCallId,
+                        conversationId: widget.conversationId,
+                      ),
                     ),
                   ),
                 ],
@@ -5016,8 +5047,9 @@ class _ToolCallItemState extends State<_ToolCallItem> {
   void _showDenyDialog(
     BuildContext context,
     ToolApprovalService approvalService,
-    String toolCallId,
-  ) {
+    String toolCallId, {
+    String? conversationId,
+  }) {
     final l10n = AppLocalizations.of(context)!;
     final reasonCtrl = TextEditingController();
     showDialog<void>(
@@ -5039,7 +5071,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
               final reason = reasonCtrl.text.trim().isEmpty
                   ? null
                   : reasonCtrl.text.trim();
-              approvalService.deny(toolCallId, reason);
+              approvalService.deny(toolCallId, reason, conversationId);
               Navigator.of(ctx).pop();
             },
             child: Text(l10n.toolApprovalDeny),
@@ -6168,29 +6200,33 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
           children: [
             ReasoningIcons.thinkingCardIcon(size: 18, color: fg.strong),
             const SizedBox(width: 8),
-            _Shimmer(
+            ThinkingSheen(
               enabled: loading,
-              child: Text(
-                l10n.chatMessageWidgetDeepThinking,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: AppFontWeights.emphasis,
-                  color: fg.strong,
-                ),
+              color: fg.strong,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    l10n.chatMessageWidgetDeepThinking,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: AppFontWeights.emphasis,
+                      color: fg.strong,
+                    ),
+                  ),
+                  if (widget.startAt != null) ...[
+                    const SizedBox(width: 8),
+                    ValueListenableBuilder<int>(
+                      valueListenable: _elapsedTick,
+                      builder: (context, _, __) => Text(
+                        _elapsed(),
+                        style: TextStyle(fontSize: 13, color: fg.medium),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
-            const SizedBox(width: 8),
-            if (widget.startAt != null)
-              ValueListenableBuilder<int>(
-                valueListenable: _elapsedTick,
-                builder: (context, _, __) => _Shimmer(
-                  enabled: loading,
-                  child: Text(
-                    _elapsed(),
-                    style: TextStyle(fontSize: 13, color: fg.medium),
-                  ),
-                ),
-              ),
             // 无标题跑马灯；内容区在加载时处理滚动
             const Spacer(),
             AnimatedRotation(
@@ -6319,88 +6355,6 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
             children: [header, if (widget.expanded || isLoading) body],
           ),
         ),
-      ),
-    );
-  }
-}
-
-// 无外部依赖的轻量微光效果
-class _Shimmer extends StatefulWidget {
-  final Widget child;
-  final bool enabled;
-  const _Shimmer({required this.child, this.enabled = false});
-
-  @override
-  State<_Shimmer> createState() => _ShimmerState();
-}
-
-class _ShimmerState extends State<_Shimmer> with TickerProviderStateMixin {
-  late AnimationController _c;
-
-  @override
-  void initState() {
-    super.initState();
-    _c = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
-    if (widget.enabled) _c.repeat();
-  }
-
-  @override
-  void didUpdateWidget(covariant _Shimmer oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.enabled && !_c.isAnimating) _c.repeat();
-    if (!widget.enabled && _c.isAnimating) _c.stop();
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!widget.enabled) return widget.child;
-    return RepaintBoundary(
-      child: AnimatedBuilder(
-        animation: _c,
-        builder: (context, child) {
-          final t = _c.value; // 0..1
-          return ShaderMask(
-            shaderCallback: (rect) {
-              final width = rect.width;
-              final gradientWidth = width * 0.4;
-              final dx = (width + gradientWidth) * t - gradientWidth;
-              final shaderRect = Rect.fromLTWH(
-                -dx,
-                0,
-                width + gradientWidth * 2,
-                rect.height,
-              );
-              return LinearGradient(
-                colors: [
-                  Colors.white.withValues(
-                    alpha: 0.0,
-                  ), // color-gate: ignore（微光效果）
-                  Colors.white.withValues(
-                    alpha: 0.35,
-                  ), // color-gate: ignore（微光效果）
-                  Colors.white.withValues(
-                    alpha: 0.0,
-                  ), // color-gate: ignore（微光效果）
-                ],
-                stops: const [0.0, 0.5, 1.0],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-              ).createShader(shaderRect);
-            },
-            blendMode: BlendMode.srcATop,
-            child: child,
-          );
-        },
-        child: widget.child,
       ),
     );
   }

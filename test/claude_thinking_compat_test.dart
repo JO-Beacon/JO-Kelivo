@@ -879,6 +879,11 @@ data: {"type":"message_stop"}
     });
 
     test('DeepSeek Claude-compatible explicit thinking uses effort', () async {
+      final lowBody = await _captureClaudeProviderBody(
+        modelId: 'deepseek-v4-pro',
+        config: _deepSeekClaudeConfig(),
+        thinkingBudget: 2000,
+      );
       final mediumBody = await _captureClaudeProviderBody(
         modelId: 'deepseek-v4-pro',
         config: _deepSeekClaudeConfig(),
@@ -887,9 +892,11 @@ data: {"type":"message_stop"}
       final maxBody = await _captureClaudeProviderBody(
         modelId: 'deepseek-v4-pro',
         config: _deepSeekClaudeConfig(),
-        thinkingBudget: 64000,
+        thinkingBudget: 128000,
       );
 
+      expect(lowBody['thinking'], {'type': 'enabled'});
+      expect(lowBody['output_config'], {'effort': 'low'});
       expect(mediumBody['thinking'], {'type': 'enabled'});
       expect(mediumBody['output_config'], {'effort': 'high'});
       expect(maxBody['thinking'], {'type': 'enabled'});

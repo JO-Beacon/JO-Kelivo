@@ -11612,6 +11612,18 @@ class $MessagePromptRowsTable extends MessagePromptRows
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _sourceContentHashMeta = const VerificationMeta(
+    'sourceContentHash',
+  );
+  @override
+  late final GeneratedColumn<String> sourceContentHash =
+      GeneratedColumn<String>(
+        'source_content_hash',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _carriesMemorySnapshotMeta =
       const VerificationMeta('carriesMemorySnapshot');
   @override
@@ -11641,6 +11653,7 @@ class $MessagePromptRowsTable extends MessagePromptRows
     revisionId,
     conversationId,
     payload,
+    sourceContentHash,
     carriesMemorySnapshot,
     createdAt,
   ];
@@ -11683,6 +11696,15 @@ class $MessagePromptRowsTable extends MessagePromptRows
     } else if (isInserting) {
       context.missing(_payloadMeta);
     }
+    if (data.containsKey('source_content_hash')) {
+      context.handle(
+        _sourceContentHashMeta,
+        sourceContentHash.isAcceptableOrUnknown(
+          data['source_content_hash']!,
+          _sourceContentHashMeta,
+        ),
+      );
+    }
     if (data.containsKey('carries_memory_snapshot')) {
       context.handle(
         _carriesMemorySnapshotMeta,
@@ -11713,6 +11735,10 @@ class $MessagePromptRowsTable extends MessagePromptRows
         DriftSqlType.string,
         data['${effectivePrefix}payload'],
       )!,
+      sourceContentHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_content_hash'],
+      ),
       carriesMemorySnapshot: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}carries_memory_snapshot'],
@@ -11740,12 +11766,14 @@ class MessagePromptRow extends DataClass
   final String revisionId;
   final String conversationId;
   final String payload;
+  final String? sourceContentHash;
   final bool carriesMemorySnapshot;
   final DateTime createdAt;
   const MessagePromptRow({
     required this.revisionId,
     required this.conversationId,
     required this.payload,
+    this.sourceContentHash,
     required this.carriesMemorySnapshot,
     required this.createdAt,
   });
@@ -11755,6 +11783,9 @@ class MessagePromptRow extends DataClass
     map['revision_id'] = Variable<String>(revisionId);
     map['conversation_id'] = Variable<String>(conversationId);
     map['payload'] = Variable<String>(payload);
+    if (!nullToAbsent || sourceContentHash != null) {
+      map['source_content_hash'] = Variable<String>(sourceContentHash);
+    }
     map['carries_memory_snapshot'] = Variable<bool>(carriesMemorySnapshot);
     {
       map['created_at'] = Variable<int>(
@@ -11769,6 +11800,9 @@ class MessagePromptRow extends DataClass
       revisionId: Value(revisionId),
       conversationId: Value(conversationId),
       payload: Value(payload),
+      sourceContentHash: sourceContentHash == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sourceContentHash),
       carriesMemorySnapshot: Value(carriesMemorySnapshot),
       createdAt: Value(createdAt),
     );
@@ -11783,6 +11817,9 @@ class MessagePromptRow extends DataClass
       revisionId: serializer.fromJson<String>(json['revisionId']),
       conversationId: serializer.fromJson<String>(json['conversationId']),
       payload: serializer.fromJson<String>(json['payload']),
+      sourceContentHash: serializer.fromJson<String?>(
+        json['sourceContentHash'],
+      ),
       carriesMemorySnapshot: serializer.fromJson<bool>(
         json['carriesMemorySnapshot'],
       ),
@@ -11796,6 +11833,7 @@ class MessagePromptRow extends DataClass
       'revisionId': serializer.toJson<String>(revisionId),
       'conversationId': serializer.toJson<String>(conversationId),
       'payload': serializer.toJson<String>(payload),
+      'sourceContentHash': serializer.toJson<String?>(sourceContentHash),
       'carriesMemorySnapshot': serializer.toJson<bool>(carriesMemorySnapshot),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
@@ -11805,12 +11843,16 @@ class MessagePromptRow extends DataClass
     String? revisionId,
     String? conversationId,
     String? payload,
+    Value<String?> sourceContentHash = const Value.absent(),
     bool? carriesMemorySnapshot,
     DateTime? createdAt,
   }) => MessagePromptRow(
     revisionId: revisionId ?? this.revisionId,
     conversationId: conversationId ?? this.conversationId,
     payload: payload ?? this.payload,
+    sourceContentHash: sourceContentHash.present
+        ? sourceContentHash.value
+        : this.sourceContentHash,
     carriesMemorySnapshot: carriesMemorySnapshot ?? this.carriesMemorySnapshot,
     createdAt: createdAt ?? this.createdAt,
   );
@@ -11823,6 +11865,9 @@ class MessagePromptRow extends DataClass
           ? data.conversationId.value
           : this.conversationId,
       payload: data.payload.present ? data.payload.value : this.payload,
+      sourceContentHash: data.sourceContentHash.present
+          ? data.sourceContentHash.value
+          : this.sourceContentHash,
       carriesMemorySnapshot: data.carriesMemorySnapshot.present
           ? data.carriesMemorySnapshot.value
           : this.carriesMemorySnapshot,
@@ -11836,6 +11881,7 @@ class MessagePromptRow extends DataClass
           ..write('revisionId: $revisionId, ')
           ..write('conversationId: $conversationId, ')
           ..write('payload: $payload, ')
+          ..write('sourceContentHash: $sourceContentHash, ')
           ..write('carriesMemorySnapshot: $carriesMemorySnapshot, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
@@ -11847,6 +11893,7 @@ class MessagePromptRow extends DataClass
     revisionId,
     conversationId,
     payload,
+    sourceContentHash,
     carriesMemorySnapshot,
     createdAt,
   );
@@ -11857,6 +11904,7 @@ class MessagePromptRow extends DataClass
           other.revisionId == this.revisionId &&
           other.conversationId == this.conversationId &&
           other.payload == this.payload &&
+          other.sourceContentHash == this.sourceContentHash &&
           other.carriesMemorySnapshot == this.carriesMemorySnapshot &&
           other.createdAt == this.createdAt);
 }
@@ -11865,6 +11913,7 @@ class MessagePromptRowsCompanion extends UpdateCompanion<MessagePromptRow> {
   final Value<String> revisionId;
   final Value<String> conversationId;
   final Value<String> payload;
+  final Value<String?> sourceContentHash;
   final Value<bool> carriesMemorySnapshot;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
@@ -11872,6 +11921,7 @@ class MessagePromptRowsCompanion extends UpdateCompanion<MessagePromptRow> {
     this.revisionId = const Value.absent(),
     this.conversationId = const Value.absent(),
     this.payload = const Value.absent(),
+    this.sourceContentHash = const Value.absent(),
     this.carriesMemorySnapshot = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -11880,6 +11930,7 @@ class MessagePromptRowsCompanion extends UpdateCompanion<MessagePromptRow> {
     required String revisionId,
     required String conversationId,
     required String payload,
+    this.sourceContentHash = const Value.absent(),
     this.carriesMemorySnapshot = const Value.absent(),
     required DateTime createdAt,
     this.rowid = const Value.absent(),
@@ -11891,6 +11942,7 @@ class MessagePromptRowsCompanion extends UpdateCompanion<MessagePromptRow> {
     Expression<String>? revisionId,
     Expression<String>? conversationId,
     Expression<String>? payload,
+    Expression<String>? sourceContentHash,
     Expression<bool>? carriesMemorySnapshot,
     Expression<int>? createdAt,
     Expression<int>? rowid,
@@ -11899,6 +11951,7 @@ class MessagePromptRowsCompanion extends UpdateCompanion<MessagePromptRow> {
       if (revisionId != null) 'revision_id': revisionId,
       if (conversationId != null) 'conversation_id': conversationId,
       if (payload != null) 'payload': payload,
+      if (sourceContentHash != null) 'source_content_hash': sourceContentHash,
       if (carriesMemorySnapshot != null)
         'carries_memory_snapshot': carriesMemorySnapshot,
       if (createdAt != null) 'created_at': createdAt,
@@ -11910,6 +11963,7 @@ class MessagePromptRowsCompanion extends UpdateCompanion<MessagePromptRow> {
     Value<String>? revisionId,
     Value<String>? conversationId,
     Value<String>? payload,
+    Value<String?>? sourceContentHash,
     Value<bool>? carriesMemorySnapshot,
     Value<DateTime>? createdAt,
     Value<int>? rowid,
@@ -11918,6 +11972,7 @@ class MessagePromptRowsCompanion extends UpdateCompanion<MessagePromptRow> {
       revisionId: revisionId ?? this.revisionId,
       conversationId: conversationId ?? this.conversationId,
       payload: payload ?? this.payload,
+      sourceContentHash: sourceContentHash ?? this.sourceContentHash,
       carriesMemorySnapshot:
           carriesMemorySnapshot ?? this.carriesMemorySnapshot,
       createdAt: createdAt ?? this.createdAt,
@@ -11936,6 +11991,9 @@ class MessagePromptRowsCompanion extends UpdateCompanion<MessagePromptRow> {
     }
     if (payload.present) {
       map['payload'] = Variable<String>(payload.value);
+    }
+    if (sourceContentHash.present) {
+      map['source_content_hash'] = Variable<String>(sourceContentHash.value);
     }
     if (carriesMemorySnapshot.present) {
       map['carries_memory_snapshot'] = Variable<bool>(
@@ -11959,6 +12017,7 @@ class MessagePromptRowsCompanion extends UpdateCompanion<MessagePromptRow> {
           ..write('revisionId: $revisionId, ')
           ..write('conversationId: $conversationId, ')
           ..write('payload: $payload, ')
+          ..write('sourceContentHash: $sourceContentHash, ')
           ..write('carriesMemorySnapshot: $carriesMemorySnapshot, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
@@ -20884,6 +20943,7 @@ typedef $$MessagePromptRowsTableCreateCompanionBuilder =
       required String revisionId,
       required String conversationId,
       required String payload,
+      Value<String?> sourceContentHash,
       Value<bool> carriesMemorySnapshot,
       required DateTime createdAt,
       Value<int> rowid,
@@ -20893,6 +20953,7 @@ typedef $$MessagePromptRowsTableUpdateCompanionBuilder =
       Value<String> revisionId,
       Value<String> conversationId,
       Value<String> payload,
+      Value<String?> sourceContentHash,
       Value<bool> carriesMemorySnapshot,
       Value<DateTime> createdAt,
       Value<int> rowid,
@@ -20919,6 +20980,11 @@ class $$MessagePromptRowsTableFilterComposer
 
   ColumnFilters<String> get payload => $composableBuilder(
     column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceContentHash => $composableBuilder(
+    column: $table.sourceContentHash,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -20958,6 +21024,11 @@ class $$MessagePromptRowsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get sourceContentHash => $composableBuilder(
+    column: $table.sourceContentHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get carriesMemorySnapshot => $composableBuilder(
     column: $table.carriesMemorySnapshot,
     builder: (column) => ColumnOrderings(column),
@@ -20990,6 +21061,11 @@ class $$MessagePromptRowsTableAnnotationComposer
 
   GeneratedColumn<String> get payload =>
       $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceContentHash => $composableBuilder(
+    column: $table.sourceContentHash,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<bool> get carriesMemorySnapshot => $composableBuilder(
     column: $table.carriesMemorySnapshot,
@@ -21043,6 +21119,7 @@ class $$MessagePromptRowsTableTableManager
                 Value<String> revisionId = const Value.absent(),
                 Value<String> conversationId = const Value.absent(),
                 Value<String> payload = const Value.absent(),
+                Value<String?> sourceContentHash = const Value.absent(),
                 Value<bool> carriesMemorySnapshot = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -21050,6 +21127,7 @@ class $$MessagePromptRowsTableTableManager
                 revisionId: revisionId,
                 conversationId: conversationId,
                 payload: payload,
+                sourceContentHash: sourceContentHash,
                 carriesMemorySnapshot: carriesMemorySnapshot,
                 createdAt: createdAt,
                 rowid: rowid,
@@ -21059,6 +21137,7 @@ class $$MessagePromptRowsTableTableManager
                 required String revisionId,
                 required String conversationId,
                 required String payload,
+                Value<String?> sourceContentHash = const Value.absent(),
                 Value<bool> carriesMemorySnapshot = const Value.absent(),
                 required DateTime createdAt,
                 Value<int> rowid = const Value.absent(),
@@ -21066,6 +21145,7 @@ class $$MessagePromptRowsTableTableManager
                 revisionId: revisionId,
                 conversationId: conversationId,
                 payload: payload,
+                sourceContentHash: sourceContentHash,
                 carriesMemorySnapshot: carriesMemorySnapshot,
                 createdAt: createdAt,
                 rowid: rowid,

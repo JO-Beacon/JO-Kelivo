@@ -29,6 +29,7 @@ SolidCompression=yes
 WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64
 ArchitecturesAllowed=x64
+ChangesAssociations=yes
 UninstallDisplayIcon={app}\{#MyAppExeName}
 
 [Languages]
@@ -37,11 +38,24 @@ Name: "chinesesimplified"; MessagesFile: "{#ChineseMessagesFile}"
 #endif
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+[CustomMessages]
+chinesesimplified.FileAssociationTask=关联 .joaiclient 文件
+chinesesimplified.FileAssociationGroup=文件关联:
+english.FileAssociationTask=Associate .joaiclient files
+english.FileAssociationGroup=File associations:
+
 [Tasks]
 Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "附加图标:"
+Name: "fileassociation"; Description: "{cm:FileAssociationTask}"; GroupDescription: "{cm:FileAssociationGroup}"
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[Registry]
+Root: HKCR; Subkey: ".joaiclient"; ValueType: string; ValueName: ""; ValueData: "JOAIClient.Backup"; Flags: uninsdeletevalue; Tasks: fileassociation
+Root: HKCR; Subkey: "JOAIClient.Backup"; ValueType: string; ValueName: ""; ValueData: "JO-AIClient 备份文件"; Flags: uninsdeletekey; Tasks: fileassociation
+Root: HKCR; Subkey: "JOAIClient.Backup\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassociation
+Root: HKCR; Subkey: "JOAIClient.Backup\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassociation
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

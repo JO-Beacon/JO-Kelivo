@@ -71,6 +71,77 @@ void main() {
     },
   );
 
+  test(
+    'migration batch preserves an explicitly supplied message tree',
+    () async {
+      final database = AppDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      await database.customSelect('SELECT 1;').getSingle();
+
+      final repository = ChatDatabaseRepository(database);
+      final conversation = Conversation(
+        id: 'conversation-migration-tree',
+        title: 'tree migration',
+      );
+      final messages = [
+        ChatMessage(
+          id: 'migration-user',
+          role: 'user',
+          content: 'question',
+          conversationId: conversation.id,
+        ),
+        ChatMessage(
+          id: 'migration-answer-old',
+          role: 'assistant',
+          content: 'old answer',
+          conversationId: conversation.id,
+        ),
+        ChatMessage(
+          id: 'migration-answer-new',
+          role: 'assistant',
+          content: 'new answer',
+          conversationId: conversation.id,
+        ),
+      ];
+      final tree =
+          ConversationTree.linear(
+            conversationId: conversation.id,
+            messageIds: const ['migration-user', 'migration-answer-old'],
+            createdAt: conversation.createdAt,
+          ).createBranch(
+            branchId: 'migration-new-answer',
+            fromMessageId: 'migration-user',
+            tipMessageId: 'migration-answer-new',
+          );
+
+      await repository.putMigrationBatch(
+        conversations: [
+          conversation.copyWith(
+            messageIds: [for (final message in messages) message.id],
+          ),
+        ],
+        messages: [
+          for (final (index, message) in messages.indexed)
+            (message: message, messageOrder: index),
+        ],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+        conversationTree: tree,
+      );
+
+      final loaded = await repository.loadConversationTree(conversation.id);
+      expect(loaded?.activeBranchId, 'migration-new-answer');
+      expect(loaded?.activePath(), const [
+        'migration-user',
+        'migration-answer-new',
+      ]);
+      expect(loaded?.branchPath('root'), const [
+        'migration-user',
+        'migration-answer-old',
+      ]);
+    },
+  );
+
   test('persists the last branch selected below a shared prefix', () async {
     final database = AppDatabase(NativeDatabase.memory());
     addTearDown(database.close);

@@ -13,6 +13,13 @@ void main() {
     return parseSseEventStrings(Stream<String>.fromIterable(chunks)).toList();
   }
 
+  Future<List<SseEvent>> parseRecovered(String text) {
+    return parseSseEventStrings(
+      Stream<String>.value(text),
+      recoverAdjacentJsonDataRecords: true,
+    ).toList();
+  }
+
   test('parses id, event, data, and retry', () async {
     final events = await parse(
       'id: 42\nevent: message_delta\nretry: 1500\ndata: {"ok":true}\n\n',
@@ -93,5 +100,34 @@ void main() {
   test('strips a leading UTF-8 BOM', () async {
     final events = await parse('\uFEFFdata: bom\n\n');
     expect(events.single.data, 'bom');
+  });
+
+  test(
+    'recovers adjacent data-only JSON records without blank delimiters',
+    () async {
+      final events = await parseRecovered(
+        'data: {"n":1}\n'
+        'data: {"n":2}\n'
+        'data: [DONE]\n',
+      );
+      expect(events.map((event) => event.data), <String>[
+        '{"n":1}',
+        '{"n":2}',
+        '[DONE]',
+      ]);
+    },
+  );
+
+  test('keeps standard multiline JSON data joined in recovery mode', () async {
+    final events = await parseRecovered(
+      'data: {"n":\n'
+      'data: 1}\n\n',
+    );
+    expect(events.single.data, '{"n":\n1}');
+  });
+
+  test('does not split non-JSON adjacent data lines', () async {
+    final events = await parseRecovered('data: first\ndata: second\n\n');
+    expect(events.single.data, 'first\nsecond');
   });
 }

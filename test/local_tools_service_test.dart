@@ -136,6 +136,25 @@ void main() {
       },
     );
 
+    test('calendar create schema describes optional reminders', () {
+      const assistant = Assistant(
+        id: 'calendar-assistant',
+        name: 'Calendar assistant',
+        localToolIds: [LocalToolNames.calendarCreate],
+      );
+      final tools = LocalToolsService.buildToolDefinitions(
+        assistant: assistant,
+        supportsTools: true,
+      );
+      final parameters = tools.single['function']['parameters'];
+      final reminders = parameters['properties']['reminders'];
+
+      expect(parameters['required'], ['title', 'start']);
+      expect(reminders['type'], 'array');
+      expect(reminders['items']['type'], 'integer');
+      expect(reminders['description'], contains('At most 5 reminders'));
+    });
+
     test('text to speech call starts playback and returns success', () async {
       final spokenTexts = <String>[];
 

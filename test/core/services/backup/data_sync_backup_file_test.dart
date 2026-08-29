@@ -465,6 +465,14 @@ void main() {
       addTearDown(chatService.dispose);
 
       expect(p.extension(backupFile.path), '.joaiclient');
+      expect(
+        p.basename(backupFile.path),
+        matches(
+          RegExp(
+            r'^joaiclient_backup_\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d+\.joaiclient$',
+          ),
+        ),
+      );
       expect(await backupFile.length(), greaterThan(56));
       expect(await JoaiclientArchive.isJoaiclient(backupFile), isTrue);
     });

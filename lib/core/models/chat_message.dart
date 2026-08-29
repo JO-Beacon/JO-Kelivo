@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 
@@ -23,6 +26,22 @@ class ChatMessage extends HiveObject {
   /// 派生文本正文：按 [parts] 顺序连接每个 [TextPart]。
   String get content =>
       parts.whereType<TextPart>().map((part) => part.text).join();
+
+  /// 用于构建提示词的消息语义指纹。
+  ///
+  /// 仅使用派生文本不够：附件、工具调用或未知 part 变化时，外显文本
+  /// 可能保持不变。指纹包含 part 类型、载荷和顺序，确保任何与提示词
+  /// 相关的消息数据变化都会使持久化提示词失效。
+  String get semanticContentHash => sha256
+      .convert(
+        utf8.encode(
+          jsonEncode([
+            for (final part in parts)
+              {'kind': part.kind, 'payload': part.encodePayload()},
+          ]),
+        ),
+      )
+      .toString();
 
   @HiveField(3)
   final DateTime timestamp;

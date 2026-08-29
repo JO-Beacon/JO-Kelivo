@@ -132,6 +132,7 @@ class _DebugPageState extends State<DebugPage> {
       await context.read<ChatService>().restoreConversation(
         seed.conversation,
         seed.messages,
+        conversationTree: seed.conversationTree,
       );
       if (!mounted) return;
       showAppSnackBar(

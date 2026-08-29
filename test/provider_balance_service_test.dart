@@ -230,6 +230,51 @@ void main() {
       expect(requests, hasLength(1));
       expect(requests.single.uri.path, '/v1/user/balance');
     });
+
+    test(
+      'routes DeepSeek Anthropic balance requests to root endpoint',
+      () async {
+        final requests = <HttpRequest>[];
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          requests.add(request);
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode({
+              'balance_infos': [
+                {'total_balance': '12.345'},
+              ],
+            }),
+          );
+          await request.response.close();
+        });
+
+        final config = ProviderConfig(
+          id: 'DeepSeek',
+          enabled: true,
+          name: 'DeepSeek',
+          apiKey: 'deepseek-key',
+          baseUrl: 'http://${server.address.address}:${server.port}/anthropic',
+          providerType: ProviderKind.claude,
+          balanceEnabled: true,
+          balanceApiPath: '',
+          balanceResultPath: 'balance_infos[0].total_balance',
+        );
+
+        expect(await ProviderBalanceService.fetchBalance(config), '12.35');
+        expect(requests, hasLength(1));
+        expect(requests.single.uri.path, '/user/balance');
+        expect(
+          requests.single.headers.value(HttpHeaders.authorizationHeader),
+          'Bearer deepseek-key',
+        );
+      },
+    );
   });
 
   group('ProviderConfig balance defaults', () {
@@ -258,8 +303,8 @@ void main() {
       expect(vercel.balanceResultPath, 'balance');
       expect(deepSeek.providerType, ProviderKind.claude);
       expect(deepSeek.baseUrl, 'https://api.deepseek.com/anthropic');
-      expect(deepSeek.balanceEnabled, isFalse);
-      expect(deepSeek.balanceApiPath, isEmpty);
+      expect(deepSeek.balanceEnabled, isTrue);
+      expect(deepSeek.balanceApiPath, '/user/balance');
       expect(deepSeek.balanceResultPath, 'balance_infos[0].total_balance');
       expect(moonshot.balanceEnabled, isTrue);
       expect(moonshot.balanceApiPath, '/users/me/balance');

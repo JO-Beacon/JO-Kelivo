@@ -20,9 +20,9 @@ void main() {
     verifier = SchemaVerifier(GeneratedHelper());
   });
 
-  test('frozen schema includes and matches current schema 4', () async {
-    expect(AppDatabase.currentSchemaVersion, 4);
-    expect(GeneratedHelper.versions, const [1, 2, 3, 4]);
+  test('frozen schema includes and matches current schema 5', () async {
+    expect(AppDatabase.currentSchemaVersion, 5);
+    expect(GeneratedHelper.versions, const [1, 2, 3, 4, 5]);
     final database = AppDatabase(NativeDatabase.memory());
     try {
       await database.customSelect('SELECT 1;').getSingle();
@@ -36,7 +36,7 @@ void main() {
     }
   });
 
-  test('schema 4 creates every business and tree persistence table', () async {
+  test('schema 5 creates every business and tree persistence table', () async {
     final database = AppDatabase(NativeDatabase.memory());
     try {
       final rows = await database
