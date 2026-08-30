@@ -10,7 +10,7 @@
 
 <p>同一个 HTML 段落里的第一行<br>这里应该换到第二行。</p>
 
-这里是普通 Markdown 链接：[Kelivo GitHub](https://github.com/kelivo/Kelivo)
+这里是普通 Markdown 链接：[Kelivo GitHub](https://github.com/Chevey339/kelivo)
 
 这里是 HTML 链接：<a href="https://example.com">Example HTML link</a>
 

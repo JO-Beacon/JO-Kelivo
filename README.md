@@ -23,11 +23,11 @@
 
 [Release 日志](Release日志.md)
 
-# 已继承的 [原版 Kelivo](https://github.com/Chevey339/kelivo) 功能特性
+# 已继承的 [Kelivo](https://github.com/Chevey339/kelivo) 功能特性
 
 - 🎨 **现代化设计** - Material You 设计语言，支持动态主题色（Android 12+）。
 - 🌙 **深色模式** - 完美适配深色主题，保护您的眼睛。
-- 🌍 **多语言支持** - 支持中文和英文界面。
+- 🌍 **多语言支持** - 支持英文、简体中文和繁体中文界面。
 - 🔄 **多供应商支持** - 支持 OpenAI、Google Gemini、Anthropic 等主流 AI 供应商。
 - 🤖 **自定义助手** - 创建和管理个性化 AI 助手。
 - 🖼️ **多模态输入** - 支持图片、文本文档、PDF、Word 文档等多种格式。
@@ -40,7 +40,7 @@
 - 📤 **二维码分享** - 通过二维码导出和导入供应商配置。
 - 💾 **数据备份** - 支持聊天记录备份和恢复。
 - 🌐 **自定义请求** - 支持自定义 HTTP 请求头和请求体。
-- 🔡 **自定义字体** - 支持自定义字体（系统字体 / Google Fonts）。
+- 🔡 **自定义字体** - 支持选择系统字体。
 - ⚙️ **Android 后台生成对话** - 可在后台持续生成消息（可在设置中开启）。
 - 🗃️ **SQLite 聊天数据库** - 聊天、消息版本和结构化附件使用 SQLite / Drift 持久化。
 - 🧠 **记忆系统** - 支持记忆提取、管理和上下文注入。
@@ -50,12 +50,16 @@
 - **单条消息身份切换** - 可在聊天消息菜单中把单条消息在“用户”和“模型”之间切换，便于整理或修正对话上下文。
 - **新建 / 复制助手置顶选项** - 可选择让新建或复制的助手自动出现在助手列表顶部，移动端和桌面端均支持。
 - **DeepSeek 默认 Anthropic-compatible 通道与内置搜索** - 新建 DeepSeek 配置默认使用 `https://api.deepseek.com/anthropic`，可直接走兼容的内置搜索协议；显式配置的 OpenAI-compatible `/v1` 路线仍可使用。
-- **历史消息结构化附件编辑** - 编辑历史消息时可查看、删除、替换或继续添加图片和文件；日常存储使用 1.2.2 的结构化消息部件，不再把附件写回正文标记字符串。
+- **消息级上下文树** - 支持消息分支创建、切换、重新生成、从历史消息继续对话和分支删除；聊天界面默认只显示当前活动分支。
+- **上下文树完整性保护** - 持久化前进行结构校验并生成稳定指纹；发现异常结构时保留原始数据并提供诊断入口，不静默修复或丢失内容。
+- **历史消息结构化附件编辑** - 编辑历史消息时可查看、删除、替换或继续添加图片和文件；日常存储使用结构化消息部件，不再把附件写回正文标记字符串。
+- **助手管理** - 助手配置接入业务数据库，列表使用轻量目录；支持助手分组以及批量选择、移动和删除。
+- **头像变换** - 支持用户和助手头像裁剪、旋转、水平/垂直翻转，并在聊天和消息导出中保留显示变换。
 - **应用身份独立化** - JO-AIClient 与 [原版 Kelivo](https://github.com/Chevey339/kelivo) 使用不同应用标识和数据目录，可并存安装和使用。
 - **宽屏聊天区域拉宽** - 可在平板、桌面或手机横屏等宽屏布局中让消息列表和输入栏尽量占满可用宽度；默认关闭。
 - **JO-AIClient 更新检测** - 新版本检查固定使用 JO-AIClient 自己的 GitHub Releases，并按当前平台匹配可下载安装包。
 - **用户数据目录入口** - 桌面端备份与恢复、存储空间页面提供打开用户数据目录入口，方便定位聊天数据和文件操作。
-- **本地备份处理提示** - 移动端和桌面端在导入、导出 Kelivo 本地备份时显示不可误触关闭的处理提示，任务结束后自动退出。
+- **本地备份处理提示** - 移动端和桌面端在导入、导出本地备份时显示不可误触关闭的处理提示，任务结束后自动退出。
 - **旧存档优化工具** - 独立的 [Python 工具](optimize_chat_archive/README.md) 只处理 JO-AIClient `0.1.5` 及更早版本导出的旧 `chats.json`，不会接触当前 SQLite 数据库。
 - ~~长会话懒加载开关 - 可按需启用或关闭长会话懒加载；开启时减少一次性渲染大量历史消息带来的压力，关闭时便于完整查看和整理会话；默认开启。~~（上游 [原版 Kelivo](https://github.com/Chevey339/kelivo) 自 `1.2.0` 起不再使用 Hive，因此不再需要关闭懒加载，该功能已完成其历史使命。）
 - ~~用户消息图片分离显示 - 可选择将用户消息中的图片显示在气泡下方独立区域，消息内容格式保持兼容。~~（上游 [原版 Kelivo](https://github.com/Chevey339/kelivo) 已在 `1.1.16` 中加入该能力，后续由上游接管。）
@@ -70,18 +74,18 @@
 
 # JO-AIClient 改版概述
 
-感谢 [原版 Kelivo](https://github.com/Chevey339/kelivo) 作者及贡献者的开源工作。原项目版权归原作者及贡献者所有。JO-AIClient 是基于原版 Kelivo 的**非官方**修改版本，不代表原版作者发布、维护或背书。
+感谢 [Kelivo](https://github.com/Chevey339/kelivo) 作者及贡献者的开源工作。原项目版权归原作者及贡献者所有。JO-AIClient 是基于原版 Kelivo 的**非官方**修改版本，不代表原版作者发布、维护或背书。
 
-本项目作为 [原版 Kelivo](https://github.com/Chevey339/kelivo) 的修改版本，继续按 GNU AGPL-3.0 发布。分发二进制文件时，会（且必须）同时提供对应源代码。
+本项目作为 [Kelivo](https://github.com/Chevey339/kelivo) 的修改版本，继续按 GNU AGPL-3.0 发布。分发二进制文件时，会（且必须）同时提供对应源代码。
 
-本项目已经与 [原版](https://github.com/Chevey339/kelivo) 做应用身份独立化处理：应用名称、平台包名、安装器标识、运行时数据目录、更新源和构建产物名均使用 JO-AIClient 身份。因此，JO-AIClient 可以与原版并存安装和使用，双方不会自动读取彼此的运行时数据。
+本项目已经与 [Kelivo](https://github.com/Chevey339/kelivo) 做应用身份独立化处理：应用名称、平台包名、安装器标识、运行时数据目录、更新源和构建产物名均使用 JO-AIClient 身份。因此，JO-AIClient 可以与原版并存安装和使用，双方不会自动读取彼此的运行时数据。
 
 **数据兼容策略**：
 
 - **应用内升级**：运行时数据以 SQLite/Drift 为唯一真相；旧 Hive 数据只在迁移阶段读取一次。迁移开始前会创建并校验恢复备份，无法解码的损坏记录会被跳过并报告，旧 Hive 不会继续参与日常写入。
 - **JO-AIClient 完整快照（`.joaiclient`）**：应用默认导出的格式，包含设置、SQLite 聊天数据库和本地文件。它用于完整恢复，恢复时固定采用覆盖模式；这是 JO-AIClient 的归档格式，不建议当成可直接复制或共享的数据库目录。
-- **Kelivo 共享备份（`.zip`，`kelivo-backup` v2）**：用于与 [原版 Kelivo](https://github.com/Chevey339/kelivo) 实现交换共同支持的数据，可按备份内容包含设置、聊天数据库和本地文件，并支持覆盖或合并恢复。可互操作的内容以双方共同支持的会话、消息、版本关系、文本、图片和文件附件、助手及供应商为限。JO-AIClient 专属设置和字段不保证被 [原版 Kelivo](https://github.com/Chevey339/kelivo) 保留；结构化消息部件也不会为了旧版本而重新降级写回正文标记。
-- **其他导入格式**：Chatbox、Cherry Studio 以及旧版 `chats.json` 属于独立的导入或迁移路径，不代表与 JO-AIClient 双向兼容。不要直接复制另一产品的数据目录或数据库文件来迁移数据。
+- **Kelivo 共享备份（`.zip`，`kelivo-backup` v2）**：用于与 [Kelivo](https://github.com/Chevey339/kelivo) 实现交换共同支持的数据，可按备份内容包含设置、聊天数据库和本地文件，并支持覆盖或合并恢复。可互操作的内容以双方共同支持的会话、消息、版本关系、文本、图片和文件附件、助手及供应商为限。JO-AIClient 专属设置和字段不保证被 [Kelivo](https://github.com/Chevey339/kelivo) 保留；结构化消息部件也不会为了旧版本而重新降级写回正文标记。
+- **Chatbox 旧版导入（<1.22）**：支持导入 Chatbox `1.22` 以下版本的导出数据，按 Chatbox v1.21.1 树形 JSON 兼容解析，并尽量保留消息分支、嵌套分叉和选择状态。Cherry Studio 仍属于独立的导入路径，不代表与 JO-AIClient 双向兼容；不要直接复制另一产品的数据目录或数据库文件来迁移数据。
 
 # JO-AIClient 详细维护者改版记录（普通用户可跳过）
 
@@ -97,7 +101,13 @@
 
 如果你喜欢这个项目，可以给个 Star ⭐
 
-[![Star History Chart](https://api.star-history.com/svg?repos=JO-Beacon/JO-Kelivo&type=Date)](https://www.star-history.com/#JO-Beacon/JO-Kelivo&Date)
+<a href="https://www.star-history.com/?type=date&repos=JO-Beacon%2FJO-Kelivo">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=JO-Beacon/JO-Kelivo&type=date&theme=dark&legend=top-left&sealed_token=cviwNfwHCNCz1YqYCFNDyNSGtySn160KcyFzHuXfrwvxZs98E2ogX9uhHzJQ0IuzVT9NqXi_kd_0lpeIxd43zfHRFwJ5s4m0iVBNchoUCp6IKgWUKcbUf94uBRQhtaY--oO9WsM5uULEmMBWF_nkj5W8YjOiFLkwm97i3Ioh1u9YzU41NAmN94wov_RK" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=JO-Beacon/JO-Kelivo&type=date&legend=top-left&sealed_token=cviwNfwHCNCz1YqYCFNDyNSGtySn160KcyFzHuXfrwvxZs98E2ogX9uhHzJQ0IuzVT9NqXi_kd_0lpeIxd43zfHRFwJ5s4m0iVBNchoUCp6IKgWUKcbUf94uBRQhtaY--oO9WsM5uULEmMBWF_nkj5W8YjOiFLkwm97i3Ioh1u9YzU41NAmN94wov_RK" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=JO-Beacon/JO-Kelivo&type=date&legend=top-left&sealed_token=cviwNfwHCNCz1YqYCFNDyNSGtySn160KcyFzHuXfrwvxZs98E2ogX9uhHzJQ0IuzVT9NqXi_kd_0lpeIxd43zfHRFwJ5s4m0iVBNchoUCp6IKgWUKcbUf94uBRQhtaY--oO9WsM5uULEmMBWF_nkj5W8YjOiFLkwm97i3Ioh1u9YzU41NAmN94wov_RK" />
+ </picture>
+</a>
 
 # 许可证
 

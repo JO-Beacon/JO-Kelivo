@@ -1,3 +1,17 @@
+# 当前发布索引
+
+当前代码版本：`0.1.11+11`（待发布）。当前实现基座：Kelivo `1.2.4+68`。GitHub 上最新已公开 Release 为 `0.1.10+10`。
+
+| 版本 | 状态 | 发布正文 |
+| --- | --- | --- |
+| `0.1.11+11` | 待发布 | [.github/release-notes/0.1.11+11.md](.github/release-notes/0.1.11+11.md) |
+| `0.1.10+10` | 已发布（2026-08-29） | [.github/release-notes/0.1.10+10.md](.github/release-notes/0.1.10+10.md) · [GitHub Release](https://github.com/JO-Beacon/JO-Kelivo/releases/tag/0.1.10+10) |
+| `0.1.9+9` | 已发布（2026-08-27） | [.github/release-notes/0.1.9+9.md](.github/release-notes/0.1.9+9.md) · [GitHub Release](https://github.com/JO-Beacon/JO-Kelivo/releases/tag/0.1.9+9) |
+| `0.1.8+8` | 已发布（2026-08-18） | [.github/release-notes/0.1.8+8.md](.github/release-notes/0.1.8+8.md) · [GitHub Release](https://github.com/JO-Beacon/JO-Kelivo/releases/tag/0.1.8+8) |
+| `0.1.7+7` 及更早 | 历史记录 | 下方保留候选验证、资产校验和早期版本记录 |
+
+下方内容是历史发布和候选验证档案；历史版本中的版本号、基座版本、资产名称、哈希和验证结论按当时事实保留，不作为当前版本说明。
+
 # 0.1.7+7
 
 ## Release notes
