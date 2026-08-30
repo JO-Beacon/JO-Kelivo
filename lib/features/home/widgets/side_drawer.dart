@@ -15,7 +15,8 @@ import '../../translate/pages/translate_page.dart';
 import '../../backup/pages/backup_page.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/update_provider.dart';
-import '../../../core/models/assistant.dart';
+import '../../../core/models/assistant_list_item.dart';
+import '../../../core/models/assistant_group.dart';
 import '../../chat/pages/chat_history_page.dart';
 import '../../../desktop/chat_history_dialog.dart';
 import 'package:flutter/services.dart';
@@ -38,9 +39,11 @@ import '../../../core/services/haptics.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../desktop/menu_anchor.dart';
 import '../../../shared/widgets/emoji_text.dart';
+import '../../../shared/widgets/avatar_image_editor.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../core/providers/assistant_group_provider.dart';
 import '../../assistant/widgets/assistant_select_sheet.dart';
+import '../../assistant/widgets/assistant_selection_bars.dart';
 import '../../../desktop/hotkeys/sidebar_tab_bus.dart';
 import '../../../desktop/desktop_settings_navigation_bus.dart';
 import 'dart:async';
@@ -180,6 +183,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   bool _selectionMode = false;
   final Set<String> _selectedConversationIds = <String>{};
   String? _selectionAssistantId;
+  bool _assistantSelectionMode = false;
+  final Set<String> _selectedAssistantIds = <String>{};
   InteractiveDrawerController? _hostDrawer;
 
   @override
@@ -688,6 +693,81 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       _selectedConversationIds.clear();
       _selectionAssistantId = null;
     });
+  }
+
+  void _enterAssistantSelectionMode(String seedId) {
+    Haptics.light();
+    if (!mounted) return;
+    setState(() {
+      _assistantSelectionMode = true;
+      _selectedAssistantIds
+        ..clear()
+        ..add(seedId);
+    });
+  }
+
+  void _exitAssistantSelectionMode() {
+    if (!_assistantSelectionMode && _selectedAssistantIds.isEmpty) return;
+    setState(() {
+      _assistantSelectionMode = false;
+      _selectedAssistantIds.clear();
+    });
+  }
+
+  void _toggleAssistantSelected(String id) {
+    setState(() {
+      if (!_selectedAssistantIds.add(id)) _selectedAssistantIds.remove(id);
+    });
+  }
+
+  Future<void> _deleteSelectedAssistants() async {
+    final ids = List<String>.of(_selectedAssistantIds);
+    if (ids.isEmpty) return;
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.assistantSelectionDeleteConfirmTitle),
+        content: Text(l10n.assistantSelectionDeleteConfirmContent(ids.length)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.assistantSettingsDeleteDialogCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.assistantSelectionDelete),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    final provider = context.read<AssistantProvider>();
+    for (final id in ids) {
+      await ChatActions.cancelActiveGenerationsForAssistant(id);
+    }
+    if (!mounted) return;
+    await provider.deleteAssistants(ids);
+    if (!mounted) return;
+    final remainingIds = provider.assistants.map((a) => a.id).toSet();
+    await context.read<AssistantGroupProvider>().assignAssistantsToGroup(
+      ids.where((id) => !remainingIds.contains(id)),
+      null,
+    );
+    if (!mounted) return;
+    _exitAssistantSelectionMode();
+  }
+
+  Future<void> _moveSelectedAssistants() async {
+    final ids = List<String>.of(_selectedAssistantIds);
+    if (ids.isEmpty) return;
+    final groupId = await showAssistantSelectionGroupSheet(context);
+    if (!mounted || groupId == null) return;
+    await context.read<AssistantGroupProvider>().assignAssistantsToGroup(
+      ids,
+      groupId == assistantSelectionUngroupedKey ? null : groupId,
+    );
+    if (mounted) _exitAssistantSelectionMode();
   }
 
   void _toggleConversationSelected(String id) {
@@ -1729,11 +1809,10 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
         final f = File(fixed);
         if (f.existsSync()) {
           return ClipOval(
-            child: Image(
-              image: FileImage(f),
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
+            child: AvatarImage(
+              path: fixed,
+              size: size,
+              transform: up.avatarTransform,
             ),
           );
         }
@@ -1780,7 +1859,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (!_selectionMode)
+                    if (!_selectionMode && !_assistantSelectionMode)
                       _buildBackupReminderBanner(
                         context,
                         textBase,
@@ -1806,6 +1885,35 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                 chatService: service,
                               ),
                             );
+                          },
+                        ),
+                      )
+                    else if (_assistantSelectionMode)
+                      SizedBox(
+                        height: _pointerInteractions ? 42 : 44,
+                        width: double.infinity,
+                        child: AssistantSelectionHeader(
+                          selectedCount: _selectedAssistantIds.length,
+                          allSelected:
+                              _selectedAssistantIds.length ==
+                              context
+                                  .read<AssistantProvider>()
+                                  .assistants
+                                  .length,
+                          onCancel: _exitAssistantSelectionMode,
+                          onToggleSelectAll: () {
+                            final ids = context
+                                .read<AssistantProvider>()
+                                .assistants
+                                .map((a) => a.id)
+                                .toList();
+                            setState(() {
+                              if (ids.every(_selectedAssistantIds.contains)) {
+                                _selectedAssistantIds.clear();
+                              } else {
+                                _selectedAssistantIds.addAll(ids);
+                              }
+                            });
                           },
                         ),
                       )
@@ -2359,7 +2467,9 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                         ],
                       ),
 
-                    if (!_selectionMode && !widget.globalSearchMode) ...[
+                    if (!_selectionMode &&
+                        !_assistantSelectionMode &&
+                        !widget.globalSearchMode) ...[
                       SizedBox(height: _pointerInteractions ? 8 : 12),
 
                       // 桌面端：替换为 Tab（助手 / 话题）
@@ -2476,14 +2586,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                   if (widget.globalSearchMode) {
                     return _buildGlobalSearchResultsList(context);
                   }
-                  if (assistOnly) {
-                    return ListView(
-                      controller: _listController,
-                      padding: const EdgeInsets.fromLTRB(10, 2, 10, 16),
-                      children: [
-                        _buildAssistantsList(context, inlineMode: true),
-                      ],
-                    );
+                  if (assistOnly || _assistantSelectionMode) {
+                    return _buildAssistantsList(context, inlineMode: true);
                   }
                   // 侧边栏细粒度订阅（缓存方案第 16 项）：
                   // 列表仅在会话列表语义变化时重建；
@@ -2554,8 +2658,11 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                       return _LegacyListArea(
                         isDesktop: _pointerInteractions,
                         assistantsExpanded: _assistantsExpanded,
-                        buildAssistants: () =>
-                            _buildAssistantsList(context, inlineMode: true),
+                        buildAssistants: () => _buildAssistantsList(
+                          context,
+                          inlineMode: true,
+                          constrainInline: true,
+                        ),
                         buildConversations: (leading, padding) =>
                             _buildConversationsList(
                               context,
@@ -2574,7 +2681,14 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                 }(),
               ),
 
-              if (_selectionMode)
+              if (_assistantSelectionMode)
+                AssistantSelectionActionBar(
+                  key: const ValueKey<String>('assistant-selection-action-bar'),
+                  selectedCount: _selectedAssistantIds.length,
+                  onMoveToGroup: _moveSelectedAssistants,
+                  onDelete: _deleteSelectedAssistants,
+                )
+              else if (_selectionMode)
                 SidebarSelectionActionBar(
                   key: const ValueKey<String>('sidebar-selection-action-bar'),
                   selectedCount: _selectedConversationIds.length,
@@ -2772,14 +2886,14 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     });
   }
 
-  Future<void> _handleSelectAssistant(Assistant assistant) async {
+  Future<void> _handleSelectAssistant(String assistantId) async {
     final sp = context.read<SettingsProvider>();
     final closeDrawer = !sp.keepSidebarOpenOnAssistantTap;
     if (closeDrawer) {
       _closeAssistantPicker();
     }
     final ap = context.read<AssistantProvider>();
-    await ap.setCurrentAssistant(assistant.id);
+    await ap.setCurrentAssistant(assistantId);
     // 桌面端：根据用户偏好可选切换到主题标签
     try {
       if (_pointerInteractions &&
@@ -2804,7 +2918,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
         final chatService = context.read<ChatService>();
         final all = chatService.getAllConversations();
         // 筛选该助手拥有的会话并选择最新一条
-        final recent = all.where((c) => c.assistantId == assistant.id).toList();
+        final recent = all.where((c) => c.assistantId == assistantId).toList();
         if (recent.isNotEmpty) {
           // getAllConversations 已按 updatedAt 降序排列
           widget.onSelectConversation?.call(
@@ -2832,12 +2946,20 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     );
   }
 
-  Future<void> _showAssistantItemMenu(Assistant assistant, {Offset? anchor}) {
-    return AssistantEntryActions.showAssistantItemMenu(
+  Future<void> _showAssistantItemMenu(
+    String assistantId, {
+    Offset? anchor,
+  }) async {
+    final assistant = await context
+        .read<AssistantProvider>()
+        .loadAssistantDetails(assistantId);
+    if (!mounted || assistant == null) return;
+    await AssistantEntryActions.showAssistantItemMenu(
       context: context,
       assistant: assistant,
       globalPosition: anchor,
       beforeAction: _closeAssistantPicker,
+      onSelect: () => _enterAssistantSelectionMode(assistant.id),
     );
   }
 
@@ -3458,14 +3580,15 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     final userProvider = context.read<UserProvider>();
     try {
       final picker = ImagePicker();
-      final XFile? file = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1024,
-        imageQuality: 90,
-      );
+      final XFile? file = await picker.pickImage(source: ImageSource.gallery);
       if (!context.mounted) return;
       if (file != null) {
-        await userProvider.setAvatarFilePath(file.path);
+        final edited = await showAvatarImageEditor(context, file.path);
+        if (!context.mounted || edited == null) return;
+        await userProvider.setAvatarFilePath(
+          file.path,
+          transform: edited.transform,
+        );
         return;
       }
     } on PlatformException {
@@ -3598,12 +3721,16 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
 
   // 构建助手列表（未分组 + 按标签分组）。当 inlineMode=false（桌面标签）时，
   // 对助手名称应用搜索筛选。
-  Widget _buildAssistantsList(BuildContext context, {bool inlineMode = false}) {
+  Widget _buildAssistantsList(
+    BuildContext context, {
+    bool inlineMode = false,
+    bool constrainInline = false,
+  }) {
     final ap2 = context.watch<AssistantProvider>();
     final groupProvider = context.watch<AssistantGroupProvider>();
     final textBase2 = Theme.of(context).colorScheme.onSurface;
 
-    List<Assistant> assistants = ap2.assistants;
+    List<AssistantListItem> assistants = ap2.assistantDirectory;
     // 在以下情况下应用搜索筛选：
     // - 桌面标签模式（inlineMode == false），或
     // - 桌面仅助手模式（主题在右侧时，助手在左侧边栏）
@@ -3616,129 +3743,163 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     }
 
     final groups = groupProvider.groups;
-    final ungrouped = assistants
-        .where((a) => groupProvider.groupOfAssistant(a.id) == null)
-        .toList();
-    final groupedByGroup = <String, List<Assistant>>{};
-    for (final group in groups) {
-      final list = assistants
-          .where((a) => groupProvider.groupOfAssistant(a.id) == group.id)
-          .toList();
-      if (list.isNotEmpty) groupedByGroup[group.id] = list;
+    final ungrouped = <AssistantListItem>[];
+    final groupedByGroup = <String, List<AssistantListItem>>{};
+    for (final assistant in assistants) {
+      final groupId = groupProvider.groupOfAssistant(assistant.id);
+      if (groupId == null) {
+        ungrouped.add(assistant);
+      } else {
+        groupedByGroup
+            .putIfAbsent(groupId, () => <AssistantListItem>[])
+            .add(assistant);
+      }
     }
 
-    Widget buildTile(Assistant a) {
+    final entries = <_AssistantListEntry>[];
+    if (ungrouped.isNotEmpty) {
+      entries.addAll(ungrouped.map(_AssistantListEntry.assistant));
+    }
+    for (final group in groups) {
+      final list = groupedByGroup[group.id];
+      if (list == null || list.isEmpty) continue;
+      entries.add(_AssistantListEntry.header(group));
+      if (!groupProvider.isGroupCollapsed(group.id)) {
+        entries.addAll(list.map(_AssistantListEntry.assistant));
+      }
+    }
+
+    Widget buildEntry(BuildContext ctx, int index) {
+      final entry = entries[index];
+      final groupId = entry.groupId;
+      if (groupId != null) {
+        final groupAssistantIds =
+            groupedByGroup[groupId]
+                ?.map((assistant) => assistant.id)
+                .toList() ??
+            const <String>[];
+        return Padding(
+          padding: const EdgeInsets.only(top: 4, bottom: 2),
+          child: _GroupHeader(
+            title: entry.groupName ?? '',
+            collapsed: groupProvider.isGroupCollapsed(groupId),
+            onToggle: () => groupProvider.toggleGroupCollapsed(groupId),
+            selectionMode: _assistantSelectionMode,
+            selected:
+                groupAssistantIds.isNotEmpty &&
+                groupAssistantIds.every(_selectedAssistantIds.contains),
+            onToggleSelect: () {
+              final allSelected = groupAssistantIds.every(
+                _selectedAssistantIds.contains,
+              );
+              setState(() {
+                if (allSelected) {
+                  _selectedAssistantIds.removeAll(groupAssistantIds);
+                } else {
+                  _selectedAssistantIds.addAll(groupAssistantIds);
+                }
+              });
+            },
+          ),
+        );
+      }
+      final assistant = entry.assistant!;
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         child: _AssistantInlineTile(
-          avatar: AssistantAvatar(
-            assistant: a,
+          avatar: AssistantAvatar.fromListItem(
+            item: assistant,
             size: _pointerInteractions ? 28 : 32,
           ),
-          name: a.name,
+          name: assistant.name,
           textColor: textBase2,
           docked: _docked,
           pointerInteractions: _pointerInteractions,
-          selected: ap2.currentAssistantId == a.id,
-          onTap: () => _handleSelectAssistant(a),
-          onEditTap: () => _openAssistantSettings(a.id),
-          onLongPress: () => _showAssistantItemMenu(a),
-          onSecondaryTapDown: (pos) => _showAssistantItemMenu(a, anchor: pos),
+          selected: ap2.currentAssistantId == assistant.id,
+          selectionMode: _assistantSelectionMode,
+          selectedForSelection: _selectedAssistantIds.contains(assistant.id),
+          onToggleSelect: () => _toggleAssistantSelected(assistant.id),
+          onTap: () => _handleSelectAssistant(assistant.id),
+          onEditTap: () => _openAssistantSettings(assistant.id),
+          onLongPress: () => _assistantSelectionMode
+              ? _toggleAssistantSelected(assistant.id)
+              : _enterAssistantSelectionMode(assistant.id),
+          onSecondaryTapDown: (pos) => _assistantSelectionMode
+              ? _toggleAssistantSelected(assistant.id)
+              : _showAssistantItemMenu(assistant.id, anchor: pos),
         ),
       );
     }
 
-    // 拖动排序是宿主外壳拥有的仅指针能力。
-    final bool enableReorder = _assistantReorder;
-
-    Widget buildReorderable(
-      List<Assistant> list, {
-      required List<String> subsetIds,
-    }) {
-      if (!enableReorder) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: list.map(buildTile).toList(),
-        );
-      }
-      return ReorderableListView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
+    Widget list;
+    // 桌面助手标签拥有自己的滚动视口；列表项按需创建。
+    if (_assistantReorder) {
+      list = ReorderableListView.builder(
+        padding: const EdgeInsets.fromLTRB(6, 6, 6, 8),
         buildDefaultDragHandles: false,
-        proxyDecorator: (child, index, animation) {
-          // 移除默认阴影/海拔，仅裁剪为圆角卡片。
-          return AnimatedBuilder(
-            animation: animation,
-            builder: (context, _) {
-              return ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Material(type: MaterialType.transparency, child: child),
-              );
-            },
-          );
-        },
+        itemCount: entries.length,
+        proxyDecorator: (child, index, animation) => ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Material(type: MaterialType.transparency, child: child),
+        ),
         onReorderItem: (oldIndex, newIndex) async {
-          try {
-            await context.read<AssistantProvider>().reorderAssistantsWithin(
-              subsetIds: subsetIds,
-              oldIndex: oldIndex,
-              newIndex: newIndex,
-            );
-          } catch (_) {}
-        },
-        itemCount: list.length,
-        itemBuilder: (ctx, index) {
-          final a = list[index];
-          final tile = buildTile(a);
-          return KeyedSubtree(
-            key: ValueKey('assistant-${a.id}'),
-            child: ReorderableDragStartListener(
-              index: index,
-              enabled: enableReorder,
-              child: tile,
-            ),
+          final moved = entries[oldIndex];
+          final movedAssistant = moved.assistant;
+          if (movedAssistant == null) return;
+          final insertionIndex = newIndex > oldIndex ? newIndex - 1 : newIndex;
+          if (insertionIndex < 0 || insertionIndex >= entries.length) return;
+          final target = entries[insertionIndex];
+          final movedGroup = moved.groupId;
+          final targetGroup = target.groupId;
+          if (movedGroup != targetGroup) return;
+          final subsetIds = [
+            for (final entry in entries)
+              if (entry.assistant != null && entry.groupId == movedGroup)
+                entry.assistant!.id,
+          ];
+          final oldSubsetIndex = subsetIds.indexOf(movedAssistant.id);
+          final targetAssistantId = target.assistant?.id;
+          if (oldSubsetIndex < 0 || targetAssistantId == null) return;
+          final targetSubsetIndex = subsetIds.indexOf(targetAssistantId);
+          if (targetSubsetIndex < 0) return;
+          await context.read<AssistantProvider>().reorderAssistantsWithin(
+            subsetIds: subsetIds,
+            oldIndex: oldSubsetIndex,
+            newIndex: targetSubsetIndex,
           );
         },
+        itemBuilder: (ctx, index) => KeyedSubtree(
+          key: ValueKey(
+            entries[index].assistant == null
+                ? 'assistant-group-${entries[index].groupId}'
+                : 'assistant-${entries[index].assistant!.id}',
+          ),
+          child: entries[index].assistant == null
+              ? buildEntry(ctx, index)
+              : ReorderableDragStartListener(
+                  index: index,
+                  child: buildEntry(ctx, index),
+                ),
+        ),
+      );
+    } else {
+      list = ListView.builder(
+        padding: const EdgeInsets.fromLTRB(6, 6, 6, 8),
+        itemCount: entries.length,
+        itemBuilder: buildEntry,
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(6, 6, 6, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (ungrouped.isNotEmpty)
-            buildReorderable(
-              ungrouped,
-              subsetIds: ungrouped.map((a) => a.id).toList(),
-            ),
-          for (final group in groups)
-            if ((groupedByGroup[group.id] ?? const <Assistant>[])
-                .isNotEmpty) ...[
-              const SizedBox(height: 4),
-              _GroupHeader(
-                title: group.name,
-                collapsed: groupProvider.isGroupCollapsed(group.id),
-                onToggle: () => groupProvider.toggleGroupCollapsed(group.id),
-              ),
-              AnimatedSize(
-                duration: const Duration(milliseconds: 260),
-                curve: Curves.easeInOutCubic,
-                alignment: Alignment.topCenter,
-                child: groupProvider.isGroupCollapsed(group.id)
-                    ? const SizedBox.shrink()
-                    : buildReorderable(
-                        groupedByGroup[group.id]!,
-                        subsetIds:
-                            (groupedByGroup[group.id] ?? const <Assistant>[])
-                                .map((a) => a.id)
-                                .toList(),
-                      ),
-              ),
-            ],
-        ],
-      ),
-    );
+    // 内联助手列表位于会话列表的 leading 中，必须有有限高度，
+    // 否则 Flutter 无法布局内部视口。限制高度也避免展开大量助手时
+    // 把会话列表整体顶出屏幕。
+    if (constrainInline) {
+      return ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 360),
+        child: list,
+      );
+    }
+    return list;
   }
 
   // 构建会话列表区域，可选包含更新横幅。
@@ -4267,10 +4428,16 @@ class _GroupHeader extends StatelessWidget {
     required this.title,
     required this.collapsed,
     required this.onToggle,
+    this.selectionMode = false,
+    this.selected = false,
+    this.onToggleSelect,
   });
   final String title;
   final bool collapsed;
   final VoidCallback onToggle;
+  final bool selectionMode;
+  final bool selected;
+  final VoidCallback? onToggleSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -4306,6 +4473,17 @@ class _GroupHeader extends StatelessWidget {
                 ),
               ),
             ),
+            if (selectionMode)
+              IgnorePointer(
+                ignoring: onToggleSelect == null,
+                child: IosCheckbox(
+                  value: selected,
+                  size: 18,
+                  hitTestSize: 28,
+                  enableHaptics: false,
+                  onChanged: (_) => onToggleSelect?.call(),
+                ),
+              ),
           ],
         ),
       ),
@@ -4531,6 +4709,20 @@ class _DesktopSidebarTabsState extends State<_DesktopSidebarTabs> {
   }
 }
 
+class _AssistantListEntry {
+  _AssistantListEntry._({this.assistant, this.groupId, this.groupName});
+
+  _AssistantListEntry.assistant(AssistantListItem value)
+    : this._(assistant: value, groupId: null, groupName: null);
+
+  _AssistantListEntry.header(AssistantGroup group)
+    : this._(groupId: group.id, groupName: group.name);
+
+  final AssistantListItem? assistant;
+  final String? groupId;
+  final String? groupName;
+}
+
 // 桌面端：承载助手和主题列表的 TabBarView 区域
 class _DesktopTabViews extends StatelessWidget {
   const _DesktopTabViews({
@@ -4550,12 +4742,9 @@ class _DesktopTabViews extends StatelessWidget {
       controller: controller,
       physics: const BouncingScrollPhysics(),
       children: [
-        // 助手列表 — 保持为未虚拟化的子项转储。
-        ListView(
-          padding: const EdgeInsets.fromLTRB(10, 2, 10, 16),
-          children: [buildAssistants()],
-        ),
-        // 主题（会话） — 虚拟化列表拥有滚动。
+        // 助手列表拥有自己的虚拟化滚动视口。
+        buildAssistants(),
+        // 主题（会话）同样拥有自己的虚拟化列表。
         buildConversations(),
       ],
     );
@@ -4622,6 +4811,9 @@ class _AssistantInlineTile extends StatefulWidget {
     this.onLongPress,
     this.onSecondaryTapDown,
     this.selected = false,
+    this.selectionMode = false,
+    this.selectedForSelection = false,
+    this.onToggleSelect,
   });
 
   final Widget avatar;
@@ -4634,6 +4826,9 @@ class _AssistantInlineTile extends StatefulWidget {
   final VoidCallback? onLongPress;
   final void Function(Offset globalPosition)? onSecondaryTapDown;
   final bool selected;
+  final bool selectionMode;
+  final bool selectedForSelection;
+  final VoidCallback? onToggleSelect;
 
   @override
   State<_AssistantInlineTile> createState() => _AssistantInlineTileState();
@@ -4674,8 +4869,8 @@ class _AssistantInlineTileState extends State<_AssistantInlineTile> {
         baseColor: bg,
         borderRadius: BorderRadius.circular(16),
         haptics: false,
-        onTap: widget.onTap,
-        onLongPress: widget.onLongPress,
+        onTap: widget.selectionMode ? widget.onToggleSelect : widget.onTap,
+        onLongPress: widget.selectionMode ? null : widget.onLongPress,
         padding: EdgeInsets.fromLTRB(
           widget.pointerInteractions ? 12 : 4,
           6,
@@ -4684,6 +4879,16 @@ class _AssistantInlineTileState extends State<_AssistantInlineTile> {
         ),
         child: Row(
           children: [
+            if (widget.selectionMode) ...[
+              IosCheckbox(
+                value: widget.selectedForSelection,
+                size: 20,
+                hitTestSize: 28,
+                enableHaptics: false,
+                onChanged: (_) => widget.onToggleSelect?.call(),
+              ),
+              const SizedBox(width: 8),
+            ],
             widget.avatar,
             const SizedBox(width: 16),
             Expanded(

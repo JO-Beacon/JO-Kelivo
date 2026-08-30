@@ -47,6 +47,7 @@ import '../widgets/mini_map_sheet.dart';
 import '../widgets/instruction_injection_sheet.dart';
 import '../widgets/world_book_sheet.dart';
 import '../widgets/learning_prompt_sheet.dart';
+import '../widgets/invalid_conversation_tree_page.dart';
 import '../widgets/scroll_nav_buttons.dart';
 import '../widgets/message_list_view.dart';
 import '../widgets/chat_input_section.dart';
@@ -908,6 +909,7 @@ class _HomePageState extends State<HomePage>
     required ColorScheme cs,
   }) {
     final allSelected = _controller.allSelectableMessagesSelected;
+    final invalidTree = _controller.conversationTreeIntegrityError;
 
     return HomeMobileScaffold(
       scaffoldKey: _scaffoldKey,
@@ -942,7 +944,7 @@ class _HomePageState extends State<HomePage>
         }
       },
       canToggleTemporaryConversation:
-          _controller.canToggleTemporaryConversation,
+          invalidTree == null && _controller.canToggleTemporaryConversation,
       temporaryConversationEnabled: _controller.isTemporaryConversation,
       onSelectModel: () => showModelSelectSheet(context),
       globalSearchMode: _controller.isGlobalSearchMode,
@@ -972,11 +974,21 @@ class _HomePageState extends State<HomePage>
               onInvertSelection: _controller.invertSelection,
             )
           : null,
-      body: _wrapWithDropTarget(_buildMobileBody(context, cs)),
+      body: invalidTree == null
+          ? _wrapWithDropTarget(_buildMobileBody(context, cs))
+          : _buildMobileBody(context, cs),
     );
   }
 
   Widget _buildMobileBody(BuildContext context, ColorScheme cs) {
+    final invalidTree = _controller.conversationTreeIntegrityError;
+    if (invalidTree != null) {
+      return InvalidConversationTreePage(
+        error: invalidTree,
+        onDefer: _deferInvalidConversation,
+        onDelete: () => unawaited(_deleteInvalidConversation()),
+      );
+    }
     final bottomContentPadding = _controller.inputBarHeight + 16;
     final topContentPadding = _chatTopOverlayInset(context) + 8;
     final backgroundImageActive = _assistantBackgroundActive(context);
@@ -1039,6 +1051,7 @@ class _HomePageState extends State<HomePage>
     _controller.initDesktopUi();
 
     final allSelected = _controller.allSelectableMessagesSelected;
+    final invalidTree = _controller.conversationTreeIntegrityError;
 
     return HomeDesktopScaffold(
       scaffoldKey: _scaffoldKey,
@@ -1073,7 +1086,7 @@ class _HomePageState extends State<HomePage>
         if (mounted) _controller.forceScrollToBottomSoon(animate: false);
       },
       canToggleTemporaryConversation:
-          _controller.canToggleTemporaryConversation,
+          invalidTree == null && _controller.canToggleTemporaryConversation,
       temporaryConversationEnabled: _controller.isTemporaryConversation,
       globalSearchMode: _controller.isGlobalSearchMode,
       globalSearchQuery: _controller.globalSearchQuery,
@@ -1106,7 +1119,9 @@ class _HomePageState extends State<HomePage>
           : null,
       body: Stack(
         children: [
-          _wrapWithDropTarget(_buildTabletBody(context, cs)),
+          invalidTree == null
+              ? _wrapWithDropTarget(_buildTabletBody(context, cs))
+              : _buildTabletBody(context, cs),
           Positioned.fill(
             child: IgnorePointer(
               ignoring: !_miniMapRouteActive,
@@ -1224,6 +1239,14 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildTabletBody(BuildContext context, ColorScheme cs) {
+    final invalidTree = _controller.conversationTreeIntegrityError;
+    if (invalidTree != null) {
+      return InvalidConversationTreePage(
+        error: invalidTree,
+        onDefer: _deferInvalidConversation,
+        onDelete: () => unawaited(_deleteInvalidConversation()),
+      );
+    }
     final bottomContentPadding = _controller.inputBarHeight + 16;
     final topContentPadding = _chatTopOverlayInset(context) + 8;
     final backgroundImageActive = _assistantBackgroundActive(context);
@@ -1296,6 +1319,40 @@ class _HomePageState extends State<HomePage>
   // ============================================================================
   // UI 组件构建器
   // ============================================================================
+
+  void _deferInvalidConversation() {
+    if (MediaQuery.sizeOf(context).width < AppBreakpoints.tablet) {
+      unawaited(_drawerController.open());
+    } else if (!_controller.tabletSidebarOpen) {
+      _controller.toggleTabletSidebar();
+    }
+  }
+
+  Future<void> _deleteInvalidConversation() async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.invalidConversationTreeDelete),
+        content: Text(l10n.invalidConversationTreeDeleteConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n.invalidConversationTreeCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(
+              l10n.invalidConversationTreeDelete,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    await _controller.deleteCurrentConversation();
+  }
 
   Widget _buildChatBackground(BuildContext context, ColorScheme cs) {
     return Builder(

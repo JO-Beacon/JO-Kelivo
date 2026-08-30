@@ -48,12 +48,11 @@ Future<String?> showAssistantMoveSelector(
           top: false,
           child: ConstrainedBox(
             constraints: BoxConstraints(maxHeight: maxHeight),
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
+            child: SizedBox(
+              height: maxHeight,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Center(
@@ -78,7 +77,14 @@ Future<String?> showAssistantMoveSelector(
                         ),
                       ),
                     ),
-                    ...assistants.map((a) => _assistantRow(ctx, a)),
+                    Expanded(
+                      child: ListView.builder(
+                        physics: const BouncingScrollPhysics(),
+                        itemCount: assistants.length,
+                        itemBuilder: (context, index) =>
+                            _assistantRow(context, assistants[index]),
+                      ),
+                    ),
                   ],
                 ),
               ),

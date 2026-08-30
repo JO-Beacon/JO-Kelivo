@@ -2694,6 +2694,9 @@ class _ExportedMessageCard extends StatelessWidget {
               assistantAvatar: useAssistAvatar
                   ? (assistant?.avatar ?? '')
                   : null,
+              assistantAvatarTransform: useAssistAvatar
+                  ? assistant?.avatarTransform
+                  : null,
               showUserAvatar: context.read<SettingsProvider>().showUserAvatar,
               showTokenStats: false,
               reasoningSegments: exportReasoningPayload.segments.isEmpty
@@ -2890,6 +2893,9 @@ class _ExportedBubble extends StatelessWidget {
                 ? (assistant?.name ?? 'Assistant')
                 : null,
             assistantAvatar: useAssistAvatar ? (assistant?.avatar ?? '') : null,
+            assistantAvatarTransform: useAssistAvatar
+                ? assistant?.avatarTransform
+                : null,
             showUserAvatar: context.read<SettingsProvider>().showUserAvatar,
             showTokenStats: false,
             reasoningSegments: exportReasoningPayload.segments.isEmpty

@@ -6,7 +6,10 @@ import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 import '../../utils/sandbox_path_resolver.dart';
 import '../database/business_preferences.dart';
+import '../database/business_data.dart';
+import '../database/business_repository.dart';
 import '../models/assistant.dart';
+import '../models/assistant_list_item.dart';
 import '../models/assistant_regex.dart';
 import '../models/preset_message.dart';
 import '../services/chat/chat_service.dart';
@@ -20,21 +23,36 @@ class AssistantProvider extends ChangeNotifier {
 
   final BusinessPreferences preferences;
   final List<Assistant> _assistants = <Assistant>[];
+  final Map<String, Assistant> _assistantsById = <String, Assistant>{};
+  List<AssistantListItem> _assistantDirectory = const <AssistantListItem>[];
+  int _directoryRevision = 0;
   String? _currentAssistantId;
   final ChatService? chatService;
+  final BusinessRepository? businessRepository;
 
   List<Assistant> get assistants => List.unmodifiable(_assistants);
+
+  /// 列表和搜索使用的轻量目录，不包含完整助手配置。
+  List<AssistantListItem> get assistantDirectory => _assistantDirectory;
+  int get assistantDirectoryRevision => _directoryRevision;
   String? get currentAssistantId => _currentAssistantId;
   Assistant? get currentAssistant {
-    final idx = _assistants.indexWhere((a) => a.id == _currentAssistantId);
-    if (idx != -1) return _assistants[idx];
+    final selectedId = _currentAssistantId;
+    if (selectedId != null) {
+      final selected = _assistantsById[selectedId];
+      if (selected != null) return selected;
+    }
     if (_assistants.isNotEmpty) return _assistants.first;
     return null;
   }
 
   bool get currentSearchEnabled => currentAssistant?.searchEnabled ?? false;
 
-  AssistantProvider({required this.preferences, this.chatService}) {
+  AssistantProvider({
+    required this.preferences,
+    this.chatService,
+    this.businessRepository,
+  }) {
     loaded = _load();
   }
 
@@ -44,11 +62,34 @@ class AssistantProvider extends ChangeNotifier {
     if (!preferences.isLoaded) {
       await preferences.load();
     }
-    final raw = preferences.getString(_assistantsKey);
-    if (raw != null && raw.isNotEmpty) {
-      _assistants
-        ..clear()
-        ..addAll(_decodeAssistants(raw));
+    final repository = businessRepository;
+    if (repository != null) {
+      final rows = await repository.readEntities(BusinessEntityKind.assistant);
+      if (rows.isNotEmpty) {
+        _assistants
+          ..clear()
+          ..addAll(_decodeAssistantRows(rows));
+      } else {
+        final raw = preferences.getString(_assistantsKey);
+        if (raw != null && raw.isNotEmpty) {
+          _assistants
+            ..clear()
+            ..addAll(_decodeAssistants(raw));
+          await _replaceAllAssistantRows();
+        }
+      }
+    } else {
+      final raw = preferences.getString(_assistantsKey);
+      if (raw != null && raw.isNotEmpty) {
+        _assistants
+          ..clear()
+          ..addAll(_decodeAssistants(raw));
+      }
+    }
+    _rebuildAssistantIndex();
+    _rebuildAssistantDirectory();
+
+    if (_assistants.isNotEmpty) {
       // 修复从其他平台导入的沙盒本地路径（头像/背景）
       bool changed = false;
       for (int i = 0; i < _assistants.length; i++) {
@@ -83,9 +124,15 @@ class AssistantProvider extends ChangeNotifier {
         }
       }
       if (changed) {
-        try {
-          await _persist();
-        } catch (_) {}
+        if (repository != null) {
+          await _replaceAllAssistantRows();
+        } else {
+          try {
+            await _persistLegacyPreferences();
+          } catch (_) {}
+        }
+        _rebuildAssistantIndex();
+        _rebuildAssistantDirectory();
       }
     }
     // 不要在此处创建默认值，因为本地化尚不可用。
@@ -93,7 +140,7 @@ class AssistantProvider extends ChangeNotifier {
     // 如果存在当前助手则恢复
     final savedValue = preferences.get(_currentAssistantKey);
     final savedId = savedValue is String ? savedValue : null;
-    if (savedId != null && _assistants.any((a) => a.id == savedId)) {
+    if (savedId != null && _assistantsById.containsKey(savedId)) {
       _currentAssistantId = savedId;
     } else {
       _currentAssistantId = null;
@@ -112,6 +159,118 @@ class AssistantProvider extends ChangeNotifier {
       return const <Assistant>[];
     }
   }
+
+  List<Assistant> _decodeAssistantRows(List<BusinessEntityValue> rows) {
+    final assistants = <Assistant>[];
+    for (final row in rows) {
+      try {
+        final decoded = jsonDecode(row.payload);
+        if (decoded is! Map) continue;
+        final payload = decoded.map(
+          (key, value) => MapEntry(key.toString(), value),
+        );
+        payload['id'] = row.id;
+        assistants.add(Assistant.fromJson(payload.cast<String, dynamic>()));
+      } catch (_) {
+        // A corrupt row must not prevent other assistants from loading.
+      }
+    }
+    return assistants;
+  }
+
+  void _rebuildAssistantIndex() {
+    _assistantsById
+      ..clear()
+      ..addEntries(
+        _assistants.map((assistant) => MapEntry(assistant.id, assistant)),
+      );
+  }
+
+  void _rebuildAssistantDirectory() {
+    _assistantDirectory = List<AssistantListItem>.unmodifiable([
+      for (var index = 0; index < _assistants.length; index++)
+        AssistantListItem.fromAssistant(_assistants[index], sortOrder: index),
+    ]);
+    _directoryRevision++;
+  }
+
+  /// 按 ID 获取完整助手配置。列表页只应使用 [assistantDirectory]；
+  /// 需要提示词、工具或正则时再调用此方法。
+  Future<Assistant?> loadAssistantDetails(String id) async {
+    await loaded;
+    final cached = _assistantsById[id];
+    if (cached != null) return cached;
+    final repository = businessRepository;
+    if (repository == null) return null;
+    final row = await repository.readEntity(BusinessEntityKind.assistant, id);
+    if (row == null) return null;
+    try {
+      final decoded = jsonDecode(row.payload);
+      if (decoded is! Map) return null;
+      final payload = decoded.map(
+        (key, value) => MapEntry(key.toString(), value),
+      );
+      payload['id'] = row.id;
+      final assistant = Assistant.fromJson(payload.cast<String, dynamic>());
+      _assistantsById[assistant.id] = assistant;
+      return assistant;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  BusinessEntityValue _assistantEntity(Assistant assistant, int sortOrder) {
+    return BusinessEntityValue(
+      id: assistant.id,
+      sortOrder: sortOrder,
+      payload: jsonEncode(assistant.toJson()),
+    );
+  }
+
+  Future<void> _replaceAllAssistantRows() async {
+    final repository = businessRepository;
+    if (repository == null) return;
+    await repository.replaceEntities(BusinessEntityKind.assistant, [
+      for (var index = 0; index < _assistants.length; index++)
+        _assistantEntity(_assistants[index], index),
+    ]);
+  }
+
+  Future<void> _persistAssistant(Assistant assistant, int sortOrder) async {
+    final repository = businessRepository;
+    if (repository != null) {
+      await repository.upsertEntity(
+        BusinessEntityKind.assistant,
+        _assistantEntity(assistant, sortOrder),
+      );
+      return;
+    }
+    await _persistLegacyPreferences();
+  }
+
+  Future<void> _deleteAssistantRow(String id) async {
+    final repository = businessRepository;
+    if (repository != null) {
+      await repository.deleteEntity(BusinessEntityKind.assistant, id);
+    } else {
+      await _persistLegacyPreferences();
+    }
+  }
+
+  Future<void> _persistAssistantOrder() async {
+    final repository = businessRepository;
+    if (repository != null) {
+      await repository.updateEntitySortOrders(
+        BusinessEntityKind.assistant,
+        _assistants.map((assistant) => assistant.id).toList(growable: false),
+      );
+    } else {
+      await _persistLegacyPreferences();
+    }
+  }
+
+  Future<void> _persistLegacyPreferences() =>
+      preferences.setString(_assistantsKey, Assistant.encodeList(_assistants));
 
   Assistant _defaultAssistant(AppLocalizations l10n) => Assistant(
     id: const Uuid().v4(),
@@ -143,6 +302,8 @@ class AssistantProvider extends ChangeNotifier {
         limitContextMessages: false,
       ),
     );
+    _rebuildAssistantIndex();
+    _rebuildAssistantDirectory();
     await _persist();
     // 若当前助手未设置，则进行设置
     if (_currentAssistantId == null && _assistants.isNotEmpty) {
@@ -269,10 +430,11 @@ class AssistantProvider extends ChangeNotifier {
   }
 
   Future<void> _persist() async {
-    await preferences.setString(
-      _assistantsKey,
-      Assistant.encodeList(_assistants),
-    );
+    if (businessRepository != null) {
+      await _replaceAllAssistantRows();
+    } else {
+      await _persistLegacyPreferences();
+    }
   }
 
   Future<void> setCurrentAssistant(String id) async {
@@ -284,9 +446,7 @@ class AssistantProvider extends ChangeNotifier {
   }
 
   Assistant? getById(String id) {
-    final idx = _assistants.indexWhere((a) => a.id == id);
-    if (idx == -1) return null;
-    return _assistants[idx];
+    return _assistantsById[id];
   }
 
   // 轻量级访问器，使调用方无需依赖 Assistant.presetMessages 符号
@@ -324,7 +484,14 @@ class AssistantProvider extends ChangeNotifier {
     } else {
       _assistants.add(a);
     }
-    await _persist();
+    _rebuildAssistantIndex();
+    _rebuildAssistantDirectory();
+    if (businessRepository != null) {
+      await _persistAssistant(a, _assistants.indexOf(a));
+      await _persistAssistantOrder();
+    } else {
+      await _persistLegacyPreferences();
+    }
     notifyListeners();
     return a.id;
   }
@@ -334,9 +501,9 @@ class AssistantProvider extends ChangeNotifier {
     AppLocalizations? l10n,
     bool insertAtTop = false,
   }) async {
-    final idx = _assistants.indexWhere((a) => a.id == id);
-    if (idx == -1) return null;
-    final source = _assistants[idx];
+    final source = _assistantsById[id];
+    if (source == null) return null;
+    final idx = _assistants.indexOf(source);
     final newId = const Uuid().v4();
 
     final avatarCopy = await _duplicateLocalFile(
@@ -387,7 +554,14 @@ class AssistantProvider extends ChangeNotifier {
     } else {
       _assistants.insert(idx + 1, copy);
     }
-    await _persist();
+    _rebuildAssistantIndex();
+    _rebuildAssistantDirectory();
+    if (businessRepository != null) {
+      await _persistAssistant(copy, _assistants.indexOf(copy));
+      await _persistAssistantOrder();
+    } else {
+      await _persistLegacyPreferences();
+    }
     notifyListeners();
     return copy.id;
   }
@@ -404,6 +578,12 @@ class AssistantProvider extends ChangeNotifier {
       final prevRaw = (prev.avatar ?? '').trim();
       final changed = raw != prevRaw;
 
+      // Changing the source image/type invalidates the previous display crop,
+      // unless the caller explicitly supplied a new transform.
+      if (changed && updated.avatarTransform == prev.avatarTransform) {
+        next = updated.copyWith(clearAvatarTransform: true);
+      }
+
       if (changed) {
         final avatarPath = await _copyLocalAssetToManagedDirectory(
           raw,
@@ -417,7 +597,7 @@ class AssistantProvider extends ChangeNotifier {
             directoryAsync: AppDirectories.getAvatarsDirectory,
             replacementPath: avatarPath,
           );
-          next = updated.copyWith(avatar: avatarPath);
+          next = next.copyWith(avatar: avatarPath);
         } else if (raw.isEmpty) {
           await _deleteManagedFileIfOwned(
             prevRaw,
@@ -465,7 +645,13 @@ class AssistantProvider extends ChangeNotifier {
     }
 
     _assistants[idx] = next;
-    await _persist();
+    _assistantsById[next.id] = next;
+    _rebuildAssistantDirectory();
+    if (businessRepository != null) {
+      await _persistAssistant(next, idx);
+    } else {
+      await _persistLegacyPreferences();
+    }
     notifyListeners();
   }
 
@@ -488,8 +674,14 @@ class AssistantProvider extends ChangeNotifier {
     final item = list.removeAt(oldIndex);
     list.insert(newIndex, item);
     _assistants[idx] = _assistants[idx].copyWith(regexRules: list);
+    _assistantsById[assistantId] = _assistants[idx];
+    _rebuildAssistantDirectory();
     notifyListeners();
-    await _persist();
+    if (businessRepository != null) {
+      await _persistAssistant(_assistants[idx], idx);
+    } else {
+      await _persistLegacyPreferences();
+    }
   }
 
   Future<bool> deleteAssistant(String id) async {
@@ -502,12 +694,19 @@ class AssistantProvider extends ChangeNotifier {
 
     final removingCurrent = _assistants[idx].id == _currentAssistantId;
     _assistants.removeAt(idx);
+    _assistantsById.remove(id);
+    _rebuildAssistantDirectory();
     if (removingCurrent) {
       _currentAssistantId = _assistants.isNotEmpty
           ? _assistants.first.id
           : null;
     }
-    await _persist();
+    if (businessRepository != null) {
+      await _deleteAssistantRow(id);
+      await _persistAssistantOrder();
+    } else {
+      await _persistLegacyPreferences();
+    }
     if (_currentAssistantId != null) {
       await preferences.setString(_currentAssistantKey, _currentAssistantId!);
     } else {
@@ -517,6 +716,25 @@ class AssistantProvider extends ChangeNotifier {
     return true;
   }
 
+  /// 删除多个助手。至少保留一个助手；当请求包含全部助手时保留当前列表中的第一个。
+  Future<int> deleteAssistants(Iterable<String> ids) async {
+    final uniqueIds = ids.toSet();
+    if (uniqueIds.isEmpty || _assistants.length <= 1) return 0;
+    final deletable = _assistants
+        .where((assistant) => uniqueIds.contains(assistant.id))
+        .map((assistant) => assistant.id)
+        .toList();
+    if (deletable.length >= _assistants.length) {
+      final keepId = _currentAssistantId ?? _assistants.first.id;
+      deletable.remove(keepId);
+    }
+    var deleted = 0;
+    for (final id in deletable) {
+      if (await deleteAssistant(id)) deleted++;
+    }
+    return deleted;
+  }
+
   Future<void> reorderAssistants(int oldIndex, int newIndex) async {
     if (oldIndex == newIndex) return;
     if (oldIndex < 0 || oldIndex >= _assistants.length) return;
@@ -524,12 +742,14 @@ class AssistantProvider extends ChangeNotifier {
 
     final assistant = _assistants.removeAt(oldIndex);
     _assistants.insert(newIndex, assistant);
+    _rebuildAssistantIndex();
+    _rebuildAssistantDirectory();
 
     // 立即通知监听器，以便 UI 平滑更新
     notifyListeners();
 
     // 然后持久化更改
-    await _persist();
+    await _persistAssistantOrder();
   }
 
   // 仅在子集内重新排序（例如属于某个标签组或未分组的助手）。
@@ -573,8 +793,10 @@ class AssistantProvider extends ChangeNotifier {
     _assistants
       ..clear()
       ..addAll(merged);
+    _rebuildAssistantIndex();
+    _rebuildAssistantDirectory();
 
     notifyListeners();
-    await _persist();
+    await _persistAssistantOrder();
   }
 }

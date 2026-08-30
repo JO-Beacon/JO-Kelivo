@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('JO-Kelivo application identity', () {
     test('uses the published JO-Kelivo version and platform namespaces', () {
-      _expectContains('pubspec.yaml', 'version: 0.1.10+10');
+      _expectContains('pubspec.yaml', 'version: 0.1.11+11');
 
       _expectContains(
         'android/app/build.gradle.kts',

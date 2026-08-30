@@ -21,6 +21,42 @@ final class BusinessRepository {
   Future<List<BusinessEntityValue>> readEntities(BusinessEntityKind kind) =>
       _readEntities(kind);
 
+  /// 按稳定顺序读取一页业务实体，供大列表按需预取使用。
+  ///
+  /// [limit] 和 [offset] 都是数据库层边界，避免调用方为了显示当前
+  /// 视口而先把全部 payload 读入内存。
+  Future<List<BusinessEntityValue>> readEntitiesPage(
+    BusinessEntityKind kind, {
+    required int limit,
+    int offset = 0,
+  }) {
+    if (limit <= 0) return Future.value(const <BusinessEntityValue>[]);
+    if (offset < 0) throw ArgumentError.value(offset, 'offset');
+    return _readEntities(kind, limit: limit, offset: offset);
+  }
+
+  Future<BusinessEntityValue?> readEntity(
+    BusinessEntityKind kind,
+    String id,
+  ) async {
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) return null;
+    final rows = await _database
+        .customSelect(
+          'SELECT ${kind.idColumn} AS entity_id, sort_order, payload'
+          ' FROM ${kind.tableName} WHERE ${kind.idColumn} = ? LIMIT 1;',
+          variables: <Variable<Object>>[Variable<String>(normalizedId)],
+        )
+        .get();
+    if (rows.isEmpty) return null;
+    final row = rows.first;
+    return BusinessEntityValue(
+      id: row.read<String>('entity_id'),
+      sortOrder: row.read<int>('sort_order'),
+      payload: row.read<String>('payload'),
+    );
+  }
+
   Future<List<BusinessEntityValue>> readMemoriesForAssistant(
     String assistantId,
   ) async {
@@ -81,6 +117,23 @@ final class BusinessRepository {
   Future<void> deleteEntity(BusinessEntityKind kind, String id) async {
     if (id.isEmpty) return;
     await _deleteEntity(kind, id);
+  }
+
+  /// Updates entity ordering without rewriting any payloads. The caller owns
+  /// the complete ordered id list; rows are updated in one transaction.
+  Future<void> updateEntitySortOrders(
+    BusinessEntityKind kind,
+    List<String> orderedIds,
+  ) async {
+    if (orderedIds.isEmpty) return;
+    await _database.transaction(() async {
+      for (var index = 0; index < orderedIds.length; index++) {
+        await _database.customStatement(
+          'UPDATE ${kind.tableName} SET sort_order = ? WHERE ${kind.idColumn} = ?;',
+          <Object?>[index, orderedIds[index]],
+        );
+      }
+    });
   }
 
   Future<Object?> getPreference(String key) async {
@@ -259,14 +312,17 @@ final class BusinessRepository {
   Future<List<BusinessEntityValue>> _readEntities(
     BusinessEntityKind kind, {
     String? assistantId,
+    int? limit,
+    int offset = 0,
   }) async {
     final isMemory = kind == BusinessEntityKind.assistantMemory;
     final filter = assistantId == null ? '' : ' WHERE assistant_id = ?';
+    final paging = limit == null ? '' : ' LIMIT $limit OFFSET $offset';
     final rows = await _database
         .customSelect(
           'SELECT ${kind.idColumn} AS entity_id, sort_order, payload'
           '${isMemory ? ', assistant_id' : ''} FROM ${kind.tableName}'
-          '$filter ORDER BY sort_order, ${kind.idColumn};',
+          '$filter ORDER BY sort_order, ${kind.idColumn}$paging;',
           variables: assistantId == null
               ? const <Variable<Object>>[]
               : <Variable<Object>>[Variable<String>(assistantId)],

@@ -1456,6 +1456,78 @@ abstract class AppLocalizations {
   /// **'Drop files to upload'**
   String get homePageDropToUpload;
 
+  /// No description provided for @invalidConversationTreeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This conversation has an invalid structure'**
+  String get invalidConversationTreeTitle;
+
+  /// No description provided for @invalidConversationTreeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The original data has not been changed. Editing and generation are unavailable until the structure is repaired.'**
+  String get invalidConversationTreeSubtitle;
+
+  /// No description provided for @invalidConversationTreeOriginalData.
+  ///
+  /// In en, this message translates to:
+  /// **'Original data was not changed'**
+  String get invalidConversationTreeOriginalData;
+
+  /// No description provided for @invalidConversationTreeFingerprint.
+  ///
+  /// In en, this message translates to:
+  /// **'Data fingerprint: {fingerprint}'**
+  String invalidConversationTreeFingerprint(Object fingerprint);
+
+  /// No description provided for @invalidConversationTreeSchemaVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Database schema version: {version}'**
+  String invalidConversationTreeSchemaVersion(Object version);
+
+  /// No description provided for @invalidConversationTreeIssues.
+  ///
+  /// In en, this message translates to:
+  /// **'Detected issues ({count})'**
+  String invalidConversationTreeIssues(Object count);
+
+  /// No description provided for @invalidConversationTreeIssueCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Issue type: {code}'**
+  String invalidConversationTreeIssueCode(Object code);
+
+  /// No description provided for @invalidConversationTreeIssueSubject.
+  ///
+  /// In en, this message translates to:
+  /// **'Related item: {subject}'**
+  String invalidConversationTreeIssueSubject(Object subject);
+
+  /// No description provided for @invalidConversationTreeDefer.
+  ///
+  /// In en, this message translates to:
+  /// **'Postpone and return to conversations'**
+  String get invalidConversationTreeDefer;
+
+  /// No description provided for @invalidConversationTreeDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this conversation'**
+  String get invalidConversationTreeDelete;
+
+  /// No description provided for @invalidConversationTreeDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this conversation and all of its messages? This cannot be undone.'**
+  String get invalidConversationTreeDeleteConfirm;
+
+  /// No description provided for @invalidConversationTreeCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get invalidConversationTreeCancel;
+
   /// No description provided for @assistantEditPageTitle.
   ///
   /// In en, this message translates to:
@@ -1941,6 +2013,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reset avatar'**
   String get desktopAvatarMenuReset;
+
+  /// No description provided for @avatarEditorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjust avatar'**
+  String get avatarEditorTitle;
+
+  /// No description provided for @avatarEditorRotate.
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate'**
+  String get avatarEditorRotate;
+
+  /// No description provided for @avatarEditorReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset adjustments'**
+  String get avatarEditorReset;
+
+  /// No description provided for @avatarEditorCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get avatarEditorCancel;
+
+  /// No description provided for @avatarEditorDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get avatarEditorDone;
+
+  /// No description provided for @avatarEditorCropHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag the image with the left mouse button to reposition it; pinch or use the mouse wheel to zoom. The square frame stays fixed.'**
+  String get avatarEditorCropHint;
+
+  /// No description provided for @avatarEditorRotateLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate left 90°'**
+  String get avatarEditorRotateLeft;
+
+  /// No description provided for @avatarEditorRotateRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate right 90°'**
+  String get avatarEditorRotateRight;
+
+  /// No description provided for @avatarEditorFlipHorizontal.
+  ///
+  /// In en, this message translates to:
+  /// **'Flip horizontal'**
+  String get avatarEditorFlipHorizontal;
+
+  /// No description provided for @avatarEditorFlipVertical.
+  ///
+  /// In en, this message translates to:
+  /// **'Flip vertical'**
+  String get avatarEditorFlipVertical;
+
+  /// No description provided for @avatarEditorFreeRotation.
+  ///
+  /// In en, this message translates to:
+  /// **'Free rotation'**
+  String get avatarEditorFreeRotation;
 
   /// No description provided for @assistantEditAvatarChooseImage.
   ///
@@ -2901,6 +3039,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Save'**
   String get assistantSettingsAddSheetSave;
+
+  /// No description provided for @assistantSelectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected'**
+  String assistantSelectionTitle(int count);
+
+  /// No description provided for @assistantSelectionSelectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Select all'**
+  String get assistantSelectionSelectAll;
+
+  /// No description provided for @assistantSelectionDeselectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Deselect all'**
+  String get assistantSelectionDeselectAll;
+
+  /// No description provided for @assistantSelectionDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get assistantSelectionDelete;
+
+  /// No description provided for @assistantSelectionMoveToGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to group'**
+  String get assistantSelectionMoveToGroup;
+
+  /// No description provided for @assistantSelectionDeleteConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete assistants'**
+  String get assistantSelectionDeleteConfirmTitle;
+
+  /// No description provided for @assistantSelectionDeleteConfirmContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {count} selected assistant(s)? This action cannot be undone.'**
+  String assistantSelectionDeleteConfirmContent(int count);
+
+  /// No description provided for @assistantSelectionGroupPickerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Move assistants to group'**
+  String get assistantSelectionGroupPickerTitle;
+
+  /// No description provided for @assistantSelectionGroupUngrouped.
+  ///
+  /// In en, this message translates to:
+  /// **'No group'**
+  String get assistantSelectionGroupUngrouped;
+
+  /// No description provided for @assistantSelectionActionSelect.
+  ///
+  /// In en, this message translates to:
+  /// **'Select assistants'**
+  String get assistantSelectionActionSelect;
 
   /// No description provided for @desktopAssistantsListTitle.
   ///

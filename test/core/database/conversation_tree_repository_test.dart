@@ -38,6 +38,7 @@ void main() {
       expect(loaded, isA<ConversationTree>());
       expect(loaded!.activeBranchId, 'root');
       expect(loaded.activePath(), const ['message-1', 'message-2']);
+      expect(loaded.fingerprint, tree.fingerprint);
 
       final branched = loaded.createBranch(
         branchId: 'branch-alt',
@@ -56,6 +57,7 @@ void main() {
       expect(loadedBranch.activePath(), const ['message-1', 'message-2-alt']);
       expect(loadedBranch.branchPath('root'), const ['message-1', 'message-2']);
       expect(loadedBranch.branches['branch-alt']?.name, 'alt');
+      expect(loadedBranch.fingerprint, branched.fingerprint);
     },
   );
 
@@ -70,6 +72,142 @@ void main() {
       expect(await repository.loadConversationTree('missing'), null);
     },
   );
+
+  test('rejects an invalid tree before replacing persisted rows', () async {
+    final database = AppDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    await database.customSelect('SELECT 1;').getSingle();
+    await database.customStatement(
+      'INSERT INTO conversation_rows (id, title, created_at, updated_at) '
+      'VALUES (?, ?, ?, ?);',
+      ['conversation-invalid', 'invalid', 1, 1],
+    );
+
+    final repository = ChatDatabaseRepository(database);
+    final invalidTree = ConversationTree(
+      conversationId: 'conversation-invalid',
+      activeBranchId: 'root',
+      branches: {
+        'root': ConversationBranch(
+          id: 'root',
+          conversationId: 'conversation-invalid',
+          tipMessageId: 'm1',
+          createdAt: DateTime.utc(2026),
+        ),
+      },
+      edges: const {
+        'm1': MessageTreeEdge(messageId: 'm1', parentMessageId: null),
+        'orphan': MessageTreeEdge(messageId: 'orphan', parentMessageId: null),
+      },
+    );
+
+    await expectLater(
+      repository.saveConversationTree(invalidTree),
+      throwsA(isA<ConversationTreeIntegrityException>()),
+    );
+    final edgeRows = await database
+        .customSelect(
+          'SELECT message_id FROM message_tree_edge_rows '
+          'WHERE conversation_id = ?;',
+          variables: [Variable.withString('conversation-invalid')],
+        )
+        .get();
+    expect(edgeRows, isEmpty);
+  });
+
+  test(
+    'loading an invalid tree reports diagnostics without repairing it',
+    () async {
+      final database = AppDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      await database.customSelect('SELECT 1;').getSingle();
+      await database.customStatement(
+        'INSERT INTO conversation_rows (id, title, created_at, updated_at) '
+        'VALUES (?, ?, ?, ?);',
+        ['conversation-invalid-load', 'invalid', 1, 1],
+      );
+      await database.customStatement(
+        'INSERT INTO conversation_branch_rows '
+        '(id, conversation_id, tip_message_id, name, created_at) '
+        'VALUES (?, ?, ?, ?, ?);',
+        ['root', 'conversation-invalid-load', 'm1', '', 1],
+      );
+      await database.customStatement(
+        'INSERT INTO message_tree_edge_rows '
+        '(conversation_id, message_id, parent_message_id) VALUES (?, ?, ?);',
+        ['conversation-invalid-load', 'm1', null],
+      );
+      await database.customStatement(
+        'INSERT INTO message_tree_edge_rows '
+        '(conversation_id, message_id, parent_message_id) VALUES (?, ?, ?);',
+        ['conversation-invalid-load', 'orphan', null],
+      );
+      await database.customStatement(
+        'INSERT INTO conversation_tree_state_rows '
+        '(conversation_id, active_branch_id, branch_selections_json) '
+        'VALUES (?, ?, ?);',
+        ['conversation-invalid-load', 'root', '{}'],
+      );
+
+      final repository = ChatDatabaseRepository(database);
+      await expectLater(
+        repository.loadConversationTree('conversation-invalid-load'),
+        throwsA(
+          isA<ConversationTreeIntegrityException>().having(
+            (error) => error.issues.map((issue) => issue.code),
+            'issue codes',
+            contains('unreachable_edge'),
+          ),
+        ),
+      );
+      final persistedOrphan = await database
+          .customSelect(
+            'SELECT message_id FROM message_tree_edge_rows '
+            'WHERE conversation_id = ? AND message_id = ?;',
+            variables: [
+              Variable.withString('conversation-invalid-load'),
+              Variable.withString('orphan'),
+            ],
+          )
+          .get();
+      expect(persistedOrphan, hasLength(1));
+    },
+  );
+
+  test('loading malformed branch selection JSON fails explicitly', () async {
+    final database = AppDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    await database.customSelect('SELECT 1;').getSingle();
+    await database.customStatement(
+      'INSERT INTO conversation_rows (id, title, created_at, updated_at) '
+      'VALUES (?, ?, ?, ?);',
+      ['conversation-invalid-selection', 'invalid', 1, 1],
+    );
+    await database.customStatement(
+      'INSERT INTO conversation_branch_rows '
+      '(id, conversation_id, tip_message_id, name, created_at) '
+      'VALUES (?, ?, ?, ?, ?);',
+      ['root', 'conversation-invalid-selection', null, '', 1],
+    );
+    await database.customStatement(
+      'INSERT INTO conversation_tree_state_rows '
+      '(conversation_id, active_branch_id, branch_selections_json) '
+      'VALUES (?, ?, ?);',
+      ['conversation-invalid-selection', 'root', '{not-json'],
+    );
+
+    final repository = ChatDatabaseRepository(database);
+    await expectLater(
+      repository.loadConversationTree('conversation-invalid-selection'),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          startsWith('conversation_tree_selections_invalid_json'),
+        ),
+      ),
+    );
+  });
 
   test(
     'migration batch preserves an explicitly supplied message tree',

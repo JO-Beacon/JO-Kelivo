@@ -171,6 +171,10 @@ final class BusinessSettingsMerger {
       final assistant = _jsonMap(row.payload, 'assistants_v1');
       final merged = <String, dynamic>{...local, ...assistant};
       _preserveLocalAsset(local, assistant, merged, 'avatar');
+      if ((local['avatar'] ?? '').toString().trim().isNotEmpty &&
+          local.containsKey('avatarTransform')) {
+        merged['avatarTransform'] = local['avatarTransform'];
+      }
       _preserveLocalAsset(local, assistant, merged, 'background');
       mergedRows[localIndex] = localRow.copyWith(payload: jsonEncode(merged));
     }

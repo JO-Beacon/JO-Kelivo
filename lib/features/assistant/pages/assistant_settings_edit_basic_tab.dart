@@ -68,13 +68,10 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
             builder: (ctx, snap) {
               final p = snap.data;
               if (p != null && File(p).existsSync()) {
-                return ClipOval(
-                  child: Image.file(
-                    File(p),
-                    width: size,
-                    height: size,
-                    fit: BoxFit.cover,
-                  ),
+                return AvatarImage(
+                  path: p,
+                  size: size,
+                  transform: a.avatarTransform,
                 );
               }
               return ClipOval(
@@ -89,13 +86,10 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
           );
         } else if (av.startsWith('/') || av.contains(':')) {
           final fixed = SandboxPathResolver.fix(av);
-          inner = ClipOval(
-            child: Image.file(
-              File(fixed),
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
-            ),
+          inner = AvatarImage(
+            path: fixed,
+            size: size,
+            transform: a.avatarTransform,
           );
         } else {
           inner = Text(
@@ -1982,13 +1976,13 @@ extension _AssistantAvatarActions on _BasicSettingsTabState {
     try {
       final assistantProvider = context.read<AssistantProvider>();
       final picker = ImagePicker();
-      final XFile? file = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1024,
-        imageQuality: 90,
-      );
+      final XFile? file = await picker.pickImage(source: ImageSource.gallery);
       if (!context.mounted || file == null) return;
-      await assistantProvider.updateAssistant(a.copyWith(avatar: file.path));
+      final edited = await showAvatarImageEditor(context, file.path);
+      if (!context.mounted || edited == null) return;
+      await assistantProvider.updateAssistant(
+        a.copyWith(avatar: file.path, avatarTransform: edited.transform),
+      );
       return;
     } on PlatformException {
       if (!context.mounted) return;

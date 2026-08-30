@@ -48,6 +48,7 @@ class AssistantEntryActions {
     required Assistant assistant,
     Offset? globalPosition,
     VoidCallback? beforeAction,
+    VoidCallback? onSelect,
   }) async {
     if (_isDesktopPlatform) {
       if (globalPosition == null) return;
@@ -56,6 +57,7 @@ class AssistantEntryActions {
         assistant: assistant,
         globalPosition: globalPosition,
         beforeAction: beforeAction,
+        onSelect: onSelect,
       );
       return;
     }
@@ -63,6 +65,7 @@ class AssistantEntryActions {
       context: context,
       assistant: assistant,
       beforeAction: beforeAction,
+      onSelect: onSelect,
     );
   }
 
@@ -89,6 +92,7 @@ class AssistantEntryActions {
     required Assistant assistant,
     required Offset globalPosition,
     VoidCallback? beforeAction,
+    VoidCallback? onSelect,
   }) async {
     final l10n = AppLocalizations.of(context)!;
     final groupProvider = context.read<AssistantGroupProvider>();
@@ -98,6 +102,15 @@ class AssistantEntryActions {
       context,
       globalPosition: globalPosition,
       items: [
+        if (onSelect != null)
+          DesktopContextMenuItem(
+            icon: Lucide.CheckSquare,
+            label: l10n.assistantSelectionActionSelect,
+            onTap: () {
+              beforeAction?.call();
+              onSelect.call();
+            },
+          ),
         DesktopContextMenuItem(
           icon: Lucide.Pencil,
           label: l10n.assistantGroupsContextMenuEditAssistant,
@@ -154,6 +167,7 @@ class AssistantEntryActions {
     required BuildContext context,
     required Assistant assistant,
     VoidCallback? beforeAction,
+    VoidCallback? onSelect,
   }) async {
     final l10n = AppLocalizations.of(context)!;
     final groupProvider = context.read<AssistantGroupProvider>();
@@ -215,6 +229,15 @@ class AssistantEntryActions {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (onSelect != null)
+                  row(
+                    l10n.assistantSelectionActionSelect,
+                    Lucide.CheckSquare,
+                    () {
+                      beforeAction?.call();
+                      onSelect.call();
+                    },
+                  ),
                 row(
                   l10n.assistantGroupsContextMenuEditAssistant,
                   Lucide.Pencil,

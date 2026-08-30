@@ -1537,4 +1537,146 @@ void main() {
       expect(tree.branchPath('old'), const ['u1', 'u2-v0']);
     },
   );
+
+  test(
+    'deleteMessageOnly removes an active branch with a single terminal message',
+    () async {
+      final branched = await createBranchedService(
+        'message-only-branch.sqlite',
+      );
+      final repository = branched.repository;
+      final service = branched.service;
+
+      final treeBefore = await repository.loadConversationTree(
+        'conversation-branch',
+      );
+      await repository.saveConversationTree(treeBefore!.switchBranch('old'));
+
+      final deleted = await service.deleteMessageOnly(
+        conversationId: 'conversation-branch',
+        messageId: 'u2-v0',
+      );
+
+      expect(deleted, const {'u2-v0'});
+      final tree = await repository.loadConversationTree('conversation-branch');
+      expect(tree, isNotNull);
+      expect(tree!.activeBranchId, 'root');
+      expect(tree.activePath(), const ['u1', 'a1-v1', 'u2-v1']);
+      expect(tree.branches.containsKey('old'), isFalse);
+    },
+  );
+
+  test(
+    'deleting a branch tip does not persist unreachable ancestor edges',
+    () async {
+      final branched = await createBranchedService('branch-tip-orphan.sqlite');
+      final repository = branched.repository;
+      final service = branched.service;
+
+      final before = await repository.loadConversationTree(
+        'conversation-branch',
+      );
+      expect(before, isNotNull);
+      await repository.saveConversationTree(before!.switchBranch('root'));
+
+      await service.deleteMessages(
+        conversationId: 'conversation-branch',
+        messageIds: const {'u2-v1'},
+        versionSelectionChanges: const {},
+      );
+
+      final after = await repository.loadConversationTree(
+        'conversation-branch',
+      );
+      expect(after, isNotNull);
+      final reachable = <String>{
+        for (final branch in after!.branches.values)
+          ...after.branchPath(branch.id),
+      };
+      expect(after.edges.keys, unorderedEquals(reachable));
+      expect(after.edges, isNot(contains('a1-v1')));
+    },
+  );
+
+  test(
+    'removing a branch tip does not persist unreachable ancestor edges',
+    () async {
+      final branched = await createBranchedService(
+        'branch-tip-orphan-message-only.sqlite',
+      );
+      final repository = branched.repository;
+      final service = branched.service;
+
+      final before = await repository.loadConversationTree(
+        'conversation-branch',
+      );
+      expect(before, isNotNull);
+      await repository.saveConversationTree(before!.switchBranch('root'));
+
+      await service.deleteMessageOnly(
+        conversationId: 'conversation-branch',
+        messageId: 'u2-v1',
+      );
+
+      final after = await repository.loadConversationTree(
+        'conversation-branch',
+      );
+      expect(after, isNotNull);
+      final reachable = <String>{
+        for (final branch in after!.branches.values)
+          ...after.branchPath(branch.id),
+      };
+      expect(after.edges.keys, unorderedEquals(reachable));
+      expect(after.edges, isNot(contains('a1-v1')));
+    },
+  );
+
+  test(
+    'deleteMessageOnly removes a shared empty-anchor branch from persistence',
+    () async {
+      final branched = await createBranchedService(
+        'shared-empty-anchor-message-only.sqlite',
+      );
+      final repository = branched.repository;
+      final service = branched.service;
+
+      final before = await repository.loadConversationTree(
+        'conversation-branch',
+      );
+      expect(before, isNotNull);
+      final withEmptyAnchor = ConversationTree(
+        conversationId: before!.conversationId,
+        activeBranchId: 'root',
+        branches: {
+          'root': before.branches['root']!,
+          'old': before.branches['old']!.copyWith(tipMessageId: 'a1-v1'),
+        },
+        edges: const {
+          'u1': MessageTreeEdge(messageId: 'u1', parentMessageId: null),
+          'a1-v1': MessageTreeEdge(messageId: 'a1-v1', parentMessageId: 'u1'),
+          'u2-v1': MessageTreeEdge(
+            messageId: 'u2-v1',
+            parentMessageId: 'a1-v1',
+          ),
+        },
+        branchSelections: const {},
+      );
+      await repository.saveConversationTree(withEmptyAnchor);
+
+      final deleted = await service.deleteMessageOnly(
+        conversationId: 'conversation-branch',
+        messageId: 'a1-v1',
+      );
+
+      expect(deleted, const {'a1-v1'});
+      final after = await repository.loadConversationTree(
+        'conversation-branch',
+      );
+      expect(after, isNotNull);
+      expect(after!.branches.containsKey('old'), isFalse);
+      expect(after.activePath(), const ['u1', 'u2-v1']);
+      expect(after.edges['u2-v1']?.parentMessageId, 'u1');
+      expect(await repository.getMessage('a1-v1'), isNull);
+    },
+  );
 }

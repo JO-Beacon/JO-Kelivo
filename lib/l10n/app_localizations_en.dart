@@ -739,6 +739,57 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homePageDropToUpload => 'Drop files to upload';
 
   @override
+  String get invalidConversationTreeTitle =>
+      'This conversation has an invalid structure';
+
+  @override
+  String get invalidConversationTreeSubtitle =>
+      'The original data has not been changed. Editing and generation are unavailable until the structure is repaired.';
+
+  @override
+  String get invalidConversationTreeOriginalData =>
+      'Original data was not changed';
+
+  @override
+  String invalidConversationTreeFingerprint(Object fingerprint) {
+    return 'Data fingerprint: $fingerprint';
+  }
+
+  @override
+  String invalidConversationTreeSchemaVersion(Object version) {
+    return 'Database schema version: $version';
+  }
+
+  @override
+  String invalidConversationTreeIssues(Object count) {
+    return 'Detected issues ($count)';
+  }
+
+  @override
+  String invalidConversationTreeIssueCode(Object code) {
+    return 'Issue type: $code';
+  }
+
+  @override
+  String invalidConversationTreeIssueSubject(Object subject) {
+    return 'Related item: $subject';
+  }
+
+  @override
+  String get invalidConversationTreeDefer =>
+      'Postpone and return to conversations';
+
+  @override
+  String get invalidConversationTreeDelete => 'Delete this conversation';
+
+  @override
+  String get invalidConversationTreeDeleteConfirm =>
+      'Delete this conversation and all of its messages? This cannot be undone.';
+
+  @override
+  String get invalidConversationTreeCancel => 'Cancel';
+
+  @override
   String get assistantEditPageTitle => 'Assistant';
 
   @override
@@ -996,6 +1047,40 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get desktopAvatarMenuReset => 'Reset avatar';
+
+  @override
+  String get avatarEditorTitle => 'Adjust avatar';
+
+  @override
+  String get avatarEditorRotate => 'Rotate';
+
+  @override
+  String get avatarEditorReset => 'Reset adjustments';
+
+  @override
+  String get avatarEditorCancel => 'Cancel';
+
+  @override
+  String get avatarEditorDone => 'Done';
+
+  @override
+  String get avatarEditorCropHint =>
+      'Drag the image with the left mouse button to reposition it; pinch or use the mouse wheel to zoom. The square frame stays fixed.';
+
+  @override
+  String get avatarEditorRotateLeft => 'Rotate left 90°';
+
+  @override
+  String get avatarEditorRotateRight => 'Rotate right 90°';
+
+  @override
+  String get avatarEditorFlipHorizontal => 'Flip horizontal';
+
+  @override
+  String get avatarEditorFlipVertical => 'Flip vertical';
+
+  @override
+  String get avatarEditorFreeRotation => 'Free rotation';
 
   @override
   String get assistantEditAvatarChooseImage => 'Choose Image';
@@ -1518,6 +1603,40 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get assistantSettingsAddSheetSave => 'Save';
+
+  @override
+  String assistantSelectionTitle(int count) {
+    return '$count selected';
+  }
+
+  @override
+  String get assistantSelectionSelectAll => 'Select all';
+
+  @override
+  String get assistantSelectionDeselectAll => 'Deselect all';
+
+  @override
+  String get assistantSelectionDelete => 'Delete';
+
+  @override
+  String get assistantSelectionMoveToGroup => 'Move to group';
+
+  @override
+  String get assistantSelectionDeleteConfirmTitle => 'Delete assistants';
+
+  @override
+  String assistantSelectionDeleteConfirmContent(int count) {
+    return 'Delete $count selected assistant(s)? This action cannot be undone.';
+  }
+
+  @override
+  String get assistantSelectionGroupPickerTitle => 'Move assistants to group';
+
+  @override
+  String get assistantSelectionGroupUngrouped => 'No group';
+
+  @override
+  String get assistantSelectionActionSelect => 'Select assistants';
 
   @override
   String get desktopAssistantsListTitle => 'Assistants';

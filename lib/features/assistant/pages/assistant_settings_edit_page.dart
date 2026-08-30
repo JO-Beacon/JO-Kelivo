@@ -50,6 +50,7 @@ import '../../home/services/local_tools_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/emoji_picker_dialog.dart';
+import '../../../shared/widgets/avatar_image_editor.dart';
 import '../../../shared/widgets/emoji_text.dart';
 import '../../../shared/widgets/ios_form_text_field.dart';
 import '../../../shared/widgets/ios_switch.dart';
@@ -1792,13 +1793,10 @@ class _DesktopAssistantBasicPaneState
                     final fixed = SandboxPathResolver.fix(av);
                     final f = File(fixed);
                     if (f.existsSync()) {
-                      inner = ClipOval(
-                        child: Image.file(
-                          f,
-                          width: 56,
-                          height: 56,
-                          fit: BoxFit.cover,
-                        ),
+                      inner = AvatarImage(
+                        path: fixed,
+                        size: 56,
+                        transform: a.avatarTransform,
                       );
                     } else {
                       inner = Container(
@@ -2571,8 +2569,11 @@ class _DesktopAssistantBasicPaneState
                   : null;
               final path = f?.path;
               if (path != null && path.isNotEmpty) {
+                if (!context.mounted) return;
+                final edited = await showAvatarImageEditor(context, path);
+                if (!context.mounted || edited == null) return;
                 await assistantProvider.updateAssistant(
-                  a.copyWith(avatar: path),
+                  a.copyWith(avatar: path, avatarTransform: edited.transform),
                 );
               }
             } catch (_) {}

@@ -1,15 +1,18 @@
 import 'package:flutter/foundation.dart';
+import 'dart:convert';
 import 'dart:io';
 import '../database/business_preferences.dart';
 import '../../utils/sandbox_path_resolver.dart';
 import '../../utils/avatar_cache.dart';
 import '../../utils/app_directories.dart';
+import '../models/avatar_transform.dart';
 
 class UserProvider extends ChangeNotifier {
   static const String _prefsUserNameKey = 'user_name';
   static const String _prefsAvatarTypeKey =
       'avatar_type'; // emoji | url | file | null
   static const String _prefsAvatarValueKey = 'avatar_value';
+  static const String _prefsAvatarTransformKey = 'avatar_transform_v1';
 
   final BusinessPreferences preferences;
   String _name = 'User';
@@ -18,8 +21,10 @@ class UserProvider extends ChangeNotifier {
 
   String? _avatarType; // 'emoji', 'url', 'file'
   String? _avatarValue;
+  AvatarTransform? _avatarTransform;
   String? get avatarType => _avatarType;
   String? get avatarValue => _avatarValue;
+  AvatarTransform? get avatarTransform => _avatarTransform;
 
   UserProvider({required this.preferences}) {
     _load();
@@ -45,6 +50,14 @@ class UserProvider extends ChangeNotifier {
       try {
         await preferences.setString(_prefsAvatarValueKey, _avatarValue!);
       } catch (_) {}
+    }
+    final rawTransform = preferences.getString(_prefsAvatarTransformKey);
+    if (rawTransform != null) {
+      try {
+        _avatarTransform = AvatarTransform.fromJson(jsonDecode(rawTransform));
+      } catch (_) {
+        _avatarTransform = null;
+      }
     }
     // 仅在头像存在时通知；否则依赖上面的名称通知
     if (_avatarType != null && _avatarValue != null) {
@@ -76,9 +89,11 @@ class UserProvider extends ChangeNotifier {
     if (e.isEmpty) return;
     _avatarType = 'emoji';
     _avatarValue = e;
+    _avatarTransform = null;
     notifyListeners();
     await preferences.setString(_prefsAvatarTypeKey, _avatarType!);
     await preferences.setString(_prefsAvatarValueKey, _avatarValue!);
+    await preferences.remove(_prefsAvatarTransformKey);
   }
 
   Future<void> setAvatarUrl(String url) async {
@@ -86,16 +101,21 @@ class UserProvider extends ChangeNotifier {
     if (u.isEmpty) return;
     _avatarType = 'url';
     _avatarValue = u;
+    _avatarTransform = null;
     notifyListeners();
     await preferences.setString(_prefsAvatarTypeKey, _avatarType!);
     await preferences.setString(_prefsAvatarValueKey, _avatarValue!);
+    await preferences.remove(_prefsAvatarTransformKey);
     // 预取，以便稍后离线显示
     try {
       await AvatarCache.getPath(u);
     } catch (_) {}
   }
 
-  Future<void> setAvatarFilePath(String path) async {
+  Future<void> setAvatarFilePath(
+    String path, {
+    AvatarTransform? transform,
+  }) async {
     final p = path.trim();
     if (p.isEmpty) return;
     final fixedInput = SandboxPathResolver.fix(p);
@@ -134,24 +154,41 @@ class UserProvider extends ChangeNotifier {
 
       _avatarType = 'file';
       _avatarValue = dest.path;
+      _avatarTransform = transform;
       notifyListeners();
       await preferences.setString(_prefsAvatarTypeKey, _avatarType!);
       await preferences.setString(_prefsAvatarValueKey, _avatarValue!);
+      await _persistTransform();
     } catch (_) {
       // 如果复制失败，回退到原始路径（可能仍是临时路径）
       _avatarType = 'file';
       _avatarValue = fixedInput;
+      _avatarTransform = transform;
       notifyListeners();
       await preferences.setString(_prefsAvatarTypeKey, _avatarType!);
       await preferences.setString(_prefsAvatarValueKey, _avatarValue!);
+      await _persistTransform();
     }
   }
 
   Future<void> resetAvatar() async {
     _avatarType = null;
     _avatarValue = null;
+    _avatarTransform = null;
     notifyListeners();
     await preferences.remove(_prefsAvatarTypeKey);
     await preferences.remove(_prefsAvatarValueKey);
+    await preferences.remove(_prefsAvatarTransformKey);
+  }
+
+  Future<void> _persistTransform() async {
+    if (_avatarTransform == null) {
+      await preferences.remove(_prefsAvatarTransformKey);
+    } else {
+      await preferences.setString(
+        _prefsAvatarTransformKey,
+        jsonEncode(_avatarTransform!.toJson()),
+      );
+    }
   }
 }

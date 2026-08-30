@@ -51,6 +51,7 @@ class UpdateInfo {
   factory UpdateInfo.fromGitHubRelease(
     Map<String, dynamic> json, {
     String appName = 'JO-Kelivo',
+    String? assetAppName,
   }) {
     final tagName = json['tag_name']?.toString() ?? '';
     final version = tagName.startsWith('v') || tagName.startsWith('V')
@@ -67,7 +68,7 @@ class UpdateInfo {
       final match = assetPlatformMatch(
         name,
         expectedVersion: version,
-        appName: appName,
+        appName: assetAppName ?? appName,
       );
       if (match == null) continue;
       final current = candidates[match.platform];
@@ -187,6 +188,7 @@ class UpdateProvider extends ChangeNotifier {
       final info = await _fetchLatestRelease(
         url: _joKelivoReleaseUrl,
         appName: 'JO-Kelivo',
+        assetAppName: 'JO-AIClient',
       );
 
       final pkg = await PackageInfo.fromPlatform();
@@ -225,6 +227,7 @@ class UpdateProvider extends ChangeNotifier {
   Future<UpdateInfo> _fetchLatestRelease({
     required String url,
     required String appName,
+    String? assetAppName,
   }) async {
     final response = await _httpClient.get(
       Uri.parse(url),
@@ -235,7 +238,11 @@ class UpdateProvider extends ChangeNotifier {
     }
     final data =
         jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
-    return UpdateInfo.fromGitHubRelease(data, appName: appName);
+    return UpdateInfo.fromGitHubRelease(
+      data,
+      appName: appName,
+      assetAppName: assetAppName,
+    );
   }
 
   @visibleForTesting

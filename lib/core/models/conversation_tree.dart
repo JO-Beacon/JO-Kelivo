@@ -1,4 +1,49 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+
+@immutable
+class ConversationTreeIntegrityIssue {
+  const ConversationTreeIntegrityIssue({
+    required this.code,
+    required this.subject,
+    required this.message,
+  });
+
+  final String code;
+  final String subject;
+  final String message;
+
+  @override
+  String toString() => '$code($subject): $message';
+}
+
+class ConversationTreeIntegrityException implements Exception {
+  ConversationTreeIntegrityException(
+    Iterable<ConversationTreeIntegrityIssue> issues, {
+    this.conversationId,
+    this.fingerprint,
+    this.schemaVersion,
+  }) : issues = List.unmodifiable(issues);
+
+  final List<ConversationTreeIntegrityIssue> issues;
+  final String? conversationId;
+  final String? fingerprint;
+  final int? schemaVersion;
+
+  @override
+  String toString() {
+    final metadata = <String>[
+      if (conversationId != null) 'conversationId=$conversationId',
+      if (fingerprint != null) 'fingerprint=$fingerprint',
+      if (schemaVersion != null) 'schemaVersion=$schemaVersion',
+    ];
+    final prefix = metadata.isEmpty ? '' : ' (${metadata.join(', ')})';
+    return 'Conversation tree is invalid$prefix:\n'
+        '${issues.map((issue) => ' - $issue').join('\n')}';
+  }
+}
 
 @immutable
 class MessageTreeEdge {
@@ -116,6 +161,19 @@ class ConversationTree {
     _validateAcyclic();
   }
 
+  /// 从持久化快照构造模型但跳过前置校验，供诊断流程保留非法原始数据。
+  ///
+  /// 调用方必须立即运行 [integrityIssues]，不得把结果交给普通树变换。
+  ConversationTree.unsafe({
+    required this.conversationId,
+    required this.activeBranchId,
+    required Map<String, ConversationBranch> branches,
+    required Map<String, MessageTreeEdge> edges,
+    Map<String, String> branchSelections = const <String, String>{},
+  }) : branches = Map.unmodifiable(branches),
+       edges = Map.unmodifiable(edges),
+       branchSelections = Map.unmodifiable(branchSelections);
+
   factory ConversationTree.linear({
     required String conversationId,
     required List<String> messageIds,
@@ -153,6 +211,225 @@ class ConversationTree {
   final Map<String, ConversationBranch> branches;
   final Map<String, MessageTreeEdge> edges;
   final Map<String, String> branchSelections;
+
+  /// 返回当前快照中所有可诊断的完整性问题。
+  ///
+  /// 构造函数只拒绝无法安全表示的局部结构错误；加载旧数据时，调用方
+  /// 应先保留原始快照，再用本方法决定是否进入非法树展示流程。
+  List<ConversationTreeIntegrityIssue> integrityIssues() {
+    final issues = <ConversationTreeIntegrityIssue>[];
+
+    if (conversationId.isEmpty) {
+      issues.add(
+        const ConversationTreeIntegrityIssue(
+          code: 'empty_conversation_id',
+          subject: 'conversationId',
+          message: '会话 ID 不能为空。',
+        ),
+      );
+    }
+    if (!branches.containsKey(activeBranchId)) {
+      issues.add(
+        ConversationTreeIntegrityIssue(
+          code: 'active_branch_missing',
+          subject: activeBranchId,
+          message: '活动分支不存在。',
+        ),
+      );
+    }
+
+    for (final entry in branches.entries) {
+      final branch = entry.value;
+      if (entry.key.isEmpty || branch.id.isEmpty) {
+        issues.add(
+          ConversationTreeIntegrityIssue(
+            code: 'empty_branch_id',
+            subject: entry.key,
+            message: '分支 ID 不能为空。',
+          ),
+        );
+      }
+      if (entry.key != branch.id) {
+        issues.add(
+          ConversationTreeIntegrityIssue(
+            code: 'branch_key_mismatch',
+            subject: entry.key,
+            message: '分支记录的键与其 ID 不一致。',
+          ),
+        );
+      }
+      if (branch.conversationId != conversationId) {
+        issues.add(
+          ConversationTreeIntegrityIssue(
+            code: 'branch_conversation_mismatch',
+            subject: branch.id,
+            message: '分支不属于当前会话。',
+          ),
+        );
+      }
+      final tip = branch.tipMessageId;
+      if (tip != null && !edges.containsKey(tip)) {
+        issues.add(
+          ConversationTreeIntegrityIssue(
+            code: 'branch_tip_missing',
+            subject: branch.id,
+            message: '分支尖端消息不存在。',
+          ),
+        );
+      }
+    }
+
+    for (final entry in edges.entries) {
+      final edge = entry.value;
+      if (entry.key.isEmpty || edge.messageId.isEmpty) {
+        issues.add(
+          ConversationTreeIntegrityIssue(
+            code: 'empty_message_id',
+            subject: entry.key,
+            message: '消息 ID 不能为空。',
+          ),
+        );
+      }
+      if (entry.key != edge.messageId) {
+        issues.add(
+          ConversationTreeIntegrityIssue(
+            code: 'edge_key_mismatch',
+            subject: entry.key,
+            message: '边记录的键与其消息 ID 不一致。',
+          ),
+        );
+      }
+      final parent = edge.parentMessageId;
+      if (parent != null && !edges.containsKey(parent)) {
+        issues.add(
+          ConversationTreeIntegrityIssue(
+            code: 'edge_parent_missing',
+            subject: edge.messageId,
+            message: '边的父消息不存在。',
+          ),
+        );
+      }
+    }
+
+    final cycleMessages = _cycleMessages();
+    for (final messageId in cycleMessages) {
+      issues.add(
+        ConversationTreeIntegrityIssue(
+          code: 'cycle',
+          subject: messageId,
+          message: '消息树包含环。',
+        ),
+      );
+    }
+
+    final reachable = _reachableMessageIds();
+    for (final messageId in edges.keys) {
+      if (!reachable.contains(messageId)) {
+        issues.add(
+          ConversationTreeIntegrityIssue(
+            code: 'unreachable_edge',
+            subject: messageId,
+            message: '边不能从任何存活分支尖端回溯到达。',
+          ),
+        );
+      }
+    }
+
+    for (final entry in branchSelections.entries) {
+      final messageId = entry.key;
+      final branchId = entry.value;
+      final branch = branches[branchId];
+      final path = branch == null ? null : _safeBranchPath(branchId);
+      final index = path?.indexOf(messageId) ?? -1;
+      if (branch == null) {
+        issues.add(
+          ConversationTreeIntegrityIssue(
+            code: 'selection_branch_missing',
+            subject: messageId,
+            message: '选择记忆指向不存在的分支 $branchId。',
+          ),
+        );
+      } else if (!edges.containsKey(messageId) || path == null || index < 0) {
+        issues.add(
+          ConversationTreeIntegrityIssue(
+            code: 'selection_invalid',
+            subject: messageId,
+            message: '选择记忆不在目标分支的有效分叉点上。',
+          ),
+        );
+      } else if (index + 1 < path.length && childrenOf(messageId).length < 2) {
+        issues.add(
+          ConversationTreeIntegrityIssue(
+            code: 'selection_not_fork',
+            subject: messageId,
+            message: '选择记忆指向的消息没有多个直接后继。',
+          ),
+        );
+      }
+    }
+
+    issues.sort((left, right) {
+      final byCode = left.code.compareTo(right.code);
+      if (byCode != 0) return byCode;
+      final bySubject = left.subject.compareTo(right.subject);
+      if (bySubject != 0) return bySubject;
+      return left.message.compareTo(right.message);
+    });
+    return List.unmodifiable(issues);
+  }
+
+  /// 校验失败时抛出包含全部问题的异常；成功时不返回值。
+  void validateIntegrity() {
+    final issues = integrityIssues();
+    if (issues.isNotEmpty) {
+      throw ConversationTreeIntegrityException(
+        issues,
+        conversationId: conversationId,
+        fingerprint: fingerprint,
+      );
+    }
+  }
+
+  bool get isIntegrityValid => integrityIssues().isEmpty;
+
+  /// 树结构的规范化 SHA-256 指纹，不依赖 Map 的插入顺序。
+  String get fingerprint {
+    final sortedEdgeIds = edges.keys.toList()..sort();
+    final sortedBranchIds = branches.keys.toList()..sort();
+    final sortedSelectionKeys = branchSelections.keys.toList()..sort();
+    final rootIds =
+        edges.values
+            .where((edge) => edge.parentMessageId == null)
+            .map((edge) => edge.messageId)
+            .toList()
+          ..sort();
+    final canonical = <String, Object?>{
+      'conversationId': conversationId,
+      'activeBranchId': activeBranchId,
+      'edges': [
+        for (final id in sortedEdgeIds) [id, edges[id]!.parentMessageId],
+      ],
+      'branches': [
+        for (final id in sortedBranchIds)
+          [
+            id,
+            branches[id]!.conversationId,
+            branches[id]!.tipMessageId,
+            branches[id]!.name,
+            branches[id]!.createdAt.toUtc().microsecondsSinceEpoch,
+          ],
+      ],
+      'branchSelections': [
+        for (final id in sortedSelectionKeys) [id, branchSelections[id]],
+      ],
+      'roots': rootIds,
+      'paths': [
+        for (final id in sortedBranchIds) [id, _safeBranchPath(id)],
+      ],
+      'activePath': _safeBranchPath(activeBranchId),
+    };
+    return sha256.convert(utf8.encode(jsonEncode(canonical))).toString();
+  }
 
   List<String> branchPath(String branchId) {
     final branch = branches[branchId];
@@ -466,9 +743,27 @@ class ConversationTree {
     );
   }
 
-  ConversationTree deleteMessage(String messageId) {
-    if (!edges.containsKey(messageId)) return this;
-    final removedIds = _descendantsOf(messageId).toSet()..add(messageId);
+  ConversationTree deleteMessage(
+    String messageId, {
+    Iterable<String> recentBranchIds = const <String>[],
+  }) => deleteMessages({messageId}, recentBranchIds: recentBranchIds);
+
+  /// 在同一棵旧树快照上删除多个节点及其全部后代。
+  ///
+  /// 目标集合先求并集，再一次性重建边和分支，因而结果不依赖调用方
+  /// 传入集合的遍历顺序。
+  ConversationTree deleteMessages(
+    Iterable<String> messageIds, {
+    Iterable<String> recentBranchIds = const <String>[],
+  }) {
+    final targets = messageIds.where(edges.containsKey).toSet();
+    if (targets.isEmpty) return this;
+    final removedIds = <String>{};
+    for (final messageId in targets) {
+      removedIds
+        ..add(messageId)
+        ..addAll(_descendantsOf(messageId));
+    }
     final nextEdges = Map<String, MessageTreeEdge>.from(edges)
       ..removeWhere((id, _) => removedIds.contains(id));
     final affectedBranches = <ConversationBranch>[];
@@ -497,26 +792,123 @@ class ConversationTree {
       );
     }
 
+    final fallbackIds = <String>[...recentBranchIds];
+    for (final messageId in targets) {
+      final remembered = branchSelections[messageId];
+      if (remembered != null) fallbackIds.add(remembered);
+      final parent = edges[messageId]?.parentMessageId;
+      for (final childId in childrenOf(parent)) {
+        if (childId == messageId) continue;
+        for (final branch in branches.values) {
+          if (_branchPathFor(branch.id, branches, edges).contains(childId)) {
+            fallbackIds.add(branch.id);
+          }
+        }
+      }
+    }
+    final nextSelections = Map<String, String>.from(branchSelections);
+    for (final messageId in targets) {
+      final parent = edges[messageId]?.parentMessageId;
+      if (parent == null) continue;
+      final survivingChildren = nextEdges.values
+          .where((edge) => edge.parentMessageId == parent)
+          .map((edge) => edge.messageId)
+          .toList(growable: false);
+      if (survivingChildren.length < 2) {
+        nextSelections.remove(parent);
+        continue;
+      }
+      final remembered = nextSelections[parent];
+      if (remembered != null && nextBranches.containsKey(remembered)) {
+        final path = _branchPathFor(remembered, nextBranches, nextEdges);
+        final parentIndex = path.indexOf(parent);
+        if (parentIndex >= 0 &&
+            parentIndex + 1 < path.length &&
+            survivingChildren.contains(path[parentIndex + 1])) {
+          continue;
+        }
+      }
+      final candidates = <ConversationBranch>[];
+      for (final branch in nextBranches.values) {
+        final path = _branchPathFor(branch.id, nextBranches, nextEdges);
+        final index = path.indexOf(parent);
+        if (index >= 0 &&
+            index + 1 < path.length &&
+            survivingChildren.contains(path[index + 1])) {
+          candidates.add(branch);
+        }
+      }
+      candidates.sort((left, right) {
+        final byDepth = _branchPathFor(left.id, nextBranches, nextEdges).length
+            .compareTo(
+              _branchPathFor(right.id, nextBranches, nextEdges).length,
+            );
+        if (byDepth != 0) return byDepth;
+        final byTime = left.createdAt.compareTo(right.createdAt);
+        if (byTime != 0) return byTime;
+        return left.id.compareTo(right.id);
+      });
+      if (candidates.isNotEmpty) nextSelections[parent] = candidates.first.id;
+    }
+    final prunedEdges = _pruneUnreachableEdges(nextBranches, nextEdges);
     final nextActiveBranchId = nextBranches.containsKey(activeBranchId)
         ? activeBranchId
-        : _fallbackBranchId(nextBranches);
+        : _fallbackBranchId(nextBranches, preferredBranchIds: fallbackIds);
     return ConversationTree(
       conversationId: conversationId,
       activeBranchId: nextActiveBranchId,
       branches: nextBranches,
-      edges: nextEdges,
+      edges: prunedEdges,
       branchSelections: _pruneBranchSelections(
         branches: nextBranches,
-        edges: nextEdges,
+        edges: prunedEdges,
+        baseSelections: nextSelections,
       ),
     );
   }
 
   /// 删除 [messageId] 及其所有后代。子树保持完整。
-  ConversationTree deleteSubtree(String messageId) => deleteMessage(messageId);
-  ConversationTree removeMessageOnly(String messageId) {
+  ConversationTree deleteSubtree(
+    String messageId, {
+    Iterable<String> recentBranchIds = const <String>[],
+  }) => deleteMessage(messageId, recentBranchIds: recentBranchIds);
+
+  /// 批量局部删除；先处理更深节点，避免输入排列影响重挂接结果。
+  ConversationTree removeMessagesOnly(
+    Iterable<String> messageIds, {
+    Iterable<String> recentBranchIds = const <String>[],
+  }) {
+    final targets = messageIds.where(edges.containsKey).toList(growable: false)
+      ..sort((left, right) {
+        final byDepth = _pathDepth(right).compareTo(_pathDepth(left));
+        if (byDepth != 0) return byDepth;
+        return left.compareTo(right);
+      });
+    var result = this;
+    for (final messageId in targets) {
+      result = result.removeMessageOnly(
+        messageId,
+        recentBranchIds: recentBranchIds,
+      );
+    }
+    return result;
+  }
+
+  /// 仅删除 [messageId]；若它是分叉末端的唯一消息，同时移除该分支。
+  ConversationTree removeMessageOnly(
+    String messageId, {
+    Iterable<String> recentBranchIds = const <String>[],
+  }) {
     final removed = edges[messageId];
     if (removed == null) return this;
+
+    // 删除分支尖端后，该分支不再有自己的消息内容，只剩一个由删除操作
+    // 产生的空锚点。空锚点不是用户当前可见的分支内容，因此必须连同分支
+    // 记录一起移除；否则它的 tip 仍指向已删除的边，会使整棵树无法保存。
+    final terminalBranchIds = branches.values
+        .where((branch) => branch.tipMessageId == messageId)
+        .map((branch) => branch.id)
+        .toSet();
 
     // 删除分叉点时，活动分支可能正好停在被删节点。先根据删除前
     // 记录的分支选择找到一个仍包含后续消息的分支，避免活动路径退回
@@ -554,35 +946,63 @@ class ConversationTree {
         );
       }
     }
-    final nextBranches = Map<String, ConversationBranch>.from(branches);
-    for (final entry in nextBranches.entries.toList(growable: false)) {
-      if (entry.value.tipMessageId == messageId) {
-        nextBranches[entry.key] = entry.value.copyWith(
-          tipMessageId: removed.parentMessageId,
-          clearTip: removed.parentMessageId == null,
-        );
+    final nextBranches = <String, ConversationBranch>{};
+    for (final branch in branches.values) {
+      if (!terminalBranchIds.contains(branch.id)) {
+        nextBranches[branch.id] = branch.tipMessageId == messageId
+            ? branch.copyWith(
+                tipMessageId: removed.parentMessageId,
+                clearTip: removed.parentMessageId == null,
+              )
+            : branch;
       }
+    }
+    if (nextBranches.isEmpty) {
+      final fallback = _chooseFallbackBranch({
+        for (final branch in branches.values)
+          if (terminalBranchIds.contains(branch.id)) branch.id: branch,
+      });
+      if (fallback == null) throw StateError('cannot_delete_last_branch');
+      nextBranches[fallback.id] = fallback.copyWith(
+        tipMessageId: removed.parentMessageId,
+        clearTip: removed.parentMessageId == null,
+      );
     }
 
     final nextSelections = Map<String, String>.from(branchSelections)
       ..remove(messageId);
     if (removed.parentMessageId != null && continuationBranchId != null) {
-      nextSelections[removed.parentMessageId!] = continuationBranchId;
+      final survivingChildren = nextEdges.values
+          .where((edge) => edge.parentMessageId == removed.parentMessageId)
+          .map((edge) => edge.messageId)
+          .toList(growable: false);
+      if (survivingChildren.length >= 2) {
+        nextSelections[removed.parentMessageId!] = continuationBranchId;
+      } else {
+        nextSelections.remove(removed.parentMessageId);
+      }
     }
-    final nextActiveBranchId = activeBranchId == continuationBranchId
+    final activeEndsAtRemoved =
+        branches[activeBranchId]?.tipMessageId == messageId;
+    final nextActiveBranchId =
+        nextBranches.containsKey(activeBranchId) && !activeEndsAtRemoved
         ? activeBranchId
-        : (branches[activeBranchId]?.tipMessageId == messageId &&
-              continuationBranchId != null)
-        ? continuationBranchId
-        : activeBranchId;
+        : _fallbackBranchId(
+            nextBranches,
+            preferredBranchIds: [
+              ...recentBranchIds,
+              if (continuationBranchId != null) continuationBranchId,
+            ],
+          );
+    final prunedEdges = _pruneUnreachableEdges(nextBranches, nextEdges);
     return ConversationTree(
       conversationId: conversationId,
       activeBranchId: nextActiveBranchId,
       branches: nextBranches,
-      edges: nextEdges,
+      edges: prunedEdges,
       branchSelections: _pruneBranchSelections(
         branches: nextBranches,
-        edges: nextEdges,
+        edges: prunedEdges,
         baseSelections: nextSelections,
       ),
     );
@@ -684,6 +1104,77 @@ class ConversationTree {
     return result;
   }
 
+  List<String>? _safeBranchPath(String branchId) {
+    final branch = branches[branchId];
+    if (branch == null || branch.tipMessageId == null) {
+      return branch == null ? null : const <String>[];
+    }
+    final reversed = <String>[];
+    final visited = <String>{};
+    String? cursor = branch.tipMessageId;
+    while (cursor != null) {
+      if (!visited.add(cursor)) return null;
+      final edge = edges[cursor];
+      if (edge == null) return null;
+      reversed.add(cursor);
+      cursor = edge.parentMessageId;
+    }
+    return reversed.reversed.toList(growable: false);
+  }
+
+  Set<String> _cycleMessages() {
+    final visiting = <String>{};
+    final visited = <String>{};
+    final cycles = <String>{};
+
+    void visit(String messageId) {
+      if (visiting.contains(messageId)) {
+        cycles.add(messageId);
+        return;
+      }
+      if (!visited.add(messageId)) return;
+      visiting.add(messageId);
+      final parent = edges[messageId]?.parentMessageId;
+      if (parent != null && edges.containsKey(parent)) visit(parent);
+      visiting.remove(messageId);
+    }
+
+    for (final messageId in edges.keys) {
+      visit(messageId);
+    }
+    return cycles;
+  }
+
+  Set<String> _reachableMessageIds() {
+    final reachable = <String>{};
+    for (final branch in branches.values) {
+      final path = _safeBranchPath(branch.id);
+      if (path != null) reachable.addAll(path);
+    }
+    return reachable;
+  }
+
+  static Map<String, MessageTreeEdge> _pruneUnreachableEdges(
+    Map<String, ConversationBranch> branches,
+    Map<String, MessageTreeEdge> edges,
+  ) {
+    final reachable = <String>{};
+    for (final branch in branches.values) {
+      final visited = <String>{};
+      String? cursor = branch.tipMessageId;
+      while (cursor != null && visited.add(cursor)) {
+        final edge = edges[cursor];
+        if (edge == null) break;
+        reachable.add(cursor);
+        cursor = edge.parentMessageId;
+      }
+    }
+    return <String, MessageTreeEdge>{
+      for (final entry in edges.entries)
+        if (reachable.contains(entry.key)) entry.key: entry.value,
+    };
+  }
+
   static List<String> _branchPathFor(
     String branchId,
     Map<String, ConversationBranch> branches,
@@ -721,9 +1212,28 @@ class ConversationTree {
     return result;
   }
 
-  String _fallbackBranchId(Map<String, ConversationBranch> branches) {
+  int _pathDepth(String messageId) {
+    var depth = 0;
+    String? cursor = messageId;
+    final visited = <String>{};
+    while (cursor != null && visited.add(cursor)) {
+      final parent = edges[cursor]?.parentMessageId;
+      if (parent == null) break;
+      depth++;
+      cursor = parent;
+    }
+    return depth;
+  }
+
+  String _fallbackBranchId(
+    Map<String, ConversationBranch> branches, {
+    Iterable<String> preferredBranchIds = const <String>[],
+  }) {
     if (branches.isEmpty) {
       throw StateError('cannot_delete_last_branch');
+    }
+    for (final branchId in preferredBranchIds) {
+      if (branches.containsKey(branchId)) return branchId;
     }
     return _chooseFallbackBranch(branches)!.id;
   }

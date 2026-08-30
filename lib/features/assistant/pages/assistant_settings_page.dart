@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../home/controllers/chat_actions.dart';
-import '../../../core/models/assistant.dart';
+import '../../../core/models/assistant_list_item.dart';
 import 'dart:io' show File;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'assistant_settings_edit_page.dart';
@@ -14,58 +14,183 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../../../core/services/haptics.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../shared/widgets/ios_checkbox.dart';
+import '../../../shared/widgets/ios_tactile.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../core/providers/assistant_group_provider.dart';
+import '../widgets/assistant_selection_bars.dart'
+    show
+        AssistantSelectionActionBar,
+        assistantSelectionUngroupedKey,
+        showAssistantSelectionGroupSheet;
 
-class AssistantSettingsPage extends StatelessWidget {
+class AssistantSettingsPage extends StatefulWidget {
   const AssistantSettingsPage({super.key});
+
+  @override
+  State<AssistantSettingsPage> createState() => _AssistantSettingsPageState();
+}
+
+class _AssistantSettingsPageState extends State<AssistantSettingsPage> {
+  bool _selectionMode = false;
+  final Set<String> _selectedIds = <String>{};
+
+  void _enterSelection(String id) {
+    setState(() {
+      _selectionMode = true;
+      _selectedIds.add(id);
+    });
+  }
+
+  void _exitSelection() => setState(() {
+    _selectionMode = false;
+    _selectedIds.clear();
+  });
+
+  void _toggleSelectAll(List<AssistantListItem> assistants) {
+    setState(() {
+      if (_selectedIds.length == assistants.length) {
+        _selectedIds.clear();
+      } else {
+        _selectedIds.addAll(assistants.map((a) => a.id));
+      }
+    });
+  }
+
+  Future<void> _deleteSelected() async {
+    final ids = List<String>.of(_selectedIds);
+    if (ids.isEmpty) return;
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.assistantSelectionDeleteConfirmTitle),
+        content: Text(l10n.assistantSelectionDeleteConfirmContent(ids.length)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.assistantSettingsDeleteDialogCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.assistantSelectionDelete),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    for (final id in ids) {
+      await ChatActions.cancelActiveGenerationsForAssistant(id);
+    }
+    if (!mounted) return;
+    final assistantProvider = context.read<AssistantProvider>();
+    await assistantProvider.deleteAssistants(ids);
+    if (!mounted) return;
+    final remainingIds = assistantProvider.assistants.map((a) => a.id).toSet();
+    final deletedIds = ids.where((id) => !remainingIds.contains(id));
+    await context.read<AssistantGroupProvider>().assignAssistantsToGroup(
+      deletedIds,
+      null,
+    );
+    _exitSelection();
+  }
+
+  Future<void> _moveSelected() async {
+    final ids = List<String>.of(_selectedIds);
+    if (ids.isEmpty) return;
+    final groupId = await showAssistantSelectionGroupSheet(context);
+    if (!mounted || groupId == null) return;
+    await context.read<AssistantGroupProvider>().assignAssistantsToGroup(
+      ids,
+      groupId == assistantSelectionUngroupedKey ? null : groupId,
+    );
+    if (mounted) _exitSelection();
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
 
-    final assistants = context.watch<AssistantProvider>().assistants;
+    final provider = context.watch<AssistantProvider>();
+    final assistants = provider.assistantDirectory;
 
     return Scaffold(
       appBar: AppBar(
         leading: Tooltip(
-          message: l10n.settingsPageBackButton,
+          message: _selectionMode
+              ? l10n.assistantSettingsAddSheetCancel
+              : l10n.settingsPageBackButton,
           child: _TactileIconButton(
-            icon: Lucide.ArrowLeft,
+            icon: _selectionMode ? Lucide.X : Lucide.ArrowLeft,
             color: cs.onSurface,
             size: 22,
-            onTap: () => Navigator.of(context).maybePop(),
+            onTap: _selectionMode
+                ? _exitSelection
+                : () => Navigator.of(context).maybePop(),
           ),
         ),
-        title: Text(l10n.assistantSettingsPageTitle),
+        title: Text(
+          _selectionMode
+              ? l10n.assistantSelectionTitle(_selectedIds.length)
+              : l10n.assistantSettingsPageTitle,
+        ),
         actions: [
-          Tooltip(
-            message: l10n.assistantSettingsAddSheetSave,
-            child: _TactileIconButton(
-              icon: Lucide.Plus,
-              color: cs.onSurface,
-              size: 22,
-              onTap: () async {
-                final assistantProvider = context.read<AssistantProvider>();
-                final name = await _showAddAssistantSheet(context);
-                if (!context.mounted || name == null) return;
-                final id = await assistantProvider.addAssistant(
-                  name: name.trim(),
-                  context: context,
-                  insertAtTop: context
-                      .read<SettingsProvider>()
-                      .insertNewAssistantAtTop,
-                );
-                if (!context.mounted) return;
-                await Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => AssistantSettingsEditPage(assistantId: id),
-                  ),
-                );
-              },
+          if (_selectionMode)
+            IosCardPress(
+              baseColor: Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+              onTap: () => _toggleSelectAll(assistants),
+              child: IosCheckbox(
+                value: _selectedIds.length == assistants.length,
+                size: 20,
+                hitTestSize: 32,
+                enableHaptics: false,
+                onChanged: (_) => _toggleSelectAll(assistants),
+              ),
+            )
+          else
+            Tooltip(
+              message: l10n.assistantSelectionActionSelect,
+              child: _TactileIconButton(
+                icon: Lucide.CheckSquare,
+                color: cs.onSurface,
+                size: 22,
+                onTap: () => setState(() => _selectionMode = true),
+              ),
             ),
-          ),
+          if (!_selectionMode) ...[
+            const SizedBox(width: 4),
+            Tooltip(
+              message: l10n.assistantSettingsAddSheetSave,
+              child: _TactileIconButton(
+                icon: Lucide.Plus,
+                color: cs.onSurface,
+                size: 22,
+                onTap: () async {
+                  final assistantProvider = context.read<AssistantProvider>();
+                  final name = await _showAddAssistantSheet(context);
+                  if (!context.mounted || name == null) return;
+                  final id = await assistantProvider.addAssistant(
+                    name: name.trim(),
+                    context: context,
+                    insertAtTop: context
+                        .read<SettingsProvider>()
+                        .insertNewAssistantAtTop,
+                  );
+                  if (!context.mounted) return;
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          AssistantSettingsEditPage(assistantId: id),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
           const SizedBox(width: 8),
         ],
       ),
@@ -97,25 +222,58 @@ class AssistantSettingsPage extends StatelessWidget {
         },
         itemBuilder: (context, index) {
           final item = assistants[index];
+          final card = Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _AssistantCard(
+              item: item,
+              selectionMode: _selectionMode,
+              selected: _selectedIds.contains(item.id),
+              onToggleSelect: () {
+                if (!_selectionMode) {
+                  _enterSelection(item.id);
+                } else {
+                  setState(() {
+                    if (!_selectedIds.add(item.id)) {
+                      _selectedIds.remove(item.id);
+                    }
+                  });
+                }
+              },
+            ),
+          );
           return KeyedSubtree(
             key: ValueKey('reorder-assistant-${item.id}'),
-            child: ReorderableDelayedDragStartListener(
-              index: index,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _AssistantCard(item: item),
-              ),
-            ),
+            child: _selectionMode
+                ? card
+                : ReorderableDelayedDragStartListener(
+                    index: index,
+                    child: card,
+                  ),
           );
         },
       ),
+      bottomNavigationBar: _selectionMode
+          ? AssistantSelectionActionBar(
+              selectedCount: _selectedIds.length,
+              onMoveToGroup: _moveSelected,
+              onDelete: _deleteSelected,
+            )
+          : null,
     );
   }
 }
 
 class _AssistantCard extends StatelessWidget {
-  const _AssistantCard({required this.item});
-  final Assistant item;
+  const _AssistantCard({
+    required this.item,
+    required this.selectionMode,
+    required this.selected,
+    required this.onToggleSelect,
+  });
+  final AssistantListItem item;
+  final bool selectionMode;
+  final bool selected;
+  final VoidCallback onToggleSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -125,13 +283,16 @@ class _AssistantCard extends StatelessWidget {
 
     final baseBg = context.appColors.surfaceCard;
     final content = _TactileCard(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => AssistantSettingsEditPage(assistantId: item.id),
-          ),
-        );
-      },
+      onTap: selectionMode
+          ? onToggleSelect
+          : () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      AssistantSettingsEditPage(assistantId: item.id),
+                ),
+              );
+            },
       builder: (pressed, overlay) {
         return Container(
           decoration: BoxDecoration(
@@ -153,6 +314,16 @@ class _AssistantCard extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (selectionMode) ...[
+                      IosCheckbox(
+                        value: selected,
+                        size: 22,
+                        hitTestSize: 30,
+                        enableHaptics: false,
+                        onChanged: (_) => onToggleSelect(),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                     _AssistantAvatar(item: item, size: 44),
                     const SizedBox(width: 12),
                     Expanded(
@@ -176,9 +347,9 @@ class _AssistantCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            (item.systemPrompt.trim().isEmpty
+                            (item.promptPreview.trim().isEmpty
                                 ? l10n.assistantSettingsNoPromptPlaceholder
-                                : item.systemPrompt),
+                                : item.promptPreview),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -566,7 +737,7 @@ Future<bool?> _confirmDelete(
 
 class _AssistantAvatar extends StatelessWidget {
   const _AssistantAvatar({required this.item, this.size = 40});
-  final Assistant item;
+  final AssistantListItem item;
   final double size;
 
   @override

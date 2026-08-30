@@ -741,6 +741,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (ctx) => AssistantProvider(
             preferences: businessPreferences,
+            businessRepository: ctx.read<BusinessRepository>(),
             chatService: ctx.read<ChatService>(),
           ),
         ),

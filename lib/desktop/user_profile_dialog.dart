@@ -16,6 +16,7 @@ import '../utils/sandbox_path_resolver.dart';
 import '../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'widgets/desktop_dialog_style.dart';
+import '../shared/widgets/avatar_image_editor.dart';
 
 Future<void> showUserProfileDialog(BuildContext context) async {
   await showGeneralDialog<void>(
@@ -103,11 +104,10 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
       final f = File(fixed);
       if (f.existsSync()) {
         avatarWidget = ClipOval(
-          child: Image(
-            image: FileImage(f),
-            width: 84,
-            height: 84,
-            fit: BoxFit.cover,
+          child: AvatarImage(
+            path: fixed,
+            size: 84,
+            transform: up.avatarTransform,
           ),
         );
       } else {
@@ -285,7 +285,10 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
                   : null;
               final path = f?.path;
               if (path != null && path.isNotEmpty) {
-                await up.setAvatarFilePath(path);
+                if (!context.mounted) return;
+                final edited = await showAvatarImageEditor(context, path);
+                if (!context.mounted || edited == null) return;
+                await up.setAvatarFilePath(path, transform: edited.transform);
               }
             } catch (_) {
               // 失败时不做处理

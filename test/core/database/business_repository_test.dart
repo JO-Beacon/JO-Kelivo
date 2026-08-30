@@ -59,6 +59,32 @@ void main() {
     expect(values.last.payload, contains('updated'));
   });
 
+  test(
+    'paged reads and single-row reads avoid loading unrelated entities',
+    () async {
+      await repository.replaceEntities(BusinessEntityKind.assistant, [
+        row('a', 0),
+        row('b', 1),
+        row('c', 2),
+      ]);
+
+      final page = await repository.readEntitiesPage(
+        BusinessEntityKind.assistant,
+        limit: 1,
+        offset: 1,
+      );
+      expect(page.map((value) => value.id), <String>['b']);
+      expect(
+        (await repository.readEntity(BusinessEntityKind.assistant, 'c'))?.id,
+        'c',
+      );
+      expect(
+        await repository.readEntity(BusinessEntityKind.assistant, 'missing'),
+        isNull,
+      );
+    },
+  );
+
   test('assistant memories use their projection for filtered reads', () async {
     await repository.replaceEntities(BusinessEntityKind.assistantMemory, [
       row('2', 1, assistantId: 'assistant-b'),
@@ -341,43 +367,37 @@ END;
     expect(await repository.hasMigrationReceipt(), isTrue);
   });
 
-  test(
-    'checkpoint barriers against a real WAL file database',
-    () async {
-      driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
-      final directory = await Directory.systemTemp.createTemp(
-        'kelivo_business_wal_checkpoint_',
-      );
-      final file = File('${directory.path}/kelivo.db');
-      final walDatabase = AppDatabase.open(file: file);
-      final walRepository = BusinessRepository(walDatabase);
-      addTearDown(() async {
-        await walDatabase.close();
-        if (await directory.exists()) {
-          await directory.delete(recursive: true);
-        }
-      });
+  test('checkpoint barriers against a real WAL file database', () async {
+    driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
+    final directory = await Directory.systemTemp.createTemp(
+      'kelivo_business_wal_checkpoint_',
+    );
+    final file = File('${directory.path}/kelivo.db');
+    final walDatabase = AppDatabase.open(file: file);
+    final walRepository = BusinessRepository(walDatabase);
+    addTearDown(() async {
+      await walDatabase.close();
+      if (await directory.exists()) {
+        await directory.delete(recursive: true);
+      }
+    });
 
-      await walDatabase.customSelect('SELECT 1;').getSingle();
-      final journalMode = await walDatabase
-          .customSelect('PRAGMA journal_mode;')
-          .getSingle();
-      expect(
-        journalMode.data.values.single.toString().toLowerCase(),
-        'wal',
-      );
+    await walDatabase.customSelect('SELECT 1;').getSingle();
+    final journalMode = await walDatabase
+        .customSelect('PRAGMA journal_mode;')
+        .getSingle();
+    expect(journalMode.data.values.single.toString().toLowerCase(), 'wal');
 
-      await walRepository.setPreference('theme_mode_v1', 'dark');
-      expect(await walRepository.checkpoint(), isTrue);
+    await walRepository.setPreference('theme_mode_v1', 'dark');
+    expect(await walRepository.checkpoint(), isTrue);
 
-      await walRepository.setPreference('app_locale_v1', 'zh-CN');
-      final row = await walDatabase
-          .customSelect('PRAGMA wal_checkpoint(FULL);')
-          .getSingle();
-      expect(row.read<int>('busy'), 0);
-      // Memory databases return the no-op sentinel log=checkpointed=-1.
-      expect(row.read<int>('log'), greaterThanOrEqualTo(0));
-      expect(row.read<int>('checkpointed'), greaterThan(0));
-    },
-  );
+    await walRepository.setPreference('app_locale_v1', 'zh-CN');
+    final row = await walDatabase
+        .customSelect('PRAGMA wal_checkpoint(FULL);')
+        .getSingle();
+    expect(row.read<int>('busy'), 0);
+    // Memory databases return the no-op sentinel log=checkpointed=-1.
+    expect(row.read<int>('log'), greaterThanOrEqualTo(0));
+    expect(row.read<int>('checkpointed'), greaterThan(0));
+  });
 }

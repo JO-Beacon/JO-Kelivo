@@ -2,11 +2,79 @@ part of '../desktop_settings_page.dart';
 
 // ===== 助手（桌面右侧内容） =====
 
-class _DesktopAssistantsBody extends StatelessWidget {
+class _DesktopAssistantsBody extends StatefulWidget {
   const _DesktopAssistantsBody({super.key});
+
+  @override
+  State<_DesktopAssistantsBody> createState() => _DesktopAssistantsBodyState();
+}
+
+class _DesktopAssistantsBodyState extends State<_DesktopAssistantsBody> {
+  bool _selectionMode = false;
+  final Set<String> _selectedIds = <String>{};
+
+  void _toggle(String id) {
+    setState(() {
+      if (!_selectedIds.add(id)) _selectedIds.remove(id);
+    });
+  }
+
+  void _exit() => setState(() {
+    _selectionMode = false;
+    _selectedIds.clear();
+  });
+
+  Future<void> _delete() async {
+    final ids = List<String>.of(_selectedIds);
+    if (ids.isEmpty) return;
+    final l10n = AppLocalizations.of(context)!;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.assistantSelectionDeleteConfirmTitle),
+        content: Text(l10n.assistantSelectionDeleteConfirmContent(ids.length)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.assistantSettingsDeleteDialogCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.assistantSelectionDelete),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || ok != true) return;
+    for (final id in ids) {
+      await ChatActions.cancelActiveGenerationsForAssistant(id);
+    }
+    if (!mounted) return;
+    final assistantProvider = context.read<AssistantProvider>();
+    await assistantProvider.deleteAssistants(ids);
+    if (!mounted) return;
+    final remainingIds = assistantProvider.assistants.map((a) => a.id).toSet();
+    await context.read<AssistantGroupProvider>().assignAssistantsToGroup(
+      ids.where((id) => !remainingIds.contains(id)),
+      null,
+    );
+    if (mounted) _exit();
+  }
+
+  Future<void> _move() async {
+    if (_selectedIds.isEmpty) return;
+    final groupId = await showAssistantSelectionGroupSheet(context);
+    if (!mounted || groupId == null) return;
+    await context.read<AssistantGroupProvider>().assignAssistantsToGroup(
+      _selectedIds,
+      groupId == assistantSelectionUngroupedKey ? null : groupId,
+    );
+    if (mounted) _exit();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final assistants = context.watch<AssistantProvider>().assistants;
+    final assistants = context.watch<AssistantProvider>().assistantDirectory;
     final cs = Theme.of(context).colorScheme;
     return Container(
       alignment: Alignment.topCenter,
@@ -20,22 +88,41 @@ class _DesktopAssistantsBody extends StatelessWidget {
                 height: 36,
                 child: Row(
                   children: [
-                    Expanded(
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          AppLocalizations.of(
-                            context,
-                          )!.desktopAssistantsListTitle,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: AppFontWeights.regular,
-                            color: cs.onSurface.withValues(alpha: 0.9),
+                    if (_selectionMode)
+                      AssistantSelectionHeader(
+                        selectedCount: _selectedIds.length,
+                        allSelected: _selectedIds.length == assistants.length,
+                        onCancel: _exit,
+                        onToggleSelectAll: () => setState(() {
+                          if (_selectedIds.length == assistants.length) {
+                            _selectedIds.clear();
+                          } else {
+                            _selectedIds.addAll(assistants.map((a) => a.id));
+                          }
+                        }),
+                      )
+                    else
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            AppLocalizations.of(
+                              context,
+                            )!.desktopAssistantsListTitle,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: AppFontWeights.regular,
+                              color: cs.onSurface.withValues(alpha: 0.9),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    _AddAssistantButton(),
+                    if (!_selectionMode) ...[
+                      _TactileSelectAssistantButton(
+                        onTap: () => setState(() => _selectionMode = true),
+                      ),
+                      _AddAssistantButton(),
+                    ],
                   ],
                 ),
               ),
@@ -50,6 +137,7 @@ class _DesktopAssistantsBody extends StatelessWidget {
                     padding: EdgeInsets.zero,
                     itemCount: assistants.length,
                     onReorderItem: (oldIndex, newIndex) async {
+                      if (_selectionMode) return;
                       await context.read<AssistantProvider>().reorderAssistants(
                         oldIndex,
                         newIndex,
@@ -77,26 +165,38 @@ class _DesktopAssistantsBody extends StatelessWidget {
                     },
                     itemBuilder: (context, index) {
                       final item = assistants[index];
-                      return KeyedSubtree(
-                        key: ValueKey('desktop-assistant-${item.id}'),
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: ReorderableDragStartListener(
-                            index: index,
-                            child: _DesktopAssistantCard(
-                              item: item,
-                              onTap: () => showAssistantDesktopDialog(
-                                context,
-                                assistantId: item.id,
-                              ),
-                            ),
+                      final card = Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _DesktopAssistantCard(
+                          item: item,
+                          selectionMode: _selectionMode,
+                          selected: _selectedIds.contains(item.id),
+                          onToggleSelect: () => _toggle(item.id),
+                          onTap: () => showAssistantDesktopDialog(
+                            context,
+                            assistantId: item.id,
                           ),
                         ),
+                      );
+                      return KeyedSubtree(
+                        key: ValueKey('desktop-assistant-${item.id}'),
+                        child: _selectionMode
+                            ? card
+                            : ReorderableDragStartListener(
+                                index: index,
+                                child: card,
+                              ),
                       );
                     },
                   ),
                 ),
               ),
+              if (_selectionMode)
+                AssistantSelectionActionBar(
+                  selectedCount: _selectedIds.length,
+                  onMoveToGroup: _move,
+                  onDelete: _delete,
+                ),
             ],
           ),
         ),
@@ -108,6 +208,24 @@ class _DesktopAssistantsBody extends StatelessWidget {
 class _AddAssistantButton extends StatefulWidget {
   @override
   State<_AddAssistantButton> createState() => _AddAssistantButtonState();
+}
+
+class _TactileSelectAssistantButton extends StatelessWidget {
+  const _TactileSelectAssistantButton({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: AppLocalizations.of(context)!.assistantSelectionActionSelect,
+      child: IconButton(
+        onPressed: onTap,
+        icon: Icon(lucide.Lucide.CheckSquare, size: 17, color: cs.primary),
+        splashRadius: 18,
+      ),
+    );
+  }
 }
 
 class _AddAssistantButtonState extends State<_AddAssistantButton> {
@@ -532,9 +650,18 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
 }
 
 class _DesktopAssistantCard extends StatefulWidget {
-  const _DesktopAssistantCard({required this.item, required this.onTap});
-  final Assistant item;
+  const _DesktopAssistantCard({
+    required this.item,
+    required this.onTap,
+    required this.selectionMode,
+    required this.selected,
+    required this.onToggleSelect,
+  });
+  final AssistantListItem item;
   final VoidCallback onTap;
+  final bool selectionMode;
+  final bool selected;
+  final VoidCallback onToggleSelect;
   @override
   State<_DesktopAssistantCard> createState() => _DesktopAssistantCardState();
 }
@@ -554,7 +681,7 @@ class _DesktopAssistantCardState extends State<_DesktopAssistantCard> {
       onExit: (_) => setState(() => _hover = false),
       cursor: SystemMouseCursors.click,
       child: _CardPress(
-        onTap: widget.onTap,
+        onTap: widget.selectionMode ? widget.onToggleSelect : widget.onTap,
         pressedScale: 1.0,
         builder: (pressed, overlay) => Container(
           decoration: BoxDecoration(
@@ -567,6 +694,16 @@ class _DesktopAssistantCardState extends State<_DesktopAssistantCard> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                if (widget.selectionMode) ...[
+                  IosCheckbox(
+                    value: widget.selected,
+                    size: 22,
+                    hitTestSize: 30,
+                    enableHaptics: false,
+                    onChanged: (_) => widget.onToggleSelect(),
+                  ),
+                  const SizedBox(width: 10),
+                ],
                 _AssistantAvatarDesktop(item: widget.item, size: 48),
                 const SizedBox(width: 12),
                 Expanded(
@@ -586,74 +723,77 @@ class _DesktopAssistantCardState extends State<_DesktopAssistantCard> {
                               ),
                             ),
                           ),
-                          _CopyAssistantIcon(
-                            onCopy: () async {
-                              final assistantProvider = context
-                                  .read<AssistantProvider>();
-                              final l10n = AppLocalizations.of(context)!;
-                              final newId = await assistantProvider
-                                  .duplicateAssistant(
-                                    widget.item.id,
-                                    l10n: l10n,
-                                    insertAtTop: context
-                                        .read<SettingsProvider>()
-                                        .insertNewAssistantAtTop,
+                          if (!widget.selectionMode)
+                            _CopyAssistantIcon(
+                              onCopy: () async {
+                                final assistantProvider = context
+                                    .read<AssistantProvider>();
+                                final l10n = AppLocalizations.of(context)!;
+                                final newId = await assistantProvider
+                                    .duplicateAssistant(
+                                      widget.item.id,
+                                      l10n: l10n,
+                                      insertAtTop: context
+                                          .read<SettingsProvider>()
+                                          .insertNewAssistantAtTop,
+                                    );
+                                if (!context.mounted) return;
+                                if (newId != null) {
+                                  showAppSnackBar(
+                                    context,
+                                    message: l10n.assistantSettingsCopySuccess,
+                                    type: NotificationType.success,
                                   );
-                              if (!context.mounted) return;
-                              if (newId != null) {
-                                showAppSnackBar(
-                                  context,
-                                  message: l10n.assistantSettingsCopySuccess,
-                                  type: NotificationType.success,
-                                );
-                              }
-                            },
-                          ),
-                          _DeleteAssistantIcon(
-                            onConfirm: () async {
-                              final assistantProvider = context
-                                  .read<AssistantProvider>();
-                              final l10n = AppLocalizations.of(context)!;
-                              final count = assistantProvider.assistants.length;
-                              if (count <= 1) {
-                                showAppSnackBar(
-                                  context,
-                                  message: l10n
-                                      .assistantSettingsAtLeastOneAssistantRequired,
-                                  type: NotificationType.warning,
-                                );
-                                return;
-                              }
-                              final ok = await _confirmDeleteDesktop(context);
-                              if (ok == true) {
-                                if (!context.mounted) return;
-                                await ChatActions.cancelActiveGenerationsForAssistant(
-                                  widget.item.id,
-                                );
-                                if (!context.mounted) return;
-                                final success = await assistantProvider
-                                    .deleteAssistant(widget.item.id);
-                                if (!context.mounted) return;
-                                if (success != true) {
+                                }
+                              },
+                            ),
+                          if (!widget.selectionMode)
+                            _DeleteAssistantIcon(
+                              onConfirm: () async {
+                                final assistantProvider = context
+                                    .read<AssistantProvider>();
+                                final l10n = AppLocalizations.of(context)!;
+                                final count =
+                                    assistantProvider.assistants.length;
+                                if (count <= 1) {
                                   showAppSnackBar(
                                     context,
                                     message: l10n
                                         .assistantSettingsAtLeastOneAssistantRequired,
                                     type: NotificationType.warning,
                                   );
+                                  return;
                                 }
-                              }
-                            },
-                          ),
+                                final ok = await _confirmDeleteDesktop(context);
+                                if (ok == true) {
+                                  if (!context.mounted) return;
+                                  await ChatActions.cancelActiveGenerationsForAssistant(
+                                    widget.item.id,
+                                  );
+                                  if (!context.mounted) return;
+                                  final success = await assistantProvider
+                                      .deleteAssistant(widget.item.id);
+                                  if (!context.mounted) return;
+                                  if (success != true) {
+                                    showAppSnackBar(
+                                      context,
+                                      message: l10n
+                                          .assistantSettingsAtLeastOneAssistantRequired,
+                                      type: NotificationType.warning,
+                                    );
+                                  }
+                                }
+                              },
+                            ),
                         ],
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        (widget.item.systemPrompt.trim().isEmpty
+                        (widget.item.promptPreview.trim().isEmpty
                             ? AppLocalizations.of(
                                 context,
                               )!.assistantSettingsNoPromptPlaceholder
-                            : widget.item.systemPrompt),
+                            : widget.item.promptPreview),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -676,7 +816,7 @@ class _DesktopAssistantCardState extends State<_DesktopAssistantCard> {
 
 class _AssistantAvatarDesktop extends StatelessWidget {
   const _AssistantAvatarDesktop({required this.item, this.size = 40});
-  final Assistant item;
+  final AssistantListItem item;
   final double size;
   @override
   Widget build(BuildContext context) {

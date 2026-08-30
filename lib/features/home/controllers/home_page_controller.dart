@@ -294,6 +294,8 @@ class HomePageController extends ChangeNotifier {
   Conversation? get currentConversation => _chatController.currentConversation;
   List<ChatMessage> get messages => _chatController.messages;
   ConversationTree? get conversationTree => _viewModel.conversationTree;
+  ConversationTreeIntegrityException? get conversationTreeIntegrityError =>
+      _viewModel.conversationTreeIntegrityError;
   String? get activeBranchId => _viewModel.activeBranchId;
 
   /// 废弃：版本选择不再被运行时使用，树是唯一真相。
@@ -1261,6 +1263,27 @@ class HomePageController extends ChangeNotifier {
         _inputFocus.requestFocus();
       });
     }
+  }
+
+  /// 删除当前会话并切换到最近的剩余会话；没有剩余会话时创建新会话。
+  Future<void> deleteCurrentConversation() async {
+    final currentId = currentConversation?.id;
+    if (currentId == null) return;
+
+    final nextId = _chatService
+        .getAllConversations()
+        .where((conversation) => conversation.id != currentId)
+        .firstOrNull
+        ?.id;
+    _switchSerial++;
+    _warmupSerial++;
+    await _viewModel.deleteConversation(currentId);
+    if (nextId != null) {
+      await switchConversationAnimated(nextId);
+    } else {
+      await createNewConversationAnimated();
+    }
+    notifyListeners();
   }
 
   Future<void> _createNewConversation() async {

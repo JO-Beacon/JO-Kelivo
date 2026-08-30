@@ -2,6 +2,7 @@ import 'dart:io' show File, Platform;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../shared/widgets/emoji_text.dart';
+import '../shared/widgets/avatar_image_editor.dart';
 import '../l10n/app_localizations.dart';
 import '../core/providers/user_provider.dart';
 import '../core/providers/settings_provider.dart';
@@ -148,11 +149,10 @@ class _UserAvatarButtonState extends State<_UserAvatarButton> {
       final f = File(fixed);
       if (f.existsSync()) {
         avatar = ClipOval(
-          child: Image(
-            image: FileImage(f),
-            width: 36,
-            height: 36,
-            fit: BoxFit.cover,
+          child: AvatarImage(
+            path: fixed,
+            size: 36,
+            transform: up.avatarTransform,
           ),
         );
       } else {

@@ -26,6 +26,8 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/avatar_cache.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant.dart';
+import '../../../core/models/avatar_transform.dart';
+import '../../../shared/widgets/avatar_image_editor.dart';
 import '../../../core/providers/tts_provider.dart';
 import '../../../shared/widgets/markdown_with_highlight.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -694,6 +696,7 @@ class ChatMessageWidget extends StatefulWidget {
   final bool useAssistantName;
   final String? assistantName;
   final String? assistantAvatar; // path/url/emoji；null 表示使用首字母
+  final AvatarTransform? assistantAvatarTransform;
   final bool showUserAvatar;
   final bool showTokenStats;
   final VoidCallback? onRegenerate;
@@ -747,6 +750,7 @@ class ChatMessageWidget extends StatefulWidget {
     this.useAssistantName = false,
     this.assistantName,
     this.assistantAvatar,
+    this.assistantAvatarTransform,
     this.showUserAvatar = true,
     this.showTokenStats = true,
     this.onRegenerate,
@@ -1266,6 +1270,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   Widget _buildUserAvatar(
     String? avatarType,
     String? avatarValue,
+    AvatarTransform? avatarTransform,
     ColorScheme cs,
   ) {
     Widget avatarContent;
@@ -1290,12 +1295,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           final p = snap.data;
           if (p != null && File(p).existsSync()) {
             return ClipOval(
-              child: Image.file(
-                File(p),
-                width: 32,
-                height: 32,
-                fit: BoxFit.cover,
-              ),
+              child: AvatarImage(path: p, size: 32, transform: avatarTransform),
             );
           }
           return ClipOval(
@@ -1314,8 +1314,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       final fixed = SandboxPathResolver.fix(avatarValue);
       final f = File(fixed);
       if (f.existsSync()) {
-        avatarContent = ClipOval(
-          child: Image.file(f, width: 32, height: 32, fit: BoxFit.cover),
+        avatarContent = AvatarImage(
+          path: fixed,
+          size: 32,
+          transform: avatarTransform,
         );
       } else {
         avatarContent = Icon(Lucide.User, size: 18, color: cs.primary);
@@ -1379,6 +1381,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     );
     final userAvatarValue = context.select<UserProvider, String?>(
       (u) => u.avatarValue,
+    );
+    final userAvatarTransform = context.select<UserProvider, AvatarTransform?>(
+      (u) => u.avatarTransform,
     );
     final l10n = AppLocalizations.of(context)!;
     final userMessageSettings = context
@@ -1468,7 +1473,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               if (widget.showUserAvatar) ...[
                 const SizedBox(width: 8),
                 // 用户头像
-                _buildUserAvatar(userAvatarType, userAvatarValue, cs),
+                _buildUserAvatar(
+                  userAvatarType,
+                  userAvatarValue,
+                  userAvatarTransform,
+                  cs,
+                ),
               ],
             ],
           ),
@@ -3260,11 +3270,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             final p = snap.data;
             if (p != null && File(p).existsSync()) {
               return ClipOval(
-                child: Image.file(
-                  File(p),
-                  width: 32,
-                  height: 32,
-                  fit: BoxFit.cover,
+                child: AvatarImage(
+                  path: p,
+                  size: 32,
+                  transform: widget.assistantAvatarTransform,
                 ),
               );
             }
@@ -3284,8 +3293,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         final fixed = SandboxPathResolver.fix(av);
         final f = File(fixed);
         if (f.existsSync()) {
-          return ClipOval(
-            child: Image.file(f, width: 32, height: 32, fit: BoxFit.cover),
+          return AvatarImage(
+            path: fixed,
+            size: 32,
+            transform: widget.assistantAvatarTransform,
           );
         }
         return _assistantInitial(cs);

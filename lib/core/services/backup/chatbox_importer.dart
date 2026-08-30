@@ -1099,7 +1099,16 @@ class ChatboxImporter {
 
         if (selectedBranchId != null &&
             branches.containsKey(selectedBranchId)) {
-          branchSelections[pivotId] = selectedBranchId;
+          final selectedBranch = branches[selectedBranchId]!;
+          final directChildCount = edges.values
+              .where((edge) => edge.parentMessageId == pivotId)
+              .length;
+          // A single imported list is a linear continuation, not a branch
+          // selection. Empty active lists intentionally retain a terminal
+          // selection so nested Chatbox fork state can be restored.
+          if (directChildCount > 1 || selectedBranch.tipMessageId == pivotId) {
+            branchSelections[pivotId] = selectedBranchId;
+          }
         }
         handledPivots.add(sourcePivotId);
         changed = true;

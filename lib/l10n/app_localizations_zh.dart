@@ -724,6 +724,52 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homePageDropToUpload => '将文件拖拽到此处上传';
 
   @override
+  String get invalidConversationTreeTitle => '此会话的结构无效';
+
+  @override
+  String get invalidConversationTreeSubtitle => '原始数据没有被修改。在修复结构前，无法编辑或生成内容。';
+
+  @override
+  String get invalidConversationTreeOriginalData => '原始数据未修改';
+
+  @override
+  String invalidConversationTreeFingerprint(Object fingerprint) {
+    return '数据指纹：$fingerprint';
+  }
+
+  @override
+  String invalidConversationTreeSchemaVersion(Object version) {
+    return '数据库结构版本：$version';
+  }
+
+  @override
+  String invalidConversationTreeIssues(Object count) {
+    return '检测到的问题（$count）';
+  }
+
+  @override
+  String invalidConversationTreeIssueCode(Object code) {
+    return '问题类型：$code';
+  }
+
+  @override
+  String invalidConversationTreeIssueSubject(Object subject) {
+    return '相关对象：$subject';
+  }
+
+  @override
+  String get invalidConversationTreeDefer => '暂缓，返回会话列表';
+
+  @override
+  String get invalidConversationTreeDelete => '删除此会话';
+
+  @override
+  String get invalidConversationTreeDeleteConfirm => '确定删除此会话及其全部消息吗？此操作无法撤销。';
+
+  @override
+  String get invalidConversationTreeCancel => '取消';
+
+  @override
   String get assistantEditPageTitle => '助手';
 
   @override
@@ -968,6 +1014,39 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get desktopAvatarMenuReset => '重置头像';
+
+  @override
+  String get avatarEditorTitle => '调整头像';
+
+  @override
+  String get avatarEditorRotate => '旋转';
+
+  @override
+  String get avatarEditorReset => '重置调整';
+
+  @override
+  String get avatarEditorCancel => '取消';
+
+  @override
+  String get avatarEditorDone => '完成';
+
+  @override
+  String get avatarEditorCropHint => '按住鼠标左键拖动图片调整位置，滚轮缩放；移动端可双指捏合，正方形裁剪框保持固定';
+
+  @override
+  String get avatarEditorRotateLeft => '左转 90°';
+
+  @override
+  String get avatarEditorRotateRight => '右转 90°';
+
+  @override
+  String get avatarEditorFlipHorizontal => '水平镜像';
+
+  @override
+  String get avatarEditorFlipVertical => '垂直镜像';
+
+  @override
+  String get avatarEditorFreeRotation => '自由旋转';
 
   @override
   String get assistantEditAvatarChooseImage => '选择图片';
@@ -1466,6 +1545,40 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get assistantSettingsAddSheetSave => '保存';
+
+  @override
+  String assistantSelectionTitle(int count) {
+    return '已选择 $count 个';
+  }
+
+  @override
+  String get assistantSelectionSelectAll => '全选';
+
+  @override
+  String get assistantSelectionDeselectAll => '取消全选';
+
+  @override
+  String get assistantSelectionDelete => '删除';
+
+  @override
+  String get assistantSelectionMoveToGroup => '移动到分组';
+
+  @override
+  String get assistantSelectionDeleteConfirmTitle => '删除助手';
+
+  @override
+  String assistantSelectionDeleteConfirmContent(int count) {
+    return '确定删除选中的 $count 个助手吗？此操作不可撤销。';
+  }
+
+  @override
+  String get assistantSelectionGroupPickerTitle => '将助手移动到分组';
+
+  @override
+  String get assistantSelectionGroupUngrouped => '未分组';
+
+  @override
+  String get assistantSelectionActionSelect => '选择助手';
 
   @override
   String get desktopAssistantsListTitle => '助手列表';
@@ -8597,6 +8710,52 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get homePageDropToUpload => '将文件拖拽到此处上传';
 
   @override
+  String get invalidConversationTreeTitle => '此会话的结构无效';
+
+  @override
+  String get invalidConversationTreeSubtitle => '原始数据没有被修改。在修复结构前，无法编辑或生成内容。';
+
+  @override
+  String get invalidConversationTreeOriginalData => '原始数据未修改';
+
+  @override
+  String invalidConversationTreeFingerprint(Object fingerprint) {
+    return '数据指纹：$fingerprint';
+  }
+
+  @override
+  String invalidConversationTreeSchemaVersion(Object version) {
+    return '数据库结构版本：$version';
+  }
+
+  @override
+  String invalidConversationTreeIssues(Object count) {
+    return '检测到的问题（$count）';
+  }
+
+  @override
+  String invalidConversationTreeIssueCode(Object code) {
+    return '问题类型：$code';
+  }
+
+  @override
+  String invalidConversationTreeIssueSubject(Object subject) {
+    return '相关对象：$subject';
+  }
+
+  @override
+  String get invalidConversationTreeDefer => '暂缓，返回会话列表';
+
+  @override
+  String get invalidConversationTreeDelete => '删除此会话';
+
+  @override
+  String get invalidConversationTreeDeleteConfirm => '确定删除此会话及其全部消息吗？此操作无法撤销。';
+
+  @override
+  String get invalidConversationTreeCancel => '取消';
+
+  @override
   String get assistantEditPageTitle => '助手';
 
   @override
@@ -8841,6 +9000,39 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get desktopAvatarMenuReset => '重置头像';
+
+  @override
+  String get avatarEditorTitle => '调整头像';
+
+  @override
+  String get avatarEditorRotate => '旋转';
+
+  @override
+  String get avatarEditorReset => '重置调整';
+
+  @override
+  String get avatarEditorCancel => '取消';
+
+  @override
+  String get avatarEditorDone => '完成';
+
+  @override
+  String get avatarEditorCropHint => '按住鼠标左键拖动图片调整位置，滚轮缩放；移动端可双指捏合，正方形裁剪框保持固定';
+
+  @override
+  String get avatarEditorRotateLeft => '左转 90°';
+
+  @override
+  String get avatarEditorRotateRight => '右转 90°';
+
+  @override
+  String get avatarEditorFlipHorizontal => '水平镜像';
+
+  @override
+  String get avatarEditorFlipVertical => '垂直镜像';
+
+  @override
+  String get avatarEditorFreeRotation => '自由旋转';
 
   @override
   String get assistantEditAvatarChooseImage => '选择图片';
@@ -9339,6 +9531,40 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get assistantSettingsAddSheetSave => '保存';
+
+  @override
+  String assistantSelectionTitle(int count) {
+    return '已选择 $count 个';
+  }
+
+  @override
+  String get assistantSelectionSelectAll => '全选';
+
+  @override
+  String get assistantSelectionDeselectAll => '取消全选';
+
+  @override
+  String get assistantSelectionDelete => '删除';
+
+  @override
+  String get assistantSelectionMoveToGroup => '移动到分组';
+
+  @override
+  String get assistantSelectionDeleteConfirmTitle => '删除助手';
+
+  @override
+  String assistantSelectionDeleteConfirmContent(int count) {
+    return '确定删除选中的 $count 个助手吗？此操作不可撤销。';
+  }
+
+  @override
+  String get assistantSelectionGroupPickerTitle => '将助手移动到分组';
+
+  @override
+  String get assistantSelectionGroupUngrouped => '未分组';
+
+  @override
+  String get assistantSelectionActionSelect => '选择助手';
 
   @override
   String get desktopAssistantsListTitle => '助手列表';
@@ -16470,6 +16696,52 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get homePageDropToUpload => '將檔案拖曳到此處以上傳';
 
   @override
+  String get invalidConversationTreeTitle => '此會話的結構無效';
+
+  @override
+  String get invalidConversationTreeSubtitle => '原始資料沒有被修改。在修復結構前，無法編輯或生成內容。';
+
+  @override
+  String get invalidConversationTreeOriginalData => '原始資料未修改';
+
+  @override
+  String invalidConversationTreeFingerprint(Object fingerprint) {
+    return '資料指紋：$fingerprint';
+  }
+
+  @override
+  String invalidConversationTreeSchemaVersion(Object version) {
+    return '資料庫結構版本：$version';
+  }
+
+  @override
+  String invalidConversationTreeIssues(Object count) {
+    return '檢測到的問題（$count）';
+  }
+
+  @override
+  String invalidConversationTreeIssueCode(Object code) {
+    return '問題類型：$code';
+  }
+
+  @override
+  String invalidConversationTreeIssueSubject(Object subject) {
+    return '相關對象：$subject';
+  }
+
+  @override
+  String get invalidConversationTreeDefer => '暫緩，返回會話列表';
+
+  @override
+  String get invalidConversationTreeDelete => '刪除此會話';
+
+  @override
+  String get invalidConversationTreeDeleteConfirm => '確定刪除此會話及其全部訊息嗎？此操作無法撤銷。';
+
+  @override
+  String get invalidConversationTreeCancel => '取消';
+
+  @override
   String get assistantEditPageTitle => '助理';
 
   @override
@@ -16714,6 +16986,39 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get desktopAvatarMenuReset => '重置頭像';
+
+  @override
+  String get avatarEditorTitle => '調整頭像';
+
+  @override
+  String get avatarEditorRotate => '旋轉';
+
+  @override
+  String get avatarEditorReset => '重設調整';
+
+  @override
+  String get avatarEditorCancel => '取消';
+
+  @override
+  String get avatarEditorDone => '完成';
+
+  @override
+  String get avatarEditorCropHint => '按住滑鼠左鍵拖曳圖片調整位置，滾輪縮放；行動裝置可雙指捏合，正方形裁剪框保持固定';
+
+  @override
+  String get avatarEditorRotateLeft => '左轉 90°';
+
+  @override
+  String get avatarEditorRotateRight => '右轉 90°';
+
+  @override
+  String get avatarEditorFlipHorizontal => '水平鏡像';
+
+  @override
+  String get avatarEditorFlipVertical => '垂直鏡像';
+
+  @override
+  String get avatarEditorFreeRotation => '自由旋轉';
 
   @override
   String get assistantEditAvatarChooseImage => '選擇圖片';
@@ -17212,6 +17517,40 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantSettingsAddSheetSave => '儲存';
+
+  @override
+  String assistantSelectionTitle(int count) {
+    return '已選擇 $count 個';
+  }
+
+  @override
+  String get assistantSelectionSelectAll => '全選';
+
+  @override
+  String get assistantSelectionDeselectAll => '取消全選';
+
+  @override
+  String get assistantSelectionDelete => '刪除';
+
+  @override
+  String get assistantSelectionMoveToGroup => '移動到分組';
+
+  @override
+  String get assistantSelectionDeleteConfirmTitle => '刪除助理';
+
+  @override
+  String assistantSelectionDeleteConfirmContent(int count) {
+    return '確定刪除選中的 $count 個助理嗎？此操作不可撤銷。';
+  }
+
+  @override
+  String get assistantSelectionGroupPickerTitle => '將助理移動到分組';
+
+  @override
+  String get assistantSelectionGroupUngrouped => '未分組';
+
+  @override
+  String get assistantSelectionActionSelect => '選擇助理';
 
   @override
   String get desktopAssistantsListTitle => '助理列表';

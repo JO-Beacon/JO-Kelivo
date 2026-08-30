@@ -339,8 +339,50 @@ void main() {
           'u1',
           'sibling-child',
         ]);
-        expect(afterRemove.branchPath('empty'), const ['u1']);
+        expect(afterRemove.branches.containsKey('empty'), isFalse);
         expect(afterRemove.branchSelections['u1'], 'continuation');
+      },
+    );
+
+    test(
+      'removeMessageOnly removes an empty anchor branch when a shared tip is deleted',
+      () {
+        final base = ConversationTree.linear(
+          conversationId: 'conversation',
+          messageIds: const ['u1', 'shared', 'child'],
+        );
+        final withEmptyAnchor = base
+            .createMessageBranch(branchId: 'empty', fromMessageId: 'shared')
+            .switchBranch('root');
+
+        final afterRemove = withEmptyAnchor.removeMessageOnly('shared');
+
+        expect(afterRemove.branches.containsKey('empty'), isFalse);
+        expect(afterRemove.activePath(), const ['u1', 'child']);
+        expect(afterRemove.edges['child']?.parentMessageId, 'u1');
+        expect(afterRemove.edges.containsKey('shared'), isFalse);
+      },
+    );
+
+    test(
+      'removeMessageOnly removes a branch whose only branch message is deleted',
+      () {
+        final base = ConversationTree.linear(
+          conversationId: 'conversation',
+          messageIds: const ['u1', 'a1'],
+        );
+        final branched = base.createBranch(
+          branchId: 'alt',
+          fromMessageId: 'u1',
+          tipMessageId: 'a1-alt',
+        );
+
+        final afterRemove = branched.removeMessageOnly('a1-alt');
+
+        expect(afterRemove.activeBranchId, 'root');
+        expect(afterRemove.branches.containsKey('alt'), isFalse);
+        expect(afterRemove.activePath(), const ['u1', 'a1']);
+        expect(afterRemove.edges.containsKey('a1-alt'), isFalse);
       },
     );
   });
@@ -420,6 +462,207 @@ void main() {
         ),
         throwsArgumentError,
       );
+    });
+
+    test('diagnoses unreachable edges without changing the snapshot', () {
+      final tree = ConversationTree(
+        conversationId: 'conversation',
+        activeBranchId: 'root',
+        branches: {
+          'root': ConversationBranch(
+            id: 'root',
+            conversationId: 'conversation',
+            tipMessageId: 'm1',
+            createdAt: DateTime(2026),
+          ),
+        },
+        edges: const {
+          'm1': MessageTreeEdge(messageId: 'm1', parentMessageId: null),
+          'orphan': MessageTreeEdge(messageId: 'orphan', parentMessageId: null),
+        },
+      );
+
+      expect(
+        tree.integrityIssues().map((issue) => issue.code),
+        contains('unreachable_edge'),
+      );
+      expect(
+        () => tree.validateIntegrity(),
+        throwsA(isA<ConversationTreeIntegrityException>()),
+      );
+      expect(tree.edges.keys, unorderedEquals(['m1', 'orphan']));
+    });
+
+    test('diagnoses invalid selection memory and map key mismatches', () {
+      final tree = ConversationTree(
+        conversationId: 'conversation',
+        activeBranchId: 'alias',
+        branches: {
+          'alias': ConversationBranch(
+            id: 'root',
+            conversationId: 'conversation',
+            tipMessageId: 'alias-message',
+            createdAt: DateTime(2026),
+          ),
+        },
+        edges: const {
+          'alias-message': MessageTreeEdge(
+            messageId: 'm1',
+            parentMessageId: null,
+          ),
+        },
+        branchSelections: const {'m1': 'alias'},
+      );
+
+      expect(
+        tree.integrityIssues().map((issue) => issue.code),
+        containsAll([
+          'branch_key_mismatch',
+          'edge_key_mismatch',
+          'selection_invalid',
+        ]),
+      );
+    });
+
+    test('accepts multiple roots and persisted empty anchors', () {
+      final tree = ConversationTree(
+        conversationId: 'conversation',
+        activeBranchId: 'empty',
+        branches: {
+          'root-a': ConversationBranch(
+            id: 'root-a',
+            conversationId: 'conversation',
+            tipMessageId: 'a',
+            createdAt: DateTime(2026),
+          ),
+          'root-b': ConversationBranch(
+            id: 'root-b',
+            conversationId: 'conversation',
+            tipMessageId: 'b',
+            createdAt: DateTime(2026),
+          ),
+          'empty': ConversationBranch(
+            id: 'empty',
+            conversationId: 'conversation',
+            tipMessageId: null,
+            createdAt: DateTime(2026),
+          ),
+        },
+        edges: const {
+          'a': MessageTreeEdge(messageId: 'a', parentMessageId: null),
+          'b': MessageTreeEdge(messageId: 'b', parentMessageId: null),
+        },
+      );
+
+      expect(tree.integrityIssues(), isEmpty);
+    });
+
+    test('fingerprint is stable when map insertion order differs', () {
+      final createdAt = DateTime.utc(2026, 1, 1);
+      final first = ConversationTree(
+        conversationId: 'conversation',
+        activeBranchId: 'alt',
+        branches: {
+          'root': ConversationBranch(
+            id: 'root',
+            conversationId: 'conversation',
+            tipMessageId: 'm1',
+            createdAt: createdAt,
+          ),
+          'alt': ConversationBranch(
+            id: 'alt',
+            conversationId: 'conversation',
+            tipMessageId: 'm2',
+            createdAt: createdAt,
+          ),
+        },
+        edges: const {
+          'm1': MessageTreeEdge(messageId: 'm1', parentMessageId: null),
+          'm2': MessageTreeEdge(messageId: 'm2', parentMessageId: null),
+        },
+      );
+      final second = ConversationTree(
+        conversationId: 'conversation',
+        activeBranchId: 'alt',
+        branches: {
+          'alt': ConversationBranch(
+            id: 'alt',
+            conversationId: 'conversation',
+            tipMessageId: 'm2',
+            createdAt: createdAt,
+          ),
+          'root': ConversationBranch(
+            id: 'root',
+            conversationId: 'conversation',
+            tipMessageId: 'm1',
+            createdAt: createdAt,
+          ),
+        },
+        edges: const {
+          'm2': MessageTreeEdge(messageId: 'm2', parentMessageId: null),
+          'm1': MessageTreeEdge(messageId: 'm1', parentMessageId: null),
+        },
+      );
+
+      expect(first.fingerprint, second.fingerprint);
+    });
+
+    test('deletion prefers a surviving recently viewed branch', () {
+      final tree =
+          ConversationTree.linear(
+            conversationId: 'conversation',
+            messageIds: const ['m0', 'm1'],
+          ).createBranch(
+            branchId: 'alt',
+            fromMessageId: 'm0',
+            tipMessageId: 'alt-reply',
+          );
+
+      final deleted = tree
+          .switchBranch('root')
+          .deleteMessage('m1', recentBranchIds: const ['alt']);
+
+      expect(deleted.activeBranchId, 'alt');
+      expect(deleted.activePath(), const ['m0', 'alt-reply']);
+    });
+
+    test('cascade deletion migrates a surviving sibling selection', () {
+      final tree = ConversationTree(
+        conversationId: 'conversation',
+        activeBranchId: 'root',
+        branches: {
+          'root': ConversationBranch(
+            id: 'root',
+            conversationId: 'conversation',
+            tipMessageId: 'reply-a',
+            createdAt: DateTime.utc(2026),
+          ),
+          'alt': ConversationBranch(
+            id: 'alt',
+            conversationId: 'conversation',
+            tipMessageId: 'reply-b',
+            createdAt: DateTime.utc(2026, 1, 2),
+          ),
+        },
+        edges: const {
+          'prompt': MessageTreeEdge(messageId: 'prompt', parentMessageId: null),
+          'reply-a': MessageTreeEdge(
+            messageId: 'reply-a',
+            parentMessageId: 'prompt',
+          ),
+          'reply-b': MessageTreeEdge(
+            messageId: 'reply-b',
+            parentMessageId: 'prompt',
+          ),
+        },
+        branchSelections: const {'prompt': 'root'},
+      );
+
+      final deleted = tree.deleteMessage('reply-a');
+
+      expect(deleted.branchSelections, isEmpty);
+      expect(deleted.activePath(), const ['prompt', 'reply-b']);
+      expect(() => deleted.validateIntegrity(), returnsNormally);
     });
   });
 }

@@ -75,6 +75,7 @@ final class BusinessKeyRegistry {
     'user_name',
     'avatar_type',
     'avatar_value',
+    'avatar_transform_v1',
     'theme_mode_v1',
     'theme_palette_v1',
     'use_dynamic_color_v1',
@@ -511,6 +512,7 @@ final class BusinessSettingsRouter {
             'presetMessages',
             'regexRules',
           },
+          maps: const {'avatarTransform'},
           stringLists: const {'mcpServerIds', 'localToolIds'},
         );
         _validateAssistantChildren(kind, payload);

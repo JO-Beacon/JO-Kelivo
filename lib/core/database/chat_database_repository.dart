@@ -4137,6 +4137,7 @@ class ChatDatabaseRepository {
   }
 
   Future<void> _writeConversationTree(ConversationTree tree) async {
+    tree.validateIntegrity();
     await (_db.delete(
       _db.messageTreeEdgeRows,
     )..where((row) => row.conversationId.equals(tree.conversationId))).go();
@@ -4205,7 +4206,7 @@ class ChatDatabaseRepository {
       throw StateError('conversation_tree_state_missing');
     }
 
-    return ConversationTree(
+    final tree = ConversationTree.unsafe(
       conversationId: conversationId,
       activeBranchId: stateRow.activeBranchId,
       branchSelections: _decodeBranchSelections(stateRow.branchSelectionsJson),
@@ -4227,19 +4228,37 @@ class ChatDatabaseRepository {
           ),
       },
     );
+    try {
+      tree.validateIntegrity();
+    } on ConversationTreeIntegrityException catch (error) {
+      throw ConversationTreeIntegrityException(
+        error.issues,
+        conversationId: conversationId,
+        fingerprint: tree.fingerprint,
+        schemaVersion: _db.schemaVersion,
+      );
+    }
+    return tree;
   }
 
   Map<String, String> _decodeBranchSelections(String rawJson) {
+    dynamic decoded;
     try {
-      final decoded = jsonDecode(rawJson);
-      if (decoded is Map<String, dynamic>) {
-        return {
-          for (final entry in decoded.entries)
-            if (entry.value is String) entry.key: entry.value as String,
-        };
+      decoded = jsonDecode(rawJson);
+    } catch (error) {
+      throw StateError('conversation_tree_selections_invalid_json: $error');
+    }
+    if (decoded is! Map) {
+      throw StateError('conversation_tree_selections_invalid_shape');
+    }
+    final result = <String, String>{};
+    for (final entry in decoded.entries) {
+      if (entry.key is! String || entry.value is! String) {
+        throw StateError('conversation_tree_selections_invalid_entry');
       }
-    } catch (_) {}
-    return <String, String>{};
+      result[entry.key as String] = entry.value as String;
+    }
+    return result;
   }
 
   String _conversationRootBranchId(String conversationId) =>
@@ -6753,6 +6772,7 @@ class ChatDatabaseRepository {
   Future<DeletedMessagesResult?> deleteMessageOnly({
     required String conversationId,
     required String messageId,
+    Iterable<String> recentBranchIds = const <String>[],
   }) {
     return _observer.measure(
       ChatDatabaseOperation.commandDeleteMessages,
@@ -6761,6 +6781,7 @@ class ChatDatabaseRepository {
         messageIds: {messageId},
         versionSelectionChanges: const {},
         preserveDescendants: true,
+        recentBranchIds: recentBranchIds,
       ),
     );
   }
@@ -6769,6 +6790,7 @@ class ChatDatabaseRepository {
     required String conversationId,
     required Set<String> messageIds,
     required Map<String, int?> versionSelectionChanges,
+    Iterable<String> recentBranchIds = const <String>[],
   }) {
     return _observer.measure(
       ChatDatabaseOperation.commandDeleteMessages,
@@ -6777,6 +6799,7 @@ class ChatDatabaseRepository {
           conversationId: conversationId,
           messageIds: messageIds,
           versionSelectionChanges: versionSelectionChanges,
+          recentBranchIds: recentBranchIds,
         );
       },
     );
@@ -6787,6 +6810,7 @@ class ChatDatabaseRepository {
     required Set<String> messageIds,
     required Map<String, int?> versionSelectionChanges,
     bool preserveDescendants = false,
+    Iterable<String> recentBranchIds = const <String>[],
   }) async {
     if (messageIds.isEmpty) return null;
     for (final entry in versionSelectionChanges.entries) {
@@ -6819,12 +6843,15 @@ class ChatDatabaseRepository {
       final treeBeforeDelete = await _loadOrCreateConversationTree(
         conversationId,
       );
-      var treeAfterDelete = treeBeforeDelete;
-      for (final row in requestedRows) {
-        treeAfterDelete = preserveDescendants
-            ? treeAfterDelete.removeMessageOnly(row.id)
-            : treeAfterDelete.deleteSubtree(row.id);
-      }
+      final treeAfterDelete = preserveDescendants
+          ? treeBeforeDelete.removeMessagesOnly(
+              requestedRows.map((row) => row.id),
+              recentBranchIds: recentBranchIds,
+            )
+          : treeBeforeDelete.deleteMessages(
+              requestedRows.map((row) => row.id),
+              recentBranchIds: recentBranchIds,
+            );
       final survivingEdges = treeAfterDelete.edges.keys.toSet();
       final effectiveMessageIds = treeBeforeDelete.edges.keys
           .where((id) => !survivingEdges.contains(id))
@@ -6882,6 +6909,22 @@ class ChatDatabaseRepository {
       final deletedIds = deletedRows
           .map((row) => row.id)
           .toList(growable: false);
+      final cancellationTimestamp = DateTime.now().toUtc();
+      final placeholders = List.filled(deletedIds.length, '?').join(',');
+      await _db.customUpdate(
+        'UPDATE generation_run_rows '
+        "SET state = 'cancelled', state_revision = state_revision + 1, "
+        'error_code = ?, updated_at = ?, terminal_at = ? '
+        'WHERE target_revision_id IN ($placeholders) '
+        "AND state IN ('preparing', 'requesting', 'streaming', 'waiting_tool');",
+        variables: [
+          Variable.withString('tree_delete'),
+          Variable.withInt(cancellationTimestamp.microsecondsSinceEpoch),
+          Variable.withInt(cancellationTimestamp.microsecondsSinceEpoch),
+          ...deletedIds.map(Variable.withString),
+        ],
+        updates: {_db.generationRunRows},
+      );
       await (_db.delete(
         _db.generationRunRows,
       )..where((row) => row.targetRevisionId.isIn(deletedIds))).go();

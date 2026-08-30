@@ -118,6 +118,8 @@ class ChatService extends ChangeNotifier {
   final Set<String> _temporaryConversationIds = <String>{};
   final Map<String, ConversationTree> _temporaryConversationTrees =
       <String, ConversationTree>{};
+  // 仅用于删除活动分支后的阅读位置回退；持久化树仍以数据库为唯一事实来源。
+  final Map<String, List<String>> _recentBranchIds = <String, List<String>>{};
   // 逐出这些 id 可能会重新引入与后台工作的持久化竞争。
   final Set<String> _discardedTemporaryConversationIds = <String>{};
   final Set<String> _discardedTemporaryMessageIds = <String>{};
@@ -3468,6 +3470,7 @@ class ChatService extends ChangeNotifier {
     if (!tree.branches.containsKey(branchId)) {
       throw StateError('conversation_branch_missing');
     }
+    _rememberViewedBranch(conversationId, tree.activeBranchId);
     final updated = tree.switchBranch(branchId);
     if (_temporaryConversationIds.contains(conversationId)) {
       _temporaryConversationTrees[conversationId] = updated;
@@ -3478,6 +3481,26 @@ class ChatService extends ChangeNotifier {
     await reloadActiveTimelineCache(conversationId);
     notifyListeners();
     return updated;
+  }
+
+  void _rememberViewedBranch(String conversationId, String branchId) {
+    final history = _recentBranchIds.putIfAbsent(
+      conversationId,
+      () => <String>[],
+    );
+    history.remove(branchId);
+    history.insert(0, branchId);
+    if (history.length > 16) history.removeRange(16, history.length);
+  }
+
+  List<String> _recentBranchIdsFor(String conversationId) =>
+      List<String>.unmodifiable(_recentBranchIds[conversationId] ?? const []);
+
+  void _pruneRecentBranches(String conversationId, ConversationTree tree) {
+    final history = _recentBranchIds[conversationId];
+    if (history == null) return;
+    history.removeWhere((branchId) => !tree.branches.containsKey(branchId));
+    if (history.isEmpty) _recentBranchIds.remove(conversationId);
   }
 
   /// Message Fork: clone the selected message as a sibling branch node.
@@ -3554,6 +3577,8 @@ class ChatService extends ChangeNotifier {
       return updated;
     }
 
+    final before = await _loadOrCreateConversationTree(conversationId);
+    _rememberViewedBranch(conversationId, before.activeBranchId);
     final result = await _repo.cloneMessageAsBranch(
       conversationId: conversationId,
       messageId: fromMessageId,
@@ -3580,6 +3605,7 @@ class ChatService extends ChangeNotifier {
   }) async {
     if (!_initialized) await init();
     final tree = await _loadOrCreateConversationTree(conversationId);
+    _rememberViewedBranch(conversationId, tree.activeBranchId);
     final branchId = 'branch-${const Uuid().v4()}';
     final updated = tree.createMessageBranchFromParent(
       branchId: branchId,
@@ -3628,6 +3654,7 @@ class ChatService extends ChangeNotifier {
       if (!tree.edges.containsKey(messageId)) return const <String>{};
       _temporaryConversationTrees[conversationId] = tree.removeMessageOnly(
         messageId,
+        recentBranchIds: _recentBranchIdsFor(conversationId),
       );
       messages.removeWhere((message) => message.id == messageId);
       conversation.messageIds.remove(messageId);
@@ -3642,6 +3669,7 @@ class ChatService extends ChangeNotifier {
     final result = await _repo.deleteMessageOnly(
       conversationId: conversationId,
       messageId: messageId,
+      recentBranchIds: _recentBranchIdsFor(conversationId),
     );
     if (result == null) return const <String>{};
 
@@ -3659,6 +3687,7 @@ class ChatService extends ChangeNotifier {
     final tree = await _repo.loadConversationTree(conversationId);
     if (tree != null) {
       await _syncContextBoundaryToActivePath(conversationId, tree);
+      _pruneRecentBranches(conversationId, tree);
     }
     await reloadActiveTimelineCache(conversationId);
     await _cleanupOrphanUploads();
@@ -4324,16 +4353,10 @@ class ChatService extends ChangeNotifier {
       messages.removeWhere((message) => deletedIds.contains(message.id));
       conversation.messageIds.removeWhere(deletedIds.contains);
       conversation.chatSuggestions = const <String>[];
-      _temporaryConversationTrees[conversationId] = tree.deleteSubtree(
-        messageIds.first,
+      _temporaryConversationTrees[conversationId] = tree.deleteMessages(
+        messageIds,
+        recentBranchIds: _recentBranchIdsFor(conversationId),
       );
-      if (messageIds.length > 1) {
-        var updatedTree = _temporaryConversationTrees[conversationId]!;
-        for (final id in messageIds.skip(1)) {
-          updatedTree = updatedTree.deleteSubtree(id);
-        }
-        _temporaryConversationTrees[conversationId] = updatedTree;
-      }
       conversation.updatedAt = DateTime.now();
       for (final id in deletedIds) {
         _temporaryToolEvents.remove(id);
@@ -4347,6 +4370,7 @@ class ChatService extends ChangeNotifier {
       conversationId: conversationId,
       messageIds: messageIds,
       versionSelectionChanges: versionSelectionChanges,
+      recentBranchIds: _recentBranchIdsFor(conversationId),
     );
     if (result == null) return const <String>{};
 
@@ -4368,6 +4392,7 @@ class ChatService extends ChangeNotifier {
     final tree = await _repo.loadConversationTree(conversationId);
     if (tree != null) {
       await _syncContextBoundaryToActivePath(conversationId, tree);
+      _pruneRecentBranches(conversationId, tree);
     }
     await reloadActiveTimelineCache(conversationId);
     await _cleanupOrphanUploads();

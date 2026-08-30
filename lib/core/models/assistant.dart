@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'assistant_regex.dart';
 import 'preset_message.dart';
+import 'avatar_transform.dart';
 
 enum MemorySmartAddMode { batched, perItem }
 
@@ -31,6 +32,7 @@ class Assistant {
   final String id;
   final String name;
   final String? avatar; // path/url/base64；null 表示使用首字母头像
+  final AvatarTransform? avatarTransform;
   final bool useAssistantAvatar; // 在聊天中用助理头像替换模型图标
   final bool useAssistantName; // 在聊天中用助理名称替换模型名称
   final String? chatModelProvider; // null 表示使用全局默认值
@@ -71,6 +73,7 @@ class Assistant {
     required this.id,
     required this.name,
     this.avatar,
+    this.avatarTransform,
     this.useAssistantAvatar = false,
     this.useAssistantName = false,
     this.chatModelProvider,
@@ -107,6 +110,7 @@ class Assistant {
     String? id,
     String? name,
     String? avatar,
+    AvatarTransform? avatarTransform,
     bool? useAssistantAvatar,
     bool? useAssistantName,
     String? chatModelProvider,
@@ -139,6 +143,7 @@ class Assistant {
     List<AssistantRegex>? regexRules,
     bool clearChatModel = false,
     bool clearAvatar = false,
+    bool clearAvatarTransform = false,
     bool clearTemperature = false,
     bool clearTopP = false,
     bool clearThinkingBudget = false,
@@ -149,6 +154,9 @@ class Assistant {
       id: id ?? this.id,
       name: name ?? this.name,
       avatar: clearAvatar ? null : (avatar ?? this.avatar),
+      avatarTransform: clearAvatar || clearAvatarTransform
+          ? null
+          : (avatarTransform ?? this.avatarTransform),
       useAssistantAvatar: useAssistantAvatar ?? this.useAssistantAvatar,
       useAssistantName: useAssistantName ?? this.useAssistantName,
       chatModelProvider: clearChatModel
@@ -195,6 +203,7 @@ class Assistant {
     'id': id,
     'name': name,
     'avatar': avatar,
+    'avatarTransform': avatarTransform?.toJson(),
     'useAssistantAvatar': useAssistantAvatar,
     'useAssistantName': useAssistantName,
     'chatModelProvider': chatModelProvider,
@@ -231,6 +240,7 @@ class Assistant {
     id: json['id'] as String,
     name: (json['name'] as String?) ?? '',
     avatar: json['avatar'] as String?,
+    avatarTransform: AvatarTransform.fromJson(json['avatarTransform']),
     useAssistantAvatar: json['useAssistantAvatar'] as bool? ?? false,
     useAssistantName: json['useAssistantName'] as bool? ?? false,
     chatModelProvider: json['chatModelProvider'] as String?,

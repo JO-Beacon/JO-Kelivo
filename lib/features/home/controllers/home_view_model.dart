@@ -146,6 +146,7 @@ class HomeViewModel extends ChangeNotifier {
       const ChatSuggestionService();
   late final ChatActions _chatActions;
   ConversationTree? _conversationTree;
+  ConversationTreeIntegrityException? _conversationTreeIntegrityError;
   int _conversationTreeReloadSerial = 0;
   bool _disposed = false;
   QueuedChatInput? _queuedInput;
@@ -192,6 +193,8 @@ class HomeViewModel extends ChangeNotifier {
 
   Conversation? get currentConversation => _chatController.currentConversation;
   ConversationTree? get conversationTree => _conversationTree;
+  ConversationTreeIntegrityException? get conversationTreeIntegrityError =>
+      _conversationTreeIntegrityError;
   String? get activeBranchId => _conversationTree?.activeBranchId;
   List<ChatMessage> get messages {
     final raw = _chatController.messages;
@@ -381,6 +384,9 @@ class HomeViewModel extends ChangeNotifier {
 
   /// 发送新消息；如果当前会话忙则将其排队。
   Future<ChatInputSubmissionResult> sendMessage(ChatInputData input) async {
+    if (_conversationTreeIntegrityError != null) {
+      return ChatInputSubmissionResult.rejected;
+    }
     final content = input.text.trim();
     if (content.isEmpty &&
         input.imagePaths.isEmpty &&
@@ -474,6 +480,7 @@ class HomeViewModel extends ChangeNotifier {
 
   Future<void> _drainQueuedInputIfReady(String conversationId) async {
     if (_isDrainingQueuedInput) return;
+    if (_conversationTreeIntegrityError != null) return;
     final queued = _queuedInput;
     final conversation = currentConversation;
     if (queued == null || conversation == null) return;
@@ -504,6 +511,7 @@ class HomeViewModel extends ChangeNotifier {
     String? existingBranchId,
     bool allowImagesApiRouting = true,
   }) async {
+    if (_conversationTreeIntegrityError != null) return false;
     final conversation = currentConversation;
     if (conversation == null) {
       return false;
@@ -541,6 +549,7 @@ class HomeViewModel extends ChangeNotifier {
     ChatMessage message, {
     bool allowImagesApiRouting = true,
   }) async {
+    if (_conversationTreeIntegrityError != null) return false;
     final conversation = currentConversation;
     if (conversation == null) {
       return false;
@@ -611,6 +620,7 @@ class HomeViewModel extends ChangeNotifier {
       _conversationTree = await _chatService.loadConversationTree(
         targetConversationId,
       );
+      _conversationTreeIntegrityError = null;
       _chatController.loadVersionSelections();
       _chatController.updateCurrentConversation(
         _chatService.getConversation(targetConversationId),
@@ -652,6 +662,7 @@ class HomeViewModel extends ChangeNotifier {
       _conversationTree = await _chatService.loadConversationTree(
         targetConversationId,
       );
+      _conversationTreeIntegrityError = null;
       _chatController.updateCurrentConversation(
         _chatService.getConversation(targetConversationId),
       );
@@ -811,6 +822,7 @@ class HomeViewModel extends ChangeNotifier {
       _conversationTree = await _chatService.loadConversationTree(
         conversationId,
       );
+      _conversationTreeIntegrityError = null;
 
       await _chatController.refreshTimelineAfterMutation(
         removedRevisionIds: deletedMessageIds,
@@ -922,9 +934,18 @@ class HomeViewModel extends ChangeNotifier {
         return;
       }
       _conversationTree = tree;
+      _conversationTreeIntegrityError = null;
       notifyListeners();
     } catch (error, stackTrace) {
       if (_disposed) return;
+      if (error is ConversationTreeIntegrityException &&
+          serial == _conversationTreeReloadSerial &&
+          currentConversation?.id == conversationId) {
+        _conversationTree = null;
+        _conversationTreeIntegrityError = error;
+        notifyListeners();
+        return;
+      }
       Error.throwWithStackTrace(error, stackTrace);
     }
   }
@@ -933,23 +954,38 @@ class HomeViewModel extends ChangeNotifier {
     if (currentConversation?.id != tree.conversationId) return;
     _conversationTreeReloadSerial++;
     _conversationTree = tree;
+    _conversationTreeIntegrityError = null;
     _chatController.invalidateCache();
     notifyListeners();
   }
 
   Future<void> refreshConversationTree(String conversationId) async {
     if (_disposed) return;
-    final tree = await _chatService.loadConversationTree(conversationId);
-    if (tree != null) installConversationTree(tree);
+    try {
+      final tree = await _chatService.loadConversationTree(conversationId);
+      if (tree != null) installConversationTree(tree);
+    } on ConversationTreeIntegrityException catch (error) {
+      if (currentConversation?.id != conversationId) return;
+      _conversationTree = null;
+      _conversationTreeIntegrityError = error;
+      notifyListeners();
+    }
   }
 
   Future<void> ensureConversationTreeForCurrentConversation() async {
     if (_disposed) return;
     final conversation = currentConversation;
     if (conversation == null) return;
-    await _chatService.ensureConversationTree(conversation.id);
-    final tree = await _chatService.loadConversationTree(conversation.id);
-    if (tree != null) installConversationTree(tree);
+    try {
+      await _chatService.ensureConversationTree(conversation.id);
+      final tree = await _chatService.loadConversationTree(conversation.id);
+      if (tree != null) installConversationTree(tree);
+    } on ConversationTreeIntegrityException catch (error) {
+      if (currentConversation?.id != conversation.id) return;
+      _conversationTree = null;
+      _conversationTreeIntegrityError = error;
+      notifyListeners();
+    }
   }
 
   /// 开始持久化切换所需的助手偏好；当助手不变时为 null。
@@ -1056,6 +1092,23 @@ class HomeViewModel extends ChangeNotifier {
     onScrollToBottom?.call();
   }
 
+  /// 删除指定会话。调用方负责在删除后选择下一个会话或创建新会话。
+  Future<void> deleteConversation(String conversationId) async {
+    final conversation = _chatService.getConversation(conversationId);
+    if (conversation == null) return;
+
+    await ChatActions.cancelActiveGenerationFor(conversationId);
+    await _chatService.deleteConversation(conversationId);
+    if (currentConversation?.id == conversationId) {
+      _conversationTreeReloadSerial++;
+      _conversationTree = null;
+      _conversationTreeIntegrityError = null;
+      _chatController.updateCurrentConversation(null);
+      _chatController.invalidateCache();
+    }
+    notifyListeners();
+  }
+
   /// 在当前会话树中从指定消息创建消息分支。
   Future<void> createMessageFork(ChatMessage message) async {
     final sourceConversation = currentConversation;
@@ -1066,6 +1119,7 @@ class HomeViewModel extends ChangeNotifier {
     );
     _conversationTreeReloadSerial++;
     _conversationTree = tree;
+    _conversationTreeIntegrityError = null;
     _chatController.invalidateCache();
     notifyListeners();
     onScrollToBottom?.call();
@@ -1104,6 +1158,7 @@ class HomeViewModel extends ChangeNotifier {
     if (tree == null) return;
     _conversationTreeReloadSerial++;
     _conversationTree = tree;
+    _conversationTreeIntegrityError = null;
     _chatController.invalidateCache();
     final branch = tree.branches[branchId];
     final tipMessageId = branch?.tipMessageId;

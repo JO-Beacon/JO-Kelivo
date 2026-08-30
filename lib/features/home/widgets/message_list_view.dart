@@ -1897,6 +1897,9 @@ class _MessageListViewState extends State<MessageListView> {
           ? (assistant?.name ?? 'Assistant')
           : null,
       assistantAvatar: useAssistAvatar ? (assistant?.avatar ?? '') : null,
+      assistantAvatarTransform: useAssistAvatar
+          ? assistant?.avatarTransform
+          : null,
       showUserAvatar: presentation.showUserAvatar,
       showTokenStats: presentation.showTokenStats,
       hideStreamingIndicator:

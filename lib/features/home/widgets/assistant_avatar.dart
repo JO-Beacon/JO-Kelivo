@@ -4,6 +4,9 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../../../core/models/assistant.dart';
+import '../../../core/models/assistant_list_item.dart';
+import '../../../core/models/avatar_transform.dart';
+import '../../../shared/widgets/avatar_image_editor.dart';
 import '../../../shared/widgets/emoji_text.dart';
 import '../../../utils/avatar_cache.dart';
 import '../../../utils/sandbox_path_resolver.dart';
@@ -15,17 +18,35 @@ class AssistantAvatar extends StatelessWidget {
     required this.assistant,
     this.fallbackName,
     this.size = 28,
+    this.avatarSource,
+    this.avatarTransform,
   });
+
+  factory AssistantAvatar.fromListItem({
+    Key? key,
+    required AssistantListItem item,
+    double size = 28,
+  }) => AssistantAvatar(
+    key: key,
+    assistant: null,
+    fallbackName: item.name,
+    avatarSource: item.avatar,
+    avatarTransform: item.avatarTransform,
+    size: size,
+  );
 
   final Assistant? assistant;
   final String? fallbackName;
   final double size;
+  final String? avatarSource;
+  final AvatarTransform? avatarTransform;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final avatarValue = assistant?.avatar?.trim() ?? '';
+    final avatarValue = (avatarSource ?? assistant?.avatar)?.trim() ?? '';
+    final transform = avatarTransform ?? assistant?.avatarTransform;
     final name = (assistant?.name ?? fallbackName ?? '').trim();
 
     Widget avatar;
@@ -37,11 +58,10 @@ class AssistantAvatar extends StatelessWidget {
             final path = snapshot.data;
             if (path != null && File(path).existsSync()) {
               return ClipOval(
-                child: Image(
-                  image: FileImage(File(path)),
-                  width: size,
-                  height: size,
-                  fit: BoxFit.cover,
+                child: AvatarImage(
+                  path: path,
+                  size: size,
+                  transform: transform,
                 ),
               );
             }
@@ -63,11 +83,10 @@ class AssistantAvatar extends StatelessWidget {
         final file = File(fixedPath);
         if (file.existsSync()) {
           avatar = ClipOval(
-            child: Image(
-              image: FileImage(file),
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
+            child: AvatarImage(
+              path: fixedPath,
+              size: size,
+              transform: transform,
             ),
           );
         } else {

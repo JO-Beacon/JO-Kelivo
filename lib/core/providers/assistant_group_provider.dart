@@ -124,6 +124,24 @@ class AssistantGroupProvider extends ChangeNotifier {
     await _persistAssignment();
   }
 
+  Future<void> assignAssistantsToGroup(
+    Iterable<String> assistantIds,
+    String? groupId,
+  ) async {
+    var changed = false;
+    for (final assistantId in assistantIds.toSet()) {
+      if (groupId == null || groupId.isEmpty) {
+        changed = _assignment.remove(assistantId) != null || changed;
+      } else if (_assignment[assistantId] != groupId) {
+        _assignment[assistantId] = groupId;
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    notifyListeners();
+    await _persistAssignment();
+  }
+
   Future<void> unassignAssistantFromGroup(String assistantId) async {
     if (_assignment.containsKey(assistantId)) {
       _assignment.remove(assistantId);

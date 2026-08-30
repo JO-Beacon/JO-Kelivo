@@ -24,8 +24,10 @@ import '../shared/widgets/ios_checkbox.dart';
 import '../features/assistant/pages/assistant_settings_edit_page.dart'
     show showAssistantDesktopDialog; // 仅用于打开对话框
 import '../core/providers/assistant_provider.dart';
+import '../core/providers/assistant_group_provider.dart';
 import '../features/home/controllers/chat_actions.dart' show ChatActions;
-import '../core/models/assistant.dart';
+import '../features/assistant/widgets/assistant_selection_bars.dart';
+import '../core/models/assistant_list_item.dart';
 import '../utils/avatar_cache.dart';
 import '../utils/sandbox_path_resolver.dart';
 import 'dart:io' show Directory, File, Platform;
