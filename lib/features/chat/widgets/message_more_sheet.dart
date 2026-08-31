@@ -25,7 +25,9 @@ enum MessageMoreAction {
   switchToAssistant,
   messageFork,
   deleteMessageOnly,
-  deleteCurrentVersion,
+  deleteMessageAndFollowing,
+  deleteMessageNode,
+  deleteCurrentBranch,
   deleteAllVersions,
   conversationForkPreserveBranches,
   conversationForkActiveBranchOnly,
@@ -37,6 +39,9 @@ Future<MessageMoreAction?> showMessageMoreSheet(
   BuildContext context,
   ChatMessage message, {
   required bool canDeleteAllVersions,
+  bool canDeleteCurrentBranch = false,
+  bool canDeleteMessageNode = false,
+  bool canUseLinearDeleteActions = true,
   required bool canCreateBranch,
   bool canCreateConversationFork = false,
 }) async {
@@ -57,6 +62,9 @@ Future<MessageMoreAction?> showMessageMoreSheet(
         message: message,
         parentContext: context,
         canDeleteAllVersions: canDeleteAllVersions,
+        canDeleteCurrentBranch: canDeleteCurrentBranch,
+        canDeleteMessageNode: canDeleteMessageNode,
+        canUseLinearDeleteActions: canUseLinearDeleteActions,
         canCreateBranch: canCreateBranch,
         canCreateConversationFork: canCreateConversationFork,
       ),
@@ -167,22 +175,42 @@ Future<MessageMoreAction?> showMessageMoreSheet(
           },
         ),
       ],
-      DesktopContextMenuItem(
-        icon: Lucide.X,
-        label: l10n.messageMoreSheetDeleteMessageOnly,
-        danger: true,
-        onTap: () {
-          selected = MessageMoreAction.deleteMessageOnly;
-        },
-      ),
-      DesktopContextMenuItem(
-        icon: Lucide.Trash2,
-        label: l10n.messageMoreSheetDelete,
-        danger: true,
-        onTap: () {
-          selected = MessageMoreAction.deleteCurrentVersion;
-        },
-      ),
+      if (canUseLinearDeleteActions) ...[
+        DesktopContextMenuItem(
+          icon: Lucide.X,
+          label: l10n.messageMoreSheetDeleteMessageOnly,
+          danger: true,
+          onTap: () {
+            selected = MessageMoreAction.deleteMessageOnly;
+          },
+        ),
+        DesktopContextMenuItem(
+          icon: Lucide.Trash2,
+          label: l10n.messageMoreSheetDeleteMessageAndFollowing,
+          danger: true,
+          onTap: () {
+            selected = MessageMoreAction.deleteMessageAndFollowing;
+          },
+        ),
+      ],
+      if (canDeleteMessageNode)
+        DesktopContextMenuItem(
+          icon: Lucide.Trash2,
+          label: l10n.messageMoreSheetDeleteMessageNode,
+          danger: true,
+          onTap: () {
+            selected = MessageMoreAction.deleteMessageNode;
+          },
+        ),
+      if (canDeleteCurrentBranch)
+        DesktopContextMenuItem(
+          icon: Lucide.Trash,
+          label: l10n.messageMoreSheetDelete,
+          danger: true,
+          onTap: () {
+            selected = MessageMoreAction.deleteCurrentBranch;
+          },
+        ),
       if (canDeleteAllVersions)
         DesktopContextMenuItem(
           icon: Lucide.Trash,
@@ -205,12 +233,18 @@ class _MessageMoreSheet extends StatefulWidget {
     required this.message,
     required this.parentContext,
     required this.canDeleteAllVersions,
+    required this.canDeleteCurrentBranch,
+    required this.canDeleteMessageNode,
+    required this.canUseLinearDeleteActions,
     required this.canCreateBranch,
     required this.canCreateConversationFork,
   });
   final ChatMessage message;
   final BuildContext parentContext;
   final bool canDeleteAllVersions;
+  final bool canDeleteCurrentBranch;
+  final bool canDeleteMessageNode;
+  final bool canUseLinearDeleteActions;
   final bool canCreateBranch;
   final bool canCreateConversationFork;
 
@@ -427,26 +461,50 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                         },
                       ),
                     ],
-                    _actionItem(
-                      icon: Lucide.X,
-                      label: l10n.messageMoreSheetDeleteMessageOnly,
-                      danger: true,
-                      onTap: () {
-                        Navigator.of(
-                          context,
-                        ).pop(MessageMoreAction.deleteMessageOnly);
-                      },
-                    ),
-                    _actionItem(
-                      icon: Lucide.Trash2,
-                      label: l10n.messageMoreSheetDelete,
-                      danger: true,
-                      onTap: () {
-                        Navigator.of(
-                          context,
-                        ).pop(MessageMoreAction.deleteCurrentVersion);
-                      },
-                    ),
+                    if (widget.canUseLinearDeleteActions) ...[
+                      _actionItem(
+                        icon: Lucide.X,
+                        label: l10n.messageMoreSheetDeleteMessageOnly,
+                        danger: true,
+                        onTap: () {
+                          Navigator.of(
+                            context,
+                          ).pop(MessageMoreAction.deleteMessageOnly);
+                        },
+                      ),
+                      _actionItem(
+                        icon: Lucide.Trash2,
+                        label: l10n.messageMoreSheetDeleteMessageAndFollowing,
+                        danger: true,
+                        onTap: () {
+                          Navigator.of(
+                            context,
+                          ).pop(MessageMoreAction.deleteMessageAndFollowing);
+                        },
+                      ),
+                    ],
+                    if (widget.canDeleteMessageNode)
+                      _actionItem(
+                        icon: Lucide.Trash2,
+                        label: l10n.messageMoreSheetDeleteMessageNode,
+                        danger: true,
+                        onTap: () {
+                          Navigator.of(
+                            context,
+                          ).pop(MessageMoreAction.deleteMessageNode);
+                        },
+                      ),
+                    if (widget.canDeleteCurrentBranch)
+                      _actionItem(
+                        icon: Lucide.Trash,
+                        label: l10n.messageMoreSheetDelete,
+                        danger: true,
+                        onTap: () {
+                          Navigator.of(
+                            context,
+                          ).pop(MessageMoreAction.deleteCurrentBranch);
+                        },
+                      ),
                     if (widget.canDeleteAllVersions)
                       _actionItem(
                         icon: Lucide.Trash,

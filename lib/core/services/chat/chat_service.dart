@@ -2259,6 +2259,42 @@ class ChatService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 原子替换指定的导入会话，不触碰其他会话或业务数据。
+  Future<void> replaceParsedImportConversations(
+    List<ParsedChatImportBatch> conversationBatches,
+  ) async {
+    if (!_initialized) await init();
+    await _repo.replaceParsedImportConversations(conversationBatches);
+    _clearPersistedMessageCache();
+    await _backfillAssetReferencesForCurrentRoot();
+    await _loadConversationsCache();
+    await _deleteUploadDirectory();
+    notifyListeners();
+  }
+
+  /// Chatbox 专用定点提交：只替换调用方已经准备好的会话批次，并在同一事务
+  /// 内应用业务补丁；不会清空其他会话或全局设置。
+  Future<void> commitScopedParsedImport({
+    required BusinessRepository businessRepository,
+    required bool replaceExisting,
+    required List<ParsedChatImportBatch> conversationBatches,
+    required BusinessSnapshot Function(BusinessSnapshot current)
+    transformBusiness,
+  }) async {
+    if (!_initialized) await init();
+    await _repo.commitScopedParsedImport(
+      businessRepository: businessRepository,
+      replaceExisting: replaceExisting,
+      conversationBatches: conversationBatches,
+      transformBusiness: transformBusiness,
+    );
+    _clearPersistedMessageCache();
+    await _backfillAssetReferencesForCurrentRoot();
+    await _loadConversationsCache();
+    await _deleteUploadDirectory();
+    notifyListeners();
+  }
+
   Future<void> replaceAllDataFromBackup({
     required List<Conversation> conversations,
     required List<ChatMessage> messages,
@@ -3636,6 +3672,151 @@ class ChatService extends ChangeNotifier {
     return deleteMessages(
       conversationId: conversationId,
       messageIds: siblingIds.isEmpty ? <String>{messageId} : siblingIds,
+      versionSelectionChanges: const {},
+    );
+  }
+
+  Future<Set<String>> deleteCurrentBranch({
+    required String conversationId,
+    required String messageId,
+  }) async {
+    if (!_initialized) await init();
+    final recentBranchIds = _recentBranchIdsFor(conversationId);
+    if (_temporaryConversationIds.contains(conversationId)) {
+      final conversation = _draftConversations[conversationId];
+      final messages = _messagesCache[conversationId];
+      if (conversation == null || messages == null) return const <String>{};
+      final tree = await _loadOrCreateConversationTree(conversationId);
+      final updated = tree.deleteCurrentBranch(
+        messageId,
+        recentBranchIds: recentBranchIds,
+      );
+      final deletedIds = tree.edges.keys
+          .where((id) => !updated.edges.containsKey(id))
+          .toSet();
+      if (deletedIds.isEmpty) return const <String>{};
+      messages.removeWhere((message) => deletedIds.contains(message.id));
+      conversation.messageIds.removeWhere(deletedIds.contains);
+      conversation.chatSuggestions = const <String>[];
+      _temporaryConversationTrees[conversationId] = updated;
+      conversation.updatedAt = DateTime.now();
+      for (final id in deletedIds) {
+        _temporaryToolEvents.remove(id);
+        _temporaryGeminiThoughtSigs.remove(id);
+      }
+      await reloadActiveTimelineCache(conversationId);
+      notifyListeners();
+      return Set<String>.unmodifiable(deletedIds);
+    }
+
+    final result = await _repo.deleteCurrentBranch(
+      conversationId: conversationId,
+      messageId: messageId,
+      recentBranchIds: recentBranchIds,
+    );
+    if (result == null) return const <String>{};
+    _conversationsCache[conversationId] = result.conversation;
+    final deletedIds = <String>{};
+    for (final message in result.messages) {
+      deletedIds.add(message.id);
+      _toolEventsCache.remove(message.id);
+      _geminiThoughtSigsCache.remove(message.id);
+    }
+    _messagesCache.remove(conversationId);
+    final groupMessages = _groupMessagesCache[conversationId];
+    if (groupMessages != null) {
+      groupMessages.removeWhere((message) => deletedIds.contains(message.id));
+      if (groupMessages.isEmpty) _groupMessagesCache.remove(conversationId);
+    }
+    _messageOrderIds.remove(conversationId);
+    _firstGroupIndicesCache.remove(conversationId);
+    final tree = await _repo.loadConversationTree(conversationId);
+    if (tree != null) {
+      await _syncContextBoundaryToActivePath(conversationId, tree);
+      _pruneRecentBranches(conversationId, tree);
+    }
+    await reloadActiveTimelineCache(conversationId);
+    await _cleanupOrphanUploads();
+    _bumpConversationListRevision();
+    notifyListeners();
+    return Set<String>.unmodifiable(deletedIds);
+  }
+
+  Future<Set<String>> deleteMessageNode({
+    required String conversationId,
+    required String messageId,
+  }) async {
+    if (!_initialized) await init();
+    final recentBranchIds = _recentBranchIdsFor(conversationId);
+    if (_temporaryConversationIds.contains(conversationId)) {
+      final conversation = _draftConversations[conversationId];
+      final messages = _messagesCache[conversationId];
+      if (conversation == null || messages == null) return const <String>{};
+      final tree = await _loadOrCreateConversationTree(conversationId);
+      final updated = tree.deleteNodeKeepActiveBranch(
+        messageId,
+        recentBranchIds: recentBranchIds,
+      );
+      final deletedIds = tree.edges.keys
+          .where((id) => !updated.edges.containsKey(id))
+          .toSet();
+      if (deletedIds.isEmpty) return const <String>{};
+      messages.removeWhere((message) => deletedIds.contains(message.id));
+      conversation.messageIds.removeWhere(deletedIds.contains);
+      conversation.chatSuggestions = const <String>[];
+      _temporaryConversationTrees[conversationId] = updated;
+      conversation.updatedAt = DateTime.now();
+      for (final id in deletedIds) {
+        _temporaryToolEvents.remove(id);
+        _temporaryGeminiThoughtSigs.remove(id);
+      }
+      await reloadActiveTimelineCache(conversationId);
+      notifyListeners();
+      return Set<String>.unmodifiable(deletedIds);
+    }
+
+    final result = await _repo.deleteMessageNode(
+      conversationId: conversationId,
+      messageId: messageId,
+      recentBranchIds: recentBranchIds,
+    );
+    if (result == null) return const <String>{};
+    _conversationsCache[conversationId] = result.conversation;
+    final deletedIds = <String>{};
+    for (final message in result.messages) {
+      deletedIds.add(message.id);
+      _toolEventsCache.remove(message.id);
+      _geminiThoughtSigsCache.remove(message.id);
+    }
+    _messagesCache.remove(conversationId);
+    final groupMessages = _groupMessagesCache[conversationId];
+    if (groupMessages != null) {
+      groupMessages.removeWhere((message) => deletedIds.contains(message.id));
+      if (groupMessages.isEmpty) _groupMessagesCache.remove(conversationId);
+    }
+    _messageOrderIds.remove(conversationId);
+    _firstGroupIndicesCache.remove(conversationId);
+    final tree = await _repo.loadConversationTree(conversationId);
+    if (tree != null) {
+      await _syncContextBoundaryToActivePath(conversationId, tree);
+      _pruneRecentBranches(conversationId, tree);
+    }
+    await reloadActiveTimelineCache(conversationId);
+    await _cleanupOrphanUploads();
+    _bumpConversationListRevision();
+    notifyListeners();
+    return Set<String>.unmodifiable(deletedIds);
+  }
+
+  /// 删除 [messageId] 及其后续消息，但保留它之前的分支前缀。
+  Future<Set<String>> deleteMessageAndFollowing({
+    required String conversationId,
+    required String messageId,
+  }) async {
+    if (!_initialized) await init();
+    return deleteMessages(
+      conversationId: conversationId,
+      messageIds: {messageId},
       versionSelectionChanges: const {},
     );
   }

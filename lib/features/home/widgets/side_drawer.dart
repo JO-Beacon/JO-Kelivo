@@ -121,6 +121,10 @@ class SideDrawer extends StatefulWidget {
   @visibleForTesting
   static void Function(String seedId)? debugEnterSelectionMode;
 
+  /// 测试钩子：进入助手多选模式，并预先选中 [seedId]。
+  @visibleForTesting
+  static void Function(String seedId)? debugEnterAssistantSelectionMode;
+
   /// 位于 [indexInSection] 的侧边栏块的入场动画延迟。
   ///
   /// 限制绝对索引交错，使虚拟化深层行不会等待数秒。
@@ -193,6 +197,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     SideDrawer.debugRequestConversationListHostRebuild =
         _debugRequestConversationListHostRebuild;
     SideDrawer.debugEnterSelectionMode = _enterSelectionMode;
+    SideDrawer.debugEnterAssistantSelectionMode = _enterAssistantSelectionMode;
     _attachCloseTicker(widget.closePickerTicker);
     _mobileSearchFocusNode.addListener(() {
       if (_pointerInteractions) return;
@@ -1078,6 +1083,12 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     if (identical(SideDrawer.debugEnterSelectionMode, _enterSelectionMode)) {
       SideDrawer.debugEnterSelectionMode = null;
     }
+    if (identical(
+      SideDrawer.debugEnterAssistantSelectionMode,
+      _enterAssistantSelectionMode,
+    )) {
+      SideDrawer.debugEnterAssistantSelectionMode = null;
+    }
     _unbindHostDrawer();
     _assistantPickerEntry?.remove();
     _assistantPickerEntry = null;
@@ -1121,9 +1132,15 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   }
 
   bool _handleHostDrawerBack() {
-    if (!_selectionMode) return false;
-    _exitSelectionMode();
-    return true;
+    if (_assistantSelectionMode) {
+      _exitAssistantSelectionMode();
+      return true;
+    }
+    if (_selectionMode) {
+      _exitSelectionMode();
+      return true;
+    }
+    return false;
   }
 
   @override
@@ -2830,10 +2847,14 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     final inner = _hostDrawer != null
         ? drawerBody
         : PopScope(
-            canPop: !_selectionMode,
+            canPop: !_selectionMode && !_assistantSelectionMode,
             onPopInvokedWithResult: (didPop, _) {
-              if (!didPop && _selectionMode) {
-                _exitSelectionMode();
+              if (!didPop) {
+                if (_assistantSelectionMode) {
+                  _exitAssistantSelectionMode();
+                } else if (_selectionMode) {
+                  _exitSelectionMode();
+                }
               }
             },
             child: drawerBody,
@@ -3823,7 +3844,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
           onEditTap: () => _openAssistantSettings(assistant.id),
           onLongPress: () => _assistantSelectionMode
               ? _toggleAssistantSelected(assistant.id)
-              : _enterAssistantSelectionMode(assistant.id),
+              : _showAssistantItemMenu(assistant.id),
           onSecondaryTapDown: (pos) => _assistantSelectionMode
               ? _toggleAssistantSelected(assistant.id)
               : _showAssistantItemMenu(assistant.id, anchor: pos),

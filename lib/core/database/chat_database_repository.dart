@@ -5262,6 +5262,148 @@ class ChatDatabaseRepository {
     });
   }
 
+  /// 原子替换指定的导入会话集合。只删除这些会话及其级联数据，
+  /// 不影响其他会话、助手或业务配置。
+  Future<void> replaceParsedImportConversations(
+    List<ParsedChatImportBatch> conversationBatches,
+  ) async {
+    for (final batch in conversationBatches) {
+      for (final message in batch.messages) {
+        if (message.conversationId != batch.conversation.id) {
+          throw ArgumentError.value(
+            message.conversationId,
+            'message.conversationId',
+          );
+        }
+      }
+      if (batch.tree != null &&
+          batch.tree!.conversationId != batch.conversation.id) {
+        throw ArgumentError('conversation_tree_import_id_mismatch');
+      }
+    }
+
+    await _db.transaction(() async {
+      for (final batch in conversationBatches) {
+        await (_db.delete(
+          _db.conversationRows,
+        )..where((row) => row.id.equals(batch.conversation.id))).go();
+        final conversation = batch.conversation.copyWith(
+          messageIds: batch.messages
+              .map((message) => message.id)
+              .toList(growable: false),
+        );
+        final messages = [
+          for (final (messageOrder, message) in batch.messages.indexed)
+            (message: message, messageOrder: messageOrder),
+        ];
+        await _writeBackupData(
+          conversations: [conversation],
+          messages: messages,
+          toolEventsByMessageId: const {},
+          geminiSignaturesByMessageId: const {},
+          freshParts: true,
+        );
+        final tree = batch.tree;
+        if (tree != null) await _writeConversationTree(tree);
+      }
+    });
+  }
+
+  /// 在同一事务内定点替换会话并应用业务补丁，不触碰批次之外的数据。
+  Future<void> commitScopedParsedImport({
+    required BusinessRepository businessRepository,
+    required bool replaceExisting,
+    required List<ParsedChatImportBatch> conversationBatches,
+    required BusinessSnapshot Function(BusinessSnapshot current)
+    transformBusiness,
+  }) async {
+    if (!businessRepository.sharesDatabaseIdentity(_db)) {
+      throw StateError('chat_business_database_mismatch');
+    }
+    for (final batch in conversationBatches) {
+      for (final message in batch.messages) {
+        if (message.conversationId != batch.conversation.id) {
+          throw ArgumentError.value(
+            message.conversationId,
+            'message.conversationId',
+          );
+        }
+      }
+      if (batch.tree != null &&
+          batch.tree!.conversationId != batch.conversation.id) {
+        throw ArgumentError('conversation_tree_import_id_mismatch');
+      }
+    }
+    await _db.transaction(() async {
+      for (final batch in conversationBatches) {
+        final existingRow =
+            await (_db.select(_db.conversationRows)
+                  ..where((row) => row.id.equals(batch.conversation.id)))
+                .getSingleOrNull();
+        if (replaceExisting) {
+          // 生成运行的目标消息约束是延迟检查的，先清掉属于被覆盖会话的
+          // 运行记录，避免删除会话后在事务提交时留下悬空引用。
+          await (_db.delete(_db.generationRunRows)..where(
+                (row) => row.conversationId.equals(batch.conversation.id),
+              ))
+              .go();
+          await (_db.delete(
+            _db.conversationRows,
+          )..where((row) => row.id.equals(batch.conversation.id))).go();
+        }
+        final conversation = batch.conversation.copyWith(
+          messageIds: batch.messages
+              .map((message) => message.id)
+              .toList(growable: false),
+        );
+        final orderedMessages = [
+          for (final (messageOrder, message) in batch.messages.indexed)
+            (message: message, messageOrder: messageOrder),
+        ];
+        if (existingRow != null && !replaceExisting) {
+          // SQLite REPLACE 会先删除旧 conversation 行，从而触发延迟外键；
+          // 合并时改用 UPDATE 保留本地关联记录。
+          await (_db.update(_db.conversationRows)
+                ..where((row) => row.id.equals(conversation.id)))
+              .write(_conversationCompanion(conversation));
+          final existingMessageRows = await (_db.select(
+            _db.messageRows,
+          )..where((row) => row.conversationId.equals(conversation.id))).get();
+          final existingMessageIds = {
+            for (final row in existingMessageRows) row.id,
+          };
+          await _db.batch((batchWriter) {
+            for (final entry in orderedMessages) {
+              if (existingMessageIds.contains(entry.message.id)) continue;
+              batchWriter.insert(
+                _db.messageRows,
+                _messageCompanion(entry.message, entry.messageOrder),
+                mode: InsertMode.insertOrReplace,
+              );
+            }
+          });
+          for (final entry in orderedMessages) {
+            if (existingMessageIds.contains(entry.message.id)) continue;
+            await _replaceMessageParts(entry.message);
+          }
+        } else {
+          await _writeBackupData(
+            conversations: [conversation],
+            messages: orderedMessages,
+            toolEventsByMessageId: const {},
+            geminiSignaturesByMessageId: const {},
+            freshParts: true,
+          );
+        }
+        if (batch.tree != null) await _writeConversationTree(batch.tree!);
+      }
+      await businessRepository.transformSnapshot(
+        transformBusiness,
+        writeReceipt: true,
+      );
+    });
+  }
+
   Future<void> replaceBackupData({
     required List<Conversation> conversations,
     required List<({ChatMessage message, int messageOrder})> messages,
@@ -6786,6 +6928,40 @@ class ChatDatabaseRepository {
     );
   }
 
+  Future<DeletedMessagesResult?> deleteCurrentBranch({
+    required String conversationId,
+    required String messageId,
+    Iterable<String> recentBranchIds = const <String>[],
+  }) {
+    return _observer.measure(
+      ChatDatabaseOperation.commandDeleteMessages,
+      () => _deleteMessages(
+        conversationId: conversationId,
+        messageIds: {messageId},
+        versionSelectionChanges: const {},
+        deleteCurrentBranch: true,
+        recentBranchIds: recentBranchIds,
+      ),
+    );
+  }
+
+  Future<DeletedMessagesResult?> deleteMessageNode({
+    required String conversationId,
+    required String messageId,
+    Iterable<String> recentBranchIds = const <String>[],
+  }) {
+    return _observer.measure(
+      ChatDatabaseOperation.commandDeleteMessages,
+      () => _deleteMessages(
+        conversationId: conversationId,
+        messageIds: {messageId},
+        versionSelectionChanges: const {},
+        deleteMessageNode: true,
+        recentBranchIds: recentBranchIds,
+      ),
+    );
+  }
+
   Future<DeletedMessagesResult?> deleteMessages({
     required String conversationId,
     required Set<String> messageIds,
@@ -6810,6 +6986,8 @@ class ChatDatabaseRepository {
     required Set<String> messageIds,
     required Map<String, int?> versionSelectionChanges,
     bool preserveDescendants = false,
+    bool deleteCurrentBranch = false,
+    bool deleteMessageNode = false,
     Iterable<String> recentBranchIds = const <String>[],
   }) async {
     if (messageIds.isEmpty) return null;
@@ -6843,7 +7021,17 @@ class ChatDatabaseRepository {
       final treeBeforeDelete = await _loadOrCreateConversationTree(
         conversationId,
       );
-      final treeAfterDelete = preserveDescendants
+      final treeAfterDelete = deleteMessageNode
+          ? treeBeforeDelete.deleteNodeKeepActiveBranch(
+              requestedRows.single.id,
+              recentBranchIds: recentBranchIds,
+            )
+          : deleteCurrentBranch
+          ? treeBeforeDelete.deleteCurrentBranch(
+              requestedRows.single.id,
+              recentBranchIds: recentBranchIds,
+            )
+          : preserveDescendants
           ? treeBeforeDelete.removeMessagesOnly(
               requestedRows.map((row) => row.id),
               recentBranchIds: recentBranchIds,

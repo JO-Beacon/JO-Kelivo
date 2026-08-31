@@ -717,6 +717,21 @@ class AppLocalizationsEn extends AppLocalizations {
       'Are you sure you want to delete this message? Following messages will remain.';
 
   @override
+  String get homePageDeleteMessageAndFollowing =>
+      'Delete This Message and Following';
+
+  @override
+  String get homePageDeleteMessageAndFollowingConfirm =>
+      'Are you sure you want to delete this message and all following messages? Other branches will remain.';
+
+  @override
+  String get homePageDeleteMessageNode => 'Delete This Node';
+
+  @override
+  String get homePageDeleteMessageNodeConfirm =>
+      'Are you sure you want to delete this node? Its non-active branches will be removed, while the active branch\'s following messages will remain.';
+
+  @override
   String get homePageDeleteAllVersions => 'Delete All Branches';
 
   @override
@@ -1064,8 +1079,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get avatarEditorDone => 'Done';
 
   @override
-  String get avatarEditorCropHint =>
-      'Drag the image with the left mouse button to reposition it; pinch or use the mouse wheel to zoom. The square frame stays fixed.';
+  String get avatarEditorCropHintDesktop =>
+      'Drag the image with the left mouse button to reposition it and use the mouse wheel to zoom. The square frame stays fixed.';
+
+  @override
+  String get avatarEditorCropHintMobile =>
+      'Drag the image to reposition it and pinch to zoom. The square frame stays fixed.';
 
   @override
   String get avatarEditorRotateLeft => 'Rotate left 90°';
@@ -1895,6 +1914,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Choose a restore mode. The chat and file switches determine which components are included.';
 
   @override
+  String get backupPageDeepSeekSelectImportMode =>
+      'Select DeepSeek Import Mode';
+
+  @override
+  String get backupPageDeepSeekSelectImportModeDescription =>
+      'Choose how to import DeepSeek conversations. Other assistants, conversations, groups, and settings are not affected.';
+
+  @override
   String get backupPageOverwriteMode => 'Complete Overwrite';
 
   @override
@@ -1902,11 +1929,19 @@ class AppLocalizationsEn extends AppLocalizations {
       'Replace the selected components; keep unselected components and unrelated local settings';
 
   @override
+  String get backupPageDeepSeekOverwriteModeDescription =>
+      'Keep the original conversation, and create or update an additional copy under the correct DeepSeek assistant when needed. Non-DeepSeek data is not affected.';
+
+  @override
   String get backupPageMergeMode => 'Smart merge';
 
   @override
   String get backupPageMergeModeDescription =>
       'Keep local data while merging the backup. Matching messages are deduplicated, new messages join the existing conversation, and conflicts stay separate.';
+
+  @override
+  String get backupPageDeepSeekMergeModeDescription =>
+      'Match conversations by DeepSeek conversation ID. Existing conversations are skipped without moving them; new conversations are imported under their dedicated DeepSeek assistants.';
 
   @override
   String get backupPageRestore => 'Restore';
@@ -2039,6 +2074,42 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageLocalBackup => 'Local Backup';
 
   @override
+  String get backupPageNativeBackup => 'Native Backup';
+
+  @override
+  String get backupPageKelivoCompatibleBackup => 'Kelivo-Compatible Backup';
+
+  @override
+  String get backupPageKelivoFormat => 'Kelivo';
+
+  @override
+  String get backupPageCuplivoFormat => 'Cuplivo';
+
+  @override
+  String get backupPageCuplivoBackup => 'Cuplivo Backup';
+
+  @override
+  String get backupPageExportAction => 'Export';
+
+  @override
+  String get backupPageImportAction => 'Import';
+
+  @override
+  String get backupPageCherryStudioName => 'Cherry Studio';
+
+  @override
+  String get backupPageChatboxName => 'Chatbox (>=1.22)';
+
+  @override
+  String get backupPageChatboxLegacyName => 'Chatbox (<1.22)';
+
+  @override
+  String get backupPageDeepSeekName => 'DeepSeek Web/App';
+
+  @override
+  String get backupPageExternalImport => 'External Import';
+
+  @override
   String get backupPageImportFromCherryStudio => 'Import from Cherry Studio';
 
   @override
@@ -2058,6 +2129,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupPageImportFromDeepSeek => 'Import from DeepSeek Web/App';
+
+  @override
+  String get backupPageDeepSeekImportAssistantGroupName =>
+      'DeepSeek Web Import';
+
+  @override
+  String get backupPageDeepSeekImportProviderName => 'DeepSeek Web';
+
+  @override
+  String get backupPageDeepSeekImportFailed =>
+      'DeepSeek import failed. Check that the selected file is a valid DeepSeek export.';
 
   @override
   String get backupReminderSectionTitle => 'Backup Reminder';
@@ -2422,6 +2504,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get messageMoreSheetDeleteMessageOnly => 'Delete This Message';
+
+  @override
+  String get messageMoreSheetDeleteMessageAndFollowing =>
+      'Delete This Message and Following';
+
+  @override
+  String get messageMoreSheetDeleteMessageNode => 'Delete This Node';
 
   @override
   String get messageMoreSheetDelete => 'Delete Current Branch';

@@ -11,12 +11,15 @@ import '../../core/models/backup.dart';
 import '../../core/models/backup_task_progress.dart';
 import '../../core/providers/backup_provider.dart';
 import '../../core/providers/backup_reminder_provider.dart';
+import '../../core/providers/assistant_group_provider.dart';
+import '../../core/providers/assistant_provider.dart';
 import '../../core/providers/s3_backup_provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/services/chat/chat_service.dart';
 import '../../core/services/backup/data_sync.dart';
 import '../../core/services/backup/cherry_importer.dart';
 import '../../core/services/backup/chatbox_importer.dart';
+import '../../core/services/backup/deepseek_importer.dart';
 import '../../shared/dialogs/loading_task_dialog.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../shared/widgets/restart_app_action.dart';
@@ -325,7 +328,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     if (path == null || !mounted) return;
     final mode = await showDialog<RestoreMode>(
       context: context,
-      builder: (_) => _RestoreModeDialog(),
+      builder: (_) => const _RestoreModeDialog(),
     );
     if (mode == null || !mounted) return;
 
@@ -410,6 +413,80 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
       message: l10n.backupPageOpenUserDataFailed,
       type: NotificationType.error,
     );
+  }
+
+  Future<void> _importDeepSeek() async {
+    final l10n = AppLocalizations.of(context)!;
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['zip', 'json'],
+      allowMultiple: false,
+    );
+    final path = result?.files.single.path;
+    if (path == null || !mounted) return;
+    final mode = await showDialog<RestoreMode>(
+      context: context,
+      builder: (_) => const _RestoreModeDialog(deepSeek: true),
+    );
+    if (mode == null || !mounted) return;
+    try {
+      final imported = await runWithLoadingTaskDialog<DeepSeekImportResult>(
+        context: context,
+        task: (onProgress) => DeepSeekImporter.importFromDeepSeek(
+          file: File(path),
+          mode: mode,
+          businessRepository: context.read<BusinessRepository>(),
+          chatService: context.read<ChatService>(),
+          assistantProvider: context.read<AssistantProvider>(),
+          assistantGroupProvider: context.read<AssistantGroupProvider>(),
+          assistantGroupName: l10n.backupPageDeepSeekImportAssistantGroupName,
+          providerName: l10n.backupPageDeepSeekImportProviderName,
+          onProgress: onProgress,
+        ),
+        label: l10n.backupPageRestore,
+        cancelLabel: l10n.backupPageCancel,
+      );
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => PopScope(
+          canPop: false,
+          child: AlertDialog(
+            title: Text(l10n.backupPageRestartRequired),
+            content: Text(
+              '${l10n.backupPageImportFromDeepSeek}:\n'
+              ' • ${l10n.migrationConversationCount}: ${imported.conversations}\n'
+              ' • ${l10n.migrationMessageCount}: ${imported.messages}\n\n'
+              '${l10n.backupPageRestartContent}',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () async {
+                  if (await requestAppRestart(
+                        dialogContext,
+                        PlatformUtils.restartApp,
+                      ) &&
+                      dialogContext.mounted) {
+                    Navigator.of(dialogContext).pop();
+                  }
+                },
+                child: Text(l10n.backupPageOK),
+              ),
+            ],
+          ),
+        ),
+      );
+    } on BackupCancelledException {
+      return;
+    } catch (error) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.backupPageDeepSeekImportFailed,
+        type: NotificationType.error,
+      );
+    }
   }
 
   @override
@@ -1055,26 +1132,12 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     ColorScheme cs,
   ) {
     return SliverToBoxAdapter(
-      child: _sectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
+          _sectionCard(
             children: [
-              Expanded(
-                child: Text(
-                  l10n.backupPageLocalBackup,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: AppFontWeights.semibold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
+              _BackupCategoryLabel(label: l10n.backupPageNativeBackup),
               Row(
                 children: [
                   Expanded(
@@ -1096,147 +1159,186 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                   ),
                 ],
               ),
-              _DeskIosButton(
-                label: l10n.backupPageExportKelivoBackup,
-                filled: false,
-                dense: true,
-                enabled: false,
-                onTap: () =>
-                    _exportLocalBackup(context, kelivoCompatible: true),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _sectionCard(
+            children: [
+              _BackupCategoryLabel(
+                label: l10n.backupPageKelivoCompatibleBackup,
               ),
-              _DeskIosButton(
-                label: l10n.backupPageImportKelivoBackup,
-                filled: false,
-                dense: true,
-                onTap: () =>
-                    _restoreLocalBackup(context, kelivoCompatible: true),
+              _BackupSubcategoryLabel(label: l10n.backupPageKelivoFormat),
+              Row(
+                children: [
+                  Expanded(
+                    child: _DeskIosButton(
+                      label: l10n.backupPageExportAction,
+                      filled: false,
+                      dense: true,
+                      enabled: false,
+                      onTap: () =>
+                          _exportLocalBackup(context, kelivoCompatible: true),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: _DeskIosButton(
+                      label: l10n.backupPageImportAction,
+                      filled: false,
+                      dense: true,
+                      onTap: () =>
+                          _restoreLocalBackup(context, kelivoCompatible: true),
+                    ),
+                  ),
+                ],
               ),
+              const SizedBox(height: 10),
+              _BackupSubcategoryLabel(label: l10n.backupPageCuplivoFormat),
               _DeskIosButton(
-                label: l10n.backupPageImportFromCherryStudio,
-                filled: false,
-                dense: true,
-                enabled: false,
-                onTap: () async {
-                  final rootCtx = Navigator.of(
-                    context,
-                    rootNavigator: true,
-                  ).context;
-                  final result = await FilePicker.platform.pickFiles(
-                    type: FileType.any,
-                    allowMultiple: false,
-                  );
-                  final path = result?.files.single.path;
-                  if (path == null) return;
-                  final f = File(path);
-                  if (!context.mounted) return;
-                  final mode = await showDialog<RestoreMode>(
-                    context: context,
-                    builder: (_) => _RestoreModeDialog(),
-                  );
-                  if (mode == null) return;
-                  if (!context.mounted) return;
-                  final chat = context.read<ChatService>();
-                  try {
-                    await CherryImporter.importFromCherryStudio(
-                      file: f,
-                      mode: mode,
-                      businessRepository: context.read<BusinessRepository>(),
-                      chatService: chat,
-                    );
-                    if (!rootCtx.mounted) return;
-                    await showDialog(
-                      context: rootCtx,
-                      barrierDismissible: false,
-                      builder: (dctx) => AlertDialog(
-                        backgroundColor: cs.surface,
-                        shape: DesktopDialogStyle.shape(dctx),
-                        title: Text(l10n.backupPageRestartRequired),
-                        content: Text(l10n.backupPageRestartContent),
-                        actions: [
-                          TextButton(
-                            onPressed: () async {
-                              if (await requestAppRestart(
-                                    rootCtx,
-                                    PlatformUtils.restartApp,
-                                  ) &&
-                                  rootCtx.mounted) {
-                                Navigator.of(rootCtx).pop();
-                              }
-                            },
-                            child: Text(l10n.backupPageOK),
-                          ),
-                        ],
-                      ),
-                    );
-                  } on CherryUnsupportedBackupVersionException catch (e) {
-                    if (!rootCtx.mounted) return;
-                    await showDialog(
-                      context: rootCtx,
-                      barrierDismissible: false,
-                      builder: (dctx) => AlertDialog(
-                        backgroundColor: cs.surface,
-                        shape: DesktopDialogStyle.shape(dctx),
-                        title: Text(l10n.backupPageImportFromCherryStudio),
-                        content: Text(
-                          l10n.backupPageCherryStudioUnsupportedBackupVersion(
-                            '${e.version}',
-                          ),
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(dctx).pop(),
-                            child: Text(l10n.backupPageOK),
-                          ),
-                        ],
-                      ),
-                    );
-                  } catch (e) {
-                    if (!rootCtx.mounted) return;
-                    await showDialog(
-                      context: rootCtx,
-                      barrierDismissible: false,
-                      builder: (dctx) => AlertDialog(
-                        backgroundColor: cs.surface,
-                        shape: DesktopDialogStyle.shape(dctx),
-                        title: Text(l10n.backupPageImportFromCherryStudio),
-                        content: Text(e.toString()),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(dctx).pop(),
-                            child: Text(l10n.backupPageOK),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-                },
-              ),
-              _DeskIosButton(
-                label: l10n.backupPageImportFromChatbox,
+                label: l10n.backupPageExportAction,
                 filled: false,
                 dense: true,
                 enabled: false,
               ),
-              SizedBox(
-                width: double.infinity,
-                child: _DeskIosButton(
-                  label: l10n.backupPageImportFromChatboxLegacy,
-                  filled: false,
-                  dense: true,
-                  onTap: _importLegacyChatbox,
-                ),
-              ),
+              const SizedBox(height: 6),
               _DeskIosButton(
-                label: l10n.backupPageImportFromDeepSeek,
+                label: l10n.backupPageImportAction,
                 filled: false,
                 dense: true,
-                onTap: () {
-                  showAppSnackBar(
-                    context,
-                    message: l10n.backupPageNotSupportedYet,
-                    type: NotificationType.info,
-                  );
-                },
+                enabled: false,
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _sectionCard(
+            children: [
+              _BackupCategoryLabel(label: l10n.backupPageExternalImport),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _DeskIosButton(
+                    label: l10n.backupPageCherryStudioName,
+                    filled: false,
+                    dense: true,
+                    enabled: false,
+                    onTap: () async {
+                      final rootCtx = Navigator.of(
+                        context,
+                        rootNavigator: true,
+                      ).context;
+                      final result = await FilePicker.platform.pickFiles(
+                        type: FileType.any,
+                        allowMultiple: false,
+                      );
+                      final path = result?.files.single.path;
+                      if (path == null) return;
+                      final f = File(path);
+                      if (!context.mounted) return;
+                      final mode = await showDialog<RestoreMode>(
+                        context: context,
+                        builder: (_) => _RestoreModeDialog(),
+                      );
+                      if (mode == null) return;
+                      if (!context.mounted) return;
+                      final chat = context.read<ChatService>();
+                      try {
+                        await CherryImporter.importFromCherryStudio(
+                          file: f,
+                          mode: mode,
+                          businessRepository: context
+                              .read<BusinessRepository>(),
+                          chatService: chat,
+                        );
+                        if (!rootCtx.mounted) return;
+                        await showDialog(
+                          context: rootCtx,
+                          barrierDismissible: false,
+                          builder: (dctx) => AlertDialog(
+                            backgroundColor: cs.surface,
+                            shape: DesktopDialogStyle.shape(dctx),
+                            title: Text(l10n.backupPageRestartRequired),
+                            content: Text(l10n.backupPageRestartContent),
+                            actions: [
+                              TextButton(
+                                onPressed: () async {
+                                  if (await requestAppRestart(
+                                        rootCtx,
+                                        PlatformUtils.restartApp,
+                                      ) &&
+                                      rootCtx.mounted) {
+                                    Navigator.of(rootCtx).pop();
+                                  }
+                                },
+                                child: Text(l10n.backupPageOK),
+                              ),
+                            ],
+                          ),
+                        );
+                      } on CherryUnsupportedBackupVersionException catch (e) {
+                        if (!rootCtx.mounted) return;
+                        await showDialog(
+                          context: rootCtx,
+                          barrierDismissible: false,
+                          builder: (dctx) => AlertDialog(
+                            backgroundColor: cs.surface,
+                            shape: DesktopDialogStyle.shape(dctx),
+                            title: Text(l10n.backupPageImportFromCherryStudio),
+                            content: Text(
+                              l10n.backupPageCherryStudioUnsupportedBackupVersion(
+                                '${e.version}',
+                              ),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(dctx).pop(),
+                                child: Text(l10n.backupPageOK),
+                              ),
+                            ],
+                          ),
+                        );
+                      } catch (e) {
+                        if (!rootCtx.mounted) return;
+                        await showDialog(
+                          context: rootCtx,
+                          barrierDismissible: false,
+                          builder: (dctx) => AlertDialog(
+                            backgroundColor: cs.surface,
+                            shape: DesktopDialogStyle.shape(dctx),
+                            title: Text(l10n.backupPageImportFromCherryStudio),
+                            content: Text(e.toString()),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(dctx).pop(),
+                                child: Text(l10n.backupPageOK),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 6),
+                  _DeskIosButton(
+                    label: l10n.backupPageChatboxName,
+                    filled: false,
+                    dense: true,
+                    enabled: false,
+                  ),
+                  const SizedBox(height: 6),
+                  _DeskIosButton(
+                    label: l10n.backupPageChatboxLegacyName,
+                    filled: false,
+                    dense: true,
+                    onTap: _importLegacyChatbox,
+                  ),
+                  const SizedBox(height: 6),
+                  _DeskIosButton(
+                    label: l10n.backupPageDeepSeekName,
+                    filled: false,
+                    dense: true,
+                    onTap: _importDeepSeek,
+                  ),
+                ],
               ),
             ],
           ),
@@ -1817,6 +1919,10 @@ class _ItemRow extends StatelessWidget {
 }
 
 class _RestoreModeDialog extends StatelessWidget {
+  const _RestoreModeDialog({this.deepSeek = false});
+
+  final bool deepSeek;
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -1833,7 +1939,9 @@ class _RestoreModeDialog extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                l10n.backupPageSelectImportMode,
+                deepSeek
+                    ? l10n.backupPageDeepSeekSelectImportMode
+                    : l10n.backupPageSelectImportMode,
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: AppFontWeights.emphasis,
@@ -1841,7 +1949,9 @@ class _RestoreModeDialog extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                l10n.backupPageSelectImportModeDescription,
+                deepSeek
+                    ? l10n.backupPageDeepSeekSelectImportModeDescription
+                    : l10n.backupPageSelectImportModeDescription,
                 style: TextStyle(
                   fontSize: 13,
                   color: cs.onSurface.withValues(alpha: 0.8),
@@ -1850,13 +1960,17 @@ class _RestoreModeDialog extends StatelessWidget {
               const SizedBox(height: 12),
               _RestoreModeTile(
                 title: l10n.backupPageOverwriteMode,
-                subtitle: l10n.backupPageOverwriteModeDescription,
+                subtitle: deepSeek
+                    ? l10n.backupPageDeepSeekOverwriteModeDescription
+                    : l10n.backupPageOverwriteModeDescription,
                 onTap: () => Navigator.of(context).pop(RestoreMode.overwrite),
               ),
               const SizedBox(height: 8),
               _RestoreModeTile(
                 title: l10n.backupPageMergeMode,
-                subtitle: l10n.backupPageMergeModeDescription,
+                subtitle: deepSeek
+                    ? l10n.backupPageDeepSeekMergeModeDescription
+                    : l10n.backupPageMergeModeDescription,
                 onTap: () => Navigator.of(context).pop(RestoreMode.merge),
               ),
               const SizedBox(height: 12),
@@ -2058,6 +2172,50 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BackupCategoryLabel extends StatelessWidget {
+  const _BackupCategoryLabel({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: AppFontWeights.semibold,
+          color: cs.onSurface.withValues(alpha: 0.95),
+        ),
+      ),
+    );
+  }
+}
+
+class _BackupSubcategoryLabel extends StatelessWidget {
+  const _BackupSubcategoryLabel({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: AppFontWeights.semibold,
+          color: cs.onSurface.withValues(alpha: 0.68),
         ),
       ),
     );

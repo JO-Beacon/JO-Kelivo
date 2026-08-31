@@ -1242,7 +1242,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                               _MenuItem(
                                 icon: Lucide.Trash2,
                                 danger: true,
-                                label: l10n.messageMoreSheetDelete,
+                                label: l10n
+                                    .messageMoreSheetDeleteMessageAndFollowing,
                                 onTap: () {
                                   Navigator.of(ctx).pop();
                                   (widget.onDelete ?? widget.onMore)?.call();
@@ -1690,7 +1691,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           ),
         DesktopContextMenuItem(
           icon: Lucide.Trash2,
-          label: l10n.messageMoreSheetDelete,
+          label: l10n.messageMoreSheetDeleteMessageAndFollowing,
           danger: true,
           onTap: () => (widget.onDelete ?? widget.onMore)?.call(),
         ),

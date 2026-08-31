@@ -134,7 +134,9 @@ class MessageListView extends StatefulWidget {
     this.onEditMessage,
     this.onSwitchMessageRole,
     this.onDeleteMessageOnly,
-    this.onDeleteMessage,
+    this.onDeleteMessageAndFollowing,
+    this.onDeleteMessageNode,
+    this.onDeleteCurrentBranch,
     this.onDeleteAllVersions,
     this.onMessageFork,
     this.onConversationFork,
@@ -237,7 +239,9 @@ class MessageListView extends StatefulWidget {
   final OnEditMessage? onEditMessage;
   final OnSwitchMessageRole? onSwitchMessageRole;
   final OnDeleteMessage? onDeleteMessageOnly;
-  final OnDeleteMessage? onDeleteMessage;
+  final OnDeleteMessage? onDeleteMessageAndFollowing;
+  final OnDeleteMessage? onDeleteMessageNode;
+  final OnDeleteMessage? onDeleteCurrentBranch;
   final OnDeleteAllVersions? onDeleteAllVersions;
   final OnMessageFork? onMessageFork;
   final OnConversationFork? onConversationFork;
@@ -1943,20 +1947,33 @@ class _MessageListViewState extends State<MessageListView> {
           ? () => widget.onEditMessage?.call(message)
           : null,
       onDelete: message.role == 'user'
-          ? () => widget.onDeleteMessage?.call(message, widget.byGroup)
+          ? () => widget.onDeleteMessageAndFollowing?.call(
+              message,
+              widget.byGroup,
+            )
           : null,
       onMore: () async {
         final action = await showMessageMoreSheet(
           context,
           message,
           canDeleteAllVersions: siblingBranchIds.length > 1,
+          canDeleteCurrentBranch: siblingBranchIds.length > 1,
+          canDeleteMessageNode: siblingBranchIds.length > 1,
+          canUseLinearDeleteActions: !useBranchSelector,
           canCreateBranch: widget.onMessageFork != null,
           canCreateConversationFork: widget.onConversationFork != null,
         );
-        if (action == MessageMoreAction.deleteCurrentVersion) {
-          await widget.onDeleteMessage?.call(message, widget.byGroup);
+        if (action == MessageMoreAction.deleteMessageAndFollowing) {
+          await widget.onDeleteMessageAndFollowing?.call(
+            message,
+            widget.byGroup,
+          );
+        } else if (action == MessageMoreAction.deleteMessageNode) {
+          await widget.onDeleteMessageNode?.call(message, widget.byGroup);
         } else if (action == MessageMoreAction.deleteMessageOnly) {
           await widget.onDeleteMessageOnly?.call(message, widget.byGroup);
+        } else if (action == MessageMoreAction.deleteCurrentBranch) {
+          await widget.onDeleteCurrentBranch?.call(message, widget.byGroup);
         } else if (action == MessageMoreAction.deleteAllVersions) {
           await widget.onDeleteAllVersions?.call(message, widget.byGroup);
         } else if (action == MessageMoreAction.edit) {

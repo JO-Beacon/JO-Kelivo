@@ -1116,6 +1116,14 @@ class ChatScrollController {
     _lastJumpUserMessageId = null;
   }
 
+  /// 取消当前尚未执行的程序化滚动请求。
+  ///
+  /// 消息树发生结构性变化时，旧会话/旧分支排队的滚动目标已经失效，
+  /// 必须在新布局中止它，避免删除分支后被旧请求强制带到列表末尾。
+  void cancelPendingNavigation({bool stopDrivenScroll = true}) {
+    _cancelProgrammaticNavigation(stopDrivenScroll: stopDrivenScroll);
+  }
+
   /// 设置自动保持底部状态。
   void setAutoStickToBottom(bool value) {
     _autoStickToBottom = value;

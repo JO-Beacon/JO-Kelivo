@@ -26,10 +26,9 @@ import '../features/assistant/pages/assistant_settings_edit_page.dart'
 import '../core/providers/assistant_provider.dart';
 import '../core/providers/assistant_group_provider.dart';
 import '../features/home/controllers/chat_actions.dart' show ChatActions;
+import '../features/home/widgets/assistant_avatar.dart';
 import '../features/assistant/widgets/assistant_selection_bars.dart';
 import '../core/models/assistant_list_item.dart';
-import '../utils/avatar_cache.dart';
-import '../utils/sandbox_path_resolver.dart';
 import 'dart:io' show Directory, File, Platform;
 import '../utils/app_directories.dart';
 import 'add_provider_dialog.dart' show showDesktopAddProviderDialog;

@@ -197,6 +197,7 @@ void main() {
     SideDrawer.debugSidebarRowsComputeCount = 0;
     SideDrawer.debugRequestConversationListHostRebuild = null;
     SideDrawer.debugEnterSelectionMode = null;
+    SideDrawer.debugEnterAssistantSelectionMode = null;
   });
 
   tearDown(() async {
@@ -564,6 +565,52 @@ void main() {
     expect(find.text(l10n.sideDrawerSelectionTitle(1)), findsNothing);
     expect(drawerController.isOpen, isTrue);
   });
+
+  testWidgets(
+    'back exits assistant selection while interactive drawer stays open',
+    (tester) async {
+      final service = createService();
+      await tester.runAsync(service.init);
+      final provider = _TestAssistantProvider(
+        preferences: createBusinessTestPreferences(),
+      );
+      addTearDown(provider.dispose);
+      provider.seedAssistants(const <Assistant>[
+        Assistant(id: 'assistant-a', name: 'Assistant A'),
+      ], currentAssistantId: 'assistant-a');
+      final drawerController = InteractiveDrawerController();
+      addTearDown(drawerController.dispose);
+
+      await pumpDrawer(
+        tester,
+        service,
+        presentation: SidebarPresentation.overlay,
+        capabilities: const SidebarCapabilities(
+          topicsOnly: true,
+          pointerInteractions: false,
+        ),
+        desktopTopicsOnly: false,
+        interactiveDrawerController: drawerController,
+        assistantProvider: provider,
+      );
+      drawerController.open();
+      await tester.pumpAndSettle();
+
+      SideDrawer.debugEnterAssistantSelectionMode!('assistant-a');
+      await tester.pump();
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(SideDrawer)),
+      )!;
+      expect(find.text(l10n.assistantSelectionTitle(1)), findsOneWidget);
+      expect(drawerController.handleBack, isNotNull);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.text(l10n.assistantSelectionTitle(1)), findsNothing);
+      expect(drawerController.isOpen, isTrue);
+    },
+  );
 
   testWidgets('partial batch move reports moved and generating counts', (
     tester,

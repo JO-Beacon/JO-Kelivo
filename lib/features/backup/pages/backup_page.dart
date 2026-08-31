@@ -19,6 +19,8 @@ import '../../../core/models/backup_task_progress.dart';
 import '../../../core/models/progress_update.dart';
 import '../../../core/providers/backup_provider.dart';
 import '../../../core/providers/backup_reminder_provider.dart';
+import '../../../core/providers/assistant_group_provider.dart';
+import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/s3_backup_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -28,6 +30,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/restart_app_action.dart';
 import '../../../core/services/backup/cherry_importer.dart';
 import '../../../core/services/backup/chatbox_importer.dart';
+import '../../../core/services/backup/deepseek_importer.dart';
 import '../../../utils/platform_utils.dart';
 import '../backup_restore_error_message.dart';
 import '../backup_restart_dialog.dart';
@@ -150,14 +153,21 @@ class _BackupPageState extends State<BackupPage> {
     );
   }
 
-  Future<RestoreMode?> _chooseImportModeDialog(BuildContext context) {
+  Future<RestoreMode?> _chooseImportModeDialog(
+    BuildContext context, {
+    bool deepSeek = false,
+  }) {
     final l10n = AppLocalizations.of(context)!;
     final cardColor = context.appColors.surfaceFill;
 
     return showDialog<RestoreMode>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.backupPageSelectImportMode),
+        title: Text(
+          deepSeek
+              ? l10n.backupPageDeepSeekSelectImportMode
+              : l10n.backupPageSelectImportMode,
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -165,7 +175,9 @@ class _BackupPageState extends State<BackupPage> {
               color: cardColor,
               icon: Lucide.RotateCw,
               title: l10n.backupPageOverwriteMode,
-              subtitle: l10n.backupPageOverwriteModeDescription,
+              subtitle: deepSeek
+                  ? l10n.backupPageDeepSeekOverwriteModeDescription
+                  : l10n.backupPageOverwriteModeDescription,
               onTap: () => Navigator.of(ctx).pop(RestoreMode.overwrite),
             ),
             const SizedBox(height: 10),
@@ -173,7 +185,9 @@ class _BackupPageState extends State<BackupPage> {
               color: cardColor,
               icon: Lucide.GitFork,
               title: l10n.backupPageMergeMode,
-              subtitle: l10n.backupPageMergeModeDescription,
+              subtitle: deepSeek
+                  ? l10n.backupPageDeepSeekMergeModeDescription
+                  : l10n.backupPageMergeModeDescription,
               onTap: () => Navigator.of(ctx).pop(RestoreMode.merge),
             ),
           ],
@@ -323,8 +337,8 @@ class _BackupPageState extends State<BackupPage> {
                 header(l10n.backupReminderSectionTitle),
                 const _BackupReminderMobileSection(),
 
-                // Section 2: 本地备份
-                ..._buildMobileLocalBackupSection(context, l10n, vm, header),
+                // Section 2: 数据迁移与兼容入口
+                ..._buildMobileLocalBackupSection(context, l10n, vm),
 
                 // Section 3: WebDAV备份
                 header(l10n.backupPageWebDavBackup),
@@ -1165,12 +1179,11 @@ class _BackupPageState extends State<BackupPage> {
     BuildContext context,
     AppLocalizations l10n,
     BackupProvider vm,
-    Widget Function(String text, {bool first}) header,
   ) {
     return [
-      header(l10n.backupPageLocalBackup),
       _iosSectionCard(
         children: [
+          _BackupCategoryLabel(label: l10n.backupPageNativeBackup),
           Row(
             children: [
               Expanded(
@@ -1194,25 +1207,53 @@ class _BackupPageState extends State<BackupPage> {
               ),
             ],
           ),
+        ],
+      ),
+      const SizedBox(height: 10),
+      _iosSectionCard(
+        children: [
+          _BackupCategoryLabel(label: l10n.backupPageKelivoCompatibleBackup),
+          _BackupSubcategoryLabel(label: l10n.backupPageKelivoFormat),
           _iosDivider(context),
           _iosNavRow(
             context,
             icon: Lucide.Export,
-            label: l10n.backupPageExportKelivoBackup,
+            label: l10n.backupPageExportAction,
             enabled: false,
           ),
           _iosDivider(context),
           _iosNavRow(
             context,
             icon: Lucide.Import2,
-            label: l10n.backupPageImportKelivoBackup,
+            label: l10n.backupPageImportAction,
             onTap: () => _doImportLocal(context, vm),
+          ),
+          _BackupSubcategoryLabel(label: l10n.backupPageCuplivoFormat),
+          _iosDivider(context),
+          _iosNavRow(
+            context,
+            icon: Lucide.Box,
+            label: l10n.backupPageExportAction,
+            enabled: false,
           ),
           _iosDivider(context),
           _iosNavRow(
             context,
             icon: Lucide.Box,
-            label: l10n.backupPageImportFromCherryStudio,
+            label: l10n.backupPageImportAction,
+            enabled: false,
+          ),
+        ],
+      ),
+      const SizedBox(height: 10),
+      _iosSectionCard(
+        children: [
+          _BackupCategoryLabel(label: l10n.backupPageExternalImport),
+          _iosDivider(context),
+          _iosNavRow(
+            context,
+            icon: Lucide.Box,
+            label: l10n.backupPageCherryStudioName,
             enabled: false,
             onTap: () async {
               // 1）提醒用户 Cherry 导入为实验性功能
@@ -1303,14 +1344,14 @@ class _BackupPageState extends State<BackupPage> {
           _iosNavRow(
             context,
             icon: Lucide.Box,
-            label: l10n.backupPageImportFromChatbox,
+            label: l10n.backupPageChatboxName,
             enabled: false,
           ),
           _iosDivider(context),
           _iosNavRow(
             context,
             icon: Lucide.Box,
-            label: l10n.backupPageImportFromChatboxLegacy,
+            label: l10n.backupPageChatboxLegacyName,
             onTap: () => _doImportChatbox(
               context,
               label: l10n.backupPageImportFromChatboxLegacy,
@@ -1320,14 +1361,8 @@ class _BackupPageState extends State<BackupPage> {
           _iosNavRow(
             context,
             icon: Lucide.Box,
-            label: l10n.backupPageImportFromDeepSeek,
-            onTap: () {
-              showAppSnackBar(
-                context,
-                message: l10n.backupPageNotSupportedYet,
-                type: NotificationType.info,
-              );
-            },
+            label: l10n.backupPageDeepSeekName,
+            onTap: () => _doImportDeepSeek(context),
           ),
         ],
       ),
@@ -1515,6 +1550,79 @@ class _BackupPageState extends State<BackupPage> {
                 if (await requestAppRestart(dctx, PlatformUtils.restartApp) &&
                     dctx.mounted) {
                   Navigator.of(dctx).pop();
+                }
+              },
+              child: Text(l10n.backupPageOK),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _doImportDeepSeek(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['zip', 'json'],
+    );
+    final path = result?.files.single.path;
+    if (path == null || !context.mounted) return;
+    final mode = await _chooseImportModeDialog(context, deepSeek: true);
+    if (mode == null || !context.mounted) return;
+
+    late DeepSeekImportResult imported;
+    try {
+      imported = await _runWithImportingOverlay<DeepSeekImportResult>(
+        context,
+        null,
+        cancellableTask: (onProgress, cancelToken) =>
+            DeepSeekImporter.importFromDeepSeek(
+              file: File(path),
+              mode: mode,
+              businessRepository: context.read<BusinessRepository>(),
+              chatService: context.read<ChatService>(),
+              assistantProvider: context.read<AssistantProvider>(),
+              assistantGroupProvider: context.read<AssistantGroupProvider>(),
+              assistantGroupName:
+                  l10n.backupPageDeepSeekImportAssistantGroupName,
+              providerName: l10n.backupPageDeepSeekImportProviderName,
+              cancelToken: cancelToken,
+              onProgress: onProgress,
+            ),
+      );
+    } catch (error) {
+      if (error is BackupCancelledException || !context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.backupPageDeepSeekImportFailed,
+        type: NotificationType.error,
+      );
+      return;
+    }
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: Text(l10n.backupPageRestartRequired),
+          content: Text(
+            '${l10n.backupPageImportFromDeepSeek}:\n'
+            ' • ${l10n.migrationConversationCount}: ${imported.conversations}\n'
+            ' • ${l10n.migrationMessageCount}: ${imported.messages}\n\n'
+            '${l10n.backupPageRestartContent}',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                if (await requestAppRestart(
+                      dialogContext,
+                      PlatformUtils.restartApp,
+                    ) &&
+                    dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop();
                 }
               },
               child: Text(l10n.backupPageOK),
@@ -1957,6 +2065,50 @@ class _SmallTactileIconState extends State<_SmallTactileIcon> {
       child: Padding(
         padding: const EdgeInsets.all(6),
         child: Icon(widget.icon, size: 18, color: c),
+      ),
+    );
+  }
+}
+
+class _BackupCategoryLabel extends StatelessWidget {
+  const _BackupCategoryLabel({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: AppFontWeights.semibold,
+          color: cs.onSurface.withValues(alpha: 0.95),
+        ),
+      ),
+    );
+  }
+}
+
+class _BackupSubcategoryLabel extends StatelessWidget {
+  const _BackupSubcategoryLabel({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 2),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: AppFontWeights.semibold,
+          color: cs.onSurface.withValues(alpha: 0.68),
+        ),
       ),
     );
   }

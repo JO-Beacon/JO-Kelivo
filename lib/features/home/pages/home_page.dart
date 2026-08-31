@@ -1566,7 +1566,11 @@ class _HomePageState extends State<HomePage>
           _controller.switchMessageRole(message, role),
       onDeleteMessageOnly: (message, byGroup) =>
           _handleDeleteMessageOnly(context, message, byGroup),
-      onDeleteMessage: (message, byGroup) =>
+      onDeleteMessageAndFollowing: (message, byGroup) =>
+          _handleDeleteMessageAndFollowing(context, message, byGroup),
+      onDeleteMessageNode: (message, byGroup) =>
+          _handleDeleteMessageNode(context, message, byGroup),
+      onDeleteCurrentBranch: (message, byGroup) =>
           _handleDeleteMessage(context, message, byGroup),
       onDeleteAllVersions: (message, byGroup) => _handleDeleteMessage(
         context,
@@ -2210,6 +2214,71 @@ class _HomePageState extends State<HomePage>
     }
 
     await _controller.deleteMessage(message: message, byGroup: byGroup);
+  }
+
+  Future<void> _handleDeleteMessageAndFollowing(
+    BuildContext context,
+    ChatMessage message,
+    Map<String, List<ChatMessage>> byGroup,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.homePageDeleteMessageAndFollowing),
+        content: Text(l10n.homePageDeleteMessageAndFollowingConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.homePageCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              l10n.homePageDelete,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    await _controller.deleteMessageAndFollowing(
+      message: message,
+      byGroup: byGroup,
+    );
+  }
+
+  Future<void> _handleDeleteMessageNode(
+    BuildContext context,
+    ChatMessage message,
+    Map<String, List<ChatMessage>> byGroup,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.homePageDeleteMessageNode),
+        content: Text(l10n.homePageDeleteMessageNodeConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.homePageCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              l10n.homePageDelete,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    await _controller.deleteMessageNode(message: message, byGroup: byGroup);
   }
 
   Future<void> _handleDeleteSelectedMessages(

@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('JO-Kelivo application identity', () {
     test('uses the published JO-Kelivo version and platform namespaces', () {
-      _expectContains('pubspec.yaml', 'version: 0.1.11+11');
+      _expectContains('pubspec.yaml', 'version: 0.1.12+12');
 
       _expectContains(
         'android/app/build.gradle.kts',
@@ -201,26 +201,40 @@ void main() {
     );
 
     test('keeps JO-Kelivo-specific labels for local Kelivo backups', () {
-      final expectedCopy = <String, ({String export, String import})>{
-        'lib/l10n/app_en.arb': (
-          export: 'Export as Kelivo Backup',
-          import: 'Import from Kelivo',
-        ),
-        'lib/l10n/app_zh.arb': (export: '导出为 Kelivo 备份', import: '从 Kelivo 导入'),
-        'lib/l10n/app_zh_Hans.arb': (
-          export: '导出为 Kelivo 备份',
-          import: '从 Kelivo 导入',
-        ),
-        'lib/l10n/app_zh_Hant.arb': (
-          export: '匯出為 Kelivo 備份',
-          import: '從 Kelivo 匯入',
-        ),
-      };
+      final expectedCopy =
+          <String, ({String export, String import, String category})>{
+            'lib/l10n/app_en.arb': (
+              export: 'Export as Kelivo Backup',
+              import: 'Import from Kelivo',
+              category: 'Kelivo-Compatible Backup',
+            ),
+            'lib/l10n/app_zh.arb': (
+              export: '导出为 Kelivo 备份',
+              import: '从 Kelivo 导入',
+              category: 'Kelivo 系兼容备份',
+            ),
+            'lib/l10n/app_zh_Hans.arb': (
+              export: '导出为 Kelivo 备份',
+              import: '从 Kelivo 导入',
+              category: 'Kelivo 系兼容备份',
+            ),
+            'lib/l10n/app_zh_Hant.arb': (
+              export: '匯出為 Kelivo 備份',
+              import: '從 Kelivo 匯入',
+              category: 'Kelivo 系相容備份',
+            ),
+          };
 
       for (final MapEntry(key: path, value: copy) in expectedCopy.entries) {
         final arb = jsonDecode(_read(path)) as Map<String, dynamic>;
         expect(arb['backupPageExportKelivoBackup'], copy.export, reason: path);
         expect(arb['backupPageImportKelivoBackup'], copy.import, reason: path);
+        expect(
+          arb['backupPageKelivoCompatibleBackup'],
+          copy.category,
+          reason: path,
+        );
+        expect(arb['backupPageKelivoFormat'], 'Kelivo', reason: path);
       }
 
       for (final path in [
@@ -235,9 +249,11 @@ void main() {
         );
         expect(
           source,
-          contains('l10n.backupPageImportKelivoBackup'),
+          contains('l10n.backupPageKelivoCompatibleBackup'),
           reason: path,
         );
+        expect(source, contains('l10n.backupPageKelivoFormat'), reason: path);
+        expect(source, contains('l10n.backupPageImportAction'), reason: path);
       }
     });
 

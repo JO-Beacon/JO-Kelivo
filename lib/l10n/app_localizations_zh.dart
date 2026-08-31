@@ -702,6 +702,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homePageDeleteMessageOnlyConfirm => '确定要删除这条消息吗？后续消息会保留。';
 
   @override
+  String get homePageDeleteMessageAndFollowing => '删除此消息及后续';
+
+  @override
+  String get homePageDeleteMessageAndFollowingConfirm =>
+      '确定要删除此消息及其后续所有消息吗？其他分支会保留。';
+
+  @override
+  String get homePageDeleteMessageNode => '删除此节点';
+
+  @override
+  String get homePageDeleteMessageNodeConfirm =>
+      '确定要删除此节点吗？该节点下的非活动分支会被删除，活动分支的后续消息会保留。';
+
+  @override
   String get homePageDeleteAllVersions => '删除所有分支';
 
   @override
@@ -1031,7 +1045,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get avatarEditorDone => '完成';
 
   @override
-  String get avatarEditorCropHint => '按住鼠标左键拖动图片调整位置，滚轮缩放；移动端可双指捏合，正方形裁剪框保持固定';
+  String get avatarEditorCropHintDesktop => '按住鼠标左键拖动图片调整位置，滚轮缩放；正方形裁剪框保持固定';
+
+  @override
+  String get avatarEditorCropHintMobile => '拖动图片调整位置，双指捏合缩放；正方形裁剪框保持固定';
 
   @override
   String get avatarEditorRotateLeft => '左转 90°';
@@ -1826,10 +1843,21 @@ class AppLocalizationsZh extends AppLocalizations {
       '请选择恢复方式。聊天和文件开关决定本次恢复的组件。';
 
   @override
+  String get backupPageDeepSeekSelectImportMode => '选择 DeepSeek 导入模式';
+
+  @override
+  String get backupPageDeepSeekSelectImportModeDescription =>
+      '请选择 DeepSeek 会话的导入方式。其他助手、会话、分组和设置不会受到影响。';
+
+  @override
   String get backupPageOverwriteMode => '完全覆盖';
 
   @override
   String get backupPageOverwriteModeDescription => '仅替换已选组件；保留未选组件及无关本地设置';
+
+  @override
+  String get backupPageDeepSeekOverwriteModeDescription =>
+      '保留原有会话；如有需要，额外创建或更新归属于正确 DeepSeek 助手的副本。不会影响非 DeepSeek 数据。';
 
   @override
   String get backupPageMergeMode => '智能合并';
@@ -1837,6 +1865,10 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get backupPageMergeModeDescription =>
       '保留本地数据并智能合并备份；相同消息自动去重，新消息并入原会话，内容冲突则保留为独立会话。';
+
+  @override
+  String get backupPageDeepSeekMergeModeDescription =>
+      '按 DeepSeek 会话 ID 识别。已有会话直接跳过，不因助手归属变化而移动；新会话导入到对应的 DeepSeek 专用助手。';
 
   @override
   String get backupPageRestore => '恢复';
@@ -1968,6 +2000,42 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageLocalBackup => '本地备份';
 
   @override
+  String get backupPageNativeBackup => '原生备份';
+
+  @override
+  String get backupPageKelivoCompatibleBackup => 'Kelivo 系兼容备份';
+
+  @override
+  String get backupPageKelivoFormat => 'Kelivo';
+
+  @override
+  String get backupPageCuplivoFormat => 'Cuplivo';
+
+  @override
+  String get backupPageCuplivoBackup => 'Cuplivo 备份';
+
+  @override
+  String get backupPageExportAction => '导出';
+
+  @override
+  String get backupPageImportAction => '导入';
+
+  @override
+  String get backupPageCherryStudioName => 'Cherry Studio';
+
+  @override
+  String get backupPageChatboxName => 'Chatbox（≥1.22）';
+
+  @override
+  String get backupPageChatboxLegacyName => 'Chatbox（<1.22）';
+
+  @override
+  String get backupPageDeepSeekName => 'DeepSeek 网页版/App';
+
+  @override
+  String get backupPageExternalImport => '外部导入';
+
+  @override
   String get backupPageImportFromCherryStudio => '从 Cherry Studio 导入';
 
   @override
@@ -1986,6 +2054,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get backupPageImportFromDeepSeek => '从 DeepSeek 网页版/App 导入';
+
+  @override
+  String get backupPageDeepSeekImportAssistantGroupName => 'DeepSeek Web 导入';
+
+  @override
+  String get backupPageDeepSeekImportProviderName => 'DeepSeek Web';
+
+  @override
+  String get backupPageDeepSeekImportFailed =>
+      'DeepSeek 导入失败，请确认选择的是有效的 DeepSeek 导出文件。';
 
   @override
   String get backupReminderSectionTitle => '备份提醒';
@@ -2339,6 +2417,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get messageMoreSheetDeleteMessageOnly => '删除此条消息';
+
+  @override
+  String get messageMoreSheetDeleteMessageAndFollowing => '删除此消息及后续';
+
+  @override
+  String get messageMoreSheetDeleteMessageNode => '删除此节点';
 
   @override
   String get messageMoreSheetDelete => '删除当前分支';
@@ -8688,6 +8772,20 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get homePageDeleteMessageOnlyConfirm => '确定要删除这条消息吗？后续消息会保留。';
 
   @override
+  String get homePageDeleteMessageAndFollowing => '删除此消息及后续';
+
+  @override
+  String get homePageDeleteMessageAndFollowingConfirm =>
+      '确定要删除此消息及其后续所有消息吗？其他分支会保留。';
+
+  @override
+  String get homePageDeleteMessageNode => '删除此节点';
+
+  @override
+  String get homePageDeleteMessageNodeConfirm =>
+      '确定要删除此节点吗？该节点下的非活动分支会被删除，活动分支的后续消息会保留。';
+
+  @override
   String get homePageDeleteAllVersions => '删除所有分支';
 
   @override
@@ -9017,7 +9115,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get avatarEditorDone => '完成';
 
   @override
-  String get avatarEditorCropHint => '按住鼠标左键拖动图片调整位置，滚轮缩放；移动端可双指捏合，正方形裁剪框保持固定';
+  String get avatarEditorCropHintDesktop => '按住鼠标左键拖动图片调整位置，滚轮缩放；正方形裁剪框保持固定';
+
+  @override
+  String get avatarEditorCropHintMobile => '拖动图片调整位置，双指捏合缩放；正方形裁剪框保持固定';
 
   @override
   String get avatarEditorRotateLeft => '左转 90°';
@@ -9812,10 +9913,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '请选择恢复方式。聊天和文件开关决定本次恢复的组件。';
 
   @override
+  String get backupPageDeepSeekSelectImportMode => '选择 DeepSeek 导入模式';
+
+  @override
+  String get backupPageDeepSeekSelectImportModeDescription =>
+      '请选择 DeepSeek 会话的导入方式。其他助手、会话、分组和设置不会受到影响。';
+
+  @override
   String get backupPageOverwriteMode => '完全覆盖';
 
   @override
   String get backupPageOverwriteModeDescription => '仅替换已选组件；保留未选组件及无关本地设置';
+
+  @override
+  String get backupPageDeepSeekOverwriteModeDescription =>
+      '保留原有会话；如有需要，额外创建或更新归属于正确 DeepSeek 助手的副本。不会影响非 DeepSeek 数据。';
 
   @override
   String get backupPageMergeMode => '智能合并';
@@ -9823,6 +9935,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get backupPageMergeModeDescription =>
       '保留本地数据并智能合并备份；相同消息自动去重，新消息并入原会话，内容冲突则保留为独立会话。';
+
+  @override
+  String get backupPageDeepSeekMergeModeDescription =>
+      '按 DeepSeek 会话 ID 识别。已有会话直接跳过，不因助手归属变化而移动；新会话导入到对应的 DeepSeek 专用助手。';
 
   @override
   String get backupPageRestore => '恢复';
@@ -9954,6 +10070,42 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageLocalBackup => '本地备份';
 
   @override
+  String get backupPageNativeBackup => '原生备份';
+
+  @override
+  String get backupPageKelivoCompatibleBackup => 'Kelivo 系兼容备份';
+
+  @override
+  String get backupPageKelivoFormat => 'Kelivo';
+
+  @override
+  String get backupPageCuplivoFormat => 'Cuplivo';
+
+  @override
+  String get backupPageCuplivoBackup => 'Cuplivo 备份';
+
+  @override
+  String get backupPageExportAction => '导出';
+
+  @override
+  String get backupPageImportAction => '导入';
+
+  @override
+  String get backupPageCherryStudioName => 'Cherry Studio';
+
+  @override
+  String get backupPageChatboxName => 'Chatbox（≥1.22）';
+
+  @override
+  String get backupPageChatboxLegacyName => 'Chatbox（<1.22）';
+
+  @override
+  String get backupPageDeepSeekName => 'DeepSeek 网页版/App';
+
+  @override
+  String get backupPageExternalImport => '外部导入';
+
+  @override
   String get backupPageImportFromCherryStudio => '从 Cherry Studio 导入';
 
   @override
@@ -9972,6 +10124,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get backupPageImportFromDeepSeek => '从 DeepSeek 网页版/App 导入';
+
+  @override
+  String get backupPageDeepSeekImportAssistantGroupName => 'DeepSeek Web 导入';
+
+  @override
+  String get backupPageDeepSeekImportProviderName => 'DeepSeek Web';
+
+  @override
+  String get backupPageDeepSeekImportFailed =>
+      'DeepSeek 导入失败，请确认选择的是有效的 DeepSeek 导出文件。';
 
   @override
   String get backupReminderSectionTitle => '备份提醒';
@@ -10325,6 +10487,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get messageMoreSheetDeleteMessageOnly => '删除此条消息';
+
+  @override
+  String get messageMoreSheetDeleteMessageAndFollowing => '删除此消息及后续';
+
+  @override
+  String get messageMoreSheetDeleteMessageNode => '删除此节点';
 
   @override
   String get messageMoreSheetDelete => '删除当前分支';
@@ -16674,6 +16842,20 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get homePageDeleteMessageOnlyConfirm => '確定要刪除這則訊息嗎？後續訊息會保留。';
 
   @override
+  String get homePageDeleteMessageAndFollowing => '刪除此訊息及後續';
+
+  @override
+  String get homePageDeleteMessageAndFollowingConfirm =>
+      '確定要刪除此訊息及其後續所有訊息嗎？其他分支會保留。';
+
+  @override
+  String get homePageDeleteMessageNode => '刪除此節點';
+
+  @override
+  String get homePageDeleteMessageNodeConfirm =>
+      '確定要刪除此節點嗎？該節點下的非活動分支會被刪除，活動分支的後續訊息會保留。';
+
+  @override
   String get homePageDeleteAllVersions => '刪除所有分支';
 
   @override
@@ -17003,7 +17185,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get avatarEditorDone => '完成';
 
   @override
-  String get avatarEditorCropHint => '按住滑鼠左鍵拖曳圖片調整位置，滾輪縮放；行動裝置可雙指捏合，正方形裁剪框保持固定';
+  String get avatarEditorCropHintDesktop => '按住滑鼠左鍵拖曳圖片調整位置，滾輪縮放；正方形裁剪框保持固定';
+
+  @override
+  String get avatarEditorCropHintMobile => '拖曳圖片調整位置，雙指捏合縮放；正方形裁剪框保持固定';
 
   @override
   String get avatarEditorRotateLeft => '左轉 90°';
@@ -17799,10 +17984,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '請選擇還原方式。聊天與檔案開關決定本次還原的元件。';
 
   @override
+  String get backupPageDeepSeekSelectImportMode => '選擇 DeepSeek 匯入模式';
+
+  @override
+  String get backupPageDeepSeekSelectImportModeDescription =>
+      '請選擇 DeepSeek 對話的匯入方式。其他助理、對話、分組和設定不會受到影響。';
+
+  @override
   String get backupPageOverwriteMode => '完全覆蓋';
 
   @override
   String get backupPageOverwriteModeDescription => '僅替換已選元件；保留未選元件及無關的本機設定';
+
+  @override
+  String get backupPageDeepSeekOverwriteModeDescription =>
+      '保留原有對話；如有需要，額外建立或更新歸屬於正確 DeepSeek 助理的副本。不會影響非 DeepSeek 資料。';
 
   @override
   String get backupPageMergeMode => '智慧合併';
@@ -17810,6 +18006,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get backupPageMergeModeDescription =>
       '保留本機資料並智慧合併備份；相同訊息會自動去重，新訊息併入原對話，內容衝突則保留為獨立對話。';
+
+  @override
+  String get backupPageDeepSeekMergeModeDescription =>
+      '按 DeepSeek 對話 ID 識別。已有對話直接跳過，不因助理歸屬變化而移動；新對話匯入至對應的 DeepSeek 專用助理。';
 
   @override
   String get backupPageRestore => '還原';
@@ -17941,6 +18141,42 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageLocalBackup => '本機備份';
 
   @override
+  String get backupPageNativeBackup => '原生備份';
+
+  @override
+  String get backupPageKelivoCompatibleBackup => 'Kelivo 系相容備份';
+
+  @override
+  String get backupPageKelivoFormat => 'Kelivo';
+
+  @override
+  String get backupPageCuplivoFormat => 'Cuplivo';
+
+  @override
+  String get backupPageCuplivoBackup => 'Cuplivo 備份';
+
+  @override
+  String get backupPageExportAction => '匯出';
+
+  @override
+  String get backupPageImportAction => '匯入';
+
+  @override
+  String get backupPageCherryStudioName => 'Cherry Studio';
+
+  @override
+  String get backupPageChatboxName => 'Chatbox（≥1.22）';
+
+  @override
+  String get backupPageChatboxLegacyName => 'Chatbox（<1.22）';
+
+  @override
+  String get backupPageDeepSeekName => 'DeepSeek 網頁版/App';
+
+  @override
+  String get backupPageExternalImport => '外部匯入';
+
+  @override
   String get backupPageImportFromCherryStudio => '從 Cherry Studio 匯入';
 
   @override
@@ -17959,6 +18195,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupPageImportFromDeepSeek => '從 DeepSeek 網頁版/App 匯入';
+
+  @override
+  String get backupPageDeepSeekImportAssistantGroupName => 'DeepSeek Web 匯入';
+
+  @override
+  String get backupPageDeepSeekImportProviderName => 'DeepSeek Web';
+
+  @override
+  String get backupPageDeepSeekImportFailed =>
+      'DeepSeek 匯入失敗，請確認選擇的是有效的 DeepSeek 匯出檔案。';
 
   @override
   String get backupReminderSectionTitle => '備份提醒';
@@ -18311,6 +18557,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get messageMoreSheetDeleteMessageOnly => '刪除此則訊息';
+
+  @override
+  String get messageMoreSheetDeleteMessageAndFollowing => '刪除此訊息及後續';
+
+  @override
+  String get messageMoreSheetDeleteMessageNode => '刪除此節點';
 
   @override
   String get messageMoreSheetDelete => '刪除目前分支';

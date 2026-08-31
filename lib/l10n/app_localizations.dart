@@ -1414,6 +1414,30 @@ abstract class AppLocalizations {
   /// **'Are you sure you want to delete this message? Following messages will remain.'**
   String get homePageDeleteMessageOnlyConfirm;
 
+  /// No description provided for @homePageDeleteMessageAndFollowing.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete This Message and Following'**
+  String get homePageDeleteMessageAndFollowing;
+
+  /// No description provided for @homePageDeleteMessageAndFollowingConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete this message and all following messages? Other branches will remain.'**
+  String get homePageDeleteMessageAndFollowingConfirm;
+
+  /// No description provided for @homePageDeleteMessageNode.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete This Node'**
+  String get homePageDeleteMessageNode;
+
+  /// No description provided for @homePageDeleteMessageNodeConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete this node? Its non-active branches will be removed, while the active branch\'s following messages will remain.'**
+  String get homePageDeleteMessageNodeConfirm;
+
   /// No description provided for @homePageDeleteAllVersions.
   ///
   /// In en, this message translates to:
@@ -2044,11 +2068,17 @@ abstract class AppLocalizations {
   /// **'Done'**
   String get avatarEditorDone;
 
-  /// No description provided for @avatarEditorCropHint.
+  /// No description provided for @avatarEditorCropHintDesktop.
   ///
   /// In en, this message translates to:
-  /// **'Drag the image with the left mouse button to reposition it; pinch or use the mouse wheel to zoom. The square frame stays fixed.'**
-  String get avatarEditorCropHint;
+  /// **'Drag the image with the left mouse button to reposition it and use the mouse wheel to zoom. The square frame stays fixed.'**
+  String get avatarEditorCropHintDesktop;
+
+  /// No description provided for @avatarEditorCropHintMobile.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag the image to reposition it and pinch to zoom. The square frame stays fixed.'**
+  String get avatarEditorCropHintMobile;
 
   /// No description provided for @avatarEditorRotateLeft.
   ///
@@ -3556,6 +3586,18 @@ abstract class AppLocalizations {
   /// **'Choose a restore mode. The chat and file switches determine which components are included.'**
   String get backupPageSelectImportModeDescription;
 
+  /// No description provided for @backupPageDeepSeekSelectImportMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Select DeepSeek Import Mode'**
+  String get backupPageDeepSeekSelectImportMode;
+
+  /// No description provided for @backupPageDeepSeekSelectImportModeDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose how to import DeepSeek conversations. Other assistants, conversations, groups, and settings are not affected.'**
+  String get backupPageDeepSeekSelectImportModeDescription;
+
   /// No description provided for @backupPageOverwriteMode.
   ///
   /// In en, this message translates to:
@@ -3568,6 +3610,12 @@ abstract class AppLocalizations {
   /// **'Replace the selected components; keep unselected components and unrelated local settings'**
   String get backupPageOverwriteModeDescription;
 
+  /// No description provided for @backupPageDeepSeekOverwriteModeDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep the original conversation, and create or update an additional copy under the correct DeepSeek assistant when needed. Non-DeepSeek data is not affected.'**
+  String get backupPageDeepSeekOverwriteModeDescription;
+
   /// No description provided for @backupPageMergeMode.
   ///
   /// In en, this message translates to:
@@ -3579,6 +3627,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Keep local data while merging the backup. Matching messages are deduplicated, new messages join the existing conversation, and conflicts stay separate.'**
   String get backupPageMergeModeDescription;
+
+  /// No description provided for @backupPageDeepSeekMergeModeDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Match conversations by DeepSeek conversation ID. Existing conversations are skipped without moving them; new conversations are imported under their dedicated DeepSeek assistants.'**
+  String get backupPageDeepSeekMergeModeDescription;
 
   /// No description provided for @backupPageRestore.
   ///
@@ -3832,6 +3886,78 @@ abstract class AppLocalizations {
   /// **'Local Backup'**
   String get backupPageLocalBackup;
 
+  /// No description provided for @backupPageNativeBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Native Backup'**
+  String get backupPageNativeBackup;
+
+  /// No description provided for @backupPageKelivoCompatibleBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo-Compatible Backup'**
+  String get backupPageKelivoCompatibleBackup;
+
+  /// No description provided for @backupPageKelivoFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo'**
+  String get backupPageKelivoFormat;
+
+  /// No description provided for @backupPageCuplivoFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Cuplivo'**
+  String get backupPageCuplivoFormat;
+
+  /// No description provided for @backupPageCuplivoBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Cuplivo Backup'**
+  String get backupPageCuplivoBackup;
+
+  /// No description provided for @backupPageExportAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get backupPageExportAction;
+
+  /// No description provided for @backupPageImportAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get backupPageImportAction;
+
+  /// No description provided for @backupPageCherryStudioName.
+  ///
+  /// In en, this message translates to:
+  /// **'Cherry Studio'**
+  String get backupPageCherryStudioName;
+
+  /// No description provided for @backupPageChatboxName.
+  ///
+  /// In en, this message translates to:
+  /// **'Chatbox (>=1.22)'**
+  String get backupPageChatboxName;
+
+  /// No description provided for @backupPageChatboxLegacyName.
+  ///
+  /// In en, this message translates to:
+  /// **'Chatbox (<1.22)'**
+  String get backupPageChatboxLegacyName;
+
+  /// No description provided for @backupPageDeepSeekName.
+  ///
+  /// In en, this message translates to:
+  /// **'DeepSeek Web/App'**
+  String get backupPageDeepSeekName;
+
+  /// No description provided for @backupPageExternalImport.
+  ///
+  /// In en, this message translates to:
+  /// **'External Import'**
+  String get backupPageExternalImport;
+
   /// No description provided for @backupPageImportFromCherryStudio.
   ///
   /// In en, this message translates to:
@@ -3867,6 +3993,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Import from DeepSeek Web/App'**
   String get backupPageImportFromDeepSeek;
+
+  /// No description provided for @backupPageDeepSeekImportAssistantGroupName.
+  ///
+  /// In en, this message translates to:
+  /// **'DeepSeek Web Import'**
+  String get backupPageDeepSeekImportAssistantGroupName;
+
+  /// No description provided for @backupPageDeepSeekImportProviderName.
+  ///
+  /// In en, this message translates to:
+  /// **'DeepSeek Web'**
+  String get backupPageDeepSeekImportProviderName;
+
+  /// No description provided for @backupPageDeepSeekImportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'DeepSeek import failed. Check that the selected file is a valid DeepSeek export.'**
+  String get backupPageDeepSeekImportFailed;
 
   /// No description provided for @backupReminderSectionTitle.
   ///
@@ -4551,6 +4695,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete This Message'**
   String get messageMoreSheetDeleteMessageOnly;
+
+  /// No description provided for @messageMoreSheetDeleteMessageAndFollowing.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete This Message and Following'**
+  String get messageMoreSheetDeleteMessageAndFollowing;
+
+  /// No description provided for @messageMoreSheetDeleteMessageNode.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete This Node'**
+  String get messageMoreSheetDeleteMessageNode;
 
   /// No description provided for @messageMoreSheetDelete.
   ///

@@ -247,6 +247,205 @@ void main() {
   });
 
   group('ConversationTree deletion', () {
+    test(
+      'deletes only the active branch when the selected message is shared',
+      () {
+        final base = ConversationTree.linear(
+          conversationId: 'conversation',
+          messageIds: const ['u1', 'a1'],
+        );
+        final branched = base
+            .createMessageBranch(branchId: 'alt', fromMessageId: 'u1')
+            .appendToActiveBranch('a1-alt')
+            .appendToActiveBranch('u2-alt')
+            .switchBranch('root');
+
+        final afterDelete = branched.deleteCurrentBranch('u1');
+
+        expect(afterDelete.activeBranchId, 'alt');
+        expect(afterDelete.activePath(), const ['u1', 'a1-alt', 'u2-alt']);
+        expect(afterDelete.branches.containsKey('root'), isFalse);
+        expect(afterDelete.edges.containsKey('a1'), isFalse);
+        expect(afterDelete.edges.containsKey('a1-alt'), isTrue);
+      },
+    );
+
+    test('deleting a branch root removes that branch tail only', () {
+      final branched =
+          ConversationTree.linear(
+                conversationId: 'conversation',
+                messageIds: const ['u1'],
+              )
+              .createBranch(
+                branchId: 'branch-a',
+                fromMessageId: 'u1',
+                tipMessageId: 'a',
+              )
+              .createBranch(
+                branchId: 'branch-b',
+                fromMessageId: 'u1',
+                tipMessageId: 'b',
+              )
+              .createBranch(
+                branchId: 'branch-c',
+                fromMessageId: 'u1',
+                tipMessageId: 'c',
+              )
+              .switchBranch('branch-c')
+              .appendToActiveBranch('c1')
+              .appendToActiveBranch('c2');
+
+      final afterDelete = branched.deleteCurrentBranch('c');
+      expect(afterDelete.activePath(), const ['u1']);
+      expect(afterDelete.edges.containsKey('c'), isFalse);
+      expect(afterDelete.edges.containsKey('c1'), isFalse);
+      expect(afterDelete.edges.containsKey('c2'), isFalse);
+      expect(afterDelete.branches.containsKey('branch-c'), isFalse);
+      expect(afterDelete.branchPath('branch-a'), const ['u1', 'a']);
+      expect(afterDelete.branchPath('branch-b'), const ['u1', 'b']);
+    });
+
+    test('deleting a nested branch keeps its parent branch', () {
+      final branched =
+          ConversationTree.linear(
+                conversationId: 'conversation',
+                messageIds: const ['u1'],
+              )
+              .createBranch(
+                branchId: 'branch-a',
+                fromMessageId: 'u1',
+                tipMessageId: 'a',
+              )
+              .createBranch(
+                branchId: 'branch-c',
+                fromMessageId: 'u1',
+                tipMessageId: 'c',
+              )
+              .createBranch(
+                branchId: 'branch-c1',
+                fromMessageId: 'c',
+                tipMessageId: 'c1',
+              )
+              .createBranch(
+                branchId: 'branch-c2',
+                fromMessageId: 'c',
+                tipMessageId: 'c2',
+              )
+              .switchBranch('branch-c1')
+              .appendToActiveBranch('c1-tail');
+
+      final afterDelete = branched.deleteCurrentBranch('c1');
+
+      expect(afterDelete.edges.containsKey('c1'), isFalse);
+      expect(afterDelete.edges.containsKey('c1-tail'), isFalse);
+      expect(afterDelete.branchPath('branch-c'), const ['u1', 'c']);
+      expect(afterDelete.branchPath('branch-c2'), const ['u1', 'c', 'c2']);
+      expect(afterDelete.branches.containsKey('branch-c1'), isFalse);
+    });
+
+    test('deleting a fork node keeps its active continuation only', () {
+      final branched =
+          ConversationTree.linear(
+                conversationId: 'conversation',
+                messageIds: const ['root'],
+              )
+              .createBranch(
+                branchId: 'branch-a',
+                fromMessageId: 'root',
+                tipMessageId: 'a',
+              )
+              .createBranch(
+                branchId: 'branch-b',
+                fromMessageId: 'root',
+                tipMessageId: 'b',
+              )
+              .createBranch(
+                branchId: 'branch-c',
+                fromMessageId: 'a',
+                tipMessageId: 'c',
+              )
+              .createBranch(
+                branchId: 'branch-d',
+                fromMessageId: 'a',
+                tipMessageId: 'd',
+              )
+              .switchBranch('branch-d')
+              .appendToActiveBranch('d1')
+              .switchBranch('branch-c')
+              .appendToActiveBranch('c1');
+
+      final afterDelete = branched.deleteNodeKeepActiveBranch('a');
+
+      expect(afterDelete.activePath(), const ['root', 'c', 'c1']);
+      expect(afterDelete.branchPath('branch-b'), const ['root', 'b']);
+      expect(afterDelete.edges.containsKey('a'), isFalse);
+      expect(afterDelete.edges.containsKey('d'), isFalse);
+      expect(afterDelete.edges.containsKey('d1'), isFalse);
+      expect(afterDelete.branches.containsKey('branch-d'), isFalse);
+      expect(afterDelete.edges['c']?.parentMessageId, 'root');
+      expect(afterDelete.edges['c1']?.parentMessageId, 'c');
+    });
+
+    test('deleting a non-fork node is a no-op for node deletion', () {
+      final tree = ConversationTree.linear(
+        conversationId: 'conversation',
+        messageIds: const ['root', 'child'],
+      );
+
+      final afterDelete = tree.deleteNodeKeepActiveBranch('child');
+
+      expect(afterDelete.fingerprint, tree.fingerprint);
+    });
+
+    test(
+      'deleting a message and its following messages keeps its branch prefix',
+      () {
+        final branched =
+            ConversationTree.linear(
+                  conversationId: 'conversation',
+                  messageIds: const ['u1'],
+                )
+                .createBranch(
+                  branchId: 'branch-a',
+                  fromMessageId: 'u1',
+                  tipMessageId: 'a',
+                )
+                .createBranch(
+                  branchId: 'branch-b',
+                  fromMessageId: 'u1',
+                  tipMessageId: 'b',
+                )
+                .createBranch(
+                  branchId: 'branch-c',
+                  fromMessageId: 'u1',
+                  tipMessageId: 'c',
+                )
+                .switchBranch('branch-c')
+                .appendToActiveBranch('c1')
+                .appendToActiveBranch('c2');
+
+        final afterDelete = branched.deleteMessage('c2');
+
+        expect(afterDelete.activePath(), const ['u1', 'c', 'c1']);
+        expect(afterDelete.edges.containsKey('c2'), isFalse);
+        expect(afterDelete.edges.containsKey('c1'), isTrue);
+        expect(afterDelete.edges.containsKey('c'), isTrue);
+        expect(afterDelete.branches.containsKey('branch-c'), isTrue);
+      },
+    );
+
+    test('deletes the last branch tail without deleting its ancestors', () {
+      final tree = ConversationTree.linear(
+        conversationId: 'conversation',
+        messageIds: const ['u1', 'a1', 'u2'],
+      );
+
+      final afterDelete = tree.deleteCurrentBranch('a1');
+
+      expect(afterDelete.activePath(), const ['u1']);
+      expect(afterDelete.edges.keys, const {'u1'});
+    });
+
     test('deletes only the selected descendant chain', () {
       final base = ConversationTree.linear(
         conversationId: 'conversation',

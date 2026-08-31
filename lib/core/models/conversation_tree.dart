@@ -767,14 +767,39 @@ class ConversationTree {
     final nextEdges = Map<String, MessageTreeEdge>.from(edges)
       ..removeWhere((id, _) => removedIds.contains(id));
     final affectedBranches = <ConversationBranch>[];
+    final retainedCandidates = <ConversationBranch>[];
     final nextBranches = <String, ConversationBranch>{};
     for (final branch in branches.values) {
       final tip = branch.tipMessageId;
       if (tip != null && removedIds.contains(tip)) {
         affectedBranches.add(branch);
+        String? retainedTip = tip;
+        while (retainedTip != null && removedIds.contains(retainedTip)) {
+          retainedTip = edges[retainedTip]?.parentMessageId;
+        }
+
+        if (retainedTip == null) {
+          continue;
+        }
+        final branchPath = _branchPathFor(branch.id, branches, edges);
+        final retainedIndex = branchPath.indexOf(retainedTip);
+        if (retainedIndex < 0) continue;
+        final retainedPath = branchPath.take(retainedIndex + 1);
+        final otherMessageIds = <String>{};
+        for (final other in branches.values) {
+          if (other.id == branch.id) continue;
+          otherMessageIds.addAll(_branchPathFor(other.id, branches, edges));
+        }
+        if (retainedPath.any((id) => !otherMessageIds.contains(id))) {
+          retainedCandidates.add(branch.copyWith(tipMessageId: retainedTip));
+        }
       } else {
         nextBranches[branch.id] = branch;
       }
+    }
+
+    for (final branch in retainedCandidates) {
+      nextBranches[branch.id] = branch;
     }
 
     if (nextBranches.isEmpty) {
@@ -872,6 +897,125 @@ class ConversationTree {
     String messageId, {
     Iterable<String> recentBranchIds = const <String>[],
   }) => deleteMessage(messageId, recentBranchIds: recentBranchIds);
+
+  /// 删除 [messageId] 所在逻辑分支的后续消息，保留公共父节点与兄弟分支。
+  ///
+  /// 分支可能从某个助手消息继续创建子分支。此时该助手消息仍会被父
+  /// 分支引用，但它属于当前分叉的首个独有节点，必须和后续消息一起
+  /// 删除；否则删除 C2 会留下 C 这个“半条分支”。
+  ConversationTree deleteCurrentBranch(
+    String messageId, {
+    Iterable<String> recentBranchIds = const <String>[],
+  }) {
+    final path = activePath();
+    final targetIndex = path.indexOf(messageId);
+    if (targetIndex < 0) {
+      return this;
+    }
+    if (branches.length <= 1) {
+      return deleteMessage(messageId, recentBranchIds: recentBranchIds);
+    }
+
+    // 分叉选择器对应的是当前消息相对其父节点的分叉。嵌套分支中，
+    // 不能从整条路径最早的分叉点开始删，否则删除 C1 会误删整个 C。
+    // 旧调用若传入非分叉消息，则回退到该消息之前最近的分叉点，保持
+    // 服务层的兼容性；UI 不会为这类消息显示此操作。
+    final rootMessageId = path.firstOrNull;
+    final hasSharedRoot =
+        rootMessageId != null &&
+        branches.values.any(
+          (branch) =>
+              branch.id != activeBranchId &&
+              _branchPathFor(
+                branch.id,
+                branches,
+                edges,
+              ).contains(rootMessageId),
+        );
+    var branchStartIndex = hasSharedRoot ? targetIndex : 0;
+    final parentMessageId = edges[messageId]?.parentMessageId;
+    final isForkNode = childrenOf(parentMessageId).length > 1;
+    if (hasSharedRoot && !isForkNode) {
+      for (var index = targetIndex; index >= 1; index--) {
+        final parent = path[index - 1];
+        final child = path[index];
+        if (childrenOf(parent).any((candidate) => candidate != child)) {
+          branchStartIndex = index;
+          break;
+        }
+      }
+      if (branchStartIndex == targetIndex && targetIndex == 0) {
+        for (var index = 1; index < path.length; index++) {
+          final parent = path[index - 1];
+          final child = path[index];
+          if (childrenOf(parent).any((candidate) => candidate != child)) {
+            branchStartIndex = index;
+            break;
+          }
+        }
+      }
+    }
+
+    final branchStartMessageId = path[branchStartIndex];
+    final nextBranches = <String, ConversationBranch>{};
+    final affectedBranches = <ConversationBranch>[];
+    final unaffectedMessageIds = <String>{};
+    for (final branch in branches.values) {
+      final branchPath = _branchPathFor(branch.id, branches, edges);
+      final startIndex = branchPath.indexOf(branchStartMessageId);
+      if (startIndex < 0) {
+        nextBranches[branch.id] = branch;
+        unaffectedMessageIds.addAll(branchPath);
+      } else {
+        affectedBranches.add(branch);
+      }
+    }
+
+    // 受影响的分支都截回分叉点父节点；只有仍带有独有前缀的分支才
+    // 需要保留。通常这会留下父分支，当前被删除的子分支则被移除。
+    final retainedTip = branchStartIndex == 0
+        ? null
+        : path[branchStartIndex - 1];
+    final retainedCandidates = <ConversationBranch>[];
+    for (final branch in affectedBranches) {
+      final branchPath = _branchPathFor(branch.id, branches, edges);
+      final startIndex = branchPath.indexOf(branchStartMessageId);
+      final retainedPath = branchPath.take(startIndex);
+      if (retainedTip == null ||
+          retainedPath.every(unaffectedMessageIds.contains)) {
+        continue;
+      }
+      retainedCandidates.add(
+        branch.copyWith(tipMessageId: branchPath[startIndex - 1]),
+      );
+    }
+    retainedCandidates.sort((left, right) {
+      final byTime = left.createdAt.compareTo(right.createdAt);
+      if (byTime != 0) return byTime;
+      return left.id.compareTo(right.id);
+    });
+    if (retainedCandidates.isNotEmpty) {
+      final survivor = retainedCandidates.first;
+      nextBranches[survivor.id] = survivor;
+    }
+    if (nextBranches.isEmpty) {
+      throw StateError('cannot_delete_last_branch');
+    }
+    final prunedEdges = _pruneUnreachableEdges(nextBranches, edges);
+    final nextActiveBranchId = nextBranches.containsKey(activeBranchId)
+        ? activeBranchId
+        : _fallbackBranchId(nextBranches, preferredBranchIds: recentBranchIds);
+    return ConversationTree(
+      conversationId: conversationId,
+      activeBranchId: nextActiveBranchId,
+      branches: nextBranches,
+      edges: prunedEdges,
+      branchSelections: _pruneBranchSelections(
+        branches: nextBranches,
+        edges: prunedEdges,
+      ),
+    );
+  }
 
   /// 批量局部删除；先处理更深节点，避免输入排列影响重挂接结果。
   ConversationTree removeMessagesOnly(
@@ -995,6 +1139,82 @@ class ConversationTree {
             ],
           );
     final prunedEdges = _pruneUnreachableEdges(nextBranches, nextEdges);
+    return ConversationTree(
+      conversationId: conversationId,
+      activeBranchId: nextActiveBranchId,
+      branches: nextBranches,
+      edges: prunedEdges,
+      branchSelections: _pruneBranchSelections(
+        branches: nextBranches,
+        edges: prunedEdges,
+        baseSelections: nextSelections,
+      ),
+    );
+  }
+
+  /// 删除活动路径上的分叉节点，同时只保留该节点后的活动后继。
+  ///
+  /// 目标节点的兄弟分支不受影响；目标节点下的非活动直接子树会被删除，
+  /// 活动直接子节点则重挂到目标节点的父节点。非分叉节点不执行此操作，
+  /// 由消息菜单层保证该入口只对分叉节点开放。
+  ConversationTree deleteNodeKeepActiveBranch(
+    String messageId, {
+    Iterable<String> recentBranchIds = const <String>[],
+  }) {
+    final activePath = this.activePath();
+    final targetIndex = activePath.indexOf(messageId);
+    if (targetIndex < 0) return this;
+
+    final removed = edges[messageId];
+    if (removed == null || childrenOf(removed.parentMessageId).length < 2) {
+      return this;
+    }
+
+    final activeContinuation = targetIndex + 1 < activePath.length
+        ? activePath[targetIndex + 1]
+        : null;
+    final directChildren = childrenOf(messageId);
+    final removedIds = <String>{messageId};
+    for (final childId in directChildren) {
+      if (childId == activeContinuation) continue;
+      removedIds
+        ..add(childId)
+        ..addAll(_descendantsOf(childId));
+    }
+
+    final nextEdges = Map<String, MessageTreeEdge>.from(edges)
+      ..removeWhere((id, _) => removedIds.contains(id));
+    if (activeContinuation != null &&
+        nextEdges.containsKey(activeContinuation)) {
+      nextEdges[activeContinuation] = MessageTreeEdge(
+        messageId: activeContinuation,
+        parentMessageId: removed.parentMessageId,
+      );
+    }
+
+    final nextBranches = <String, ConversationBranch>{};
+    for (final branch in branches.values) {
+      final tip = branch.tipMessageId;
+      if (tip != null && removedIds.contains(tip)) continue;
+      nextBranches[branch.id] = branch;
+    }
+    if (nextBranches.isEmpty) throw StateError('cannot_delete_last_branch');
+
+    final baseSelections = Map<String, String>.from(branchSelections)
+      ..removeWhere(
+        (message, branchId) =>
+            removedIds.contains(message) || !nextBranches.containsKey(branchId),
+      );
+    final nextSelections = _rememberBranchSelections(
+      activeBranchId,
+      branches: nextBranches,
+      edges: nextEdges,
+      baseSelections: baseSelections,
+    );
+    final prunedEdges = _pruneUnreachableEdges(nextBranches, nextEdges);
+    final nextActiveBranchId = nextBranches.containsKey(activeBranchId)
+        ? activeBranchId
+        : _fallbackBranchId(nextBranches, preferredBranchIds: recentBranchIds);
     return ConversationTree(
       conversationId: conversationId,
       activeBranchId: nextActiveBranchId,

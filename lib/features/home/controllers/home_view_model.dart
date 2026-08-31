@@ -590,7 +590,119 @@ class HomeViewModel extends ChangeNotifier {
     required ChatMessage message,
     required Map<String, List<ChatMessage>> byGroup,
   }) async {
-    await deleteMessages(messageIds: {message.id});
+    final targetConversationId = message.conversationId;
+    final streamingMessageId = _chatActions.activeStreamingMessageId(
+      targetConversationId,
+    );
+    if (streamingMessageId != null) {
+      await _chatActions.cancelStreaming(
+        _chatService.getConversation(targetConversationId),
+      );
+    }
+
+    final deletedIds = await _chatService.deleteCurrentBranch(
+      conversationId: targetConversationId,
+      messageId: message.id,
+    );
+    for (final id in deletedIds) {
+      _streamController.clearMessageState(id);
+    }
+
+    if (targetConversationId == currentConversation?.id) {
+      _conversationTreeReloadSerial++;
+      _conversationTree = await _chatService.loadConversationTree(
+        targetConversationId,
+      );
+      _conversationTreeIntegrityError = null;
+      _chatController.loadVersionSelections();
+      _chatController.updateCurrentConversation(
+        _chatService.getConversation(targetConversationId),
+      );
+      await _chatController.refreshTimelineAfterMutation(
+        removedRevisionIds: deletedIds,
+      );
+    }
+    notifyListeners();
+  }
+
+  /// 删除分叉节点本身，保留活动分支的后续消息。
+  Future<void> deleteMessageNode({
+    required ChatMessage message,
+    required Map<String, List<ChatMessage>> byGroup,
+  }) async {
+    final targetConversationId = message.conversationId;
+    final streamingMessageId = _chatActions.activeStreamingMessageId(
+      targetConversationId,
+    );
+    if (streamingMessageId != null) {
+      await _chatActions.cancelStreaming(
+        _chatService.getConversation(targetConversationId),
+      );
+    }
+
+    final deletedIds = await _chatService.deleteMessageNode(
+      conversationId: targetConversationId,
+      messageId: message.id,
+    );
+    for (final id in deletedIds) {
+      _streamController.clearMessageState(id);
+    }
+
+    if (targetConversationId == currentConversation?.id) {
+      _conversationTreeReloadSerial++;
+      _conversationTree = await _chatService.loadConversationTree(
+        targetConversationId,
+      );
+      _conversationTreeIntegrityError = null;
+      _chatController.loadVersionSelections();
+      _chatController.updateCurrentConversation(
+        _chatService.getConversation(targetConversationId),
+      );
+      await _chatController.refreshTimelineAfterMutation(
+        removedRevisionIds: deletedIds,
+      );
+    }
+    notifyListeners();
+  }
+
+  /// 删除消息及其后续消息，保留消息之前的分支前缀。
+  Future<void> deleteMessageAndFollowing({
+    required ChatMessage message,
+    required Map<String, List<ChatMessage>> byGroup,
+  }) async {
+    final targetConversationId = message.conversationId;
+    final streamingMessageId = _chatActions.activeStreamingMessageId(
+      targetConversationId,
+    );
+    if (streamingMessageId != null) {
+      await _chatActions.cancelStreaming(
+        _chatService.getConversation(targetConversationId),
+      );
+    }
+
+    final deletedIds = await _chatService.deleteMessageAndFollowing(
+      conversationId: targetConversationId,
+      messageId: message.id,
+    );
+    for (final id in deletedIds) {
+      _streamController.clearMessageState(id);
+    }
+
+    if (targetConversationId == currentConversation?.id) {
+      _conversationTreeReloadSerial++;
+      _conversationTree = await _chatService.loadConversationTree(
+        targetConversationId,
+      );
+      _conversationTreeIntegrityError = null;
+      _chatController.loadVersionSelections();
+      _chatController.updateCurrentConversation(
+        _chatService.getConversation(targetConversationId),
+      );
+      await _chatController.refreshTimelineAfterMutation(
+        removedRevisionIds: deletedIds,
+      );
+    }
+    notifyListeners();
   }
 
   Future<void> deleteMessageOnly({
@@ -1169,7 +1281,6 @@ class HomeViewModel extends ChangeNotifier {
     }
     if (currentConversation?.id != sourceConversation.id) return;
     notifyListeners();
-    onScrollToBottom?.call();
   }
 
   /// 清除上下文（在尾部切换截断）。

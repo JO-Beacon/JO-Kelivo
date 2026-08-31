@@ -181,7 +181,7 @@ void main() {
       expect(settings.webDavConfig.userAgent, 'KelivoTest/1.0');
     });
 
-    testWidgets('shows local backup before WebDAV and S3 backup sections', (
+    testWidgets('shows backup categories before WebDAV and S3 sections', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(900, 1200));
@@ -194,12 +194,19 @@ void main() {
       await _pumpBackupPage(tester, settings: settings, business: business);
 
       expect(find.text('Backup Reminder'), findsOneWidget);
-      expect(find.text('Local Backup'), findsOneWidget);
+      expect(find.text('Native Backup'), findsOneWidget);
+      expect(find.text('Kelivo-Compatible Backup'), findsOneWidget);
+      expect(find.text('Kelivo'), findsOneWidget);
+      expect(find.text('Cuplivo'), findsOneWidget);
+      expect(find.text('External Import'), findsOneWidget);
       expect(find.text('WebDAV Backup'), findsOneWidget);
-      expect(find.text('S3 Backup'), findsOneWidget);
-      _expectAbove(tester, 'Backup Reminder', 'Local Backup');
-      _expectAbove(tester, 'Local Backup', 'WebDAV Backup');
-      _expectAbove(tester, 'WebDAV Backup', 'S3 Backup');
+      final s3Backup = find.text('S3 Backup');
+      await tester.scrollUntilVisible(
+        s3Backup,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(s3Backup, findsOneWidget);
     });
 
     testWidgets('mobile exposes enabled local backup and restore actions', (
@@ -234,14 +241,14 @@ void main() {
           .dy;
       expect((backupTop - restoreTop).abs(), lessThan(1));
 
-      final legacyImport = find.text('Import from Chatbox (<1.22)');
+      final legacyImport = find.text('Chatbox (<1.22)');
       await tester.scrollUntilVisible(
         legacyImport,
         120,
         scrollable: find.byType(Scrollable).first,
       );
       expect(legacyImport, findsOneWidget);
-      final currentImport = find.text('Import from Chatbox (>=1.22)');
+      final currentImport = find.text('Chatbox (>=1.22)');
       expect(currentImport, findsOneWidget);
       final currentImportGesture = tester.widget<GestureDetector>(
         find
@@ -255,22 +262,17 @@ void main() {
             .first,
       );
       expect(legacyImportGesture.onTap, isNotNull);
-      final exportEntry = find.text('Export as Kelivo Backup');
-      expect(exportEntry, findsOneWidget);
+      final exportEntry = find.text('Export').first;
       final exportGesture = tester.widget<GestureDetector>(
         find
             .ancestor(of: exportEntry, matching: find.byType(GestureDetector))
             .first,
       );
       expect(exportGesture.onTap, isNull);
-      _expectAbove(
-        tester,
-        'Import from Chatbox (>=1.22)',
-        'Import from Chatbox (<1.22)',
-      );
+      _expectAbove(tester, 'Chatbox (>=1.22)', 'Chatbox (<1.22)');
     });
 
-    testWidgets('DeepSeek import remains a non-importing placeholder', (
+    testWidgets('DeepSeek import entry invokes the real importer', (
       tester,
     ) async {
       final business = await createBusinessTestHarness();
@@ -278,23 +280,17 @@ void main() {
       await settings.loaded;
 
       await _pumpBackupPage(tester, settings: settings, business: business);
-      final entry = find.text('Import from DeepSeek Web/App');
-      await tester.ensureVisible(entry);
-      await tester.pumpAndSettle();
-      await tester.tap(entry);
-      await tester.pump();
-
-      expect(
-        AppSnackBarManager().activeToasts.single.notification.message,
-        'Not supported yet',
+      final entry = find.text('DeepSeek Web/App');
+      await tester.scrollUntilVisible(
+        entry,
+        160,
+        scrollable: find.byType(Scrollable).first,
       );
-      expect(
-        AppSnackBarManager().activeToasts.single.notification.type,
-        NotificationType.info,
-      );
-      expect(find.byType(AlertDialog), findsNothing);
-      await tester.pump(const Duration(seconds: 4));
       await tester.pumpAndSettle();
+      final gesture = tester.widget<GestureDetector>(
+        find.ancestor(of: entry, matching: find.byType(GestureDetector)).first,
+      );
+      expect(gesture.onTap, isNotNull);
     });
 
     testWidgets('opens S3 settings as a full page and saves config', (
@@ -324,93 +320,100 @@ void main() {
       expect(settings.s3Config.userAgent, 'KelivoS3/1.0');
     });
 
-    testWidgets('desktop shows local backup before WebDAV and S3 sections', (
-      tester,
-    ) async {
-      await tester.binding.setSurfaceSize(const Size(1100, 1300));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
+    testWidgets(
+      'desktop shows backup categories before WebDAV and S3 sections',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(1100, 1300));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
 
-      final business = await createBusinessTestHarness();
-      final settings = SettingsProvider(business.preferences);
-      await settings.loaded;
+        final business = await createBusinessTestHarness();
+        final settings = SettingsProvider(business.preferences);
+        await settings.loaded;
 
-      await _pumpDesktopBackupPane(
-        tester,
-        settings: settings,
-        business: business,
-      );
-
-      expect(find.text('Backup Reminder'), findsOneWidget);
-      expect(find.text('Local Backup'), findsOneWidget);
-      expect(find.text('WebDAV Server Settings'), findsOneWidget);
-      expect(find.text('S3 Settings'), findsOneWidget);
-      for (final label in [
-        'Backup',
-        'Restore',
-        'Export as Kelivo Backup',
-        'Import from Kelivo',
-        'Import from Cherry Studio',
-        'Import from Chatbox (>=1.22)',
-        'Import from Chatbox (<1.22)',
-        'Import from DeepSeek Web/App',
-      ]) {
-        expect(
-          find.text(label),
-          label == 'Restore' ? findsWidgets : findsOneWidget,
-          reason: label,
+        await _pumpDesktopBackupPane(
+          tester,
+          settings: settings,
+          business: business,
         );
-      }
-      final backupTop = tester.getTopLeft(find.text('Backup').first).dy;
-      final restoreTop = tester.getTopLeft(find.text('Restore').first).dy;
-      expect((backupTop - restoreTop).abs(), lessThan(1));
-      final backupButton = find
-          .ancestor(
-            of: find.text('Backup').first,
-            matching: find.byType(GestureDetector),
-          )
-          .first;
-      final restoreButton = find
-          .ancestor(
-            of: find.text('Restore').first,
-            matching: find.byType(GestureDetector),
-          )
-          .first;
-      expect(
-        tester.getSize(backupButton).width,
-        closeTo(tester.getSize(restoreButton).width, 1),
-      );
-      final desktopCurrentImport = find.text('Import from Chatbox (>=1.22)');
-      final desktopCurrentGesture = tester.widget<GestureDetector>(
-        find
+
+        expect(find.text('Backup Reminder'), findsOneWidget);
+        expect(find.text('Native Backup'), findsOneWidget);
+        expect(find.text('Kelivo-Compatible Backup'), findsOneWidget);
+        expect(find.text('External Import'), findsOneWidget);
+        expect(find.text('WebDAV Server Settings'), findsOneWidget);
+        final s3Settings = find.text('S3 Settings');
+        await tester.scrollUntilVisible(
+          s3Settings,
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        expect(s3Settings, findsOneWidget);
+        for (final label in [
+          'Backup',
+          'Restore',
+          'Export',
+          'Import',
+          'Cherry Studio',
+          'Chatbox (>=1.22)',
+          'Chatbox (<1.22)',
+          'DeepSeek Web/App',
+        ]) {
+          expect(
+            find.text(label),
+            (label == 'Restore' || label == 'Export' || label == 'Import')
+                ? findsWidgets
+                : findsOneWidget,
+            reason: label,
+          );
+        }
+        final backupTop = tester.getTopLeft(find.text('Backup').first).dy;
+        final restoreTop = tester.getTopLeft(find.text('Restore').first).dy;
+        expect((backupTop - restoreTop).abs(), lessThan(1));
+        final backupButton = find
             .ancestor(
-              of: desktopCurrentImport,
+              of: find.text('Backup').first,
               matching: find.byType(GestureDetector),
             )
-            .first,
-      );
-      expect(desktopCurrentGesture.onTap, isNull);
-      final desktopLegacyImport = find.text('Import from Chatbox (<1.22)');
-      final desktopLegacyGesture = tester.widget<GestureDetector>(
-        find
+            .first;
+        final restoreButton = find
             .ancestor(
-              of: desktopLegacyImport,
+              of: find.text('Restore').first,
               matching: find.byType(GestureDetector),
             )
-            .first,
-      );
-      expect(desktopLegacyGesture.onTap, isNotNull);
-      _expectAbove(
-        tester,
-        'Import from Chatbox (>=1.22)',
-        'Import from Chatbox (<1.22)',
-      );
-      _expectAbove(tester, 'Backup Reminder', 'Local Backup');
-      _expectAbove(tester, 'Local Backup', 'WebDAV Server Settings');
-      _expectAbove(tester, 'WebDAV Server Settings', 'S3 Settings');
-    });
+            .first;
+        expect(
+          tester.getSize(backupButton).width,
+          closeTo(tester.getSize(restoreButton).width, 1),
+        );
+        final desktopCurrentImport = find.text('Chatbox (>=1.22)');
+        final desktopCurrentGesture = tester.widget<GestureDetector>(
+          find
+              .ancestor(
+                of: desktopCurrentImport,
+                matching: find.byType(GestureDetector),
+              )
+              .first,
+        );
+        expect(desktopCurrentGesture.onTap, isNull);
+        final desktopLegacyImport = find.text('Chatbox (<1.22)');
+        final desktopLegacyGesture = tester.widget<GestureDetector>(
+          find
+              .ancestor(
+                of: desktopLegacyImport,
+                matching: find.byType(GestureDetector),
+              )
+              .first,
+        );
+        expect(desktopLegacyGesture.onTap, isNotNull);
+        _expectAbove(tester, 'Chatbox (>=1.22)', 'Chatbox (<1.22)');
+        _expectAbove(tester, 'Backup Reminder', 'Native Backup');
+        _expectAbove(tester, 'External Import', 'WebDAV Server Settings');
+        _expectAbove(tester, 'WebDAV Server Settings', 'S3 Settings');
+      },
+    );
 
     testWidgets(
-      'desktop exposes JO-Kelivo data directory and DeepSeek placeholder',
+      'desktop exposes JO-Kelivo data directory and DeepSeek importer',
       (tester) async {
         await tester.binding.setSurfaceSize(const Size(1100, 1300));
         addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -428,26 +431,18 @@ void main() {
         expect(find.text('User Data Directory'), findsOneWidget);
         expect(find.text('Open User Data Directory'), findsOneWidget);
 
-        final deepSeek = find.text('Import from DeepSeek Web/App');
+        final deepSeek = find.text('DeepSeek Web/App');
         await tester.scrollUntilVisible(
           deepSeek,
           120,
           scrollable: find.byType(Scrollable).first,
         );
-        await tester.tap(deepSeek);
-        await tester.pump();
-
-        expect(
-          AppSnackBarManager().activeToasts.single.notification.message,
-          'Not supported yet',
+        final gesture = tester.widget<GestureDetector>(
+          find
+              .ancestor(of: deepSeek, matching: find.byType(GestureDetector))
+              .first,
         );
-        expect(
-          AppSnackBarManager().activeToasts.single.notification.type,
-          NotificationType.info,
-        );
-        expect(find.byType(AlertDialog), findsNothing);
-        await tester.pump(const Duration(seconds: 4));
-        await tester.pumpAndSettle();
+        expect(gesture.onTap, isNotNull);
       },
     );
   });

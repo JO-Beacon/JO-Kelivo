@@ -158,14 +158,32 @@ class ChatboxImporter {
     onProgress?.call(
       const ProgressUpdate(phase: BackupPhase.restoring, value: 0.85),
     );
-    await chatService.commitParsedImport(
+    final existingBeforeImport = {
+      for (final conversation in chatService.getAllCompleteConversations())
+        conversation.id: conversation,
+    };
+    final existingMessageIdsBefore = <String, Set<String>>{};
+    if (mode == RestoreMode.merge) {
+      for (final conversation in existingBeforeImport.values) {
+        existingMessageIdsBefore[conversation.id] =
+            (await chatService.loadAllConversationMessages(
+              conversation.id,
+            )).map((message) => message.id).toSet();
+      }
+    }
+    final preparedBatches = await _prepareConversationBatches(
+      chatService,
+      assistantConvRes.conversationBatches,
+      mode: mode,
+    );
+    await chatService.commitScopedParsedImport(
       businessRepository: businessRepository,
-      overwrite: mode == RestoreMode.overwrite,
-      conversationBatches: assistantConvRes.conversationBatches,
-      messagesToAppend: assistantConvRes.messagesToAppend,
+      replaceExisting: mode == RestoreMode.overwrite,
+      conversationBatches: preparedBatches,
       transformBusiness: (current) => _transformBusinessData(
         current: current,
         mode: mode,
+        scopedOverwrite: mode == RestoreMode.overwrite,
         providers: providerPlan.configs,
         deletedProviderIds: providerPlan.deletedProviderIds,
         assistants: assistantConvRes.assistantPayloads,
@@ -178,12 +196,369 @@ class ChatboxImporter {
       const ProgressUpdate(phase: BackupPhase.finalizing, value: 1),
     );
 
+    var admittedConversations = 0;
+    var admittedMessages = 0;
+    for (final batch in preparedBatches) {
+      final old = existingBeforeImport[batch.conversation.id];
+      final oldIds =
+          existingMessageIdsBefore[batch.conversation.id] ?? const <String>{};
+      final added = old == null
+          ? batch.messages.length
+          : batch.messages
+                .where((message) => !oldIds.contains(message.id))
+                .length;
+      if (old == null || mode == RestoreMode.overwrite || added > 0) {
+        admittedConversations++;
+        admittedMessages += mode == RestoreMode.merge && old != null
+            ? added
+            : batch.messages.length;
+      }
+    }
     return ChatboxImportResult(
       providers: providerPlan.configs.length,
       assistants: assistantConvRes.assistants,
-      conversations: assistantConvRes.conversations,
-      messages: assistantConvRes.messages,
+      conversations: admittedConversations,
+      messages: admittedMessages,
     );
+  }
+
+  static Future<List<ParsedChatImportBatch>> _prepareConversationBatches(
+    ChatService chatService,
+    List<ParsedChatImportBatch> imported, {
+    required RestoreMode mode,
+  }) async {
+    final existing = {
+      for (final conversation in chatService.getAllCompleteConversations())
+        conversation.id: conversation,
+    };
+    final result = <ParsedChatImportBatch>[];
+    for (final batch in imported) {
+      final current = existing[batch.conversation.id];
+      if (current == null) {
+        result.add(batch);
+        continue;
+      }
+      if (mode == RestoreMode.merge) {
+        final localMessages = await chatService.loadAllConversationMessages(
+          current.id,
+        );
+        final localById = <String, ChatMessage>{
+          for (final message in localMessages) message.id: message,
+        };
+        final merged = await _mergeConversationBatch(
+          chatService,
+          current,
+          batch,
+        );
+        final unchanged =
+            merged.messages.length == localMessages.length &&
+            merged.messages.every((message) {
+              final local = localById[message.id];
+              return local != null &&
+                  local.semanticContentHash == message.semanticContentHash;
+            });
+        if (!unchanged) result.add(merged);
+        continue;
+      }
+
+      // 完全覆盖只覆盖正确助手位置；错误位置保留原会话并写入稳定副本。
+      if (current.assistantId == batch.conversation.assistantId) {
+        result.add(batch);
+      } else {
+        final placedId = '${batch.conversation.id}_placed';
+        result.add(_remapImportedTreeStable(batch, placedId));
+        final placed = existing[placedId];
+        if (placed != null) {
+          result[result.length - 1] = await _mergeConversationBatch(
+            chatService,
+            placed,
+            result.last,
+          );
+        }
+      }
+    }
+    return result;
+  }
+
+  static ParsedChatImportBatch _remapImportedTreeStable(
+    ParsedChatImportBatch batch,
+    String targetConversationId,
+  ) {
+    final messageMap = <String, String>{
+      for (final message in batch.messages)
+        message.id: _legacyId('placed_${batch.conversation.id}_${message.id}'),
+    };
+    final branchMap = <String, String>{
+      for (final branch
+          in batch.tree?.branches.values ?? const <ConversationBranch>[])
+        branch.id: _legacyId(
+          'placed_branch_${batch.conversation.id}_${branch.id}',
+        ),
+    };
+    final messages = [
+      for (final message in batch.messages)
+        message.copyWith(
+          id: messageMap[message.id],
+          conversationId: targetConversationId,
+        ),
+    ];
+    final sourceTree = batch.tree;
+    final tree = sourceTree == null
+        ? null
+        : ConversationTree(
+            conversationId: targetConversationId,
+            activeBranchId: branchMap[sourceTree.activeBranchId]!,
+            branches: {
+              for (final branch in sourceTree.branches.values)
+                branchMap[branch.id]!: ConversationBranch(
+                  id: branchMap[branch.id]!,
+                  conversationId: targetConversationId,
+                  tipMessageId: branch.tipMessageId == null
+                      ? null
+                      : messageMap[branch.tipMessageId],
+                  name: branch.name,
+                  createdAt: branch.createdAt,
+                ),
+            },
+            edges: {
+              for (final edge in sourceTree.edges.values)
+                messageMap[edge.messageId]!: MessageTreeEdge(
+                  messageId: messageMap[edge.messageId]!,
+                  parentMessageId: edge.parentMessageId == null
+                      ? null
+                      : messageMap[edge.parentMessageId],
+                ),
+            },
+            branchSelections: {
+              for (final entry in sourceTree.branchSelections.entries)
+                if (messageMap[entry.key] != null &&
+                    branchMap[entry.value] != null)
+                  messageMap[entry.key]!: branchMap[entry.value]!,
+            },
+          );
+    return (
+      conversation: batch.conversation.copyWith(
+        id: targetConversationId,
+        assistantId: batch.conversation.assistantId,
+        messageIds: messages.map((message) => message.id).toList(),
+      ),
+      messages: messages,
+      tree: tree,
+    );
+  }
+
+  static Future<ParsedChatImportBatch> _mergeConversationBatch(
+    ChatService chatService,
+    Conversation current,
+    ParsedChatImportBatch incoming,
+  ) async {
+    final localMessages = await chatService.loadAllConversationMessages(
+      current.id,
+    );
+    final localById = <String, ChatMessage>{
+      for (final message in localMessages) message.id: message,
+    };
+    final incomingById = <String, ChatMessage>{
+      for (final message in incoming.messages) message.id: message,
+    };
+    final idMap = <String, String>{};
+    final mergedMessages = List<ChatMessage>.of(localMessages);
+    final occupiedGroupVersions = <({String groupId, int version})>{
+      for (final message in localMessages)
+        (groupId: message.groupId ?? message.id, version: message.version),
+    };
+    for (final message in incoming.messages) {
+      final local = localById[message.id];
+      if (local == null) {
+        idMap[message.id] = message.id;
+        var nextMessage = message;
+        final groupId = message.groupId ?? message.id;
+        final groupVersion = (groupId: groupId, version: message.version);
+        if (occupiedGroupVersions.contains(groupVersion)) {
+          nextMessage = message.copyWith(
+            groupId: _legacyId('merge_${current.id}_${message.id}'),
+            version: 0,
+          );
+        }
+        mergedMessages.add(nextMessage);
+        occupiedGroupVersions.add((
+          groupId: nextMessage.groupId ?? nextMessage.id,
+          version: nextMessage.version,
+        ));
+      } else if (local.semanticContentHash == message.semanticContentHash &&
+          local.role == message.role) {
+        idMap[message.id] = message.id;
+      } else {
+        final conflictId = _stableUniqueMessageId(
+          _legacyId('conflict_${current.id}_${message.id}'),
+          {...localById, ...incomingById},
+        );
+        idMap[message.id] = conflictId;
+        mergedMessages.add(
+          message.copyWith(
+            id: conflictId,
+            groupId: _legacyId('merge_${current.id}_${message.id}'),
+            version: 0,
+          ),
+        );
+        occupiedGroupVersions.add((
+          groupId: _legacyId('merge_${current.id}_${message.id}'),
+          version: 0,
+        ));
+      }
+    }
+
+    final localTree =
+        await chatService.loadConversationTree(current.id) ??
+        ConversationTree.linear(
+          conversationId: current.id,
+          messageIds: localMessages.map((message) => message.id).toList(),
+        );
+    final incomingTree =
+        incoming.tree ??
+        ConversationTree.linear(
+          conversationId: current.id,
+          messageIds: incoming.messages.map((message) => message.id).toList(),
+        );
+    final edges = Map<String, MessageTreeEdge>.from(localTree.edges);
+    final branches = Map<String, ConversationBranch>.from(localTree.branches);
+    final selections = Map<String, String>.from(localTree.branchSelections);
+    final branchMap = <String, String>{};
+    for (final branch in incomingTree.branches.values) {
+      if (branches.containsKey(branch.id)) {
+        branchMap[branch.id] = branch.id;
+      } else {
+        final branchId = _stableUniqueBranchId(branch.id, branches);
+        branchMap[branch.id] = branchId;
+        branches[branchId] = branch.copyWith(
+          id: branchId,
+          conversationId: current.id,
+          tipMessageId: branch.tipMessageId == null
+              ? null
+              : idMap[branch.tipMessageId],
+        );
+      }
+    }
+    final incomingByMappedId = <String, ChatMessage>{
+      for (final message in incoming.messages)
+        idMap[message.id]!: message.copyWith(id: idMap[message.id]),
+    };
+    for (final edge in incomingTree.edges.values) {
+      var mappedId = idMap[edge.messageId];
+      if (mappedId == null) continue;
+      var parentId = edge.parentMessageId == null
+          ? null
+          : idMap[edge.parentMessageId];
+      if (parentId == null && edge.parentMessageId != null) {
+        parentId = _nearestMessageBefore(
+          mergedMessages,
+          incomingByMappedId[mappedId]?.timestamp,
+        );
+      }
+      final existingEdge = edges[mappedId];
+      if (existingEdge != null && existingEdge.parentMessageId != parentId) {
+        final sourceMessage = incomingById[edge.messageId];
+        if (sourceMessage != null && mappedId == edge.messageId) {
+          mappedId = _stableUniqueMessageId(
+            _legacyId('placement_${current.id}_${edge.messageId}'),
+            {...localById, ...incomingByMappedId},
+          );
+          idMap[edge.messageId] = mappedId;
+          mergedMessages.add(sourceMessage.copyWith(id: mappedId));
+        }
+      }
+      if (existingEdge == null || !edges.containsKey(mappedId)) {
+        edges[mappedId] = MessageTreeEdge(
+          messageId: mappedId,
+          parentMessageId: parentId,
+        );
+      }
+    }
+    for (final branch in incomingTree.branches.values) {
+      final mappedBranchId = branchMap[branch.id];
+      if (mappedBranchId == null) continue;
+      final mappedTip = branch.tipMessageId == null
+          ? null
+          : idMap[branch.tipMessageId];
+      final existing = branches[mappedBranchId];
+      if (existing != null &&
+          existing.tipMessageId == null &&
+          mappedTip != null) {
+        branches[mappedBranchId] = existing.copyWith(tipMessageId: mappedTip);
+      }
+    }
+    for (final entry in incomingTree.branchSelections.entries) {
+      final messageId = idMap[entry.key];
+      final branchId = branchMap[entry.value];
+      if (messageId != null && branchId != null) {
+        selections[messageId] = branchId;
+      }
+    }
+    final mergedMessageIds = mergedMessages
+        .map((message) => message.id)
+        .toSet();
+    if (!edges.keys.every(mergedMessageIds.contains)) {
+      throw StateError('chatbox_merge_tree_message_missing');
+    }
+    final mergedTree = ConversationTree(
+      conversationId: current.id,
+      activeBranchId: localTree.activeBranchId,
+      branches: branches,
+      edges: edges,
+      branchSelections: selections,
+    );
+    final updatedAt = mergedMessages
+        .map((message) => message.timestamp)
+        .fold<DateTime>(
+          current.updatedAt,
+          (latest, value) => value.isAfter(latest) ? value : latest,
+        );
+    return (
+      conversation: current.copyWith(
+        updatedAt: updatedAt,
+        messageIds: mergedMessages.map((message) => message.id).toList(),
+      ),
+      messages: mergedMessages,
+      tree: mergedTree,
+    );
+  }
+
+  static String _stableUniqueMessageId(
+    String candidate,
+    Map<String, ChatMessage> occupied,
+  ) {
+    if (!occupied.containsKey(candidate)) return candidate;
+    var index = 2;
+    while (occupied.containsKey('${candidate}_$index')) {
+      index++;
+    }
+    return '${candidate}_$index';
+  }
+
+  static String _stableUniqueBranchId(
+    String candidate,
+    Map<String, ConversationBranch> occupied,
+  ) {
+    if (!occupied.containsKey(candidate)) return candidate;
+    var index = 2;
+    while (occupied.containsKey('${candidate}_$index')) {
+      index++;
+    }
+    return '${candidate}_$index';
+  }
+
+  static String? _nearestMessageBefore(
+    List<ChatMessage> messages,
+    DateTime? timestamp,
+  ) {
+    if (messages.isEmpty) return null;
+    final sorted = List<ChatMessage>.of(messages)
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    if (timestamp == null) return sorted.last.id;
+    final candidates = sorted.where(
+      (message) => !message.timestamp.isAfter(timestamp),
+    );
+    return candidates.isEmpty ? sorted.first.id : candidates.last.id;
   }
 
   // ---------- 解析 ----------
@@ -408,23 +783,7 @@ class ChatboxImporter {
     final regularAssistantIds = <String>[];
     final conversationBatches = <ParsedChatImportBatch>[];
     final messagesToAppend = <String, List<ChatMessage>>{};
-    final existingGroupVersionsByConversation =
-        <String, Set<({String groupId, int version})>>{};
-    final plannedGroupVersionsByConversation =
-        <String, Set<({String groupId, int version})>>{};
-
-    // 在构建完整导入计划期间，现有状态只读。
     if (!chatService.initialized) await chatService.init();
-
-    final existingConvs = chatService.getAllCompleteConversations();
-    final existingConvIds = existingConvs.map((c) => c.id).toSet();
-    final existingMsgIds = <String>{};
-    if (mode == RestoreMode.merge) {
-      // 仅取 id：完整加载消息会无意义地冲掉 LRU 缓存。
-      for (final c in existingConvs) {
-        existingMsgIds.addAll(await chatService.getMessageIds(c.id));
-      }
-    }
 
     int convCount = 0;
     int msgCount = 0;
@@ -612,12 +971,6 @@ class ChatboxImporter {
             sourceMsgId,
             () => _legacyId(sourceMsgId),
           );
-          final hasForkArchive = session['messageForksHash'] is Map;
-          if (mode == RestoreMode.merge &&
-              !hasForkArchive &&
-              existingMsgIds.contains(msgId)) {
-            continue;
-          }
           final roleRaw = (msg['role'] ?? '').toString();
           final parts = _extractMessageParts(msg, roleHint: roleRaw);
           final content = _textFromParts(parts);
@@ -753,74 +1106,13 @@ class ChatboxImporter {
           assistantId: assistantId,
         );
 
-        final hasForks =
-            importedTree.branches.length > 1 ||
-            importedTree.branchSelections.isNotEmpty;
-        var groupVersionCollision = false;
-        if (mode == RestoreMode.merge && existingConvIds.contains(tid)) {
-          final existingGroupVersions =
-              existingGroupVersionsByConversation[tid] ??= {
-                for (final existingMessage
-                    in await chatService.loadAllConversationMessages(tid))
-                  (
-                    groupId: existingMessage.groupId ?? existingMessage.id,
-                    version: existingMessage.version,
-                  ),
-              };
-          final plannedGroupVersions = plannedGroupVersionsByConversation
-              .putIfAbsent(
-                tid,
-                () => <({String groupId, int version})>{
-                  ...existingGroupVersions,
-                },
-              );
-          groupVersionCollision = messages.any((message) {
-            final key = (
-              groupId: message.groupId ?? message.id,
-              version: message.version,
-            );
-            return plannedGroupVersions.contains(key) &&
-                !existingMsgIds.contains(message.id);
-          });
-          if (!groupVersionCollision) {
-            plannedGroupVersions.addAll(
-              messages.map(
-                (message) => (
-                  groupId: message.groupId ?? message.id,
-                  version: message.version,
-                ),
-              ),
-            );
-          }
-        }
-        if (mode == RestoreMode.merge && existingConvIds.contains(tid)) {
-          if (!hasForks && !groupVersionCollision) {
-            messagesToAppend.putIfAbsent(tid, () => []).addAll(messages);
-            msgCount += messages.length;
-          } else if (hasForks && messages.every(existingMsgIds.contains)) {
-            // 完整树的所有消息都已存在时视为重复导入，不能再追加线性副本。
-            continue;
-          } else {
-            // 合并时如果本地已占用相同的 group/version，保留为独立会话，
-            // 与“内容冲突则保留为独立会话”的导入语义一致。
-            final remapped = _remapImportedTree(
-              conversation: conv,
-              messages: messages,
-              tree: importedTree,
-            );
-            conversationBatches.add(remapped);
-            convCount += 1;
-            msgCount += remapped.messages.length;
-          }
-        } else {
-          conversationBatches.add((
-            conversation: conv,
-            messages: messages,
-            tree: importedTree,
-          ));
-          convCount += 1;
-          msgCount += messages.length;
-        }
+        conversationBatches.add((
+          conversation: conv,
+          messages: messages,
+          tree: importedTree,
+        ));
+        convCount += 1;
+        msgCount += messages.length;
       }
       onProgress?.call(
         ProgressUpdate(
@@ -851,74 +1143,6 @@ class ChatboxImporter {
       starredAssistantIds: starredAssistantIds,
       conversationBatches: conversationBatches,
       messagesToAppend: messagesToAppend,
-    );
-  }
-
-  static ({
-    Conversation conversation,
-    List<ChatMessage> messages,
-    ConversationTree tree,
-  })
-  _remapImportedTree({
-    required Conversation conversation,
-    required List<ChatMessage> messages,
-    required ConversationTree tree,
-  }) {
-    final targetConversationId = _legacyId(
-      'import_conversation_${const Uuid().v4()}',
-    );
-    final messageIds = <String, String>{
-      for (final message in messages)
-        message.id: _legacyId('import_message_${const Uuid().v4()}'),
-    };
-    final branchIds = <String, String>{
-      for (final branch in tree.branches.values)
-        branch.id: _legacyId('import_branch_${const Uuid().v4()}'),
-    };
-    final remappedMessages = [
-      for (final message in messages)
-        message.copyWith(
-          id: messageIds[message.id],
-          conversationId: targetConversationId,
-        ),
-    ];
-    final remappedTree = ConversationTree(
-      conversationId: targetConversationId,
-      activeBranchId: branchIds[tree.activeBranchId]!,
-      branches: {
-        for (final branch in tree.branches.values)
-          branchIds[branch.id]!: ConversationBranch(
-            id: branchIds[branch.id]!,
-            conversationId: targetConversationId,
-            tipMessageId: branch.tipMessageId == null
-                ? null
-                : messageIds[branch.tipMessageId],
-            name: branch.name,
-            createdAt: branch.createdAt,
-          ),
-      },
-      edges: {
-        for (final edge in tree.edges.values)
-          messageIds[edge.messageId]!: MessageTreeEdge(
-            messageId: messageIds[edge.messageId]!,
-            parentMessageId: edge.parentMessageId == null
-                ? null
-                : messageIds[edge.parentMessageId],
-          ),
-      },
-      branchSelections: {
-        for (final entry in tree.branchSelections.entries)
-          if (messageIds[entry.key] != null && branchIds[entry.value] != null)
-            messageIds[entry.key]!: branchIds[entry.value]!,
-      },
-    );
-    return (
-      conversation: conversation.copyWith(
-        id: targetConversationId,
-        messageIds: remappedMessages.map((message) => message.id).toList(),
-      ),
-      messages: remappedMessages,
-      tree: remappedTree,
     );
   }
 
@@ -1106,12 +1330,50 @@ class ChatboxImporter {
           // A single imported list is a linear continuation, not a branch
           // selection. Empty active lists intentionally retain a terminal
           // selection so nested Chatbox fork state can be restored.
-          if (directChildCount > 1 || selectedBranch.tipMessageId == pivotId) {
+          // Chatbox writes a position for linear records as well.  A
+          // selection is meaningful only when the archive contains multiple
+          // candidate lists; otherwise remembering the current continuation
+          // creates stale selections on the imported tree.
+          if (listsRaw.length > 1 &&
+              (directChildCount > 1 ||
+                  selectedBranch.tipMessageId == pivotId)) {
             branchSelections[pivotId] = selectedBranchId;
           }
         }
         handledPivots.add(sourcePivotId);
         changed = true;
+      }
+    }
+
+    // Re-check selections against the completed edge set. Nested fork
+    // materialization can reveal that a previously selected pivot is only a
+    // shared linear prefix, so it must not be persisted as a fork selection.
+    final normalizedSelections = <String, String>{};
+    for (final entry in branchSelections.entries) {
+      final branch = branches[entry.value];
+      if (branch == null || branch.tipMessageId == null) continue;
+      final path = <String>[];
+      final visited = <String>{};
+      String? cursor = branch.tipMessageId;
+      while (cursor != null && visited.add(cursor)) {
+        final edge = edges[cursor];
+        if (edge == null) {
+          path.clear();
+          break;
+        }
+        path.add(cursor);
+        cursor = edge.parentMessageId;
+      }
+      if (path.isEmpty && branch.tipMessageId != null) continue;
+      final orderedPath = path.reversed.toList(growable: false);
+      final index = orderedPath.indexOf(entry.key);
+      if (index < 0) continue;
+      final directChildren = edges.values
+          .where((edge) => edge.parentMessageId == entry.key)
+          .map((edge) => edge.messageId)
+          .toSet();
+      if (index + 1 >= orderedPath.length || directChildren.length >= 2) {
+        normalizedSelections[entry.key] = entry.value;
       }
     }
 
@@ -1122,7 +1384,7 @@ class ChatboxImporter {
         activeBranchId: rootBranchId,
         branches: branches,
         edges: edges,
-        branchSelections: branchSelections,
+        branchSelections: normalizedSelections,
       ),
     );
   }
@@ -1189,6 +1451,7 @@ class ChatboxImporter {
   static BusinessSnapshot _transformBusinessData({
     required BusinessSnapshot current,
     required RestoreMode mode,
+    bool scopedOverwrite = false,
     required Map<String, Map<String, dynamic>> providers,
     required Set<String> deletedProviderIds,
     required List<Map<String, dynamic>> assistants,
@@ -1197,7 +1460,7 @@ class ChatboxImporter {
     required String starredGroupName,
   }) {
     final settings = BusinessSettingsRouter.exportSnapshot(current);
-    final overwrite = mode == RestoreMode.overwrite;
+    final overwrite = mode == RestoreMode.overwrite && !scopedOverwrite;
 
     if (overwrite) {
       // 历史上不含 providers 的 Chatbox 导出会保留本地 providers
@@ -1275,6 +1538,7 @@ class ChatboxImporter {
     _applyImportedProviderGroups(
       settings: settings,
       mode: mode,
+      scopedOverwrite: scopedOverwrite,
       importedProviderIds: providers.keys.toSet(),
       deletedProviderIds: deletedProviderIds,
     );
@@ -1361,7 +1625,7 @@ class ChatboxImporter {
             ? starredGroupId
             : regularGroupId;
         if (targetGroupId == null) continue;
-        if (overwrite) {
+        if (overwrite || scopedOverwrite) {
           nextAssignment[id] = targetGroupId;
         } else {
           nextAssignment.putIfAbsent(id, () => targetGroupId);
@@ -1794,12 +2058,13 @@ class ChatboxImporter {
   static void _applyImportedProviderGroups({
     required Map<String, Object> settings,
     required RestoreMode mode,
+    bool scopedOverwrite = false,
     required Set<String> importedProviderIds,
     required Set<String> deletedProviderIds,
   }) {
     if (importedProviderIds.isEmpty) return;
 
-    final overwrite = mode == RestoreMode.overwrite;
+    final overwrite = mode == RestoreMode.overwrite && !scopedOverwrite;
     final groups = overwrite
         ? <Map<String, dynamic>>[]
         : _jsonObjectList(settings[_providerGroupsKey], _providerGroupsKey);

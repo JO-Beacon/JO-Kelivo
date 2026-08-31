@@ -521,6 +521,105 @@ void main() {
   );
 
   test(
+    'deleteMessages removes only the selected suffix in persistence',
+    () async {
+      final database = AppDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      await database.customSelect('SELECT 1;').getSingle();
+
+      final conversationId = 'conversation-current-branch-tip';
+      final createdAt = DateTime.utc(2026, 1, 1);
+      await database.customStatement(
+        'INSERT INTO conversation_rows (id, title, created_at, updated_at) '
+        'VALUES (?, ?, ?, ?);',
+        [
+          conversationId,
+          'branch tip',
+          createdAt.microsecondsSinceEpoch,
+          createdAt.microsecondsSinceEpoch,
+        ],
+      );
+
+      final repository = ChatDatabaseRepository(database);
+      final conversation = Conversation(
+        id: conversationId,
+        title: 'branch tip',
+      );
+      final messageIds = const ['u1', 'a', 'b', 'c', 'c1', 'c2'];
+      final messages = [
+        for (final (index, id) in messageIds.indexed)
+          (
+            message: ChatMessage(
+              id: id,
+              conversationId: conversationId,
+              role: index == 0 || index == 4 ? 'user' : 'assistant',
+              content: id,
+              timestamp: createdAt.add(Duration(seconds: index)),
+            ),
+            messageOrder: index,
+          ),
+      ];
+      await repository.putMigrationBatch(
+        conversations: [conversation.copyWith(messageIds: messageIds)],
+        messages: messages,
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+      await repository.saveConversationTree(
+        ConversationTree(
+          conversationId: conversationId,
+          activeBranchId: 'branch-c',
+          branches: {
+            'branch-a': ConversationBranch(
+              id: 'branch-a',
+              conversationId: conversationId,
+              tipMessageId: 'a',
+              createdAt: createdAt,
+            ),
+            'branch-b': ConversationBranch(
+              id: 'branch-b',
+              conversationId: conversationId,
+              tipMessageId: 'b',
+              createdAt: createdAt,
+            ),
+            'branch-c': ConversationBranch(
+              id: 'branch-c',
+              conversationId: conversationId,
+              tipMessageId: 'c2',
+              createdAt: createdAt,
+            ),
+          },
+          edges: const {
+            'u1': MessageTreeEdge(messageId: 'u1', parentMessageId: null),
+            'a': MessageTreeEdge(messageId: 'a', parentMessageId: 'u1'),
+            'b': MessageTreeEdge(messageId: 'b', parentMessageId: 'u1'),
+            'c': MessageTreeEdge(messageId: 'c', parentMessageId: 'u1'),
+            'c1': MessageTreeEdge(messageId: 'c1', parentMessageId: 'c'),
+            'c2': MessageTreeEdge(messageId: 'c2', parentMessageId: 'c1'),
+          },
+        ),
+      );
+
+      final deleted = await repository.deleteMessages(
+        conversationId: conversationId,
+        messageIds: {'c2'},
+        versionSelectionChanges: const {},
+      );
+      final tree = await repository.loadConversationTree(conversationId);
+
+      expect(deleted, isNot(equals(null)));
+      expect(deleted!.messages.map((message) => message.id), ['c2']);
+      expect(await repository.getMessage('c1'), isNot(equals(null)));
+      expect(await repository.getMessage('c'), isNot(equals(null)));
+      expect(tree, isNot(equals(null)));
+      expect(tree!.activePath(), const ['u1', 'c', 'c1']);
+      expect(tree.branchPath('branch-a'), const ['u1', 'a']);
+      expect(tree.branchPath('branch-b'), const ['u1', 'b']);
+      expect(tree.branches.containsKey('branch-c'), isTrue);
+    },
+  );
+
+  test(
     'regeneration appends the new assistant to the requested branch',
     () async {
       final database = AppDatabase(NativeDatabase.memory());

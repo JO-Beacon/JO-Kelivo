@@ -1344,10 +1344,30 @@ class HomePageController extends ChangeNotifier {
     required ChatMessage message,
     required Map<String, List<ChatMessage>> byGroup,
   }) async {
+    // 分支删除会切换活动路径，原消息槽位可能由兄弟分支重新出现。
+    // 不能复用消息删除的淡出动画，否则会把“分支切换”表现成“节点消失”。
+    _scrollCtrl.cancelPendingNavigation();
+    _translations.remove(message.id);
+    await _viewModel.deleteMessage(message: message, byGroup: byGroup);
+    notifyListeners();
+  }
+
+  Future<void> deleteMessageNode({
+    required ChatMessage message,
+    required Map<String, List<ChatMessage>> byGroup,
+  }) async {
+    _scrollCtrl.cancelPendingNavigation();
+    _translations.remove(message.id);
+    await _viewModel.deleteMessageNode(message: message, byGroup: byGroup);
+    notifyListeners();
+  }
+
+  Future<void> deleteMessageAndFollowing({
+    required ChatMessage message,
+    required Map<String, List<ChatMessage>> byGroup,
+  }) async {
     final keepAtBottom = _scrollCtrl.isNearBottom();
     final gid = (message.groupId ?? message.id);
-    // 删除唯一版本会移除整个槽位；删除多个版本中的一个会在原位替换内容，
-    // 这样在不使用移除动画时阅读体验更好。
     final slotDisappears = (byGroup[gid] ?? const <ChatMessage>[]).length <= 1;
     int? preserveRequest;
     if (slotDisappears && _shouldAnimateSlotRemoval(message)) {
@@ -1358,7 +1378,10 @@ class HomePageController extends ChangeNotifier {
     }
     _translations.remove(message.id);
     try {
-      await _viewModel.deleteMessage(message: message, byGroup: byGroup);
+      await _viewModel.deleteMessageAndFollowing(
+        message: message,
+        byGroup: byGroup,
+      );
     } finally {
       _settleAfterSlotRemoval(
         gid,

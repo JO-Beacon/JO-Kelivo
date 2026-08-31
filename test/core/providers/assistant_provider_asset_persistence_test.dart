@@ -124,4 +124,106 @@ void main() {
       expect(storedAssistant['background'], updated.background);
     },
   );
+
+  test('duplicated assistants keep independent background assets', () async {
+    final provider = await _loadedProvider(
+      session: session,
+      assistants: const [
+        {'id': 'assistant-a', 'name': 'Assistant A'},
+      ],
+    );
+    final sourceDir = Directory(p.join(tempDir.path, 'external'))
+      ..createSync(recursive: true);
+    final first = File(p.join(sourceDir.path, 'first.jpg'))
+      ..writeAsBytesSync(const [1, 2, 3]);
+    final second = File(p.join(sourceDir.path, 'second.jpg'))
+      ..writeAsBytesSync(const [4, 5, 6]);
+    final third = File(p.join(sourceDir.path, 'third.jpg'))
+      ..writeAsBytesSync(const [7, 8, 9]);
+
+    await provider.updateAssistant(
+      provider.getById('assistant-a')!.copyWith(background: first.path),
+    );
+    final copiedId = await provider.duplicateAssistant('assistant-a');
+    expect(copiedId, isNotNull);
+
+    final originalPath = provider.getById('assistant-a')!.background;
+    final copiedPath = provider.getById(copiedId!)!.background;
+    expect(originalPath, isNotNull);
+    expect(copiedPath, isNotNull);
+    expect(copiedPath, isNot(originalPath));
+    expect(await File(copiedPath!).readAsBytes(), const [1, 2, 3]);
+
+    await provider.updateAssistant(
+      provider.getById('assistant-a')!.copyWith(background: second.path),
+    );
+    expect(provider.getById(copiedId)!.background, copiedPath);
+    expect(await File(copiedPath).readAsBytes(), const [1, 2, 3]);
+
+    await provider.updateAssistant(
+      provider.getById(copiedId)!.copyWith(background: third.path),
+    );
+    expect(provider.getById('assistant-a')!.background, isNot(copiedPath));
+    expect(
+      await File(provider.getById('assistant-a')!.background!).readAsBytes(),
+      const [4, 5, 6],
+    );
+  });
+
+  test(
+    'shared legacy background is retained while one assistant changes it',
+    () async {
+      final imagesDir = Directory(p.join(tempDir.path, 'images'))
+        ..createSync(recursive: true);
+      final shared = File(p.join(imagesDir.path, 'shared.jpg'))
+        ..writeAsBytesSync(const [1, 2, 3]);
+      final replacement = File(p.join(tempDir.path, 'replacement.jpg'))
+        ..writeAsBytesSync(const [4, 5, 6]);
+      final provider = await _loadedProvider(
+        session: session,
+        assistants: [
+          {
+            'id': 'assistant-a',
+            'name': 'Assistant A',
+            'background': shared.path,
+          },
+          {
+            'id': 'assistant-b',
+            'name': 'Assistant B',
+            'background': shared.path,
+          },
+        ],
+      );
+
+      await provider.updateAssistant(
+        provider.getById('assistant-a')!.copyWith(background: replacement.path),
+      );
+
+      expect(
+        p.normalize(provider.getById('assistant-b')!.background!),
+        p.normalize(shared.path),
+      );
+      expect(await shared.exists(), isTrue);
+      expect(await shared.readAsBytes(), const [1, 2, 3]);
+    },
+  );
+
+  test(
+    'does not duplicate a missing local background by reusing its path',
+    () async {
+      final provider = await _loadedProvider(
+        session: session,
+        assistants: [
+          {
+            'id': 'assistant-a',
+            'name': 'Assistant A',
+            'background': p.join(tempDir.path, 'missing.jpg'),
+          },
+        ],
+      );
+
+      expect(await provider.duplicateAssistant('assistant-a'), isNull);
+      expect(provider.assistants, hasLength(1));
+    },
+  );
 }

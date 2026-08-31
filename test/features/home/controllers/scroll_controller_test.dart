@@ -42,6 +42,34 @@ void main() {
       scrollController.dispose();
     });
 
+    testWidgets('structural mutation cancels a queued bottom navigation', (
+      tester,
+    ) async {
+      final scrollController = ChatAutoFollowScrollController();
+      final chatScrollController = ChatScrollController(
+        scrollController: scrollController,
+        onStateChanged: () {},
+        getAutoScrollEnabled: () => false,
+        getAutoScrollIdleSeconds: () => 8,
+      );
+      await tester.pumpWidget(
+        _SuperScrollHarness(
+          scrollController: scrollController,
+          listController: chatScrollController.messageListController,
+          itemCount: 40,
+        ),
+      );
+      scrollController.jumpTo(0);
+
+      chatScrollController.scrollToBottom();
+      chatScrollController.cancelPendingNavigation();
+      await tester.pumpAndSettle();
+
+      expect(scrollController.offset, 0);
+      chatScrollController.dispose();
+      scrollController.dispose();
+    });
+
     testWidgets('short conversation starts with fresh scroll state', (
       tester,
     ) async {

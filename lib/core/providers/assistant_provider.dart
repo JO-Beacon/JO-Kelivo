@@ -340,7 +340,10 @@ class AssistantProvider extends ChangeNotifier {
     if (raw.startsWith('http') || raw.startsWith('data:')) return rawPath;
     final fixed = SandboxPathResolver.fix(raw);
     final src = File(fixed);
-    if (!await src.exists()) return rawPath;
+    if (!await src.exists()) {
+      final looksLikeLocalPath = raw.startsWith('/') || raw.contains(':');
+      return looksLikeLocalPath ? null : rawPath;
+    }
 
     try {
       final dir = isAvatar
@@ -364,8 +367,39 @@ class AssistantProvider extends ChangeNotifier {
       await src.copy(dest.path);
       return dest.path;
     } catch (_) {
-      return rawPath;
+      return null;
     }
+  }
+
+  bool _isLocalAssetReference(String? rawPath) {
+    final raw = (rawPath ?? '').trim();
+    return raw.isNotEmpty &&
+        !raw.startsWith('http') &&
+        !raw.startsWith('data:') &&
+        (raw.startsWith('/') || raw.contains(':'));
+  }
+
+  bool _isReferencedByAnotherAssistant(
+    String? rawPath,
+    String assistantId, {
+    required bool isAvatar,
+  }) {
+    final raw = (rawPath ?? '').trim();
+    if (raw.isEmpty) return false;
+    final target = p.normalize(
+      File(SandboxPathResolver.fix(raw)).absolute.path,
+    );
+    for (final assistant in _assistants) {
+      if (assistant.id == assistantId) continue;
+      final candidate = isAvatar ? assistant.avatar : assistant.background;
+      final value = (candidate ?? '').trim();
+      if (value.isEmpty) continue;
+      final normalized = p.normalize(
+        File(SandboxPathResolver.fix(value)).absolute.path,
+      );
+      if (p.equals(target, normalized)) return true;
+    }
+    return false;
   }
 
   Future<String?> _copyLocalAssetToManagedDirectory(
@@ -496,6 +530,23 @@ class AssistantProvider extends ChangeNotifier {
     return a.id;
   }
 
+  /// Persists an assistant reconstructed from an external conversation
+  /// without changing an existing assistant with the same stable id.
+  Future<void> addImportedAssistant(Assistant assistant) async {
+    await loaded;
+    if (_assistantsById.containsKey(assistant.id)) return;
+    _assistants.add(assistant);
+    _rebuildAssistantIndex();
+    _rebuildAssistantDirectory();
+    if (businessRepository != null) {
+      await _persistAssistant(assistant, _assistants.indexOf(assistant));
+      await _persistAssistantOrder();
+    } else {
+      await _persistLegacyPreferences();
+    }
+    notifyListeners();
+  }
+
   Future<String?> duplicateAssistant(
     String id, {
     AppLocalizations? l10n,
@@ -511,11 +562,24 @@ class AssistantProvider extends ChangeNotifier {
       isAvatar: true,
       newId: newId,
     );
+    if (_isLocalAssetReference(source.avatar) && avatarCopy == null) {
+      return null;
+    }
     final backgroundCopy = await _duplicateLocalFile(
       source.background,
       isAvatar: false,
       newId: newId,
     );
+    if (_isLocalAssetReference(source.background) && backgroundCopy == null) {
+      if (avatarCopy != null) {
+        await _deleteManagedFileIfOwned(
+          avatarCopy,
+          directoryAsync: AppDirectories.getAvatarsDirectory,
+          replacementPath: null,
+        );
+      }
+      return null;
+    }
 
     final copy = source.copyWith(
       id: newId,
@@ -592,18 +656,30 @@ class AssistantProvider extends ChangeNotifier {
           id: updated.id,
         );
         if (avatarPath != updated.avatar) {
-          await _deleteManagedFileIfOwned(
+          if (!_isReferencedByAnotherAssistant(
             prevRaw,
-            directoryAsync: AppDirectories.getAvatarsDirectory,
-            replacementPath: avatarPath,
-          );
+            updated.id,
+            isAvatar: true,
+          )) {
+            await _deleteManagedFileIfOwned(
+              prevRaw,
+              directoryAsync: AppDirectories.getAvatarsDirectory,
+              replacementPath: avatarPath,
+            );
+          }
           next = next.copyWith(avatar: avatarPath);
         } else if (raw.isEmpty) {
-          await _deleteManagedFileIfOwned(
+          if (!_isReferencedByAnotherAssistant(
             prevRaw,
-            directoryAsync: AppDirectories.getAvatarsDirectory,
-            replacementPath: null,
-          );
+            updated.id,
+            isAvatar: true,
+          )) {
+            await _deleteManagedFileIfOwned(
+              prevRaw,
+              directoryAsync: AppDirectories.getAvatarsDirectory,
+              replacementPath: null,
+            );
+          }
         }
       }
 
@@ -626,18 +702,30 @@ class AssistantProvider extends ChangeNotifier {
           id: updated.id,
         );
         if (backgroundPath != updated.background) {
-          await _deleteManagedFileIfOwned(
+          if (!_isReferencedByAnotherAssistant(
             prevBgRaw,
-            directoryAsync: AppDirectories.getImagesDirectory,
-            replacementPath: backgroundPath,
-          );
+            updated.id,
+            isAvatar: false,
+          )) {
+            await _deleteManagedFileIfOwned(
+              prevBgRaw,
+              directoryAsync: AppDirectories.getImagesDirectory,
+              replacementPath: backgroundPath,
+            );
+          }
           next = next.copyWith(background: backgroundPath);
         } else if (bgRaw.isEmpty) {
-          await _deleteManagedFileIfOwned(
+          if (!_isReferencedByAnotherAssistant(
             prevBgRaw,
-            directoryAsync: AppDirectories.getImagesDirectory,
-            replacementPath: null,
-          );
+            updated.id,
+            isAvatar: false,
+          )) {
+            await _deleteManagedFileIfOwned(
+              prevBgRaw,
+              directoryAsync: AppDirectories.getImagesDirectory,
+              replacementPath: null,
+            );
+          }
         }
       }
     } catch (_) {

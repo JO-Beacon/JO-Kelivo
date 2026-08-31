@@ -1,7 +1,5 @@
-import 'dart:io' show File;
-
 import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, TargetPlatform, kIsWeb;
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -10,10 +8,8 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/models/assistant.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
-import '../../../shared/widgets/emoji_text.dart';
-import '../../../utils/avatar_cache.dart';
-import '../../../utils/sandbox_path_resolver.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../home/widgets/assistant_avatar.dart';
 
 // 显示用于移动主题的助手选择器。
 // - 移动端：底部弹层
@@ -202,87 +198,7 @@ Future<String?> showAssistantMoveSelector(
 }
 
 Widget _assistantAvatar(BuildContext context, Assistant a, {double size = 28}) {
-  final cs = Theme.of(context).colorScheme;
-  final av = (a.avatar ?? '').trim();
-  if (av.isNotEmpty) {
-    if (av.startsWith('http')) {
-      return FutureBuilder<String?>(
-        future: AvatarCache.getPath(av),
-        builder: (ctx, snap) {
-          final p = snap.data;
-          if (p != null && File(p).existsSync()) {
-            return ClipOval(
-              child: Image(
-                image: FileImage(File(p)),
-                width: size,
-                height: size,
-                fit: BoxFit.cover,
-              ),
-            );
-          }
-          return ClipOval(
-            child: Image.network(
-              av,
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
-              errorBuilder: (c, e, s) => _assistantInitial(cs, a.name, size),
-            ),
-          );
-        },
-      );
-    } else if (!kIsWeb && (av.startsWith('/') || av.contains(':'))) {
-      final fixed = SandboxPathResolver.fix(av);
-      final f = File(fixed);
-      if (f.existsSync()) {
-        return ClipOval(
-          child: Image(
-            image: FileImage(f),
-            width: size,
-            height: size,
-            fit: BoxFit.cover,
-          ),
-        );
-      }
-    } else {
-      return Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: cs.primary.withValues(alpha: 0.15),
-          shape: BoxShape.circle,
-        ),
-        alignment: Alignment.center,
-        child: EmojiText(
-          (av.isNotEmpty ? av : '🙂'),
-          fontSize: size * 0.5,
-          optimizeEmojiAlign: true,
-        ),
-      );
-    }
-  }
-  return _assistantInitial(cs, a.name, size);
-}
-
-Widget _assistantInitial(ColorScheme cs, String name, double size) {
-  final letter = name.trim().isNotEmpty ? name.trim()[0] : '?';
-  return Container(
-    width: size,
-    height: size,
-    decoration: BoxDecoration(
-      color: cs.primary.withValues(alpha: 0.15),
-      shape: BoxShape.circle,
-    ),
-    alignment: Alignment.center,
-    child: Text(
-      letter,
-      style: TextStyle(
-        color: cs.primary,
-        fontSize: size * 0.42,
-        fontWeight: AppFontWeights.emphasis,
-      ),
-    ),
-  );
+  return AssistantAvatar(assistant: a, size: size);
 }
 
 Widget _assistantRow(BuildContext context, Assistant a) {

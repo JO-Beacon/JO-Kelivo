@@ -102,15 +102,6 @@ class AssistantEntryActions {
       context,
       globalPosition: globalPosition,
       items: [
-        if (onSelect != null)
-          DesktopContextMenuItem(
-            icon: Lucide.CheckSquare,
-            label: l10n.assistantSelectionActionSelect,
-            onTap: () {
-              beforeAction?.call();
-              onSelect.call();
-            },
-          ),
         DesktopContextMenuItem(
           icon: Lucide.Pencil,
           label: l10n.assistantGroupsContextMenuEditAssistant,
@@ -120,6 +111,15 @@ class AssistantEntryActions {
             beforeAction: beforeAction,
           ),
         ),
+        if (onSelect != null)
+          DesktopContextMenuItem(
+            icon: Lucide.CheckSquare,
+            label: l10n.assistantSelectionActionSelect,
+            onTap: () {
+              beforeAction?.call();
+              onSelect.call();
+            },
+          ),
         DesktopContextMenuItem(
           icon: Lucide.Copy,
           label: l10n.assistantSettingsCopyButton,
@@ -229,15 +229,6 @@ class AssistantEntryActions {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (onSelect != null)
-                  row(
-                    l10n.assistantSelectionActionSelect,
-                    Lucide.CheckSquare,
-                    () {
-                      beforeAction?.call();
-                      onSelect.call();
-                    },
-                  ),
                 row(
                   l10n.assistantGroupsContextMenuEditAssistant,
                   Lucide.Pencil,
@@ -247,6 +238,15 @@ class AssistantEntryActions {
                     beforeAction: beforeAction,
                   ),
                 ),
+                if (onSelect != null)
+                  row(
+                    l10n.assistantSelectionActionSelect,
+                    Lucide.CheckSquare,
+                    () {
+                      beforeAction?.call();
+                      onSelect.call();
+                    },
+                  ),
                 row(l10n.assistantSettingsCopyButton, Lucide.Copy, () async {
                   beforeAction?.call();
                   await _duplicateAssistantFromMenu(context, assistant);

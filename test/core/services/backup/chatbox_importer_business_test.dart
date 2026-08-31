@@ -669,6 +669,59 @@ void main() {
     );
 
     test(
+      'does not persist a selection for a single-list legacy fork record',
+      () async {
+        final fixture = _chatboxFixture();
+        final session = Map<String, dynamic>.from(
+          fixture['session:assistant-1'] as Map,
+        );
+        session['messages'] = [
+          ...(session['messages'] as List),
+          {
+            'id': 'current-answer',
+            'role': 'assistant',
+            'content': 'Current answer',
+            'timestamp': 1784332801000,
+          },
+        ];
+        session['messageForksHash'] = {
+          'message-1': {
+            'position': 0,
+            'lists': [
+              {
+                'id': 'legacy-linear-record',
+                'messages': [
+                  {
+                    'id': 'alternative-answer',
+                    'role': 'assistant',
+                    'content': 'Alternative answer',
+                    'timestamp': 1784332801000,
+                  },
+                ],
+              },
+            ],
+          },
+        };
+        fixture['session:assistant-1'] = session;
+        await backup.writeAsString(jsonEncode(fixture), flush: true);
+
+        await ChatboxImporter.importFromChatbox(
+          file: backup,
+          mode: RestoreMode.overwrite,
+          businessRepository: businessRepository,
+          chatService: chatService,
+        );
+
+        final tree = await chatService.loadConversationTree(
+          _legacyId('default_assistant-1'),
+        );
+        expect(tree, isNotNull);
+        expect(tree!.branchSelections, isEmpty);
+        expect(tree.isIntegrityValid, isTrue);
+      },
+    );
+
+    test(
       'rolls back all business rows when a later table write fails',
       () async {
         final retainedUpload = await File(
@@ -794,7 +847,7 @@ void main() {
       );
     });
 
-    test('merge skips conversations and messages that already exist', () async {
+    test('merge keeps same-id messages when content differs', () async {
       await chatService.restoreConversation(
         Conversation(id: _legacyId('default_assistant-1'), title: 'Existing'),
         <ChatMessage>[
@@ -807,7 +860,6 @@ void main() {
         ],
       );
 
-      // Merge dedup now reads ids only; existing rows must still be skipped.
       final result = await ChatboxImporter.importFromChatbox(
         file: backup,
         mode: RestoreMode.merge,
@@ -815,18 +867,78 @@ void main() {
         chatService: chatService,
       );
 
-      expect(result.conversations, 0);
-      expect(result.messages, 0);
+      expect(result.conversations, 1);
+      expect(result.messages, 1);
+      final messages = await chatService.loadAllConversationMessages(
+        _legacyId('default_assistant-1'),
+      );
+      expect(messages, hasLength(2));
       expect(
-        (await chatService.loadMessages(
-          _legacyId('default_assistant-1'),
-        )).map((message) => message.id),
-        [_legacyId('message-1')],
+        messages.map((message) => message.content),
+        containsAll(<String>['Hello', 'Hello']),
       );
     });
 
     test(
-      'merge keeps group/version conflicts as a separate conversation',
+      'overwrite preserves a moved Chatbox conversation and creates placed copy',
+      () async {
+        await chatService.restoreConversation(
+          Conversation(
+            id: _legacyId('default_assistant-1'),
+            title: 'Moved locally',
+            assistantId: 'local-assistant',
+          ),
+          <ChatMessage>[
+            ChatMessage(
+              id: 'local-only',
+              role: 'user',
+              content: 'Keep me',
+              conversationId: _legacyId('default_assistant-1'),
+            ),
+          ],
+        );
+
+        await ChatboxImporter.importFromChatbox(
+          file: backup,
+          mode: RestoreMode.overwrite,
+          businessRepository: businessRepository,
+          chatService: chatService,
+        );
+
+        expect(
+          chatService.getConversation(_legacyId('default_assistant-1')),
+          isNotNull,
+        );
+        final placed = chatService.getConversation(
+          '${_legacyId('default_assistant-1')}_placed',
+        );
+        expect(placed, isNotNull);
+        final placedMessages = await chatService.loadAllConversationMessages(
+          placed!.id,
+        );
+        expect(placedMessages, isNotEmpty);
+        expect(chatService.getAllConversations(), hasLength(2));
+
+        await ChatboxImporter.importFromChatbox(
+          file: backup,
+          mode: RestoreMode.overwrite,
+          businessRepository: businessRepository,
+          chatService: chatService,
+        );
+
+        expect(
+          chatService.getAllConversations(),
+          hasLength(2),
+          reason: '重复完全覆盖不得生成第三份 _placed 会话',
+        );
+        final placedMessagesAfterRepeat = await chatService
+            .loadAllConversationMessages(placed.id);
+        expect(placedMessagesAfterRepeat, hasLength(placedMessages.length));
+      },
+    );
+
+    test(
+      'merge keeps same-id content conflicts in the same conversation',
       () async {
         await chatService.restoreConversation(
           Conversation(id: _legacyId('default_assistant-1'), title: 'Existing'),
@@ -851,7 +963,15 @@ void main() {
 
         expect(result.conversations, 1);
         expect(result.messages, 1);
-        expect(chatService.getAllConversations(), hasLength(2));
+        expect(chatService.getAllConversations(), hasLength(1));
+        final messages = await chatService.loadAllConversationMessages(
+          _legacyId('default_assistant-1'),
+        );
+        expect(messages, hasLength(2));
+        expect(
+          messages.map((message) => message.content),
+          containsAll(<String>['Local revision', 'Hello']),
+        );
       },
     );
 

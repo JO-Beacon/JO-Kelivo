@@ -17,13 +17,14 @@ class AssistantGroupProvider extends ChangeNotifier {
   final List<AssistantGroup> _groups = <AssistantGroup>[];
   final Map<String, String> _assignment = <String, String>{};
   final Map<String, bool> _collapsed = <String, bool>{};
+  late final Future<void> loaded;
 
   List<AssistantGroup> get groups => List.unmodifiable(_groups);
   Map<String, String> get assignment => Map.unmodifiable(_assignment);
   bool isGroupCollapsed(String groupId) => _collapsed[groupId] ?? false;
 
   AssistantGroupProvider({required this.preferences}) {
-    _load();
+    loaded = _load();
   }
 
   Future<void> _load() async {
@@ -74,11 +75,24 @@ class AssistantGroupProvider extends ChangeNotifier {
   String? groupOfAssistant(String assistantId) => _assignment[assistantId];
 
   Future<String> createGroup(String name) async {
+    await loaded;
     final id = const Uuid().v4();
     _groups.add(AssistantGroup(id: id, name: name.trim()));
     await _persistGroups();
     notifyListeners();
     return id;
+  }
+
+  Future<String> ensureGroup(String name) async {
+    await loaded;
+    final normalized = name.trim();
+    if (normalized.isEmpty) {
+      throw ArgumentError.value(name, 'name');
+    }
+    for (final group in _groups) {
+      if (group.name == normalized) return group.id;
+    }
+    return createGroup(normalized);
   }
 
   Future<void> renameGroup(String groupId, String name) async {

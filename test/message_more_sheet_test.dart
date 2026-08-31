@@ -21,6 +21,9 @@ ChatMessage _message({String role = 'assistant'}) {
 Future<MessageMoreAction?> _openMoreSheet(
   WidgetTester tester, {
   required bool canDeleteAllVersions,
+  bool canDeleteCurrentBranch = false,
+  bool canDeleteMessageNode = false,
+  bool canUseLinearDeleteActions = true,
   bool canCreateBranch = true,
   String role = 'assistant',
   String? tapLabel,
@@ -46,6 +49,9 @@ Future<MessageMoreAction?> _openMoreSheet(
                     context,
                     _message(role: role),
                     canDeleteAllVersions: canDeleteAllVersions,
+                    canDeleteCurrentBranch: canDeleteCurrentBranch,
+                    canDeleteMessageNode: canDeleteMessageNode,
+                    canUseLinearDeleteActions: canUseLinearDeleteActions,
                     canCreateBranch: canCreateBranch,
                   );
                 },
@@ -61,6 +67,7 @@ Future<MessageMoreAction?> _openMoreSheet(
   await tester.tap(find.text('open'));
   await tester.pumpAndSettle();
   if (tapLabel != null) {
+    await tester.ensureVisible(find.text(tapLabel));
     await tester.tap(find.text(tapLabel));
     await tester.pumpAndSettle();
   }
@@ -68,23 +75,67 @@ Future<MessageMoreAction?> _openMoreSheet(
 }
 
 void main() {
-  testWidgets('多版本消息菜单显示删除全部版本', (tester) async {
-    await _openMoreSheet(tester, canDeleteAllVersions: true);
+  testWidgets('分叉节点消息菜单显示删除当前分支和删除全部版本', (tester) async {
+    await _openMoreSheet(
+      tester,
+      canDeleteAllVersions: true,
+      canDeleteCurrentBranch: true,
+      canDeleteMessageNode: true,
+      canUseLinearDeleteActions: false,
+    );
 
     expect(find.text('Select Messages'), findsOneWidget);
     expect(find.text('Create Message Branch'), findsOneWidget);
-    expect(find.text('Delete This Message'), findsOneWidget);
+    expect(find.text('Delete This Message'), findsNothing);
     expect(find.text('Delete Current Branch'), findsOneWidget);
+    expect(find.text('Delete This Node'), findsOneWidget);
+    expect(find.text('Delete This Message and Following'), findsNothing);
     expect(find.text('Delete All Branches'), findsOneWidget);
+
+    final labels = tester
+        .widgetList<Text>(find.byType(Text))
+        .map((widget) => widget.data)
+        .whereType<String>()
+        .toList();
+    expect(
+      labels.indexOf('Delete This Node'),
+      lessThan(labels.indexOf('Delete Current Branch')),
+    );
   });
 
-  testWidgets('单版本消息菜单不显示删除全部版本', (tester) async {
+  testWidgets('普通节点消息菜单不显示删除当前分支和删除全部版本', (tester) async {
     await _openMoreSheet(tester, canDeleteAllVersions: false);
 
     expect(find.text('Select Messages'), findsOneWidget);
     expect(find.text('Delete This Message'), findsOneWidget);
-    expect(find.text('Delete Current Branch'), findsOneWidget);
+    expect(find.text('Delete Current Branch'), findsNothing);
+    expect(find.text('Delete This Node'), findsNothing);
+    expect(find.text('Delete This Message and Following'), findsOneWidget);
     expect(find.text('Delete All Branches'), findsNothing);
+  });
+
+  testWidgets('消息菜单可以触发删除当前分支', (tester) async {
+    final action = await _openMoreSheet(
+      tester,
+      canDeleteAllVersions: true,
+      canDeleteCurrentBranch: true,
+      tapLabel: 'Delete Current Branch',
+    );
+
+    expect(action, MessageMoreAction.deleteCurrentBranch);
+  });
+
+  testWidgets('分叉节点消息菜单可以触发删除此节点', (tester) async {
+    final action = await _openMoreSheet(
+      tester,
+      canDeleteAllVersions: true,
+      canDeleteCurrentBranch: true,
+      canDeleteMessageNode: true,
+      canUseLinearDeleteActions: false,
+      tapLabel: 'Delete This Node',
+    );
+
+    expect(action, MessageMoreAction.deleteMessageNode);
   });
 
   testWidgets('临时会话消息菜单不显示创建消息分支', (tester) async {
@@ -115,6 +166,16 @@ void main() {
     );
 
     expect(action, MessageMoreAction.deleteMessageOnly);
+  });
+
+  testWidgets('消息菜单可以触发删除此消息及后续', (tester) async {
+    final action = await _openMoreSheet(
+      tester,
+      canDeleteAllVersions: false,
+      tapLabel: 'Delete This Message and Following',
+    );
+
+    expect(action, MessageMoreAction.deleteMessageAndFollowing);
   });
 
   testWidgets('用户消息菜单可以切换为助手', (tester) async {

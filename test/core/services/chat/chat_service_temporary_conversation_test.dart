@@ -1516,6 +1516,54 @@ void main() {
   );
 
   test(
+    'deleteCurrentBranch keeps the sibling branch when deleting a shared message',
+    () async {
+      final branched = await createBranchedService('current-branch.sqlite');
+      final repository = branched.repository;
+      final service = branched.service;
+
+      final deleted = await service.deleteCurrentBranch(
+        conversationId: 'conversation-branch',
+        messageId: 'u1',
+      );
+
+      expect(deleted, containsAll(<String>['a1-v1', 'u2-v1']));
+      expect(await repository.getMessage('u1'), isNotNull);
+      expect(await repository.getMessage('a1-v0'), isNotNull);
+      expect(await repository.getMessage('u2-v0'), isNotNull);
+      expect(await repository.getMessage('a1-v1'), isNull);
+      expect(await repository.getMessage('u2-v1'), isNull);
+      final tree = await repository.loadConversationTree('conversation-branch');
+      expect(tree, isNotNull);
+      expect(tree!.activePath(), const ['u1', 'a1-v0', 'u2-v0']);
+    },
+  );
+
+  test(
+    'deleteMessageNode removes the fork node and keeps its active continuation',
+    () async {
+      final branched = await createBranchedService('message-node.sqlite');
+      final repository = branched.repository;
+      final service = branched.service;
+
+      final deleted = await service.deleteMessageNode(
+        conversationId: 'conversation-branch',
+        messageId: 'a1-v1',
+      );
+
+      expect(deleted, const {'a1-v1'});
+      expect(await repository.getMessage('a1-v1'), isNull);
+      expect(await repository.getMessage('u2-v1'), isNotNull);
+      expect(await repository.getMessage('a1-v0'), isNotNull);
+      final tree = await repository.loadConversationTree('conversation-branch');
+      expect(tree, isNotNull);
+      expect(tree!.activePath(), const ['u1', 'u2-v1']);
+      expect(tree.branchPath('old'), const ['u1', 'a1-v0', 'u2-v0']);
+      expect(tree.edges['u2-v1']?.parentMessageId, 'u1');
+    },
+  );
+
+  test(
     'deleteMessageOnly removes one message and reconnects its descendants',
     () async {
       final branched = await createBranchedService('message-only.sqlite');
@@ -1567,7 +1615,7 @@ void main() {
   );
 
   test(
-    'deleting a branch tip does not persist unreachable ancestor edges',
+    'deleting a message tip preserves its surviving branch prefix',
     () async {
       final branched = await createBranchedService('branch-tip-orphan.sqlite');
       final repository = branched.repository;
@@ -1594,7 +1642,8 @@ void main() {
           ...after.branchPath(branch.id),
       };
       expect(after.edges.keys, unorderedEquals(reachable));
-      expect(after.edges, isNot(contains('a1-v1')));
+      expect(after.edges, contains('a1-v1'));
+      expect(after.activePath(), const ['u1', 'a1-v1']);
     },
   );
 

@@ -3,10 +3,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as image_lib;
 
 import '../../core/models/avatar_transform.dart';
 import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
+import '../../utils/platform_utils.dart';
 
 class AvatarImageEditResult {
   const AvatarImageEditResult(this.transform);
@@ -37,6 +39,19 @@ Future<AvatarImageEditResult?> showAvatarImageEditor(
   );
 }
 
+Future<double> _readImageAspectRatio(String path) async {
+  try {
+    final bytes = await File(path).readAsBytes();
+    final image = image_lib.decodePng(bytes) ?? image_lib.decodeJpg(bytes);
+    if (image == null) return 1;
+    final ratio = image.width / image.height;
+    if (ratio.isFinite && ratio > 0) return ratio;
+  } catch (_) {
+    // Image.file will surface the loading error; use neutral geometry here.
+  }
+  return 1;
+}
+
 class _AvatarImageEditor extends StatefulWidget {
   const _AvatarImageEditor({required this.path, required this.initial});
   final String path;
@@ -49,22 +64,21 @@ class _AvatarImageEditorState extends State<_AvatarImageEditor> {
   late double _left, _top, _width, _height, _angle;
   late int _rotation;
   late bool _flipX, _flipY;
+  late final Future<double> _imageAspectRatio;
 
   @override
   void initState() {
     super.initState();
     final t = widget.initial;
-    // The editor always uses a square frame. Normalize older rectangular
-    // transforms when they are opened, while keeping their source image.
-    final size = math.min(t.width, t.height).clamp(0.08, 1.0);
-    _width = size;
-    _height = size;
-    _left = t.left.clamp(0.0, 1.0 - size);
-    _top = t.top.clamp(0.0, 1.0 - size);
+    _width = t.width.clamp(0.08, 1.0);
+    _height = t.height.clamp(0.08, 1.0);
+    _left = t.left.clamp(0.0, 1.0 - _width);
+    _top = t.top.clamp(0.0, 1.0 - _height);
     _rotation = t.rotation;
     _angle = t.rotationDegrees;
     _flipX = t.flipX;
     _flipY = t.flipY;
+    _imageAspectRatio = _readImageAspectRatio(widget.path);
   }
 
   void _reset() => setState(() {
@@ -112,7 +126,9 @@ class _AvatarImageEditorState extends State<_AvatarImageEditor> {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    l10n.avatarEditorCropHint,
+                    PlatformUtils.isDesktopTarget
+                        ? l10n.avatarEditorCropHintDesktop
+                        : l10n.avatarEditorCropHintMobile,
                     style: TextStyle(
                       color: cs.onSurface.withValues(alpha: 0.62),
                       fontSize: 13,
@@ -123,26 +139,36 @@ class _AvatarImageEditorState extends State<_AvatarImageEditor> {
                 LayoutBuilder(
                   builder: (context, constraints) {
                     final side = math.min(constraints.maxWidth, 380.0);
-                    return SizedBox(
-                      width: side,
-                      height: side,
-                      child: _CropCanvas(
-                        path: widget.path,
-                        left: _left,
-                        top: _top,
-                        width: _width,
-                        height: _height,
-                        rotation: _rotation,
-                        angle: _angle,
-                        flipX: _flipX,
-                        flipY: _flipY,
-                        onChanged: (l, t, w, h) => setState(() {
-                          _left = l;
-                          _top = t;
-                          _width = w;
-                          _height = h;
-                        }),
-                      ),
+                    return FutureBuilder<double>(
+                      future: _imageAspectRatio,
+                      builder: (context, snapshot) {
+                        final canvas = SizedBox(
+                          width: side,
+                          height: side,
+                          child: _CropCanvas(
+                            path: widget.path,
+                            imageAspectRatio: snapshot.data ?? 1,
+                            left: _left,
+                            top: _top,
+                            width: _width,
+                            height: _height,
+                            rotation: _rotation,
+                            angle: _angle,
+                            flipX: _flipX,
+                            flipY: _flipY,
+                            onChanged: (l, t, w, h) => setState(() {
+                              _left = l;
+                              _top = t;
+                              _width = w;
+                              _height = h;
+                            }),
+                          ),
+                        );
+                        return IgnorePointer(
+                          ignoring: !snapshot.hasData,
+                          child: canvas,
+                        );
+                      },
                     );
                   },
                 ),
@@ -245,6 +271,7 @@ class _AvatarImageEditorState extends State<_AvatarImageEditor> {
 class _CropCanvas extends StatefulWidget {
   const _CropCanvas({
     required this.path,
+    required this.imageAspectRatio,
     required this.left,
     required this.top,
     required this.width,
@@ -256,6 +283,7 @@ class _CropCanvas extends StatefulWidget {
     required this.onChanged,
   });
   final String path;
+  final double imageAspectRatio;
   final double left, top, width, height, angle;
   final int rotation;
   final bool flipX, flipY;
@@ -268,7 +296,8 @@ class _CropCanvas extends StatefulWidget {
 class _CropCanvasState extends State<_CropCanvas> {
   double _startLeft = 0;
   double _startTop = 0;
-  double _startSize = 1;
+  double _startWidth = 1;
+  double _startHeight = 1;
   Offset _startFocal = Offset.zero;
   double _frameSide = 0;
   int? _mousePointer;
@@ -281,10 +310,20 @@ class _CropCanvasState extends State<_CropCanvas> {
     return canvasPosition - Offset(inset, inset);
   }
 
+  double get _imageWidth => math.max(widget.imageAspectRatio, 1);
+  double get _imageHeight => math.max(1 / widget.imageAspectRatio, 1);
+
+  bool get _isDefaultTransform =>
+      widget.left.abs() < 0.001 &&
+      widget.top.abs() < 0.001 &&
+      widget.width >= 0.999 &&
+      widget.height >= 0.999;
+
   void _beginScale(ScaleStartDetails details) {
     _startLeft = widget.left;
     _startTop = widget.top;
-    _startSize = math.min(widget.width, widget.height).clamp(0.08, 1.0);
+    _startWidth = widget.width;
+    _startHeight = widget.height;
     final inset = _frameSide * (1 - 0.78) / 2;
     _startFocal = details.localFocalPoint - Offset(inset, inset);
   }
@@ -297,16 +336,30 @@ class _CropCanvasState extends State<_CropCanvas> {
     const frameTop = 0.0;
     final focalX = ((_startFocal.dx - frameLeft) / frameSide).clamp(0.0, 1.0);
     final focalY = ((_startFocal.dy - frameTop) / frameSide).clamp(0.0, 1.0);
-    final sourceX = _startLeft + focalX * _startSize;
-    final sourceY = _startTop + focalY * _startSize;
-    final size = (_startSize / details.scale).clamp(0.08, 1.0);
+    final startCropWidth = _startWidth * _imageWidth;
+    final startCropHeight = _startHeight * _imageHeight;
+    final sourceX = _startLeft * _imageWidth + focalX * startCropWidth;
+    final sourceY = _startTop * _imageHeight + focalY * startCropHeight;
+    final startSide = math.min(startCropWidth, startCropHeight);
+    final nextSide = (startSide / details.scale).clamp(
+      0.08 * math.min(_imageWidth, _imageHeight),
+      math.min(_imageWidth, _imageHeight),
+    );
+    final width = (nextSide / _imageWidth).clamp(0.08, 1.0);
+    final height = (nextSide / _imageHeight).clamp(0.08, 1.0);
     final inset = _frameSide * (1 - 0.78) / 2;
     final currentFocal = details.localFocalPoint - Offset(inset, inset);
     final currentX = (currentFocal.dx - frameLeft) / frameSide;
     final currentY = (currentFocal.dy - frameTop) / frameSide;
-    final left = (sourceX - currentX * size).clamp(0.0, 1.0 - size);
-    final top = (sourceY - currentY * size).clamp(0.0, 1.0 - size);
-    widget.onChanged(left, top, size, size);
+    final left = ((sourceX - currentX * nextSide) / _imageWidth).clamp(
+      0.0,
+      1.0 - width,
+    );
+    final top = ((sourceY - currentY * nextSide) / _imageHeight).clamp(
+      0.0,
+      1.0 - height,
+    );
+    widget.onChanged(left, top, width, height);
   }
 
   void _mouseDown(PointerDownEvent event) {
@@ -327,17 +380,22 @@ class _CropCanvasState extends State<_CropCanvas> {
       return;
     }
     final frameSide = _frameSide * 0.78;
-    final size = math.min(widget.width, widget.height).clamp(0.08, 1.0);
+    final cropSide = math.min(
+      widget.width * _imageWidth,
+      widget.height * _imageHeight,
+    );
     final delta = event.localPosition - _mouseStart;
-    final left = (_mouseStartLeft - delta.dx / frameSide * size).clamp(
-      0.0,
-      1.0 - size,
-    );
-    final top = (_mouseStartTop - delta.dy / frameSide * size).clamp(
-      0.0,
-      1.0 - size,
-    );
-    widget.onChanged(left, top, size, size);
+    final left =
+        (_mouseStartLeft - delta.dx / frameSide * cropSide / _imageWidth).clamp(
+          0.0,
+          1.0 - widget.width,
+        );
+    final top =
+        (_mouseStartTop - delta.dy / frameSide * cropSide / _imageHeight).clamp(
+          0.0,
+          1.0 - widget.height,
+        );
+    widget.onChanged(left, top, widget.width, widget.height);
   }
 
   void _mouseEnd(PointerEvent event) {
@@ -348,16 +406,30 @@ class _CropCanvasState extends State<_CropCanvas> {
     if (event is! PointerScrollEvent || _frameSide <= 0) return;
     final zoomFactor = event.scrollDelta.dy > 0 ? 1 / 1.12 : 1.12;
     final frameSide = _frameSide * 0.78;
-    final size = math.min(widget.width, widget.height).clamp(0.08, 1.0);
+    final cropSide = math.min(
+      widget.width * _imageWidth,
+      widget.height * _imageHeight,
+    );
     final focal = _frameLocal(event.localPosition);
     final focalX = (focal.dx / frameSide).clamp(0.0, 1.0);
     final focalY = (focal.dy / frameSide).clamp(0.0, 1.0);
-    final sourceX = widget.left + focalX * size;
-    final sourceY = widget.top + focalY * size;
-    final nextSize = (size / zoomFactor).clamp(0.08, 1.0);
-    final left = (sourceX - focalX * nextSize).clamp(0.0, 1.0 - nextSize);
-    final top = (sourceY - focalY * nextSize).clamp(0.0, 1.0 - nextSize);
-    widget.onChanged(left, top, nextSize, nextSize);
+    final sourceX = widget.left * _imageWidth + focalX * cropSide;
+    final sourceY = widget.top * _imageHeight + focalY * cropSide;
+    final nextSide = (cropSide / zoomFactor).clamp(
+      0.08 * math.min(_imageWidth, _imageHeight),
+      math.min(_imageWidth, _imageHeight),
+    );
+    final nextWidth = (nextSide / _imageWidth).clamp(0.08, 1.0);
+    final nextHeight = (nextSide / _imageHeight).clamp(0.08, 1.0);
+    final left = ((sourceX - focalX * nextSide) / _imageWidth).clamp(
+      0.0,
+      1.0 - nextWidth,
+    );
+    final top = ((sourceY - focalY * nextSide) / _imageHeight).clamp(
+      0.0,
+      1.0 - nextHeight,
+    );
+    widget.onChanged(left, top, nextWidth, nextHeight);
   }
 
   @override
@@ -371,9 +443,20 @@ class _CropCanvasState extends State<_CropCanvas> {
         width: frameSide,
         height: frameSide,
       );
-      final size = math.min(widget.width, widget.height).clamp(0.08, 1.0);
-      final left = widget.left.clamp(0.0, 1.0 - size);
-      final top = widget.top.clamp(0.0, 1.0 - size);
+      final cropWidth = widget.width * _imageWidth;
+      final cropHeight = widget.height * _imageHeight;
+      final cropSide = math.min(cropWidth, cropHeight);
+      final imageScale = _isDefaultTransform
+          ? frameSide / math.max(_imageWidth, _imageHeight)
+          : frameSide / cropSide;
+      final imageWidth = _imageWidth * imageScale;
+      final imageHeight = _imageHeight * imageScale;
+      final imageLeft = _isDefaultTransform
+          ? frame.left + (frameSide - imageWidth) / 2
+          : frame.left - widget.left * _imageWidth * imageScale;
+      final imageTop = _isDefaultTransform
+          ? frame.top + (frameSide - imageHeight) / 2
+          : frame.top - widget.top * _imageHeight * imageScale;
       return ColoredBox(
         color: Colors.black,
         child: Stack(
@@ -397,11 +480,16 @@ class _CropCanvasState extends State<_CropCanvas> {
                     fit: StackFit.expand,
                     children: [
                       Positioned(
-                        left: frame.left - left * frameSide / size,
-                        top: frame.top - top * frameSide / size,
-                        width: frameSide / size,
-                        height: frameSide / size,
-                        child: Image.file(File(widget.path), fit: BoxFit.cover),
+                        left: imageLeft,
+                        top: imageTop,
+                        width: imageWidth,
+                        height: imageHeight,
+                        // 保持原图比例；裁剪只由固定视口和变换框完成，
+                        // 避免缩放后 BoxFit.cover 再次截断非方形原图。
+                        child: Image.file(
+                          File(widget.path),
+                          fit: BoxFit.contain,
+                        ),
                       ),
                     ],
                   ),
@@ -512,7 +600,7 @@ class AvatarImage extends StatelessWidget {
                 -1 + 2 * t.left / t.width,
                 -1 + 2 * t.top / t.height,
               ),
-              child: Image.file(File(path), fit: BoxFit.cover),
+              child: Image.file(File(path), fit: BoxFit.contain),
             ),
           ),
         ),

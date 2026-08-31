@@ -509,7 +509,6 @@ void main() {
           controller.visibleMessages.map((message) => message.id),
           contains(rootAssistant.id),
         );
-
         await controller.deleteMessage(
           message: rootAssistant,
           byGroup: controller.visibleGroupedMessages,
