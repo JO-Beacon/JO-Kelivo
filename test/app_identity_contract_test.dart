@@ -4,39 +4,105 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('JO-Kelivo application identity', () {
-    test('uses the published JO-Kelivo version and platform namespaces', () {
-      _expectContains('pubspec.yaml', 'version: 0.1.12+12');
+  group('JO-AIClient application identity', () {
+    test('uses the published JO-AIClient version and platform namespaces', () {
+      _expectContains('pubspec.yaml', 'version: 0.1.13+13');
 
       _expectContains(
         'android/app/build.gradle.kts',
-        'applicationId = "com.psyche.jokelivo"',
+        'namespace = "io.github.jobeacon.joaiclient"',
       );
       _expectContains(
-        'android/app/src/main/AndroidManifest.xml',
-        'android:scheme="psyche.jokelivo"',
+        'android/app/build.gradle.kts',
+        'applicationId = "io.github.jobeacon.joaiclient"',
+      );
+      expect(
+        Directory(
+          'android/app/src/main/kotlin/io/github/jobeacon/joaiclient',
+        ).existsSync(),
+        isTrue,
+      );
+      expect(
+        Directory(
+          'android/app/src/main/kotlin/com/psyche/jokelivo',
+        ).existsSync(),
+        isFalse,
       );
 
       final iosProject = _read('ios/Runner.xcodeproj/project.pbxproj');
-      expect(iosProject, contains('com.psyche.jokelivo'));
+      expect(iosProject, contains('io.github.jobeacon.joaiclient'));
+      expect(iosProject, isNot(contains('com.psyche.jokelivo')));
       expect(iosProject, isNot(contains('psyche.kelivo')));
 
       final macosProject = _read('macos/Runner.xcodeproj/project.pbxproj');
-      expect(macosProject, contains('com.psyche.jokelivo.RunnerTests'));
+      expect(
+        macosProject,
+        contains('io.github.jobeacon.joaiclient.RunnerTests'),
+      );
+      expect(macosProject, isNot(contains('com.psyche.jokelivo')));
       expect(macosProject, contains('JO-AIClient.app'));
       expect(macosProject, isNot(contains('com.psyche.kelivo')));
+      _expectContains(
+        'macos/Runner/Configs/AppInfo.xcconfig',
+        'PRODUCT_BUNDLE_IDENTIFIER = io.github.jobeacon.joaiclient',
+      );
+      _expectContains(
+        'macos/Runner/Configs/RestoreHarness.xcconfig',
+        'PRODUCT_BUNDLE_IDENTIFIER = '
+            'io.github.jobeacon.joaiclient.restoreharness',
+      );
 
       _expectContains(
         'linux/CMakeLists.txt',
-        'set(APPLICATION_ID "com.psyche.jokelivo")',
+        'set(APPLICATION_ID "io.github.jobeacon.joaiclient")',
       );
-      _expectContains('linux/CMakeLists.txt', 'set(BINARY_NAME "jo_kelivo")');
-      _expectContains('windows/CMakeLists.txt', 'set(BINARY_NAME "jo_kelivo")');
-      _expectContains('windows/runner/main.cpp', 'L"JOKelivoMutex"');
+      _expectContains('linux/CMakeLists.txt', 'set(BINARY_NAME "jo_aiclient")');
+      _expectContains(
+        'linux/runner/my_application.cc',
+        'gtk_window_set_icon_name(window, "jo_aiclient")',
+      );
+      _expectContains(
+        'windows/CMakeLists.txt',
+        'set(BINARY_NAME "jo_aiclient")',
+      );
+      _expectContains('windows/runner/main.cpp', 'L"JOAIClientMutex"');
+      _expectContains(
+        'windows/runner/Runner.rc',
+        'VALUE "ProductName", "JO-AIClient"',
+      );
+      _expectContains(
+        'windows/runner/Runner.rc',
+        'VALUE "CompanyName", "JO-Beacon"',
+      );
+      _expectContains(
+        'windows/runner/Runner.rc',
+        'VALUE "OriginalFilename", "jo_aiclient.exe"',
+      );
+
+      final windowsInstaller = _read('scripts/windows/kelivo_installer.iss');
+      expect(windowsInstaller, contains('#define MyAppPublisher "JO-Beacon"'));
+      expect(
+        windowsInstaller,
+        contains('#define MyAppExeName "jo_aiclient.exe"'),
+      );
+      expect(
+        windowsInstaller,
+        contains('Type: files; Name: "{app}\\jo_kelivo.exe"'),
+      );
+      expect(windowsInstaller, contains('Excludes: "jo_kelivo.exe"'));
+
+      final linuxWorkflow = _read('.github/workflows/build-linux.yml');
+      expect('Name=JO-AIClient'.allMatches(linuxWorkflow), hasLength(2));
+      expect(
+        linuxWorkflow,
+        contains('Description: JO-AIClient Linux application'),
+      );
+      expect(linuxWorkflow, contains('Package: jo-aiclient'));
+      expect(linuxWorkflow, isNot(contains('Exec=jo_kelivo')));
     });
 
     test(
-      'keeps JO-Kelivo update and About metadata separate from the base',
+      'keeps JO-AIClient update and About metadata separate from the base',
       () {
         _expectContains(
           'lib/core/providers/update_provider.dart',
@@ -70,6 +136,25 @@ void main() {
       }
     });
 
+    test('identifies outbound integrations as JO-AIClient', () {
+      _expectContains(
+        'lib/core/services/api/provider_request_headers.dart',
+        "_openRouterAppTitle = 'JO-AIClient'",
+      );
+      _expectContains(
+        'lib/core/services/network/dio_http_client.dart',
+        "'User-Agent', () => 'JO-AIClient'",
+      );
+      _expectContains(
+        'lib/core/services/tts/network_tts.dart',
+        "headers['User-Agent'] = 'JO-AIClient'",
+      );
+      _expectContains(
+        'lib/core/services/mcp/mcp_oauth_service.dart',
+        "? 'JO-AIClient'",
+      );
+    });
+
     test('places the user data directory before local backups on desktop', () {
       final source = _read('lib/desktop/setting/backup_pane.dart');
       final userDataDirectory = source.indexOf(
@@ -84,7 +169,7 @@ void main() {
     });
 
     test(
-      'keeps JO-Kelivo About copy without community or sponsorship actions',
+      'keeps JO-AIClient About copy without community or sponsorship actions',
       () {
         final expectedCopy =
             <
@@ -98,27 +183,28 @@ void main() {
             >{
               'lib/l10n/app_en.arb': (
                 checkUpdates: 'Check for Updates',
-                description: 'Open-source AI assistant based on Kelivo',
+                description:
+                    'JO-AIClient is an open-source AI assistant based on Kelivo',
                 share: 'JO-AIClient - Open Source AI Assistant',
-                title: 'About Kelivo',
+                title: 'About JO-AIClient',
               ),
               'lib/l10n/app_zh.arb': (
                 checkUpdates: '检查更新',
-                description: '基于 Kelivo 的开源 AI 助手',
+                description: 'JO-AIClient 是基于 Kelivo 的开源 AI 助手',
                 share: 'JO-AIClient - 开源 AI 助手',
-                title: '关于 Kelivo',
+                title: '关于 JO-AIClient',
               ),
               'lib/l10n/app_zh_Hans.arb': (
                 checkUpdates: '检查更新',
-                description: '基于 Kelivo 的开源 AI 助手',
+                description: 'JO-AIClient 是基于 Kelivo 的开源 AI 助手',
                 share: 'JO-AIClient - 开源 AI 助手',
-                title: '关于 Kelivo',
+                title: '关于 JO-AIClient',
               ),
               'lib/l10n/app_zh_Hant.arb': (
                 checkUpdates: '檢查更新',
-                description: '基於 Kelivo 的開源 AI 助理',
+                description: 'JO-AIClient 是基於 Kelivo 的開源 AI 助理',
                 share: 'JO-AIClient - 開源 AI 助理',
-                title: '關於 Kelivo',
+                title: '關於 JO-AIClient',
               ),
             };
         const retiredKeys = [
@@ -184,14 +270,41 @@ void main() {
     );
 
     test(
-      'uses JO-Kelivo OAuth schemes without changing compatibility URI data',
+      'uses JO-AIClient OAuth schemes without changing compatibility URI data',
       () {
         final callback = _read(
           'lib/core/services/mcp/mcp_oauth_callback_io.dart',
         );
-        expect(callback, contains("scheme: 'psyche.jokelivo'"));
-        expect(callback, contains("scheme: 'com.psyche.jokelivo'"));
+        expect(
+          "scheme: 'io.github.jobeacon.joaiclient'".allMatches(callback),
+          hasLength(2),
+        );
+        expect(callback, isNot(contains("scheme: 'psyche.jokelivo'")));
+        expect(callback, isNot(contains("scheme: 'com.psyche.jokelivo'")));
         expect(callback, isNot(contains("scheme: 'psyche.kelivo'")));
+
+        final androidManifest = _read(
+          'android/app/src/main/AndroidManifest.xml',
+        );
+        expect(
+          androidManifest,
+          contains('android:scheme="io.github.jobeacon.joaiclient"'),
+        );
+        expect(androidManifest, contains('android:scheme="psyche.jokelivo"'));
+
+        final iosInfo = _read('ios/Runner/Info.plist');
+        expect(
+          iosInfo,
+          contains('<string>io.github.jobeacon.joaiclient</string>'),
+        );
+        expect(iosInfo, contains('<string>com.psyche.jokelivo</string>'));
+
+        final iosAppDelegate = _read('ios/Runner/AppDelegate.swift');
+        expect(
+          iosAppDelegate,
+          contains('url.scheme == "io.github.jobeacon.joaiclient"'),
+        );
+        expect(iosAppDelegate, contains('url.scheme == "com.psyche.jokelivo"'));
 
         _expectContains(
           'lib/utils/kelivo_file_uri.dart',
@@ -269,7 +382,7 @@ void main() {
     });
   });
 
-  group('JO-Kelivo release workflow contract', () {
+  group('JO-AIClient release workflow contract', () {
     test('covers every release asset and checksum', () {
       final expectedTokens = <String, List<({String token, int count})>>{
         '.github/workflows/build-android.yml': [

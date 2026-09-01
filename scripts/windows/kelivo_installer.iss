@@ -1,6 +1,6 @@
 #define MyAppName "JO-AIClient"
-#define MyAppPublisher "Psyche"
-#define MyAppExeName "jo_kelivo.exe"
+#define MyAppPublisher "JO-Beacon"
+#define MyAppExeName "jo_aiclient.exe"
 #define MyAppId "{{D4C6D2A7-8F3E-4D7B-9D55-6B6B6D2E5A91}}"
 
 #ifndef AppVersion
@@ -49,7 +49,10 @@ Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: 
 Name: "fileassociation"; Description: "{cm:FileAssociationTask}"; GroupDescription: "{cm:FileAssociationGroup}"
 
 [Files]
-Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "jo_kelivo.exe"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[InstallDelete]
+Type: files; Name: "{app}\jo_kelivo.exe"
 
 [Registry]
 Root: HKCR; Subkey: ".joaiclient"; ValueType: string; ValueName: ""; ValueData: "JOAIClient.Backup"; Flags: uninsdeletevalue; Tasks: fileassociation

@@ -550,7 +550,9 @@ final class McpOAuthService {
       registration ??= await _cachedDynamicRegistration(
         discovery,
         redirectUri: callback.redirectUri,
-        clientName: serverName.trim().isEmpty ? 'JO-Kelivo' : serverName.trim(),
+        clientName: serverName.trim().isEmpty
+            ? 'JO-AIClient'
+            : serverName.trim(),
         scopes: scopes,
       );
       _validateClientRegistration(registration);

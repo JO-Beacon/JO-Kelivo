@@ -620,6 +620,124 @@ void main() {
   );
 
   test(
+    'deleting a nested active tail keeps its shared prefix in persistence',
+    () async {
+      final database = AppDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      await database.customSelect('SELECT 1;').getSingle();
+
+      final conversationId = 'conversation-nested-delete';
+      final createdAt = DateTime.utc(2026, 1, 1);
+      await database.customStatement(
+        'INSERT INTO conversation_rows (id, title, created_at, updated_at) '
+        'VALUES (?, ?, ?, ?);',
+        [
+          conversationId,
+          'nested delete',
+          createdAt.microsecondsSinceEpoch,
+          createdAt.microsecondsSinceEpoch,
+        ],
+      );
+
+      final repository = ChatDatabaseRepository(database);
+      final messageIds = const [
+        'u1',
+        'root-m1',
+        'root-m2',
+        'second-m1',
+        'nested-m2',
+      ];
+      final messages = [
+        for (final (index, id) in messageIds.indexed)
+          (
+            message: ChatMessage(
+              id: id,
+              conversationId: conversationId,
+              role: index == 0 ? 'user' : 'assistant',
+              content: id,
+              timestamp: createdAt.add(Duration(seconds: index)),
+            ),
+            messageOrder: index,
+          ),
+      ];
+      await repository.putMigrationBatch(
+        conversations: [
+          Conversation(
+            id: conversationId,
+            title: 'nested delete',
+            messageIds: messageIds,
+          ),
+        ],
+        messages: messages,
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+      await repository.saveConversationTree(
+        ConversationTree(
+          conversationId: conversationId,
+          activeBranchId: 'nested',
+          branches: {
+            'root': ConversationBranch(
+              id: 'root',
+              conversationId: conversationId,
+              tipMessageId: 'root-m2',
+              createdAt: createdAt,
+            ),
+            'second': ConversationBranch(
+              id: 'second',
+              conversationId: conversationId,
+              tipMessageId: 'second-m1',
+              createdAt: createdAt,
+            ),
+            'nested': ConversationBranch(
+              id: 'nested',
+              conversationId: conversationId,
+              tipMessageId: 'nested-m2',
+              createdAt: createdAt,
+            ),
+          },
+          edges: const {
+            'u1': MessageTreeEdge(messageId: 'u1', parentMessageId: null),
+            'root-m1': MessageTreeEdge(
+              messageId: 'root-m1',
+              parentMessageId: 'u1',
+            ),
+            'root-m2': MessageTreeEdge(
+              messageId: 'root-m2',
+              parentMessageId: 'root-m1',
+            ),
+            'second-m1': MessageTreeEdge(
+              messageId: 'second-m1',
+              parentMessageId: 'u1',
+            ),
+            'nested-m2': MessageTreeEdge(
+              messageId: 'nested-m2',
+              parentMessageId: 'second-m1',
+            ),
+          },
+        ),
+      );
+
+      final deleted = await repository.deleteMessages(
+        conversationId: conversationId,
+        messageIds: const {'nested-m2'},
+        versionSelectionChanges: const {},
+      );
+      final tree = await repository.loadConversationTree(conversationId);
+
+      expect(deleted, isNot(equals(null)));
+      expect(deleted!.messages.map((message) => message.id), ['nested-m2']);
+      expect(await repository.getMessage('u1'), isNot(equals(null)));
+      expect(await repository.getMessage('second-m1'), isNot(equals(null)));
+      expect(await repository.getMessage('nested-m2'), equals(null));
+      expect(tree, isNot(equals(null)));
+      expect(tree!.activePath(), const ['u1', 'second-m1']);
+      expect(tree.branches.containsKey('second'), isTrue);
+      expect(tree.branches.containsKey('nested'), isFalse);
+    },
+  );
+
+  test(
     'regeneration appends the new assistant to the requested branch',
     () async {
       final database = AppDatabase(NativeDatabase.memory());

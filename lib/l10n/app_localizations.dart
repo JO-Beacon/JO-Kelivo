@@ -8452,7 +8452,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutPageKelivoSectionTitle.
   ///
   /// In en, this message translates to:
-  /// **'About Kelivo'**
+  /// **'About JO-AIClient'**
   String get aboutPageKelivoSectionTitle;
 
   /// No description provided for @mcpOAuthCallbackPageTitle.
@@ -8470,7 +8470,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutPageAppDescription.
   ///
   /// In en, this message translates to:
-  /// **'Open-source AI assistant based on Kelivo'**
+  /// **'JO-AIClient is an open-source AI assistant based on Kelivo'**
   String get aboutPageAppDescription;
 
   /// No description provided for @aboutPageVersion.

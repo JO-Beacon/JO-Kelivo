@@ -1989,10 +1989,10 @@
   "aboutPageEasterEggMessage": "Thanks for exploring! \n (No egg yet)",
   "aboutPageEasterEggButton": "Nice!",
   "aboutPageAppName": "JO-AIClient",
-  "aboutPageKelivoSectionTitle": "About Kelivo",
+  "aboutPageKelivoSectionTitle": "About JO-AIClient",
   "mcpOAuthCallbackPageTitle": "JO-AIClient authorization",
   "mcpOAuthCallbackPageMessage": "Authorization received. You may close this window and return to JO-AIClient.",
-  "aboutPageAppDescription": "Open-source AI assistant based on Kelivo",
+  "aboutPageAppDescription": "JO-AIClient is an open-source AI assistant based on Kelivo",
   "aboutPageVersion": "Version",
   "aboutPageVersionDetail": "{version} / {buildNumber}",
   "@aboutPageVersionDetail": {

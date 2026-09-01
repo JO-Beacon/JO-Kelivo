@@ -1,4 +1,4 @@
-package com.psyche.jokelivo
+package io.github.jobeacon.joaiclient
 
 import android.app.Activity
 import android.app.ActivityManager

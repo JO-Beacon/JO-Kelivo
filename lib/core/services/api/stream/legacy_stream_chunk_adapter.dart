@@ -3,7 +3,7 @@ import 'dart:convert';
 import '../chat_api_service.dart';
 import 'stream_chunk.dart';
 
-/// 将 JO-Kelivo 现有的兼容分块投影为 provider-independent 事件。
+/// 将 JO-AIClient 现有的兼容分块投影为 provider-independent 事件。
 ///
 /// 这是流式架构迁移期间的桥接层：现有供应商仍可返回
 /// [ChatStreamChunk]，新的下游代码可以先按 [StreamChunk] 消费，

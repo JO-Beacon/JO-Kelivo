@@ -14,6 +14,7 @@ import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/desktop/setting/backup_pane.dart';
 import 'package:Kelivo/features/backup/pages/backup_page.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/ios_tile_button.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 
 Future<BackupReminderProvider> _createReminderProvider(
@@ -221,6 +222,8 @@ void main() {
 
       await _pumpBackupPage(tester, settings: settings, business: business);
 
+      expect(tester.takeException(), isNull);
+
       for (final key in const [
         ValueKey<String>('mobile-local-backup-action'),
         ValueKey<String>('mobile-local-restore-action'),
@@ -240,6 +243,18 @@ void main() {
           .getTopLeft(find.byKey(const ValueKey('mobile-local-restore-action')))
           .dy;
       expect((backupTop - restoreTop).abs(), lessThan(1));
+
+      for (final entry in const {
+        'mobile-kelivo-export-action': false,
+        'mobile-kelivo-import-action': true,
+        'mobile-cuplivo-export-action': false,
+        'mobile-cuplivo-import-action': false,
+      }.entries) {
+        final button = tester.widget<IosTileButton>(
+          find.byKey(ValueKey<String>(entry.key)),
+        );
+        expect(button.enabled, entry.value, reason: entry.key);
+      }
 
       final legacyImport = find.text('Chatbox (<1.22)');
       await tester.scrollUntilVisible(
@@ -262,14 +277,29 @@ void main() {
             .first,
       );
       expect(legacyImportGesture.onTap, isNotNull);
-      final exportEntry = find.text('Export').first;
-      final exportGesture = tester.widget<GestureDetector>(
-        find
-            .ancestor(of: exportEntry, matching: find.byType(GestureDetector))
-            .first,
-      );
-      expect(exportGesture.onTap, isNull);
       _expectAbove(tester, 'Chatbox (>=1.22)', 'Chatbox (<1.22)');
+    });
+
+    testWidgets('mobile stacks backup actions on narrow screens', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(320, 1000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final business = await createBusinessTestHarness();
+      final settings = SettingsProvider(business.preferences);
+      await settings.loaded;
+
+      await _pumpBackupPage(tester, settings: settings, business: business);
+
+      expect(tester.takeException(), isNull);
+      final backupTop = tester
+          .getTopLeft(find.byKey(const ValueKey('mobile-local-backup-action')))
+          .dy;
+      final restoreTop = tester
+          .getTopLeft(find.byKey(const ValueKey('mobile-local-restore-action')))
+          .dy;
+      expect(restoreTop, greaterThan(backupTop));
     });
 
     testWidgets('DeepSeek import entry invokes the real importer', (
@@ -384,6 +414,22 @@ void main() {
         expect(
           tester.getSize(backupButton).width,
           closeTo(tester.getSize(restoreButton).width, 1),
+        );
+        final cuplivoExport = find.byKey(
+          const ValueKey('desktop-cuplivo-export-action'),
+        );
+        final cuplivoImport = find.byKey(
+          const ValueKey('desktop-cuplivo-import-action'),
+        );
+        expect(
+          (tester.getTopLeft(cuplivoExport).dy -
+                  tester.getTopLeft(cuplivoImport).dy)
+              .abs(),
+          lessThan(1),
+        );
+        expect(
+          tester.getSize(cuplivoExport).width,
+          closeTo(tester.getSize(cuplivoImport).width, 1),
         );
         final desktopCurrentImport = find.text('Chatbox (>=1.22)');
         final desktopCurrentGesture = tester.widget<GestureDetector>(

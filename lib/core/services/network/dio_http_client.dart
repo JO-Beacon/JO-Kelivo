@@ -180,7 +180,7 @@ class DioHttpClient extends http.BaseClient {
     } catch (_) {}
 
     final reqHeaders = Map<String, String>.from(request.headers);
-    reqHeaders.putIfAbsent('User-Agent', () => 'JO-Kelivo');
+    reqHeaders.putIfAbsent('User-Agent', () => 'JO-AIClient');
 
     if (RequestLogger.enabled) {
       RequestLogger.logLine(

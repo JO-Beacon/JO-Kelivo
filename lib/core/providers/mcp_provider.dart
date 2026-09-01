@@ -1308,7 +1308,7 @@ class McpProvider extends ChangeNotifier {
         return false;
       }
       final clientConfig = mcp.McpClient.simpleConfig(
-        name: 'Kelivo MCP',
+        name: 'JO-AIClient MCP',
         version: '1.0.0',
         enableDebugLogging: false,
         requestTimeout: _requestTimeout,

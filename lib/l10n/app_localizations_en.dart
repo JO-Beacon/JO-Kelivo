@@ -4590,7 +4590,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutPageAppName => 'JO-AIClient';
 
   @override
-  String get aboutPageKelivoSectionTitle => 'About Kelivo';
+  String get aboutPageKelivoSectionTitle => 'About JO-AIClient';
 
   @override
   String get mcpOAuthCallbackPageTitle => 'JO-AIClient authorization';
@@ -4601,7 +4601,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutPageAppDescription =>
-      'Open-source AI assistant based on Kelivo';
+      'JO-AIClient is an open-source AI assistant based on Kelivo';
 
   @override
   String get aboutPageVersion => 'Version';

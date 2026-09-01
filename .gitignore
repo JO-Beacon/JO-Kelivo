@@ -76,6 +76,8 @@ internationalization.md
 /dist/
 /JO-Kelivo-v*-windows-*-portable.zip
 /JO-Kelivo-v*-windows-*-setup.exe
+/JO-AIClient-v*-windows-*-portable.zip
+/JO-AIClient-v*-windows-*-setup.exe
 /build/installer-languages/
 
 /参考文件/

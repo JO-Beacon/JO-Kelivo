@@ -27,6 +27,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/backup/data_sync.dart';
 import '../../../core/services/native_file_save.dart';
 import '../../../shared/widgets/ios_switch.dart';
+import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/restart_app_action.dart';
 import '../../../core/services/backup/cherry_importer.dart';
 import '../../../core/services/backup/chatbox_importer.dart';
@@ -338,7 +339,7 @@ class _BackupPageState extends State<BackupPage> {
                 const _BackupReminderMobileSection(),
 
                 // Section 2: 数据迁移与兼容入口
-                ..._buildMobileLocalBackupSection(context, l10n, vm),
+                ..._buildMobileLocalBackupSection(context, l10n, vm, header),
 
                 // Section 3: WebDAV备份
                 header(l10n.backupPageWebDavBackup),
@@ -1179,77 +1180,69 @@ class _BackupPageState extends State<BackupPage> {
     BuildContext context,
     AppLocalizations l10n,
     BackupProvider vm,
+    Widget Function(String text, {bool first}) header,
   ) {
     return [
+      header(l10n.backupPageNativeBackup),
       _iosSectionCard(
         children: [
-          _BackupCategoryLabel(label: l10n.backupPageNativeBackup),
-          Row(
-            children: [
-              Expanded(
-                child: _iosNavRow(
-                  context,
-                  key: const ValueKey('mobile-local-backup-action'),
-                  icon: Lucide.Export,
-                  label: l10n.backupPageLocalBackupAction,
-                  onTap: () => _doExport(context, vm),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _iosNavRow(
-                  context,
-                  key: const ValueKey('mobile-local-restore-action'),
-                  icon: Lucide.Import,
-                  label: l10n.backupPageRestore,
-                  onTap: () => _doImportLocal(context, vm, joaiclient: true),
-                ),
-              ),
-            ],
+          _mobileBackupActionPair(
+            first: IosTileButton(
+              key: const ValueKey('mobile-local-backup-action'),
+              icon: Lucide.Export,
+              label: l10n.backupPageLocalBackupAction,
+              onTap: () => _doExport(context, vm),
+            ),
+            second: IosTileButton(
+              key: const ValueKey('mobile-local-restore-action'),
+              icon: Lucide.Import,
+              label: l10n.backupPageRestore,
+              onTap: () => _doImportLocal(context, vm, joaiclient: true),
+            ),
           ),
         ],
       ),
-      const SizedBox(height: 10),
+      header(l10n.backupPageKelivoCompatibleBackup),
       _iosSectionCard(
         children: [
-          _BackupCategoryLabel(label: l10n.backupPageKelivoCompatibleBackup),
           _BackupSubcategoryLabel(label: l10n.backupPageKelivoFormat),
-          _iosDivider(context),
-          _iosNavRow(
-            context,
-            icon: Lucide.Export,
-            label: l10n.backupPageExportAction,
-            enabled: false,
-          ),
-          _iosDivider(context),
-          _iosNavRow(
-            context,
-            icon: Lucide.Import2,
-            label: l10n.backupPageImportAction,
-            onTap: () => _doImportLocal(context, vm),
+          _mobileBackupActionPair(
+            first: IosTileButton(
+              key: const ValueKey('mobile-kelivo-export-action'),
+              icon: Lucide.Export,
+              label: l10n.backupPageExportAction,
+              enabled: false,
+              onTap: () {},
+            ),
+            second: IosTileButton(
+              key: const ValueKey('mobile-kelivo-import-action'),
+              icon: Lucide.Import2,
+              label: l10n.backupPageImportAction,
+              onTap: () => _doImportLocal(context, vm),
+            ),
           ),
           _BackupSubcategoryLabel(label: l10n.backupPageCuplivoFormat),
-          _iosDivider(context),
-          _iosNavRow(
-            context,
-            icon: Lucide.Box,
-            label: l10n.backupPageExportAction,
-            enabled: false,
-          ),
-          _iosDivider(context),
-          _iosNavRow(
-            context,
-            icon: Lucide.Box,
-            label: l10n.backupPageImportAction,
-            enabled: false,
+          _mobileBackupActionPair(
+            first: IosTileButton(
+              key: const ValueKey('mobile-cuplivo-export-action'),
+              icon: Lucide.Export,
+              label: l10n.backupPageExportAction,
+              enabled: false,
+              onTap: () {},
+            ),
+            second: IosTileButton(
+              key: const ValueKey('mobile-cuplivo-import-action'),
+              icon: Lucide.Import2,
+              label: l10n.backupPageImportAction,
+              enabled: false,
+              onTap: () {},
+            ),
           ),
         ],
       ),
-      const SizedBox(height: 10),
+      header(l10n.backupPageExternalImport),
       _iosSectionCard(
         children: [
-          _BackupCategoryLabel(label: l10n.backupPageExternalImport),
-          _iosDivider(context),
           _iosNavRow(
             context,
             icon: Lucide.Box,
@@ -2070,28 +2063,6 @@ class _SmallTactileIconState extends State<_SmallTactileIcon> {
   }
 }
 
-class _BackupCategoryLabel extends StatelessWidget {
-  const _BackupCategoryLabel({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 15,
-          fontWeight: AppFontWeights.semibold,
-          color: cs.onSurface.withValues(alpha: 0.95),
-        ),
-      ),
-    );
-  }
-}
-
 class _BackupSubcategoryLabel extends StatelessWidget {
   const _BackupSubcategoryLabel({required this.label});
 
@@ -2137,6 +2108,32 @@ Widget _iosSectionCard({required List<Widget> children}) {
         ),
       );
     },
+  );
+}
+
+Widget _mobileBackupActionPair({
+  required Widget first,
+  required Widget second,
+}) {
+  return Padding(
+    padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 320) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [first, const SizedBox(height: 8), second],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: first),
+            const SizedBox(width: 8),
+            Expanded(child: second),
+          ],
+        );
+      },
+    ),
   );
 }
 

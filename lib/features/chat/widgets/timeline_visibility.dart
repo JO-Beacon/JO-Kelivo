@@ -52,7 +52,7 @@ bool isTimelineToolVisible({
   if (!toolCreatesTimelineCard(toolName)) return false;
   if (showToolCards) return true;
   if (toolName == LocalToolNames.askUser) return true;
-  // JO-Kelivo's renderer keeps every in-progress tool visible while cards
+  // JO-AIClient's renderer keeps every in-progress tool visible while cards
   // are hidden; a pending approval is also visible even if its part has
   // already been marked complete.
   return loading || pendingApproval;

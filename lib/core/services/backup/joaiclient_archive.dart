@@ -6,7 +6,7 @@ import 'package:crypto/crypto.dart';
 import '../../models/progress_update.dart';
 import '../../models/backup_task_progress.dart';
 
-/// JO-Kelivo 外部归档的隐式外层容器。
+/// JO-AIClient 外部归档的隐式外层容器。
 ///
 /// 第一个版本有意不加密。它仍在固定头部保留保护字段，并在 payload 中保留
 /// 空间，以便未来升级时无需引入第二种文件类型。

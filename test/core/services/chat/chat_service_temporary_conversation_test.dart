@@ -1539,6 +1539,70 @@ void main() {
     },
   );
 
+  test('deleteCurrentBranch keeps a nested branch parent anchor', () async {
+    final branched = await createBranchedService(
+      'nested-current-branch.sqlite',
+    );
+    final repository = branched.repository;
+    final service = branched.service;
+    final before = await repository.loadConversationTree('conversation-branch');
+    expect(before, isNotNull);
+
+    await repository.saveConversationTree(
+      ConversationTree(
+        conversationId: 'conversation-branch',
+        activeBranchId: 'nested',
+        branches: {
+          'root': ConversationBranch(
+            id: 'root',
+            conversationId: 'conversation-branch',
+            tipMessageId: 'u2-v0',
+            createdAt: DateTime.utc(2026, 1, 1),
+          ),
+          'second': ConversationBranch(
+            id: 'second',
+            conversationId: 'conversation-branch',
+            tipMessageId: 'a1-v1',
+            createdAt: DateTime.utc(2026, 1, 1),
+          ),
+          'nested': ConversationBranch(
+            id: 'nested',
+            conversationId: 'conversation-branch',
+            tipMessageId: 'u2-v1',
+            createdAt: DateTime.utc(2026, 1, 1),
+          ),
+        },
+        edges: const {
+          'u1': MessageTreeEdge(messageId: 'u1', parentMessageId: null),
+          'a1-v0': MessageTreeEdge(messageId: 'a1-v0', parentMessageId: 'u1'),
+          'a1-v1': MessageTreeEdge(messageId: 'a1-v1', parentMessageId: 'u1'),
+          'u2-v0': MessageTreeEdge(
+            messageId: 'u2-v0',
+            parentMessageId: 'a1-v0',
+          ),
+          'u2-v1': MessageTreeEdge(
+            messageId: 'u2-v1',
+            parentMessageId: 'a1-v1',
+          ),
+        },
+      ),
+    );
+
+    final deleted = await service.deleteCurrentBranch(
+      conversationId: 'conversation-branch',
+      messageId: 'u2-v1',
+    );
+
+    expect(deleted, const {'u2-v1'});
+    expect(await repository.getMessage('a1-v1'), isNotNull);
+    expect(await repository.getMessage('u2-v1'), isNull);
+    final after = await repository.loadConversationTree('conversation-branch');
+    expect(after, isNotNull);
+    expect(after!.activePath(), const ['u1', 'a1-v1']);
+    expect(after.branches.containsKey('second'), isTrue);
+    expect(after.branches.containsKey('nested'), isFalse);
+  });
+
   test(
     'deleteMessageNode removes the fork node and keeps its active continuation',
     () async {
@@ -1587,7 +1651,7 @@ void main() {
   );
 
   test(
-    'deleteMessageOnly removes an active branch with a single terminal message',
+    'deleteMessageOnly keeps an active branch prefix after deleting its tip',
     () async {
       final branched = await createBranchedService(
         'message-only-branch.sqlite',
@@ -1610,7 +1674,8 @@ void main() {
       expect(tree, isNotNull);
       expect(tree!.activeBranchId, 'root');
       expect(tree.activePath(), const ['u1', 'a1-v1', 'u2-v1']);
-      expect(tree.branches.containsKey('old'), isFalse);
+      expect(tree.branches.containsKey('old'), isTrue);
+      expect(tree.branchPath('old'), const ['u1', 'a1-v0']);
     },
   );
 
@@ -1676,7 +1741,8 @@ void main() {
           ...after.branchPath(branch.id),
       };
       expect(after.edges.keys, unorderedEquals(reachable));
-      expect(after.edges, isNot(contains('a1-v1')));
+      expect(after.edges, contains('a1-v1'));
+      expect(after.branchPath('root'), const ['u1', 'a1-v1']);
     },
   );
 

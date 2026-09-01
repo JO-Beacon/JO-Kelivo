@@ -4426,7 +4426,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutPageAppName => 'JO-AIClient';
 
   @override
-  String get aboutPageKelivoSectionTitle => '关于 Kelivo';
+  String get aboutPageKelivoSectionTitle => '关于 JO-AIClient';
 
   @override
   String get mcpOAuthCallbackPageTitle => 'JO-AIClient 授权';
@@ -4435,7 +4435,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mcpOAuthCallbackPageMessage => '已收到授权。你可以关闭此窗口并返回 JO-AIClient。';
 
   @override
-  String get aboutPageAppDescription => '基于 Kelivo 的开源 AI 助手';
+  String get aboutPageAppDescription => 'JO-AIClient 是基于 Kelivo 的开源 AI 助手';
 
   @override
   String get aboutPageVersion => '版本';
@@ -12496,7 +12496,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get aboutPageAppName => 'JO-AIClient';
 
   @override
-  String get aboutPageKelivoSectionTitle => '关于 Kelivo';
+  String get aboutPageKelivoSectionTitle => '关于 JO-AIClient';
 
   @override
   String get mcpOAuthCallbackPageTitle => 'JO-AIClient 授权';
@@ -12505,7 +12505,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get mcpOAuthCallbackPageMessage => '已收到授权。你可以关闭此窗口并返回 JO-AIClient。';
 
   @override
-  String get aboutPageAppDescription => '基于 Kelivo 的开源 AI 助手';
+  String get aboutPageAppDescription => 'JO-AIClient 是基于 Kelivo 的开源 AI 助手';
 
   @override
   String get aboutPageVersion => '版本';
@@ -20565,7 +20565,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get aboutPageAppName => 'JO-AIClient';
 
   @override
-  String get aboutPageKelivoSectionTitle => '關於 Kelivo';
+  String get aboutPageKelivoSectionTitle => '關於 JO-AIClient';
 
   @override
   String get mcpOAuthCallbackPageTitle => 'JO-AIClient 授權';
@@ -20574,7 +20574,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get mcpOAuthCallbackPageMessage => '已收到授權。你可以關閉此視窗並返回 JO-AIClient。';
 
   @override
-  String get aboutPageAppDescription => '基於 Kelivo 的開源 AI 助理';
+  String get aboutPageAppDescription => 'JO-AIClient 是基於 Kelivo 的開源 AI 助理';
 
   @override
   String get aboutPageVersion => '版本';

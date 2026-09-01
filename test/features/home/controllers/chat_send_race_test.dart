@@ -527,6 +527,75 @@ void main() {
     },
   );
 
+  testWidgets('deleting another branch does not cancel an active stream', (
+    tester,
+  ) async {
+    final controller = await pumpHarness(tester);
+    await tester.runAsync(() async {
+      final convo = await openConversation(controller);
+      await controller.sendMessage(ChatInputData(text: 'A1'));
+      await waitFor(
+        () => !controller.chatController.isConversationLoading(convo.id),
+        'A1 streaming to finish',
+      );
+
+      final initial = await service.loadMessages(convo.id);
+      final rootUser = initial.firstWhere((message) => message.role == 'user');
+      final treeWithBranch = await service.createMessageBranch(
+        conversationId: convo.id,
+        fromMessageId: rootUser.id,
+      );
+      final branchBId = treeWithBranch.activeBranchId;
+      final branchAId = treeWithBranch.branches.keys.firstWhere(
+        (branchId) => branchId != branchBId,
+      );
+      await controller.switchConversationBranch(branchBId);
+      await controller.sendMessage(ChatInputData(text: 'B1'));
+      await waitFor(
+        () => !controller.chatController.isConversationLoading(convo.id),
+        'B1 streaming to finish',
+      );
+
+      await controller.switchConversationBranch(branchAId);
+      streamResponseGate = Completer<void>();
+      final a2Send = controller.sendMessage(ChatInputData(text: 'A2'));
+      await waitFor(() => streamRequestCount == 3, 'A2 stream to fire');
+      await a2Send;
+      expect(controller.chatController.isConversationLoading(convo.id), isTrue);
+
+      final branchMessages = await service.loadAllConversationMessages(
+        convo.id,
+      );
+      final bMessage = branchMessages.firstWhere(
+        (message) => message.content == 'B1',
+      );
+      await controller.switchConversationBranch(branchBId);
+      await controller.deleteMessage(
+        message: bMessage,
+        byGroup: controller.visibleGroupedMessages,
+      );
+
+      expect(controller.chatController.isConversationLoading(convo.id), isTrue);
+      streamResponseGate!.complete();
+      streamResponseGate = null;
+      await waitFor(
+        () => !controller.chatController.isConversationLoading(convo.id),
+        'A2 streaming to finish after deleting B',
+      );
+
+      final messagesAfterDelete = await service.loadMessages(convo.id);
+      expect(
+        messagesAfterDelete.any((message) => message.content == 'B1'),
+        isFalse,
+      );
+      expect(
+        messagesAfterDelete.any((message) => message.content == 'A2'),
+        isTrue,
+      );
+    });
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('assistant edit save and send creates a new reply slot', (
     tester,
   ) async {

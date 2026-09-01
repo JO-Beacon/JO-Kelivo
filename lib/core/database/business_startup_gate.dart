@@ -46,7 +46,7 @@ final class BusinessStartupGate {
       developer.log(
         'Business migration degraded; entering with defaults and retaining '
         'legacy data for a future retry.',
-        name: 'Kelivo.business.migration',
+        name: 'JO-AIClient.business.migration',
         error: error,
         stackTrace: stackTrace,
       );

@@ -10,7 +10,7 @@ void main() {
   setUpAll(() {
     PackageInfo.setMockInitialValues(
       appName: 'JO-AIClient',
-      packageName: 'com.jobeacon.joaiclient',
+      packageName: 'io.github.jobeacon.joaiclient',
       version: '9.9.9',
       buildNumber: '99',
       buildSignature: '',
@@ -22,6 +22,8 @@ void main() {
     () {
       final info = UpdateInfo.fromGitHubRelease({
         'tag_name': 'v0.1.6',
+        'html_url':
+            'https://github.com/JO-Beacon/JO-Kelivo/releases/tag/v0.1.6',
         'published_at': '2026-08-13T00:00:00Z',
         'body': 'notes',
         'assets': [
@@ -39,6 +41,10 @@ void main() {
 
       expect(info.app, 'JO-Kelivo');
       expect(info.version, '0.1.6');
+      expect(
+        info.releaseUrl,
+        'https://github.com/JO-Beacon/JO-Kelivo/releases/tag/v0.1.6',
+      );
       expect(info.downloads, {
         'android': _url('JO-Kelivo-v0.1.6+6-android-arm64-v8a-release.apk'),
         'windows': _url('JO-Kelivo-v0.1.6-windows-x64-setup.exe'),
@@ -213,7 +219,7 @@ void main() {
     await provider.checkForUpdates();
 
     expect(provider.error, isNull);
-    expect(provider.available?.app, 'JO-Kelivo');
+    expect(provider.available?.app, 'JO-AIClient');
     expect(requestedPaths, [
       '/repos/JO-Beacon/JO-AIClient/releases/latest',
       '/repos/JO-Beacon/JO-Kelivo/releases/latest',
@@ -242,7 +248,7 @@ void main() {
     await provider.checkForUpdates();
 
     expect(provider.error, isNull);
-    expect(provider.available?.app, 'JO-Kelivo');
+    expect(provider.available?.app, 'JO-AIClient');
     expect(requestedPaths, hasLength(2));
   });
 
@@ -279,6 +285,8 @@ http.Response _releaseResponse({
   return http.Response(
     jsonEncode({
       'tag_name': 'v$version',
+      'html_url':
+          'https://github.com/JO-Beacon/$appName/releases/tag/v$version',
       'body': '$appName release notes',
       'assets': [
         _asset('$appName-v$version-android-arm64-v8a-release.apk'),

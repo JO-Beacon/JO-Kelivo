@@ -1101,7 +1101,7 @@ class ChatboxImporter {
           createdAt: createdAt,
           updatedAt: updatedAt,
           // Chatbox starred is represented by the imported assistant group,
-          // not by JO-Kelivo conversation pinning.
+          // not by JO-AIClient conversation pinning.
           isPinned: false,
           assistantId: assistantId,
         );

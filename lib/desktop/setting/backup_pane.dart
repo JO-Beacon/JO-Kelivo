@@ -1194,18 +1194,28 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
               ),
               const SizedBox(height: 10),
               _BackupSubcategoryLabel(label: l10n.backupPageCuplivoFormat),
-              _DeskIosButton(
-                label: l10n.backupPageExportAction,
-                filled: false,
-                dense: true,
-                enabled: false,
-              ),
-              const SizedBox(height: 6),
-              _DeskIosButton(
-                label: l10n.backupPageImportAction,
-                filled: false,
-                dense: true,
-                enabled: false,
+              Row(
+                children: [
+                  Expanded(
+                    child: _DeskIosButton(
+                      key: const ValueKey('desktop-cuplivo-export-action'),
+                      label: l10n.backupPageExportAction,
+                      filled: false,
+                      dense: true,
+                      enabled: false,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: _DeskIosButton(
+                      key: const ValueKey('desktop-cuplivo-import-action'),
+                      label: l10n.backupPageImportAction,
+                      filled: false,
+                      dense: true,
+                      enabled: false,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -2099,6 +2109,7 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
 
 class _DeskIosButton extends StatefulWidget {
   const _DeskIosButton({
+    super.key,
     required this.label,
     required this.filled,
     required this.dense,

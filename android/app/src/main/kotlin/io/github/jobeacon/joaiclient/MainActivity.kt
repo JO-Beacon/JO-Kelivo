@@ -1,4 +1,4 @@
-package com.psyche.jokelivo
+package io.github.jobeacon.joaiclient
 
 import android.app.Activity
 import android.content.ActivityNotFoundException
@@ -359,7 +359,7 @@ class MainActivity : FlutterActivity() {
         } catch (error: Exception) {
             // The backup is already complete; an unsupported provider must not
             // turn a successful save into a reported failure.
-            Log.w("JO-Kelivo", "Unable to restore .joaiclient extension", error)
+            Log.w("JO-AIClient", "Unable to restore .joaiclient extension", error)
         }
     }
 }

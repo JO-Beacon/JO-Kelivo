@@ -20,7 +20,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   // Enforce a single running instance on Windows using a named mutex.
   HANDLE instance_mutex =
-      ::CreateMutexW(nullptr, TRUE, L"JOKelivoMutex");
+      ::CreateMutexW(nullptr, TRUE, L"JOAIClientMutex");
   if (instance_mutex != nullptr && ::GetLastError() == ERROR_ALREADY_EXISTS) {
     // restart_app launches the replacement process before terminating the
     // current one. Give that short handoff a chance to acquire the mutex;

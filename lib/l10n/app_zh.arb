@@ -1587,10 +1587,10 @@
   "aboutPageEasterEggMessage": "\n（好吧现在还没彩蛋）",
   "aboutPageEasterEggButton": "好的",
   "aboutPageAppName": "JO-AIClient",
-  "aboutPageKelivoSectionTitle": "关于 Kelivo",
+  "aboutPageKelivoSectionTitle": "关于 JO-AIClient",
   "mcpOAuthCallbackPageTitle": "JO-AIClient 授权",
   "mcpOAuthCallbackPageMessage": "已收到授权。你可以关闭此窗口并返回 JO-AIClient。",
-  "aboutPageAppDescription": "基于 Kelivo 的开源 AI 助手",
+  "aboutPageAppDescription": "JO-AIClient 是基于 Kelivo 的开源 AI 助手",
   "aboutPageVersion": "版本",
   "aboutPageVersionDetail": "{version} / {buildNumber}",
   "@aboutPageVersionDetail": {

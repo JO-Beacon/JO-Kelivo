@@ -102,7 +102,7 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
         FlutterErrorDetails(
           exception: error,
           stack: stackTrace,
-          library: 'Kelivo restore',
+          library: 'JO-AIClient restore',
           context: ErrorDescription('while repairing after startup failure'),
         ),
       );
@@ -195,7 +195,7 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
         FlutterErrorDetails(
           exception: error,
           stack: stackTrace,
-          library: 'Kelivo restore',
+          library: 'JO-AIClient restore',
           context: ErrorDescription('while resetting after startup failure'),
         ),
       );
@@ -221,7 +221,7 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
         FlutterErrorDetails(
           exception: error,
           stack: stackTrace,
-          library: 'Kelivo restore',
+          library: 'JO-AIClient restore',
           context: ErrorDescription('while restarting after restore failure'),
         ),
       );

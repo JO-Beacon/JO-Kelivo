@@ -493,6 +493,9 @@ class _AboutPageState extends State<AboutPage> {
               key: const ValueKey('about-update-release-notes'),
               title: l10n.sideDrawerUpdateTitle(update.version),
               notes: update.notes ?? '',
+              onTap: update.releaseUrl == null
+                  ? null
+                  : () => _openUrl(update.releaseUrl!),
               onLinkTap: _openUrl,
             ),
             const SizedBox(height: 12),

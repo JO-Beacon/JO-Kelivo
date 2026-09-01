@@ -16,7 +16,7 @@ void main() {
   setUpAll(() {
     PackageInfo.setMockInitialValues(
       appName: 'JO-AIClient',
-      packageName: 'com.jobeacon.joaiclient',
+      packageName: 'io.github.jobeacon.joaiclient',
       version: '0.1.6',
       buildNumber: '6',
       buildSignature: '',

@@ -759,7 +759,7 @@ class ChatApiService {
   /// 兼容入口：把现有供应商流式结果转换为 provider-independent 事件。
   ///
   /// 请求和旧版 `ChatStreamChunk` 管线保持不变，便于下游逐步迁移到
-  /// [StreamChunkHandler]，同时保留 JO-Kelivo 当前工具循环和上下文树契约。
+  /// [StreamChunkHandler]，同时保留 JO-AIClient 当前工具循环和上下文树契约。
   static Stream<StreamChunk> sendMessageStreamEvents({
     required ProviderConfig config,
     required String modelId,

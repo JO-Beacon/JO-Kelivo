@@ -343,6 +343,61 @@ void main() {
       expect(afterDelete.branches.containsKey('branch-c1'), isFalse);
     });
 
+    test(
+      'deleting an active nested tail preserves its longest prefix branch',
+      () {
+        final branched =
+            ConversationTree.linear(
+                  conversationId: 'conversation',
+                  messageIds: const ['m0', 'm1', 'm2'],
+                )
+                .createMessageBranch(branchId: 'second', fromMessageId: 'm0')
+                .appendToActiveBranch('second-m1')
+                .createMessageBranch(
+                  branchId: 'nested',
+                  fromMessageId: 'second-m1',
+                )
+                .appendToActiveBranch('nested-m2');
+
+        final afterDelete = branched.deleteMessage('nested-m2');
+
+        expect(afterDelete.activeBranchId, 'second');
+        expect(afterDelete.activePath(), const ['m0', 'second-m1']);
+        expect(afterDelete.branches.containsKey('nested'), isFalse);
+        expect(afterDelete.edges.containsKey('m0'), isTrue);
+        expect(afterDelete.edges.containsKey('second-m1'), isTrue);
+        expect(afterDelete.edges.containsKey('nested-m2'), isFalse);
+        expect(() => afterDelete.validateIntegrity(), returnsNormally);
+      },
+    );
+
+    test(
+      'deleting an active nested branch does not delete its parent anchor',
+      () {
+        final branched =
+            ConversationTree.linear(
+                  conversationId: 'conversation',
+                  messageIds: const ['m0', 'm1', 'm2'],
+                )
+                .createMessageBranch(branchId: 'second', fromMessageId: 'm0')
+                .appendToActiveBranch('second-m1')
+                .createMessageBranch(
+                  branchId: 'nested',
+                  fromMessageId: 'second-m1',
+                )
+                .appendToActiveBranch('nested-m2');
+
+        final afterDelete = branched.deleteCurrentBranch('nested-m2');
+
+        expect(afterDelete.activeBranchId, 'second');
+        expect(afterDelete.activePath(), const ['m0', 'second-m1']);
+        expect(afterDelete.edges.containsKey('second-m1'), isTrue);
+        expect(afterDelete.edges.containsKey('nested-m2'), isFalse);
+        expect(afterDelete.branches.containsKey('nested'), isFalse);
+        expect(() => afterDelete.validateIntegrity(), returnsNormally);
+      },
+    );
+
     test('deleting a fork node keeps its active continuation only', () {
       final branched =
           ConversationTree.linear(
@@ -582,6 +637,32 @@ void main() {
         expect(afterRemove.branches.containsKey('alt'), isFalse);
         expect(afterRemove.activePath(), const ['u1', 'a1']);
         expect(afterRemove.edges.containsKey('a1-alt'), isFalse);
+      },
+    );
+
+    test(
+      'removeMessageOnly keeps the previous branch message when deleting its tip',
+      () {
+        final base = ConversationTree.linear(
+          conversationId: 'conversation',
+          messageIds: const ['u1', 'fork'],
+        );
+        final branched = base
+            .createMessageBranch(branchId: 'alt', fromMessageId: 'fork')
+            .appendToActiveBranch('a1')
+            .appendToActiveBranch('a2');
+
+        final afterRemove = branched.removeMessageOnly('a2');
+
+        expect(afterRemove.branches.containsKey('alt'), isTrue);
+        expect(afterRemove.branches['alt']?.tipMessageId, 'a1');
+        expect(afterRemove.edges.containsKey('a1'), isTrue);
+        expect(afterRemove.edges.containsKey('a2'), isFalse);
+        expect(afterRemove.switchBranch('alt').activePath(), const [
+          'u1',
+          'fork',
+          'a1',
+        ]);
       },
     );
   });

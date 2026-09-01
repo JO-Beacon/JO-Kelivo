@@ -477,7 +477,8 @@ class MessageGenerationService {
     required bool enableReasoning,
   }) async {
     if (enableReasoning) {
-      final rd = stream_ctrl.ReasoningData();
+      final rd = stream_ctrl.ReasoningData()
+        ..expanded = streamController.reasoning[messageId]?.expanded ?? false;
       streamController.reasoning[messageId] = rd;
       await chatService.updateMessage(
         messageId,

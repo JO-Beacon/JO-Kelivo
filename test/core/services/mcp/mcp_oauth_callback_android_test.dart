@@ -41,7 +41,7 @@ void main() {
     );
     await callback.close();
 
-    expect(callback.redirectUri.scheme, 'psyche.jokelivo');
+    expect(callback.redirectUri.scheme, 'io.github.jobeacon.joaiclient');
     expect(callback.redirectUri.host, 'mcp-oauth-callback');
     expect(callback.redirectUri.pathSegments, hasLength(1));
     expect(callback.redirectUri.hasQuery, isFalse);

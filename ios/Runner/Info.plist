@@ -36,9 +36,10 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>com.psyche.jokelivo.oauth-return</string>
+			<string>io.github.jobeacon.joaiclient.oauth-return</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
+				<string>io.github.jobeacon.joaiclient</string>
 				<string>jo-kelivo</string>
 				<string>com.psyche.jokelivo</string>
 			</array>
@@ -46,8 +47,8 @@
 	</array>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>com.psyche.jokelivo.background-generation.refresh</string>
-		<string>com.psyche.jokelivo.background-generation.processing</string>
+		<string>io.github.jobeacon.joaiclient.background-generation.refresh</string>
+		<string>io.github.jobeacon.joaiclient.background-generation.processing</string>
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>

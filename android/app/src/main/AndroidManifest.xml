@@ -21,7 +21,7 @@
          tools:ignore="ProtectedPermissions" />
     <!-- OS auto-backup/device-transfer can restore a partial SQLite file
          family (db without -wal, receipt without db), which the fail-closed
-         startup gate rejects. JO-Kelivo ships its own backup (WebDAV/S3/local
+         startup gate rejects. JO-AIClient ships its own backup (WebDAV/S3/local
          export), so system backup is disabled. -->
     <application
         android:label="JO-AIClient"
@@ -70,6 +70,7 @@
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="io.github.jobeacon.joaiclient" android:host="mcp-oauth-callback"/>
                 <data android:scheme="psyche.jokelivo" android:host="mcp-oauth-callback"/>
             </intent-filter>
         </activity>

@@ -30,6 +30,15 @@ export '../../../core/models/compress_context_options.dart';
 
 enum BackgroundTaskKind { ocr, title, summary, suggestions, memory }
 
+enum _DeletionOperation {
+  messages,
+  currentBranch,
+  messageNode,
+  messageAndFollowing,
+  messageOnly,
+  branchSiblings,
+}
+
 class BatchDeleteGroupPlan {
   const BatchDeleteGroupPlan({
     required this.groupId,
@@ -582,6 +591,61 @@ class HomeViewModel extends ChangeNotifier {
     await _chatActions.cancelStreaming(currentConversation);
   }
 
+  /// 在实际删除前计算会被移除的消息，避免按会话取消其他分支的生成。
+  Future<bool> _willDeleteStreamingMessage({
+    required String conversationId,
+    required String messageId,
+    required _DeletionOperation operation,
+    Set<String> messageIds = const <String>{},
+  }) async {
+    final streamingMessageId = _chatActions.activeStreamingMessageId(
+      conversationId,
+    );
+    if (streamingMessageId == null) return false;
+
+    await _chatService.ensureConversationTree(conversationId);
+    final tree = await _chatService.loadConversationTree(conversationId);
+    if (tree == null) {
+      return operation == _DeletionOperation.messageOnly &&
+          streamingMessageId == messageId;
+    }
+
+    final updated = switch (operation) {
+      _DeletionOperation.messages => tree.deleteMessages(messageIds),
+      _DeletionOperation.currentBranch => tree.deleteCurrentBranch(messageId),
+      _DeletionOperation.messageNode => tree.deleteNodeKeepActiveBranch(
+        messageId,
+      ),
+      _DeletionOperation.messageAndFollowing => tree.deleteMessages({
+        messageId,
+      }),
+      _DeletionOperation.messageOnly => tree.removeMessageOnly(messageId),
+      _DeletionOperation.branchSiblings => tree.deleteMessages(
+        _siblingMessageIds(tree, messageId),
+      ),
+    };
+    return !updated.edges.containsKey(streamingMessageId);
+  }
+
+  Future<void> _cancelStreamingIfDeleted({
+    required String conversationId,
+    required String messageId,
+    required _DeletionOperation operation,
+    Set<String> messageIds = const <String>{},
+  }) async {
+    if (!await _willDeleteStreamingMessage(
+      conversationId: conversationId,
+      messageId: messageId,
+      operation: operation,
+      messageIds: messageIds,
+    )) {
+      return;
+    }
+    await _chatActions.cancelStreaming(
+      _chatService.getConversation(conversationId),
+    );
+  }
+
   /// 删除消息并调整版本选择。
   ///
   /// 返回需要清理 UI 状态的消息 ID 列表。
@@ -591,14 +655,11 @@ class HomeViewModel extends ChangeNotifier {
     required Map<String, List<ChatMessage>> byGroup,
   }) async {
     final targetConversationId = message.conversationId;
-    final streamingMessageId = _chatActions.activeStreamingMessageId(
-      targetConversationId,
+    await _cancelStreamingIfDeleted(
+      conversationId: targetConversationId,
+      messageId: message.id,
+      operation: _DeletionOperation.currentBranch,
     );
-    if (streamingMessageId != null) {
-      await _chatActions.cancelStreaming(
-        _chatService.getConversation(targetConversationId),
-      );
-    }
 
     final deletedIds = await _chatService.deleteCurrentBranch(
       conversationId: targetConversationId,
@@ -631,14 +692,11 @@ class HomeViewModel extends ChangeNotifier {
     required Map<String, List<ChatMessage>> byGroup,
   }) async {
     final targetConversationId = message.conversationId;
-    final streamingMessageId = _chatActions.activeStreamingMessageId(
-      targetConversationId,
+    await _cancelStreamingIfDeleted(
+      conversationId: targetConversationId,
+      messageId: message.id,
+      operation: _DeletionOperation.messageNode,
     );
-    if (streamingMessageId != null) {
-      await _chatActions.cancelStreaming(
-        _chatService.getConversation(targetConversationId),
-      );
-    }
 
     final deletedIds = await _chatService.deleteMessageNode(
       conversationId: targetConversationId,
@@ -671,14 +729,11 @@ class HomeViewModel extends ChangeNotifier {
     required Map<String, List<ChatMessage>> byGroup,
   }) async {
     final targetConversationId = message.conversationId;
-    final streamingMessageId = _chatActions.activeStreamingMessageId(
-      targetConversationId,
+    await _cancelStreamingIfDeleted(
+      conversationId: targetConversationId,
+      messageId: message.id,
+      operation: _DeletionOperation.messageAndFollowing,
     );
-    if (streamingMessageId != null) {
-      await _chatActions.cancelStreaming(
-        _chatService.getConversation(targetConversationId),
-      );
-    }
 
     final deletedIds = await _chatService.deleteMessageAndFollowing(
       conversationId: targetConversationId,
@@ -710,14 +765,11 @@ class HomeViewModel extends ChangeNotifier {
     required Map<String, List<ChatMessage>> byGroup,
   }) async {
     final targetConversationId = message.conversationId;
-    final streamingMessageId = _chatActions.activeStreamingMessageId(
-      targetConversationId,
+    await _cancelStreamingIfDeleted(
+      conversationId: targetConversationId,
+      messageId: message.id,
+      operation: _DeletionOperation.messageOnly,
     );
-    if (streamingMessageId == message.id) {
-      await _chatActions.cancelStreaming(
-        _chatService.getConversation(targetConversationId),
-      );
-    }
 
     final deletedIds = await _chatService.deleteMessageOnly(
       conversationId: targetConversationId,
@@ -753,14 +805,11 @@ class HomeViewModel extends ChangeNotifier {
 
   Future<Set<String>> deleteBranchSiblings(ChatMessage message) async {
     final targetConversationId = message.conversationId;
-    final streamingMessageId = _chatActions.activeStreamingMessageId(
-      targetConversationId,
+    await _cancelStreamingIfDeleted(
+      conversationId: targetConversationId,
+      messageId: message.id,
+      operation: _DeletionOperation.branchSiblings,
     );
-    if (streamingMessageId != null) {
-      await _chatActions.cancelStreaming(
-        _chatService.getConversation(targetConversationId),
-      );
-    }
     final deletedIds = await _chatService.deleteBranchSiblings(
       conversationId: targetConversationId,
       messageId: message.id,
@@ -785,6 +834,11 @@ class HomeViewModel extends ChangeNotifier {
     }
     notifyListeners();
     return deletedIds;
+  }
+
+  Set<String> _siblingMessageIds(ConversationTree tree, String messageId) {
+    final parentId = tree.edges[messageId]?.parentMessageId;
+    return tree.childrenOf(parentId).toSet();
   }
 
   @visibleForTesting
@@ -907,15 +961,12 @@ class HomeViewModel extends ChangeNotifier {
 
     // 删除活动生成写入检查点的行会使下一次流式写入命中
     // 已删除消息上的外键；因此先停止生成。
-    final streamingMessageId = _chatActions.activeStreamingMessageId(
-      conversationId,
+    await _cancelStreamingIfDeleted(
+      conversationId: conversationId,
+      messageId: selected.first.id,
+      operation: _DeletionOperation.messages,
+      messageIds: deletedCandidates,
     );
-    if (streamingMessageId != null &&
-        deletedCandidates.contains(streamingMessageId)) {
-      await _chatActions.cancelStreaming(
-        _chatService.getConversation(conversationId),
-      );
-    }
 
     final deletedMessageIds = await _chatService.deleteMessages(
       conversationId: conversationId,
@@ -1280,6 +1331,7 @@ class HomeViewModel extends ChangeNotifier {
       await _chatController.loadStartWindow();
     }
     if (currentConversation?.id != sourceConversation.id) return;
+    _restoreMessageUiState();
     notifyListeners();
   }
 

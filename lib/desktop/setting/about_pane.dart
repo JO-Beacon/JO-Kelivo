@@ -186,13 +186,16 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
                   key: const ValueKey('about-update-release-notes'),
                   title: l10n.sideDrawerUpdateTitle(update.version),
                   notes: update.notes ?? '',
+                  onTap: update.releaseUrl == null
+                      ? null
+                      : () => _openUrl(update.releaseUrl!),
                   onLinkTap: _openUrl,
                 ),
               ],
 
               const SizedBox(height: 16),
 
-              // JO-Kelivo 信息和链接
+              // JO-AIClient 信息和链接
               _DeskCard(
                 title: l10n.settingsPageAbout,
                 children: [

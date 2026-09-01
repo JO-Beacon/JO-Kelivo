@@ -121,21 +121,21 @@ jobs:
           SELF="$(readlink -f "$0")"
           HERE="${SELF%/*}"
           export PATH="${HERE}/usr/bin:${PATH}"
-          exec "${HERE}/usr/bin/jo_kelivo" "$@"
+          exec "${HERE}/usr/bin/jo_aiclient" "$@"
           EOF
           chmod +x AppDir/AppRun
 
-          cat > AppDir/jo_kelivo.desktop <<'EOF'
+          cat > AppDir/jo_aiclient.desktop <<'EOF'
           [Desktop Entry]
-          Name=JO-Kelivo
-          Exec=jo_kelivo
-          Icon=jo_kelivo
+          Name=JO-AIClient
+          Exec=jo_aiclient
+          Icon=jo_aiclient
           Type=Application
           Categories=Utility;
           EOF
 
-          install -Dm644 assets/app_icon.png AppDir/jo_kelivo.png
-          install -Dm644 assets/app_icon.png AppDir/usr/share/icons/hicolor/256x256/apps/jo_kelivo.png
+          install -Dm644 assets/app_icon.png AppDir/jo_aiclient.png
+          install -Dm644 assets/app_icon.png AppDir/usr/share/icons/hicolor/256x256/apps/jo_aiclient.png
 
           ARCH=x86_64 ./appimagetool AppDir "JO-AIClient-v${VERSION}-linux-x64-appimage.AppImage"
 
@@ -144,33 +144,33 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p deb/DEBIAN
-          mkdir -p deb/opt/jo_kelivo
+          mkdir -p deb/opt/jo_aiclient
           mkdir -p deb/usr/bin
           mkdir -p deb/usr/share/applications
           mkdir -p deb/usr/share/icons/hicolor/256x256/apps
 
-          cp -r build/linux/x64/release/bundle/* deb/opt/jo_kelivo/
-          ln -s /opt/jo_kelivo/jo_kelivo deb/usr/bin/jo_kelivo
-          install -Dm644 assets/app_icon.png deb/usr/share/icons/hicolor/256x256/apps/jo_kelivo.png
+          cp -r build/linux/x64/release/bundle/* deb/opt/jo_aiclient/
+          ln -s /opt/jo_aiclient/jo_aiclient deb/usr/bin/jo_aiclient
+          install -Dm644 assets/app_icon.png deb/usr/share/icons/hicolor/256x256/apps/jo_aiclient.png
 
-          cat > deb/usr/share/applications/jo_kelivo.desktop <<'EOF'
+          cat > deb/usr/share/applications/jo_aiclient.desktop <<'EOF'
           [Desktop Entry]
-          Name=JO-Kelivo
-          Exec=/opt/jo_kelivo/jo_kelivo
-          Icon=jo_kelivo
+          Name=JO-AIClient
+          Exec=/opt/jo_aiclient/jo_aiclient
+          Icon=jo_aiclient
           Type=Application
           Categories=Utility;
           EOF
 
           cat > deb/DEBIAN/control <<EOF
-          Package: jo-kelivo
+          Package: jo-aiclient
           Version: ${VERSION_NUMBER}
           Section: utils
           Priority: optional
           Architecture: amd64
-          Maintainer: Psyche <maintainer@example.com>
+          Maintainer: JO-Beacon <maintainer@example.com>
           Depends: libgtk-3-0, libstdc++6, libglu1-mesa, libgstreamer1.0-0, libgstreamer-plugins-base1.0-0, libglib2.0-0, libc6
-          Description: JO-Kelivo Linux application
+          Description: JO-AIClient Linux application
            A cross-platform Flutter LLM chat client.
           EOF
 

@@ -155,6 +155,9 @@ class HomePageController extends ChangeNotifier {
   /// 编辑提交链路，避免重复点击或旧回调并发改写同一棵会话树。
   Future<void>? _editMessageInFlight;
 
+  /// 同一消息的推理展开状态必须按点击顺序写入，避免异步数据库更新乱序。
+  final Map<String, Future<void>> _reasoningUiPersistenceChains = {};
+
   // ============================================================================
   // 动画控制器
   // ============================================================================
@@ -2290,6 +2293,7 @@ class HomePageController extends ChangeNotifier {
     final r = reasoning[messageId];
     if (r != null) {
       r.expanded = !r.expanded;
+      _scheduleReasoningUiStatePersistence(messageId);
       // 检查推理是否仍在加载（finishedAt == null 表示流式处理中）
       // 这是 O(1) 操作，不需要遍历列表
       final isStillStreaming = r.finishedAt == null && r.text.isNotEmpty;
@@ -2316,6 +2320,7 @@ class HomePageController extends ChangeNotifier {
     if (segments != null && segmentIndex < segments.length) {
       final seg = segments[segmentIndex];
       seg.expanded = !seg.expanded;
+      _scheduleReasoningUiStatePersistence(messageId);
       // 检查此片段是否仍在加载（finishedAt == null 表示流式处理中）
       // 这是 O(1) 操作，不需要遍历列表
       final isStillStreaming = seg.finishedAt == null && seg.text.isNotEmpty;
@@ -2327,6 +2332,78 @@ class HomePageController extends ChangeNotifier {
         notifyListeners();
       }
     }
+  }
+
+  void _scheduleReasoningUiStatePersistence(String messageId) {
+    final previous =
+        _reasoningUiPersistenceChains[messageId] ?? Future<void>.value();
+    final next = previous.then<void>(
+      (_) => _persistReasoningUiStateSafely(messageId),
+    );
+    _reasoningUiPersistenceChains[messageId] = next;
+    unawaited(
+      next.then<void>((_) {
+        if (identical(_reasoningUiPersistenceChains[messageId], next)) {
+          _reasoningUiPersistenceChains.remove(messageId);
+        }
+      }),
+    );
+  }
+
+  Future<void> _persistReasoningUiStateSafely(String messageId) async {
+    try {
+      await _persistReasoningUiState(messageId);
+    } catch (error, stackTrace) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'JO-AIClient chat UI',
+          context: ErrorDescription(
+            'while persisting reasoning expansion state',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _persistReasoningUiState(String messageId) async {
+    final currentReasoning = reasoning[messageId];
+    final currentSegments = reasoningSegments[messageId];
+    if (currentReasoning == null &&
+        (currentSegments == null || currentSegments.isEmpty)) {
+      return;
+    }
+
+    final segments = currentSegments == null || currentSegments.isEmpty
+        ? [
+            stream_ctrl.ReasoningSegmentData()
+              ..text = currentReasoning?.text ?? ''
+              ..startAt = currentReasoning?.startAt
+              ..finishedAt = currentReasoning?.finishedAt
+              ..expanded = currentReasoning?.expanded ?? false,
+          ]
+        : currentSegments;
+    final splits = contentSplits[messageId];
+    final json = _streamController.serializeReasoningSegmentsWithSplits(
+      segments,
+      contentSplitOffsets: splits?.offsets,
+      reasoningCountAtSplit: splits?.reasoningCounts,
+      toolCountAtSplit: splits?.toolCounts,
+      reasoningDetails: _streamController.reasoningDetails[messageId],
+    );
+
+    final snapshotIndex = _chatController.messages.indexWhere(
+      (message) => message.id == messageId,
+    );
+    if (snapshotIndex >= 0) {
+      _chatController.replaceMessageSnapshot(
+        _chatController.messages[snapshotIndex].copyWith(
+          reasoningSegmentsJson: json,
+        ),
+      );
+    }
+    await _chatService.updateMessage(messageId, reasoningSegmentsJson: json);
   }
 
   void setDragHovering(bool hovering) {

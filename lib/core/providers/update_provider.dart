@@ -8,6 +8,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 class UpdateInfo {
   final String app;
   final String version;
+  final String? releaseUrl;
   final int? build;
   final DateTime? releasedAt;
   final String? notes;
@@ -17,6 +18,7 @@ class UpdateInfo {
   const UpdateInfo({
     required this.app,
     required this.version,
+    this.releaseUrl,
     this.build,
     this.releasedAt,
     this.notes,
@@ -86,6 +88,7 @@ class UpdateInfo {
     return UpdateInfo(
       app: appName,
       version: version,
+      releaseUrl: json['html_url']?.toString(),
       releasedAt: released,
       notes: json['body']?.toString(),
       downloads: candidates.map(
@@ -187,7 +190,7 @@ class UpdateProvider extends ChangeNotifier {
 
       final info = await _fetchLatestRelease(
         url: _joKelivoReleaseUrl,
-        appName: 'JO-Kelivo',
+        appName: 'JO-AIClient',
         assetAppName: 'JO-AIClient',
       );
 

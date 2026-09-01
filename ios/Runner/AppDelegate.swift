@@ -6,8 +6,8 @@
  import ActivityKit
  import EventKit
 
-private let backgroundRefreshIdentifier = "com.psyche.jokelivo.background-generation.refresh"
-private let backgroundProcessingIdentifier = "com.psyche.jokelivo.background-generation.processing"
+private let backgroundRefreshIdentifier = "io.github.jobeacon.joaiclient.background-generation.refresh"
+private let backgroundProcessingIdentifier = "io.github.jobeacon.joaiclient.background-generation.processing"
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -85,7 +85,10 @@ private let backgroundProcessingIdentifier = "com.psyche.jokelivo.background-gen
     open url: URL,
     options: [UIApplication.OpenURLOptionsKey: Any] = [:]
   ) -> Bool {
-    if url.scheme == "jo-kelivo" && url.host == "oauth-return" {
+    if (url.scheme == "io.github.jobeacon.joaiclient" ||
+        url.scheme == "com.psyche.jokelivo" ||
+        url.scheme == "jo-kelivo") &&
+        url.host == "oauth-return" {
       return true
     }
     return super.application(app, open: url, options: options)
@@ -315,7 +318,7 @@ private final class IosBackgroundGenerationHandler {
 
   private func beginBackgroundTask() {
     if backgroundTask != .invalid { return }
-    backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "JOKelivoBackgroundGeneration") { [weak self] in
+    backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "JOAIClientBackgroundGeneration") { [weak self] in
       self?.endBackgroundTask()
     }
   }
@@ -332,7 +335,7 @@ private final class IosBackgroundGenerationHandler {
     do {
       try BGTaskScheduler.shared.submit(refresh)
     } catch {
-      NSLog("Kelivo background refresh schedule failed: \(error)")
+      NSLog("JO-AIClient background refresh schedule failed: \(error)")
     }
 
     let processing = BGProcessingTaskRequest(identifier: backgroundProcessingIdentifier)
@@ -342,7 +345,7 @@ private final class IosBackgroundGenerationHandler {
     do {
       try BGTaskScheduler.shared.submit(processing)
     } catch {
-      NSLog("Kelivo background processing schedule failed: \(error)")
+      NSLog("JO-AIClient background processing schedule failed: \(error)")
     }
   }
 
@@ -357,7 +360,7 @@ private final class IosBackgroundGenerationHandler {
     content.title = title
     content.body = body
     content.sound = .default
-    let request = UNNotificationRequest(identifier: "jo-kelivo.background-generation.\(Date().timeIntervalSince1970)", content: content, trigger: nil)
+    let request = UNNotificationRequest(identifier: "joaiclient.background-generation.\(Date().timeIntervalSince1970)", content: content, trigger: nil)
     UNUserNotificationCenter.current().add(request)
   }
 
@@ -396,7 +399,7 @@ private final class IosBackgroundGenerationHandler {
         }
         startLiveActivityRefreshTimer()
       } catch {
-        NSLog("Kelivo live activity start failed: \(error)")
+        NSLog("JO-AIClient live activity start failed: \(error)")
         liveActivity = nil
       }
     }
