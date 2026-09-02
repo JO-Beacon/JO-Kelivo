@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/conversation_tree.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -172,5 +173,125 @@ void main() {
     test('returns null when the source topic does not exist', () async {
       expect(await repository.duplicateConversation('missing'), isNull);
     });
+
+    test(
+      'preserves the conversation tree when duplicating a branched topic',
+      () async {
+        final createdAt = DateTime.utc(2026, 8, 2);
+        final messages = [
+          ChatMessage(
+            id: 'root-message',
+            role: 'user',
+            content: 'root',
+            conversationId: 'source',
+            timestamp: createdAt,
+          ),
+          ChatMessage(
+            id: 'anchor-message',
+            role: 'assistant',
+            content: 'anchor',
+            conversationId: 'source',
+            timestamp: createdAt.add(const Duration(minutes: 1)),
+          ),
+          ChatMessage(
+            id: 'active-tail',
+            role: 'user',
+            content: 'active',
+            conversationId: 'source',
+            timestamp: createdAt.add(const Duration(minutes: 2)),
+          ),
+          ChatMessage(
+            id: 'hidden-tail',
+            role: 'user',
+            content: 'hidden',
+            conversationId: 'source',
+            timestamp: createdAt.add(const Duration(minutes: 3)),
+          ),
+        ];
+        await repository.putMigrationBatch(
+          conversations: [
+            Conversation(
+              id: 'source',
+              title: 'Branched Topic',
+              createdAt: createdAt,
+              updatedAt: createdAt,
+              messageIds: messages.map((message) => message.id).toList(),
+            ),
+          ],
+          messages: [
+            for (var index = 0; index < messages.length; index++)
+              (message: messages[index], messageOrder: index),
+          ],
+          toolEventsByMessageId: const {},
+          geminiSignaturesByMessageId: const {},
+        );
+        final sourceTree = await repository.loadConversationTree('source');
+        expect(sourceTree, isNotNull);
+        final branchedTree = ConversationTree(
+          conversationId: 'source',
+          activeBranchId: 'root',
+          branches: {
+            'root': ConversationBranch(
+              id: 'root',
+              conversationId: 'source',
+              tipMessageId: 'active-tail',
+              createdAt: createdAt,
+            ),
+            'hidden-branch': ConversationBranch(
+              id: 'hidden-branch',
+              conversationId: 'source',
+              tipMessageId: 'hidden-tail',
+              createdAt: createdAt,
+              parentBranchId: 'root',
+              forkAnchorMessageId: 'anchor-message',
+            ),
+          },
+          edges: const {
+            'root-message': MessageTreeEdge(
+              messageId: 'root-message',
+              parentMessageId: null,
+            ),
+            'anchor-message': MessageTreeEdge(
+              messageId: 'anchor-message',
+              parentMessageId: 'root-message',
+            ),
+            'active-tail': MessageTreeEdge(
+              messageId: 'active-tail',
+              parentMessageId: 'anchor-message',
+            ),
+            'hidden-tail': MessageTreeEdge(
+              messageId: 'hidden-tail',
+              parentMessageId: 'anchor-message',
+            ),
+          },
+        );
+        await repository.saveConversationTree(branchedTree);
+
+        final duplicate = await repository.duplicateConversation('source');
+
+        expect(duplicate, isNotNull);
+        final duplicateTree = await repository.loadConversationTree(
+          duplicate!.id,
+        );
+        expect(duplicateTree, isNotNull);
+        expect(duplicateTree!.branches, hasLength(2));
+        expect(duplicateTree.activeBranchId, isNot('root'));
+        expect(
+          duplicateTree.activePath().map((id) => id).toList(),
+          hasLength(3),
+        );
+        expect(
+          duplicateTree.edges.values.where(
+            (edge) => edge.parentMessageId == null,
+          ),
+          hasLength(1),
+        );
+        expect(
+          duplicateTree.branches.values.map((branch) => branch.tipMessageId),
+          containsAll([duplicate.messageIds[2], duplicate.messageIds[3]]),
+        );
+        expect(() => duplicateTree.validateIntegrity(), returnsNormally);
+      },
+    );
   });
 }

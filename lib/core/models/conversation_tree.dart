@@ -57,6 +57,24 @@ class MessageTreeEdge {
 }
 
 @immutable
+class ConversationTreeTransformResult {
+  const ConversationTreeTransformResult({
+    required this.before,
+    required this.after,
+    required this.deletedMessageIds,
+  });
+
+  final ConversationTree before;
+  final ConversationTree after;
+  final Set<String> deletedMessageIds;
+
+  String get previousActiveBranchId => before.activeBranchId;
+  String get activeBranchId => after.activeBranchId;
+  bool get activeBranchChanged => before.activeBranchId != after.activeBranchId;
+  List<String> get activeBranchHistory => after.activeBranchHistory;
+}
+
+@immutable
 class ConversationBranch {
   const ConversationBranch({
     required this.id,
@@ -64,6 +82,8 @@ class ConversationBranch {
     required this.tipMessageId,
     this.name = '',
     required this.createdAt,
+    this.parentBranchId,
+    this.forkAnchorMessageId,
   });
 
   final String id;
@@ -71,6 +91,8 @@ class ConversationBranch {
   final String? tipMessageId;
   final String name;
   final DateTime createdAt;
+  final String? parentBranchId;
+  final String? forkAnchorMessageId;
 
   ConversationBranch copyWith({
     String? id,
@@ -78,7 +100,11 @@ class ConversationBranch {
     String? tipMessageId,
     String? name,
     DateTime? createdAt,
+    String? parentBranchId,
+    String? forkAnchorMessageId,
     bool clearTip = false,
+    bool clearParentBranch = false,
+    bool clearForkAnchor = false,
   }) {
     return ConversationBranch(
       id: id ?? this.id,
@@ -86,6 +112,12 @@ class ConversationBranch {
       tipMessageId: clearTip ? null : (tipMessageId ?? this.tipMessageId),
       name: name ?? this.name,
       createdAt: createdAt ?? this.createdAt,
+      parentBranchId: clearParentBranch
+          ? null
+          : (parentBranchId ?? this.parentBranchId),
+      forkAnchorMessageId: clearForkAnchor
+          ? null
+          : (forkAnchorMessageId ?? this.forkAnchorMessageId),
     );
   }
 }
@@ -98,9 +130,11 @@ class ConversationTree {
     required Map<String, ConversationBranch> branches,
     required Map<String, MessageTreeEdge> edges,
     Map<String, String> branchSelections = const <String, String>{},
+    List<String> activeBranchHistory = const <String>[],
   }) : branches = Map.unmodifiable(branches),
        edges = Map.unmodifiable(edges),
-       branchSelections = Map.unmodifiable(branchSelections) {
+       branchSelections = Map.unmodifiable(branchSelections),
+       activeBranchHistory = List.unmodifiable(activeBranchHistory) {
     if (conversationId.isEmpty) {
       throw ArgumentError.value(
         conversationId,
@@ -170,9 +204,11 @@ class ConversationTree {
     required Map<String, ConversationBranch> branches,
     required Map<String, MessageTreeEdge> edges,
     Map<String, String> branchSelections = const <String, String>{},
+    List<String> activeBranchHistory = const <String>[],
   }) : branches = Map.unmodifiable(branches),
        edges = Map.unmodifiable(edges),
-       branchSelections = Map.unmodifiable(branchSelections);
+       branchSelections = Map.unmodifiable(branchSelections),
+       activeBranchHistory = List.unmodifiable(activeBranchHistory);
 
   factory ConversationTree.linear({
     required String conversationId,
@@ -211,6 +247,7 @@ class ConversationTree {
   final Map<String, ConversationBranch> branches;
   final Map<String, MessageTreeEdge> edges;
   final Map<String, String> branchSelections;
+  final List<String> activeBranchHistory;
 
   /// 返回当前快照中所有可诊断的完整性问题。
   ///
@@ -267,6 +304,36 @@ class ConversationTree {
           ),
         );
       }
+      final parentBranchId = branch.parentBranchId;
+      if (parentBranchId == branch.id) {
+        issues.add(
+          ConversationTreeIntegrityIssue(
+            code: 'branch_parent_self',
+            subject: branch.id,
+            message: '分支不能把自身作为父分支。',
+          ),
+        );
+      } else if (parentBranchId != null &&
+          !branches.containsKey(parentBranchId)) {
+        issues.add(
+          ConversationTreeIntegrityIssue(
+            code: 'branch_parent_missing',
+            subject: branch.id,
+            message: '分支父关系指向不存在的分支。',
+          ),
+        );
+      }
+      final forkAnchorMessageId = branch.forkAnchorMessageId;
+      if (forkAnchorMessageId != null &&
+          !edges.containsKey(forkAnchorMessageId)) {
+        issues.add(
+          ConversationTreeIntegrityIssue(
+            code: 'branch_anchor_missing',
+            subject: branch.id,
+            message: '分支锚点消息不存在。',
+          ),
+        );
+      }
       final tip = branch.tipMessageId;
       if (tip != null && !edges.containsKey(tip)) {
         issues.add(
@@ -274,6 +341,18 @@ class ConversationTree {
             code: 'branch_tip_missing',
             subject: branch.id,
             message: '分支尖端消息不存在。',
+          ),
+        );
+      }
+    }
+
+    for (final branchId in activeBranchHistory) {
+      if (!branches.containsKey(branchId)) {
+        issues.add(
+          ConversationTreeIntegrityIssue(
+            code: 'active_history_branch_missing',
+            subject: branchId,
+            message: '活动历史包含不存在的分支。',
           ),
         );
       }
@@ -417,6 +496,8 @@ class ConversationTree {
             branches[id]!.tipMessageId,
             branches[id]!.name,
             branches[id]!.createdAt.toUtc().microsecondsSinceEpoch,
+            branches[id]!.parentBranchId,
+            branches[id]!.forkAnchorMessageId,
           ],
       ],
       'branchSelections': [
@@ -427,6 +508,7 @@ class ConversationTree {
         for (final id in sortedBranchIds) [id, _safeBranchPath(id)],
       ],
       'activePath': _safeBranchPath(activeBranchId),
+      'activeBranchHistory': activeBranchHistory,
     };
     return sha256.convert(utf8.encode(jsonEncode(canonical))).toString();
   }
@@ -585,6 +667,23 @@ class ConversationTree {
   List<String> childrenOf(String? parentMessageId) =>
       childrenByParent[parentMessageId] ?? const <String>[];
 
+  /// 返回消息的全部严格后代，包含隐藏和嵌套分支。
+  Set<String> descendantsOf(String messageId) {
+    if (!edges.containsKey(messageId)) {
+      throw StateError('message_not_found');
+    }
+    return Set<String>.unmodifiable(_descendantsOf(messageId));
+  }
+
+  /// 是否为分支节点。根级多个消息共享不可见虚拟根分叉锚点。
+  bool isBranchNode(String messageId) {
+    final edge = edges[messageId];
+    if (edge == null) {
+      throw StateError('message_not_found');
+    }
+    return childrenOf(edge.parentMessageId).length > 1;
+  }
+
   ConversationTree appendToActiveBranch(
     String messageId, {
     String? parentMessageId,
@@ -641,6 +740,12 @@ class ConversationTree {
       branches: nextBranches,
       edges: nextEdges,
       branchSelections: nextSelections,
+      activeBranchHistory: activate && targetBranchId != activeBranchId
+          ? [
+              activeBranchId,
+              ...activeBranchHistory.where((id) => id != targetBranchId),
+            ].take(32).toList(growable: false)
+          : activeBranchHistory,
     );
   }
 
@@ -705,6 +810,8 @@ class ConversationTree {
         tipMessageId: tipMessageId,
         name: name,
         createdAt: createdAt ?? DateTime.now(),
+        parentBranchId: _branchIdForAnchor(parentMessageId),
+        forkAnchorMessageId: parentMessageId,
       );
     return ConversationTree(
       conversationId: conversationId,
@@ -716,6 +823,10 @@ class ConversationTree {
         branches: nextBranches,
         edges: nextEdges,
       ),
+      activeBranchHistory: [
+        activeBranchId,
+        ...activeBranchHistory.where((id) => id != branchId),
+      ].take(32).toList(growable: false),
     );
   }
 
@@ -723,6 +834,7 @@ class ConversationTree {
     if (!branches.containsKey(branchId)) {
       throw ArgumentError.value(branchId, 'branchId', 'Unknown branch.');
     }
+    if (branchId == activeBranchId) return this;
     final rememberedSelections = _rememberBranchSelections(
       activeBranchId,
       branches: branches,
@@ -740,6 +852,10 @@ class ConversationTree {
       branches: branches,
       edges: edges,
       branchSelections: nextSelections,
+      activeBranchHistory: [
+        activeBranchId,
+        ...activeBranchHistory.where((id) => id != branchId),
+      ].take(32).toList(growable: false),
     );
   }
 
@@ -747,6 +863,127 @@ class ConversationTree {
     String messageId, {
     Iterable<String> recentBranchIds = const <String>[],
   }) => deleteMessages({messageId}, recentBranchIds: recentBranchIds);
+
+  ConversationTreeTransformResult deleteMessageOnlyResult(
+    String messageId, {
+    Iterable<String> recentBranchIds = const <String>[],
+  }) {
+    final updated = deleteMessageOnly(
+      messageId,
+      recentBranchIds: recentBranchIds,
+    );
+    return _transformResult(updated);
+  }
+
+  ConversationTreeTransformResult deleteMessageAndFollowingResult(
+    String messageId, {
+    Iterable<String> recentBranchIds = const <String>[],
+  }) {
+    final updated = deleteMessageAndFollowing(
+      messageId,
+      recentBranchIds: recentBranchIds,
+    );
+    return _transformResult(updated);
+  }
+
+  ConversationTreeTransformResult deleteCurrentBranchResult(
+    String messageId, {
+    Iterable<String> recentBranchIds = const <String>[],
+  }) {
+    final updated = deleteCurrentBranch(
+      messageId,
+      recentBranchIds: recentBranchIds,
+    );
+    return _transformResult(updated);
+  }
+
+  ConversationTreeTransformResult deleteMessageNodeResult(
+    String messageId, {
+    Iterable<String> recentBranchIds = const <String>[],
+  }) {
+    final updated = deleteMessageNode(
+      messageId,
+      recentBranchIds: recentBranchIds,
+    );
+    return _transformResult(updated);
+  }
+
+  ConversationTreeTransformResult deleteAllBranchesResult(
+    String messageId, {
+    Iterable<String> recentBranchIds = const <String>[],
+  }) {
+    final updated = deleteAllBranches(
+      messageId,
+      recentBranchIds: recentBranchIds,
+    );
+    return _transformResult(updated);
+  }
+
+  /// 删除单条消息并把其直接子节点重挂到原父节点。
+  ConversationTree deleteMessageOnly(
+    String messageId, {
+    Iterable<String> recentBranchIds = const <String>[],
+  }) {
+    _requireMessageOperationTarget(
+      messageId,
+      operation: 'delete_message_only',
+      allowBranchNode: false,
+      allowLeaf: true,
+    );
+    return removeMessageOnly(messageId, recentBranchIds: recentBranchIds);
+  }
+
+  /// 删除消息及其全部后代（包括隐藏和嵌套分支）。
+  ConversationTree deleteMessageAndFollowing(
+    String messageId, {
+    Iterable<String> recentBranchIds = const <String>[],
+  }) {
+    _requireMessageOperationTarget(
+      messageId,
+      operation: 'delete_message_and_following',
+      allowBranchNode: false,
+      allowLeaf: false,
+    );
+    return deleteMessages({messageId}, recentBranchIds: recentBranchIds);
+  }
+
+  /// 删除分支节点本身，并保留当前活动直接后继。
+  ConversationTree deleteMessageNode(
+    String messageId, {
+    Iterable<String> recentBranchIds = const <String>[],
+  }) {
+    _requireMessageOperationTarget(
+      messageId,
+      operation: 'delete_message_node',
+      allowBranchNode: true,
+      allowLeaf: true,
+    );
+    if (!isBranchNode(messageId)) {
+      throw StateError('delete_message_node_requires_branch_node');
+    }
+    return deleteNodeKeepActiveBranch(
+      messageId,
+      recentBranchIds: recentBranchIds,
+    );
+  }
+
+  /// 删除目标分支节点所属锚点下的全部直接子树。
+  ConversationTree deleteAllBranches(
+    String messageId, {
+    Iterable<String> recentBranchIds = const <String>[],
+  }) {
+    _requireMessageOperationTarget(
+      messageId,
+      operation: 'delete_all_branches',
+      allowBranchNode: true,
+      allowLeaf: false,
+    );
+    if (!isBranchNode(messageId)) {
+      throw StateError('delete_all_branches_requires_branch_node');
+    }
+    final parent = edges[messageId]!.parentMessageId;
+    return deleteMessages(childrenOf(parent), recentBranchIds: recentBranchIds);
+  }
 
   /// 在同一棵旧树快照上删除多个节点及其全部后代。
   ///
@@ -770,6 +1007,10 @@ class ConversationTree {
     final affectedBranches = <ConversationBranch>[];
     final retainedCandidates = <ConversationBranch>[];
     final nextBranches = <String, ConversationBranch>{};
+    final branchPaths = <String, List<String>>{
+      for (final branch in branches.values)
+        branch.id: _branchPathFor(branch.id, branches, edges),
+    };
     for (final branch in branches.values) {
       final tip = branch.tipMessageId;
       if (tip != null && removedIds.contains(tip)) {
@@ -786,12 +1027,22 @@ class ConversationTree {
         final retainedIndex = branchPath.indexOf(retainedTip);
         if (retainedIndex < 0) continue;
         final retainedPath = branchPath.take(retainedIndex + 1);
-        final otherMessageIds = <String>{};
-        for (final other in branches.values) {
-          if (other.id == branch.id) continue;
-          otherMessageIds.addAll(_branchPathFor(other.id, branches, edges));
+        final parentBranchPath = branch.parentBranchId == null
+            ? null
+            : branchPaths[branch.parentBranchId!];
+        final unaffectedMessageIds = <String>{};
+        if (parentBranchPath == null) {
+          for (final other in branches.values) {
+            if (other.id == branch.id) continue;
+            final otherTip = other.tipMessageId;
+            if (otherTip == null || removedIds.contains(otherTip)) continue;
+            unaffectedMessageIds.addAll(branchPaths[other.id] ?? const []);
+          }
         }
-        if (retainedPath.any((id) => !otherMessageIds.contains(id))) {
+        final hasDivergentPrefix = parentBranchPath != null
+            ? retainedPath.any((id) => !parentBranchPath.contains(id))
+            : retainedPath.any((id) => !unaffectedMessageIds.contains(id));
+        if (hasDivergentPrefix) {
           retainedCandidates.add(branch.copyWith(tipMessageId: retainedTip));
         }
       } else {
@@ -818,7 +1069,7 @@ class ConversationTree {
       );
     }
 
-    final fallbackIds = <String>[...recentBranchIds];
+    final fallbackIds = <String>[...activeBranchHistory, ...recentBranchIds];
     for (final messageId in targets) {
       final remembered = branchSelections[messageId];
       if (remembered != null) fallbackIds.add(remembered);
@@ -877,6 +1128,10 @@ class ConversationTree {
       if (candidates.isNotEmpty) nextSelections[parent] = candidates.first.id;
     }
     final prunedEdges = _pruneUnreachableEdges(nextBranches, nextEdges);
+    final normalizedBranches = _normalizeBranchRelations(
+      nextBranches,
+      prunedEdges,
+    );
     final nextActiveBranchId = nextBranches.containsKey(activeBranchId)
         ? activeBranchId
         : _fallbackBranchId(
@@ -888,12 +1143,17 @@ class ConversationTree {
     return ConversationTree(
       conversationId: conversationId,
       activeBranchId: nextActiveBranchId,
-      branches: nextBranches,
+      branches: normalizedBranches,
       edges: prunedEdges,
       branchSelections: _pruneBranchSelections(
-        branches: nextBranches,
+        branches: normalizedBranches,
         edges: prunedEdges,
         baseSelections: nextSelections,
+      ),
+      activeBranchHistory: _pruneActiveBranchHistory(
+        normalizedBranches,
+        nextActiveBranchId,
+        additional: fallbackIds,
       ),
     );
   }
@@ -913,98 +1173,34 @@ class ConversationTree {
     String messageId, {
     Iterable<String> recentBranchIds = const <String>[],
   }) {
-    final path = activePath();
-    final targetIndex = path.indexOf(messageId);
-    if (targetIndex < 0) {
-      return this;
+    _requireMessageOperationTarget(
+      messageId,
+      operation: 'delete_current_branch',
+      allowBranchNode: true,
+      allowLeaf: true,
+    );
+    if (!isBranchNode(messageId)) {
+      throw StateError('delete_current_branch_requires_branch_node');
     }
-    if (branches.length <= 1) {
-      return deleteMessage(messageId, recentBranchIds: recentBranchIds);
+    if (!isMessageInActivePath(messageId)) {
+      throw StateError('delete_current_branch_target_not_active');
     }
-
-    // 分支记录只有尖端，没有单独保存父分支锚点。通过活动路径与其他
-    // 分支的最长公共前缀推导最近父分支；这样嵌套分支会从自己的首个
-    // 独有消息开始删除，而不会把父分支的锚点一起删掉。
-    var branchStartIndex = 0;
-    for (final branch in branches.values) {
-      if (branch.id == activeBranchId) continue;
-      final otherPath = _branchPathFor(branch.id, branches, edges);
-      var commonPrefixLength = 0;
-      while (commonPrefixLength < path.length &&
-          commonPrefixLength < otherPath.length &&
-          path[commonPrefixLength] == otherPath[commonPrefixLength]) {
-        commonPrefixLength++;
-      }
-      if (commonPrefixLength < path.length &&
-          commonPrefixLength > branchStartIndex) {
-        branchStartIndex = commonPrefixLength;
-      }
-    }
-
-    final branchStartMessageId = path[branchStartIndex];
-    final nextBranches = <String, ConversationBranch>{};
-    final affectedBranches = <ConversationBranch>[];
-    final unaffectedMessageIds = <String>{};
-    for (final branch in branches.values) {
-      final branchPath = _branchPathFor(branch.id, branches, edges);
-      final startIndex = branchPath.indexOf(branchStartMessageId);
-      if (startIndex < 0) {
-        nextBranches[branch.id] = branch;
-        unaffectedMessageIds.addAll(branchPath);
-      } else {
-        affectedBranches.add(branch);
-      }
-    }
-
-    // 受影响的分支都截回分叉点父节点；只有仍带有独有前缀的分支才
-    // 需要保留。通常这会留下父分支，当前被删除的子分支则被移除。
-    final retainedTip = branchStartIndex == 0
-        ? null
-        : path[branchStartIndex - 1];
-    final retainedCandidates = <ConversationBranch>[];
-    for (final branch in affectedBranches) {
-      final branchPath = _branchPathFor(branch.id, branches, edges);
-      final startIndex = branchPath.indexOf(branchStartMessageId);
-      final retainedPath = branchPath.take(startIndex);
-      if (retainedTip == null ||
-          retainedPath.every(unaffectedMessageIds.contains)) {
+    final removedIds = <String>{messageId}..addAll(_descendantsOf(messageId));
+    final fallbackHistory = <String>[];
+    for (final branchId in activeBranchHistory) {
+      if (branchId == activeBranchId || fallbackHistory.contains(branchId)) {
         continue;
       }
-      retainedCandidates.add(
-        branch.copyWith(tipMessageId: branchPath[startIndex - 1]),
-      );
+      final branch = branches[branchId];
+      if (branch == null) continue;
+      final tip = branch.tipMessageId;
+      if (tip != null && removedIds.contains(tip)) continue;
+      fallbackHistory.add(branchId);
     }
-    retainedCandidates.sort((left, right) {
-      final byTime = left.createdAt.compareTo(right.createdAt);
-      if (byTime != 0) return byTime;
-      return left.id.compareTo(right.id);
-    });
-    if (retainedCandidates.isNotEmpty) {
-      final survivor = retainedCandidates.first;
-      nextBranches[survivor.id] = survivor;
+    if (fallbackHistory.isEmpty) {
+      throw StateError('delete_current_branch_history_unavailable');
     }
-    if (nextBranches.isEmpty) {
-      throw StateError('cannot_delete_last_branch');
-    }
-    final prunedEdges = _pruneUnreachableEdges(nextBranches, edges);
-    final nextActiveBranchId = nextBranches.containsKey(activeBranchId)
-        ? activeBranchId
-        : _fallbackBranchId(
-            nextBranches,
-            preferredBranchIds: recentBranchIds,
-            preferredPath: path,
-            pathEdges: edges,
-          );
-    return ConversationTree(
-      conversationId: conversationId,
-      activeBranchId: nextActiveBranchId,
-      branches: nextBranches,
-      edges: prunedEdges,
-      branchSelections: _pruneBranchSelections(
-        branches: nextBranches,
-        edges: prunedEdges,
-      ),
-    );
+    return deleteMessages({messageId}, recentBranchIds: fallbackHistory);
   }
 
   /// 批量局部删除；先处理更深节点，避免输入排列影响重挂接结果。
@@ -1134,10 +1330,9 @@ class ConversationTree {
         nextSelections.remove(removed.parentMessageId);
       }
     }
-    final activeEndsAtRemoved =
-        branches[activeBranchId]?.tipMessageId == messageId;
-    final nextActiveBranchId =
-        nextBranches.containsKey(activeBranchId) && !activeEndsAtRemoved
+    // 尖端删除后，分支可能已回退到仍存活的独有前缀；只要分支记录仍在，
+    // 普通消息删除不得借此触发活动分支回退。
+    final nextActiveBranchId = nextBranches.containsKey(activeBranchId)
         ? activeBranchId
         : _fallbackBranchId(
             nextBranches,
@@ -1147,15 +1342,28 @@ class ConversationTree {
             ],
           );
     final prunedEdges = _pruneUnreachableEdges(nextBranches, nextEdges);
+    final normalizedBranches = _normalizeBranchRelations(
+      nextBranches,
+      prunedEdges,
+    );
     return ConversationTree(
       conversationId: conversationId,
       activeBranchId: nextActiveBranchId,
-      branches: nextBranches,
+      branches: normalizedBranches,
       edges: prunedEdges,
       branchSelections: _pruneBranchSelections(
-        branches: nextBranches,
+        branches: normalizedBranches,
         edges: prunedEdges,
         baseSelections: nextSelections,
+      ),
+      activeBranchHistory: _pruneActiveBranchHistory(
+        normalizedBranches,
+        nextActiveBranchId,
+        additional: [
+          ...activeBranchHistory,
+          ...recentBranchIds,
+          if (continuationBranchId != null) continuationBranchId,
+        ],
       ),
     );
   }
@@ -1220,18 +1428,27 @@ class ConversationTree {
       baseSelections: baseSelections,
     );
     final prunedEdges = _pruneUnreachableEdges(nextBranches, nextEdges);
+    final normalizedBranches = _normalizeBranchRelations(
+      nextBranches,
+      prunedEdges,
+    );
     final nextActiveBranchId = nextBranches.containsKey(activeBranchId)
         ? activeBranchId
         : _fallbackBranchId(nextBranches, preferredBranchIds: recentBranchIds);
     return ConversationTree(
       conversationId: conversationId,
       activeBranchId: nextActiveBranchId,
-      branches: nextBranches,
+      branches: normalizedBranches,
       edges: prunedEdges,
       branchSelections: _pruneBranchSelections(
-        branches: nextBranches,
+        branches: normalizedBranches,
         edges: prunedEdges,
         baseSelections: nextSelections,
+      ),
+      activeBranchHistory: _pruneActiveBranchHistory(
+        normalizedBranches,
+        nextActiveBranchId,
+        additional: recentBranchIds,
       ),
     );
   }
@@ -1274,6 +1491,8 @@ class ConversationTree {
         tipMessageId: fromMessageId,
         name: name,
         createdAt: createdAt ?? DateTime.now(),
+        parentBranchId: _branchIdForAnchor(fromMessageId),
+        forkAnchorMessageId: fromMessageId,
       );
     return ConversationTree(
       conversationId: conversationId,
@@ -1285,6 +1504,10 @@ class ConversationTree {
         branches: nextBranches,
         edges: edges,
       ),
+      activeBranchHistory: [
+        activeBranchId,
+        ...activeBranchHistory.where((id) => id != branchId),
+      ].take(32).toList(growable: false),
     );
   }
 
@@ -1421,6 +1644,95 @@ class ConversationTree {
     return reversed.reversed.toList(growable: false);
   }
 
+  String? _branchIdForAnchor(String? messageId) {
+    if (messageId == null) return null;
+    return preferredBranchIdForMessage(messageId);
+  }
+
+  Map<String, ConversationBranch> _normalizeBranchRelations(
+    Map<String, ConversationBranch> nextBranches,
+    Map<String, MessageTreeEdge> nextEdges,
+  ) {
+    final result = <String, ConversationBranch>{};
+    for (final branch in nextBranches.values) {
+      var parentBranchId = branch.parentBranchId;
+      final visitedBranches = <String>{};
+      while (parentBranchId != null &&
+          !nextBranches.containsKey(parentBranchId) &&
+          visitedBranches.add(parentBranchId)) {
+        parentBranchId = branches[parentBranchId]?.parentBranchId;
+      }
+      if (parentBranchId != null && !nextBranches.containsKey(parentBranchId)) {
+        parentBranchId = null;
+      }
+
+      var forkAnchorMessageId = branch.forkAnchorMessageId;
+      final visitedMessages = <String>{};
+      while (forkAnchorMessageId != null &&
+          !nextEdges.containsKey(forkAnchorMessageId) &&
+          visitedMessages.add(forkAnchorMessageId)) {
+        forkAnchorMessageId = edges[forkAnchorMessageId]?.parentMessageId;
+      }
+      if (forkAnchorMessageId != null &&
+          !nextEdges.containsKey(forkAnchorMessageId)) {
+        forkAnchorMessageId = null;
+      }
+
+      result[branch.id] = branch.copyWith(
+        parentBranchId: parentBranchId,
+        forkAnchorMessageId: forkAnchorMessageId,
+        clearParentBranch: parentBranchId == null,
+        clearForkAnchor: forkAnchorMessageId == null,
+      );
+    }
+    return result;
+  }
+
+  ConversationTreeTransformResult _transformResult(ConversationTree updated) {
+    return ConversationTreeTransformResult(
+      before: this,
+      after: updated,
+      deletedMessageIds: Set<String>.unmodifiable(
+        edges.keys.where((id) => !updated.edges.containsKey(id)),
+      ),
+    );
+  }
+
+  List<String> _pruneActiveBranchHistory(
+    Map<String, ConversationBranch> nextBranches,
+    String nextActiveBranchId, {
+    Iterable<String> additional = const <String>[],
+  }) {
+    final result = <String>[];
+    for (final branchId in [...activeBranchHistory, ...additional]) {
+      if (branchId == nextActiveBranchId ||
+          !nextBranches.containsKey(branchId) ||
+          result.contains(branchId)) {
+        continue;
+      }
+      result.add(branchId);
+      if (result.length == 32) break;
+    }
+    return result;
+  }
+
+  void _requireMessageOperationTarget(
+    String messageId, {
+    required String operation,
+    required bool allowBranchNode,
+    required bool allowLeaf,
+  }) {
+    if (!edges.containsKey(messageId)) {
+      throw StateError('${operation}_message_not_found');
+    }
+    if (!allowBranchNode && isBranchNode(messageId)) {
+      throw StateError('${operation}_branch_node_not_allowed');
+    }
+    if (!allowLeaf && childrenOf(messageId).isEmpty) {
+      throw StateError('${operation}_leaf_not_allowed');
+    }
+  }
+
   Set<String> _descendantsOf(String messageId) {
     final children = <String, List<String>>{};
     for (final edge in edges.values) {
@@ -1462,6 +1774,11 @@ class ConversationTree {
     if (branches.isEmpty) {
       throw StateError('cannot_delete_last_branch');
     }
+    // 显式活动历史优先于任何路径相似度推导。调用方传入的候选顺序
+    // 已经代表“上一个、上上个活动分支”的时间顺序。
+    for (final branchId in preferredBranchIds) {
+      if (branches.containsKey(branchId)) return branchId;
+    }
     if (preferredPath != null && preferredPath.isNotEmpty) {
       // 删除活动分支后优先保留旧路径前缀，避免切到 root 造成历史消息看似消失。
       final edgesForPath = pathEdges ?? edges;
@@ -1488,9 +1805,6 @@ class ConversationTree {
         }
         return _chooseFallbackBranch(prefixCandidates)!.id;
       }
-    }
-    for (final branchId in preferredBranchIds) {
-      if (branches.containsKey(branchId)) return branchId;
     }
     return _chooseFallbackBranch(branches)!.id;
   }

@@ -7,22 +7,12 @@ final class MessageRenderModel {
   const MessageRenderModel({
     required this.slotId,
     required this.message,
-    required this.versions,
-    required this.availableVersions,
-    required this.selectedVersion,
-    required this.versionCount,
-    required this.selectedVersionIndex,
     required this.showContextDivider,
     required this.isLatestCompleteAssistant,
   });
 
   final String slotId;
   final ChatMessage message;
-  final List<ChatMessage> versions;
-  final List<int> availableVersions;
-  final int selectedVersion;
-  final int versionCount;
-  final int selectedVersionIndex;
   final bool showContextDivider;
   final bool isLatestCompleteAssistant;
 }
@@ -32,9 +22,6 @@ final class MessageRenderModelProjector {
 
   static List<MessageRenderModel> project({
     required List<ChatMessage> messages,
-    required Map<String, List<ChatMessage>> byGroup,
-    required Map<String, int> versionSelections,
-    Map<String, int> versionCounts = const <String, int>{},
     required int contextDividerIndex,
   }) {
     var latestCompleteAssistantIndex = -1;
@@ -51,10 +38,6 @@ final class MessageRenderModelProjector {
         _projectSlot(
           index: index,
           message: message,
-          versions: byGroup[message.groupId ?? message.id],
-          selectedVersion: versionSelections[message.groupId ?? message.id],
-          authoritativeVersionCount:
-              versionCounts[message.groupId ?? message.id],
           contextDividerIndex: contextDividerIndex,
           latestCompleteAssistantIndex: latestCompleteAssistantIndex,
         ),
@@ -64,37 +47,12 @@ final class MessageRenderModelProjector {
   static MessageRenderModel _projectSlot({
     required int index,
     required ChatMessage message,
-    required List<ChatMessage>? versions,
-    required int? selectedVersion,
-    required int? authoritativeVersionCount,
     required int contextDividerIndex,
     required int latestCompleteAssistantIndex,
   }) {
-    final sortedVersions = List<ChatMessage>.of(
-      versions ?? const <ChatMessage>[],
-    )..sort((left, right) => left.version.compareTo(right.version));
-    final loadedVersionCount = sortedVersions.isEmpty
-        ? 1
-        : sortedVersions.length;
-    final versionCount = (authoritativeVersionCount ?? loadedVersionCount)
-        .clamp(loadedVersionCount, 1 << 31)
-        .toInt();
-    final availableVersions = sortedVersions.isEmpty
-        ? <int>[message.version]
-        : sortedVersions.map((version) => version.version).toList();
-    final effectiveSelectedVersion =
-        selectedVersion != null && availableVersions.contains(selectedVersion)
-        ? selectedVersion
-        : message.version;
-    final selectedIndex = availableVersions.indexOf(effectiveSelectedVersion);
     return MessageRenderModel(
-      slotId: message.groupId ?? message.id,
+      slotId: message.id,
       message: message,
-      versions: List<ChatMessage>.unmodifiable(sortedVersions),
-      availableVersions: List<int>.unmodifiable(availableVersions),
-      selectedVersion: effectiveSelectedVersion,
-      versionCount: versionCount,
-      selectedVersionIndex: selectedIndex < 0 ? 0 : selectedIndex,
       showContextDivider:
           contextDividerIndex >= 0 && index == contextDividerIndex,
       isLatestCompleteAssistant: index == latestCompleteAssistantIndex,

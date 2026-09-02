@@ -2198,6 +2198,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageEditPageOverwriteSave => '覆盖保存';
 
   @override
+  String get messageEditPageSaveAsBranchCopyChildren => '保存为新分支并复制子分支';
+
+  @override
   String get messageEditPageHint => '输入消息内容…';
 
   @override
@@ -2243,6 +2246,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get messageEditCloseConfirmConfirm => '确认';
+
+  @override
+  String get messageEditOverwriteConfirmTitle => '覆盖现有消息？';
+
+  @override
+  String get messageEditOverwriteConfirmContent => '原消息及其分支将被原地更新。';
+
+  @override
+  String get messageEditOverwriteConfirmCancel => '取消';
+
+  @override
+  String get messageEditOverwriteConfirmConfirm => '覆盖保存';
 
   @override
   String get selectCopyPageTitle => '选择复制';
@@ -4426,7 +4441,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutPageAppName => 'JO-AIClient';
 
   @override
-  String get aboutPageKelivoSectionTitle => '关于 JO-AIClient';
+  String get aboutPageKelivoSectionTitle => '关于 Kelivo';
 
   @override
   String get mcpOAuthCallbackPageTitle => 'JO-AIClient 授权';
@@ -10268,6 +10283,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get messageEditPageOverwriteSave => '覆盖保存';
 
   @override
+  String get messageEditPageSaveAsBranchCopyChildren => '保存为新分支并复制子分支';
+
+  @override
   String get messageEditPageHint => '输入消息内容…';
 
   @override
@@ -10313,6 +10331,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get messageEditCloseConfirmConfirm => '确认';
+
+  @override
+  String get messageEditOverwriteConfirmTitle => '覆盖现有消息？';
+
+  @override
+  String get messageEditOverwriteConfirmContent => '原消息及其分支将被原地更新。';
+
+  @override
+  String get messageEditOverwriteConfirmCancel => '取消';
+
+  @override
+  String get messageEditOverwriteConfirmConfirm => '覆盖保存';
 
   @override
   String get selectCopyPageTitle => '选择复制';
@@ -12496,7 +12526,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get aboutPageAppName => 'JO-AIClient';
 
   @override
-  String get aboutPageKelivoSectionTitle => '关于 JO-AIClient';
+  String get aboutPageKelivoSectionTitle => '关于 Kelivo';
 
   @override
   String get mcpOAuthCallbackPageTitle => 'JO-AIClient 授权';
@@ -18338,6 +18368,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get messageEditPageOverwriteSave => '覆蓋儲存';
 
   @override
+  String get messageEditPageSaveAsBranchCopyChildren => '儲存為新分支並複製子分支';
+
+  @override
   String get messageEditPageHint => '輸入訊息內容…';
 
   @override
@@ -18383,6 +18416,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get messageEditCloseConfirmConfirm => '確認';
+
+  @override
+  String get messageEditOverwriteConfirmTitle => '覆蓋現有訊息？';
+
+  @override
+  String get messageEditOverwriteConfirmContent => '原訊息及其分支將被原地更新。';
+
+  @override
+  String get messageEditOverwriteConfirmCancel => '取消';
+
+  @override
+  String get messageEditOverwriteConfirmConfirm => '覆蓋儲存';
 
   @override
   String get selectCopyPageTitle => '選擇複製';
@@ -20565,7 +20610,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get aboutPageAppName => 'JO-AIClient';
 
   @override
-  String get aboutPageKelivoSectionTitle => '關於 JO-AIClient';
+  String get aboutPageKelivoSectionTitle => '關於 Kelivo';
 
   @override
   String get mcpOAuthCallbackPageTitle => 'JO-AIClient 授權';

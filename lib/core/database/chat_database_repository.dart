@@ -32,6 +32,25 @@ typedef ChatDatabaseSnapshotInfo = ({
 
 typedef InstalledChatDatabaseInfo = ({int schemaVersion, String? databaseId});
 
+class _DecodedBranchRelation {
+  const _DecodedBranchRelation({this.parentBranchId, this.forkAnchorMessageId});
+
+  final String? parentBranchId;
+  final String? forkAnchorMessageId;
+}
+
+class _DecodedTreeState {
+  const _DecodedTreeState({
+    required this.selections,
+    required this.activeBranchHistory,
+    required this.branchRelations,
+  });
+
+  final Map<String, String> selections;
+  final List<String> activeBranchHistory;
+  final Map<String, _DecodedBranchRelation> branchRelations;
+}
+
 typedef ParsedChatImportBatch = ({
   Conversation conversation,
   List<ChatMessage> messages,
@@ -680,11 +699,14 @@ class ChatDatabaseRepository {
         'tip_message_id',
         'name',
         'created_at',
+        'parent_branch_id',
+        'fork_anchor_message_id',
       ],
       'conversation_tree_state_rows': [
         'conversation_id',
         'active_branch_id',
         'branch_selections_json',
+        'active_branch_history_json',
       ],
       'chat_storage_meta_rows': ['key', 'value'],
       'message_part_rows': [
@@ -3889,6 +3911,7 @@ class ChatDatabaseRepository {
                 ..where((row) => row.conversationId.equals(sourceId))
                 ..orderBy([(row) => OrderingTerm.asc(row.messageOrder)]))
               .get();
+      final sourceTree = await _loadConversationTree(sourceId);
       const uuid = Uuid();
       final targetId = uuid.v4();
       final messageIdMap = {
@@ -3990,6 +4013,51 @@ class ChatDatabaseRepository {
         "WHERE conversation_id = ? AND kind IN ('image', 'file');",
         [targetId, targetId],
       );
+      if (sourceTree != null) {
+        final branchIdMap = <String, String>{
+          for (final branchId in sourceTree.branches.keys) branchId: uuid.v4(),
+        };
+        final duplicatedTree = ConversationTree(
+          conversationId: targetId,
+          activeBranchId: branchIdMap[sourceTree.activeBranchId]!,
+          branches: {
+            for (final branch in sourceTree.branches.values)
+              branchIdMap[branch.id]!: ConversationBranch(
+                id: branchIdMap[branch.id]!,
+                conversationId: targetId,
+                tipMessageId: branch.tipMessageId == null
+                    ? null
+                    : messageIdMap[branch.tipMessageId],
+                name: branch.name,
+                createdAt: branch.createdAt,
+                parentBranchId: branch.parentBranchId == null
+                    ? null
+                    : branchIdMap[branch.parentBranchId],
+                forkAnchorMessageId: branch.forkAnchorMessageId == null
+                    ? null
+                    : messageIdMap[branch.forkAnchorMessageId],
+              ),
+          },
+          edges: {
+            for (final edge in sourceTree.edges.values)
+              messageIdMap[edge.messageId]!: MessageTreeEdge(
+                messageId: messageIdMap[edge.messageId]!,
+                parentMessageId: edge.parentMessageId == null
+                    ? null
+                    : messageIdMap[edge.parentMessageId],
+              ),
+          },
+          branchSelections: {
+            for (final entry in sourceTree.branchSelections.entries)
+              messageIdMap[entry.key]!: branchIdMap[entry.value]!,
+          },
+          activeBranchHistory: [
+            for (final branchId in sourceTree.activeBranchHistory)
+              if (branchIdMap[branchId] != null) branchIdMap[branchId]!,
+          ],
+        );
+        await _writeConversationTree(duplicatedTree);
+      }
       return duplicate;
     });
   }
@@ -4169,16 +4237,32 @@ class ChatDatabaseRepository {
               tipMessageId: Value(branch.tipMessageId),
               name: Value(branch.name),
               createdAt: branch.createdAt,
+              parentBranchId: Value(branch.parentBranchId),
+              forkAnchorMessageId: Value(branch.forkAnchorMessageId),
             ),
           );
     }
+    final treeState = <String, Object?>{
+      'selections': tree.branchSelections,
+      'activeBranchHistory': tree.activeBranchHistory,
+      'branchRelations': <String, Object?>{
+        for (final branch in tree.branches.values)
+          branch.id: <String, Object?>{
+            'parentBranchId': branch.parentBranchId,
+            'forkAnchorMessageId': branch.forkAnchorMessageId,
+          },
+      },
+    };
     await _db
         .into(_db.conversationTreeStateRows)
         .insert(
           ConversationTreeStateRowsCompanion.insert(
             conversationId: tree.conversationId,
             activeBranchId: tree.activeBranchId,
-            branchSelectionsJson: Value(jsonEncode(tree.branchSelections)),
+            branchSelectionsJson: Value(jsonEncode(treeState)),
+            activeBranchHistoryJson: Value(
+              jsonEncode(tree.activeBranchHistory),
+            ),
           ),
         );
   }
@@ -4206,10 +4290,16 @@ class ChatDatabaseRepository {
       throw StateError('conversation_tree_state_missing');
     }
 
+    final decodedState = _decodeTreeState(
+      stateRow.branchSelectionsJson,
+      activeBranchHistoryJson: stateRow.activeBranchHistoryJson,
+    );
+    final relations = decodedState.branchRelations;
     final tree = ConversationTree.unsafe(
       conversationId: conversationId,
       activeBranchId: stateRow.activeBranchId,
-      branchSelections: _decodeBranchSelections(stateRow.branchSelectionsJson),
+      branchSelections: decodedState.selections,
+      activeBranchHistory: decodedState.activeBranchHistory,
       branches: {
         for (final row in branchRows)
           row.id: ConversationBranch(
@@ -4218,6 +4308,11 @@ class ChatDatabaseRepository {
             tipMessageId: row.tipMessageId,
             name: row.name,
             createdAt: row.createdAt,
+            parentBranchId:
+                row.parentBranchId ?? relations[row.id]?.parentBranchId,
+            forkAnchorMessageId:
+                row.forkAnchorMessageId ??
+                relations[row.id]?.forkAnchorMessageId,
           ),
       },
       edges: {
@@ -4251,6 +4346,7 @@ class ChatDatabaseRepository {
     if (decoded is! Map) {
       throw StateError('conversation_tree_selections_invalid_shape');
     }
+    if (decoded['selections'] is Map) decoded = decoded['selections'];
     final result = <String, String>{};
     for (final entry in decoded.entries) {
       if (entry.key is! String || entry.value is! String) {
@@ -4259,6 +4355,64 @@ class ChatDatabaseRepository {
       result[entry.key as String] = entry.value as String;
     }
     return result;
+  }
+
+  _DecodedTreeState _decodeTreeState(
+    String rawJson, {
+    String? activeBranchHistoryJson,
+  }) {
+    dynamic decoded;
+    try {
+      decoded = jsonDecode(rawJson);
+    } catch (error) {
+      throw StateError('conversation_tree_selections_invalid_json: $error');
+    }
+    if (decoded is! Map) {
+      throw StateError('conversation_tree_selections_invalid_shape');
+    }
+    final selections = _decodeBranchSelections(rawJson);
+    final history = <String>[];
+    dynamic rawHistory;
+    try {
+      rawHistory = activeBranchHistoryJson == null
+          ? decoded['activeBranchHistory']
+          : jsonDecode(activeBranchHistoryJson);
+    } catch (error) {
+      throw StateError('conversation_tree_history_invalid_json: $error');
+    }
+    if (rawHistory is List) {
+      for (final value in rawHistory) {
+        if (value is! String) {
+          throw StateError('conversation_tree_history_invalid_entry');
+        }
+        history.add(value);
+      }
+    }
+    final relations = <String, _DecodedBranchRelation>{};
+    final rawRelations = decoded['branchRelations'];
+    if (rawRelations is Map) {
+      for (final entry in rawRelations.entries) {
+        if (entry.key is! String || entry.value is! Map) {
+          throw StateError('conversation_tree_relations_invalid_entry');
+        }
+        final relation = entry.value as Map;
+        final parent = relation['parentBranchId'];
+        final anchor = relation['forkAnchorMessageId'];
+        if (parent != null && parent is! String ||
+            anchor != null && anchor is! String) {
+          throw StateError('conversation_tree_relations_invalid_entry');
+        }
+        relations[entry.key as String] = _DecodedBranchRelation(
+          parentBranchId: parent as String?,
+          forkAnchorMessageId: anchor as String?,
+        );
+      }
+    }
+    return _DecodedTreeState(
+      selections: selections,
+      activeBranchHistory: history,
+      branchRelations: relations,
+    );
   }
 
   String _conversationRootBranchId(String conversationId) =>
@@ -4510,7 +4664,6 @@ class ChatDatabaseRepository {
   Future<GenerationBeginResult> beginAssistantGeneration({
     required Conversation conversation,
     required ChatMessage assistantMessage,
-    required String anchorGroupId,
     required String runId,
     required bool truncateFuture,
     String? parentMessageId,
@@ -4864,6 +5017,180 @@ class ChatDatabaseRepository {
     );
   }
 
+  /// 克隆消息及其全部严格后代，并将克隆根接入原消息的同级分支。
+  /// 该操作只允许非叶子消息；所有写入在同一事务内完成。
+  Future<AppendedMessageVersion?> cloneMessageWithSubtreeAsBranch({
+    required String conversationId,
+    required String messageId,
+    required List<MessagePart> parts,
+  }) {
+    return _observer.measure(
+      ChatDatabaseOperation.commandAppendVersion,
+      () => _cloneMessageWithSubtreeAsBranch(
+        conversationId: conversationId,
+        messageId: messageId,
+        parts: parts,
+      ),
+    );
+  }
+
+  Future<AppendedMessageVersion?> _cloneMessageWithSubtreeAsBranch({
+    required String conversationId,
+    required String messageId,
+    required List<MessagePart> parts,
+  }) async {
+    return _db.transaction(() async {
+      final originalRow = await (_db.select(
+        _db.messageRows,
+      )..where((row) => row.id.equals(messageId))).getSingleOrNull();
+      if (originalRow == null || originalRow.conversationId != conversationId) {
+        return null;
+      }
+      final conversationRow = await (_db.select(
+        _db.conversationRows,
+      )..where((row) => row.id.equals(conversationId))).getSingleOrNull();
+      if (conversationRow == null) return null;
+      final tree = await _loadOrCreateConversationTree(conversationId);
+      final originalEdge = tree.edges[messageId];
+      if (originalEdge == null) {
+        throw StateError('cloned_message_tree_edge_missing');
+      }
+      final descendants = tree.descendantsOf(messageId);
+      if (descendants.isEmpty) {
+        throw StateError('clone_subtree_requires_non_leaf');
+      }
+      final sourceIds = <String>[messageId, ...descendants];
+      final sourceRows = <String, MessageRow>{};
+      for (final row in await (_db.select(
+        _db.messageRows,
+      )..where((row) => row.id.isIn(sourceIds))).get()) {
+        sourceRows[row.id] = row;
+      }
+      if (sourceRows.length != sourceIds.length) {
+        throw StateError('clone_subtree_source_message_missing');
+      }
+      final idMap = <String, String>{
+        for (final sourceId in sourceIds) sourceId: const Uuid().v4(),
+      };
+      final clonedMessages = <String, ChatMessage>{};
+      for (final sourceId in sourceIds) {
+        final source = await _messageFromRowWithParts(sourceRows[sourceId]!);
+        clonedMessages[sourceId] = ChatMessage(
+          id: idMap[sourceId],
+          role: source.role,
+          parts: sourceId == messageId ? parts : source.parts,
+          timestamp: source.timestamp,
+          modelId: source.modelId,
+          providerId: source.providerId,
+          totalTokens: source.totalTokens,
+          conversationId: source.conversationId,
+          isStreaming: false,
+          reasoningText: source.reasoningText,
+          reasoningStartAt: source.reasoningStartAt,
+          reasoningFinishedAt: source.reasoningFinishedAt,
+          translation: source.translation,
+          reasoningSegmentsJson: source.reasoningSegmentsJson,
+          promptTokens: source.promptTokens,
+          completionTokens: source.completionTokens,
+          cachedTokens: source.cachedTokens,
+          durationMs: source.durationMs,
+          // 克隆后的树消息不再属于旧版本组。
+          groupId: null,
+          version: 0,
+        );
+      }
+      final currentConversation = await _conversationFromRow(
+        conversationRow,
+        includeMessageIds: false,
+      );
+      final conversation = currentConversation.copyWith(
+        updatedAt: DateTime.now(),
+      );
+      for (final sourceId in sourceIds) {
+        final clone = clonedMessages[sourceId]!;
+        await _db
+            .into(_db.messageRows)
+            .insert(
+              _messageCompanion(clone, await _nextMessageOrder(conversationId)),
+              mode: InsertMode.insert,
+            );
+        await _replaceMessageParts(clone);
+      }
+
+      final nextEdges = Map<String, MessageTreeEdge>.from(tree.edges);
+      for (final sourceId in sourceIds) {
+        final sourceEdge = tree.edges[sourceId]!;
+        final parent = sourceEdge.parentMessageId;
+        nextEdges[idMap[sourceId]!] = MessageTreeEdge(
+          messageId: idMap[sourceId]!,
+          parentMessageId: sourceId == messageId ? parent : idMap[parent]!,
+        );
+      }
+      final nextBranches = Map<String, ConversationBranch>.from(tree.branches);
+      final branchIdMap = <String, String>{};
+      for (final branch in tree.branches.values) {
+        final path = tree.branchPath(branch.id);
+        if (!path.any(sourceIds.contains)) continue;
+        branchIdMap[branch.id] = 'branch-${const Uuid().v4()}';
+      }
+      for (final branch in tree.branches.values) {
+        final clonedBranchId = branchIdMap[branch.id];
+        if (clonedBranchId == null) continue;
+        final mappedTip = branch.tipMessageId == null
+            ? null
+            : idMap[branch.tipMessageId];
+        if (mappedTip == null) continue;
+        final mappedAnchor = branch.forkAnchorMessageId == null
+            ? (branch.id == tree.activeBranchId
+                  ? originalEdge.parentMessageId
+                  : null)
+            : idMap[branch.forkAnchorMessageId];
+        final mappedParentBranch = branch.parentBranchId == null
+            ? (branch.id == tree.activeBranchId
+                  ? tree.preferredBranchIdForMessage(
+                      originalEdge.parentMessageId ?? '',
+                    )
+                  : null)
+            : branchIdMap[branch.parentBranchId];
+        nextBranches[clonedBranchId] = ConversationBranch(
+          id: clonedBranchId,
+          conversationId: conversationId,
+          tipMessageId: mappedTip,
+          name: branch.name,
+          createdAt: DateTime.now(),
+          parentBranchId: mappedParentBranch,
+          forkAnchorMessageId: mappedAnchor,
+        );
+      }
+      final rootBranchId = 'branch-${const Uuid().v4()}';
+      final activeClone = branchIdMap[tree.activeBranchId] ?? rootBranchId;
+      if (!nextBranches.containsKey(activeClone)) {
+        nextBranches[rootBranchId] = ConversationBranch(
+          id: rootBranchId,
+          conversationId: conversationId,
+          tipMessageId: idMap[messageId],
+          name: '',
+          createdAt: DateTime.now(),
+          parentBranchId: tree.branches[tree.activeBranchId]?.parentBranchId,
+          forkAnchorMessageId: originalEdge.parentMessageId,
+        );
+      }
+      final updatedTree = ConversationTree(
+        conversationId: conversationId,
+        activeBranchId: activeClone,
+        branches: nextBranches,
+        edges: nextEdges,
+        branchSelections: tree.branchSelections,
+        activeBranchHistory: [activeClone, ...tree.activeBranchHistory],
+      );
+      await _writeConversationTree(updatedTree);
+      await (_db.update(_db.conversationRows)
+            ..where((row) => row.id.equals(conversationId)))
+          .write(_conversationCompanion(conversation));
+      return (conversation: conversation, message: clonedMessages[messageId]!);
+    });
+  }
+
   Future<AppendedMessageVersion?> _cloneMessageAsBranch({
     required String conversationId,
     required String messageId,
@@ -4995,22 +5322,6 @@ class ChatDatabaseRepository {
               .getSingleOrNull();
       if (conversationRow == null) return null;
 
-      // 仅 Metadata —— body 文本通过 message parts 写入。
-      final groupId = originalRow.groupId ?? originalRow.id;
-      final maxVersion = _db.messageRows.version.max();
-      final maxVersionRow =
-          await (_db.selectOnly(_db.messageRows)
-                ..addColumns([maxVersion])
-                ..where(
-                  _db.messageRows.conversationId.equals(
-                        originalRow.conversationId,
-                      ) &
-                      (_db.messageRows.groupId.equals(groupId) |
-                          (_db.messageRows.groupId.isNull() &
-                              _db.messageRows.id.equals(groupId))),
-                ))
-              .getSingle();
-      final nextVersion = (maxVersionRow.read(maxVersion) ?? -1) + 1;
       // 仅追加 Content 时必须先加载原始 parts，并在新 revision 上保留非文本
       // attachments（ImagePart/FilePart/etc.），同时保持
       // ordinal（[Image, Text] 保持为 [Image, Text(new)]，而不是 [Text(new), Image]）。
@@ -5032,8 +5343,9 @@ class ChatDatabaseRepository {
         providerId: originalRow.providerId,
         totalTokens: null,
         isStreaming: false,
-        groupId: groupId,
-        version: nextVersion,
+        // 新分支是独立消息节点，不再写入旧版本字段。
+        groupId: null,
+        version: 0,
       );
       final currentConversation = await _conversationFromRow(
         conversationRow,
@@ -6086,8 +6398,30 @@ class ChatDatabaseRepository {
     await _db.customStatement(
       'UPDATE main.conversation_tree_state_rows SET branch_selections_json = ? '
       'WHERE conversation_id = ?;',
-      [jsonEncode(merged), conversationId],
+      [
+        _replaceEncodedSelections(
+          selections.read<String>('branch_selections_json'),
+          merged,
+        ),
+        conversationId,
+      ],
     );
+  }
+
+  String _replaceEncodedSelections(
+    String rawJson,
+    Map<String, String> selections,
+  ) {
+    try {
+      final decoded = jsonDecode(rawJson);
+      if (decoded is Map && decoded['selections'] is Map) {
+        decoded['selections'] = selections;
+        return jsonEncode(decoded);
+      }
+    } catch (_) {
+      // _decodeBranchSelections already validates the value before this call.
+    }
+    return jsonEncode(selections);
   }
 
   Future<String?> _messageFingerprint(String schema, String id) async {
@@ -6564,6 +6898,9 @@ class ChatDatabaseRepository {
     final sourceBranchSelections = _decodeBranchSelections(
       sourceState.data['branch_selections_json']?.toString() ?? '{}',
     );
+    final sourceTreeState = _decodeTreeState(
+      sourceState.data['branch_selections_json']?.toString() ?? '{}',
+    );
     final targetBranchSelections = <String, String>{};
     for (final entry in sourceBranchSelections.entries) {
       final targetMessageId = messageIdMap[entry.key];
@@ -6577,11 +6914,30 @@ class ChatDatabaseRepository {
     if (activeTargetBranchId == null) {
       throw StateError('merge_source_active_branch_missing');
     }
+    final targetTreeState = <String, Object?>{
+      'selections': targetBranchSelections,
+      'activeBranchHistory': [
+        for (final branchId in sourceTreeState.activeBranchHistory)
+          if (branchIdMap[branchId] != null) branchIdMap[branchId]!,
+      ],
+      'branchRelations': <String, Object?>{
+        for (final entry in sourceTreeState.branchRelations.entries)
+          if (branchIdMap[entry.key] != null)
+            branchIdMap[entry.key]!: <String, Object?>{
+              'parentBranchId': entry.value.parentBranchId == null
+                  ? null
+                  : branchIdMap[entry.value.parentBranchId],
+              'forkAnchorMessageId': entry.value.forkAnchorMessageId == null
+                  ? null
+                  : messageIdMap[entry.value.forkAnchorMessageId],
+            },
+      },
+    };
     await _db.customStatement(
       'INSERT INTO main.conversation_tree_state_rows '
       '(conversation_id, active_branch_id, branch_selections_json) '
       'VALUES (?, ?, ?);',
-      [targetId, activeTargetBranchId, jsonEncode(targetBranchSelections)],
+      [targetId, activeTargetBranchId, jsonEncode(targetTreeState)],
     );
   }
 
@@ -6923,6 +7279,7 @@ class ChatDatabaseRepository {
         messageIds: {messageId},
         versionSelectionChanges: const {},
         preserveDescendants: true,
+        validateMessageOnly: true,
         recentBranchIds: recentBranchIds,
       ),
     );
@@ -6981,6 +7338,21 @@ class ChatDatabaseRepository {
     );
   }
 
+  Future<DeletedMessagesResult?> deleteMessageAndFollowing({
+    required String conversationId,
+    required String messageId,
+  }) {
+    return _observer.measure(
+      ChatDatabaseOperation.commandDeleteMessages,
+      () => _deleteMessages(
+        conversationId: conversationId,
+        messageIds: {messageId},
+        versionSelectionChanges: const {},
+        validateMessageAndFollowing: true,
+      ),
+    );
+  }
+
   Future<DeletedMessagesResult?> _deleteMessages({
     required String conversationId,
     required Set<String> messageIds,
@@ -6988,6 +7360,8 @@ class ChatDatabaseRepository {
     bool preserveDescendants = false,
     bool deleteCurrentBranch = false,
     bool deleteMessageNode = false,
+    bool validateMessageOnly = false,
+    bool validateMessageAndFollowing = false,
     Iterable<String> recentBranchIds = const <String>[],
   }) async {
     if (messageIds.isEmpty) return null;
@@ -7022,12 +7396,22 @@ class ChatDatabaseRepository {
         conversationId,
       );
       final treeAfterDelete = deleteMessageNode
-          ? treeBeforeDelete.deleteNodeKeepActiveBranch(
+          ? treeBeforeDelete.deleteMessageNode(
               requestedRows.single.id,
               recentBranchIds: recentBranchIds,
             )
           : deleteCurrentBranch
           ? treeBeforeDelete.deleteCurrentBranch(
+              requestedRows.single.id,
+              recentBranchIds: recentBranchIds,
+            )
+          : validateMessageOnly
+          ? treeBeforeDelete.deleteMessageOnly(
+              requestedRows.single.id,
+              recentBranchIds: recentBranchIds,
+            )
+          : validateMessageAndFollowing
+          ? treeBeforeDelete.deleteMessageAndFollowing(
               requestedRows.single.id,
               recentBranchIds: recentBranchIds,
             )

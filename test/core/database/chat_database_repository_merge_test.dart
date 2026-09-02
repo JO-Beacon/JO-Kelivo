@@ -671,7 +671,7 @@ void main() {
       });
     });
 
-    test('remap 时 group_id 为 null 的 v0 与后续版本仍属同一版本组', () async {
+    test('remap 时旧版本字段不再合并运行时树节点', () async {
       await putConversation(
         live,
         conversationId: 'versioned',
@@ -707,14 +707,35 @@ void main() {
       expect(remappedId, isNotNull);
 
       final projections = await live.getSelectedMessageProjections(remappedId!);
-      expect(projections, hasLength(1));
-      expect(projections.single.content, 'v1');
+      expect(projections, hasLength(2));
       expect(
-        await live.getMaxMessageVersionForGroup(
-          remappedId,
-          projections.single.groupId!,
+        projections.map((message) => message.content),
+        containsAll(['v0', 'v1']),
+      );
+      expect(
+        projections.every(
+          (message) => message.groupId == null || message.groupId == message.id,
         ),
-        1,
+        isTrue,
+      );
+
+      final tree = await live.loadConversationTree(remappedId);
+      expect(tree, isNotNull);
+      final originalId = projections
+          .singleWhere((message) => message.content == 'v0')
+          .id;
+      final editedId = projections
+          .singleWhere((message) => message.content == 'v1')
+          .id;
+      expect(tree!.edges[originalId]?.parentMessageId, isNull);
+      expect(tree.edges[editedId]?.parentMessageId, isNull);
+      expect(tree.activePath(), [editedId]);
+      expect(
+        tree.siblingBranchIdsByMessageId()[editedId],
+        containsAll(<String>[
+          tree.preferredBranchIdForMessage(originalId)!,
+          tree.preferredBranchIdForMessage(editedId)!,
+        ]),
       );
 
       final second = await live.mergeBackupSnapshot(sourceFile);

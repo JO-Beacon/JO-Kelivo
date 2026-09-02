@@ -72,6 +72,17 @@ void main() {
     },
   );
 
+  test('fresh business storage only keeps KelivoIN built-in models', () async {
+    final settings = SettingsProvider(BusinessPreferences(repository));
+    await settings.loaded;
+
+    expect(settings.getProviderConfig('KelivoIN').models, [
+      'mistral',
+      'qwen-coder',
+    ]);
+    expect(settings.getProviderConfig('SiliconFlow').models, isEmpty);
+  });
+
   test('fresh built-in provider reordering survives a cold reload', () async {
     final settings = SettingsProvider(BusinessPreferences(repository));
     await settings.loaded;

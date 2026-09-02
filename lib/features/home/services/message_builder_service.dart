@@ -126,55 +126,11 @@ class MessageBuilderService {
   final Map<String, _DocTextCacheEntry> _docTextCache =
       <String, _DocTextCacheEntry>{};
 
-  /// 折叠消息版本，每组只显示已选版本。
-  List<ChatMessage> collapseVersions(
-    List<ChatMessage> items,
-    Map<String, int> versionSelections,
-  ) {
-    final Map<String, List<ChatMessage>> byGroup =
-        <String, List<ChatMessage>>{};
-    final List<String> order = <String>[];
-
-    for (final m in items) {
-      final gid = (m.groupId ?? m.id);
-      final list = byGroup.putIfAbsent(gid, () {
-        order.add(gid);
-        return <ChatMessage>[];
-      });
-      list.add(m);
-    }
-
-    // 按版本对每个组排序
-    for (final e in byGroup.entries) {
-      e.value.sort((a, b) => a.version.compareTo(b.version));
-    }
-
-    // 从每个组中选择合适的版本
-    final out = <ChatMessage>[];
-    for (final gid in order) {
-      final vers = byGroup[gid]!;
-      final sel = versionSelections[gid];
-      ChatMessage? selected;
-      if (sel != null) {
-        for (final candidate in vers) {
-          if (candidate.version == sel) {
-            selected = candidate;
-            break;
-          }
-        }
-      }
-      out.add(selected ?? vers.last);
-    }
-
-    return out;
-  }
-
   /// 从当前会话状态构建 API 消息列表。
   ///
   /// 应用截断。调用方必须传入当前消息树活动路径；附件来自消息部分。
   List<Map<String, dynamic>> buildApiMessages({
     required List<ChatMessage> messages,
-    required Map<String, int> versionSelections,
     required Conversation? currentConversation,
     bool includeToolMessages = false,
   }) {

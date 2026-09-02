@@ -93,11 +93,40 @@ void main() {
     await tester.enterText(find.byType(TextField), 'after');
     await tester.tap(find.text('Overwrite Save'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Overwrite'));
+    await tester.pumpAndSettle();
 
     expect(result, isNotNull);
     expect(result!.saveMode, MessageEditSaveMode.overwrite);
     expect(result!.shouldSend, isFalse);
     expect(result!.content, 'after');
+  });
+
+  testWidgets('cancelling overwrite confirmation keeps the draft open', (
+    tester,
+  ) async {
+    var completed = false;
+    await tester.pumpWidget(
+      harness(
+        message: ChatMessage(
+          role: 'user',
+          content: 'before',
+          conversationId: 'conversation',
+        ),
+        onResult: (_) => completed = true,
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'after');
+    await tester.tap(find.text('Overwrite Save'));
+    await tester.pumpAndSettle();
+    expect(find.text('Overwrite existing message?'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit Message'), findsOneWidget);
+    expect(find.text('after'), findsOneWidget);
+    expect(completed, isFalse);
   });
 
   testWidgets('unchanged sheet closes without asking to save', (tester) async {

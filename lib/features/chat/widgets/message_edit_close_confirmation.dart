@@ -5,6 +5,29 @@ import '../../../l10n/app_localizations.dart';
 
 enum MessageEditCloseAction { cancel, confirm }
 
+Future<bool> showMessageEditOverwriteConfirmation(BuildContext context) async {
+  final l10n = AppLocalizations.of(context)!;
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      shape: DesktopDialogStyle.shape(dialogContext),
+      title: Text(l10n.messageEditOverwriteConfirmTitle),
+      content: Text(l10n.messageEditOverwriteConfirmContent),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: Text(l10n.messageEditOverwriteConfirmCancel),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          child: Text(l10n.messageEditOverwriteConfirmConfirm),
+        ),
+      ],
+    ),
+  );
+  return result ?? false;
+}
+
 Future<MessageEditCloseAction?> showMessageEditCloseConfirmation(
   BuildContext context,
 ) {

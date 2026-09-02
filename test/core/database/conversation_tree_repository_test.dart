@@ -7,6 +7,7 @@ import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/models/conversation_tree.dart';
+import 'package:Kelivo/core/models/message_part.dart';
 
 void main() {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
@@ -47,7 +48,10 @@ void main() {
         name: 'alt',
         createdAt: DateTime.utc(2026, 1, 2),
       );
-      await repository.saveConversationTree(branched);
+      final withHistory = branched
+          .switchBranch('root')
+          .switchBranch('branch-alt');
+      await repository.saveConversationTree(withHistory);
 
       final loadedBranch = await repository.loadConversationTree(
         'conversation-1',
@@ -57,7 +61,13 @@ void main() {
       expect(loadedBranch.activePath(), const ['message-1', 'message-2-alt']);
       expect(loadedBranch.branchPath('root'), const ['message-1', 'message-2']);
       expect(loadedBranch.branches['branch-alt']?.name, 'alt');
-      expect(loadedBranch.fingerprint, branched.fingerprint);
+      expect(loadedBranch.branches['branch-alt']?.parentBranchId, 'root');
+      expect(
+        loadedBranch.branches['branch-alt']?.forkAnchorMessageId,
+        'message-1',
+      );
+      expect(loadedBranch.activeBranchHistory, contains('root'));
+      expect(loadedBranch.fingerprint, withHistory.fingerprint);
     },
   );
 
@@ -208,6 +218,44 @@ void main() {
       ),
     );
   });
+
+  test(
+    'loading malformed active branch history JSON fails explicitly',
+    () async {
+      final database = AppDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      await database.customSelect('SELECT 1;').getSingle();
+      final repository = ChatDatabaseRepository(database);
+      final conversation = Conversation(title: 'history-json');
+      await database.customStatement(
+        'INSERT INTO conversation_rows (id, title, created_at, updated_at) '
+        'VALUES (?, ?, ?, ?);',
+        [conversation.id, conversation.title, 1, 1],
+      );
+      final tree = ConversationTree.linear(
+        conversationId: conversation.id,
+        messageIds: const <String>[],
+        activeBranchId: 'root-${conversation.id}',
+      );
+      await repository.saveConversationTree(tree);
+      await database.customStatement(
+        'UPDATE conversation_tree_state_rows '
+        "SET active_branch_history_json = 'not-json' WHERE conversation_id = ?;",
+        [conversation.id],
+      );
+
+      expect(
+        () => repository.loadConversationTree(conversation.id),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            startsWith('conversation_tree_history_invalid_json'),
+          ),
+        ),
+      );
+    },
+  );
 
   test(
     'migration batch preserves an explicitly supplied message tree',
@@ -800,7 +848,6 @@ void main() {
           isStreaming: true,
           timestamp: DateTime.utc(2026, 1, 1, 0, 0, 1),
         ),
-        anchorGroupId: 'u1',
         runId: 'run-branch',
         truncateFuture: false,
         parentMessageId: 'u1',
@@ -872,6 +919,229 @@ void main() {
     expect(tree.branchPath('root-edit-tree'), ['u1', 'a1', 'u2']);
     expect(tree.edges[edited.message.id]?.parentMessageId, 'u1');
     expect(tree.childrenOf('u1'), containsAll(['a1', edited.message.id]));
+  });
+
+  test(
+    'editing a non-leaf message clones its complete child subtree',
+    () async {
+      final database = AppDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      await database.customSelect('SELECT 1;').getSingle();
+      final repository = ChatDatabaseRepository(database);
+      final conversation = Conversation(id: 'clone-subtree', title: 'clone');
+      final messages = [
+        ChatMessage(
+          id: 'clone-user',
+          role: 'user',
+          content: 'old',
+          conversationId: conversation.id,
+        ),
+        ChatMessage(
+          id: 'clone-assistant',
+          role: 'assistant',
+          content: 'answer',
+          conversationId: conversation.id,
+        ),
+        ChatMessage(
+          id: 'clone-follow-up',
+          role: 'user',
+          content: 'follow-up',
+          conversationId: conversation.id,
+        ),
+      ];
+      final tree = ConversationTree(
+        conversationId: conversation.id,
+        activeBranchId: 'root',
+        branches: {
+          'root': ConversationBranch(
+            id: 'root',
+            conversationId: conversation.id,
+            tipMessageId: messages.last.id,
+            createdAt: DateTime.utc(2026),
+          ),
+        },
+        edges: const {
+          'clone-user': MessageTreeEdge(
+            messageId: 'clone-user',
+            parentMessageId: null,
+          ),
+          'clone-assistant': MessageTreeEdge(
+            messageId: 'clone-assistant',
+            parentMessageId: 'clone-user',
+          ),
+          'clone-follow-up': MessageTreeEdge(
+            messageId: 'clone-follow-up',
+            parentMessageId: 'clone-assistant',
+          ),
+        },
+      );
+      await repository.putMigrationBatch(
+        conversations: [conversation],
+        messages: [
+          for (final (index, message) in messages.indexed)
+            (message: message, messageOrder: index),
+        ],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+        conversationTree: tree,
+      );
+
+      final result = await repository.cloneMessageWithSubtreeAsBranch(
+        conversationId: conversation.id,
+        messageId: 'clone-assistant',
+        parts: const [TextPart('edited answer')],
+      );
+      expect(result, isNot(null));
+      final persistedIds = await repository.getMessageIds(conversation.id);
+      expect(persistedIds.length, 5);
+      final loaded = await repository.loadConversationTree(conversation.id);
+      expect(loaded!.childrenOf('clone-user'), hasLength(2));
+      expect(loaded.activePath().length, 3);
+      expect(loaded.activePath()[1], isNot('clone-assistant'));
+    },
+  );
+
+  test(
+    'cloning a subtree preserves nested branch ancestry at the fork anchor',
+    () async {
+      final database = AppDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      await database.customSelect('SELECT 1;').getSingle();
+      final repository = ChatDatabaseRepository(database);
+      final conversation = Conversation(id: 'clone-nested', title: 'clone');
+      final messages = [
+        ChatMessage(
+          id: 'u1',
+          role: 'user',
+          content: 'u1',
+          conversationId: conversation.id,
+        ),
+        ChatMessage(
+          id: 'a1',
+          role: 'assistant',
+          content: 'a1',
+          conversationId: conversation.id,
+        ),
+        ChatMessage(
+          id: 'a2',
+          role: 'user',
+          content: 'a2',
+          conversationId: conversation.id,
+        ),
+        ChatMessage(
+          id: 'a3',
+          role: 'assistant',
+          content: 'a3',
+          conversationId: conversation.id,
+        ),
+        ChatMessage(
+          id: 'b2',
+          role: 'user',
+          content: 'b2',
+          conversationId: conversation.id,
+        ),
+        ChatMessage(
+          id: 'b3',
+          role: 'assistant',
+          content: 'b3',
+          conversationId: conversation.id,
+        ),
+      ];
+      final tree = ConversationTree(
+        conversationId: conversation.id,
+        activeBranchId: 'root',
+        branches: {
+          'root': ConversationBranch(
+            id: 'root',
+            conversationId: conversation.id,
+            tipMessageId: 'a3',
+            createdAt: DateTime.utc(2026),
+          ),
+          'branch-b': ConversationBranch(
+            id: 'branch-b',
+            conversationId: conversation.id,
+            tipMessageId: 'b3',
+            parentBranchId: 'root',
+            forkAnchorMessageId: 'a1',
+            createdAt: DateTime.utc(2026, 1, 2),
+          ),
+        },
+        edges: const {
+          'u1': MessageTreeEdge(messageId: 'u1', parentMessageId: null),
+          'a1': MessageTreeEdge(messageId: 'a1', parentMessageId: 'u1'),
+          'a2': MessageTreeEdge(messageId: 'a2', parentMessageId: 'a1'),
+          'a3': MessageTreeEdge(messageId: 'a3', parentMessageId: 'a2'),
+          'b2': MessageTreeEdge(messageId: 'b2', parentMessageId: 'a1'),
+          'b3': MessageTreeEdge(messageId: 'b3', parentMessageId: 'b2'),
+        },
+      );
+      await repository.putMigrationBatch(
+        conversations: [conversation],
+        messages: [
+          for (final (index, message) in messages.indexed)
+            (message: message, messageOrder: index),
+        ],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+        conversationTree: tree,
+      );
+
+      final result = await repository.cloneMessageWithSubtreeAsBranch(
+        conversationId: conversation.id,
+        messageId: 'a1',
+        parts: const [TextPart('edited')],
+      );
+      expect(result, isNot(null));
+      final after = await repository.loadConversationTree(conversation.id);
+      expect(after, isNot(null));
+      final clonedRoot = after!.branches[after.activeBranchId]!;
+      expect(clonedRoot.parentBranchId, 'root');
+      expect(clonedRoot.forkAnchorMessageId, 'u1');
+      final clonedNested = after.branches.values.firstWhere(
+        (branch) =>
+            branch.id != 'root' &&
+            branch.id != after.activeBranchId &&
+            branch.forkAnchorMessageId != 'a1',
+      );
+      expect(clonedNested.parentBranchId, after.activeBranchId);
+      expect(clonedNested.forkAnchorMessageId, isNot('a1'));
+      expect(after.activePath().length, 4);
+    },
+  );
+
+  test('cloning a leaf message subtree fails without mutation', () async {
+    final database = AppDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    await database.customSelect('SELECT 1;').getSingle();
+    final repository = ChatDatabaseRepository(database);
+    final conversation = Conversation(id: 'clone-leaf', title: 'clone');
+    final message = ChatMessage(
+      id: 'clone-leaf-message',
+      role: 'user',
+      content: 'leaf',
+      conversationId: conversation.id,
+    );
+    final tree = ConversationTree.linear(
+      conversationId: conversation.id,
+      messageIds: [message.id],
+      activeBranchId: 'root',
+    );
+    await repository.putMigrationBatch(
+      conversations: [conversation],
+      messages: [(message: message, messageOrder: 0)],
+      toolEventsByMessageId: const {},
+      geminiSignaturesByMessageId: const {},
+      conversationTree: tree,
+    );
+    await expectLater(
+      repository.cloneMessageWithSubtreeAsBranch(
+        conversationId: conversation.id,
+        messageId: message.id,
+        parts: const [TextPart('edited')],
+      ),
+      throwsA(isA<StateError>()),
+    );
+    expect(await repository.getMessageIds(conversation.id), [message.id]);
   });
 
   test(

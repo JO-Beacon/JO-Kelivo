@@ -1,6 +1,6 @@
 import '../../../core/models/message_part.dart';
 
-enum MessageEditSaveMode { newBranch, overwrite }
+enum MessageEditSaveMode { newBranch, cloneSubtree, overwrite }
 
 class MessageEditResult {
   final String content;

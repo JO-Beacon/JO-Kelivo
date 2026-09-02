@@ -87,6 +87,18 @@ void main() {
       );
       expect(
         windowsInstaller,
+        contains('#define MyAppId "{{4DAB8FFA-513A-4729-9A93-82207E2F2785}}"'),
+      );
+      expect(
+        windowsInstaller,
+        isNot(contains('D4C6D2A7-8F3E-4D7B-9D55-6B6B6D2E5A91')),
+      );
+      expect(
+        windowsInstaller,
+        contains('DefaultDirName={autopf}\\{#MyAppName}'),
+      );
+      expect(
+        windowsInstaller,
         contains('Type: files; Name: "{app}\\jo_kelivo.exe"'),
       );
       expect(windowsInstaller, contains('Excludes: "jo_kelivo.exe"'));
@@ -186,25 +198,25 @@ void main() {
                 description:
                     'JO-AIClient is an open-source AI assistant based on Kelivo',
                 share: 'JO-AIClient - Open Source AI Assistant',
-                title: 'About JO-AIClient',
+                title: 'About Kelivo',
               ),
               'lib/l10n/app_zh.arb': (
                 checkUpdates: '检查更新',
                 description: 'JO-AIClient 是基于 Kelivo 的开源 AI 助手',
                 share: 'JO-AIClient - 开源 AI 助手',
-                title: '关于 JO-AIClient',
+                title: '关于 Kelivo',
               ),
               'lib/l10n/app_zh_Hans.arb': (
                 checkUpdates: '检查更新',
                 description: 'JO-AIClient 是基于 Kelivo 的开源 AI 助手',
                 share: 'JO-AIClient - 开源 AI 助手',
-                title: '关于 JO-AIClient',
+                title: '关于 Kelivo',
               ),
               'lib/l10n/app_zh_Hant.arb': (
                 checkUpdates: '檢查更新',
                 description: 'JO-AIClient 是基於 Kelivo 的開源 AI 助理',
                 share: 'JO-AIClient - 開源 AI 助理',
-                title: '關於 JO-AIClient',
+                title: '關於 Kelivo',
               ),
             };
         const retiredKeys = [

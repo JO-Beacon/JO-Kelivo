@@ -81,7 +81,6 @@ void main() {
           _message(id: 'u1', role: 'user', content: 'hello'),
           _message(id: 'a1', role: 'assistant', content: 'hi'),
         ],
-        versionSelections: const {},
         currentConversation: Conversation(title: 'test'),
       );
 
@@ -118,7 +117,6 @@ void main() {
           _message(id: 'u1', role: 'user', content: '杭州天气'),
           _message(id: 'a1', role: 'assistant', content: '明天多云。'),
         ],
-        versionSelections: const {},
         currentConversation: Conversation(title: 'test'),
         includeToolMessages: true,
       );
@@ -206,7 +204,6 @@ void main() {
         _message(id: 'u1', role: 'user', content: 'hello'),
         _message(id: 'a1', role: 'assistant', content: 'hi'),
       ],
-      versionSelections: const {},
       currentConversation: Conversation(title: 'test'),
     );
 

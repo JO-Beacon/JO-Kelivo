@@ -4270,6 +4270,12 @@ abstract class AppLocalizations {
   /// **'Overwrite Save'**
   String get messageEditPageOverwriteSave;
 
+  /// No description provided for @messageEditPageSaveAsBranchCopyChildren.
+  ///
+  /// In en, this message translates to:
+  /// **'Save as Branch with Replies'**
+  String get messageEditPageSaveAsBranchCopyChildren;
+
   /// No description provided for @messageEditPageHint.
   ///
   /// In en, this message translates to:
@@ -4359,6 +4365,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Confirm'**
   String get messageEditCloseConfirmConfirm;
+
+  /// No description provided for @messageEditOverwriteConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Overwrite existing message?'**
+  String get messageEditOverwriteConfirmTitle;
+
+  /// No description provided for @messageEditOverwriteConfirmContent.
+  ///
+  /// In en, this message translates to:
+  /// **'The original message and its branches will be updated in place.'**
+  String get messageEditOverwriteConfirmContent;
+
+  /// No description provided for @messageEditOverwriteConfirmCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get messageEditOverwriteConfirmCancel;
+
+  /// No description provided for @messageEditOverwriteConfirmConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Overwrite'**
+  String get messageEditOverwriteConfirmConfirm;
 
   /// No description provided for @selectCopyPageTitle.
   ///
@@ -8452,7 +8482,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutPageKelivoSectionTitle.
   ///
   /// In en, this message translates to:
-  /// **'About JO-AIClient'**
+  /// **'About Kelivo'**
   String get aboutPageKelivoSectionTitle;
 
   /// No description provided for @mcpOAuthCallbackPageTitle.

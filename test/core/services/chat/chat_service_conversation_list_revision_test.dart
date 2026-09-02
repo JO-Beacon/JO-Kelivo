@@ -103,6 +103,43 @@ void main() {
       expect(service.conversationListRevision, greaterThan(last));
     });
 
+    test(
+      'duplicate keeps branches visible through the conversation service',
+      () async {
+        final service = createService();
+        await service.init();
+        final conversation = await service.createConversation(
+          title: 'Branched',
+        );
+        final anchor = await service.addMessage(
+          conversationId: conversation.id,
+          role: 'user',
+          content: 'anchor',
+        );
+        await service.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: 'active',
+        );
+        await service.createMessageBranch(
+          conversationId: conversation.id,
+          fromMessageId: anchor.id,
+        );
+
+        final duplicate = await service.duplicateConversation(conversation.id);
+
+        expect(duplicate, isNotNull);
+        final tree = await service.loadConversationTree(duplicate!.id);
+        expect(tree, isNotNull);
+        expect(tree!.branches, hasLength(2));
+        expect(
+          tree.edges.values.where((edge) => edge.parentMessageId == null),
+          hasLength(2),
+        );
+        expect(() => tree.validateIntegrity(), returnsNormally);
+      },
+    );
+
     test('does not bump on selection, streaming, or summary updates', () async {
       final service = createService();
       await service.init();

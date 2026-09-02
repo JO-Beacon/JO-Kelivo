@@ -2328,6 +2328,28 @@ class $ConversationBranchRowsTable extends ConversationBranchRows
       ).withConverter<DateTime>(
         $ConversationBranchRowsTable.$convertercreatedAt,
       );
+  static const VerificationMeta _parentBranchIdMeta = const VerificationMeta(
+    'parentBranchId',
+  );
+  @override
+  late final GeneratedColumn<String> parentBranchId = GeneratedColumn<String>(
+    'parent_branch_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _forkAnchorMessageIdMeta =
+      const VerificationMeta('forkAnchorMessageId');
+  @override
+  late final GeneratedColumn<String> forkAnchorMessageId =
+      GeneratedColumn<String>(
+        'fork_anchor_message_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -2335,6 +2357,8 @@ class $ConversationBranchRowsTable extends ConversationBranchRows
     tipMessageId,
     name,
     createdAt,
+    parentBranchId,
+    forkAnchorMessageId,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2379,6 +2403,24 @@ class $ConversationBranchRowsTable extends ConversationBranchRows
         name.isAcceptableOrUnknown(data['name']!, _nameMeta),
       );
     }
+    if (data.containsKey('parent_branch_id')) {
+      context.handle(
+        _parentBranchIdMeta,
+        parentBranchId.isAcceptableOrUnknown(
+          data['parent_branch_id']!,
+          _parentBranchIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('fork_anchor_message_id')) {
+      context.handle(
+        _forkAnchorMessageIdMeta,
+        forkAnchorMessageId.isAcceptableOrUnknown(
+          data['fork_anchor_message_id']!,
+          _forkAnchorMessageIdMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -2410,6 +2452,14 @@ class $ConversationBranchRowsTable extends ConversationBranchRows
           data['${effectivePrefix}created_at'],
         )!,
       ),
+      parentBranchId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}parent_branch_id'],
+      ),
+      forkAnchorMessageId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}fork_anchor_message_id'],
+      ),
     );
   }
 
@@ -2429,12 +2479,16 @@ class ConversationBranchRow extends DataClass
   final String? tipMessageId;
   final String name;
   final DateTime createdAt;
+  final String? parentBranchId;
+  final String? forkAnchorMessageId;
   const ConversationBranchRow({
     required this.id,
     required this.conversationId,
     this.tipMessageId,
     required this.name,
     required this.createdAt,
+    this.parentBranchId,
+    this.forkAnchorMessageId,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2450,6 +2504,12 @@ class ConversationBranchRow extends DataClass
         $ConversationBranchRowsTable.$convertercreatedAt.toSql(createdAt),
       );
     }
+    if (!nullToAbsent || parentBranchId != null) {
+      map['parent_branch_id'] = Variable<String>(parentBranchId);
+    }
+    if (!nullToAbsent || forkAnchorMessageId != null) {
+      map['fork_anchor_message_id'] = Variable<String>(forkAnchorMessageId);
+    }
     return map;
   }
 
@@ -2462,6 +2522,12 @@ class ConversationBranchRow extends DataClass
           : Value(tipMessageId),
       name: Value(name),
       createdAt: Value(createdAt),
+      parentBranchId: parentBranchId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentBranchId),
+      forkAnchorMessageId: forkAnchorMessageId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(forkAnchorMessageId),
     );
   }
 
@@ -2476,6 +2542,10 @@ class ConversationBranchRow extends DataClass
       tipMessageId: serializer.fromJson<String?>(json['tipMessageId']),
       name: serializer.fromJson<String>(json['name']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      parentBranchId: serializer.fromJson<String?>(json['parentBranchId']),
+      forkAnchorMessageId: serializer.fromJson<String?>(
+        json['forkAnchorMessageId'],
+      ),
     );
   }
   @override
@@ -2487,6 +2557,8 @@ class ConversationBranchRow extends DataClass
       'tipMessageId': serializer.toJson<String?>(tipMessageId),
       'name': serializer.toJson<String>(name),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'parentBranchId': serializer.toJson<String?>(parentBranchId),
+      'forkAnchorMessageId': serializer.toJson<String?>(forkAnchorMessageId),
     };
   }
 
@@ -2496,12 +2568,20 @@ class ConversationBranchRow extends DataClass
     Value<String?> tipMessageId = const Value.absent(),
     String? name,
     DateTime? createdAt,
+    Value<String?> parentBranchId = const Value.absent(),
+    Value<String?> forkAnchorMessageId = const Value.absent(),
   }) => ConversationBranchRow(
     id: id ?? this.id,
     conversationId: conversationId ?? this.conversationId,
     tipMessageId: tipMessageId.present ? tipMessageId.value : this.tipMessageId,
     name: name ?? this.name,
     createdAt: createdAt ?? this.createdAt,
+    parentBranchId: parentBranchId.present
+        ? parentBranchId.value
+        : this.parentBranchId,
+    forkAnchorMessageId: forkAnchorMessageId.present
+        ? forkAnchorMessageId.value
+        : this.forkAnchorMessageId,
   );
   ConversationBranchRow copyWithCompanion(
     ConversationBranchRowsCompanion data,
@@ -2516,6 +2596,12 @@ class ConversationBranchRow extends DataClass
           : this.tipMessageId,
       name: data.name.present ? data.name.value : this.name,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      parentBranchId: data.parentBranchId.present
+          ? data.parentBranchId.value
+          : this.parentBranchId,
+      forkAnchorMessageId: data.forkAnchorMessageId.present
+          ? data.forkAnchorMessageId.value
+          : this.forkAnchorMessageId,
     );
   }
 
@@ -2526,14 +2612,23 @@ class ConversationBranchRow extends DataClass
           ..write('conversationId: $conversationId, ')
           ..write('tipMessageId: $tipMessageId, ')
           ..write('name: $name, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('parentBranchId: $parentBranchId, ')
+          ..write('forkAnchorMessageId: $forkAnchorMessageId')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, conversationId, tipMessageId, name, createdAt);
+  int get hashCode => Object.hash(
+    id,
+    conversationId,
+    tipMessageId,
+    name,
+    createdAt,
+    parentBranchId,
+    forkAnchorMessageId,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2542,7 +2637,9 @@ class ConversationBranchRow extends DataClass
           other.conversationId == this.conversationId &&
           other.tipMessageId == this.tipMessageId &&
           other.name == this.name &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.parentBranchId == this.parentBranchId &&
+          other.forkAnchorMessageId == this.forkAnchorMessageId);
 }
 
 class ConversationBranchRowsCompanion
@@ -2552,6 +2649,8 @@ class ConversationBranchRowsCompanion
   final Value<String?> tipMessageId;
   final Value<String> name;
   final Value<DateTime> createdAt;
+  final Value<String?> parentBranchId;
+  final Value<String?> forkAnchorMessageId;
   final Value<int> rowid;
   const ConversationBranchRowsCompanion({
     this.id = const Value.absent(),
@@ -2559,6 +2658,8 @@ class ConversationBranchRowsCompanion
     this.tipMessageId = const Value.absent(),
     this.name = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.parentBranchId = const Value.absent(),
+    this.forkAnchorMessageId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ConversationBranchRowsCompanion.insert({
@@ -2567,6 +2668,8 @@ class ConversationBranchRowsCompanion
     this.tipMessageId = const Value.absent(),
     this.name = const Value.absent(),
     required DateTime createdAt,
+    this.parentBranchId = const Value.absent(),
+    this.forkAnchorMessageId = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        conversationId = Value(conversationId),
@@ -2577,6 +2680,8 @@ class ConversationBranchRowsCompanion
     Expression<String>? tipMessageId,
     Expression<String>? name,
     Expression<int>? createdAt,
+    Expression<String>? parentBranchId,
+    Expression<String>? forkAnchorMessageId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2585,6 +2690,9 @@ class ConversationBranchRowsCompanion
       if (tipMessageId != null) 'tip_message_id': tipMessageId,
       if (name != null) 'name': name,
       if (createdAt != null) 'created_at': createdAt,
+      if (parentBranchId != null) 'parent_branch_id': parentBranchId,
+      if (forkAnchorMessageId != null)
+        'fork_anchor_message_id': forkAnchorMessageId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2595,6 +2703,8 @@ class ConversationBranchRowsCompanion
     Value<String?>? tipMessageId,
     Value<String>? name,
     Value<DateTime>? createdAt,
+    Value<String?>? parentBranchId,
+    Value<String?>? forkAnchorMessageId,
     Value<int>? rowid,
   }) {
     return ConversationBranchRowsCompanion(
@@ -2603,6 +2713,8 @@ class ConversationBranchRowsCompanion
       tipMessageId: tipMessageId ?? this.tipMessageId,
       name: name ?? this.name,
       createdAt: createdAt ?? this.createdAt,
+      parentBranchId: parentBranchId ?? this.parentBranchId,
+      forkAnchorMessageId: forkAnchorMessageId ?? this.forkAnchorMessageId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2627,6 +2739,14 @@ class ConversationBranchRowsCompanion
         $ConversationBranchRowsTable.$convertercreatedAt.toSql(createdAt.value),
       );
     }
+    if (parentBranchId.present) {
+      map['parent_branch_id'] = Variable<String>(parentBranchId.value);
+    }
+    if (forkAnchorMessageId.present) {
+      map['fork_anchor_message_id'] = Variable<String>(
+        forkAnchorMessageId.value,
+      );
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2641,6 +2761,8 @@ class ConversationBranchRowsCompanion
           ..write('tipMessageId: $tipMessageId, ')
           ..write('name: $name, ')
           ..write('createdAt: $createdAt, ')
+          ..write('parentBranchId: $parentBranchId, ')
+          ..write('forkAnchorMessageId: $forkAnchorMessageId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2690,11 +2812,24 @@ class $ConversationTreeStateRowsTable extends ConversationTreeStateRows
         requiredDuringInsert: false,
         defaultValue: const Constant('{}'),
       );
+  static const VerificationMeta _activeBranchHistoryJsonMeta =
+      const VerificationMeta('activeBranchHistoryJson');
+  @override
+  late final GeneratedColumn<String> activeBranchHistoryJson =
+      GeneratedColumn<String>(
+        'active_branch_history_json',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('[]'),
+      );
   @override
   List<GeneratedColumn> get $columns => [
     conversationId,
     activeBranchId,
     branchSelectionsJson,
+    activeBranchHistoryJson,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2739,6 +2874,15 @@ class $ConversationTreeStateRowsTable extends ConversationTreeStateRows
         ),
       );
     }
+    if (data.containsKey('active_branch_history_json')) {
+      context.handle(
+        _activeBranchHistoryJsonMeta,
+        activeBranchHistoryJson.isAcceptableOrUnknown(
+          data['active_branch_history_json']!,
+          _activeBranchHistoryJsonMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -2763,6 +2907,10 @@ class $ConversationTreeStateRowsTable extends ConversationTreeStateRows
         DriftSqlType.string,
         data['${effectivePrefix}branch_selections_json'],
       )!,
+      activeBranchHistoryJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}active_branch_history_json'],
+      )!,
     );
   }
 
@@ -2777,10 +2925,12 @@ class ConversationTreeStateRow extends DataClass
   final String conversationId;
   final String activeBranchId;
   final String branchSelectionsJson;
+  final String activeBranchHistoryJson;
   const ConversationTreeStateRow({
     required this.conversationId,
     required this.activeBranchId,
     required this.branchSelectionsJson,
+    required this.activeBranchHistoryJson,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2788,6 +2938,9 @@ class ConversationTreeStateRow extends DataClass
     map['conversation_id'] = Variable<String>(conversationId);
     map['active_branch_id'] = Variable<String>(activeBranchId);
     map['branch_selections_json'] = Variable<String>(branchSelectionsJson);
+    map['active_branch_history_json'] = Variable<String>(
+      activeBranchHistoryJson,
+    );
     return map;
   }
 
@@ -2796,6 +2949,7 @@ class ConversationTreeStateRow extends DataClass
       conversationId: Value(conversationId),
       activeBranchId: Value(activeBranchId),
       branchSelectionsJson: Value(branchSelectionsJson),
+      activeBranchHistoryJson: Value(activeBranchHistoryJson),
     );
   }
 
@@ -2810,6 +2964,9 @@ class ConversationTreeStateRow extends DataClass
       branchSelectionsJson: serializer.fromJson<String>(
         json['branchSelectionsJson'],
       ),
+      activeBranchHistoryJson: serializer.fromJson<String>(
+        json['activeBranchHistoryJson'],
+      ),
     );
   }
   @override
@@ -2819,6 +2976,9 @@ class ConversationTreeStateRow extends DataClass
       'conversationId': serializer.toJson<String>(conversationId),
       'activeBranchId': serializer.toJson<String>(activeBranchId),
       'branchSelectionsJson': serializer.toJson<String>(branchSelectionsJson),
+      'activeBranchHistoryJson': serializer.toJson<String>(
+        activeBranchHistoryJson,
+      ),
     };
   }
 
@@ -2826,10 +2986,13 @@ class ConversationTreeStateRow extends DataClass
     String? conversationId,
     String? activeBranchId,
     String? branchSelectionsJson,
+    String? activeBranchHistoryJson,
   }) => ConversationTreeStateRow(
     conversationId: conversationId ?? this.conversationId,
     activeBranchId: activeBranchId ?? this.activeBranchId,
     branchSelectionsJson: branchSelectionsJson ?? this.branchSelectionsJson,
+    activeBranchHistoryJson:
+        activeBranchHistoryJson ?? this.activeBranchHistoryJson,
   );
   ConversationTreeStateRow copyWithCompanion(
     ConversationTreeStateRowsCompanion data,
@@ -2844,6 +3007,9 @@ class ConversationTreeStateRow extends DataClass
       branchSelectionsJson: data.branchSelectionsJson.present
           ? data.branchSelectionsJson.value
           : this.branchSelectionsJson,
+      activeBranchHistoryJson: data.activeBranchHistoryJson.present
+          ? data.activeBranchHistoryJson.value
+          : this.activeBranchHistoryJson,
     );
   }
 
@@ -2852,21 +3018,27 @@ class ConversationTreeStateRow extends DataClass
     return (StringBuffer('ConversationTreeStateRow(')
           ..write('conversationId: $conversationId, ')
           ..write('activeBranchId: $activeBranchId, ')
-          ..write('branchSelectionsJson: $branchSelectionsJson')
+          ..write('branchSelectionsJson: $branchSelectionsJson, ')
+          ..write('activeBranchHistoryJson: $activeBranchHistoryJson')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(conversationId, activeBranchId, branchSelectionsJson);
+  int get hashCode => Object.hash(
+    conversationId,
+    activeBranchId,
+    branchSelectionsJson,
+    activeBranchHistoryJson,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is ConversationTreeStateRow &&
           other.conversationId == this.conversationId &&
           other.activeBranchId == this.activeBranchId &&
-          other.branchSelectionsJson == this.branchSelectionsJson);
+          other.branchSelectionsJson == this.branchSelectionsJson &&
+          other.activeBranchHistoryJson == this.activeBranchHistoryJson);
 }
 
 class ConversationTreeStateRowsCompanion
@@ -2874,17 +3046,20 @@ class ConversationTreeStateRowsCompanion
   final Value<String> conversationId;
   final Value<String> activeBranchId;
   final Value<String> branchSelectionsJson;
+  final Value<String> activeBranchHistoryJson;
   final Value<int> rowid;
   const ConversationTreeStateRowsCompanion({
     this.conversationId = const Value.absent(),
     this.activeBranchId = const Value.absent(),
     this.branchSelectionsJson = const Value.absent(),
+    this.activeBranchHistoryJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ConversationTreeStateRowsCompanion.insert({
     required String conversationId,
     required String activeBranchId,
     this.branchSelectionsJson = const Value.absent(),
+    this.activeBranchHistoryJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : conversationId = Value(conversationId),
        activeBranchId = Value(activeBranchId);
@@ -2892,6 +3067,7 @@ class ConversationTreeStateRowsCompanion
     Expression<String>? conversationId,
     Expression<String>? activeBranchId,
     Expression<String>? branchSelectionsJson,
+    Expression<String>? activeBranchHistoryJson,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2899,6 +3075,8 @@ class ConversationTreeStateRowsCompanion
       if (activeBranchId != null) 'active_branch_id': activeBranchId,
       if (branchSelectionsJson != null)
         'branch_selections_json': branchSelectionsJson,
+      if (activeBranchHistoryJson != null)
+        'active_branch_history_json': activeBranchHistoryJson,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2907,12 +3085,15 @@ class ConversationTreeStateRowsCompanion
     Value<String>? conversationId,
     Value<String>? activeBranchId,
     Value<String>? branchSelectionsJson,
+    Value<String>? activeBranchHistoryJson,
     Value<int>? rowid,
   }) {
     return ConversationTreeStateRowsCompanion(
       conversationId: conversationId ?? this.conversationId,
       activeBranchId: activeBranchId ?? this.activeBranchId,
       branchSelectionsJson: branchSelectionsJson ?? this.branchSelectionsJson,
+      activeBranchHistoryJson:
+          activeBranchHistoryJson ?? this.activeBranchHistoryJson,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2931,6 +3112,11 @@ class ConversationTreeStateRowsCompanion
         branchSelectionsJson.value,
       );
     }
+    if (activeBranchHistoryJson.present) {
+      map['active_branch_history_json'] = Variable<String>(
+        activeBranchHistoryJson.value,
+      );
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2943,6 +3129,7 @@ class ConversationTreeStateRowsCompanion
           ..write('conversationId: $conversationId, ')
           ..write('activeBranchId: $activeBranchId, ')
           ..write('branchSelectionsJson: $branchSelectionsJson, ')
+          ..write('activeBranchHistoryJson: $activeBranchHistoryJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -14432,6 +14619,8 @@ typedef $$ConversationBranchRowsTableCreateCompanionBuilder =
       Value<String?> tipMessageId,
       Value<String> name,
       required DateTime createdAt,
+      Value<String?> parentBranchId,
+      Value<String?> forkAnchorMessageId,
       Value<int> rowid,
     });
 typedef $$ConversationBranchRowsTableUpdateCompanionBuilder =
@@ -14441,6 +14630,8 @@ typedef $$ConversationBranchRowsTableUpdateCompanionBuilder =
       Value<String?> tipMessageId,
       Value<String> name,
       Value<DateTime> createdAt,
+      Value<String?> parentBranchId,
+      Value<String?> forkAnchorMessageId,
       Value<int> rowid,
     });
 
@@ -14507,6 +14698,16 @@ class $$ConversationBranchRowsTableFilterComposer
         builder: (column) => ColumnWithTypeConverterFilters(column),
       );
 
+  ColumnFilters<String> get parentBranchId => $composableBuilder(
+    column: $table.parentBranchId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get forkAnchorMessageId => $composableBuilder(
+    column: $table.forkAnchorMessageId,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$ConversationRowsTableFilterComposer get conversationId {
     final $$ConversationRowsTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -14560,6 +14761,16 @@ class $$ConversationBranchRowsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get parentBranchId => $composableBuilder(
+    column: $table.parentBranchId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get forkAnchorMessageId => $composableBuilder(
+    column: $table.forkAnchorMessageId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$ConversationRowsTableOrderingComposer get conversationId {
     final $$ConversationRowsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -14606,6 +14817,16 @@ class $$ConversationBranchRowsTableAnnotationComposer
 
   GeneratedColumnWithTypeConverter<DateTime, int> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get parentBranchId => $composableBuilder(
+    column: $table.parentBranchId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get forkAnchorMessageId => $composableBuilder(
+    column: $table.forkAnchorMessageId,
+    builder: (column) => column,
+  );
 
   $$ConversationRowsTableAnnotationComposer get conversationId {
     final $$ConversationRowsTableAnnotationComposer composer = $composerBuilder(
@@ -14675,6 +14896,8 @@ class $$ConversationBranchRowsTableTableManager
                 Value<String?> tipMessageId = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<String?> parentBranchId = const Value.absent(),
+                Value<String?> forkAnchorMessageId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ConversationBranchRowsCompanion(
                 id: id,
@@ -14682,6 +14905,8 @@ class $$ConversationBranchRowsTableTableManager
                 tipMessageId: tipMessageId,
                 name: name,
                 createdAt: createdAt,
+                parentBranchId: parentBranchId,
+                forkAnchorMessageId: forkAnchorMessageId,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -14691,6 +14916,8 @@ class $$ConversationBranchRowsTableTableManager
                 Value<String?> tipMessageId = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 required DateTime createdAt,
+                Value<String?> parentBranchId = const Value.absent(),
+                Value<String?> forkAnchorMessageId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ConversationBranchRowsCompanion.insert(
                 id: id,
@@ -14698,6 +14925,8 @@ class $$ConversationBranchRowsTableTableManager
                 tipMessageId: tipMessageId,
                 name: name,
                 createdAt: createdAt,
+                parentBranchId: parentBranchId,
+                forkAnchorMessageId: forkAnchorMessageId,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -14774,6 +15003,7 @@ typedef $$ConversationTreeStateRowsTableCreateCompanionBuilder =
       required String conversationId,
       required String activeBranchId,
       Value<String> branchSelectionsJson,
+      Value<String> activeBranchHistoryJson,
       Value<int> rowid,
     });
 typedef $$ConversationTreeStateRowsTableUpdateCompanionBuilder =
@@ -14781,6 +15011,7 @@ typedef $$ConversationTreeStateRowsTableUpdateCompanionBuilder =
       Value<String> conversationId,
       Value<String> activeBranchId,
       Value<String> branchSelectionsJson,
+      Value<String> activeBranchHistoryJson,
       Value<int> rowid,
     });
 
@@ -14836,6 +15067,11 @@ class $$ConversationTreeStateRowsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get activeBranchHistoryJson => $composableBuilder(
+    column: $table.activeBranchHistoryJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$ConversationRowsTableFilterComposer get conversationId {
     final $$ConversationRowsTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -14879,6 +15115,11 @@ class $$ConversationTreeStateRowsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get activeBranchHistoryJson => $composableBuilder(
+    column: $table.activeBranchHistoryJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$ConversationRowsTableOrderingComposer get conversationId {
     final $$ConversationRowsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -14919,6 +15160,11 @@ class $$ConversationTreeStateRowsTableAnnotationComposer
 
   GeneratedColumn<String> get branchSelectionsJson => $composableBuilder(
     column: $table.branchSelectionsJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get activeBranchHistoryJson => $composableBuilder(
+    column: $table.activeBranchHistoryJson,
     builder: (column) => column,
   );
 
@@ -14991,11 +15237,13 @@ class $$ConversationTreeStateRowsTableTableManager
                 Value<String> conversationId = const Value.absent(),
                 Value<String> activeBranchId = const Value.absent(),
                 Value<String> branchSelectionsJson = const Value.absent(),
+                Value<String> activeBranchHistoryJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ConversationTreeStateRowsCompanion(
                 conversationId: conversationId,
                 activeBranchId: activeBranchId,
                 branchSelectionsJson: branchSelectionsJson,
+                activeBranchHistoryJson: activeBranchHistoryJson,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -15003,11 +15251,13 @@ class $$ConversationTreeStateRowsTableTableManager
                 required String conversationId,
                 required String activeBranchId,
                 Value<String> branchSelectionsJson = const Value.absent(),
+                Value<String> activeBranchHistoryJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ConversationTreeStateRowsCompanion.insert(
                 conversationId: conversationId,
                 activeBranchId: activeBranchId,
                 branchSelectionsJson: branchSelectionsJson,
+                activeBranchHistoryJson: activeBranchHistoryJson,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

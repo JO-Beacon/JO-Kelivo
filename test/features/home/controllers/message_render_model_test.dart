@@ -19,65 +19,41 @@ void main() {
     isStreaming: streaming,
   );
 
-  test('projects versions, divider and latest assistant in one snapshot', () {
+  test('projects message ids without legacy version grouping', () {
     final user = message('user', 'user');
-    final first = message('a0', 'assistant', groupId: 'answer', version: 0);
     final selected = message('a2', 'assistant', groupId: 'answer', version: 2);
     final streaming = message('tail', 'assistant', streaming: true);
 
     final models = MessageRenderModelProjector.project(
       messages: [user, selected, streaming],
-      byGroup: {
-        'user': [user],
-        'answer': [selected, first],
-        'tail': [streaming],
-      },
-      versionSelections: const {'answer': 2},
-      versionCounts: const {'answer': 2},
       contextDividerIndex: 1,
     );
 
-    expect(models.map((model) => model.slotId), ['user', 'answer', 'tail']);
-    expect(models[1].versions.map((item) => item.version), [0, 2]);
-    expect(models[1].availableVersions, [0, 2]);
-    expect(models[1].selectedVersion, 2);
-    expect(models[1].selectedVersionIndex, 1);
+    expect(models.map((model) => model.slotId), ['user', 'a2', 'tail']);
+    expect(models[1].message, selected);
     expect(models[1].showContextDivider, isTrue);
     expect(models[1].isLatestCompleteAssistant, isTrue);
     expect(models[2].isLatestCompleteAssistant, isFalse);
   });
 
-  test('clamps stale selections without scanning from a row builder', () {
+  test('projects a single message without legacy selection input', () {
     final only = message('only', 'assistant');
     final models = MessageRenderModelProjector.project(
       messages: [only],
-      byGroup: {
-        'only': [only],
-      },
-      versionSelections: const {'only': 99},
-      versionCounts: const {'only': 1},
       contextDividerIndex: -1,
     );
 
-    expect(models.single.selectedVersionIndex, 0);
-    expect(models.single.versionCount, 1);
+    expect(models.single.message, only);
   });
 
-  test('uses available revisions for the display ordinal', () {
+  test('ignores legacy authoritative version counts', () {
     final selected = message('a1', 'assistant', groupId: 'answer', version: 1);
 
     final models = MessageRenderModelProjector.project(
       messages: [selected],
-      byGroup: {
-        'answer': [selected],
-      },
-      versionSelections: const {'answer': 1},
-      versionCounts: const {'answer': 2},
       contextDividerIndex: -1,
     );
 
-    expect(models.single.versions, [selected]);
-    expect(models.single.versionCount, 2);
-    expect(models.single.selectedVersionIndex, 0);
+    expect(models.single.message, selected);
   });
 }

@@ -105,7 +105,7 @@ void main() {
   );
 
   test(
-    'append version selects it without moving or deleting later groups',
+    'save as branch activates it without deleting the original future',
     () async {
       final root = await Directory.systemTemp.createTemp('linear_edit_test_');
       final repository = ChatDatabaseRepository.open(
@@ -149,12 +149,20 @@ void main() {
       );
 
       expect(appended, isNotNull);
-      expect(appended!.message.version, 1);
+      expect(appended!.message.groupId, isNull);
+      expect(appended.message.version, 0);
       expect(appended.conversation.versionSelections, isEmpty);
       expect(window.slots.map((slot) => slot.revisionId), [
-        appended.message.id,
+        original.id,
         later.id,
+        appended.message.id,
       ]);
+      final tree = await repository.loadConversationTree(conversation.id);
+      expect(tree!.activePath(), [appended.message.id]);
+      expect(
+        tree.branches.values.map((branch) => tree.branchPath(branch.id)),
+        contains(equals([original.id, later.id])),
+      );
       expect(await repository.getMessageIndex(conversation.id, later.id), 9);
     },
   );

@@ -53,7 +53,7 @@ void main() {
     );
   }
 
-  test('append version creates and activates a tree branch', () async {
+  test('save as branch creates and activates an independent message', () async {
     await repository.appendLinearMessageToConversation(
       conversation: conversation(),
       message: message(id: 'message-0', groupId: 'group-1'),
@@ -64,15 +64,12 @@ void main() {
       content: 'v1',
     );
 
-    expect(result?.message.version, 1);
-    final timeline = await repository.loadLinearMessageWindow(
-      conversationId: 'conversation-1',
-      fromStart: true,
-    );
-    expect(timeline.slots.single.revisionId, result!.message.id);
+    expect(result?.message.groupId, isNull);
+    expect(result?.message.version, 0);
+    final saved = result!;
     final tree = await repository.loadConversationTree('conversation-1');
     expect(tree, isNotNull);
-    expect(tree!.activePath(), contains(result.message.id));
+    expect(tree!.activePath(), contains(saved.message.id));
     expect(
       (await repository.getConversation('conversation-1'))?.versionSelections,
       isEmpty,
@@ -115,40 +112,40 @@ void main() {
     );
   });
 
-  test('editing a middle user version preserves the active future', () async {
-    final base = conversation();
-    for (final item in [
-      message(id: 'u1', role: 'user'),
-      message(id: 'a1'),
-      message(id: 'u2', role: 'user'),
-      message(id: 'a2'),
-    ]) {
-      await repository.appendLinearMessageToConversation(
-        conversation: base,
-        message: item,
+  test(
+    'editing a middle user creates a sibling and preserves the old future',
+    () async {
+      final base = conversation();
+      for (final item in [
+        message(id: 'u1', role: 'user'),
+        message(id: 'a1'),
+        message(id: 'u2', role: 'user'),
+        message(id: 'a2'),
+      ]) {
+        await repository.appendLinearMessageToConversation(
+          conversation: base,
+          message: item,
+        );
+      }
+
+      final result = await repository.appendMessageVersion(
+        messageId: 'u2',
+        content: 'u2 edited',
       );
-    }
-
-    final result = await repository.appendMessageVersion(
-      messageId: 'u2',
-      content: 'u2 edited',
-    );
-    final timeline = await repository.loadLinearMessageWindow(
-      conversationId: base.id,
-      fromStart: true,
-    );
-
-    expect(timeline.slots.map((slot) => slot.revisionId), [
-      'u1',
-      'a1',
-      result!.message.id,
-      'a2',
-    ]);
-    expect(await repository.getMessage('u2'), isNotNull);
-    final persisted = await repository.getMessage(result.message.id);
-    expect(persisted?.id, result.message.id);
-    expect(persisted?.content, 'u2 edited');
-  });
+      final tree = await repository.loadConversationTree(base.id);
+      expect(tree!.activePath(), ['u1', 'a1', result!.message.id]);
+      expect(
+        tree.branches.values.any(
+          (branch) => tree.branchPath(branch.id).join('|') == 'u1|a1|u2|a2',
+        ),
+        isTrue,
+      );
+      expect(await repository.getMessage('u2'), isNotNull);
+      final persisted = await repository.getMessage(result.message.id);
+      expect(persisted?.id, result.message.id);
+      expect(persisted?.content, 'u2 edited');
+    },
+  );
 
   test(
     'concurrent selection and append commands preserve unrelated state',

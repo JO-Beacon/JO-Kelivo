@@ -13,17 +13,25 @@ import 'widgets/desktop_dialog_style.dart';
 Future<MessageEditResult?> showMessageEditDesktopDialog(
   BuildContext context, {
   required ChatMessage message,
+  bool canCloneSubtree = false,
 }) async {
   return showDialog<MessageEditResult?>(
     context: context,
     barrierDismissible: true,
-    builder: (ctx) => _MessageEditDesktopDialog(message: message),
+    builder: (ctx) => _MessageEditDesktopDialog(
+      message: message,
+      canCloneSubtree: canCloneSubtree,
+    ),
   );
 }
 
 class _MessageEditDesktopDialog extends StatefulWidget {
-  const _MessageEditDesktopDialog({required this.message});
+  const _MessageEditDesktopDialog({
+    required this.message,
+    this.canCloneSubtree = false,
+  });
   final ChatMessage message;
+  final bool canCloneSubtree;
 
   @override
   State<_MessageEditDesktopDialog> createState() =>
@@ -106,6 +114,15 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
     }
   }
 
+  Future<void> _confirmOverwrite() async {
+    if (_allowClose) return;
+    if (await showMessageEditOverwriteConfirmation(context) && mounted) {
+      _closeWithResult(
+        _result(shouldSend: false, saveMode: MessageEditSaveMode.overwrite),
+      );
+    }
+  }
+
   BoxConstraints _dialogConstraints(BuildContext context) {
     return DesktopDialogStyle.proportionalConstraints(
       context,
@@ -171,23 +188,41 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                           spacing: 4,
                           runSpacing: 2,
                           children: [
-                            TextButton.icon(
-                              onPressed: () {
-                                _closeWithResult(_result(shouldSend: true));
-                              },
-                              icon: Icon(
-                                Lucide.MessageCirclePlus,
-                                size: 18,
-                                color: cs.primary,
-                              ),
-                              label: Text(
-                                l10n.messageEditPageSaveAsBranchAndSend,
-                                style: TextStyle(
+                            if (widget.message.role == 'user')
+                              TextButton.icon(
+                                onPressed: () {
+                                  _closeWithResult(_result(shouldSend: true));
+                                },
+                                icon: Icon(
+                                  Lucide.MessageCirclePlus,
+                                  size: 18,
                                   color: cs.primary,
-                                  fontWeight: AppFontWeights.semibold,
+                                ),
+                                label: Text(
+                                  l10n.messageEditPageSaveAsBranchAndSend,
+                                  style: TextStyle(
+                                    color: cs.primary,
+                                    fontWeight: AppFontWeights.semibold,
+                                  ),
                                 ),
                               ),
-                            ),
+                            if (widget.canCloneSubtree)
+                              TextButton.icon(
+                                onPressed: () => _closeWithResult(
+                                  _result(
+                                    shouldSend: false,
+                                    saveMode: MessageEditSaveMode.cloneSubtree,
+                                  ),
+                                ),
+                                icon: Icon(
+                                  Lucide.GitFork,
+                                  size: 18,
+                                  color: cs.primary,
+                                ),
+                                label: Text(
+                                  l10n.messageEditPageSaveAsBranchCopyChildren,
+                                ),
+                              ),
                             TextButton.icon(
                               onPressed: () {
                                 _closeWithResult(_result(shouldSend: false));
@@ -206,14 +241,7 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                               ),
                             ),
                             TextButton.icon(
-                              onPressed: () {
-                                _closeWithResult(
-                                  _result(
-                                    shouldSend: false,
-                                    saveMode: MessageEditSaveMode.overwrite,
-                                  ),
-                                );
-                              },
+                              onPressed: () => _confirmOverwrite(),
                               icon: Icon(
                                 Lucide.Edit,
                                 size: 18,

@@ -42,6 +42,7 @@ import '../../../shared/widgets/emoji_text.dart';
 import '../../../shared/widgets/avatar_image_editor.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../core/providers/assistant_group_provider.dart';
+import '../../../core/database/business_preferences.dart';
 import '../../assistant/widgets/assistant_select_sheet.dart';
 import '../../assistant/widgets/assistant_selection_bars.dart';
 import '../../../desktop/hotkeys/sidebar_tab_bus.dart';
@@ -50,6 +51,7 @@ import 'dart:async';
 import '../../../features/search/services/global_session_search_service.dart';
 import '../../../utils/search_highlight.dart';
 import '../controllers/chat_actions.dart';
+import '../services/chat_sidebar_state_store.dart';
 import 'assistant_avatar.dart';
 import 'assistant_entry_actions.dart';
 import 'sidebar_presentation.dart';
@@ -158,6 +160,10 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   ValueNotifier<int>? _closeTicker;
   bool _assistantsExpanded = false;
   final ScrollController _listController = ScrollController();
+  final ScrollController _assistantListController = ScrollController();
+  ChatSidebarStateStore? _sidebarStateStore;
+  Timer? _assistantScrollSaveTimer;
+  bool _assistantScrollRestored = false;
   bool _assistantHeaderHovered = false;
   double _mobileSearchSwipeDx = 0;
   bool _mobileSearchSwipeHandled = false;
@@ -194,6 +200,13 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    try {
+      _sidebarStateStore = ChatSidebarStateStore(
+        context.read<BusinessPreferences>(),
+      );
+      _assistantListController.addListener(_onAssistantListScrolled);
+      unawaited(_restoreAssistantListScroll());
+    } catch (_) {}
     SideDrawer.debugRequestConversationListHostRebuild =
         _debugRequestConversationListHostRebuild;
     SideDrawer.debugEnterSelectionMode = _enterSelectionMode;
@@ -1096,6 +1109,20 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     _mobileSearchFocusNode.dispose();
     _searchController.dispose();
     _listController.dispose();
+    _assistantScrollSaveTimer?.cancel();
+    _assistantListController.removeListener(_onAssistantListScrolled);
+    if (_assistantListController.hasClients) {
+      final store = _sidebarStateStore;
+      if (store != null) {
+        unawaited(
+          store.setAssistantScrollOffset(
+            _assistantScrollScope,
+            _assistantListController.offset,
+          ),
+        );
+      }
+    }
+    _assistantListController.dispose();
     _tabController?.removeListener(_onDesktopTabChanged);
     _tabController?.dispose();
     try {
@@ -2884,20 +2911,52 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     setState(() {
       _assistantsExpanded = goingToExpand;
     });
-    if (goingToExpand) {
-      // 在顶部平滑显示助手列表
-      if (_listController.hasClients) {
-        // 轻微延迟，确保动画前布局已就绪
-        Future<void>.delayed(const Duration(milliseconds: 10), () {
-          if (!_listController.hasClients) return;
-          _listController.animateTo(
-            0,
-            duration: const Duration(milliseconds: 420),
-            curve: Curves.easeOutCubic,
-          );
-        });
-      }
+    if (goingToExpand && !_assistantScrollRestored) {
+      unawaited(_restoreAssistantListScroll());
     }
+  }
+
+  String get _assistantScrollScope {
+    if (_assistantsOnly) return 'assistants-only';
+    if (_showTabs) return 'assistant-tab';
+    return 'assistant-inline';
+  }
+
+  Future<void> _restoreAssistantListScroll() async {
+    final store = _sidebarStateStore;
+    if (store == null) return;
+    await store.load();
+    if (!mounted) return;
+    final offset = store.assistantScrollOffset(_assistantScrollScope);
+    for (var pass = 0; pass < 8; pass++) {
+      if (!mounted) return;
+      if (_assistantListController.hasClients) {
+        final position = _assistantListController.position;
+        _assistantListController.jumpTo(
+          offset.clamp(position.minScrollExtent, position.maxScrollExtent),
+        );
+        _assistantScrollRestored = true;
+        return;
+      }
+      await WidgetsBinding.instance.endOfFrame;
+    }
+  }
+
+  void _onAssistantListScrolled() {
+    if (!_assistantScrollRestored || !_assistantListController.hasClients) {
+      return;
+    }
+    _assistantScrollSaveTimer?.cancel();
+    _assistantScrollSaveTimer = Timer(const Duration(milliseconds: 250), () {
+      final store = _sidebarStateStore;
+      if (store == null || !_assistantListController.hasClients) return;
+      unawaited(
+        store.setAssistantScrollOffset(
+          _assistantScrollScope,
+          _assistantListController.offset,
+        ),
+      );
+    });
   }
 
   void _closeAssistantPicker() {
@@ -3856,6 +3915,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     // 桌面助手标签拥有自己的滚动视口；列表项按需创建。
     if (_assistantReorder) {
       list = ReorderableListView.builder(
+        scrollController: _assistantListController,
         padding: const EdgeInsets.fromLTRB(6, 6, 6, 8),
         buildDefaultDragHandles: false,
         itemCount: entries.length,
@@ -3905,6 +3965,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       );
     } else {
       list = ListView.builder(
+        controller: _assistantListController,
         padding: const EdgeInsets.fromLTRB(6, 6, 6, 8),
         itemCount: entries.length,
         itemBuilder: buildEntry,

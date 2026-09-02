@@ -707,11 +707,12 @@ class ChatMessageWidget extends StatefulWidget {
   final VoidCallback? onMore;
   final VoidCallback? onEdit; // 用户：编辑
   final VoidCallback? onDelete; // 用户：删除
-  // 可选版本切换器（分支）UI 控件
-  final int? versionIndex; // 从 0 开始的展示序号，不是版本号
-  final int? versionCount;
-  final VoidCallback? onPrevVersion;
-  final VoidCallback? onNextVersion;
+  final bool canDeleteMessageAndFollowing;
+  // 可选分支切换器 UI 控件
+  final int? branchIndex;
+  final int? branchCount;
+  final VoidCallback? onPreviousBranch;
+  final VoidCallback? onNextBranch;
   // 可选推理 UI 属性（用于支持推理的模型）
   final String? reasoningText;
   final bool reasoningExpanded;
@@ -761,10 +762,11 @@ class ChatMessageWidget extends StatefulWidget {
     this.onMore,
     this.onEdit,
     this.onDelete,
-    this.versionIndex,
-    this.versionCount,
-    this.onPrevVersion,
-    this.onNextVersion,
+    this.canDeleteMessageAndFollowing = true,
+    this.branchIndex,
+    this.branchCount,
+    this.onPreviousBranch,
+    this.onNextBranch,
     this.reasoningText,
     this.reasoningExpanded = false,
     this.reasoningLoading = false,
@@ -1239,16 +1241,17 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                     widget.onEdit?.call();
                                   },
                                 ),
-                              _MenuItem(
-                                icon: Lucide.Trash2,
-                                danger: true,
-                                label: l10n
-                                    .messageMoreSheetDeleteMessageAndFollowing,
-                                onTap: () {
-                                  Navigator.of(ctx).pop();
-                                  (widget.onDelete ?? widget.onMore)?.call();
-                                },
-                              ),
+                              if (widget.canDeleteMessageAndFollowing)
+                                _MenuItem(
+                                  icon: Lucide.Trash2,
+                                  danger: true,
+                                  label: l10n
+                                      .messageMoreSheetDeleteMessageAndFollowing,
+                                  onTap: () {
+                                    Navigator.of(ctx).pop();
+                                    (widget.onDelete ?? widget.onMore)?.call();
+                                  },
+                                ),
                             ],
                           ),
                         ),
@@ -1413,7 +1416,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       scope: AssistantRegexScope.user,
     );
     final showUserActions = userMessageSettings.showActions;
-    final showVersionSwitcher = (widget.versionCount ?? 1) > 1;
+    final showBranchSwitcher = (widget.branchCount ?? 1) > 1;
     final mediaPreview = _buildAttachmentPreview(
       context,
       parts: widget.message.parts,
@@ -1520,7 +1523,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               ),
             ),
           ),
-          if (showUserActions || showVersionSwitcher) ...[
+          if (showUserActions || showBranchSwitcher) ...[
             SizedBox(height: showUserActions ? 8 : 6),
             Align(
               alignment: Alignment.centerRight,
@@ -1634,13 +1637,13 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                         ),
                       ),
                     ],
-                    if (showVersionSwitcher) ...[
+                    if (showBranchSwitcher) ...[
                       if (showUserActions) const SizedBox(width: 6),
                       _BranchSelector(
-                        index: widget.versionIndex ?? 0,
-                        total: widget.versionCount ?? 1,
-                        onPrev: widget.onPrevVersion,
-                        onNext: widget.onNextVersion,
+                        index: widget.branchIndex ?? 0,
+                        total: widget.branchCount ?? 1,
+                        onPrev: widget.onPreviousBranch,
+                        onNext: widget.onNextBranch,
                       ),
                     ],
                   ],
@@ -1689,12 +1692,13 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             label: l10n.messageMoreSheetEdit,
             onTap: () => widget.onEdit?.call(),
           ),
-        DesktopContextMenuItem(
-          icon: Lucide.Trash2,
-          label: l10n.messageMoreSheetDeleteMessageAndFollowing,
-          danger: true,
-          onTap: () => (widget.onDelete ?? widget.onMore)?.call(),
-        ),
+        if (widget.canDeleteMessageAndFollowing)
+          DesktopContextMenuItem(
+            icon: Lucide.Trash2,
+            label: l10n.messageMoreSheetDeleteMessageAndFollowing,
+            danger: true,
+            onTap: () => (widget.onDelete ?? widget.onMore)?.call(),
+          ),
       ],
     );
   }
@@ -3041,13 +3045,13 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                             ),
                           ),
                         ),
-                        if ((widget.versionCount ?? 1) > 1) ...[
+                        if ((widget.branchCount ?? 1) > 1) ...[
                           const SizedBox(width: 6),
                           _BranchSelector(
-                            index: widget.versionIndex ?? 0,
-                            total: widget.versionCount ?? 1,
-                            onPrev: widget.onPrevVersion,
-                            onNext: widget.onNextVersion,
+                            index: widget.branchIndex ?? 0,
+                            total: widget.branchCount ?? 1,
+                            onPrev: widget.onPreviousBranch,
+                            onNext: widget.onNextBranch,
                           ),
                         ],
                         if (widget.showTokenStats &&

@@ -147,12 +147,12 @@ void main() {
   });
 
   test(
-    'multi-version group honors the selected revision from memory',
+    'legacy version selection cannot change the active tree projection',
     () async {
       final (service, conversationId, ids) = await seedRestartedService();
 
-      // Add a second version for the last message's group and select the older
-      // version, so the selected revision is not the latest one.
+      // Legacy group/version fields remain migration input only. Runtime
+      // selection must continue to follow the persisted active tree.
       final groupId = ids.last;
       final newer = await service.addMessage(
         conversationId: conversationId,
@@ -175,12 +175,11 @@ void main() {
       expect(pageSignature(cachedPage), orderedEquals(pageSignature(dbPage)));
 
       final tailSlot = cachedPage!.slots.last;
-      expect(tailSlot.identity.slotId, ids.last);
-      expect(tailSlot.identity.revisionId, ids.last);
+      expect(tailSlot.identity.slotId, newer.id);
+      expect(tailSlot.identity.revisionId, newer.id);
       expect(tailSlot.identity.versionCount, 1);
-      expect(tailSlot.message.content, 'message 4');
+      expect(tailSlot.message.content, 'regenerated');
       expect(cachedPage.totalSlotCount, ids.length);
-      expect(newer.id, isNot(tailSlot.identity.revisionId));
     },
   );
 

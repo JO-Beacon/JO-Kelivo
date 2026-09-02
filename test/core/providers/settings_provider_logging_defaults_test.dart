@@ -26,5 +26,6 @@ void main() {
     expect(settings.logSaveOutput, isFalse);
     expect(settings.logElideLargePayloads, isTrue);
     expect(settings.logMaxSizeMB, 50);
+    expect(settings.newChatOnLaunch, isFalse);
   });
 }

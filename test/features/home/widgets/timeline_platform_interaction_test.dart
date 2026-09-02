@@ -35,7 +35,6 @@ void main() {
               listController: listController,
               messages: const [],
               byGroup: const {},
-              versionSelections: const {},
               reasoning: const {},
               reasoningSegments: const {},
               contentSplits: const {},

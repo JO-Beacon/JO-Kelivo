@@ -588,20 +588,12 @@ class ChatService extends ChangeNotifier {
     final byId = <String, ChatMessage>{
       for (final message in allMessages) message.id: message,
     };
-    final activeMessages = <ChatMessage>[];
-    final versionCounts = <String, int>{};
-    for (final id in tree.activePath()) {
-      final message = byId[id];
-      if (message != null) {
-        activeMessages.add(message);
-        final groupId = message.groupId ?? message.id;
-        versionCounts[groupId] = allMessages
-            .where(
-              (candidate) => (candidate.groupId ?? candidate.id) == groupId,
-            )
-            .length;
-      }
-    }
+    // 临时会话与持久化会话统一只投影树的活动路径；旧 groupId/version
+    // 仅作为迁移输入，不能重新折叠时间线。
+    final activeMessages = <ChatMessage>[
+      for (final id in tree.activePath())
+        if (byId[id] != null) byId[id]!,
+    ];
 
     var start = 0;
     var end = activeMessages.length;
@@ -643,14 +635,14 @@ class ChatService extends ChangeNotifier {
       slots.add(
         LoadedTimelineSlot(
           identity: ActiveTimelineSlot(
-            slotId: message.groupId ?? message.id,
+            slotId: message.id,
             revisionId: message.id,
             parentRevisionId: parentRevisionId,
             role: message.role,
             createdAt: message.timestamp,
             updatedAt: message.timestamp,
             finalizedAt: message.isStreaming ? null : message.timestamp,
-            versionCount: versionCounts[message.groupId ?? message.id] ?? 1,
+            versionCount: 1,
             logicalIndex: index,
           ),
           message: message,
@@ -1081,25 +1073,24 @@ class ChatService extends ChangeNotifier {
     int snippetLength = 120,
   }) async {
     if (!_initialized) return const <MiniMapSearchHit>[];
-    if (_temporaryConversationIds.contains(conversationId) ||
-        _draftConversations.containsKey(conversationId)) {
-      return _miniMapHitsFromCachedMessages(
-        conversationId,
-        query,
-        snippetRadius: snippetRadius,
-        snippetLength: snippetLength,
-      );
-    }
-    return _repo.searchMiniMapMatches(
-      conversationId,
+    final tree = await _loadOrCreateConversationTree(conversationId);
+    final messages =
+        _temporaryConversationIds.contains(conversationId) ||
+            _draftConversations.containsKey(conversationId)
+        ? (_messagesCache[conversationId] ?? const <ChatMessage>[])
+        : await loadAllConversationMessages(conversationId);
+    return _miniMapHitsFromTree(
+      tree,
+      messages,
       query,
       snippetRadius: snippetRadius,
       snippetLength: snippetLength,
     );
   }
 
-  List<MiniMapSearchHit> _miniMapHitsFromCachedMessages(
-    String conversationId,
+  List<MiniMapSearchHit> _miniMapHitsFromTree(
+    ConversationTree tree,
+    List<ChatMessage> messages,
     String query, {
     required int snippetRadius,
     required int snippetLength,
@@ -1112,48 +1103,34 @@ class ChatService extends ChangeNotifier {
       snippetRadius: snippetRadius,
       snippetLength: snippetLength,
     );
-    final messages = _messagesCache[conversationId] ?? const <ChatMessage>[];
-    final groups = <String, List<ChatMessage>>{};
-    final order = <String>[];
-    for (final message in messages) {
-      final groupId = message.groupId ?? message.id;
-      if (!groups.containsKey(groupId)) order.add(groupId);
-      groups.putIfAbsent(groupId, () => <ChatMessage>[]).add(message);
-    }
-    final selections = getVersionSelections(conversationId);
+    final byId = <String, ChatMessage>{for (final m in messages) m.id: m};
     final hits = <MiniMapSearchHit>[];
-    for (final groupId in order) {
-      final versions = groups[groupId]!
-        ..sort((a, b) => a.version.compareTo(b.version));
-      final selected =
-          versions.cast<ChatMessage?>().firstWhere(
-            (message) => message!.version == selections[groupId],
-            orElse: () => null,
-          ) ??
-          versions.last;
-      if (selected.role != 'user' && selected.role != 'assistant') continue;
-      final text = selected.content;
-      final lower = text.toLowerCase();
+    for (final id in tree.activePath()) {
+      final message = byId[id];
+      if (message == null ||
+          (message.role != 'user' && message.role != 'assistant')) {
+        continue;
+      }
+      final value = message.content;
+      final lower = value.toLowerCase();
       final first = lower.indexOf(needle);
       if (first < 0) continue;
-      var matchCount = 0;
+      var count = 0;
       var position = 0;
       while (true) {
         final index = lower.indexOf(needle, position);
         if (index < 0) break;
-        matchCount++;
+        count++;
         position = index + needle.length;
       }
-      final snippetStart = first < radius ? 0 : first - radius;
-      final snippetEnd = snippetStart + length > text.length
-          ? text.length
-          : snippetStart + length;
+      final start = first < radius ? 0 : first - radius;
+      final end = (start + length).clamp(0, value.length).toInt();
       hits.add(
         MiniMapSearchHit(
-          messageId: selected.id,
-          matchCount: matchCount,
-          snippet: text.substring(snippetStart, snippetEnd),
-          snippetStart: snippetStart,
+          messageId: message.id,
+          matchCount: count,
+          snippet: value.substring(start, end),
+          snippetStart: start,
         ),
       );
     }
@@ -1206,10 +1183,15 @@ class ChatService extends ChangeNotifier {
 
     final List<ChatMessage> source;
     if (isConversationFullyCached(conversationId)) {
-      final selected = _collapseTitleVersions(
-        _messagesCache[conversationId]!,
-        getVersionSelections(conversationId),
-      );
+      final tree = await _loadOrCreateConversationTree(conversationId);
+      final byId = <String, ChatMessage>{
+        for (final message in _messagesCache[conversationId]!)
+          message.id: message,
+      };
+      final selected = [
+        for (final id in tree.activePath())
+          if (byId[id] != null) byId[id]!,
+      ];
       final start = (truncateIndex >= 0 && truncateIndex <= selected.length)
           ? truncateIndex
           : 0;
@@ -1286,40 +1268,6 @@ class ChatService extends ChangeNotifier {
       if (chars >= _titleSourceMaxChars) break;
     }
     return selected;
-  }
-
-  List<ChatMessage> _collapseTitleVersions(
-    List<ChatMessage> messages,
-    Map<String, int> selections,
-  ) {
-    final byGroup = <String, List<ChatMessage>>{};
-    final order = <String>[];
-    for (final message in messages) {
-      final groupId = message.groupId ?? message.id;
-      byGroup
-          .putIfAbsent(groupId, () {
-            order.add(groupId);
-            return <ChatMessage>[];
-          })
-          .add(message);
-    }
-    return [
-      for (final groupId in order)
-        _selectedTitleVersion(byGroup[groupId]!, selections[groupId]),
-    ];
-  }
-
-  ChatMessage _selectedTitleVersion(
-    List<ChatMessage> versions,
-    int? selection,
-  ) {
-    versions.sort((a, b) => a.version.compareTo(b.version));
-    if (selection != null) {
-      for (final candidate in versions) {
-        if (candidate.version == selection) return candidate;
-      }
-    }
-    return versions.last;
   }
 
   Future<List<ChatMessage>> loadMessages(String conversationId) async {
@@ -2735,8 +2683,7 @@ class ChatService extends ChangeNotifier {
       var tree = await _loadOrCreateConversationTree(conversationId);
       var effectiveParentMessageId = parentMessageId;
       var effectiveBranchId = branchId;
-      // 旧调用方可能仍通过 selectVersion 写入一条版本。把它转换为
-      // 树上的兄弟节点，字段只作为兼容元数据，不参与活动路径计算。
+      // 兼容旧调用方传入的版本字段；树仍是实际活动路径的唯一投影。
       if (selectVersion &&
           groupId != null &&
           parentMessageId == null &&
@@ -2843,56 +2790,10 @@ class ChatService extends ChangeNotifier {
     return result;
   }
 
-  Future<GenerationBeginResult> beginRegeneration({
-    required String conversationId,
-    required String modelId,
-    required String providerId,
-    required String groupId,
-    required int version,
-    required bool truncateFuture,
-    String? parentMessageId,
-    String? branchId,
-  }) async {
-    if (!_initialized) await init();
-    if (isTemporaryConversation(conversationId)) {
-      throw StateError('temporary_generation_is_not_persisted');
-    }
-    final conversation = _conversationsCache[conversationId];
-    if (conversation == null) throw StateError('conversation_missing');
-    await _loadMessageOrder(conversationId);
-    final assistantMessage = ChatMessage(
-      role: 'assistant',
-      content: '',
-      conversationId: conversationId,
-      modelId: modelId,
-      providerId: providerId,
-      isStreaming: true,
-      groupId: groupId,
-      version: version,
-    );
-    final result = await _repo.beginRegeneration(
-      conversation: conversation,
-      assistantMessage: assistantMessage,
-      runId: const Uuid().v4(),
-      truncateFuture: truncateFuture,
-      parentMessageId: parentMessageId,
-      branchId: branchId,
-    );
-    if (truncateFuture) {
-      _messagesCache.remove(conversationId);
-      _messageOrderIds.remove(conversationId);
-      _firstGroupIndicesCache.remove(conversationId);
-      await _loadMessageOrder(conversationId);
-    }
-    await _publishGenerationBegin(result);
-    return result;
-  }
-
   Future<GenerationBeginResult> beginAssistantGeneration({
     required String conversationId,
     required String modelId,
     required String providerId,
-    required String anchorGroupId,
     required bool truncateFuture,
     String? parentMessageId,
     String? branchId,
@@ -2915,7 +2816,6 @@ class ChatService extends ChangeNotifier {
     final result = await _repo.beginAssistantGeneration(
       conversation: conversation,
       assistantMessage: assistantMessage,
-      anchorGroupId: anchorGroupId,
       runId: const Uuid().v4(),
       truncateFuture: truncateFuture,
       parentMessageId: parentMessageId,
@@ -3546,14 +3446,8 @@ class ChatService extends ChangeNotifier {
     String name = '',
   }) async {
     if (!_initialized) await init();
-    // A null message is only used by low-level callers to open an empty root
-    // branch; the user-facing Message Fork always supplies a message to clone.
     if (fromMessageId == null) {
-      return createMessageContinuationBranch(
-        conversationId: conversationId,
-        fromMessageId: null,
-        name: name,
-      );
+      throw StateError('message_branch_source_required');
     }
 
     if (_temporaryConversationIds.contains(conversationId)) {
@@ -3563,17 +3457,6 @@ class ChatService extends ChangeNotifier {
       if (original == null || edge == null) {
         throw StateError('message_branch_source_missing');
       }
-      final cloneGroupId = original.groupId ?? original.id;
-      final cloneVersion =
-          (_messagesCache[conversationId] ?? const <ChatMessage>[])
-              .where(
-                (candidate) =>
-                    (candidate.groupId ?? candidate.id) == cloneGroupId,
-              )
-              .fold<int>(-1, (max, candidate) {
-                return candidate.version > max ? candidate.version : max;
-              }) +
-          1;
       final clone = ChatMessage(
         role: original.role,
         parts: original.parts,
@@ -3592,8 +3475,8 @@ class ChatService extends ChangeNotifier {
         completionTokens: original.completionTokens,
         cachedTokens: original.cachedTokens,
         durationMs: original.durationMs,
-        groupId: cloneGroupId,
-        version: cloneVersion,
+        groupId: original.groupId,
+        version: original.version,
       );
       final branchId = 'branch-${const Uuid().v4()}';
       final updated = tree.createBranchFromParent(
@@ -3753,7 +3636,7 @@ class ChatService extends ChangeNotifier {
       final messages = _messagesCache[conversationId];
       if (conversation == null || messages == null) return const <String>{};
       final tree = await _loadOrCreateConversationTree(conversationId);
-      final updated = tree.deleteNodeKeepActiveBranch(
+      final updated = tree.deleteMessageNode(
         messageId,
         recentBranchIds: recentBranchIds,
       );
@@ -3814,11 +3697,37 @@ class ChatService extends ChangeNotifier {
     required String messageId,
   }) async {
     if (!_initialized) await init();
-    return deleteMessages(
+    if (_temporaryConversationIds.contains(conversationId)) {
+      final conversation = _draftConversations[conversationId];
+      final messages = _messagesCache[conversationId];
+      if (conversation == null || messages == null) return const <String>{};
+      final tree = await _loadOrCreateConversationTree(conversationId);
+      final updated = tree.deleteMessageAndFollowing(messageId);
+      final deletedIds = tree.edges.keys
+          .where((id) => !updated.edges.containsKey(id))
+          .toSet();
+      messages.removeWhere((message) => deletedIds.contains(message.id));
+      conversation.messageIds.removeWhere(deletedIds.contains);
+      _temporaryConversationTrees[conversationId] = updated;
+      await reloadActiveTimelineCache(conversationId);
+      notifyListeners();
+      return Set<String>.unmodifiable(deletedIds);
+    }
+    final result = await _repo.deleteMessageAndFollowing(
       conversationId: conversationId,
-      messageIds: {messageId},
-      versionSelectionChanges: const {},
+      messageId: messageId,
     );
+    if (result == null) return const <String>{};
+    final deletedIds = result.messages.map((message) => message.id).toSet();
+    _conversationsCache[conversationId] = result.conversation;
+    _messagesCache.remove(conversationId);
+    _messageOrderIds.remove(conversationId);
+    _firstGroupIndicesCache.remove(conversationId);
+    await reloadActiveTimelineCache(conversationId);
+    await _cleanupOrphanUploads();
+    _bumpConversationListRevision();
+    notifyListeners();
+    return Set<String>.unmodifiable(deletedIds);
   }
 
   /// 只删除 [messageId]，保留其后续消息并重挂到父节点。
@@ -3832,11 +3741,11 @@ class ChatService extends ChangeNotifier {
       final messages = _messagesCache[conversationId];
       if (conversation == null || messages == null) return const <String>{};
       final tree = await _loadOrCreateConversationTree(conversationId);
-      if (!tree.edges.containsKey(messageId)) return const <String>{};
-      _temporaryConversationTrees[conversationId] = tree.removeMessageOnly(
+      final updated = tree.deleteMessageOnly(
         messageId,
         recentBranchIds: _recentBranchIdsFor(conversationId),
       );
+      _temporaryConversationTrees[conversationId] = updated;
       messages.removeWhere((message) => message.id == messageId);
       conversation.messageIds.remove(messageId);
       conversation.updatedAt = DateTime.now();
@@ -4031,8 +3940,8 @@ class ChatService extends ChangeNotifier {
         reasoningText: source.reasoningText,
         reasoningStartAt: source.reasoningStartAt,
         reasoningFinishedAt: source.reasoningFinishedAt,
-        groupId: source.groupId,
-        version: source.version,
+        groupId: null,
+        version: 0,
       );
       final toolEvents =
           toolEventsBySourceId[source.id] ?? getToolEvents(source.id);
@@ -4059,31 +3968,22 @@ class ChatService extends ChangeNotifier {
   ) {
     final included = activePath.take(targetIndex + 1).toSet();
     if (mode == ConversationForkMode.preserveBranches) {
-      for (var index = 0; index <= targetIndex; index++) {
-        final parent = index == 0 ? null : activePath[index - 1];
-        final activeChild = activePath[index];
-        for (final child in tree.childrenOf(parent)) {
-          if (child == activeChild) continue;
-          _addConversationForkSubtree(tree, child, included);
-        }
-      }
+      // 保留整个源树，但排除选中消息的严格后代；这同时覆盖其他根、
+      // 祖先兄弟分支和无关分叉，避免把复制范围错误限制为活动前缀。
+      final selectedMessageId = activePath[targetIndex];
+      final excluded = tree
+          .childrenOf(selectedMessageId)
+          .expand((child) => <String>[child, ...tree.descendantsOf(child)])
+          .toSet();
+      included
+        ..addAll(tree.edges.keys)
+        ..removeWhere(excluded.contains);
     }
     final ordered = <String>[];
     for (final edge in tree.edges.values) {
       if (included.contains(edge.messageId)) ordered.add(edge.messageId);
     }
     return ordered;
-  }
-
-  void _addConversationForkSubtree(
-    ConversationTree tree,
-    String messageId,
-    Set<String> included,
-  ) {
-    if (!included.add(messageId)) return;
-    for (final child in tree.childrenOf(messageId)) {
-      _addConversationForkSubtree(tree, child, included);
-    }
   }
 
   ConversationTree _remapConversationForkTree(
@@ -4131,8 +4031,33 @@ class ChatService extends ChangeNotifier {
           tipMessageId: messageIdMap[path.last],
           name: branch.name,
           createdAt: branch.createdAt,
+          parentBranchId: branch.parentBranchId == null
+              ? null
+              : branchIdMap[branch.parentBranchId],
+          forkAnchorMessageId:
+              branch.forkAnchorMessageId == null ||
+                  !included.contains(branch.forkAnchorMessageId)
+              ? null
+              : messageIdMap[branch.forkAnchorMessageId],
         );
       }
+    }
+    for (final sourceBranch in source.branches.values) {
+      final targetBranchId = branchIdMap[sourceBranch.id];
+      if (targetBranchId == null || !branches.containsKey(targetBranchId)) {
+        continue;
+      }
+      final target = branches[targetBranchId]!;
+      branches[targetBranchId] = target.copyWith(
+        parentBranchId: sourceBranch.parentBranchId == null
+            ? null
+            : branchIdMap[sourceBranch.parentBranchId],
+        forkAnchorMessageId:
+            sourceBranch.forkAnchorMessageId == null ||
+                !included.contains(sourceBranch.forkAnchorMessageId)
+            ? null
+            : messageIdMap[sourceBranch.forkAnchorMessageId],
+      );
     }
     final activeBranchId = branchIdMap[source.activeBranchId];
     if (activeBranchId == null) {
@@ -4146,12 +4071,17 @@ class ChatService extends ChangeNotifier {
                   branchIdMap[entry.value] != null)
                 messageIdMap[entry.key]!: branchIdMap[entry.value]!,
           };
+    final history = [
+      for (final branchId in source.activeBranchHistory)
+        if (branchIdMap[branchId] != null) branchIdMap[branchId]!,
+    ];
     return ConversationTree(
       conversationId: targetConversationId,
       activeBranchId: activeBranchId,
       branches: branches,
       edges: edges,
       branchSelections: selections,
+      activeBranchHistory: history,
     );
   }
 
@@ -4173,14 +4103,6 @@ class ChatService extends ChangeNotifier {
       final conversation = _draftConversations[conversationId];
       final messages = _messagesCache[conversationId];
       if (conversation == null || messages == null) return null;
-      // 保留旧字段仅用于导出/兼容检查；活动分支仍完全由树决定。
-      final groupId = temporaryOriginal.groupId ?? temporaryOriginal.id;
-      final nextVersion =
-          messages
-              .where((message) => (message.groupId ?? message.id) == groupId)
-              .map((message) => message.version)
-              .fold<int>(-1, (max, value) => value > max ? value : max) +
-          1;
       // 仅追加内容时必须保留先前的 ImagePart/FilePart 附件，
       // 并保持顺序（[Image, Text] 保持为 [Image, Text(new)]）。
       final resolvedParts =
@@ -4192,8 +4114,9 @@ class ChatService extends ChangeNotifier {
         conversationId: conversationId,
         modelId: temporaryOriginal.modelId,
         providerId: temporaryOriginal.providerId,
-        groupId: groupId,
-        version: nextVersion,
+        // 新分支是独立消息节点，不再写入旧版本字段。
+        groupId: null,
+        version: 0,
       );
       final tree = await _loadOrCreateConversationTree(conversationId);
       final edge = tree.edges[temporaryOriginal.id];
@@ -4238,6 +4161,162 @@ class ChatService extends ChangeNotifier {
     _bumpConversationListRevision();
     notifyListeners();
     return newMsg;
+  }
+
+  Future<ChatMessage?> cloneMessageWithSubtreeAsBranch({
+    required String messageId,
+    required List<MessagePart> parts,
+  }) async {
+    if (!_initialized) await init();
+    final original = await _repo.getMessage(messageId);
+    if (_temporaryConversationIds.any(
+      (id) => (_messagesCache[id] ?? const <ChatMessage>[]).any(
+        (message) => message.id == messageId,
+      ),
+    )) {
+      final temporaryOriginal = _cachedTemporaryMessage(messageId);
+      if (temporaryOriginal == null) return null;
+      final conversationId = temporaryOriginal.conversationId;
+      final tree = await _loadOrCreateConversationTree(conversationId);
+      final descendants = tree.descendantsOf(messageId).toList(growable: false);
+      if (descendants.isEmpty) {
+        throw StateError('clone_subtree_requires_non_leaf');
+      }
+      final idMap = <String, String>{
+        for (final id in [messageId, ...descendants]) id: const Uuid().v4(),
+      };
+      final messages = _messagesCache[conversationId]!;
+      final byId = <String, ChatMessage>{for (final m in messages) m.id: m};
+      final clones = <ChatMessage>[];
+      for (final id in [messageId, ...descendants]) {
+        final source = byId[id];
+        if (source == null) {
+          throw StateError('clone_subtree_source_message_missing');
+        }
+        clones.add(
+          ChatMessage(
+            id: idMap[id],
+            role: source.role,
+            parts: id == messageId ? parts : source.parts,
+            timestamp: source.timestamp,
+            modelId: source.modelId,
+            providerId: source.providerId,
+            totalTokens: source.totalTokens,
+            conversationId: conversationId,
+            isStreaming: false,
+            reasoningText: source.reasoningText,
+            reasoningStartAt: source.reasoningStartAt,
+            reasoningFinishedAt: source.reasoningFinishedAt,
+            translation: source.translation,
+            reasoningSegmentsJson: source.reasoningSegmentsJson,
+            promptTokens: source.promptTokens,
+            completionTokens: source.completionTokens,
+            cachedTokens: source.cachedTokens,
+            durationMs: source.durationMs,
+            groupId: null,
+            version: 0,
+          ),
+        );
+      }
+      final nextEdges = Map<String, MessageTreeEdge>.from(tree.edges);
+      for (final id in [messageId, ...descendants]) {
+        final edge = tree.edges[id]!;
+        nextEdges[idMap[id]!] = MessageTreeEdge(
+          messageId: idMap[id]!,
+          parentMessageId: id == messageId
+              ? edge.parentMessageId
+              : idMap[edge.parentMessageId],
+        );
+      }
+      final nextBranches = Map<String, ConversationBranch>.from(tree.branches);
+      final branchIdMap = <String, String>{};
+      for (final branch in tree.branches.values) {
+        if (tree.branchPath(branch.id).any(idMap.containsKey)) {
+          branchIdMap[branch.id] = 'branch-${const Uuid().v4()}';
+        }
+      }
+      for (final branch in tree.branches.values) {
+        final cloneBranchId = branchIdMap[branch.id];
+        final cloneTip = branch.tipMessageId == null
+            ? null
+            : idMap[branch.tipMessageId];
+        if (cloneBranchId == null || cloneTip == null) continue;
+        final cloneAnchor = branch.forkAnchorMessageId == null
+            ? (branch.id == tree.activeBranchId
+                  ? tree.edges[messageId]?.parentMessageId
+                  : null)
+            : idMap[branch.forkAnchorMessageId];
+        final cloneParent = branch.parentBranchId == null
+            ? (branch.id == tree.activeBranchId
+                  ? tree.preferredBranchIdForMessage(
+                      tree.edges[messageId]?.parentMessageId ?? '',
+                    )
+                  : null)
+            : branchIdMap[branch.parentBranchId];
+        nextBranches[cloneBranchId] = ConversationBranch(
+          id: cloneBranchId,
+          conversationId: conversationId,
+          tipMessageId: cloneTip,
+          name: branch.name,
+          createdAt: DateTime.now(),
+          parentBranchId: cloneParent,
+          forkAnchorMessageId: cloneAnchor,
+        );
+      }
+      final branchId =
+          branchIdMap[tree.activeBranchId] ?? 'branch-${const Uuid().v4()}';
+      if (!nextBranches.containsKey(branchId)) {
+        nextBranches[branchId] = ConversationBranch(
+          id: branchId,
+          conversationId: conversationId,
+          tipMessageId: idMap[descendants.last],
+          createdAt: DateTime.now(),
+          parentBranchId: tree.preferredBranchIdForMessage(
+            tree.edges[messageId]?.parentMessageId ?? '',
+          ),
+          forkAnchorMessageId: tree.edges[messageId]?.parentMessageId,
+        );
+      }
+      final updatedTree = ConversationTree(
+        conversationId: conversationId,
+        activeBranchId: branchId,
+        branches: nextBranches,
+        edges: nextEdges,
+        branchSelections: tree.branchSelections,
+        activeBranchHistory: [tree.activeBranchId, ...tree.activeBranchHistory],
+      );
+      messages.addAll(clones);
+      for (final sourceId in [messageId, ...descendants]) {
+        final cloneId = idMap[sourceId]!;
+        final toolEvents = _temporaryToolEvents[sourceId];
+        if (toolEvents != null) {
+          _temporaryToolEvents[cloneId] = [
+            for (final event in toolEvents) Map<String, dynamic>.from(event),
+          ];
+        }
+        final signature = _temporaryGeminiThoughtSigs[sourceId];
+        if (signature != null) _temporaryGeminiThoughtSigs[cloneId] = signature;
+      }
+      _draftConversations[conversationId]?.messageIds.addAll(
+        clones.map((m) => m.id),
+      );
+      _temporaryConversationTrees[conversationId] = updatedTree;
+      await reloadActiveTimelineCache(conversationId);
+      notifyListeners();
+      return clones.first;
+    }
+    if (original == null) return null;
+    final result = await _repo.cloneMessageWithSubtreeAsBranch(
+      conversationId: original.conversationId,
+      messageId: messageId,
+      parts: parts,
+    );
+    if (result == null) return null;
+    _conversationsCache[original.conversationId] = result.conversation;
+    await reloadActiveTimelineCache(original.conversationId);
+    _bumpConversationListRevision();
+    notifyListeners();
+    return result.message;
   }
 
   /// 根据当前字节将图像 path/data-URL 解析为内容 SHA-256。
@@ -4376,78 +4455,21 @@ class ChatService extends ChangeNotifier {
     );
   }
 
+  @Deprecated('Version selections are no longer used at runtime')
   Future<void> setSelectedVersion(
     String conversationId,
     String groupId,
     int version,
   ) async {
-    if (_draftConversations.containsKey(conversationId)) {
-      final draft = _draftConversations[conversationId]!;
-      draft.versionSelections[groupId] = version;
-      draft.updatedAt = DateTime.now();
-      notifyListeners();
-      return;
-    }
-    final candidates = await _repo.getMessagesForGroups(conversationId, [
-      groupId,
-    ]);
-    ChatMessage? target;
-    for (final candidate in candidates) {
-      if (candidate.version == version) {
-        target = candidate;
-        break;
-      }
-    }
-    final selectedTarget = target;
-    if (selectedTarget == null) {
-      throw StateError('message_version_missing');
-    }
-    // 不再写入 versionSelections，树是唯一真相
-    var tree = await _loadOrCreateConversationTree(conversationId);
-    final matchingBranches =
-        tree.branches.values
-            .where(
-              (branch) =>
-                  tree.branchPath(branch.id).contains(selectedTarget.id),
-            )
-            .toList()
-          ..sort((left, right) {
-            final leftExact = left.tipMessageId == selectedTarget.id ? 0 : 1;
-            final rightExact = right.tipMessageId == selectedTarget.id ? 0 : 1;
-            if (leftExact != rightExact) return leftExact.compareTo(rightExact);
-            final leftLength = tree.branchPath(left.id).length;
-            final rightLength = tree.branchPath(right.id).length;
-            if (leftLength != rightLength) {
-              return leftLength.compareTo(rightLength);
-            }
-            return left.id.compareTo(right.id);
-          });
-    if (matchingBranches.isNotEmpty &&
-        matchingBranches.first.id != tree.activeBranchId) {
-      tree = tree.switchBranch(matchingBranches.first.id);
-      await _repo.saveConversationTree(tree);
-    }
-    await _syncContextBoundaryToActivePath(conversationId, tree);
-    await reloadActiveTimelineCache(conversationId);
-    _bumpConversationListRevision();
-    notifyListeners();
+    // 保留 API 以兼容旧调用方，但绝不改变树或任何持久化状态。
   }
 
+  @Deprecated('Version selections are no longer used at runtime')
   Future<void> clearSelectedVersion(
     String conversationId,
     String groupId,
   ) async {
-    if (_draftConversations.containsKey(conversationId)) {
-      final draft = _draftConversations[conversationId]!;
-      draft.versionSelections.remove(groupId);
-      draft.updatedAt = DateTime.now();
-      notifyListeners();
-      return;
-    }
-    // 不再写入 versionSelections，树是唯一真相
-    await reloadActiveTimelineCache(conversationId);
-    _bumpConversationListRevision();
-    notifyListeners();
+    // 保留 API 以兼容旧调用方，但绝不改变树或任何持久化状态。
   }
 
   Future<Conversation?> toggleTruncateAtTail(

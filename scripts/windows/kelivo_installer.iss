@@ -1,7 +1,7 @@
 #define MyAppName "JO-AIClient"
 #define MyAppPublisher "JO-Beacon"
 #define MyAppExeName "jo_aiclient.exe"
-#define MyAppId "{{D4C6D2A7-8F3E-4D7B-9D55-6B6B6D2E5A91}}"
+#define MyAppId "{{4DAB8FFA-513A-4729-9A93-82207E2F2785}}"
 
 #ifndef AppVersion
   #error AppVersion must be provided, for example: ISCC.exe /DAppVersion=0.1.3+3 scripts\windows\kelivo_installer.iss

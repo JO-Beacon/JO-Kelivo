@@ -1,10 +1,11 @@
 # 当前发布索引
 
-当前代码版本：`0.1.12+12`（待发布）。当前实现基座：Kelivo `1.2.4+68`。GitHub 上最新已公开 Release 为 `0.1.11+11`。
+当前代码版本：`0.1.13+13`（待发布）。当前实现基座：Kelivo `1.2.4+68`。GitHub 上最新已公开 Release 为 `0.1.11+11`。
 
 | 版本 | 状态 | 发布正文 |
 | --- | --- | --- |
-| `0.1.12+12` | 待发布 | [.github/release-notes/0.1.12+12.md](.github/release-notes/0.1.12+12.md) |
+| `0.1.13+13` | 待发布 | [.github/release-notes/0.1.13+13.md](.github/release-notes/0.1.13+13.md) |
+| `0.1.12+12` | 历史草稿 | [.github/release-notes/0.1.12+12.md](.github/release-notes/0.1.12+12.md) |
 | `0.1.11+11` | 已发布（2026-09-01） | [.github/release-notes/0.1.11+11.md](.github/release-notes/0.1.11+11.md) · [GitHub Release](https://github.com/JO-Beacon/JO-Kelivo/releases/tag/0.1.11%2B11) |
 | `0.1.10+10` | 已发布（2026-08-29） | [.github/release-notes/0.1.10+10.md](.github/release-notes/0.1.10+10.md) · [GitHub Release](https://github.com/JO-Beacon/JO-Kelivo/releases/tag/0.1.10+10) |
 | `0.1.9+9` | 已发布（2026-08-27） | [.github/release-notes/0.1.9+9.md](.github/release-notes/0.1.9+9.md) · [GitHub Release](https://github.com/JO-Beacon/JO-Kelivo/releases/tag/0.1.9+9) |

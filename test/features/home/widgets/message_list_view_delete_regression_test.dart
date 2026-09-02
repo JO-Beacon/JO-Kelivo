@@ -142,7 +142,6 @@ class _DeleteHarnessState extends State<_DeleteHarness> {
               listController: listController,
               messages: messages,
               byGroup: byGroup,
-              versionSelections: const {},
               reasoning: const {},
               reasoningSegments: const {},
               contentSplits: const {},

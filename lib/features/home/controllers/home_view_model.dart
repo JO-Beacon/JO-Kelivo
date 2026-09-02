@@ -39,44 +39,6 @@ enum _DeletionOperation {
   branchSiblings,
 }
 
-class BatchDeleteGroupPlan {
-  const BatchDeleteGroupPlan({
-    required this.groupId,
-    required this.versionsBefore,
-    required this.deletedMessageIds,
-    required this.nextVersionSelection,
-  });
-
-  final String groupId;
-  final List<ChatMessage> versionsBefore;
-  final Set<String> deletedMessageIds;
-  final int? nextVersionSelection;
-}
-
-class BatchDeletePlan {
-  const BatchDeletePlan({
-    required this.groups,
-    required this.nextVersionSelections,
-    required this.clearedVersionSelectionGroupIds,
-  });
-
-  static const empty = BatchDeletePlan(
-    groups: <String, BatchDeleteGroupPlan>{},
-    nextVersionSelections: <String, int>{},
-    clearedVersionSelectionGroupIds: <String>{},
-  );
-
-  final Map<String, BatchDeleteGroupPlan> groups;
-  final Map<String, int> nextVersionSelections;
-  final Set<String> clearedVersionSelectionGroupIds;
-
-  bool get isEmpty => groups.isEmpty;
-
-  Set<String> get deletedMessageIds => {
-    for (final group in groups.values) ...group.deletedMessageIds,
-  };
-}
-
 /// [HomeViewModel.prepareConversationSwitch] 的结果：
 /// 调用方准备好后原子提交会话切换所需的一切。
 class PreparedConversationSwitch {
@@ -215,7 +177,6 @@ class HomeViewModel extends ChangeNotifier {
         .toList(growable: false);
   }
 
-  Map<String, int> get versionSelections => _chatController.versionSelections;
   Set<String> get loadingConversationIds => <String>{
     for (final id in _chatController.loadingConversationIds)
       if (!_chatActions.isStopping(id)) id,
@@ -613,18 +574,23 @@ class HomeViewModel extends ChangeNotifier {
     final updated = switch (operation) {
       _DeletionOperation.messages => tree.deleteMessages(messageIds),
       _DeletionOperation.currentBranch => tree.deleteCurrentBranch(messageId),
-      _DeletionOperation.messageNode => tree.deleteNodeKeepActiveBranch(
+      _DeletionOperation.messageNode => tree.deleteMessageNode(messageId),
+      _DeletionOperation.messageAndFollowing => tree.deleteMessageAndFollowing(
         messageId,
       ),
-      _DeletionOperation.messageAndFollowing => tree.deleteMessages({
-        messageId,
-      }),
-      _DeletionOperation.messageOnly => tree.removeMessageOnly(messageId),
+      _DeletionOperation.messageOnly => tree.deleteMessageOnly(messageId),
       _DeletionOperation.branchSiblings => tree.deleteMessages(
         _siblingMessageIds(tree, messageId),
       ),
     };
-    return !updated.edges.containsKey(streamingMessageId);
+    if (updated.edges.containsKey(streamingMessageId)) return false;
+    // 流式助手消息可能尚未完成树检查点。删除其他分支时不能因为
+    // 该临时消息尚未出现在持久化快照而误取消整会话生成；只有明确
+    // 删除同一消息时才在缺失边的情况下取消。
+    if (!tree.edges.containsKey(streamingMessageId)) {
+      return streamingMessageId == messageId;
+    }
+    return true;
   }
 
   Future<void> _cancelStreamingIfDeleted({
@@ -655,16 +621,25 @@ class HomeViewModel extends ChangeNotifier {
     required Map<String, List<ChatMessage>> byGroup,
   }) async {
     final targetConversationId = message.conversationId;
+    final tree = await _chatService.loadConversationTree(targetConversationId);
+    final operation = tree != null && tree.isBranchNode(message.id)
+        ? _DeletionOperation.currentBranch
+        : _DeletionOperation.messageOnly;
     await _cancelStreamingIfDeleted(
       conversationId: targetConversationId,
       messageId: message.id,
-      operation: _DeletionOperation.currentBranch,
+      operation: operation,
     );
 
-    final deletedIds = await _chatService.deleteCurrentBranch(
-      conversationId: targetConversationId,
-      messageId: message.id,
-    );
+    final deletedIds = operation == _DeletionOperation.currentBranch
+        ? await _chatService.deleteCurrentBranch(
+            conversationId: targetConversationId,
+            messageId: message.id,
+          )
+        : await _chatService.deleteMessageOnly(
+            conversationId: targetConversationId,
+            messageId: message.id,
+          );
     for (final id in deletedIds) {
       _streamController.clearMessageState(id);
     }
@@ -675,12 +650,12 @@ class HomeViewModel extends ChangeNotifier {
         targetConversationId,
       );
       _conversationTreeIntegrityError = null;
-      _chatController.loadVersionSelections();
       _chatController.updateCurrentConversation(
         _chatService.getConversation(targetConversationId),
       );
       await _chatController.refreshTimelineAfterMutation(
         removedRevisionIds: deletedIds,
+        activePathIds: _conversationTree?.activePath(),
       );
     }
     notifyListeners();
@@ -712,12 +687,12 @@ class HomeViewModel extends ChangeNotifier {
         targetConversationId,
       );
       _conversationTreeIntegrityError = null;
-      _chatController.loadVersionSelections();
       _chatController.updateCurrentConversation(
         _chatService.getConversation(targetConversationId),
       );
       await _chatController.refreshTimelineAfterMutation(
         removedRevisionIds: deletedIds,
+        activePathIds: _conversationTree?.activePath(),
       );
     }
     notifyListeners();
@@ -749,12 +724,12 @@ class HomeViewModel extends ChangeNotifier {
         targetConversationId,
       );
       _conversationTreeIntegrityError = null;
-      _chatController.loadVersionSelections();
       _chatController.updateCurrentConversation(
         _chatService.getConversation(targetConversationId),
       );
       await _chatController.refreshTimelineAfterMutation(
         removedRevisionIds: deletedIds,
+        activePathIds: _conversationTree?.activePath(),
       );
     }
     notifyListeners();
@@ -785,12 +760,12 @@ class HomeViewModel extends ChangeNotifier {
         targetConversationId,
       );
       _conversationTreeIntegrityError = null;
-      _chatController.loadVersionSelections();
       _chatController.updateCurrentConversation(
         _chatService.getConversation(targetConversationId),
       );
       await _chatController.refreshTimelineAfterMutation(
         removedRevisionIds: deletedIds,
+        activePathIds: _conversationTree?.activePath(),
       );
     }
     notifyListeners();
@@ -829,7 +804,7 @@ class HomeViewModel extends ChangeNotifier {
       );
       await _chatController.refreshTimelineAfterMutation(
         removedRevisionIds: deletedIds,
-        survivingVersionsByGroup: const <String, List<ChatMessage>>{},
+        activePathIds: _conversationTree?.activePath(),
       );
     }
     notifyListeners();
@@ -839,107 +814,6 @@ class HomeViewModel extends ChangeNotifier {
   Set<String> _siblingMessageIds(ConversationTree tree, String messageId) {
     final parentId = tree.edges[messageId]?.parentMessageId;
     return tree.childrenOf(parentId).toSet();
-  }
-
-  @visibleForTesting
-  static int? computeNextVersionSelection({
-    required List<ChatMessage> versionsBefore,
-    required Set<String> deletedMessageIds,
-    required int? oldSelection,
-  }) {
-    final sorted = List<ChatMessage>.of(versionsBefore)
-      ..sort((a, b) => a.version.compareTo(b.version));
-    if (sorted.isEmpty) return null;
-
-    final remainingVersions =
-        sorted
-            .where((message) => !deletedMessageIds.contains(message.id))
-            .map((message) => message.version)
-            .toSet()
-            .toList()
-          ..sort();
-    if (remainingVersions.isEmpty) return null;
-
-    final newSelection = oldSelection ?? sorted.last.version;
-    final selectedVersionWasDeleted = sorted.any(
-      (message) =>
-          deletedMessageIds.contains(message.id) &&
-          message.version == newSelection,
-    );
-    if (!selectedVersionWasDeleted) return newSelection;
-
-    for (final version in remainingVersions.reversed) {
-      if (version < newSelection) return version;
-    }
-    return remainingVersions.first;
-  }
-
-  @visibleForTesting
-  static BatchDeletePlan buildBatchDeletePlan({
-    required List<ChatMessage> messages,
-    required Set<String> selectedMessageIds,
-    required Map<String, int> versionSelections,
-    bool deleteAllVersions = false,
-  }) {
-    if (selectedMessageIds.isEmpty || messages.isEmpty) {
-      return BatchDeletePlan.empty;
-    }
-
-    final byGroup = <String, List<ChatMessage>>{};
-    final deletedByGroup = <String, Set<String>>{};
-    for (final message in messages) {
-      final groupId = message.groupId ?? message.id;
-      byGroup.putIfAbsent(groupId, () => <ChatMessage>[]).add(message);
-      if (selectedMessageIds.contains(message.id)) {
-        deletedByGroup.putIfAbsent(groupId, () => <String>{});
-        if (!deleteAllVersions) {
-          deletedByGroup[groupId]!.add(message.id);
-        }
-      }
-    }
-
-    if (deletedByGroup.isEmpty) return BatchDeletePlan.empty;
-
-    final groups = <String, BatchDeleteGroupPlan>{};
-    final nextVersionSelections = <String, int>{};
-    final clearedVersionSelectionGroupIds = <String>{};
-
-    for (final entry in deletedByGroup.entries) {
-      final groupId = entry.key;
-      final versionsBefore = List<ChatMessage>.of(
-        byGroup[groupId] ?? const <ChatMessage>[],
-      )..sort((a, b) => a.version.compareTo(b.version));
-      final deletedMessageIds = deleteAllVersions
-          ? versionsBefore.map((message) => message.id).toSet()
-          : Set<String>.of(entry.value);
-      final oldSelection =
-          versionSelections[groupId] ??
-          (versionsBefore.isNotEmpty ? versionsBefore.last.version : 0);
-      final nextVersionSelection = computeNextVersionSelection(
-        versionsBefore: versionsBefore,
-        deletedMessageIds: deletedMessageIds,
-        oldSelection: oldSelection,
-      );
-
-      groups[groupId] = BatchDeleteGroupPlan(
-        groupId: groupId,
-        versionsBefore: versionsBefore,
-        deletedMessageIds: deletedMessageIds,
-        nextVersionSelection: nextVersionSelection,
-      );
-
-      if (nextVersionSelection == null) {
-        clearedVersionSelectionGroupIds.add(groupId);
-      } else {
-        nextVersionSelections[groupId] = nextVersionSelection;
-      }
-    }
-
-    return BatchDeletePlan(
-      groups: groups,
-      nextVersionSelections: nextVersionSelections,
-      clearedVersionSelectionGroupIds: clearedVersionSelectionGroupIds,
-    );
   }
 
   Future<void> deleteMessages({
@@ -977,7 +851,6 @@ class HomeViewModel extends ChangeNotifier {
       _streamController.clearMessageState(id);
     }
     if (isCurrentConversation()) {
-      _chatController.loadVersionSelections();
       _chatController.updateCurrentConversation(
         _chatService.getConversation(conversationId),
       );
@@ -989,6 +862,7 @@ class HomeViewModel extends ChangeNotifier {
 
       await _chatController.refreshTimelineAfterMutation(
         removedRevisionIds: deletedMessageIds,
+        activePathIds: _conversationTree?.activePath(),
       );
     }
     notifyListeners();
@@ -1062,10 +936,7 @@ class HomeViewModel extends ChangeNotifier {
   void commitConversationSwitch(PreparedConversationSwitch prepared) {
     final id = prepared.conversation.id;
     _chatService.setCurrentConversation(id);
-    _chatController.commitConversationWindow(
-      prepared.window,
-      onDeferredGroupDataLoaded: notifyListeners,
-    );
+    _chatController.commitConversationWindow(prepared.window);
     // 与 switchConversation 相同的并发情况：助手变化会在其磁盘写入
     // 完成前通知。
     final assistantProvider = _contextProvider.read<AssistantProvider>();
@@ -1537,16 +1408,6 @@ class HomeViewModel extends ChangeNotifier {
     return true;
   }
 
-  /// 设置消息组的已选版本。
-  Future<void> setSelectedVersion(String groupId, int version) async {
-    final cid = currentConversation?.id;
-    if (cid != null) {
-      await _clearSuggestionsFor(cid);
-    }
-    await _chatController.setSelectedVersion(groupId, version);
-    notifyListeners();
-  }
-
   // ============================================================================
   // 公共方法 - UI 状态
   // ============================================================================
@@ -1594,11 +1455,6 @@ class HomeViewModel extends ChangeNotifier {
     List<stream_ctrl.ReasoningSegmentData> segments,
   ) {
     return _streamController.serializeReasoningSegments(segments);
-  }
-
-  /// 折叠消息版本，每组只显示已选版本。
-  List<ChatMessage> collapseVersions(List<ChatMessage> items) {
-    return _chatController.collapseVersions(items);
   }
 
   /// 按 groupId 对消息分组。

@@ -74,16 +74,77 @@ void main() {
       debugDefaultTargetPlatformOverride = null;
     }
   });
+
+  testWidgets(
+    'leaf non-branch user message hides delete-and-following shortcut',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      try {
+        await tester.pumpWidget(
+          _MessageListHarness(
+            messages: <ChatMessage>[
+              ChatMessage(
+                id: 'leaf-user',
+                role: 'user',
+                content: 'leaf question',
+                conversationId: 'conversation-1',
+              ),
+            ],
+            onEditMessage: (_) {},
+          ),
+        );
+
+        await tester.longPress(find.text('leaf question'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Delete This Message and Following'), findsNothing);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    },
+  );
+
+  testWidgets(
+    'non-leaf non-branch user message keeps delete-and-following shortcut',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      try {
+        await tester.pumpWidget(
+          _MessageListHarness(
+            messages: <ChatMessage>[
+              ChatMessage(
+                id: 'ordinary-user',
+                role: 'user',
+                content: 'ordinary question',
+                conversationId: 'conversation-1',
+              ),
+            ],
+            messageIdsWithChildren: const <String>{'ordinary-user'},
+            onEditMessage: (_) {},
+          ),
+        );
+
+        await tester.longPress(find.text('ordinary question'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Delete This Message and Following'), findsOneWidget);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    },
+  );
 }
 
 class _MessageListHarness extends StatefulWidget {
   const _MessageListHarness({
     required this.messages,
     required this.onEditMessage,
+    this.messageIdsWithChildren = const <String>{},
   });
 
   final List<ChatMessage> messages;
   final ValueChanged<ChatMessage> onEditMessage;
+  final Set<String> messageIdsWithChildren;
 
   @override
   State<_MessageListHarness> createState() => _MessageListHarnessState();
@@ -141,7 +202,7 @@ class _MessageListHarnessState extends State<_MessageListHarness> {
             listController: listController,
             messages: widget.messages,
             byGroup: const {},
-            versionSelections: const {},
+            messageIdsWithChildren: widget.messageIdsWithChildren,
             reasoning: const <String, stream_ctrl.ReasoningData>{},
             reasoningSegments:
                 const <String, List<stream_ctrl.ReasoningSegmentData>>{},

@@ -209,7 +209,6 @@ void main() {
 
       expect(fetched.conversation.id, 'conv-b');
       expect(fetched.page, isNotNull);
-      expect(fetched.versionSelections, const {'group-a': 1});
       expect(controller.currentConversation?.id, 'conv-a');
       expect(controller.messages.map((m) => m.conversationId).toSet(), {
         'conv-a',
@@ -241,12 +240,11 @@ void main() {
       });
       expect(controller.messages, hasLength(3));
       expect(controller.totalMessageCount, 3);
-      expect(controller.versionSelections, const {'group-a': 1});
       expect(controller.isLoadingWindow, isFalse);
       expect(notifyCount, 1);
     });
 
-    test('fetch includes visible message versions before commit', () async {
+    test('fetch does not preload legacy message versions', () async {
       final version0 = _versionedMessage('answer-v0', 0);
       final version1 = _versionedMessage('answer-v1', 1);
       service._messagesByConversation['conv-versioned'] = [version0, version1];
@@ -262,22 +260,19 @@ void main() {
       );
       final fetched = await fetch;
 
-      expect(service.groupLoadCalls, 1);
+      expect(service.groupLoadCalls, 0);
 
-      int? versionCountAtCommit;
       String? selectedMessageAtCommit;
       controller.addListener(() {
         final model = controller.messageRenderModels.single;
-        versionCountAtCommit = model.versionCount;
         selectedMessageAtCommit = model.message.id;
       });
       controller.commitConversationWindow(fetched);
 
-      expect(versionCountAtCommit, 2);
       expect(selectedMessageAtCommit, 'answer-v1');
     });
 
-    test('failed version preload still commits and retries', () async {
+    test('legacy version preload failures are irrelevant', () async {
       final version0 = _versionedMessage('answer-v0', 0);
       final version1 = _versionedMessage('answer-v1', 1);
       service._messagesByConversation['conv-versioned'] = [version0, version1];
@@ -294,23 +289,18 @@ void main() {
       );
       final fetched = await fetch;
 
-      final observedVersionCounts = <int>[];
+      final observedMessageIds = <String>[];
       controller.addListener(() {
-        observedVersionCounts.add(
-          controller.messageRenderModels.single.versionCount,
+        observedMessageIds.add(
+          controller.messageRenderModels.single.message.id,
         );
       });
-      var deferredRefreshCount = 0;
-      controller.commitConversationWindow(
-        fetched,
-        onDeferredGroupDataLoaded: () => deferredRefreshCount++,
-      );
+      controller.commitConversationWindow(fetched);
 
-      expect(observedVersionCounts, [2]);
+      expect(observedMessageIds, ['answer-v1']);
       await Future<void>.delayed(Duration.zero);
-      expect(service.groupLoadCalls, 2);
-      expect(observedVersionCounts, [2, 2]);
-      expect(deferredRefreshCount, 1);
+      expect(service.groupLoadCalls, 0);
+      expect(observedMessageIds, ['answer-v1']);
     });
 
     test('commit supersedes an in-flight window load', () async {

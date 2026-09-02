@@ -2278,6 +2278,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageEditPageOverwriteSave => 'Overwrite Save';
 
   @override
+  String get messageEditPageSaveAsBranchCopyChildren =>
+      'Save as Branch with Replies';
+
+  @override
   String get messageEditPageHint => 'Enter message…';
 
   @override
@@ -2324,6 +2328,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get messageEditCloseConfirmConfirm => 'Confirm';
+
+  @override
+  String get messageEditOverwriteConfirmTitle => 'Overwrite existing message?';
+
+  @override
+  String get messageEditOverwriteConfirmContent =>
+      'The original message and its branches will be updated in place.';
+
+  @override
+  String get messageEditOverwriteConfirmCancel => 'Cancel';
+
+  @override
+  String get messageEditOverwriteConfirmConfirm => 'Overwrite';
 
   @override
   String get selectCopyPageTitle => 'Select & Copy';
@@ -4590,7 +4607,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutPageAppName => 'JO-AIClient';
 
   @override
-  String get aboutPageKelivoSectionTitle => 'About JO-AIClient';
+  String get aboutPageKelivoSectionTitle => 'About Kelivo';
 
   @override
   String get mcpOAuthCallbackPageTitle => 'JO-AIClient authorization';

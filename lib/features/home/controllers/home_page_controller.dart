@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/database/chat_database_repository.dart';
+import '../../../core/database/business_preferences.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/conversation_tree.dart';
@@ -47,6 +48,7 @@ import '../services/ocr_service.dart';
 import '../services/translation_service.dart';
 import '../services/file_upload_service.dart';
 import '../services/chat_read_position_store.dart';
+import '../services/chat_sidebar_state_store.dart';
 import '../utils/chat_layout_constants.dart';
 import '../widgets/chat_input_bar.dart';
 import '../../model/widgets/model_select_sheet.dart';
@@ -130,6 +132,7 @@ class HomePageController extends ChangeNotifier {
   final ChatCompletionNotificationSender _chatCompletionNotificationSender;
   ScrollController _scrollController;
   final ChatReadPositionStore? _readPositionStore;
+  ChatSidebarStateStore? _sidebarStateStore;
 
   // ============================================================================
   // 服务和控制器（内部创建）
@@ -301,10 +304,6 @@ class HomePageController extends ChangeNotifier {
       _viewModel.conversationTreeIntegrityError;
   String? get activeBranchId => _viewModel.activeBranchId;
 
-  /// 废弃：版本选择不再被运行时使用，树是唯一真相。
-  @Deprecated('Version selections are no longer used at runtime')
-  Map<String, int> get versionSelections => const <String, int>{};
-
   Set<String> get loadingConversationIds => _viewModel.loadingConversationIds;
   Map<String, StreamSubscription<dynamic>> get conversationStreams =>
       _chatController.conversationStreams;
@@ -336,7 +335,7 @@ class HomePageController extends ChangeNotifier {
     }
     return <String, List<ChatMessage>>{
       for (final message in visibleCollapsedMessages)
-        message.groupId ?? message.id: <ChatMessage>[message],
+        message.id: <ChatMessage>[message],
     };
   }
 
@@ -351,14 +350,8 @@ class HomePageController extends ChangeNotifier {
           .toList(growable: false);
     }
     final visible = visibleCollapsedMessages;
-    final grouped = visibleGroupedMessages;
     return MessageRenderModelProjector.project(
       messages: visible,
-      byGroup: grouped,
-      versionSelections: const <String, int>{},
-      versionCounts: <String, int>{
-        for (final entry in grouped.entries) entry.key: 1,
-      },
       contextDividerIndex: _treeContextDividerIndex(visible),
     );
   }
@@ -367,6 +360,17 @@ class HomePageController extends ChangeNotifier {
     final tree = _viewModel.conversationTree;
     if (tree == null) return const <String, List<String>>{};
     return tree.siblingBranchIdsByMessageId();
+  }
+
+  Set<String> get messageIdsWithChildren {
+    final tree = _viewModel.conversationTree;
+    if (tree == null) return const <String>{};
+    final childrenByParent = tree.childrenByParent;
+    return Set<String>.unmodifiable(
+      childrenByParent.entries
+          .where((entry) => entry.key != null && entry.value.isNotEmpty)
+          .map((entry) => entry.key!),
+    );
   }
 
   List<ChatMessage> _filterActivePath(Iterable<ChatMessage> source) {
@@ -450,6 +454,11 @@ class HomePageController extends ChangeNotifier {
   void _initialize() {
     _initializeAnimations();
     _initializeControllers();
+    try {
+      _sidebarStateStore = ChatSidebarStateStore(
+        _context.read<BusinessPreferences>(),
+      );
+    } catch (_) {}
     _initializeScrollController();
     _initializeServices();
     _initializeViewModel();
@@ -868,6 +877,8 @@ class HomePageController extends ChangeNotifier {
       if (readPositionStore != null) {
         await readPositionStore.load();
       }
+      final sidebarStateStore = _sidebarStateStore;
+      if (sidebarStateStore != null) await sidebarStateStore.load();
       // 这两个启动流程彼此独立。
       await Future.wait([assistantProvider.loaded, _chatService.init()]);
       if (prefs.newChatOnLaunch) {
@@ -875,7 +886,13 @@ class HomePageController extends ChangeNotifier {
       } else {
         final conversations = _chatService.getAllConversations();
         if (conversations.isNotEmpty) {
-          final recent = conversations.first;
+          final savedId = sidebarStateStore?.lastOpenedConversationId;
+          final recent = savedId == null
+              ? conversations.first
+              : conversations.firstWhere(
+                  (conversation) => conversation.id == savedId,
+                  orElse: () => conversations.first,
+                );
           _chatService.setCurrentConversation(recent.id);
           // 助手恢复和窗口加载彼此独立；消息列表已经能够容忍
           // 一帧的缺少助手回退。
@@ -1294,6 +1311,7 @@ class HomePageController extends ChangeNotifier {
     _translations.clear();
     final previousId = currentConversation?.id;
     await _viewModel.createNewConversation();
+    _rememberLastOpenedConversation();
     if (currentConversation?.id != null &&
         currentConversation!.id != previousId) {
       _clearSelectionState();
@@ -1370,7 +1388,7 @@ class HomePageController extends ChangeNotifier {
     required Map<String, List<ChatMessage>> byGroup,
   }) async {
     final keepAtBottom = _scrollCtrl.isNearBottom();
-    final gid = (message.groupId ?? message.id);
+    final gid = _messageSlotId(message, byGroup);
     final slotDisappears = (byGroup[gid] ?? const <ChatMessage>[]).length <= 1;
     int? preserveRequest;
     if (slotDisappears && _shouldAnimateSlotRemoval(message)) {
@@ -1400,7 +1418,7 @@ class HomePageController extends ChangeNotifier {
     required Map<String, List<ChatMessage>> byGroup,
   }) async {
     final keepAtBottom = _scrollCtrl.isNearBottom();
-    final gid = (message.groupId ?? message.id);
+    final gid = _messageSlotId(message, byGroup);
     final slotDisappears = (byGroup[gid] ?? const <ChatMessage>[]).length <= 1;
     int? preserveRequest;
     if (slotDisappears && _shouldAnimateSlotRemoval(message)) {
@@ -1427,7 +1445,7 @@ class HomePageController extends ChangeNotifier {
     required Map<String, List<ChatMessage>> byGroup,
   }) async {
     final keepAtBottom = _scrollCtrl.isNearBottom();
-    final gid = (message.groupId ?? message.id);
+    final gid = _messageSlotId(message, byGroup);
     int? preserveRequest;
     if (_shouldAnimateSlotRemoval(message)) {
       preserveRequest = await _playSlotRemovalAnimation(
@@ -1455,7 +1473,7 @@ class HomePageController extends ChangeNotifier {
 
   Future<void> deleteAllBranchSiblings(ChatMessage message) async {
     final keepAtBottom = _scrollCtrl.isNearBottom();
-    final gid = (message.groupId ?? message.id);
+    final gid = _messageSlotId(message, _chatController.groupedMessages);
     int? preserveRequest;
     if (_shouldAnimateSlotRemoval(message)) {
       preserveRequest = await _playSlotRemovalAnimation(
@@ -1499,6 +1517,17 @@ class HomePageController extends ChangeNotifier {
       _finishPreserveDistanceAfterFrame(preserveRequest);
     }
     notifyListeners();
+  }
+
+  String _messageSlotId(
+    ChatMessage message,
+    Map<String, List<ChatMessage>> byGroup,
+  ) {
+    // Tree projections use one entry per message. Legacy linear projections
+    // may still group migrated rows by groupId for compatibility only.
+    return byGroup.containsKey(message.id)
+        ? message.id
+        : (message.groupId ?? message.id);
   }
 
   /// 移除 [message] 的槽位时是否应播放淡出折叠动画。
@@ -1569,12 +1598,12 @@ class HomePageController extends ChangeNotifier {
     if (selectedMessageIds.isEmpty) return;
 
     final keepAtBottom = _scrollCtrl.isNearBottom();
-    // 在等待删除工作前使进行中的全选失效。
-    _selectionEpoch++;
     final deletedMessageIds = await _selectedMessageIdsForDeletion(
       selectedMessageIds,
       deleteAllVersions: deleteAllVersions,
     );
+    // 领域输入验证成功后再使进行中的全选失效；失败必须保持状态不变。
+    _selectionEpoch++;
     for (final id in deletedMessageIds) {
       _translations.remove(id);
     }
@@ -1597,24 +1626,13 @@ class HomePageController extends ChangeNotifier {
 
     final tree = _viewModel.conversationTree;
     if (tree == null) {
-      // 仅兼容尚未加载树的旧导入/测试服务；正常会话始终走树路径。
-      final conversation = currentConversation;
-      if (conversation == null) return selectedMessageIds;
-      final selected = await _chatService.loadMessagesByIds(
-        selectedMessageIds.toList(growable: false),
-      );
-      final groupIds = selected
-          .map((message) => message.groupId ?? message.id)
-          .toSet();
-      if (groupIds.isEmpty) return selectedMessageIds;
-      return _chatService.loadMessageIdsForGroups(conversation.id, groupIds);
+      throw StateError('conversation_tree_unavailable');
     }
     final result = <String>{};
     for (final messageId in selectedMessageIds) {
       final edge = tree.edges[messageId];
       if (edge == null) {
-        result.add(messageId);
-        continue;
+        throw StateError('conversation_tree_message_missing:$messageId');
       }
       result.addAll(tree.childrenOf(edge.parentMessageId));
     }
@@ -1696,12 +1714,26 @@ class HomePageController extends ChangeNotifier {
   }
 
   Future<void> _editMessageInternal(ChatMessage message) async {
-    final ctx = _context;
-    if (!ctx.mounted) return;
+    if (!_context.mounted) return;
     final isDesktop = isDesktopPlatform;
+    final installedTree = _viewModel.conversationTree;
+    final tree = installedTree?.conversationId == message.conversationId
+        ? installedTree
+        : await _chatService.loadConversationTree(message.conversationId);
+    if (!_context.mounted) return;
+    final ctx = _context;
+    final canCloneSubtree = tree?.childrenOf(message.id).isNotEmpty ?? false;
     final Future<MessageEditResult?> future = isDesktop
-        ? showMessageEditDesktopDialog(ctx, message: message)
-        : showMessageEditSheet(ctx, message: message);
+        ? showMessageEditDesktopDialog(
+            ctx,
+            message: message,
+            canCloneSubtree: canCloneSubtree,
+          )
+        : showMessageEditSheet(
+            ctx,
+            message: message,
+            canCloneSubtree: canCloneSubtree,
+          );
     final MessageEditResult? result = await future;
     if (result == null) return;
 
@@ -1727,6 +1759,11 @@ class HomePageController extends ChangeNotifier {
         messageId: message.id,
         parts: result.parts,
       ),
+      MessageEditSaveMode.cloneSubtree =>
+        _chatService.cloneMessageWithSubtreeAsBranch(
+          messageId: message.id,
+          parts: result.parts,
+        ),
       MessageEditSaveMode.overwrite => _chatService.overwriteMessage(
         messageId: message.id,
         parts: result.parts,
@@ -1964,59 +2001,14 @@ class HomePageController extends ChangeNotifier {
         selectable.every((m) => _selectedItems.contains(m.id));
   }
 
-  /// 当所选组可能具有多个版本时为 true。
-  ///
-  /// 使用已加载的折叠窗口和 [ChatService.getMessagesForGroups]
-  /// （由可见组预加载填充）。绝不会仅为渲染删除操作栏而遍历
-  /// 完整会话顺序或 [getMessagesRange]。当组预加载不完整/未知时，
-  /// 包括所选 ID 在已加载窗口之外，都会保守地返回 true，
-  /// 使两个删除选项保持可用；最终删除仍使用异步数据库路径。
+  /// 所选消息中是否包含分支节点。
   bool get selectedMessagesIncludeMultipleVersions {
-    final conversation = currentConversation;
-    if (conversation == null || _selectedItems.isEmpty) return false;
-    final groupIds = _selectedSelectionGroupIds();
-    if (groupIds.isEmpty) return false;
-
-    final loaded = _chatService.getMessagesForGroups(conversation.id, groupIds);
-    final counts = <String, int>{};
-    for (final message in loaded) {
-      final groupId = message.groupId ?? message.id;
-      counts.update(groupId, (value) => value + 1, ifAbsent: () => 1);
-    }
-
-    for (final groupId in groupIds) {
-      final known = counts[groupId] ?? 0;
-      if (known > 1) return true;
-      // 预加载不完整：不要将未知状态视为单版本。
-      if (known == 0) return true;
-      for (final message in _chatController.collapsedMessages) {
-        if ((message.groupId ?? message.id) != groupId) continue;
-        if (message.version > 0 ||
-            _chatController.versionSelections.containsKey(groupId)) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  Set<String> _selectedSelectionGroupIds() {
-    if (_selectedItems.isEmpty) return const <String>{};
-    final windowMessages = _chatController
-        .allCollapsedMessagesForCurrentConversation();
-    final windowIds = {for (final message in windowMessages) message.id};
-    // 窗口外的选择对版本化来说是未知的，因此给出合成组键，
-    // 使调用方将其视为潜在的多版本。
-    final groupIds = <String>{
-      for (final message in windowMessages)
-        if (_selectedItems.contains(message.id)) message.groupId ?? message.id,
-    };
-    for (final id in _selectedItems) {
-      if (!windowIds.contains(id)) {
-        groupIds.add(id);
-      }
-    }
-    return groupIds;
+    final tree = _viewModel.conversationTree;
+    if (tree == null || _selectedItems.isEmpty) return false;
+    return _selectedItems.any(
+      (messageId) =>
+          tree.edges.containsKey(messageId) && tree.isBranchNode(messageId),
+    );
   }
 
   void selectAll() {
@@ -2264,25 +2256,6 @@ class HomePageController extends ChangeNotifier {
       _selectedItems.remove(messageId);
     }
     notifyListeners();
-  }
-
-  // ============================================================================
-  // 公共方法 - 版本管理
-  // ============================================================================
-
-  Future<void> setSelectedVersion(String groupId, int version) async {
-    await _chatController.setSelectedVersion(groupId, version);
-    for (final message in _chatController.collapsedMessages) {
-      if ((message.groupId ?? message.id) == groupId) {
-        _restoreAssistantMessageUiState(message);
-        break;
-      }
-    }
-    notifyListeners();
-  }
-
-  List<ChatMessage> collapseVersions(List<ChatMessage> items) {
-    return _chatController.collapseVersions(items);
   }
 
   // ============================================================================
@@ -2605,6 +2578,7 @@ class HomePageController extends ChangeNotifier {
   /// 这里的恢复请求会等待列表实际附着后再执行，避免冷启动阶段
   /// `scrollToMessageId` 因为还没有客户端而静默丢失。
   void _positionCurrentConversationAfterOpen() {
+    _rememberLastOpenedConversation();
     final shouldRestore = _restoreReadPositionOnNextSwitch;
     _restoreReadPositionOnNextSwitch = true;
     final conversationId = currentConversation?.id;
@@ -2620,6 +2594,16 @@ class HomePageController extends ChangeNotifier {
       return;
     }
     unawaited(_restoreReadPositionAfterOpen(conversationId!, targetId));
+  }
+
+  void _rememberLastOpenedConversation() {
+    final openedConversationId = currentConversation?.id;
+    final sidebarStateStore = _sidebarStateStore;
+    if (openedConversationId != null && sidebarStateStore != null) {
+      unawaited(
+        sidebarStateStore.setLastOpenedConversationId(openedConversationId),
+      );
+    }
   }
 
   Future<void> _restoreReadPositionAfterOpen(

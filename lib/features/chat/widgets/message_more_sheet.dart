@@ -41,7 +41,8 @@ Future<MessageMoreAction?> showMessageMoreSheet(
   required bool canDeleteAllVersions,
   bool canDeleteCurrentBranch = false,
   bool canDeleteMessageNode = false,
-  bool canUseLinearDeleteActions = true,
+  bool canDeleteMessageOnly = true,
+  bool canDeleteMessageAndFollowing = true,
   required bool canCreateBranch,
   bool canCreateConversationFork = false,
 }) async {
@@ -64,7 +65,8 @@ Future<MessageMoreAction?> showMessageMoreSheet(
         canDeleteAllVersions: canDeleteAllVersions,
         canDeleteCurrentBranch: canDeleteCurrentBranch,
         canDeleteMessageNode: canDeleteMessageNode,
-        canUseLinearDeleteActions: canUseLinearDeleteActions,
+        canDeleteMessageOnly: canDeleteMessageOnly,
+        canDeleteMessageAndFollowing: canDeleteMessageAndFollowing,
         canCreateBranch: canCreateBranch,
         canCreateConversationFork: canCreateConversationFork,
       ),
@@ -175,7 +177,7 @@ Future<MessageMoreAction?> showMessageMoreSheet(
           },
         ),
       ],
-      if (canUseLinearDeleteActions) ...[
+      if (canDeleteMessageOnly)
         DesktopContextMenuItem(
           icon: Lucide.X,
           label: l10n.messageMoreSheetDeleteMessageOnly,
@@ -184,6 +186,7 @@ Future<MessageMoreAction?> showMessageMoreSheet(
             selected = MessageMoreAction.deleteMessageOnly;
           },
         ),
+      if (canDeleteMessageAndFollowing)
         DesktopContextMenuItem(
           icon: Lucide.Trash2,
           label: l10n.messageMoreSheetDeleteMessageAndFollowing,
@@ -192,7 +195,6 @@ Future<MessageMoreAction?> showMessageMoreSheet(
             selected = MessageMoreAction.deleteMessageAndFollowing;
           },
         ),
-      ],
       if (canDeleteMessageNode)
         DesktopContextMenuItem(
           icon: Lucide.Trash2,
@@ -235,7 +237,8 @@ class _MessageMoreSheet extends StatefulWidget {
     required this.canDeleteAllVersions,
     required this.canDeleteCurrentBranch,
     required this.canDeleteMessageNode,
-    required this.canUseLinearDeleteActions,
+    required this.canDeleteMessageOnly,
+    required this.canDeleteMessageAndFollowing,
     required this.canCreateBranch,
     required this.canCreateConversationFork,
   });
@@ -244,7 +247,8 @@ class _MessageMoreSheet extends StatefulWidget {
   final bool canDeleteAllVersions;
   final bool canDeleteCurrentBranch;
   final bool canDeleteMessageNode;
-  final bool canUseLinearDeleteActions;
+  final bool canDeleteMessageOnly;
+  final bool canDeleteMessageAndFollowing;
   final bool canCreateBranch;
   final bool canCreateConversationFork;
 
@@ -461,7 +465,7 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                         },
                       ),
                     ],
-                    if (widget.canUseLinearDeleteActions) ...[
+                    if (widget.canDeleteMessageOnly)
                       _actionItem(
                         icon: Lucide.X,
                         label: l10n.messageMoreSheetDeleteMessageOnly,
@@ -472,6 +476,7 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                           ).pop(MessageMoreAction.deleteMessageOnly);
                         },
                       ),
+                    if (widget.canDeleteMessageAndFollowing)
                       _actionItem(
                         icon: Lucide.Trash2,
                         label: l10n.messageMoreSheetDeleteMessageAndFollowing,
@@ -482,7 +487,6 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                           ).pop(MessageMoreAction.deleteMessageAndFollowing);
                         },
                       ),
-                    ],
                     if (widget.canDeleteMessageNode)
                       _actionItem(
                         icon: Lucide.Trash2,

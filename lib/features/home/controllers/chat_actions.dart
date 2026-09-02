@@ -153,25 +153,6 @@ class ChatActionResult {
 /// - 处理流式分块（推理、工具、内容）
 /// - 管理流式状态
 class ChatActions {
-  static bool shouldPhysicallyRemoveRegenerationTail({
-    required bool deleteTrailingEnabled,
-    required bool isTemporaryConversation,
-  }) => deleteTrailingEnabled && isTemporaryConversation;
-
-  /// 重新生成时是否应追加新的助手回复，而不是向已有回复组添加版本。
-  ///
-  /// 当助手被视为新回复，或锚点是后面没有助手组的用户消息时
-  /// （例如所有已生成版本都被删除），[targetGroupId] 为 null。
-  @visibleForTesting
-  static bool shouldBeginNewAssistantReply({
-    required String role,
-    required String? targetGroupId,
-    required bool assistantAsNewReply,
-  }) {
-    if (assistantAsNewReply && role == 'assistant') return true;
-    return targetGroupId == null && role == 'user';
-  }
-
   ChatActions({
     required this.chatService,
     required this.chatController,
@@ -432,7 +413,15 @@ class ChatActions {
     }
   }
 
-  void _setConversationLoading(String conversationId, bool loading) {
+  void _setConversationLoading(
+    String conversationId,
+    bool loading, {
+    String? finishedMessageId,
+  }) {
+    if (!loading) {
+      final activeId = _activeAssistantMessages[conversationId]?.id;
+      if (activeId != null && activeId != finishedMessageId) return;
+    }
     chatController.setConversationLoading(conversationId, loading);
     onLoadingChanged?.call(conversationId, loading);
   }
@@ -607,7 +596,11 @@ class ChatActions {
       if (chatController.publishTerminalMessage(message)) {
         onMessagesChanged?.call();
       }
-      _setConversationLoading(conversationId, false);
+      _setConversationLoading(
+        conversationId,
+        false,
+        finishedMessageId: message.id,
+      );
     }
   }
 
@@ -834,7 +827,6 @@ class ChatActions {
     final apiMessages = messageGenerationService.messageBuilderService
         .buildApiMessages(
           messages: messages,
-          versionSelections: const <String, int>{},
           currentConversation: _conversationForMessageContext(
             conversation,
             messages,
@@ -844,53 +836,6 @@ class ChatActions {
     return messageGenerationService.apiMessagesContainAudioAttachments(
       apiMessages,
     );
-  }
-
-  @visibleForTesting
-  static List<ChatMessage> projectMessagesForRegenerationContext({
-    required List<ChatMessage> messages,
-    required int lastKeep,
-    required String? targetGroupId,
-  }) {
-    if (lastKeep >= messages.length - 1) {
-      return List<ChatMessage>.of(messages);
-    }
-
-    final keepGroups = <String>{};
-    for (int i = 0; i <= lastKeep && i < messages.length; i++) {
-      keepGroups.add(messages[i].groupId ?? messages[i].id);
-    }
-    if (targetGroupId != null) keepGroups.add(targetGroupId);
-
-    final projected = <ChatMessage>[];
-    for (int i = 0; i < messages.length; i++) {
-      if (i <= lastKeep) {
-        projected.add(messages[i]);
-        continue;
-      }
-      final gid = messages[i].groupId ?? messages[i].id;
-      if (keepGroups.contains(gid)) {
-        projected.add(messages[i]);
-      }
-    }
-    return projected;
-  }
-
-  @visibleForTesting
-  static List<ChatMessage> buildRegenerationMessages({
-    required List<ChatMessage> messages,
-    required int lastKeep,
-    required String? targetGroupId,
-    required ChatMessage assistantPlaceholder,
-  }) {
-    return <ChatMessage>[
-      ...projectMessagesForRegenerationContext(
-        messages: messages,
-        lastKeep: lastKeep,
-        targetGroupId: targetGroupId,
-      ),
-      assistantPlaceholder,
-    ];
   }
 
   /// 使用助手正则表达式转换原始内容。
@@ -1110,7 +1055,6 @@ class ChatActions {
       final prepared = await messageGenerationService
           .prepareApiMessagesWithInjections(
             messages: apiContextMessages,
-            versionSelections: const <String, int>{},
             currentConversation: conversation.copyWith(truncateIndex: -1),
             settings: settings,
             assistant: assistant,
@@ -1376,7 +1320,6 @@ class ChatActions {
       conversationId: conversation.id,
       modelId: modelId,
       providerKey: providerKey,
-      anchorGroupId: message.groupId ?? message.id,
       truncateFuture: truncateFuture,
       parentMessageId: parentMessageId,
       branchId: createdTree.activeBranchId,
@@ -1426,7 +1369,6 @@ class ChatActions {
       final prepared = await messageGenerationService
           .prepareApiMessagesWithInjections(
             messages: regenerationMessages,
-            versionSelections: const <String, int>{},
             currentConversation: conversation.copyWith(truncateIndex: -1),
             settings: settings,
             assistant: assistant,
@@ -1551,7 +1493,6 @@ class ChatActions {
       final prepared = await messageGenerationService
           .prepareApiMessagesWithInjections(
             messages: apiContextMessages,
-            versionSelections: const <String, int>{},
             currentConversation: conversation.copyWith(truncateIndex: -1),
             settings: settings,
             assistant: assistant,
@@ -2440,7 +2381,11 @@ class ChatActions {
         onMessagesChanged?.call();
       }
       streamController.removeStreamingNotifier(messageId);
-      _setConversationLoading(conversationId, false);
+      _setConversationLoading(
+        conversationId,
+        false,
+        finishedMessageId: messageId,
+      );
       // 最终控件通常比流式控件更高；在 isGenerating 变为 false 后
       // 再固定一次，使布局阶段的跟随不会错过高度变化。
       onStreamFinished?.call(conversationId);
@@ -2488,7 +2433,11 @@ class ChatActions {
         onMessagesChanged?.call();
       }
       streamController.removeStreamingNotifier(messageId);
-      _setConversationLoading(conversationId, false);
+      _setConversationLoading(
+        conversationId,
+        false,
+        finishedMessageId: messageId,
+      );
       // 此错误处理器返回后，顺序流排空逻辑拥有源流取消。
       // 此处再次进入其屏障取消会等待当前处理器本身，
       // 并阻止下方 UI 错误回调触发。

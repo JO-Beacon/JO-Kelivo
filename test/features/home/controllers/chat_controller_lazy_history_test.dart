@@ -971,9 +971,9 @@ void main() {
 
         await controller.setCurrentConversationAndLoad(conversation);
 
-        expect(chatService.groupsLoaded, isTrue);
+        expect(chatService.groupLoadRequests, isEmpty);
         expect(controller.collapsedMessages.single.id, 'answer-v0');
-        expect(controller.groupedMessages['answer'], hasLength(1));
+        expect(controller.groupedMessages['answer-v0'], [messages.first]);
       },
     );
 
@@ -1246,25 +1246,28 @@ void main() {
       },
     );
 
-    test('a new version of a loaded tail group forces a reload', () async {
-      await controller.setCurrentConversationAndLoad(conversation);
-      final revision = chatService.appendPersistedMessage(
-        _versionedMessage(
-          id: 'message-99-v1',
-          role: 'assistant',
-          groupId: 'message-99',
-          version: 1,
-        ),
-      );
-      final timelineLoadsBeforeAppend = chatService.timelinePageCalls;
+    test(
+      'a new message sharing a legacy group appends by message identity',
+      () async {
+        await controller.setCurrentConversationAndLoad(conversation);
+        final revision = chatService.appendPersistedMessage(
+          _versionedMessage(
+            id: 'message-99-v1',
+            role: 'assistant',
+            groupId: 'message-99',
+            version: 1,
+          ),
+        );
+        final timelineLoadsBeforeAppend = chatService.timelinePageCalls;
 
-      final appended = await controller.appendPersistedTailMessage(revision);
+        final appended = await controller.appendPersistedTailMessage(revision);
 
-      expect(appended, isTrue);
-      expect(chatService.timelinePageCalls, timelineLoadsBeforeAppend + 1);
-      expect(controller.collapsedMessages.last.id, 'message-99-v1');
-      expect(controller.totalMessageCount, 100);
-    });
+        expect(appended, isTrue);
+        expect(chatService.timelinePageCalls, timelineLoadsBeforeAppend);
+        expect(controller.collapsedMessages.last.id, 'message-99-v1');
+        expect(controller.totalMessageCount, 101);
+      },
+    );
 
     test(
       'multi-version conversations append incrementally without a false gap',
@@ -1409,7 +1412,7 @@ void main() {
     );
 
     test(
-      'edited visible revision preserves the current bounded timeline window',
+      'overwrite edit preserves the current bounded timeline window',
       () async {
         messages = List<ChatMessage>.generate(500, _message);
         conversation = Conversation(
@@ -1432,52 +1435,42 @@ void main() {
           'message-470',
         );
         final idsBeforeEdit = controller.messages
-            .map((message) => message.groupId ?? message.id)
+            .map((message) => message.id)
             .toList();
         final timelineLoadsBeforeEdit = chatService.timelinePageCalls;
         final edited = ChatMessage(
-          id: 'message-470-v2',
+          id: 'message-470',
           role: messages[470].role,
           content: 'edited visible message with a different height',
           conversationId: 'conversation-1',
-          groupId: 'message-470',
-          version: 1,
         );
-        messages.add(edited);
-        chatService.versionSelections = const {'message-470': 1};
+        messages[470] = edited;
 
         final opening = controller.openAroundPersistedMessage(edited);
 
         expect(
           controller.collapsedMessages
-              .singleWhere(
-                (message) => (message.groupId ?? message.id) == 'message-470',
-              )
-              .id,
-          edited.id,
+              .singleWhere((message) => message.id == 'message-470')
+              .content,
+          edited.content,
         );
         final opened = await opening;
 
         expect(opened, isTrue);
         expect(controller.loadedStartIndex, startBeforeEdit);
         expect(chatService.timelinePageCalls, timelineLoadsBeforeEdit);
-        expect(
-          controller.messages.map((message) => message.groupId ?? message.id),
-          idsBeforeEdit,
-        );
+        expect(controller.messages.map((message) => message.id), idsBeforeEdit);
         expect(
           controller.messages
-              .singleWhere(
-                (message) => (message.groupId ?? message.id) == 'message-470',
-              )
-              .id,
-          edited.id,
+              .singleWhere((message) => message.id == 'message-470')
+              .content,
+          edited.content,
         );
       },
     );
 
     test(
-      'visible persisted mutation reconciles the window after truncation',
+      'new branch mutation reloads the active path after truncation',
       () async {
         await controller.setCurrentConversationAndLoad(conversation);
         final timelineLoadsBeforeMutation = chatService.timelinePageCalls;
@@ -1501,8 +1494,8 @@ void main() {
         );
 
         expect(opened, isTrue);
-        expect(chatService.timelinePageCalls, timelineLoadsBeforeMutation);
-        expect(controller.messages.first.id, 'message-60');
+        expect(chatService.timelinePageCalls, timelineLoadsBeforeMutation + 1);
+        expect(controller.messages.first.id, 'message-40');
         expect(controller.messages.last.id, regenerated.id);
         expect(controller.totalMessageCount, 81);
         expect(controller.hasMoreAfter, isFalse);
@@ -1520,7 +1513,7 @@ void main() {
     );
 
     test(
-      'visible edit keeps every version switcher while groups reload',
+      'visible edit projects messages without legacy group reloads',
       () async {
         messages = <ChatMessage>[
           _versionedMessage(
@@ -1560,8 +1553,8 @@ void main() {
         controller = ChatController(chatService: chatService);
         await controller.setCurrentConversationAndLoad(conversation);
         expect(
-          controller.messageRenderModels.map((model) => model.versionCount),
-          [2, 2],
+          controller.messageRenderModels.map((model) => model.message.id),
+          ['answer-a-v1', 'answer-b-v1'],
         );
 
         final edited = _versionedMessage(
@@ -1571,26 +1564,21 @@ void main() {
           version: 2,
         );
         messages.add(edited);
-        chatService
-          ..versionSelections = const {'answer-a': 2, 'answer-b': 1}
-          ..groupsLoaded = false
-          ..groupLoadRequests.clear()
-          ..groupLoadGate = Completer<void>();
+        chatService.versionSelections = const {'answer-a': 2, 'answer-b': 1};
 
         final opening = controller.openAroundPersistedMessage(edited);
         await Future<void>.delayed(Duration.zero);
 
-        expect(chatService.groupLoadRequests.single, {'answer-a', 'answer-b'});
+        expect(chatService.groupLoadRequests, isEmpty);
         expect(
-          controller.messageRenderModels.map((model) => model.versionCount),
-          [2, 2],
+          controller.messageRenderModels.map((model) => model.message.id),
+          ['answer-a-v2', 'answer-b-v1'],
         );
 
-        chatService.groupLoadGate!.complete();
         expect(await opening, isTrue);
         expect(
-          controller.messageRenderModels.map((model) => model.versionCount),
-          [2, 2],
+          controller.messageRenderModels.map((model) => model.message.id),
+          ['answer-a-v2', 'answer-b-v1'],
         );
       },
     );
@@ -1643,6 +1631,7 @@ void main() {
         expect(
           await controller.refreshTimelineAfterMutation(
             removedRevisionIds: const {'message-80'},
+            activePathIds: messages.map((message) => message.id).toList(),
           ),
           isTrue,
         );
@@ -1742,37 +1731,34 @@ void main() {
       );
     });
 
-    test(
-      'mutation refresh with survivor data edits the window in place',
-      () async {
-        await controller.setCurrentConversationAndLoad(conversation);
-        final callsBefore = chatService.timelinePageCalls;
-        messages.removeWhere((message) => message.id == 'message-80');
+    test('mutation refresh removes a known window message in place', () async {
+      await controller.setCurrentConversationAndLoad(conversation);
+      final callsBefore = chatService.timelinePageCalls;
+      messages.removeWhere((message) => message.id == 'message-80');
 
-        expect(
-          await controller.refreshTimelineAfterMutation(
-            removedRevisionIds: const {'message-80'},
-            survivingVersionsByGroup: const {'message-80': <ChatMessage>[]},
-          ),
-          isTrue,
-        );
+      expect(
+        await controller.refreshTimelineAfterMutation(
+          removedRevisionIds: const {'message-80'},
+          activePathIds: messages.map((message) => message.id).toList(),
+        ),
+        isTrue,
+      );
 
-        // The surviving slots keep their identity and order: the list widget
-        // then sees a pure removal instead of a reshaped window that would
-        // drop every measured row height and make the viewport drift.
-        expect(controller.messages.map((message) => message.id), [
-          for (var index = 60; index < 100; index++)
-            if (index != 80) 'message-$index',
-        ]);
-        expect(controller.totalMessageCount, 99);
-        expect(controller.hasMoreBefore, isTrue);
-        expect(controller.hasMoreAfter, isFalse);
-        expect(chatService.timelinePageCalls, callsBefore);
-      },
-    );
+      // The surviving slots keep their identity and order: the list widget
+      // then sees a pure removal instead of a reshaped window that would
+      // drop every measured row height and make the viewport drift.
+      expect(controller.messages.map((message) => message.id), [
+        for (var index = 60; index < 100; index++)
+          if (index != 80) 'message-$index',
+      ]);
+      expect(controller.totalMessageCount, 99);
+      expect(controller.hasMoreBefore, isTrue);
+      expect(controller.hasMoreAfter, isFalse);
+      expect(chatService.timelinePageCalls, callsBefore);
+    });
 
     test(
-      'mutation refresh swaps the surviving version into its slot in place',
+      'mutation refresh reloads the activity projection instead of choosing a version',
       () async {
         final survivor = _versionedMessage(
           id: 'answer-v0',
@@ -1807,14 +1793,10 @@ void main() {
         // timeline refresh runs, mirroring the view-model delete flow.
         messages.removeWhere((message) => message.id == 'answer-v1');
         chatService.versionSelections = const {'answer': 0};
-        controller.loadVersionSelections();
-
         expect(
           await controller.refreshTimelineAfterMutation(
             removedRevisionIds: const {'answer-v1'},
-            survivingVersionsByGroup: {
-              'answer': [survivor],
-            },
+            activePathIds: messages.map((message) => message.id).toList(),
           ),
           isTrue,
         );
@@ -1822,12 +1804,12 @@ void main() {
         expect(controller.messages.last.id, 'answer-v0');
         expect(controller.messages.length, 11);
         expect(controller.totalMessageCount, 11);
-        expect(chatService.timelinePageCalls, callsBefore);
+        expect(chatService.timelinePageCalls, greaterThan(callsBefore));
       },
     );
 
     test(
-      'mutation refresh reloads when a deleted slot is outside the window',
+      'mutation refresh reconciles an outside deletion from the active path',
       () async {
         messages = List<ChatMessage>.generate(1000, _message);
         conversation = Conversation(
@@ -1845,14 +1827,12 @@ void main() {
         expect(
           await controller.refreshTimelineAfterMutation(
             removedRevisionIds: const {'message-100'},
-            survivingVersionsByGroup: const {'message-100': <ChatMessage>[]},
+            activePathIds: messages.map((message) => message.id).toList(),
           ),
           isTrue,
         );
 
-        // An in-place edit cannot track slot counts outside the window, so
-        // this must fall back to the full reload.
-        expect(chatService.timelinePageCalls, greaterThan(callsBefore));
+        expect(chatService.timelinePageCalls, callsBefore);
         expect(controller.totalMessageCount, 999);
       },
     );
@@ -1961,12 +1941,8 @@ void main() {
     );
 
     test(
-      'fetch/open visible-group preload does not await full message order',
+      'fetch/open uses the activity-projected page without group preload',
       () async {
-        // Issue 2: first window + directed group preload must complete even
-        // when a full-order backfill would be blocked. The fake never exposes
-        // getMessageIds; hanging here would mean the controller still awaits
-        // a full-order path on open.
         final user = _versionedMessage(
           id: 'user-1',
           role: 'user',
@@ -1999,13 +1975,11 @@ void main() {
         controller = ChatController(chatService: chatService);
 
         final fetchFuture = controller.fetchConversationWindow(conversation);
-        // Preload is in-flight on the directed group path only.
         await Future<void>.delayed(Duration.zero);
-        expect(chatService.groupLoadRequests, isNotEmpty);
+        expect(chatService.groupLoadRequests, isEmpty);
         expect(chatService.fullLoadCalls, 0);
         expect(chatService.timelinePageCalls, 1);
 
-        chatService.groupLoadGate!.complete();
         final fetched = await fetchFuture.timeout(const Duration(seconds: 2));
         controller.commitConversationWindow(fetched);
 
@@ -2014,64 +1988,54 @@ void main() {
           'assistant-v1',
         ]);
         expect(chatService.fullLoadCalls, 0);
-        expect(
-          chatService.groupLoadRequests.any((ids) => ids.contains('assistant')),
-          isTrue,
-        );
+        expect(chatService.groupLoadRequests, isEmpty);
       },
     );
 
-    test(
-      'multi-version open preloads groups and projects the selected version',
-      () async {
-        final user = _versionedMessage(
-          id: 'user-1',
-          role: 'user',
-          groupId: 'user-1',
-          version: 0,
-        );
-        final v0 = _versionedMessage(
-          id: 'assistant-v0',
-          role: 'assistant',
-          groupId: 'assistant',
-          version: 0,
-        );
-        final v1 = _versionedMessage(
-          id: 'assistant-v1',
-          role: 'assistant',
-          groupId: 'assistant',
-          version: 1,
-        );
-        messages = [user, v0, v1];
-        conversation = Conversation(
-          id: 'conversation-1',
-          title: 'Multi-version',
-          messageIds: messages.map((m) => m.id).toList(),
-        );
-        chatService = _FakeLazyChatService(messages)
-          ..versionSelections = const {'assistant': 1};
-        controller.dispose();
-        controller = ChatController(chatService: chatService);
+    test('open trusts the activity-projected timeline page', () async {
+      final user = _versionedMessage(
+        id: 'user-1',
+        role: 'user',
+        groupId: 'user-1',
+        version: 0,
+      );
+      final v0 = _versionedMessage(
+        id: 'assistant-v0',
+        role: 'assistant',
+        groupId: 'assistant',
+        version: 0,
+      );
+      final v1 = _versionedMessage(
+        id: 'assistant-v1',
+        role: 'assistant',
+        groupId: 'assistant',
+        version: 1,
+      );
+      messages = [user, v0, v1];
+      conversation = Conversation(
+        id: 'conversation-1',
+        title: 'Multi-version',
+        messageIds: messages.map((m) => m.id).toList(),
+      );
+      chatService = _FakeLazyChatService(messages)
+        ..versionSelections = const {'assistant': 1};
+      controller.dispose();
+      controller = ChatController(chatService: chatService);
 
-        await controller.setCurrentConversationAndLoad(conversation);
+      await controller.setCurrentConversationAndLoad(conversation);
 
-        expect(controller.collapsedMessages.map((m) => m.id), [
-          'user-1',
-          'assistant-v1',
-        ]);
-        expect(chatService.groupLoadRequests, isNotEmpty);
-        expect(
-          chatService.groupLoadRequests.any((ids) => ids.contains('assistant')),
-          isTrue,
-        );
-        expect(chatService.fullLoadCalls, 0);
-        expect(
-          controller.allCollapsedMessagesForCurrentConversation().map(
-            (m) => m.id,
-          ),
-          ['user-1', 'assistant-v1'],
-        );
-      },
-    );
+      expect(controller.collapsedMessages.map((m) => m.id), [
+        'user-1',
+        'assistant-v1',
+      ]);
+      expect(chatService.groupLoadRequests, isEmpty);
+      expect(chatService.fullLoadCalls, 0);
+      expect(
+        controller.allCollapsedMessagesForCurrentConversation().map(
+          (m) => m.id,
+        ),
+        ['user-1', 'assistant-v1'],
+      );
+    });
   });
 }

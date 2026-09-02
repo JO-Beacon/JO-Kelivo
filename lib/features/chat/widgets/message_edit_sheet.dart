@@ -16,6 +16,7 @@ import 'message_edit_close_confirmation.dart';
 Future<MessageEditResult?> showMessageEditSheet(
   BuildContext context, {
   required ChatMessage message,
+  bool canCloneSubtree = false,
 }) async {
   final cs = Theme.of(context).colorScheme;
   return showModalBottomSheet<MessageEditResult?>(
@@ -26,14 +27,23 @@ Future<MessageEditResult?> showMessageEditSheet(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (ctx) =>
-        SafeArea(top: false, child: _MessageEditSheet(message: message)),
+    builder: (ctx) => SafeArea(
+      top: false,
+      child: _MessageEditSheet(
+        message: message,
+        canCloneSubtree: canCloneSubtree,
+      ),
+    ),
   );
 }
 
 class _MessageEditSheet extends StatefulWidget {
-  const _MessageEditSheet({required this.message});
+  const _MessageEditSheet({
+    required this.message,
+    this.canCloneSubtree = false,
+  });
   final ChatMessage message;
+  final bool canCloneSubtree;
   @override
   State<_MessageEditSheet> createState() => _MessageEditSheetState();
 }
@@ -115,6 +125,15 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
     }
   }
 
+  Future<void> _confirmOverwrite() async {
+    if (_allowClose) return;
+    if (await showMessageEditOverwriteConfirmation(context) && mounted) {
+      _closeWithResult(
+        _result(shouldSend: false, saveMode: MessageEditSaveMode.overwrite),
+      );
+    }
+  }
+
   void _handleHeaderDragStart(DragStartDetails _) {
     _headerDragDistance = 0;
   }
@@ -188,29 +207,31 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
                         spacing: 4,
                         runSpacing: 2,
                         children: [
-                          IosCardPress(
-                            onTap: () {
-                              Haptics.light();
-                              _closeWithResult(_result(shouldSend: true));
-                            },
-                            borderRadius: BorderRadius.circular(20),
-                            baseColor: Colors.transparent,
-                            pressedBlendStrength:
-                                Theme.of(context).brightness == Brightness.dark
-                                ? 0.10
-                                : 0.06,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 6,
-                            ),
-                            child: Text(
-                              l10n.messageEditPageSaveAsBranchAndSend,
-                              style: TextStyle(
-                                color: cs.primary,
-                                fontWeight: AppFontWeights.emphasis,
+                          if (widget.message.role == 'user')
+                            IosCardPress(
+                              onTap: () {
+                                Haptics.light();
+                                _closeWithResult(_result(shouldSend: true));
+                              },
+                              borderRadius: BorderRadius.circular(20),
+                              baseColor: Colors.transparent,
+                              pressedBlendStrength:
+                                  Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? 0.10
+                                  : 0.06,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 6,
+                              ),
+                              child: Text(
+                                l10n.messageEditPageSaveAsBranchAndSend,
+                                style: TextStyle(
+                                  color: cs.primary,
+                                  fontWeight: AppFontWeights.emphasis,
+                                ),
                               ),
                             ),
-                          ),
                           IosCardPress(
                             onTap: () {
                               Haptics.light();
@@ -234,15 +255,29 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
                               ),
                             ),
                           ),
+                          if (widget.canCloneSubtree)
+                            IosCardPress(
+                              onTap: () => _closeWithResult(
+                                _result(
+                                  shouldSend: false,
+                                  saveMode: MessageEditSaveMode.cloneSubtree,
+                                ),
+                              ),
+                              borderRadius: BorderRadius.circular(20),
+                              baseColor: Colors.transparent,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 6,
+                              ),
+                              child: Text(
+                                l10n.messageEditPageSaveAsBranchCopyChildren,
+                                style: TextStyle(color: cs.primary),
+                              ),
+                            ),
                           IosCardPress(
                             onTap: () {
                               Haptics.light();
-                              _closeWithResult(
-                                _result(
-                                  shouldSend: false,
-                                  saveMode: MessageEditSaveMode.overwrite,
-                                ),
-                              );
+                              unawaited(_confirmOverwrite());
                             },
                             borderRadius: BorderRadius.circular(20),
                             baseColor: Colors.transparent,

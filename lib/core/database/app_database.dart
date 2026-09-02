@@ -126,6 +126,8 @@ class ConversationBranchRows extends Table {
   TextColumn get name => text().withDefault(const Constant(''))();
   IntColumn get createdAt =>
       integer().map(const MicrosecondDateTimeConverter())();
+  TextColumn get parentBranchId => text().nullable()();
+  TextColumn get forkAnchorMessageId => text().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -141,6 +143,8 @@ class ConversationTreeStateRows extends Table {
   TextColumn get activeBranchId => text()();
   TextColumn get branchSelectionsJson =>
       text().withDefault(const Constant('{}'))();
+  TextColumn get activeBranchHistoryJson =>
+      text().withDefault(const Constant('[]'))();
 
   @override
   Set<Column<Object>> get primaryKey => {conversationId};
@@ -757,8 +761,8 @@ class AppDatabase extends _$AppDatabase {
   // Schema 1 是第一个发布的 SQLite 契约。模式 2 添加显式消息树边、
   // 分支和活动分支状态，模式 3 存储每个共享树前缀下最后选择的分支，
   // 模式 4 将 Kelivo 的助手标签表迁移为 JO-Kelivo 的助手分组表，模式 5
-  // 为冻结提示词绑定消息正文哈希。
-  static const currentSchemaVersion = 5;
+  // 为冻结提示词绑定消息正文哈希，模式 6 持久化明确的分支关系和活动历史。
+  static const currentSchemaVersion = 6;
   // 保持 SQLite 既定的 1000 页节奏显式声明。按通常 4 KiB 页大小计算，
   // 这大约在 4 MiB 时触发一次检查点，但页大小仍是实际依据。
   static const walAutoCheckpointPages = 1000;
@@ -1083,6 +1087,40 @@ FROM probe;
           'CREATE INDEX idx_message_prompts_conversation_snapshot '
           'ON message_prompt_rows (conversation_id, carries_memory_snapshot);',
         );
+      }
+      // Versions before 2 create the tree tables in this migration using the
+      // current table definitions, so their v6 columns already exist.
+      if (from >= 2 && from < 6) {
+        final branchColumns = await customSelect(
+          'PRAGMA table_info(conversation_branch_rows);',
+        ).get();
+        final branchColumnNames = branchColumns
+            .map((row) => row.read<String>('name'))
+            .toSet();
+        if (!branchColumnNames.contains('parent_branch_id')) {
+          await migrator.addColumn(
+            conversationBranchRows,
+            conversationBranchRows.parentBranchId,
+          );
+        }
+        if (!branchColumnNames.contains('fork_anchor_message_id')) {
+          await migrator.addColumn(
+            conversationBranchRows,
+            conversationBranchRows.forkAnchorMessageId,
+          );
+        }
+        final stateColumns = await customSelect(
+          'PRAGMA table_info(conversation_tree_state_rows);',
+        ).get();
+        final stateColumnNames = stateColumns
+            .map((row) => row.read<String>('name'))
+            .toSet();
+        if (!stateColumnNames.contains('active_branch_history_json')) {
+          await migrator.addColumn(
+            conversationTreeStateRows,
+            conversationTreeStateRows.activeBranchHistoryJson,
+          );
+        }
       }
     },
     beforeOpen: (details) async {

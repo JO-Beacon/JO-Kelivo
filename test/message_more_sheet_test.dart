@@ -23,7 +23,8 @@ Future<MessageMoreAction?> _openMoreSheet(
   required bool canDeleteAllVersions,
   bool canDeleteCurrentBranch = false,
   bool canDeleteMessageNode = false,
-  bool canUseLinearDeleteActions = true,
+  bool canDeleteMessageOnly = true,
+  bool canDeleteMessageAndFollowing = true,
   bool canCreateBranch = true,
   String role = 'assistant',
   String? tapLabel,
@@ -51,7 +52,8 @@ Future<MessageMoreAction?> _openMoreSheet(
                     canDeleteAllVersions: canDeleteAllVersions,
                     canDeleteCurrentBranch: canDeleteCurrentBranch,
                     canDeleteMessageNode: canDeleteMessageNode,
-                    canUseLinearDeleteActions: canUseLinearDeleteActions,
+                    canDeleteMessageOnly: canDeleteMessageOnly,
+                    canDeleteMessageAndFollowing: canDeleteMessageAndFollowing,
                     canCreateBranch: canCreateBranch,
                   );
                 },
@@ -81,7 +83,8 @@ void main() {
       canDeleteAllVersions: true,
       canDeleteCurrentBranch: true,
       canDeleteMessageNode: true,
-      canUseLinearDeleteActions: false,
+      canDeleteMessageOnly: false,
+      canDeleteMessageAndFollowing: false,
     );
 
     expect(find.text('Select Messages'), findsOneWidget);
@@ -114,6 +117,17 @@ void main() {
     expect(find.text('Delete All Branches'), findsNothing);
   });
 
+  testWidgets('叶子非分支节点菜单仅显示删除当前消息', (tester) async {
+    await _openMoreSheet(
+      tester,
+      canDeleteAllVersions: false,
+      canDeleteMessageAndFollowing: false,
+    );
+
+    expect(find.text('Delete This Message'), findsOneWidget);
+    expect(find.text('Delete This Message and Following'), findsNothing);
+  });
+
   testWidgets('消息菜单可以触发删除当前分支', (tester) async {
     final action = await _openMoreSheet(
       tester,
@@ -131,7 +145,8 @@ void main() {
       canDeleteAllVersions: true,
       canDeleteCurrentBranch: true,
       canDeleteMessageNode: true,
-      canUseLinearDeleteActions: false,
+      canDeleteMessageOnly: false,
+      canDeleteMessageAndFollowing: false,
       tapLabel: 'Delete This Node',
     );
 

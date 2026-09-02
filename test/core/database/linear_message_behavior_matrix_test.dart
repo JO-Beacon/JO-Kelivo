@@ -89,7 +89,9 @@ void main() {
       final tree = await repository.loadConversationTree(conversation.id);
 
       expect(result, isNotNull);
-      expect(tree!.activePath(), ['user-0', result!.message.id]);
+      expect(result!.message.groupId, isNull);
+      expect(result.message.version, 0);
+      expect(tree!.activePath(), ['user-0', result.message.id]);
       expect(
         tree.branches.values.map(
           (branch) => tree.branchPath(branch.id).join('|'),
@@ -294,7 +296,6 @@ void main() {
     );
 
     expect(await activeIds(), ['user-0', editedId]);
-    expect(await repository.getMessageIndex(conversation.id, editedId), 1);
     expect(await repository.getMessageIds(conversation.id), [
       'user-0',
       editedId,

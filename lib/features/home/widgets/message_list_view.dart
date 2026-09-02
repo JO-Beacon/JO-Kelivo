@@ -30,7 +30,6 @@ import '../utils/chat_layout_constants.dart';
 import 'model_icon.dart';
 
 /// 消息列表视图动作的回调类型
-typedef OnVersionChange = Future<void> Function(String groupId, int version);
 typedef OnRegenerateMessage = void Function(ChatMessage message);
 typedef OnResendMessage = void Function(ChatMessage message);
 typedef OnTranslateMessage = void Function(ChatMessage message);
@@ -103,7 +102,7 @@ class MessageListView extends StatefulWidget {
     required this.messages,
     this.renderModels,
     required this.byGroup,
-    required this.versionSelections,
+    this.messageIdsWithChildren = const <String>{},
     this.truncCollapsedIndex = -1,
     required this.reasoning,
     required this.reasoningSegments,
@@ -127,7 +126,6 @@ class MessageListView extends StatefulWidget {
     this.siblingBranchIdsByMessageId = const <String, List<String>>{},
     this.activeBranchId,
     this.onBranchChange,
-    this.onVersionChange,
     this.onRegenerateMessage,
     this.onResendMessage,
     this.onTranslateMessage,
@@ -184,8 +182,8 @@ class MessageListView extends StatefulWidget {
   /// 按 groupId 分组的所有消息（来自 ChatController.groupedMessages）。
   final Map<String, List<ChatMessage>> byGroup;
 
-  /// 每个消息分组选中的版本（用于版本导航控件）。
-  final Map<String, int> versionSelections;
+  /// 具有至少一个直接子消息的消息 ID，用于线性删除入口适用性。
+  final Set<String> messageIdsWithChildren;
 
   /// 折叠消息空间中预计算的截断索引（-1 表示无截断）。
   final int truncCollapsedIndex;
@@ -232,7 +230,6 @@ class MessageListView extends StatefulWidget {
   final ValueChanged<String>? onBranchChange;
 
   // 回调
-  final OnVersionChange? onVersionChange;
   final OnRegenerateMessage? onRegenerateMessage;
   final OnResendMessage? onResendMessage;
   final OnTranslateMessage? onTranslateMessage;
@@ -319,7 +316,7 @@ class _MessageListViewState extends State<MessageListView> {
     debugLabel: 'timeline-keyboard-scroll-region',
   );
 
-  String _slotId(ChatMessage message) => message.groupId ?? message.id;
+  String _slotId(ChatMessage message) => message.id;
 
   @override
   void initState() {
@@ -353,8 +350,6 @@ class _MessageListViewState extends State<MessageListView> {
         widget.renderModels ??
         MessageRenderModelProjector.project(
           messages: widget.messages,
-          byGroup: widget.byGroup,
-          versionSelections: widget.versionSelections,
           contextDividerIndex: widget.truncCollapsedIndex,
         );
     _slotIndexById = <String, int>{
@@ -1567,16 +1562,15 @@ class _MessageListViewState extends State<MessageListView> {
     final useAssistAvatar = assistant?.useAssistantAvatar == true;
     final useAssistName = assistant?.useAssistantName == true;
     final gid = model.slotId;
-    final availableVersions = model.availableVersions;
-    final selectedVersion = model.selectedVersion;
-    final selectedIdx = model.selectedVersionIndex;
-    final total = availableVersions.length;
     final siblingBranchIds =
         widget.siblingBranchIdsByMessageId[message.id] ?? const <String>[];
     final useBranchSelector = siblingBranchIds.length > 1;
+    final canDeleteMessageAndFollowing =
+        !useBranchSelector &&
+        widget.messageIdsWithChildren.contains(message.id);
     final selectedBranchIndex = useBranchSelector
         ? siblingBranchIds.indexOf(widget.activeBranchId ?? '')
-        : selectedIdx;
+        : 0;
     final messageSuggestions =
         !widget.selecting &&
             model.isLatestCompleteAssistant &&
@@ -1638,13 +1632,11 @@ class _MessageListViewState extends State<MessageListView> {
                               useAssistName: useAssistName,
                               assistant: assistant,
                               gid: gid,
-                              availableVersions: availableVersions,
-                              selectedVersion: selectedVersion,
-                              selectedIdx: selectedIdx,
-                              total: total,
                               siblingBranchIds: siblingBranchIds,
                               selectedBranchIndex: selectedBranchIndex,
                               useBranchSelector: useBranchSelector,
+                              canDeleteMessageAndFollowing:
+                                  canDeleteMessageAndFollowing,
                               isProcessingFiles: processing,
                               suggestions: messageSuggestions,
                               presentation: presentation,
@@ -1659,13 +1651,11 @@ class _MessageListViewState extends State<MessageListView> {
                               useAssistName: useAssistName,
                               assistant: assistant,
                               gid: gid,
-                              availableVersions: availableVersions,
-                              selectedVersion: selectedVersion,
-                              selectedIdx: selectedIdx,
-                              total: total,
                               siblingBranchIds: siblingBranchIds,
                               selectedBranchIndex: selectedBranchIndex,
                               useBranchSelector: useBranchSelector,
+                              canDeleteMessageAndFollowing:
+                                  canDeleteMessageAndFollowing,
                               isProcessingFiles: processing,
                               suggestions: messageSuggestions,
                               presentation: presentation,
@@ -1765,13 +1755,10 @@ class _MessageListViewState extends State<MessageListView> {
     required bool useAssistName,
     required dynamic assistant,
     required String gid,
-    required List<int> availableVersions,
-    required int selectedVersion,
-    required int selectedIdx,
-    required int total,
     required List<String> siblingBranchIds,
     required int selectedBranchIndex,
     required bool useBranchSelector,
+    required bool canDeleteMessageAndFollowing,
     required bool isProcessingFiles,
     required List<String> suggestions,
     required _MessagePresentation presentation,
@@ -1821,13 +1808,10 @@ class _MessageListViewState extends State<MessageListView> {
             useAssistName: useAssistName,
             assistant: assistant,
             gid: gid,
-            availableVersions: availableVersions,
-            selectedVersion: selectedVersion,
-            selectedIdx: selectedIdx,
-            total: total,
             siblingBranchIds: siblingBranchIds,
             selectedBranchIndex: selectedBranchIndex,
             useBranchSelector: useBranchSelector,
+            canDeleteMessageAndFollowing: canDeleteMessageAndFollowing,
             isProcessingFiles: isProcessingFiles,
             suggestions: suggestions,
             presentation: presentation,
@@ -1849,34 +1833,29 @@ class _MessageListViewState extends State<MessageListView> {
     required bool useAssistName,
     required dynamic assistant,
     required String gid,
-    required List<int> availableVersions,
-    required int selectedVersion,
-    required int selectedIdx,
-    required int total,
     required List<String> siblingBranchIds,
     required int selectedBranchIndex,
     required bool useBranchSelector,
+    required bool canDeleteMessageAndFollowing,
     required bool isProcessingFiles,
     required List<String> suggestions,
     required _MessagePresentation presentation,
     bool enableStreamingTextMotion = true,
   }) {
-    final currentIdx = useBranchSelector
-        ? selectedBranchIndex
-        : availableVersions.indexOf(selectedVersion);
+    final currentIdx = useBranchSelector ? selectedBranchIndex : 0;
     return ChatMessageWidget(
       message: message,
       enableStreamingTextMotion: enableStreamingTextMotion,
-      versionIndex: currentIdx < 0 ? selectedIdx : currentIdx,
-      versionCount: useBranchSelector ? siblingBranchIds.length : 1,
-      onPrevVersion: useBranchSelector
+      branchIndex: currentIdx < 0 ? 0 : currentIdx,
+      branchCount: useBranchSelector ? siblingBranchIds.length : 1,
+      onPreviousBranch: useBranchSelector
           ? (currentIdx > 0)
                 ? () => widget.onBranchChange?.call(
                     siblingBranchIds[currentIdx - 1],
                   )
                 : null
           : null,
-      onNextVersion: useBranchSelector
+      onNextBranch: useBranchSelector
           ? (currentIdx >= 0 && currentIdx < siblingBranchIds.length - 1)
                 ? () => widget.onBranchChange?.call(
                     siblingBranchIds[currentIdx + 1],
@@ -1906,6 +1885,7 @@ class _MessageListViewState extends State<MessageListView> {
           : null,
       showUserAvatar: presentation.showUserAvatar,
       showTokenStats: presentation.showTokenStats,
+      canDeleteMessageAndFollowing: canDeleteMessageAndFollowing,
       hideStreamingIndicator:
           isProcessingFiles ||
           (widget.isPinnedIndicatorActive &&
@@ -1946,7 +1926,7 @@ class _MessageListViewState extends State<MessageListView> {
       onEdit: (message.role == 'assistant' || message.role == 'user')
           ? () => widget.onEditMessage?.call(message)
           : null,
-      onDelete: message.role == 'user'
+      onDelete: message.role == 'user' && canDeleteMessageAndFollowing
           ? () => widget.onDeleteMessageAndFollowing?.call(
               message,
               widget.byGroup,
@@ -1959,7 +1939,8 @@ class _MessageListViewState extends State<MessageListView> {
           canDeleteAllVersions: siblingBranchIds.length > 1,
           canDeleteCurrentBranch: siblingBranchIds.length > 1,
           canDeleteMessageNode: siblingBranchIds.length > 1,
-          canUseLinearDeleteActions: !useBranchSelector,
+          canDeleteMessageOnly: !useBranchSelector,
+          canDeleteMessageAndFollowing: canDeleteMessageAndFollowing,
           canCreateBranch: widget.onMessageFork != null,
           canCreateConversationFork: widget.onConversationFork != null,
         );

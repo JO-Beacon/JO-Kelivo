@@ -16,15 +16,11 @@ class FetchedConversationWindow {
   const FetchedConversationWindow({
     required this.conversation,
     required this.page,
-    required this.versionSelections,
-    required this.needsVisibleGroupPreloadRetry,
     required this.lazyHistoryEnabled,
   });
 
   final Conversation conversation;
   final LoadedTimelinePage? page;
-  final Map<String, int> versionSelections;
-  final bool needsVisibleGroupPreloadRetry;
   final bool lazyHistoryEnabled;
 }
 
@@ -70,8 +66,6 @@ class ChatController extends ChangeNotifier {
   int _totalMessageCount = 0;
   int get totalMessageCount => _totalMessageCount;
 
-  /// 来自最新已加载时间线窗口的 versionCount，按 groupId 索引。
-  Map<String, int> _windowVersionCounts = <String, int>{};
   bool get hasMoreBefore => _loadedStartIndex > 0;
   bool get hasMoreAfter =>
       _loadedStartIndex + _messages.length < _totalMessageCount;
@@ -90,10 +84,6 @@ class ChatController extends ChangeNotifier {
   /// 是其完整历史或此阈值中较小者。
   @visibleForTesting
   static const int idleCacheBackfillSlotLimit = 5000;
-
-  /// 每个消息组的已选版本（groupId -> 已选版本索引）。
-  Map<String, int> _versionSelections = <String, int>{};
-  Map<String, int> get versionSelections => _versionSelections;
 
   /// 缓存的折叠消息（在 notifyListeners 时失效）。
   Map<String, List<ChatMessage>>? _groupCache;
@@ -147,8 +137,6 @@ class ChatController extends ChangeNotifier {
     _messages = [];
     _loadedStartIndex = 0;
     _totalMessageCount = 0;
-    _windowVersionCounts = <String, int>{};
-    _versionSelections = <String, int>{};
     notifyListeners();
   }
 
@@ -157,10 +145,7 @@ class ChatController extends ChangeNotifier {
     _messages = [];
     _loadedStartIndex = 0;
     _totalMessageCount = 0;
-    _windowVersionCounts = <String, int>{};
-    _versionSelections = <String, int>{};
     if (conversation != null) {
-      _loadVersionSelections();
       await _loadInitialMessageWindow(conversation.id);
       if (_currentConversation?.id != conversation.id) return;
     }
@@ -180,34 +165,9 @@ class ChatController extends ChangeNotifier {
             limit: ChatService.defaultTimelineInitialSlots,
           )
         : await _fetchCompleteTimeline(conversation.id);
-    Map<String, int> versionSelections;
-    try {
-      versionSelections = _chatService.getVersionSelections(conversation.id);
-    } catch (_) {
-      versionSelections = <String, int>{};
-    }
-    final groupIds = <String>{
-      for (final slot in page?.slots ?? const <LoadedTimelineSlot>[])
-        if (slot.identity.versionCount > 1 ||
-            slot.message.version > 0 ||
-            versionSelections.containsKey(
-              slot.message.groupId ?? slot.message.id,
-            ))
-          slot.message.groupId ?? slot.message.id,
-    };
-    var needsVisibleGroupPreloadRetry = false;
-    if (groupIds.isNotEmpty) {
-      try {
-        await _preloadGroupIds(conversation.id, groupIds);
-      } catch (_) {
-        needsVisibleGroupPreloadRetry = true;
-      }
-    }
     return FetchedConversationWindow(
       conversation: conversation,
       page: page,
-      versionSelections: versionSelections,
-      needsVisibleGroupPreloadRetry: needsVisibleGroupPreloadRetry,
       lazyHistoryEnabled: lazyHistoryEnabled,
     );
   }
@@ -215,27 +175,12 @@ class ChatController extends ChangeNotifier {
   /// 会话切换的提交阶段：安装此前由 [fetchConversationWindow]
   /// 获取的窗口。它会取代任何进行中的窗口加载，
   /// 因此迟到的分页和加载标志清除都会失效。
-  void commitConversationWindow(
-    FetchedConversationWindow fetched, {
-    VoidCallback? onDeferredGroupDataLoaded,
-  }) {
+  void commitConversationWindow(FetchedConversationWindow fetched) {
     _windowLoadSerial++;
     _isLoadingWindow = false;
     _currentConversation = fetched.conversation;
     _replaceWindow(fetched.page);
-    _versionSelections = fetched.versionSelections;
     notifyListeners();
-    if (fetched.needsVisibleGroupPreloadRetry) {
-      unawaited(
-        _preloadVisibleGroupData()
-            .then((_) {
-              if (_currentConversation?.id != fetched.conversation.id) return;
-              notifyListeners();
-              onDeferredGroupDataLoaded?.call();
-            })
-            .catchError((Object _) {}),
-      );
-    }
     _scheduleIdleCacheBackfill(fetched.conversation.id);
     if (fetched.lazyHistoryEnabled != _lazyHistoryEnabled) {
       unawaited(
@@ -263,20 +208,6 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 废弃：版本选择不再被运行时使用，树是唯一真相。
-  @Deprecated('Version selections are no longer used at runtime')
-  void _loadVersionSelections() {
-    // 不再加载 versionSelections，树的 activeBranchId 是唯一真相
-    _versionSelections = <String, int>{};
-  }
-
-  /// 废弃：版本选择不再被运行时使用。
-  @Deprecated('Version selections are no longer used at runtime')
-  void loadVersionSelections() {
-    _loadVersionSelections();
-    notifyListeners();
-  }
-
   /// 创建新会话并将其设为当前会话。
   Future<Conversation> createNewConversation({
     required String title,
@@ -290,8 +221,6 @@ class ChatController extends ChangeNotifier {
     _messages = [];
     _loadedStartIndex = 0;
     _totalMessageCount = 0;
-    _windowVersionCounts = <String, int>{};
-    _versionSelections = <String, int>{};
     notifyListeners();
     return conversation;
   }
@@ -307,8 +236,6 @@ class ChatController extends ChangeNotifier {
     _messages = [];
     _loadedStartIndex = 0;
     _totalMessageCount = 0;
-    _windowVersionCounts = <String, int>{};
-    _versionSelections = <String, int>{};
   }
 
   Future<void> _loadInitialMessageWindow(String conversationId) async {
@@ -333,7 +260,6 @@ class ChatController extends ChangeNotifier {
       if (serial == _windowLoadSerial) _isLoadingWindow = false;
     }
     invalidateCache();
-    await _preloadVisibleGroupData();
     _scheduleIdleCacheBackfill(conversationId);
   }
 
@@ -366,7 +292,6 @@ class ChatController extends ChangeNotifier {
         return;
       }
       _replaceWindow(page);
-      await _preloadVisibleGroupData();
       if (serial != _windowLoadSerial ||
           _currentConversation?.id != conversation.id ||
           _lazyHistoryEnabled != enabled) {
@@ -475,7 +400,6 @@ class ChatController extends ChangeNotifier {
       _messages = <ChatMessage>[];
       _loadedStartIndex = 0;
       _totalMessageCount = 0;
-      _windowVersionCounts = <String, int>{};
       return;
     }
     _messages = page.slots.map((slot) => slot.message).toList(growable: true);
@@ -483,19 +407,7 @@ class ChatController extends ChangeNotifier {
         ? 0
         : page.slots.first.identity.logicalIndex;
     _totalMessageCount = page.totalSlotCount;
-    _windowVersionCounts = {
-      for (final slot in page.slots)
-        slot.identity.slotId: slot.identity.versionCount,
-    };
     invalidateCache();
-  }
-
-  void _mergeWindowVersionCounts(LoadedTimelinePage page) {
-    final next = Map<String, int>.of(_windowVersionCounts);
-    for (final slot in page.slots) {
-      next[slot.identity.slotId] = slot.identity.versionCount;
-    }
-    _windowVersionCounts = next;
   }
 
   Future<bool> loadMoreBefore({
@@ -520,7 +432,6 @@ class ChatController extends ChangeNotifier {
     ]);
     _loadedStartIndex = page.slots.first.identity.logicalIndex;
     _totalMessageCount = page.totalSlotCount;
-    _mergeWindowVersionCounts(page);
     if (_lazyHistoryEnabled &&
         _messages.length > ChatService.defaultLoadedWindowMax) {
       _messages.removeRange(
@@ -529,7 +440,6 @@ class ChatController extends ChangeNotifier {
       );
     }
     invalidateCache();
-    await _preloadVisibleGroupData();
     notifyListeners();
     return true;
   }
@@ -555,7 +465,6 @@ class ChatController extends ChangeNotifier {
         if (existing.add(slot.message.id)) slot.message,
     ]);
     _totalMessageCount = page.totalSlotCount;
-    _mergeWindowVersionCounts(page);
     if (_lazyHistoryEnabled &&
         _messages.length > ChatService.defaultLoadedWindowMax) {
       final removeCount = _messages.length - ChatService.defaultLoadedWindowMax;
@@ -563,7 +472,6 @@ class ChatController extends ChangeNotifier {
       _loadedStartIndex += removeCount;
     }
     invalidateCache();
-    await _preloadVisibleGroupData();
     notifyListeners();
     return true;
   }
@@ -580,7 +488,6 @@ class ChatController extends ChangeNotifier {
     // 如果加载期间会话发生变化，则丢弃该页。
     if (_currentConversation?.id != conversation.id) return false;
     _replaceWindow(page);
-    await _preloadVisibleGroupData();
     notifyListeners();
     return _messages.isNotEmpty;
   }
@@ -596,7 +503,6 @@ class ChatController extends ChangeNotifier {
     // 如果加载期间会话发生变化，则丢弃该页。
     if (_currentConversation?.id != conversation.id) return false;
     _replaceWindow(page);
-    await _preloadVisibleGroupData();
     notifyListeners();
     return _messages.isNotEmpty;
   }
@@ -647,23 +553,18 @@ class ChatController extends ChangeNotifier {
     } finally {
       if (serial == _windowLoadSerial) _isLoadingWindow = false;
     }
-    await _preloadVisibleGroupData();
     notifyListeners();
     return _messages.any((message) => message.id == messageId);
   }
 
   Future<bool> refreshTimelineAfterMutation({
     Set<String> removedRevisionIds = const <String>{},
-    Map<String, List<ChatMessage>>? survivingVersionsByGroup,
+    List<String>? activePathIds,
   }) async {
     final conversation = _currentConversation;
     if (conversation == null) return false;
-    if (survivingVersionsByGroup != null &&
-        _removeRevisionsFromWindow(
-          removedRevisionIds,
-          survivingVersionsByGroup,
-        )) {
-      await _preloadVisibleGroupData();
+    if (activePathIds != null &&
+        _removeMessagesFromWindow(removedRevisionIds, activePathIds)) {
       if (_currentConversation?.id != conversation.id) return false;
       notifyListeners();
       return true;
@@ -677,7 +578,7 @@ class ChatController extends ChangeNotifier {
       }
     }
     final previousSlotIds = <String>{
-      for (final message in _messages) message.groupId ?? message.id,
+      for (final message in _messages) message.id,
     };
     final page = _lazyHistoryEnabled
         ? await _chatService.loadTimelinePage(
@@ -688,79 +589,49 @@ class ChatController extends ChangeNotifier {
         : await _fetchCompleteTimeline(conversation.id);
     if (_currentConversation?.id != conversation.id) return false;
     _replaceWindow(_withoutBackfilledHead(page, previousSlotIds));
-    await _preloadVisibleGroupData();
     notifyListeners();
     return page != null;
   }
 
-  /// 直接在已加载窗口内应用删除，而不是重新加载整个窗口。
+  /// 直接在已加载窗口内应用可证明的消息删除，而不是重新加载整个窗口。
   ///
   /// 完整重载会围绕数据库锚点重建窗口，可能重塑窗口
   /// （回填头部、索引偏移）；随后列表控件会失去对幸存行的跟踪，
   /// 必须丢弃所有已测量的行高，在重新测量所有内容时视口会漂移。
-  /// 直接从已加载窗口中移除被删除修订可以让每个幸存槽位身份保持稳定，
+  /// 直接从已加载窗口中移除被删除消息可以让每个幸存槽位身份保持稳定，
   /// 因此列表只会看到“这些槽位消失了”。
   ///
-  /// [survivingVersionsByGroup] 必须为每个至少失去一个修订的组
-  /// 提供条目，保存仍然存在的版本（当整个槽位消失时为空）。
-  /// 当变更不能表达为窗口内编辑时返回 false，包括被删除修订属于
-  /// 已加载窗口外的槽位、缺少幸存数据，或窗口会因此清空；
-  /// 此时调用方回退到完整重载。
-  bool _removeRevisionsFromWindow(
+  /// 只有删除集合全部位于当前窗口时才能原地编辑；隐藏分支或窗口外
+  /// 消息无法由窗口证明，必须回退到活动路径重载。
+  bool _removeMessagesFromWindow(
     Set<String> removedRevisionIds,
-    Map<String, List<ChatMessage>> survivingVersionsByGroup,
+    List<String> activePathIds,
   ) {
     if (removedRevisionIds.isEmpty || _messages.isEmpty) return false;
-    final windowSlotIds = <String>{
-      for (final message in _messages) message.groupId ?? message.id,
-    };
-    // 窗口外的组会改变此方法未跟踪区域的槽位数量，
-    // 因此只能通过重新加载来解决。
-    for (final groupId in survivingVersionsByGroup.keys) {
-      if (!windowSlotIds.contains(groupId)) return false;
-    }
-
-    final next = <ChatMessage>[];
-    final nextVersionCounts = Map<String, int>.of(_windowVersionCounts);
-    var removedSlotCount = 0;
-    for (final message in _messages) {
-      final groupId = message.groupId ?? message.id;
-      final survivors = survivingVersionsByGroup[groupId];
-      if (survivors != null && survivors.isNotEmpty) {
-        nextVersionCounts[groupId] = survivors.length;
-      }
-      if (!removedRevisionIds.contains(message.id)) {
-        next.add(message);
-        continue;
-      }
-      if (survivors == null) return false;
-      if (survivors.isEmpty) {
-        removedSlotCount++;
-        nextVersionCounts.remove(groupId);
-        continue;
-      }
-      final sorted = List<ChatMessage>.of(survivors)
-        ..sort((left, right) => left.version.compareTo(right.version));
-      final selection = _versionSelections[groupId];
-      ChatMessage? selected;
-      if (selection != null) {
-        for (final candidate in sorted) {
-          if (candidate.version == selection) {
-            selected = candidate;
-            break;
-          }
-        }
-      }
-      next.add(selected ?? sorted.last);
-    }
+    final next = _messages
+        .where((message) => !removedRevisionIds.contains(message.id))
+        .toList(growable: true);
     if (next.isEmpty) return false;
 
+    final firstIndex = activePathIds.indexOf(next.first.id);
+    final lastIndex = activePathIds.indexOf(next.last.id);
+    if (firstIndex < 0 || lastIndex < firstIndex) return false;
+    final expectedStart = hasMoreBefore ? firstIndex : 0;
+    final expectedEnd = hasMoreAfter ? lastIndex + 1 : activePathIds.length;
+    final expectedWindow = activePathIds.sublist(expectedStart, expectedEnd);
+    if (!listEquals(
+      expectedWindow,
+      next.map((message) => message.id).toList(growable: false),
+    )) {
+      return false;
+    }
+
     _messages = next;
+    _loadedStartIndex = expectedStart;
     _totalMessageCount = math.max(
       _loadedStartIndex + next.length,
-      _totalMessageCount - removedSlotCount,
+      _totalMessageCount - removedRevisionIds.length,
     );
-    _windowVersionCounts = nextVersionCounts;
     invalidateCache();
     return true;
   }
@@ -783,7 +654,7 @@ class ChatController extends ChangeNotifier {
     }
     var cut = 0;
     while (cut < page.slots.length &&
-        !previousSlotIds.contains(page.slots[cut].identity.slotId)) {
+        !previousSlotIds.contains(page.slots[cut].message.id)) {
       cut++;
     }
     // cut == 0：没有回填内容。cut == length：窗口已完全移离旧窗口，
@@ -882,38 +753,6 @@ class ChatController extends ChangeNotifier {
     return current;
   }
 
-  Future<void> _preloadVisibleGroupData() async {
-    final conversation = _currentConversation;
-    if (conversation == null || _messages.isEmpty) return;
-    final groupIds = <String>{
-      for (final message in _messages)
-        if ((_windowVersionCounts[message.groupId ?? message.id] ?? 1) > 1 ||
-            message.version > 0 ||
-            _versionSelections.containsKey(message.groupId ?? message.id))
-          message.groupId ?? message.id,
-    };
-    if (groupIds.isEmpty) return;
-    await _preloadGroupIds(conversation.id, groupIds);
-    if (_currentConversation?.id != conversation.id) return;
-    invalidateCache();
-  }
-
-  Future<void> _preloadGroupIds(
-    String conversationId,
-    Iterable<String> groupIds,
-  ) async {
-    const batchSize = 400;
-    final ids = groupIds.toList(growable: false);
-    for (var start = 0; start < ids.length; start += batchSize) {
-      final end = (start + batchSize).clamp(0, ids.length);
-      final batch = ids.sublist(start, end);
-      await Future.wait([
-        _chatService.loadMessagesForGroups(conversationId, batch),
-        _chatService.loadFirstMessageIndicesForGroups(conversationId, batch),
-      ]);
-    }
-  }
-
   // ============================================================================
   // 消息管理
   // ============================================================================
@@ -957,11 +796,10 @@ class ChatController extends ChangeNotifier {
     return appendPersistedTailMessages([message]);
   }
 
-  /// 围绕已持久化的修订变更打开逻辑窗口。
+  /// 围绕已持久化的消息变更打开逻辑窗口。
   ///
-  /// 编辑或选择版本可能作用于远离尾部窗口的槽位，
-  /// 因此不能复用追加到尾部的导航路径。当持久化移除了
-  /// 目标之后的所有逻辑槽位时，设置 [truncateFollowingSlots]。
+  /// 覆盖编辑保留消息 ID，可直接替换当前窗口快照；新分支使用新 ID，
+  /// 必须从活动时间线重新定位，不能按旧 groupId/version 猜测槽位。
   Future<bool> openAroundPersistedMessage(
     ChatMessage message, {
     bool truncateFollowingSlots = false,
@@ -971,51 +809,16 @@ class ChatController extends ChangeNotifier {
       return false;
     }
 
-    final groupId = message.groupId ?? message.id;
     final visibleIndex = _messages.indexWhere(
-      (candidate) => (candidate.groupId ?? candidate.id) == groupId,
+      (candidate) => candidate.id == message.id,
     );
     if (visibleIndex >= 0) {
-      // 编辑后的版本属于同一个逻辑时间线槽位。保持当前有界窗口不变，
-      // 使列表在仅此槽位重新测量高度时仍能保留可见锚点。
-      // 在异步刷新完成前保留当前可见组快照，
-      // 避免无关的版本切换器短暂消失。
-      final visibleSnapshot = List<ChatMessage>.of(
-        _messagesWithVisibleGroups(),
-      );
-      final groupInsertIndex = visibleSnapshot.indexWhere(
-        (candidate) => (candidate.groupId ?? candidate.id) == groupId,
-      );
-      final groupMessages =
-          visibleSnapshot
-              .where(
-                (candidate) => (candidate.groupId ?? candidate.id) == groupId,
-              )
-              .where((candidate) => candidate.id != message.id)
-              .toList()
-            ..add(message)
-            ..sort((left, right) => left.version.compareTo(right.version));
-
       _messages[visibleIndex] = message;
       if (truncateFollowingSlots) {
         _messages.removeRange(visibleIndex + 1, _messages.length);
         _totalMessageCount = _loadedStartIndex + _messages.length;
       }
       invalidateCache();
-      if (groupInsertIndex >= 0) {
-        visibleSnapshot.removeWhere(
-          (candidate) => (candidate.groupId ?? candidate.id) == groupId,
-        );
-        visibleSnapshot.insertAll(groupInsertIndex, groupMessages);
-        if (truncateFollowingSlots) {
-          visibleSnapshot.removeRange(
-            groupInsertIndex + groupMessages.length,
-            visibleSnapshot.length,
-          );
-        }
-      }
-      _loadVersionSelections();
-      await _preloadVisibleGroupData();
       if (_currentConversation?.id != conversation.id) return false;
       notifyListeners();
       return true;
@@ -1044,7 +847,6 @@ class ChatController extends ChangeNotifier {
 
     if (_tryAppendPersistedTail(conversation.id, messages)) {
       invalidateCache();
-      await _preloadVisibleGroupData();
       notifyListeners();
       return true;
     }
@@ -1059,7 +861,6 @@ class ChatController extends ChangeNotifier {
         : await _fetchCompleteTimeline(conversation.id);
     if (_currentConversation?.id != conversation.id) return false;
     _replaceWindow(page);
-    await _preloadVisibleGroupData();
     notifyListeners();
     return true;
   }
@@ -1075,21 +876,17 @@ class ChatController extends ChangeNotifier {
       return false;
     }
 
-    // 每条传入消息都必须打开一个新槽位。已加载组的新版本会改变该槽位的选择，
-    // 这只能通过重新加载来解决。
-    final knownGroups = <String>{
-      for (final loaded in _messages) loaded.groupId ?? loaded.id,
-    };
-    final batchGroups = <String>{};
+    // 每条传入消息都必须是尚未加载的新消息 ID。
+    final knownMessageIds = <String>{for (final loaded in _messages) loaded.id};
+    final batchMessageIds = <String>{};
     for (final message in messages) {
-      final groupId = message.groupId ?? message.id;
-      if (knownGroups.contains(groupId) || !batchGroups.add(groupId)) {
+      if (knownMessageIds.contains(message.id) ||
+          !batchMessageIds.add(message.id)) {
         return false;
       }
     }
 
-    // 间隙检测只比较持久化行（修订）索引，绝不比较折叠槽位数量；
-    // 多版本会话会使折叠槽位数偏离行数。该批次必须紧接在已加载尾部
+    // 间隙检测比较持久化消息索引。该批次必须紧接在已加载尾部
     // 之后占据最后几行；否则意味着中间出现了未见过的变更。
     // 未知数量（-1）会使 `rowCount < messages.length` 失败，
     // 并保守地跳过快速追加路径（回退到完整重载）。
@@ -1211,28 +1008,6 @@ class ChatController extends ChangeNotifier {
   }
 
   // ============================================================================
-  // 版本选择
-  // ============================================================================
-
-  /// 废弃：版本选择不再被运行时使用，树是唯一真相。
-  @Deprecated('Version selections are no longer used at runtime')
-  int getSelectedVersion(String groupId) {
-    return -1; // 版本选择已废弃
-  }
-
-  /// 废弃：版本选择不再被运行时使用，树是唯一真相。
-  @Deprecated('Version selections are no longer used at runtime')
-  Future<void> setSelectedVersion(String groupId, int version) async {
-    // 不再写入 versionSelections
-  }
-
-  /// 废弃：版本选择不再被运行时使用。
-  @Deprecated('Version selections are no longer used at runtime')
-  void removeVersionSelection(String groupId) {
-    // 不再写入 versionSelections
-  }
-
-  // ============================================================================
   // 加载状态管理
   // ============================================================================
 
@@ -1305,13 +1080,6 @@ class ChatController extends ChangeNotifier {
   // ============================================================================
 
   /// 废弃：版本折叠不再需要，树模式下活动路径就是投影。
-  // ignore: deprecated_member_use_from_same_package
-  @Deprecated('Version collapsing is no longer used with tree mode')
-  List<ChatMessage> collapseVersions(List<ChatMessage> items) {
-    return items;
-  }
-
-  /// 废弃：版本折叠不再需要，树模式下活动路径就是投影。
   @Deprecated('Version collapsing is no longer used with tree mode')
   List<ChatMessage> get collapsedMessages {
     return _messages;
@@ -1356,9 +1124,6 @@ class ChatController extends ChangeNotifier {
   List<MessageRenderModel> get messageRenderModels {
     return _renderModelsCache ??= MessageRenderModelProjector.project(
       messages: collapsedMessages,
-      byGroup: groupedMessages,
-      versionSelections: _versionSelections,
-      versionCounts: _windowVersionCounts,
       contextDividerIndex: _collapsedContextDividerIndex(),
     );
   }
@@ -1366,24 +1131,16 @@ class ChatController extends ChangeNotifier {
   int _collapsedContextDividerIndex() {
     final raw = loadedWindowTruncateIndex();
     if (raw <= 0) return -1;
-    final seen = <String>{};
     final limit = raw.clamp(0, _messages.length);
-    var count = 0;
-    for (var index = 0; index < limit; index++) {
-      if (seen.add(_messages[index].groupId ?? _messages[index].id)) count++;
-    }
-    return count - 1;
+    return limit - 1;
   }
 
-  /// 按 groupId 对所有消息分组。
+  /// 兼容旧调用方的消息索引；运行时每条消息都是独立槽位。
   Map<String, List<ChatMessage>> groupMessagesByGroup() {
-    final Map<String, List<ChatMessage>> byGroup =
-        <String, List<ChatMessage>>{};
-    for (final m in _messagesWithVisibleGroups()) {
-      final gid = (m.groupId ?? m.id);
-      byGroup.putIfAbsent(gid, () => <ChatMessage>[]).add(m);
-    }
-    return byGroup;
+    return <String, List<ChatMessage>>{
+      for (final message in _messagesWithVisibleGroups())
+        message.id: <ChatMessage>[message],
+    };
   }
 
   // ============================================================================

@@ -1113,7 +1113,7 @@ class SettingsProvider extends ChangeNotifier {
       autoDeleteDays: _logAutoDeleteDays,
       maxSizeMB: _logMaxSizeMB,
     );
-    _newChatOnLaunch = prefs.getBool(_displayNewChatOnLaunchKey) ?? true;
+    _newChatOnLaunch = prefs.getBool(_displayNewChatOnLaunchKey) ?? false;
     _newChatOnAssistantSwitch =
         prefs.getBool(_displayNewChatOnAssistantSwitchKey) ?? false;
     _insertNewAssistantAtTop =
@@ -4490,7 +4490,7 @@ Requirements:
   }
 
   // 显示：应用启动时创建新聊天
-  bool _newChatOnLaunch = true;
+  bool _newChatOnLaunch = false;
   bool get newChatOnLaunch => _newChatOnLaunch;
   Future<void> setNewChatOnLaunch(bool v) async {
     if (_newChatOnLaunch == v) return;
@@ -6193,7 +6193,7 @@ class ProviderConfig {
             claudePromptCachingEnabled: false,
           );
         }
-        // 对 SiliconFlow 做特殊处理：预填两个合作模型
+        // 对 SiliconFlow 保留合作模型的能力覆盖，但首次启动不预选模型。
         if (lowerKey.contains('silicon')) {
           return ProviderConfig(
             id: key,
@@ -6204,7 +6204,7 @@ class ProviderConfig {
             providerType: ProviderKind.openai,
             chatPath: '/chat/completions',
             useResponseApi: false,
-            models: const ['THUDM/GLM-4-9B-0414', 'Qwen/Qwen3-8B'],
+            models: const [],
             modelOverrides: const {
               'THUDM/GLM-4-9B-0414': {
                 'type': 'chat',

@@ -113,7 +113,6 @@ class MessageGenerationService {
   /// 准备应用所有注入后的 API 消息。
   Future<PreparedGeneration> prepareApiMessagesWithInjections({
     required List<ChatMessage> messages,
-    required Map<String, int> versionSelections,
     required Conversation? currentConversation,
     required SettingsProvider settings,
     required Assistant? assistant,
@@ -136,7 +135,6 @@ class MessageGenerationService {
     // 构建 API 消息
     final apiMessages = messageBuilderService.buildApiMessages(
       messages: messages,
-      versionSelections: versionSelections,
       currentConversation: currentConversation,
       includeToolMessages: includeToolMessages,
     );
@@ -328,47 +326,11 @@ class MessageGenerationService {
     );
   }
 
-  Future<({ChatMessage assistantMessage, String? runId})> beginRegeneration({
-    required String conversationId,
-    required String modelId,
-    required String providerKey,
-    required String groupId,
-    required int version,
-    required bool truncateFuture,
-    String? parentMessageId,
-    String? branchId,
-  }) async {
-    if (chatService.isTemporaryConversation(conversationId)) {
-      final assistantMessage = await createAssistantPlaceholder(
-        conversationId: conversationId,
-        modelId: modelId,
-        providerKey: providerKey,
-        groupId: groupId,
-        version: version,
-        parentMessageId: parentMessageId,
-        branchId: branchId,
-      );
-      return (assistantMessage: assistantMessage, runId: null);
-    }
-    final result = await chatService.beginRegeneration(
-      conversationId: conversationId,
-      modelId: modelId,
-      providerId: providerKey,
-      groupId: groupId,
-      version: version,
-      truncateFuture: truncateFuture,
-      parentMessageId: parentMessageId,
-      branchId: branchId,
-    );
-    return (assistantMessage: result.assistantMessage, runId: result.run.id);
-  }
-
   Future<({ChatMessage assistantMessage, String? runId})>
   beginAssistantGeneration({
     required String conversationId,
     required String modelId,
     required String providerKey,
-    required String anchorGroupId,
     required bool truncateFuture,
     String? parentMessageId,
     String? branchId,
@@ -387,7 +349,6 @@ class MessageGenerationService {
       conversationId: conversationId,
       modelId: modelId,
       providerId: providerKey,
-      anchorGroupId: anchorGroupId,
       truncateFuture: truncateFuture,
       parentMessageId: parentMessageId,
       branchId: branchId,
@@ -452,8 +413,6 @@ class MessageGenerationService {
     required String conversationId,
     required String modelId,
     required String providerKey,
-    String? groupId,
-    int version = 0,
     String? parentMessageId,
     String? branchId,
   }) async {
@@ -464,8 +423,6 @@ class MessageGenerationService {
       modelId: modelId,
       providerId: providerKey,
       isStreaming: true,
-      groupId: groupId,
-      version: version,
       parentMessageId: parentMessageId,
       branchId: branchId,
     );
@@ -543,148 +500,6 @@ class MessageGenerationService {
           assistant?.chatModelProvider ?? settings.currentModelProvider,
       modelId: assistant?.chatModelId ?? settings.currentModelId,
     );
-  }
-
-  /// 为重新生成计算版本信息。
-  ({String? targetGroupId, int nextVersion, int lastKeep})
-  calculateRegenerationVersioning({
-    required ChatMessage message,
-    required List<ChatMessage> messages,
-    required bool assistantAsNewReply,
-  }) {
-    final idx = messages.indexWhere((m) => m.id == message.id);
-    if (idx < 0) {
-      return (targetGroupId: null, nextVersion: 0, lastKeep: -1);
-    }
-
-    String? targetGroupId;
-    int nextVersion = 0;
-    int lastKeep;
-
-    if (message.role == 'assistant') {
-      lastKeep = idx;
-      if (assistantAsNewReply) {
-        targetGroupId = null;
-        nextVersion = 0;
-      } else {
-        targetGroupId = message.groupId ?? message.id;
-        int maxVer = -1;
-        for (final m in messages) {
-          final gid = (m.groupId ?? m.id);
-          if (gid == targetGroupId) {
-            if (m.version > maxVer) maxVer = m.version;
-          }
-        }
-        nextVersion = maxVer + 1;
-      }
-    } else {
-      // 用户消息
-      final userGroupId = message.groupId ?? message.id;
-      int userFirst = -1;
-      for (int i = 0; i < messages.length; i++) {
-        final gid0 = (messages[i].groupId ?? messages[i].id);
-        if (gid0 == userGroupId) {
-          userFirst = i;
-          break;
-        }
-      }
-      if (userFirst < 0) userFirst = idx;
-
-      int aid = -1;
-      for (int i = userFirst + 1; i < messages.length; i++) {
-        if (messages[i].role == 'assistant') {
-          aid = i;
-          break;
-        }
-      }
-
-      if (aid >= 0) {
-        lastKeep = aid;
-        targetGroupId = messages[aid].groupId ?? messages[aid].id;
-        int maxVer = -1;
-        for (final m in messages) {
-          final gid = (m.groupId ?? m.id);
-          if (gid == targetGroupId) {
-            if (m.version > maxVer) maxVer = m.version;
-          }
-        }
-        nextVersion = maxVer + 1;
-      } else {
-        lastKeep = userFirst;
-        targetGroupId = null;
-        nextVersion = 0;
-      }
-    }
-
-    return (
-      targetGroupId: targetGroupId,
-      nextVersion: nextVersion,
-      lastKeep: lastKeep,
-    );
-  }
-
-  /// 移除重新生成分割点之后的后续消息。
-  @visibleForTesting
-  static List<String> collectTrailingMessageIdsForRemoval({
-    required List<ChatMessage> messages,
-    required int lastKeep,
-    required String? targetGroupId,
-  }) {
-    if (lastKeep >= messages.length - 1) {
-      return const [];
-    }
-
-    final keepGroups = <String>{};
-    for (int i = 0; i <= lastKeep && i < messages.length; i++) {
-      keepGroups.add(messages[i].groupId ?? messages[i].id);
-    }
-    if (targetGroupId != null) keepGroups.add(targetGroupId);
-
-    final removeIds = <String>[];
-    for (final message in messages.sublist(lastKeep + 1)) {
-      final groupId = message.groupId ?? message.id;
-      if (!keepGroups.contains(groupId)) {
-        removeIds.add(message.id);
-      }
-    }
-    return removeIds;
-  }
-
-  /// 移除重新生成分割点之后的后续消息。
-  Future<List<String>> removeTrailingMessages({
-    required List<ChatMessage> messages,
-    required int lastKeep,
-    required String? targetGroupId,
-  }) async {
-    final removeIds = collectTrailingMessageIdsForRemoval(
-      messages: messages,
-      lastKeep: lastKeep,
-      targetGroupId: targetGroupId,
-    );
-
-    var deletedIds = removeIds;
-    if (removeIds.isNotEmpty && messages.isNotEmpty) {
-      final removeIdSet = removeIds.toSet();
-      final conversationId = messages.first.conversationId;
-      final selectionChanges = <String, int?>{};
-      for (final message in messages) {
-        if (removeIdSet.contains(message.id)) {
-          selectionChanges[message.groupId ?? message.id] = null;
-        }
-      }
-      deletedIds = (await chatService.deleteMessages(
-        conversationId: conversationId,
-        messageIds: removeIdSet,
-        versionSelectionChanges: selectionChanges,
-      )).toList(growable: false);
-    }
-    for (final id in deletedIds) {
-      streamController.reasoning.remove(id);
-      streamController.toolParts.remove(id);
-      streamController.reasoningSegments.remove(id);
-    }
-
-    return deletedIds;
   }
 
   bool _shouldIncludeAudioForProvider(

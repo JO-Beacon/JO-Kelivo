@@ -37,7 +37,7 @@ void main() {
   test(
     'installation gate rejects every unpublished SQLite schema without mutation',
     () async {
-      for (final schemaVersion in <int>[6, 7, 8, 9, 10, 11, 42]) {
+      for (final schemaVersion in <int>[7, 8, 9, 10, 11, 42]) {
         final directory = await Directory.systemTemp.createTemp(
           'kelivo_reject_schema_${schemaVersion}_',
         );
@@ -264,7 +264,7 @@ void main() {
         mode: sqlite.OpenMode.readOnly,
       );
       try {
-        expect(migrated.userVersion, 5);
+        expect(migrated.userVersion, AppDatabase.currentSchemaVersion);
         expect(
           migrated.select('PRAGMA table_info(message_prompt_rows);'),
           anyElement(containsPair('name', 'source_content_hash')),
@@ -344,6 +344,155 @@ void main() {
       );
     },
   );
+
+  test(
+    'schema 5 tree state migrates to explicit branch protocol fields',
+    () async {
+      final verifier = SchemaVerifier(GeneratedHelper());
+      final schema = await verifier.schemaAt(5);
+      addTearDown(schema.close);
+      final raw = schema.rawDatabase;
+      final createdAt = DateTime.utc(2026, 1, 1).microsecondsSinceEpoch;
+      raw.execute(
+        'INSERT INTO conversation_rows (id, title, created_at, updated_at) '
+        "VALUES ('conversation-tree-v5', 'tree', $createdAt, $createdAt);",
+      );
+      raw.execute(
+        'INSERT INTO conversation_branch_rows '
+        '(id, conversation_id, tip_message_id, name, created_at) '
+        "VALUES ('root', 'conversation-tree-v5', NULL, '', $createdAt);",
+      );
+      raw.execute(
+        'INSERT INTO conversation_tree_state_rows '
+        '(conversation_id, active_branch_id, branch_selections_json) '
+        "VALUES ('conversation-tree-v5', 'root', '{}');",
+      );
+
+      final database = AppDatabase(schema.newConnection());
+      try {
+        await verifier.migrateAndValidate(
+          database,
+          AppDatabase.currentSchemaVersion,
+          options: const ValidationOptions(validateDropped: true),
+        );
+      } finally {
+        await database.close();
+      }
+
+      final branchColumns = raw
+          .select('PRAGMA table_info(conversation_branch_rows);')
+          .map((row) => row['name'])
+          .toSet();
+      expect(
+        branchColumns,
+        containsAll(['parent_branch_id', 'fork_anchor_message_id']),
+      );
+      final stateColumns = raw
+          .select('PRAGMA table_info(conversation_tree_state_rows);')
+          .map((row) => row['name'])
+          .toSet();
+      expect(stateColumns, contains('active_branch_history_json'));
+      final state = raw.select(
+        'SELECT branch_selections_json, active_branch_history_json '
+        'FROM conversation_tree_state_rows WHERE conversation_id = ?;',
+        ['conversation-tree-v5'],
+      ).single;
+      expect(state['branch_selections_json'], '{}');
+      expect(state['active_branch_history_json'], '[]');
+    },
+  );
+
+  test('schema 5 multi-branch state preserves selections and messages', () async {
+    final verifier = SchemaVerifier(GeneratedHelper());
+    final schema = await verifier.schemaAt(5);
+    addTearDown(schema.close);
+    final raw = schema.rawDatabase;
+    final createdAt = DateTime.utc(2026, 1, 1).microsecondsSinceEpoch;
+    raw.execute(
+      'INSERT INTO conversation_rows (id, title, created_at, updated_at) '
+      "VALUES ('conversation-tree-v5-branches', 'tree', $createdAt, $createdAt);",
+    );
+    raw.execute(
+      'INSERT INTO message_rows '
+      '(id, conversation_id, role, timestamp, message_order) VALUES '
+      "('v5-root', 'conversation-tree-v5-branches', 'user', $createdAt, 0),"
+      "('v5-main', 'conversation-tree-v5-branches', 'assistant', $createdAt, 1),"
+      "('v5-alt', 'conversation-tree-v5-branches', 'assistant', $createdAt, 2);",
+    );
+    raw.execute(
+      'INSERT INTO message_tree_edge_rows '
+      '(conversation_id, message_id, parent_message_id) VALUES '
+      "('conversation-tree-v5-branches', 'v5-root', NULL),"
+      "('conversation-tree-v5-branches', 'v5-main', 'v5-root'),"
+      "('conversation-tree-v5-branches', 'v5-alt', 'v5-root');",
+    );
+    raw.execute(
+      'INSERT INTO conversation_branch_rows '
+      '(id, conversation_id, tip_message_id, name, created_at) VALUES '
+      "('v5-root-branch', 'conversation-tree-v5-branches', 'v5-main', '主分支', $createdAt),"
+      "('v5-alt-branch', 'conversation-tree-v5-branches', 'v5-alt', '备用分支', $createdAt);",
+    );
+    raw.execute(
+      'INSERT INTO conversation_tree_state_rows '
+      '(conversation_id, active_branch_id, branch_selections_json) VALUES '
+      "('conversation-tree-v5-branches', 'v5-root-branch', '{\"v5-root\":\"v5-alt-branch\"}');",
+    );
+
+    final database = AppDatabase(schema.newConnection());
+    try {
+      await verifier.migrateAndValidate(
+        database,
+        AppDatabase.currentSchemaVersion,
+        options: const ValidationOptions(validateDropped: true),
+      );
+    } finally {
+      await database.close();
+    }
+
+    final branches = raw.select(
+      'SELECT id, tip_message_id, parent_branch_id, fork_anchor_message_id '
+      'FROM conversation_branch_rows '
+      'WHERE conversation_id = ? ORDER BY id;',
+      ['conversation-tree-v5-branches'],
+    );
+    expect(branches, hasLength(2));
+    expect(branches[0]['id'], 'v5-alt-branch');
+    expect(branches[0]['tip_message_id'], 'v5-alt');
+    expect(branches[0]['parent_branch_id'], null);
+    expect(branches[0]['fork_anchor_message_id'], null);
+    expect(branches[1]['id'], 'v5-root-branch');
+    expect(branches[1]['tip_message_id'], 'v5-main');
+    expect(branches[1]['parent_branch_id'], null);
+    expect(branches[1]['fork_anchor_message_id'], null);
+
+    final state = raw.select(
+      'SELECT active_branch_id, branch_selections_json, '
+      'active_branch_history_json FROM conversation_tree_state_rows '
+      'WHERE conversation_id = ?;',
+      ['conversation-tree-v5-branches'],
+    ).single;
+    expect(state['active_branch_id'], 'v5-root-branch');
+    expect(jsonDecode(state['branch_selections_json'] as String), {
+      'v5-root': 'v5-alt-branch',
+    });
+    expect(state['active_branch_history_json'], '[]');
+    expect(
+      raw
+          .select(
+            'SELECT message_id, parent_message_id '
+            'FROM message_tree_edge_rows '
+            'WHERE conversation_id = ? ORDER BY message_id;',
+            ['conversation-tree-v5-branches'],
+          )
+          .map((row) => [row['message_id'], row['parent_message_id']])
+          .toList(),
+      [
+        ['v5-alt', 'v5-root'],
+        ['v5-main', 'v5-root'],
+        ['v5-root', null],
+      ],
+    );
+  });
 
   test('schema 1 version groups migrate into visible sibling branches', () async {
     final verifier = SchemaVerifier(GeneratedHelper());

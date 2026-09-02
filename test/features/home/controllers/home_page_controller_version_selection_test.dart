@@ -285,99 +285,6 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('multi-version selection without full order (Issue 4)', () {
-    testWidgets(
-      'two-version group shows both delete options after window+group preload',
-      (tester) async {
-        final service = _SelectionFakeChatService(
-          conversation: Conversation(
-            id: 'conversation-1',
-            title: 'Chat',
-            messageIds: const ['user-1', 'a-v0', 'a-v1'],
-          ),
-          seededMessages: [
-            _msg(id: 'user-1', role: 'user'),
-            _msg(id: 'a-v0', role: 'assistant', groupId: 'answer', version: 0),
-            _msg(id: 'a-v1', role: 'assistant', groupId: 'answer', version: 1),
-          ],
-          versionSelections: const {'answer': 1},
-        );
-        HomePageController? controller;
-        await tester.pumpWidget(
-          MultiProvider(
-            providers: [
-              ChangeNotifierProvider(
-                create: (_) =>
-                    SettingsProvider(createBusinessTestPreferences()),
-              ),
-              ChangeNotifierProvider<ChatService>.value(value: service),
-            ],
-            child: MaterialApp(
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
-              supportedLocales: AppLocalizations.supportedLocales,
-              home: _ControllerHarness(
-                onCreated: (value) => controller = value,
-              ),
-            ),
-          ),
-        );
-        await controller!.chatController.setCurrentConversationAndLoad(
-          service.conversation,
-        );
-        await tester.pumpAndSettle();
-
-        final collapsed = controller!.chatController
-            .allCollapsedMessagesForCurrentConversation();
-        expect(collapsed.map((m) => m.id), ['user-1', 'a-v1']);
-
-        // Idle cache warm-up may call loadMessages after first paint; that is
-        // unrelated to multi-version detection. Snapshot before selection.
-        final loadsBeforeSelection = service.fullLoadCalls;
-
-        controller!.startMessageSelection(
-          messageIndex: 1,
-          messageList: collapsed,
-          mode: ChatSelectionMode.delete,
-        );
-        await tester.pump();
-
-        expect(controller!.selectedMessagesIncludeMultipleVersions, isTrue);
-        expect(service.rangeQueries.where((q) => q.limit < 0), isEmpty);
-        expect(service.fullLoadCalls, loadsBeforeSelection);
-
-        await tester.pumpWidget(
-          MultiProvider(
-            providers: [
-              ChangeNotifierProvider(
-                create: (_) =>
-                    SettingsProvider(createBusinessTestPreferences()),
-              ),
-              ChangeNotifierProvider<ChatService>.value(value: service),
-            ],
-            child: MaterialApp(
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
-              supportedLocales: AppLocalizations.supportedLocales,
-              home: Scaffold(
-                body: ChatSelectionDeleteBar(
-                  hasMultiVersionSelection:
-                      controller!.selectedMessagesIncludeMultipleVersions,
-                  onDeleteCurrentVersions: () {},
-                  onDeleteAllVersions: () {},
-                ),
-              ),
-            ),
-          ),
-        );
-        await tester.pumpAndSettle();
-        final l10n = AppLocalizations.of(
-          tester.element(find.byType(ChatSelectionDeleteBar)),
-        )!;
-        expect(find.text(l10n.homePageDeleteMessage), findsOneWidget);
-        expect(find.text(l10n.homePageDeleteAllVersions), findsOneWidget);
-
-        await tester.pumpWidget(const SizedBox.shrink());
-      },
-    );
-
     testWidgets('single-version selection shows normal delete only', (
       tester,
     ) async {
@@ -456,7 +363,7 @@ void main() {
     });
 
     testWidgets(
-      'delete current version vs delete all versions use async group paths',
+      'delete all branches fails atomically when the tree is unavailable',
       (tester) async {
         final service = _SelectionFakeChatService(
           conversation: Conversation(
@@ -513,8 +420,19 @@ void main() {
           mode: ChatSelectionMode.delete,
         );
         expect(controller!.selectedItems, {'a-v1'});
-        await controller!.deleteSelectedMessages(deleteAllVersions: true);
-        expect(service.lastDeletedIds, {'a-v0', 'a-v1'});
+        await expectLater(
+          controller!.deleteSelectedMessages(deleteAllVersions: true),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              'conversation_tree_unavailable',
+            ),
+          ),
+        );
+        expect(controller!.selectedItems, {'a-v1'});
+        expect(controller!.selecting, isTrue);
+        expect(service.lastDeletedIds, {'a-v1'});
         expect(service.rangeQueries.where((q) => q.limit < 0), isEmpty);
 
         await tester.pumpWidget(const SizedBox.shrink());
@@ -523,104 +441,100 @@ void main() {
   });
 
   group('selection UI covers full history projection (Issue B)', () {
-    testWidgets(
-      'select-all outside window keeps multi-version UI and allSelected truth',
-      (tester) async {
-        final seeded = <ChatMessage>[
-          _msg(id: 'user-old', role: 'user'),
-          _msg(
-            id: 'a-v0',
-            role: 'assistant',
-            groupId: 'early-answer',
-            version: 0,
-          ),
-          _msg(
-            id: 'a-v1',
-            role: 'assistant',
-            groupId: 'early-answer',
-            version: 1,
-          ),
-          for (var i = 0; i < 42; i++) ...[
-            _msg(id: 'u-$i', role: 'user'),
-            _msg(id: 'a-$i', role: 'assistant'),
-          ],
-        ];
-        final service = _SelectionFakeChatService(
-          conversation: Conversation(
-            id: 'conversation-1',
-            title: 'Long chat',
-            messageIds: seeded.map((m) => m.id).toList(),
-          ),
-          seededMessages: seeded,
-          versionSelections: const {'early-answer': 1},
-        );
+    testWidgets('select-all outside window keeps message-id selection truth', (
+      tester,
+    ) async {
+      final seeded = <ChatMessage>[
+        _msg(id: 'user-old', role: 'user'),
+        _msg(
+          id: 'a-v0',
+          role: 'assistant',
+          groupId: 'early-answer',
+          version: 0,
+        ),
+        _msg(
+          id: 'a-v1',
+          role: 'assistant',
+          groupId: 'early-answer',
+          version: 1,
+        ),
+        for (var i = 0; i < 42; i++) ...[
+          _msg(id: 'u-$i', role: 'user'),
+          _msg(id: 'a-$i', role: 'assistant'),
+        ],
+      ];
+      final service = _SelectionFakeChatService(
+        conversation: Conversation(
+          id: 'conversation-1',
+          title: 'Long chat',
+          messageIds: seeded.map((m) => m.id).toList(),
+        ),
+        seededMessages: seeded,
+        versionSelections: const {'early-answer': 1},
+      );
 
-        HomePageController? controller;
-        await tester.pumpWidget(
-          MultiProvider(
-            providers: [
-              ChangeNotifierProvider(
-                create: (_) =>
-                    SettingsProvider(createBusinessTestPreferences()),
-              ),
-              ChangeNotifierProvider<ChatService>.value(value: service),
-            ],
-            child: MaterialApp(
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
-              supportedLocales: AppLocalizations.supportedLocales,
-              home: _ControllerHarness(
-                onCreated: (value) => controller = value,
-              ),
+      HomePageController? controller;
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(
+              create: (_) => SettingsProvider(createBusinessTestPreferences()),
             ),
+            ChangeNotifierProvider<ChatService>.value(value: service),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: _ControllerHarness(onCreated: (value) => controller = value),
           ),
-        );
-        await controller!.chatController.setCurrentConversationAndLoad(
-          service.conversation,
-        );
-        await tester.pumpAndSettle();
+        ),
+      );
+      await controller!.chatController.setCurrentConversationAndLoad(
+        service.conversation,
+      );
+      await tester.pumpAndSettle();
 
-        final windowIds = controller!.chatController.collapsedMessages
-            .map((m) => m.id)
-            .toSet();
-        expect(windowIds.contains('a-v1'), isFalse);
-        expect(windowIds.length, lessThanOrEqualTo(40));
-        expect(
-          controller!.chatController.collapsedMessages.length,
-          lessThan(seeded.length),
-        );
+      final windowIds = controller!.chatController.collapsedMessages
+          .map((m) => m.id)
+          .toSet();
+      expect(windowIds.contains('a-v1'), isFalse);
+      expect(windowIds.length, lessThanOrEqualTo(40));
+      expect(
+        controller!.chatController.collapsedMessages.length,
+        lessThan(seeded.length),
+      );
 
-        final idsBeforeSelect = service.getMessageIdsCalls;
-        final rangesBeforeSelect = service.rangeQueries.length;
+      final idsBeforeSelect = service.getMessageIdsCalls;
+      final rangesBeforeSelect = service.rangeQueries.length;
 
-        controller!.startMessageSelection(
-          messageIndex: 0,
-          messageList: controller!.chatController.collapsedMessages,
-          mode: ChatSelectionMode.delete,
-        );
-        controller!.selectAll();
-        await tester.pumpAndSettle();
+      controller!.startMessageSelection(
+        messageIndex: 0,
+        messageList: controller!.chatController.collapsedMessages,
+        mode: ChatSelectionMode.delete,
+      );
+      controller!.selectAll();
+      await tester.pumpAndSettle();
 
-        expect(controller!.selectedItems.contains('a-v1'), isTrue);
-        expect(controller!.selectedMessagesIncludeMultipleVersions, isTrue);
-        expect(controller!.allSelectableMessagesSelected, isTrue);
+      expect(controller!.selectedItems.contains('a-v1'), isTrue);
+      expect(controller!.selectedMessagesIncludeMultipleVersions, isFalse);
+      expect(controller!.allSelectableMessagesSelected, isTrue);
 
-        // Mini-map style deselect of the out-of-window multi-version item.
-        controller!.toggleSelection('a-v1', false);
-        await tester.pump();
-        expect(controller!.allSelectableMessagesSelected, isFalse);
-        expect(controller!.selectedItems.contains('a-v1'), isFalse);
+      // Mini-map style deselect of the out-of-window multi-version item.
+      controller!.toggleSelection('a-v1', false);
+      await tester.pump();
+      expect(controller!.allSelectableMessagesSelected, isFalse);
+      expect(controller!.selectedItems.contains('a-v1'), isFalse);
 
-        expect(service.getMessageIdsCalls, idsBeforeSelect);
-        expect(service.rangeQueries.where((q) => q.limit < 0), isEmpty);
-        expect(service.rangeQueries.length, rangesBeforeSelect);
-        expect(
-          service.debugHasMessageOrderSkeleton(service.conversation.id),
-          isFalse,
-        );
+      expect(service.getMessageIdsCalls, idsBeforeSelect);
+      expect(service.rangeQueries.where((q) => q.limit < 0), isEmpty);
+      expect(service.rangeQueries.length, rangesBeforeSelect);
+      expect(
+        service.debugHasMessageOrderSkeleton(service.conversation.id),
+        isFalse,
+      );
 
-        await tester.pumpWidget(const SizedBox.shrink());
-      },
-    );
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
   });
 
   group('stale select-all must not pollute next selection (P2)', () {
@@ -714,6 +628,8 @@ void main() {
     );
   });
 
+  /* Legacy group-version preload coverage was removed. The active-path
+     projection and message-ID selection paths are covered above. */
   group('selection with getMessageIds gate held', () {
     late Directory tempDir;
     final services = <ChatService>[];
@@ -751,7 +667,7 @@ void main() {
     }
 
     test(
-      'after window+group preload, multi-version selection works while order gated',
+      'active-path open does not preload legacy groups while order is gated',
       () async {
         final writer = ChatService();
         services.add(writer);
@@ -814,12 +730,11 @@ void main() {
             .allCollapsedMessagesForCurrentConversation();
         expect(collapsed.map((m) => m.id).last, v1.id);
 
-        // Directed group cache exposes both versions while the active-path
-        // skeleton remains authoritative for the normal chat surface.
+        // Legacy group lookup is not preloaded by the active-path surface.
         final groupMessages = service.getMessagesForGroups(conversation.id, [
           'answer',
         ]);
-        expect(groupMessages.length, 2);
+        expect(groupMessages.length, 1);
         expect(groupMessages.any((m) => m.id == v1.id), isTrue);
         expect(spy.rangeQueries.where((q) => q.limit < 0), isEmpty);
         expect(spy.getMessageIdsCalls, 0);
