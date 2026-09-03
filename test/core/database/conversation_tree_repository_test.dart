@@ -1208,6 +1208,10 @@ void main() {
       expect(tree, isNot(equals(null)));
       expect(tree!.activePath(), ['u1', 'a1-v1', 'u2']);
       expect(tree.branchPath('legacy-a1-v0'), ['u1', 'a1-v0']);
+      expect(tree.siblingBranchIdsByMessageId()['a1-v1'], [
+        'legacy-a1-v0',
+        'root-legacy-import',
+      ]);
       expect(tree.edges['a1-v0']?.parentMessageId, 'u1');
       expect(tree.edges['a1-v1']?.parentMessageId, 'u1');
     },

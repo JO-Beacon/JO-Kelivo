@@ -71,6 +71,7 @@ internationalization.md
 /.agents/
 /skills-lock.json
 /.grok/
+/.workbuddy/
 
 # Local release artifacts
 /dist/

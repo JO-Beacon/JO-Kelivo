@@ -267,6 +267,40 @@ void main() {
         );
         await repository.saveConversationTree(branchedTree);
 
+        // SQLite does not promise edge-row order. Simulate a database where
+        // the two sibling edges were inserted in the opposite order before
+        // duplicating the conversation.
+        final rawBeforeDuplicate = sqlite.sqlite3.open(
+          '${directory.path}/chat.sqlite',
+        );
+        try {
+          rawBeforeDuplicate.execute(
+            'DELETE FROM message_tree_edge_rows WHERE conversation_id = ?;',
+            ['source'],
+          );
+          rawBeforeDuplicate.execute(
+            'INSERT INTO message_tree_edge_rows '
+            '(conversation_id, message_id, parent_message_id) VALUES '
+            '(?, ?, ?), (?, ?, ?), (?, ?, ?), (?, ?, ?);',
+            [
+              'source',
+              'root-message',
+              null,
+              'source',
+              'anchor-message',
+              'root-message',
+              'source',
+              'hidden-tail',
+              'anchor-message',
+              'source',
+              'active-tail',
+              'anchor-message',
+            ],
+          );
+        } finally {
+          rawBeforeDuplicate.close();
+        }
+
         final duplicate = await repository.duplicateConversation('source');
 
         expect(duplicate, isNotNull);
@@ -289,6 +323,15 @@ void main() {
         expect(
           duplicateTree.branches.values.map((branch) => branch.tipMessageId),
           containsAll([duplicate.messageIds[2], duplicate.messageIds[3]]),
+        );
+        final siblingBranchIds = duplicateTree
+            .siblingBranchIdsByMessageId()[duplicate.messageIds[2]];
+        expect(siblingBranchIds, isNotNull);
+        expect(
+          siblingBranchIds!.map(
+            (branchId) => duplicateTree.branches[branchId]!.tipMessageId,
+          ),
+          [duplicate.messageIds[2], duplicate.messageIds[3]],
         );
         expect(() => duplicateTree.validateIntegrity(), returnsNormally);
       },

@@ -85,7 +85,7 @@ void main() {
       final siblings = legacy.siblingBranchIdsByMessageId();
 
       expect(siblings.keys, unorderedEquals(['a1-v0', 'a1-v1']));
-      expect(siblings['a1-v1'], ['root', 'legacy-a1-v0']);
+      expect(siblings['a1-v1'], ['legacy-a1-v0', 'root']);
       expect(siblings.containsKey('u1'), isFalse);
     });
 

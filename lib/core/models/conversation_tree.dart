@@ -630,8 +630,22 @@ class ConversationTree {
 
       final branchIds = representativeByChild.values.toSet();
       if (branchIds.length < 2) continue;
+      // The edge insertion order is the stable source order for sibling
+      // revisions. It is preserved when a tree is persisted or copied, while
+      // branch IDs and branch timestamps may be regenerated or differ between
+      // active and hidden branches.
+      final childOrder = <String, int>{
+        for (var i = 0; i < children.length; i++) children[i]: i,
+      };
+      final branchOrder = <String, int>{
+        for (final entry in representativeByChild.entries)
+          entry.value: childOrder[entry.key] ?? children.length,
+      };
       final sorted = branchIds.toList(growable: false)
         ..sort((leftId, rightId) {
+          final bySourceOrder = (branchOrder[leftId] ?? children.length)
+              .compareTo(branchOrder[rightId] ?? children.length);
+          if (bySourceOrder != 0) return bySourceOrder;
           final left = branches[leftId]!;
           final right = branches[rightId]!;
           final byTime = left.createdAt.compareTo(right.createdAt);

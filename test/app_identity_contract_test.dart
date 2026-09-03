@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('JO-AIClient application identity', () {
     test('uses the published JO-AIClient version and platform namespaces', () {
-      _expectContains('pubspec.yaml', 'version: 0.1.13+13');
+      _expectContains('pubspec.yaml', 'version: 0.1.14+4');
 
       _expectContains(
         'android/app/build.gradle.kts',

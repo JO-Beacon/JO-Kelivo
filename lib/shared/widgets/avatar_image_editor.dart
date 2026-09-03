@@ -42,7 +42,7 @@ Future<AvatarImageEditResult?> showAvatarImageEditor(
 Future<double> _readImageAspectRatio(String path) async {
   try {
     final bytes = await File(path).readAsBytes();
-    final image = image_lib.decodePng(bytes) ?? image_lib.decodeJpg(bytes);
+    final image = image_lib.decodeImage(bytes);
     if (image == null) return 1;
     final ratio = image.width / image.height;
     if (ratio.isFinite && ratio > 0) return ratio;
@@ -593,14 +593,23 @@ class AvatarImage extends StatelessWidget {
                 1.0,
               )
               ..rotateZ((t.rotation * 90 + t.rotationDegrees) * math.pi / 180),
-            child: FractionallySizedBox(
-              widthFactor: 1 / t.width,
-              heightFactor: 1 / t.height,
-              alignment: Alignment(
-                -1 + 2 * t.left / t.width,
-                -1 + 2 * t.top / t.height,
+            child: OverflowBox(
+              alignment: Alignment.topLeft,
+              minWidth: 0,
+              minHeight: 0,
+              maxWidth: double.infinity,
+              maxHeight: double.infinity,
+              child: Transform.translate(
+                offset: Offset(
+                  -size * t.left / t.width,
+                  -size * t.top / t.height,
+                ),
+                child: SizedBox(
+                  width: size / t.width,
+                  height: size / t.height,
+                  child: Image.file(File(path), fit: BoxFit.contain),
+                ),
               ),
-              child: Image.file(File(path), fit: BoxFit.contain),
             ),
           ),
         ),

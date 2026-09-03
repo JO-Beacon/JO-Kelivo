@@ -4282,6 +4282,33 @@ class ChatDatabaseRepository {
     final edgeRows = await (_db.select(
       _db.messageTreeEdgeRows,
     )..where((row) => row.conversationId.equals(conversationId))).get();
+    // The tree edge table has no persisted ordinal. Rehydrate its map in the
+    // conversation's message order so sibling projections remain stable after
+    // reloads and conversation duplication instead of depending on SQLite's
+    // primary-key ordering.
+    final orderedMessageRows =
+        await (_db.select(_db.messageRows)
+              ..where((row) => row.conversationId.equals(conversationId))
+              ..orderBy([
+                (row) => OrderingTerm.asc(row.messageOrder),
+                (row) => OrderingTerm.asc(row.id),
+              ]))
+            .get();
+    final orderedMessageIds = {
+      for (final message in orderedMessageRows) message.id,
+    };
+    final edgeByMessageId = <String, MessageTreeEdgeRow>{
+      for (final row in edgeRows) row.messageId: row,
+    };
+    final orderedEdgeRows = <MessageTreeEdgeRow>[
+      for (final message in orderedMessageRows)
+        if (edgeByMessageId[message.id] case final edge?) edge,
+    ];
+    for (final edge in edgeRows) {
+      if (!orderedMessageIds.contains(edge.messageId)) {
+        orderedEdgeRows.add(edge);
+      }
+    }
     final stateRow =
         await (_db.select(_db.conversationTreeStateRows)
               ..where((row) => row.conversationId.equals(conversationId)))
@@ -4316,7 +4343,7 @@ class ChatDatabaseRepository {
           ),
       },
       edges: {
-        for (final row in edgeRows)
+        for (final row in orderedEdgeRows)
           row.messageId: MessageTreeEdge(
             messageId: row.messageId,
             parentMessageId: row.parentMessageId,

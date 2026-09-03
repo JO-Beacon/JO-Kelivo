@@ -135,6 +135,64 @@ void main() {
     expect(tester.widget<Image>(find.byType(Image)).fit, BoxFit.contain);
   });
 
+  testWidgets('positions a cropped source at the selected source coordinates', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Center(
+          child: AvatarImage(
+            path: imagePath,
+            size: 100,
+            transform: const AvatarTransform(
+              left: 0.1,
+              top: 0.05,
+              width: 0.25,
+              height: 0.25,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final image = tester.renderObject<RenderBox>(find.byType(Image));
+    expect(image.size, const Size(400, 400));
+    expect(
+      tester.getTopLeft(find.byType(Image)) -
+          tester.getTopLeft(find.byType(AvatarImage)),
+      const Offset(-40, -20),
+    );
+  });
+
+  testWidgets('keeps a boundary crop aligned with the viewport edge', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Center(
+          child: AvatarImage(
+            path: imagePath,
+            size: 100,
+            transform: const AvatarTransform(
+              left: 0.75,
+              top: 0.75,
+              width: 0.25,
+              height: 0.25,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.getTopLeft(find.byType(Image)) -
+          tester.getTopLeft(find.byType(AvatarImage)),
+      const Offset(-300, -300),
+    );
+  });
+
   testWidgets('shows only the desktop crop hint on desktop platforms', (
     tester,
   ) async {
