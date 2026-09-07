@@ -916,6 +916,7 @@ class ChatActions {
     final modelConfig = messageGenerationService.getModelConfig(
       settings,
       assistant,
+      conversation,
     );
 
     if (modelConfig.providerKey == null || modelConfig.modelId == null) {
@@ -1271,6 +1272,7 @@ class ChatActions {
     final modelConfig = messageGenerationService.getModelConfig(
       settings,
       assistant,
+      conversation,
     );
 
     if (modelConfig.providerKey == null || modelConfig.modelId == null) {
@@ -1463,6 +1465,7 @@ class ChatActions {
     final modelConfig = messageGenerationService.getModelConfig(
       settings,
       assistant,
+      conversation,
     );
     if (modelConfig.providerKey == null || modelConfig.modelId == null) {
       return ChatActionResult.noModel();
@@ -1788,6 +1791,30 @@ class ChatActions {
     StreamChunk event,
     stream_ctrl.StreamingState state,
   ) async {
+    if (event case ProviderArtifact(:final kind, :final payload)) {
+      if (kind == 'claude_container' || kind == 'claude_turn') {
+        await chatService.setProviderArtifact(state.messageId, kind, payload);
+      }
+      if (kind == 'claude_container') {
+        final events = _streamingToolEvents[state.messageId];
+        if (events != null) {
+          for (final tool in events) {
+            final metadata = tool['metadata'];
+            final merged = <String, dynamic>{
+              if (metadata is Map) ...metadata.cast<String, dynamic>(),
+            };
+            final anthropic = <String, dynamic>{
+              if (merged['anthropic'] is Map)
+                ...(merged['anthropic'] as Map).cast<String, dynamic>(),
+              'container_id': payload,
+            };
+            merged['anthropic'] = anthropic;
+            tool['metadata'] = merged;
+          }
+        }
+      }
+      return;
+    }
     final handler = _streamEventHandlers.putIfAbsent(
       state.messageId,
       StreamChunkHandler.new,
@@ -1921,6 +1948,8 @@ class ChatActions {
       case Finish():
         final usage = _streamEventHandlers[messageId]?.usage;
         return chunk(isDone: true, usage: usage);
+      case ProviderArtifact() || GeneratedFile():
+        return null;
       case TextStart() ||
           TextEnd() ||
           ReasoningStart() ||

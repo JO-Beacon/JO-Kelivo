@@ -59,6 +59,13 @@ class Conversation extends HiveObject {
   @HiveField(14)
   int lastMemoryExtractedOrder;
 
+  // 会话级模型覆盖；为空时继承助手模型，再继承全局默认模型。
+  @HiveField(15)
+  String? chatModelProvider;
+
+  @HiveField(16)
+  String? chatModelId;
+
   Conversation({
     String? id,
     required this.title,
@@ -75,6 +82,8 @@ class Conversation extends HiveObject {
     List<String>? chatSuggestions,
     this.injectedMemoryHash,
     int? lastMemoryExtractedOrder,
+    this.chatModelProvider,
+    this.chatModelId,
   }) : id = id ?? const Uuid().v4(),
        createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now(),
@@ -102,8 +111,11 @@ class Conversation extends HiveObject {
     List<String>? chatSuggestions,
     String? injectedMemoryHash,
     int? lastMemoryExtractedOrder,
+    String? chatModelProvider,
+    String? chatModelId,
     bool clearSummary = false,
     bool clearInjectedMemoryHash = false,
+    bool clearChatModel = false,
   }) {
     return Conversation(
       id: id ?? this.id,
@@ -125,6 +137,10 @@ class Conversation extends HiveObject {
           : (injectedMemoryHash ?? this.injectedMemoryHash),
       lastMemoryExtractedOrder:
           lastMemoryExtractedOrder ?? this.lastMemoryExtractedOrder,
+      chatModelProvider: clearChatModel
+          ? null
+          : (chatModelProvider ?? this.chatModelProvider),
+      chatModelId: clearChatModel ? null : (chatModelId ?? this.chatModelId),
     );
   }
 
@@ -145,6 +161,8 @@ class Conversation extends HiveObject {
       'chatSuggestions': chatSuggestions,
       'injectedMemoryHash': injectedMemoryHash,
       'lastMemoryExtractedOrder': lastMemoryExtractedOrder,
+      'chatModelProvider': chatModelProvider,
+      'chatModelId': chatModelId,
     };
   }
 
@@ -173,6 +191,8 @@ class Conversation extends HiveObject {
           const <String>[],
       injectedMemoryHash: json['injectedMemoryHash'] as String?,
       lastMemoryExtractedOrder: json['lastMemoryExtractedOrder'] as int? ?? -1,
+      chatModelProvider: json['chatModelProvider'] as String?,
+      chatModelId: json['chatModelId'] as String?,
     );
   }
 }

@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import '../services/backup/restore_durability.dart';
+import '../services/backup/data_sync.dart';
+import '../services/backup/local_snapshot_store.dart';
 import 'app_database.dart';
 import 'database_installation_gate.dart';
 
@@ -28,6 +30,34 @@ final class StartupRecoveryService {
   static const _temporaryPrefix = '.database_installation_receipt';
   static const _temporarySuffix = '.tmp';
   static const _restoreWorkspaceName = '.kelivo_restore';
+
+  /// 返回可供用户手动选择的已发布本地快照，按时间从新到旧排列。
+  static Future<List<File>> listLocalSnapshots({
+    required Directory appDataDirectory,
+  }) => LocalSnapshotStore(appDataDirectory).list();
+
+  /// 校验并暂存所选快照。该方法不直接替换活动数据库；重启后的启动闸门
+  /// 会根据恢复回执完成切换，并在失败时回滚。
+  static Future<void> prepareLocalSnapshotRestore({
+    required Directory appDataDirectory,
+    required File snapshot,
+  }) async {
+    final snapshotDirectory = LocalSnapshotStore(appDataDirectory).directory;
+    final snapshotDirectoryPath = p.normalize(snapshotDirectory.absolute.path);
+    final snapshotPath = p.normalize(snapshot.absolute.path);
+    final snapshotName = p.basename(snapshotPath);
+    if (!p.equals(p.dirname(snapshotPath), snapshotDirectoryPath) ||
+        !snapshotName.startsWith('kelivo-snapshot-') ||
+        !snapshotName.endsWith('.zip') ||
+        await FileSystemEntity.type(snapshotPath, followLinks: false) !=
+            FileSystemEntityType.file) {
+      throw StateError('startup_recovery_snapshot_outside_store');
+    }
+    await DataSync.prepareStartupRestoreFromFile(
+      appDataDirectory: appDataDirectory,
+      sourceFile: snapshot,
+    );
+  }
 
   /// 将整个应用数据目录复制到 [destinationParent] 下带时间戳的文件夹，
   /// 以便用户在尝试任何修复或重置之前抢救其数据。

@@ -285,6 +285,30 @@ void main() {
     });
 
     test(
+      'startup restore stages a valid snapshot without live services',
+      () async {
+        final zipFile = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'startup_snapshot',
+          settings: const {},
+        );
+
+        final prepared = await DataSync.prepareStartupRestoreFromFile(
+          appDataDirectory: root,
+          sourceFile: zipFile,
+        );
+
+        expect(prepared.receipt.state, RestoreReceiptState.prepared);
+        expect(
+          File(
+            p.join(prepared.candidateDirectory.path, 'database', 'kelivo.db'),
+          ).existsSync(),
+          isTrue,
+        );
+      },
+    );
+
+    test(
       'packs files as deflated zip entries and removes staging files',
       () async {
         final uploadDir = Directory('${root.path}/upload');

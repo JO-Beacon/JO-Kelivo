@@ -500,6 +500,9 @@ Future<void> _showErrorDetails(
 }) async {
   final cs = Theme.of(context).colorScheme;
   final l10n = AppLocalizations.of(context)!;
+  final displayMessage = message == 'mcp_session_stream_expired'
+      ? l10n.mcpPageSessionExpiredDetails
+      : message;
   await showDialog<void>(
     context: context,
     barrierDismissible: true,
@@ -562,8 +565,8 @@ Future<void> _showErrorDetails(
                   ),
                   child: SingleChildScrollView(
                     child: SelectableText(
-                      (message?.isNotEmpty == true
-                          ? message!
+                      (displayMessage?.isNotEmpty == true
+                          ? displayMessage!
                           : l10n.mcpPageErrorNoDetails),
                       style: (Theme.of(ctx).textTheme.bodyMedium ?? TextStyle())
                           .copyWith(fontSize: 13.0, height: 1.35),

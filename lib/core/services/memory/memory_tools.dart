@@ -91,6 +91,91 @@ abstract final class MemoryTools {
     return out;
   }
 
+  /// 设置页使用的完整 V1 记忆工具目录，不受单个助手开关门控。
+  static List<Map<String, dynamic>> catalogDefinitions(MemoryPromptLang lang) {
+    return <Map<String, dynamic>>[
+      _defMemoryRead(lang),
+      _defMemorySearchProfile(lang),
+      _defMemoryUpdate(lang, MemoryWriteScope.toolDefaultGlobal),
+      _defMemoryEdit(lang),
+      _defMemoryDelete(lang),
+      _defUpdateUserProfile(lang),
+      _defChatSearch(lang),
+    ];
+  }
+
+  /// 旧版记忆模式仍会发送的三个工具定义。
+  static List<Map<String, dynamic>> legacyDefinitions(MemoryPromptLang lang) {
+    final zh = lang == MemoryPromptLang.zh;
+    return <Map<String, dynamic>>[
+      {
+        'type': 'function',
+        'function': {
+          'name': 'create_memory',
+          'description': zh ? '新增一条记忆记录。' : 'Create a memory record.',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'content': {
+                'type': 'string',
+                'description': zh
+                    ? '记忆记录的内容。'
+                    : 'The content of the memory record.',
+              },
+            },
+            'required': ['content'],
+          },
+        },
+      },
+      {
+        'type': 'function',
+        'function': {
+          'name': 'edit_memory',
+          'description': zh
+              ? '更新一条已有的记忆记录。'
+              : 'Update an existing memory record.',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'id': {
+                'type': 'integer',
+                'description': zh
+                    ? '记忆记录的 id。'
+                    : 'The id of the memory record.',
+              },
+              'content': {
+                'type': 'string',
+                'description': zh
+                    ? '记忆记录的内容。'
+                    : 'The content of the memory record.',
+              },
+            },
+            'required': ['id', 'content'],
+          },
+        },
+      },
+      {
+        'type': 'function',
+        'function': {
+          'name': 'delete_memory',
+          'description': zh ? '删除一条记忆记录。' : 'Delete a memory record.',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'id': {
+                'type': 'integer',
+                'description': zh
+                    ? '记忆记录的 id。'
+                    : 'The id of the memory record.',
+              },
+            },
+            'required': ['id'],
+          },
+        },
+      },
+    ];
+  }
+
   // —— 分发 ——
 
   /// 处理 memory / chat_search 工具调用。

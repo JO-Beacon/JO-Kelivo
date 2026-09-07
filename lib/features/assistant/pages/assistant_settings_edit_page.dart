@@ -55,6 +55,7 @@ import '../../../shared/widgets/emoji_text.dart';
 import '../../../shared/widgets/ios_form_text_field.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/section_card.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/design_tokens.dart';
@@ -64,6 +65,9 @@ import '../../../utils/platform_utils.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../utils/assistant_edit_tab_layout.dart';
 import 'assistant_regex_tab.dart';
+import '../../home/services/health_data_selection.dart';
+import '../../../core/models/health_data_type.dart';
+import 'health_data_settings_page.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 part 'assistant_settings_edit_basic_tab.dart';

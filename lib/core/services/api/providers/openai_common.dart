@@ -1477,7 +1477,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
   // 因此对其禁用累积快照检测；其他服务可能在每个分块中重发截至当前的完整数组。
   final reasoningDetailsAllowSnapshots =
       !BuiltInToolsHelper.isOpenRouterProvider(config);
-  final bool needsReasoningEcho = info.needsReasoningEcho && isReasoning;
+  final bool needsReasoningEcho =
+      info.needsReasoningEcho &&
+      (isReasoning || (info.isDeepSeek && tools?.isNotEmpty == true));
   void setMaxTokens(Map<String, dynamic> map) {
     if (maxTokens != null) map[info.completionTokensKey] = maxTokens;
   }
@@ -1503,7 +1505,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
       kimiFormulaTools = const <Map<String, dynamic>>[];
     }
   }
-  Future<String> resolveToolCall(
+  Future<dynamic> resolveToolCall(
     String name,
     Map<String, dynamic> args, {
     String? toolCallId,

@@ -286,6 +286,9 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
     final outMsg = Map<String, dynamic>.from(m);
     outMsg.remove(multimodalInternalMediaPathsKey);
     outMsg.remove(multimodalInternalRevisionIdKey);
+    outMsg.remove(multimodalInternalDocumentPathsKey);
+    outMsg.remove(multimodalInternalClaudeContainerKey);
+    outMsg.remove(multimodalInternalClaudeTurnKey);
     outMsg['role'] = role;
 
     if (isAssistant) {

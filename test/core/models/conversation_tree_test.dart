@@ -338,8 +338,10 @@ void main() {
 
       expect(afterDelete.edges.containsKey('c1'), isFalse);
       expect(afterDelete.edges.containsKey('c1-tail'), isFalse);
-      expect(afterDelete.branchPath('branch-c'), const ['u1', 'c']);
-      expect(afterDelete.branchPath('branch-c2'), const ['u1', 'c', 'c2']);
+      // 契约 §4.3 修订：c 的锚点降级后，停锚的 branch-c 吸收
+      // 唯一存活直接子 c2，路径自然延伸。
+      expect(afterDelete.branchPath('branch-c'), const ['u1', 'c', 'c2']);
+      expect(afterDelete.branches.containsKey('branch-c2'), isFalse);
       expect(afterDelete.branches.containsKey('branch-c1'), isFalse);
     });
 
@@ -367,8 +369,11 @@ void main() {
       final afterDelete = branched.deleteMessage('nested-m2');
 
       expect(afterDelete.activeBranchId, 'second');
-      expect(afterDelete.activePath(), const ['m0', 'second-m1']);
+      // 契约 §4.3 修订：锚点 second-m1 降级，second 吸收 sibling 侧，
+      // 活动路径延伸覆盖剩余内容。
+      expect(afterDelete.activePath(), const ['m0', 'second-m1', 'sibling-m2']);
       expect(afterDelete.branches.containsKey('nested'), isFalse);
+      expect(afterDelete.branches.containsKey('sibling'), isFalse);
       expect(afterDelete.edges.containsKey('m0'), isTrue);
       expect(afterDelete.edges.containsKey('second-m1'), isTrue);
       expect(afterDelete.edges.containsKey('nested-m2'), isFalse);
@@ -401,10 +406,16 @@ void main() {
         final afterDelete = branched.deleteCurrentBranch('nested-m2');
 
         expect(afterDelete.activeBranchId, 'second');
-        expect(afterDelete.activePath(), const ['m0', 'second-m1']);
+        // 契约 §4.3 修订：锚点降级合并后活动路径延伸覆盖剩余内容。
+        expect(afterDelete.activePath(), const [
+          'm0',
+          'second-m1',
+          'sibling-m2',
+        ]);
         expect(afterDelete.edges.containsKey('second-m1'), isTrue);
         expect(afterDelete.edges.containsKey('nested-m2'), isFalse);
         expect(afterDelete.branches.containsKey('nested'), isFalse);
+        expect(afterDelete.branches.containsKey('sibling'), isFalse);
         expect(() => afterDelete.validateIntegrity(), returnsNormally);
       },
     );
@@ -440,13 +451,17 @@ void main() {
               .switchBranch('branch-c')
               .appendToActiveBranch('c1');
 
+      // 契约 §4.4 修订：a 是 root 下的分支节点，删除 a = 收掉
+      // root 分叉的全部分支（a/b/d/d1 链全删），仅活动血脉 c 重挂
+      // root；branch-b 随分叉一并消失。
       final afterDelete = branched.deleteNodeKeepActiveBranch('a');
 
       expect(afterDelete.activePath(), const ['root', 'c', 'c1']);
-      expect(afterDelete.branchPath('branch-b'), const ['root', 'b']);
       expect(afterDelete.edges.containsKey('a'), isFalse);
+      expect(afterDelete.edges.containsKey('b'), isFalse);
       expect(afterDelete.edges.containsKey('d'), isFalse);
       expect(afterDelete.edges.containsKey('d1'), isFalse);
+      expect(afterDelete.branches.containsKey('branch-b'), isFalse);
       expect(afterDelete.branches.containsKey('branch-d'), isFalse);
       expect(afterDelete.edges['c']?.parentMessageId, 'root');
       expect(afterDelete.edges['c1']?.parentMessageId, 'c');

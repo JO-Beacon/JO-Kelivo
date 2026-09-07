@@ -2864,6 +2864,180 @@ final price = "$12";
   });
 
   testWidgets(
+    'SelectableHighlightView adds iOS native translation for non-empty selection',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      const channel = MethodChannel('app.ios_translation');
+      final calls = <MethodCall>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call);
+            return call.method == 'isAvailable' ? true : null;
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null),
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SelectableHighlightView(
+              'final value = 1;',
+              language: 'dart',
+              theme: {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final editableTextState = tester.state<EditableTextState>(
+        find.byType(EditableText),
+      );
+      final contextMenuBuilder = tester
+          .widget<SelectableText>(find.byType(SelectableText))
+          .contextMenuBuilder!;
+      final editableContext = tester.element(find.byType(EditableText));
+
+      final collapsedMenu =
+          contextMenuBuilder(editableContext, editableTextState)
+              as AdaptiveTextSelectionToolbar;
+      expect(
+        collapsedMenu.buttonItems,
+        isNot(
+          contains(
+            predicate<ContextMenuButtonItem>((item) {
+              return item.label == 'Translate';
+            }),
+          ),
+        ),
+      );
+
+      editableTextState.userUpdateTextEditingValue(
+        editableTextState.textEditingValue.copyWith(
+          selection: const TextSelection(baseOffset: 0, extentOffset: 5),
+        ),
+        SelectionChangedCause.longPress,
+      );
+      await tester.pump();
+
+      final selectionMenu =
+          contextMenuBuilder(editableContext, editableTextState)
+              as AdaptiveTextSelectionToolbar;
+      final translateItem = selectionMenu.buttonItems!.singleWhere(
+        (item) => item.label == 'Translate',
+      );
+      translateItem.onPressed!();
+      await tester.pump();
+
+      final presentCall = calls.singleWhere((call) => call.method == 'present');
+      final arguments = presentCall.arguments as Map<Object?, Object?>;
+      expect(arguments['text'], 'final');
+      expect(arguments['anchorX'], isA<double>());
+      expect(arguments['anchorY'], isA<double>());
+      debugDefaultTargetPlatformOverride = null;
+    },
+  );
+
+  testWidgets(
+    'SelectableHighlightView keeps stock menu when iOS translation is unavailable',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      const channel = MethodChannel('app.ios_translation');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async => false);
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null),
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: SelectableHighlightView(
+              'final value = 1;',
+              language: 'dart',
+              theme: {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final editableTextState = tester.state<EditableTextState>(
+        find.byType(EditableText),
+      );
+      editableTextState.userUpdateTextEditingValue(
+        editableTextState.textEditingValue.copyWith(
+          selection: const TextSelection(baseOffset: 0, extentOffset: 5),
+        ),
+        SelectionChangedCause.longPress,
+      );
+      await tester.pump();
+      final menu =
+          tester
+              .widget<SelectableText>(find.byType(SelectableText))
+              .contextMenuBuilder!(
+            tester.element(find.byType(EditableText)),
+            editableTextState,
+          );
+
+      expect(menu, isA<AdaptiveTextSelectionToolbar>());
+      expect(
+        (menu as AdaptiveTextSelectionToolbar).buttonItems,
+        isNot(
+          contains(
+            predicate<ContextMenuButtonItem>((item) {
+              return item.label == 'Translate';
+            }),
+          ),
+        ),
+      );
+      debugDefaultTargetPlatformOverride = null;
+    },
+  );
+
+  testWidgets(
+    'SelectableHighlightView does not query native translation off iOS',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      const channel = MethodChannel('app.ios_translation');
+      final calls = <MethodCall>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call);
+            return true;
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null),
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: SelectableHighlightView(
+              'final value = 1;',
+              language: 'dart',
+              theme: {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(calls, isEmpty);
+      debugDefaultTargetPlatformOverride = null;
+    },
+  );
+
+  testWidgets(
     'SelectableHighlightView skips synchronous highlighting on demand',
     (tester) async {
       await tester.pumpWidget(
@@ -3864,6 +4038,56 @@ void main() {}
 
       final tableHeader = textSpans.singleWhere((span) => span.text == 'A');
       expect(tableHeader.style.color, theme.colorScheme.onSurface);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight forwards Windows CJK fonts to math fallbacks',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      try {
+        await tester.pumpWidget(
+          _markdownHarness(
+            r'出现 \(0 = \text{非零常数的矛盾}\)',
+            theme: buildLightThemeForScheme(ThemePalettes.defaultPalette.light),
+          ),
+        );
+        await tester.pump();
+
+        final cjkGlyph = tester
+            .widgetList<RichText>(find.byType(RichText))
+            .firstWhere((widget) => widget.text.toPlainText() == '非');
+
+        expect(cjkGlyph.text.style?.fontFamily, contains('KaTeX_Main'));
+        expect(
+          cjkGlyph.text.style?.fontFamilyFallback,
+          containsAllInOrder(kWindowsFontFamilyFallback),
+        );
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight renders nested ovalbox and operatorname expressions',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+标签\(\textbf{\small\colorbox{white}{\textcolor{#AEC6CF}{\ovalbox{\textcolor{#AEC6CF}{\textbf{示例文字}}}}}}\)。
+函数\(\operatorname{Function}\left(x\right)\)&#x20;
+'''),
+      );
+      await tester.pump();
+
+      final mathWidgets = _mathWidgets(tester);
+      expect(mathWidgets, hasLength(2));
+      expect(
+        mathWidgets.map((widget) => widget.parseError),
+        everyElement(isNull),
+      );
+      expect(find.textContaining(r'\ovalbox'), findsNothing);
+      expect(find.textContaining(r'\operatorname'), findsNothing);
     },
   );
 }

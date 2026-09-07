@@ -52,7 +52,7 @@ class UpdateInfo {
 
   factory UpdateInfo.fromGitHubRelease(
     Map<String, dynamic> json, {
-    String appName = 'JO-Kelivo',
+    String appName = 'JO-AIClient',
     String? assetAppName,
   }) {
     final tagName = json['tag_name']?.toString() ?? '';
@@ -101,7 +101,7 @@ class UpdateInfo {
   static ({String platform, int priority})? assetPlatformMatch(
     String assetName, {
     String? expectedVersion,
-    String appName = 'JO-Kelivo',
+    String appName = 'JO-AIClient',
   }) {
     final name = assetName.toLowerCase();
     final normalizedAppName = appName.toLowerCase();

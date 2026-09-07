@@ -6,7 +6,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 
-ProviderConfig _deepSeekConfig(String baseUrl, {bool useResponseApi = false}) {
+ProviderConfig _deepSeekConfig(
+  String baseUrl, {
+  bool useResponseApi = false,
+  Map<String, dynamic> modelOverrides = const <String, dynamic>{},
+}) {
   return ProviderConfig(
     id: 'DeepSeekCompatTest',
     enabled: true,
@@ -15,12 +19,118 @@ ProviderConfig _deepSeekConfig(String baseUrl, {bool useResponseApi = false}) {
     baseUrl: baseUrl,
     providerType: ProviderKind.openai,
     useResponseApi: useResponseApi,
+    modelOverrides: modelOverrides,
   );
 }
 
 Future<Map<String, dynamic>> _readJsonBody(HttpRequest request) async {
   return jsonDecode(await utf8.decoder.bind(request).join())
       as Map<String, dynamic>;
+}
+
+Future<List<Map<String, dynamic>>> _collectToolOnlyContinuationRequests({
+  required bool useEvents,
+  bool deepSeek = true,
+}) async {
+  final requests = <Map<String, dynamic>>[];
+  final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+  addTearDown(() async {
+    await server.close(force: true);
+  });
+
+  server.listen((request) async {
+    requests.add(await _readJsonBody(request));
+    request.response.statusCode = HttpStatus.ok;
+    request.response.headers.contentType = ContentType(
+      'text',
+      'event-stream',
+      charset: 'utf-8',
+    );
+    if (requests.length == 1) {
+      request.response.write(
+        'data: ${jsonEncode({
+          'choices': [
+            {
+              'delta': {
+                'role': 'assistant',
+                'content': '',
+                'tool_calls': [
+                  {
+                    'index': 0,
+                    'id': 'call_date',
+                    'type': 'function',
+                    'function': {'name': 'date', 'arguments': '{}'},
+                  },
+                ],
+              },
+              'finish_reason': 'tool_calls',
+            },
+          ],
+        })}\n\n',
+      );
+    } else {
+      request.response.write(
+        'data: ${jsonEncode({
+          'choices': [
+            {
+              'delta': {'role': 'assistant', 'content': '2026-08-29'},
+              'finish_reason': 'stop',
+            },
+          ],
+        })}\n\n',
+      );
+    }
+    request.response.write('data: [DONE]\n\n');
+    await request.response.close();
+  });
+
+  final baseUrl = 'http://${server.address.address}:${server.port}/v1';
+  final modelId = deepSeek ? 'deepseek-v4-flash' : 'tool-only-model';
+  final config = ProviderConfig(
+    id: deepSeek ? 'DeepSeekCompatTest' : 'GenericCompatTest',
+    enabled: true,
+    name: deepSeek ? 'DeepSeekCompatTest' : 'GenericCompatTest',
+    apiKey: 'test-key',
+    baseUrl: baseUrl,
+    providerType: ProviderKind.openai,
+    modelOverrides: {
+      modelId: const {
+        'abilities': ['tool'],
+      },
+    },
+  );
+  const messages = [
+    {'role': 'user', 'content': 'What is the date?'},
+  ];
+  const tools = [
+    {
+      'type': 'function',
+      'function': {
+        'name': 'date',
+        'description': 'Get the current date',
+        'parameters': {'type': 'object', 'properties': <String, dynamic>{}},
+      },
+    },
+  ];
+
+  if (useEvents) {
+    await ChatApiService.sendMessageStreamEvents(
+      config: config,
+      modelId: modelId,
+      messages: messages,
+      tools: tools,
+      onToolCall: (_, __, {toolCallId}) async => '2026-08-29',
+    ).toList();
+  } else {
+    await ChatApiService.sendMessageStream(
+      config: config,
+      modelId: modelId,
+      messages: messages,
+      tools: tools,
+      onToolCall: (_, __, {toolCallId}) async => '2026-08-29',
+    ).toList();
+  }
+  return requests;
 }
 
 void main() {
@@ -293,6 +403,161 @@ void main() {
       expect(requests.single['thinking'], {'type': 'disabled'});
       expect(requests.single.containsKey('reasoning_effort'), isFalse);
     });
+
+    for (final useEvents in [false, true]) {
+      test(
+        'tool-only model echoes empty reasoning_content for tool continuation '
+        '(${useEvents ? 'event pipeline' : 'legacy pipeline'})',
+        () async {
+          final requests = await _collectToolOnlyContinuationRequests(
+            useEvents: useEvents,
+          );
+
+          expect(requests, hasLength(2));
+          expect(requests[1].containsKey('thinking'), isFalse);
+          final messages = (requests[1]['messages'] as List).cast<Map>();
+          final assistantToolMessage = messages.firstWhere(
+            (message) =>
+                message['role'] == 'assistant' && message['tool_calls'] is List,
+          );
+          expect(assistantToolMessage['reasoning_content'], '');
+        },
+      );
+
+      test('tool-only non-DeepSeek model does not receive reasoning_content '
+          '(${useEvents ? 'event pipeline' : 'legacy pipeline'})', () async {
+        final requests = await _collectToolOnlyContinuationRequests(
+          useEvents: useEvents,
+          deepSeek: false,
+        );
+
+        expect(requests, hasLength(2));
+        final messages = (requests[1]['messages'] as List).cast<Map>();
+        final assistantToolMessage = messages.firstWhere(
+          (message) =>
+              message['role'] == 'assistant' && message['tool_calls'] is List,
+        );
+        expect(assistantToolMessage.containsKey('reasoning_content'), isFalse);
+      });
+    }
+
+    test(
+      'multi-round tool calls keep reasoning_content with its own turn',
+      () async {
+        final requests = <Map<String, dynamic>>[];
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          requests.add(await _readJsonBody(request));
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+            charset: 'utf-8',
+          );
+          final event = switch (requests.length) {
+            1 => {
+              'choices': [
+                {
+                  'delta': {
+                    'role': 'assistant',
+                    'reasoning_content': 'reason for first tool',
+                    'tool_calls': [
+                      {
+                        'index': 0,
+                        'id': 'call_first',
+                        'type': 'function',
+                        'function': {'name': 'first_tool', 'arguments': '{}'},
+                      },
+                    ],
+                  },
+                  'finish_reason': 'tool_calls',
+                },
+              ],
+            },
+            2 => {
+              'choices': [
+                {
+                  'delta': {
+                    'role': 'assistant',
+                    'reasoning_content': 'reason for second tool',
+                    'tool_calls': [
+                      {
+                        'index': 0,
+                        'id': 'call_second',
+                        'type': 'function',
+                        'function': {'name': 'second_tool', 'arguments': '{}'},
+                      },
+                    ],
+                  },
+                  'finish_reason': 'tool_calls',
+                },
+              ],
+            },
+            _ => {
+              'choices': [
+                {
+                  'delta': {'role': 'assistant', 'content': 'done'},
+                  'finish_reason': 'stop',
+                },
+              ],
+            },
+          };
+          request.response.write('data: ${jsonEncode(event)}\n\n');
+          request.response.write('data: [DONE]\n\n');
+          await request.response.close();
+        });
+
+        final baseUrl = 'http://${server.address.address}:${server.port}/v1';
+        await ChatApiService.sendMessageStreamEvents(
+          config: _deepSeekConfig(
+            baseUrl,
+            modelOverrides: const {
+              'deepseek-reasoner': {
+                'abilities': ['tool', 'reasoning'],
+              },
+            },
+          ),
+          modelId: 'deepseek-reasoner',
+          messages: const [
+            {'role': 'user', 'content': 'use both tools'},
+          ],
+          tools: const [
+            {
+              'type': 'function',
+              'function': {
+                'name': 'first_tool',
+                'parameters': {'type': 'object'},
+              },
+            },
+            {
+              'type': 'function',
+              'function': {
+                'name': 'second_tool',
+                'parameters': {'type': 'object'},
+              },
+            },
+          ],
+          onToolCall: (name, _, {toolCallId}) async => '$name result',
+        ).toList();
+
+        expect(requests, hasLength(3));
+        final finalHistory = (requests[2]['messages'] as List).cast<Map>();
+        final toolTurns = finalHistory
+            .where(
+              (message) =>
+                  message['role'] == 'assistant' &&
+                  message['tool_calls'] is List,
+            )
+            .toList();
+        expect(toolTurns, hasLength(2));
+        expect(toolTurns[0]['reasoning_content'], 'reason for first tool');
+        expect(toolTurns[1]['reasoning_content'], 'reason for second tool');
+      },
+    );
 
     test('ordinary history strips reasoning_content', () async {
       late Map<String, dynamic> requestBody;

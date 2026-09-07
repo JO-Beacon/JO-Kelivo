@@ -101,6 +101,46 @@ void main() {
     },
   );
 
+  test('message-list fork copies Claude provider artifacts', () async {
+    final service = createService();
+    await service.init();
+    final source = await service.createConversation(title: 'Source');
+    final assistant = await service.addMessage(
+      conversationId: source.id,
+      role: 'assistant',
+      content: 'answer',
+    );
+    await service.setProviderArtifact(
+      assistant.id,
+      'claude_container',
+      '{"id":"container_source"}',
+    );
+    await service.setProviderArtifact(
+      assistant.id,
+      'claude_turn',
+      '[[{"type":"tool_use","id":"tool_source"}]]',
+    );
+
+    final fork = await service.forkConversationFromMessages(
+      title: 'Fork',
+      assistantId: null,
+      sourceMessages: [assistant],
+    );
+    final cloned = service.getMessages(fork.id).single;
+    expect(
+      service.getProviderArtifact(cloned.id, 'claude_container'),
+      '{"id":"container_source"}',
+    );
+    expect(
+      service.getProviderArtifact(cloned.id, 'claude_turn'),
+      '[[{"type":"tool_use","id":"tool_source"}]]',
+    );
+
+    await service.deleteMessage(cloned.id);
+    expect(service.getProviderArtifact(cloned.id, 'claude_container'), isNull);
+    expect(service.getProviderArtifact(cloned.id, 'claude_turn'), isNull);
+  });
+
   test('message fork rejects the removed empty-branch entry point', () async {
     final service = createService();
     await service.init();
@@ -953,6 +993,69 @@ void main() {
     );
 
     test(
+      'temporary deleteMessageNodes collapses the fork and keeps the active lineage',
+      () async {
+        final service = createService();
+        await service.init();
+        final conversation = await service.createDraftConversation(
+          title: 'Temporary Chat',
+          temporary: true,
+        );
+        final parent = await service.addMessage(
+          conversationId: conversation.id,
+          role: 'user',
+          content: 'parent',
+        );
+        final selected = await service.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: 'selected',
+        );
+        final rootBranchId = (await service.loadConversationTree(
+          conversation.id,
+        ))!.activeBranchId;
+        final descendant = await service.addMessage(
+          conversationId: conversation.id,
+          role: 'user',
+          content: 'descendant',
+        );
+        final siblingTree = await service.createMessageContinuationBranch(
+          conversationId: conversation.id,
+          fromMessageId: parent.id,
+        );
+        final siblingBranchId = siblingTree.activeBranchId;
+        final sibling = await service.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: 'sibling',
+        );
+
+        await service.switchConversationBranch(
+          conversationId: conversation.id,
+          branchId: rootBranchId,
+        );
+        final deleted = await service.deleteMessageNodes(
+          conversationId: conversation.id,
+          messageIds: {selected.id},
+        );
+
+        // 契约 §4.4 修订：selected 是 parent 下的分支节点，删除 =
+        // 收掉整个分叉（selected 与 sibling 子树），仅活动血脉
+        // descendant 重挂 parent。
+        expect(deleted, {selected.id, sibling.id});
+        final updated = await service.loadConversationTree(conversation.id);
+        expect(updated, isNotNull);
+        expect(updated!.activePath(), [parent.id, descendant.id]);
+        expect(updated.branches.keys, isNot(contains(siblingBranchId)));
+        expect(updated.activeBranchId, rootBranchId);
+        final remaining = await service.loadMessages(conversation.id);
+        expect(remaining, isNot(contains(sibling)));
+        expect(remaining.map((message) => message.id), contains(descendant.id));
+        expect(() => updated.validateIntegrity(), returnsNormally);
+      },
+    );
+
+    test(
       'temporary timeline projects the active tree path without versions',
       () async {
         final service = createService();
@@ -1619,6 +1722,71 @@ void main() {
     },
   );
 
+  test(
+    'deleteMessageNodes collapses the fork and keeps the active lineage',
+    () async {
+      final branched = await createBranchedService(
+        'delete-message-nodes.sqlite',
+      );
+      final repository = branched.repository;
+      final service = branched.service;
+
+      final deleted = await service.deleteMessageNodes(
+        conversationId: 'conversation-branch',
+        messageIds: {'a1-v1'},
+      );
+
+      // 契约 §4.4 修订：a1-v1 是 u1 下的分支节点，删除 = 收掉整个
+      // u1 分叉（a1-v0 与 a1-v1 两侧全删），仅活动血脉 u2-v1 重挂
+      // u1；old 分支随分叉消失。
+      expect(deleted, const {'a1-v0', 'a1-v1', 'u2-v0'});
+      expect(await repository.getMessage('a1-v1'), isNull);
+      expect(await repository.getMessage('a1-v0'), isNull);
+      expect(await repository.getMessage('u2-v1'), isNotNull);
+      final tree = await repository.loadConversationTree('conversation-branch');
+      expect(tree, isNotNull);
+      expect(tree!.activePath(), const ['u1', 'u2-v1']);
+      expect(tree.branches.keys, const ['root']);
+      expect(tree.edges['u2-v1']?.parentMessageId, 'u1');
+      expect(() => tree.validateIntegrity(), returnsNormally);
+    },
+  );
+
+  test(
+    'deleting the original message branch after cloning it activates the clone',
+    () async {
+      final branched = await createBranchedService(
+        'clone-delete-current.sqlite',
+      );
+      final repository = branched.repository;
+      final service = branched.service;
+
+      final cloned = await service.createMessageBranch(
+        conversationId: 'conversation-branch',
+        fromMessageId: 'a1-v1',
+      );
+      final cloneBranchId = cloned.activeBranchId;
+      final cloneMessageId = cloned.activePath().last;
+
+      await service.switchConversationBranch(
+        conversationId: 'conversation-branch',
+        branchId: 'root',
+      );
+      final deleted = await service.deleteCurrentBranch(
+        conversationId: 'conversation-branch',
+        messageId: 'a1-v1',
+      );
+
+      expect(deleted, contains('a1-v1'));
+      final after = await repository.loadConversationTree(
+        'conversation-branch',
+      );
+      expect(after, isNotNull);
+      expect(after!.activeBranchId, cloneBranchId);
+      expect(after.activePath(), contains(cloneMessageId));
+    },
+  );
+
   test('deleteCurrentBranch keeps a nested branch parent anchor', () async {
     final branched = await createBranchedService(
       'nested-current-branch.sqlite',
@@ -1691,13 +1859,19 @@ void main() {
     expect(await repository.getMessage('u2-v1'), isNull);
     final after = await repository.loadConversationTree('conversation-branch');
     expect(after, isNotNull);
-    expect(after!.activePath(), const ['u1', 'a1-v1']);
-    expect(after.branches.containsKey('second'), isTrue);
+    // 嵌套分支删除后锚点降级（a1-v1 只剩 u2-v0 一个直接子），
+    // 归一化让幸存内容并入主线：activePath 直接展示 u2-v0
+    // （可达即可见，契约 §8），不保留单子锚点的搁浅形态。
+    expect(after!.activePath(), const ['u1', 'a1-v1', 'u2-v0']);
+    // 合并明细：停锚分支 second 作为继承者存活，尖端延伸至 u2-v0；
+    // 覆盖分支 root（forkAnchor 即 a1-v1）被吸收清理；nested 已删除。
+    expect(after.branches['second']?.tipMessageId, 'u2-v0');
+    expect(after.branches.containsKey('root'), isFalse);
     expect(after.branches.containsKey('nested'), isFalse);
   });
 
   test(
-    'deleteMessageNode removes the fork node and keeps its active continuation',
+    'deleteMessageNode collapses the fork and keeps the active lineage',
     () async {
       final branched = await createBranchedService('message-node.sqlite');
       final repository = branched.repository;
@@ -1708,15 +1882,19 @@ void main() {
         messageId: 'a1-v1',
       );
 
-      expect(deleted, const {'a1-v1'});
+      // 契约 §4.4 修订：a1-v1 是 u1 下的分支节点，删除 = 收掉整个
+      // u1 分叉（a1-v0 侧与 a1-v1 侧全删），仅活动血脉 u2-v1 重挂
+      // u1；old 分支随分叉消失。
+      expect(deleted, const {'a1-v0', 'a1-v1', 'u2-v0'});
       expect(await repository.getMessage('a1-v1'), isNull);
+      expect(await repository.getMessage('a1-v0'), isNull);
       expect(await repository.getMessage('u2-v1'), isNotNull);
-      expect(await repository.getMessage('a1-v0'), isNotNull);
       final tree = await repository.loadConversationTree('conversation-branch');
       expect(tree, isNotNull);
       expect(tree!.activePath(), const ['u1', 'u2-v1']);
-      expect(tree.branchPath('old'), const ['u1', 'a1-v0', 'u2-v0']);
+      expect(tree.branches.keys, const ['root']);
       expect(tree.edges['u2-v1']?.parentMessageId, 'u1');
+      expect(() => tree.validateIntegrity(), returnsNormally);
     },
   );
 

@@ -85,6 +85,7 @@ class MessageBuilderService {
     this.ocrHandler,
     this.ocrPrefetch,
     this.geminiThoughtSignatureHandler,
+    this.providerArtifactLookup,
   });
 
   final ChatService chatService;
@@ -104,6 +105,7 @@ class MessageBuilderService {
     List<String> imagePaths, {
     String? revisionId,
     OcrPrepareSession? session,
+    String? requestId,
   })?
   ocrHandler;
 
@@ -120,6 +122,9 @@ class MessageBuilderService {
   /// 为 API 调用追加 Gemini 思考签名的处理器
   final String Function(ChatMessage message, String content)?
   geminiThoughtSignatureHandler;
+
+  final String? Function(ChatMessage message, String kind)?
+  providerArtifactLookup;
 
   /// 文档文本提取缓存，避免每条消息都重新读取文件。
   /// 按路径索引，通过（修改时间 + 大小）校验以避免复用过期数据。
@@ -254,6 +259,19 @@ class MessageBuilderService {
       final message = <String, dynamic>{'role': role, 'content': content};
       if (role == 'user') {
         message[internalRevisionIdKey] = m.id;
+        final documentRefs = documentRefsFromParts(m);
+        if (documentRefs.isNotEmpty) {
+          message[multimodalInternalDocumentPathsKey] = documentRefs;
+        }
+      } else {
+        final container = providerArtifactLookup?.call(m, 'claude_container');
+        if (container != null && container.isNotEmpty) {
+          message[multimodalInternalClaudeContainerKey] = container;
+        }
+        final turn = providerArtifactLookup?.call(m, 'claude_turn');
+        if (turn != null && turn.isNotEmpty) {
+          message[multimodalInternalClaudeTurnKey] = turn;
+        }
       }
       if (mediaRefs.isNotEmpty) {
         message[internalMediaPathsKey] = mediaRefs;
@@ -312,6 +330,27 @@ class MessageBuilderService {
           ),
         );
       }
+    }
+    return refs;
+  }
+
+  static List<Map<String, dynamic>> documentRefsFromParts(ChatMessage message) {
+    final refs = <Map<String, dynamic>>[];
+    for (final part in message.parts) {
+      if (part is! FilePart || part.unavailable) continue;
+      final uri = part.uri.trim();
+      if (uri.isEmpty) continue;
+      final mime = resolveMediaAttachmentMime(
+        explicitMime: part.mime ?? '',
+        fileName: part.name,
+        path: uri,
+      );
+      if (isImageMime(mime) || isAudioMime(mime) || isVideoMime(mime)) {
+        continue;
+      }
+      refs.add(
+        encodeInternalDocumentRef((uri: uri, name: part.name, mime: mime)),
+      );
     }
     return refs;
   }
@@ -534,6 +573,7 @@ class MessageBuilderService {
     SettingsProvider settings, {
     Conversation? conversation,
     List<ChatMessage>? sourceMessages,
+    bool sandboxDataFiles = false,
   }) {
     final ocrActive =
         settings.ocrEnabled &&
@@ -563,6 +603,10 @@ class MessageBuilderService {
           if (path.isNotEmpty) mediaPaths.add(path);
           continue;
         }
+        if (sandboxDataFiles &&
+            isSandboxDataFile(fileName: document.fileName, mime: mime)) {
+          continue;
+        }
         return true;
       }
       if (!ocrActive) continue;
@@ -584,6 +628,7 @@ class MessageBuilderService {
     Assistant? assistant, {
     Conversation? conversation,
     List<ChatMessage>? sourceMessages,
+    bool sandboxDataFiles = false,
   }) async {
     final bool ocrActive =
         settings.ocrEnabled &&
@@ -826,7 +871,16 @@ class MessageBuilderService {
       // 记录没有 sourceContentHash，或消息 parts 已被覆盖编辑时，走重建路径。
       final existing = frozenPrompts?[revisionId];
       final currentSourceHash = chatMessageForParts?.semanticContentHash;
-      if (existing != null &&
+      final hasSandboxDataFiles =
+          sandboxDataFiles &&
+          parsedUser.documents.any(
+            (document) => isSandboxDataFile(
+              fileName: document.fileName,
+              mime: _effectiveAttachmentMime(document),
+            ),
+          );
+      if (!hasSandboxDataFiles &&
+          existing != null &&
           currentSourceHash != null &&
           existing.sourceContentHash == currentSourceHash) {
         final sendPayload = _legacyAwareFrozenPayload(
@@ -860,9 +914,15 @@ class MessageBuilderService {
       final cleanedUser = replacedUserText.trim();
 
       final filePrompts = StringBuffer();
+      var leftToSandbox = false;
       for (final d in parsedUser.documents) {
         final effectiveMime = _effectiveAttachmentMime(d);
         if (isVideoMime(effectiveMime) || isAudioMime(effectiveMime)) {
+          continue;
+        }
+        if (sandboxDataFiles &&
+            isSandboxDataFile(fileName: d.fileName, mime: effectiveMime)) {
+          leftToSandbox = true;
           continue;
         }
         final text = await readDocument(d);
@@ -877,7 +937,7 @@ class MessageBuilderService {
       }
 
       String merged = (filePrompts.toString() + cleanedUser).trim();
-      var canFreezePrompt = true;
+      var canFreezePrompt = !leftToSandbox;
 
       if (ocrActive && ocrHandler != null) {
         final ocrTargets = parsedUser.imagePaths
@@ -895,6 +955,7 @@ class MessageBuilderService {
             ocrTargets,
             revisionId: revisionId.isEmpty ? null : revisionId,
             session: ocrSession,
+            requestId: conversation?.id,
           );
           if (ocrText == null) {
             canFreezePrompt = false;

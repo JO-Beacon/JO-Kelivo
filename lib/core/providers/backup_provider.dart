@@ -10,6 +10,7 @@ import '../models/backup_task_progress.dart';
 import '../models/progress_update.dart';
 import '../services/chat/chat_service.dart';
 import '../services/backup/data_sync.dart';
+import '../services/backup/backup_activity.dart';
 
 class BackupProvider extends ChangeNotifier {
   final DataSync _dataSync;
@@ -56,6 +57,7 @@ class BackupProvider extends ChangeNotifier {
   }
 
   Future<bool> backup({ProgressCallback? onProgress}) async {
+    BackupActivity.begin();
     _busy = true;
     _message = null;
     notifyListeners();
@@ -67,6 +69,7 @@ class BackupProvider extends ChangeNotifier {
       _message = e.toString();
       return false;
     } finally {
+      BackupActivity.end();
       _busy = false;
       notifyListeners();
     }
@@ -77,6 +80,7 @@ class BackupProvider extends ChangeNotifier {
     RestoreMode mode = RestoreMode.overwrite,
     ProgressCallback? onProgress,
   }) async {
+    BackupActivity.begin();
     _busy = true;
     _message = null;
     notifyListeners();
@@ -92,6 +96,7 @@ class BackupProvider extends ChangeNotifier {
       _message = e.toString();
       rethrow;
     } finally {
+      BackupActivity.end();
       _busy = false;
       notifyListeners();
     }
@@ -109,24 +114,45 @@ class BackupProvider extends ChangeNotifier {
   Future<File> exportToFile({
     ProgressCallback? onProgress,
     BackupCancelToken? cancelToken,
-  }) => _dataSync.prepareJoaiclientFile(
-    _cfg,
-    onProgress: onProgress,
-    cancelToken: cancelToken,
-  );
+  }) async {
+    BackupActivity.begin();
+    try {
+      return await _dataSync.prepareJoaiclientFile(
+        _cfg,
+        onProgress: onProgress,
+        cancelToken: cancelToken,
+      );
+    } finally {
+      BackupActivity.end();
+    }
+  }
 
-  Future<File> exportKelivoBackupToFile() => _dataSync.prepareBackupFile(_cfg);
+  Future<File> exportKelivoBackupToFile() async {
+    BackupActivity.begin();
+    try {
+      return await _dataSync.prepareBackupFile(_cfg);
+    } finally {
+      BackupActivity.end();
+    }
+  }
 
   Future<void> restoreFromLocalFile(
     File file, {
     RestoreMode mode = RestoreMode.overwrite,
     ProgressCallback? onProgress,
     BackupCancelToken? cancelToken,
-  }) => _dataSync.restoreFromLocalFile(
-    file,
-    _cfg,
-    mode: mode,
-    onProgress: onProgress,
-    cancelToken: cancelToken,
-  );
+  }) async {
+    BackupActivity.begin();
+    try {
+      await _dataSync.restoreFromLocalFile(
+        file,
+        _cfg,
+        mode: mode,
+        onProgress: onProgress,
+        cancelToken: cancelToken,
+      );
+    } finally {
+      BackupActivity.end();
+    }
+  }
 }

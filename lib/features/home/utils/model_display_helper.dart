@@ -1,5 +1,6 @@
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/models/assistant.dart';
+import '../../../core/models/conversation.dart';
 
 /// 用于提取模型显示信息的辅助类。
 ///
@@ -34,12 +35,13 @@ class ModelDisplayInfo {
   }
 }
 
-/// 从设置和助手中提取模型显示信息。
+/// 按会话覆盖、助手配置、全局默认的优先级提取模型显示信息。
 ///
 /// 统一了以下重复模式：
 /// ```dart
-/// final providerKey = assistant?.chatModelProvider ?? settings.currentModelProvider;
-/// final modelId = assistant?.chatModelId ?? settings.currentModelId;
+/// final model = resolveChatModel(settings, conversation: conversation, assistant: assistant);
+/// final providerKey = model.providerKey;
+/// final modelId = model.modelId;
 /// if (providerKey != null && modelId != null) {
 ///   final cfg = settings.getProviderConfig(providerKey);
 ///   final ov = cfg.modelOverrides[modelId] as Map?;
@@ -48,12 +50,16 @@ class ModelDisplayInfo {
 /// ```
 ModelDisplayInfo getModelDisplayInfo(
   SettingsProvider settings, {
+  Conversation? conversation,
   Assistant? assistant,
 }) {
-  // 从助手或全局默认值确定供应商和模型
-  final providerKey =
-      assistant?.chatModelProvider ?? settings.currentModelProvider;
-  final modelId = assistant?.chatModelId ?? settings.currentModelId;
+  final resolved = resolveChatModel(
+    settings,
+    conversation: conversation,
+    assistant: assistant,
+  );
+  final providerKey = resolved.providerKey;
+  final modelId = resolved.modelId;
 
   if (providerKey == null || modelId == null) {
     return const ModelDisplayInfo();
@@ -90,21 +96,52 @@ ModelDisplayInfo getModelDisplayInfo(
 /// 当只需要 API 调用的原始标识时使用。
 ({String? providerKey, String? modelId}) getActiveModelIds(
   SettingsProvider settings, {
+  Conversation? conversation,
+  Assistant? assistant,
+}) => resolveChatModel(
+  settings,
+  conversation: conversation,
+  assistant: assistant,
+);
+
+({String? providerKey, String? modelId}) resolveChatModel(
+  SettingsProvider settings, {
+  Conversation? conversation,
   Assistant? assistant,
 }) {
-  return (
-    providerKey: assistant?.chatModelProvider ?? settings.currentModelProvider,
-    modelId: assistant?.chatModelId ?? settings.currentModelId,
-  );
+  final conversationProvider = conversation?.chatModelProvider;
+  final conversationModel = conversation?.chatModelId;
+  final hasConversationOverride =
+      conversationProvider != null &&
+      conversationModel != null &&
+      conversationProvider.trim().isNotEmpty &&
+      conversationModel.trim().isNotEmpty;
+  final provider = hasConversationOverride
+      ? conversationProvider
+      : (assistant?.chatModelProvider ?? settings.currentModelProvider);
+  final model = hasConversationOverride
+      ? conversationModel
+      : (assistant?.chatModelId ?? settings.currentModelId);
+  if (provider == null ||
+      model == null ||
+      provider.trim().isEmpty ||
+      model.trim().isEmpty) {
+    return (providerKey: null, modelId: null);
+  }
+  return (providerKey: provider, modelId: model);
 }
 
 /// 获取当前模型的 ProviderConfig。
 ProviderConfig? getActiveProviderConfig(
   SettingsProvider settings, {
+  Conversation? conversation,
   Assistant? assistant,
 }) {
-  final providerKey =
-      assistant?.chatModelProvider ?? settings.currentModelProvider;
+  final providerKey = resolveChatModel(
+    settings,
+    conversation: conversation,
+    assistant: assistant,
+  ).providerKey;
   if (providerKey == null) return null;
   return settings.getProviderConfig(providerKey);
 }

@@ -17,60 +17,56 @@ void main() {
     );
   });
 
-  test(
-    'JO-Kelivo GitHub release parser keeps only supported JO-Kelivo assets',
-    () {
-      final info = UpdateInfo.fromGitHubRelease({
-        'tag_name': 'v0.1.6',
-        'html_url':
-            'https://github.com/JO-Beacon/JO-Kelivo/releases/tag/v0.1.6',
-        'published_at': '2026-08-13T00:00:00Z',
-        'body': 'notes',
-        'assets': [
-          _asset('JO-Kelivo-v0.1.6+6-android-x86_64-release.apk'),
-          _asset('JO-Kelivo-v0.1.6+6-android-arm64-v8a-release.apk'),
-          _asset('JO-Kelivo-v0.1.6-windows-x64-portable.zip'),
-          _asset('JO-Kelivo-v0.1.6-windows-x64-setup.exe'),
-          _asset('JO-Kelivo-v0.1.6-linux-x64-deb.deb'),
-          _asset('JO-Kelivo-v0.1.6-linux-x64-appimage.AppImage'),
-          _asset('JO-Kelivo-v0.1.5+5-windows-x64-setup.exe'),
-          _asset('kelivo-v9.9.9-windows-x64-setup.exe'),
-          _asset('JO-Kelivo-v0.1.6-windows-x64-setup.exe.sha256'),
-        ],
-      });
+  test('GitHub release parser keeps only supported JO-AIClient assets', () {
+    final info = UpdateInfo.fromGitHubRelease({
+      'tag_name': 'v0.1.6',
+      'html_url': 'https://github.com/JO-Beacon/JO-Kelivo/releases/tag/v0.1.6',
+      'published_at': '2026-08-13T00:00:00Z',
+      'body': 'notes',
+      'assets': [
+        _asset('JO-AIClient-v0.1.6+6-android-x86_64-release.apk'),
+        _asset('JO-AIClient-v0.1.6+6-android-arm64-v8a-release.apk'),
+        _asset('JO-AIClient-v0.1.6-windows-x64-portable.zip'),
+        _asset('JO-AIClient-v0.1.6-windows-x64-setup.exe'),
+        _asset('JO-AIClient-v0.1.6-linux-x64-deb.deb'),
+        _asset('JO-AIClient-v0.1.6-linux-x64-appimage.AppImage'),
+        _asset('JO-AIClient-v0.1.5+5-windows-x64-setup.exe'),
+        _asset('kelivo-v9.9.9-windows-x64-setup.exe'),
+        _asset('JO-AIClient-v0.1.6-windows-x64-setup.exe.sha256'),
+      ],
+    });
 
-      expect(info.app, 'JO-Kelivo');
-      expect(info.version, '0.1.6');
-      expect(
-        info.releaseUrl,
-        'https://github.com/JO-Beacon/JO-Kelivo/releases/tag/v0.1.6',
-      );
-      expect(info.downloads, {
-        'android': _url('JO-Kelivo-v0.1.6+6-android-arm64-v8a-release.apk'),
-        'windows': _url('JO-Kelivo-v0.1.6-windows-x64-setup.exe'),
-        'linux': _url('JO-Kelivo-v0.1.6-linux-x64-appimage.AppImage'),
-      });
-    },
-  );
+    expect(info.app, 'JO-AIClient');
+    expect(info.version, '0.1.6');
+    expect(
+      info.releaseUrl,
+      'https://github.com/JO-Beacon/JO-Kelivo/releases/tag/v0.1.6',
+    );
+    expect(info.downloads, {
+      'android': _url('JO-AIClient-v0.1.6+6-android-arm64-v8a-release.apk'),
+      'windows': _url('JO-AIClient-v0.1.6-windows-x64-setup.exe'),
+      'linux': _url('JO-AIClient-v0.1.6-linux-x64-appimage.AppImage'),
+    });
+  });
 
   test('release tag with build number accepts only the matching build', () {
     final info = UpdateInfo.fromGitHubRelease({
       'tag_name': 'v0.1.6+6',
       'assets': [
-        _asset('JO-Kelivo-v0.1.6+5-android-arm64-v8a-release.apk'),
-        _asset('JO-Kelivo-v0.1.6+6-android-arm64-v8a-release.apk'),
-        _asset('JO-Kelivo-v0.1.6+5-windows-x64-setup.exe'),
-        _asset('JO-Kelivo-v0.1.6+6-windows-x64-setup.exe'),
-        _asset('JO-Kelivo-v0.1.6+5-linux-x64-appimage.AppImage'),
-        _asset('JO-Kelivo-v0.1.6+6-linux-x64-appimage.AppImage'),
+        _asset('JO-AIClient-v0.1.6+5-android-arm64-v8a-release.apk'),
+        _asset('JO-AIClient-v0.1.6+6-android-arm64-v8a-release.apk'),
+        _asset('JO-AIClient-v0.1.6+5-windows-x64-setup.exe'),
+        _asset('JO-AIClient-v0.1.6+6-windows-x64-setup.exe'),
+        _asset('JO-AIClient-v0.1.6+5-linux-x64-appimage.AppImage'),
+        _asset('JO-AIClient-v0.1.6+6-linux-x64-appimage.AppImage'),
       ],
     });
 
     expect(info.version, '0.1.6+6');
     expect(info.downloads, {
-      'android': _url('JO-Kelivo-v0.1.6+6-android-arm64-v8a-release.apk'),
-      'windows': _url('JO-Kelivo-v0.1.6+6-windows-x64-setup.exe'),
-      'linux': _url('JO-Kelivo-v0.1.6+6-linux-x64-appimage.AppImage'),
+      'android': _url('JO-AIClient-v0.1.6+6-android-arm64-v8a-release.apk'),
+      'windows': _url('JO-AIClient-v0.1.6+6-windows-x64-setup.exe'),
+      'linux': _url('JO-AIClient-v0.1.6+6-linux-x64-appimage.AppImage'),
     });
   });
 
@@ -81,27 +77,30 @@ void main() {
     );
     expect(
       UpdateInfo.assetPlatformMatch(
-        'JO-Kelivo-v0.1.6-windows-x64-setup.exe.sha256',
-      ),
-      isNull,
-    );
-    expect(UpdateInfo.assetPlatformMatch('JO-Kelivo-v0.1.6-macos.dmg'), isNull);
-    expect(
-      UpdateInfo.assetPlatformMatch(
-        'JO-Kelivo-v0.1.6-evil-windows-x64-setup.exe',
+        'JO-AIClient-v0.1.6-windows-x64-setup.exe.sha256',
       ),
       isNull,
     );
     expect(
+      UpdateInfo.assetPlatformMatch('JO-AIClient-v0.1.6-macos.dmg'),
+      isNull,
+    );
+    expect(
       UpdateInfo.assetPlatformMatch(
-        'JO-Kelivo-v0.1.5+5-windows-x64-setup.exe',
+        'JO-AIClient-v0.1.6-evil-windows-x64-setup.exe',
+      ),
+      isNull,
+    );
+    expect(
+      UpdateInfo.assetPlatformMatch(
+        'JO-AIClient-v0.1.5+5-windows-x64-setup.exe',
         expectedVersion: '0.1.6',
       ),
       isNull,
     );
     expect(
       UpdateInfo.assetPlatformMatch(
-        'JO-Kelivo-v0.1.6+5-windows-x64-setup.exe',
+        'JO-AIClient-v0.1.6+5-windows-x64-setup.exe',
         expectedVersion: '0.1.6+6',
       ),
       isNull,
@@ -211,7 +210,11 @@ void main() {
         if (request.url.path.contains('/JO-AIClient/')) {
           return http.Response('not found', 404);
         }
-        return _releaseResponse(appName: 'JO-Kelivo', version: '10.0.0+1');
+        return _releaseResponse(
+          appName: 'JO-Kelivo',
+          assetAppName: 'JO-AIClient',
+          version: '10.0.0+1',
+        );
       }),
     );
     addTearDown(provider.dispose);
@@ -240,7 +243,11 @@ void main() {
             200,
           );
         }
-        return _releaseResponse(appName: 'JO-Kelivo', version: '10.0.0+1');
+        return _releaseResponse(
+          appName: 'JO-Kelivo',
+          assetAppName: 'JO-AIClient',
+          version: '10.0.0+1',
+        );
       }),
     );
     addTearDown(provider.dispose);
@@ -281,7 +288,11 @@ String _url(String name) => 'https://example.invalid/$name';
 http.Response _releaseResponse({
   required String appName,
   required String version,
+  String? assetAppName,
 }) {
+  // 仓库名与资产前缀在回落路径上并不相同：仓库仍是 JO-Kelivo，
+  // 而资产按 JO-AIClient 前缀匹配，因此两者分开传。
+  final assetPrefix = assetAppName ?? appName;
   return http.Response(
     jsonEncode({
       'tag_name': 'v$version',
@@ -289,9 +300,9 @@ http.Response _releaseResponse({
           'https://github.com/JO-Beacon/$appName/releases/tag/v$version',
       'body': '$appName release notes',
       'assets': [
-        _asset('$appName-v$version-android-arm64-v8a-release.apk'),
-        _asset('$appName-v$version-windows-x64-setup.exe'),
-        _asset('$appName-v$version-linux-x64-appimage.AppImage'),
+        _asset('$assetPrefix-v$version-android-arm64-v8a-release.apk'),
+        _asset('$assetPrefix-v$version-windows-x64-setup.exe'),
+        _asset('$assetPrefix-v$version-linux-x64-appimage.AppImage'),
       ],
     }),
     200,

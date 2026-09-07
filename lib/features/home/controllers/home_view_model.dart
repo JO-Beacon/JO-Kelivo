@@ -20,6 +20,7 @@ import '../../chat/widgets/chat_message_widget.dart' show ToolUIPart;
 import '../services/message_builder_service.dart';
 import '../services/message_generation_service.dart';
 import '../services/chat_suggestion_service.dart';
+import '../utils/model_display_helper.dart';
 import 'chat_actions.dart';
 import 'file_processing_indicator_controller.dart';
 import 'chat_controller.dart';
@@ -32,6 +33,7 @@ enum BackgroundTaskKind { ocr, title, summary, suggestions, memory }
 
 enum _DeletionOperation {
   messages,
+  messageNodes,
   currentBranch,
   messageNode,
   messageAndFollowing,
@@ -573,6 +575,7 @@ class HomeViewModel extends ChangeNotifier {
 
     final updated = switch (operation) {
       _DeletionOperation.messages => tree.deleteMessages(messageIds),
+      _DeletionOperation.messageNodes => tree.deleteMessageNodes(messageIds),
       _DeletionOperation.currentBranch => tree.deleteCurrentBranch(messageId),
       _DeletionOperation.messageNode => tree.deleteMessageNode(messageId),
       _DeletionOperation.messageAndFollowing => tree.deleteMessageAndFollowing(
@@ -838,15 +841,22 @@ class HomeViewModel extends ChangeNotifier {
     await _cancelStreamingIfDeleted(
       conversationId: conversationId,
       messageId: selected.first.id,
-      operation: _DeletionOperation.messages,
+      operation: deleteAllVersions
+          ? _DeletionOperation.messages
+          : _DeletionOperation.messageNodes,
       messageIds: deletedCandidates,
     );
 
-    final deletedMessageIds = await _chatService.deleteMessages(
-      conversationId: conversationId,
-      messageIds: deletedCandidates,
-      versionSelectionChanges: const <String, int?>{},
-    );
+    final deletedMessageIds = deleteAllVersions
+        ? await _chatService.deleteMessages(
+            conversationId: conversationId,
+            messageIds: deletedCandidates,
+            versionSelectionChanges: const <String, int?>{},
+          )
+        : await _chatService.deleteMessageNodes(
+            conversationId: conversationId,
+            messageIds: deletedCandidates,
+          );
     for (final id in deletedMessageIds) {
       _streamController.clearMessageState(id);
     }
@@ -1223,6 +1233,23 @@ class HomeViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> setConversationModel({
+    String? providerKey,
+    String? modelId,
+  }) async {
+    final convo = currentConversation;
+    if (convo == null) return;
+    final updated = await _chatService.setConversationModel(
+      convo.id,
+      providerKey: providerKey,
+      modelId: modelId,
+    );
+    if (updated != null) {
+      _chatController.updateCurrentConversation(updated);
+      notifyListeners();
+    }
+  }
+
   /// 压缩上下文：通过 LLM 摘要消息，并使用摘要创建新会话。
   /// 成功返回 null，失败返回错误键字符串。
   Future<String?> compressContext({
@@ -1528,17 +1555,22 @@ class HomeViewModel extends ChangeNotifier {
     }
 
     final settings = _contextProvider.read<SettingsProvider>();
-    final titleModelProvider = settings.titleModelProvider;
-    final titleModelId = settings.titleModelId;
-    // 标题生成是显式配置的可选功能，不回退到聊天模型，避免用户未启用时
-    // 每次回复都额外发起标题请求。
-    if (titleModelProvider == null || titleModelId == null) return;
+    if (!settings.isTitleGenerationEnabled) return;
     final assistantProvider = _contextProvider.read<AssistantProvider>();
 
     // 获取此会话的助手
     final assistant = convo.assistantId != null
         ? assistantProvider.getById(convo.assistantId!)
         : assistantProvider.currentAssistant;
+    final chatModel = resolveChatModel(
+      settings,
+      conversation: convo,
+      assistant: assistant,
+    );
+    final titleModelProvider =
+        settings.titleModelProvider ?? chatModel.providerKey;
+    final titleModelId = settings.titleModelId ?? chatModel.modelId;
+    if (titleModelProvider == null || titleModelId == null) return;
 
     final cfg = settings.getProviderConfig(titleModelProvider);
     final budget = settings.titleGenerationThinkingBudgetFor(
@@ -1788,15 +1820,21 @@ class HomeViewModel extends ChangeNotifier {
     if (convo == null) return;
 
     final settings = _contextProvider.read<SettingsProvider>();
-    final provKey = settings.suggestionModelProvider;
-    final mdlId = settings.suggestionModelId;
-    if (provKey == null || mdlId == null) return;
+    if (!settings.isSuggestionGenerationEnabled) return;
 
     // 在下方异步间隙前读取与上下文相关的输入。
     final assistantProvider = _contextProvider.read<AssistantProvider>();
     final assistant = convo.assistantId != null
         ? assistantProvider.getById(convo.assistantId!)
         : assistantProvider.currentAssistant;
+    final chatModel = resolveChatModel(
+      settings,
+      conversation: convo,
+      assistant: assistant,
+    );
+    final provKey = settings.suggestionModelProvider ?? chatModel.providerKey;
+    final mdlId = settings.suggestionModelId ?? chatModel.modelId;
+    if (provKey == null || mdlId == null) return;
     final locale = Localizations.localeOf(_contextProvider).toLanguageTag();
     final budget = settings.suggestionGenerationThinkingBudgetFor(
       assistant?.thinkingBudget,

@@ -91,7 +91,6 @@ class ResolvedAttachmentImage extends StatelessWidget {
         errorBuilder: (_, __, ___) => errorWidget(),
       );
     }
-
     if (path.startsWith('data:')) {
       final bytes = _decodeDataUriBytes(path);
       if (bytes == null) return errorWidget();
@@ -108,6 +107,7 @@ class ResolvedAttachmentImage extends StatelessWidget {
         ? SandboxPathResolver.resolveForIo(path)
         : SandboxPathResolver.fix(path);
     if (resolved == null || resolved.isEmpty) return errorWidget();
+
     return Image.file(
       File(resolved),
       width: width,

@@ -1843,6 +1843,8 @@ class _MessageListViewState extends State<MessageListView> {
     bool enableStreamingTextMotion = true,
   }) {
     final currentIdx = useBranchSelector ? selectedBranchIndex : 0;
+    final canDeleteAllVersions =
+        useBranchSelector && widget.messageIdsWithChildren.contains(message.id);
     return ChatMessageWidget(
       message: message,
       enableStreamingTextMotion: enableStreamingTextMotion,
@@ -1936,7 +1938,7 @@ class _MessageListViewState extends State<MessageListView> {
         final action = await showMessageMoreSheet(
           context,
           message,
-          canDeleteAllVersions: siblingBranchIds.length > 1,
+          canDeleteAllVersions: canDeleteAllVersions,
           canDeleteCurrentBranch: siblingBranchIds.length > 1,
           canDeleteMessageNode: siblingBranchIds.length > 1,
           canDeleteMessageOnly: !useBranchSelector,

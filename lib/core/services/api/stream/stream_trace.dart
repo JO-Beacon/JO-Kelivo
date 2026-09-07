@@ -180,6 +180,16 @@ Map<String, dynamic> _chunkSnapshot(StreamChunk chunk) {
       'status': status.name,
       if (output != null) 'output': _stableJson(output),
     },
+    GeneratedFile(:final uri, :final name, :final mime) => <String, dynamic>{
+      'type': 'generated_file',
+      'name': name,
+      if (mime != null) 'mime': mime,
+      'uri': uri,
+    },
+    ProviderArtifact(:final kind) => <String, dynamic>{
+      'type': 'provider_artifact',
+      'kind': kind,
+    },
     ImageStart(:final id, :final mimeType) => <String, dynamic>{
       'type': 'image_start',
       'id': id,

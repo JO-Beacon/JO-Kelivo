@@ -12,6 +12,7 @@ import '../../shared/widgets/ios_switch.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../widgets/desktop_dialog_style.dart';
+import '../widgets/desktop_select_dropdown.dart';
 
 class DesktopSearchServicesPane extends StatefulWidget {
   const DesktopSearchServicesPane({super.key});
@@ -604,6 +605,9 @@ class _BrandBadge extends StatelessWidget {
     if (s is SerperOptions) return 'serper';
     if (s is QueritOptions) return 'querit';
     if (s is GrokOptions) return 'grok';
+    if (s is YouSearchOptions) return 'you';
+    if (s is ParallelOptions) return 'parallel';
+    if (s is AnySearchOptions) return 'anysearch';
     if (s is StepFunOptions) return 'stepfun';
     if (s is FirecrawlOptions) return 'firecrawl';
     if (s is TinyFishOptions) return 'tinyfish';
@@ -769,6 +773,7 @@ class _AddServiceDialog extends StatefulWidget {
 
 class _AddServiceDialogState extends State<_AddServiceDialog> {
   String _selectedType = 'bing_local';
+  bool _maximumTokensInvalid = false;
   final Map<String, TextEditingController> _controllers = {
     'apiKey': TextEditingController(),
     'url': TextEditingController(),
@@ -801,6 +806,13 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
     'location': TextEditingController(),
     'includeDomains': TextEditingController(),
     'excludeDomains': TextEditingController(),
+    'mode': TextEditingController(text: ParallelOptions.defaultMode),
+    'contentMode': TextEditingController(
+      text: YouSearchOptions.defaultContentMode,
+    ),
+    'maximumNumberOfTokens': TextEditingController(
+      text: '${BraveOptions.defaultMaximumNumberOfTokens}',
+    ),
   };
 
   @override
@@ -866,6 +878,7 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
                 filled: true,
                 dense: true,
                 onTap: () {
+                  if (!_acceptBraveMaximumTokens()) return;
                   final created = _createService();
                   Navigator.of(context).pop(created);
                 },
@@ -919,9 +932,51 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
             ),
           ),
         ];
+      case 'brave':
+        final braveMode = BraveOptions.normalizeMode(
+          _controllers['mode']!.text,
+        );
+        return [
+          TextField(
+            controller: _controllers['apiKey'],
+            decoration: deco(l10n.searchServicesDialogApiKey),
+          ),
+          const SizedBox(height: 12),
+          _deskModeDropdown(
+            context: context,
+            label: l10n.searchServicesDialogSearchMode,
+            value: braveMode,
+            items: [
+              (
+                value: BraveOptions.webMode,
+                label: l10n.searchServicesDialogWebSearch,
+              ),
+              (
+                value: BraveOptions.llmContextMode,
+                label: l10n.searchServicesDialogLlmContext,
+              ),
+            ],
+            onChanged: (value) => setState(() {
+              _controllers['mode']!.text = value;
+            }),
+          ),
+          if (braveMode == BraveOptions.llmContextMode) ...[
+            const SizedBox(height: 12),
+            _BraveMaximumTokensField(
+              controller: _controllers['maximumNumberOfTokens']!,
+              errorText: _maximumTokensInvalid
+                  ? l10n.searchServicesDialogMaximumTokensInvalid
+                  : null,
+              onChanged: (_) {
+                if (_maximumTokensInvalid) {
+                  setState(() => _maximumTokensInvalid = false);
+                }
+              },
+            ),
+          ],
+        ];
       case 'zhipu':
       case 'linkup':
-      case 'brave':
       case 'metaso':
       case 'jina':
       case 'ollama':
@@ -1060,6 +1115,69 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
             obscureText: true,
           ),
         ];
+      case 'you':
+        return [
+          TextField(
+            controller: _controllers['apiKey'],
+            decoration: deco(l10n.searchServicesDialogApiKey),
+          ),
+          const SizedBox(height: 12),
+          _deskModeDropdown(
+            context: context,
+            label: l10n.searchServicesDialogContentMode,
+            value: YouSearchOptions.normalizeContentMode(
+              _controllers['contentMode']!.text,
+            ),
+            items: [
+              (
+                value: YouSearchOptions.highlightsMode,
+                label: l10n.searchServicesDialogHighlights,
+              ),
+              (
+                value: YouSearchOptions.snippetsMode,
+                label: l10n.searchServicesDialogSnippets,
+              ),
+            ],
+            onChanged: (value) => setState(() {
+              _controllers['contentMode']!.text = value;
+            }),
+          ),
+        ];
+      case 'parallel':
+        return [
+          TextField(
+            controller: _controllers['apiKey'],
+            decoration: deco(l10n.searchServicesDialogApiKey),
+          ),
+          const SizedBox(height: 12),
+          _deskModeDropdown(
+            context: context,
+            label: l10n.searchServicesDialogSearchMode,
+            value: ParallelOptions.normalizeMode(_controllers['mode']!.text),
+            items: [
+              for (final mode in ParallelOptions.modes)
+                (value: mode, label: ParallelOptions.modeLabel(mode)),
+            ],
+            onChanged: (value) => setState(() {
+              _controllers['mode']!.text = value;
+            }),
+          ),
+        ];
+      case 'anysearch':
+        return [
+          TextField(
+            controller: _controllers['apiKey'],
+            decoration: deco(l10n.searchServicesDialogApiKey),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['url'],
+            decoration: _deskInputDecoration(context).copyWith(
+              labelText: l10n.searchServicesFieldCustomUrlOptional,
+              hintText: AnySearchOptions.defaultUrl,
+            ),
+          ),
+        ];
       case 'stepfun':
         return [
           TextField(
@@ -1146,6 +1264,20 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
     }
   }
 
+  bool _acceptBraveMaximumTokens() {
+    final isLlmContext =
+        _selectedType == 'brave' &&
+        BraveOptions.normalizeMode(_controllers['mode']!.text) ==
+            BraveOptions.llmContextMode;
+    final valid =
+        !isLlmContext ||
+        BraveOptions.isValidMaximumNumberOfTokensInput(
+          _controllers['maximumNumberOfTokens']!.text,
+        );
+    setState(() => _maximumTokensInvalid = !valid);
+    return valid;
+  }
+
   SearchServiceOptions _createService() {
     final id = const Uuid().v4().substring(0, 8);
     switch (_selectedType) {
@@ -1181,7 +1313,14 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
       case 'linkup':
         return LinkUpOptions(id: id, apiKey: _controllers['apiKey']!.text);
       case 'brave':
-        return BraveOptions(id: id, apiKey: _controllers['apiKey']!.text);
+        return BraveOptions(
+          id: id,
+          apiKey: _controllers['apiKey']!.text,
+          mode: BraveOptions.normalizeMode(_controllers['mode']!.text),
+          maximumNumberOfTokens: BraveOptions.normalizeMaximumNumberOfTokens(
+            _controllers['maximumNumberOfTokens']!.text,
+          ),
+        );
       case 'metaso':
         return MetasoOptions(id: id, apiKey: _controllers['apiKey']!.text);
       case 'jina':
@@ -1222,6 +1361,26 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
           reasoningEffort: _controllers['reasoningEffort']!.text,
           customUrl: _controllers['customUrl']!.text.trim(),
           systemPrompt: _controllers['systemPrompt']!.text,
+        );
+      case 'you':
+        return YouSearchOptions(
+          id: id,
+          apiKey: _controllers['apiKey']!.text,
+          contentMode: YouSearchOptions.normalizeContentMode(
+            _controllers['contentMode']!.text,
+          ),
+        );
+      case 'parallel':
+        return ParallelOptions(
+          id: id,
+          apiKey: _controllers['apiKey']!.text,
+          mode: ParallelOptions.normalizeMode(_controllers['mode']!.text),
+        );
+      case 'anysearch':
+        return AnySearchOptions(
+          id: id,
+          apiKey: _controllers['apiKey']!.text,
+          url: (_controllers['url']?.text ?? '').trim(),
         );
       case 'stepfun':
         return StepFunOptions(
@@ -1265,6 +1424,7 @@ class _EditServiceDialog extends StatefulWidget {
 class _EditServiceDialogState extends State<_EditServiceDialog> {
   final Map<String, TextEditingController> _controllers = {};
   late List<String> _extraApiKeys;
+  bool _maximumTokensInvalid = false;
   @override
   void initState() {
     super.initState();
@@ -1300,6 +1460,10 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
       _controllers['apiKey'] = TextEditingController(text: s.apiKey);
     } else if (s is BraveOptions) {
       _controllers['apiKey'] = TextEditingController(text: s.apiKey);
+      _controllers['mode'] = TextEditingController(text: s.mode);
+      _controllers['maximumNumberOfTokens'] = TextEditingController(
+        text: '${s.maximumNumberOfTokens}',
+      );
     } else if (s is MetasoOptions) {
       _controllers['apiKey'] = TextEditingController(text: s.apiKey);
     } else if (s is OllamaOptions) {
@@ -1341,6 +1505,15 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
       _controllers['systemPrompt'] = TextEditingController(
         text: s.systemPrompt,
       );
+    } else if (s is YouSearchOptions) {
+      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
+      _controllers['contentMode'] = TextEditingController(text: s.contentMode);
+    } else if (s is ParallelOptions) {
+      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
+      _controllers['mode'] = TextEditingController(text: s.mode);
+    } else if (s is AnySearchOptions) {
+      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
+      _controllers['url'] = TextEditingController(text: s.url);
     } else if (s is StepFunOptions) {
       _controllers['apiKey'] = TextEditingController(text: s.apiKey);
       _controllers['url'] = TextEditingController(text: s.url);
@@ -1422,6 +1595,7 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
                 filled: true,
                 dense: true,
                 onTap: () {
+                  if (!_acceptBraveMaximumTokens()) return;
                   final updated = _updateService();
                   Navigator.of(context).pop(updated);
                 },
@@ -1472,9 +1646,51 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
           ),
         ),
       ];
+    } else if (s is BraveOptions) {
+      final braveMode = BraveOptions.normalizeMode(_controllers['mode']!.text);
+      return [
+        TextField(
+          controller: _controllers['apiKey'],
+          decoration: deco('API Key'),
+        ),
+        const SizedBox(height: 12),
+        _multiKeyTile(),
+        const SizedBox(height: 12),
+        _deskModeDropdown(
+          context: context,
+          label: l10n.searchServicesDialogSearchMode,
+          value: braveMode,
+          items: [
+            (
+              value: BraveOptions.webMode,
+              label: l10n.searchServicesDialogWebSearch,
+            ),
+            (
+              value: BraveOptions.llmContextMode,
+              label: l10n.searchServicesDialogLlmContext,
+            ),
+          ],
+          onChanged: (value) => setState(() {
+            _controllers['mode']!.text = value;
+          }),
+        ),
+        if (braveMode == BraveOptions.llmContextMode) ...[
+          const SizedBox(height: 12),
+          _BraveMaximumTokensField(
+            controller: _controllers['maximumNumberOfTokens']!,
+            errorText: _maximumTokensInvalid
+                ? l10n.searchServicesDialogMaximumTokensInvalid
+                : null,
+            onChanged: (_) {
+              if (_maximumTokensInvalid) {
+                setState(() => _maximumTokensInvalid = false);
+              }
+            },
+          ),
+        ],
+      ];
     } else if (s is ZhipuOptions ||
         s is LinkUpOptions ||
-        s is BraveOptions ||
         s is MetasoOptions ||
         s is JinaOptions ||
         s is OllamaOptions ||
@@ -1626,6 +1842,75 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
           controller: _controllers['password'],
           decoration: deco(l10n.searchServicesAddDialogPasswordOptional),
           obscureText: true,
+        ),
+      ];
+    } else if (s is YouSearchOptions) {
+      return [
+        TextField(
+          controller: _controllers['apiKey'],
+          decoration: deco(l10n.searchServicesDialogApiKey),
+        ),
+        const SizedBox(height: 12),
+        _multiKeyTile(),
+        const SizedBox(height: 12),
+        _deskModeDropdown(
+          context: context,
+          label: l10n.searchServicesDialogContentMode,
+          value: YouSearchOptions.normalizeContentMode(
+            _controllers['contentMode']!.text,
+          ),
+          items: [
+            (
+              value: YouSearchOptions.highlightsMode,
+              label: l10n.searchServicesDialogHighlights,
+            ),
+            (
+              value: YouSearchOptions.snippetsMode,
+              label: l10n.searchServicesDialogSnippets,
+            ),
+          ],
+          onChanged: (value) => setState(() {
+            _controllers['contentMode']!.text = value;
+          }),
+        ),
+      ];
+    } else if (s is ParallelOptions) {
+      return [
+        TextField(
+          controller: _controllers['apiKey'],
+          decoration: deco(l10n.searchServicesDialogApiKey),
+        ),
+        const SizedBox(height: 12),
+        _multiKeyTile(),
+        const SizedBox(height: 12),
+        _deskModeDropdown(
+          context: context,
+          label: l10n.searchServicesDialogSearchMode,
+          value: ParallelOptions.normalizeMode(_controllers['mode']!.text),
+          items: [
+            for (final mode in ParallelOptions.modes)
+              (value: mode, label: ParallelOptions.modeLabel(mode)),
+          ],
+          onChanged: (value) => setState(() {
+            _controllers['mode']!.text = value;
+          }),
+        ),
+      ];
+    } else if (s is AnySearchOptions) {
+      return [
+        TextField(
+          controller: _controllers['apiKey'],
+          decoration: deco(l10n.searchServicesDialogApiKey),
+        ),
+        const SizedBox(height: 12),
+        _multiKeyTile(),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['url'],
+          decoration: _deskInputDecoration(context).copyWith(
+            labelText: l10n.searchServicesFieldCustomUrlOptional,
+            hintText: AnySearchOptions.defaultUrl,
+          ),
         ),
       ];
     } else if (s is StepFunOptions) {
@@ -1784,6 +2069,20 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
     }
   }
 
+  bool _acceptBraveMaximumTokens() {
+    final isLlmContext =
+        widget.service is BraveOptions &&
+        BraveOptions.normalizeMode(_controllers['mode']?.text) ==
+            BraveOptions.llmContextMode;
+    final valid =
+        !isLlmContext ||
+        BraveOptions.isValidMaximumNumberOfTokensInput(
+          _controllers['maximumNumberOfTokens']?.text,
+        );
+    setState(() => _maximumTokensInvalid = !valid);
+    return valid;
+  }
+
   SearchServiceOptions _updateService() {
     final s = widget.service;
     if (s is TavilyOptions) {
@@ -1838,6 +2137,10 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
         id: s.id,
         apiKey: _controllers['apiKey']!.text,
         extraApiKeys: _extraApiKeys,
+        mode: BraveOptions.normalizeMode(_controllers['mode']!.text),
+        maximumNumberOfTokens: BraveOptions.normalizeMaximumNumberOfTokens(
+          _controllers['maximumNumberOfTokens']!.text,
+        ),
       );
     }
     if (s is MetasoOptions) {
@@ -1914,6 +2217,32 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
         reasoningEffort: _controllers['reasoningEffort']!.text,
         customUrl: _controllers['customUrl']!.text.trim(),
         systemPrompt: _controllers['systemPrompt']!.text,
+        extraApiKeys: _extraApiKeys,
+      );
+    }
+    if (s is YouSearchOptions) {
+      return YouSearchOptions(
+        id: s.id,
+        apiKey: _controllers['apiKey']!.text,
+        contentMode: YouSearchOptions.normalizeContentMode(
+          _controllers['contentMode']!.text,
+        ),
+        extraApiKeys: _extraApiKeys,
+      );
+    }
+    if (s is ParallelOptions) {
+      return ParallelOptions(
+        id: s.id,
+        apiKey: _controllers['apiKey']!.text,
+        mode: ParallelOptions.normalizeMode(_controllers['mode']!.text),
+        extraApiKeys: _extraApiKeys,
+      );
+    }
+    if (s is AnySearchOptions) {
+      return AnySearchOptions(
+        id: s.id,
+        apiKey: _controllers['apiKey']!.text,
+        url: (_controllers['url']?.text ?? '').trim(),
         extraApiKeys: _extraApiKeys,
       );
     }
@@ -2226,6 +2555,9 @@ class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
     (type: 'serper', brand: 'serper'),
     (type: 'querit', brand: 'querit'),
     (type: 'grok', brand: 'grok'),
+    (type: 'anysearch', brand: 'anysearch'),
+    (type: 'parallel', brand: 'parallel'),
+    (type: 'you', brand: 'you'),
     (type: 'stepfun', brand: 'stepfun'),
     (type: 'firecrawl', brand: 'firecrawl'),
     (type: 'tinyfish', brand: 'tinyfish'),
@@ -2315,6 +2647,12 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameQuerit;
     case 'grok':
       return l10n.searchServiceNameGrok;
+    case 'you':
+      return l10n.searchServiceNameYou;
+    case 'parallel':
+      return l10n.searchServiceNameParallel;
+    case 'anysearch':
+      return l10n.searchServiceNameAnySearch;
     case 'stepfun':
       return l10n.searchServiceNameStepFun;
     case 'firecrawl':
@@ -2661,6 +2999,65 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
       ),
     );
   }
+}
+
+class _BraveMaximumTokensField extends StatelessWidget {
+  const _BraveMaximumTokensField({
+    required this.controller,
+    required this.errorText,
+    this.onChanged,
+  });
+
+  final TextEditingController controller;
+  final String? errorText;
+  final ValueChanged<String>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return TextField(
+      key: const ValueKey('desktop-search-service-field-maximumNumberOfTokens'),
+      controller: controller,
+      keyboardType: TextInputType.number,
+      onChanged: onChanged,
+      decoration: _deskInputDecoration(context).copyWith(
+        labelText: l10n.searchServicesDialogMaximumTokens,
+        hintText: '${BraveOptions.defaultMaximumNumberOfTokens}',
+        errorText: errorText,
+      ),
+    );
+  }
+}
+
+Widget _deskModeDropdown({
+  required BuildContext context,
+  required String label,
+  required String value,
+  required List<({String value, String label})> items,
+  required ValueChanged<String> onChanged,
+}) {
+  final effective = items.any((item) => item.value == value)
+      ? value
+      : items.first.value;
+  return InputDecorator(
+    decoration: _deskInputDecoration(context).copyWith(labelText: label),
+    child: SizedBox(
+      width: double.infinity,
+      child: DesktopSelectDropdown<String>(
+        value: effective,
+        options: [
+          for (final item in items)
+            DesktopSelectOption(value: item.value, label: item.label),
+        ],
+        onSelected: onChanged,
+        minWidth: 0,
+        minHeight: 24,
+        padding: EdgeInsets.zero,
+        borderRadius: 8,
+        maxLabelWidth: 360,
+      ),
+    ),
+  );
 }
 
 InputDecoration _deskInputDecoration(BuildContext context) {

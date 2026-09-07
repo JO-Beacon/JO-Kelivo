@@ -177,6 +177,7 @@ void main() {
       List<String> imagePaths, {
       String? revisionId,
       OcrPrepareSession? session,
+      String? requestId,
     })?
     ocrHandler,
     Future<OcrPrepareSession> Function({
@@ -807,7 +808,7 @@ void main() {
         var ocrCalls = 0;
         final service = buildService(
           messages: [message],
-          ocrHandler: (imagePaths, {revisionId, session}) async {
+          ocrHandler: (imagePaths, {revisionId, session, requestId}) async {
             ocrCalls++;
             return ocrCalls == 1 ? null : 'recognized image';
           },

@@ -258,6 +258,9 @@ List<ToolUIPart> _exportToolPartsForMessage(
             content: (e['content']?.toString().isNotEmpty == true)
                 ? e['content'].toString()
                 : null,
+            metadata: e['metadata'] is Map
+                ? Map<String, dynamic>.from(e['metadata'] as Map)
+                : null,
             loading: !(e['content']?.toString().isNotEmpty == true),
           ),
         )

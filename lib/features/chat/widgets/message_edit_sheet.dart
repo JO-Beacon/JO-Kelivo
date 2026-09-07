@@ -2,15 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../core/models/message_part.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../models/message_edit_result.dart';
-import '../models/message_parts_edit_draft.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
 import '../../../theme/app_font_weights.dart';
-import 'package:Kelivo/theme/app_semantic_colors.dart';
-import 'message_attachment_editor.dart';
+import 'message_parts_editor.dart';
 import 'message_edit_close_confirmation.dart';
 
 Future<MessageEditResult?> showMessageEditSheet(
@@ -50,7 +49,7 @@ class _MessageEditSheet extends StatefulWidget {
 
 class _MessageEditSheetState extends State<_MessageEditSheet> {
   late final TextEditingController _controller;
-  late MessagePartsEditDraft _draft;
+  late List<MessagePart> _editedParts;
   bool _allowClose = false;
   bool _confirmingClose = false;
   double _headerDragDistance = 0;
@@ -59,7 +58,7 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.message.content);
-    _draft = MessagePartsEditDraft(widget.message.parts);
+    _editedParts = List<MessagePart>.of(widget.message.parts);
   }
 
   @override
@@ -72,11 +71,13 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
     required bool shouldSend,
     MessageEditSaveMode saveMode = MessageEditSaveMode.newBranch,
   }) {
-    final text = _controller.text;
-    _draft.replaceText(text);
+    final text = _editedParts
+        .whereType<TextPart>()
+        .map((part) => part.text)
+        .join();
     return MessageEditResult(
       content: text,
-      parts: _draft.parts,
+      parts: _editedParts,
       shouldSend: shouldSend,
       saveMode: saveMode,
     );
@@ -93,17 +94,15 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
 
   bool get _hasChanges =>
       _controller.text != widget.message.content ||
-      !_draft.isSameAs(widget.message.parts);
+      !_sameParts(_editedParts, widget.message.parts);
 
   void _trimWhitespace() {
-    final trimmed = _controller.text.trim();
-    if (trimmed == _controller.text) return;
-    _controller.value = TextEditingValue(
-      text: trimmed,
-      selection: TextSelection.collapsed(offset: trimmed.length),
-      composing: TextRange.empty,
-    );
-    setState(() {});
+    setState(() {
+      _editedParts = [
+        for (final part in _editedParts)
+          part is TextPart ? TextPart(part.text.trim()) : part,
+      ];
+    });
   }
 
   Future<void> _confirmClose() async {
@@ -148,7 +147,9 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
         _headerDragDistance >= 48 ||
         details.primaryVelocity != null && details.primaryVelocity! >= 700;
     _headerDragDistance = 0;
-    if (shouldConfirm) unawaited(_confirmClose());
+    if (shouldConfirm) {
+      unawaited(_confirmClose());
+    }
   }
 
   @override
@@ -336,44 +337,11 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
                     controller: sc,
                     child: Column(
                       children: [
-                        TextField(
-                          controller: _controller,
-                          autofocus: false,
-                          keyboardType: TextInputType.multiline,
-                          minLines: 8,
-                          maxLines: null,
-                          decoration: InputDecoration(
-                            hintText: l10n.messageEditPageHint,
-                            filled: true,
-                            fillColor: context.appColors.surfaceFill,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              borderSide: const BorderSide(
-                                color: Colors.transparent,
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              borderSide: const BorderSide(
-                                color: Colors.transparent,
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              borderSide: BorderSide(
-                                color: cs.primary.withValues(alpha: 0.45),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        MessageAttachmentEditor(
-                          parts: _draft.parts,
-                          onChanged: (parts) {
-                            setState(() {
-                              _draft = MessagePartsEditDraft(parts);
-                            });
-                          },
+                        MessagePartsEditor(
+                          parts: _editedParts,
+                          onChanged: (parts) => setState(() {
+                            _editedParts = parts;
+                          }),
                         ),
                       ],
                     ),
@@ -386,4 +354,15 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
       ),
     );
   }
+}
+
+bool _sameParts(List<MessagePart> left, List<MessagePart> right) {
+  if (left.length != right.length) return false;
+  for (var i = 0; i < left.length; i++) {
+    if (left[i].kind != right[i].kind ||
+        left[i].encodePayload() != right[i].encodePayload()) {
+      return false;
+    }
+  }
+  return true;
 }

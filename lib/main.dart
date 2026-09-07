@@ -40,6 +40,8 @@ import 'core/providers/world_book_provider.dart';
 import 'core/providers/memory_provider.dart';
 import 'core/providers/memory_provider_v2.dart';
 import 'core/providers/backup_provider.dart';
+import 'core/providers/local_snapshot_provider.dart';
+import 'features/backup/local_snapshot_scheduler.dart';
 import 'core/models/progress_update.dart';
 import 'core/services/memory/memory_pipeline.dart';
 import 'core/services/memory/memory_repository.dart';
@@ -305,6 +307,7 @@ Future<void> main(List<String> arguments) async {
         MyApp(
           databaseLease: processDatabaseLease,
           businessPreferences: businessPreferences,
+          appDataDirectory: appDataDirectory,
           initialJoaiclientPath: associatedJoaiclientPath,
           restoreOutcome: restoreOutcome?.state,
         ),
@@ -427,13 +430,12 @@ class _RestoreFailureApp extends StatelessWidget {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: buildLightThemeForScheme(palette.light),
       darkTheme: buildDarkThemeForScheme(palette.dark),
-      home: diagnosticCode == 'database_schema_too_new'
-          ? _UpdateRequiredScreen(diagnosticCode: diagnosticCode)
-          : RestoreFailureScreen(
-              diagnosticCode: diagnosticCode,
-              restart: PlatformUtils.restartApp,
-              appDataDirectory: appDataDirectory,
-            ),
+      home: RestoreFailureScreen(
+        diagnosticCode: diagnosticCode,
+        restart: PlatformUtils.restartApp,
+        appDataDirectory: appDataDirectory,
+        databaseTooNew: diagnosticCode == 'database_schema_too_new',
+      ),
     );
   }
 }
@@ -474,106 +476,6 @@ class _StartupScreen extends StatelessWidget {
         builder: (context, update, child) => LoadingDialogCard(
           label: l10n.startupRecoveryBusy,
           progress: update?.fraction,
-        ),
-      ),
-    );
-  }
-}
-
-/// 当已安装数据库由更新版本的应用写入时显示；
-/// 重启无法解决问题，唯一操作是升级 JO-AIClient。
-class _UpdateRequiredScreen extends StatelessWidget {
-  const _UpdateRequiredScreen({required this.diagnosticCode});
-
-  final String diagnosticCode;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final colors = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: Material(
-                color: colors.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(20),
-                child: Padding(
-                  padding: const EdgeInsets.all(28),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: colors.primaryContainer,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Icon(
-                          Icons.system_update_alt_rounded,
-                          size: 30,
-                          color: colors.onPrimaryContainer,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        l10n.startupDatabaseUpdateRequiredTitle,
-                        style: textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        l10n.startupDatabaseUpdateRequiredContent,
-                        style: textTheme.bodyLarge?.copyWith(
-                          color: colors.onSurfaceVariant,
-                          height: 1.45,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: colors.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: SelectableText(
-                                l10n.backupRestoreFailureDiagnostic(
-                                  diagnosticCode,
-                                ),
-                                style: textTheme.bodySmall?.copyWith(
-                                  color: colors.onSurfaceVariant,
-                                  fontFamily: 'monospace',
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: () => Clipboard.setData(
-                                ClipboardData(text: diagnosticCode),
-                              ),
-                              tooltip: l10n.backupRestoreFailureCopyButton,
-                              icon: const Icon(Icons.copy_rounded, size: 18),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
         ),
       ),
     );
@@ -699,12 +601,14 @@ class MyApp extends StatelessWidget {
     super.key,
     required this.databaseLease,
     required this.businessPreferences,
+    required this.appDataDirectory,
     this.initialJoaiclientPath,
     this.restoreOutcome,
   });
 
   final ChatDatabaseLease databaseLease;
   final BusinessPreferences businessPreferences;
+  final Directory appDataDirectory;
   final String? initialJoaiclientPath;
   final RestoreReceiptState? restoreOutcome;
 
@@ -814,6 +718,14 @@ class MyApp extends StatelessWidget {
             businessRepository: databaseLease.businessRepository,
             businessPreferences: businessPreferences,
             initialConfig: ctx.read<SettingsProvider>().s3Config,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => LocalSnapshotProvider(
+            appDataDirectory: appDataDirectory,
+            chatService: ctx.read<ChatService>(),
+            businessRepository: databaseLease.businessRepository,
+            businessPreferences: businessPreferences,
           ),
         ),
       ],
@@ -948,11 +860,13 @@ class MyApp extends StatelessWidget {
                 palette.light,
                 dynamicScheme: useDyn ? lightDynamic : null,
                 pureBackground: settings.usePureBackground,
+                layeredSurfaces: settings.useLayeredSurfaces,
               );
               final dark = buildDarkThemeForScheme(
                 palette.dark,
                 dynamicScheme: useDyn ? darkDynamic : null,
                 pureBackground: settings.usePureBackground,
+                layeredSurfaces: settings.useLayeredSurfaces,
               );
               // 解析实际生效的应用字体（系统或本地别名）
               String? effectiveAppFontFamily() {
@@ -1114,7 +1028,11 @@ class MyApp extends StatelessWidget {
                             ),
                           )
                         : mq,
-                    child: AppOverlays(child: child ?? const SizedBox.shrink()),
+                    child: LocalSnapshotScheduler(
+                      child: AppOverlays(
+                        child: child ?? const SizedBox.shrink(),
+                      ),
+                    ),
                   );
                   // 在整棵 widget 树中，为未显式指定字体的 Text 强制使用应用字体
                   return AnnotatedRegion<SystemUiOverlayStyle>(

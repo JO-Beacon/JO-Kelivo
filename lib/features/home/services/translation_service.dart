@@ -5,6 +5,7 @@ import '../../../core/models/chat_message.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/retry_policy.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../settings/widgets/language_select_sheet.dart';
 
@@ -38,6 +39,32 @@ class TranslationResult {
   bool get isCancelled => type == TranslationResultType.cancelled;
 }
 
+/// 判断某次翻译是否仍拥有该消息的更新权。
+@visibleForTesting
+bool translationRunIsCurrent(Object runToken, Object? currentToken) =>
+    identical(currentToken, runToken);
+
+@visibleForTesting
+String translationRequestId(String messageId) => 'translate-msg-$messageId';
+
+/// 让旧翻译失效，避免旧请求结束后覆盖新结果。
+@visibleForTesting
+Object supersedeTranslationRun(Map<String, Object> runs, String messageId) {
+  final token = Object();
+  runs[messageId] = token;
+  return token;
+}
+
+@visibleForTesting
+bool shouldApplyTranslationFailure({
+  required Object runToken,
+  required Object? currentToken,
+  required Object error,
+}) {
+  if (!translationRunIsCurrent(runToken, currentToken)) return false;
+  return !isUserCancelError(error);
+}
+
 /// 消息翻译服务
 ///
 /// 功能：
@@ -50,6 +77,7 @@ class TranslationService {
 
   final ChatService chatService;
   final BuildContext Function() _getContext;
+  final Map<String, Object> _runs = <String, Object>{};
 
   /// 翻译消息
   ///
@@ -78,8 +106,13 @@ class TranslationService {
 
     // 检查是否选择清除翻译
     if (language.code == '__clear__') {
+      final clearToken = supersedeTranslationRun(_runs, message.id);
+      ChatApiService.cancelRequest(translationRequestId(message.id));
       onTranslationCleared();
       await chatService.updateMessage(message.id, translation: '');
+      if (identical(_runs[message.id], clearToken)) {
+        _runs.remove(message.id);
+      }
       return TranslationResult(type: TranslationResultType.cleared);
     }
 
@@ -102,6 +135,8 @@ class TranslationService {
 
     // 提取要翻译的文本内容
     String textToTranslate = message.content;
+    final runToken = Object();
+    _runs[message.id] = runToken;
 
     try {
       // 构建翻译 prompt
@@ -121,17 +156,25 @@ class TranslationService {
         thinkingBudget: settings.translateGenerationThinkingBudgetFor(
           assistant?.thinkingBudget,
         ),
+        requestId: translationRequestId(message.id),
       );
 
       final buffer = StringBuffer();
 
       await for (final chunk in translationStream) {
+        if (!translationRunIsCurrent(runToken, _runs[message.id])) {
+          return TranslationResult(type: TranslationResultType.cancelled);
+        }
         // 推理/用量块不携带可见文本。在翻译文本到达前保持加载卡片，
         // 而不是将其替换为空内容。
         if (chunk.content.isEmpty && !chunk.isDone) continue;
         buffer.write(chunk.content);
         // 实时更新翻译
         onTranslationUpdate(buffer.toString());
+      }
+
+      if (!translationRunIsCurrent(runToken, _runs[message.id])) {
+        return TranslationResult(type: TranslationResultType.cancelled);
       }
 
       // 保存最终翻译结果
@@ -142,6 +185,13 @@ class TranslationService {
 
       return TranslationResult(type: TranslationResultType.success);
     } catch (e) {
+      if (!shouldApplyTranslationFailure(
+        runToken: runToken,
+        currentToken: _runs[message.id],
+        error: e,
+      )) {
+        return TranslationResult(type: TranslationResultType.cancelled);
+      }
       // 出错时清除翻译
       onTranslationCleared();
       await chatService.updateMessage(message.id, translation: '');
@@ -150,6 +200,10 @@ class TranslationService {
         type: TranslationResultType.error,
         errorMessage: e.toString(),
       );
+    } finally {
+      if (identical(_runs[message.id], runToken)) {
+        _runs.remove(message.id);
+      }
     }
   }
 }

@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import '../core/models/chat_message.dart';
+import '../core/models/message_part.dart';
 import '../features/chat/models/message_edit_result.dart';
-import '../features/chat/models/message_parts_edit_draft.dart';
-import '../features/chat/widgets/message_attachment_editor.dart';
+import '../features/chat/widgets/message_parts_editor.dart';
 import '../features/chat/widgets/message_edit_close_confirmation.dart';
 import '../l10n/app_localizations.dart';
 import '../icons/lucide_adapter.dart';
 import '../theme/app_font_weights.dart';
-import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'widgets/desktop_dialog_style.dart';
 
 Future<MessageEditResult?> showMessageEditDesktopDialog(
@@ -40,7 +39,7 @@ class _MessageEditDesktopDialog extends StatefulWidget {
 
 class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
   late final TextEditingController _controller;
-  late MessagePartsEditDraft _draft;
+  late List<MessagePart> _editedParts;
   bool _allowClose = false;
   bool _confirmingClose = false;
 
@@ -48,7 +47,7 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.message.content);
-    _draft = MessagePartsEditDraft(widget.message.parts);
+    _editedParts = List<MessagePart>.of(widget.message.parts);
   }
 
   @override
@@ -61,11 +60,13 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
     required bool shouldSend,
     MessageEditSaveMode saveMode = MessageEditSaveMode.newBranch,
   }) {
-    final text = _controller.text;
-    _draft.replaceText(text);
+    final text = _editedParts
+        .whereType<TextPart>()
+        .map((part) => part.text)
+        .join();
     return MessageEditResult(
       content: text,
-      parts: _draft.parts,
+      parts: _editedParts,
       shouldSend: shouldSend,
       saveMode: saveMode,
     );
@@ -82,17 +83,15 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
 
   bool get _hasChanges =>
       _controller.text != widget.message.content ||
-      !_draft.isSameAs(widget.message.parts);
+      !_sameParts(_editedParts, widget.message.parts);
 
   void _trimWhitespace() {
-    final trimmed = _controller.text.trim();
-    if (trimmed == _controller.text) return;
-    _controller.value = TextEditingValue(
-      text: trimmed,
-      selection: TextSelection.collapsed(offset: trimmed.length),
-      composing: TextRange.empty,
-    );
-    setState(() {});
+    setState(() {
+      _editedParts = [
+        for (final part in _editedParts)
+          part is TextPart ? TextPart(part.text.trim()) : part,
+      ];
+    });
   }
 
   Future<void> _confirmClose() async {
@@ -288,56 +287,11 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                               ),
                             ),
                             const SizedBox(height: 4),
-                            TextField(
-                              controller: _controller,
-                              autofocus: true,
-                              keyboardType: TextInputType.multiline,
-                              minLines: 10,
-                              maxLines: null,
-                              decoration: InputDecoration(
-                                hintText: l10n.messageEditPageHint,
-                                filled: true,
-                                fillColor: context.appColors.surfaceFill,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: cs.outlineVariant.withValues(
-                                      alpha: 0.18,
-                                    ),
-                                    width: 0.6,
-                                  ),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: cs.outlineVariant.withValues(
-                                      alpha: 0.18,
-                                    ),
-                                    width: 0.6,
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: cs.primary.withValues(alpha: 0.35),
-                                    width: 0.8,
-                                  ),
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 12,
-                                ),
-                              ),
-                              style: const TextStyle(fontSize: 15, height: 1.5),
-                            ),
-                            const SizedBox(height: 12),
-                            MessageAttachmentEditor(
-                              parts: _draft.parts,
-                              onChanged: (parts) {
-                                setState(() {
-                                  _draft = MessagePartsEditDraft(parts);
-                                });
-                              },
+                            MessagePartsEditor(
+                              parts: _editedParts,
+                              onChanged: (parts) => setState(() {
+                                _editedParts = parts;
+                              }),
                             ),
                           ],
                         ),
@@ -352,4 +306,15 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
       ),
     );
   }
+}
+
+bool _sameParts(List<MessagePart> left, List<MessagePart> right) {
+  if (left.length != right.length) return false;
+  for (var i = 0; i < left.length; i++) {
+    if (left[i].kind != right[i].kind ||
+        left[i].encodePayload() != right[i].encodePayload()) {
+      return false;
+    }
+  }
+  return true;
 }

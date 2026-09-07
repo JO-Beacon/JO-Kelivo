@@ -803,6 +803,29 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
                       : null),
           ),
         ),
+      ] else if (_providerKind == ProviderKind.claude) ...[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+          child: _ToolTile(
+            title: l10n.modelDetailSheetOpenRouterWebFetchTool,
+            desc: l10n.modelDetailSheetOpenRouterWebFetchToolDescription,
+            value: _openRouterWebFetchTool,
+            onChanged: disableTools
+                ? null
+                : (v) => setState(() => _openRouterWebFetchTool = v),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: _ToolTile(
+            title: l10n.modelDetailSheetCodeExecutionTool,
+            desc: l10n.modelDetailSheetCodeExecutionToolDescription,
+            value: _googleCodeExecutionTool,
+            onChanged: disableTools
+                ? null
+                : (v) => setState(() => _googleCodeExecutionTool = v),
+          ),
+        ),
       ] else
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
@@ -919,6 +942,13 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
         builtInSet.remove(BuiltInToolNames.shell);
         if (_openRouterWebFetchTool) builtInSet.add(BuiltInToolNames.webFetch);
         if (_openRouterShellTool) builtInSet.add(BuiltInToolNames.shell);
+      }
+    } else if (_providerKind == ProviderKind.claude) {
+      builtInSet.remove(BuiltInToolNames.webFetch);
+      builtInSet.remove(BuiltInToolNames.codeExecution);
+      if (_openRouterWebFetchTool) builtInSet.add(BuiltInToolNames.webFetch);
+      if (_googleCodeExecutionTool) {
+        builtInSet.add(BuiltInToolNames.codeExecution);
       }
     }
     final builtInTools = BuiltInToolNames.orderedForStorage(builtInSet);

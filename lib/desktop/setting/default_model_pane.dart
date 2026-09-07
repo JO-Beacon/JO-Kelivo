@@ -92,11 +92,19 @@ class DesktopDefaultModelPane extends StatelessWidget {
                     subtitle: l10n.defaultModelPageTitleModelSubtitle,
                     modelProvider: settings.titleModelProvider,
                     modelId: settings.titleModelId,
-                    disabledWhenUnset: true,
-                    resetIcon: lucide.Lucide.Ban,
+                    fallbackProvider: settings.currentModelProvider,
+                    fallbackModelId: settings.currentModelId,
+                    disabledWhenUnset: !settings.isTitleGenerationEnabled,
+                    showResetWhenUnset: !settings.isTitleGenerationEnabled,
+                    resetTooltip: l10n.defaultModelPageUseCurrentModel,
                     onReset: () async {
                       await context.read<SettingsProvider>().resetTitleModel();
                     },
+                    onDisable: settings.isTitleGenerationEnabled
+                        ? () async => context
+                              .read<SettingsProvider>()
+                              .disableTitleGeneration()
+                        : null,
                     onPick: () async {
                       final settingsProvider = context.read<SettingsProvider>();
                       final sel = await pickConfiguredModel(
@@ -153,13 +161,21 @@ class DesktopDefaultModelPane extends StatelessWidget {
                     subtitle: l10n.defaultModelPageSuggestionModelSubtitle,
                     modelProvider: settings.suggestionModelProvider,
                     modelId: settings.suggestionModelId,
-                    disabledWhenUnset: true,
-                    resetIcon: lucide.Lucide.Ban,
+                    fallbackProvider: settings.currentModelProvider,
+                    fallbackModelId: settings.currentModelId,
+                    disabledWhenUnset: !settings.isSuggestionGenerationEnabled,
+                    showResetWhenUnset: !settings.isSuggestionGenerationEnabled,
+                    resetTooltip: l10n.defaultModelPageUseCurrentModel,
                     onReset: () async {
                       await context
                           .read<SettingsProvider>()
                           .resetSuggestionModel();
                     },
+                    onDisable: settings.isSuggestionGenerationEnabled
+                        ? () async => context
+                              .read<SettingsProvider>()
+                              .disableSuggestionGeneration()
+                        : null,
                     onPick: () async {
                       final settingsProvider = context.read<SettingsProvider>();
                       final sel = await pickConfiguredModel(
@@ -864,9 +880,11 @@ class _ModelCard extends StatefulWidget {
     this.fallbackProvider,
     this.fallbackModelId,
     this.disabledWhenUnset = false,
-    this.resetIcon = lucide.Lucide.RotateCcw,
+    this.showResetWhenUnset = false,
+    this.resetTooltip,
     this.onReset,
     this.configAction,
+    this.onDisable,
   });
 
   final IconData icon;
@@ -877,10 +895,12 @@ class _ModelCard extends StatefulWidget {
   final String? fallbackProvider;
   final String? fallbackModelId;
   final bool disabledWhenUnset;
-  final IconData resetIcon;
+  final bool showResetWhenUnset;
+  final String? resetTooltip;
   final VoidCallback? onReset;
   final VoidCallback onPick;
   final VoidCallback? configAction;
+  final VoidCallback? onDisable;
 
   @override
   State<_ModelCard> createState() => _ModelCardState();
@@ -961,12 +981,23 @@ class _ModelCardState extends State<_ModelCard> {
                     ),
                   ),
                 ),
-                if (widget.onReset != null && !usingFallback)
+                if (widget.onReset != null &&
+                    (!usingFallback || widget.showResetWhenUnset))
                   Tooltip(
-                    message: l10n.defaultModelPageResetDefault,
+                    message:
+                        widget.resetTooltip ??
+                        l10n.defaultModelPageResetDefault,
                     child: _SmallIconBtn(
-                      icon: widget.resetIcon,
+                      icon: lucide.Lucide.RotateCcw,
                       onTap: widget.onReset!,
+                    ),
+                  ),
+                if (widget.onDisable != null)
+                  Tooltip(
+                    message: l10n.defaultModelPageDisable,
+                    child: _SmallIconBtn(
+                      icon: lucide.Lucide.Ban,
+                      onTap: widget.onDisable!,
                     ),
                   ),
                 if (widget.configAction != null)

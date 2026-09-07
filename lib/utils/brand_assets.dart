@@ -84,6 +84,9 @@ class BrandAssets {
         MapEntry(RegExp(r'serper'), 'serper.svg'),
         MapEntry(RegExp(r'querit'), 'querit-color.svg'),
         MapEntry(RegExp(r'bocha|博查'), 'bocha-color.svg'),
+        MapEntry(RegExp(r'anysearch'), 'anysearch.svg'),
+        MapEntry(RegExp(r'parallel'), 'parallel.svg'),
+        MapEntry(RegExp(r'^you(?:\.com)?(?:\s+search)?$'), 'you.svg'),
         MapEntry(RegExp(r'kat'), 'katkwaipilot-color.svg'),
         MapEntry(RegExp(r'duckduckgo'), 'duckduckgo-color.svg'),
         MapEntry(RegExp(r'inclusionai'), 'ling.png'),
@@ -335,6 +338,17 @@ class BrandAssets {
       asset: 'assets/icons/bocha-color.svg',
     ),
     BrandIconOption(
+      id: 'anysearch',
+      label: 'AnySearch',
+      asset: 'assets/icons/anysearch.svg',
+    ),
+    BrandIconOption(
+      id: 'parallel',
+      label: 'Parallel',
+      asset: 'assets/icons/parallel.svg',
+    ),
+    BrandIconOption(id: 'you', label: 'You.com', asset: 'assets/icons/you.svg'),
+    BrandIconOption(
       id: 'kat',
       label: 'KAT',
       asset: 'assets/icons/katkwaipilot-color.svg',
@@ -381,6 +395,8 @@ class BrandAssets {
     'firecrawl.svg',
     'stepfun.svg',
     'fish-audio.svg',
+    'anysearch.svg',
+    'parallel.svg',
   };
 
   // 根据图标名称（例如 'openai'）构建 LobeHub 静态 SVG CDN URL。

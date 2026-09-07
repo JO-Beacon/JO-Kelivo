@@ -1,11 +1,17 @@
 import '../../home/services/ask_user_interaction_service.dart';
 import '../../home/services/local_tools_service.dart';
 import 'screen_time_tool_ui.dart';
+import 'weather_tool_ui.dart';
+import '../../../utils/mcp_structured_image.dart';
 
 const String kBuiltinSearchToolName = 'builtin_search';
 
-(String, List<String>) parseToolResultImages(String? content) {
-  if (content == null || content.isEmpty) return ('', const []);
+(String, List<String>) parseToolResultImages(
+  String? content, {
+  Map<String, dynamic>? metadata,
+}) {
+  final metadataImages = mcpResultImageUris(readMcpResultMetadata(metadata));
+  if (content == null || content.isEmpty) return ('', metadataImages);
   final images = <String>[];
   final buffer = StringBuffer();
   var i = 0;
@@ -27,7 +33,9 @@ const String kBuiltinSearchToolName = 'builtin_search';
           j++;
         }
         if (depth == 0 && j < content.length) {
-          final path = content.substring(destStart, j).trim();
+          final path = decodeMarkdownImageDestination(
+            content.substring(destStart, j),
+          );
           if (path.isNotEmpty && path != 'generated') images.add(path);
           i = j + 1;
           continue;
@@ -37,7 +45,9 @@ const String kBuiltinSearchToolName = 'builtin_search';
     buffer.writeCharCode(content.codeUnitAt(i));
     i++;
   }
-  return (buffer.toString().trim(), images);
+  if (metadataImages.isEmpty) return (buffer.toString().trim(), images);
+  final merged = dedupeImageUrisFirstSeen([...metadataImages, ...images]);
+  return (buffer.toString().trim(), merged);
 }
 
 bool toolCreatesTimelineCard(String toolName) =>
@@ -148,6 +158,12 @@ double estimateToolExtraHeight({
       return _estimateScreenTimeExtra(screenTime, fontScale);
     }
   }
+  if (toolName == LocalToolNames.weather) {
+    final weather = WeatherToolResult.tryParse(cleanText);
+    if (weather != null && !weather.isError) {
+      return _estimateWeatherExtra(weather, fontScale);
+    }
+  }
   var extra = 0.0;
   final summaryFontSize = 12.0 * fontScale;
   final summaryLineHeight = summaryFontSize * 1.4;
@@ -232,6 +248,12 @@ double _estimateScreenTimeExtra(ScreenTimeResult result, double fontScale) {
   if (result.isNoPermission) return line;
   final apps = result.apps.length.clamp(0, 3);
   return line + apps * (line + 2);
+}
+
+double _estimateWeatherExtra(WeatherToolResult result, double fontScale) {
+  if (!result.hasCurrent) return 0;
+  final line = 16.0 * fontScale;
+  return line * 2;
 }
 
 double _estimatePendingApprovalExtra(

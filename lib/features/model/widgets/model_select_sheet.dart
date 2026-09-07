@@ -21,12 +21,16 @@ import '../../provider/widgets/provider_avatar.dart';
 import '../../provider/widgets/provider_balance_badge.dart';
 import '../../../core/services/model_override_resolver.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../home/controllers/home_page_controller.dart';
+import '../../home/utils/model_display_helper.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 class ModelSelection {
   final String providerKey;
   final String modelId;
-  ModelSelection(this.providerKey, this.modelId);
+  const ModelSelection(this.providerKey, this.modelId);
+  const ModelSelection.inherit() : providerKey = '', modelId = '';
+  bool get isInherit => providerKey.isEmpty || modelId.isEmpty;
 }
 
 // 防止模型选择对话框重入
@@ -202,6 +206,8 @@ Future<ModelSelection?> showModelSelector(
   String? limitProviderKey,
   String? initialProviderKey,
   String? initialModelId,
+  bool allowInherit = false,
+  String? inheritLabel,
 }) async {
   if (_modelSelectorOpen) return null;
   _modelSelectorOpen = true;
@@ -216,6 +222,8 @@ Future<ModelSelection?> showModelSelector(
         limitProviderKey: limitProviderKey,
         initialProviderKey: initialProviderKey,
         initialModelId: initialModelId,
+        allowInherit: allowInherit,
+        inheritLabel: inheritLabel,
       );
     }
     final cs = Theme.of(context).colorScheme;
@@ -230,6 +238,8 @@ Future<ModelSelection?> showModelSelector(
         limitProviderKey: limitProviderKey,
         initialProviderKey: initialProviderKey,
         initialModelId: initialModelId,
+        allowInherit: allowInherit,
+        inheritLabel: inheritLabel,
       ),
     );
   } finally {
@@ -239,28 +249,27 @@ Future<ModelSelection?> showModelSelector(
 
 Future<void> showModelSelectSheet(
   BuildContext context, {
-  bool updateAssistant = true,
+  required HomePageController controller,
 }) async {
-  final assistantProvider = context.read<AssistantProvider>();
-  final settings = context.read<SettingsProvider>();
-  final sel = await showModelSelector(context);
-  if (sel != null) {
-    if (updateAssistant) {
-      // 更新助手的模型，而不是全局默认模型
-      final assistant = assistantProvider.currentAssistant;
-      if (assistant != null) {
-        await assistantProvider.updateAssistant(
-          assistant.copyWith(
-            chatModelProvider: sel.providerKey,
-            chatModelId: sel.modelId,
-          ),
-        );
-      }
-    } else {
-      // 只有明确要求时才更新全局默认模型（例如来自设置页）
-      await settings.setCurrentModel(sel.providerKey, sel.modelId);
-    }
-  }
+  final conversation = controller.currentConversation;
+  final resolved = resolveChatModel(
+    context.read<SettingsProvider>(),
+    conversation: conversation,
+    assistant: context.read<AssistantProvider>().currentAssistant,
+  );
+  final sel = await showModelSelector(
+    context,
+    initialProviderKey: resolved.providerKey,
+    initialModelId: resolved.modelId,
+    allowInherit:
+        conversation?.chatModelProvider?.trim().isNotEmpty == true &&
+        conversation?.chatModelId?.trim().isNotEmpty == true,
+  );
+  if (sel == null) return;
+  await controller.setConversationModel(
+    providerKey: sel.isInherit ? null : sel.providerKey,
+    modelId: sel.isInherit ? null : sel.modelId,
+  );
 }
 
 class _ModelSelectSheet extends StatefulWidget {
@@ -268,10 +277,14 @@ class _ModelSelectSheet extends StatefulWidget {
     this.limitProviderKey,
     this.initialProviderKey,
     this.initialModelId,
+    this.allowInherit = false,
+    this.inheritLabel,
   });
   final String? limitProviderKey;
   final String? initialProviderKey;
   final String? initialModelId;
+  final bool allowInherit;
+  final String? inheritLabel;
   @override
   State<_ModelSelectSheet> createState() => _ModelSelectSheetState();
 }
@@ -959,6 +972,14 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
 
     final Set<String> favMatchedKeys = <String>{};
 
+    if (widget.allowInherit && query.isEmpty) {
+      _rows.add(
+        _InheritRow(
+          widget.inheritLabel ?? l10n.modelSelectSheetFollowAssistant,
+        ),
+      );
+    }
+
     if (widget.limitProviderKey == null) {
       final pinned = context.watch<SettingsProvider>().pinnedModels;
       if (pinned.isNotEmpty) {
@@ -1045,7 +1066,9 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
               padding: const EdgeInsets.only(bottom: 12),
               itemBuilder: (context, index) {
                 final row = _rows[index];
-                if (row is _HeaderRow) {
+                if (row is _InheritRow) {
+                  return _inheritTile(context, row);
+                } else if (row is _HeaderRow) {
                   return _sectionHeader(
                     context,
                     row.title,
@@ -1076,6 +1099,37 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
           ],
         );
       },
+    );
+  }
+
+  Widget _inheritTile(BuildContext context, _InheritRow row) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+      child: IosCardPress(
+        baseColor: cs.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        onTap: () => Navigator.of(context).pop(const ModelSelection.inherit()),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Lucide.RotateCcw, size: 18, color: cs.primary),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                row.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: cs.primary,
+                  fontWeight: AppFontWeights.semibold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1562,6 +1616,11 @@ class _ModelItem {
 // 展平列表的行
 abstract class _ListRow {}
 
+class _InheritRow extends _ListRow {
+  _InheritRow(this.label);
+  final String label;
+}
+
 class _HeaderRow extends _ListRow {
   final String title;
   final String? providerKey;
@@ -1639,6 +1698,8 @@ Future<ModelSelection?> _showDesktopModelSelector(
   String? limitProviderKey,
   String? initialProviderKey,
   String? initialModelId,
+  bool allowInherit = false,
+  String? inheritLabel,
 }) async {
   return showGeneralDialog<ModelSelection>(
     context: context,
@@ -1649,6 +1710,8 @@ Future<ModelSelection?> _showDesktopModelSelector(
       limitProviderKey: limitProviderKey,
       initialProviderKey: initialProviderKey,
       initialModelId: initialModelId,
+      allowInherit: allowInherit,
+      inheritLabel: inheritLabel,
     ),
     transitionBuilder: (ctx, anim, _, child) {
       final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
@@ -1668,10 +1731,14 @@ class _DesktopModelSelectDialogBody extends StatefulWidget {
     this.limitProviderKey,
     this.initialProviderKey,
     this.initialModelId,
+    this.allowInherit = false,
+    this.inheritLabel,
   });
   final String? limitProviderKey;
   final String? initialProviderKey;
   final String? initialModelId;
+  final bool allowInherit;
+  final String? inheritLabel;
   @override
   State<_DesktopModelSelectDialogBody> createState() =>
       _DesktopModelSelectDialogBodyState();
@@ -1845,6 +1912,14 @@ class _DesktopModelSelectDialogBodyState
     _favModelIndexMap.clear();
 
     final Set<String> favMatchedKeys = <String>{};
+
+    if (widget.allowInherit && query.isEmpty) {
+      _rows.add(
+        _InheritRow(
+          widget.inheritLabel ?? l10n.modelSelectSheetFollowAssistant,
+        ),
+      );
+    }
 
     if (widget.limitProviderKey == null) {
       final pinned = settings.pinnedModels;
@@ -2060,7 +2135,9 @@ class _DesktopModelSelectDialogBodyState
       padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
       itemBuilder: (context, index) {
         final row = _rows[index];
-        if (row is _HeaderRow) {
+        if (row is _InheritRow) {
+          return _desktopInheritTile(context, row);
+        } else if (row is _HeaderRow) {
           if (row.isFavorites) {
             return _favoritesHeader(context, row.title);
           }
@@ -2074,6 +2151,37 @@ class _DesktopModelSelectDialogBodyState
         }
         return const SizedBox.shrink();
       },
+    );
+  }
+
+  Widget _desktopInheritTile(BuildContext context, _InheritRow row) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 2, 4, 6),
+      child: IosCardPress(
+        baseColor: cs.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        onTap: () => Navigator.of(context).pop(const ModelSelection.inherit()),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Lucide.RotateCcw, size: 14, color: cs.primary),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                row.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: cs.primary,
+                  fontWeight: AppFontWeights.semibold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

@@ -262,6 +262,15 @@ class _SelectionFakeChatService extends ChatService {
     lastDeletedIds = Set<String>.of(messageIds);
     return lastDeletedIds!;
   }
+
+  @override
+  Future<Set<String>> deleteMessageNodes({
+    required String conversationId,
+    required Set<String> messageIds,
+  }) async {
+    lastDeletedIds = Set<String>.of(messageIds);
+    return lastDeletedIds!;
+  }
 }
 
 ChatMessage _msg({

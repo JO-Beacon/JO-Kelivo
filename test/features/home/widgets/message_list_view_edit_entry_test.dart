@@ -9,6 +9,7 @@ import 'package:Kelivo/features/home/controllers/stream_controller.dart'
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/features/home/widgets/message_list_view.dart';
+import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -133,6 +134,36 @@ void main() {
       }
     },
   );
+
+  testWidgets('叶子分支节点隐藏删除所有分支入口', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      await tester.pumpWidget(
+        _MessageListHarness(
+          messages: <ChatMessage>[
+            ChatMessage(
+              id: 'leaf-branch',
+              role: 'assistant',
+              content: 'leaf branch answer',
+              conversationId: 'conversation-1',
+            ),
+          ],
+          siblingBranchIdsByMessageId: const <String, List<String>>{
+            'leaf-branch': <String>['root', 'alternate'],
+          },
+          onEditMessage: (_) {},
+        ),
+      );
+
+      await tester.tap(find.byIcon(Lucide.Ellipsis));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delete This Branch Node'), findsOneWidget);
+      expect(find.text('Delete All Branches'), findsNothing);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
 }
 
 class _MessageListHarness extends StatefulWidget {
@@ -140,11 +171,13 @@ class _MessageListHarness extends StatefulWidget {
     required this.messages,
     required this.onEditMessage,
     this.messageIdsWithChildren = const <String>{},
+    this.siblingBranchIdsByMessageId = const <String, List<String>>{},
   });
 
   final List<ChatMessage> messages;
   final ValueChanged<ChatMessage> onEditMessage;
   final Set<String> messageIdsWithChildren;
+  final Map<String, List<String>> siblingBranchIdsByMessageId;
 
   @override
   State<_MessageListHarness> createState() => _MessageListHarnessState();
@@ -203,6 +236,7 @@ class _MessageListHarnessState extends State<_MessageListHarness> {
             messages: widget.messages,
             byGroup: const {},
             messageIdsWithChildren: widget.messageIdsWithChildren,
+            siblingBranchIdsByMessageId: widget.siblingBranchIdsByMessageId,
             reasoning: const <String, stream_ctrl.ReasoningData>{},
             reasoningSegments:
                 const <String, List<stream_ctrl.ReasoningSegmentData>>{},

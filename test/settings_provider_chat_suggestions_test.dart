@@ -16,6 +16,7 @@ void main() {
       expect(settings.suggestionModelProvider, isNull);
       expect(settings.suggestionModelId, isNull);
       expect(settings.suggestionModelKey, isNull);
+      expect(settings.isSuggestionGenerationEnabled, isFalse);
       expect(
         settings.suggestionPrompt,
         SettingsProvider.defaultSuggestionPrompt,
@@ -29,6 +30,7 @@ void main() {
       await settings.loaded;
       await settings.setSuggestionModel('OpenAI', 'gpt-test');
       await settings.setSuggestionPrompt('Custom {content} {locale}');
+      expect(settings.isSuggestionGenerationEnabled, isTrue);
 
       expect(settings.suggestionModelProvider, 'OpenAI');
       expect(settings.suggestionModelId, 'gpt-test');
@@ -41,6 +43,29 @@ void main() {
         prefs.getString('suggestion_prompt_v1'),
         'Custom {content} {locale}',
       );
+    });
+
+    test('reset follows current model and disable turns feature off', () async {
+      final harness = await createBusinessTestHarness(initial: {});
+      final settings = SettingsProvider(harness.preferences);
+
+      await settings.loaded;
+      await settings.resetSuggestionModel();
+      expect(settings.isSuggestionGenerationEnabled, isTrue);
+      expect(settings.suggestionModelKey, isNull);
+
+      await settings.disableSuggestionGeneration();
+      expect(settings.isSuggestionGenerationEnabled, isFalse);
+    });
+
+    test('legacy suggestion model configuration remains enabled', () async {
+      final harness = await createBusinessTestHarness(
+        initial: {'suggestion_model_v1': 'OpenAI::gpt-test'},
+      );
+      final settings = SettingsProvider(harness.preferences);
+
+      await settings.loaded;
+      expect(settings.isSuggestionGenerationEnabled, isTrue);
     });
 
     test('defaults suggestion tap to auto-send', () async {

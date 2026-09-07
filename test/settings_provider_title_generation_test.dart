@@ -7,19 +7,34 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
-    'title generation is disabled until a model is explicitly selected',
+    'title generation defaults enabled and can be disabled explicitly',
     () async {
       final harness = await createBusinessTestHarness(initial: {});
       final settings = SettingsProvider(harness.preferences);
 
       await settings.loaded;
-      expect(settings.isTitleGenerationEnabled, isFalse);
+      expect(settings.isTitleGenerationEnabled, isTrue);
 
       await settings.setTitleModel('TestProvider', 'title-model');
       expect(settings.isTitleGenerationEnabled, isTrue);
 
-      await settings.resetTitleModel();
+      await settings.disableTitleGeneration();
       expect(settings.isTitleGenerationEnabled, isFalse);
+      expect(settings.titleModelKey, isNull);
+
+      await settings.resetTitleModel();
+      expect(settings.isTitleGenerationEnabled, isTrue);
     },
   );
+
+  test('legacy title model configuration remains enabled', () async {
+    final harness = await createBusinessTestHarness(
+      initial: {'title_model_v1': 'TestProvider::title-model'},
+    );
+    final settings = SettingsProvider(harness.preferences);
+
+    await settings.loaded;
+    expect(settings.isTitleGenerationEnabled, isTrue);
+    expect(settings.titleModelKey, 'TestProvider::title-model');
+  });
 }

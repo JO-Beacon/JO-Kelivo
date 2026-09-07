@@ -2030,6 +2030,16 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
             children: [
               _iosSwitchRow(
                 context,
+                icon: Lucide.RefreshCw,
+                label: l10n.displaySettingsPageAutoRetryTitle,
+                subtitle: l10n.displaySettingsPageAutoRetrySubtitle,
+                value: sp.autoRetryEnabled,
+                onChanged: (value) =>
+                    context.read<SettingsProvider>().setAutoRetryEnabled(value),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
                 icon: Lucide.Brain,
                 label: l10n.displaySettingsPageAutoCollapseThinkingTitle,
                 value: sp.autoCollapseThinking,

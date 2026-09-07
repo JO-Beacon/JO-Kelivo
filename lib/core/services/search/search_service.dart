@@ -24,6 +24,9 @@ import 'providers/stepfun_search_service.dart';
 import 'providers/firecrawl_search_service.dart';
 import 'providers/tinyfish_search_service.dart';
 import 'providers/doubao_search_service.dart';
+import 'providers/anysearch_search_service.dart';
+import 'providers/parallel_search_service.dart';
+import 'providers/you_search_service.dart';
 
 // 所有搜索服务的基类接口
 abstract class SearchService<T extends SearchServiceOptions> {
@@ -72,6 +75,12 @@ abstract class SearchService<T extends SearchServiceOptions> {
         return LinkUpSearchService() as SearchService;
       case BraveOptions _:
         return BraveSearchService() as SearchService;
+      case AnySearchOptions _:
+        return AnySearchSearchService() as SearchService;
+      case ParallelOptions _:
+        return ParallelSearchService() as SearchService;
+      case YouSearchOptions _:
+        return YouSearchService() as SearchService;
       case MetasoOptions _:
         return MetasoSearchService() as SearchService;
       case OllamaOptions _:
@@ -221,6 +230,12 @@ abstract class SearchServiceOptions {
         return LinkUpOptions.fromJson(json);
       case 'brave':
         return BraveOptions.fromJson(json);
+      case 'anysearch':
+        return AnySearchOptions.fromJson(json);
+      case 'parallel':
+        return ParallelOptions.fromJson(json);
+      case 'you':
+        return YouSearchOptions.fromJson(json);
       case 'metaso':
         return MetasoOptions.fromJson(json);
       case 'ollama':
@@ -426,21 +441,64 @@ class LinkUpOptions extends SearchServiceOptions {
 }
 
 class BraveOptions extends SearchServiceOptions {
-  final String apiKey;
+  static const String webMode = 'web';
+  static const String llmContextMode = 'llmContext';
+  static const String defaultMode = webMode;
+  static const List<String> modes = [webMode, llmContextMode];
+  static const int defaultMaximumNumberOfTokens = 8192;
+  static const int minMaximumNumberOfTokens = 1024;
+  static const int maxMaximumNumberOfTokens = 32768;
 
-  BraveOptions({required super.id, required this.apiKey, super.extraApiKeys});
+  final String apiKey;
+  final String mode;
+  final int maximumNumberOfTokens;
+
+  BraveOptions({
+    required super.id,
+    required this.apiKey,
+    this.mode = defaultMode,
+    this.maximumNumberOfTokens = defaultMaximumNumberOfTokens,
+    super.extraApiKeys,
+  });
+
+  static String normalizeMode(String? value) {
+    final mode = (value ?? '').trim();
+    return modes.contains(mode) ? mode : defaultMode;
+  }
+
+  static int normalizeMaximumNumberOfTokens(dynamic value) {
+    final parsed = value is int ? value : int.tryParse(value?.toString() ?? '');
+    if (parsed == null) return defaultMaximumNumberOfTokens;
+    return parsed.clamp(minMaximumNumberOfTokens, maxMaximumNumberOfTokens);
+  }
+
+  /// 空输入合法（保存时回落默认值）；超范围值不合法。
+  static bool isValidMaximumNumberOfTokensInput(String? value) {
+    final text = value?.trim() ?? '';
+    if (text.isEmpty) return true;
+    final tokens = int.tryParse(text);
+    return tokens != null &&
+        tokens >= minMaximumNumberOfTokens &&
+        tokens <= maxMaximumNumberOfTokens;
+  }
 
   @override
   Map<String, dynamic> toJson() => {
     'type': 'brave',
     'id': id,
     'apiKey': apiKey,
+    'mode': mode,
+    'maximumNumberOfTokens': maximumNumberOfTokens,
     if (extraApiKeys.isNotEmpty) 'apiKeys': extraApiKeys,
   };
 
   factory BraveOptions.fromJson(Map<String, dynamic> json) => BraveOptions(
     id: json['id'],
-    apiKey: json['apiKey'],
+    apiKey: json['apiKey'] ?? '',
+    mode: normalizeMode(json['mode']),
+    maximumNumberOfTokens: normalizeMaximumNumberOfTokens(
+      json['maximumNumberOfTokens'],
+    ),
     extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
   );
 }
@@ -923,4 +981,126 @@ class DoubaoOptions extends SearchServiceOptions {
     apiKey: json['apiKey'] ?? '',
     extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
   );
+}
+
+class AnySearchOptions extends SearchServiceOptions {
+  static const String defaultUrl = 'https://api.anysearch.ai/v1/search';
+  final String apiKey;
+  final String url;
+
+  AnySearchOptions({
+    required super.id,
+    required this.apiKey,
+    this.url = '',
+    super.extraApiKeys,
+  });
+
+  String get resolvedUrl => url.trim().isEmpty ? defaultUrl : url.trim();
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'anysearch',
+    'id': id,
+    'apiKey': apiKey,
+    'url': url.trim(),
+    if (extraApiKeys.isNotEmpty) 'apiKeys': extraApiKeys,
+  };
+
+  factory AnySearchOptions.fromJson(Map<String, dynamic> json) =>
+      AnySearchOptions(
+        id: json['id'],
+        apiKey: json['apiKey'] ?? '',
+        url: json['url'] ?? '',
+        extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
+      );
+}
+
+class ParallelOptions extends SearchServiceOptions {
+  static const String defaultMode = 'advanced';
+  static const List<String> modes = ['advanced', 'basic', 'fast', 'turbo'];
+
+  final String apiKey;
+  final String mode;
+
+  ParallelOptions({
+    required super.id,
+    required this.apiKey,
+    this.mode = defaultMode,
+    super.extraApiKeys,
+  });
+
+  static String normalizeMode(String? value) {
+    final mode = (value ?? '').trim();
+    return modes.contains(mode) ? mode : defaultMode;
+  }
+
+  static String modeLabel(String mode) {
+    switch (mode) {
+      case 'turbo':
+        return 'Turbo';
+      case 'fast':
+        return 'Fast';
+      case 'basic':
+        return 'Basic';
+      case 'advanced':
+      default:
+        return 'Advanced';
+    }
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'parallel',
+    'id': id,
+    'apiKey': apiKey,
+    'mode': mode,
+    if (extraApiKeys.isNotEmpty) 'apiKeys': extraApiKeys,
+  };
+
+  factory ParallelOptions.fromJson(Map<String, dynamic> json) =>
+      ParallelOptions(
+        id: json['id'],
+        apiKey: json['apiKey'] ?? '',
+        mode: normalizeMode(json['mode']),
+        extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
+      );
+}
+
+class YouSearchOptions extends SearchServiceOptions {
+  static const String highlightsMode = 'highlights';
+  static const String snippetsMode = 'snippets';
+  static const String defaultContentMode = highlightsMode;
+  static const List<String> contentModes = [highlightsMode, snippetsMode];
+
+  final String apiKey;
+  final String contentMode;
+
+  YouSearchOptions({
+    required super.id,
+    required this.apiKey,
+    this.contentMode = defaultContentMode,
+    super.extraApiKeys,
+  });
+
+  static String normalizeContentMode(String? value) {
+    final mode = (value ?? '').trim();
+    return contentModes.contains(mode) ? mode : defaultContentMode;
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'you',
+    'id': id,
+    'apiKey': apiKey,
+    'contentMode': contentMode,
+    if (extraApiKeys.isNotEmpty) 'apiKeys': extraApiKeys,
+  };
+
+  factory YouSearchOptions.fromJson(Map<String, dynamic> json) =>
+      YouSearchOptions(
+        id: json['id'],
+        apiKey: json['apiKey'] ?? '',
+        contentMode: normalizeContentMode(json['contentMode']),
+        extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
+      );
 }

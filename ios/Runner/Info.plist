@@ -58,6 +58,16 @@
 	<true/>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>JO-AIClient 需要访问日历，以便 AI 助手在您授权后查询和创建日程；数据仅在设备上处理，我们不会收集这些信息。 / JO-AIClient needs calendar access so the AI assistant can query and create events when you enable the calendar tools; data is processed on-device and JO-AIClient does not collect this information.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>JO-AIClient 需要读取您选择的健康数据，以便生成健康活动摘要。摘要可能会发送给您选择的 AI 服务以生成回答。 / JO-AIClient needs to read the health data you choose so it can build an activity summary. That summary may be sent to the AI provider you selected to generate answers.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>JO-AIClient 不会写入健康数据。此说明仅用于满足系统对 HealthKit 的要求。 / JO-AIClient does not write health data. This description is required by HealthKit.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>JO-AIClient 需要获取您的位置，以便提供当前位置和天气信息。位置信息可能会发送给您选择的 AI 服务以生成回答。 / JO-AIClient needs your location to provide current location and weather. Location data may be sent to the AI provider you selected to generate answers.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>JO-AIClient 需要访问提醒事项，以便在您确认后查询、创建和完成提醒。提醒内容可能会发送给您选择的 AI 服务以生成回答。 / JO-AIClient needs reminders access so it can query, create, and complete reminders after you confirm. Reminder content may be sent to the AI provider you selected to generate answers.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>JO-AIClient 需要访问提醒事项，以便在您确认后查询、创建和完成提醒。提醒内容可能会发送给您选择的 AI 服务以生成回答。 / JO-AIClient needs reminders access so it can query, create, and complete reminders after you confirm. Reminder content may be sent to the AI provider you selected to generate answers.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>JO-AIClient 需要访问日历，以便 AI 助手在您授权后查询和创建日程；数据仅在设备上处理，我们不会收集这些信息。 / JO-AIClient needs calendar access so the AI assistant can query and create events when you enable the calendar tools; data is processed on-device and JO-AIClient does not collect this information.</string>
 	<key>NSCameraUsageDescription</key>

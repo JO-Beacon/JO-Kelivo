@@ -27,8 +27,8 @@ class AboutPage extends StatefulWidget {
 }
 
 class _AboutPageState extends State<AboutPage> {
-  static const String _upstreamKelivoVersion = '1.2.4';
-  static const String _upstreamKelivoBuildNumber = '68';
+  static const String _upstreamKelivoVersion = '1.2.5';
+  static const String _upstreamKelivoBuildNumber = '72';
 
   String _version = '';
   String _buildNumber = '';

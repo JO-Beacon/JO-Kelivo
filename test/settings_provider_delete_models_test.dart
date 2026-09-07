@@ -67,6 +67,7 @@ void main() {
       await settings.setProviderConfig('TestProvider', _configWithModels());
       await settings.setCurrentModel('TestProvider', 'remove-a');
       await settings.setTitleModel('TestProvider', 'keep');
+      await settings.setSuggestionModel('TestProvider', 'remove-a');
 
       final deleted = await settings.deleteModels('TestProvider', const {
         'remove-a',
@@ -77,6 +78,8 @@ void main() {
       expect(settings.currentModelId, isNull);
       expect(settings.titleModelProvider, 'TestProvider');
       expect(settings.titleModelId, 'keep');
+      expect(settings.suggestionModelProvider, isNull);
+      expect(settings.isSuggestionGenerationEnabled, isFalse);
     });
 
     test(

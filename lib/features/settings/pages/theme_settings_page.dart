@@ -102,6 +102,20 @@ class ThemeSettingsPage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
+          _iosSectionCard(
+            children: [
+              _iosSwitchRow(
+                context,
+                icon: Lucide.Layers,
+                label: l10n.themeSettingsPageUseLayeredSurfacesTitle,
+                subtitle: l10n.themeSettingsPageUseLayeredSurfacesSubtitle,
+                value: settings.useLayeredSurfaces,
+                onChanged: (v) =>
+                    context.read<SettingsProvider>().setUseLayeredSurfaces(v),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           // header(l10n.themeSettingsPageColorPalettesSection),
           _iosSectionCard(
             children: [

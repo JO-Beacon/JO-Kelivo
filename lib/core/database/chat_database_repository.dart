@@ -661,6 +661,8 @@ class ChatDatabaseRepository {
         'chat_suggestions_json',
         'injected_memory_hash',
         'last_memory_extracted_order',
+        'chat_model_provider',
+        'chat_model_id',
       ],
       'conversation_mcp_server_rows': [
         'conversation_id',
@@ -3899,6 +3901,25 @@ class ChatDatabaseRepository {
     });
   }
 
+  Future<int> clearConversationModelOverrides({
+    required String providerKey,
+    String? modelId,
+  }) async {
+    final statement = _db.update(_db.conversationRows)
+      ..where(
+        (t) => modelId == null
+            ? t.chatModelProvider.equals(providerKey)
+            : t.chatModelProvider.equals(providerKey) &
+                  t.chatModelId.equals(modelId),
+      );
+    return statement.write(
+      const ConversationRowsCompanion(
+        chatModelProvider: Value(null),
+        chatModelId: Value(null),
+      ),
+    );
+  }
+
   Future<Conversation?> duplicateConversation(String sourceId) {
     return _db.transaction(() async {
       final sourceRow = await (_db.select(
@@ -4360,7 +4381,9 @@ class ChatDatabaseRepository {
         schemaVersion: _db.schemaVersion,
       );
     }
-    return tree;
+    // 契约阶段 2：修复历史删除产生的降级锚点（搁浅分支）。
+    // 归一化只在存在 §8 可见性违反时改写树；正常树原样返回。
+    return tree.normalizeDegradedAnchors();
   }
 
   Map<String, String> _decodeBranchSelections(String rawJson) {
@@ -7312,6 +7335,25 @@ class ChatDatabaseRepository {
     );
   }
 
+  /// 批量「删除此分支节点」：分支节点目标收掉所属分叉的全部分支，
+  /// 仅保留活动血脉（契约 §4.4 修订）；非分支节点目标删除消息本身。
+  Future<DeletedMessagesResult?> deleteMessageNodes({
+    required String conversationId,
+    required Set<String> messageIds,
+    Iterable<String> recentBranchIds = const <String>[],
+  }) {
+    return _observer.measure(
+      ChatDatabaseOperation.commandDeleteMessages,
+      () => _deleteMessages(
+        conversationId: conversationId,
+        messageIds: messageIds,
+        versionSelectionChanges: const <String, int?>{},
+        preserveDescendants: true,
+        recentBranchIds: recentBranchIds,
+      ),
+    );
+  }
+
   Future<DeletedMessagesResult?> deleteCurrentBranch({
     required String conversationId,
     required String messageId,
@@ -7443,7 +7485,7 @@ class ChatDatabaseRepository {
               recentBranchIds: recentBranchIds,
             )
           : preserveDescendants
-          ? treeBeforeDelete.removeMessagesOnly(
+          ? treeBeforeDelete.deleteMessageNodes(
               requestedRows.map((row) => row.id),
               recentBranchIds: recentBranchIds,
             )
@@ -7663,6 +7705,56 @@ class ChatDatabaseRepository {
         await _replaceMessageParts(message, toolEvents: const []);
       }
     });
+  }
+
+  Future<Map<String, String>> getProviderArtifactsForMessages(
+    Iterable<String> messageIds,
+    String kind,
+  ) async {
+    final ids = messageIds.toSet();
+    if (ids.isEmpty || kind.trim().isEmpty) return const {};
+    final rows = await (_db.select(
+      _db.providerArtifactRows,
+    )..where((row) => row.revisionId.isIn(ids) & row.kind.equals(kind))).get();
+    return {
+      for (final row in rows)
+        if (row.payload.trim().isNotEmpty) row.revisionId: row.payload,
+    };
+  }
+
+  Future<void> setProviderArtifact(
+    String messageId,
+    String kind,
+    String payload,
+  ) async {
+    await _db.transaction(() async {
+      final message = await getMessage(messageId);
+      if (message == null) {
+        throw StateError('provider_artifact_revision_missing');
+      }
+      final now = DateTime.now().toUtc();
+      await _db
+          .into(_db.providerArtifactRows)
+          .insertOnConflictUpdate(
+            ProviderArtifactRowsCompanion.insert(
+              conversationId: message.conversationId,
+              revisionId: messageId,
+              kind: kind,
+              payload: payload,
+              createdAt: message.timestamp,
+              updatedAt: now.isBefore(message.timestamp)
+                  ? message.timestamp
+                  : now,
+            ),
+          );
+    });
+  }
+
+  Future<void> deleteProviderArtifact(String messageId, String kind) async {
+    await (_db.delete(_db.providerArtifactRows)..where(
+          (row) => row.revisionId.equals(messageId) & row.kind.equals(kind),
+        ))
+        .go();
   }
 
   Future<String?> getGeminiThoughtSignature(String messageId) async {
@@ -8119,6 +8211,8 @@ class ChatDatabaseRepository {
       chatSuggestions: _decodeStringList(row.chatSuggestionsJson),
       injectedMemoryHash: row.injectedMemoryHash,
       lastMemoryExtractedOrder: row.lastMemoryExtractedOrder,
+      chatModelProvider: row.chatModelProvider,
+      chatModelId: row.chatModelId,
     );
   }
 
@@ -8143,6 +8237,8 @@ class ChatDatabaseRepository {
       injectedMemoryHash:
           injectedMemoryHash ?? Value(conversation.injectedMemoryHash),
       lastMemoryExtractedOrder: Value(conversation.lastMemoryExtractedOrder),
+      chatModelProvider: Value(conversation.chatModelProvider),
+      chatModelId: Value(conversation.chatModelId),
     );
   }
 

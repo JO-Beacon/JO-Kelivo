@@ -10,7 +10,6 @@ import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
-import '../utils/model_display_helper.dart';
 import 'chat_input_bar.dart';
 import 'model_icon.dart';
 
@@ -66,6 +65,9 @@ class ChatInputSection extends StatelessWidget {
     this.onCompressContext,
     this.clearContextLabel,
     this.conversationId,
+    this.chatModelProviderKey,
+    this.chatModelId,
+    this.chatModelIsConversationOverride = false,
     this.sendButtonTooltip,
     this.backgroundImageActive = false,
   });
@@ -109,6 +111,9 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onCompressContext;
   final String? clearContextLabel;
   final String? conversationId;
+  final String? chatModelProviderKey;
+  final String? chatModelId;
+  final bool chatModelIsConversationOverride;
   final String? sendButtonTooltip;
   final bool backgroundImageActive;
 
@@ -121,12 +126,13 @@ class ChatInputSection extends StatelessWidget {
     final assistantId = a?.id;
 
     // 使用统一辅助函数获取模型标识符
-    final modelIds = getActiveModelIds(settings, assistant: a);
-    final pk = modelIds.providerKey;
-    final mid = modelIds.modelId;
+    final pk = chatModelProviderKey;
+    final mid = chatModelId;
 
     // 强制模型能力约束：如果模型不支持工具，则禁用 MCP 选择
-    _enforceModelCapabilities(context, settings, ap, a, pk, mid);
+    if (!chatModelIsConversationOverride) {
+      _enforceModelCapabilities(context, settings, ap, a, pk, mid);
+    }
 
     final isDesktop = _isDesktopPlatform(context);
     final hasWorldBooks =
@@ -138,6 +144,8 @@ class ChatInputSection extends StatelessWidget {
       onSelectModel: onSelectModel,
       onLongPressSelectModel: onLongPressSelectModel,
       conversationId: conversationId,
+      chatModelProviderKey: chatModelProviderKey,
+      chatModelId: chatModelId,
       onOpenMcp: onOpenMcp,
       onLongPressMcp: onLongPressMcp,
       onStop: onStop,
@@ -269,11 +277,9 @@ class ChatInputSection extends StatelessWidget {
     String? pk,
     String? mid,
   ) {
-    final pk2 = a?.chatModelProvider ?? settings.currentModelProvider;
-    final mid3 = a?.chatModelId ?? settings.currentModelId;
-    if (pk2 == null || mid3 == null) return false;
+    if (pk == null || mid == null) return false;
     final hasEnabledMcp = context.watch<McpProvider>().hasAnyEnabled;
-    return isToolModel(pk2, mid3) && hasEnabledMcp;
+    return isToolModel(pk, mid) && hasEnabledMcp;
   }
 
   bool _isMcpActive(BuildContext context, Assistant? a) {

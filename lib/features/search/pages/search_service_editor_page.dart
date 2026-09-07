@@ -510,6 +510,77 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
         ),
       ];
     }
+    if (service is YouSearchOptions) {
+      return [
+        field(
+          key: 'apiKey',
+          label: l10n.searchServicesDialogApiKey,
+          obscure: true,
+          validator: requiredApiKey,
+        ),
+        _buildMultiKeyEntry(context),
+        _SearchEditorDropdown(
+          key: const ValueKey('search-service-field-contentMode'),
+          label: l10n.searchServicesDialogContentMode,
+          value: YouSearchOptions.normalizeContentMode(_text('contentMode')),
+          items: [
+            (
+              value: YouSearchOptions.highlightsMode,
+              label: l10n.searchServicesDialogHighlights,
+            ),
+            (
+              value: YouSearchOptions.snippetsMode,
+              label: l10n.searchServicesDialogSnippets,
+            ),
+          ],
+          onChanged: (value) {
+            _controller('contentMode').text = value;
+            _markDirty();
+          },
+        ),
+      ];
+    }
+    if (service is ParallelOptions) {
+      return [
+        field(
+          key: 'apiKey',
+          label: l10n.searchServicesDialogApiKey,
+          obscure: true,
+          validator: requiredApiKey,
+        ),
+        _buildMultiKeyEntry(context),
+        _SearchEditorDropdown(
+          key: const ValueKey('search-service-field-mode'),
+          label: l10n.searchServicesDialogSearchMode,
+          value: ParallelOptions.normalizeMode(_text('mode')),
+          items: [
+            for (final mode in ParallelOptions.modes)
+              (value: mode, label: ParallelOptions.modeLabel(mode)),
+          ],
+          onChanged: (value) {
+            _controller('mode').text = value;
+            _markDirty();
+          },
+        ),
+      ];
+    }
+    if (service is AnySearchOptions) {
+      return [
+        field(
+          key: 'apiKey',
+          label: l10n.searchServicesDialogApiKey,
+          obscure: true,
+          validator: requiredApiKey,
+        ),
+        _buildMultiKeyEntry(context),
+        field(
+          key: 'url',
+          label: l10n.searchServicesFieldCustomUrlOptional,
+          hint: AnySearchOptions.defaultUrl,
+          keyboardType: TextInputType.url,
+        ),
+      ];
+    }
     if (service is StepFunOptions) {
       return [
         field(
@@ -569,6 +640,49 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
         field(key: 'language', label: 'Language', hint: 'en'),
         field(key: 'includeDomains', label: 'Include domains'),
         field(key: 'excludeDomains', label: 'Exclude domains'),
+      ];
+    }
+    if (service is BraveOptions) {
+      final mode = BraveOptions.normalizeMode(_text('mode'));
+      return [
+        field(
+          key: 'apiKey',
+          label: l10n.searchServicesDialogApiKey,
+          obscure: true,
+          validator: requiredApiKey,
+        ),
+        _buildMultiKeyEntry(context),
+        _SearchEditorDropdown(
+          key: const ValueKey('search-service-field-mode'),
+          label: l10n.searchServicesDialogSearchMode,
+          value: mode,
+          items: [
+            (
+              value: BraveOptions.webMode,
+              label: l10n.searchServicesDialogWebSearch,
+            ),
+            (
+              value: BraveOptions.llmContextMode,
+              label: l10n.searchServicesDialogLlmContext,
+            ),
+          ],
+          onChanged: (value) {
+            _controller('mode').text = value;
+            _markDirty();
+          },
+        ),
+        if (mode == BraveOptions.llmContextMode)
+          field(
+            key: 'maximumNumberOfTokens',
+            label: l10n.searchServicesDialogMaximumTokens,
+            hint: '${BraveOptions.defaultMaximumNumberOfTokens}',
+            keyboardType: TextInputType.number,
+            validator: (value) {
+              return BraveOptions.isValidMaximumNumberOfTokensInput(value)
+                  ? null
+                  : l10n.searchServicesDialogMaximumTokensInvalid;
+            },
+          ),
       ];
     }
 
@@ -1057,6 +1171,11 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
       _putController('apiKey', service.apiKey);
     } else if (service is BraveOptions) {
       _putController('apiKey', service.apiKey);
+      _putController('mode', service.mode);
+      _putController(
+        'maximumNumberOfTokens',
+        '${service.maximumNumberOfTokens}',
+      );
     } else if (service is MetasoOptions) {
       _putController('apiKey', service.apiKey);
     } else if (service is OllamaOptions) {
@@ -1088,6 +1207,15 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
       _putController('reasoningEffort', service.reasoningEffort);
       _putController('customUrl', service.customUrl);
       _putController('systemPrompt', service.systemPrompt);
+    } else if (service is YouSearchOptions) {
+      _putController('apiKey', service.apiKey);
+      _putController('contentMode', service.contentMode);
+    } else if (service is ParallelOptions) {
+      _putController('apiKey', service.apiKey);
+      _putController('mode', service.mode);
+    } else if (service is AnySearchOptions) {
+      _putController('apiKey', service.apiKey);
+      _putController('url', service.url);
     } else if (service is StepFunOptions) {
       _putController('apiKey', service.apiKey);
       _putController('url', service.url);
@@ -1171,6 +1299,10 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
           id: _serviceId,
           apiKey: _text('apiKey'),
           extraApiKeys: _extraApiKeys,
+          mode: BraveOptions.normalizeMode(_text('mode')),
+          maximumNumberOfTokens: BraveOptions.normalizeMaximumNumberOfTokens(
+            _text('maximumNumberOfTokens'),
+          ),
         );
       case 'metaso':
         return MetasoOptions(
@@ -1249,6 +1381,29 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
           reasoningEffort: _text('reasoningEffort'),
           customUrl: _text('customUrl'),
           systemPrompt: _controller('systemPrompt').text,
+        );
+      case 'you':
+        return YouSearchOptions(
+          id: _serviceId,
+          apiKey: _text('apiKey'),
+          extraApiKeys: _extraApiKeys,
+          contentMode: YouSearchOptions.normalizeContentMode(
+            _text('contentMode'),
+          ),
+        );
+      case 'parallel':
+        return ParallelOptions(
+          id: _serviceId,
+          apiKey: _text('apiKey'),
+          extraApiKeys: _extraApiKeys,
+          mode: ParallelOptions.normalizeMode(_text('mode')),
+        );
+      case 'anysearch':
+        return AnySearchOptions(
+          id: _serviceId,
+          apiKey: _text('apiKey'),
+          extraApiKeys: _extraApiKeys,
+          url: _text('url'),
         );
       case 'stepfun':
         return StepFunOptions(
@@ -1527,6 +1682,201 @@ String _formatUsageNumber(BuildContext context, num value) {
         ..minimumFractionDigits = 0
         ..maximumFractionDigits = 2;
   return format.format(value);
+}
+
+class _SearchEditorDropdown extends StatelessWidget {
+  const _SearchEditorDropdown({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String value;
+  final List<({String value, String label})> items;
+  final ValueChanged<String> onChanged;
+
+  String get _effectiveValue {
+    return items.any((item) => item.value == value) ? value : items.first.value;
+  }
+
+  String get _effectiveLabel {
+    for (final item in items) {
+      if (item.value == _effectiveValue) return item.label;
+    }
+    return items.first.label;
+  }
+
+  Future<void> _openPicker(BuildContext context) async {
+    final selected = await _showSearchEditorOptionSheet(
+      context,
+      title: label,
+      value: _effectiveValue,
+      items: items,
+    );
+    if (selected != null) onChanged(selected);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: AppFontWeights.semibold,
+            color: cs.onSurface.withValues(alpha: 0.72),
+          ),
+        ),
+        const SizedBox(height: 7),
+        InkWell(
+          key: key,
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => _openPicker(context),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              color: context.appColors.surfaceFill,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _effectiveLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: AppFontWeights.medium,
+                      color: cs.onSurface.withValues(alpha: 0.92),
+                    ),
+                  ),
+                ),
+                Icon(
+                  Lucide.ChevronDown,
+                  size: 18,
+                  color: cs.onSurface.withValues(alpha: 0.5),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+Future<String?> _showSearchEditorOptionSheet(
+  BuildContext context, {
+  required String title,
+  required String value,
+  required List<({String value, String label})> items,
+}) {
+  final cs = Theme.of(context).colorScheme;
+  return showModalBottomSheet<String>(
+    context: context,
+    backgroundColor: cs.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) {
+      final localCs = Theme.of(ctx).colorScheme;
+      return SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: localCs.onSurface.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: AppFontWeights.emphasis,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        for (var i = 0; i < items.length; i++) ...[
+                          InkWell(
+                            onTap: () => Navigator.of(ctx).pop(items[i].value),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      items[i].label,
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: items[i].value == value
+                                            ? AppFontWeights.semibold
+                                            : AppFontWeights.regular,
+                                        color: localCs.onSurface.withValues(
+                                          alpha: 0.9,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  if (items[i].value == value)
+                                    Icon(
+                                      Lucide.Check,
+                                      size: 18,
+                                      color: localCs.primary,
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          if (i != items.length - 1)
+                            Divider(
+                              height: 6,
+                              thickness: 0.6,
+                              indent: 12,
+                              endIndent: 12,
+                              color: localCs.outlineVariant.withValues(
+                                alpha: 0.18,
+                              ),
+                            ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
 }
 
 class _SearchEditorTextField extends StatefulWidget {
@@ -2118,6 +2468,9 @@ String _typeForService(SearchServiceOptions service) {
   if (service is SerperOptions) return 'serper';
   if (service is QueritOptions) return 'querit';
   if (service is GrokOptions) return 'grok';
+  if (service is YouSearchOptions) return 'you';
+  if (service is ParallelOptions) return 'parallel';
+  if (service is AnySearchOptions) return 'anysearch';
   if (service is StepFunOptions) return 'stepfun';
   if (service is FirecrawlOptions) return 'firecrawl';
   if (service is TinyFishOptions) return 'tinyfish';
@@ -2165,6 +2518,12 @@ SearchServiceOptions _defaultService(String type, String id) {
       return QueritOptions(id: id, apiKey: '');
     case 'grok':
       return GrokOptions(id: id, apiKey: '');
+    case 'you':
+      return YouSearchOptions(id: id, apiKey: '');
+    case 'parallel':
+      return ParallelOptions(id: id, apiKey: '');
+    case 'anysearch':
+      return AnySearchOptions(id: id, apiKey: '');
     case 'stepfun':
       return StepFunOptions(id: id, apiKey: '');
     case 'firecrawl':
@@ -2213,6 +2572,12 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameQuerit;
     case 'grok':
       return l10n.searchServiceNameGrok;
+    case 'you':
+      return l10n.searchServiceNameYou;
+    case 'parallel':
+      return l10n.searchServiceNameParallel;
+    case 'anysearch':
+      return l10n.searchServiceNameAnySearch;
     case 'stepfun':
       return l10n.searchServiceNameStepFun;
     case 'firecrawl':
@@ -2242,6 +2607,9 @@ const _providerTypes = <({String type, String brand})>[
   (type: 'serper', brand: 'serper'),
   (type: 'querit', brand: 'querit'),
   (type: 'grok', brand: 'grok'),
+  (type: 'you', brand: 'you'),
+  (type: 'parallel', brand: 'parallel'),
+  (type: 'anysearch', brand: 'anysearch'),
   (type: 'stepfun', brand: 'stepfun'),
   (type: 'firecrawl', brand: 'firecrawl'),
   (type: 'tinyfish', brand: 'tinyfish'),

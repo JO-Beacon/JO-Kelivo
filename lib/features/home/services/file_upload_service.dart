@@ -199,8 +199,15 @@ class FileUploadService {
         if (croppedFile != null) {
           croppedFiles.add(XFile(croppedFile.path));
         }
-      } catch (_) {
-        croppedFiles.add(file);
+      } catch (error, stackTrace) {
+        debugPrint('[FileUploadService] Image cropping failed: $error');
+        debugPrintStack(stackTrace: stackTrace);
+        if (!context.mounted) return croppedFiles;
+        showAppSnackBar(
+          context,
+          message: l10n.chatImageCropFailed(file.name, error.toString()),
+          type: NotificationType.error,
+        );
       }
     }
 

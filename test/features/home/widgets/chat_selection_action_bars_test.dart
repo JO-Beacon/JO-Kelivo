@@ -93,7 +93,7 @@ void main() {
     expect(allVersionDeletes, 0);
   });
 
-  testWidgets('删除栏在多版本选择时展示当前分支和所有分支', (tester) async {
+  testWidgets('删除栏在多版本选择时展示删除此分支节点和所有分支', (tester) async {
     var currentVersionDeletes = 0;
     var allVersionDeletes = 0;
 
@@ -111,10 +111,10 @@ void main() {
     );
 
     final l10n = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
-    expect(find.text(l10n.homePageDeleteMessage), findsOneWidget);
+    expect(find.text(l10n.homePageDeleteMessageNode), findsOneWidget);
     expect(find.text(l10n.homePageDeleteAllVersions), findsOneWidget);
 
-    await tester.tap(find.text(l10n.homePageDeleteMessage));
+    await tester.tap(find.text(l10n.homePageDeleteMessageNode));
     await tester.tap(find.text(l10n.homePageDeleteAllVersions));
 
     expect(currentVersionDeletes, 1);

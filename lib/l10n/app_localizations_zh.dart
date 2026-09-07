@@ -9,6 +9,11 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String chatImageCropFailed(String fileName, String error) {
+    return '图片“$fileName”裁剪失败：$error';
+  }
+
+  @override
   String get helloWorld => '你好，世界！';
 
   @override
@@ -709,11 +714,11 @@ class AppLocalizationsZh extends AppLocalizations {
       '确定要删除此消息及其后续所有消息吗？其他分支会保留。';
 
   @override
-  String get homePageDeleteMessageNode => '删除此节点';
+  String get homePageDeleteMessageNode => '删除此分支节点';
 
   @override
   String get homePageDeleteMessageNodeConfirm =>
-      '确定要删除此节点吗？该节点下的非活动分支会被删除，活动分支的后续消息会保留。';
+      '确定要删除此分支节点吗？该分叉下的所有分支都会被删除，仅活动血脉的后续消息会保留。';
 
   @override
   String get homePageDeleteAllVersions => '删除所有分支';
@@ -1820,6 +1825,49 @@ class AppLocalizationsZh extends AppLocalizations {
       '本设备上的聊天数据库由更新版本的 JO-AIClient 创建，当前版本无法打开。数据未被改动。请安装最新版 JO-AIClient 后重新打开。';
 
   @override
+  String get startupRecoverySnapshotButton => '恢复本地快照';
+
+  @override
+  String get startupRecoveryDowngradeSnapshotButton => '高级：恢复较早的快照';
+
+  @override
+  String get startupRecoveryChooseSnapshotTitle => '选择快照';
+
+  @override
+  String startupRecoverySnapshotDetails(String date, String time, String size) {
+    return '$date $time · $size MB';
+  }
+
+  @override
+  String get startupRecoveryNoSnapshots => '没有可用的本地快照。';
+
+  @override
+  String get startupRecoveryRestoreConfirmTitle => '恢复这份快照？';
+
+  @override
+  String startupRecoveryRestoreConfirmContent(String fileName) {
+    return 'JO-AIClient 将使用 $fileName 替换当前数据库。创建该快照后的改动可能丢失；在恢复通过验证前，当前数据库仍会由恢复日志保留。';
+  }
+
+  @override
+  String get startupRecoveryRestoreConfirmButton => '恢复并重启';
+
+  @override
+  String get startupRecoveryProtectionFailedTitle => '无法保护当前数据';
+
+  @override
+  String get startupRecoveryProtectionFailedContent =>
+      '降级前必须创建的数据副本失败。继续操作可能永久丢失由较新版本写入的数据。';
+
+  @override
+  String get startupRecoveryContinueWithoutProtection => '不创建副本并继续';
+
+  @override
+  String startupRecoverySnapshotFailed(String code) {
+    return '无法准备该快照。诊断代码：$code';
+  }
+
+  @override
   String backupPageRestoreFailedMessage(String error) {
     return '恢复失败：$error';
   }
@@ -2437,7 +2485,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageMoreSheetDeleteMessageAndFollowing => '删除此消息及后续';
 
   @override
-  String get messageMoreSheetDeleteMessageNode => '删除此节点';
+  String get messageMoreSheetDeleteMessageNode => '删除此分支节点';
 
   @override
   String get messageMoreSheetDelete => '删除当前分支';
@@ -2692,7 +2740,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String chatSelectionDeleteSelectedConfirm(int count) {
-    return '确定要删除已选择的$count条消息吗？此操作不可撤销。';
+    return '确定要删除已选择的$count条消息吗？所选分支节点所属分叉下的所有分支都会被删除，仅活动血脉会保留。此操作不可撤销。';
   }
 
   @override
@@ -3141,6 +3189,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mcpPageReconnect => '重新连接';
 
   @override
+  String get mcpPageSessionExpiredDetails =>
+      '服务器会话在重新连接后立即再次失效。请确认服务器就绪后手动重新连接。';
+
+  @override
   String get mcpPageStatusConnected => '已连接';
 
   @override
@@ -3296,7 +3348,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get defaultModelPageTitleModelSubtitle =>
-      '用于总结对话标题的模型，推荐使用快速且便宜的模型。选择模型后才会启用。';
+      '用于总结对话标题，默认跟随当前对话模型，也可指定其他模型。';
 
   @override
   String get titleModelThinkingTitle => '是否开启思考';
@@ -3312,7 +3364,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get defaultModelPageSuggestionModelSubtitle =>
-      '用于在助手回复后生成继续对话的建议气泡。选择模型后才会启用。';
+      '用于在助手回复后生成聊天建议，可跟随当前对话模型或指定其他模型。默认未启用。';
 
   @override
   String get assistantEditRecentChatsSummaryFrequencyTitle => '摘要更新频率';
@@ -3435,6 +3487,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get defaultModelPageNotEnabled => '未启用';
+
+  @override
+  String get defaultModelPageDisable => '禁用';
+
+  @override
+  String get localSnapshotTitle => '本地数据库快照';
+
+  @override
+  String get localSnapshotEnabled => '保留自动本地快照';
+
+  @override
+  String get localSnapshotTakeNow => '立即创建快照';
 
   @override
   String get translatePagePasteButton => '粘贴';
@@ -3629,6 +3693,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get modelSelectSheetFavoritesSection => '收藏';
+
+  @override
+  String get modelSelectSheetFollowAssistant => '跟随助手';
 
   @override
   String get modelSelectSheetFavoriteTooltip => '收藏';
@@ -4621,6 +4688,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageShowRegenerateConfirmDialogTitle => '重新生成前弹出确认';
 
   @override
+  String get displaySettingsPageAutoRetryTitle => '自动重试';
+
+  @override
+  String get displaySettingsPageAutoRetrySubtitle => '在收到任何回复前遇到临时网络错误或限流时自动重试';
+
+  @override
   String chainOfThoughtExpandSteps(Object count) {
     return '展开更多 $count 步';
   }
@@ -4863,6 +4936,49 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get themeSettingsPageUsePureBackgroundSubtitle => '仅气泡与强调色随主题变化';
+
+  @override
+  String get themeSettingsPageUseLayeredSurfacesTitle => '分层表面';
+
+  @override
+  String get themeSettingsPageUseLayeredSurfacesSubtitle =>
+      '让卡片和面板与页面背景形成更明显的层次';
+
+  @override
+  String get searchProviderAnySearchDescription => 'AnySearch 统一网页搜索';
+
+  @override
+  String get searchProviderParallelDescription =>
+      'Parallel 搜索 API。返回面向 LLM 优化的网页摘录，支持 turbo、fast、basic 和 advanced 模式。';
+
+  @override
+  String get searchServicesDialogSearchMode => '搜索模式';
+
+  @override
+  String get searchServicesDialogContentMode => '内容模式';
+
+  @override
+  String get searchServicesDialogHighlights => 'Highlights';
+
+  @override
+  String get searchServicesDialogSnippets => 'Snippets';
+
+  @override
+  String get searchServicesDialogWebSearch => 'Web Search';
+
+  @override
+  String get searchServicesDialogLlmContext => 'LLM Context';
+
+  @override
+  String get searchServicesDialogMaximumTokens => '最大 token 数';
+
+  @override
+  String get searchServicesDialogMaximumTokensInvalid =>
+      '最大 token 数必须介于 1024 和 32768 之间。';
+
+  @override
+  String get searchProviderYouDescription =>
+      'You.com 搜索 API。返回网页与新闻结果，支持 Highlights 或 Snippets。';
 
   @override
   String get themeSettingsPageColorPalettesSection => '配色方案';
@@ -5564,6 +5680,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get searchServiceNameDoubao => '豆包';
+
+  @override
+  String get searchServiceNameAnySearch => 'AnySearch';
+
+  @override
+  String get searchServiceNameParallel => 'Parallel';
+
+  @override
+  String get searchServiceNameYou => 'You.com';
 
   @override
   String get searchProviderDoubaoDescription => '火山引擎豆包网页搜索 API。';
@@ -8037,6 +8162,53 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageStyleSettingsPageStyleDefaultSubtitle => '跟随主题，不可调节';
 
   @override
+  String get messageStyleSettingsPageAssistantSplitParagraphs => '分段显示为多个气泡';
+
+  @override
+  String get messageStyleSettingsPageAssistantSplitParagraphsSubtitle =>
+      '助手回复遇到空行时拆分，每段单独一个气泡';
+
+  @override
+  String get messageEditAddTextPart => '添加正文部件';
+
+  @override
+  String get messageEditTextPart => '正文';
+
+  @override
+  String get messageEditReasoningPart => '思维链';
+
+  @override
+  String get messageEditToolCallPart => '工具调用';
+
+  @override
+  String get messageEditImagePart => '图片';
+
+  @override
+  String get messageEditFilePart => '文件';
+
+  @override
+  String get messageEditUnknownPart => '未知部件';
+
+  @override
+  String get messageEditDeletePart => '删除部件';
+
+  @override
+  String get messageEditDeletePartConfirmTitle => '删除这个部件？';
+
+  @override
+  String get messageEditDeletePartConfirmMessage => '此操作只影响当前编辑后的消息版本。';
+
+  @override
+  String get messageEditCancel => '取消';
+
+  @override
+  String get messageStyleSettingsPageAssistantFitContent => '助手气泡贴合内容';
+
+  @override
+  String get messageStyleSettingsPageAssistantFitContentSubtitle =>
+      '助手气泡按文字宽度收缩，不再占满整行';
+
+  @override
   String get messageStyleSettingsPageStyleFrostedSubtitle => '半透明毛玻璃';
 
   @override
@@ -8087,11 +8259,255 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get messageStyleSettingsPageRoleAssistantHint =>
       '助手设定同时作用于思考、工具调用和翻译卡片。';
+
+  @override
+  String get toolSchemaSettingsPageTitle => '工具描述';
+
+  @override
+  String get toolSchemaSettingsGroupSearch => '搜索';
+
+  @override
+  String get toolSchemaSettingsGroupMemory => '记忆';
+
+  @override
+  String get toolSchemaSettingsGroupLocal => '本地工具';
+
+  @override
+  String get toolSchemaSettingsModified => '已修改';
+
+  @override
+  String get toolSchemaSettingsResetDefault => '恢复默认';
+
+  @override
+  String get toolSchemaSettingsResetAll => '全部恢复默认';
+
+  @override
+  String get toolSchemaSettingsResetAllTitle => '全部恢复默认？';
+
+  @override
+  String get toolSchemaSettingsResetAllMessage =>
+      '将把所有内置工具的描述恢复为应用默认文案，自定义措辞会丢失。';
+
+  @override
+  String get toolSchemaSettingsResetAllConfirm => '恢复';
+
+  @override
+  String toolSchemaSettingsParamDescriptions(int count) {
+    return '参数描述（$count）';
+  }
+
+  @override
+  String get toolSchemaSettingsMemoryLangNote =>
+      '记忆工具的默认描述会随记忆提示语言在中英文之间切换。自定义描述按工具名只存一份，切换语言后不会跟着改变。';
+
+  @override
+  String get toolSchemaSettingsDescriptionLabel => '描述';
+
+  @override
+  String get toolSchemaSettingsToolName => '工具名';
+
+  @override
+  String get toolSchemaEditorPageTitle => '编辑描述';
+
+  @override
+  String get toolSchemaSettingsCancel => '取消';
+
+  @override
+  String get assistantEditLocalToolHealthSubtitle =>
+      '读取本设备的健康活动摘要，需要授予健康数据读取权限。';
+
+  @override
+  String get assistantEditLocalToolHealthTitle => '健康摘要';
+
+  @override
+  String assistantEditLocalToolHealthSelectedCount(int selected, int total) {
+    return '已选择 $selected/$total 项';
+  }
+
+  @override
+  String get assistantEditLocalToolLocationSubtitle => '读取本设备的一次性位置，需要授予定位权限。';
+
+  @override
+  String get assistantEditLocalToolLocationTitle => '当前位置';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteSubtitle =>
+      '在你确认后将提醒事项标记为完成，需要授予提醒事项完整访问权限。';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteTitle => '完成提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateSubtitle =>
+      '在你确认后于本设备创建提醒事项，需要授予提醒事项完整访问权限。';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateTitle => '创建提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersQuerySubtitle =>
+      '读取本设备上的提醒事项，需要授予提醒事项完整访问权限。';
+
+  @override
+  String get assistantEditLocalToolRemindersQueryTitle => '查询提醒';
+
+  @override
+  String get assistantEditLocalToolWeatherSubtitle =>
+      '获取当前位置或指定地点的 Apple 天气，结果中会展示 WeatherKit 数据来源。';
+
+  @override
+  String get assistantEditLocalToolWeatherTitle => '天气';
+
+  @override
+  String healthDataSettingsBadge(int selected, int total) {
+    return '$selected/$total 开启';
+  }
+
+  @override
+  String get healthDataSettingsCategoryActivity => '活动';
+
+  @override
+  String get healthDataSettingsCategoryBody => '身体';
+
+  @override
+  String get healthDataSettingsCategoryHeart => '心率';
+
+  @override
+  String get healthDataSettingsCategoryRest => '休息';
+
+  @override
+  String get healthDataSettingsDescription =>
+      '当前助手在日常对话中可使用的 HealthKit 信号。开关表示 Kelivo 可以尝试读取该范围，实际授权仍由 iOS 管理。';
+
+  @override
+  String get healthDataSettingsDisableAll => '全部关闭';
+
+  @override
+  String get healthDataSettingsEnableAll => '全部开启';
+
+  @override
+  String get healthDataSettingsIosReadSubtitle => '设备可用，读取范围由 iOS 管理';
+
+  @override
+  String get healthDataSettingsIosReadTitle => 'iOS 健康读取';
+
+  @override
+  String get healthDataSettingsOpenSystemSettings => '打开系统设置';
+
+  @override
+  String get healthDataSettingsTitle => '健康数据';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergySubtitle => '活动能量消耗';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergyTitle => '能量';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseSubtitle => '血糖样本';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseTitle => '血糖';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenSubtitle => '血氧饱和度';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenTitle => '血氧';
+
+  @override
+  String get healthDataSettingsTypeBmiSubtitle => '身体质量指数';
+
+  @override
+  String get healthDataSettingsTypeBmiTitle => 'BMI';
+
+  @override
+  String get healthDataSettingsTypeDaylightSubtitle => '户外日光时间';
+
+  @override
+  String get healthDataSettingsTypeDaylightTitle => '日照';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergySubtitle => '饮食热量记录';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergyTitle => '摄入能量';
+
+  @override
+  String get healthDataSettingsTypeDistanceSubtitle => '步行和跑步距离';
+
+  @override
+  String get healthDataSettingsTypeDistanceTitle => '距离';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesSubtitle => 'Apple 锻炼分钟数';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesTitle => '锻炼';
+
+  @override
+  String get healthDataSettingsTypeHeartRateSubtitle => '最近心率样本';
+
+  @override
+  String get healthDataSettingsTypeHeartRateTitle => '心率';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessSubtitle => '正念或静息时段';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessTitle => '静息';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateSubtitle => '静息状态心率';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateTitle => '静息心率';
+
+  @override
+  String get healthDataSettingsTypeSleepSubtitle => '睡眠时长';
+
+  @override
+  String get healthDataSettingsTypeSleepTitle => '睡眠';
+
+  @override
+  String get healthDataSettingsTypeStandTimeSubtitle => '站立时间';
+
+  @override
+  String get healthDataSettingsTypeStandTimeTitle => '站立';
+
+  @override
+  String get healthDataSettingsTypeStepsSubtitle => '行走步数摘要';
+
+  @override
+  String get healthDataSettingsTypeStepsTitle => '步数';
+
+  @override
+  String get healthDataSettingsTypeWaterSubtitle => '饮水量记录';
+
+  @override
+  String get healthDataSettingsTypeWaterTitle => '饮水';
+
+  @override
+  String get healthDataSettingsTypeWeightSubtitle => '体重样本';
+
+  @override
+  String get healthDataSettingsTypeWeightTitle => '体重';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsSubtitle => '训练记录：类型、时长、距离与消耗';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsTitle => '健身训练';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
 class AppLocalizationsZhHans extends AppLocalizationsZh {
   AppLocalizationsZhHans() : super('zh_Hans');
+
+  @override
+  String chatImageCropFailed(String fileName, String error) {
+    return '图片“$fileName”裁剪失败：$error';
+  }
 
   @override
   String get helloWorld => '你好，世界！';
@@ -8794,11 +9210,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '确定要删除此消息及其后续所有消息吗？其他分支会保留。';
 
   @override
-  String get homePageDeleteMessageNode => '删除此节点';
+  String get homePageDeleteMessageNode => '删除此分支节点';
 
   @override
   String get homePageDeleteMessageNodeConfirm =>
-      '确定要删除此节点吗？该节点下的非活动分支会被删除，活动分支的后续消息会保留。';
+      '确定要删除此分支节点吗？该分叉下的所有分支都会被删除，仅活动血脉的后续消息会保留。';
 
   @override
   String get homePageDeleteAllVersions => '删除所有分支';
@@ -9905,6 +10321,49 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '本设备上的聊天数据库由更新版本的 JO-AIClient 创建，当前版本无法打开。数据未被改动。请安装最新版 JO-AIClient 后重新打开。';
 
   @override
+  String get startupRecoverySnapshotButton => '恢复本地快照';
+
+  @override
+  String get startupRecoveryDowngradeSnapshotButton => '高级：恢复较早的快照';
+
+  @override
+  String get startupRecoveryChooseSnapshotTitle => '选择快照';
+
+  @override
+  String startupRecoverySnapshotDetails(String date, String time, String size) {
+    return '$date $time · $size MB';
+  }
+
+  @override
+  String get startupRecoveryNoSnapshots => '没有可用的本地快照。';
+
+  @override
+  String get startupRecoveryRestoreConfirmTitle => '恢复这份快照？';
+
+  @override
+  String startupRecoveryRestoreConfirmContent(String fileName) {
+    return 'JO-AIClient 将使用 $fileName 替换当前数据库。创建该快照后的改动可能丢失；在恢复通过验证前，当前数据库仍会由恢复日志保留。';
+  }
+
+  @override
+  String get startupRecoveryRestoreConfirmButton => '恢复并重启';
+
+  @override
+  String get startupRecoveryProtectionFailedTitle => '无法保护当前数据';
+
+  @override
+  String get startupRecoveryProtectionFailedContent =>
+      '降级前必须创建的数据副本失败。继续操作可能永久丢失由较新版本写入的数据。';
+
+  @override
+  String get startupRecoveryContinueWithoutProtection => '不创建副本并继续';
+
+  @override
+  String startupRecoverySnapshotFailed(String code) {
+    return '无法准备该快照。诊断代码：$code';
+  }
+
+  @override
   String backupPageRestoreFailedMessage(String error) {
     return '恢复失败：$error';
   }
@@ -10522,7 +10981,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get messageMoreSheetDeleteMessageAndFollowing => '删除此消息及后续';
 
   @override
-  String get messageMoreSheetDeleteMessageNode => '删除此节点';
+  String get messageMoreSheetDeleteMessageNode => '删除此分支节点';
 
   @override
   String get messageMoreSheetDelete => '删除当前分支';
@@ -10777,7 +11236,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String chatSelectionDeleteSelectedConfirm(int count) {
-    return '确定要删除已选择的$count条消息吗？此操作不可撤销。';
+    return '确定要删除已选择的$count条消息吗？所选分支节点所属分叉下的所有分支都会被删除，仅活动血脉会保留。此操作不可撤销。';
   }
 
   @override
@@ -11226,6 +11685,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get mcpPageReconnect => '重新连接';
 
   @override
+  String get mcpPageSessionExpiredDetails =>
+      '服务器会话在重新连接后立即再次失效。请确认服务器就绪后手动重新连接。';
+
+  @override
   String get mcpPageStatusConnected => '已连接';
 
   @override
@@ -11381,7 +11844,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageTitleModelSubtitle =>
-      '用于总结对话标题的模型，推荐使用快速且便宜的模型。选择模型后才会启用。';
+      '用于总结对话标题，默认跟随当前对话模型，也可指定其他模型。';
 
   @override
   String get titleModelThinkingTitle => '是否开启思考';
@@ -11397,7 +11860,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageSuggestionModelSubtitle =>
-      '用于在助手回复后生成继续对话的建议气泡。选择模型后才会启用。';
+      '用于在助手回复后生成聊天建议，可跟随当前对话模型或指定其他模型。默认未启用。';
 
   @override
   String get assistantEditRecentChatsSummaryFrequencyTitle => '摘要更新频率';
@@ -11520,6 +11983,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageNotEnabled => '未启用';
+
+  @override
+  String get defaultModelPageDisable => '禁用';
+
+  @override
+  String get localSnapshotTitle => '本地数据库快照';
+
+  @override
+  String get localSnapshotEnabled => '保留自动本地快照';
+
+  @override
+  String get localSnapshotTakeNow => '立即创建快照';
 
   @override
   String get translatePagePasteButton => '粘贴';
@@ -11714,6 +12189,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get modelSelectSheetFavoritesSection => '收藏';
+
+  @override
+  String get modelSelectSheetFollowAssistant => '跟随助手';
 
   @override
   String get modelSelectSheetFavoriteTooltip => '收藏';
@@ -12706,6 +13184,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageShowRegenerateConfirmDialogTitle => '重新生成前弹出确认';
 
   @override
+  String get displaySettingsPageAutoRetryTitle => '自动重试';
+
+  @override
+  String get displaySettingsPageAutoRetrySubtitle => '在收到任何回复前遇到临时网络错误或限流时自动重试';
+
+  @override
   String chainOfThoughtExpandSteps(Object count) {
     return '展开更多 $count 步';
   }
@@ -12948,6 +13432,49 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get themeSettingsPageUsePureBackgroundSubtitle => '仅气泡与强调色随主题变化';
+
+  @override
+  String get themeSettingsPageUseLayeredSurfacesTitle => '分层表面';
+
+  @override
+  String get themeSettingsPageUseLayeredSurfacesSubtitle =>
+      '让卡片和面板与页面背景形成更明显的层次';
+
+  @override
+  String get searchProviderAnySearchDescription => 'AnySearch 统一网页搜索';
+
+  @override
+  String get searchProviderParallelDescription =>
+      'Parallel 搜索 API。返回面向 LLM 优化的网页摘录，支持 turbo、fast、basic 和 advanced 模式。';
+
+  @override
+  String get searchServicesDialogSearchMode => '搜索模式';
+
+  @override
+  String get searchServicesDialogContentMode => '内容模式';
+
+  @override
+  String get searchServicesDialogHighlights => 'Highlights';
+
+  @override
+  String get searchServicesDialogSnippets => 'Snippets';
+
+  @override
+  String get searchServicesDialogWebSearch => 'Web Search';
+
+  @override
+  String get searchServicesDialogLlmContext => 'LLM Context';
+
+  @override
+  String get searchServicesDialogMaximumTokens => '最大 token 数';
+
+  @override
+  String get searchServicesDialogMaximumTokensInvalid =>
+      '最大 token 数必须介于 1024 和 32768 之间。';
+
+  @override
+  String get searchProviderYouDescription =>
+      'You.com 搜索 API。返回网页与新闻结果，支持 Highlights 或 Snippets。';
 
   @override
   String get themeSettingsPageColorPalettesSection => '配色方案';
@@ -13649,6 +14176,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get searchServiceNameDoubao => '豆包';
+
+  @override
+  String get searchServiceNameAnySearch => 'AnySearch';
+
+  @override
+  String get searchServiceNameParallel => 'Parallel';
+
+  @override
+  String get searchServiceNameYou => 'You.com';
 
   @override
   String get searchProviderDoubaoDescription => '火山引擎豆包网页搜索 API。';
@@ -16122,6 +16658,53 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get messageStyleSettingsPageStyleDefaultSubtitle => '跟随主题，不可调节';
 
   @override
+  String get messageStyleSettingsPageAssistantSplitParagraphs => '分段显示为多个气泡';
+
+  @override
+  String get messageStyleSettingsPageAssistantSplitParagraphsSubtitle =>
+      '助手回复遇到空行时拆分，每段单独一个气泡';
+
+  @override
+  String get messageEditAddTextPart => '添加正文部件';
+
+  @override
+  String get messageEditTextPart => '正文';
+
+  @override
+  String get messageEditReasoningPart => '思维链';
+
+  @override
+  String get messageEditToolCallPart => '工具调用';
+
+  @override
+  String get messageEditImagePart => '图片';
+
+  @override
+  String get messageEditFilePart => '文件';
+
+  @override
+  String get messageEditUnknownPart => '未知部件';
+
+  @override
+  String get messageEditDeletePart => '删除部件';
+
+  @override
+  String get messageEditDeletePartConfirmTitle => '删除这个部件？';
+
+  @override
+  String get messageEditDeletePartConfirmMessage => '此操作只影响当前编辑后的消息版本。';
+
+  @override
+  String get messageEditCancel => '取消';
+
+  @override
+  String get messageStyleSettingsPageAssistantFitContent => '助手气泡贴合内容';
+
+  @override
+  String get messageStyleSettingsPageAssistantFitContentSubtitle =>
+      '助手气泡按文字宽度收缩，不再占满整行';
+
+  @override
   String get messageStyleSettingsPageStyleFrostedSubtitle => '半透明毛玻璃';
 
   @override
@@ -16172,11 +16755,255 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get messageStyleSettingsPageRoleAssistantHint =>
       '助手设定同时作用于思考、工具调用和翻译卡片。';
+
+  @override
+  String get toolSchemaSettingsPageTitle => '工具描述';
+
+  @override
+  String get toolSchemaSettingsGroupSearch => '搜索';
+
+  @override
+  String get toolSchemaSettingsGroupMemory => '记忆';
+
+  @override
+  String get toolSchemaSettingsGroupLocal => '本地工具';
+
+  @override
+  String get toolSchemaSettingsModified => '已修改';
+
+  @override
+  String get toolSchemaSettingsResetDefault => '恢复默认';
+
+  @override
+  String get toolSchemaSettingsResetAll => '全部恢复默认';
+
+  @override
+  String get toolSchemaSettingsResetAllTitle => '全部恢复默认？';
+
+  @override
+  String get toolSchemaSettingsResetAllMessage =>
+      '将把所有内置工具的描述恢复为应用默认文案，自定义措辞会丢失。';
+
+  @override
+  String get toolSchemaSettingsResetAllConfirm => '恢复';
+
+  @override
+  String toolSchemaSettingsParamDescriptions(int count) {
+    return '参数描述（$count）';
+  }
+
+  @override
+  String get toolSchemaSettingsMemoryLangNote =>
+      '记忆工具的默认描述会随记忆提示语言在中英文之间切换。自定义描述按工具名只存一份，切换语言后不会跟着改变。';
+
+  @override
+  String get toolSchemaSettingsDescriptionLabel => '描述';
+
+  @override
+  String get toolSchemaSettingsToolName => '工具名';
+
+  @override
+  String get toolSchemaEditorPageTitle => '编辑描述';
+
+  @override
+  String get toolSchemaSettingsCancel => '取消';
+
+  @override
+  String get assistantEditLocalToolHealthSubtitle =>
+      '读取本设备的健康活动摘要，需要授予健康数据读取权限。';
+
+  @override
+  String get assistantEditLocalToolHealthTitle => '健康摘要';
+
+  @override
+  String assistantEditLocalToolHealthSelectedCount(int selected, int total) {
+    return '已选择 $selected/$total 项';
+  }
+
+  @override
+  String get assistantEditLocalToolLocationSubtitle => '读取本设备的一次性位置，需要授予定位权限。';
+
+  @override
+  String get assistantEditLocalToolLocationTitle => '当前位置';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteSubtitle =>
+      '在你确认后将提醒事项标记为完成，需要授予提醒事项完整访问权限。';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteTitle => '完成提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateSubtitle =>
+      '在你确认后于本设备创建提醒事项，需要授予提醒事项完整访问权限。';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateTitle => '创建提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersQuerySubtitle =>
+      '读取本设备上的提醒事项，需要授予提醒事项完整访问权限。';
+
+  @override
+  String get assistantEditLocalToolRemindersQueryTitle => '查询提醒';
+
+  @override
+  String get assistantEditLocalToolWeatherSubtitle =>
+      '获取当前位置或指定地点的 Apple 天气，结果中会展示 WeatherKit 数据来源。';
+
+  @override
+  String get assistantEditLocalToolWeatherTitle => '天气';
+
+  @override
+  String healthDataSettingsBadge(int selected, int total) {
+    return '$selected/$total 开启';
+  }
+
+  @override
+  String get healthDataSettingsCategoryActivity => '活动';
+
+  @override
+  String get healthDataSettingsCategoryBody => '身体';
+
+  @override
+  String get healthDataSettingsCategoryHeart => '心率';
+
+  @override
+  String get healthDataSettingsCategoryRest => '休息';
+
+  @override
+  String get healthDataSettingsDescription =>
+      '当前助手在日常对话中可使用的 HealthKit 信号。开关表示 Kelivo 可以尝试读取该范围，实际授权仍由 iOS 管理。';
+
+  @override
+  String get healthDataSettingsDisableAll => '全部关闭';
+
+  @override
+  String get healthDataSettingsEnableAll => '全部开启';
+
+  @override
+  String get healthDataSettingsIosReadSubtitle => '设备可用，读取范围由 iOS 管理';
+
+  @override
+  String get healthDataSettingsIosReadTitle => 'iOS 健康读取';
+
+  @override
+  String get healthDataSettingsOpenSystemSettings => '打开系统设置';
+
+  @override
+  String get healthDataSettingsTitle => '健康数据';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergySubtitle => '活动能量消耗';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergyTitle => '能量';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseSubtitle => '血糖样本';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseTitle => '血糖';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenSubtitle => '血氧饱和度';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenTitle => '血氧';
+
+  @override
+  String get healthDataSettingsTypeBmiSubtitle => '身体质量指数';
+
+  @override
+  String get healthDataSettingsTypeBmiTitle => 'BMI';
+
+  @override
+  String get healthDataSettingsTypeDaylightSubtitle => '户外日光时间';
+
+  @override
+  String get healthDataSettingsTypeDaylightTitle => '日照';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergySubtitle => '饮食热量记录';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergyTitle => '摄入能量';
+
+  @override
+  String get healthDataSettingsTypeDistanceSubtitle => '步行和跑步距离';
+
+  @override
+  String get healthDataSettingsTypeDistanceTitle => '距离';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesSubtitle => 'Apple 锻炼分钟数';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesTitle => '锻炼';
+
+  @override
+  String get healthDataSettingsTypeHeartRateSubtitle => '最近心率样本';
+
+  @override
+  String get healthDataSettingsTypeHeartRateTitle => '心率';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessSubtitle => '正念或静息时段';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessTitle => '静息';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateSubtitle => '静息状态心率';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateTitle => '静息心率';
+
+  @override
+  String get healthDataSettingsTypeSleepSubtitle => '睡眠时长';
+
+  @override
+  String get healthDataSettingsTypeSleepTitle => '睡眠';
+
+  @override
+  String get healthDataSettingsTypeStandTimeSubtitle => '站立时间';
+
+  @override
+  String get healthDataSettingsTypeStandTimeTitle => '站立';
+
+  @override
+  String get healthDataSettingsTypeStepsSubtitle => '行走步数摘要';
+
+  @override
+  String get healthDataSettingsTypeStepsTitle => '步数';
+
+  @override
+  String get healthDataSettingsTypeWaterSubtitle => '饮水量记录';
+
+  @override
+  String get healthDataSettingsTypeWaterTitle => '饮水';
+
+  @override
+  String get healthDataSettingsTypeWeightSubtitle => '体重样本';
+
+  @override
+  String get healthDataSettingsTypeWeightTitle => '体重';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsSubtitle => '训练记录：类型、时长、距离与消耗';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsTitle => '健身训练';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
 class AppLocalizationsZhHant extends AppLocalizationsZh {
   AppLocalizationsZhHant() : super('zh_Hant');
+
+  @override
+  String chatImageCropFailed(String fileName, String error) {
+    return '圖片「$fileName」裁剪失敗：$error';
+  }
 
   @override
   String get helloWorld => '你好，世界！';
@@ -16879,11 +17706,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '確定要刪除此訊息及其後續所有訊息嗎？其他分支會保留。';
 
   @override
-  String get homePageDeleteMessageNode => '刪除此節點';
+  String get homePageDeleteMessageNode => '刪除此分支節點';
 
   @override
   String get homePageDeleteMessageNodeConfirm =>
-      '確定要刪除此節點嗎？該節點下的非活動分支會被刪除，活動分支的後續訊息會保留。';
+      '確定要刪除此分支節點嗎？該分叉下的所有分支都會被刪除，僅活動血脈的後續訊息會保留。';
 
   @override
   String get homePageDeleteAllVersions => '刪除所有分支';
@@ -17991,6 +18818,49 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '本裝置上的聊天資料庫由更新版本的 JO-AIClient 建立，目前版本無法開啟。資料未被改動。請安裝最新版 JO-AIClient 後重新開啟。';
 
   @override
+  String get startupRecoverySnapshotButton => '還原本機快照';
+
+  @override
+  String get startupRecoveryDowngradeSnapshotButton => '進階：還原較早的快照';
+
+  @override
+  String get startupRecoveryChooseSnapshotTitle => '選擇快照';
+
+  @override
+  String startupRecoverySnapshotDetails(String date, String time, String size) {
+    return '$date $time · $size MB';
+  }
+
+  @override
+  String get startupRecoveryNoSnapshots => '沒有可用的本機快照。';
+
+  @override
+  String get startupRecoveryRestoreConfirmTitle => '還原這份快照？';
+
+  @override
+  String startupRecoveryRestoreConfirmContent(String fileName) {
+    return 'JO-AIClient 將使用 $fileName 取代目前資料庫。建立該快照後的變更可能遺失；在還原通過驗證前，目前資料庫仍會由還原日誌保留。';
+  }
+
+  @override
+  String get startupRecoveryRestoreConfirmButton => '還原並重新啟動';
+
+  @override
+  String get startupRecoveryProtectionFailedTitle => '無法保護目前資料';
+
+  @override
+  String get startupRecoveryProtectionFailedContent =>
+      '降級前必須建立的資料副本失敗。繼續操作可能永久遺失由較新版本寫入的資料。';
+
+  @override
+  String get startupRecoveryContinueWithoutProtection => '不建立副本並繼續';
+
+  @override
+  String startupRecoverySnapshotFailed(String code) {
+    return '無法準備該快照。診斷代碼：$code';
+  }
+
+  @override
   String backupPageRestoreFailedMessage(String error) {
     return '還原失敗：$error';
   }
@@ -18607,7 +19477,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get messageMoreSheetDeleteMessageAndFollowing => '刪除此訊息及後續';
 
   @override
-  String get messageMoreSheetDeleteMessageNode => '刪除此節點';
+  String get messageMoreSheetDeleteMessageNode => '刪除此分支節點';
 
   @override
   String get messageMoreSheetDelete => '刪除目前分支';
@@ -18862,7 +19732,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String chatSelectionDeleteSelectedConfirm(int count) {
-    return '確定要刪除已選擇的$count則訊息嗎？此操作不可撤銷。';
+    return '確定要刪除已選擇的$count則訊息嗎？所選分支節點所屬分叉下的所有分支都會被刪除，僅活動血脈會保留。此操作不可撤銷。';
   }
 
   @override
@@ -19311,6 +20181,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get mcpPageReconnect => '重新連線';
 
   @override
+  String get mcpPageSessionExpiredDetails =>
+      '伺服器工作階段在重新連線後立即再次失效。請確認伺服器就緒後手動重新連線。';
+
+  @override
   String get mcpPageStatusConnected => '已連線';
 
   @override
@@ -19466,7 +20340,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageTitleModelSubtitle =>
-      '用於總結對話標題的模型，推薦使用快速且便宜的模型。選擇模型後才會啟用。';
+      '用於總結對話標題，預設跟隨目前對話模型，也可指定其他模型。';
 
   @override
   String get titleModelThinkingTitle => '是否開啟思考';
@@ -19482,7 +20356,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageSuggestionModelSubtitle =>
-      '用於在助手回覆後生成繼續對話的建議氣泡。選擇模型後才會啟用。';
+      '用於在助手回覆後生成聊天建議，可跟隨目前對話模型或指定其他模型。預設未啟用。';
 
   @override
   String get assistantEditRecentChatsSummaryFrequencyTitle => '摘要更新頻率';
@@ -19605,6 +20479,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageNotEnabled => '未啟用';
+
+  @override
+  String get defaultModelPageDisable => '停用';
+
+  @override
+  String get localSnapshotTitle => '本機資料庫快照';
+
+  @override
+  String get localSnapshotEnabled => '保留自動本機快照';
+
+  @override
+  String get localSnapshotTakeNow => '立即建立快照';
 
   @override
   String get translatePagePasteButton => '貼上';
@@ -19799,6 +20685,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get modelSelectSheetFavoritesSection => '收藏';
+
+  @override
+  String get modelSelectSheetFollowAssistant => '跟隨助手';
 
   @override
   String get modelSelectSheetFavoriteTooltip => '收藏';
@@ -20790,6 +21679,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get displaySettingsPageShowRegenerateConfirmDialogTitle => '重新生成前彈出確認';
 
   @override
+  String get displaySettingsPageAutoRetryTitle => '自動重試';
+
+  @override
+  String get displaySettingsPageAutoRetrySubtitle =>
+      '在收到任何回覆前遇到暫時網路錯誤或流量限制時自動重試';
+
+  @override
   String chainOfThoughtExpandSteps(Object count) {
     return '展開更多 $count 步';
   }
@@ -21032,6 +21928,49 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get themeSettingsPageUsePureBackgroundSubtitle => '僅氣泡與強調色隨主題變化';
+
+  @override
+  String get themeSettingsPageUseLayeredSurfacesTitle => '分層表面';
+
+  @override
+  String get themeSettingsPageUseLayeredSurfacesSubtitle =>
+      '讓卡片和面板與頁面背景形成更明顯的層次';
+
+  @override
+  String get searchProviderAnySearchDescription => 'AnySearch 統一網頁搜尋';
+
+  @override
+  String get searchProviderParallelDescription =>
+      'Parallel 搜尋 API。返回面向 LLM 優化的網頁摘錄，支援 turbo、fast、basic 和 advanced 模式。';
+
+  @override
+  String get searchServicesDialogSearchMode => '搜尋模式';
+
+  @override
+  String get searchServicesDialogContentMode => '內容模式';
+
+  @override
+  String get searchServicesDialogHighlights => 'Highlights';
+
+  @override
+  String get searchServicesDialogSnippets => 'Snippets';
+
+  @override
+  String get searchServicesDialogWebSearch => 'Web Search';
+
+  @override
+  String get searchServicesDialogLlmContext => 'LLM Context';
+
+  @override
+  String get searchServicesDialogMaximumTokens => '最大 token 數';
+
+  @override
+  String get searchServicesDialogMaximumTokensInvalid =>
+      '最大 token 數必須介於 1024 和 32768 之間。';
+
+  @override
+  String get searchProviderYouDescription =>
+      'You.com 搜尋 API。返回網頁與新聞結果，支援 Highlights 或 Snippets。';
 
   @override
   String get themeSettingsPageColorPalettesSection => '配色方案';
@@ -21734,6 +22673,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get searchServiceNameDoubao => '豆包';
+
+  @override
+  String get searchServiceNameAnySearch => 'AnySearch';
+
+  @override
+  String get searchServiceNameParallel => 'Parallel';
+
+  @override
+  String get searchServiceNameYou => 'You.com';
 
   @override
   String get searchProviderDoubaoDescription => '火山引擎豆包網頁搜尋 API。';
@@ -24208,6 +25156,53 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get messageStyleSettingsPageStyleDefaultSubtitle => '跟隨主題，不可調節';
 
   @override
+  String get messageStyleSettingsPageAssistantSplitParagraphs => '分段顯示為多個氣泡';
+
+  @override
+  String get messageStyleSettingsPageAssistantSplitParagraphsSubtitle =>
+      '助手回覆遇到空行時拆分，每段單獨一個氣泡';
+
+  @override
+  String get messageEditAddTextPart => '新增正文部件';
+
+  @override
+  String get messageEditTextPart => '正文';
+
+  @override
+  String get messageEditReasoningPart => '思維鏈';
+
+  @override
+  String get messageEditToolCallPart => '工具呼叫';
+
+  @override
+  String get messageEditImagePart => '圖片';
+
+  @override
+  String get messageEditFilePart => '檔案';
+
+  @override
+  String get messageEditUnknownPart => '未知部件';
+
+  @override
+  String get messageEditDeletePart => '刪除部件';
+
+  @override
+  String get messageEditDeletePartConfirmTitle => '刪除這個部件？';
+
+  @override
+  String get messageEditDeletePartConfirmMessage => '此操作只影響目前編輯後的訊息版本。';
+
+  @override
+  String get messageEditCancel => '取消';
+
+  @override
+  String get messageStyleSettingsPageAssistantFitContent => '助手氣泡貼合內容';
+
+  @override
+  String get messageStyleSettingsPageAssistantFitContentSubtitle =>
+      '助手氣泡按文字寬度收縮，不再佔滿整行';
+
+  @override
   String get messageStyleSettingsPageStyleFrostedSubtitle => '半透明毛玻璃';
 
   @override
@@ -24258,4 +25253,243 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get messageStyleSettingsPageRoleAssistantHint =>
       '助手設定同時作用於思考、工具呼叫和翻譯卡片。';
+
+  @override
+  String get toolSchemaSettingsPageTitle => '工具描述';
+
+  @override
+  String get toolSchemaSettingsGroupSearch => '搜尋';
+
+  @override
+  String get toolSchemaSettingsGroupMemory => '記憶';
+
+  @override
+  String get toolSchemaSettingsGroupLocal => '本機工具';
+
+  @override
+  String get toolSchemaSettingsModified => '已修改';
+
+  @override
+  String get toolSchemaSettingsResetDefault => '還原預設';
+
+  @override
+  String get toolSchemaSettingsResetAll => '全部還原預設';
+
+  @override
+  String get toolSchemaSettingsResetAllTitle => '全部還原預設？';
+
+  @override
+  String get toolSchemaSettingsResetAllMessage =>
+      '將把所有內建工具的描述還原為應用程式預設文案，自訂措辭會遺失。';
+
+  @override
+  String get toolSchemaSettingsResetAllConfirm => '還原';
+
+  @override
+  String toolSchemaSettingsParamDescriptions(int count) {
+    return '參數描述（$count）';
+  }
+
+  @override
+  String get toolSchemaSettingsMemoryLangNote =>
+      '記憶工具的預設描述會隨記憶提示語言在中英文之間切換。自訂描述按工具名只儲存一份，切換語言後不會跟著改變。';
+
+  @override
+  String get toolSchemaSettingsDescriptionLabel => '描述';
+
+  @override
+  String get toolSchemaSettingsToolName => '工具名';
+
+  @override
+  String get toolSchemaEditorPageTitle => '編輯描述';
+
+  @override
+  String get toolSchemaSettingsCancel => '取消';
+
+  @override
+  String get assistantEditLocalToolHealthSubtitle =>
+      '讀取本裝置的健康活動摘要，需要授予健康資料讀取權限。';
+
+  @override
+  String get assistantEditLocalToolHealthTitle => '健康摘要';
+
+  @override
+  String assistantEditLocalToolHealthSelectedCount(int selected, int total) {
+    return '已選擇 $selected/$total 項';
+  }
+
+  @override
+  String get assistantEditLocalToolLocationSubtitle => '讀取本裝置的一次性位置，需要授予定位權限。';
+
+  @override
+  String get assistantEditLocalToolLocationTitle => '目前位置';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteSubtitle =>
+      '在你確認後將提醒事項標記為完成，需要授予提醒事項完整存取權限。';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteTitle => '完成提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateSubtitle =>
+      '在你確認後於本裝置建立提醒事項，需要授予提醒事項完整存取權限。';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateTitle => '建立提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersQuerySubtitle =>
+      '讀取本裝置上的提醒事項，需要授予提醒事項完整存取權限。';
+
+  @override
+  String get assistantEditLocalToolRemindersQueryTitle => '查詢提醒';
+
+  @override
+  String get assistantEditLocalToolWeatherSubtitle =>
+      '取得目前位置或指定地點的 Apple 天氣，結果中會顯示 WeatherKit 資料來源。';
+
+  @override
+  String get assistantEditLocalToolWeatherTitle => '天氣';
+
+  @override
+  String healthDataSettingsBadge(int selected, int total) {
+    return '$selected/$total 開啟';
+  }
+
+  @override
+  String get healthDataSettingsCategoryActivity => '活動';
+
+  @override
+  String get healthDataSettingsCategoryBody => '身體';
+
+  @override
+  String get healthDataSettingsCategoryHeart => '心率';
+
+  @override
+  String get healthDataSettingsCategoryRest => '休息';
+
+  @override
+  String get healthDataSettingsDescription =>
+      '目前助手在日常對話中可使用的 HealthKit 訊號。開關表示 Kelivo 可以嘗試讀取該範圍，實際授權仍由 iOS 管理。';
+
+  @override
+  String get healthDataSettingsDisableAll => '全部關閉';
+
+  @override
+  String get healthDataSettingsEnableAll => '全部開啟';
+
+  @override
+  String get healthDataSettingsIosReadSubtitle => '裝置可用，讀取範圍由 iOS 管理';
+
+  @override
+  String get healthDataSettingsIosReadTitle => 'iOS 健康讀取';
+
+  @override
+  String get healthDataSettingsOpenSystemSettings => '開啟系統設定';
+
+  @override
+  String get healthDataSettingsTitle => '健康資料';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergySubtitle => '活動能量消耗';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergyTitle => '能量';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseSubtitle => '血糖樣本';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseTitle => '血糖';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenSubtitle => '血氧飽和度';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenTitle => '血氧';
+
+  @override
+  String get healthDataSettingsTypeBmiSubtitle => '身體質量指數';
+
+  @override
+  String get healthDataSettingsTypeBmiTitle => 'BMI';
+
+  @override
+  String get healthDataSettingsTypeDaylightSubtitle => '戶外日光時間';
+
+  @override
+  String get healthDataSettingsTypeDaylightTitle => '日照';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergySubtitle => '飲食熱量紀錄';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergyTitle => '攝入能量';
+
+  @override
+  String get healthDataSettingsTypeDistanceSubtitle => '步行和跑步距離';
+
+  @override
+  String get healthDataSettingsTypeDistanceTitle => '距離';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesSubtitle => 'Apple 鍛鍊分鐘數';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesTitle => '鍛鍊';
+
+  @override
+  String get healthDataSettingsTypeHeartRateSubtitle => '最近心率樣本';
+
+  @override
+  String get healthDataSettingsTypeHeartRateTitle => '心率';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessSubtitle => '正念或靜息時段';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessTitle => '靜息';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateSubtitle => '靜息狀態心率';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateTitle => '靜息心率';
+
+  @override
+  String get healthDataSettingsTypeSleepSubtitle => '睡眠時長';
+
+  @override
+  String get healthDataSettingsTypeSleepTitle => '睡眠';
+
+  @override
+  String get healthDataSettingsTypeStandTimeSubtitle => '站立時間';
+
+  @override
+  String get healthDataSettingsTypeStandTimeTitle => '站立';
+
+  @override
+  String get healthDataSettingsTypeStepsSubtitle => '行走步數摘要';
+
+  @override
+  String get healthDataSettingsTypeStepsTitle => '步數';
+
+  @override
+  String get healthDataSettingsTypeWaterSubtitle => '飲水量紀錄';
+
+  @override
+  String get healthDataSettingsTypeWaterTitle => '飲水';
+
+  @override
+  String get healthDataSettingsTypeWeightSubtitle => '體重樣本';
+
+  @override
+  String get healthDataSettingsTypeWeightTitle => '體重';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsSubtitle => '訓練紀錄：類型、時長、距離與消耗';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsTitle => '健身訓練';
 }

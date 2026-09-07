@@ -37,7 +37,7 @@ void main() {
   test(
     'installation gate rejects every unpublished SQLite schema without mutation',
     () async {
-      for (final schemaVersion in <int>[7, 8, 9, 10, 11, 42]) {
+      for (final schemaVersion in <int>[8, 9, 10, 11, 42]) {
         final directory = await Directory.systemTemp.createTemp(
           'kelivo_reject_schema_${schemaVersion}_',
         );

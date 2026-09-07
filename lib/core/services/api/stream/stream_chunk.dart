@@ -175,6 +175,23 @@ final class ServerToolEnd extends StreamChunk {
   final Map<String, dynamic>? metadata;
 }
 
+/// Provider 生成并落盘的文件引用。
+final class GeneratedFile extends StreamChunk {
+  const GeneratedFile({required this.uri, required this.name, this.mime});
+
+  final String uri;
+  final String name;
+  final String? mime;
+}
+
+/// 需要随下一轮请求回传的供应商状态（例如 Claude 容器 ID）。
+final class ProviderArtifact extends StreamChunk {
+  const ProviderArtifact({required this.kind, required this.payload});
+
+  final String kind;
+  final String payload;
+}
+
 final class ImageStart extends StreamChunk {
   const ImageStart({
     required this.id,

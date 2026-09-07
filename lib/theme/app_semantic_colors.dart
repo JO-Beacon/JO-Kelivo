@@ -16,6 +16,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   final Color onWarningContainer;
   final Color searchHighlight;
   final List<Color> chartSeries;
+  final bool layered;
 
   const AppSemanticColors({
     required this.surfaceFill,
@@ -28,6 +29,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     required this.onWarningContainer,
     required this.searchHighlight,
     required this.chartSeries,
+    this.layered = false,
   });
 
   /// 用于输入框、标签、小卡片和标签容器的柔和填充色。
@@ -55,12 +57,12 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
           );
   }
 
-  factory AppSemanticColors.light(ColorScheme cs) {
+  factory AppSemanticColors.light(ColorScheme cs, {bool layered = false}) {
     const successBase = Color(0xFF2E7D32);
     const warningBase = Color(0xFFF57C00);
     return AppSemanticColors(
-      surfaceFill: _deriveSurfaceFill(cs),
-      surfaceCard: _deriveSurfaceCard(cs),
+      surfaceFill: layered ? cs.surfaceContainer : _deriveSurfaceFill(cs),
+      surfaceCard: layered ? cs.surfaceContainerHigh : _deriveSurfaceCard(cs),
       success: successBase.harmonizeWith(cs.primary),
       successContainer: const Color(0xFFA5D6A7).harmonizeWith(cs.primary),
       onSuccessContainer: const Color(0xFF1B5E20),
@@ -78,15 +80,16 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
         Color(0xFFCA8A04),
         Color(0xFF0891B2),
       ],
+      layered: layered,
     );
   }
 
-  factory AppSemanticColors.dark(ColorScheme cs) {
+  factory AppSemanticColors.dark(ColorScheme cs, {bool layered = false}) {
     const successBase = Color(0xFF81C784);
     const warningBase = Color(0xFFFFB74D);
     return AppSemanticColors(
-      surfaceFill: _deriveSurfaceFill(cs),
-      surfaceCard: _deriveSurfaceCard(cs),
+      surfaceFill: layered ? cs.surfaceContainer : _deriveSurfaceFill(cs),
+      surfaceCard: layered ? cs.surfaceContainerHigh : _deriveSurfaceCard(cs),
       success: successBase.harmonizeWith(cs.primary),
       successContainer: const Color(0xFF1B5E20).harmonizeWith(cs.primary),
       onSuccessContainer: const Color(0xFFC8E6C9),
@@ -104,6 +107,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
         Color(0xFFFACC15),
         Color(0xFF67E8F9),
       ],
+      layered: layered,
     );
   }
 
@@ -119,6 +123,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     Color? onWarningContainer,
     Color? searchHighlight,
     List<Color>? chartSeries,
+    bool? layered,
   }) {
     return AppSemanticColors(
       surfaceFill: surfaceFill ?? this.surfaceFill,
@@ -131,6 +136,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
       onWarningContainer: onWarningContainer ?? this.onWarningContainer,
       searchHighlight: searchHighlight ?? this.searchHighlight,
       chartSeries: chartSeries ?? this.chartSeries,
+      layered: layered ?? this.layered,
     );
   }
 
@@ -170,6 +176,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
         len,
         (i) => Color.lerp(chartSeries[i], other.chartSeries[i], t)!,
       ),
+      layered: t < 0.5 ? layered : other.layered,
     );
   }
 }

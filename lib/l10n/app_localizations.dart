@@ -100,6 +100,12 @@ abstract class AppLocalizations {
     Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
   ];
 
+  /// No description provided for @chatImageCropFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not crop \"{fileName}\": {error}'**
+  String chatImageCropFailed(String fileName, String error);
+
   /// No description provided for @helloWorld.
   ///
   /// In en, this message translates to:
@@ -1429,13 +1435,13 @@ abstract class AppLocalizations {
   /// No description provided for @homePageDeleteMessageNode.
   ///
   /// In en, this message translates to:
-  /// **'Delete This Node'**
+  /// **'Delete This Branch Node'**
   String get homePageDeleteMessageNode;
 
   /// No description provided for @homePageDeleteMessageNodeConfirm.
   ///
   /// In en, this message translates to:
-  /// **'Are you sure you want to delete this node? Its non-active branches will be removed, while the active branch\'s following messages will remain.'**
+  /// **'Are you sure you want to delete this branch node? Every branch below this fork will be removed, and only the active lineage\'s following messages will remain.'**
   String get homePageDeleteMessageNodeConfirm;
 
   /// No description provided for @homePageDeleteAllVersions.
@@ -3550,6 +3556,78 @@ abstract class AppLocalizations {
   /// **'The chat database on this device was created by a newer version of JO-AIClient and cannot be opened by this version. Your data has not been changed. Install the latest version of JO-AIClient, then open it again.'**
   String get startupDatabaseUpdateRequiredContent;
 
+  /// No description provided for @startupRecoverySnapshotButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore a local snapshot'**
+  String get startupRecoverySnapshotButton;
+
+  /// No description provided for @startupRecoveryDowngradeSnapshotButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced: restore an older snapshot'**
+  String get startupRecoveryDowngradeSnapshotButton;
+
+  /// No description provided for @startupRecoveryChooseSnapshotTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a snapshot'**
+  String get startupRecoveryChooseSnapshotTitle;
+
+  /// No description provided for @startupRecoverySnapshotDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'{date} {time} · {size} MB'**
+  String startupRecoverySnapshotDetails(String date, String time, String size);
+
+  /// No description provided for @startupRecoveryNoSnapshots.
+  ///
+  /// In en, this message translates to:
+  /// **'No local snapshots are available.'**
+  String get startupRecoveryNoSnapshots;
+
+  /// No description provided for @startupRecoveryRestoreConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore this snapshot?'**
+  String get startupRecoveryRestoreConfirmTitle;
+
+  /// No description provided for @startupRecoveryRestoreConfirmContent.
+  ///
+  /// In en, this message translates to:
+  /// **'JO-AIClient will replace the current database with {fileName}. Changes made after this snapshot may be lost. The current database will remain recoverable through the restore journal until the operation is verified.'**
+  String startupRecoveryRestoreConfirmContent(String fileName);
+
+  /// No description provided for @startupRecoveryRestoreConfirmButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore and restart'**
+  String get startupRecoveryRestoreConfirmButton;
+
+  /// No description provided for @startupRecoveryProtectionFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not protect the current data'**
+  String get startupRecoveryProtectionFailedTitle;
+
+  /// No description provided for @startupRecoveryProtectionFailedContent.
+  ///
+  /// In en, this message translates to:
+  /// **'The required pre-downgrade data copy could not be created. Continuing may permanently discard data written by the newer version.'**
+  String get startupRecoveryProtectionFailedContent;
+
+  /// No description provided for @startupRecoveryContinueWithoutProtection.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue without a copy'**
+  String get startupRecoveryContinueWithoutProtection;
+
+  /// No description provided for @startupRecoverySnapshotFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The snapshot could not be prepared. Diagnostic code: {code}'**
+  String startupRecoverySnapshotFailed(String code);
+
   /// No description provided for @backupPageRestoreFailedMessage.
   ///
   /// In en, this message translates to:
@@ -4735,7 +4813,7 @@ abstract class AppLocalizations {
   /// No description provided for @messageMoreSheetDeleteMessageNode.
   ///
   /// In en, this message translates to:
-  /// **'Delete This Node'**
+  /// **'Delete This Branch Node'**
   String get messageMoreSheetDeleteMessageNode;
 
   /// No description provided for @messageMoreSheetDelete.
@@ -5191,7 +5269,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatSelectionDeleteSelectedConfirm.
   ///
   /// In en, this message translates to:
-  /// **'Delete {count} selected message(s)? This cannot be undone.'**
+  /// **'Delete {count} selected message(s) as branch nodes? Every branch below their forks will be removed, and only the active lineage will remain. This cannot be undone.'**
   String chatSelectionDeleteSelectedConfirm(int count);
 
   /// No description provided for @chatSelectionDeleteSelectedAllVersionsConfirm.
@@ -6022,6 +6100,12 @@ abstract class AppLocalizations {
   /// **'Reconnect'**
   String get mcpPageReconnect;
 
+  /// No description provided for @mcpPageSessionExpiredDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'The server session expired again immediately after reconnecting. Reconnect manually when the server is ready.'**
+  String get mcpPageSessionExpiredDetails;
+
   /// No description provided for @mcpPageStatusConnected.
   ///
   /// In en, this message translates to:
@@ -6325,7 +6409,7 @@ abstract class AppLocalizations {
   /// No description provided for @defaultModelPageTitleModelSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Used for summarizing conversation titles; prefer fast & cheap models. Disabled until a model is selected.'**
+  /// **'Used for summarizing conversation titles. Follows the current chat model unless you choose a dedicated one.'**
   String get defaultModelPageTitleModelSubtitle;
 
   /// No description provided for @titleModelThinkingTitle.
@@ -6355,7 +6439,7 @@ abstract class AppLocalizations {
   /// No description provided for @defaultModelPageSuggestionModelSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Used for follow-up suggestion bubbles after assistant replies. Disabled until a model is selected.'**
+  /// **'Generates follow-up suggestions after assistant replies. Follows the current chat model or a dedicated one; disabled by default.'**
   String get defaultModelPageSuggestionModelSubtitle;
 
   /// No description provided for @assistantEditRecentChatsSummaryFrequencyTitle.
@@ -6558,6 +6642,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Not enabled'**
   String get defaultModelPageNotEnabled;
+
+  /// No description provided for @defaultModelPageDisable.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable'**
+  String get defaultModelPageDisable;
+
+  /// No description provided for @localSnapshotTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Local database snapshots'**
+  String get localSnapshotTitle;
+
+  /// No description provided for @localSnapshotEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep automatic local snapshots'**
+  String get localSnapshotEnabled;
+
+  /// No description provided for @localSnapshotTakeNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Take snapshot now'**
+  String get localSnapshotTakeNow;
 
   /// No description provided for @translatePagePasteButton.
   ///
@@ -6930,6 +7038,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Favorites'**
   String get modelSelectSheetFavoritesSection;
+
+  /// No description provided for @modelSelectSheetFollowAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow assistant'**
+  String get modelSelectSheetFollowAssistant;
 
   /// No description provided for @modelSelectSheetFavoriteTooltip.
   ///
@@ -8809,6 +8923,18 @@ abstract class AppLocalizations {
   /// **'Confirm before regenerating'**
   String get displaySettingsPageShowRegenerateConfirmDialogTitle;
 
+  /// No description provided for @displaySettingsPageAutoRetryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic Retry'**
+  String get displaySettingsPageAutoRetryTitle;
+
+  /// No description provided for @displaySettingsPageAutoRetrySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry temporary network and rate-limit failures before any response is received'**
+  String get displaySettingsPageAutoRetrySubtitle;
+
   /// No description provided for @chainOfThoughtExpandSteps.
   ///
   /// In en, this message translates to:
@@ -9276,6 +9402,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Bubbles and accents follow theme.'**
   String get themeSettingsPageUsePureBackgroundSubtitle;
+
+  /// No description provided for @themeSettingsPageUseLayeredSurfacesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Layered surfaces'**
+  String get themeSettingsPageUseLayeredSurfacesTitle;
+
+  /// No description provided for @themeSettingsPageUseLayeredSurfacesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Make cards and panels stand above the page background.'**
+  String get themeSettingsPageUseLayeredSurfacesSubtitle;
+
+  /// No description provided for @searchProviderAnySearchDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'AnySearch unified web search'**
+  String get searchProviderAnySearchDescription;
+
+  /// No description provided for @searchProviderParallelDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Parallel Search API. Returns LLM-optimized web excerpts with turbo, fast, basic, and advanced modes.'**
+  String get searchProviderParallelDescription;
+
+  /// No description provided for @searchServicesDialogSearchMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Search mode'**
+  String get searchServicesDialogSearchMode;
+
+  /// No description provided for @searchServicesDialogContentMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Content mode'**
+  String get searchServicesDialogContentMode;
+
+  /// No description provided for @searchServicesDialogHighlights.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlights'**
+  String get searchServicesDialogHighlights;
+
+  /// No description provided for @searchServicesDialogSnippets.
+  ///
+  /// In en, this message translates to:
+  /// **'Snippets'**
+  String get searchServicesDialogSnippets;
+
+  /// No description provided for @searchServicesDialogWebSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Web Search'**
+  String get searchServicesDialogWebSearch;
+
+  /// No description provided for @searchServicesDialogLlmContext.
+  ///
+  /// In en, this message translates to:
+  /// **'LLM Context'**
+  String get searchServicesDialogLlmContext;
+
+  /// No description provided for @searchServicesDialogMaximumTokens.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum tokens'**
+  String get searchServicesDialogMaximumTokens;
+
+  /// No description provided for @searchServicesDialogMaximumTokensInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum tokens must be between 1024 and 32768.'**
+  String get searchServicesDialogMaximumTokensInvalid;
+
+  /// No description provided for @searchProviderYouDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'You.com Search API. Returns web and news results with highlights or snippets.'**
+  String get searchProviderYouDescription;
 
   /// No description provided for @themeSettingsPageColorPalettesSection.
   ///
@@ -10614,6 +10818,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Doubao'**
   String get searchServiceNameDoubao;
+
+  /// No description provided for @searchServiceNameAnySearch.
+  ///
+  /// In en, this message translates to:
+  /// **'AnySearch'**
+  String get searchServiceNameAnySearch;
+
+  /// No description provided for @searchServiceNameParallel.
+  ///
+  /// In en, this message translates to:
+  /// **'Parallel'**
+  String get searchServiceNameParallel;
+
+  /// No description provided for @searchServiceNameYou.
+  ///
+  /// In en, this message translates to:
+  /// **'You.com'**
+  String get searchServiceNameYou;
 
   /// No description provided for @searchProviderDoubaoDescription.
   ///
@@ -15211,6 +15433,96 @@ abstract class AppLocalizations {
   /// **'Follows the theme; not customizable'**
   String get messageStyleSettingsPageStyleDefaultSubtitle;
 
+  /// No description provided for @messageStyleSettingsPageAssistantSplitParagraphs.
+  ///
+  /// In en, this message translates to:
+  /// **'Split paragraphs into bubbles'**
+  String get messageStyleSettingsPageAssistantSplitParagraphs;
+
+  /// No description provided for @messageStyleSettingsPageAssistantSplitParagraphsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Blank lines break an assistant reply into one bubble per paragraph'**
+  String get messageStyleSettingsPageAssistantSplitParagraphsSubtitle;
+
+  /// No description provided for @messageEditAddTextPart.
+  ///
+  /// In en, this message translates to:
+  /// **'Add text part'**
+  String get messageEditAddTextPart;
+
+  /// No description provided for @messageEditTextPart.
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get messageEditTextPart;
+
+  /// No description provided for @messageEditReasoningPart.
+  ///
+  /// In en, this message translates to:
+  /// **'Thinking'**
+  String get messageEditReasoningPart;
+
+  /// No description provided for @messageEditToolCallPart.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool call'**
+  String get messageEditToolCallPart;
+
+  /// No description provided for @messageEditImagePart.
+  ///
+  /// In en, this message translates to:
+  /// **'Image'**
+  String get messageEditImagePart;
+
+  /// No description provided for @messageEditFilePart.
+  ///
+  /// In en, this message translates to:
+  /// **'File'**
+  String get messageEditFilePart;
+
+  /// No description provided for @messageEditUnknownPart.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown part'**
+  String get messageEditUnknownPart;
+
+  /// No description provided for @messageEditDeletePart.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete part'**
+  String get messageEditDeletePart;
+
+  /// No description provided for @messageEditDeletePartConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this part?'**
+  String get messageEditDeletePartConfirmTitle;
+
+  /// No description provided for @messageEditDeletePartConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This change only affects the edited message version.'**
+  String get messageEditDeletePartConfirmMessage;
+
+  /// No description provided for @messageEditCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get messageEditCancel;
+
+  /// No description provided for @messageStyleSettingsPageAssistantFitContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Fit assistant bubble to content'**
+  String get messageStyleSettingsPageAssistantFitContent;
+
+  /// No description provided for @messageStyleSettingsPageAssistantFitContentSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant bubbles hug their text instead of filling the row'**
+  String get messageStyleSettingsPageAssistantFitContentSubtitle;
+
   /// No description provided for @messageStyleSettingsPageStyleFrostedSubtitle.
   ///
   /// In en, this message translates to:
@@ -15312,6 +15624,456 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Assistant settings also apply to thinking, tool-call, and translation cards.'**
   String get messageStyleSettingsPageRoleAssistantHint;
+
+  /// No description provided for @toolSchemaSettingsPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool Descriptions'**
+  String get toolSchemaSettingsPageTitle;
+
+  /// No description provided for @toolSchemaSettingsGroupSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get toolSchemaSettingsGroupSearch;
+
+  /// No description provided for @toolSchemaSettingsGroupMemory.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory'**
+  String get toolSchemaSettingsGroupMemory;
+
+  /// No description provided for @toolSchemaSettingsGroupLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Device tools'**
+  String get toolSchemaSettingsGroupLocal;
+
+  /// No description provided for @toolSchemaSettingsModified.
+  ///
+  /// In en, this message translates to:
+  /// **'Modified'**
+  String get toolSchemaSettingsModified;
+
+  /// No description provided for @toolSchemaSettingsResetDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore default'**
+  String get toolSchemaSettingsResetDefault;
+
+  /// No description provided for @toolSchemaSettingsResetAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore all defaults'**
+  String get toolSchemaSettingsResetAll;
+
+  /// No description provided for @toolSchemaSettingsResetAllTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore all defaults?'**
+  String get toolSchemaSettingsResetAllTitle;
+
+  /// No description provided for @toolSchemaSettingsResetAllMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This restores every built-in tool description to the app default. Your custom wording will be lost.'**
+  String get toolSchemaSettingsResetAllMessage;
+
+  /// No description provided for @toolSchemaSettingsResetAllConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get toolSchemaSettingsResetAllConfirm;
+
+  /// No description provided for @toolSchemaSettingsParamDescriptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Parameter descriptions ({count})'**
+  String toolSchemaSettingsParamDescriptions(int count);
+
+  /// No description provided for @toolSchemaSettingsMemoryLangNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory tool defaults follow the memory prompt language. A custom description is stored once per tool and will not switch when you change that language.'**
+  String get toolSchemaSettingsMemoryLangNote;
+
+  /// No description provided for @toolSchemaSettingsDescriptionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get toolSchemaSettingsDescriptionLabel;
+
+  /// No description provided for @toolSchemaSettingsToolName.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool name'**
+  String get toolSchemaSettingsToolName;
+
+  /// No description provided for @toolSchemaEditorPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit description'**
+  String get toolSchemaEditorPageTitle;
+
+  /// No description provided for @toolSchemaSettingsCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get toolSchemaSettingsCancel;
+
+  /// No description provided for @assistantEditLocalToolHealthSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Read a privacy-preserving activity summary from Apple Health, requires Health access.'**
+  String get assistantEditLocalToolHealthSubtitle;
+
+  /// No description provided for @assistantEditLocalToolHealthTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Health Summary'**
+  String get assistantEditLocalToolHealthTitle;
+
+  /// No description provided for @assistantEditLocalToolHealthSelectedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{selected}/{total} selected'**
+  String assistantEditLocalToolHealthSelectedCount(int selected, int total);
+
+  /// No description provided for @assistantEditLocalToolLocationSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Read a one-shot location from this device, requires the location permission.'**
+  String get assistantEditLocalToolLocationSubtitle;
+
+  /// No description provided for @assistantEditLocalToolLocationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Current Location'**
+  String get assistantEditLocalToolLocationTitle;
+
+  /// No description provided for @assistantEditLocalToolRemindersCompleteSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark a reminder as done with your confirmation, requires full reminders access.'**
+  String get assistantEditLocalToolRemindersCompleteSubtitle;
+
+  /// No description provided for @assistantEditLocalToolRemindersCompleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete Reminder'**
+  String get assistantEditLocalToolRemindersCompleteTitle;
+
+  /// No description provided for @assistantEditLocalToolRemindersCreateSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a reminder on this device with your confirmation, requires full reminders access.'**
+  String get assistantEditLocalToolRemindersCreateSubtitle;
+
+  /// No description provided for @assistantEditLocalToolRemindersCreateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Reminder'**
+  String get assistantEditLocalToolRemindersCreateTitle;
+
+  /// No description provided for @assistantEditLocalToolRemindersQuerySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Read reminders on this device, requires full reminders access.'**
+  String get assistantEditLocalToolRemindersQuerySubtitle;
+
+  /// No description provided for @assistantEditLocalToolRemindersQueryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Query Reminders'**
+  String get assistantEditLocalToolRemindersQueryTitle;
+
+  /// No description provided for @assistantEditLocalToolWeatherSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Get Apple Weather for the current or a specified location. WeatherKit attribution is shown in the result.'**
+  String get assistantEditLocalToolWeatherSubtitle;
+
+  /// No description provided for @assistantEditLocalToolWeatherTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Weather'**
+  String get assistantEditLocalToolWeatherTitle;
+
+  /// No description provided for @healthDataSettingsBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'{selected}/{total} on'**
+  String healthDataSettingsBadge(int selected, int total);
+
+  /// No description provided for @healthDataSettingsCategoryActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'Activity'**
+  String get healthDataSettingsCategoryActivity;
+
+  /// No description provided for @healthDataSettingsCategoryBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Body'**
+  String get healthDataSettingsCategoryBody;
+
+  /// No description provided for @healthDataSettingsCategoryHeart.
+  ///
+  /// In en, this message translates to:
+  /// **'Heart'**
+  String get healthDataSettingsCategoryHeart;
+
+  /// No description provided for @healthDataSettingsCategoryRest.
+  ///
+  /// In en, this message translates to:
+  /// **'Rest'**
+  String get healthDataSettingsCategoryRest;
+
+  /// No description provided for @healthDataSettingsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'HealthKit signals available to the current assistant in daily conversation. Switches control what Kelivo may try to read; iOS still manages actual Health access.'**
+  String get healthDataSettingsDescription;
+
+  /// No description provided for @healthDataSettingsDisableAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable all'**
+  String get healthDataSettingsDisableAll;
+
+  /// No description provided for @healthDataSettingsEnableAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable all'**
+  String get healthDataSettingsEnableAll;
+
+  /// No description provided for @healthDataSettingsIosReadSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Device available, read range managed by iOS'**
+  String get healthDataSettingsIosReadSubtitle;
+
+  /// No description provided for @healthDataSettingsIosReadTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'iOS Health Read'**
+  String get healthDataSettingsIosReadTitle;
+
+  /// No description provided for @healthDataSettingsOpenSystemSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open system settings'**
+  String get healthDataSettingsOpenSystemSettings;
+
+  /// No description provided for @healthDataSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Health Data'**
+  String get healthDataSettingsTitle;
+
+  /// No description provided for @healthDataSettingsTypeActiveEnergySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Active energy burned'**
+  String get healthDataSettingsTypeActiveEnergySubtitle;
+
+  /// No description provided for @healthDataSettingsTypeActiveEnergyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Energy'**
+  String get healthDataSettingsTypeActiveEnergyTitle;
+
+  /// No description provided for @healthDataSettingsTypeBloodGlucoseSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Blood glucose sample'**
+  String get healthDataSettingsTypeBloodGlucoseSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeBloodGlucoseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Blood Glucose'**
+  String get healthDataSettingsTypeBloodGlucoseTitle;
+
+  /// No description provided for @healthDataSettingsTypeBloodOxygenSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Blood oxygen saturation'**
+  String get healthDataSettingsTypeBloodOxygenSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeBloodOxygenTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Blood Oxygen'**
+  String get healthDataSettingsTypeBloodOxygenTitle;
+
+  /// No description provided for @healthDataSettingsTypeBmiSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Body mass index'**
+  String get healthDataSettingsTypeBmiSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeBmiTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'BMI'**
+  String get healthDataSettingsTypeBmiTitle;
+
+  /// No description provided for @healthDataSettingsTypeDaylightSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Outdoor daylight time'**
+  String get healthDataSettingsTypeDaylightSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeDaylightTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sunlight'**
+  String get healthDataSettingsTypeDaylightTitle;
+
+  /// No description provided for @healthDataSettingsTypeDietaryEnergySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Dietary calorie record'**
+  String get healthDataSettingsTypeDietaryEnergySubtitle;
+
+  /// No description provided for @healthDataSettingsTypeDietaryEnergyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Dietary Energy'**
+  String get healthDataSettingsTypeDietaryEnergyTitle;
+
+  /// No description provided for @healthDataSettingsTypeDistanceSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Walking and running distance'**
+  String get healthDataSettingsTypeDistanceSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeDistanceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Distance'**
+  String get healthDataSettingsTypeDistanceTitle;
+
+  /// No description provided for @healthDataSettingsTypeExerciseMinutesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Apple exercise minutes'**
+  String get healthDataSettingsTypeExerciseMinutesSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeExerciseMinutesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Exercise'**
+  String get healthDataSettingsTypeExerciseMinutesTitle;
+
+  /// No description provided for @healthDataSettingsTypeHeartRateSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Latest heart rate sample'**
+  String get healthDataSettingsTypeHeartRateSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeHeartRateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Heart Rate'**
+  String get healthDataSettingsTypeHeartRateTitle;
+
+  /// No description provided for @healthDataSettingsTypeMindfulnessSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Mindfulness or resting periods'**
+  String get healthDataSettingsTypeMindfulnessSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeMindfulnessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Resting'**
+  String get healthDataSettingsTypeMindfulnessTitle;
+
+  /// No description provided for @healthDataSettingsTypeRestingHeartRateSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Resting heart rate sample'**
+  String get healthDataSettingsTypeRestingHeartRateSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeRestingHeartRateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Resting Heart Rate'**
+  String get healthDataSettingsTypeRestingHeartRateTitle;
+
+  /// No description provided for @healthDataSettingsTypeSleepSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep duration last night'**
+  String get healthDataSettingsTypeSleepSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeSleepTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep'**
+  String get healthDataSettingsTypeSleepTitle;
+
+  /// No description provided for @healthDataSettingsTypeStandTimeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stand time'**
+  String get healthDataSettingsTypeStandTimeSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeStandTimeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stand'**
+  String get healthDataSettingsTypeStandTimeTitle;
+
+  /// No description provided for @healthDataSettingsTypeStepsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Walking steps summary'**
+  String get healthDataSettingsTypeStepsSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeStepsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Steps'**
+  String get healthDataSettingsTypeStepsTitle;
+
+  /// No description provided for @healthDataSettingsTypeWaterSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Water intake record'**
+  String get healthDataSettingsTypeWaterSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeWaterTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Water'**
+  String get healthDataSettingsTypeWaterTitle;
+
+  /// No description provided for @healthDataSettingsTypeWeightSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Body weight sample'**
+  String get healthDataSettingsTypeWeightSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeWeightTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Weight'**
+  String get healthDataSettingsTypeWeightTitle;
+
+  /// No description provided for @healthDataSettingsTypeWorkoutsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Workout records: type, duration, distance, and energy'**
+  String get healthDataSettingsTypeWorkoutsSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeWorkoutsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Workouts'**
+  String get healthDataSettingsTypeWorkoutsTitle;
 }
 
 class _AppLocalizationsDelegate

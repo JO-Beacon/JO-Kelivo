@@ -81,6 +81,30 @@ Map<String, dynamic>? _thinkingConfig(Map<String, dynamic> body) {
   return thinkingConfig.cast<String, dynamic>();
 }
 
+Future<Map<String, dynamic>> _captureThinkingConfig({
+  required String modelId,
+  int? thinkingBudget,
+}) async {
+  late Map<String, dynamic> body;
+  final server = await _startGeminiServer((captured) => body = captured);
+  addTearDown(() => server.close(force: true));
+
+  final chunks = await ChatApiService.sendMessageStream(
+    config: _geminiConfig(
+      'http://${server.address.address}:${server.port}/v1beta',
+    ),
+    modelId: modelId,
+    messages: const [
+      {'role': 'user', 'content': 'hello'},
+    ],
+    thinkingBudget: thinkingBudget,
+    stream: false,
+  ).toList();
+
+  expect(chunks.last.isDone, isTrue, reason: modelId);
+  return body;
+}
+
 void main() {
   group('Google Gemma 4 thinking config', () {
     test('non-stream request maps custom budget to thinking level', () async {
@@ -172,6 +196,30 @@ void main() {
   });
 
   group('latest Gemini Flash thinking config', () {
+    test('routes an unknown Gemini 3.x Pro through thinkingLevel', () async {
+      final body = await _captureThinkingConfig(
+        modelId: 'gemini-3.2-pro-preview',
+        thinkingBudget: 16000,
+      );
+
+      expect(_thinkingConfig(body), {
+        'includeThoughts': true,
+        'thinkingLevel': 'medium',
+      });
+    });
+
+    test('hides thoughts when Gemini 3.7 thinking is off', () async {
+      final body = await _captureThinkingConfig(
+        modelId: 'gemini-3.7-flash',
+        thinkingBudget: 0,
+      );
+
+      expect(_thinkingConfig(body), {
+        'includeThoughts': false,
+        'thinkingLevel': 'low',
+      });
+    });
+
     test('Gemini 3.6 Flash defaults to medium with 64K output', () async {
       late Map<String, dynamic> capturedBody;
       final server = await _startGeminiServer((body) {

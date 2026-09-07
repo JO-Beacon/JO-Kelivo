@@ -91,7 +91,7 @@ void main() {
     expect(find.text('Create Message Branch'), findsOneWidget);
     expect(find.text('Delete This Message'), findsNothing);
     expect(find.text('Delete Current Branch'), findsOneWidget);
-    expect(find.text('Delete This Node'), findsOneWidget);
+    expect(find.text('Delete This Branch Node'), findsOneWidget);
     expect(find.text('Delete This Message and Following'), findsNothing);
     expect(find.text('Delete All Branches'), findsOneWidget);
 
@@ -101,7 +101,7 @@ void main() {
         .whereType<String>()
         .toList();
     expect(
-      labels.indexOf('Delete This Node'),
+      labels.indexOf('Delete This Branch Node'),
       lessThan(labels.indexOf('Delete Current Branch')),
     );
   });
@@ -112,7 +112,7 @@ void main() {
     expect(find.text('Select Messages'), findsOneWidget);
     expect(find.text('Delete This Message'), findsOneWidget);
     expect(find.text('Delete Current Branch'), findsNothing);
-    expect(find.text('Delete This Node'), findsNothing);
+    expect(find.text('Delete This Branch Node'), findsNothing);
     expect(find.text('Delete This Message and Following'), findsOneWidget);
     expect(find.text('Delete All Branches'), findsNothing);
   });
@@ -139,7 +139,7 @@ void main() {
     expect(action, MessageMoreAction.deleteCurrentBranch);
   });
 
-  testWidgets('分叉节点消息菜单可以触发删除此节点', (tester) async {
+  testWidgets('分叉节点消息菜单可以触发删除此分支节点', (tester) async {
     final action = await _openMoreSheet(
       tester,
       canDeleteAllVersions: true,
@@ -147,7 +147,7 @@ void main() {
       canDeleteMessageNode: true,
       canDeleteMessageOnly: false,
       canDeleteMessageAndFollowing: false,
-      tapLabel: 'Delete This Node',
+      tapLabel: 'Delete This Branch Node',
     );
 
     expect(action, MessageMoreAction.deleteMessageNode);

@@ -318,10 +318,10 @@ void main() {
       _expectValid(right);
     });
 
-    test('batch local deletion is independent of input order', () {
+    test('batch branch-node deletion is independent of input order', () {
       final tree = _complexTree();
-      final left = tree.removeMessagesOnly(const ['m1', 'first-m1']);
-      final right = tree.removeMessagesOnly(const ['first-m1', 'm1']);
+      final left = tree.deleteMessageNodes(const ['m1', 'first-m1']);
+      final right = tree.deleteMessageNodes(const ['first-m1', 'm1']);
 
       expect(_signature(left), _signature(right));
       _expectValid(left);

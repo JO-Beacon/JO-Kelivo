@@ -15,9 +15,9 @@ import '../../../core/services/api/json_schema_utils.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
 import '../../../core/services/memory/memory_pipeline.dart';
-import '../../../core/services/memory/memory_prompts.dart';
 import '../../../core/services/memory/memory_tools.dart';
 import '../../../core/services/search/search_tool_service.dart';
+import '../../../core/services/tools/tool_schema_overrides.dart';
 import 'ask_user_interaction_service.dart';
 import 'built_in_tool_names.dart';
 import 'local_tools_service.dart';
@@ -239,7 +239,7 @@ class ToolHandlerService {
     if (settings.legacyMemoryMode) {
       if (assistant?.enableMemory == true && supportsTools) {
         toolDefs.addAll(
-          _buildLegacyMemoryToolDefinitions(settings.resolvedMemoryPromptLang),
+          MemoryTools.legacyDefinitions(settings.resolvedMemoryPromptLang),
         );
       }
     } else if (supportsTools && assistant != null) {
@@ -272,81 +272,9 @@ class ToolHandlerService {
     );
     toolDefs.addAll(mcpTools);
 
-    return toolDefs;
-  }
-
-  /// 旧版 create/edit/delete_memory 工具 schema（v2 之前的记忆系统）。
-  List<Map<String, dynamic>> _buildLegacyMemoryToolDefinitions(
-    MemoryPromptLang lang,
-  ) {
-    final zh = lang == MemoryPromptLang.zh;
-    return [
-      {
-        'type': 'function',
-        'function': {
-          'name': 'create_memory',
-          'description': zh ? '新增一条记忆记录。' : 'Create a memory record.',
-          'parameters': {
-            'type': 'object',
-            'properties': {
-              'content': {
-                'type': 'string',
-                'description': zh
-                    ? '记忆记录的内容。'
-                    : 'The content of the memory record.',
-              },
-            },
-            'required': ['content'],
-          },
-        },
-      },
-      {
-        'type': 'function',
-        'function': {
-          'name': 'edit_memory',
-          'description': zh
-              ? '更新一条已有的记忆记录。'
-              : 'Update an existing memory record.',
-          'parameters': {
-            'type': 'object',
-            'properties': {
-              'id': {
-                'type': 'integer',
-                'description': zh
-                    ? '记忆记录的 id。'
-                    : 'The id of the memory record.',
-              },
-              'content': {
-                'type': 'string',
-                'description': zh
-                    ? '记忆记录的内容。'
-                    : 'The content of the memory record.',
-              },
-            },
-            'required': ['id', 'content'],
-          },
-        },
-      },
-      {
-        'type': 'function',
-        'function': {
-          'name': 'delete_memory',
-          'description': zh ? '删除一条记忆记录。' : 'Delete a memory record.',
-          'parameters': {
-            'type': 'object',
-            'properties': {
-              'id': {
-                'type': 'integer',
-                'description': zh
-                    ? '记忆记录的 id。'
-                    : 'The id of the memory record.',
-              },
-            },
-            'required': ['id'],
-          },
-        },
-      },
-    ];
+    final overrides = settings.toolSchemaOverrides;
+    if (overrides.isEmpty) return toolDefs;
+    return ToolSchemaOverrides.apply(toolDefs, overrides);
   }
 
   /// 从已连接的服务器构建 MCP 工具定义。
@@ -442,7 +370,7 @@ class ToolHandlerService {
           reservedNames: BuiltInToolNames.all,
         );
 
-    Future<String> approveAndExecuteMcp(
+    Future<Object?> approveAndExecuteMcp(
       String name,
       Map<String, dynamic> args, {
       String? toolCallId,
@@ -473,7 +401,7 @@ class ToolHandlerService {
           );
         }
       }
-      return toolSvc.callToolTextForAssistant(
+      return toolSvc.callToolForAssistant(
         mcp,
         assistantProvider,
         assistantId: assistant?.id,
@@ -508,11 +436,11 @@ class ToolHandlerService {
           return memoryResult;
         }
 
-        // 创建日历事件会修改用户数据，因此本地工具运行前
-        // 始终需要用户显式批准。
-        if (name == LocalToolNames.calendarCreate &&
+        // 创建日历事件或修改提醒事项会修改用户数据，因此这些
+        // 本地工具运行前始终需要用户显式批准。
+        if (LocalToolNames.requiresUserApproval.contains(name) &&
             assistant != null &&
-            assistant.localToolIds.contains(LocalToolNames.calendarCreate) &&
+            assistant.localToolIds.contains(name) &&
             approvalService != null) {
           final approvalId = (toolCallId?.trim().isNotEmpty == true)
               ? toolCallId!.trim()

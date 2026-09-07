@@ -7,6 +7,7 @@ import '../../../core/models/message_part.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/logging/context_logger.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
@@ -18,6 +19,7 @@ import '../controllers/generation_controller.dart';
 import 'ask_user_interaction_service.dart';
 import 'message_builder_service.dart';
 import 'tool_approval_service.dart';
+import '../utils/model_display_helper.dart';
 
 /// MessageGenerationService 用于 UI 更新的回调类型
 typedef OnMessagesChanged = void Function();
@@ -191,6 +193,23 @@ class MessageGenerationService {
     // 永不处理 (#769)。
     messageBuilderService.applyContextLimit(apiMessages, assistant);
 
+    final mcpRouteSnapshot = generationController.captureMcpToolRoutes(
+      assistant,
+    );
+    final toolDefs = generationController.buildToolDefinitions(
+      settings,
+      assistant,
+      providerKey,
+      modelId,
+      hasBuiltInSearch,
+      mcpRouteSnapshot: mcpRouteSnapshot,
+    );
+    final sandboxDataFiles = BuiltInToolsHelper.sendsDataFilesToSandbox(
+      cfg: cfg,
+      modelId: modelId,
+      clientTools: toolDefs,
+    );
+
     final indicatorMessageId =
         processingMessageId != null &&
             messageBuilderService.hasPendingAttachmentWork(
@@ -198,6 +217,7 @@ class MessageGenerationService {
               settings,
               conversation: currentConversation,
               sourceMessages: messages,
+              sandboxDataFiles: sandboxDataFiles,
             )
         ? processingMessageId
         : null;
@@ -213,6 +233,7 @@ class MessageGenerationService {
             assistant,
             conversation: currentConversation,
             sourceMessages: messages,
+            sandboxDataFiles: sandboxDataFiles,
           );
     } finally {
       if (indicatorMessageId != null) {
@@ -234,17 +255,6 @@ class MessageGenerationService {
     messageBuilderService.stripInternalRevisionIds(apiMessages);
 
     // 准备工具
-    final mcpRouteSnapshot = generationController.captureMcpToolRoutes(
-      assistant,
-    );
-    final toolDefs = generationController.buildToolDefinitions(
-      settings,
-      assistant,
-      providerKey,
-      modelId,
-      hasBuiltInSearch,
-      mcpRouteSnapshot: mcpRouteSnapshot,
-    );
     final onToolCall = toolDefs.isNotEmpty
         ? generationController.buildToolCallHandler(
             settings,
@@ -493,12 +503,13 @@ class MessageGenerationService {
   /// 从助手或全局设置获取当前 model 和 provider。
   ({String? providerKey, String? modelId}) getModelConfig(
     SettingsProvider settings,
-    Assistant? assistant,
-  ) {
-    return (
-      providerKey:
-          assistant?.chatModelProvider ?? settings.currentModelProvider,
-      modelId: assistant?.chatModelId ?? settings.currentModelId,
+    Assistant? assistant, [
+    Conversation? conversation,
+  ]) {
+    return resolveChatModel(
+      settings,
+      conversation: conversation,
+      assistant: assistant,
     );
   }
 

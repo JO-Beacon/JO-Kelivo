@@ -48,6 +48,10 @@ void main() {
           BusinessKeyDisposition.preference,
         );
         expect(
+          BusinessKeyRegistry.classify('tool_schema_overrides_v1'),
+          BusinessKeyDisposition.preference,
+        );
+        expect(
           BusinessKeyRegistry.classify('flutter_log_enabled_v1'),
           BusinessKeyDisposition.localOnly,
         );

@@ -216,6 +216,74 @@ abstract class BuiltInToolsHelper {
         normalized == 'claude-sonnet-4-6';
   }
 
+  /// Claude 官方服务端工具支持的模型集合。
+  static bool isClaudeCodeExecutionSupportedModel(String? modelId) {
+    final normalized = _normalizedModelId(modelId);
+    if (normalized.contains('mythos')) return true;
+    const supported = <String>{
+      'claude-fable-5',
+      'claude-opus-5',
+      'claude-opus-4-8',
+      'claude-opus-4-7',
+      'claude-opus-4-6',
+      'claude-sonnet-5',
+      'claude-sonnet-4-6',
+      'claude-opus-4-5-20251101',
+      'claude-sonnet-4-5-20250929',
+      'claude-haiku-4-5-20251001',
+    };
+    return supported.contains(normalized);
+  }
+
+  static bool isClaudeWebFetchSupportedModel(String? modelId) {
+    final normalized = _normalizedModelId(modelId);
+    return normalized != 'claude-opus-5' &&
+        isClaudeBuiltInSearchSupportedModel(modelId);
+  }
+
+  static bool isOfficialAnthropicEndpoint(ProviderConfig? cfg) {
+    if (cfg == null) return false;
+    final raw = cfg.baseUrl.trim();
+    if (raw.isEmpty) return true;
+    return (Uri.tryParse(raw)?.host.toLowerCase() ?? '') == 'api.anthropic.com';
+  }
+
+  static const claudeFetchMaxContentTokens = 30000;
+  static const claudeCodeExecutionToolType = 'code_execution_20250825';
+
+  static List<Map<String, dynamic>> claudeServerToolEntries({
+    required ProviderConfig? cfg,
+    required String? modelId,
+    required Set<String> enabled,
+  }) {
+    if (!isOfficialAnthropicEndpoint(cfg) ||
+        modelId == null ||
+        modelId.trim().isEmpty) {
+      return const <Map<String, dynamic>>[];
+    }
+    final upstream = BuiltInToolNames.effectiveModelId(
+      cfg: cfg,
+      modelId: modelId,
+    );
+    final entries = <Map<String, dynamic>>[];
+    if (enabled.contains(BuiltInToolNames.webFetch) &&
+        isClaudeWebFetchSupportedModel(upstream)) {
+      entries.add({
+        'type': 'web_fetch_20250910',
+        'name': 'web_fetch',
+        'max_content_tokens': claudeFetchMaxContentTokens,
+      });
+    }
+    if (enabled.contains(BuiltInToolNames.codeExecution) &&
+        isClaudeCodeExecutionSupportedModel(upstream)) {
+      entries.add({
+        'type': claudeCodeExecutionToolType,
+        'name': 'code_execution',
+      });
+    }
+    return entries;
+  }
+
   static bool isOpenAIResponsesBuiltInSearchSupportedModel(String? modelId) {
     final m = _normalizedModelId(modelId);
     return m.startsWith('gpt-4o') ||
@@ -796,6 +864,9 @@ abstract class BuiltInToolsHelper {
         BuiltInToolNames.youtube,
       };
     }
+    if (kind == ProviderKind.claude) {
+      return const {BuiltInToolNames.webFetch, BuiltInToolNames.codeExecution};
+    }
     if (kind != ProviderKind.openai) return const <String>{};
     if (isOpenRouterProvider(cfg)) {
       return {
@@ -823,6 +894,17 @@ abstract class BuiltInToolsHelper {
       selected.map(BuiltInToolNames.normalize).where(editable.contains),
     );
     return result;
+  }
+
+  static bool sendsDataFilesToSandbox({
+    required ProviderConfig cfg,
+    required String modelId,
+    required Iterable<Map<String, dynamic>> clientTools,
+  }) {
+    if (!isOfficialAnthropicEndpoint(cfg)) return false;
+    return BuiltInToolNames.parseFromOverride(
+      cfg.modelOverrides[modelId],
+    ).contains(BuiltInToolNames.codeExecution);
   }
 
   /// 检查提供商/模型组合是否支持搜索工具。

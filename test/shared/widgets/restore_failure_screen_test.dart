@@ -79,4 +79,30 @@ void main() {
     expect(find.textContaining('another app process'), findsOneWidget);
     expect(find.text('Restart JO-AIClient'), findsOneWidget);
   });
+
+  testWidgets(
+    'offers export and manual snapshot rollback for a newer database',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          home: RestoreFailureScreen(
+            diagnosticCode: 'database_schema_too_new',
+            restart: () async {},
+            appDataDirectory: Directory.systemTemp,
+            databaseTooNew: true,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Update JO-AIClient to continue'), findsOneWidget);
+      expect(find.text('Advanced: restore an older snapshot'), findsOneWidget);
+      expect(find.text('Export a copy of my data'), findsOneWidget);
+      expect(find.text('Repair and restart'), findsNothing);
+      expect(find.text('Reset data'), findsNothing);
+    },
+  );
 }

@@ -25,6 +25,7 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/search/search_service.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../utils/model_display_helper.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../utils/sandbox_path_resolver.dart';
@@ -137,6 +138,8 @@ class ChatInputBar extends StatefulWidget {
     this.ocrActive = false,
     this.onToggleOcr,
     this.conversationId,
+    this.chatModelProviderKey,
+    this.chatModelId,
     this.sendButtonTooltip,
     this.backgroundImageActive = false,
     this.inputBackgroundOpacityLight =
@@ -190,6 +193,8 @@ class ChatInputBar extends StatefulWidget {
   final bool ocrActive;
   final VoidCallback? onToggleOcr;
   final String? conversationId;
+  final String? chatModelProviderKey;
+  final String? chatModelId;
   final String? sendButtonTooltip;
   final bool backgroundImageActive;
   final double inputBackgroundOpacityLight;
@@ -244,6 +249,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   // 应用恢复后短暂抑制上下文菜单，避免闪烁
   bool _suppressContextMenu = false;
   bool _isSubmitting = false;
+  int _submitSerial = 0;
   String? _imageModeModelKey;
   String? _lastImageModeModelKey;
   String? _dismissedImageModeModelKey;
@@ -279,10 +285,12 @@ class _ChatInputBarState extends State<ChatInputBar>
 
   bool _supportsImagesApiRouting(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
-    final ap = context.watch<AssistantProvider>();
-    final a = ap.currentAssistant;
-    final providerKey = a?.chatModelProvider ?? settings.currentModelProvider;
-    final modelId = a?.chatModelId ?? settings.currentModelId;
+    final fallback = getActiveModelIds(
+      settings,
+      assistant: context.watch<AssistantProvider>().currentAssistant,
+    );
+    final providerKey = widget.chatModelProviderKey ?? fallback.providerKey;
+    final modelId = widget.chatModelId ?? fallback.modelId;
     if (providerKey == null || modelId == null) {
       _imageModeModelKey = null;
       return false;
@@ -587,6 +595,15 @@ class _ChatInputBarState extends State<ChatInputBar>
   @override
   void didUpdateWidget(covariant ChatInputBar oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final previousConversationId = oldWidget.conversationId;
+    final nextConversationId = widget.conversationId;
+    if (previousConversationId != null &&
+        nextConversationId != null &&
+        previousConversationId != nextConversationId) {
+      _submitSerial++;
+      _isSubmitting = false;
+      _draftReplacementRevision++;
+    }
     if (!identical(oldWidget.asrProvider, widget.asrProvider)) {
       _stopVoiceLevelSampling();
       oldWidget.asrProvider?.removeListener(_handleAsrChanged);
@@ -930,6 +947,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     final submittedImageIds = submittedImages.map((image) => image.id).toSet();
     final submittedDocuments = List<DocumentAttachment>.of(_docs);
     final submittedDraftRevision = _draftReplacementRevision;
+    final submitSerial = ++_submitSerial;
     _isSubmitting = true;
     // 发送调用现在在消息对落库后就返回，附件应随本次提交立即离开输入框。
     // 如果提交被拒绝，下面会把本次快照恢复，同时保留用户期间新增的内容。
@@ -951,7 +969,7 @@ class _ChatInputBarState extends State<ChatInputBar>
             ),
           ) ??
           ChatInputSubmissionResult.rejected;
-      if (!mounted) return;
+      if (!mounted || submitSerial != _submitSerial) return;
       if (result == ChatInputSubmissionResult.sent ||
           result == ChatInputSubmissionResult.queued) {
         if (_draftReplacementRevision != submittedDraftRevision) return;
@@ -973,7 +991,9 @@ class _ChatInputBarState extends State<ChatInputBar>
         );
       }
     } catch (_) {
-      if (mounted && _draftReplacementRevision == submittedDraftRevision) {
+      if (mounted &&
+          submitSerial == _submitSerial &&
+          _draftReplacementRevision == submittedDraftRevision) {
         setState(
           () => _restoreSubmittedDraft(
             submittedValue,
@@ -984,7 +1004,9 @@ class _ChatInputBarState extends State<ChatInputBar>
       }
       rethrow;
     } finally {
-      _isSubmitting = false;
+      if (submitSerial == _submitSerial) {
+        _isSubmitting = false;
+      }
     }
   }
 
@@ -1758,10 +1780,13 @@ class _ChatInputBarState extends State<ChatInputBar>
         // 搜索按钮（图标根据供应商配置变化）
         final settings = context.watch<SettingsProvider>();
         final ap = context.watch<AssistantProvider>();
-        final a = ap.currentAssistant;
+        final fallback = getActiveModelIds(
+          settings,
+          assistant: ap.currentAssistant,
+        );
         final currentProviderKey =
-            a?.chatModelProvider ?? settings.currentModelProvider;
-        final currentModelId = a?.chatModelId ?? settings.currentModelId;
+            widget.chatModelProviderKey ?? fallback.providerKey;
+        final currentModelId = widget.chatModelId ?? fallback.modelId;
         final cfg = (currentProviderKey != null)
             ? settings.getProviderConfig(currentProviderKey)
             : null;

@@ -16,10 +16,122 @@ import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../utils/sandbox_path_resolver.dart';
+import '../../../utils/safe_resize_image.dart';
 import '../../../utils/clipboard_images.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+
+@visibleForTesting
+const int kMaxViewerDecodeEdge = 4096;
+@visibleForTesting
+const int kMaxViewerDecodePixels = 12 * 1024 * 1024;
+
+@visibleForTesting
+({int width, int height}) computeViewerDecodePixels({
+  required double logicalWidth,
+  required double logicalHeight,
+  required double devicePixelRatio,
+}) {
+  final dpr = devicePixelRatio <= 0 ? 1.0 : devicePixelRatio;
+  return clampDecodedPixelSize(
+    width: math.max(1.0, logicalWidth * dpr),
+    height: math.max(1.0, logicalHeight * dpr),
+    maxEdge: kMaxViewerDecodeEdge,
+    maxPixels: kMaxViewerDecodePixels,
+  );
+}
+
+@visibleForTesting
+({int width, int height}) quantizeViewerDecodePixels({
+  required int width,
+  required int height,
+}) => computeViewerDecodePixels(
+  logicalWidth: width.toDouble(),
+  logicalHeight: height.toDouble(),
+  devicePixelRatio: 1,
+);
+
+@visibleForTesting
+bool canReuseViewerDisplayPixels({
+  required int cachedWidth,
+  required int cachedHeight,
+  required int targetWidth,
+  required int targetHeight,
+}) =>
+    targetWidth <= (cachedWidth * 1.2).ceil() &&
+    targetHeight <= (cachedHeight * 1.2).ceil();
+
+@visibleForTesting
+String detectClipboardImageFormat({required List<int> bytes}) {
+  if (bytes.length >= 8 &&
+      bytes[0] == 0x89 &&
+      bytes[1] == 0x50 &&
+      bytes[2] == 0x4e &&
+      bytes[3] == 0x47) {
+    return 'png';
+  }
+  if (bytes.length >= 3 &&
+      bytes[0] == 0xff &&
+      bytes[1] == 0xd8 &&
+      bytes[2] == 0xff) {
+    return 'jpeg';
+  }
+  if (bytes.length >= 6 &&
+      bytes[0] == 0x47 &&
+      bytes[1] == 0x49 &&
+      bytes[2] == 0x46) {
+    return 'gif';
+  }
+  if (bytes.length >= 12 &&
+      bytes[0] == 0x52 &&
+      bytes[1] == 0x49 &&
+      bytes[2] == 0x46 &&
+      bytes[8] == 0x57 &&
+      bytes[9] == 0x45 &&
+      bytes[10] == 0x42 &&
+      bytes[11] == 0x50) {
+    return 'webp';
+  }
+  return '';
+}
+
+@visibleForTesting
+Future<({Uint8List bytes, String format, bool converted})?>
+prepareClipboardImageBytes({required Uint8List bytes}) async {
+  final format = detectClipboardImageFormat(bytes: bytes);
+  if (format.isNotEmpty) {
+    return (bytes: bytes, format: format, converted: false);
+  }
+  ui.ImmutableBuffer? buffer;
+  ui.ImageDescriptor? descriptor;
+  ui.Codec? codec;
+  ui.Image? image;
+  try {
+    buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
+    descriptor = await ui.ImageDescriptor.encoded(buffer);
+    final target = computeViewerDecodePixels(
+      logicalWidth: descriptor.width.toDouble(),
+      logicalHeight: descriptor.height.toDouble(),
+      devicePixelRatio: 1,
+    );
+    codec = await descriptor.instantiateCodec(
+      targetWidth: target.width,
+      targetHeight: target.height,
+    );
+    image = (await codec.getNextFrame()).image;
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+    if (data == null) return null;
+    return (bytes: data.buffer.asUint8List(), format: 'png', converted: true);
+  } catch (_) {
+    return null;
+  } finally {
+    image?.dispose();
+    codec?.dispose();
+    descriptor?.dispose();
+    buffer?.dispose();
+  }
+}
 
 class ImageViewerPage extends StatefulWidget {
   const ImageViewerPage({
@@ -67,6 +179,8 @@ class _ImageViewerPageState extends State<ImageViewerPage>
   final GlobalKey _viewerKey = GlobalKey();
 
   final Map<String, ImageProvider> _imageProviderCache =
+      <String, ImageProvider>{};
+  final Map<String, ImageProvider> _displayProviderCache =
       <String, ImageProvider>{};
 
   bool get _isDesktop =>
@@ -535,6 +649,28 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     return provider;
   }
 
+  ImageProvider _displayProviderFor(
+    String src,
+    ImageProvider provider, {
+    required int width,
+    required int height,
+  }) {
+    if (widget.imageProviders.containsKey(src)) return provider;
+    final key = '$src\u0000${width}x$height';
+    return _displayProviderCache.putIfAbsent(
+      key,
+      () => SafeResizeImage.display(
+        provider,
+        width: width,
+        height: height,
+        fit: SafeResizeFit.contain,
+        allowUpscaling: false,
+        maxEdge: kMaxViewerDecodeEdge,
+        maxPixels: kMaxViewerDecodePixels,
+      ),
+    );
+  }
+
   ImageProvider _createProviderFor(String src) {
     if (src.startsWith('http://') || src.startsWith('https://')) {
       return NetworkImage(src);
@@ -828,13 +964,6 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     return '';
   }
 
-  bool _isSupportedClipboardFormat(String format) {
-    return format == 'png' ||
-        format == 'jpeg' ||
-        format == 'gif' ||
-        format == 'webp';
-  }
-
   String _normalizeSuggestedName(String? name, String format) {
     final ext = format == 'jpeg' ? '.jpg' : '.$format';
     final fallback = 'image$ext';
@@ -911,33 +1040,19 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       return null;
     }
 
-    Uint8List safeBytes = bytes;
-
-    if (!_isSupportedClipboardFormat(format)) {
-      try {
-        final codec = await ui.instantiateImageCodec(safeBytes);
-        final frame = await codec.getNextFrame();
-        final data = await frame.image.toByteData(
-          format: ui.ImageByteFormat.png,
-        );
-        if (data != null) {
-          safeBytes = data.buffer.asUint8List();
-          format = 'png';
-        }
-      } catch (_) {}
-      if (!_isSupportedClipboardFormat(format)) {
-        setError('unsupported-format');
-        return null;
-      }
+    final prepared = await prepareClipboardImageBytes(bytes: bytes);
+    if (prepared == null || prepared.format.isEmpty) {
+      setError('unsupported-format');
+      return null;
     }
-
+    format = prepared.format;
     suggestedName = _normalizeSuggestedName(suggestedName, format);
 
     return _CopyPayload(
-      bytes: safeBytes,
+      bytes: prepared.bytes,
       format: format,
       suggestedName: suggestedName,
-      sourcePath: sourcePath,
+      sourcePath: prepared.converted ? null : sourcePath,
     );
   }
 
@@ -1132,8 +1247,19 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     final src = widget.images[i];
     final provider = _providerFor(src);
     _ensureImageNaturalSize(src, provider);
+    final viewport = MediaQuery.sizeOf(context);
+    final target = computeViewerDecodePixels(
+      logicalWidth: viewport.width,
+      logicalHeight: viewport.height,
+      devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+    );
     final image = Image(
-      image: provider,
+      image: _displayProviderFor(
+        src,
+        provider,
+        width: target.width,
+        height: target.height,
+      ),
       fit: BoxFit.contain,
       gaplessPlayback: true,
       loadingBuilder: (context, child, loadingProgress) {

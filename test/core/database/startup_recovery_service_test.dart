@@ -179,6 +179,51 @@ void main() {
     });
   });
 
+  group('local snapshots', () {
+    test('lists published snapshots from newest to oldest', () async {
+      final snapshots = Directory(p.join(directory.path, 'snapshots'));
+      await snapshots.create();
+      await File(
+        p.join(snapshots.path, 'kelivo-snapshot-1.zip'),
+      ).writeAsString('old');
+      await File(
+        p.join(snapshots.path, 'kelivo-snapshot-2.zip'),
+      ).writeAsString('new');
+      await File(
+        p.join(snapshots.path, 'kelivo-snapshot-3.zip.tmp'),
+      ).writeAsString('incomplete');
+
+      final files = await StartupRecoveryService.listLocalSnapshots(
+        appDataDirectory: directory,
+      );
+
+      expect(files.map((file) => p.basename(file.path)), [
+        'kelivo-snapshot-2.zip',
+        'kelivo-snapshot-1.zip',
+      ]);
+    });
+
+    test('rejects a restore source outside the snapshot store', () async {
+      final outside = await File(
+        p.join(directory.path, 'outside.zip'),
+      ).writeAsString('not a snapshot');
+
+      await expectLater(
+        StartupRecoveryService.prepareLocalSnapshotRestore(
+          appDataDirectory: directory,
+          snapshot: outside,
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            'startup_recovery_snapshot_outside_store',
+          ),
+        ),
+      );
+    });
+  });
+
   group('exportDataCopy destination guard', () {
     test('rejects a destination inside the data directory', () async {
       await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);

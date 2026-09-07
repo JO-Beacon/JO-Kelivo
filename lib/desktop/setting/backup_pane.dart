@@ -15,6 +15,7 @@ import '../../core/providers/assistant_group_provider.dart';
 import '../../core/providers/assistant_provider.dart';
 import '../../core/providers/s3_backup_provider.dart';
 import '../../core/providers/settings_provider.dart';
+import '../../core/providers/local_snapshot_provider.dart';
 import '../../core/services/chat/chat_service.dart';
 import '../../core/services/backup/data_sync.dart';
 import '../../core/services/backup/cherry_importer.dart';
@@ -1131,10 +1132,34 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     AppLocalizations l10n,
     ColorScheme cs,
   ) {
+    final localSnapshot = context.watch<LocalSnapshotProvider?>();
     return SliverToBoxAdapter(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (localSnapshot != null) ...[
+            _sectionCard(
+              children: [
+                _BackupCategoryLabel(label: l10n.localSnapshotTitle),
+                _ItemRow(
+                  label: l10n.localSnapshotEnabled,
+                  vpad: 2,
+                  trailing: IosSwitch(
+                    value: localSnapshot.settings.enabled,
+                    onChanged: localSnapshot.setEnabled,
+                  ),
+                ),
+                _rowDivider(context),
+                _DeskIosButton(
+                  label: l10n.localSnapshotTakeNow,
+                  filled: false,
+                  dense: true,
+                  onTap: localSnapshot.takeNow,
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+          ],
           _sectionCard(
             children: [
               _BackupCategoryLabel(label: l10n.backupPageNativeBackup),

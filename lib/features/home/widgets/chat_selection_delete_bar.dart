@@ -80,7 +80,7 @@ class ChatSelectionDeleteBar extends StatelessWidget {
                         Expanded(
                           child: _DeleteButton(
                             icon: Lucide.Trash2,
-                            label: l10n.homePageDeleteMessage,
+                            label: l10n.homePageDeleteMessageNode,
                             color: cs.error,
                             onTap: onDeleteCurrentVersions,
                             dense: compact,

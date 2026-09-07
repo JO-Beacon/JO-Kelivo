@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/chat/chat_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -250,6 +251,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                 onTap: () async {
                   final assistantProvider = context.read<AssistantProvider>();
                   final settings = context.read<SettingsProvider>();
+                  final chatService = context.read<ChatService>();
                   final confirm = await showDialog<bool>(
                     context: context,
                     builder: (ctx) => AlertDialog(
@@ -287,6 +289,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                     } catch (_) {}
 
                     // 移除供应商配置及相关选择或置顶
+                    await chatService.clearConversationModelOverrides(
+                      providerKey: widget.keyName,
+                    );
                     await settings.removeProviderConfig(widget.keyName);
                     if (!context.mounted) return;
                     showAppSnackBar(
@@ -1474,6 +1479,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                             final settings = context.read<SettingsProvider>();
                             final assistantProvider = context
                                 .read<AssistantProvider>();
+                            final chatService = context.read<ChatService>();
                             final ok = await showDialog<bool>(
                               context: context,
                               builder: (dctx) => AlertDialog(
@@ -1530,6 +1536,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                             await settings.clearSelectionsForModel(
                               widget.keyName,
                               id,
+                            );
+                            await chatService.clearConversationModelOverrides(
+                              providerKey: widget.keyName,
+                              modelId: id,
                             );
                             try {
                               for (final a in assistantProvider.assistants) {
@@ -3062,11 +3072,18 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
 
     final settings = context.read<SettingsProvider>();
     final assistantProvider = context.read<AssistantProvider>();
+    final chatService = context.read<ChatService>();
     final deletedCount = await settings.deleteModels(
       widget.keyName,
       modelsToDelete,
     );
     await _clearAssistantSelectionsForModels(modelsToDelete, assistantProvider);
+    for (final modelId in modelsToDelete) {
+      await chatService.clearConversationModelOverrides(
+        providerKey: widget.keyName,
+        modelId: modelId,
+      );
+    }
     if (!mounted) return;
     setState(() {
       _selectedModels.clear();
@@ -3185,9 +3202,13 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     if (ok != true) return;
     if (!mounted) return;
     final assistantProvider = context.read<AssistantProvider>();
+    final chatService = context.read<ChatService>();
     final modelsToDelete = Set<String>.from(cfg.models);
     await settings.deleteModels(widget.keyName, modelsToDelete);
     await _clearAssistantSelectionsForModels(modelsToDelete, assistantProvider);
+    await chatService.clearConversationModelOverrides(
+      providerKey: widget.keyName,
+    );
     if (!mounted) return;
     setState(() {
       _selectedModels.clear();

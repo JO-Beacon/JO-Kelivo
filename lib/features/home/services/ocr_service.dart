@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/retry_policy.dart';
 
 /// OCR 缓存条目
 class OcrCacheEntry {
@@ -105,12 +106,19 @@ class OcrService {
   /// 返回识别的文本内容，失败时返回 null
   Future<String?> runOcrForImages(
     List<String> imagePaths,
-    BuildContext context,
-  ) async {
+    BuildContext context, {
+    String? requestId,
+  }) async {
     if (imagePaths.isEmpty) return null;
     if (ocrExecutor != null) {
-      final out = (await ocrExecutor!(imagePaths))?.trim();
-      return (out == null || out.isEmpty) ? null : out;
+      try {
+        final out = (await ocrExecutor!(imagePaths))?.trim();
+        return (out == null || out.isEmpty) ? null : out;
+      } catch (error) {
+        if (isUserCancelError(error)) rethrow;
+        onError?.call(error);
+        return null;
+      }
     }
 
     final settings = context.read<SettingsProvider>();
@@ -136,6 +144,7 @@ class OcrService {
       extraBody: null,
       stream: false,
       ocrActive: true,
+      requestId: requestId,
     );
 
     String out = '';
@@ -146,6 +155,7 @@ class OcrService {
         }
       }
     } catch (e) {
+      if (isUserCancelError(e)) rethrow;
       onError?.call(e);
       return null;
     }
@@ -283,6 +293,7 @@ class OcrService {
     BuildContext context, {
     String? revisionId,
     OcrPrepareSession? session,
+    String? requestId,
   }) async {
     if (imagePaths.isEmpty) return null;
 
@@ -380,7 +391,7 @@ class OcrService {
       }
 
       if (!context.mounted) break;
-      final text = await runOcrForImages([path], context);
+      final text = await runOcrForImages([path], context, requestId: requestId);
       if (text != null && text.trim().isNotEmpty) {
         final t = text.trim();
         if (hash != null && hash.isNotEmpty) {

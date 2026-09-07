@@ -87,3 +87,10 @@ internationalization.md
 # Local agent instruction mirrors; keep AGENTS.md and CLAUDE.md out of Git.
 /AGENTS.md
 /CLAUDE.md
+
+# Flutter 工具本地状态文件
+.flutter
+.flutter_tool_state
+
+# 历史 Release 二进制存档（仅本地保留）
+/历史Release二进制文件/

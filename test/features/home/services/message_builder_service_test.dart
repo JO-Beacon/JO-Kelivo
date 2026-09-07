@@ -1216,7 +1216,7 @@ void main() {
       final service = MessageBuilderService(
         chatService: _FakeChatService({}),
         contextProvider: _FakeBuildContext(),
-        ocrHandler: (imagePaths, {revisionId, session}) async {
+        ocrHandler: (imagePaths, {revisionId, session, requestId}) async {
           ocrCalls.add(List<String>.of(imagePaths));
           return 'ocr-should-not-run';
         },
@@ -1298,11 +1298,16 @@ void main() {
       final settings = SettingsProvider(createBusinessTestPreferences());
       await settings.loaded;
 
+      String? observedRequestId;
       final service = MessageBuilderService(
         chatService: _FakeChatService({}),
         contextProvider: _FakeBuildContext(),
-        ocrHandler: (imagePaths, {revisionId, session}) async => 'ocr',
+        ocrHandler: (imagePaths, {revisionId, session, requestId}) async {
+          observedRequestId = requestId;
+          return 'ocr';
+        },
       );
+      final conversation = Conversation(title: 'test');
 
       final realUser = ChatMessage(
         id: 'u-real',
@@ -1347,6 +1352,7 @@ void main() {
         apiMessages,
         settings,
         const Assistant(id: 'a1', name: 'test'),
+        conversation: conversation,
         sourceMessages: [realUser],
       );
 
@@ -1357,6 +1363,7 @@ void main() {
       expect(media, [
         encodeInternalMediaRef(uri: '/tmp/clip.mp3', mime: 'audio/mpeg'),
       ]);
+      expect(observedRequestId, conversation.id);
       expect(apiMessages.single['content'], isNot(contains('[image:')));
     });
 

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'assistant_regex.dart';
 import 'preset_message.dart';
 import 'avatar_transform.dart';
+import 'health_data_type.dart';
 
 enum MemorySmartAddMode { batched, perItem }
 
@@ -49,6 +50,9 @@ class Assistant {
   final bool searchEnabled; // 每个助手的联网搜索开关
   final List<String> mcpServerIds; // 绑定的 MCP 服务器 ID
   final List<String> localToolIds; // 启用的本地工具 ID
+  /// 该助手可读取的 HealthKit 指标 ID。健康总开关关闭时保留选择，
+  /// 以便重新开启时恢复。
+  final List<String> healthDataTypeIds;
   final String? background; // 聊天背景（颜色/图片引用）
   // 自定义请求覆盖（每个助手）
   final List<Map<String, String>>
@@ -90,6 +94,7 @@ class Assistant {
     this.searchEnabled = false,
     this.mcpServerIds = const <String>[],
     this.localToolIds = const <String>[],
+    this.healthDataTypeIds = HealthDataTypeIds.defaultSelected,
     this.background,
     this.customHeaders = const <Map<String, String>>[],
     this.customBody = const <Map<String, String>>[],
@@ -127,6 +132,7 @@ class Assistant {
     bool? searchEnabled,
     List<String>? mcpServerIds,
     List<String>? localToolIds,
+    List<String>? healthDataTypeIds,
     String? background,
     List<Map<String, String>>? customHeaders,
     List<Map<String, String>>? customBody,
@@ -177,6 +183,7 @@ class Assistant {
       searchEnabled: searchEnabled ?? this.searchEnabled,
       mcpServerIds: mcpServerIds ?? this.mcpServerIds,
       localToolIds: localToolIds ?? this.localToolIds,
+      healthDataTypeIds: healthDataTypeIds ?? this.healthDataTypeIds,
       background: clearBackground ? null : (background ?? this.background),
       customHeaders: customHeaders ?? this.customHeaders,
       customBody: customBody ?? this.customBody,
@@ -220,6 +227,7 @@ class Assistant {
     'searchEnabled': searchEnabled,
     'mcpServerIds': mcpServerIds,
     'localToolIds': localToolIds,
+    'healthDataTypeIds': healthDataTypeIds,
     'background': background,
     'customHeaders': customHeaders,
     'customBody': customBody,
@@ -259,6 +267,9 @@ class Assistant {
         (json['mcpServerIds'] as List?)?.cast<String>() ?? const <String>[],
     localToolIds:
         (json['localToolIds'] as List?)?.cast<String>() ?? const <String>[],
+    healthDataTypeIds: HealthDataTypeIds.parseStoredIds(
+      json['healthDataTypeIds'],
+    ),
     background: json['background'] as String?,
     customHeaders: (() {
       final raw = json['customHeaders'];

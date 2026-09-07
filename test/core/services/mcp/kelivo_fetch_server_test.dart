@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -15,7 +16,22 @@ void main() {
       baseUri = Uri.parse('http://127.0.0.1:${httpServer.port}');
       engine = KelivoFetchMcpServerEngine();
       httpServer.listen((request) async {
-        if (request.uri.path == '/json') {
+        if (request.uri.path == '/echo') {
+          final body = await utf8.decoder.bind(request).join();
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode({
+              'method': request.method,
+              'body': body,
+              'contentType':
+                  request.headers.value(HttpHeaders.contentTypeHeader) ?? '',
+            }),
+          );
+        } else if (request.uri.path == '/fail') {
+          request.response.statusCode = HttpStatus.badRequest;
+          request.response.headers.contentType = ContentType.json;
+          request.response.write('{"error":"bad request"}');
+        } else if (request.uri.path == '/json') {
           request.response.headers.contentType = ContentType.json;
           request.response.write('''
 {
@@ -152,6 +168,53 @@ void main() {
       expect(_resultText(first), startsWith('😀'));
       expect(_resultText(first), contains('start_index=2'));
       expect(_resultText(continued), 'abc');
+    });
+
+    test('posts a JSON object as UTF-8', () async {
+      final result = await _callFetch(
+        engine,
+        baseUri.resolve('/echo'),
+        arguments: const {
+          'method': 'post',
+          'body': {'key': '值'},
+        },
+      );
+      final echo = jsonDecode(_resultText(result)) as Map<String, dynamic>;
+
+      expect(result['isError'], isFalse);
+      expect(echo['method'], 'POST');
+      expect(echo['body'], '{"key":"值"}');
+      expect(echo['contentType'], contains('application/json'));
+    });
+
+    test('rejects methods beyond GET and POST', () async {
+      final result = await _callFetch(
+        engine,
+        baseUri.resolve('/echo'),
+        arguments: const {'method': 'DELETE'},
+      );
+
+      expect(result['isError'], isTrue);
+      expect(_resultText(result), contains('expected GET or POST'));
+    });
+
+    test('does not replay POST to continue a truncated response', () async {
+      final result = await _callFetch(
+        engine,
+        baseUri.resolve('/echo'),
+        arguments: const {'method': 'POST', 'body': '{}', 'start_index': 1},
+      );
+
+      expect(result['isError'], isTrue);
+      expect(_resultText(result), contains('cannot be continued'));
+    });
+
+    test('reports an HTTP error together with its response body', () async {
+      final result = await _callFetch(engine, baseUri.resolve('/fail'));
+
+      expect(result['isError'], isTrue);
+      expect(_resultText(result), contains('HTTP 400'));
+      expect(_resultText(result), contains('bad request'));
     });
 
     test('rejects attempts to exceed the hard output limit', () async {

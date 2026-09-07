@@ -25,8 +25,10 @@ import '../model_override_resolver.dart';
 import '../model_override_payload_parser.dart';
 import '../custom_request_merger.dart';
 import 'provider_request_headers.dart';
+import 'retry_policy.dart';
 import '../../utils/multimodal_input_utils.dart';
 import 'stream/legacy_stream_chunk_adapter.dart';
+import 'stream/retrying_stream.dart';
 import 'stream/stream_chunk.dart';
 import 'stream/stream_chunk_emit.dart';
 import 'stream/stream_chunk_ids.dart';
@@ -49,7 +51,7 @@ part 'providers/claude_official.dart';
 part 'providers/zhipu_layout_parsing.dart';
 
 typedef ToolCallHandler =
-    Future<String> Function(
+    Future<dynamic> Function(
       String name,
       Map<String, dynamic> args, {
       String? toolCallId,
@@ -522,6 +524,9 @@ class ChatApiService {
       final copy = Map<String, dynamic>.from(message);
       copy.remove(multimodalInternalMediaPathsKey);
       copy.remove(multimodalInternalRevisionIdKey);
+      copy.remove(multimodalInternalDocumentPathsKey);
+      copy.remove(multimodalInternalClaudeContainerKey);
+      copy.remove(multimodalInternalClaudeTurnKey);
       copy.remove(kelivoContextSegmentsKey);
       if (copy.containsKey('content')) {
         copy['content'] = await _stripImageInputsFromContent(copy['content']);
@@ -587,9 +592,104 @@ class ChatApiService {
       config.id,
       explicitType: config.providerType,
     );
-    final cancelToken = CancelToken();
+    final useImagesApi =
+        kind == ProviderKind.openai &&
+        allowImagesApiRouting &&
+        _shouldUseOpenAIImagesApi(config, modelId);
+    final useZhipuLayoutParsing = shouldUseZhipuLayoutParsing(config, modelId);
+    final imageOutput = _effectiveModelInfo(
+      config,
+      modelId,
+    ).output.contains(Modality.image);
+    final hasClientTools = (tools?.isNotEmpty ?? false) || onToolCall != null;
+    final replaySafe =
+        !useImagesApi &&
+        !useZhipuLayoutParsing &&
+        !imageOutput &&
+        !hasClientTools;
+    final options = AutoRetryConfig.current;
+    final sessionToken = CancelToken();
     final rid = (requestId ?? '').trim();
     if (rid.isNotEmpty) {
+      final previous = _activeCancelTokens.remove(rid);
+      try {
+        previous?.cancel('replaced');
+      } catch (_) {}
+      _activeCancelTokens[rid] = sessionToken;
+    }
+
+    try {
+      yield* retryingStream<ChatStreamChunk>(
+        options: options,
+        isCancelled: () => sessionToken.isCancelled,
+        cancelled: _whenCancelled(sessionToken),
+        shouldRetry: (error) => replaySafe && shouldRetryError(error),
+        onRetry: (attempt, delay, error) async {
+          FlutterLogger.log(
+            'API request retry ${attempt + 1}/${options.maxRetries} '
+            'after ${delay.inMilliseconds} ms: $error',
+            tag: 'AutoRetry',
+          );
+        },
+        attempt: (_) => _sendMessageStreamOnce(
+          config: config,
+          modelId: modelId,
+          messages: messages,
+          userImagePaths: userImagePaths,
+          thinkingBudget: thinkingBudget,
+          temperature: temperature,
+          topP: topP,
+          maxTokens: maxTokens,
+          tools: tools,
+          onToolCall: onToolCall,
+          extraHeaders: extraHeaders,
+          extraBody: extraBody,
+          stream: stream,
+          requestId: null,
+          allowImagesApiRouting: allowImagesApiRouting,
+          ocrActive: ocrActive,
+          parentCancelToken: sessionToken,
+        ),
+      );
+    } finally {
+      if (rid.isNotEmpty) {
+        final current = _activeCancelTokens[rid];
+        if (identical(current, sessionToken)) {
+          _activeCancelTokens.remove(rid);
+        }
+      }
+    }
+  }
+
+  static Stream<ChatStreamChunk> _sendMessageStreamOnce({
+    required ProviderConfig config,
+    required String modelId,
+    required List<Map<String, dynamic>> messages,
+    List<String>? userImagePaths,
+    int? thinkingBudget,
+    double? temperature,
+    double? topP,
+    int? maxTokens,
+    List<Map<String, dynamic>>? tools,
+    ToolCallHandler? onToolCall,
+    Map<String, String>? extraHeaders,
+    Map<String, dynamic>? extraBody,
+    required bool stream,
+    String? requestId,
+    required bool allowImagesApiRouting,
+    required bool ocrActive,
+    CancelToken? parentCancelToken,
+  }) async* {
+    final kind = ProviderConfig.classify(
+      config.id,
+      explicitType: config.providerType,
+    );
+    final cancelToken = CancelToken();
+    if (parentCancelToken != null) {
+      _bridgeCancel(parentCancelToken, cancelToken);
+    }
+    final rid = (requestId ?? '').trim();
+    if (rid.isNotEmpty && parentCancelToken == null) {
       final prev = _activeCancelTokens.remove(rid);
       try {
         prev?.cancel('replaced');
@@ -747,7 +847,7 @@ class ChatApiService {
       }
     } finally {
       client.close();
-      if (rid.isNotEmpty) {
+      if (rid.isNotEmpty && parentCancelToken == null) {
         final cur = _activeCancelTokens[rid];
         if (identical(cur, cancelToken)) {
           _activeCancelTokens.remove(rid);
@@ -787,19 +887,97 @@ class ChatApiService {
         allowImagesApiRouting &&
         _shouldUseOpenAIImagesApi(config, modelId);
     final useZhipuLayoutParsing = shouldUseZhipuLayoutParsing(config, modelId);
+    final imageOutput = _effectiveModelInfo(
+      config,
+      modelId,
+    ).output.contains(Modality.image);
+    final replaySafe = !useImagesApi && !useZhipuLayoutParsing && !imageOutput;
+    final options = AutoRetryConfig.current;
+    final sessionToken = CancelToken();
+    final rid = (requestId ?? '').trim();
+    if (rid.isNotEmpty) {
+      final previous = _activeCancelTokens.remove(rid);
+      try {
+        previous?.cancel('replaced');
+      } catch (_) {}
+      _activeCancelTokens[rid] = sessionToken;
+    }
+
+    try {
+      yield* retryingStream<StreamChunk>(
+        options: options,
+        isCancelled: () => sessionToken.isCancelled,
+        cancelled: _whenCancelled(sessionToken),
+        shouldRetry: (error) => replaySafe && shouldRetryError(error),
+        onRetry: (attempt, delay, error) async {
+          FlutterLogger.log(
+            'API request retry ${attempt + 1}/${options.maxRetries} '
+            'after ${delay.inMilliseconds} ms: $error',
+            tag: 'AutoRetry',
+          );
+        },
+        attempt: (_) => _sendMessageStreamEventsOnce(
+          config: config,
+          modelId: modelId,
+          messages: messages,
+          userImagePaths: userImagePaths,
+          thinkingBudget: thinkingBudget,
+          temperature: temperature,
+          topP: topP,
+          maxTokens: maxTokens,
+          tools: tools,
+          onToolCall: onToolCall,
+          extraHeaders: extraHeaders,
+          extraBody: extraBody,
+          stream: stream,
+          allowImagesApiRouting: allowImagesApiRouting,
+          ocrActive: ocrActive,
+          sessionToken: sessionToken,
+        ),
+      );
+    } finally {
+      if (rid.isNotEmpty) {
+        final current = _activeCancelTokens[rid];
+        if (identical(current, sessionToken)) {
+          _activeCancelTokens.remove(rid);
+        }
+      }
+    }
+  }
+
+  static Stream<StreamChunk> _sendMessageStreamEventsOnce({
+    required ProviderConfig config,
+    required String modelId,
+    required List<Map<String, dynamic>> messages,
+    List<String>? userImagePaths,
+    int? thinkingBudget,
+    double? temperature,
+    double? topP,
+    int? maxTokens,
+    List<Map<String, dynamic>>? tools,
+    ToolCallHandler? onToolCall,
+    Map<String, String>? extraHeaders,
+    Map<String, dynamic>? extraBody,
+    required bool stream,
+    required bool allowImagesApiRouting,
+    required bool ocrActive,
+    required CancelToken sessionToken,
+  }) async* {
+    final kind = ProviderConfig.classify(
+      config.id,
+      explicitType: config.providerType,
+    );
+    final useImagesApi =
+        kind == ProviderKind.openai &&
+        allowImagesApiRouting &&
+        _shouldUseOpenAIImagesApi(config, modelId);
+    final useZhipuLayoutParsing = shouldUseZhipuLayoutParsing(config, modelId);
 
     // Images 和 GLM-OCR 是一次性 JSON 特殊路由，直接转换为统一事件。
     if ((kind == ProviderKind.openai && useImagesApi) ||
         useZhipuLayoutParsing) {
       final cancelToken = CancelToken();
-      final rid = (requestId ?? '').trim();
-      if (rid.isNotEmpty) {
-        final previous = _activeCancelTokens.remove(rid);
-        try {
-          previous?.cancel('replaced');
-        } catch (_) {}
-        _activeCancelTokens[rid] = cancelToken;
-      }
+      _bridgeCancel(sessionToken, cancelToken);
       final safeMessages = _sanitizeMessages(messages);
       final client = _clientFor(config, cancelToken);
       try {
@@ -825,12 +1003,6 @@ class ChatApiService {
         }
       } finally {
         client.close();
-        if (rid.isNotEmpty) {
-          final current = _activeCancelTokens[rid];
-          if (identical(current, cancelToken)) {
-            _activeCancelTokens.remove(rid);
-          }
-        }
       }
       return;
     }
@@ -841,14 +1013,7 @@ class ChatApiService {
         !useImagesApi &&
         !useZhipuLayoutParsing) {
       final cancelToken = CancelToken();
-      final rid = (requestId ?? '').trim();
-      if (rid.isNotEmpty) {
-        final previous = _activeCancelTokens.remove(rid);
-        try {
-          previous?.cancel('replaced');
-        } catch (_) {}
-        _activeCancelTokens[rid] = cancelToken;
-      }
+      _bridgeCancel(sessionToken, cancelToken);
 
       final unicodeSafeMessages = _sanitizeMessages(messages);
       final stripUnsupportedImageInputs =
@@ -879,12 +1044,6 @@ class ChatApiService {
         );
       } finally {
         client.close();
-        if (rid.isNotEmpty) {
-          final current = _activeCancelTokens[rid];
-          if (identical(current, cancelToken)) {
-            _activeCancelTokens.remove(rid);
-          }
-        }
       }
       return;
     }
@@ -899,14 +1058,7 @@ class ChatApiService {
     final useGoogleEvents = kind == ProviderKind.google && !isVertexClaude;
     if (useClaudeEvents || useGoogleEvents) {
       final cancelToken = CancelToken();
-      final rid = (requestId ?? '').trim();
-      if (rid.isNotEmpty) {
-        final previous = _activeCancelTokens.remove(rid);
-        try {
-          previous?.cancel('replaced');
-        } catch (_) {}
-        _activeCancelTokens[rid] = cancelToken;
-      }
+      _bridgeCancel(sessionToken, cancelToken);
 
       final unicodeSafeMessages = _sanitizeMessages(messages);
       final stripUnsupportedImageInputs =
@@ -958,17 +1110,11 @@ class ChatApiService {
         }
       } finally {
         client.close();
-        if (rid.isNotEmpty) {
-          final current = _activeCancelTokens[rid];
-          if (identical(current, cancelToken)) {
-            _activeCancelTokens.remove(rid);
-          }
-        }
       }
       return;
     }
 
-    await for (final chunk in sendMessageStream(
+    await for (final chunk in _sendMessageStreamOnce(
       config: config,
       modelId: modelId,
       messages: messages,
@@ -982,14 +1128,36 @@ class ChatApiService {
       extraHeaders: extraHeaders,
       extraBody: extraBody,
       stream: stream,
-      requestId: requestId,
+      requestId: null,
       allowImagesApiRouting: allowImagesApiRouting,
       ocrActive: ocrActive,
+      parentCancelToken: sessionToken,
     )) {
       for (final event in legacyChunkToEvents(chunk)) {
         yield event;
       }
     }
+  }
+
+  static Future<void> _whenCancelled(CancelToken token) async {
+    try {
+      await token.whenCancel;
+    } catch (_) {}
+  }
+
+  static void _bridgeCancel(CancelToken parent, CancelToken child) {
+    if (parent.isCancelled) {
+      if (!child.isCancelled) child.cancel('cancelled');
+      return;
+    }
+    parent.whenCancel.then(
+      (_) {
+        if (!child.isCancelled) child.cancel('cancelled');
+      },
+      onError: (_) {
+        if (!child.isCancelled) child.cancel('cancelled');
+      },
+    );
   }
 
   // 用于标题摘要等工具的非流式文本生成
@@ -1003,6 +1171,42 @@ class ChatApiService {
 
     /// 工具提示（标题、摘要、压缩）只处理文本；保留 Markdown 图片语法，不执行媒体发现。
     bool skipImageParsing = false,
+  }) async {
+    final options = AutoRetryConfig.current;
+    final replaySafe = _builtInTools(config, modelId).isEmpty;
+    return retryingStream<String>(
+      options: options,
+      isCancelled: () => false,
+      shouldRetry: (error) => replaySafe && shouldRetryError(error),
+      onRetry: (attempt, delay, error) async {
+        FlutterLogger.log(
+          'API request retry ${attempt + 1}/${options.maxRetries} '
+          'after ${delay.inMilliseconds} ms: $error',
+          tag: 'AutoRetry',
+        );
+      },
+      attempt: (_) async* {
+        yield await _generateTextOnce(
+          config: config,
+          modelId: modelId,
+          prompt: prompt,
+          extraHeaders: extraHeaders,
+          extraBody: extraBody,
+          thinkingBudget: thinkingBudget,
+          skipImageParsing: skipImageParsing,
+        );
+      },
+    ).single;
+  }
+
+  static Future<String> _generateTextOnce({
+    required ProviderConfig config,
+    required String modelId,
+    required String prompt,
+    Map<String, String>? extraHeaders,
+    Map<String, dynamic>? extraBody,
+    int? thinkingBudget,
+    required bool skipImageParsing,
   }) async {
     final kind = ProviderConfig.classify(
       config.id,

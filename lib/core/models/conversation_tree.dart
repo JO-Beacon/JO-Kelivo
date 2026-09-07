@@ -123,6 +123,30 @@ class ConversationBranch {
 }
 
 @immutable
+class _AnchorDegradation {
+  const _AnchorDegradation({
+    required this.anchorMessageId,
+    required this.survivorMessageId,
+  });
+
+  final String anchorMessageId;
+  final String survivorMessageId;
+}
+
+@immutable
+class _AnchorMerge {
+  const _AnchorMerge({
+    required this.branches,
+    required this.edges,
+    required this.selections,
+  });
+
+  final Map<String, ConversationBranch> branches;
+  final Map<String, MessageTreeEdge> edges;
+  final Map<String, String> selections;
+}
+
+@immutable
 class ConversationTree {
   ConversationTree({
     required this.conversationId,
@@ -535,6 +559,309 @@ class ConversationTree {
   }
 
   List<String> activePath() => branchPath(activeBranchId);
+
+  /// 删除后按契约合并降级锚点。只处理「本次删除造成降级」的锚点：
+  /// 删除前该锚点有 ≥2 个直接子（至少一个子被本次删除移除），删除后
+  /// 恰剩一个。树中本就存在的单子链（如停锚的根分支）不在此列，
+  /// 不得误并用户创建的分支。
+  _AnchorMerge _mergeDegradedAnchorsAfterDeletion({
+    required Map<String, ConversationBranch> branches,
+    required Map<String, MessageTreeEdge> edges,
+    required Map<String, String> selections,
+    required Set<String> removedIds,
+  }) {
+    var nextBranches = branches;
+    var nextEdges = edges;
+    var nextSelections = selections;
+    var mergedAny = false;
+    // 合并可能级联（吸收者尖端移动后，其上级锚点也可能降级），
+    // 迭代至不动点。降级检测只依据删除集合，天然幂等。
+    while (true) {
+      final childrenByParent = <String?, Set<String>>{};
+      for (final edge in nextEdges.values) {
+        childrenByParent
+            .putIfAbsent(edge.parentMessageId, () => <String>{})
+            .add(edge.messageId);
+      }
+      _AnchorDegradation? degradation;
+      for (final entry in childrenByParent.entries) {
+        final anchor = entry.key;
+        if (anchor == null) continue;
+        final children = entry.value;
+        if (children.length != 1) continue;
+        // 本次删除是否移除了该锚点的至少一个其他直接子？
+        final removedSibling = removedIds.any(
+          (id) =>
+              edges[id]?.parentMessageId == anchor ||
+              nextEdges[id]?.parentMessageId == anchor,
+        );
+        // 吸收者的尖端本来停在锚点，合并后延伸；上级锚点的直接子数
+        // 不因合并变化，但吸收者自身的旧尖端所在锚点可能降级——用
+        // 原树边集判断“删除前是否有别的子”。
+        final hadSiblingBefore =
+            removedSibling ||
+            _hadSiblingAtAnchorBefore(anchor, nextEdges, removedIds);
+        if (!hadSiblingBefore) continue;
+        final degradationCandidate = _AnchorDegradation(
+          anchorMessageId: anchor,
+          survivorMessageId: children.single,
+        );
+        if (_mergeDegradedAnchor(
+              degradation: degradationCandidate,
+              branches: nextBranches,
+              edges: nextEdges,
+              selections: nextSelections,
+            ) ==
+            null) {
+          continue;
+        }
+        degradation = degradationCandidate;
+        break;
+      }
+      if (degradation == null) break;
+      final merged = _mergeDegradedAnchor(
+        degradation: degradation,
+        branches: nextBranches,
+        edges: nextEdges,
+        selections: nextSelections,
+      )!;
+      nextBranches = merged.branches;
+      nextEdges = merged.edges;
+      nextSelections = merged.selections;
+      mergedAny = true;
+    }
+    if (!mergedAny) {
+      return _AnchorMerge(
+        branches: branches,
+        edges: edges,
+        selections: selections,
+      );
+    }
+    return _AnchorMerge(
+      branches: nextBranches,
+      edges: nextEdges,
+      selections: nextSelections,
+    );
+  }
+
+  /// 判断锚点在本次删除前是否还有存活子之外的直接子。
+  ///
+  /// 删除前的边信息只能从原树 [edges] 与删除集合重建：原树下该锚点
+  /// 的直接子中，存在既不是当前唯一存活子、也未被删除的子即说明
+  /// 锚点删除前子数 > 2（本轮不构成“本次降级”）。仅当原树锚点下
+  /// 恰有两个子、其中一个被删除时，才返回 true。
+  bool _hadSiblingAtAnchorBefore(
+    String anchor,
+    Map<String, MessageTreeEdge> currentEdges,
+    Set<String> removedIds,
+  ) {
+    final childrenBefore = <String>{};
+    for (final edge in edges.values) {
+      if (edge.parentMessageId == anchor) childrenBefore.add(edge.messageId);
+    }
+    if (childrenBefore.length != 2) return false;
+    final removedChildren = childrenBefore
+        .where((id) => removedIds.contains(id))
+        .toList(growable: false);
+    if (removedChildren.length != 1) return false;
+    final survivor = childrenBefore
+        .where((id) => !removedIds.contains(id))
+        .firstOrNull;
+    return survivor != null && currentEdges.containsKey(survivor);
+  }
+
+  /// 归一化因删除产生的降级锚点（分叉锚点只剩一个直接子消息）。
+  ///
+  /// 检测器是契约 §8 的「可达即可见」不变量：从根可达的消息必须
+  /// 在活动路径上，或其直接父消息仍是分叉锚点（可经分支导航到达）。
+  /// 违反该不变量的消息所在的降级锚点按「删除当前分支」契约的
+  /// 合并规则修复：停锚分支吸收唯一存活直接子分支的尖端，被吸收
+  /// 分支的记录与锚点的分叉选择状态一并清理。无违反的停锚形态
+  /// （如用户 fork 后留下的原生停锚）保持原样。幂等。
+  ConversationTree normalizeDegradedAnchors() {
+    if (branches.isEmpty) return this;
+    var nextBranches = Map<String, ConversationBranch>.from(branches);
+    var nextEdges = edges;
+    var nextSelections = branchSelections;
+    var changed = false;
+    while (true) {
+      final activePathSet = _branchPathFor(
+        activeBranchId,
+        nextBranches,
+        nextEdges,
+      ).toSet();
+      final childrenByParent = <String?, Set<String>>{};
+      for (final edge in nextEdges.values) {
+        childrenByParent
+            .putIfAbsent(edge.parentMessageId, () => <String>{})
+            .add(edge.messageId);
+      }
+      // 找 §8 违反：可达消息不在活动路径、其父也不是分叉锚点。
+      _AnchorDegradation? degradation;
+      for (final edge in nextEdges.values) {
+        if (activePathSet.contains(edge.messageId)) continue;
+        final parent = edge.parentMessageId;
+        if (parent == null) continue;
+        final siblings = childrenByParent[parent] ?? const <String>{};
+        if (siblings.length >= 2) continue;
+        final candidate = _AnchorDegradation(
+          anchorMessageId: parent,
+          survivorMessageId: edge.messageId,
+        );
+        // 仅当该锚点确有停锚分支可合并时才构成可修复的残迹；
+        // 否则（如 fork 停锚等原生形态）保持原状。
+        if (_mergeDegradedAnchor(
+              degradation: candidate,
+              branches: nextBranches,
+              edges: nextEdges,
+              selections: nextSelections,
+            ) !=
+            null) {
+          degradation = candidate;
+          break;
+        }
+      }
+      if (degradation == null) break;
+      final merged = _mergeDegradedAnchor(
+        degradation: degradation,
+        branches: nextBranches,
+        edges: nextEdges,
+        selections: nextSelections,
+      )!;
+      nextBranches = merged.branches;
+      nextEdges = merged.edges;
+      nextSelections = merged.selections;
+      changed = true;
+    }
+    if (!changed) return this;
+    return _rebuildAfterMerge(
+      nextBranches,
+      nextEdges,
+      nextSelections,
+      fallbackIds: const <String>[],
+    );
+  }
+
+  /// 单个降级锚点的合并执行。返回 null 表示该锚点无需合并。
+  ///
+  /// 锚点只剩一个直接子（幸存子）且存在停锚分支（尖端=锚点）时：
+  /// 停锚分支中创建最早者继承幸存子一侧的尖端；代表幸存子一侧的
+  /// 覆盖分支（在锚点处分叉、路径经锚点走向幸存子）被吸收清理，
+  /// 其内容经继承者的延伸路径仍然全部可达；其余停锚分支按契约作
+  /// 重复记录一并清理；锚点的分叉选择记忆清除。
+  _AnchorMerge? _mergeDegradedAnchor({
+    required _AnchorDegradation degradation,
+    required Map<String, ConversationBranch> branches,
+    required Map<String, MessageTreeEdge> edges,
+    required Map<String, String> selections,
+  }) {
+    final anchor = degradation.anchorMessageId;
+    final survivorId = degradation.survivorMessageId;
+
+    // 停锚分支：尖端停在锚点本身。
+    final stuckBranches = <ConversationBranch>[];
+    // 覆盖分支：路径穿过锚点且下一跳是幸存子。
+    final coveringBranches = <ConversationBranch, int>{}; // 分支 → 锚点后缀长度
+    for (final branch in branches.values) {
+      final path = _branchPathFor(branch.id, branches, edges);
+      final anchorIndex = path.indexOf(anchor);
+      if (anchorIndex < 0) continue;
+      if (path.last == anchor) {
+        stuckBranches.add(branch);
+        continue;
+      }
+      final nextHop = anchorIndex + 1 < path.length
+          ? path[anchorIndex + 1]
+          : null;
+      if (nextHop == survivorId) {
+        coveringBranches[branch] = path.length - anchorIndex;
+      }
+    }
+    if (stuckBranches.isEmpty) return null;
+    // 无停锚分支时锚点无需合并：幸存子位于穿过锚点的分支路径上，
+    // 路径自然连续（契约「无需合并」条款）。
+
+    // 继承者：停锚分支中创建最早者；其余停锚分支作为重复记录清理。
+    stuckBranches.sort((a, b) {
+      final byTime = a.createdAt.compareTo(b.createdAt);
+      if (byTime != 0) return byTime;
+      return a.id.compareTo(b.id);
+    });
+    final inheritor = stuckBranches.first;
+
+    // 被吸收的覆盖分支：优先「在锚点处分叉」的记录（forkAnchor 即
+    // 锚点）——它是幸存子一侧在该锚点的代表；否则退化取锚点后缀
+    // 最短者。幸存子子级的更深分叉不在其列，保持原样。
+    ConversationBranch? absorbed;
+    var absorbedSuffixLength = 0;
+    for (final entry in coveringBranches.entries) {
+      final branch = entry.key;
+      final suffixLength = entry.value;
+      final isAnchorFork = branch.forkAnchorMessageId == anchor;
+      if (absorbed == null) {
+        absorbed = branch;
+        absorbedSuffixLength = suffixLength;
+        continue;
+      }
+      final absorbedIsAnchorFork = absorbed.forkAnchorMessageId == anchor;
+      if (isAnchorFork && !absorbedIsAnchorFork) {
+        absorbed = branch;
+        absorbedSuffixLength = suffixLength;
+      } else if (isAnchorFork == absorbedIsAnchorFork &&
+          suffixLength < absorbedSuffixLength) {
+        absorbed = branch;
+        absorbedSuffixLength = suffixLength;
+      }
+    }
+    // 继承者的新尖端：代表分支的尖端；无覆盖分支时为幸存子自身。
+    final newTip = absorbed?.tipMessageId ?? survivorId;
+
+    final nextBranches = <String, ConversationBranch>{
+      for (final entry in branches.entries)
+        if (!stuckBranches.any((b) => b.id == entry.key) &&
+            entry.key != absorbed?.id)
+          entry.key: entry.value,
+    }..[inheritor.id] = inheritor.copyWith(tipMessageId: newTip);
+    final nextSelections = Map<String, String>.from(selections)..remove(anchor);
+    return _AnchorMerge(
+      branches: nextBranches,
+      edges: edges,
+      selections: nextSelections,
+    );
+  }
+
+  /// 合并后的公共收尾：跑既有 normalize/prune 管线并重建树。
+  ConversationTree _rebuildAfterMerge(
+    Map<String, ConversationBranch> nextBranches,
+    Map<String, MessageTreeEdge> nextEdges,
+    Map<String, String> nextSelections, {
+    required List<String> fallbackIds,
+  }) {
+    final nextActiveBranchId = nextBranches.containsKey(activeBranchId)
+        ? activeBranchId
+        : _fallbackBranchId(nextBranches, preferredBranchIds: fallbackIds);
+    final prunedEdges = _pruneUnreachableEdges(nextBranches, nextEdges);
+    final normalizedBranches = _normalizeBranchRelations(
+      nextBranches,
+      prunedEdges,
+    );
+    return ConversationTree(
+      conversationId: conversationId,
+      activeBranchId: nextActiveBranchId,
+      branches: normalizedBranches,
+      edges: prunedEdges,
+      branchSelections: _pruneBranchSelections(
+        branches: normalizedBranches,
+        edges: prunedEdges,
+        baseSelections: nextSelections,
+      ),
+      activeBranchHistory: _pruneActiveBranchHistory(
+        normalizedBranches,
+        nextActiveBranchId,
+        additional: fallbackIds,
+      ),
+    );
+  }
 
   /// 选择包含 [messageId] 的最具体分支。
   ///
@@ -1016,11 +1343,11 @@ class ConversationTree {
         ..add(messageId)
         ..addAll(_descendantsOf(messageId));
     }
-    final nextEdges = Map<String, MessageTreeEdge>.from(edges)
+    var nextEdges = Map<String, MessageTreeEdge>.from(edges)
       ..removeWhere((id, _) => removedIds.contains(id));
     final affectedBranches = <ConversationBranch>[];
     final retainedCandidates = <ConversationBranch>[];
-    final nextBranches = <String, ConversationBranch>{};
+    var nextBranches = <String, ConversationBranch>{};
     final branchPaths = <String, List<String>>{
       for (final branch in branches.values)
         branch.id: _branchPathFor(branch.id, branches, edges),
@@ -1097,7 +1424,7 @@ class ConversationTree {
         }
       }
     }
-    final nextSelections = Map<String, String>.from(branchSelections);
+    var nextSelections = Map<String, String>.from(branchSelections);
     for (final messageId in targets) {
       final parent = edges[messageId]?.parentMessageId;
       if (parent == null) continue;
@@ -1141,6 +1468,18 @@ class ConversationTree {
       });
       if (candidates.isNotEmpty) nextSelections[parent] = candidates.first.id;
     }
+    // 契约 §4.3 修订：删除造成分叉锚点降级（只剩一个直接子）时，
+    // 停锚分支与唯一存活直接子分支合并，防止存活内容从时间线与
+    // 分支导航中消失。
+    final merged = _mergeDegradedAnchorsAfterDeletion(
+      branches: nextBranches,
+      edges: nextEdges,
+      selections: nextSelections,
+      removedIds: removedIds,
+    );
+    nextBranches = merged.branches;
+    nextEdges = merged.edges;
+    nextSelections = merged.selections;
     final prunedEdges = _pruneUnreachableEdges(nextBranches, nextEdges);
     final normalizedBranches = _normalizeBranchRelations(
       nextBranches,
@@ -1201,7 +1540,7 @@ class ConversationTree {
     }
     final removedIds = <String>{messageId}..addAll(_descendantsOf(messageId));
     final fallbackHistory = <String>[];
-    for (final branchId in activeBranchHistory) {
+    for (final branchId in [...activeBranchHistory, ...recentBranchIds]) {
       if (branchId == activeBranchId || fallbackHistory.contains(branchId)) {
         continue;
       }
@@ -1215,27 +1554,6 @@ class ConversationTree {
       throw StateError('delete_current_branch_history_unavailable');
     }
     return deleteMessages({messageId}, recentBranchIds: fallbackHistory);
-  }
-
-  /// 批量局部删除；先处理更深节点，避免输入排列影响重挂接结果。
-  ConversationTree removeMessagesOnly(
-    Iterable<String> messageIds, {
-    Iterable<String> recentBranchIds = const <String>[],
-  }) {
-    final targets = messageIds.where(edges.containsKey).toList(growable: false)
-      ..sort((left, right) {
-        final byDepth = _pathDepth(right).compareTo(_pathDepth(left));
-        if (byDepth != 0) return byDepth;
-        return left.compareTo(right);
-      });
-    var result = this;
-    for (final messageId in targets) {
-      result = result.removeMessageOnly(
-        messageId,
-        recentBranchIds: recentBranchIds,
-      );
-    }
-    return result;
   }
 
   /// 仅删除 [messageId]；若它是分叉末端的唯一消息，同时移除该分支。
@@ -1382,89 +1700,110 @@ class ConversationTree {
     );
   }
 
-  /// 删除活动路径上的分叉节点，同时只保留该节点后的活动后继。
+  /// 删除分支节点，收掉其所属分叉锚点下的全部分支（契约 §4.4 修订）。
   ///
-  /// 目标节点的兄弟分支不受影响；目标节点下的非活动直接子树会被删除，
-  /// 活动直接子节点则重挂到目标节点的父节点。非分叉节点不执行此操作，
-  /// 由消息菜单层保证该入口只对分叉节点开放。
+  /// 目标是分支节点时，删除其直接父锚点下的全部分支子树（含目标
+  /// 自身与所有兄弟分支），仅保留活动血脉并重挂到锚点下。活动血脉
+  /// 取活动路径在锚点之后的首个应存活节点：
+  /// - 活动路径在兄弟一侧：血脉为锚点的活动直接子，目标整棵删除；
+  /// - 目标在活动路径上：跳过目标，血脉为目标的活动后继及其后代；
+  /// - 目标即活动末端（或活动分支不经过锚点）：无血脉可保，锚点
+  ///   下分支全清，与「删除所有分支」一致。
+  /// 非分叉节点不执行此操作，由消息菜单层保证该入口只对分支节点开放。
   ConversationTree deleteNodeKeepActiveBranch(
     String messageId, {
     Iterable<String> recentBranchIds = const <String>[],
   }) {
-    final activePath = this.activePath();
-    final targetIndex = activePath.indexOf(messageId);
-    if (targetIndex < 0) return this;
-
     final removed = edges[messageId];
     if (removed == null || childrenOf(removed.parentMessageId).length < 2) {
       return this;
     }
+    final anchor = removed.parentMessageId;
+    final anchorChildren = childrenOf(anchor);
 
-    final activeContinuation = targetIndex + 1 < activePath.length
-        ? activePath[targetIndex + 1]
-        : null;
-    final directChildren = childrenOf(messageId);
-    final removedIds = <String>{messageId};
-    for (final childId in directChildren) {
-      if (childId == activeContinuation) continue;
-      removedIds
-        ..add(childId)
-        ..addAll(_descendantsOf(childId));
+    // 活动血脉：活动分支路径穿过锚点时，锚点之后的第一个应存活
+    // 节点。目标本身占据该位置时（目标在活动路径上），血脉起点
+    // 跳过目标，改取目标在活动路径上的直接后继。
+    final activePath = this.activePath();
+    final anchorIndex = activePath.indexOf(anchor ?? '');
+    String? activeContinuation;
+    if (anchorIndex >= 0 && anchorIndex + 1 < activePath.length) {
+      final nextOnPath = activePath[anchorIndex + 1];
+      if (nextOnPath == messageId) {
+        activeContinuation = anchorIndex + 2 < activePath.length
+            ? activePath[anchorIndex + 2]
+            : null;
+      } else if (anchorChildren.contains(nextOnPath)) {
+        activeContinuation = nextOnPath;
+      }
     }
 
-    final nextEdges = Map<String, MessageTreeEdge>.from(edges)
-      ..removeWhere((id, _) => removedIds.contains(id));
-    if (activeContinuation != null &&
-        nextEdges.containsKey(activeContinuation)) {
-      nextEdges[activeContinuation] = MessageTreeEdge(
+    // 无血脉可保（目标即活动末端，或活动分支不经过锚点）→
+    // 锚点下分支全清。
+    if (activeContinuation == null) {
+      return deleteMessages(anchorChildren, recentBranchIds: recentBranchIds);
+    }
+
+    // 第一步：把活动血脉提拔到锚点下（若它原是目标的子节点，
+    // 则借此脱离目标子树）。
+    final promotedEdges = Map<String, MessageTreeEdge>.from(edges);
+    if (promotedEdges[activeContinuation]?.parentMessageId != anchor) {
+      promotedEdges[activeContinuation] = MessageTreeEdge(
         messageId: activeContinuation,
-        parentMessageId: removed.parentMessageId,
+        parentMessageId: anchor,
       );
     }
-
-    final nextBranches = <String, ConversationBranch>{};
-    for (final branch in branches.values) {
-      final tip = branch.tipMessageId;
-      if (tip != null && removedIds.contains(tip)) continue;
-      nextBranches[branch.id] = branch;
-    }
-    if (nextBranches.isEmpty) throw StateError('cannot_delete_last_branch');
-
-    final baseSelections = Map<String, String>.from(branchSelections)
-      ..removeWhere(
-        (message, branchId) =>
-            removedIds.contains(message) || !nextBranches.containsKey(branchId),
-      );
-    final nextSelections = _rememberBranchSelections(
-      activeBranchId,
-      branches: nextBranches,
-      edges: nextEdges,
-      baseSelections: baseSelections,
-    );
-    final prunedEdges = _pruneUnreachableEdges(nextBranches, nextEdges);
-    final normalizedBranches = _normalizeBranchRelations(
-      nextBranches,
-      prunedEdges,
-    );
-    final nextActiveBranchId = nextBranches.containsKey(activeBranchId)
-        ? activeBranchId
-        : _fallbackBranchId(nextBranches, preferredBranchIds: recentBranchIds);
-    return ConversationTree(
+    final promotedTree = ConversationTree(
       conversationId: conversationId,
-      activeBranchId: nextActiveBranchId,
-      branches: normalizedBranches,
-      edges: prunedEdges,
-      branchSelections: _pruneBranchSelections(
-        branches: normalizedBranches,
-        edges: prunedEdges,
-        baseSelections: nextSelections,
-      ),
-      activeBranchHistory: _pruneActiveBranchHistory(
-        normalizedBranches,
-        nextActiveBranchId,
-        additional: recentBranchIds,
-      ),
+      activeBranchId: activeBranchId,
+      branches: branches,
+      edges: promotedEdges,
+      branchSelections: branchSelections,
+      activeBranchHistory: activeBranchHistory,
     );
+
+    // 第二步：收掉锚点下其余全部分支（目标自身与所有兄弟子树）。
+    // 血脉已改挂锚点，不在任何被删子树内；锚点因删除降级为单子
+    // 时由 deleteMessages 内部的降级合并收拢，无需额外归一化。
+    return promotedTree.deleteMessages(
+      anchorChildren.where((id) => id != activeContinuation),
+      recentBranchIds: recentBranchIds,
+    );
+  }
+
+  /// 批量「删除此分支节点」（多选删除统一语义，契约 §4.4 修订）。
+  ///
+  /// 对每个选中目标统一执行：分支节点目标收掉其所属分叉锚点下的
+  /// 全部分支、仅保留活动血脉；非分支节点目标没有分叉可收，删除
+  /// 该消息本身并把子消息重挂到原父节点。目标按深度降序处理
+  /// （同深度按 id 排序），保证结果与输入顺序无关。
+  ConversationTree deleteMessageNodes(
+    Iterable<String> messageIds, {
+    Iterable<String> recentBranchIds = const <String>[],
+  }) {
+    final targets = messageIds.where(edges.containsKey).toList(growable: false)
+      ..sort((left, right) {
+        final byDepth = _pathDepth(right).compareTo(_pathDepth(left));
+        if (byDepth != 0) return byDepth;
+        return left.compareTo(right);
+      });
+    if (targets.isEmpty) return this;
+    var result = this;
+    for (final messageId in targets) {
+      final edge = result.edges[messageId];
+      if (edge == null) continue;
+      final isBranchNode = result.childrenOf(edge.parentMessageId).length > 1;
+      result = isBranchNode
+          ? result.deleteNodeKeepActiveBranch(
+              messageId,
+              recentBranchIds: recentBranchIds,
+            )
+          : result.removeMessageOnly(
+              messageId,
+              recentBranchIds: recentBranchIds,
+            );
+    }
+    return result;
   }
 
   ConversationTree createMessageBranch({

@@ -25,6 +25,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ToggleRowPureBackground(),
                   _RowDivider(),
+                  _ToggleRowUseLayeredSurfaces(),
+                  _RowDivider(),
                   _MessageStyleRow(),
                   _RowDivider(),
                   _TopicPositionRow(),
@@ -104,6 +106,8 @@ class _DisplaySettingsBody extends StatelessWidget {
               _SettingsCard(
                 title: l10n.displaySettingsPageBehaviorStartupTitle,
                 children: const [
+                  _ToggleRowAutoRetry(),
+                  _RowDivider(),
                   _ToggleRowAutoSwitchTopicsDesktop(),
                   _RowDivider(),
                   _ToggleRowAutoCollapseThinking(),
@@ -812,6 +816,21 @@ class _ToggleRowPureBackground extends StatelessWidget {
       value: sp.usePureBackground,
       onChanged: (v) =>
           context.read<SettingsProvider>().setUsePureBackground(v),
+    );
+  }
+}
+
+class _ToggleRowUseLayeredSurfaces extends StatelessWidget {
+  const _ToggleRowUseLayeredSurfaces();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.themeSettingsPageUseLayeredSurfacesTitle,
+      value: sp.useLayeredSurfaces,
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setUseLayeredSurfaces(v),
     );
   }
 }
@@ -2581,6 +2600,21 @@ class _ToggleRowAutoScrollEnabled extends StatelessWidget {
       value: sp.autoScrollEnabled,
       onChanged: (v) =>
           context.read<SettingsProvider>().setAutoScrollEnabled(v),
+    );
+  }
+}
+
+class _ToggleRowAutoRetry extends StatelessWidget {
+  const _ToggleRowAutoRetry();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageAutoRetryTitle,
+      value: settings.autoRetryEnabled,
+      onChanged: (value) =>
+          context.read<SettingsProvider>().setAutoRetryEnabled(value),
     );
   }
 }

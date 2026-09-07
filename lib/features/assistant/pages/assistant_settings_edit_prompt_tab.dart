@@ -161,26 +161,19 @@ class _PromptTabState extends State<_PromptTab> {
   }
 
   Future<String?> _showSystemPromptDesktopDialog(String initial) {
-    return showGeneralDialog<String>(
+    final cs = Theme.of(context).colorScheme;
+    return showDialog<String>(
       context: context,
       barrierDismissible: true,
-      barrierLabel: 'system-prompt-editor',
-      barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.12),
-      pageBuilder: (ctx, _, __) {
-        return _SystemPromptDesktopDialog(initial: initial);
-      },
-      transitionBuilder: (ctx, anim, _, child) {
-        final curved = CurvedAnimation(
-          parent: anim,
-          curve: Curves.easeOutCubic,
-          reverseCurve: Curves.easeInCubic,
-        );
-        return FadeTransition(
-          opacity: curved,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.98, end: 1.0).animate(curved),
-            child: child,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: cs.surface,
+          shape: DesktopDialogStyle.shape(ctx),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 24,
           ),
+          child: _SystemPromptDesktopDialog(initial: initial),
         );
       },
     );
@@ -1295,109 +1288,88 @@ class _SystemPromptDesktopDialogState
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Center(
-      child: Material(
-        type: MaterialType.transparency,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 860, maxHeight: 660),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: cs.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: cs.outlineVariant.withValues(
-                  alpha: isDark ? 0.22 : 0.18,
-                ),
-              ),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+    return ConstrainedBox(
+      constraints: DesktopDialogStyle.proportionalConstraints(
+        context,
+        maxWidth: 860,
+        maxHeight: 660,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 12, 6),
+              child: Row(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 12, 6),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            l10n.assistantEditSystemPromptTitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 14.5,
-                              fontWeight: AppFontWeights.emphasis,
-                            ),
-                          ),
-                        ),
-                        _HoverTextButton(
-                          label: MaterialLocalizations.of(
-                            context,
-                          ).closeButtonLabel,
-                          color: cs.onSurface,
-                          onTap: () => Navigator.of(context).maybePop(),
-                          dense: true,
-                        ),
-                      ],
-                    ),
-                  ),
-                  Divider(
-                    height: 1,
-                    thickness: 0.6,
-                    color: cs.outlineVariant.withValues(alpha: 0.14),
-                  ),
                   Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: context.appColors.surfaceFill,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: cs.outlineVariant.withValues(alpha: 0.2),
-                          ),
-                        ),
-                        child: TextField(
-                          controller: _controller,
-                          autofocus: true,
-                          expands: true,
-                          maxLines: null,
-                          minLines: null,
-                          keyboardType: TextInputType.multiline,
-                          textAlignVertical: TextAlignVertical.top,
-                          decoration: InputDecoration(
-                            hintText: l10n.assistantEditSystemPromptHint,
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.fromLTRB(
-                              14,
-                              14,
-                              14,
-                              14,
-                            ),
-                          ),
-                        ),
+                    child: Text(
+                      l10n.assistantEditSystemPromptTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: AppFontWeights.emphasis,
                       ),
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: _HoverTextButton(
-                        label: l10n.assistantEditEmojiDialogSave,
-                        color: cs.primary,
-                        onTap: () =>
-                            Navigator.of(context).pop(_controller.text),
-                        dense: true,
-                      ),
-                    ),
+                  _HoverTextButton(
+                    label: MaterialLocalizations.of(context).closeButtonLabel,
+                    color: cs.onSurface,
+                    onTap: () => Navigator.of(context).maybePop(),
+                    dense: true,
                   ),
                 ],
               ),
             ),
-          ),
+            Divider(
+              height: 1,
+              thickness: 0.6,
+              color: cs.outlineVariant.withValues(alpha: 0.14),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: context.appColors.surfaceFill,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: cs.outlineVariant.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: TextField(
+                    controller: _controller,
+                    autofocus: true,
+                    expands: true,
+                    maxLines: null,
+                    minLines: null,
+                    keyboardType: TextInputType.multiline,
+                    textAlignVertical: TextAlignVertical.top,
+                    decoration: InputDecoration(
+                      hintText: l10n.assistantEditSystemPromptHint,
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: _HoverTextButton(
+                  label: l10n.assistantEditEmojiDialogSave,
+                  color: cs.primary,
+                  onTap: () => Navigator.of(context).pop(_controller.text),
+                  dense: true,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

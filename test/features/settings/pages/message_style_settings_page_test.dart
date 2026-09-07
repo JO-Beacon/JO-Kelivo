@@ -6,6 +6,7 @@ import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/settings/pages/message_style_settings_page.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/ios_switch.dart';
 
 import '../../../support/business_test_harness.dart';
 
@@ -118,6 +119,48 @@ void main() {
           .data
           .brightness,
       Brightness.dark,
+    );
+  });
+
+  testWidgets('paragraph bubble switch is visible and persists changes', (
+    tester,
+  ) async {
+    final harness = await createBusinessTestHarness();
+    final settings = SettingsProvider(harness.preferences);
+    await settings.loaded;
+
+    await pumpPage(tester, settings: settings);
+
+    expect(find.text('Split paragraphs into bubbles'), findsOneWidget);
+    await tester.tap(find.byType(IosSwitch).at(1));
+    await tester.pump();
+
+    expect(settings.assistantBubbleSplitParagraphs, isTrue);
+    expect(
+      harness.preferences.getBool(
+        'display_assistant_bubble_split_paragraphs_v1',
+      ),
+      isTrue,
+    );
+  });
+
+  testWidgets('fit-content switch is visible and persists changes', (
+    tester,
+  ) async {
+    final harness = await createBusinessTestHarness();
+    final settings = SettingsProvider(harness.preferences);
+    await settings.loaded;
+
+    await pumpPage(tester, settings: settings);
+
+    expect(find.text('Fit assistant bubble to content'), findsOneWidget);
+    await tester.tap(find.byType(IosSwitch).first);
+    await tester.pump();
+
+    expect(settings.assistantBubbleFitContent, isTrue);
+    expect(
+      harness.preferences.getBool('display_assistant_bubble_fit_content_v1'),
+      isTrue,
     );
   });
 }

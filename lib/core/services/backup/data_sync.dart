@@ -99,6 +99,67 @@ class DataSync {
     this.businessPreferences,
   });
 
+  /// 在尚未打开业务数据库的启动恢复阶段，将一个完整备份暂存为恢复工作区。
+  ///
+  /// 该入口只做文件解包、清单校验和候选工作区发布；业务设置会在
+  /// [RestoreBundlePreparation] 中写入候选数据库，真正切换由启动闸门完成。
+  /// 因此调用方不需要构造 ChatService 或 BusinessRepository。
+  static Future<PreparedRestoreBundle> prepareStartupRestoreFromFile({
+    required Directory appDataDirectory,
+    required File sourceFile,
+    BackupCancelToken? cancelToken,
+  }) async {
+    if (!await sourceFile.exists()) {
+      throw const FormatException('startup_recovery_snapshot_missing');
+    }
+    final tmp = await Directory.systemTemp.createTemp(
+      'joaiclient_startup_restore_',
+    );
+    final extractDir = Directory(p.join(tmp.path, 'extract'));
+    await extractDir.create(recursive: true);
+    File? payloadFile;
+    try {
+      final isJoaiclient = await JoaiclientArchive.isJoaiclient(sourceFile);
+      if (isJoaiclient) {
+        payloadFile = File(p.join(tmp.path, 'payload.zip'));
+        await JoaiclientArchive.unwrapToZip(
+          sourceFile: sourceFile,
+          zipFile: payloadFile,
+          cancelToken: cancelToken,
+        );
+      }
+      final zipSource = payloadFile ?? sourceFile;
+      await _extractZipWithProgress(
+        zipPath: zipSource.path,
+        extractDirPath: extractDir.path,
+        onProgress: (_, __) {},
+        cancelToken: cancelToken,
+      );
+      final manifestFile = File(p.join(extractDir.path, _manifestEntryName));
+      if (!await manifestFile.exists()) {
+        throw const FormatException('startup_recovery_snapshot_manifest');
+      }
+      final versioned = await _preflightVersionedBackupInIsolate(
+        manifestPath: manifestFile.path,
+        extractDirPath: extractDir.path,
+      );
+      if (!versioned.includeChats) {
+        throw const FormatException('startup_recovery_snapshot_database');
+      }
+      return await _prepareRestoreBundle(
+        appDataPath: appDataDirectory.path,
+        extractedPath: extractDir.path,
+        sourceManifestSha256: versioned.normalizedManifestSha256,
+        includeChats: versioned.includeChats,
+        includeFiles: versioned.includeFiles,
+        restoreChats: true,
+        restoreFiles: versioned.includeFiles,
+      );
+    } finally {
+      await _deleteDirectoryQuietly(tmp);
+    }
+  }
+
   Future<T> _runLiveBusinessRestore<T>(Future<T> Function() operation) {
     final preferences = businessPreferences;
     return preferences == null
@@ -106,7 +167,7 @@ class DataSync {
         : preferences.runWithRestoreWriteFence(operation);
   }
 
-  static Future<void> _prepareRestoreBundle({
+  static Future<PreparedRestoreBundle> _prepareRestoreBundle({
     required String appDataPath,
     required String extractedPath,
     required String sourceManifestSha256,
@@ -115,7 +176,7 @@ class DataSync {
     required bool restoreChats,
     required bool restoreFiles,
   }) => Isolate.run(() async {
-    await RestoreBundlePreparation.prepare(
+    return RestoreBundlePreparation.prepare(
       appDataDirectory: Directory(appDataPath),
       extractedDirectory: Directory(extractedPath),
       sourceManifestSha256: sourceManifestSha256,

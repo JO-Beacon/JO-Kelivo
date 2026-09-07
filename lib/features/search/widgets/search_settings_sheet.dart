@@ -14,7 +14,11 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
 import '../../../theme/app_font_weights.dart';
 
-Future<void> showSearchSettingsSheet(BuildContext context) async {
+Future<void> showSearchSettingsSheet(
+  BuildContext context, {
+  String? chatModelProviderKey,
+  String? chatModelId,
+}) async {
   await showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -22,12 +26,17 @@ Future<void> showSearchSettingsSheet(BuildContext context) async {
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (ctx) => const _SearchSettingsSheet(),
+    builder: (ctx) => _SearchSettingsSheet(
+      chatModelProviderKey: chatModelProviderKey,
+      chatModelId: chatModelId,
+    ),
   );
 }
 
 class _SearchSettingsSheet extends StatelessWidget {
-  const _SearchSettingsSheet();
+  const _SearchSettingsSheet({this.chatModelProviderKey, this.chatModelId});
+  final String? chatModelProviderKey;
+  final String? chatModelId;
 
   String _nameOf(BuildContext context, SearchServiceOptions s) {
     final svc = SearchService.getService(s);
@@ -121,8 +130,11 @@ class _SearchSettingsSheet extends StatelessWidget {
     final enabled = ap.currentSearchEnabled;
 
     // 判断当前选中的模型是否支持内置搜索
-    final providerKey = a?.chatModelProvider ?? settings.currentModelProvider;
-    final modelId = a?.chatModelId ?? settings.currentModelId;
+    final providerKey =
+        chatModelProviderKey ??
+        a?.chatModelProvider ??
+        settings.currentModelProvider;
+    final modelId = chatModelId ?? a?.chatModelId ?? settings.currentModelId;
     final cfg = (providerKey != null)
         ? settings.getProviderConfig(providerKey)
         : null;
@@ -504,6 +516,9 @@ class _BrandBadge extends StatelessWidget {
     if (s is DoubaoOptions) return 'doubao';
     if (s is SerperOptions) return 'serper';
     if (s is GrokOptions) return 'grok';
+    if (s is YouSearchOptions) return 'you';
+    if (s is ParallelOptions) return 'parallel';
+    if (s is AnySearchOptions) return 'anysearch';
     if (s is StepFunOptions) return 'stepfun';
     if (s is FirecrawlOptions) return 'firecrawl';
     if (s is TinyFishOptions) return 'tinyfish';

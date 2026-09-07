@@ -237,6 +237,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
           : () async {
               final l10n = AppLocalizations.of(context)!;
               final ap = context.read<AssistantProvider>();
+              final chatService = context.read<ChatService>();
               final ok = await showDialog<bool>(
                 context: context,
                 builder: (ctx) => AlertDialog(
@@ -262,6 +263,9 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
               );
               if (ok != true) return;
               try {
+                await chatService.clearConversationModelOverrides(
+                  providerKey: item.key,
+                );
                 for (final assistant in ap.assistants) {
                   if (assistant.chatModelProvider == item.key) {
                     await ap.updateAssistant(
@@ -4874,10 +4878,17 @@ class _DesktopProviderDetailPaneState
 
     final sp = context.read<SettingsProvider>();
     final assistantProvider = context.read<AssistantProvider>();
+    final chatService = context.read<ChatService>();
     final deletedCount = await sp.deleteModels(
       widget.providerKey,
       modelsToDelete,
     );
+    for (final modelId in modelsToDelete) {
+      await chatService.clearConversationModelOverrides(
+        providerKey: widget.providerKey,
+        modelId: modelId,
+      );
+    }
     await _clearAssistantSelectionsForModels(modelsToDelete, assistantProvider);
     if (!mounted) return;
     setState(() {
@@ -4992,7 +5003,11 @@ class _DesktopProviderDetailPaneState
     if (!mounted) return;
     final modelsToDelete = Set<String>.from(cfg.models);
     final assistantProvider = context.read<AssistantProvider>();
+    final chatService = context.read<ChatService>();
     await sp.deleteModels(widget.providerKey, modelsToDelete);
+    await chatService.clearConversationModelOverrides(
+      providerKey: widget.providerKey,
+    );
     await _clearAssistantSelectionsForModels(modelsToDelete, assistantProvider);
     if (!mounted) return;
     setState(() {

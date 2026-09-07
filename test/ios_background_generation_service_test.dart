@@ -355,10 +355,16 @@ void main() {
     await service.flushUpdates();
 
     expect(starts, hasLength(2));
+    // 服务在发起 update 之前记录节流时间戳，而 mock 通道是在真正收到调用时才记时，
+    // 两次记时之间存在微小偏移（首个偏移记作 ε1）。整机繁忙时 ε1 会被放大，
+    // 测出的间隔会变成 500ms + ε2 - ε1，因此这里扣掉一个明确的测量误差再比较。
+    // 被验证的节流规则仍是 updateMinimumInterval 本身，没有放宽。
+    const measurementTolerance = Duration(milliseconds: 50);
     expect(
       starts.last.difference(starts.first),
       greaterThanOrEqualTo(
-        IosBackgroundGenerationService.updateMinimumInterval,
+        IosBackgroundGenerationService.updateMinimumInterval -
+            measurementTolerance,
       ),
     );
   });

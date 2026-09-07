@@ -10,10 +10,12 @@ import '../../stream/stream_chunk_ids.dart';
 class ClaudeStreamDecoder implements StreamChunkDecoder {
   ClaudeStreamDecoder({
     this.skipRedactedThinkingBlocks = false,
+    this.serverToolNames = const <String>{},
     String sourceId = 'stream',
   }) : _ids = StreamChunkIds(sourceId);
 
   final bool skipRedactedThinkingBlocks;
+  final Set<String> serverToolNames;
   final StreamChunkIds _ids;
 
   final List<Map<String, dynamic>> assistantBlocks = <Map<String, dynamic>>[];
@@ -22,12 +24,16 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
   final Map<String, String> toolResults = <String, String>{};
 
   TokenUsage? usage;
+  String? containerId;
   String? lastStopReason;
   bool messageStopped = false;
 
   final Map<int, String> _clientIndexToId = <int, String>{};
   final Map<int, String> _serverIndexToId = <int, String>{};
   final Map<String, StringBuffer> _serverArgs = <String, StringBuffer>{};
+  final Map<String, Map<String, dynamic>> _serverBlocks =
+      <String, Map<String, dynamic>>{};
+  final Map<String, String> _serverToolNames = <String, String>{};
   final Set<String> _serverToolStarted = <String>{};
   final Set<String> _serverToolEnded = <String>{};
   final Set<String> _clientToolEnded = <String>{};
@@ -41,13 +47,52 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
   bool _closed = false;
 
   Map<String, dynamic> get _anthropicMetadata => <String, dynamic>{
-    'anthropic': <String, dynamic>{'assistant_blocks': assistantBlocks},
+    'anthropic': <String, dynamic>{
+      'assistant_blocks': assistantBlocks,
+      if (containerId != null && containerId!.isNotEmpty)
+        'container_id': containerId,
+    },
   };
 
   bool isClientTool(String id) => clientTools.containsKey(id);
 
   void recordToolResult(String id, String content) {
     toolResults[id] = content;
+  }
+
+  /// 解析非流式响应中的服务端工具块，使其与 SSE 路径使用同一套展示和
+  /// 失败语义。调用方同时可读取 [assistantBlocks] 用于后续请求回放。
+  List<StreamChunk> decodeCompleteServerTools(
+    List<Map<String, dynamic>> blocks,
+  ) {
+    final chunks = <StreamChunk>[];
+    for (final block in blocks) {
+      final type = (block['type'] ?? '').toString();
+      if (type == 'server_tool_use') {
+        assistantBlocks.add(Map<String, dynamic>.from(block));
+        final id = (block['id'] ?? '').toString();
+        final name = (block['name'] ?? '').toString();
+        final display = _serverToolDisplayName(name);
+        if (id.isEmpty || display == null) continue;
+        final args =
+            (block['input'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{};
+        _serverArgs[id] = StringBuffer(jsonEncode(args));
+        _serverToolNames[id] = display;
+        if (_serverToolStarted.add(id)) {
+          chunks.add(ServerToolStart(id: id, toolName: display, input: args));
+        }
+      } else if (type.endsWith('_tool_result')) {
+        assistantBlocks.add(Map<String, dynamic>.from(block));
+        final name = type.substring(0, type.length - '_tool_result'.length);
+        if (name == 'web_search') {
+          chunks.addAll(_webSearchResult(block));
+        } else if (_serverToolDisplayName(name) != null) {
+          chunks.addAll(_serverToolResult(block, name));
+        }
+      }
+    }
+    return chunks;
   }
 
   @override
@@ -87,7 +132,20 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
           chunks.addAll(_onBlockDelta(obj));
         case 'content_block_stop':
           chunks.addAll(_onBlockStop(obj));
+        case 'message_start':
+          final message = obj['message'];
+          final container = message is Map ? message['container'] : null;
+          if (container is Map &&
+              (container['id'] ?? '').toString().isNotEmpty) {
+            containerId = (container['id'] ?? '').toString();
+          }
+          chunks.addAll(_onMessageDelta(obj));
         case 'message_delta':
+          final container = obj['container'];
+          if (container is Map &&
+              (container['id'] ?? '').toString().isNotEmpty) {
+            containerId = (container['id'] ?? '').toString();
+          }
           chunks.addAll(_onMessageDelta(obj));
         case 'message_stop':
           _flushTextBlock();
@@ -118,7 +176,11 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
     final cb = obj['content_block'];
     if (cb is! Map) return const <StreamChunk>[];
     final block = cb.cast<String, dynamic>();
-    final kind = (block['type'] ?? '').toString();
+    var kind = (block['type'] ?? '').toString();
+    if (kind == 'tool_use' &&
+        serverToolNames.contains((block['name'] ?? '').toString())) {
+      kind = 'server_tool_use';
+    }
     final idx = _parseIndex(obj['index']);
     final chunks = <StreamChunk>[];
 
@@ -161,25 +223,46 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         );
       }
     } else if (kind == 'server_tool_use') {
+      _flushTextBlock();
       final id = (block['id'] ?? '').toString();
       final name = (block['name'] ?? '').toString();
       if (id.isNotEmpty && idx != null) {
         _serverIndexToId[idx] = id;
         _serverArgs[id] = StringBuffer();
       }
-      if (id.isNotEmpty && name == 'web_search') {
+      if (id.isNotEmpty) {
+        final serverBlock = <String, dynamic>{
+          'type': 'server_tool_use',
+          'id': id,
+          'name': name,
+          'input': <String, dynamic>{},
+          if (block['caller'] != null) 'caller': block['caller'],
+        };
+        assistantBlocks.add(serverBlock);
+        _serverBlocks[id] = serverBlock;
+      }
+      final display = _serverToolDisplayName(name);
+      if (id.isNotEmpty && display != null) {
+        _serverToolNames[id] = display;
         _serverToolStarted.add(id);
-        chunks.add(ServerToolStart(id: id, toolName: 'search_web'));
+        chunks.add(ServerToolStart(id: id, toolName: display));
         chunks.add(
           ToolCallStart(
             id: id,
-            toolName: 'search_web',
+            toolName: display,
             metadata: _anthropicMetadata,
           ),
         );
       }
-    } else if (kind == 'web_search_tool_result') {
-      chunks.addAll(_webSearchResult(block));
+    } else if (kind.endsWith('_tool_result')) {
+      _flushTextBlock();
+      assistantBlocks.add(Map<String, dynamic>.from(block));
+      final name = kind.substring(0, kind.length - '_tool_result'.length);
+      if (name == 'web_search') {
+        chunks.addAll(_webSearchResult(block));
+      } else if (_serverToolDisplayName(name) != null) {
+        chunks.addAll(_serverToolResult(block, name));
+      }
     } else if (kind == 'text') {
       if (idx != null) {
         chunks.add(TextStart(_ids.indexed('text', idx)));
@@ -253,7 +336,9 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         final serverId = _serverIndexToId[idx];
         if (serverId != null) {
           _serverArgs.putIfAbsent(serverId, StringBuffer.new).write(part);
-          chunks.add(ToolCallDelta(id: serverId, inputDelta: part));
+          if (_serverToolStarted.contains(serverId)) {
+            chunks.add(ToolCallDelta(id: serverId, inputDelta: part));
+          }
         }
       }
     }
@@ -300,7 +385,8 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
 
     if (idx != null && _serverIndexToId.containsKey(idx)) {
       final sid = _serverIndexToId[idx]!;
-      chunks.add(ToolCallEnd(sid));
+      _serverBlocks[sid]?['input'] = _serverArgsFor(sid);
+      if (_serverToolStarted.contains(sid)) chunks.add(ToolCallEnd(sid));
     }
     return chunks;
   }
@@ -368,6 +454,69 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
           'items': items,
           if ((errorCode ?? '').isNotEmpty) 'error': errorCode,
         },
+        metadata: _anthropicMetadata,
+      ),
+    ];
+  }
+
+  static String? _serverToolDisplayName(String name) {
+    switch (name) {
+      case 'web_search':
+        return 'search_web';
+      case 'web_fetch':
+      case 'code_execution':
+      case 'bash_code_execution':
+      case 'text_editor_code_execution':
+        return name;
+      default:
+        return null;
+    }
+  }
+
+  static const _serverToolOutputLimit = 4000;
+
+  static Object? _clipServerToolValue(Object? value) {
+    if (value is String) {
+      return value.length <= _serverToolOutputLimit
+          ? value
+          : '${value.substring(0, _serverToolOutputLimit)}…';
+    }
+    if (value is List) return value.map(_clipServerToolValue).toList();
+    if (value is Map) {
+      return <String, dynamic>{
+        for (final entry in value.entries)
+          entry.key.toString(): _clipServerToolValue(entry.value),
+      };
+    }
+    return value;
+  }
+
+  List<StreamChunk> _serverToolResult(
+    Map<String, dynamic> block,
+    String blockToolName,
+  ) {
+    final id = (block['tool_use_id'] ?? '').toString();
+    if (id.isEmpty || !_serverToolEnded.add(id)) {
+      return const <StreamChunk>[];
+    }
+    final toolName = _serverToolNames[id] ?? blockToolName;
+    final content = block['content'];
+    final error =
+        content is Map && (content['type'] ?? '').toString().endsWith('_error')
+        ? (content['error_code'] ?? '').toString()
+        : '';
+    return <StreamChunk>[
+      if (_serverToolStarted.add(id))
+        ServerToolStart(id: id, toolName: toolName, input: _serverArgsFor(id)),
+      ServerToolEnd(
+        id: id,
+        input: _serverArgsFor(id),
+        output: error.isNotEmpty
+            ? <String, dynamic>{'error': error}
+            : _clipServerToolValue(content),
+        status: error.isNotEmpty
+            ? ServerToolStatus.failed
+            : ServerToolStatus.completed,
         metadata: _anthropicMetadata,
       ),
     ];

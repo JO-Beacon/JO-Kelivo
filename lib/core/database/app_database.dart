@@ -95,6 +95,8 @@ class ConversationRows extends Table {
       // ignore: recursive_getters
       .check(lastMemoryExtractedOrder.isBiggerOrEqualValue(-1))
       .withDefault(const Constant(-1))();
+  TextColumn get chatModelProvider => text().nullable()();
+  TextColumn get chatModelId => text().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -762,7 +764,7 @@ class AppDatabase extends _$AppDatabase {
   // 分支和活动分支状态，模式 3 存储每个共享树前缀下最后选择的分支，
   // 模式 4 将 Kelivo 的助手标签表迁移为 JO-Kelivo 的助手分组表，模式 5
   // 为冻结提示词绑定消息正文哈希，模式 6 持久化明确的分支关系和活动历史。
-  static const currentSchemaVersion = 6;
+  static const currentSchemaVersion = 7;
   // 保持 SQLite 既定的 1000 页节奏显式声明。按通常 4 KiB 页大小计算，
   // 这大约在 4 MiB 时触发一次检查点，但页大小仍是实际依据。
   static const walAutoCheckpointPages = 1000;
@@ -1119,6 +1121,26 @@ FROM probe;
           await migrator.addColumn(
             conversationTreeStateRows,
             conversationTreeStateRows.activeBranchHistoryJson,
+          );
+        }
+      }
+      if (from < 7) {
+        final conversationColumns = await customSelect(
+          'PRAGMA table_info(conversation_rows);',
+        ).get();
+        final names = conversationColumns
+            .map((row) => row.read<String>('name'))
+            .toSet();
+        if (!names.contains('chat_model_provider')) {
+          await migrator.addColumn(
+            conversationRows,
+            conversationRows.chatModelProvider,
+          );
+        }
+        if (!names.contains('chat_model_id')) {
+          await migrator.addColumn(
+            conversationRows,
+            conversationRows.chatModelId,
           );
         }
       }

@@ -12,6 +12,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../core/services/haptics.dart';
 import '../widgets/share_provider_sheet.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/services/chat/chat_service.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
@@ -642,6 +643,7 @@ class _ProvidersPageState extends State<ProvidersPage> {
     final l10n = AppLocalizations.of(context)!;
     final assistantProvider = context.read<AssistantProvider>();
     final settingsProvider = context.read<SettingsProvider>();
+    final chatService = context.read<ChatService>();
     // 跳过内置供应商（默认供应商）
     final builtInKeys = {for (final p in _providers(l10n: l10n)) p.keyName};
     final keysToDelete = _selected
@@ -686,6 +688,7 @@ class _ProvidersPageState extends State<ProvidersPage> {
       }
     }
     for (final key in keysToDelete) {
+      await chatService.clearConversationModelOverrides(providerKey: key);
       await settingsProvider.removeProviderConfig(key);
     }
     if (!mounted) return;

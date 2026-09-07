@@ -178,6 +178,16 @@ class StreamChunkHandler {
           server: true,
           metadata: metadata,
         );
+      case ProviderArtifact():
+        // 供应商状态由上层持久化，不进入消息正文。
+        return;
+      case GeneratedFile(:final uri, :final name, :final mime):
+        if (uri.isEmpty) return;
+        if ((mime ?? '').toLowerCase().startsWith('image/')) {
+          _parts.add(ImagePart(uri: uri, mime: mime));
+        } else {
+          _parts.add(FilePart(uri: uri, name: name, mime: mime));
+        }
       case ImageStart(:final id, :final mimeType):
         _imageMime[id] = mimeType;
       case ImageDelta(:final id, :final data):

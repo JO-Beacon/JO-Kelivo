@@ -23,6 +23,7 @@ import '../../../core/providers/assistant_group_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/s3_backup_provider.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/providers/local_snapshot_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/backup/data_sync.dart';
 import '../../../core/services/native_file_save.dart';
@@ -264,6 +265,7 @@ class _BackupPageState extends State<BackupPage> {
         builder: (context) {
           final vm = context.watch<BackupProvider>();
           final s3Vm = context.watch<S3BackupProvider>();
+          final localSnapshot = context.watch<LocalSnapshotProvider?>();
           final cfg = vm.config;
           final s3Cfg = s3Vm.config;
 
@@ -297,6 +299,12 @@ class _BackupPageState extends State<BackupPage> {
             body: ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
               children: [
+                if (localSnapshot != null)
+                  _LocalSnapshotSection(
+                    enabled: localSnapshot.settings.enabled,
+                    onChanged: localSnapshot.setEnabled,
+                    onTakeNow: localSnapshot.takeNow,
+                  ),
                 // Section 1: 备份管理
                 header(l10n.backupPageBackupManagement, first: true),
                 _iosSectionCard(
@@ -1650,6 +1658,43 @@ class _BackupPageState extends State<BackupPage> {
       MaterialPageRoute(
         builder: (_) => _S3SettingsPage(settings: settings, vm: vm, cfg: cfg),
       ),
+    );
+  }
+}
+
+class _LocalSnapshotSection extends StatelessWidget {
+  const _LocalSnapshotSection({
+    required this.enabled,
+    required this.onChanged,
+    required this.onTakeNow,
+  });
+  final bool enabled;
+  final ValueChanged<bool> onChanged;
+  final Future<void> Function() onTakeNow;
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
+      children: [
+        _iosSectionCard(
+          children: [
+            _iosSwitchRow(
+              context,
+              icon: Lucide.Database,
+              label: l10n.localSnapshotEnabled,
+              value: enabled,
+              onChanged: onChanged,
+            ),
+            _iosDivider(context),
+            IosTileButton(
+              icon: Lucide.Download,
+              label: l10n.localSnapshotTakeNow,
+              onTap: () => onTakeNow(),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+      ],
     );
   }
 }

@@ -30,13 +30,17 @@ class ConversationAdapter extends TypeAdapter<Conversation> {
       summary: fields[10] as String?,
       lastSummarizedMessageCount: fields[11] as int?,
       chatSuggestions: (fields[12] as List?)?.cast<String>(),
+      injectedMemoryHash: fields[13] as String?,
+      lastMemoryExtractedOrder: fields[14] as int?,
+      chatModelProvider: fields[15] as String?,
+      chatModelId: fields[16] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Conversation obj) {
     writer
-      ..writeByte(13)
+      ..writeByte(17)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -62,11 +66,20 @@ class ConversationAdapter extends TypeAdapter<Conversation> {
       ..writeByte(11)
       ..write(obj.lastSummarizedMessageCount)
       ..writeByte(12)
-      ..write(obj.chatSuggestions);
+      ..write(obj.chatSuggestions)
+      ..writeByte(13)
+      ..write(obj.injectedMemoryHash)
+      ..writeByte(14)
+      ..write(obj.lastMemoryExtractedOrder)
+      ..writeByte(15)
+      ..write(obj.chatModelProvider)
+      ..writeByte(16)
+      ..write(obj.chatModelId);
   }
 
   @override
   int get hashCode => typeId.hashCode;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||

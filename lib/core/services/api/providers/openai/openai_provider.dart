@@ -143,7 +143,9 @@ Stream<StreamChunk> sendOpenAIStream(
   // it; other providers may resend the full array-so-far with each chunk.
   final reasoningDetailsAllowSnapshots =
       !BuiltInToolsHelper.isOpenRouterProvider(config);
-  final bool needsReasoningEcho = info.needsReasoningEcho && isReasoning;
+  final bool needsReasoningEcho =
+      info.needsReasoningEcho &&
+      (isReasoning || (info.isDeepSeek && tools?.isNotEmpty == true));
   void setMaxTokens(Map<String, dynamic> map) {
     if (maxTokens != null) map[info.completionTokensKey] = maxTokens;
   }
@@ -169,7 +171,7 @@ Stream<StreamChunk> sendOpenAIStream(
       kimiFormulaTools = const <Map<String, dynamic>>[];
     }
   }
-  Future<String> resolveToolCall(
+  Future<dynamic> resolveToolCall(
     String name,
     Map<String, dynamic> args, {
     String? toolCallId,

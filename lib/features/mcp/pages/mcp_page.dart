@@ -46,6 +46,9 @@ class McpPage extends StatelessWidget {
     ) async {
       final cs = Theme.of(context).colorScheme;
       final l10n = AppLocalizations.of(context)!;
+      final displayMessage = message == 'mcp_session_stream_expired'
+          ? l10n.mcpPageSessionExpiredDetails
+          : message;
       await showModalBottomSheet<void>(
         context: context,
         backgroundColor: cs.surface,
@@ -86,8 +89,8 @@ class McpPage extends StatelessWidget {
                       ),
                     ),
                     child: Text(
-                      message?.isNotEmpty == true
-                          ? message!
+                      displayMessage?.isNotEmpty == true
+                          ? displayMessage!
                           : l10n.mcpPageErrorNoDetails,
                     ),
                   ),
@@ -119,10 +122,9 @@ class McpPage extends StatelessWidget {
                         child: ElevatedButton.icon(
                           onPressed: () async {
                             final mcpProvider = ctx.read<McpProvider>();
-                            final connected = await mcpProvider.reconnect(
-                              serverId,
-                            );
-                            if (connected && ctx.mounted) {
+                            await mcpProvider.reconnect(serverId);
+                            if (mcpProvider.isConnected(serverId) &&
+                                ctx.mounted) {
                               Navigator.of(ctx).pop();
                             }
                           },

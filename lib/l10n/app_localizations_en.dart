@@ -9,6 +9,11 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String chatImageCropFailed(String fileName, String error) {
+    return 'Could not crop \"$fileName\": $error';
+  }
+
+  @override
   String get helloWorld => 'Hello World!';
 
   @override
@@ -725,11 +730,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Are you sure you want to delete this message and all following messages? Other branches will remain.';
 
   @override
-  String get homePageDeleteMessageNode => 'Delete This Node';
+  String get homePageDeleteMessageNode => 'Delete This Branch Node';
 
   @override
   String get homePageDeleteMessageNodeConfirm =>
-      'Are you sure you want to delete this node? Its non-active branches will be removed, while the active branch\'s following messages will remain.';
+      'Are you sure you want to delete this branch node? Every branch below this fork will be removed, and only the active lineage\'s following messages will remain.';
 
   @override
   String get homePageDeleteAllVersions => 'Delete All Branches';
@@ -1891,6 +1896,52 @@ class AppLocalizationsEn extends AppLocalizations {
       'The chat database on this device was created by a newer version of JO-AIClient and cannot be opened by this version. Your data has not been changed. Install the latest version of JO-AIClient, then open it again.';
 
   @override
+  String get startupRecoverySnapshotButton => 'Restore a local snapshot';
+
+  @override
+  String get startupRecoveryDowngradeSnapshotButton =>
+      'Advanced: restore an older snapshot';
+
+  @override
+  String get startupRecoveryChooseSnapshotTitle => 'Choose a snapshot';
+
+  @override
+  String startupRecoverySnapshotDetails(String date, String time, String size) {
+    return '$date $time · $size MB';
+  }
+
+  @override
+  String get startupRecoveryNoSnapshots => 'No local snapshots are available.';
+
+  @override
+  String get startupRecoveryRestoreConfirmTitle => 'Restore this snapshot?';
+
+  @override
+  String startupRecoveryRestoreConfirmContent(String fileName) {
+    return 'JO-AIClient will replace the current database with $fileName. Changes made after this snapshot may be lost. The current database will remain recoverable through the restore journal until the operation is verified.';
+  }
+
+  @override
+  String get startupRecoveryRestoreConfirmButton => 'Restore and restart';
+
+  @override
+  String get startupRecoveryProtectionFailedTitle =>
+      'Could not protect the current data';
+
+  @override
+  String get startupRecoveryProtectionFailedContent =>
+      'The required pre-downgrade data copy could not be created. Continuing may permanently discard data written by the newer version.';
+
+  @override
+  String get startupRecoveryContinueWithoutProtection =>
+      'Continue without a copy';
+
+  @override
+  String startupRecoverySnapshotFailed(String code) {
+    return 'The snapshot could not be prepared. Diagnostic code: $code';
+  }
+
+  @override
   String backupPageRestoreFailedMessage(String error) {
     return 'Restore failed: $error';
   }
@@ -2527,7 +2578,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Delete This Message and Following';
 
   @override
-  String get messageMoreSheetDeleteMessageNode => 'Delete This Node';
+  String get messageMoreSheetDeleteMessageNode => 'Delete This Branch Node';
 
   @override
   String get messageMoreSheetDelete => 'Delete Current Branch';
@@ -2790,7 +2841,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String chatSelectionDeleteSelectedConfirm(int count) {
-    return 'Delete $count selected message(s)? This cannot be undone.';
+    return 'Delete $count selected message(s) as branch nodes? Every branch below their forks will be removed, and only the active lineage will remain. This cannot be undone.';
   }
 
   @override
@@ -3260,6 +3311,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mcpPageReconnect => 'Reconnect';
 
   @override
+  String get mcpPageSessionExpiredDetails =>
+      'The server session expired again immediately after reconnecting. Reconnect manually when the server is ready.';
+
+  @override
   String get mcpPageStatusConnected => 'Connected';
 
   @override
@@ -3417,7 +3472,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get defaultModelPageTitleModelSubtitle =>
-      'Used for summarizing conversation titles; prefer fast & cheap models. Disabled until a model is selected.';
+      'Used for summarizing conversation titles. Follows the current chat model unless you choose a dedicated one.';
 
   @override
   String get titleModelThinkingTitle => 'Enable Thinking';
@@ -3434,7 +3489,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get defaultModelPageSuggestionModelSubtitle =>
-      'Used for follow-up suggestion bubbles after assistant replies. Disabled until a model is selected.';
+      'Generates follow-up suggestions after assistant replies. Follows the current chat model or a dedicated one; disabled by default.';
 
   @override
   String get assistantEditRecentChatsSummaryFrequencyTitle =>
@@ -3568,6 +3623,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get defaultModelPageNotEnabled => 'Not enabled';
+
+  @override
+  String get defaultModelPageDisable => 'Disable';
+
+  @override
+  String get localSnapshotTitle => 'Local database snapshots';
+
+  @override
+  String get localSnapshotEnabled => 'Keep automatic local snapshots';
+
+  @override
+  String get localSnapshotTakeNow => 'Take snapshot now';
 
   @override
   String get translatePagePasteButton => 'Paste';
@@ -3771,6 +3838,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get modelSelectSheetFavoritesSection => 'Favorites';
+
+  @override
+  String get modelSelectSheetFollowAssistant => 'Follow assistant';
 
   @override
   String get modelSelectSheetFavoriteTooltip => 'Favorite';
@@ -4806,6 +4876,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Confirm before regenerating';
 
   @override
+  String get displaySettingsPageAutoRetryTitle => 'Automatic Retry';
+
+  @override
+  String get displaySettingsPageAutoRetrySubtitle =>
+      'Retry temporary network and rate-limit failures before any response is received';
+
+  @override
   String chainOfThoughtExpandSteps(Object count) {
     return 'Show $count more steps';
   }
@@ -5074,6 +5151,50 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get themeSettingsPageUsePureBackgroundSubtitle =>
       'Bubbles and accents follow theme.';
+
+  @override
+  String get themeSettingsPageUseLayeredSurfacesTitle => 'Layered surfaces';
+
+  @override
+  String get themeSettingsPageUseLayeredSurfacesSubtitle =>
+      'Make cards and panels stand above the page background.';
+
+  @override
+  String get searchProviderAnySearchDescription =>
+      'AnySearch unified web search';
+
+  @override
+  String get searchProviderParallelDescription =>
+      'Parallel Search API. Returns LLM-optimized web excerpts with turbo, fast, basic, and advanced modes.';
+
+  @override
+  String get searchServicesDialogSearchMode => 'Search mode';
+
+  @override
+  String get searchServicesDialogContentMode => 'Content mode';
+
+  @override
+  String get searchServicesDialogHighlights => 'Highlights';
+
+  @override
+  String get searchServicesDialogSnippets => 'Snippets';
+
+  @override
+  String get searchServicesDialogWebSearch => 'Web Search';
+
+  @override
+  String get searchServicesDialogLlmContext => 'LLM Context';
+
+  @override
+  String get searchServicesDialogMaximumTokens => 'Maximum tokens';
+
+  @override
+  String get searchServicesDialogMaximumTokensInvalid =>
+      'Maximum tokens must be between 1024 and 32768.';
+
+  @override
+  String get searchProviderYouDescription =>
+      'You.com Search API. Returns web and news results with highlights or snippets.';
 
   @override
   String get themeSettingsPageColorPalettesSection => 'Color Palettes';
@@ -5801,6 +5922,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchServiceNameDoubao => 'Doubao';
+
+  @override
+  String get searchServiceNameAnySearch => 'AnySearch';
+
+  @override
+  String get searchServiceNameParallel => 'Parallel';
+
+  @override
+  String get searchServiceNameYou => 'You.com';
 
   @override
   String get searchProviderDoubaoDescription =>
@@ -8388,6 +8518,56 @@ class AppLocalizationsEn extends AppLocalizations {
       'Follows the theme; not customizable';
 
   @override
+  String get messageStyleSettingsPageAssistantSplitParagraphs =>
+      'Split paragraphs into bubbles';
+
+  @override
+  String get messageStyleSettingsPageAssistantSplitParagraphsSubtitle =>
+      'Blank lines break an assistant reply into one bubble per paragraph';
+
+  @override
+  String get messageEditAddTextPart => 'Add text part';
+
+  @override
+  String get messageEditTextPart => 'Text';
+
+  @override
+  String get messageEditReasoningPart => 'Thinking';
+
+  @override
+  String get messageEditToolCallPart => 'Tool call';
+
+  @override
+  String get messageEditImagePart => 'Image';
+
+  @override
+  String get messageEditFilePart => 'File';
+
+  @override
+  String get messageEditUnknownPart => 'Unknown part';
+
+  @override
+  String get messageEditDeletePart => 'Delete part';
+
+  @override
+  String get messageEditDeletePartConfirmTitle => 'Delete this part?';
+
+  @override
+  String get messageEditDeletePartConfirmMessage =>
+      'This change only affects the edited message version.';
+
+  @override
+  String get messageEditCancel => 'Cancel';
+
+  @override
+  String get messageStyleSettingsPageAssistantFitContent =>
+      'Fit assistant bubble to content';
+
+  @override
+  String get messageStyleSettingsPageAssistantFitContentSubtitle =>
+      'Assistant bubbles hug their text instead of filling the row';
+
+  @override
   String get messageStyleSettingsPageStyleFrostedSubtitle =>
       'Translucent frosted glass';
 
@@ -8441,4 +8621,257 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get messageStyleSettingsPageRoleAssistantHint =>
       'Assistant settings also apply to thinking, tool-call, and translation cards.';
+
+  @override
+  String get toolSchemaSettingsPageTitle => 'Tool Descriptions';
+
+  @override
+  String get toolSchemaSettingsGroupSearch => 'Search';
+
+  @override
+  String get toolSchemaSettingsGroupMemory => 'Memory';
+
+  @override
+  String get toolSchemaSettingsGroupLocal => 'Device tools';
+
+  @override
+  String get toolSchemaSettingsModified => 'Modified';
+
+  @override
+  String get toolSchemaSettingsResetDefault => 'Restore default';
+
+  @override
+  String get toolSchemaSettingsResetAll => 'Restore all defaults';
+
+  @override
+  String get toolSchemaSettingsResetAllTitle => 'Restore all defaults?';
+
+  @override
+  String get toolSchemaSettingsResetAllMessage =>
+      'This restores every built-in tool description to the app default. Your custom wording will be lost.';
+
+  @override
+  String get toolSchemaSettingsResetAllConfirm => 'Restore';
+
+  @override
+  String toolSchemaSettingsParamDescriptions(int count) {
+    return 'Parameter descriptions ($count)';
+  }
+
+  @override
+  String get toolSchemaSettingsMemoryLangNote =>
+      'Memory tool defaults follow the memory prompt language. A custom description is stored once per tool and will not switch when you change that language.';
+
+  @override
+  String get toolSchemaSettingsDescriptionLabel => 'Description';
+
+  @override
+  String get toolSchemaSettingsToolName => 'Tool name';
+
+  @override
+  String get toolSchemaEditorPageTitle => 'Edit description';
+
+  @override
+  String get toolSchemaSettingsCancel => 'Cancel';
+
+  @override
+  String get assistantEditLocalToolHealthSubtitle =>
+      'Read a privacy-preserving activity summary from Apple Health, requires Health access.';
+
+  @override
+  String get assistantEditLocalToolHealthTitle => 'Health Summary';
+
+  @override
+  String assistantEditLocalToolHealthSelectedCount(int selected, int total) {
+    return '$selected/$total selected';
+  }
+
+  @override
+  String get assistantEditLocalToolLocationSubtitle =>
+      'Read a one-shot location from this device, requires the location permission.';
+
+  @override
+  String get assistantEditLocalToolLocationTitle => 'Current Location';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteSubtitle =>
+      'Mark a reminder as done with your confirmation, requires full reminders access.';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteTitle =>
+      'Complete Reminder';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateSubtitle =>
+      'Create a reminder on this device with your confirmation, requires full reminders access.';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateTitle => 'Create Reminder';
+
+  @override
+  String get assistantEditLocalToolRemindersQuerySubtitle =>
+      'Read reminders on this device, requires full reminders access.';
+
+  @override
+  String get assistantEditLocalToolRemindersQueryTitle => 'Query Reminders';
+
+  @override
+  String get assistantEditLocalToolWeatherSubtitle =>
+      'Get Apple Weather for the current or a specified location. WeatherKit attribution is shown in the result.';
+
+  @override
+  String get assistantEditLocalToolWeatherTitle => 'Weather';
+
+  @override
+  String healthDataSettingsBadge(int selected, int total) {
+    return '$selected/$total on';
+  }
+
+  @override
+  String get healthDataSettingsCategoryActivity => 'Activity';
+
+  @override
+  String get healthDataSettingsCategoryBody => 'Body';
+
+  @override
+  String get healthDataSettingsCategoryHeart => 'Heart';
+
+  @override
+  String get healthDataSettingsCategoryRest => 'Rest';
+
+  @override
+  String get healthDataSettingsDescription =>
+      'HealthKit signals available to the current assistant in daily conversation. Switches control what Kelivo may try to read; iOS still manages actual Health access.';
+
+  @override
+  String get healthDataSettingsDisableAll => 'Disable all';
+
+  @override
+  String get healthDataSettingsEnableAll => 'Enable all';
+
+  @override
+  String get healthDataSettingsIosReadSubtitle =>
+      'Device available, read range managed by iOS';
+
+  @override
+  String get healthDataSettingsIosReadTitle => 'iOS Health Read';
+
+  @override
+  String get healthDataSettingsOpenSystemSettings => 'Open system settings';
+
+  @override
+  String get healthDataSettingsTitle => 'Health Data';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergySubtitle =>
+      'Active energy burned';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergyTitle => 'Energy';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseSubtitle =>
+      'Blood glucose sample';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseTitle => 'Blood Glucose';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenSubtitle =>
+      'Blood oxygen saturation';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenTitle => 'Blood Oxygen';
+
+  @override
+  String get healthDataSettingsTypeBmiSubtitle => 'Body mass index';
+
+  @override
+  String get healthDataSettingsTypeBmiTitle => 'BMI';
+
+  @override
+  String get healthDataSettingsTypeDaylightSubtitle => 'Outdoor daylight time';
+
+  @override
+  String get healthDataSettingsTypeDaylightTitle => 'Sunlight';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergySubtitle =>
+      'Dietary calorie record';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergyTitle => 'Dietary Energy';
+
+  @override
+  String get healthDataSettingsTypeDistanceSubtitle =>
+      'Walking and running distance';
+
+  @override
+  String get healthDataSettingsTypeDistanceTitle => 'Distance';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesSubtitle =>
+      'Apple exercise minutes';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesTitle => 'Exercise';
+
+  @override
+  String get healthDataSettingsTypeHeartRateSubtitle =>
+      'Latest heart rate sample';
+
+  @override
+  String get healthDataSettingsTypeHeartRateTitle => 'Heart Rate';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessSubtitle =>
+      'Mindfulness or resting periods';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessTitle => 'Resting';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateSubtitle =>
+      'Resting heart rate sample';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateTitle =>
+      'Resting Heart Rate';
+
+  @override
+  String get healthDataSettingsTypeSleepSubtitle => 'Sleep duration last night';
+
+  @override
+  String get healthDataSettingsTypeSleepTitle => 'Sleep';
+
+  @override
+  String get healthDataSettingsTypeStandTimeSubtitle => 'Stand time';
+
+  @override
+  String get healthDataSettingsTypeStandTimeTitle => 'Stand';
+
+  @override
+  String get healthDataSettingsTypeStepsSubtitle => 'Walking steps summary';
+
+  @override
+  String get healthDataSettingsTypeStepsTitle => 'Steps';
+
+  @override
+  String get healthDataSettingsTypeWaterSubtitle => 'Water intake record';
+
+  @override
+  String get healthDataSettingsTypeWaterTitle => 'Water';
+
+  @override
+  String get healthDataSettingsTypeWeightSubtitle => 'Body weight sample';
+
+  @override
+  String get healthDataSettingsTypeWeightTitle => 'Weight';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsSubtitle =>
+      'Workout records: type, duration, distance, and energy';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsTitle => 'Workouts';
 }

@@ -1,13 +1,29 @@
+import '../../../../utils/mcp_structured_image.dart';
 import '../../../models/token_usage.dart';
 import '../chat_api_helpers.dart';
 import '../stream/stream_chunk.dart';
 import '../stream/stream_chunk_emit.dart';
 
 final class ExecutedClientTool {
-  const ExecutedClientTool({required this.call, required this.content});
+  const ExecutedClientTool({
+    required this.call,
+    required this.content,
+    this.metadata,
+  });
 
   final EmitToolCall call;
+  final Map<String, dynamic>? metadata;
   final String content;
+}
+
+EmitToolResult _emitExecuted(ExecutedClientTool item) {
+  return emitToolResult(
+    id: item.call.id,
+    name: item.call.name,
+    arguments: item.call.arguments,
+    content: item.content,
+    metadata: mergeToolResultMetadata(item.call.metadata, item.metadata),
+  );
 }
 
 /// Execute [calls] and yield [ToolCallResult]s (and optionally [ToolCall*]).
@@ -22,24 +38,15 @@ Stream<StreamChunk> executeClientTools({
   if (emitCalls) {
     yield* emitToolCalls(calls, usage: usage, totalTokens: totalTokens);
   }
-  final results = <EmitToolResult>[];
+  final executed = <ExecutedClientTool>[];
   for (final call in calls) {
-    final content = await onToolCall(
-      call.name,
-      call.arguments,
-      toolCallId: call.id,
-    );
-    results.add(
-      emitToolResult(
-        id: call.id,
-        name: call.name,
-        arguments: call.arguments,
-        content: content,
-        metadata: call.metadata,
-      ),
-    );
+    executed.add(await _executeClientTool(call, onToolCall));
   }
-  yield* emitToolResults(results, usage: usage, totalTokens: totalTokens);
+  yield* emitToolResults(
+    [for (final item in executed) _emitExecuted(item)],
+    usage: usage,
+    totalTokens: totalTokens,
+  );
 }
 
 /// After-round client-tool loop: execute → append → send follow-up → repeat.
@@ -74,28 +81,10 @@ Stream<StreamChunk> runClientToolFollowUps({
       yield* emitToolCalls(calls, usage: usage, totalTokens: totalTokens);
     }
     for (final call in calls) {
-      executed.add(
-        ExecutedClientTool(
-          call: call,
-          content: await onToolCall(
-            call.name,
-            call.arguments,
-            toolCallId: call.id,
-          ),
-        ),
-      );
+      executed.add(await _executeClientTool(call, onToolCall));
     }
     yield* emitToolResults(
-      [
-        for (final item in executed)
-          emitToolResult(
-            id: item.call.id,
-            name: item.call.name,
-            arguments: item.call.arguments,
-            content: item.content,
-            metadata: item.call.metadata,
-          ),
-      ],
+      [for (final item in executed) _emitExecuted(item)],
       usage: usage,
       totalTokens: totalTokens,
     );
@@ -135,32 +124,27 @@ Stream<StreamChunk> runProviderToolRounds({
         yield* emitToolCalls(calls, usage: usage, totalTokens: totalTokens);
       }
       for (final call in calls) {
-        executed.add(
-          ExecutedClientTool(
-            call: call,
-            content: await onToolCall(
-              call.name,
-              call.arguments,
-              toolCallId: call.id,
-            ),
-          ),
-        );
+        executed.add(await _executeClientTool(call, onToolCall));
       }
       yield* emitToolResults(
-        [
-          for (final item in executed)
-            emitToolResult(
-              id: item.call.id,
-              name: item.call.name,
-              arguments: item.call.arguments,
-              content: item.content,
-              metadata: item.call.metadata,
-            ),
-        ],
+        [for (final item in executed) _emitExecuted(item)],
         usage: usage,
         totalTokens: totalTokens,
       );
     }
     append(executed);
   }
+}
+
+Future<ExecutedClientTool> _executeClientTool(
+  EmitToolCall call,
+  ToolCallHandler onToolCall,
+) async {
+  final raw = await onToolCall(call.name, call.arguments, toolCallId: call.id);
+  final parsed = ClientToolResult.fromHandler(raw);
+  return ExecutedClientTool(
+    call: call,
+    content: parsed.content,
+    metadata: parsed.metadata,
+  );
 }

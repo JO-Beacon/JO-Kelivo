@@ -8,7 +8,6 @@ import '../../../../models/token_usage.dart';
 import '../../../../providers/model_provider.dart';
 import '../../../../providers/settings_provider.dart';
 import '../../../../utils/multimodal_input_utils.dart';
-import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../builtin_tools.dart';
 import '../../chat_api_helpers.dart';
 import '../../generation/tool_loop_runner.dart';
@@ -18,6 +17,9 @@ import '../../stream/stream_chunk.dart';
 import '../../stream/stream_chunk_emit.dart';
 import '../../stream/stream_chunk_ids.dart';
 import 'claude_decoder.dart';
+import 'claude_container.dart';
+import 'claude_files.dart';
+import 'claude_history.dart';
 
 int _defaultClaudeMaxOutputTokens(String modelId) {
   final lower = modelId.trim().toLowerCase();
@@ -103,262 +105,16 @@ Stream<StreamChunk> sendClaudeStreamEvents(
     );
   }
 
-  // 按 Anthropic schema 转换最后一条用户消息并加入图片。
-  final initialMessages = <Map<String, dynamic>>[];
-  final pendingToolResults = <Map<String, dynamic>>[];
-  void flushPendingToolResults() {
-    if (pendingToolResults.isEmpty) return;
-    initialMessages.add({
-      'role': 'user',
-      'content': List<Map<String, dynamic>>.from(pendingToolResults),
-    });
-    pendingToolResults.clear();
-  }
-
-  Map<String, dynamic>? toolUseBlockFromToolCall(Map tc) {
-    final id = (tc['id'] ?? '').toString();
-    final fn = tc['function'];
-    if (id.isEmpty || fn is! Map) return null;
-    Map<String, dynamic> input = const <String, dynamic>{};
-    try {
-      input = (jsonDecode((fn['arguments'] ?? '{}').toString()) as Map)
-          .cast<String, dynamic>();
-    } catch (_) {}
-    return {
-      'type': 'tool_use',
-      'id': id,
-      'name': (fn['name'] ?? '').toString(),
-      'input': input,
-    };
-  }
-
-  Set<String> toolUseIdsInBlocks(List<Map<String, dynamic>> blocks) {
-    return blocks
-        .where((block) => block['type'] == 'tool_use')
-        .map((block) => (block['id'] ?? '').toString())
-        .where((id) => id.isNotEmpty)
-        .toSet();
-  }
-
-  Map<String, dynamic>? assistantBlockForClaudeRequest(Map block) {
-    final type = (block['type'] ?? '').toString();
-    if (skipRedactedThinkingBlocks && type == 'redacted_thinking') {
-      return null;
-    }
-    return block.map((key, value) => MapEntry(key.toString(), value));
-  }
-
-  List<Map<String, dynamic>> assistantBlocksForClaudeRequest(
-    Iterable<Map> blocks,
-  ) {
-    return [
-      for (final block in blocks)
-        if (assistantBlockForClaudeRequest(block) case final sanitized?)
-          sanitized,
-    ];
-  }
-
-  List<Map<String, dynamic>>? anthropicBlocksFromToolCallMetadata(
-    List toolCalls,
-  ) {
-    final expectedIds = toolCalls
-        .whereType<Map>()
-        .map((tc) => (tc['id'] ?? '').toString())
-        .where((id) => id.isNotEmpty)
-        .toSet();
-    List<Map<String, dynamic>>? bestBlocks;
-    var bestMatchCount = -1;
-
-    for (final tc in toolCalls) {
-      if (tc is! Map) continue;
-      final meta = tc['metadata'];
-      if (meta is! Map) continue;
-      final anthropic = meta['anthropic'];
-      if (anthropic is! Map) continue;
-      final blocks = anthropic['assistant_blocks'];
-      if (blocks is! List || blocks.isEmpty) continue;
-      final candidate = assistantBlocksForClaudeRequest(
-        blocks.whereType<Map>(),
-      );
-      final matchCount = toolUseIdsInBlocks(
-        candidate,
-      ).where(expectedIds.contains).length;
-      if (matchCount > bestMatchCount ||
-          (matchCount == bestMatchCount &&
-              candidate.length > (bestBlocks?.length ?? 0))) {
-        bestBlocks = candidate;
-        bestMatchCount = matchCount;
-      }
-    }
-    if (bestBlocks == null) return null;
-    if (expectedIds.isEmpty) return bestBlocks;
-
-    final presentIds = toolUseIdsInBlocks(bestBlocks);
-    if (presentIds.containsAll(expectedIds)) return bestBlocks;
-
-    final completed = <Map<String, dynamic>>[
-      for (final block in bestBlocks) Map<String, dynamic>.from(block),
-    ];
-    for (final tc in toolCalls.whereType<Map>()) {
-      final block = toolUseBlockFromToolCall(tc);
-      if (block == null) continue;
-      final id = (block['id'] ?? '').toString();
-      if (presentIds.contains(id)) continue;
-      completed.add(block);
-      presentIds.add(id);
-    }
-    return completed;
-  }
-
-  for (int i = 0; i < nonSystemMessages.length; i++) {
-    final m = nonSystemMessages[i];
-    final isLast = i == nonSystemMessages.length - 1;
-    final role = (m['role'] ?? 'user').toString();
-    if (role == 'tool') {
-      final id = (m['tool_call_id'] ?? '').toString();
-      if (id.isNotEmpty) {
-        pendingToolResults.add({
-          'type': 'tool_result',
-          'tool_use_id': id,
-          'content': (m['content'] ?? '').toString(),
-        });
-      }
-      continue;
-    }
-    flushPendingToolResults();
-
-    if (role == 'assistant' && m['tool_calls'] is List) {
-      final toolCalls = m['tool_calls'] as List;
-      final blocks =
-          anthropicBlocksFromToolCallMetadata(toolCalls) ??
-          <Map<String, dynamic>>[];
-      if (blocks.isEmpty) {
-        final text = (m['content'] ?? '').toString();
-        if (text.trim().isNotEmpty && text.trim() != '\n\n') {
-          blocks.add({'type': 'text', 'text': text});
-        }
-        for (final tc in toolCalls) {
-          if (tc is! Map) continue;
-          final block = toolUseBlockFromToolCall(tc);
-          if (block != null) blocks.add(block);
-        }
-      }
-      if (blocks.isNotEmpty) {
-        initialMessages.add({'role': 'assistant', 'content': blocks});
-      }
-      continue;
-    }
-    final raw = (m['content'] ?? '').toString();
-    // 只做语义媒体检测，不识别自定义附件标记；附件来自结构化媒体路径、userImagePaths 或 Markdown 图片。
-    final hasMarkdownImages = shouldParseMarkdownImages(raw);
-    final internalMediaRefs = parseInternalMediaRefs(
-      m[multimodalInternalMediaPathsKey],
-    );
-    // 消费用户与 assistant 历史消息中注入的媒体引用。
-    final hasInternalMedia = internalMediaRefs.isNotEmpty;
-    final hasAttachedImages =
-        isLast && role == 'user' && (userImagePaths?.isNotEmpty == true);
-
-    if ((role == 'user' || role == 'assistant') &&
-        (hasMarkdownImages || hasInternalMedia || hasAttachedImages)) {
-      final parts = <Map<String, dynamic>>[];
-      final seenSources = <String>{};
-      String normalizeSrc(String src) {
-        if (src.startsWith('http') || src.startsWith('data:')) return src;
-        try {
-          return SandboxPathResolver.fix(src);
-        } catch (_) {
-          return src;
-        }
-      }
-
-      Future<void> addClaudeImage(String source, {String? explicitMime}) async {
-        final normalized = normalizeSrc(source);
-        if (!seenSources.add(normalized)) return;
-        if (source.startsWith('http://') || source.startsWith('https://')) {
-          // 保持官方 Claude 路径对远程 URL 的既有行为。
-          parts.add({'type': 'text', 'text': source});
-          return;
-        }
-        if (source.startsWith('data:')) {
-          final mime = normalizeClaudeImageMime(
-            (explicitMime != null && explicitMime.trim().isNotEmpty)
-                ? explicitMime.trim()
-                : mimeFromDataUrl(source),
-          );
-          final idx = source.indexOf('base64,');
-          if (idx > 0) {
-            parts.add({
-              'type': 'image',
-              'source': {
-                'type': 'base64',
-                'media_type': mime,
-                'data': source.substring(idx + 7),
-              },
-            });
-          }
-          return;
-        }
-        final mime = normalizeClaudeImageMime(
-          (explicitMime != null && explicitMime.trim().isNotEmpty)
-              ? explicitMime.trim()
-              : mimeFromPath(source),
-        );
-        final b64 = await tryEncodeBase64File(source, withPrefix: false);
-        if (b64 == null) return;
-        parts.add({
-          'type': 'image',
-          'source': {'type': 'base64', 'media_type': mime, 'data': b64},
-        });
-      }
-
-      final parsed = await parseTextAndImages(
-        raw,
-        allowRemoteImages: true,
-        allowLocalImages: true,
-        keepRemoteMarkdownText: true,
-      );
-      if (parsed.text.isNotEmpty) {
-        parts.add({'type': 'text', 'text': parsed.text});
-      }
-      for (final ref in parsed.images) {
-        if (ref.kind == 'data' || ref.kind == 'path' || ref.kind == 'url') {
-          await addClaudeImage(ref.src);
-        }
-      }
-      final supplementalRefs = supplementalMediaRefs(
-        internalRaw: m[multimodalInternalMediaPathsKey],
-        userPaths: userImagePaths,
-        includeUserPaths: hasAttachedImages,
-      );
-      for (final mediaRef in supplementalRefs) {
-        final mime = mimeForInternalMediaRef(mediaRef);
-        // 视频、音频及其他非 Claude 图片 MIME 类型（例如 video/mp4）不生成 Anthropic 图片分片。
-        if (isVideoMime(mime) ||
-            isAudioMime(mime) ||
-            !isClaudeSupportedImageMime(mime)) {
-          final uri = mediaRef.uri;
-          final isRemote =
-              uri.startsWith('http://') || uri.startsWith('https://');
-          if (isRemote) {
-            final normalized = normalizeSrc(uri);
-            if (seenSources.add(normalized)) {
-              parts.add({'type': 'text', 'text': uri});
-            }
-          }
-          continue;
-        }
-        await addClaudeImage(mediaRef.uri, explicitMime: mediaRef.mime);
-      }
-      initialMessages.add({
-        'role': role,
-        'content': parts.isEmpty ? raw : parts,
-      });
-    } else {
-      initialMessages.add({'role': role, 'content': raw});
-    }
-  }
-  flushPendingToolResults();
+  // 使用统一历史适配器重建 Anthropic 消息，保留多响应轮次、服务端工具结果、
+  // pause_turn 和附件引用的协议顺序。
+  final history = ClaudeHistory(
+    replayServerToolBlocks:
+        !isVertex && BuiltInToolsHelper.isOfficialAnthropicEndpoint(config),
+    skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
+    skipImageParsing: skipImageParsing,
+    userImagePaths: userImagePaths,
+  );
+  final initialMessages = await history.build(nonSystemMessages);
 
   // 将 OpenAI 风格工具映射为 Anthropic 自定义工具（客户端工具）。
   List<Map<String, dynamic>>? anthropicTools;
@@ -383,13 +139,20 @@ Stream<StreamChunk> sendClaudeStreamEvents(
 
   // 汇总最终工具列表：客户端工具、服务端工具和内置 web_search。
   final List<Map<String, dynamic>> allTools = [];
+  final declaredNames = <String>{};
   if (anthropicTools != null && anthropicTools.isNotEmpty) {
-    allTools.addAll(anthropicTools);
+    for (final tool in anthropicTools) {
+      final name = (tool['name'] ?? '').toString();
+      if (name.isNotEmpty && declaredNames.add(name)) allTools.add(tool);
+    }
   }
   if (tools != null && tools.isNotEmpty) {
     for (final t in tools) {
       final type = (t['type'] ?? '').toString();
-      if (type.startsWith('web_search_')) {
+      final name = (t['name'] ?? '').toString();
+      if (type.startsWith('web_search_') &&
+          name.isNotEmpty &&
+          declaredNames.add(name)) {
         allTools.add(t);
       }
     }
@@ -411,12 +174,6 @@ Stream<StreamChunk> sendClaudeStreamEvents(
       'type': searchToolType,
       'name': 'web_search',
     };
-    if (searchToolType == 'web_search_20260209') {
-      allTools.add(<String, dynamic>{
-        'type': 'code_execution_20250825',
-        'name': 'code_execution',
-      });
-    }
     if (ws['max_uses'] is int && (ws['max_uses'] as int) > 0) {
       entry['max_uses'] = ws['max_uses'];
     }
@@ -434,8 +191,25 @@ Stream<StreamChunk> sendClaudeStreamEvents(
       entry['user_location'] = (ws['user_location'] as Map)
           .cast<String, dynamic>();
     }
-    allTools.add(entry);
+    if (declaredNames.add('web_search')) allTools.add(entry);
   }
+  for (final entry in BuiltInToolsHelper.claudeServerToolEntries(
+    cfg: config,
+    modelId: modelId,
+    enabled: builtIns,
+  )) {
+    final name = (entry['name'] ?? '').toString();
+    if (name.isNotEmpty && declaredNames.add(name)) allTools.add(entry);
+  }
+
+  final hasCodeExecution = allTools.any(
+    (tool) =>
+        (tool['name'] ?? '').toString() == 'code_execution' &&
+        (tool['type'] ?? '').toString().startsWith('code_execution_'),
+  );
+  final dataFiles = history.dataFiles;
+  final unseenDataFiles = history.unseenDataFiles;
+  final turnDataFiles = history.turnDataFiles;
 
   // 请求头在各轮次之间保持不变。
   final vertexToken = isVertex ? await _vertexAccessToken(config) : null;
@@ -459,6 +233,52 @@ Stream<StreamChunk> sendClaudeStreamEvents(
   List<Map<String, dynamic>> convo = List<Map<String, dynamic>>.from(
     initialMessages,
   );
+  String? carriedContainerId = history.storedContainer?.id;
+
+  final uploadedPaths = <String>{};
+  final turnFileUris = {for (final doc in turnDataFiles) doc.uri};
+  final turnResponses = <List<Map<String, dynamic>>>[];
+  Future<void> uploadDataFiles() async {
+    if (!hasCodeExecution || dataFiles.isEmpty || convo.isEmpty) return;
+    final blocks = <Map<String, dynamic>>[];
+    final source = carriedContainerId == null ? dataFiles : unseenDataFiles;
+    for (final doc in source) {
+      if (!uploadedPaths.add(doc.uri)) continue;
+      try {
+        final fileId = await uploadClaudeFile(
+          client: client,
+          base: base,
+          headers: baseHeaders,
+          path: doc.uri,
+          name: doc.name,
+          mime: doc.mime,
+        );
+        blocks.add({'type': 'container_upload', 'file_id': fileId});
+      } on ClaudeFileUploadException catch (e) {
+        if (turnFileUris.contains(doc.uri)) rethrow;
+        blocks.add({'type': 'text', 'text': e.toString()});
+      }
+    }
+    if (blocks.isEmpty) return;
+    final index = convo.lastIndexWhere(
+      (message) => (message['role'] ?? '').toString() == 'user',
+    );
+    if (index < 0) return;
+    final last = convo[index];
+    final content = last['content'];
+    convo[index] = {
+      ...last,
+      'content': [
+        if (content is List)
+          ...content
+        else if ((content ?? '').toString().isNotEmpty)
+          {'type': 'text', 'text': content.toString()},
+        ...blocks,
+      ],
+    };
+  }
+
+  await uploadDataFiles();
   TokenUsage? totalUsage;
   var streamRound = 0;
   var pendingCalls = <EmitToolCall>[];
@@ -509,6 +329,10 @@ Stream<StreamChunk> sendClaudeStreamEvents(
         if (compatibleTopP != null) 'top_p': compatibleTopP,
         if (allTools.isNotEmpty) 'tools': allTools,
         if (allTools.isNotEmpty) 'tool_choice': {'type': 'auto'},
+        if (hasCodeExecution &&
+            carriedContainerId != null &&
+            carriedContainerId!.isNotEmpty)
+          'container': carriedContainerId,
         if (thinking != null) 'thinking': thinking,
         if (outputConfig != null) 'output_config': outputConfig,
       };
@@ -521,10 +345,27 @@ Stream<StreamChunk> sendClaudeStreamEvents(
       request.headers.addAll(baseHeaders);
       request.body = jsonEncode(body);
 
-      final response = await client.send(request);
+      var response = await client.send(request);
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final errorBody = await response.stream.bytesToString();
-        throw HttpException('HTTP ${response.statusCode}: $errorBody');
+        final stale =
+            hasCodeExecution &&
+            carriedContainerId != null &&
+            isClaudeStaleContainerError(response.statusCode, errorBody);
+        if (!stale) {
+          throw HttpException('HTTP ${response.statusCode}: $errorBody');
+        }
+        carriedContainerId = null;
+        body.remove('container');
+        await uploadDataFiles();
+        final retry = http.Request('POST', url);
+        retry.headers.addAll(baseHeaders);
+        retry.body = jsonEncode(body);
+        response = await client.send(retry);
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          final retryBody = await response.stream.bytesToString();
+          throw HttpException('HTTP ${response.statusCode}: $retryBody');
+        }
       }
 
       pendingCalls = [];
@@ -587,6 +428,64 @@ Stream<StreamChunk> sendClaudeStreamEvents(
             }
           }
         }
+        final serverDecoder = ClaudeStreamDecoder(
+          serverToolNames: {
+            for (final tool in allTools)
+              if ((tool['type'] ?? '').toString().startsWith('web_') ||
+                  (tool['type'] ?? '').toString().startsWith('code_execution_'))
+                (tool['name'] ?? '').toString(),
+          },
+        );
+        final responseContainer = (obj['container'] is Map)
+            ? (obj['container'] as Map)['id']?.toString()
+            : null;
+        final serverBlocks = [
+          for (final item in content)
+            if (item is Map) item.cast<String, dynamic>(),
+        ];
+        for (final chunk in serverDecoder.decodeCompleteServerTools(
+          serverBlocks,
+        )) {
+          yield chunk;
+          if (chunk case ServerToolEnd(:final output)) {
+            for (final fileId in claudeGeneratedFileIds(output)) {
+              final file = await downloadClaudeGeneratedFile(
+                client: client,
+                base: base,
+                headers: baseHeaders,
+                fileId: fileId,
+              );
+              if (file != null) yield file;
+            }
+          }
+        }
+        // The complete response already contains the authoritative block
+        // order; keep it intact for Anthropic replay.
+        assistantBlocks
+          ..clear()
+          ..addAll(serverBlocks);
+        final responseHasTool = assistantBlocks.any(
+          (block) =>
+              block['type'] == 'tool_use' || block['type'] == 'server_tool_use',
+        );
+        if (responseHasTool || turnResponses.isNotEmpty) {
+          turnResponses.add([
+            for (final block in assistantBlocks)
+              Map<String, dynamic>.from(block),
+          ]);
+          yield ProviderArtifact(
+            kind: 'claude_turn',
+            payload: jsonEncode(turnResponses),
+          );
+        }
+        if (hasCodeExecution &&
+            responseContainer != null &&
+            responseContainer.isNotEmpty) {
+          yield ProviderArtifact(
+            kind: 'claude_container',
+            payload: ClaudeContainerRef(id: responseContainer).encode(),
+          );
+        }
         lastAssistantBlocks = assistantBlocks;
         lastText = buf.toString();
         if (toolUses.isNotEmpty && onToolCall != null) {
@@ -597,10 +496,18 @@ Stream<StreamChunk> sendClaudeStreamEvents(
                 name: (e.value['name'] ?? '').toString(),
                 arguments: (e.value['args'] as Map<String, dynamic>),
                 metadata: {
-                  'anthropic': {'assistant_blocks': assistantBlocks},
+                  'anthropic': {
+                    'assistant_blocks': assistantBlocks,
+                    if (responseContainer != null &&
+                        responseContainer.isNotEmpty)
+                      'container_id': responseContainer,
+                  },
                 },
               ),
           ];
+        }
+        if (toolUses.isEmpty) {
+          pauseTurn = (obj['stop_reason'] ?? '').toString() == 'pause_turn';
         }
         return;
       }
@@ -608,6 +515,12 @@ Stream<StreamChunk> sendClaudeStreamEvents(
       final sse = response.stream.transform(utf8.decoder);
       final decoder = ClaudeStreamDecoder(
         skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
+        serverToolNames: {
+          for (final tool in allTools)
+            if ((tool['type'] ?? '').toString().startsWith('web_') ||
+                (tool['type'] ?? '').toString().startsWith('code_execution_'))
+              (tool['name'] ?? '').toString(),
+        },
         sourceId: 'round-${streamRound++}',
       );
       final executedToolIds = <String>{};
@@ -617,6 +530,17 @@ Stream<StreamChunk> sendClaudeStreamEvents(
         final decoded = decoder.accept(event);
         for (final chunk in decoded.chunks) {
           yield chunk;
+          if (chunk case ServerToolEnd(:final output)) {
+            for (final fileId in claudeGeneratedFileIds(output)) {
+              final file = await downloadClaudeGeneratedFile(
+                client: client,
+                base: base,
+                headers: baseHeaders,
+                fileId: fileId,
+              );
+              if (file != null) yield file;
+            }
+          }
           if (chunk is ToolCallEnd &&
               decoder.isClientTool(chunk.id) &&
               onToolCall != null &&
@@ -651,6 +575,17 @@ Stream<StreamChunk> sendClaudeStreamEvents(
       }
       for (final chunk in decoder.onClosed()) {
         yield chunk;
+        if (chunk case ServerToolEnd(:final output)) {
+          for (final fileId in claudeGeneratedFileIds(output)) {
+            final file = await downloadClaudeGeneratedFile(
+              client: client,
+              base: base,
+              headers: baseHeaders,
+              fileId: fileId,
+            );
+            if (file != null) yield file;
+          }
+        }
       }
 
       final usage = decoder.usage;
@@ -659,6 +594,28 @@ Stream<StreamChunk> sendClaudeStreamEvents(
       final toolResultsContent = decoder.toolResults;
 
       totalUsage = usage ?? totalUsage;
+      final responseHasTool = assistantBlocks.any(
+        (block) =>
+            block['type'] == 'tool_use' || block['type'] == 'server_tool_use',
+      );
+      if (responseHasTool || turnResponses.isNotEmpty) {
+        turnResponses.add([
+          for (final block in assistantBlocks) Map<String, dynamic>.from(block),
+        ]);
+        yield ProviderArtifact(
+          kind: 'claude_turn',
+          payload: jsonEncode(turnResponses),
+        );
+      }
+      if (hasCodeExecution &&
+          decoder.containerId != null &&
+          decoder.containerId!.isNotEmpty) {
+        carriedContainerId = decoder.containerId;
+        yield ProviderArtifact(
+          kind: 'claude_container',
+          payload: ClaudeContainerRef(id: decoder.containerId!).encode(),
+        );
+      }
 
       lastAssistantBlocks = assistantBlocks;
       if (decoder.clientTools.isEmpty) {

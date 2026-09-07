@@ -552,18 +552,31 @@ void main() {
         _legacyId('default_assistant-1'),
       );
       expect(tree, isNotNull);
-      expect(tree!.activePath(), [_legacyId('message-1')]);
+      // 单列表 fork 表示「当前选中的版本就是这条替代内容」：
+      // 归一化后幸存内容并入主线，活跃路径直接展示 fork-answer
+      // （可达即可见，契约 §8）。
+      expect(tree!.activePath(), [
+        _legacyId('message-1'),
+        _legacyId('fork-answer'),
+      ]);
       expect(
         tree.edges[_legacyId('fork-answer')]?.parentMessageId,
         _legacyId('message-1'),
       );
-      final branchId = tree.branches.keys.singleWhere(
-        (id) => id == _legacyId('fork_${_legacyId('message-1')}_alternative'),
+      // 降级锚点合并：代表 fork 内容的分支记录被主线分支吸收清理，
+      // 不保留单子锚点的空切换形态。
+      expect(
+        tree.branches.containsKey(
+          _legacyId('fork_${_legacyId('message-1')}_alternative'),
+        ),
+        isFalse,
       );
-      expect(tree.branchPath(branchId), [
-        _legacyId('message-1'),
+      expect(
+        tree
+            .branches[_legacyId('root_${_legacyId('default_assistant-1')}')]
+            ?.tipMessageId,
         _legacyId('fork-answer'),
-      ]);
+      );
     });
 
     test(
@@ -638,21 +651,23 @@ void main() {
           _legacyId('message-1'),
           _legacyId('current-answer'),
         ]);
+        // 外层分叉（message-1 下两个真实子）保留分支记录与选中记忆。
         final outerBranch =
             tree.branches[_legacyId(
               'fork_${_legacyId('message-1')}_outer-alternative',
             )];
-        final nestedBranch =
-            tree.branches[_legacyId(
-              'fork_${_legacyId('outer-answer')}_nested-alternative',
-            )];
         expect(outerBranch, isNotNull);
-        expect(nestedBranch, isNotNull);
+        // 嵌套分叉锚定在单子 outer-answer 上（空选中槽被丢弃后
+        // 无第二真实子），归一化把 nested 内容并入外层替代分支：
+        // 其路径延伸至 nested-answer，内容经 message-1 的分支切换
+        // 可见（可达即可见，契约 §8）。
+        expect(
+          tree.branches.containsKey(
+            _legacyId('fork_${_legacyId('outer-answer')}_nested-alternative'),
+          ),
+          isFalse,
+        );
         expect(tree.branchPath(outerBranch!.id), [
-          _legacyId('message-1'),
-          _legacyId('outer-answer'),
-        ]);
-        expect(tree.branchPath(nestedBranch!.id), [
           _legacyId('message-1'),
           _legacyId('outer-answer'),
           _legacyId('nested-answer'),
@@ -661,9 +676,10 @@ void main() {
           tree.branchSelections[_legacyId('message-1')],
           _legacyId('root_${_legacyId('default_assistant-1')}'),
         );
+        // 外层空选中槽的终端选择记忆随锚点合并清除。
         expect(
-          tree.branchSelections[_legacyId('outer-answer')],
-          outerBranch.id,
+          tree.branchSelections.containsKey(_legacyId('outer-answer')),
+          isFalse,
         );
       },
     );

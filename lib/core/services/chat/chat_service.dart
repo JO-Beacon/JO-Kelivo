@@ -22,6 +22,7 @@ import '../../models/progress_update.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/app_directories.dart';
 import '../backup/backup_isolate_runner.dart';
+import '../api/providers/claude/claude_container.dart';
 
 final class LoadedTimelineSlot {
   const LoadedTimelineSlot({required this.identity, required this.message});
@@ -128,6 +129,13 @@ class ChatService extends ChangeNotifier {
   final Map<String, String> _temporaryGeminiThoughtSigs = <String, String>{};
   final Map<String, List<Map<String, dynamic>>> _toolEventsCache = {};
   final Map<String, String> _geminiThoughtSigsCache = {};
+  static const Set<String> _providerArtifactKinds = {
+    claudeContainerArtifactKind,
+    'claude_turn',
+    'gemini_thought_signature',
+  };
+  final Map<String, Map<String, String>> _providerArtifactsCache = {};
+  final Map<String, Map<String, String>> _temporaryProviderArtifacts = {};
   final Map<String, Map<String, int>> _firstGroupIndicesCache = {};
   final Map<String, int> _messageCounts = {};
   // 不变量：键要么不存在，要么保存完整的权威
@@ -329,6 +337,7 @@ class ChatService extends ChangeNotifier {
     final conversations = await _repo.getAllConversationSummaries();
     _toolEventsCache.clear();
     _geminiThoughtSigsCache.clear();
+    _providerArtifactsCache.clear();
     _messageOrderIds.clear();
     _firstGroupIndicesCache.clear();
     // 重新加载时丢弃过期计数；不要通过全库聚合重新填充。
@@ -730,18 +739,34 @@ class ChatService extends ChangeNotifier {
   Future<void> _cacheMessageArtifacts(Iterable<ChatMessage> messages) async {
     final ids = messages.map((message) => message.id).toSet();
     if (ids.isEmpty) return;
+    final artifactKinds = _providerArtifactKinds.toList();
     final results = await Future.wait([
       _repo.getToolEventsForMessages(ids),
-      _repo.getGeminiThoughtSignaturesForMessages(ids),
+      ...artifactKinds.map(
+        (kind) => _repo.getProviderArtifactsForMessages(ids, kind),
+      ),
     ]);
     for (final id in ids) {
       _toolEventsCache.remove(id);
       _geminiThoughtSigsCache.remove(id);
+      _providerArtifactsCache.remove(id);
     }
     _toolEventsCache.addAll(
       results[0] as Map<String, List<Map<String, dynamic>>>,
     );
-    _geminiThoughtSigsCache.addAll(results[1] as Map<String, String>);
+    for (var i = 0; i < artifactKinds.length; i++) {
+      final artifacts = results[i + 1] as Map<String, String>;
+      for (final entry in artifacts.entries) {
+        _providerArtifactsCache.putIfAbsent(
+          entry.key,
+          () => {},
+        )[artifactKinds[i]] = entry.value;
+      }
+    }
+    _geminiThoughtSigsCache.addAll(
+      (results[artifactKinds.indexOf('gemini_thought_signature') + 1]
+          as Map<String, String>),
+    );
   }
 
   void _cacheLoadedMessages(
@@ -820,6 +845,7 @@ class ChatService extends ChangeNotifier {
       for (final message in messages.sublist(0, drop)) {
         _toolEventsCache.remove(message.id);
         _geminiThoughtSigsCache.remove(message.id);
+        _providerArtifactsCache.remove(message.id);
       }
       if (drop >= messages.length) {
         _messagesCache.remove(conversationId);
@@ -855,6 +881,7 @@ class ChatService extends ChangeNotifier {
       for (final message in candidate.value) {
         _toolEventsCache.remove(message.id);
         _geminiThoughtSigsCache.remove(message.id);
+        _providerArtifactsCache.remove(message.id);
       }
     }
   }
@@ -1681,6 +1708,7 @@ class ChatService extends ChangeNotifier {
     for (final message in messages) {
       _temporaryToolEvents.remove(message.id);
       _temporaryGeminiThoughtSigs.remove(message.id);
+      _temporaryProviderArtifacts.remove(message.id);
     }
     _draftConversations.remove(id);
     _messagesCache.remove(id);
@@ -1729,6 +1757,7 @@ class ChatService extends ChangeNotifier {
     for (final message in messages) {
       _temporaryToolEvents.remove(message.id);
       _temporaryGeminiThoughtSigs.remove(message.id);
+      _temporaryProviderArtifacts.remove(message.id);
     }
     _messagesCache.remove(id);
     _temporaryConversationTrees.remove(id);
@@ -1763,6 +1792,7 @@ class ChatService extends ChangeNotifier {
     for (final messageId in artifactMessageIds) {
       _toolEventsCache.remove(messageId);
       _geminiThoughtSigsCache.remove(messageId);
+      _providerArtifactsCache.remove(messageId);
     }
 
     if (_currentConversationId == id) {
@@ -3249,6 +3279,51 @@ class ChatService extends ChangeNotifier {
     notifyListeners();
   }
 
+  String? getProviderArtifact(String messageId, String kind) {
+    if (!_initialized) return null;
+    final temporary = _temporaryProviderArtifacts[messageId]?[kind];
+    if (temporary != null && temporary.trim().isNotEmpty) return temporary;
+    return _providerArtifactsCache[messageId]?[kind];
+  }
+
+  Future<void> setProviderArtifact(
+    String messageId,
+    String kind,
+    String payload,
+  ) async {
+    if (!_initialized) await init();
+    if (messageId.trim().isEmpty || kind.trim().isEmpty || payload.isEmpty) {
+      return;
+    }
+    if (_discardedTemporaryMessageIds.contains(messageId)) return;
+    if (_isTemporaryMessageId(messageId)) {
+      _temporaryProviderArtifacts.putIfAbsent(messageId, () => {})[kind] =
+          payload;
+      return;
+    }
+    final artifacts = _providerArtifactsCache.putIfAbsent(messageId, () => {});
+    final previous = artifacts[kind];
+    artifacts[kind] = payload;
+    try {
+      await _repo.setProviderArtifact(messageId, kind, payload);
+    } catch (_) {
+      if (previous == null) {
+        artifacts.remove(kind);
+      } else {
+        artifacts[kind] = previous;
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> deleteProviderArtifact(String messageId, String kind) async {
+    if (!_initialized) await init();
+    _temporaryProviderArtifacts[messageId]?.remove(kind);
+    if (_isTemporaryMessageId(messageId)) return;
+    await _repo.deleteProviderArtifact(messageId, kind);
+    _providerArtifactsCache[messageId]?.remove(kind);
+  }
+
   // Gemini 思考签名持久化（按助手消息）
   String? getGeminiThoughtSignature(String assistantMessageId) {
     if (!_initialized) return null;
@@ -3586,6 +3661,7 @@ class ChatService extends ChangeNotifier {
       for (final id in deletedIds) {
         _temporaryToolEvents.remove(id);
         _temporaryGeminiThoughtSigs.remove(id);
+        _temporaryProviderArtifacts.remove(id);
       }
       await reloadActiveTimelineCache(conversationId);
       notifyListeners();
@@ -3604,6 +3680,7 @@ class ChatService extends ChangeNotifier {
       deletedIds.add(message.id);
       _toolEventsCache.remove(message.id);
       _geminiThoughtSigsCache.remove(message.id);
+      _providerArtifactsCache.remove(message.id);
     }
     _messagesCache.remove(conversationId);
     final groupMessages = _groupMessagesCache[conversationId];
@@ -3670,6 +3747,77 @@ class ChatService extends ChangeNotifier {
       deletedIds.add(message.id);
       _toolEventsCache.remove(message.id);
       _geminiThoughtSigsCache.remove(message.id);
+      _providerArtifactsCache.remove(message.id);
+    }
+    _messagesCache.remove(conversationId);
+    final groupMessages = _groupMessagesCache[conversationId];
+    if (groupMessages != null) {
+      groupMessages.removeWhere((message) => deletedIds.contains(message.id));
+      if (groupMessages.isEmpty) _groupMessagesCache.remove(conversationId);
+    }
+    _messageOrderIds.remove(conversationId);
+    _firstGroupIndicesCache.remove(conversationId);
+    final tree = await _repo.loadConversationTree(conversationId);
+    if (tree != null) {
+      await _syncContextBoundaryToActivePath(conversationId, tree);
+      _pruneRecentBranches(conversationId, tree);
+    }
+    await reloadActiveTimelineCache(conversationId);
+    await _cleanupOrphanUploads();
+    _bumpConversationListRevision();
+    notifyListeners();
+    return Set<String>.unmodifiable(deletedIds);
+  }
+
+  /// 批量「删除此分支节点」：分支节点目标收掉所属分叉的全部分支，
+  /// 仅保留活动血脉（契约 §4.4 修订）；非分支节点目标删除消息本身。
+  Future<Set<String>> deleteMessageNodes({
+    required String conversationId,
+    required Set<String> messageIds,
+  }) async {
+    if (!_initialized) await init();
+    if (messageIds.isEmpty) return const <String>{};
+    final recentBranchIds = _recentBranchIdsFor(conversationId);
+    if (_temporaryConversationIds.contains(conversationId)) {
+      final conversation = _draftConversations[conversationId];
+      final messages = _messagesCache[conversationId];
+      if (conversation == null || messages == null) return const <String>{};
+      final tree = await _loadOrCreateConversationTree(conversationId);
+      final updated = tree.deleteMessageNodes(
+        messageIds,
+        recentBranchIds: recentBranchIds,
+      );
+      final deletedIds = tree.edges.keys
+          .where((id) => !updated.edges.containsKey(id))
+          .toSet();
+      if (deletedIds.isEmpty) return const <String>{};
+      messages.removeWhere((message) => deletedIds.contains(message.id));
+      conversation.messageIds.removeWhere(deletedIds.contains);
+      conversation.chatSuggestions = const <String>[];
+      _temporaryConversationTrees[conversationId] = updated;
+      conversation.updatedAt = DateTime.now();
+      for (final id in deletedIds) {
+        _temporaryToolEvents.remove(id);
+        _temporaryGeminiThoughtSigs.remove(id);
+      }
+      await reloadActiveTimelineCache(conversationId);
+      notifyListeners();
+      return Set<String>.unmodifiable(deletedIds);
+    }
+
+    final result = await _repo.deleteMessageNodes(
+      conversationId: conversationId,
+      messageIds: messageIds,
+      recentBranchIds: recentBranchIds,
+    );
+    if (result == null) return const <String>{};
+    _conversationsCache[conversationId] = result.conversation;
+    final deletedIds = <String>{};
+    for (final message in result.messages) {
+      deletedIds.add(message.id);
+      _toolEventsCache.remove(message.id);
+      _geminiThoughtSigsCache.remove(message.id);
+      _providerArtifactsCache.remove(message.id);
     }
     _messagesCache.remove(conversationId);
     final groupMessages = _groupMessagesCache[conversationId];
@@ -3766,6 +3914,7 @@ class ChatService extends ChangeNotifier {
     _conversationsCache[conversationId] = result.conversation;
     _toolEventsCache.remove(messageId);
     _geminiThoughtSigsCache.remove(messageId);
+    _providerArtifactsCache.remove(messageId);
     _messagesCache.remove(conversationId);
     final groupMessages = _groupMessagesCache[conversationId];
     if (groupMessages != null) {
@@ -3869,6 +4018,8 @@ class ChatService extends ChangeNotifier {
       title: source.title,
       assistantId: source.assistantId,
       mcpServerIds: List<String>.of(source.mcpServerIds),
+      chatModelProvider: source.chatModelProvider,
+      chatModelId: source.chatModelId,
     );
     final remappedMessages = [
       for (final message in targetMessages)
@@ -3923,6 +4074,16 @@ class ChatService extends ChangeNotifier {
     final signaturesBySourceId = sourceIds.isEmpty
         ? const <String, String>{}
         : await _repo.getGeminiThoughtSignaturesForMessages(sourceIds);
+    final providerArtifactsBySourceId = <String, Map<String, String>>{};
+    for (final kind in _providerArtifactKinds) {
+      final artifacts = sourceIds.isEmpty
+          ? const <String, String>{}
+          : await _repo.getProviderArtifactsForMessages(sourceIds, kind);
+      for (final entry in artifacts.entries) {
+        providerArtifactsBySourceId.putIfAbsent(entry.key, () => {})[kind] =
+            entry.value;
+      }
+    }
     for (final source in sourceMessages) {
       final cloned = await addMessage(
         conversationId: persisted.id,
@@ -3953,6 +4114,15 @@ class ChatService extends ChangeNotifier {
           getGeminiThoughtSignature(source.id);
       if (signature != null && signature.trim().isNotEmpty) {
         await setGeminiThoughtSignature(cloned.id, signature);
+      }
+      final providerArtifacts =
+          providerArtifactsBySourceId[source.id] ??
+          _providerArtifactsCache[source.id] ??
+          const <String, String>{};
+      for (final entry in providerArtifacts.entries) {
+        if (entry.value.trim().isNotEmpty) {
+          await setProviderArtifact(cloned.id, entry.key, entry.value);
+        }
       }
     }
     _currentConversationId = persisted.id;
@@ -4296,6 +4466,12 @@ class ChatService extends ChangeNotifier {
         }
         final signature = _temporaryGeminiThoughtSigs[sourceId];
         if (signature != null) _temporaryGeminiThoughtSigs[cloneId] = signature;
+        final artifacts = _temporaryProviderArtifacts[sourceId];
+        if (artifacts != null && artifacts.isNotEmpty) {
+          _temporaryProviderArtifacts[cloneId] = Map<String, String>.from(
+            artifacts,
+          );
+        }
       }
       _draftConversations[conversationId]?.messageIds.addAll(
         clones.map((m) => m.id),
@@ -4472,6 +4648,66 @@ class ChatService extends ChangeNotifier {
     // 保留 API 以兼容旧调用方，但绝不改变树或任何持久化状态。
   }
 
+  Future<Conversation?> setConversationModel(
+    String conversationId, {
+    String? providerKey,
+    String? modelId,
+  }) async {
+    if (!_initialized) await init();
+    final provider = providerKey?.trim();
+    final model = modelId?.trim();
+    final hasPair =
+        provider != null &&
+        provider.isNotEmpty &&
+        model != null &&
+        model.isNotEmpty;
+    final nextProvider = hasPair ? provider : null;
+    final nextModel = hasPair ? model : null;
+    final draft = _draftConversations[conversationId];
+    if (draft != null) {
+      draft.chatModelProvider = nextProvider;
+      draft.chatModelId = nextModel;
+      draft.updatedAt = DateTime.now();
+      notifyListeners();
+      return draft;
+    }
+    final conversation = _conversationsCache[conversationId];
+    if (conversation == null) return null;
+    if (conversation.chatModelProvider == nextProvider &&
+        conversation.chatModelId == nextModel) {
+      return conversation;
+    }
+    conversation.chatModelProvider = nextProvider;
+    conversation.chatModelId = nextModel;
+    conversation.updatedAt = DateTime.now();
+    await _saveConversation(conversation);
+    notifyListeners();
+    return conversation;
+  }
+
+  Future<void> clearConversationModelOverrides({
+    required String providerKey,
+    String? modelId,
+  }) async {
+    if (!_initialized) await init();
+    final changed = await _repo.clearConversationModelOverrides(
+      providerKey: providerKey,
+      modelId: modelId,
+    );
+    var cacheChanged = false;
+    for (final conversation in [
+      ..._conversationsCache.values,
+      ..._draftConversations.values,
+    ]) {
+      if (conversation.chatModelProvider != providerKey) continue;
+      if (modelId != null && conversation.chatModelId != modelId) continue;
+      conversation.chatModelProvider = null;
+      conversation.chatModelId = null;
+      cacheChanged = true;
+    }
+    if (changed > 0 || cacheChanged) notifyListeners();
+  }
+
   Future<Conversation?> toggleTruncateAtTail(
     String conversationId, {
     String? defaultTitle,
@@ -4583,6 +4819,7 @@ class ChatService extends ChangeNotifier {
       deletedIds.add(message.id);
       _toolEventsCache.remove(message.id);
       _geminiThoughtSigsCache.remove(message.id);
+      _providerArtifactsCache.remove(message.id);
     }
     _messagesCache.remove(conversationId);
     final groupMessages = _groupMessagesCache[conversationId];

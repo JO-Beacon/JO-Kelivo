@@ -10,6 +10,7 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../icons/reasoning_icons.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/services/haptics.dart';
+import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../theme/app_font_weights.dart';
@@ -169,6 +170,25 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
           onTap: () => settings.setChatMessageBackgroundStyle(
             ChatMessageBackgroundStyle.solid,
           ),
+        ),
+      ],
+    );
+
+    final layoutCard = _iosSectionCard(
+      children: [
+        _MessageLayoutSwitchRow(
+          label: l10n.messageStyleSettingsPageAssistantFitContent,
+          subtitle: l10n.messageStyleSettingsPageAssistantFitContentSubtitle,
+          value: settings.assistantBubbleFitContent,
+          onChanged: settings.setAssistantBubbleFitContent,
+        ),
+        _iosDivider(context),
+        _MessageLayoutSwitchRow(
+          label: l10n.messageStyleSettingsPageAssistantSplitParagraphs,
+          subtitle:
+              l10n.messageStyleSettingsPageAssistantSplitParagraphsSubtitle,
+          value: settings.assistantBubbleSplitParagraphs,
+          onChanged: settings.setAssistantBubbleSplitParagraphs,
         ),
       ],
     );
@@ -346,6 +366,8 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
           children: [
             stylePicker,
             const SizedBox(height: 12),
+            layoutCard,
+            const SizedBox(height: 12),
             _SegmentedToggle(
               leftLabel: l10n.messageStyleSettingsPageLight,
               leftIcon: Lucide.Sun,
@@ -459,6 +481,51 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
     );
     if (!mounted || result == null) return;
     onPicked(result);
+  }
+}
+
+class _MessageLayoutSwitchRow extends StatelessWidget {
+  const _MessageLayoutSwitchRow({
+    required this.label,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: TextStyle(color: cs.onSurface)),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.25,
+                    color: cs.onSurface.withValues(alpha: 0.52),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          IosSwitch(value: value, onChanged: onChanged),
+        ],
+      ),
+    );
   }
 }
 

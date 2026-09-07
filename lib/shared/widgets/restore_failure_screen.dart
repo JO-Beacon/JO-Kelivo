@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
+import 'package:path/path.dart' as p;
 
 import '../../core/database/startup_recovery_service.dart';
 import '../../l10n/app_localizations.dart';
@@ -56,6 +57,7 @@ class RestoreFailureScreen extends StatefulWidget {
     required this.diagnosticCode,
     required this.restart,
     this.appDataDirectory,
+    this.databaseTooNew = false,
   });
 
   final String diagnosticCode;
@@ -64,6 +66,7 @@ class RestoreFailureScreen extends StatefulWidget {
   /// 当提供该参数且失败不是租约冲突时，屏幕会提供文件级恢复操作，
   /// 确保失败关闭的启动不会变成永久性锁死。
   final Directory? appDataDirectory;
+  final bool databaseTooNew;
 
   @override
   State<RestoreFailureScreen> createState() => _RestoreFailureScreenState();
@@ -76,9 +79,6 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
   bool _recoveryBusy = false;
   String? _recoveryMessage;
   bool _recoveryMessageIsError = false;
-
-  bool get _isDesktop =>
-      Platform.isWindows || Platform.isMacOS || Platform.isLinux;
 
   Future<void> _repairAndRestart() async {
     final directory = widget.appDataDirectory;
@@ -144,6 +144,174 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
       setState(() {
         _recoveryBusy = false;
         _recoveryMessage = l10n.startupRecoveryExportFailed;
+        _recoveryMessageIsError = true;
+      });
+    }
+  }
+
+  Future<File?> _chooseSnapshot(List<File> snapshots) {
+    final l10n = AppLocalizations.of(context)!;
+    return showDialog<File>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.startupRecoveryChooseSnapshotTitle),
+        content: SizedBox(
+          width: 520,
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: snapshots.length,
+            separatorBuilder: (_, _) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final snapshot = snapshots[index];
+              return ListTile(
+                title: Text(p.basename(snapshot.path)),
+                subtitle: FutureBuilder<FileStat>(
+                  future: snapshot.stat(),
+                  builder: (context, value) {
+                    final stat = value.data;
+                    if (stat == null) return const SizedBox.shrink();
+                    final date = MaterialLocalizations.of(
+                      context,
+                    ).formatFullDate(stat.modified);
+                    final time = MaterialLocalizations.of(
+                      context,
+                    ).formatTimeOfDay(TimeOfDay.fromDateTime(stat.modified));
+                    final size = (stat.size / (1024 * 1024)).toStringAsFixed(1);
+                    return Text(
+                      l10n.startupRecoverySnapshotDetails(date, time, size),
+                    );
+                  },
+                ),
+                onTap: () => Navigator.of(dialogContext).pop(snapshot),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(l10n.startupRecoveryResetDialogCancel),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool> _confirmSnapshotRestore(File snapshot) async {
+    final l10n = AppLocalizations.of(context)!;
+    return await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(l10n.startupRecoveryRestoreConfirmTitle),
+            content: Text(
+              l10n.startupRecoveryRestoreConfirmContent(
+                p.basename(snapshot.path),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: Text(l10n.startupRecoveryResetDialogCancel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: Text(l10n.startupRecoveryRestoreConfirmButton),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  Future<bool> _protectBeforeDowngrade() async {
+    final directory = widget.appDataDirectory!;
+    final l10n = AppLocalizations.of(context)!;
+    final destination = await FilePicker.platform.getDirectoryPath();
+    if (destination == null || destination.trim().isEmpty) return false;
+    try {
+      await StartupRecoveryService.exportDataCopy(
+        appDataDirectory: directory,
+        destinationParent: Directory(destination),
+      );
+      return true;
+    } catch (_) {
+      if (!mounted) return false;
+      return await showDialog<bool>(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+              title: Text(l10n.startupRecoveryProtectionFailedTitle),
+              content: Text(l10n.startupRecoveryProtectionFailedContent),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: Text(l10n.startupRecoveryResetDialogCancel),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  child: Text(l10n.startupRecoveryContinueWithoutProtection),
+                ),
+              ],
+            ),
+          ) ??
+          false;
+    }
+  }
+
+  Future<void> _restoreLocalSnapshot() async {
+    final directory = widget.appDataDirectory;
+    if (directory == null || _recoveryBusy || _restarting) return;
+    final l10n = AppLocalizations.of(context)!;
+    setState(() {
+      _recoveryBusy = true;
+      _recoveryMessage = null;
+    });
+    try {
+      final snapshots = await StartupRecoveryService.listLocalSnapshots(
+        appDataDirectory: directory,
+      );
+      if (!mounted) return;
+      setState(() => _recoveryBusy = false);
+      if (snapshots.isEmpty) {
+        setState(() {
+          _recoveryMessage = l10n.startupRecoveryNoSnapshots;
+          _recoveryMessageIsError = true;
+        });
+        return;
+      }
+      final selected = await _chooseSnapshot(snapshots);
+      if (selected == null || !mounted) return;
+      if (!await _confirmSnapshotRestore(selected) || !mounted) return;
+      if (widget.databaseTooNew && !await _protectBeforeDowngrade()) return;
+      if (!mounted) return;
+      setState(() {
+        _recoveryBusy = true;
+        _recoveryMessage = null;
+      });
+      await StartupRecoveryService.prepareLocalSnapshotRestore(
+        appDataDirectory: directory,
+        snapshot: selected,
+      );
+      await widget.restart();
+      if (!mounted) return;
+      setState(() {
+        _recoveryBusy = false;
+        _restartFailed = true;
+      });
+    } catch (error, stackTrace) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'JO-AIClient restore',
+          context: ErrorDescription('while preparing a local snapshot restore'),
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _recoveryBusy = false;
+        _recoveryMessage = l10n.startupRecoverySnapshotFailed(
+          restoreFailureDiagnosticCode(error),
+        );
         _recoveryMessageIsError = true;
       });
     }
@@ -277,7 +445,9 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
                       ),
                       const SizedBox(height: 20),
                       Text(
-                        isLeaseUnavailable
+                        widget.databaseTooNew
+                            ? l10n.startupDatabaseUpdateRequiredTitle
+                            : isLeaseUnavailable
                             ? l10n.backupRestoreBusinessLeaseUnavailableTitle
                             : l10n.backupRestoreFailureTitle,
                         style: textTheme.headlineSmall?.copyWith(
@@ -286,7 +456,9 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        isLeaseUnavailable
+                        widget.databaseTooNew
+                            ? l10n.startupDatabaseUpdateRequiredContent
+                            : isLeaseUnavailable
                             ? l10n.backupRestoreBusinessLeaseUnavailableContent
                             : l10n.backupRestoreFailureContent,
                         style: textTheme.bodyLarge?.copyWith(
@@ -347,25 +519,27 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
                           ),
                         ),
                       ],
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: (_restarting || _recoveryBusy)
-                              ? null
-                              : _restart,
-                          icon: _restarting
-                              ? SizedBox.square(
-                                  dimension: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: colors.onPrimary,
-                                  ),
-                                )
-                              : const Icon(Icons.restart_alt_rounded),
-                          label: Text(l10n.backupRestoreFailureRestartButton),
+                      if (!widget.databaseTooNew) ...[
+                        const SizedBox(height: 24),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: (_restarting || _recoveryBusy)
+                                ? null
+                                : _restart,
+                            icon: _restarting
+                                ? SizedBox.square(
+                                    dimension: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: colors.onPrimary,
+                                    ),
+                                  )
+                                : const Icon(Icons.restart_alt_rounded),
+                            label: Text(l10n.backupRestoreFailureRestartButton),
+                          ),
                         ),
-                      ),
+                      ],
                       if (widget.appDataDirectory != null &&
                           !isLeaseUnavailable) ...[
                         const SizedBox(height: 8),
@@ -383,44 +557,58 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
                           child: OutlinedButton.icon(
                             onPressed: (_restarting || _recoveryBusy)
                                 ? null
-                                : _repairAndRestart,
-                            icon: const Icon(Icons.healing_rounded, size: 18),
-                            label: Text(l10n.startupRecoveryRepairButton),
+                                : _restoreLocalSnapshot,
+                            icon: const Icon(Icons.history_rounded, size: 18),
+                            label: Text(
+                              widget.databaseTooNew
+                                  ? l10n.startupRecoveryDowngradeSnapshotButton
+                                  : l10n.startupRecoverySnapshotButton,
+                            ),
                           ),
                         ),
-                        if (_isDesktop) ...[
+                        if (!widget.databaseTooNew) ...[
                           const SizedBox(height: 8),
                           SizedBox(
                             width: double.infinity,
                             child: OutlinedButton.icon(
                               onPressed: (_restarting || _recoveryBusy)
                                   ? null
-                                  : _exportCopy,
-                              icon: const Icon(
-                                Icons.download_rounded,
-                                size: 18,
-                              ),
-                              label: Text(l10n.startupRecoveryExportButton),
+                                  : _repairAndRestart,
+                              icon: const Icon(Icons.healing_rounded, size: 18),
+                              label: Text(l10n.startupRecoveryRepairButton),
                             ),
                           ),
                         ],
                         const SizedBox(height: 8),
                         SizedBox(
                           width: double.infinity,
-                          child: TextButton.icon(
+                          child: OutlinedButton.icon(
                             onPressed: (_restarting || _recoveryBusy)
                                 ? null
-                                : _resetAndRestart,
-                            style: TextButton.styleFrom(
-                              foregroundColor: colors.error,
-                            ),
-                            icon: const Icon(
-                              Icons.delete_forever_rounded,
-                              size: 18,
-                            ),
-                            label: Text(l10n.startupRecoveryResetButton),
+                                : _exportCopy,
+                            icon: const Icon(Icons.download_rounded, size: 18),
+                            label: Text(l10n.startupRecoveryExportButton),
                           ),
                         ),
+                        if (!widget.databaseTooNew) ...[
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            child: TextButton.icon(
+                              onPressed: (_restarting || _recoveryBusy)
+                                  ? null
+                                  : _resetAndRestart,
+                              style: TextButton.styleFrom(
+                                foregroundColor: colors.error,
+                              ),
+                              icon: const Icon(
+                                Icons.delete_forever_rounded,
+                                size: 18,
+                              ),
+                              label: Text(l10n.startupRecoveryResetButton),
+                            ),
+                          ),
+                        ],
                         if (_recoveryBusy) ...[
                           const SizedBox(height: 12),
                           Row(

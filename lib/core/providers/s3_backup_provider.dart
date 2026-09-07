@@ -9,6 +9,7 @@ import '../database/business_repository.dart';
 import '../models/backup.dart';
 import '../models/progress_update.dart';
 import '../services/backup/data_sync.dart';
+import '../services/backup/backup_activity.dart';
 import '../services/backup/s3_client.dart';
 import '../services/backup/temporary_restore_file.dart';
 import '../services/chat/chat_service.dart';
@@ -98,6 +99,7 @@ class S3BackupProvider extends ChangeNotifier {
   }
 
   Future<bool> backup({ProgressCallback? onProgress}) async {
+    BackupActivity.begin();
     _busy = true;
     _message = null;
     notifyListeners();
@@ -135,6 +137,7 @@ class S3BackupProvider extends ChangeNotifier {
       return false;
     } finally {
       await DataSync.cleanupTemporaryBackupFile(file);
+      BackupActivity.end();
       _busy = false;
       notifyListeners();
     }
@@ -149,6 +152,7 @@ class S3BackupProvider extends ChangeNotifier {
     RestoreMode mode = RestoreMode.overwrite,
     ProgressCallback? onProgress,
   }) async {
+    BackupActivity.begin();
     _busy = true;
     _message = null;
     notifyListeners();
@@ -192,6 +196,7 @@ class S3BackupProvider extends ChangeNotifier {
           await file.delete();
         }
       } catch (_) {}
+      BackupActivity.end();
       _busy = false;
       notifyListeners();
     }

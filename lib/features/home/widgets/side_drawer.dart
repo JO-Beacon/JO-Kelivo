@@ -51,6 +51,7 @@ import 'dart:async';
 import '../../../features/search/services/global_session_search_service.dart';
 import '../../../utils/search_highlight.dart';
 import '../controllers/chat_actions.dart';
+import '../utils/model_display_helper.dart';
 import '../services/chat_sidebar_state_store.dart';
 import 'assistant_avatar.dart';
 import 'assistant_entry_actions.dart';
@@ -1021,14 +1022,21 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     final assistantProvider = context.read<AssistantProvider>();
     final convo = chatService.getConversation(conversationId);
     if (convo == null) return;
-    final titleModelProvider = settings.titleModelProvider;
-    final titleModelId = settings.titleModelId;
-    if (titleModelProvider == null || titleModelId == null) return;
+    if (!settings.isTitleGenerationEnabled) return;
 
     // 获取此会话的助手
     final assistant = convo.assistantId != null
         ? assistantProvider.getById(convo.assistantId!)
         : assistantProvider.currentAssistant;
+    final chatModel = resolveChatModel(
+      settings,
+      conversation: convo,
+      assistant: assistant,
+    );
+    final titleModelProvider =
+        settings.titleModelProvider ?? chatModel.providerKey;
+    final titleModelId = settings.titleModelId ?? chatModel.modelId;
+    if (titleModelProvider == null || titleModelId == null) return;
 
     final cfg = settings.getProviderConfig(titleModelProvider);
     final budget = settings.titleGenerationThinkingBudgetFor(

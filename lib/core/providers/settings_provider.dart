@@ -18,9 +18,12 @@ import '../services/logging/context_logger.dart';
 import '../services/logging/flutter_logger.dart';
 import '../services/learning_mode_store.dart';
 import '../models/api_keys.dart';
+import '../models/auto_retry_options.dart';
 import '../models/backup.dart';
 import '../models/compress_context_options.dart';
 import '../models/provider_group.dart';
+import '../models/tool_schema_override.dart';
+import '../services/app_exit_flush.dart';
 import '../services/haptics.dart';
 import '../services/screen_wakelock.dart';
 import '../../utils/app_directories.dart';
@@ -33,6 +36,7 @@ import '../../utils/image_compressor.dart';
 import '../database/business_preferences.dart';
 import '../services/memory/memory_prompts.dart';
 import '../services/memory/memory_trace.dart';
+import '../services/api/retry_policy.dart';
 import '../../theme/palettes.dart';
 import '../../theme/custom_theme.dart';
 import '../../theme/chat_bubble_style.dart';
@@ -91,12 +95,16 @@ class SettingsProvider extends ChangeNotifier {
   static const String _pinnedModelsKey = 'pinned_models_v1';
   static const String _selectedModelKey = 'selected_model_v1';
   static const String _titleModelKey = 'title_model_v1';
+  static const String _titleGenerationEnabledKey =
+      'title_generation_enabled_v1';
   static const String _titlePromptKey = 'title_prompt_v1';
   static const String _ocrModelKey = 'ocr_model_v1';
   static const String _ocrPromptKey = 'ocr_prompt_v1';
   static const String _summaryModelKey = 'summary_model_v1';
   static const String _summaryPromptKey = 'summary_prompt_v1';
   static const String _suggestionModelKey = 'suggestion_model_v1';
+  static const String _suggestionGenerationEnabledKey =
+      'suggestion_generation_enabled_v1';
   static const String _suggestionPromptKey = 'suggestion_prompt_v1';
   static const String _suggestionInsertOnTapOnlyKey =
       'suggestion_insert_on_tap_only_v1';
@@ -246,6 +254,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _displayChatFontScaleKey = 'display_chat_font_scale_v1';
   static const String _displayAutoScrollEnabledKey =
       'display_auto_scroll_enabled_v1';
+  static const String _displayAutoRetryEnabledKey =
+      'display_auto_retry_enabled_v1';
   static const String _displayAutoScrollIdleSecondsKey =
       'display_auto_scroll_idle_seconds_v1';
   static const String _displayChatBackgroundMaskStrengthKey =
@@ -286,12 +296,19 @@ class SettingsProvider extends ChangeNotifier {
       'display_desktop_minimize_to_tray_on_close_v1';
   static const String _displayUsePureBackgroundKey =
       'display_use_pure_background_v1';
+  static const String _displayUseLayeredSurfacesKey =
+      'display_use_layered_surfaces_v1';
   static const String _displayChatMessageBackgroundStyleKey =
       'display_chat_message_background_style_v1';
+  static const String _displayAssistantBubbleSplitParagraphsKey =
+      'display_assistant_bubble_split_paragraphs_v1';
+  static const String _displayAssistantBubbleFitContentKey =
+      'display_assistant_bubble_fit_content_v1';
   static const String _chatBubbleStyleOverridesKey =
       'chat_bubble_style_overrides_v1';
   static const String _userChatBubbleStyleOverridesKey =
       'chat_bubble_style_overrides_user_v1';
+  static const String _toolSchemaOverridesKey = 'tool_schema_overrides_v1';
   static const String _mobileAssistantEditTabOrderKey =
       'mobile_assistant_edit_tab_order_v1';
   static const String _mobileAssistantEditTabHiddenKey =
@@ -490,6 +507,8 @@ class SettingsProvider extends ChangeNotifier {
   // 启用后，无论主题颜色如何，都强制使用纯白/纯黑背景
   bool _usePureBackground = false;
   bool get usePureBackground => _usePureBackground;
+  bool _useLayeredSurfaces = false;
+  bool get useLayeredSurfaces => _useLayeredSurfaces;
 
   // 桌面端 UI 持久化状态
   double _desktopSidebarWidth = 240;
@@ -821,6 +840,7 @@ class SettingsProvider extends ChangeNotifier {
         _titleModelId = parts.sublist(1).join('::');
       }
     }
+    _titleGenerationEnabled = prefs.getBool(_titleGenerationEnabledKey) ?? true;
     // 加载标题提示词
     final tp = prefs.getString(_titlePromptKey);
     _titlePrompt = (tp == null || tp.trim().isEmpty) ? defaultTitlePrompt : tp;
@@ -883,6 +903,8 @@ class SettingsProvider extends ChangeNotifier {
         _suggestionModelId = parts.sublist(1).join('::');
       }
     }
+    _suggestionGenerationEnabled =
+        prefs.getBool(_suggestionGenerationEnabledKey) ?? suggestionSel != null;
     // 加载聊天建议提示词
     final suggestionp = prefs.getString(_suggestionPromptKey);
     _suggestionPrompt = (suggestionp == null || suggestionp.trim().isEmpty)
@@ -1027,6 +1049,10 @@ class SettingsProvider extends ChangeNotifier {
             .clamp(minMemoryInjectionMaxItems, maxMemoryInjectionMaxItems);
 
     // 显示设置
+    _autoRetryEnabled = prefs.getBool(_displayAutoRetryEnabledKey) ?? true;
+    AutoRetryConfig.current = const AutoRetryOptions.defaults().copyWith(
+      enabled: _autoRetryEnabled,
+    );
     _showUserAvatar = prefs.getBool(_displayShowUserAvatarKey) ?? true;
     _showModelIcon = prefs.getBool(_displayShowModelIconKey) ?? true;
     _showModelNameTimestamp =
@@ -1170,6 +1196,7 @@ class SettingsProvider extends ChangeNotifier {
     } else {
       _usePureBackground = pureBgPref;
     }
+    _useLayeredSurfaces = prefs.getBool(_displayUseLayeredSurfacesKey) ?? false;
     // 显示：markdown/math 渲染
     _enableDollarLatex = prefs.getBool(_displayEnableDollarLatexKey) ?? true;
     _enableMathRendering =
@@ -1257,6 +1284,10 @@ class SettingsProvider extends ChangeNotifier {
       default:
         _chatMessageBackgroundStyle = ChatMessageBackgroundStyle.defaultStyle;
     }
+    _assistantBubbleSplitParagraphs =
+        prefs.getBool(_displayAssistantBubbleSplitParagraphsKey) ?? false;
+    _assistantBubbleFitContent =
+        prefs.getBool(_displayAssistantBubbleFitContentKey) ?? false;
     final bubbleOverridesRaw = prefs.getString(_chatBubbleStyleOverridesKey);
     if (bubbleOverridesRaw != null && bubbleOverridesRaw.isNotEmpty) {
       try {
@@ -1293,6 +1324,9 @@ class SettingsProvider extends ChangeNotifier {
         // Keep null so a corrupt user key still follows the assistant style.
       }
     }
+    _toolSchemaOverrides = _decodeToolSchemaOverrides(
+      prefs.getString(_toolSchemaOverridesKey),
+    );
     _mobileAssistantEditTabOrder = List.unmodifiable(
       prefs.getStringList(_mobileAssistantEditTabOrderKey) ?? const <String>[],
     );
@@ -2591,6 +2625,13 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setBool(_displayUsePureBackgroundKey, v);
   }
 
+  Future<void> setUseLayeredSurfaces(bool v) async {
+    if (_useLayeredSurfaces == v) return;
+    _useLayeredSurfaces = v;
+    notifyListeners();
+    await _preferences.setBool(_displayUseLayeredSurfacesKey, v);
+  }
+
   void _loadCustomThemes(BusinessPreferences prefs) {
     final raw = prefs.getStringList(_customThemesKey) ?? const <String>[];
     final themes = <CustomTheme>[];
@@ -2730,6 +2771,29 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setString(_displayChatMessageBackgroundStyleKey, v);
   }
 
+  bool _assistantBubbleSplitParagraphs = false;
+  bool get assistantBubbleSplitParagraphs => _assistantBubbleSplitParagraphs;
+
+  Future<void> setAssistantBubbleSplitParagraphs(bool value) async {
+    if (_assistantBubbleSplitParagraphs == value) return;
+    _assistantBubbleSplitParagraphs = value;
+    notifyListeners();
+    await _preferences.setBool(
+      _displayAssistantBubbleSplitParagraphsKey,
+      value,
+    );
+  }
+
+  bool _assistantBubbleFitContent = false;
+  bool get assistantBubbleFitContent => _assistantBubbleFitContent;
+
+  Future<void> setAssistantBubbleFitContent(bool value) async {
+    if (_assistantBubbleFitContent == value) return;
+    _assistantBubbleFitContent = value;
+    notifyListeners();
+    await _preferences.setBool(_displayAssistantBubbleFitContentKey, value);
+  }
+
   ChatBubbleStyleOverrides _chatBubbleStyleOverrides =
       const ChatBubbleStyleOverrides();
   ChatBubbleStyleOverrides? _userChatBubbleStyleOverrides;
@@ -2801,6 +2865,135 @@ class SettingsProvider extends ChangeNotifier {
       _chatBubbleStyleOverridesKey,
       jsonEncode(value.toJson()),
     );
+  }
+
+  static const Duration toolSchemaOverridePersistDebounce = Duration(
+    milliseconds: 300,
+  );
+
+  Map<String, ToolSchemaOverride> _toolSchemaOverrides =
+      const <String, ToolSchemaOverride>{};
+  Map<String, ToolSchemaOverride> get toolSchemaOverrides =>
+      Map<String, ToolSchemaOverride>.unmodifiable(_toolSchemaOverrides);
+
+  Timer? _toolSchemaOverridePersistTimer;
+  bool _toolSchemaOverridePersistDirty = false;
+  Future<void> Function()? _toolSchemaOverrideExitFlushHandler;
+
+  bool _applyToolSchemaOverrideInMemory(
+    String toolName,
+    ToolSchemaOverride value,
+  ) {
+    if (toolName.isEmpty) return false;
+    final next = Map<String, ToolSchemaOverride>.from(_toolSchemaOverrides);
+    if (value.isEmpty) {
+      if (!next.containsKey(toolName)) return false;
+      next.remove(toolName);
+    } else {
+      if (next[toolName] == value) return false;
+      next[toolName] = value;
+    }
+    _toolSchemaOverrides = next;
+    notifyListeners();
+    return true;
+  }
+
+  Future<void> setToolSchemaOverride(
+    String toolName,
+    ToolSchemaOverride value,
+  ) async {
+    if (!_applyToolSchemaOverrideInMemory(toolName, value)) {
+      await flushPendingToolSchemaOverridePersist();
+      return;
+    }
+    _toolSchemaOverridePersistTimer?.cancel();
+    _toolSchemaOverridePersistTimer = null;
+    await _persistToolSchemaOverrides();
+  }
+
+  void setToolSchemaOverrideLive(String toolName, ToolSchemaOverride value) {
+    if (!_applyToolSchemaOverrideInMemory(toolName, value)) return;
+    _toolSchemaOverridePersistDirty = true;
+    _ensureToolSchemaOverrideExitFlushRegistered();
+    _toolSchemaOverridePersistTimer?.cancel();
+    _toolSchemaOverridePersistTimer = Timer(
+      toolSchemaOverridePersistDebounce,
+      () => unawaited(_persistToolSchemaOverrides()),
+    );
+  }
+
+  Future<void> flushPendingToolSchemaOverridePersist() async {
+    _toolSchemaOverridePersistTimer?.cancel();
+    _toolSchemaOverridePersistTimer = null;
+    if (!_toolSchemaOverridePersistDirty) return;
+    await _persistToolSchemaOverrides();
+  }
+
+  Future<void> resetToolSchemaOverride(String toolName) {
+    return setToolSchemaOverride(toolName, const ToolSchemaOverride());
+  }
+
+  Future<void> resetAllToolSchemaOverrides() async {
+    final hadPendingPersist = _toolSchemaOverridePersistDirty;
+    _toolSchemaOverridePersistTimer?.cancel();
+    _toolSchemaOverridePersistTimer = null;
+    _toolSchemaOverridePersistDirty = false;
+    final hadOverrides = _toolSchemaOverrides.isNotEmpty;
+    if (hadOverrides) {
+      _toolSchemaOverrides = const <String, ToolSchemaOverride>{};
+      notifyListeners();
+    }
+    if (hadOverrides || hadPendingPersist) {
+      await _preferences.remove(_toolSchemaOverridesKey);
+    }
+  }
+
+  void _ensureToolSchemaOverrideExitFlushRegistered() {
+    if (_toolSchemaOverrideExitFlushHandler != null) return;
+    _toolSchemaOverrideExitFlushHandler = flushPendingToolSchemaOverridePersist;
+    AppExitFlush.register(_toolSchemaOverrideExitFlushHandler!);
+  }
+
+  Future<void> _persistToolSchemaOverrides() async {
+    _toolSchemaOverridePersistDirty = false;
+    if (_toolSchemaOverrides.isEmpty) {
+      await _preferences.remove(_toolSchemaOverridesKey);
+      return;
+    }
+    await _preferences.setString(
+      _toolSchemaOverridesKey,
+      jsonEncode(<String, dynamic>{
+        for (final entry in _toolSchemaOverrides.entries)
+          entry.key: entry.value.toJson(),
+      }),
+    );
+  }
+
+  static Map<String, ToolSchemaOverride> _decodeToolSchemaOverrides(
+    String? raw,
+  ) {
+    if (raw == null || raw.isEmpty) {
+      return const <String, ToolSchemaOverride>{};
+    }
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return const <String, ToolSchemaOverride>{};
+      final result = <String, ToolSchemaOverride>{};
+      for (final entry in decoded.entries) {
+        if (entry.value is! Map) continue;
+        final value = ToolSchemaOverride.fromJson(
+          Map<String, dynamic>.from(entry.value as Map),
+        );
+        if (!value.isEmpty) result[entry.key.toString()] = value;
+      }
+      return result;
+    } catch (error) {
+      FlutterLogger.log(
+        'Failed to decode tool schema overrides: $error',
+        tag: 'Settings',
+      );
+      return const <String, ToolSchemaOverride>{};
+    }
   }
 
   List<String> _mobileAssistantEditTabOrder = const <String>[];
@@ -3130,7 +3323,9 @@ class SettingsProvider extends ChangeNotifier {
     if (_titleModelProvider == providerKey) {
       _titleModelProvider = null;
       _titleModelId = null;
+      _titleGenerationEnabled = false;
       await prefs.remove(_titleModelKey);
+      await prefs.setBool(_titleGenerationEnabledKey, false);
       changed = true;
     }
     if (_translateModelProvider == providerKey) {
@@ -3156,7 +3351,9 @@ class SettingsProvider extends ChangeNotifier {
     if (_suggestionModelProvider == providerKey) {
       _suggestionModelProvider = null;
       _suggestionModelId = null;
+      _suggestionGenerationEnabled = false;
       await prefs.remove(_suggestionModelKey);
+      await prefs.setBool(_suggestionGenerationEnabledKey, false);
       changed = true;
     }
     if (_compressModelProvider == providerKey) {
@@ -3191,7 +3388,9 @@ class SettingsProvider extends ChangeNotifier {
     if (_titleModelProvider == providerKey && _titleModelId == modelId) {
       _titleModelProvider = null;
       _titleModelId = null;
+      _titleGenerationEnabled = false;
       await prefs.remove(_titleModelKey);
+      await prefs.setBool(_titleGenerationEnabledKey, false);
       changed = true;
     }
     if (_translateModelProvider == providerKey &&
@@ -3219,7 +3418,9 @@ class SettingsProvider extends ChangeNotifier {
         _suggestionModelId == modelId) {
       _suggestionModelProvider = null;
       _suggestionModelId = null;
+      _suggestionGenerationEnabled = false;
       await prefs.remove(_suggestionModelKey);
+      await prefs.setBool(_suggestionGenerationEnabledKey, false);
       changed = true;
     }
     if (_compressModelProvider == providerKey && _compressModelId == modelId) {
@@ -3263,7 +3464,9 @@ class SettingsProvider extends ChangeNotifier {
     if (_titleModelProvider == key) {
       _titleModelProvider = null;
       _titleModelId = null;
+      _titleGenerationEnabled = false;
       await prefs.remove(_titleModelKey);
+      await prefs.setBool(_titleGenerationEnabledKey, false);
     }
     if (_translateModelProvider == key) {
       _translateModelProvider = null;
@@ -3285,7 +3488,9 @@ class SettingsProvider extends ChangeNotifier {
     if (_suggestionModelProvider == key) {
       _suggestionModelProvider = null;
       _suggestionModelId = null;
+      _suggestionGenerationEnabled = false;
       await prefs.remove(_suggestionModelKey);
+      await prefs.setBool(_suggestionGenerationEnabledKey, false);
     }
     if (_compressModelProvider == key) {
       _compressModelProvider = null;
@@ -3358,10 +3563,10 @@ class SettingsProvider extends ChangeNotifier {
   // 标题模型和提示词
   String? _titleModelProvider;
   String? _titleModelId;
+  bool _titleGenerationEnabled = true;
   String? get titleModelProvider => _titleModelProvider;
   String? get titleModelId => _titleModelId;
-  bool get isTitleGenerationEnabled =>
-      _titleModelProvider != null && _titleModelId != null;
+  bool get isTitleGenerationEnabled => _titleGenerationEnabled;
   String? get titleModelKey =>
       (_titleModelProvider != null && _titleModelId != null)
       ? '${_titleModelProvider!}::${_titleModelId!}'
@@ -3386,17 +3591,31 @@ You need to summarize the conversation between user and assistant into a short t
   Future<void> setTitleModel(String providerKey, String modelId) async {
     _titleModelProvider = providerKey;
     _titleModelId = modelId;
+    _titleGenerationEnabled = true;
     notifyListeners();
     final prefs = _preferences;
     await prefs.setString(_titleModelKey, '$providerKey::$modelId');
+    await prefs.setBool(_titleGenerationEnabledKey, true);
   }
 
   Future<void> resetTitleModel() async {
     _titleModelProvider = null;
     _titleModelId = null;
+    _titleGenerationEnabled = true;
     notifyListeners();
     final prefs = _preferences;
     await prefs.remove(_titleModelKey);
+    await prefs.setBool(_titleGenerationEnabledKey, true);
+  }
+
+  Future<void> disableTitleGeneration() async {
+    _titleModelProvider = null;
+    _titleModelId = null;
+    _titleGenerationEnabled = false;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.remove(_titleModelKey);
+    await prefs.setBool(_titleGenerationEnabledKey, false);
   }
 
   Future<void> setTitlePrompt(String prompt) async {
@@ -3598,11 +3817,13 @@ Generate or update a brief summary of the user's questions and intentions.
   Future<void> resetSummaryPrompt() async =>
       setSummaryPrompt(defaultSummaryPrompt);
 
-  // 聊天建议模型和提示词。模型为 null 表示该功能已禁用。
+  // 聊天建议模型和提示词。未配置专用模型时跟随当前聊天模型。
   String? _suggestionModelProvider;
   String? _suggestionModelId;
+  bool _suggestionGenerationEnabled = false;
   String? get suggestionModelProvider => _suggestionModelProvider;
   String? get suggestionModelId => _suggestionModelId;
+  bool get isSuggestionGenerationEnabled => _suggestionGenerationEnabled;
   String? get suggestionModelKey =>
       (_suggestionModelProvider != null && _suggestionModelId != null)
       ? '${_suggestionModelProvider!}::${_suggestionModelId!}'
@@ -3632,17 +3853,31 @@ Rules:
   Future<void> setSuggestionModel(String providerKey, String modelId) async {
     _suggestionModelProvider = providerKey;
     _suggestionModelId = modelId;
+    _suggestionGenerationEnabled = true;
     notifyListeners();
     final prefs = _preferences;
     await prefs.setString(_suggestionModelKey, '$providerKey::$modelId');
+    await prefs.setBool(_suggestionGenerationEnabledKey, true);
   }
 
   Future<void> resetSuggestionModel() async {
     _suggestionModelProvider = null;
     _suggestionModelId = null;
+    _suggestionGenerationEnabled = true;
     notifyListeners();
     final prefs = _preferences;
     await prefs.remove(_suggestionModelKey);
+    await prefs.setBool(_suggestionGenerationEnabledKey, true);
+  }
+
+  Future<void> disableSuggestionGeneration() async {
+    _suggestionModelProvider = null;
+    _suggestionModelId = null;
+    _suggestionGenerationEnabled = false;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.remove(_suggestionModelKey);
+    await prefs.setBool(_suggestionGenerationEnabledKey, false);
   }
 
   Future<void> setSuggestionPrompt(String prompt) async {
@@ -4267,6 +4502,16 @@ Requirements:
   int? _backgroundThinkingBudgetFor(bool enabled, int? assistantBudget) {
     if (!enabled) return 0;
     return assistantBudget ?? _thinkingBudget;
+  }
+
+  bool _autoRetryEnabled = true;
+  bool get autoRetryEnabled => _autoRetryEnabled;
+  Future<void> setAutoRetryEnabled(bool value) async {
+    if (_autoRetryEnabled == value) return;
+    _autoRetryEnabled = value;
+    AutoRetryConfig.current = AutoRetryConfig.current.copyWith(enabled: value);
+    notifyListeners();
+    await _preferences.setBool(_displayAutoRetryEnabledKey, value);
   }
 
   // 显示设置：用户头像和模型图标的可见性
@@ -5336,12 +5581,14 @@ Requirements:
     copy._currentModelId = _currentModelId;
     copy._titleModelProvider = _titleModelProvider;
     copy._titleModelId = _titleModelId;
+    copy._titleGenerationEnabled = _titleGenerationEnabled;
     copy._titlePrompt = _titlePrompt;
     copy._summaryModelProvider = _summaryModelProvider;
     copy._summaryModelId = _summaryModelId;
     copy._summaryPrompt = _summaryPrompt;
     copy._suggestionModelProvider = _suggestionModelProvider;
     copy._suggestionModelId = _suggestionModelId;
+    copy._suggestionGenerationEnabled = _suggestionGenerationEnabled;
     copy._suggestionPrompt = _suggestionPrompt;
     copy._insertSuggestionOnTapOnly = _insertSuggestionOnTapOnly;
     copy._compressModelProvider = _compressModelProvider;
@@ -5464,13 +5711,33 @@ Requirements:
     copy._desktopMinimizeToTrayOnClose = _desktopMinimizeToTrayOnClose;
     copy._usePureBackground = _usePureBackground;
     copy._chatMessageBackgroundStyle = _chatMessageBackgroundStyle;
+    copy._assistantBubbleSplitParagraphs = _assistantBubbleSplitParagraphs;
+    copy._assistantBubbleFitContent = _assistantBubbleFitContent;
     copy._chatBubbleStyleOverrides = _chatBubbleStyleOverrides;
     copy._userChatBubbleStyleOverrides = _userChatBubbleStyleOverrides;
+    copy._toolSchemaOverrides = Map<String, ToolSchemaOverride>.from(
+      _toolSchemaOverrides,
+    );
     copy._mobileAssistantEditTabOrder = _mobileAssistantEditTabOrder;
     copy._hiddenMobileAssistantEditTabs = _hiddenMobileAssistantEditTabs;
     copy._mobileAssistantDetailOutlineEnabled =
         _mobileAssistantDetailOutlineEnabled;
     return copy;
+  }
+
+  @override
+  void dispose() {
+    _toolSchemaOverridePersistTimer?.cancel();
+    _toolSchemaOverridePersistTimer = null;
+    if (_toolSchemaOverridePersistDirty) {
+      unawaited(_persistToolSchemaOverrides());
+    }
+    final handler = _toolSchemaOverrideExitFlushHandler;
+    if (handler != null) {
+      AppExitFlush.unregister(handler);
+      _toolSchemaOverrideExitFlushHandler = null;
+    }
+    super.dispose();
   }
 }
 

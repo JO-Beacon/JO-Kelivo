@@ -172,8 +172,13 @@ class _IosSwitchState extends State<IosSwitch> {
   void _handleTap() {
     // 仅在 widget 级和设置级开关都允许时才振动；
     // 全局总开关在 Haptics.* 方法内部执行。
-    final sp = context.read<SettingsProvider>();
-    if (widget.enableHaptics && sp.hapticsIosSwitch) Haptics.soft();
+    if (widget.enableHaptics) {
+      var hapticsOn = false;
+      try {
+        hapticsOn = context.read<SettingsProvider>().hapticsIosSwitch;
+      } catch (_) {}
+      if (hapticsOn) Haptics.soft();
+    }
     widget.onChanged?.call(!widget.value);
   }
 }

@@ -32,6 +32,7 @@ import '../../../core/providers/tts_provider.dart';
 import '../../../shared/widgets/markdown_with_highlight.dart';
 import '../../../shared/widgets/snackbar.dart';
 import 'resolved_attachment_image.dart';
+import '../../../utils/mcp_structured_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -49,11 +50,13 @@ import '../../../utils/platform_utils.dart';
 import '../../home/services/ask_user_interaction_service.dart';
 import '../../home/services/local_tools_service.dart';
 import '../../home/services/tool_approval_service.dart';
+import '../utils/assistant_paragraph_splitter.dart';
 import '../utils/thinking_tag_parser.dart';
 import 'citation_sources_sheet.dart';
 import 'chat_suggestion_bubbles.dart';
 import 'token_display_widget.dart';
 import 'screen_time_tool_ui.dart';
+import 'weather_tool_ui.dart';
 import 'tool_detail_text_section.dart';
 import 'frosted/frosted_surface.dart';
 import '../../../theme/app_font_weights.dart';
@@ -92,8 +95,12 @@ Uri? _tryNormalizeExternalUri(String raw) {
 ///
 /// 目标可能包含括号（例如 `/tmp/run (1)/image.png`）；
 /// 解析器找到 `![...](` 后扫描平衡括号到匹配的 `)`。
-(String, List<String>) _parseMcpImagePaths(String? content) {
-  if (content == null || content.isEmpty) return ('', const []);
+(String, List<String>) _parseMcpImagePaths(
+  String? content, {
+  Map<String, dynamic>? metadata,
+}) {
+  final metadataImages = mcpResultImageUris(readMcpResultMetadata(metadata));
+  if (content == null || content.isEmpty) return ('', metadataImages);
 
   final images = <String>[];
   final buffer = StringBuffer();
@@ -118,7 +125,9 @@ Uri? _tryNormalizeExternalUri(String raw) {
           j += 1;
         }
         if (depth == 0 && j < content.length) {
-          final path = content.substring(destStart, j).trim();
+          final path = decodeMarkdownImageDestination(
+            content.substring(destStart, j),
+          );
           if (path.isNotEmpty && path != 'generated') {
             images.add(path);
           }
@@ -131,12 +140,17 @@ Uri? _tryNormalizeExternalUri(String raw) {
     i += 1;
   }
 
-  return (buffer.toString().trim(), images);
+  return (
+    buffer.toString().trim(),
+    dedupeImageUrisFirstSeen([...metadataImages, ...images]),
+  );
 }
 
 @visibleForTesting
-(String, List<String>) parseMcpImagePathsForTesting(String? content) =>
-    _parseMcpImagePaths(content);
+(String, List<String>) parseMcpImagePathsForTesting(
+  String? content, {
+  Map<String, dynamic>? metadata,
+}) => _parseMcpImagePaths(content, metadata: metadata);
 
 String _resolveAttachmentImageUri(String uri) {
   final path = uri.trim();
@@ -212,6 +226,12 @@ IconData? _localToolIconFor(String name, Map<String, dynamic> args) {
     LocalToolNames.screenTime => Lucide.Smartphone,
     LocalToolNames.calendarQuery => Lucide.Calendar,
     LocalToolNames.calendarCreate => Lucide.CalendarPlus,
+    LocalToolNames.currentLocation => Lucide.MapPin,
+    LocalToolNames.weather => Lucide.CloudSun,
+    LocalToolNames.healthSummary => Lucide.HeartPulse,
+    LocalToolNames.remindersQuery => Lucide.ListTodo,
+    LocalToolNames.remindersCreate => Lucide.ListPlus,
+    LocalToolNames.remindersComplete => Lucide.CheckCircle,
     _ => null,
   };
 }
@@ -238,6 +258,15 @@ String? _localToolTitleFor(
       l10n.assistantEditLocalToolCalendarQueryTitle,
     LocalToolNames.calendarCreate =>
       l10n.assistantEditLocalToolCalendarCreateTitle,
+    LocalToolNames.currentLocation => l10n.assistantEditLocalToolLocationTitle,
+    LocalToolNames.weather => l10n.assistantEditLocalToolWeatherTitle,
+    LocalToolNames.healthSummary => l10n.assistantEditLocalToolHealthTitle,
+    LocalToolNames.remindersQuery =>
+      l10n.assistantEditLocalToolRemindersQueryTitle,
+    LocalToolNames.remindersCreate =>
+      l10n.assistantEditLocalToolRemindersCreateTitle,
+    LocalToolNames.remindersComplete =>
+      l10n.assistantEditLocalToolRemindersCompleteTitle,
     _ => null,
   };
 }
@@ -413,7 +442,10 @@ void _showToolFullImage(BuildContext context, String path) {
 void _showToolDetail(BuildContext context, ToolUIPart part) {
   final l10n = AppLocalizations.of(context)!;
   final argsPretty = const JsonEncoder.withIndent('  ').convert(part.arguments);
-  final (cleanText, images) = _parseMcpImagePaths(part.content);
+  final (cleanText, images) = _parseMcpImagePaths(
+    part.content,
+    metadata: part.metadata,
+  );
   final resultText = cleanText.isNotEmpty
       ? _prettyToolJson(cleanText)
       : l10n.chatMessageWidgetNoResultYet;
@@ -428,6 +460,12 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
       ? ScreenTimeResult.tryParse(cleanText)
       : null;
   final useScreenTimeDetail = screenTime != null && screenTime.hasApps;
+  final weather = part.toolName == LocalToolNames.weather
+      ? WeatherToolResult.tryParse(cleanText)
+      : null;
+  final weatherAttribution = weather != null && !weather.isError
+      ? weather.attribution
+      : null;
 
   if (PlatformUtils.isDesktopTarget) {
     unawaited(
@@ -444,6 +482,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
           resultLabel: l10n.chatMessageWidgetResult,
           imagesLabel: l10n.chatMessageWidgetImages,
           screenTimeResult: useScreenTimeDetail ? screenTime : null,
+          weatherAttribution: weatherAttribution,
         ),
       ),
     );
@@ -470,6 +509,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
           argumentsLabel: l10n.chatMessageWidgetArguments,
           resultLabel: l10n.chatMessageWidgetResult,
           imagesLabel: l10n.chatMessageWidgetImages,
+          weatherAttribution: weatherAttribution,
         );
       },
     ),
@@ -487,6 +527,7 @@ class _ToolDetailDesktopDialog extends StatefulWidget {
     required this.resultLabel,
     required this.imagesLabel,
     this.screenTimeResult,
+    this.weatherAttribution,
   });
 
   static const dialogKey = ValueKey('tool_detail_desktop_dialog');
@@ -501,6 +542,7 @@ class _ToolDetailDesktopDialog extends StatefulWidget {
   final String resultLabel;
   final String imagesLabel;
   final ScreenTimeResult? screenTimeResult;
+  final WeatherAttribution? weatherAttribution;
 
   @override
   State<_ToolDetailDesktopDialog> createState() =>
@@ -594,6 +636,7 @@ class _ToolDetailDesktopDialogState extends State<_ToolDetailDesktopDialog> {
                             resultLabel: widget.resultLabel,
                             imagesLabel: widget.imagesLabel,
                             padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                            weatherAttribution: widget.weatherAttribution,
                           ),
                   ),
                 ),
@@ -616,6 +659,7 @@ class _ToolDetailBody extends StatelessWidget {
     required this.resultLabel,
     required this.imagesLabel,
     this.padding = const EdgeInsets.fromLTRB(16, 8, 16, 24),
+    this.weatherAttribution,
   });
 
   final ScrollController scrollController;
@@ -626,6 +670,7 @@ class _ToolDetailBody extends StatelessWidget {
   final String resultLabel;
   final String imagesLabel;
   final EdgeInsets padding;
+  final WeatherAttribution? weatherAttribution;
 
   @override
   Widget build(BuildContext context) {
@@ -675,6 +720,14 @@ class _ToolDetailBody extends StatelessWidget {
                           );
                         },
                       ),
+                    ),
+                  ),
+                ],
+                if (weatherAttribution != null) ...[
+                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                  SliverToBoxAdapter(
+                    child: WeatherAttributionLabel(
+                      attribution: weatherAttribution!,
                     ),
                   ),
                 ],
@@ -1346,12 +1399,17 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     String toolName = 'tool';
     Map<String, dynamic> args = const {};
     String result = '';
+    Map<String, dynamic>? metadata;
     try {
       final obj = jsonDecode(widget.message.content) as Map<String, dynamic>;
       toolName = (obj['tool'] ?? 'tool').toString();
       final a = obj['arguments'];
       if (a is Map<String, dynamic>) args = a;
       result = (obj['result'] ?? '').toString();
+      final rawMetadata = obj['metadata'];
+      if (rawMetadata is Map) {
+        metadata = Map<String, dynamic>.from(rawMetadata);
+      }
     } catch (_) {}
 
     final part = ToolUIPart(
@@ -1359,6 +1417,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       toolName: toolName,
       arguments: args,
       content: result,
+      metadata: metadata,
       loading: false,
     );
     final showToolCards =
@@ -2094,8 +2153,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     BuildContext context,
     String visualContent,
     SettingsProvider settings,
-    Map<String, String> citationIndexLookup,
-  ) {
+    Map<String, String> citationIndexLookup, {
+    String contentKey = '',
+  }) {
     final bool isDesktop =
         defaultTargetPlatform == TargetPlatform.macOS ||
         defaultTargetPlatform == TargetPlatform.windows ||
@@ -2138,7 +2198,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
     return RepaintBoundary(
       child: SelectionArea(
-        key: ValueKey('assistant_${widget.message.id}'),
+        key: ValueKey(
+          contentKey.isEmpty
+              ? 'assistant_${widget.message.id}'
+              : 'assistant_${widget.message.id}_$contentKey',
+        ),
         child: DefaultTextStyle.merge(
           style: TextStyle(fontSize: baseAssistant, height: 1.5),
           child: assistantContent,
@@ -2151,20 +2215,44 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     BuildContext context,
     String visualContent,
     SettingsProvider settings,
-    Map<String, String> citationIndexLookup,
-  ) {
-    return SizedBox(
-      width: double.infinity,
-      child: _buildAssistantBubbleContainer(
-        context: context,
-        child: _buildAssistantTextContent(
-          context,
-          visualContent,
-          settings,
-          citationIndexLookup,
-        ),
+    Map<String, String> citationIndexLookup, {
+    String contentKey = '',
+  }) {
+    final bubble = _buildAssistantBubbleContainer(
+      context: context,
+      child: _buildAssistantTextContent(
+        context,
+        visualContent,
+        settings,
+        citationIndexLookup,
+        contentKey: contentKey,
       ),
     );
+    return settings.assistantBubbleFitContent
+        ? Align(alignment: Alignment.centerLeft, child: bubble)
+        : SizedBox(width: double.infinity, child: bubble);
+  }
+
+  List<Widget> _buildAssistantTextBubbles(
+    BuildContext context,
+    String visualContent,
+    SettingsProvider settings,
+    Map<String, String> citationIndexLookup, {
+    required String blockKey,
+  }) {
+    final parts = settings.assistantBubbleSplitParagraphs
+        ? splitAssistantParagraphs(visualContent)
+        : <String>[visualContent];
+    return <Widget>[
+      for (var index = 0; index < parts.length; index++)
+        _buildAssistantTextBlock(
+          context,
+          parts[index],
+          settings,
+          citationIndexLookup,
+          contentKey: parts.length == 1 ? '' : '$blockKey.$index',
+        ),
+    ];
   }
 
   List<_TimelineStepData> _buildTimelineSteps(
@@ -2621,21 +2709,37 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 widget.message.isStreaming &&
                 visualContent.isEmpty) {
               return <Widget>[
-                SizedBox(
-                  width: double.infinity,
-                  child: _buildAssistantBubbleContainer(
-                    context: context,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Semantics(
-                        label: l10n.chatMessageWidgetThinking,
-                        child: widget.hideStreamingIndicator
-                            ? const SizedBox(height: 16)
-                            : const LoadingIndicator(),
+                settings.assistantBubbleFitContent
+                    ? Align(
+                        alignment: Alignment.centerLeft,
+                        child: _buildAssistantBubbleContainer(
+                          context: context,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Semantics(
+                              label: l10n.chatMessageWidgetThinking,
+                              child: widget.hideStreamingIndicator
+                                  ? const SizedBox(height: 16)
+                                  : const LoadingIndicator(),
+                            ),
+                          ),
+                        ),
+                      )
+                    : SizedBox(
+                        width: double.infinity,
+                        child: _buildAssistantBubbleContainer(
+                          context: context,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Semantics(
+                              label: l10n.chatMessageWidgetThinking,
+                              child: widget.hideStreamingIndicator
+                                  ? const SizedBox(height: 16)
+                                  : const LoadingIndicator(),
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                ),
               ];
             }
 
@@ -2647,14 +2751,23 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             for (int i = 0; i < renderBlocks.length; i++) {
               final block = renderBlocks[i];
               if (block.type == _RenderBlockType.text && block.text != null) {
-                widgets.add(
-                  _buildAssistantTextBlock(
-                    context,
-                    block.text!,
-                    settings,
-                    citationIndexLookup,
-                  ),
+                final bubbles = _buildAssistantTextBubbles(
+                  context,
+                  block.text!,
+                  settings,
+                  citationIndexLookup,
+                  blockKey: 'text$i',
                 );
+                for (
+                  var bubbleIndex = 0;
+                  bubbleIndex < bubbles.length;
+                  bubbleIndex++
+                ) {
+                  if (bubbleIndex > 0) {
+                    widgets.add(const SizedBox(height: 8));
+                  }
+                  widgets.add(bubbles[bubbleIndex]);
+                }
               } else if (block.steps.isNotEmpty) {
                 final visibleSteps = block.steps.where((step) {
                   if (step.isReasoning) return showThinkingCards;
@@ -3796,6 +3909,7 @@ ToolUIPart? toolUiFromPayload(String payloadJson, {int fallbackOrdinal = 0}) {
     }
     final args = decoded['arguments'];
     final content = decoded['content']?.toString();
+    final rawMetadata = decoded['metadata'];
     return ToolUIPart(
       id: id,
       toolName: name,
@@ -3803,6 +3917,9 @@ ToolUIPart? toolUiFromPayload(String payloadJson, {int fallbackOrdinal = 0}) {
           ? args.cast<String, dynamic>()
           : const <String, dynamic>{},
       content: content,
+      metadata: rawMetadata is Map
+          ? Map<String, dynamic>.from(rawMetadata)
+          : null,
       loading: content == null || content.isEmpty,
     );
   } catch (_) {
@@ -3816,12 +3933,14 @@ class ToolUIPart {
   final String toolName;
   final Map<String, dynamic> arguments;
   final String? content; // null 表示仍在加载或结果尚不可用
+  final Map<String, dynamic>? metadata;
   final bool loading;
   const ToolUIPart({
     required this.id,
     required this.toolName,
     required this.arguments,
     this.content,
+    this.metadata,
     this.loading = false,
   });
 }
@@ -4438,6 +4557,7 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
   bool? _askUserExpanded;
 
   String? _cachedContent;
+  Map<String, dynamic>? _cachedMetadata;
   String _cleanText = '';
   List<String> _imagePaths = const [];
 
@@ -4459,16 +4579,19 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
     if (_isAskUser && !wasAnswered && _askUserAnswered) {
       _askUserExpanded = true;
     }
-    if (oldWidget.part.content != widget.part.content) {
+    if (oldWidget.part.content != widget.part.content ||
+        oldWidget.part.metadata != widget.part.metadata) {
       _updateContentCache();
     }
   }
 
   void _updateContentCache() {
     final content = widget.part.content;
-    if (content == _cachedContent) return;
+    final metadata = widget.part.metadata;
+    if (content == _cachedContent && metadata == _cachedMetadata) return;
     _cachedContent = content;
-    final (cleanText, paths) = _parseMcpImagePaths(content);
+    _cachedMetadata = metadata;
+    final (cleanText, paths) = _parseMcpImagePaths(content, metadata: metadata);
     _cleanText = cleanText;
     _imagePaths = paths;
   }
@@ -4600,6 +4723,9 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
     final screenTimeResult = widget.part.toolName == LocalToolNames.screenTime
         ? ScreenTimeResult.tryParse(cleanText)
         : null;
+    final weatherResult = widget.part.toolName == LocalToolNames.weather
+        ? WeatherToolResult.tryParse(cleanText)
+        : null;
     final String summaryText = approvalRequest != null
         ? _argsSummary(approvalRequest.arguments)
         : cleanText.isNotEmpty
@@ -4635,6 +4761,8 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
             secondaryColor: fg.muted,
             errorColor: cs.error,
           )
+        : weatherResult != null && !weatherResult.isError
+        ? WeatherToolSummary(result: weatherResult, textColor: fg.body)
         : !shouldShowSummary || summaryText.trim().isEmpty
         ? null
         : Text(
@@ -4758,13 +4886,16 @@ class _ToolCallItemState extends State<_ToolCallItem> {
   // 缓存图片路径（本地文件或 URL）
   List<String> _imagePaths = const [];
   String? _lastContent;
+  Map<String, dynamic>? _lastMetadata;
 
   void _updateImageCache() {
     final content = widget.part.content;
-    if (content == _lastContent) return;
+    final metadata = widget.part.metadata;
+    if (content == _lastContent && metadata == _lastMetadata) return;
     _lastContent = content;
+    _lastMetadata = metadata;
 
-    final (_, paths) = _parseMcpImagePaths(content);
+    final (_, paths) = _parseMcpImagePaths(content, metadata: metadata);
     _imagePaths = paths;
   }
 
@@ -4786,7 +4917,8 @@ class _ToolCallItemState extends State<_ToolCallItem> {
   @override
   void didUpdateWidget(covariant _ToolCallItem oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.part.content != widget.part.content) {
+    if (oldWidget.part.content != widget.part.content ||
+        oldWidget.part.metadata != widget.part.metadata) {
       _updateImageCache();
     }
   }

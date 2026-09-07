@@ -245,6 +245,7 @@ ThemeData buildLightThemeForScheme(
   ColorScheme staticScheme, {
   ColorScheme? dynamicScheme,
   bool pureBackground = false,
+  bool layeredSurfaces = false,
 }) {
   final fontFallback = _getPlatformFontFallback();
   var scheme = (dynamicScheme?.harmonized()) ?? staticScheme;
@@ -256,13 +257,18 @@ ThemeData buildLightThemeForScheme(
     );
   }
   scheme = _withDerivedSurfaceContainers(scheme);
+  if (layeredSurfaces) {
+    scheme = scheme.copyWith(surface: scheme.surfaceContainerLowest);
+  }
   // 让日志行为与 buildLightTheme 保持一致，以便诊断结果一致。
   // _logColorScheme('Light ${dynamicScheme != null ? 'Dynamic' : 'Static'}', scheme);
   final theme = ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
     scaffoldBackgroundColor: scheme.surface,
-    extensions: <ThemeExtension<dynamic>>[AppSemanticColors.light(scheme)],
+    extensions: <ThemeExtension<dynamic>>[
+      AppSemanticColors.light(scheme, layered: layeredSurfaces),
+    ],
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: scheme.inverseSurface,
@@ -411,6 +417,7 @@ ThemeData buildDarkThemeForScheme(
   ColorScheme staticScheme, {
   ColorScheme? dynamicScheme,
   bool pureBackground = false,
+  bool layeredSurfaces = false,
 }) {
   final fontFallback = _getPlatformFontFallback();
   var scheme = (dynamicScheme?.harmonized()) ?? staticScheme;
@@ -422,13 +429,18 @@ ThemeData buildDarkThemeForScheme(
     );
   }
   scheme = _withDerivedSurfaceContainers(scheme);
+  if (layeredSurfaces) {
+    scheme = scheme.copyWith(surface: scheme.surfaceContainerLowest);
+  }
   // 让日志行为与 buildDarkTheme 保持一致，以便诊断结果一致。
   // _logColorScheme('Dark ${dynamicScheme != null ? 'Dynamic' : 'Static'}', scheme);
   final theme = ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
     scaffoldBackgroundColor: scheme.surface,
-    extensions: <ThemeExtension<dynamic>>[AppSemanticColors.dark(scheme)],
+    extensions: <ThemeExtension<dynamic>>[
+      AppSemanticColors.dark(scheme, layered: layeredSurfaces),
+    ],
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: scheme.inverseSurface,

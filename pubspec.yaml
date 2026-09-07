@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 0.1.14+4
+version: 0.1.14+14
 
 environment:
   sdk: ^3.12.1
@@ -104,7 +104,9 @@ dependencies:
   webview_flutter: ^4.13.1
   webview_flutter_wkwebview: ^3.25.1
   webview_windows: ^0.4.0
-  flutter_math_fork: ^0.7.4
+  # 本地 fork：在 pub 版 0.7.4 基础上修复中文与公式混排的字体回退，详见 dependencies/flutter_math_fork
+  flutter_math_fork:
+    path: ./dependencies/flutter_math_fork
   scrollable_positioned_list: ^0.3.8
   super_sliver_list: ^0.4.1
   image_gallery_saver_plus: ^4.0.1

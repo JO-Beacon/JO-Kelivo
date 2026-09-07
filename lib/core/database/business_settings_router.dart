@@ -81,6 +81,7 @@ final class BusinessKeyRegistry {
     'use_dynamic_color_v1',
     'app_locale_v1',
     'title_model_v1',
+    'title_generation_enabled_v1',
     'title_prompt_v1',
     'title_generation_thinking_enabled_v1',
     'summary_generation_thinking_enabled_v1',
@@ -97,8 +98,13 @@ final class BusinessKeyRegistry {
     'summary_model_v1',
     'summary_prompt_v1',
     'suggestion_model_v1',
+    'suggestion_generation_enabled_v1',
     'suggestion_prompt_v1',
     'suggestion_insert_on_tap_only_v1',
+    'local_snapshot_enabled_v1',
+    'local_snapshot_keep_recent_v1',
+    'local_snapshot_last_success_at_v1',
+    'local_snapshot_last_failure_v1',
     'compress_model_v1',
     'compress_prompt_v1',
     'thinking_budget_v1',
@@ -168,6 +174,7 @@ final class BusinessKeyRegistry {
     'memory_injection_max_items_v1',
     'chat_bubble_style_overrides_v1',
     'chat_bubble_style_overrides_user_v1',
+    'tool_schema_overrides_v1',
   };
 
   static BusinessKeyDisposition classify(String key) {
@@ -513,7 +520,11 @@ final class BusinessSettingsRouter {
             'regexRules',
           },
           maps: const {'avatarTransform'},
-          stringLists: const {'mcpServerIds', 'localToolIds'},
+          stringLists: const {
+            'mcpServerIds',
+            'localToolIds',
+            'healthDataTypeIds',
+          },
         );
         _validateAssistantChildren(kind, payload);
         return;
