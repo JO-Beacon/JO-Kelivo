@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/database/chat_database_repository.dart';
@@ -33,11 +34,25 @@ import '../../../utils/markdown_media_sanitizer.dart';
 import 'ocr_service.dart';
 
 /// §7.6 记忆前缀解析结果。
+/// [persistHash] 区分「不写哈希」与「写入 [hash]」。
+/// 清空需要这个区分：当最后一条可见记忆消失时，本轮不注入任何内容，
+/// 但仍必须记录上下文中已无快照——即 null [hash] 而非不写入。
 typedef MemoryPrefixResolution = ({
   String prefix,
   String? hash,
+  bool persistHash,
   String? snapshotKind,
 });
+
+/// 某一时刻为某个助手生成的记忆块。
+typedef MemorySnapshotState = ({String prefix, String hash, bool isEmpty});
+
+const MemoryPrefixResolution _noMemoryPrefix = (
+  prefix: '',
+  hash: null,
+  persistHash: false,
+  snapshotKind: null,
+);
 
 /// 同一次请求中组装的消息共享的记忆注入状态。
 ///
@@ -60,6 +75,15 @@ class MemoryInjectionPass {
   void recordInjectedHash(String? hash) {
     _injectedHash = hash;
     _hasInjectedHash = true;
+  }
+
+  /// 注入当前会生成的内容，计算一次后复用：
+  /// 解析完状态又决定不注入的请求，不必在出口再读一次。
+  MemorySnapshotState? get currentSnapshot => _currentSnapshot;
+  MemorySnapshotState? _currentSnapshot;
+
+  void recordCurrentSnapshot(MemorySnapshotState snapshot) {
+    _currentSnapshot = snapshot;
   }
 }
 
@@ -766,6 +790,11 @@ class MessageBuilderService {
 
     final injectionPass = MemoryInjectionPass();
 
+    // 真正由记忆注入产生的修订 ID。绝不能仅凭文本形态判断：
+    // 用户若从上下文日志里粘贴了一段快照，那段文本属于用户自己的消息，
+    // 不能被当成内部块剥离掉。
+    final snapshotRevisionIds = <String>{};
+
     for (int i = 0; i < apiMessages.length; i++) {
       if (!isPersistedUserMessage(apiMessages[i])) continue;
       final revisionId = (apiMessages[i][internalRevisionIdKey] ?? '')
@@ -889,13 +918,14 @@ class MessageBuilderService {
           settings: settings,
         );
         apiMessages[i]['content'] = sendPayload;
+        final carriesSnapshot =
+            existing.carriesMemorySnapshot && sendPayload == existing.payload;
+        if (carriesSnapshot) snapshotRevisionIds.add(revisionId);
         if (ContextLogger.enabled) {
           _tagFrozenUserPrompt(
             apiMessages[i],
             payload: sendPayload,
-            carriesMemorySnapshot:
-                existing.carriesMemorySnapshot &&
-                sendPayload == existing.payload,
+            carriesMemorySnapshot: carriesSnapshot,
           );
         }
         continue;
@@ -1008,7 +1038,118 @@ class MessageBuilderService {
       }
     }
 
+    await refreshMemorySnapshots(
+      apiMessages,
+      assistant: assistant,
+      conversation: conversation,
+      settings: settings,
+      pass: injectionPass,
+      snapshotRevisionIds: snapshotRevisionIds
+        ..addAll(injectionPass.snapshotCarriers),
+    );
+
     return lastUserImagePaths ?? <String>[];
+  }
+
+  /// 在请求中只保留当前生效的记忆快照（§7.6）。
+  ///
+  /// 快照被冻结在注入它的那条用户消息里，否则会在整个会话生命周期内
+  /// 被反复重放。记忆一变，其余快照就立刻过期；作用域切换会让这种过期
+  /// 变得用户可见：从全局移到某个助手的条目，仍会出现在另一个助手的旧
+  /// 会话里，因为那段历史仍带着它们还是全局时拍下的快照。
+  ///
+  /// 冻结行本身不动——它记录的是真正发出去的内容，且一轮没有任何变化的
+  /// 请求必须继续命中提示词缓存——所以纠正在出口进行：被取代的前缀被丢弃，
+  /// 若本次请求没有注入新快照，则把幸存的那条就地更新到最新。
+  ///
+  /// [snapshotRevisionIds] 指出哪些消息的负载确实来自注入。只有这些是候选；
+  /// 仅仅长得像快照的文本属于用户自己，保持不动。
+  Future<void> refreshMemorySnapshots(
+    List<Map<String, dynamic>> apiMessages, {
+    required Assistant? assistant,
+    required Conversation? conversation,
+    required SettingsProvider settings,
+    required Set<String> snapshotRevisionIds,
+    MemoryInjectionPass? pass,
+  }) async {
+    if (snapshotRevisionIds.isEmpty) return;
+
+    final carriers = <int>[];
+    int? injectedThisRequest;
+    for (int i = 0; i < apiMessages.length; i++) {
+      final message = apiMessages[i];
+      if ((message['role'] ?? '').toString() != 'user') continue;
+      final revisionId = (message[internalRevisionIdKey] ?? '')
+          .toString()
+          .trim();
+      if (!snapshotRevisionIds.contains(revisionId)) continue;
+      final content = message['content'];
+      if (content is! String || content.isEmpty) continue;
+      if (MemoryBlockBuilder.endOfInjectedPrefix(content) == null) continue;
+      carriers.add(i);
+      if (pass?.snapshotCarriers.contains(revisionId) ?? false) {
+        injectedThisRequest = i;
+      }
+    }
+    if (carriers.isEmpty) return;
+
+    // 本次请求中注入的快照就是生效的那条，无论它位于何处。
+    // 仅凭位置会判错：一条无法冻结的历史消息（OCR 失败、沙盒数据文件）
+    // 会在请求中途重新组装，可能带着新快照排在一条更旧的冻结消息之前。
+    int? live = injectedThisRequest;
+    String? wanted;
+    if (live == null) {
+      // 没有注入——要么状态未变，要么根本没有新的用户消息触发决策，
+      // 重新生成旧回复就是这种情况。幸存的那条必须自证是最新的：
+      // 它得恰好持有当前状态生成的快照，否则就地改写；空状态则把它改掉。
+      //
+      // 它自己的前缀是唯一可靠的证据。会话里存的哈希指的是最后注入的
+      // 那条快照，未必是这里幸存的那条：重新生成更早的回复会把后面的
+      // 消息、连同更新的快照一起从请求中裁掉。
+      //
+      // 改写刻意不落库：存储的哈希必须继续描述冻结行，
+      // 否则下一轮会以为过期前缀是最新的而原样发出。
+      if (assistant == null || _repo == null) return;
+      final current = assistant.enableMemory && !_legacyMemoryMode(settings)
+          ? pass?.currentSnapshot ??
+                await _currentMemorySnapshot(
+                  assistant: assistant,
+                  lang: settings.resolvedMemoryPromptLang,
+                  settings: settings,
+                )
+          : null;
+      wanted = current == null || current.isEmpty ? '' : current.prefix;
+      live = carriers.last;
+    }
+
+    for (final i in carriers) {
+      final message = apiMessages[i];
+      final split = MemoryBlockBuilder.splitInjectedPrefix(
+        message['content'] as String,
+      );
+      if (split == null) continue;
+      if (i == live) {
+        if (wanted == null || wanted == split.prefix) continue;
+        final refreshed = '$wanted${split.rest}';
+        message['content'] = refreshed;
+        if (ContextLogger.enabled) {
+          _tagFrozenUserPrompt(
+            message,
+            payload: refreshed,
+            carriesMemorySnapshot: wanted.isNotEmpty,
+          );
+        }
+        continue;
+      }
+      message['content'] = split.rest;
+      if (ContextLogger.enabled) {
+        ContextSegmentTags.replaceWithSingle(
+          message,
+          source: ContextSource.chatHistory,
+          length: split.rest.length,
+        );
+      }
+    }
   }
 
   /// API 负载背后的已存储消息；无法找到时为 null。
@@ -1070,7 +1211,7 @@ class MessageBuilderService {
     }
 
     final memory = assistant == null
-        ? (prefix: '', hash: null, snapshotKind: null)
+        ? _noMemoryPrefix
         : await resolveMemoryPrefix(
             conversation: conversation,
             assistant: assistant,
@@ -1136,7 +1277,9 @@ class MessageBuilderService {
         conversationId: message.conversationId,
         payload: finalContent,
         carriesMemorySnapshot: memory.prefix.isNotEmpty,
-        injectedMemoryHash: memory.hash,
+        injectedMemoryHash: memory.persistHash
+            ? Value(memory.hash)
+            : const Value.absent(),
         sourceContentHash: message.semanticContentHash,
       );
     }
@@ -1175,13 +1318,95 @@ class MessageBuilderService {
     SettingsProvider? settings,
   }) async {
     if (_legacyMemoryMode(settings) || !assistant.enableMemory) {
-      return (prefix: '', hash: null, snapshotKind: null);
+      return _noMemoryPrefix;
     }
 
     final repo = _repo;
     if (repo == null) {
-      return (prefix: '', hash: null, snapshotKind: null);
+      return _noMemoryPrefix;
     }
+
+    final current = await _currentMemorySnapshot(
+      assistant: assistant,
+      lang: lang,
+      settings: settings,
+    );
+    if (current == null) return _noMemoryPrefix;
+    pass?.recordCurrentSnapshot(current);
+    final currentHash = current.hash;
+
+    // 自愈逻辑：本次请求中是否有任何历史用户消息携带快照？
+    // 在 stripInternalRevisionIds 前读取修订 ID；排除当前正在组装的消息。
+    final historyUserIds = <String>[];
+    for (final message in apiMessages) {
+      if ((message['role'] ?? '').toString() != 'user') continue;
+      final revisionId = (message[internalRevisionIdKey] ?? '')
+          .toString()
+          .trim();
+      if (revisionId.isEmpty || revisionId == currentMessageId) continue;
+      historyUserIds.add(revisionId);
+    }
+    final hasSnapshot =
+        historyUserIds.any(
+          (id) => pass?.snapshotCarriers.contains(id) ?? false,
+        ) ||
+        await repo.anyPromptCarriesMemorySnapshot(historyUserIds);
+
+    // 关键：在任何写入之前与先前哈希比较（附录 §6）。
+    // 先写入会使 currentHash == injectedMemoryHash，之后再也检测不到变化。
+    //
+    // 从数据库读取，而不是从 [conversation] 读取：调用方传给我们的是
+    // `conversation.copyWith(...)`，且没有任何逻辑会把此列加载回模型，
+    // 因此缓存值会永远过期，每一轮看起来都像发生变化。
+    //
+    // 同一次请求中早先已注入的哈希优先，因为临时会话从不持久化，
+    // 否则每条消息都会读到 null，并重复执行相同的快照。
+    final previousHash = pass != null && pass.hasInjectedHash
+        ? pass.injectedHash
+        : await repo.getConversationInjectedMemoryHash(conversation.id);
+
+    // 没有可见内容了。已冻结进历史的快照会在出口被
+    // [refreshMemorySnapshots] 丢弃，因此不需要用更新块来宣布清空——
+    // 但会话必须记录其上下文现在已无任何快照。跳过这次写入会留下已消失
+    // 快照的哈希，之后重新加入相同内容时会与它哈希相等，再也不会被注入。
+    if (current.isEmpty) {
+      if (!hasSnapshot && previousHash == null) return _noMemoryPrefix;
+      pass?.recordInjectedHash(null);
+      return (
+        prefix: '',
+        hash: null,
+        // 先前某轮已清空：记忆仍为空的每一轮再记一次同样的 null 没有意义。
+        persistHash: previousHash != null,
+        snapshotKind: null,
+      );
+    }
+
+    // 已是上下文中的快照，且仍有消息携带它。
+    if (hasSnapshot && currentHash == previousHash) return _noMemoryPrefix;
+
+    // 哈希通过 freezeMessagePrompt 在与提示词行相同的事务中写入数据库。
+    pass?.recordInjectedHash(currentHash);
+    return (
+      prefix: current.prefix,
+      hash: currentHash,
+      persistHash: true,
+      snapshotKind: 'full',
+    );
+  }
+
+  /// 当前时刻为 [assistant] 生成的记忆块及其哈希。纯状态：
+  /// 不决定是否注入。
+  ///
+  /// [isEmpty] 表示档案字段与可见记忆都不存在——与哈希不同，
+  /// 后者是两个空块的完全合法哈希。始终是完整快照：
+  /// 被取代的快照从历史中剥离，而不是留在原地等更新块来纠正。
+  Future<MemorySnapshotState?> _currentMemorySnapshot({
+    required Assistant assistant,
+    required MemoryPromptLang lang,
+    SettingsProvider? settings,
+  }) async {
+    final repo = _repo;
+    if (repo == null) return null;
 
     SettingsProvider? resolvedSettings = settings;
     if (resolvedSettings == null) {
@@ -1213,72 +1438,15 @@ class MessageBuilderService {
       lang: lang,
       maxItems: maxItems,
     );
-
-    final currentHash = MemoryBlockBuilder.hashBlocks(
-      profileBlock,
-      memoryBlock,
+    return (
+      prefix: MemoryBlockBuilder.buildFullSnapshotPrefix(
+        profileBlock,
+        memoryBlock,
+        lang,
+      ),
+      hash: MemoryBlockBuilder.hashBlocks(profileBlock, memoryBlock),
+      isEmpty: !hasProfile && !hasAnyMemory,
     );
-
-    // 自愈逻辑：本次请求中是否有任何历史用户消息携带快照？
-    // 在 stripInternalRevisionIds 前读取修订 ID；排除当前正在组装的消息。
-    final historyUserIds = <String>[];
-    for (final message in apiMessages) {
-      if ((message['role'] ?? '').toString() != 'user') continue;
-      final revisionId = (message[internalRevisionIdKey] ?? '')
-          .toString()
-          .trim();
-      if (revisionId.isEmpty || revisionId == currentMessageId) continue;
-      historyUserIds.add(revisionId);
-    }
-    final hasSnapshot =
-        historyUserIds.any(
-          (id) => pass?.snapshotCarriers.contains(id) ?? false,
-        ) ||
-        await repo.anyPromptCarriesMemorySnapshot(historyUserIds);
-
-    // 没有先前快照时无需清除。然而一旦快照已发送，
-    // 全空状态本身就是最新快照。
-    if (!hasProfile && !hasAnyMemory && !hasSnapshot) {
-      return (prefix: '', hash: null, snapshotKind: null);
-    }
-
-    // 关键：在任何写入之前与先前哈希比较（附录 §6）。
-    // 先写入会使 currentHash == injectedMemoryHash，
-    // 更新分支将永远不可达。
-    //
-    // 从数据库读取，而不是从 [conversation] 读取：调用方传给我们的是
-    // `conversation.copyWith(...)`，且没有任何逻辑会把此列加载回模型，
-    // 因此缓存值会永远过期，每一轮看起来都像发生变化。
-    //
-    // 同一次请求中早先已注入的哈希优先，因为临时会话从不持久化，
-    // 否则每条消息都会读到 null，并重复执行相同的更新块。
-    final previousHash = pass != null && pass.hasInjectedHash
-        ? pass.injectedHash
-        : await repo.getConversationInjectedMemoryHash(conversation.id);
-
-    final String prefix;
-    final String snapshotKind;
-    if (!hasSnapshot) {
-      prefix = MemoryBlockBuilder.buildFullSnapshotPrefix(
-        profileBlock,
-        memoryBlock,
-        lang,
-      );
-      snapshotKind = 'full';
-    } else if (currentHash != previousHash) {
-      prefix = MemoryBlockBuilder.buildUpdatePrefix(
-        profileBlock,
-        memoryBlock,
-        lang,
-      );
-      snapshotKind = 'update';
-    } else {
-      return (prefix: '', hash: null, snapshotKind: null);
-    }
-
-    // 哈希通过 freezeMessagePrompt 在与提示词行相同的事务中写入数据库。
-    pass?.recordInjectedHash(currentHash);
-    return (prefix: prefix, hash: currentHash, snapshotKind: snapshotKind);
   }
 
   /// 默认 OCR 文本包装函数

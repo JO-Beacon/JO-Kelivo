@@ -170,7 +170,7 @@ void main() {
       );
     });
 
-    test('off budget omits thinking config for Gemma 4', () async {
+    test('off budget sends minimal thinking level for Gemma 4', () async {
       late Map<String, dynamic> capturedBody;
       final server = await _startGeminiServer((body) {
         capturedBody = body;
@@ -191,7 +191,10 @@ void main() {
       ).toList();
 
       expect(chunks.last.isDone, isTrue);
-      expect(_thinkingConfig(capturedBody), isNull);
+      expect(_thinkingConfig(capturedBody), {
+        'includeThoughts': false,
+        'thinkingLevel': 'minimal',
+      });
     });
   });
 
@@ -219,6 +222,27 @@ void main() {
         'thinkingLevel': 'low',
       });
     });
+
+    test(
+      'Gemini 3.8 Flash inherits 3.7 thinking levels and default medium',
+      () async {
+        final body = await _captureThinkingConfig(modelId: 'gemini-3.8-flash');
+
+        expect(_thinkingConfig(body), {
+          'includeThoughts': true,
+          'thinkingLevel': 'medium',
+        });
+
+        final offBody = await _captureThinkingConfig(
+          modelId: 'gemini-3.8-flash',
+          thinkingBudget: 0,
+        );
+        expect(_thinkingConfig(offBody), {
+          'includeThoughts': false,
+          'thinkingLevel': 'low',
+        });
+      },
+    );
 
     test('Gemini 3.6 Flash defaults to medium with 64K output', () async {
       late Map<String, dynamic> capturedBody;

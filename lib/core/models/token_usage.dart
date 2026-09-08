@@ -11,6 +11,9 @@ class TokenUsage {
     this.totalTokens = 0,
   });
 
+  /// 将新的用量快照折叠进运行值：最新的非零字段胜出，
+  /// 因此后一轮的数字会替换前一轮而不是相加
+  /// （各 provider 每轮都上报完整上下文）。
   TokenUsage merge(TokenUsage other) {
     // 对于流式响应：
     // - prompt tokens：取最大值（通常在初始值后保持不变）
@@ -31,23 +34,6 @@ class TokenUsage {
       completionTokens: completion,
       cachedTokens: cached,
       totalTokens: total,
-    );
-  }
-
-  /// 累加已经结束的不同工具调用轮次；与同一轮流式快照的 [merge] 相反，
-  /// 这里的 prompt/completion/cached token 都代表新增消耗。
-  TokenUsage accumulate(TokenUsage other) {
-    final prompt = promptTokens + other.promptTokens;
-    final completion = completionTokens + other.completionTokens;
-    final cached = cachedTokens + other.cachedTokens;
-    final splitTotal = prompt + completion;
-    return TokenUsage(
-      promptTokens: prompt,
-      completionTokens: completion,
-      cachedTokens: cached,
-      totalTokens: splitTotal > 0
-          ? splitTotal
-          : totalTokens + other.totalTokens,
     );
   }
 }

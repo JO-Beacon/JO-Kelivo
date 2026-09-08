@@ -74,6 +74,7 @@ import 'shared/widgets/app_overlays.dart';
 import 'shared/widgets/loading_dialog_card.dart';
 import 'shared/widgets/snackbar.dart';
 import 'shared/widgets/restore_failure_screen.dart';
+import 'shared/widgets/restore_progress_screen.dart';
 import 'shared/widgets/restore_outcome_notice.dart';
 import 'shared/widgets/context_tree_migration_notice.dart';
 import 'features/backup/widgets/associated_backup_import_launcher.dart';
@@ -147,6 +148,18 @@ Future<void> main(List<String> arguments) async {
             await AssociatedBackupPathEvents.readPendingPath(appDataDirectory);
       }
       final RestoreReceipt? restoreOutcome;
+      // 大备份恢复可能耗时数秒，若期间一帧不画，用户无法区分这与应用
+      // 卡死有何区别。仅当确有待处理工作时才绘制进度屏：普通启动不应
+      // 为一个马上要被替换的帧买单。
+      final restoreStage =
+          await RestoreStartupGate.hasPendingWork(
+            appDataDirectory: appDataDirectory,
+          )
+          ? ValueNotifier(RestoreStartupStage.checkingBackup)
+          : null;
+      if (restoreStage != null) {
+        runApp(_RestoreProgressApp(stage: restoreStage));
+      }
       try {
         // 租约通过其内部注册表在进程退出前始终由进程持有，
         // 防止另一个实例与当前实例争抢业务 I/O。
@@ -157,6 +170,9 @@ Future<void> main(List<String> arguments) async {
             await RestoreStartupGate.recoverAndRequireBusinessReady(
               appDataDirectory: appDataDirectory,
               businessLease: businessLease,
+              onStage: restoreStage == null
+                  ? null
+                  : (stage) => restoreStage.value = stage,
             );
         reportStartupProgress(0.24);
       } catch (error, stackTrace) {
@@ -407,6 +423,31 @@ Future<void> _initRestoreFailureWindow() async {
     );
   } catch (error) {
     stderr.writeln('[RestoreFailureWindow] $error');
+  }
+}
+
+/// [RestoreProgressScreen] 的无持久化外壳。
+///
+/// 刻意只用默认值构建：用户的主题与语言设置存在于本次恢复可能正在
+/// 替换的设置里，这里不得打开它们中的任何一个。
+class _RestoreProgressApp extends StatelessWidget {
+  const _RestoreProgressApp({required this.stage});
+
+  final ValueNotifier<RestoreStartupStage> stage;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = ThemePalettes.defaultPalette;
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      onGenerateTitle: (context) =>
+          AppLocalizations.of(context)!.aboutPageAppName,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      theme: buildLightThemeForScheme(palette.light),
+      darkTheme: buildDarkThemeForScheme(palette.dark),
+      home: RestoreProgressScreen(stage: stage),
+    );
   }
 }
 

@@ -66,6 +66,7 @@ Stream<StreamChunk> sendClaudeStreamEvents(
   Map<String, dynamic>? extraBody,
   bool stream = true,
   bool skipImageParsing = false,
+  StreamRoundRunner? retryRound,
 }) async* {
   final upstreamModelId = apiModelId(config, modelId);
   final isVertex = config.vertexAI == true;
@@ -288,6 +289,7 @@ Stream<StreamChunk> sendClaudeStreamEvents(
   var pauseTurn = false;
 
   yield* runProviderToolRounds(
+    retryRound: retryRound,
     sendRound: () async* {
       final omitSamplingParams = claudeShouldOmitSamplingParams(
         upstreamModelId,
@@ -382,7 +384,7 @@ Stream<StreamChunk> sendClaudeStreamEvents(
         try {
           final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
           if (u != null) {
-            totalUsage = (totalUsage ?? const TokenUsage()).accumulate(
+            totalUsage = (totalUsage ?? const TokenUsage()).merge(
               claudeUsageFromMap(u),
             );
           }

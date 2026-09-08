@@ -104,7 +104,9 @@ class HomeMobileScaffold extends StatelessWidget {
         capabilities: const SidebarCapabilities(
           showTabs: true,
           pointerInteractions: false,
-          assistantReorder: false,
+          // 移动端同样支持拖动排序：把手是助手头像（长按头像即拖），
+          // 不额外加图标，也不占用条目点击/长按菜单的手势。
+          assistantReorder: true,
         ),
         globalSearchMode: globalSearchMode,
         globalSearchQuery: globalSearchQuery,

@@ -69,6 +69,7 @@ void main() {
         generateText:
             ({
               required ProviderConfig config,
+              String? conversationId,
               required String modelId,
               required String prompt,
               int? thinkingBudget,
@@ -100,6 +101,7 @@ void main() {
         generateText:
             ({
               required ProviderConfig config,
+              String? conversationId,
               required String modelId,
               required String prompt,
               int? thinkingBudget,
@@ -231,6 +233,7 @@ void main() {
           generateText:
               ({
                 required ProviderConfig config,
+                String? conversationId,
                 required String modelId,
                 required String prompt,
                 int? thinkingBudget,
@@ -297,6 +300,7 @@ void main() {
           generateText:
               ({
                 required ProviderConfig config,
+                String? conversationId,
                 required String modelId,
                 required String prompt,
                 int? thinkingBudget,
@@ -352,6 +356,7 @@ void main() {
         generateText:
             ({
               required ProviderConfig config,
+              String? conversationId,
               required String modelId,
               required String prompt,
               int? thinkingBudget,
@@ -416,6 +421,7 @@ void main() {
         generateText:
             ({
               required ProviderConfig config,
+              String? conversationId,
               required String modelId,
               required String prompt,
               int? thinkingBudget,
@@ -470,6 +476,7 @@ void main() {
           generateText:
               ({
                 required ProviderConfig config,
+                String? conversationId,
                 required String modelId,
                 required String prompt,
                 int? thinkingBudget,

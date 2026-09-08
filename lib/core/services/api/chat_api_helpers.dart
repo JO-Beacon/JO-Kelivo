@@ -532,7 +532,6 @@ Map<String, dynamic>? claudeThinkingConfig(
   ProviderConfig? config,
 }) {
   if (_isClaudeThinkingAlwaysOnModel(modelId)) {
-    if (!isClaudeReasoningEnabled(budget)) return null;
     return <String, dynamic>{'type': 'adaptive', 'display': 'summarized'};
   }
   if (!isClaudeReasoningEnabled(budget)) {
@@ -556,11 +555,12 @@ Map<String, dynamic>? claudeOutputConfig(
   ProviderConfig? config,
 }) {
   if (_isClaudeThinkingAlwaysOnModel(modelId)) {
-    final effort = _normalizeClaudeEffort(
-      _claudeEffortForBudget(budget),
-      modelId,
-    );
-    if (effort == 'auto' || effort == 'off') return null;
+    // 自适应思考无法关闭。省略 effort 会默认 high，
+    // 因此界面「关闭」必须发送最低合法档位。
+    var effort = _claudeEffortForBudget(budget);
+    if (effort == 'off') effort = 'low';
+    effort = _normalizeClaudeEffort(effort, modelId);
+    if (effort == 'auto') return null;
     return <String, dynamic>{'effort': effort};
   }
   if (_isDeepSeekClaudeCompatible(modelId, config: config)) {

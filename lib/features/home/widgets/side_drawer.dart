@@ -1052,6 +1052,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
           .replaceAll('{locale}', locale)
           .replaceAll('{content}', content);
       final title = (await ChatApiService.generateText(
+        conversationId: conversationId,
         config: cfg,
         modelId: titleModelId,
         prompt: prompt,
@@ -3853,16 +3854,38 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       if (list == null || list.isEmpty) continue;
       entries.add(_AssistantListEntry.header(group));
       if (!groupProvider.isGroupCollapsed(group.id)) {
-        entries.addAll(list.map(_AssistantListEntry.assistant));
+        entries.addAll(
+          list.map((a) => _AssistantListEntry.assistant(a, groupId: group.id)),
+        );
       }
     }
 
-    Widget buildEntry(BuildContext ctx, int index) {
+    // ⚠️ 临时诊断：拖拽后 5 秒内的每次界面重建都把条目顺序记进日志，
+    // 用来对比"框架松手那次重建"与"后续重建"看到的顺序是否一致。
+    if (_dragDiagArmedAt != null &&
+        DateTime.now().difference(_dragDiagArmedAt!).inMilliseconds < 5000) {
+      _dragDiagBuildSeq++;
+      _dragDiagLog(
+        '重建#$_dragDiagBuildSeq(${inlineMode ? '内联' : '标签'}模式) '
+        'entries=[${_dragDiagEntries(entries)}]',
+      );
+    } else {
+      _dragDiagArmedAt = null;
+    }
+
+    Widget buildEntry(
+      BuildContext ctx,
+      int index, {
+      bool reorderHandle = false,
+    }) {
       final entry = entries[index];
       final groupId = entry.groupId;
-      if (groupId != null) {
+      // 分组标题条目没有助手；助手条目即使属于某个分组也仍然是助手，
+      // 不能用 groupId 是否为空来区分两者。
+      if (entry.isHeader) {
+        final headerGroupId = groupId!;
         final groupAssistantIds =
-            groupedByGroup[groupId]
+            groupedByGroup[headerGroupId]
                 ?.map((assistant) => assistant.id)
                 .toList() ??
             const <String>[];
@@ -3870,8 +3893,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
           padding: const EdgeInsets.only(top: 4, bottom: 2),
           child: _GroupHeader(
             title: entry.groupName ?? '',
-            collapsed: groupProvider.isGroupCollapsed(groupId),
-            onToggle: () => groupProvider.toggleGroupCollapsed(groupId),
+            collapsed: groupProvider.isGroupCollapsed(headerGroupId),
+            onToggle: () => groupProvider.toggleGroupCollapsed(headerGroupId),
             selectionMode: _assistantSelectionMode,
             selected:
                 groupAssistantIds.isNotEmpty &&
@@ -3895,10 +3918,18 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         child: _AssistantInlineTile(
-          avatar: AssistantAvatar.fromListItem(
-            item: assistant,
-            size: _pointerInteractions ? 28 : 32,
-          ),
+          avatar: reorderHandle
+              ? ReorderableDragStartListener(
+                  index: index,
+                  child: AssistantAvatar.fromListItem(
+                    item: assistant,
+                    size: _pointerInteractions ? 28 : 32,
+                  ),
+                )
+              : AssistantAvatar.fromListItem(
+                  item: assistant,
+                  size: _pointerInteractions ? 28 : 32,
+                ),
           name: assistant.name,
           textColor: textBase2,
           docked: _docked,
@@ -3925,51 +3956,153 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       list = ReorderableListView.builder(
         scrollController: _assistantListController,
         padding: const EdgeInsets.fromLTRB(6, 6, 6, 8),
+        // 与上游 Kelivo 一致：不显示系统默认拖拽把手（否则每个条目都会
+        // 多出"≡"图标），拖拽手势由 itemBuilder 里自行包裹。
         buildDefaultDragHandles: false,
         itemCount: entries.length,
         proxyDecorator: (child, index, animation) => ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: Material(type: MaterialType.transparency, child: child),
         ),
+        // ⚠️ 临时诊断：开始拖拽时开始记录（5 秒窗口内的重建都会留痕）。
+        onReorderStart: (index) {
+          _dragDiagArmedAt = DateTime.now();
+          _dragDiagBuildSeq = 0;
+          _dragDiagLog('═══ 开始拖拽 index=$index');
+        },
+        onReorderEnd: (index) {
+          _dragDiagLog('═══ 松手，框架最终落点 index=$index');
+        },
         onReorderItem: (oldIndex, newIndex) async {
           final moved = entries[oldIndex];
           final movedAssistant = moved.assistant;
-          if (movedAssistant == null) return;
-          final insertionIndex = newIndex > oldIndex ? newIndex - 1 : newIndex;
-          if (insertionIndex < 0 || insertionIndex >= entries.length) return;
-          final target = entries[insertionIndex];
-          final movedGroup = moved.groupId;
-          final targetGroup = target.groupId;
-          if (movedGroup != targetGroup) return;
-          final subsetIds = [
-            for (final entry in entries)
-              if (entry.assistant != null && entry.groupId == movedGroup)
-                entry.assistant!.id,
-          ];
-          final oldSubsetIndex = subsetIds.indexOf(movedAssistant.id);
-          final targetAssistantId = target.assistant?.id;
-          if (oldSubsetIndex < 0 || targetAssistantId == null) return;
-          final targetSubsetIndex = subsetIds.indexOf(targetAssistantId);
-          if (targetSubsetIndex < 0) return;
-          await context.read<AssistantProvider>().reorderAssistantsWithin(
-            subsetIds: subsetIds,
-            oldIndex: oldSubsetIndex,
-            newIndex: targetSubsetIndex,
+          if (movedAssistant == null) {
+            _dragDiagLog('onReorderItem：拖的是分组标题，忽略');
+            return;
+          }
+          _dragDiagLog(
+            'onReorderItem old=$oldIndex new=$newIndex '
+            '拖动项=${_dragDiagEntryLabel(moved)}',
+          );
+          // newIndex 已经是"移除被拖项之后的插入位置"（框架内部换算过），
+          // 不能再自行减一 —— 那是旧版 onReorder 的语义，多减一次会让
+          // 向下拖动少走一格，拖一格时算成落在自己身上而完全无反应。
+          final drop = resolveAssistantDropTarget(
+            oldIndex: oldIndex,
+            newIndex: newIndex,
+            length: entries.length,
+          );
+          // 落点邻居是分组标题时，"标题上方的缝隙"应归属上一组的末尾，
+          // 否则拖到某组末尾会被误判成加入下一个组。
+          final placement = resolveAssistantDropPlacement(
+            neighborIndex: drop.neighborIndex,
+            insertAfter: drop.insertAfter,
+            isHeader: [for (final e in entries) e.isHeader],
+            groupIds: [for (final e in entries) e.groupId],
+            assistantIds: [for (final e in entries) e.assistant?.id],
+            // 未分组段（groupId == null）的成员不在 groupedByGroup 里，
+            // 必须单独从 ungrouped 取——否则"拖到组标题上方的缝隙"（=
+            // 未分组段末尾）会解析出空锚点，调用方跳过重排序，助手停在
+            // 原全局位置，落进未分组后显示在列表中间（跨组跳走真凶，
+            // 2026-09-08 拖拽日志实测确认）。
+            firstMemberOf: (groupId) => groupId == null
+                ? ungrouped.firstOrNull?.id
+                : groupedByGroup[groupId]?.firstOrNull?.id,
+            lastMemberOf: (groupId) => groupId == null
+                ? ungrouped.lastOrNull?.id
+                : groupedByGroup[groupId]?.lastOrNull?.id,
+          );
+          final assistantProvider = context.read<AssistantProvider>();
+          // 严禁在此"纠正"框架给出的落点：拖动动画已经把助手显示在最终
+          // 位置，任何与预览不一致的修正都会表现为松手后跳一格（曾引入
+          // "组尾统一"，把"插在某人之前"翻成"之后"，导致反复跳动）。
+          final crossGroup = placement.groupId != moved.groupId;
+          final targetGroupId = placement.groupId;
+          final anchor = placement.anchorId;
+          final targetGroupName = targetGroupId == null
+              ? '未分组'
+              : groupProvider.groups
+                    .where((g) => g.id == targetGroupId)
+                    .map((g) => g.name)
+                    .fold('', (a, b) => a + b);
+          _dragDiagLog(
+            '落点换算：邻居=${_dragDiagEntryLabel(entries[drop.neighborIndex])} '
+            '插邻居${drop.insertAfter ? '之后' : '之前'} → '
+            '目标组=$targetGroupName '
+            '锚点=${anchor == null ? '无' : entries.where((e) => e.assistant?.id == anchor).map(_dragDiagEntryLabel).join()} '
+            '插锚点${placement.insertAfter ? '之后' : '之前'} 跨组=$crossGroup',
+          );
+
+          // ⚠️ 关键：框架 `_dropCompleted()` 调用 onReorderItem 之后**不会
+          // 等待**它返回的 Future，而是立刻 setState 重建列表。因此换组与
+          // 挪位必须在本回调的同步部分就改完内存并发出通知；一旦推迟到
+          // await 之后，框架那次重建看到的仍是旧顺序——助手先弹回原位，
+          // 等落盘完成才跳到落点（跨组拖动"跳来跳去"的根因，且只影响
+          // 跨组：同组路径的通知本来就在落盘之前）。
+          if (crossGroup) {
+            // 折叠的分组不显示成员，助手投进去会像"凭空消失"：先展开它。
+            if (targetGroupId != null &&
+                groupProvider.isGroupCollapsed(targetGroupId)) {
+              _dragDiagLog('目标组是折叠的，先展开再落位');
+              unawaited(
+                groupProvider
+                    .setGroupCollapsed(targetGroupId, false)
+                    .then((_) => _dragDiagLog('折叠组展开+落盘完成')),
+              );
+            }
+            groupProvider.applyGroupAssignment(
+              movedAssistant.id,
+              targetGroupId,
+            );
+          }
+          if (anchor != null && anchor != movedAssistant.id) {
+            assistantProvider.applyOrderRelativeTo(
+              assistantId: movedAssistant.id,
+              targetId: anchor,
+              insertAfter: placement.insertAfter,
+            );
+          }
+          // 同一同步块内统一通知，与框架的 reset 合并为一次重建。
+          assistantProvider.notifyAssistantDirectoryChanged();
+          if (crossGroup) groupProvider.notifyAssignmentChanged();
+          _dragDiagLog(
+            '已改内存+已通知 directory=[${_dragDiagDirectory(assistantProvider, groupProvider)}]',
+          );
+
+          // 通知之后再落盘，持久化不再参与界面重建。
+          if (crossGroup) {
+            await groupProvider.persistAssignment();
+          }
+          await assistantProvider.persistAssistantOrder();
+          _dragDiagLog(
+            '落盘完成 directory=[${_dragDiagDirectory(assistantProvider, groupProvider)}]',
           );
         },
-        itemBuilder: (ctx, index) => KeyedSubtree(
-          key: ValueKey(
-            entries[index].assistant == null
-                ? 'assistant-group-${entries[index].groupId}'
-                : 'assistant-${entries[index].assistant!.id}',
-          ),
-          child: entries[index].assistant == null
-              ? buildEntry(ctx, index)
-              : ReorderableDragStartListener(
-                  index: index,
-                  child: buildEntry(ctx, index),
-                ),
-        ),
+        itemBuilder: (ctx, index) {
+          final entry = entries[index];
+          final tile = buildEntry(
+            ctx,
+            index,
+            // 触屏端把头像作为拖拽把手；桌面端不在这里包。
+            reorderHandle: !_pointerInteractions && !entry.isHeader,
+          );
+          if (entry.isHeader) {
+            // 分组标题不可拖。
+            return KeyedSubtree(
+              key: ValueKey('assistant-group-${entry.groupId}'),
+              child: tile,
+            );
+          }
+          return KeyedSubtree(
+            key: ValueKey('assistant-${entry.assistant!.id}'),
+            // 桌面端与上游一致：整条包 ReorderableDragStartListener，
+            // 无额外视觉变化，按住即可拖；短按切换、长按菜单、右键菜单
+            // 照常工作。
+            child: _pointerInteractions
+                ? ReorderableDragStartListener(index: index, child: tile)
+                : tile,
+          );
+        },
       );
     } else {
       list = ListView.builder(
@@ -4799,11 +4932,120 @@ class _DesktopSidebarTabsState extends State<_DesktopSidebarTabs> {
   }
 }
 
+/// 拖动落点的解析结果：被拖条目应插到 [neighborIndex] 这一项的前面或后面。
+class AssistantDropTarget {
+  const AssistantDropTarget({
+    required this.neighborIndex,
+    required this.insertAfter,
+  });
+
+  final int neighborIndex;
+  final bool insertAfter;
+}
+
+/// 把框架给出的插入索引换算成"落点邻居"在条目列表中的下标。
+///
+/// [newIndex] 是被拖项移除之后的插入位置（合法取值 0..length-1），
+/// 因此要先映射回仍然包含被拖项的条目列表；落到列表末尾时改为
+/// "插到最后一项之后"。
+AssistantDropTarget resolveAssistantDropTarget({
+  required int oldIndex,
+  required int newIndex,
+  required int length,
+}) {
+  if (length <= 0) {
+    return const AssistantDropTarget(neighborIndex: 0, insertAfter: false);
+  }
+  final insertIndex = newIndex.clamp(0, length - 1);
+  var neighborIndex = insertIndex >= oldIndex ? insertIndex + 1 : insertIndex;
+  var insertAfter = false;
+  if (neighborIndex > length - 1) {
+    neighborIndex = length - 1;
+    insertAfter = true;
+  }
+  return AssistantDropTarget(
+    neighborIndex: neighborIndex,
+    insertAfter: insertAfter,
+  );
+}
+
+/// 分组语义下的落位：应加入哪个组、贴住哪个助手、插在它前还是后。
+class AssistantDropPlacement {
+  const AssistantDropPlacement({
+    required this.groupId,
+    this.anchorId,
+    required this.insertAfter,
+  });
+
+  /// 松手后应归属的分组（null = 未分组区）。
+  final String? groupId;
+
+  /// 落位锚点助手；组内没有其他成员时为 null（仅换组即可）。
+  final String? anchorId;
+
+  final bool insertAfter;
+}
+
+/// 把"落点邻居"翻译成分组语义下的落位。
+///
+/// 规则（产品语义，2026-09-08 拍板）：
+/// - 邻居是助手：贴住它，insertAfter 决定前后，组归属取它所在组；
+/// - 邻居是分组标题且插在标题之后（含标题在列表最前的情形）：
+///   加入该组并排第一位；
+/// - 邻居是分组标题且插在标题之前：落在**上一组的末尾**（上一组是
+///   分组则加入那个组并排在最后；上面是未分组区则移出分组）；
+/// - 邻居是标题但上面没有任何助手条目（标题就是列表第一项）：
+///   按插到该组第一位处理。
+AssistantDropPlacement resolveAssistantDropPlacement({
+  required int neighborIndex,
+  required bool insertAfter,
+  required List<bool> isHeader,
+  required List<String?> groupIds,
+  required List<String?> assistantIds,
+  required String? Function(String? groupId) firstMemberOf,
+  required String? Function(String? groupId) lastMemberOf,
+}) {
+  final neighborIsHeader = isHeader[neighborIndex];
+  final neighborGroupId = groupIds[neighborIndex];
+  if (!neighborIsHeader) {
+    // 邻居是助手：贴住它。
+    return AssistantDropPlacement(
+      groupId: neighborGroupId,
+      anchorId: assistantIds[neighborIndex],
+      insertAfter: insertAfter,
+    );
+  }
+  if (insertAfter) {
+    // 插在分组标题之后：加入该组并排第一位。
+    return AssistantDropPlacement(
+      groupId: neighborGroupId,
+      anchorId: firstMemberOf(neighborGroupId),
+      insertAfter: false,
+    );
+  }
+  // 插在分组标题之前：归属上一段（上一个条目）。
+  for (int i = neighborIndex - 1; i >= 0; i--) {
+    if (isHeader[i]) continue;
+    final upperGroupId = groupIds[i];
+    return AssistantDropPlacement(
+      groupId: upperGroupId,
+      anchorId: lastMemberOf(upperGroupId),
+      insertAfter: true,
+    );
+  }
+  // 标题上方没有任何条目：按该组第一位处理。
+  return AssistantDropPlacement(
+    groupId: neighborGroupId,
+    anchorId: firstMemberOf(neighborGroupId),
+    insertAfter: false,
+  );
+}
+
 class _AssistantListEntry {
   _AssistantListEntry._({this.assistant, this.groupId, this.groupName});
 
-  _AssistantListEntry.assistant(AssistantListItem value)
-    : this._(assistant: value, groupId: null, groupName: null);
+  _AssistantListEntry.assistant(AssistantListItem value, {String? groupId})
+    : this._(assistant: value, groupId: groupId, groupName: null);
 
   _AssistantListEntry.header(AssistantGroup group)
     : this._(groupId: group.id, groupName: group.name);
@@ -4811,7 +5053,46 @@ class _AssistantListEntry {
   final AssistantListItem? assistant;
   final String? groupId;
   final String? groupName;
+
+  /// 是否为分组标题条目（标题条目不携带助手）。
+  bool get isHeader => assistant == null;
 }
+
+// ============================================================
+// 拖拽诊断日志（助手列表排序问题排查用）
+// 接入「运行时日志」开关（设置 → 显示 → 运行时日志）：开关关闭时
+// 完全不写，打开后随 FlutterLogger 写入应用数据目录 logs/ 并按天
+// 轮转（tag=Drag）。定位 2026-09-08"标题缝隙跳位"BUG 时立过功：
+// 拖动起止 index、落点换算、落位与每次界面重建的顺序都会留痕。
+// ============================================================
+DateTime? _dragDiagArmedAt;
+int _dragDiagBuildSeq = 0;
+
+void _dragDiagLog(String message) {
+  FlutterLogger.log(message, tag: 'Drag');
+}
+
+String _dragDiagShortId(String id) =>
+    id.length <= 4 ? id : id.substring(0, 4);
+
+String _dragDiagEntryLabel(_AssistantListEntry e) => e.isHeader
+    ? '【组:${e.groupName ?? e.groupId}】'
+    : '${e.assistant!.name}(${_dragDiagShortId(e.assistant!.id)})';
+
+String _dragDiagEntries(List<_AssistantListEntry> entries) =>
+    entries.map(_dragDiagEntryLabel).join(' ');
+
+String _dragDiagDirectory(
+  AssistantProvider ap,
+  AssistantGroupProvider gp,
+) => ap.assistantDirectory
+    .map(
+      (a) =>
+          '${a.name}(${_dragDiagShortId(a.id)},组:'
+          '${gp.groupOfAssistant(a.id) == null ? '无' : _dragDiagShortId(gp.groupOfAssistant(a.id)!)}'
+          ')',
+    )
+    .join(' ');
 
 // 桌面端：承载助手和主题列表的 TabBarView 区域
 class _DesktopTabViews extends StatelessWidget {

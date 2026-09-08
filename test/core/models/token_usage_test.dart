@@ -18,24 +18,25 @@ void main() {
       },
     );
 
-    test('accumulate adds token usage from separate tool rounds', () {
-      final total =
-          const TokenUsage(
-            promptTokens: 100,
-            completionTokens: 20,
-            cachedTokens: 5,
-          ).accumulate(
-            const TokenUsage(
-              promptTokens: 80,
-              completionTokens: 30,
-              cachedTokens: 2,
-            ),
-          );
+    test('merge keeps only the newest round, never the sum of rounds', () {
+      final latest = const TokenUsage(promptTokens: 100, completionTokens: 20)
+          .merge(const TokenUsage(promptTokens: 300, completionTokens: 40))
+          .merge(const TokenUsage(promptTokens: 500, completionTokens: 10));
 
-      expect(total.promptTokens, 180);
-      expect(total.completionTokens, 50);
-      expect(total.cachedTokens, 7);
-      expect(total.totalTokens, 230);
+      expect(latest.promptTokens, 500);
+      expect(latest.completionTokens, 10);
+      expect(latest.totalTokens, 510);
+    });
+
+    test('merge keeps the prior snapshot when a round reports nothing', () {
+      final kept = const TokenUsage(
+        promptTokens: 100,
+        completionTokens: 20,
+      ).merge(const TokenUsage());
+
+      expect(kept.promptTokens, 100);
+      expect(kept.completionTokens, 20);
+      expect(kept.totalTokens, 120);
     });
   });
 }

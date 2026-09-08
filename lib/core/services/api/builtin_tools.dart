@@ -184,8 +184,11 @@ abstract class BuiltInToolsHelper {
 
   static bool isClaudeBuiltInSearchSupportedModel(String? modelId) {
     final normalized = _normalizedModelId(modelId);
-    if (normalized.contains('mythos')) return true;
+    if (normalized.contains('mythos') || normalized.contains('fable')) {
+      return true;
+    }
     const supported = <String>{
+      'claude-fable-5-1',
       'claude-fable-5',
       'claude-opus-5',
       'claude-opus-4-8',
@@ -207,7 +210,8 @@ abstract class BuiltInToolsHelper {
   static bool isClaudeDynamicWebSearchSupportedModel(String? modelId) {
     final normalized = _normalizedModelId(modelId);
     return normalized.contains('mythos') ||
-        normalized == 'claude-fable-5' ||
+        normalized.contains('fable') ||
+        normalized == 'claude-fable-5-1' ||
         normalized == 'claude-opus-5' ||
         normalized == 'claude-opus-4-8' ||
         normalized == 'claude-opus-4-7' ||
@@ -219,8 +223,11 @@ abstract class BuiltInToolsHelper {
   /// Claude 官方服务端工具支持的模型集合。
   static bool isClaudeCodeExecutionSupportedModel(String? modelId) {
     final normalized = _normalizedModelId(modelId);
-    if (normalized.contains('mythos')) return true;
+    if (normalized.contains('mythos') || normalized.contains('fable')) {
+      return true;
+    }
     const supported = <String>{
+      'claude-fable-5-1',
       'claude-fable-5',
       'claude-opus-5',
       'claude-opus-4-8',
@@ -291,7 +298,8 @@ abstract class BuiltInToolsHelper {
         m.startsWith('o4-mini') ||
         m == 'o3' ||
         m.startsWith('o3-') ||
-        m.startsWith('gpt-5');
+        m.startsWith('gpt-5') ||
+        m.startsWith('gpt-6');
   }
 
   static bool isOpenRouterProvider(ProviderConfig? cfg) {
@@ -374,7 +382,46 @@ abstract class BuiltInToolsHelper {
           minSnapshot: '2025-07-15',
           extraExact: const <String>['qwen-turbo-latest'],
         ) ||
-        m == 'qwq-plus';
+        m == 'qwq-plus' ||
+        _isDashScopeQwen37SearchModel(m) ||
+        _isDashScopeQwen38SearchModel(m);
+  }
+
+  /// Qwen3.7 系列（Chat API）的搜索白名单。
+  static bool _isDashScopeQwen37SearchModel(String normalizedModelId) {
+    return _matchesExactOrSnapshot(
+          normalizedModelId,
+          alias: 'qwen3.7-max',
+          minSnapshot: '2026-05-17',
+          extraExact: const <String>['qwen3.7-max-preview'],
+        ) ||
+        _matchesExactOrSnapshot(
+          normalizedModelId,
+          alias: 'qwen3.7-plus',
+          minSnapshot: '2026-05-26',
+        ) ||
+        _matchesExactOrSnapshot(
+          normalizedModelId,
+          alias: 'qwen3.7-flash',
+          minSnapshot: '2026-07-15',
+        );
+  }
+
+  /// Qwen3.8 系列（Chat API）的搜索白名单。
+  static bool _isDashScopeQwen38SearchModel(String normalizedModelId) {
+    return _matchesExactOrSnapshot(
+          normalizedModelId,
+          alias: 'qwen3.8-max',
+          minSnapshot: '2026-08-02',
+          extraExact: const <String>['qwen3.8-max-preview', 'qwen3.8-max-0902'],
+        ) ||
+        _matchesExactOrSnapshot(
+          normalizedModelId,
+          alias: 'qwen3.8-flash',
+          minSnapshot: '2026-08-26',
+        ) ||
+        normalizedModelId == 'qwen3.8-2.4t-a95b' ||
+        normalizedModelId == 'qwen3.8-27b';
   }
 
   static bool isDashScopeResponsesBuiltInSearchSupportedModel(String? modelId) {
@@ -405,21 +452,9 @@ abstract class BuiltInToolsHelper {
           minSnapshot: '2026-01-23',
         ) ||
         // 官方 Responses web_search 白名单新增：
-        // Qwen3.7 Max / Plus。请勿猜测式启用 3.7 Flash。
-        _matchesExactOrSnapshot(
-          m,
-          alias: 'qwen3.7-max',
-          minSnapshot: '2026-05-17',
-          extraExact: const <String>['qwen3.7-max-preview'],
-        ) ||
-        _matchesExactOrSnapshot(
-          m,
-          alias: 'qwen3.7-plus',
-          minSnapshot: '2026-05-26',
-        ) ||
-        // Token Plan / Responses 仅用于预览 SKU。普通的
-        // `qwen3.8-max` 在未进行 Key 验证时有意不开放。
-        m == 'qwen3.8-max-preview';
+        // Qwen3.7 / Qwen3.8 系列。
+        _isDashScopeQwen37SearchModel(m) ||
+        _isDashScopeQwen38SearchModel(m);
   }
 
   static bool isArkProvider(ProviderConfig? cfg) {

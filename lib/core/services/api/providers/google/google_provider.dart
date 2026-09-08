@@ -136,7 +136,15 @@ Map<String, dynamic> _googleThinkingConfig(
 ) {
   final off = isOff(budget);
   if (_isGemma4Model(upstreamModelId)) {
-    if (off) return const <String, dynamic>{};
+    // 官方开关是 thinkingLevel high/minimal。省略配置等于保持思考开启；
+    // 关闭必须发送 minimal。
+    // https://ai.google.dev/gemma/docs/core/gemma_on_gemini_api
+    if (off) {
+      return const <String, dynamic>{
+        'includeThoughts': false,
+        'thinkingLevel': 'minimal',
+      };
+    }
     return const <String, dynamic>{
       'includeThoughts': true,
       'thinkingLevel': 'high',
@@ -398,6 +406,7 @@ Stream<StreamChunk> sendGoogleStreamEvents(
   Map<String, dynamic>? extraBody,
   bool stream = true,
   bool skipImageParsing = false,
+  StreamRoundRunner? retryRound,
 }) async* {
   final upstreamModelId = apiModelId(config, modelId);
   final bool isGemini3 = upstreamModelId.toLowerCase().contains('gemini-3');
@@ -683,6 +692,7 @@ Stream<StreamChunk> sendGoogleStreamEvents(
     var lastText = '';
 
     yield* runProviderToolRounds(
+      retryRound: retryRound,
       sendRound: () async* {
         pendingCalls = [];
         lastParts = [];
@@ -705,7 +715,7 @@ Stream<StreamChunk> sendGoogleStreamEvents(
           if (u != null) {
             final prompt = (u['promptTokenCount'] ?? 0) as int? ?? 0;
             final completion = (u['candidatesTokenCount'] ?? 0) as int? ?? 0;
-            totalUsage = (totalUsage ?? const TokenUsage()).accumulate(
+            totalUsage = (totalUsage ?? const TokenUsage()).merge(
               TokenUsage(
                 promptTokens: prompt,
                 completionTokens: completion,
@@ -1108,6 +1118,7 @@ Stream<StreamChunk> sendGoogleStreamEvents(
   var retryMalformed = false;
 
   yield* runProviderToolRounds(
+    retryRound: retryRound,
     sendRound: () async* {
       pendingCalls = [];
       lastRoundCalls = [];

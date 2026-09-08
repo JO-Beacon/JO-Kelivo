@@ -1326,6 +1326,7 @@ class HomeViewModel extends ChangeNotifier {
           .replaceAll('{content}', content)
           .replaceAll('{locale}', locale);
       return ChatApiService.generateText(
+        conversationId: convo.id,
         config: cfg,
         modelId: mdlId,
         prompt: prompt,
@@ -1588,6 +1589,7 @@ class HomeViewModel extends ChangeNotifier {
 
     try {
       final title = (await ChatApiService.generateText(
+        conversationId: convo.id,
         config: cfg,
         modelId: titleModelId,
         prompt: prompt,
@@ -1728,6 +1730,7 @@ class HomeViewModel extends ChangeNotifier {
 
     try {
       final summary = (await ChatApiService.generateText(
+        conversationId: convo.id,
         config: cfg,
         modelId: mdlId,
         prompt: prompt,
@@ -1860,6 +1863,7 @@ class HomeViewModel extends ChangeNotifier {
     try {
       await _chatService.clearConversationSuggestions(conversationId);
       final suggestions = await _suggestionService.generate(
+        conversationId: conversationId,
         settings: settings,
         providerKey: provKey,
         modelId: mdlId,

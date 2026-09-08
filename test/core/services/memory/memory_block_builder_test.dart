@@ -356,7 +356,7 @@ void main() {
   });
 
   group('MemoryBlockBuilder injection prefixes', () {
-    test('full and update prefix shapes match §7.5', () {
+    test('full prefix shape matches §7.5', () {
       const profile = '<user_profile/>\n';
       const memory =
           '<user_memory type="identity"/>\n'
@@ -371,18 +371,6 @@ void main() {
           MemoryPromptLang.zh,
         ),
         '${MemoryPrompts.introFullZh}\n$profile$memory\n',
-      );
-      expect(
-        MemoryBlockBuilder.buildUpdatePrefix(
-          profile,
-          memory,
-          MemoryPromptLang.en,
-        ),
-        '${MemoryPrompts.introUpdateEn}\n'
-        '<user_memory_update>\n'
-        '$profile$memory'
-        '</user_memory_update>\n'
-        '\n',
       );
     });
   });
@@ -408,19 +396,19 @@ void main() {
       expect(split.rest, '你好');
     });
 
-    test('splits an update snapshot from the user turn', () {
-      final prefix = MemoryBlockBuilder.buildUpdatePrefix(
-        MemoryBlockBuilder.buildProfileBlock(
-          fields: const [],
-          lang: MemoryPromptLang.en,
-        ),
-        MemoryBlockBuilder.buildMemoryBlock(
-          visible: const [],
-          totalByType: const {},
-          lang: MemoryPromptLang.en,
-        ),
-        MemoryPromptLang.en,
-      );
+    test('splits a legacy update snapshot from the user turn', () {
+      // 更新块不再写出，但早期版本冻结的会话仍会重放它们，
+      // 必须保持可剥离。
+      final prefix =
+          '${MemoryPrompts.introUpdateEn}\n'
+          '<user_memory_update>\n'
+          '<user_profile/>\n'
+          '<user_memory type="identity"/>\n'
+          '<user_memory type="workflow"/>\n'
+          '<user_memory type="voice"/>\n'
+          '<user_memory type="instruction"/>\n'
+          '</user_memory_update>\n'
+          '\n';
       final split = MemoryBlockBuilder.splitInjectedPrefix('${prefix}hello');
       expect(split, isNotNull);
       expect(split!.kind, 'update');

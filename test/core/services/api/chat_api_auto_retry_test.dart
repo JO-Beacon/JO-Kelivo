@@ -201,6 +201,101 @@ void main() {
     expect(requests, 1);
   });
 
+  test(
+    'events stream retries a tool follow-up without rerunning the tool',
+    () async {
+      AutoRetryConfig.current = _fastRetry;
+      var requests = 0;
+      var toolCalls = 0;
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      server.listen((request) async {
+        requests++;
+        await request.drain();
+        if (requests == 2) {
+          // The tool follow-up round is rate limited before any output.
+          request.response.statusCode = HttpStatus.tooManyRequests;
+          request.response.write('rate limit');
+          await request.response.close();
+          return;
+        }
+
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType(
+          'text',
+          'event-stream',
+          charset: 'utf-8',
+        );
+        final data = requests == 1
+            ? {
+                'choices': [
+                  {
+                    'index': 0,
+                    'delta': {
+                      'role': 'assistant',
+                      'tool_calls': [
+                        {
+                          'index': 0,
+                          'id': 'call_1',
+                          'type': 'function',
+                          'function': {'name': 'get_time', 'arguments': '{}'},
+                        },
+                      ],
+                    },
+                    'finish_reason': 'tool_calls',
+                  },
+                ],
+              }
+            : {
+                'choices': [
+                  {
+                    'index': 0,
+                    'delta': {'content': 'recovered'},
+                    'finish_reason': 'stop',
+                  },
+                ],
+              };
+        request.response.write('data: ${jsonEncode(data)}\n\n');
+        request.response.write('data: [DONE]\n\n');
+        await request.response.close();
+      });
+      final baseUrl = 'http://${server.address.address}:${server.port}/v1';
+
+      final events = await ChatApiService.sendMessageStreamEvents(
+        config: _config(baseUrl),
+        modelId: 'gpt-auto-retry-test',
+        messages: const [
+          {'role': 'user', 'content': 'what time is it?'},
+        ],
+        tools: const [
+          {
+            'type': 'function',
+            'function': {
+              'name': 'get_time',
+              'description': 'Get the current time',
+              'parameters': {
+                'type': 'object',
+                'properties': <String, dynamic>{},
+              },
+            },
+          },
+        ],
+        onToolCall: (name, args, {toolCallId}) async {
+          toolCalls++;
+          return '12:34';
+        },
+      ).toList();
+
+      expect(requests, 3);
+      expect(toolCalls, 1);
+      expect(
+        events.whereType<TextDelta>().map((chunk) => chunk.text).join(),
+        'recovered',
+      );
+      expect(events.whereType<Finish>(), hasLength(1));
+    },
+  );
+
   test('cancelRequest interrupts a legacy stream retry delay', () async {
     const requestId = 'legacy-auto-retry-cancel-test';
     AutoRetryConfig.current = const AutoRetryOptions(

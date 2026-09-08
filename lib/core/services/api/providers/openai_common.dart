@@ -167,6 +167,20 @@ void _applyCompatibleResponsesReasoning(
 }) {
   if (config.useResponseApi != true) return;
 
+  final poolsideInfo = _OpenAIProviderInfo(
+    host: Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '',
+    providerId: config.id.toLowerCase(),
+    upstreamModelId: upstreamModelId,
+  );
+  if (poolsideInfo.usesPoolsideThinking && !poolsideInfo.isOpenRouter) {
+    _applyPoolsideThinkingKnob(
+      body,
+      isReasoning: isReasoning,
+      thinkingBudget: thinkingBudget,
+    );
+    return;
+  }
+
   if (BuiltInToolsHelper.isMimoProvider(config)) {
     body.remove('reasoning');
     if (!isReasoning) return;
@@ -209,11 +223,35 @@ void _applyCompatibleResponsesReasoning(
   final forceThinkingForQwen3Max =
       builtInSearchEnabled &&
       upstreamModelId.toLowerCase().startsWith('qwen3-max');
+  if (_isDashScopeThinkingOnlyModel(upstreamModelId)) {
+    body.remove('enable_thinking');
+    return;
+  }
   body['enable_thinking'] = forceThinkingForQwen3Max || !_isOff(thinkingBudget);
 }
 
-bool _isKimiK25Model(String upstreamModelId) {
-  return upstreamModelId.toLowerCase().contains('kimi-k2.5');
+bool _isDashScopeThinkingOnlyModel(String modelId) {
+  final lower = modelId.trim().toLowerCase();
+  if (lower.contains('qwen3.7-max-preview') ||
+      lower.contains('qwen3.7-max-2026-05-17')) {
+    return true;
+  }
+  if (RegExp(r'(^|[/_:@])qwq(?:$|[-.])').hasMatch(lower)) return true;
+  if (RegExp(r'(^|[/_:@])deepseek-r1(?:$|[-.])').hasMatch(lower)) {
+    return true;
+  }
+  if (lower.contains('kimi-k2.7-code') || lower.contains('kimi-k2-thinking')) {
+    return true;
+  }
+  if (RegExp(r'(^|[/_:@])minimax-m2\.(?:1|5)(?:$|[-.])').hasMatch(lower)) {
+    return true;
+  }
+  return lower.contains('-thinking');
+}
+
+bool _isKimiHybridThinkingModel(String upstreamModelId) {
+  final lower = upstreamModelId.toLowerCase();
+  return lower.contains('kimi-k2.5') || lower.contains('kimi-k2.6');
 }
 
 bool _isKimiK3Model(String upstreamModelId) {
@@ -319,11 +357,13 @@ void _normalizeMoonshotKimiChatBody(
     return;
   }
 
-  if (_isKimiK25Model(upstreamModelId)) {
+  if (_isKimiHybridThinkingModel(upstreamModelId)) {
     body['thinking'] = {
       'type': _isOff(thinkingBudget) ? 'disabled' : 'enabled',
     };
-    _removeMoonshotKimiUnsupportedSamplingParams(body);
+    if (upstreamModelId.toLowerCase().contains('kimi-k2.5')) {
+      _removeMoonshotKimiUnsupportedSamplingParams(body);
+    }
     return;
   }
 
@@ -1286,6 +1326,16 @@ class _OpenAIProviderInfo {
       host.contains('xiaomimimo') ||
       upstreamModelId.toLowerCase().startsWith('mimo-') ||
       upstreamModelId.toLowerCase().contains('/mimo-');
+  bool get isLaguna {
+    final id = upstreamModelId.toLowerCase();
+    return id.startsWith('laguna-') || id.contains('/laguna-');
+  }
+
+  bool get isPoolsideHost =>
+      host == 'poolside.ai' ||
+      host == 'inference.poolside.ai' ||
+      host.endsWith('.poolside.ai');
+  bool get usesPoolsideThinking => isLaguna || isPoolsideHost;
   bool get isSiliconFlow =>
       providerId.contains('siliconflow') || host.contains('siliconflow');
   bool get isAzureOpenAI => host.contains('openai.azure.com');
@@ -1314,9 +1364,14 @@ class _OpenAIProviderInfo {
   bool get isKimiThinkingModel => _isKimiThinkingModel(upstreamModelId);
 
   bool get needsReasoningEcho =>
-      isDeepSeek || isMimo || isZhipu || isKimiThinkingModel;
+      usesPoolsideThinking ||
+      isDeepSeek ||
+      isMimo ||
+      isZhipu ||
+      isKimiThinkingModel;
   _ReasoningContentReplayPolicy get reasoningContentReplayPolicy {
-    if (_isKimiPreservedThinkingModel(upstreamModelId)) {
+    if (usesPoolsideThinking ||
+        _isKimiPreservedThinkingModel(upstreamModelId)) {
       return _ReasoningContentReplayPolicy.all;
     }
     if (needsReasoningEcho) {
@@ -1349,6 +1404,37 @@ Map<String, dynamic> _openAIToolCallForRequest(
   return copy;
 }
 
+void _applyPoolsideThinkingKnob(
+  Map<String, dynamic> body, {
+  required bool isReasoning,
+  int? thinkingBudget,
+}) {
+  final enable = isReasoning && !_isOff(thinkingBudget);
+  final existing = body['chat_template_kwargs'];
+  final kwargs = <String, dynamic>{
+    if (existing is Map)
+      ...existing.map((key, value) => MapEntry(key.toString(), value)),
+  };
+  kwargs.putIfAbsent('enable_thinking', () => enable);
+  body['chat_template_kwargs'] = kwargs;
+  body.remove('reasoning_effort');
+  body.remove('reasoning');
+}
+
+void _applyPoolsideThinkingKnobIfNeeded(
+  Map<String, dynamic> body, {
+  required _OpenAIProviderInfo info,
+  required bool isReasoning,
+  int? thinkingBudget,
+}) {
+  if (!info.usesPoolsideThinking || info.isOpenRouter) return;
+  _applyPoolsideThinkingKnob(
+    body,
+    isReasoning: isReasoning,
+    thinkingBudget: thinkingBudget,
+  );
+}
+
 void _applyVendorReasoningKnobs(
   Map<String, dynamic> body, {
   required _OpenAIProviderInfo info,
@@ -1378,7 +1464,11 @@ void _applyVendorReasoningKnobs(
     }
   } else if (info.isDashScope) {
     if (isReasoning) {
-      body['enable_thinking'] = !off;
+      if (_isDashScopeThinkingOnlyModel(info.upstreamModelId)) {
+        body.remove('enable_thinking');
+      } else {
+        body['enable_thinking'] = !off;
+      }
       if (!off && thinkingBudget != null && thinkingBudget > 0) {
         body['thinking_budget'] = thinkingBudget;
       } else {
@@ -1389,13 +1479,56 @@ void _applyVendorReasoningKnobs(
       body.remove('thinking_budget');
     }
     body.remove('reasoning_effort');
+  } else if (info.usesPoolsideThinking) {
+    _applyPoolsideThinkingKnob(
+      body,
+      isReasoning: isReasoning,
+      thinkingBudget: thinkingBudget,
+    );
   } else if (info.isZhipu || info.isMimo) {
-    if (isReasoning) {
+    if (isGlm53FamilyModel(info.upstreamModelId)) {
+      // GLM-5.3 / 5.3-Flash 常开思考。disabled 会返回 400；off 映射为 low。
+      body['thinking'] = const <String, dynamic>{'type': 'enabled'};
+      if (isReasoning) {
+        final effort = _openAIEffortForBudget(
+          thinkingBudget,
+          info.upstreamModelId,
+        );
+        if (effort == 'auto') {
+          body.remove('reasoning_effort');
+        } else {
+          body['reasoning_effort'] = effort;
+        }
+      } else {
+        body.remove('reasoning_effort');
+      }
+    } else if (isGlm52FamilyModel(info.upstreamModelId)) {
+      if (isReasoning) {
+        body['thinking'] = {'type': off ? 'disabled' : 'enabled'};
+        if (off) {
+          body.remove('reasoning_effort');
+        } else {
+          final effort = _openAIEffortForBudget(
+            thinkingBudget,
+            info.upstreamModelId,
+          );
+          if (effort == 'auto') {
+            body.remove('reasoning_effort');
+          } else {
+            body['reasoning_effort'] = effort;
+          }
+        }
+      } else {
+        body.remove('thinking');
+        body.remove('reasoning_effort');
+      }
+    } else if (isReasoning) {
       body['thinking'] = {'type': off ? 'disabled' : 'enabled'};
+      body.remove('reasoning_effort');
     } else {
       body.remove('thinking');
+      body.remove('reasoning_effort');
     }
-    body.remove('reasoning_effort');
   } else if (info.isVolc) {
     if (isReasoning) {
       body['thinking'] = {'type': off ? 'disabled' : 'enabled'};
@@ -2062,6 +2195,12 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
   if (extraBodyCfg.isNotEmpty) {
     body.addAll(extraBodyCfg);
   }
+  _applyPoolsideThinkingKnobIfNeeded(
+    body,
+    info: info,
+    isReasoning: isReasoning,
+    thinkingBudget: thinkingBudget,
+  );
   _sanitizeOpenAIGpt5SamplingParams(
     body,
     upstreamModelId,
@@ -2192,7 +2331,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               cachedTokens: cached,
               totalTokens: prompt + completion,
             );
-            aggUsage = (aggUsage ?? const TokenUsage()).accumulate(round);
+            aggUsage = (aggUsage ?? const TokenUsage()).merge(round);
           }
         } catch (_) {}
 
@@ -2565,6 +2704,12 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               body2.addAll(extraBodyCfg);
             }
 
+            _applyPoolsideThinkingKnobIfNeeded(
+              body2,
+              info: info,
+              isReasoning: isReasoning,
+              thinkingBudget: thinkingBudget,
+            );
             _sanitizeOpenAIGpt5SamplingParams(
               body2,
               upstreamModelId,
@@ -2802,7 +2947,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             }
 
             if (followUpUsage != null) {
-              usage = (usage ?? const TokenUsage()).accumulate(followUpUsage);
+              usage = (usage ?? const TokenUsage()).merge(followUpUsage);
               totalTokens = usage.totalTokens;
             }
 
@@ -3452,9 +3597,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 }
 
                 if (followUpUsage != null) {
-                  usage = (usage ?? const TokenUsage()).accumulate(
-                    followUpUsage,
-                  );
+                  usage = (usage ?? const TokenUsage()).merge(followUpUsage);
                   totalTokens = usage.totalTokens;
                 }
                 if (respCalls2.isEmpty) {
@@ -3986,6 +4129,12 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             if (extraBodyCfg.isNotEmpty) {
               body2.addAll(extraBodyCfg);
             }
+            _applyPoolsideThinkingKnobIfNeeded(
+              body2,
+              info: info,
+              isReasoning: isReasoning,
+              thinkingBudget: thinkingBudget,
+            );
             _sanitizeOpenAIGpt5SamplingParams(
               body2,
               upstreamModelId,
@@ -4262,7 +4411,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               }
             }
             if (followUpUsage != null) {
-              usage = (usage ?? const TokenUsage()).accumulate(followUpUsage);
+              usage = (usage ?? const TokenUsage()).merge(followUpUsage);
               totalTokens = usage.totalTokens;
             }
             if (finishReason2 == 'tool_calls' || toolAcc2.isNotEmpty) {
@@ -4523,6 +4672,12 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 if (extraBodyCfg.isNotEmpty) {
                   body2.addAll(extraBodyCfg);
                 }
+                _applyPoolsideThinkingKnobIfNeeded(
+                  body2,
+                  info: info,
+                  isReasoning: isReasoning,
+                  thinkingBudget: thinkingBudget,
+                );
                 _sanitizeOpenAIGpt5SamplingParams(
                   body2,
                   upstreamModelId,
@@ -4776,9 +4931,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   }
                 }
                 if (followUpUsage != null) {
-                  usage = (usage ?? const TokenUsage()).accumulate(
-                    followUpUsage,
-                  );
+                  usage = (usage ?? const TokenUsage()).merge(followUpUsage);
                   totalTokens = usage.totalTokens;
                 }
                 if (finishReason2 == 'tool_calls' || toolAcc2.isNotEmpty) {

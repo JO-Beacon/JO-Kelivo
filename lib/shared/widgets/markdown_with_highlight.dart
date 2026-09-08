@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:gpt_markdown/custom_widgets/markdown_config.dart'
     show GptMarkdownConfig;
+import 'package:gpt_markdown/custom_widgets/selectable_adapter.dart';
 import 'package:flutter_highlight/themes/github.dart';
 import 'package:flutter_highlight/themes/atom-one-dark-reasonable.dart';
 import 'package:flutter/rendering.dart';
@@ -191,8 +192,10 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
       return value;
     }
 
+    // Keep the same block tree from the first streaming frame through
+    // completion, so growing replies do not dispose interactive children.
     final useIncrementalBlocks =
-        widget.streaming && sanitizedText.length >= 512;
+        widget.streaming || _incrementalDocument.blocks.isNotEmpty;
     final sourceBlocks = useIncrementalBlocks
         ? _incrementalDocument.update(sanitizedText)
         : const <IncrementalMarkdownBlock>[];
@@ -607,6 +610,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
     // the block renderer as well so a paused paragraph break cannot add height.
     final blockContents = <String>[];
     final blockStarts = <int>[];
+    final blockSources = <String>[];
     if (useIncrementalBlocks) {
       for (final block in sourceBlocks) {
         final content = normalize(
@@ -616,6 +620,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
         if (_isBlank(content)) continue;
         blockContents.add(content);
         blockStarts.add(block.start);
+        blockSources.add(block.text);
       }
     }
     final markdownWidget = useIncrementalBlocks
@@ -630,6 +635,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
                   _MarkdownBlockSeparator(style: baseTextStyle),
                 _CachedMarkdownBlock(
                   key: ValueKey('markdown-source-block-${blockStarts[i]}'),
+                  source: blockSources[i],
                   content: blockContents[i],
                   signature: themeSignature,
                   builder: buildMarkdown,
@@ -638,6 +644,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
             ],
           )
         : _CachedMarkdownBlock(
+            source: sanitizedText,
             content: normalized!,
             signature: themeSignature,
             builder: buildMarkdown,
@@ -690,11 +697,13 @@ typedef _MarkdownBlockBuilder = Widget Function(String content, Key key);
 class _CachedMarkdownBlock extends StatefulWidget {
   const _CachedMarkdownBlock({
     super.key,
+    required this.source,
     required this.content,
     required this.signature,
     required this.builder,
   });
 
+  final String source;
   final String content;
   final String signature;
   final _MarkdownBlockBuilder builder;
@@ -711,7 +720,8 @@ class _CachedMarkdownBlockState extends State<_CachedMarkdownBlock> {
   @override
   void didUpdateWidget(covariant _CachedMarkdownBlock oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.content != widget.content ||
+    if (oldWidget.source != widget.source ||
+        oldWidget.content != widget.content ||
         oldWidget.signature != widget.signature) {
       _rendered = null;
     }
@@ -731,7 +741,10 @@ class _CachedMarkdownBlockState extends State<_CachedMarkdownBlock> {
   Widget build(BuildContext context) {
     return _rendered ??= widget.builder(
       widget.content,
-      _parseIdentity(widget.content),
+      // Synthetic table cells and math delimiters change as tokens arrive;
+      // only a replacement of the source should reset interactive state.
+      // The splitter removes trailing newlines when a block becomes stable.
+      _parseIdentity(widget.source.trimRight()),
     );
   }
 }
@@ -831,12 +844,17 @@ class _MarkdownBlockSeparator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SelectionContainer.disabled(
-      child: Text.rich(
-        const TextSpan(text: ' '),
-        style: (style ?? const TextStyle()).copyWith(
-          fontSize: style?.fontSize ?? 14,
-          height: 1.15,
+    // Copy the paragraph break instead of the invisible space used to
+    // measure it.
+    return SelectableAdapter(
+      selectedText: '\n\n',
+      child: SelectionContainer.disabled(
+        child: Text.rich(
+          const TextSpan(text: ' '),
+          style: (style ?? const TextStyle()).copyWith(
+            fontSize: style?.fontSize ?? 14,
+            height: 1.15,
+          ),
         ),
       ),
     );
@@ -850,9 +868,11 @@ class _MarkdownBlockColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Let loose-width bubbles hug their content; tight parent constraints
+    // still make the column fill the available width.
     final column = Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: children,
     );
     return LayoutBuilder(
@@ -860,9 +880,10 @@ class _MarkdownBlockColumn extends StatelessWidget {
         if (!constraints.hasBoundedHeight) return column;
         return OverflowBox(
           alignment: Alignment.topCenter,
+          fit: OverflowBoxFit.deferToChild,
           minHeight: 0,
           maxHeight: double.infinity,
-          child: SizedBox(width: constraints.maxWidth, child: column),
+          child: column,
         );
       },
     );

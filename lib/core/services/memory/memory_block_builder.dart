@@ -126,19 +126,10 @@ abstract final class MemoryBlockBuilder {
         '$profileBlock$memoryBlock\n';
   }
 
-  static String buildUpdatePrefix(
-    String profileBlock,
-    String memoryBlock,
-    MemoryPromptLang lang,
-  ) {
-    return '${MemoryPrompts.introUpdateFor(lang)}\n'
-        '<user_memory_update>\n'
-        '$profileBlock$memoryBlock'
-        '</user_memory_update>\n'
-        '\n';
-  }
-
   /// [payload] 开头处 §7.6 前缀的独占结束索引，如果没有则为 null。
+  ///
+  /// 注入只会写出完整快照，但早期版本冻结的会话会带有
+  /// `<user_memory_update>` 块，仍必须能识别，以便在被取代时剥离。
   static int? endOfInjectedPrefix(String payload) {
     if (payload.isEmpty) return null;
     return _endOfUpdatePrefix(payload) ?? _endOfFullPrefix(payload);

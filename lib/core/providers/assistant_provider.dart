@@ -841,6 +841,73 @@ class AssistantProvider extends ChangeNotifier {
     await _persistAssistantOrder();
   }
 
+  /// 把助手移动到 [targetId] 的前面或后面（作用于全局顺序）。
+  ///
+  /// 用于跨分组拖动：改变归属之后仍需"拖到谁旁边就排谁旁边"，
+  /// 而 [reorderAssistantsWithin] 只能在同一个子集内表达相对位置。
+  ///
+  /// [notify] 为 false 时不触发界面刷新，供拖拽落位链路把"换组 +
+  /// 挪位"合并成一次重建（避免先闪现组尾、再跳到落点的两段式跳动）。
+  Future<void> moveAssistantRelativeTo({
+    required String assistantId,
+    required String targetId,
+    required bool insertAfter,
+    bool notify = true,
+  }) async {
+    if (assistantId == targetId) return;
+    final fromIndex = _assistants.indexWhere((a) => a.id == assistantId);
+    if (fromIndex < 0) return;
+    final targetBeforeMove = _assistants.indexWhere((a) => a.id == targetId);
+    if (targetBeforeMove < 0) return;
+
+    final moved = _assistants.removeAt(fromIndex);
+    final targetIndex = _assistants.indexWhere((a) => a.id == targetId);
+    if (targetIndex < 0) {
+      _assistants.insert(fromIndex, moved);
+      return;
+    }
+    _assistants.insert(insertAfter ? targetIndex + 1 : targetIndex, moved);
+    _rebuildAssistantIndex();
+    _rebuildAssistantDirectory();
+
+    if (notify) notifyListeners();
+    await _persistAssistantOrder();
+  }
+
+  /// 拖拽落位链路在静默（notify: false）修改后手动触发一次刷新。
+  void notifyAssistantDirectoryChanged() => notifyListeners();
+
+  /// 只更新内存中的顺序：不通知、不落盘。
+  ///
+  /// 拖拽落位专用。`ReorderableListView` 的 `_dropCompleted()` 调用
+  /// `onReorderItem` 后**不会等待**它返回的 Future，而是立刻 `setState`
+  /// 重建列表。因此顺序必须在回调的同步部分就改好并通知，否则框架那次
+  /// 重建用的是旧顺序——助手先弹回原位，等落盘完成才跳到落点。
+  void applyOrderRelativeTo({
+    required String assistantId,
+    required String targetId,
+    required bool insertAfter,
+  }) {
+    if (assistantId == targetId) return;
+    final fromIndex = _assistants.indexWhere((a) => a.id == assistantId);
+    if (fromIndex < 0) return;
+    final targetBeforeMove = _assistants.indexWhere((a) => a.id == targetId);
+    if (targetBeforeMove < 0) return;
+
+    final moved = _assistants.removeAt(fromIndex);
+    final targetIndex = _assistants.indexWhere((a) => a.id == targetId);
+    if (targetIndex < 0) {
+      _assistants.insert(fromIndex, moved);
+      return;
+    }
+    _assistants.insert(insertAfter ? targetIndex + 1 : targetIndex, moved);
+    _rebuildAssistantIndex();
+    _rebuildAssistantDirectory();
+  }
+
+  /// 落盘当前顺序，与 [applyOrderRelativeTo] 配套使用。
+  Future<void> persistAssistantOrder() => _persistAssistantOrder();
+
   // 仅在子集内重新排序（例如属于某个标签组或未分组的助手）。
   // subsetIds 定义集合与顺序边界；其他助手保持原位。
   Future<void> reorderAssistantsWithin({

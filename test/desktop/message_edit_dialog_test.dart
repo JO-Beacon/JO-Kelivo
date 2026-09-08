@@ -226,4 +226,162 @@ void main() {
     expect(completed, isTrue);
     expect(result, isNull);
   });
+
+  testWidgets('long text part scrolls inside its own field', (tester) async {
+    tester.view.physicalSize = const Size(1100, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final longText = List<String>.generate(
+      60,
+      (i) => 'line $i abcdef',
+    ).join('\n');
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create: (_) => SettingsProvider(createBusinessTestPreferences()),
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () => showMessageEditDesktopDialog(
+                  context,
+                  message: ChatMessage(
+                    role: 'assistant',
+                    conversationId: 'conversation',
+                    parts: <MessagePart>[TextPart(longText)],
+                  ),
+                ),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    // 编辑框必须有高度上限：否则它会把整段内容撑开、自己永远不可滚，
+    // 滚轮只能去滚外层容器，拖选时选区就会跑偏。
+    final fieldSize = tester.getSize(find.byType(TextField).first);
+    expect(fieldSize.height, lessThan(400));
+
+    final innerScrollable = find.descendant(
+      of: find.byType(TextField).first,
+      matching: find.byType(Scrollable),
+    );
+    expect(innerScrollable, findsWidgets);
+    final position = tester.state<ScrollableState>(innerScrollable.first).position;
+    expect(position.maxScrollExtent, greaterThan(0));
+  });
+
+  testWidgets('expand button edits a text part in a large dialog', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1100, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    MessageEditResult? result;
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create: (_) => SettingsProvider(createBusinessTestPreferences()),
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () async {
+                  result = await showMessageEditDesktopDialog(
+                    context,
+                    message: ChatMessage(
+                      role: 'assistant',
+                      conversationId: 'conversation',
+                      parts: const <MessagePart>[TextPart('before')],
+                    ),
+                  );
+                },
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Lucide.Maximize2), findsOneWidget);
+    await tester.tap(find.byIcon(Lucide.Maximize2));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).last, 'expanded body');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    final controller = tester
+        .widget<TextField>(find.byType(TextField).first)
+        .controller!;
+    expect(controller.text, 'expanded body');
+
+    await tester.tap(find.text('Save as New Branch'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(result, isNotNull);
+    expect(result!.content, 'expanded body');
+  });
+
+  testWidgets('read-only parts can be expanded without a save button', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1100, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create: (_) => SettingsProvider(createBusinessTestPreferences()),
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () => showMessageEditDesktopDialog(
+                  context,
+                  message: ChatMessage(
+                    role: 'assistant',
+                    conversationId: 'conversation',
+                    parts: const <MessagePart>[ReasoningPart('thinking…')],
+                  ),
+                ),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Lucide.Maximize2));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Thinking 1'), findsWidgets);
+    expect(find.text('Save'), findsNothing);
+
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
 }

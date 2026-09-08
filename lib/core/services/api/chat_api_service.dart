@@ -26,6 +26,7 @@ import '../model_override_payload_parser.dart';
 import '../custom_request_merger.dart';
 import 'provider_request_headers.dart';
 import 'retry_policy.dart';
+import 'generation/tool_loop_runner.dart' show StreamRoundRunner;
 import '../../utils/multimodal_input_utils.dart';
 import 'stream/legacy_stream_chunk_adapter.dart';
 import 'stream/retrying_stream.dart';
@@ -585,6 +586,7 @@ class ChatApiService {
     Map<String, dynamic>? extraBody,
     bool stream = true,
     String? requestId,
+    String? conversationId,
     bool allowImagesApiRouting = true,
     bool ocrActive = false,
   }) async* {
@@ -608,6 +610,11 @@ class ChatApiService {
         !imageOutput &&
         !hasClientTools;
     final options = AutoRetryConfig.current;
+    final sessionHeaders = providerSessionHeaders(
+      config,
+      conversationId: conversationId,
+      extraHeaders: extraHeaders,
+    );
     final sessionToken = CancelToken();
     final rid = (requestId ?? '').trim();
     if (rid.isNotEmpty) {
@@ -642,7 +649,7 @@ class ChatApiService {
           maxTokens: maxTokens,
           tools: tools,
           onToolCall: onToolCall,
-          extraHeaders: extraHeaders,
+          extraHeaders: sessionHeaders,
           extraBody: extraBody,
           stream: stream,
           requestId: null,
@@ -875,6 +882,7 @@ class ChatApiService {
     Map<String, dynamic>? extraBody,
     bool stream = true,
     String? requestId,
+    String? conversationId,
     bool allowImagesApiRouting = true,
     bool ocrActive = false,
   }) async* {
@@ -893,6 +901,11 @@ class ChatApiService {
     ).output.contains(Modality.image);
     final replaySafe = !useImagesApi && !useZhipuLayoutParsing && !imageOutput;
     final options = AutoRetryConfig.current;
+    final sessionHeaders = providerSessionHeaders(
+      config,
+      conversationId: conversationId,
+      extraHeaders: extraHeaders,
+    );
     final sessionToken = CancelToken();
     final rid = (requestId ?? '').trim();
     if (rid.isNotEmpty) {
@@ -903,8 +916,10 @@ class ChatApiService {
       _activeCancelTokens[rid] = sessionToken;
     }
 
-    try {
-      yield* retryingStream<StreamChunk>(
+    // 每个工具轮独立重试（U10）：轮内尚未产生任何事件时才重放该轮，
+    // 已执行的工具不会重复执行（工具在轮间执行，不在重放范围内）。
+    Stream<StreamChunk> retryRound(Stream<StreamChunk> Function() sendRound) {
+      return retryingStream<StreamChunk>(
         options: options,
         isCancelled: () => sessionToken.isCancelled,
         cancelled: _whenCancelled(sessionToken),
@@ -916,7 +931,16 @@ class ChatApiService {
             tag: 'AutoRetry',
           );
         },
-        attempt: (_) => _sendMessageStreamEventsOnce(
+        attempt: (_) => sendRound(),
+      );
+    }
+
+    try {
+      // 首轮与工具续轮共用同一个 retryRound，保证整条链路只包一层重试：
+      // 早先版本外层再套一次 retryingStream，会与轮内重试相乘（3×3 层退避
+      // 叠加超过 30s），让 Vertex/HTTP 错误测试超时。
+      yield* retryRound(
+        () => _sendMessageStreamEventsOnce(
           config: config,
           modelId: modelId,
           messages: messages,
@@ -927,12 +951,13 @@ class ChatApiService {
           maxTokens: maxTokens,
           tools: tools,
           onToolCall: onToolCall,
-          extraHeaders: extraHeaders,
+          extraHeaders: sessionHeaders,
           extraBody: extraBody,
           stream: stream,
           allowImagesApiRouting: allowImagesApiRouting,
           ocrActive: ocrActive,
           sessionToken: sessionToken,
+          retryRound: retryRound,
         ),
       );
     } finally {
@@ -962,6 +987,7 @@ class ChatApiService {
     required bool allowImagesApiRouting,
     required bool ocrActive,
     required CancelToken sessionToken,
+    StreamRoundRunner? retryRound,
   }) async* {
     final kind = ProviderConfig.classify(
       config.id,
@@ -1041,6 +1067,7 @@ class ChatApiService {
           extraHeaders: extraHeaders,
           extraBody: extraBody,
           stream: stream,
+          retryRound: retryRound,
         );
       } finally {
         client.close();
@@ -1088,6 +1115,7 @@ class ChatApiService {
             extraBody: extraBody,
             stream: stream,
             skipImageParsing: false,
+            retryRound: retryRound,
           );
         } else {
           yield* sendGoogleStreamEvents(
@@ -1106,6 +1134,7 @@ class ChatApiService {
             extraBody: extraBody,
             stream: stream,
             skipImageParsing: false,
+            retryRound: retryRound,
           );
         }
       } finally {
@@ -1165,6 +1194,7 @@ class ChatApiService {
     required ProviderConfig config,
     required String modelId,
     required String prompt,
+    String? conversationId,
     Map<String, String>? extraHeaders,
     Map<String, dynamic>? extraBody,
     int? thinkingBudget,
@@ -1174,6 +1204,11 @@ class ChatApiService {
   }) async {
     final options = AutoRetryConfig.current;
     final replaySafe = _builtInTools(config, modelId).isEmpty;
+    final sessionHeaders = providerSessionHeaders(
+      config,
+      conversationId: conversationId,
+      extraHeaders: extraHeaders,
+    );
     return retryingStream<String>(
       options: options,
       isCancelled: () => false,
@@ -1190,7 +1225,7 @@ class ChatApiService {
           config: config,
           modelId: modelId,
           prompt: prompt,
-          extraHeaders: extraHeaders,
+          extraHeaders: sessionHeaders,
           extraBody: extraBody,
           thinkingBudget: thinkingBudget,
           skipImageParsing: skipImageParsing,
@@ -1781,7 +1816,6 @@ class ChatApiService {
     ProviderConfig? config,
   }) {
     if (_isClaudeThinkingAlwaysOnModel(modelId)) {
-      if (!_isClaudeReasoningEnabled(budget)) return null;
       return <String, dynamic>{'type': 'adaptive', 'display': 'summarized'};
     }
     if (!_isClaudeReasoningEnabled(budget)) {
@@ -1805,11 +1839,12 @@ class ChatApiService {
     ProviderConfig? config,
   }) {
     if (_isClaudeThinkingAlwaysOnModel(modelId)) {
-      final effort = _normalizeClaudeEffort(
-        _claudeEffortForBudget(budget),
-        modelId,
-      );
-      if (effort == 'auto' || effort == 'off') return null;
+      // 自适应思考无法关闭。省略 effort 会默认 high，
+      // 因此界面「关闭」必须发送最低合法档位。
+      var effort = _claudeEffortForBudget(budget);
+      if (effort == 'off') effort = 'low';
+      effort = _normalizeClaudeEffort(effort, modelId);
+      if (effort == 'auto') return null;
       return <String, dynamic>{'effort': effort};
     }
     if (_isDeepSeekClaudeCompatible(modelId, config: config)) {

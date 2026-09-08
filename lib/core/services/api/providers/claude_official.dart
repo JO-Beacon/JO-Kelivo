@@ -518,7 +518,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       try {
         final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
         if (u != null) {
-          totalUsage = (totalUsage ?? const TokenUsage()).accumulate(
+          totalUsage = (totalUsage ?? const TokenUsage()).merge(
             _claudeUsageFromMap(u),
           );
         }
@@ -1055,9 +1055,9 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       }
     }
 
-    // 合并各轮用量以得到最终 token 计数
+    // 末轮用量即整条消息的 token 计数（每轮上报完整上下文，跨轮相加会重复计数）
     if (usage != null) {
-      totalUsage = (totalUsage ?? const TokenUsage()).accumulate(usage);
+      totalUsage = usage;
     }
 
     // 若无 client 工具调用，决定是继续（pause_turn/服务端工具）还是结束

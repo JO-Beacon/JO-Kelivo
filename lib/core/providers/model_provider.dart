@@ -18,16 +18,16 @@ class ModelRegistry {
   // Qwen 视觉判断是有意且精确的（见 [_isQwenVisionModel]）：并非
   // 每个 Qwen 3.7 Max id 都是多模态。
   static final RegExp vision = RegExp(
-    // GPT 系列，包括 4o、4.1、5（排除 gpt-5-chat），以及 OpenAI o* 系列
-    r'(gpt-4o|gpt-4\.1|gpt-5(?!-chat)|o\d|gemini|claude|kimi-k2([-.])(?:5|6|7)|kimi-k3(?:$|[/_:@.-])|muse-spark-1\.1(?:$|[/_:@.-])|doubao.+(?:1([-.])(?:6|8)|seed-2|seed-evolving)|grok-4|step-3|intern-s1|minimax-m3(?:$|[/_:@])|mimo-v2(?:-omni(?:$|[/_:@])|\.5(?:$|[/_:@]))|sensenova-6\.7-flash-lite|deepseek.+vision|laguna)',
+    // GPT 系列，包括 4o、4.1、5（排除 gpt-5-chat）、6，以及 OpenAI o* 系列
+    r'(gpt-4o|gpt-4\.1|gpt-5(?!-chat)|gpt-6|o\d|gemini|claude|kimi-k2([-.])(?:5|6|7)|kimi-k3(?:$|[/_:@.-])|muse-spark-1(?:$|[/_:@.-])|doubao.+(?:1([-.])(?:6|8)|seed-2|seed-evolving)|grok-4|step-3|intern-s1|minimax-m3(?:$|[/_:@])|mimo-v2(?:-omni(?:$|[/_:@])|\.5(?:$|[/_:@]))|sensenova-6\.7-flash-lite|deepseek.+vision|laguna)',
     caseSensitive: false,
   );
   // 可使用工具的模型
   static final RegExp tool = RegExp(
-    (r'(gpt-4o|gpt-4\.1|gpt-oss|gpt-5(?!-chat)|o\d|'
+    (r'(gpt-4o|gpt-4\.1|gpt-oss|gpt-5(?!-chat)|gpt-6|o\d|'
             r'gemini|claude|'
             r'qwen-?3|doubao.+(?:1([-.])(?:6|8)|seed-2|seed-evolving)|grok-4|kimi-k2|'
-            r'kimi-k3(?:$|[/_:@.-])|muse-spark-1\.1(?:$|[/_:@.-])|'
+            r'kimi-k3(?:$|[/_:@.-])|muse-spark-1(?:$|[/_:@.-])|'
             r'step-3|intern-s1|glm-4([-.])(?:5|6|7)|glm-5|minimax-(?:m2|m3)|'
             r'deepseek-(?:r1|v3|chat|v3\.1|v3\.2|v4)|'
             r'deepseek-reasoner|'
@@ -38,13 +38,13 @@ class ModelRegistry {
     caseSensitive: false,
   );
   static final RegExp reasoning = RegExp(
-    (r'(gpt-oss|gpt-5(?!-chat)|o\d|'
+    (r'(gpt-oss|gpt-5(?!-chat)|gpt-6|o\d|'
             r'gemini-(?:2\.5|3).*|gemini-(?:flash-latest|pro-latest)|'
             r'gemini-3-pro-image-preview|'
             r'gemma[-_]?4|'
             r'claude|'
             r'qwen-?3|doubao.+(?:1([-.])(?:6|8)|seed-2|seed-evolving)|grok-4|kimi-k2|'
-            r'kimi-k3(?:$|[/_:@.-])|muse-spark-1\.1(?:$|[/_:@.-])|'
+            r'kimi-k3(?:$|[/_:@.-])|muse-spark-1(?:$|[/_:@.-])|'
             r'step-3|intern-s1|glm-4([-.])(?:5|6|7)|glm-5|minimax-(?:m2|m3)|'
             r'deepseek-(?:r1|v3\.1|v3\.2|v4)|'
             r'deepseek-reasoner|'
@@ -58,15 +58,17 @@ class ModelRegistry {
   /// - `qwen3.5*` (existing)
   /// - `qwen3.7-plus` / `qwen3.7-flash`（+ 快照）
   /// - 仅限 vision Max 快照 `qwen3.7-max-2026-06-08` 及之后
-  /// - `qwen3.8-max`（+ 快照）
-  /// 纯文本 / 更早的 `qwen3.7-max` 文本型 SKU 被有意排除。
+  /// - `qwen3.8-max` / `qwen3.8-flash` / `qwen3.8-27b`（+ 快照）
+  /// 开放的 `qwen3.8-2.4t-a95b` 与纯文本 / 更早的 `qwen3.7-max` 保持纯文本。
   static bool _isQwenVisionModel(String id) {
     final lower = id.toLowerCase();
     if (RegExp(r'qwen-?3([-.])5').hasMatch(lower)) return true;
     if (RegExp(r'qwen-?3([-.])7-(?:plus|flash)').hasMatch(lower)) {
       return true;
     }
-    if (RegExp(r'qwen-?3([-.])8-max').hasMatch(lower)) return true;
+    if (RegExp(r'qwen-?3([-.])8-(?:max|flash|27b)').hasMatch(lower)) {
+      return true;
+    }
     final maxSnap = RegExp(
       r'qwen-?3([-.])7-max-(\d{4}-\d{2}-\d{2})',
     ).firstMatch(lower);
@@ -74,6 +76,14 @@ class ModelRegistry {
     final date = DateTime.tryParse(maxSnap.group(2)!);
     if (date == null) return false;
     return !date.isBefore(DateTime(2026, 6, 8));
+  }
+
+  /// GLM-5.3-Flash 是首个原生多模态 GLM-5 SKU。
+  static bool _isGlmVisionModel(String id) {
+    return RegExp(
+      r'(^|[/_:@])glm-5\.3-flash(?:$|[-.])',
+      caseSensitive: false,
+    ).hasMatch(id);
   }
 
   static bool isLikelyEmbeddingId(String rawId) {
@@ -130,7 +140,9 @@ class ModelRegistry {
       }
       return base.copyWith(input: inMods, output: outMods, abilities: ab);
     }
-    if (vision.hasMatch(id) || _isQwenVisionModel(id)) {
+    if (vision.hasMatch(id) ||
+        _isQwenVisionModel(id) ||
+        _isGlmVisionModel(id)) {
       if (!inMods.contains(Modality.image)) inMods.add(Modality.image);
     }
     if (tool.hasMatch(id) && !ab.contains(ModelAbility.tool)) {
@@ -360,6 +372,7 @@ class GoogleProvider extends BaseProvider {
       // 为方便起见，我们手动注入已知受支持的 Claude 模型。
       if (cfg.vertexAI == true) {
         final knownClaude = [
+          'claude-fable-5-1',
           'claude-fable-5',
           'claude-opus-5',
           'claude-opus-4-8',

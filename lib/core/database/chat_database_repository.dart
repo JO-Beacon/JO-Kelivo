@@ -8823,7 +8823,7 @@ class ChatDatabaseRepository {
     required String conversationId,
     required String payload,
     required bool carriesMemorySnapshot,
-    String? injectedMemoryHash,
+    Value<String?> injectedMemoryHash = const Value.absent(),
     String? sourceContentHash,
   }) {
     return _db.transaction(() async {
@@ -8834,10 +8834,10 @@ class ChatDatabaseRepository {
         carriesMemorySnapshot: carriesMemorySnapshot,
         sourceContentHash: sourceContentHash,
       );
-      if (carriesMemorySnapshot) {
+      if (injectedMemoryHash.present) {
         await setConversationInjectedMemoryHash(
           conversationId,
-          injectedMemoryHash,
+          injectedMemoryHash.value,
         );
       }
     });

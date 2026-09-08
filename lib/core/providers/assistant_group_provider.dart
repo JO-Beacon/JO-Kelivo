@@ -127,16 +127,36 @@ class AssistantGroupProvider extends ChangeNotifier {
 
   Future<void> assignAssistantToGroup(
     String assistantId,
-    String? groupId,
-  ) async {
+    String? groupId, {
+    bool notify = true,
+  }) async {
     if (groupId == null || groupId.isEmpty) {
       _assignment.remove(assistantId);
     } else {
       _assignment[assistantId] = groupId;
     }
-    notifyListeners();
+    // 拖拽落位链路会把"换组 + 挪到落点旁边"合并成一次界面刷新，
+    // 此时传 notify: false，由挪位完成后的那次通知统一触发重建。
+    if (notify) notifyListeners();
     await _persistAssignment();
   }
+
+  /// 拖拽链路专用：换组已静默应用后，若后续挪位没有产生任何通知
+  /// （例如落点组内没有其他成员），调用本方法手动触发一次刷新。
+  void notifyAssignmentChanged() => notifyListeners();
+
+  /// 只更新内存中的归属：不通知、不落盘（拖拽落位专用，理由同
+  /// `AssistantProvider.applyOrderRelativeTo`——框架不会等异步回调）。
+  void applyGroupAssignment(String assistantId, String? groupId) {
+    if (groupId == null || groupId.isEmpty) {
+      _assignment.remove(assistantId);
+    } else {
+      _assignment[assistantId] = groupId;
+    }
+  }
+
+  /// 落盘归属，与 [applyGroupAssignment] 配套使用。
+  Future<void> persistAssignment() => _persistAssignment();
 
   Future<void> assignAssistantsToGroup(
     Iterable<String> assistantIds,

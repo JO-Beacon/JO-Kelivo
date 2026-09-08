@@ -551,9 +551,6 @@ Input:
   static String introFullFor(MemoryPromptLang lang) =>
       lang == MemoryPromptLang.zh ? introFullZh : introFullEn;
 
-  static String introUpdateFor(MemoryPromptLang lang) =>
-      lang == MemoryPromptLang.zh ? introUpdateZh : introUpdateEn;
-
   static String moreHintFor(MemoryPromptLang lang) =>
       lang == MemoryPromptLang.zh ? moreHintZh : moreHintEn;
 }

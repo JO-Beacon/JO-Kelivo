@@ -1759,6 +1759,31 @@ class AppLocalizationsZh extends AppLocalizations {
       'JO-AIClient 的数据仍被另一个应用进程占用。请关闭其他 JO-AIClient 窗口后重新启动；当前进程尚未打开聊天数据。';
 
   @override
+  String get restoreProgressTitle => '正在恢复备份';
+
+  @override
+  String get restoreProgressWarning =>
+      '请保持 JO-AIClient 开启直到完成。此时关闭应用，下次启动会从头再来一次。';
+
+  @override
+  String get restoreProgressStageCheckingBackup => '正在校验备份';
+
+  @override
+  String get restoreProgressStagePreservingCurrentData => '正在保留当前数据';
+
+  @override
+  String get restoreProgressStageInstallingBackup => '正在写入备份';
+
+  @override
+  String get restoreProgressStageVerifying => '正在验证';
+
+  @override
+  String get restoreProgressStageRollingBack => '正在恢复原有数据';
+
+  @override
+  String get restoreProgressStageFinishing => '即将完成';
+
+  @override
   String get backupRestoreFailureRestartButton => '重启 JO-AIClient';
 
   @override
@@ -8202,6 +8227,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageEditCancel => '取消';
 
   @override
+  String get messageEditExpandPart => '放大';
+
+  @override
+  String get messageEditExpandedSave => '保存';
+
+  @override
   String get messageStyleSettingsPageAssistantFitContent => '助手气泡贴合内容';
 
   @override
@@ -10253,6 +10284,31 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get backupRestoreBusinessLeaseUnavailableContent =>
       'JO-AIClient 的数据仍被另一个应用进程占用。请关闭其他 JO-AIClient 窗口后重新启动；当前进程尚未打开聊天数据。';
+
+  @override
+  String get restoreProgressTitle => '正在恢复备份';
+
+  @override
+  String get restoreProgressWarning =>
+      '请保持 JO-AIClient 开启直到完成。此时关闭应用，下次启动会从头再来一次。';
+
+  @override
+  String get restoreProgressStageCheckingBackup => '正在校验备份';
+
+  @override
+  String get restoreProgressStagePreservingCurrentData => '正在保留当前数据';
+
+  @override
+  String get restoreProgressStageInstallingBackup => '正在写入备份';
+
+  @override
+  String get restoreProgressStageVerifying => '正在验证';
+
+  @override
+  String get restoreProgressStageRollingBack => '正在恢复原有数据';
+
+  @override
+  String get restoreProgressStageFinishing => '即将完成';
 
   @override
   String get backupRestoreFailureRestartButton => '重启 JO-AIClient';
@@ -16698,6 +16754,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get messageEditCancel => '取消';
 
   @override
+  String get messageEditExpandPart => '放大';
+
+  @override
+  String get messageEditExpandedSave => '保存';
+
+  @override
   String get messageStyleSettingsPageAssistantFitContent => '助手气泡贴合内容';
 
   @override
@@ -18750,6 +18812,31 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get backupRestoreBusinessLeaseUnavailableContent =>
       'JO-AIClient 的資料仍由另一個應用程式程序使用。請關閉其他 JO-AIClient 視窗後重新啟動；目前程序尚未開啟聊天資料。';
+
+  @override
+  String get restoreProgressTitle => '正在恢復備份';
+
+  @override
+  String get restoreProgressWarning =>
+      '請保持 JO-AIClient 開啟直到完成。此時關閉應用，下次啟動會從頭再來一次。';
+
+  @override
+  String get restoreProgressStageCheckingBackup => '正在校驗備份';
+
+  @override
+  String get restoreProgressStagePreservingCurrentData => '正在保留目前資料';
+
+  @override
+  String get restoreProgressStageInstallingBackup => '正在寫入備份';
+
+  @override
+  String get restoreProgressStageVerifying => '正在驗證';
+
+  @override
+  String get restoreProgressStageRollingBack => '正在恢復原有資料';
+
+  @override
+  String get restoreProgressStageFinishing => '即將完成';
 
   @override
   String get backupRestoreFailureRestartButton => '重新啟動 JO-AIClient';
@@ -25194,6 +25281,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get messageEditCancel => '取消';
+
+  @override
+  String get messageEditExpandPart => '放大';
+
+  @override
+  String get messageEditExpandedSave => '儲存';
 
   @override
   String get messageStyleSettingsPageAssistantFitContent => '助手氣泡貼合內容';

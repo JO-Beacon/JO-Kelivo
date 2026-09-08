@@ -82,6 +82,7 @@ class MemoryPipelineService {
       required ProviderConfig config,
       required String modelId,
       required String prompt,
+      String? conversationId,
       int? thinkingBudget,
     })?
     generateText,
@@ -100,9 +101,11 @@ class MemoryPipelineService {
     required ProviderConfig config,
     required String modelId,
     required String prompt,
+    String? conversationId,
     int? thinkingBudget,
   }) {
     return ChatApiService.generateText(
+      conversationId: conversationId,
       config: config,
       modelId: modelId,
       prompt: prompt,
@@ -126,6 +129,7 @@ class MemoryPipelineService {
     required ProviderConfig config,
     required String modelId,
     required String prompt,
+    String? conversationId,
     int? thinkingBudget,
   })
   _generateText;
@@ -501,6 +505,7 @@ class MemoryPipelineService {
       window: window,
       trace: handle,
       llmCall: (prompt) => _generateText(
+        conversationId: job.conversationId,
         config: cfg,
         modelId: mdlId,
         prompt: prompt,

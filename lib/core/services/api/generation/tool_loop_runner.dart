@@ -4,6 +4,10 @@ import '../chat_api_helpers.dart';
 import '../stream/stream_chunk.dart';
 import '../stream/stream_chunk_emit.dart';
 
+/// Wraps one tool round with the caller's per-round retry policy.
+typedef StreamRoundRunner =
+    Stream<StreamChunk> Function(Stream<StreamChunk> Function() sendRound);
+
 final class ExecutedClientTool {
   const ExecutedClientTool({
     required this.call,
@@ -66,6 +70,7 @@ Stream<StreamChunk> runClientToolFollowUps({
   required Stream<StreamChunk> Function() sendFollowUp,
   required List<EmitToolCall> Function() takeCallsAfterRound,
   required Stream<StreamChunk> Function() finish,
+  StreamRoundRunner? retryRound,
   bool emitCalls = false,
   TokenUsage? Function()? usageOf,
 }) async* {
@@ -89,7 +94,7 @@ Stream<StreamChunk> runClientToolFollowUps({
       totalTokens: totalTokens,
     );
     append(executed);
-    yield* sendFollowUp();
+    yield* retryRound?.call(sendFollowUp) ?? sendFollowUp();
     calls = takeCallsAfterRound();
   }
   yield* finish();
@@ -105,12 +110,21 @@ Stream<StreamChunk> runProviderToolRounds({
   required bool Function() continueWithoutCalls,
   required Stream<StreamChunk> Function() finish,
   ToolCallHandler? onToolCall,
+  StreamRoundRunner? retryRound,
   bool emitCalls = false,
   bool executeAfterRound = true,
   TokenUsage? Function()? usageOf,
 }) async* {
+  var roundIndex = 0;
   while (true) {
-    yield* sendRound();
+    // 首轮由调用方（chat_api_service）统一包重试，这里不再重复包一层——
+    // 否则首轮失败会形成 4×4=16 次请求、退避叠加超过 30s。
+    if (roundIndex == 0) {
+      yield* sendRound();
+    } else {
+      yield* retryRound?.call(sendRound) ?? sendRound();
+    }
+    roundIndex++;
     final calls = takeCalls();
     if (calls.isEmpty && !continueWithoutCalls()) {
       yield* finish();

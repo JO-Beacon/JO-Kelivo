@@ -109,6 +109,7 @@ Future<String?> _maybeVertexAccessToken(ProviderConfig cfg) async {
 int _getMaxOutputTokensForClaudeModel(String modelId) {
   // 限制依据 Google Vertex AI 文档
   switch (modelId) {
+    case 'claude-fable-5-1':
     case 'claude-fable-5':
     case 'claude-opus-5':
     case 'claude-opus-4-8':
@@ -479,7 +480,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
       try {
         final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
         if (u != null) {
-          totalUsage = (totalUsage ?? const TokenUsage()).accumulate(
+          totalUsage = (totalUsage ?? const TokenUsage()).merge(
             _claudeUsageFromMap(u),
           );
         }
@@ -972,7 +973,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
     }
 
     if (usage != null) {
-      totalUsage = (totalUsage ?? const TokenUsage()).accumulate(usage);
+      totalUsage = usage;
     }
 
     if (anthToolUse.isEmpty) {

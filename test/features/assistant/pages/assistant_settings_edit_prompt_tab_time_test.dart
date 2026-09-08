@@ -123,6 +123,7 @@ _createAssistantProvider(
     generateText:
         ({
           required config,
+          conversationId,
           required modelId,
           required prompt,
           int? thinkingBudget,

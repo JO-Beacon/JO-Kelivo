@@ -49,77 +49,80 @@ void main() {
       expect(ordinary.containsKey('extra_content'), isFalse);
     });
 
-    test('accumulates usage across streamed tool-call rounds', () async {
-      final requestBodies = <Map<String, dynamic>>[];
-      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      addTearDown(() async {
-        await server.close(force: true);
-      });
+    test(
+      'usage across streamed tool-call rounds keeps the last round',
+      () async {
+        final requestBodies = <Map<String, dynamic>>[];
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
 
-      server.listen((request) async {
-        requestBodies.add(
-          (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
-              .cast<String, dynamic>(),
-        );
-        request.response.statusCode = HttpStatus.ok;
-        request.response.headers.contentType = ContentType(
-          'text',
-          'event-stream',
-          charset: 'utf-8',
-        );
-        if (requestBodies.length == 1) {
-          request.response.write(
-            'data: ${jsonEncode({
-              'choices': [
-                {
-                  'delta': {
-                    'tool_calls': [
-                      {
-                        'index': 0,
-                        'id': 'call_lookup',
-                        'function': {'name': 'lookup', 'arguments': '{}'},
-                      },
-                    ],
+        server.listen((request) async {
+          requestBodies.add(
+            (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
+                .cast<String, dynamic>(),
+          );
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+            charset: 'utf-8',
+          );
+          if (requestBodies.length == 1) {
+            request.response.write(
+              'data: ${jsonEncode({
+                'choices': [
+                  {
+                    'delta': {
+                      'tool_calls': [
+                        {
+                          'index': 0,
+                          'id': 'call_lookup',
+                          'function': {'name': 'lookup', 'arguments': '{}'},
+                        },
+                      ],
+                    },
+                    'finish_reason': 'tool_calls',
                   },
-                  'finish_reason': 'tool_calls',
-                },
-              ],
-              'usage': {'prompt_tokens': 10, 'completion_tokens': 2},
-            })}\n\n',
-          );
-        } else {
-          request.response.write(
-            'data: ${jsonEncode({
-              'choices': [
-                {
-                  'delta': {'content': 'done'},
-                  'finish_reason': 'stop',
-                },
-              ],
-              'usage': {'prompt_tokens': 20, 'completion_tokens': 4},
-            })}\n\n',
-          );
-        }
-        request.response.write('data: [DONE]\n\n');
-        await request.response.close();
-      });
+                ],
+                'usage': {'prompt_tokens': 10, 'completion_tokens': 2},
+              })}\n\n',
+            );
+          } else {
+            request.response.write(
+              'data: ${jsonEncode({
+                'choices': [
+                  {
+                    'delta': {'content': 'done'},
+                    'finish_reason': 'stop',
+                  },
+                ],
+                'usage': {'prompt_tokens': 20, 'completion_tokens': 4},
+              })}\n\n',
+            );
+          }
+          request.response.write('data: [DONE]\n\n');
+          await request.response.close();
+        });
 
-      final chunks = await ChatApiService.sendMessageStream(
-        config: _openAIConfig(
-          'http://${server.address.address}:${server.port}/v1',
-        ),
-        modelId: 'gpt-4o-mini',
-        messages: const [
-          {'role': 'user', 'content': 'look this up'},
-        ],
-        onToolCall: (name, args, {toolCallId}) async => 'result',
-      ).toList();
+        final chunks = await ChatApiService.sendMessageStream(
+          config: _openAIConfig(
+            'http://${server.address.address}:${server.port}/v1',
+          ),
+          modelId: 'gpt-4o-mini',
+          messages: const [
+            {'role': 'user', 'content': 'look this up'},
+          ],
+          onToolCall: (name, args, {toolCallId}) async => 'result',
+        ).toList();
 
-      expect(requestBodies, hasLength(2));
-      expect(chunks.last.usage?.promptTokens, 30);
-      expect(chunks.last.usage?.completionTokens, 6);
-      expect(chunks.last.usage?.totalTokens, 36);
-    });
+        expect(requestBodies, hasLength(2));
+        expect(chunks.last.usage?.promptTokens, 20);
+        expect(chunks.last.usage?.completionTokens, 4);
+        expect(chunks.last.usage?.totalTokens, 24);
+      },
+    );
 
     test('merges reasoning fragments and drops signature-only leftovers', () {
       final normalized = ChatApiService.normalizeClaudeReasoningDetailsForTest([
