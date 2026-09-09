@@ -5,6 +5,7 @@ import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/chat/models/message_edit_result.dart';
 import 'package:Kelivo/features/chat/widgets/message_edit_sheet.dart';
+import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -57,8 +58,16 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '  after  ');
-    await tester.tap(find.text('Trim whitespace'));
-    await tester.pump();
+    await tester.pumpAndSettle();
+    // 清理首尾空白在放大窗口里，一级面板不再提供总按钮。
+    await tester.tap(find.byIcon(Lucide.Maximize2).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Lucide.Eraser));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    // 一级面板不再提供清理首尾空白的总按钮（只在放大窗口里按段清理）。
+    expect(find.text('Trim whitespace'), findsNothing);
     await tester.tap(find.text('Save as New Branch'));
     await tester.pumpAndSettle();
 

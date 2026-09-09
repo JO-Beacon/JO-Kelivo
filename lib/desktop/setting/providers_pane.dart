@@ -4228,11 +4228,7 @@ class _DesktopProviderDetailPaneState
             vertical: 24,
           ),
           child: ConstrainedBox(
-            constraints: DesktopDialogStyle.proportionalConstraints(
-              context,
-              maxWidth: 680,
-              maxHeight: 620,
-            ),
+            constraints: DesktopDialogStyle.formConstraints(context),
             child: StatefulBuilder(
               builder: (dctx, setD) {
                 setDRef = setD;

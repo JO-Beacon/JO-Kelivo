@@ -2022,11 +2022,7 @@ Future<String?> _showDesktopFontChooserDialog(
         shape: DesktopDialogStyle.shape(ctx),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
-          constraints: DesktopDialogStyle.proportionalConstraints(
-            ctx,
-            maxWidth: 520,
-            maxHeight: 520,
-          ),
+          constraints: DesktopDialogStyle.formConstraints(ctx),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
             child: StatefulBuilder(
@@ -2609,12 +2605,18 @@ class _ToggleRowAutoRetry extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final settings = context.watch<SettingsProvider>();
-    return _ToggleRow(
-      label: l10n.displaySettingsPageAutoRetryTitle,
-      value: settings.autoRetryEnabled,
-      onChanged: (value) =>
-          context.read<SettingsProvider>().setAutoRetryEnabled(value),
+    final enabled = context
+        .watch<SettingsProvider>()
+        .autoRetryOptions
+        .enabled;
+    return _LabeledRow(
+      label: l10n.settingsPageAutoRetry,
+      trailing: _DesktopFontDropdownButton(
+        display: enabled
+            ? l10n.iosBackgroundStatusOn
+            : l10n.iosBackgroundStatusOff,
+        onTap: () => auto_retry.showDesktopAutoRetryDialog(context),
+      ),
     );
   }
 }

@@ -159,12 +159,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
 
     final dialog = Center(
       child: ConstrainedBox(
-        constraints: DesktopDialogStyle.proportionalConstraints(
-          context,
-          minWidth: 520,
-          maxWidth: 860,
-          maxHeight: 720,
-        ),
+        constraints: DesktopDialogStyle.editorConstraints(context),
         child: Material(
           color: cs.surface,
           elevation: 0,

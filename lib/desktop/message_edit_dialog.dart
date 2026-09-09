@@ -85,15 +85,6 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
       _controller.text != widget.message.content ||
       !_sameParts(_editedParts, widget.message.parts);
 
-  void _trimWhitespace() {
-    setState(() {
-      _editedParts = [
-        for (final part in _editedParts)
-          part is TextPart ? TextPart(part.text.trim()) : part,
-      ];
-    });
-  }
-
   Future<void> _confirmClose() async {
     if (_confirmingClose || _allowClose) return;
     if (!_hasChanges) {
@@ -123,12 +114,7 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
   }
 
   BoxConstraints _dialogConstraints(BuildContext context) {
-    return DesktopDialogStyle.proportionalConstraints(
-      context,
-      minWidth: 520,
-      maxWidth: 720,
-      maxHeight: 680,
-    );
+    return DesktopDialogStyle.editorConstraints(context);
   }
 
   @override
@@ -264,30 +250,11 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton.icon(
-                                onPressed: _trimWhitespace,
-                                icon: Icon(
-                                  Lucide.Eraser,
-                                  size: 18,
-                                  color: cs.primary,
-                                ),
-                                label: Text(
-                                  l10n.messageEditTrimWhitespace,
-                                  style: TextStyle(
-                                    color: cs.primary,
-                                    fontWeight: AppFontWeights.semibold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            MessagePartsEditor(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              MessagePartsEditor(
                               parts: _editedParts,
                               onChanged: (parts) => setState(() {
                                 _editedParts = parts;

@@ -71,6 +71,11 @@ class DefaultModelPage extends StatelessWidget {
             },
           ),
           const SizedBox(height: 16),
+          _PerChatModelCard(
+            value: settings.perChatModelEnabled,
+            onChanged: settings.setPerChatModelEnabled,
+          ),
+          const SizedBox(height: 16),
           _ModelCard(
             icon: Lucide.NotebookTabs,
             title: l10n.defaultModelPageTitleModelTitle,
@@ -89,9 +94,10 @@ class DefaultModelPage extends StatelessWidget {
                 ? () async => settings.disableTitleGeneration()
                 : null,
             onPick: () async {
-              final sel = await pickConfiguredModel(
-                settings.titleModelProvider,
-                settings.titleModelId,
+              final sel = await showModelSelectorWithCurrentChatFallback(
+                context,
+                initialProviderKey: settings.titleModelProvider,
+                initialModelId: settings.titleModelId,
               );
               if (sel != null) {
                 await settings.setTitleModel(sel.providerKey, sel.modelId);
@@ -1072,6 +1078,74 @@ class _BrandAvatar extends StatelessWidget {
       ),
       alignment: Alignment.center,
       child: inner,
+    );
+  }
+}
+
+/// 切换聊天里选模型时写入哪一层：会话，还是当前助手。
+///
+/// 会话上的单独设置始终保留，关掉再打开依然生效，所以文案说的是「作用范围」，
+/// 而不是「重置」。
+class _PerChatModelCard extends StatelessWidget {
+  const _PerChatModelCard({required this.value, required this.onChanged});
+
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
+      decoration: BoxDecoration(
+        color: context.appColors.surfaceCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: cs.outlineVariant.withValues(alpha: 0.07),
+          width: 0.6,
+        ),
+      ),
+      child: _TactileRow(
+        onTap: () => onChanged(!value),
+        builder: (_) => Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Lucide.MessagesSquare, size: 18, color: cs.onSurface),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.defaultModelPagePerChatModelTitle,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: AppFontWeights.semibold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      l10n.defaultModelPagePerChatModelSubtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurface.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              IosSwitch(
+                value: value,
+                semanticLabel: l10n.defaultModelPagePerChatModelTitle,
+                onChanged: onChanged,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

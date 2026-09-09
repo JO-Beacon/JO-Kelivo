@@ -334,12 +334,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
     final l10n = AppLocalizations.of(context)!;
     return Center(
       child: ConstrainedBox(
-        constraints: DesktopDialogStyle.proportionalConstraints(
-          context,
-          minWidth: 540,
-          maxWidth: 700,
-          maxHeight: 650,
-        ),
+        constraints: DesktopDialogStyle.formConstraints(context),
         child: Material(
           color: cs.surface,
           shape: DesktopDialogStyle.shape(context),

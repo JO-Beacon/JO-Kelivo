@@ -112,6 +112,7 @@ Stream<StreamChunk> sendOpenAIStream(
   Map<String, dynamic>? extraBody,
   bool stream = true,
   bool builtInSearchOnly = false,
+  bool skipImageParsing = false,
   StreamRoundRunner? retryRound,
 }) async* {
   final upstreamModelId = apiModelId(config, modelId);
@@ -302,7 +303,8 @@ Stream<StreamChunk> sendOpenAIStream(
       // Semantic media detection only - custom attachment markers are not
       // recognized. Attachments arrive via structured media-path keys /
       // userImagePaths, plus Markdown ![](...).
-      final hasMarkdownImages = raw.contains('![') && raw.contains('](');
+      final hasMarkdownImages =
+          !skipImageParsing && raw.contains('![') && raw.contains('](');
       final internalMediaRefs = parseInternalMediaRefs(
         m[multimodalInternalMediaPathsKey],
       );
@@ -331,6 +333,7 @@ Stream<StreamChunk> sendOpenAIStream(
           allowDataImages: canImageInput,
           keepRemoteMarkdownText: true,
           keepDisallowedImageText: canImageInput,
+          skipImageParsing: skipImageParsing,
         );
         if (!canImageInput) {
           if (isAssistant) {
@@ -563,6 +566,7 @@ Stream<StreamChunk> sendOpenAIStream(
       allowRemoteImages: allowRemoteImages,
       reasoningContentReplayPolicy: info.reasoningContentReplayPolicy,
       stripReasoningContent: isClaudeUpstream,
+      skipImageParsing: skipImageParsing,
     );
     body = {
       'model': upstreamModelId,
@@ -790,6 +794,7 @@ Stream<StreamChunk> sendOpenAIStream(
           userImagePaths: userImagePaths,
           canImageInput: canImageInput,
           allowRemoteImages: allowRemoteImages,
+          skipImageParsing: skipImageParsing,
           isClaudeUpstream: isClaudeUpstream,
           needsReasoningEcho: needsReasoningEcho,
           extraHeaders: extraHeaders,
@@ -1038,6 +1043,7 @@ Stream<StreamChunk> sendOpenAIStream(
               userImagePaths: userImagePaths,
               canImageInput: canImageInput,
               allowRemoteImages: allowRemoteImages,
+              skipImageParsing: skipImageParsing,
               isClaudeUpstream: isClaudeUpstream,
               isReasoning: isReasoning,
               effort: effort,
@@ -1104,6 +1110,7 @@ Stream<StreamChunk> sendOpenAIStream(
           userImagePaths: userImagePaths,
           canImageInput: canImageInput,
           allowRemoteImages: allowRemoteImages,
+          skipImageParsing: skipImageParsing,
           isClaudeUpstream: isClaudeUpstream,
           isReasoning: isReasoning,
           effort: effort,
@@ -1157,6 +1164,7 @@ Stream<StreamChunk> sendOpenAIStream(
             userImagePaths: userImagePaths,
             canImageInput: canImageInput,
             allowRemoteImages: allowRemoteImages,
+            skipImageParsing: skipImageParsing,
             isClaudeUpstream: isClaudeUpstream,
             isReasoning: isReasoning,
             effort: effort,

@@ -139,13 +139,17 @@ void main() {
       'stream tool follow-up and retry reuse session $conversationId',
       () async {
         final previousOptions = AutoRetryConfig.current;
-        AutoRetryConfig.current = const AutoRetryOptions(
+        AutoRetryConfig.current = AutoRetryOptions(
           enabled: true,
           maxRetries: 2,
-          initialDelay: Duration.zero,
+          initialDelayMs: 0,
           multiplier: 1,
-          maxDelay: Duration.zero,
+          maxDelayMs: 0,
           jitter: false,
+          retryOnNetworkError: true,
+          retryStatusCodes: AutoRetryOptions.defaultRetryStatusCodes,
+          retryKeywords: AutoRetryOptions.defaultRetryKeywords,
+          stopKeywords: AutoRetryOptions.defaultStopKeywords,
         );
         addTearDown(() {
           AutoRetryConfig.current = previousOptions;

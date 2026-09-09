@@ -12,6 +12,7 @@ import '../../../core/providers/settings_provider.dart';
 import 'image_settings_page.dart';
 import 'message_style_settings_page.dart';
 import 'theme_settings_page.dart';
+import 'auto_retry_page.dart';
 import '../../../theme/palettes.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
@@ -2028,14 +2029,13 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
         children: [
           _iosSectionCard(
             children: [
-              _iosSwitchRow(
+              _iosNavRow(
                 context,
                 icon: Lucide.RefreshCw,
-                label: l10n.displaySettingsPageAutoRetryTitle,
-                subtitle: l10n.displaySettingsPageAutoRetrySubtitle,
-                value: sp.autoRetryEnabled,
-                onChanged: (value) =>
-                    context.read<SettingsProvider>().setAutoRetryEnabled(value),
+                label: l10n.settingsPageAutoRetry,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AutoRetryPage()),
+                ),
               ),
               _iosDivider(context),
               _iosSwitchRow(

@@ -242,6 +242,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
   required bool allowRemoteImages,
   required ReasoningContentReplayPolicy reasoningContentReplayPolicy,
   bool stripReasoningContent = false,
+  bool skipImageParsing = false,
 }) async {
   final out = <Map<String, dynamic>>[];
   // Assistant turns cannot carry image_url/video_url; stash for the last user
@@ -510,7 +511,10 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
       continue;
     }
 
-    final hasMarkdownImages = raw.contains('![') && raw.contains('](');
+    final hasMarkdownImages = shouldParseMarkdownImages(
+      raw,
+      skipImageParsing: skipImageParsing,
+    );
     // Semantic media detection only - custom attachment markers are not
     // recognized. Attachments arrive via structured media-path keys /
     // userMediaPaths, plus Markdown ![](...).
@@ -532,6 +536,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
       allowDataImages: canImageInput,
       keepRemoteMarkdownText: true,
       keepDisallowedImageText: canImageInput,
+      skipImageParsing: skipImageParsing,
     );
     if (!canImageInput) {
       outMsg['content'] = parsed.text;
@@ -698,6 +703,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
   required bool canImageInput,
   required bool allowRemoteImages,
   required bool isClaudeUpstream,
+  bool skipImageParsing = false,
   required bool isReasoning,
   required String effort,
   required int? thinkingBudget,
@@ -757,6 +763,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
           allowRemoteImages: allowRemoteImages,
           reasoningContentReplayPolicy: info.reasoningContentReplayPolicy,
           stripReasoningContent: isClaudeUpstream,
+          skipImageParsing: skipImageParsing,
         ),
         'stream': true,
         if (temperature != null) 'temperature': temperature,
@@ -894,6 +901,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
   required bool canImageInput,
   required bool allowRemoteImages,
   required bool isClaudeUpstream,
+  bool skipImageParsing = false,
   required bool needsReasoningEcho,
   required Map<String, String>? extraHeaders,
   required TokenUsage? initialUsage,
@@ -948,6 +956,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
         allowRemoteImages: allowRemoteImages,
         reasoningContentReplayPolicy: info.reasoningContentReplayPolicy,
         stripReasoningContent: isClaudeUpstream,
+        skipImageParsing: skipImageParsing,
       );
       reqBody.remove('stream');
       req.body = jsonEncode(reqBody);

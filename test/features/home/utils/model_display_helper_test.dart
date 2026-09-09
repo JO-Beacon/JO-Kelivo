@@ -64,6 +64,31 @@ void main() {
     expect(resolved.modelId, 'a');
   });
 
+  test('每个对话独立模型默认开启', () {
+    expect(settings.perChatModelEnabled, isTrue);
+  });
+
+  test('关闭后会话层整体跳过，重新开启仍生效', () async {
+    await settings.setPerChatModelEnabled(false);
+    final off = resolveChatModel(
+      settings,
+      conversation: conversation(provider: 'conversation', model: 'c'),
+      assistant: assistant(provider: 'assistant', model: 'a'),
+    );
+    expect(off.providerKey, 'assistant');
+    expect(off.modelId, 'a');
+
+    // 会话上的设置只是被忽略，没有被清除。
+    await settings.setPerChatModelEnabled(true);
+    final on = resolveChatModel(
+      settings,
+      conversation: conversation(provider: 'conversation', model: 'c'),
+      assistant: assistant(provider: 'assistant', model: 'a'),
+    );
+    expect(on.providerKey, 'conversation');
+    expect(on.modelId, 'c');
+  });
+
   test('display and active ids use the same resolved model', () {
     final conversationModel = conversation(
       provider: 'conversation',

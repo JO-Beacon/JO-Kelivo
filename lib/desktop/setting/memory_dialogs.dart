@@ -27,8 +27,7 @@ Future<T?> showDesktopMemoryDialog<T>(
   required String title,
   required Widget body,
   List<Widget> Function(BuildContext dialogContext)? headerActionsBuilder,
-  double maxWidth = 860,
-  double maxHeight = 640,
+  bool compact = false,
 }) {
   final cs = Theme.of(context).colorScheme;
   return showDialog<T>(
@@ -41,11 +40,9 @@ Future<T?> showDesktopMemoryDialog<T>(
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         shape: DesktopDialogStyle.shape(ctx),
         child: ConstrainedBox(
-          constraints: DesktopDialogStyle.proportionalConstraints(
-            ctx,
-            maxWidth: maxWidth,
-            maxHeight: maxHeight,
-          ),
+          constraints: compact
+              ? DesktopDialogStyle.compactConstraints(ctx)
+              : DesktopDialogStyle.formConstraints(ctx),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -275,8 +272,7 @@ Future<void> showDesktopMemoryAboutDialog(BuildContext context) {
   return showDesktopMemoryDialog<void>(
     context,
     title: l10n.memorySettingsAboutTitle,
-    maxWidth: 560,
-    maxHeight: 520,
+    compact: true,
     body: const MemoryAboutContent(
       padding: EdgeInsets.fromLTRB(20, 12, 20, 24),
     ),

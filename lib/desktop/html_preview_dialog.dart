@@ -186,12 +186,7 @@ class _HtmlPreviewDialogState extends State<_HtmlPreviewDialog> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       shape: DesktopDialogStyle.shape(context),
       child: ConstrainedBox(
-        constraints: DesktopDialogStyle.proportionalConstraints(
-          context,
-          minWidth: 520,
-          maxWidth: 900,
-          maxHeight: 740,
-        ),
+        constraints: DesktopDialogStyle.editorConstraints(context),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: Material(
@@ -315,12 +310,7 @@ class _ConsoleDialog extends StatelessWidget {
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       shape: DesktopDialogStyle.shape(context),
       child: ConstrainedBox(
-        constraints: DesktopDialogStyle.proportionalConstraints(
-          context,
-          minWidth: 520,
-          maxWidth: 700,
-          maxHeight: 620,
-        ),
+        constraints: DesktopDialogStyle.formConstraints(context),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: Material(

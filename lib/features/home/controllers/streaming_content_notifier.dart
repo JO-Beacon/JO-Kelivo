@@ -21,6 +21,31 @@ class ToolHeightEvent {
   final int version;
 }
 
+/// 自动重试退避等待期间气泡内的倒计时状态。
+@immutable
+class RetryStatus {
+  const RetryStatus({
+    required this.attempt,
+    required this.maxRetries,
+    required this.retryAt,
+  });
+
+  final int attempt;
+  final int maxRetries;
+  final DateTime retryAt;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RetryStatus &&
+          attempt == other.attempt &&
+          maxRetries == other.maxRetries &&
+          retryAt == other.retryAt;
+
+  @override
+  int get hashCode => Object.hash(attempt, maxRetries, retryAt);
+}
+
 class StreamingContentNotifier {
   /// 消息 ID 到其 content notifier 的映射。
   /// 每条流式消息都有自己的 `ValueNotifier<String>`。
@@ -112,6 +137,7 @@ class StreamingContentNotifier {
         completionTokens: current.completionTokens,
         cachedTokens: current.cachedTokens,
         durationMs: current.durationMs,
+        retryStatus: current.retryStatus,
       );
     }
   }
@@ -163,6 +189,7 @@ class StreamingContentNotifier {
         completionTokens: current.completionTokens,
         cachedTokens: current.cachedTokens,
         durationMs: current.durationMs,
+        retryStatus: current.retryStatus,
       );
     }
     notifyToolHeightChanged(messageId);
@@ -186,8 +213,33 @@ class StreamingContentNotifier {
         completionTokens: current.completionTokens,
         cachedTokens: current.cachedTokens,
         durationMs: current.durationMs,
+        retryStatus: current.retryStatus,
       );
     }
+  }
+
+  /// 更新自动重试倒计时状态（null 表示清除）。
+  void updateRetryStatus(String messageId, RetryStatus? status) {
+    final notifier = getNotifier(messageId);
+    final current = notifier.value;
+    if (current.retryStatus == status) return;
+    notifier.value = StreamingContentData(
+      content: current.content,
+      totalTokens: current.totalTokens,
+      reasoningText: current.reasoningText,
+      reasoningStartAt: current.reasoningStartAt,
+      reasoningFinishedAt: current.reasoningFinishedAt,
+      contentSplitOffsets: current.contentSplitOffsets,
+      reasoningCountAtSplit: current.reasoningCountAtSplit,
+      toolCountAtSplit: current.toolCountAtSplit,
+      toolPartsVersion: current.toolPartsVersion,
+      uiVersion: current.uiVersion,
+      promptTokens: current.promptTokens,
+      completionTokens: current.completionTokens,
+      cachedTokens: current.cachedTokens,
+      durationMs: current.durationMs,
+      retryStatus: status,
+    );
   }
 
   /// 流式完成时移除 notifier。
@@ -229,6 +281,7 @@ class StreamingContentData {
     this.completionTokens,
     this.cachedTokens,
     this.durationMs,
+    this.retryStatus,
   });
 
   final String content;
@@ -252,6 +305,9 @@ class StreamingContentData {
   final int? cachedTokens;
   final int? durationMs;
 
+  /// 自动重试倒计时状态（非消息内容）。
+  final RetryStatus? retryStatus;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -270,7 +326,8 @@ class StreamingContentData {
           promptTokens == other.promptTokens &&
           completionTokens == other.completionTokens &&
           cachedTokens == other.cachedTokens &&
-          durationMs == other.durationMs;
+          durationMs == other.durationMs &&
+          retryStatus == other.retryStatus;
 
   @override
   int get hashCode =>
@@ -287,5 +344,6 @@ class StreamingContentData {
       promptTokens.hashCode ^
       completionTokens.hashCode ^
       cachedTokens.hashCode ^
-      durationMs.hashCode;
+      durationMs.hashCode ^
+      retryStatus.hashCode;
 }

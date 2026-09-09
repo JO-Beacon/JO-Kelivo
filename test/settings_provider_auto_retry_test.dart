@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:Kelivo/core/models/auto_retry_options.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/retry_policy.dart';
@@ -31,6 +33,7 @@ void main() {
       final settings = SettingsProvider(harness.preferences);
 
       await settings.loaded;
+      // 旧 D10 布尔键经一次性迁移种子到新 JSON 配置的 enabled。
       expect(settings.autoRetryEnabled, isFalse);
       expect(AutoRetryConfig.current.enabled, isFalse);
 
@@ -38,8 +41,12 @@ void main() {
 
       expect(settings.autoRetryEnabled, isTrue);
       expect(AutoRetryConfig.current.enabled, isTrue);
+      final stored = harness.preferences.getString('auto_retry_options');
+      expect(stored, isNotNull);
       expect(
-        harness.preferences.getBool('display_auto_retry_enabled_v1'),
+        AutoRetryOptions.fromJson(
+          jsonDecode(stored!) as Map<String, dynamic>,
+        ).enabled,
         isTrue,
       );
     },

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show
+        debugPrint,
         kIsWeb,
         defaultTargetPlatform,
         TargetPlatform,
@@ -25,6 +26,7 @@ import 'theme/palettes.dart';
 import 'theme/custom_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:dynamic_color/dynamic_color.dart';
+import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'core/providers/user_provider.dart';
 import 'core/providers/settings_provider.dart';
 import 'core/providers/mcp_provider.dart';
@@ -90,6 +92,8 @@ final RouteObserver<ModalRoute<dynamic>> routeObserver =
     RouteObserver<ModalRoute<dynamic>>();
 bool _didCheckUpdates = false; // 一次性更新检查标记
 bool _didEnsureAssistants = false; // 在 l10n 就绪后确保默认值
+AppLifecycleListener? _displayModeLifecycleListener;
+const MethodChannel _displayModeChannel = MethodChannel('app.display_mode');
 
 Future<void> main(List<String> arguments) async {
   final commandLineAssociatedJoaiclientPath = Platform.isWindows
@@ -116,6 +120,7 @@ Future<void> main(List<String> arguments) async {
 
       reportStartupProgress(0.02);
       FlutterLogger.installGlobalHandlers();
+      _initializeAndroidDisplayMode();
       // 在可能耗时的恢复或数据库准入流程开始前，先配置并显示桌面窗口。
       await _initDesktopWindow();
       reportStartupProgress(0.08);
@@ -338,6 +343,35 @@ Future<void> main(List<String> arguments) async {
   );
 }
 
+void _initializeAndroidDisplayMode() {
+  if (!Platform.isAndroid || _displayModeLifecycleListener != null) return;
+
+  // Some Android variants clear refresh-rate requests in background.
+  _displayModeLifecycleListener = AppLifecycleListener(
+    onResume: _requestHighRefreshRate,
+  );
+  _requestHighRefreshRate();
+}
+
+void _requestHighRefreshRate() {
+  unawaited(_applyAndroidHighRefreshRate());
+}
+
+Future<void> _applyAndroidHighRefreshRate() async {
+  try {
+    final handledNatively =
+        await _displayModeChannel.invokeMethod<bool>(
+          'requestHighRefreshRate',
+        ) ??
+        false;
+    if (!handledNatively) {
+      await FlutterDisplayMode.setHighRefreshRate();
+    }
+  } catch (error) {
+    debugPrint('[DisplayMode] High refresh rate request failed: $error');
+  }
+}
+
 enum _AdmissionRecovery { none, rebuilt, remigrate }
 
 /// 名称必须与 HiveToSqliteMigrationService.check() 保持一致。
@@ -408,12 +442,6 @@ Future<void> _initRestoreFailureWindow() async {
   if (!isDesktop) return;
   try {
     await windowManager.ensureInitialized();
-    if (defaultTargetPlatform == TargetPlatform.windows) {
-      await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
-      await windowManager.show();
-      await windowManager.focus();
-      return;
-    }
     await windowManager.waitUntilReadyToShow(
       const WindowOptions(title: 'JO-AIClient'),
       () async {
@@ -526,10 +554,6 @@ class _StartupScreen extends StatelessWidget {
 Future<void> _initDesktopWindow() async {
   if (kIsWeb) return;
   try {
-    if (defaultTargetPlatform == TargetPlatform.windows) {
-      await windowManager.ensureInitialized();
-      await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
-    }
     // 初始化并按持久化的大小和位置显示桌面窗口
     await DesktopWindowController.instance.initializeAndShow(
       title: 'JO-AIClient',

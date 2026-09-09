@@ -64,6 +64,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
   Map<String, String>? extraHeaders,
   Map<String, dynamic>? extraBody,
   bool stream = true,
+  bool skipImageParsing = false,
 }) async* {
   final upstreamModelId = _apiModelId(config, modelId);
   // 端点与请求头（各轮次保持不变）
@@ -250,7 +251,8 @@ Stream<ChatStreamChunk> _sendClaudeStream(
     // 仅做语义媒体检测——不识别自定义附件标记。
     // 附件通过结构化 media-path 键 /
     // userImagePaths 以及 Markdown ![](...) 传入。
-    final hasMarkdownImages = raw.contains('![') && raw.contains('](');
+    final hasMarkdownImages =
+        !skipImageParsing && raw.contains('![') && raw.contains('](');
     final internalMediaRefs = parseInternalMediaRefs(
       m[multimodalInternalMediaPathsKey],
     );
@@ -317,6 +319,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
         allowRemoteImages: true,
         allowLocalImages: true,
         keepRemoteMarkdownText: true,
+        skipImageParsing: skipImageParsing,
       );
       if (parsed.text.isNotEmpty) {
         parts.add({'type': 'text', 'text': parsed.text});

@@ -43,12 +43,7 @@ class _SelectCopyDesktopDialog extends StatelessWidget {
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       shape: DesktopDialogStyle.shape(context),
       child: ConstrainedBox(
-        constraints: DesktopDialogStyle.proportionalConstraints(
-          context,
-          minWidth: 420,
-          maxWidth: 720,
-          maxHeight: 640,
-        ),
+        constraints: DesktopDialogStyle.compactConstraints(context),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: Material(

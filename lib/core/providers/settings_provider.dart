@@ -94,6 +94,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String _providerConfigsKey = 'provider_configs_v1';
   static const String _pinnedModelsKey = 'pinned_models_v1';
   static const String _selectedModelKey = 'selected_model_v1';
+  static const String _perChatModelEnabledKey = 'per_chat_model_enabled_v1';
   static const String _titleModelKey = 'title_model_v1';
   static const String _titleGenerationEnabledKey =
       'title_generation_enabled_v1';
@@ -256,6 +257,7 @@ class SettingsProvider extends ChangeNotifier {
       'display_auto_scroll_enabled_v1';
   static const String _displayAutoRetryEnabledKey =
       'display_auto_retry_enabled_v1';
+  static const String _autoRetryOptionsKey = 'auto_retry_options';
   static const String _displayAutoScrollIdleSecondsKey =
       'display_auto_scroll_idle_seconds_v1';
   static const String _displayChatBackgroundMaskStrengthKey =
@@ -282,6 +284,8 @@ class SettingsProvider extends ChangeNotifier {
       'image_compress_custom_quality_v1';
   static const String _imageCompressTransparentEnabledKey =
       'image_compress_transparent_enabled_v1';
+  static const String _sendMarkdownImageLinksAsImagesKey =
+      'send_markdown_image_links_as_images_v1';
   static const String _displayMobileCodeBlockWrapKey =
       'display_mobile_code_block_wrap_v1';
   static const String _displayAutoCollapseCodeBlockKey =
@@ -831,6 +835,8 @@ class SettingsProvider extends ChangeNotifier {
         _currentModelId = parts.sublist(1).join('::');
       }
     }
+    // 每会话模型开关（JO 决策：默认开=现状，上游 1.2.6 默认关）
+    _perChatModelEnabled = prefs.getBool(_perChatModelEnabledKey) ?? true;
     // 加载标题模型
     final titleSel = prefs.getString(_titleModelKey);
     if (titleSel != null && titleSel.contains('::')) {
@@ -1049,10 +1055,21 @@ class SettingsProvider extends ChangeNotifier {
             .clamp(minMemoryInjectionMaxItems, maxMemoryInjectionMaxItems);
 
     // 显示设置
-    _autoRetryEnabled = prefs.getBool(_displayAutoRetryEnabledKey) ?? true;
-    AutoRetryConfig.current = const AutoRetryOptions.defaults().copyWith(
-      enabled: _autoRetryEnabled,
-    );
+    _autoRetry = const AutoRetryOptions.defaults().copyWith(enabled: true);
+    final autoRetryStr = prefs.getString(_autoRetryOptionsKey);
+    if (autoRetryStr != null && autoRetryStr.isNotEmpty) {
+      try {
+        _autoRetry = AutoRetryOptions.fromJson(
+          jsonDecode(autoRetryStr) as Map<String, dynamic>,
+        );
+      } catch (_) {}
+    } else if (prefs.containsKey(_displayAutoRetryEnabledKey)) {
+      // 一次性迁移：旧 D10 布尔键作为 enabled 种子，其余参数保持默认。
+      _autoRetry = _autoRetry.copyWith(
+        enabled: prefs.getBool(_displayAutoRetryEnabledKey) ?? true,
+      );
+    }
+    AutoRetryConfig.current = _autoRetry;
     _showUserAvatar = prefs.getBool(_displayShowUserAvatarKey) ?? true;
     _showModelIcon = prefs.getBool(_displayShowModelIconKey) ?? true;
     _showModelNameTimestamp =
@@ -1219,6 +1236,8 @@ class SettingsProvider extends ChangeNotifier {
         (prefs.getInt(_imageCompressCustomQualityKey) ?? 85).clamp(10, 100);
     _imageCompressTransparentEnabled =
         prefs.getBool(_imageCompressTransparentEnabledKey) ?? false;
+    _sendMarkdownImageLinksAsImages =
+        prefs.getBool(_sendMarkdownImageLinksAsImagesKey) ?? true;
     _mobileCodeBlockWrap =
         prefs.getBool(_displayMobileCodeBlockWrapKey) ?? false;
     _autoCollapseCodeBlock =
@@ -3560,6 +3579,20 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.remove(_selectedModelKey);
   }
 
+  // 开启时：在会话里选模型只作用于当前会话。
+  // 关闭时：选模型改写当前助手的模型，该助手下所有会话都跟随；
+  // 会话上的单独设置仍然保留，只是被忽略，重新开启后依然生效。
+  bool _perChatModelEnabled = true;
+  bool get perChatModelEnabled => _perChatModelEnabled;
+
+  Future<void> setPerChatModelEnabled(bool value) async {
+    if (_perChatModelEnabled == value) return;
+    _perChatModelEnabled = value;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.setBool(_perChatModelEnabledKey, value);
+  }
+
   // 标题模型和提示词
   String? _titleModelProvider;
   String? _titleModelId;
@@ -4504,14 +4537,25 @@ Requirements:
     return assistantBudget ?? _thinkingBudget;
   }
 
-  bool _autoRetryEnabled = true;
-  bool get autoRetryEnabled => _autoRetryEnabled;
-  Future<void> setAutoRetryEnabled(bool value) async {
-    if (_autoRetryEnabled == value) return;
-    _autoRetryEnabled = value;
-    AutoRetryConfig.current = AutoRetryConfig.current.copyWith(enabled: value);
+  AutoRetryOptions _autoRetry = const AutoRetryOptions.defaults().copyWith(
+    enabled: true,
+  );
+  AutoRetryOptions get autoRetryOptions => _autoRetry;
+  Future<void> setAutoRetryOptions(AutoRetryOptions value) async {
+    if (_autoRetry == value) return;
+    _autoRetry = value;
+    AutoRetryConfig.current = value;
     notifyListeners();
-    await _preferences.setBool(_displayAutoRetryEnabledKey, value);
+    await _preferences.setString(
+      _autoRetryOptionsKey,
+      jsonEncode(value.toJson()),
+    );
+  }
+
+  bool get autoRetryEnabled => _autoRetry.enabled;
+  Future<void> setAutoRetryEnabled(bool value) async {
+    if (_autoRetry.enabled == value) return;
+    await setAutoRetryOptions(_autoRetry.copyWith(enabled: value));
   }
 
   // 显示设置：用户头像和模型图标的可见性
@@ -5151,6 +5195,19 @@ Requirements:
     await _preferences.setBool(_imageCompressTransparentEnabledKey, value);
   }
 
+  // Default on to preserve pre-U2 behavior: markdown image links used to be
+  // parsed unconditionally, so turning it off by default would silently change
+  // behavior for users upgrading from 0.1.14. Explicit attachments are
+  // unaffected: they travel as media paths, not Markdown.
+  bool _sendMarkdownImageLinksAsImages = true;
+  bool get sendMarkdownImageLinksAsImages => _sendMarkdownImageLinksAsImages;
+  Future<void> setSendMarkdownImageLinksAsImages(bool value) async {
+    if (_sendMarkdownImageLinksAsImages == value) return;
+    _sendMarkdownImageLinksAsImages = value;
+    notifyListeners();
+    await _preferences.setBool(_sendMarkdownImageLinksAsImagesKey, value);
+  }
+
   ImageCompressConfig resolveImageCompressConfig() {
     return switch (_imageUploadQuality) {
       ImageUploadQuality.original => ImageCompressConfig(
@@ -5579,6 +5636,7 @@ Requirements:
     copy._pinnedModels.addAll(_pinnedModels);
     copy._currentModelProvider = _currentModelProvider;
     copy._currentModelId = _currentModelId;
+    copy._perChatModelEnabled = _perChatModelEnabled;
     copy._titleModelProvider = _titleModelProvider;
     copy._titleModelId = _titleModelId;
     copy._titleGenerationEnabled = _titleGenerationEnabled;

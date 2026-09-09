@@ -10,7 +10,6 @@ import 'package:reel_text/reel_text.dart';
 
 import '../../core/services/native_file_save.dart';
 import '../../core/services/migration/migration_backup_file_name.dart';
-import '../../desktop/window_title_bar.dart';
 import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
 import '../../shared/widgets/ios_tile_button.dart';
@@ -345,7 +344,7 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
         extendBody: true,
         body: Column(
           children: [
-            if (Platform.isWindows) WindowTitleBar(backgroundColor: cs.surface),
+            // Windows 已改用原生标题栏，不再插入自绘标题栏
             Expanded(
               child: DecoratedBox(
                 decoration: BoxDecoration(color: cs.surface),

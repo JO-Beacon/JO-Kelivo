@@ -1815,6 +1815,7 @@ class _MessageListViewState extends State<MessageListView> {
             isProcessingFiles: isProcessingFiles,
             suggestions: suggestions,
             presentation: presentation,
+            retryStatus: data.retryStatus,
             enableStreamingTextMotion: !deferUpdates,
           ),
         );
@@ -1840,6 +1841,7 @@ class _MessageListViewState extends State<MessageListView> {
     required bool isProcessingFiles,
     required List<String> suggestions,
     required _MessagePresentation presentation,
+    RetryStatus? retryStatus,
     bool enableStreamingTextMotion = true,
   }) {
     final currentIdx = useBranchSelector ? selectedBranchIndex : 0;
@@ -1892,6 +1894,7 @@ class _MessageListViewState extends State<MessageListView> {
           isProcessingFiles ||
           (widget.isPinnedIndicatorActive &&
               (message.id == widget.pinnedStreamingMessageId)),
+      retryStatus: retryStatus,
       reasoningText: (message.role == 'assistant') ? (r?.text ?? '') : null,
       reasoningExpanded: (message.role == 'assistant')
           ? (r?.expanded ?? false)

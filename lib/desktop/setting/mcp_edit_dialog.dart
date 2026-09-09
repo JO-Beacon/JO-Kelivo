@@ -27,11 +27,7 @@ Future<void> showDesktopMcpEditDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       shape: DesktopDialogStyle.shape(ctx),
       child: ConstrainedBox(
-        constraints: DesktopDialogStyle.proportionalConstraints(
-          ctx,
-          maxWidth: 720,
-          maxHeight: 640,
-        ),
+        constraints: DesktopDialogStyle.formConstraints(ctx),
         child: _DesktopMcpEditDialog(serverId: serverId),
       ),
     ),

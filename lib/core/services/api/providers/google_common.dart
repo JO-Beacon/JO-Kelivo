@@ -376,6 +376,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
   Map<String, String>? extraHeaders,
   Map<String, dynamic>? extraBody,
   bool stream = true,
+  bool skipImageParsing = false,
 }) async* {
   // 检查 Vertex AI Claude 模型（前缀为 "claude-"）
   // 如果它是 Vertex 上的 Claude 模型，则路由到特殊处理
@@ -396,6 +397,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       extraHeaders: extraHeaders,
       extraBody: extraBody,
       stream: stream,
+      skipImageParsing: skipImageParsing,
     );
     return;
   }
@@ -481,7 +483,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       // 仅进行语义媒体检测：自定义附件标记不会被识别。
       // 附件通过结构化 media-path 键 / userImagePaths 以及
       // Markdown ![](...) 传入。
-      final hasMarkdownImages = raw.contains('![') && raw.contains('](');
+      final hasMarkdownImages =
+          !skipImageParsing && raw.contains('![') && raw.contains('](');
       final internalMediaRefs = parseInternalMediaRefs(
         msg[multimodalInternalMediaPathsKey],
       );
@@ -496,6 +499,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
           allowRemoteImages: false,
           allowLocalImages: true,
           keepRemoteMarkdownText: true,
+          skipImageParsing: skipImageParsing,
         );
         if (parsed.text.isNotEmpty) parts.add({'text': parsed.text});
         for (final ref in parsed.images) {
@@ -967,7 +971,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
     // 仅在有图像需要处理时解析图像。
     // 仅做语义媒体检测，不识别自定义附件标记。附件通过结构化 media-path 键 /
     // userImagePaths 以及 Markdown ![](...) 到达。
-    final hasMarkdownImages = raw.contains('![') && raw.contains('](');
+    final hasMarkdownImages =
+        !skipImageParsing && raw.contains('![') && raw.contains('](');
     final internalMediaRefs = parseInternalMediaRefs(
       msg[multimodalInternalMediaPathsKey],
     );
@@ -983,6 +988,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         allowRemoteImages: false,
         allowLocalImages: true,
         keepRemoteMarkdownText: true,
+        skipImageParsing: skipImageParsing,
       );
       if (parsed.text.isNotEmpty) parts.add({'text': parsed.text});
       // 从此消息文本中提取的图像

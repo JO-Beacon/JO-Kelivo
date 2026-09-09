@@ -1199,12 +1199,7 @@ class _WorldBookEntryEditDialogState extends State<_WorldBookEntryEditDialog> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       shape: DesktopDialogStyle.shape(context),
       child: ConstrainedBox(
-        constraints: DesktopDialogStyle.proportionalConstraints(
-          context,
-          maxWidth: 760,
-          maxHeight: 760,
-          verticalInset: 18,
-        ),
+        constraints: DesktopDialogStyle.formConstraints(context),
         child: Stack(
           children: [
             Padding(

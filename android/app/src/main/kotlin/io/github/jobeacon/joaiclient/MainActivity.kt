@@ -4,11 +4,15 @@ import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.net.Uri
 import android.content.Intent
+import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import android.util.Log
+import android.view.Surface
+import android.view.SurfaceHolder
 import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterSurfaceView
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
@@ -20,14 +24,18 @@ class MainActivity : FlutterActivity() {
     private companion object {
         const val CREATE_DOCUMENT_REQUEST_CODE = 4107
         const val DEFAULT_DOCUMENT_MIME_TYPE = "application/zip"
+        const val TAG = "MainActivity"
     }
 
     private enum class WritableFileState { IDLE, OPEN, COMMITTED, DISCARDED }
 
     private val processTextChannelName = "app.process_text"
     private val fileSaveChannelName = "app.file_save"
+    private val displayModeChannelName = "app.display_mode"
     private var processTextChannel: MethodChannel? = null
     private var fileSaveChannel: MethodChannel? = null
+    private var displayModeChannel: MethodChannel? = null
+    private var flutterSurfaceView: FlutterSurfaceView? = null
     private var pendingProcessText: String? = null
     private var pendingSaveResult: MethodChannel.Result? = null
     private var pendingSaveSourcePath: String? = null
@@ -38,6 +46,29 @@ class MainActivity : FlutterActivity() {
     @Volatile private var writableFileState = WritableFileState.IDLE
     private val writableFileExecutor = Executors.newSingleThreadExecutor()
      private var deviceLocalToolsHandler: DeviceLocalToolsHandler? = null
+
+    override fun onFlutterSurfaceViewCreated(flutterSurfaceView: FlutterSurfaceView) {
+        super.onFlutterSurfaceViewCreated(flutterSurfaceView)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            this.flutterSurfaceView = flutterSurfaceView
+            flutterSurfaceView.holder.addCallback(object : SurfaceHolder.Callback {
+                override fun surfaceCreated(holder: SurfaceHolder) {
+                    requestNativeHighRefreshRate()
+                }
+
+                override fun surfaceChanged(
+                    holder: SurfaceHolder,
+                    format: Int,
+                    width: Int,
+                    height: Int,
+                ) {
+                    requestNativeHighRefreshRate()
+                }
+
+                override fun surfaceDestroyed(holder: SurfaceHolder) = Unit
+            })
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
          super.configureFlutterEngine(flutterEngine)
@@ -67,10 +98,49 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+        displayModeChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, displayModeChannelName)
+        displayModeChannel?.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "requestHighRefreshRate" -> result.success(requestNativeHighRefreshRate())
+                else -> result.notImplemented()
+            }
+        }
         pendingProcessText = extractProcessText(intent)
     }
 
+    private fun requestNativeHighRefreshRate(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return false
+
+        try {
+            val surface = flutterSurfaceView?.holder?.surface
+            if (surface?.isValid == true) {
+                val currentDisplay = display ?: return true
+                val activeMode = currentDisplay.mode
+                val targetRefreshRate = currentDisplay.supportedModes
+                    .asSequence()
+                    .filter {
+                        it.physicalWidth == activeMode.physicalWidth &&
+                            it.physicalHeight == activeMode.physicalHeight
+                    }
+                    .maxOfOrNull { it.refreshRate }
+                if (targetRefreshRate != null) {
+                    // Hint the actual Flutter rendering surface while leaving
+                    // mode selection, ARR, and system limits to Android.
+                    surface.setFrameRate(
+                        targetRefreshRate,
+                        Surface.FRAME_RATE_COMPATIBILITY_DEFAULT,
+                        Surface.CHANGE_FRAME_RATE_ONLY_IF_SEAMLESS,
+                    )
+                }
+            }
+        } catch (error: RuntimeException) {
+            Log.w(TAG, "Unable to request a high refresh rate", error)
+        }
+        return true
+    }
+
     override fun onDestroy() {
+        deviceLocalToolsHandler?.dispose()
         val stream = pendingWritableStream
         val uri = pendingWritableUri
         if (stream != null && uri != null) {

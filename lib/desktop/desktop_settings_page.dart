@@ -78,6 +78,7 @@ import '../utils/provider_grouping_logic.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../theme/custom_theme.dart';
 import '../features/settings/widgets/custom_theme_widgets.dart';
+import 'setting/auto_retry_pane.dart' as auto_retry;
 import '../features/settings/pages/message_style_settings_page.dart';
 
 part 'setting/assistants_pane.dart';

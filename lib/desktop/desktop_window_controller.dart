@@ -5,7 +5,6 @@ import 'package:window_manager/window_manager.dart';
 
 import 'window_size_manager.dart';
 import 'dart:async';
-import 'package:bitsdojo_window/bitsdojo_window.dart';
 
 /// 处理桌面窗口初始化和持久化（尺寸、位置、最大化状态）。
 class DesktopWindowController with WindowListener {
@@ -29,7 +28,6 @@ class DesktopWindowController with WindowListener {
 
     await windowManager.ensureInitialized();
     _attachListeners();
-    // Windows 自定义标题栏在 main 中处理（TitleBarStyle.hidden）
 
     final initialSize = await _sizeMgr.getInitialSize();
     const minSize = Size(
@@ -54,36 +52,25 @@ class DesktopWindowController with WindowListener {
     final savedPos = await _sizeMgr.getPosition();
     final wasMax = await _sizeMgr.getWindowMaximized();
 
-    if (defaultTargetPlatform == TargetPlatform.windows) {
-      await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
-      doWhenWindowReady(() async {
-        appWindow.minSize = options.minimumSize;
-        appWindow.maxSize = options.maximumSize;
-        appWindow.size = initialSize;
-
-        if (savedPos != null) {
-          appWindow.position = savedPos;
-        }
-
-        /// 在 Windows 上，如果窗口上次是从最大化状态关闭的，则恢复为最大化。
-        if (wasMax) {
-          appWindow.maximize();
-        }
-      });
-    } else {
-      await windowManager.waitUntilReadyToShow(options, () async {
-        // 先显示窗口，再恢复位置，避免 macOS 上跳动或闪烁。
-        await windowManager.show();
-        await windowManager.focus();
-        // 在 macOS 上依赖原生自动保存，不从 Dart 设置位置。
-        final shouldRestorePos = savedPos != null && !isMac;
-        if (shouldRestorePos) {
-          try {
-            await windowManager.setPosition(savedPos);
-          } catch (_) {}
-        }
-      });
-    }
+    await windowManager.waitUntilReadyToShow(options, () async {
+      // 在 Windows 上，如果窗口上次是从最大化状态关闭的，则在显示前恢复最大化，
+      // 避免先出现普通窗口再放大的闪烁。
+      if (!isMac && wasMax) {
+        try {
+          await windowManager.maximize();
+        } catch (_) {}
+      }
+      // 先显示窗口，再恢复位置，避免 macOS 上跳动或闪烁。
+      await windowManager.show();
+      await windowManager.focus();
+      // 在 macOS 上依赖原生自动保存，不从 Dart 设置位置。
+      final shouldRestorePos = savedPos != null && !isMac;
+      if (shouldRestorePos && !wasMax) {
+        try {
+          await windowManager.setPosition(savedPos);
+        } catch (_) {}
+      }
+    });
   }
 
   void _attachListeners() {

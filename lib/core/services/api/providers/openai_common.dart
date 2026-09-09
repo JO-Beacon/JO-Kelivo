@@ -726,6 +726,7 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
   bool supportsGoogleOpenAIThoughtSignatures = false,
   bool stripReasoningContent = false,
   bool normalizeReasoningDetails = false,
+  bool skipImageParsing = false,
 }) async {
   final out = <Map<String, dynamic>>[];
   // 助手轮次不能携带 image_url/video_url；暂存到最后一个用户消息
@@ -1009,7 +1010,8 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
       continue;
     }
 
-    final hasMarkdownImages = raw.contains('![') && raw.contains('](');
+    final hasMarkdownImages =
+        !skipImageParsing && raw.contains('![') && raw.contains('](');
     // 仅进行语义媒体检测——自定义附件标记不会被识别。
     // 附件通过结构化 media-path 键 /
     // userMediaPaths 以及 Markdown ![](...) 传入。
@@ -1031,6 +1033,7 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
       allowDataImages: canImageInput,
       keepRemoteMarkdownText: true,
       keepDisallowedImageText: canImageInput,
+      skipImageParsing: skipImageParsing,
     );
     if (!canImageInput) {
       outMsg['content'] = parsed.text;
@@ -1586,6 +1589,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
   Map<String, String>? extraHeaders,
   Map<String, dynamic>? extraBody,
   bool stream = true,
+  bool skipImageParsing = false,
 }) async* {
   final upstreamModelId = _apiModelId(config, modelId);
   final url = _openAICompatibleUrl(config);
@@ -1859,7 +1863,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
       // 仅进行语义媒体检测，无法识别自定义附件标记。
       // 附件通过结构化 media-path 键 /
       // userImagePaths，以及 Markdown 的 ![](...) 传入。
-      final hasMarkdownImages = raw.contains('![') && raw.contains('](');
+      final hasMarkdownImages =
+          !skipImageParsing && raw.contains('![') && raw.contains('](');
       final internalMediaRefs = parseInternalMediaRefs(
         m[multimodalInternalMediaPathsKey],
       );
@@ -1888,6 +1893,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           allowDataImages: canImageInput,
           keepRemoteMarkdownText: true,
           keepDisallowedImageText: canImageInput,
+          skipImageParsing: skipImageParsing,
         );
         if (!canImageInput) {
           if (isAssistant) {
@@ -2121,6 +2127,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           info.supportsGoogleOpenAIThoughtSignatures,
       stripReasoningContent: isClaudeUpstream,
       normalizeReasoningDetails: isClaudeUpstream,
+      skipImageParsing: skipImageParsing,
     );
     body = {
       'model': upstreamModelId,
@@ -2455,6 +2462,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 info.supportsGoogleOpenAIThoughtSignatures,
             stripReasoningContent: isClaudeUpstream,
             normalizeReasoningDetails: isClaudeUpstream,
+            skipImageParsing: skipImageParsing,
           );
           reqBody.remove('stream');
           req.body = jsonEncode(reqBody);
@@ -2666,6 +2674,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     info.supportsGoogleOpenAIThoughtSignatures,
                 stripReasoningContent: isClaudeUpstream,
                 normalizeReasoningDetails: isClaudeUpstream,
+                skipImageParsing: skipImageParsing,
               ),
               'stream': true,
               if (temperature != null) 'temperature': temperature,
@@ -4097,6 +4106,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     info.supportsGoogleOpenAIThoughtSignatures,
                 stripReasoningContent: isClaudeUpstream,
                 normalizeReasoningDetails: isClaudeUpstream,
+                skipImageParsing: skipImageParsing,
               ),
               'stream': true,
               if (temperature != null) 'temperature': temperature,
@@ -4640,6 +4650,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                         info.supportsGoogleOpenAIThoughtSignatures,
                     stripReasoningContent: isClaudeUpstream,
                     normalizeReasoningDetails: isClaudeUpstream,
+                    skipImageParsing: skipImageParsing,
                   ),
                   'stream': true,
                   if (temperature != null) 'temperature': temperature,

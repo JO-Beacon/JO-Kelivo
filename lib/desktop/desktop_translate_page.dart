@@ -180,6 +180,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
           context.read<AssistantProvider>().currentAssistant?.thinkingBudget,
         ),
         requestId: _requestId,
+        parseMarkdownImageLinks: settings.sendMarkdownImageLinksAsImages,
       );
 
       _subscription = stream.listen(

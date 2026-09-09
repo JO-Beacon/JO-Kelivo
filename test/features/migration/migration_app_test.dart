@@ -7,7 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/features/migration/hive_to_sqlite_migration_page.dart';
 import 'package:Kelivo/features/migration/hive_to_sqlite_migration_service.dart';
-import 'package:Kelivo/desktop/window_title_bar.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/main.dart' show MigrationApp;
@@ -51,7 +50,6 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.byType(WindowTitleBar), findsOneWidget);
     expect(find.text('线性 SQLite'), findsOneWidget);
     expect(find.text('树化 SQLite'), findsOneWidget);
     expect(find.text('Hive'), findsNothing);

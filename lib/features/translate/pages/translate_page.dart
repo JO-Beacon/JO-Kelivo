@@ -143,6 +143,7 @@ class _TranslatePageState extends State<TranslatePage> {
           context.read<AssistantProvider>().currentAssistant?.thinkingBudget,
         ),
         requestId: _requestId,
+        parseMarkdownImageLinks: settings.sendMarkdownImageLinksAsImages,
       );
       _sub = stream.listen(
         (chunk) {

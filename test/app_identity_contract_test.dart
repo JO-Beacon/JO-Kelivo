@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('JO-AIClient application identity', () {
     test('uses the published JO-AIClient version and platform namespaces', () {
-      _expectContains('pubspec.yaml', 'version: 0.1.14+14');
+      _expectContains('pubspec.yaml', 'version: 0.1.15+15');
 
       _expectContains(
         'android/app/build.gradle.kts',
@@ -128,8 +128,8 @@ void main() {
           'lib/features/settings/pages/about_page.dart',
           'lib/desktop/setting/about_pane.dart',
         ]) {
-          _expectContains(path, "_upstreamKelivoVersion = '1.2.5'");
-          _expectContains(path, "_upstreamKelivoBuildNumber = '72'");
+          _expectContains(path, "_upstreamKelivoVersion = '1.2.6'");
+          _expectContains(path, "_upstreamKelivoBuildNumber = '73'");
           _expectContains(path, 'https://github.com/JO-Beacon/JO-Kelivo');
           _expectContains(path, 'https://github.com/Chevey339/kelivo');
         }

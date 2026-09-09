@@ -2,7 +2,6 @@ import "../../../support/business_test_harness.dart";
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/settings/pages/display_settings_page.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -49,7 +48,7 @@ void main() {
     expect(find.byType(SfSlider), findsNWidgets(2));
   });
 
-  testWidgets('behavior settings expose the automatic retry switch', (
+  testWidgets('behavior settings open the auto retry panel', (
     tester,
   ) async {
     final preferences = createBusinessTestPreferences();
@@ -72,16 +71,13 @@ void main() {
     await tester.tap(find.text('Behavior & startup'));
     await tester.pumpAndSettle();
 
-    final label = find.text('Automatic Retry');
+    final label = find.text('Auto Retry');
     expect(label, findsOneWidget);
-    expect(find.textContaining('temporary network'), findsOneWidget);
-    final row = find.ancestor(of: label, matching: find.byType(Row)).first;
-    final toggle = find.descendant(of: row, matching: find.byType(IosSwitch));
-    expect(tester.widget<IosSwitch>(toggle).value, isTrue);
 
-    await tester.tap(toggle);
-    await tester.pump();
+    await tester.tap(label);
+    await tester.pumpAndSettle();
 
-    expect(settings.autoRetryEnabled, isFalse);
+    expect(find.text('Enable auto-retry'), findsOneWidget);
+    expect(find.text('Max retries'), findsOneWidget);
   });
 }

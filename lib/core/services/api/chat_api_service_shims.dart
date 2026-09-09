@@ -48,6 +48,7 @@ Future<_ParsedTextAndImages> _parseTextAndImages(
   bool allowDataImages = true,
   bool keepRemoteMarkdownText = true,
   bool keepDisallowedImageText = true,
+  bool skipImageParsing = false,
 }) => ChatApiService._parseTextAndImages(
   raw,
   allowRemoteImages: allowRemoteImages,
@@ -55,6 +56,7 @@ Future<_ParsedTextAndImages> _parseTextAndImages(
   allowDataImages: allowDataImages,
   keepRemoteMarkdownText: keepRemoteMarkdownText,
   keepDisallowedImageText: keepDisallowedImageText,
+  skipImageParsing: skipImageParsing,
 );
 
 Future<String?> _tryEncodeBase64File(String path, {bool withPrefix = false}) =>

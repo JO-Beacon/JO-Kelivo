@@ -1867,13 +1867,13 @@ abstract class AppLocalizations {
   /// No description provided for @assistantEditChatModelTitle.
   ///
   /// In en, this message translates to:
-  /// **'Chat Model'**
+  /// **'Default Chat Model'**
   String get assistantEditChatModelTitle;
 
   /// No description provided for @assistantEditChatModelSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Default chat model for this assistant (fallback to global)'**
+  /// **'Default chat model for this assistant (falls back to global if unset)'**
   String get assistantEditChatModelSubtitle;
 
   /// No description provided for @assistantEditTemperatureDescription.
@@ -6448,6 +6448,18 @@ abstract class AppLocalizations {
   /// **'Global default chat model'**
   String get defaultModelPageChatModelSubtitle;
 
+  /// No description provided for @defaultModelPagePerChatModelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Per-Chat Model'**
+  String get defaultModelPagePerChatModelTitle;
+
+  /// No description provided for @defaultModelPagePerChatModelSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'On: picking a model in a chat applies to that chat only. Off: it becomes the current assistant\'s model, so every chat using that assistant follows it.'**
+  String get defaultModelPagePerChatModelSubtitle;
+
   /// No description provided for @defaultModelPageTitleModelTitle.
   ///
   /// In en, this message translates to:
@@ -6859,18 +6871,6 @@ abstract class AppLocalizations {
   /// **'Reasoning'**
   String get modelDetailSheetReasoningAbility;
 
-  /// No description provided for @modelDetailSheetProviderOverrideDescription.
-  ///
-  /// In en, this message translates to:
-  /// **'Provider overrides: customize provider for a specific model.'**
-  String get modelDetailSheetProviderOverrideDescription;
-
-  /// No description provided for @modelDetailSheetAddProviderOverride.
-  ///
-  /// In en, this message translates to:
-  /// **'Add Provider Override'**
-  String get modelDetailSheetAddProviderOverride;
-
   /// No description provided for @modelDetailSheetCustomHeadersTitle.
   ///
   /// In en, this message translates to:
@@ -7087,11 +7087,23 @@ abstract class AppLocalizations {
   /// **'Favorites'**
   String get modelSelectSheetFavoritesSection;
 
-  /// No description provided for @modelSelectSheetFollowAssistant.
+  /// No description provided for @modelSelectSheetInheritSourceAssistant.
   ///
   /// In en, this message translates to:
-  /// **'Follow assistant'**
-  String get modelSelectSheetFollowAssistant;
+  /// **'Assistant default'**
+  String get modelSelectSheetInheritSourceAssistant;
+
+  /// No description provided for @modelSelectSheetInheritSourceGlobal.
+  ///
+  /// In en, this message translates to:
+  /// **'Global default'**
+  String get modelSelectSheetInheritSourceGlobal;
+
+  /// No description provided for @modelSelectSheetInheritSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No model set for this chat'**
+  String get modelSelectSheetInheritSubtitle;
 
   /// No description provided for @modelSelectSheetFavoriteTooltip.
   ///
@@ -9448,7 +9460,7 @@ abstract class AppLocalizations {
   /// No description provided for @themeSettingsPageUsePureBackgroundSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Bubbles and accents follow theme.'**
+  /// **'Page background becomes pure white or black; bubbles and accents keep following the theme.'**
   String get themeSettingsPageUsePureBackgroundSubtitle;
 
   /// No description provided for @themeSettingsPageUseLayeredSurfacesTitle.
@@ -9460,7 +9472,7 @@ abstract class AppLocalizations {
   /// No description provided for @themeSettingsPageUseLayeredSurfacesSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Make cards and panels stand above the page background.'**
+  /// **'Fine-tunes card and input fill colors; with pure background on, the page background stays unchanged and only input fills differ.'**
   String get themeSettingsPageUseLayeredSurfacesSubtitle;
 
   /// No description provided for @searchProviderAnySearchDescription.
@@ -14839,6 +14851,24 @@ abstract class AppLocalizations {
   /// **'Compression happens when images are added. Previously saved or sent images are not affected. Compressed images are sent as JPEG files.'**
   String get imageSettingsPageFooter;
 
+  /// No description provided for @imageSettingsPageSendSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending'**
+  String get imageSettingsPageSendSectionTitle;
+
+  /// No description provided for @imageSettingsPageMarkdownImageLinksTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send Markdown image links as images'**
+  String get imageSettingsPageMarkdownImageLinksTitle;
+
+  /// No description provided for @imageSettingsPageMarkdownImageLinksSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When enabled, an ![alt](url) link in your message text is sent to vision models as an image. When off it stays plain text. Images you attach yourself are always sent as images.'**
+  String get imageSettingsPageMarkdownImageLinksSubtitle;
+
   /// No description provided for @memoryTraceSettingsTitle.
   ///
   /// In en, this message translates to:
@@ -16066,7 +16096,7 @@ abstract class AppLocalizations {
   /// No description provided for @healthDataSettingsTypeSleepSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Sleep duration last night'**
+  /// **'Past 24 hours: sleep, time in bed, awake periods and sleep stages'**
   String get healthDataSettingsTypeSleepSubtitle;
 
   /// No description provided for @healthDataSettingsTypeSleepTitle.
@@ -16134,6 +16164,162 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Workouts'**
   String get healthDataSettingsTypeWorkoutsTitle;
+
+  /// No description provided for @healthDataSettingsCategoryReproductive.
+  ///
+  /// In en, this message translates to:
+  /// **'Reproductive health'**
+  String get healthDataSettingsCategoryReproductive;
+
+  /// No description provided for @healthDataSettingsTypeMenstrualFlowTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Menstrual flow'**
+  String get healthDataSettingsTypeMenstrualFlowTitle;
+
+  /// No description provided for @healthDataSettingsTypeMenstrualFlowSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded menstrual flow and cycle starts in the past 90 days'**
+  String get healthDataSettingsTypeMenstrualFlowSubtitle;
+
+  /// No description provided for @assistantEditLocationPermissionSettingsMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Location permission is blocked. Allow location access in system settings, then turn this tool on again.'**
+  String get assistantEditLocationPermissionSettingsMessage;
+
+  /// No description provided for @reasoningBudgetSliderLow.
+  ///
+  /// In en, this message translates to:
+  /// **'Low'**
+  String get reasoningBudgetSliderLow;
+
+  /// No description provided for @reasoningBudgetSliderMedium.
+  ///
+  /// In en, this message translates to:
+  /// **'Medium'**
+  String get reasoningBudgetSliderMedium;
+
+  /// No description provided for @reasoningBudgetSliderHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'High'**
+  String get reasoningBudgetSliderHigh;
+
+  /// No description provided for @reasoningBudgetSliderXhigh.
+  ///
+  /// In en, this message translates to:
+  /// **'XHigh'**
+  String get reasoningBudgetSliderXhigh;
+
+  /// No description provided for @reasoningBudgetSliderMax.
+  ///
+  /// In en, this message translates to:
+  /// **'Max'**
+  String get reasoningBudgetSliderMax;
+
+  /// No description provided for @autoRetryCountdown.
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds}s until retry ({attempt}/{maxRetries})'**
+  String autoRetryCountdown(int seconds, int attempt, int maxRetries);
+
+  /// No description provided for @settingsPageAutoRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto Retry'**
+  String get settingsPageAutoRetry;
+
+  /// No description provided for @autoRetryEnableLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable auto-retry'**
+  String get autoRetryEnableLabel;
+
+  /// No description provided for @autoRetryMaxRetries.
+  ///
+  /// In en, this message translates to:
+  /// **'Max retries'**
+  String get autoRetryMaxRetries;
+
+  /// No description provided for @autoRetryInitialDelay.
+  ///
+  /// In en, this message translates to:
+  /// **'Initial delay (ms)'**
+  String get autoRetryInitialDelay;
+
+  /// No description provided for @autoRetryMultiplier.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait time multiplier'**
+  String get autoRetryMultiplier;
+
+  /// No description provided for @autoRetryMultiplierSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Multiplied into the wait after each failed attempt; 1 keeps every wait the same'**
+  String get autoRetryMultiplierSubtitle;
+
+  /// No description provided for @autoRetryMaxDelay.
+  ///
+  /// In en, this message translates to:
+  /// **'Max delay (ms)'**
+  String get autoRetryMaxDelay;
+
+  /// No description provided for @autoRetryJitter.
+  ///
+  /// In en, this message translates to:
+  /// **'Random variation'**
+  String get autoRetryJitter;
+
+  /// No description provided for @autoRetryJitterSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Randomize each wait by ±20%'**
+  String get autoRetryJitterSubtitle;
+
+  /// No description provided for @autoRetryOnNetworkError.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry on network errors'**
+  String get autoRetryOnNetworkError;
+
+  /// No description provided for @autoRetryStatusCodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry status codes'**
+  String get autoRetryStatusCodes;
+
+  /// No description provided for @autoRetryKeywords.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry keywords'**
+  String get autoRetryKeywords;
+
+  /// No description provided for @autoRetryStopKeywords.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop keywords'**
+  String get autoRetryStopKeywords;
+
+  /// No description provided for @autoRetryAddHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get autoRetryAddHint;
+
+  /// No description provided for @autoRetryRestoreDefaults.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore defaults'**
+  String get autoRetryRestoreDefaults;
+
+  /// No description provided for @autoRetryFooter.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-retry only runs if the current model response has not produced any output yet.'**
+  String get autoRetryFooter;
 }
 
 class _AppLocalizationsDelegate

@@ -1755,12 +1755,7 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
       shape: DesktopDialogStyle.shape(context),
       child: ConstrainedBox(
-        constraints: DesktopDialogStyle.proportionalConstraints(
-          context,
-          maxWidth: 760,
-          maxHeight: 540,
-          verticalInset: 18,
-        ),
+        constraints: DesktopDialogStyle.formConstraints(context),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
           child: Column(

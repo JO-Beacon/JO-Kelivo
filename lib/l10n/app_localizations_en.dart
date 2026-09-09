@@ -971,11 +971,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assistantEditUseAssistantNameTitle => 'Use Assistant Name';
 
   @override
-  String get assistantEditChatModelTitle => 'Chat Model';
+  String get assistantEditChatModelTitle => 'Default Chat Model';
 
   @override
   String get assistantEditChatModelSubtitle =>
-      'Default chat model for this assistant (fallback to global)';
+      'Default chat model for this assistant (falls back to global if unset)';
 
   @override
   String get assistantEditTemperatureDescription =>
@@ -3494,6 +3494,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get defaultModelPageChatModelSubtitle => 'Global default chat model';
 
   @override
+  String get defaultModelPagePerChatModelTitle => 'Per-Chat Model';
+
+  @override
+  String get defaultModelPagePerChatModelSubtitle =>
+      'On: picking a model in a chat applies to that chat only. Off: it becomes the current assistant\'s model, so every chat using that assistant follows it.';
+
+  @override
   String get defaultModelPageTitleModelTitle => 'Title Summary Model';
 
   @override
@@ -3738,13 +3745,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get modelDetailSheetReasoningAbility => 'Reasoning';
 
   @override
-  String get modelDetailSheetProviderOverrideDescription =>
-      'Provider overrides: customize provider for a specific model.';
-
-  @override
-  String get modelDetailSheetAddProviderOverride => 'Add Provider Override';
-
-  @override
   String get modelDetailSheetCustomHeadersTitle => 'Custom Headers';
 
   @override
@@ -3866,7 +3866,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get modelSelectSheetFavoritesSection => 'Favorites';
 
   @override
-  String get modelSelectSheetFollowAssistant => 'Follow assistant';
+  String get modelSelectSheetInheritSourceAssistant => 'Assistant default';
+
+  @override
+  String get modelSelectSheetInheritSourceGlobal => 'Global default';
+
+  @override
+  String get modelSelectSheetInheritSubtitle => 'No model set for this chat';
 
   @override
   String get modelSelectSheetFavoriteTooltip => 'Favorite';
@@ -5176,14 +5182,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get themeSettingsPageUsePureBackgroundSubtitle =>
-      'Bubbles and accents follow theme.';
+      'Page background becomes pure white or black; bubbles and accents keep following the theme.';
 
   @override
   String get themeSettingsPageUseLayeredSurfacesTitle => 'Layered surfaces';
 
   @override
   String get themeSettingsPageUseLayeredSurfacesSubtitle =>
-      'Make cards and panels stand above the page background.';
+      'Fine-tunes card and input fill colors; with pure background on, the page background stays unchanged and only input fills differ.';
 
   @override
   String get searchProviderAnySearchDescription =>
@@ -8197,6 +8203,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'Compression happens when images are added. Previously saved or sent images are not affected. Compressed images are sent as JPEG files.';
 
   @override
+  String get imageSettingsPageSendSectionTitle => 'Sending';
+
+  @override
+  String get imageSettingsPageMarkdownImageLinksTitle =>
+      'Send Markdown image links as images';
+
+  @override
+  String get imageSettingsPageMarkdownImageLinksSubtitle =>
+      'When enabled, an ![alt](url) link in your message text is sent to vision models as an image. When off it stays plain text. Images you attach yourself are always sent as images.';
+
+  @override
   String get memoryTraceSettingsTitle => 'Pipeline Traces';
 
   @override
@@ -8871,7 +8888,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Resting Heart Rate';
 
   @override
-  String get healthDataSettingsTypeSleepSubtitle => 'Sleep duration last night';
+  String get healthDataSettingsTypeSleepSubtitle =>
+      'Past 24 hours: sleep, time in bed, awake periods and sleep stages';
 
   @override
   String get healthDataSettingsTypeSleepTitle => 'Sleep';
@@ -8906,4 +8924,88 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get healthDataSettingsTypeWorkoutsTitle => 'Workouts';
+
+  @override
+  String get healthDataSettingsCategoryReproductive => 'Reproductive health';
+
+  @override
+  String get healthDataSettingsTypeMenstrualFlowTitle => 'Menstrual flow';
+
+  @override
+  String get healthDataSettingsTypeMenstrualFlowSubtitle =>
+      'Recorded menstrual flow and cycle starts in the past 90 days';
+
+  @override
+  String get assistantEditLocationPermissionSettingsMessage =>
+      'Location permission is blocked. Allow location access in system settings, then turn this tool on again.';
+
+  @override
+  String get reasoningBudgetSliderLow => 'Low';
+
+  @override
+  String get reasoningBudgetSliderMedium => 'Medium';
+
+  @override
+  String get reasoningBudgetSliderHigh => 'High';
+
+  @override
+  String get reasoningBudgetSliderXhigh => 'XHigh';
+
+  @override
+  String get reasoningBudgetSliderMax => 'Max';
+
+  @override
+  String autoRetryCountdown(int seconds, int attempt, int maxRetries) {
+    return '${seconds}s until retry ($attempt/$maxRetries)';
+  }
+
+  @override
+  String get settingsPageAutoRetry => 'Auto Retry';
+
+  @override
+  String get autoRetryEnableLabel => 'Enable auto-retry';
+
+  @override
+  String get autoRetryMaxRetries => 'Max retries';
+
+  @override
+  String get autoRetryInitialDelay => 'Initial delay (ms)';
+
+  @override
+  String get autoRetryMultiplier => 'Wait time multiplier';
+
+  @override
+  String get autoRetryMultiplierSubtitle =>
+      'Multiplied into the wait after each failed attempt; 1 keeps every wait the same';
+
+  @override
+  String get autoRetryMaxDelay => 'Max delay (ms)';
+
+  @override
+  String get autoRetryJitter => 'Random variation';
+
+  @override
+  String get autoRetryJitterSubtitle => 'Randomize each wait by ±20%';
+
+  @override
+  String get autoRetryOnNetworkError => 'Retry on network errors';
+
+  @override
+  String get autoRetryStatusCodes => 'Retry status codes';
+
+  @override
+  String get autoRetryKeywords => 'Retry keywords';
+
+  @override
+  String get autoRetryStopKeywords => 'Stop keywords';
+
+  @override
+  String get autoRetryAddHint => 'Add';
+
+  @override
+  String get autoRetryRestoreDefaults => 'Restore defaults';
+
+  @override
+  String get autoRetryFooter =>
+      'Auto-retry only runs if the current model response has not produced any output yet.';
 }

@@ -185,8 +185,14 @@ Future<ParsedTextAndImages> parseTextAndImages(
   bool allowDataImages = true,
   bool keepRemoteMarkdownText = true,
   bool keepDisallowedImageText = true,
+  bool skipImageParsing = false,
 }) async {
   if (raw.isEmpty) return const ParsedTextAndImages('', <ImageRef>[]);
+  // 工具类/纯文本提示（标题、摘要、压缩）必须把 `![...](...)` 保持为
+  // 字面文本，绝不走 Markdown 扫描器。
+  if (skipImageParsing || !raw.contains('![')) {
+    return ParsedTextAndImages(raw.trim(), const <ImageRef>[]);
+  }
   final mdImg = RegExp(r'!\[[^\]]*\]\(([^)]+)\)');
   // 这里有意不识别自定义附件标记；附件通过结构化 parts/媒体路径键传入。
   final images = <ImageRef>[];
@@ -282,8 +288,9 @@ Future<ParsedTextAndImages> parseTextAndImages(
       // 远程 http(s) URL。
       if (url.startsWith('http://') || url.startsWith('https://')) {
         if (!allowRemoteImages) {
-          // 模型不接受图片输入，或有意跳过 http 图片；保留原始 Markdown 模板。
-          if (keepDisallowedImageText) buf.write(full);
+          // 远程链接不带数据载荷，丢弃等于悄悄删掉用户的一段文字；
+          // 是否保留跟随 keepRemoteMarkdownText。
+          if (keepRemoteMarkdownText) buf.write(full);
           i = m1.end;
           continue;
         }

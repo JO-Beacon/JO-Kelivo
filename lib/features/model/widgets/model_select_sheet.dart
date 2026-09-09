@@ -7,6 +7,7 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/model_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/services/chat/chat_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'model_detail_sheet.dart';
@@ -207,7 +208,7 @@ Future<ModelSelection?> showModelSelector(
   String? initialProviderKey,
   String? initialModelId,
   bool allowInherit = false,
-  String? inheritLabel,
+  bool inheritSelected = false,
 }) async {
   if (_modelSelectorOpen) return null;
   _modelSelectorOpen = true;
@@ -223,7 +224,7 @@ Future<ModelSelection?> showModelSelector(
         initialProviderKey: initialProviderKey,
         initialModelId: initialModelId,
         allowInherit: allowInherit,
-        inheritLabel: inheritLabel,
+        inheritSelected: inheritSelected,
       );
     }
     final cs = Theme.of(context).colorScheme;
@@ -239,7 +240,7 @@ Future<ModelSelection?> showModelSelector(
         initialProviderKey: initialProviderKey,
         initialModelId: initialModelId,
         allowInherit: allowInherit,
-        inheritLabel: inheritLabel,
+        inheritSelected: inheritSelected,
       ),
     );
   } finally {
@@ -251,24 +252,82 @@ Future<void> showModelSelectSheet(
   BuildContext context, {
   required HomePageController controller,
 }) async {
+  final settings = context.read<SettingsProvider>();
+  final assistantProvider = context.read<AssistantProvider>();
+  final assistant = assistantProvider.currentAssistant;
+  final perChat = settings.perChatModelEnabled;
   final conversation = controller.currentConversation;
   final resolved = resolveChatModel(
-    context.read<SettingsProvider>(),
+    settings,
     conversation: conversation,
-    assistant: context.read<AssistantProvider>().currentAssistant,
+    assistant: assistant,
   );
+  final hasOwnModel =
+      conversation?.chatModelProvider?.trim().isNotEmpty == true &&
+      conversation?.chatModelId?.trim().isNotEmpty == true;
   final sel = await showModelSelector(
     context,
     initialProviderKey: resolved.providerKey,
     initialModelId: resolved.modelId,
-    allowInherit:
-        conversation?.chatModelProvider?.trim().isNotEmpty == true &&
-        conversation?.chatModelId?.trim().isNotEmpty == true,
+    // 关掉独立模型时本对话无法单独指定，整行不显示。
+    allowInherit: perChat,
+    // 本对话没单独指定时，勾落在「跟随」这一行上。
+    inheritSelected: perChat && !hasOwnModel,
   );
   if (sel == null) return;
+  // 关闭时选择落在当前助手上，该助手下所有会话跟随最近一次选择。
+  if (!perChat) {
+    if (assistant == null) return;
+    await assistantProvider.updateAssistant(
+      assistant.copyWith(
+        chatModelProvider: sel.providerKey,
+        chatModelId: sel.modelId,
+      ),
+    );
+    return;
+  }
   await controller.setConversationModel(
     providerKey: sel.isInherit ? null : sel.providerKey,
     modelId: sel.isInherit ? null : sel.modelId,
+  );
+}
+
+/// 打开跟随当前对话的后台任务模型选择器：未指定时回退到当前对话实际使用的模型。
+///
+/// 标题/摘要这类任务默认跟随对话，让用户看到的是「现在在跟谁说话」的那一档，
+/// 而不是全局默认，避免选完发现跟实际聊天用的不是同一个模型。
+Future<ModelSelection?> showModelSelectorWithCurrentChatFallback(
+  BuildContext context, {
+  String? initialProviderKey,
+  String? initialModelId,
+}) {
+  if (initialProviderKey != null && initialModelId != null) {
+    return showModelSelector(
+      context,
+      initialProviderKey: initialProviderKey,
+      initialModelId: initialModelId,
+    );
+  }
+  final settings = context.read<SettingsProvider>();
+  final chats = context.read<ChatService>();
+  final conversationId = chats.currentConversationId;
+  final conversation = conversationId == null
+      ? null
+      : chats.getConversation(conversationId);
+  final assistants = context.read<AssistantProvider>();
+  final assistantId = conversation?.assistantId;
+  final assistant = assistantId != null
+      ? assistants.getById(assistantId)
+      : assistants.currentAssistant;
+  final current = resolveChatModel(
+    settings,
+    conversation: conversation,
+    assistant: assistant,
+  );
+  return showModelSelector(
+    context,
+    initialProviderKey: current.providerKey,
+    initialModelId: current.modelId,
   );
 }
 
@@ -278,13 +337,13 @@ class _ModelSelectSheet extends StatefulWidget {
     this.initialProviderKey,
     this.initialModelId,
     this.allowInherit = false,
-    this.inheritLabel,
+    this.inheritSelected = false,
   });
   final String? limitProviderKey;
   final String? initialProviderKey;
   final String? initialModelId;
   final bool allowInherit;
-  final String? inheritLabel;
+  final bool inheritSelected;
   @override
   State<_ModelSelectSheet> createState() => _ModelSelectSheetState();
 }
@@ -379,6 +438,8 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     SettingsProvider settings,
     AssistantProvider assistantProvider,
   ) {
+    // 勾在「不单独指定」那一行上时，列表里不再有选中项，避免出现两个勾。
+    if (widget.inheritSelected) return '';
     final hasInitial =
         widget.initialProviderKey != null && widget.initialModelId != null;
     final provider = hasInitial
@@ -973,11 +1034,11 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     final Set<String> favMatchedKeys = <String>{};
 
     if (widget.allowInherit && query.isEmpty) {
-      _rows.add(
-        _InheritRow(
-          widget.inheritLabel ?? l10n.modelSelectSheetFollowAssistant,
-        ),
+      final inherit = _buildInheritRow(
+        context,
+        selected: widget.inheritSelected,
       );
+      if (inherit != null) _rows.add(inherit);
     }
 
     if (widget.limitProviderKey == null) {
@@ -1104,29 +1165,73 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
 
   Widget _inheritTile(BuildContext context, _InheritRow row) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
       child: IosCardPress(
-        baseColor: cs.primary.withValues(alpha: 0.06),
+        baseColor: row.selected
+            ? (isDark
+                  ? cs.primary.withValues(alpha: 0.16)
+                  : cs.primary.withValues(alpha: 0.10))
+            : cs.primary.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(14),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         onTap: () => Navigator.of(context).pop(const ModelSelection.inherit()),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Lucide.RotateCcw, size: 18, color: cs.primary),
             const SizedBox(width: 10),
-            Flexible(
-              child: Text(
-                row.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: cs.primary,
-                  fontWeight: AppFontWeights.semibold,
-                ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text.rich(
+                          TextSpan(
+                            text: row.modelName,
+                            style: TextStyle(
+                              color: cs.primary,
+                              fontSize: 14,
+                              fontWeight: AppFontWeights.semibold,
+                            ),
+                            children: [
+                              TextSpan(
+                                text: ' · ${row.providerName}',
+                                style: TextStyle(
+                                  color: cs.primary.withValues(alpha: 0.7),
+                                  fontSize: 12,
+                                  fontWeight: AppFontWeights.regular,
+                                ),
+                              ),
+                            ],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      _InheritSourceBadge(row.sourceLabel),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    row.subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.55),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
             ),
+            if (row.selected) ...[
+              const SizedBox(width: 8),
+              Icon(Lucide.Check, size: 18, color: cs.primary),
+            ],
           ],
         ),
       ),
@@ -1616,9 +1721,48 @@ class _ModelItem {
 // 展平列表的行
 abstract class _ListRow {}
 
+/// 「本对话不单独指定模型」这一行。
+///
+/// 显示的是实际上会被用到的那一档模型（助手的，或助手没设时的全局默认），
+/// 让用户在点之前就知道会换成什么，而不是一个看不出结果的「跟随助手」。
 class _InheritRow extends _ListRow {
-  _InheritRow(this.label);
+  _InheritRow({
+    required this.modelName,
+    required this.providerName,
+    required this.sourceLabel,
+    required this.subtitle,
+    required this.selected,
+  });
+  final String modelName;
+  final String providerName;
+  final String sourceLabel;
+  final String subtitle;
+  final bool selected;
+}
+
+class _InheritSourceBadge extends StatelessWidget {
+  const _InheritSourceBadge(this.label);
   final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: BoxDecoration(
+        color: cs.primary.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: cs.primary,
+          fontSize: 11,
+          fontWeight: AppFontWeights.medium,
+        ),
+      ),
+    );
+  }
 }
 
 class _HeaderRow extends _ListRow {
@@ -1699,7 +1843,7 @@ Future<ModelSelection?> _showDesktopModelSelector(
   String? initialProviderKey,
   String? initialModelId,
   bool allowInherit = false,
-  String? inheritLabel,
+  bool inheritSelected = false,
 }) async {
   return showGeneralDialog<ModelSelection>(
     context: context,
@@ -1711,7 +1855,7 @@ Future<ModelSelection?> _showDesktopModelSelector(
       initialProviderKey: initialProviderKey,
       initialModelId: initialModelId,
       allowInherit: allowInherit,
-      inheritLabel: inheritLabel,
+      inheritSelected: inheritSelected,
     ),
     transitionBuilder: (ctx, anim, _, child) {
       final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
@@ -1726,19 +1870,43 @@ Future<ModelSelection?> _showDesktopModelSelector(
   );
 }
 
+/// 构造「本对话不单独指定模型」这一行；取不到可显示的模型时返回 null（整行不显示）。
+_InheritRow? _buildInheritRow(BuildContext context, {required bool selected}) {
+  final l10n = AppLocalizations.of(context)!;
+  final settings = context.read<SettingsProvider>();
+  final assistant = context.read<AssistantProvider>().currentAssistant;
+  // 会话传 null：拿的就是「不单独指定时实际会用到的那一档」。
+  final info = getModelDisplayInfo(settings, assistant: assistant);
+  final providerKey = info.providerKey;
+  final modelId = info.modelId;
+  if (providerKey == null || modelId == null) return null;
+  final fromAssistant =
+      assistant?.chatModelProvider?.trim().isNotEmpty == true &&
+      assistant?.chatModelId?.trim().isNotEmpty == true;
+  return _InheritRow(
+    modelName: info.modelDisplay ?? modelId,
+    providerName: info.providerName ?? providerKey,
+    sourceLabel: fromAssistant
+        ? l10n.modelSelectSheetInheritSourceAssistant
+        : l10n.modelSelectSheetInheritSourceGlobal,
+    subtitle: l10n.modelSelectSheetInheritSubtitle,
+    selected: selected,
+  );
+}
+
 class _DesktopModelSelectDialogBody extends StatefulWidget {
   const _DesktopModelSelectDialogBody({
     this.limitProviderKey,
     this.initialProviderKey,
     this.initialModelId,
     this.allowInherit = false,
-    this.inheritLabel,
+    this.inheritSelected = false,
   });
   final String? limitProviderKey;
   final String? initialProviderKey;
   final String? initialModelId;
   final bool allowInherit;
-  final String? inheritLabel;
+  final bool inheritSelected;
   @override
   State<_DesktopModelSelectDialogBody> createState() =>
       _DesktopModelSelectDialogBodyState();
@@ -1827,6 +1995,8 @@ class _DesktopModelSelectDialogBodyState
     SettingsProvider settings,
     AssistantProvider assistantProvider,
   ) {
+    // 勾在「不单独指定」那一行上时，列表里不再有选中项，避免出现两个勾。
+    if (widget.inheritSelected) return '';
     final hasInitial =
         widget.initialProviderKey != null && widget.initialModelId != null;
     final provider = hasInitial
@@ -1914,11 +2084,11 @@ class _DesktopModelSelectDialogBodyState
     final Set<String> favMatchedKeys = <String>{};
 
     if (widget.allowInherit && query.isEmpty) {
-      _rows.add(
-        _InheritRow(
-          widget.inheritLabel ?? l10n.modelSelectSheetFollowAssistant,
-        ),
+      final inherit = _buildInheritRow(
+        context,
+        selected: widget.inheritSelected,
       );
+      if (inherit != null) _rows.add(inherit);
     }
 
     if (widget.limitProviderKey == null) {
@@ -2156,29 +2326,74 @@ class _DesktopModelSelectDialogBodyState
 
   Widget _desktopInheritTile(BuildContext context, _InheritRow row) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 2, 4, 6),
       child: IosCardPress(
-        baseColor: cs.primary.withValues(alpha: 0.06),
+        baseColor: row.selected
+            ? (isDark
+                  ? cs.primary.withValues(alpha: 0.16)
+                  : cs.primary.withValues(alpha: 0.10))
+            : cs.primary.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(14),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         onTap: () => Navigator.of(context).pop(const ModelSelection.inherit()),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Lucide.RotateCcw, size: 14, color: cs.primary),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                row.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: cs.primary,
-                  fontWeight: AppFontWeights.semibold,
-                ),
+            Icon(Lucide.RotateCcw, size: 15, color: cs.primary),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text.rich(
+                          TextSpan(
+                            text: row.modelName,
+                            style: TextStyle(
+                              color: cs.primary,
+                              fontSize: 13,
+                              fontWeight: AppFontWeights.semibold,
+                            ),
+                            children: [
+                              TextSpan(
+                                text: ' · ${row.providerName}',
+                                style: TextStyle(
+                                  color: cs.primary.withValues(alpha: 0.7),
+                                  fontSize: 12,
+                                  fontWeight: AppFontWeights.regular,
+                                ),
+                              ),
+                            ],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      _InheritSourceBadge(row.sourceLabel),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    row.subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.55),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
             ),
+            if (row.selected) ...[
+              const SizedBox(width: 8),
+              Icon(Lucide.Check, size: 15, color: cs.primary),
+            ],
           ],
         ),
       ),

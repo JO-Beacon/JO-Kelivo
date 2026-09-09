@@ -15,6 +15,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexStream(
   Map<String, String>? extraHeaders,
   Map<String, dynamic>? extraBody,
   bool stream = true,
+  bool skipImageParsing = false,
 }) {
   final cfg = config.copyWith(vertexAI: true);
   return _sendGoogleStream(
@@ -32,6 +33,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexStream(
     extraHeaders: extraHeaders,
     extraBody: extraBody,
     stream: stream,
+    skipImageParsing: skipImageParsing,
   );
 }
 
@@ -152,6 +154,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
   Map<String, String>? extraHeaders,
   Map<String, dynamic>? extraBody,
   bool stream = true,
+  bool skipImageParsing = false,
 }) async* {
   final upstreamId = _apiModelId(config, modelId);
   final loc = (config.location ?? 'us-central1').trim();
@@ -229,7 +232,8 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
     final raw = (m['content'] ?? '').toString();
     // 仅做语义媒体检测，不识别自定义附件标记。附件通过结构化 media-path 键 /
     // userImagePaths 以及 Markdown ![](...) 到达。
-    final hasMarkdownImages = raw.contains('![') && raw.contains('](');
+    final hasMarkdownImages =
+        !skipImageParsing && raw.contains('![') && raw.contains('](');
     final internalMediaRefs = parseInternalMediaRefs(
       m[multimodalInternalMediaPathsKey],
     );
@@ -316,6 +320,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
         allowRemoteImages: true,
         allowLocalImages: true,
         keepRemoteMarkdownText: true,
+        skipImageParsing: skipImageParsing,
       );
       if (parsed.text.isNotEmpty) {
         parts.add({'type': 'text', 'text': parsed.text});

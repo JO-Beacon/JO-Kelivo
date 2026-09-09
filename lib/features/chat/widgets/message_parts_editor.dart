@@ -411,16 +411,22 @@ class _ExpandedPartDesktopDialogState
     super.dispose();
   }
 
+  void _trimWhitespace() {
+    final trimmed = _controller.text.trim();
+    if (trimmed == _controller.text) return;
+    _controller.value = TextEditingValue(
+      text: trimmed,
+      selection: TextSelection.collapsed(offset: trimmed.length),
+      composing: TextRange.empty,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     return ConstrainedBox(
-      constraints: DesktopDialogStyle.proportionalConstraints(
-        context,
-        maxWidth: 860,
-        maxHeight: 660,
-      ),
+      constraints: DesktopDialogStyle.editorConstraints(context),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Column(
@@ -441,6 +447,22 @@ class _ExpandedPartDesktopDialogState
                       ),
                     ),
                   ),
+                  if (!widget.readOnly)
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _controller,
+                      builder: (context, value, _) => IconButton(
+                        tooltip: l10n.messageEditTrimWhitespace,
+                        // 首尾已经干净时置灰，避免点了没反应被当成失效。
+                        onPressed: value.text.trim() == value.text
+                            ? null
+                            : _trimWhitespace,
+                        icon: Icon(
+                          Lucide.Eraser,
+                          size: 18,
+                          color: cs.onSurface.withValues(alpha: 0.75),
+                        ),
+                      ),
+                    ),
                   IconButton(
                     tooltip: MaterialLocalizations.of(
                       context,
@@ -534,6 +556,16 @@ class _ExpandedPartMobileSheetState extends State<_ExpandedPartMobileSheet> {
     super.dispose();
   }
 
+  void _trimWhitespace() {
+    final trimmed = _controller.text.trim();
+    if (trimmed == _controller.text) return;
+    _controller.value = TextEditingValue(
+      text: trimmed,
+      selection: TextSelection.collapsed(offset: trimmed.length),
+      composing: TextRange.empty,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -559,6 +591,22 @@ class _ExpandedPartMobileSheetState extends State<_ExpandedPartMobileSheet> {
                     ),
                   ),
                 ),
+                if (!widget.readOnly)
+                  ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: _controller,
+                    builder: (context, value, _) => IconButton(
+                      tooltip: l10n.messageEditTrimWhitespace,
+                      // 首尾已经干净时置灰，避免点了没反应被当成失效。
+                      onPressed: value.text.trim() == value.text
+                          ? null
+                          : _trimWhitespace,
+                      icon: Icon(
+                        Lucide.Eraser,
+                        size: 18,
+                        color: cs.onSurface.withValues(alpha: 0.75),
+                      ),
+                    ),
+                  ),
                 TextButton(
                   onPressed: () => Navigator.of(context).maybePop(),
                   child: Text(

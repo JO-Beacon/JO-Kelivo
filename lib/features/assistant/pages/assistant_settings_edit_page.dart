@@ -1504,11 +1504,7 @@ Future<void> showAssistantDesktopDialog(
         shape: DesktopDialogStyle.shape(ctx),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
-          constraints: DesktopDialogStyle.proportionalConstraints(
-            ctx,
-            maxWidth: 860,
-            maxHeight: 640,
-          ),
+          constraints: DesktopDialogStyle.editorConstraints(ctx),
           child: _DesktopAssistantDialogShell(assistantId: assistantId),
         ),
       );

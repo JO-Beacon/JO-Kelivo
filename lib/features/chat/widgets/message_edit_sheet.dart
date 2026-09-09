@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
-import '../../../icons/lucide_adapter.dart';
 import '../models/message_edit_result.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
@@ -95,15 +94,6 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
   bool get _hasChanges =>
       _controller.text != widget.message.content ||
       !_sameParts(_editedParts, widget.message.parts);
-
-  void _trimWhitespace() {
-    setState(() {
-      _editedParts = [
-        for (final part in _editedParts)
-          part is TextPart ? TextPart(part.text.trim()) : part,
-      ];
-    });
-  }
 
   Future<void> _confirmClose() async {
     if (_confirmingClose || _allowClose) return;
@@ -304,34 +294,6 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: IosCardPress(
-                    onTap: _trimWhitespace,
-                    borderRadius: BorderRadius.circular(16),
-                    baseColor: Colors.transparent,
-                    pressedBlendStrength:
-                        Theme.of(context).brightness == Brightness.dark
-                        ? 0.10
-                        : 0.06,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 6,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Lucide.Eraser, size: 16, color: cs.primary),
-                        const SizedBox(width: 6),
-                        Text(
-                          l10n.messageEditTrimWhitespace,
-                          style: TextStyle(color: cs.primary),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
                 Expanded(
                   child: SingleChildScrollView(
                     controller: sc,

@@ -13,6 +13,7 @@ import '../../../core/models/token_usage.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/retry_policy.dart';
 import '../../../core/services/api/stream/stream_chunk.dart';
 import '../../../core/services/api/stream/stream_chunk_handler.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -31,6 +32,7 @@ import 'generation_controller.dart';
 import 'home_view_model.dart';
 import 'latest_wins_checkpoint_writer.dart';
 import 'stream_controller.dart' as stream_ctrl;
+import 'streaming_content_notifier.dart' show RetryStatus;
 
 final class UnsupportedAudioAttachmentException implements Exception {
   const UnsupportedAudioAttachmentException();
@@ -396,6 +398,31 @@ class ChatActions {
   /// 当 [conversationId] 没有活动生成时为 null。
   String? activeStreamingMessageId(String conversationId) =>
       _activeAssistantMessages[conversationId]?.id;
+
+  /// 更新（或清除）气泡内的自动重试倒计时。
+  void _setRetryStatus(
+    stream_ctrl.StreamingState state,
+    RetryPending? pending,
+  ) {
+    if (pending == null) {
+      state.retryStatus = null;
+      streamController.streamingContentNotifier.updateRetryStatus(
+        state.messageId,
+        null,
+      );
+      return;
+    }
+    final status = RetryStatus(
+      attempt: pending.attempt,
+      maxRetries: pending.maxRetries,
+      retryAt: pending.deadlineAt(),
+    );
+    state.retryStatus = status;
+    streamController.streamingContentNotifier.updateRetryStatus(
+      state.messageId,
+      status,
+    );
+  }
 
   static const Duration _streamCancelTimeout = Duration(seconds: 3);
 
@@ -1612,6 +1639,11 @@ class ChatActions {
     if (visibleStreaming != null) {
       streamController.markStreamingEnded(visibleStreaming.id);
       streamController.cleanupTimers(visibleStreaming.id);
+      // 取消时清除自动重试倒计时。
+      streamController.streamingContentNotifier.updateRetryStatus(
+        visibleStreaming.id,
+        null,
+      );
       final index = _messages.indexWhere((m) => m.id == visibleStreaming.id);
       final visibleMessage = index == -1 ? visibleStreaming : _messages[index];
       if (chatController.publishTerminalMessage(visibleMessage)) {
@@ -1761,6 +1793,7 @@ class ChatActions {
         conversationId: conversationId,
         allowImagesApiRouting: ctx.allowImagesApiRouting,
         ocrActive: ctx.ocrActive,
+        parseMarkdownImageLinks: ctx.settings.sendMarkdownImageLinksAsImages,
       );
 
       // 替换先前的流：新请求尚未注册其取消令牌（这发生在监听时），
@@ -1820,6 +1853,15 @@ class ChatActions {
       state.messageId,
       StreamChunkHandler.new,
     );
+    // 自动重试控制块：更新倒计时 UI，不进入内容管线。
+    if (event is RetryPending) {
+      _setRetryStatus(state, event);
+      return;
+    }
+    if (event is RetryAttemptStart) {
+      _setRetryStatus(state, null);
+      return;
+    }
     handler.handle(event);
 
     final legacy = _legacyChunkFromEvent(event, state.messageId);
@@ -1946,6 +1988,9 @@ class ChatActions {
         );
       case Usage(:final usage):
         return chunk(usage: usage);
+      case RetryPending() || RetryAttemptStart():
+        // 重试控制块不投影为旧版聊天分块（已在事件入口处理 UI）。
+        return null;
       case Finish():
         final usage = _streamEventHandlers[messageId]?.usage;
         return chunk(isDone: true, usage: usage);
@@ -2243,6 +2288,7 @@ class ChatActions {
     stream_ctrl.StreamingState state,
     String chunkContent,
   ) async {
+    _setRetryStatus(state, null);
     final messageId = state.messageId;
     final conversationId = state.conversationId;
     final autoCollapseThinking =
@@ -2429,6 +2475,14 @@ class ChatActions {
   ) async {
     final messageId = state.messageId;
     final conversationId = state.conversationId;
+    // 重试等待期间取消/结束：清掉倒计时 UI，且用户取消不算生成失败。
+    _setRetryStatus(state, null);
+    if (isCancelledGenerationError(
+      e,
+      requestCancelled: isStopping(conversationId),
+    )) {
+      return;
+    }
     final errorText = e.toString();
 
     // 出错时只清理当前助手消息的处理指示器。

@@ -9,6 +9,35 @@ abstract final class DesktopDialogStyle {
   static const defaultVerticalInset = 24.0;
   static const defaultVerticalFraction = 0.9;
 
+  /// 大中弹窗的三档命名尺寸，同类弹窗必须使用同一档位。
+  ///
+  /// - [editor]：写大段内容的编辑窗（助手编辑、消息编辑、放大窗口、JSON/HTML 预览等）。
+  /// - [form]：填表单/配置的中型弹窗（供应商、模型、MCP、TTS、世界书、备份、记忆等）。
+  /// - [compact]：轻量列表选择窗（会话历史、选择复制等）。
+  static BoxConstraints editorConstraints(BuildContext context) =>
+      proportionalConstraints(
+        context,
+        minWidth: 720,
+        maxWidth: 860,
+        maxHeight: 700,
+      );
+
+  static BoxConstraints formConstraints(BuildContext context) =>
+      proportionalConstraints(
+        context,
+        minWidth: 560,
+        maxWidth: 720,
+        maxHeight: 660,
+      );
+
+  static BoxConstraints compactConstraints(BuildContext context) =>
+      proportionalConstraints(
+        context,
+        minWidth: 420,
+        maxWidth: 560,
+        maxHeight: 620,
+      );
+
   static BoxConstraints proportionalConstraints(
     BuildContext context, {
     double? minWidth,

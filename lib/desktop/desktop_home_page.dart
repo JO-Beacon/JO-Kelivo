@@ -1,14 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:Kelivo/theme/app_font_weights.dart';
-import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, TargetPlatform;
 import 'desktop_nav_rail.dart';
 import 'desktop_chat_page.dart';
-import 'window_title_bar.dart';
 import 'desktop_settings_page.dart';
 import 'desktop_translate_page.dart';
 import '../features/settings/pages/storage_space_page.dart';
-import '../l10n/app_localizations.dart';
 import 'package:window_manager/window_manager.dart';
 import 'dart:async';
 import 'hotkeys/hotkey_event_bus.dart';
@@ -160,7 +155,6 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
     const minWidth = 960.0;
     const minHeight = 640.0;
 
-    final isWindows = defaultTargetPlatform == TargetPlatform.windows;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -237,29 +231,16 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
           ],
         );
 
-        // 在 Windows 平台上包裹自定义 Windows 标题栏。
-        final content = isWindows
-            ? Column(
-                children: [
-                  WindowTitleBar(
-                    leftChildren: [
-                      SizedBox(width: DesktopNavRail.width / 2 - 8 - 6 - 12),
-                      const _TitleBarLeading(),
-                    ],
-                  ),
-                  Expanded(
-                    child: Stack(
-                      children: [
-                        body,
-                        // 需要时将延迟构建的设置页注入 IndexedStack，
-                        // 以便传入 initialProviderKey 而不丢弃聊天状态。
-                        if (_tabIndex == 3) const SizedBox.shrink(),
-                      ],
-                    ),
-                  ),
-                ],
-              )
-            : body;
+        // Windows 已改用原生标题栏，自绘标题栏（WindowTitleBar）随之移除；
+        // 仅保留为窗口尺寸不足时居中的约束包装。
+        final content = Stack(
+          children: [
+            body,
+            // 需要时将延迟构建的设置页注入 IndexedStack，
+            // 以便传入 initialProviderKey 而不丢弃聊天状态。
+            if (_tabIndex == 3) const SizedBox.shrink(),
+          ],
+        );
 
         // if (!needsWidthPad && !needsHeightPad) return content;
 
@@ -298,36 +279,3 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
 
 // 没有额外路由或垫片；我们直接在上方导入 DesktopSettingsPage。
 
-class _TitleBarLeading extends StatelessWidget {
-  const _TitleBarLeading();
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // 应用图标
-        Image.asset(
-          'assets/icons/kelivo.png',
-          width: 16,
-          height: 16,
-          filterQuality: FilterQuality.medium,
-        ),
-        const SizedBox(width: 8),
-        // 应用名称
-        Text(
-          l10n.aboutPageAppName,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: AppFontWeights.semibold,
-            color: cs.onSurface.withValues(alpha: 0.8),
-            // 避免在边界情况下缺少 Material 祖先时意外出现下划线
-            decoration: TextDecoration.none,
-          ),
-        ),
-      ],
-    );
-  }
-}

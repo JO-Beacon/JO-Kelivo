@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 0.1.14+14
+version: 0.1.15+15
 
 environment:
   sdk: ^3.12.1
@@ -33,7 +33,6 @@ dependencies:
     sdk: flutter
   logging: ^1.2.0
   # BitsDojo Window for Windows
-  bitsdojo_window: ^0.1.6
   window_manager: ^0.5.1
   screen_retriever: ^0.2.0
   tray_manager:
@@ -46,6 +45,7 @@ dependencies:
     sdk: flutter
   provider: ^6.0.5
   dynamic_color: ^1.8.1
+  flutter_displaymode: ^0.7.0
   material_color_utilities: ^0.13.0
   lucide_icons_flutter: ^3.1.13
   shared_preferences: ^2.2.3

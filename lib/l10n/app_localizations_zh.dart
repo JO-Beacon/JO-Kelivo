@@ -944,10 +944,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditUseAssistantNameTitle => '使用助手名字';
 
   @override
-  String get assistantEditChatModelTitle => '聊天模型';
+  String get assistantEditChatModelTitle => '默认聊天模型';
 
   @override
-  String get assistantEditChatModelSubtitle => '为该助手设置默认聊天模型（未设置时使用全局默认）';
+  String get assistantEditChatModelSubtitle => '该助手的默认聊天模型，未设置时使用全局默认';
 
   @override
   String get assistantEditTemperatureDescription => '控制输出的随机性，范围 0–2';
@@ -3369,6 +3369,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get defaultModelPageChatModelSubtitle => '全局默认的聊天模型';
 
   @override
+  String get defaultModelPagePerChatModelTitle => '每个对话独立模型';
+
+  @override
+  String get defaultModelPagePerChatModelSubtitle =>
+      '开启后，在对话中切换模型只影响当前对话；关闭后会直接修改当前助手的模型，使用该助手的所有对话都会跟随。';
+
+  @override
   String get defaultModelPageTitleModelTitle => '标题总结模型';
 
   @override
@@ -3600,13 +3607,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelDetailSheetReasoningAbility => '推理';
 
   @override
-  String get modelDetailSheetProviderOverrideDescription =>
-      '供应商重写：允许为特定模型自定义供应商设置。（暂未实现）';
-
-  @override
-  String get modelDetailSheetAddProviderOverride => '添加供应商重写';
-
-  @override
   String get modelDetailSheetCustomHeadersTitle => '自定义 Headers';
 
   @override
@@ -3720,7 +3720,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelSelectSheetFavoritesSection => '收藏';
 
   @override
-  String get modelSelectSheetFollowAssistant => '跟随助手';
+  String get modelSelectSheetInheritSourceAssistant => '助手默认';
+
+  @override
+  String get modelSelectSheetInheritSourceGlobal => '全局默认';
+
+  @override
+  String get modelSelectSheetInheritSubtitle => '本对话不单独指定模型';
 
   @override
   String get modelSelectSheetFavoriteTooltip => '收藏';
@@ -4960,14 +4966,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get themeSettingsPageUsePureBackgroundTitle => '纯色背景';
 
   @override
-  String get themeSettingsPageUsePureBackgroundSubtitle => '仅气泡与强调色随主题变化';
+  String get themeSettingsPageUsePureBackgroundSubtitle =>
+      '底色改为纯白或纯黑；气泡与强调色仍随主题变化';
 
   @override
   String get themeSettingsPageUseLayeredSurfacesTitle => '分层表面';
 
   @override
   String get themeSettingsPageUseLayeredSurfacesSubtitle =>
-      '让卡片和面板与页面背景形成更明显的层次';
+      '微调卡片与输入框底色；与纯色背景同开时页面底色不变，仅在输入框处可辨';
 
   @override
   String get searchProviderAnySearchDescription => 'AnySearch 统一网页搜索';
@@ -7855,6 +7862,17 @@ class AppLocalizationsZh extends AppLocalizations {
       '压缩在添加图片时进行，已保存或已发送的图片不受影响；压缩后图片以 JPEG 格式随消息发送。';
 
   @override
+  String get imageSettingsPageSendSectionTitle => '发送';
+
+  @override
+  String get imageSettingsPageMarkdownImageLinksTitle =>
+      '将 Markdown 图片链接作为图片发送';
+
+  @override
+  String get imageSettingsPageMarkdownImageLinksSubtitle =>
+      '开启后，消息文本中的 ![alt](url) 会作为图片发送给视觉模型；关闭后仅作为普通文本发送。手动添加的图片附件不受影响。';
+
+  @override
   String get memoryTraceSettingsTitle => '流程追踪';
 
   @override
@@ -8495,7 +8513,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get healthDataSettingsTypeRestingHeartRateTitle => '静息心率';
 
   @override
-  String get healthDataSettingsTypeSleepSubtitle => '睡眠时长';
+  String get healthDataSettingsTypeSleepSubtitle => '最近 24 小时的睡眠、卧床、清醒与睡眠分期';
 
   @override
   String get healthDataSettingsTypeSleepTitle => '睡眠';
@@ -8529,6 +8547,88 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get healthDataSettingsTypeWorkoutsTitle => '健身训练';
+
+  @override
+  String get healthDataSettingsCategoryReproductive => '生殖健康';
+
+  @override
+  String get healthDataSettingsTypeMenstrualFlowTitle => '经期记录';
+
+  @override
+  String get healthDataSettingsTypeMenstrualFlowSubtitle =>
+      '最近 90 天记录的经量与周期开始日期';
+
+  @override
+  String get assistantEditLocationPermissionSettingsMessage =>
+      '定位权限已被禁止。请在系统设置中允许定位访问，然后重新开启此工具。';
+
+  @override
+  String get reasoningBudgetSliderLow => 'Low';
+
+  @override
+  String get reasoningBudgetSliderMedium => 'Medium';
+
+  @override
+  String get reasoningBudgetSliderHigh => 'High';
+
+  @override
+  String get reasoningBudgetSliderXhigh => 'XHigh';
+
+  @override
+  String get reasoningBudgetSliderMax => 'Max';
+
+  @override
+  String autoRetryCountdown(int seconds, int attempt, int maxRetries) {
+    return '$seconds 秒后重试 ($attempt/$maxRetries)';
+  }
+
+  @override
+  String get settingsPageAutoRetry => '自动重试';
+
+  @override
+  String get autoRetryEnableLabel => '开启自动重试';
+
+  @override
+  String get autoRetryMaxRetries => '最大重试次数';
+
+  @override
+  String get autoRetryInitialDelay => '首次延迟（毫秒）';
+
+  @override
+  String get autoRetryMultiplier => '等待递增倍数';
+
+  @override
+  String get autoRetryMultiplierSubtitle => '每多失败一次，等待时间乘以它；填 1 则每次等待同样长';
+
+  @override
+  String get autoRetryMaxDelay => '最大延迟（毫秒）';
+
+  @override
+  String get autoRetryJitter => '随机浮动';
+
+  @override
+  String get autoRetryJitterSubtitle => '每次等待随机 ±20%';
+
+  @override
+  String get autoRetryOnNetworkError => '网络错误时重试';
+
+  @override
+  String get autoRetryStatusCodes => '可重试状态码';
+
+  @override
+  String get autoRetryKeywords => '重试关键字';
+
+  @override
+  String get autoRetryStopKeywords => '停止重试关键字';
+
+  @override
+  String get autoRetryAddHint => '添加';
+
+  @override
+  String get autoRetryRestoreDefaults => '恢复默认';
+
+  @override
+  String get autoRetryFooter => '仅在当前这轮模型响应尚未产生任何输出时才会自动重试。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -9471,10 +9571,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantEditUseAssistantNameTitle => '使用助手名字';
 
   @override
-  String get assistantEditChatModelTitle => '聊天模型';
+  String get assistantEditChatModelTitle => '默认聊天模型';
 
   @override
-  String get assistantEditChatModelSubtitle => '为该助手设置默认聊天模型（未设置时使用全局默认）';
+  String get assistantEditChatModelSubtitle => '该助手的默认聊天模型，未设置时使用全局默认';
 
   @override
   String get assistantEditTemperatureDescription => '控制输出的随机性，范围 0–2';
@@ -11896,6 +11996,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get defaultModelPageChatModelSubtitle => '全局默认的聊天模型';
 
   @override
+  String get defaultModelPagePerChatModelTitle => '每个对话独立模型';
+
+  @override
+  String get defaultModelPagePerChatModelSubtitle =>
+      '开启后，在对话中切换模型只影响当前对话；关闭后会直接修改当前助手的模型，使用该助手的所有对话都会跟随。';
+
+  @override
   String get defaultModelPageTitleModelTitle => '标题总结模型';
 
   @override
@@ -12127,13 +12234,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get modelDetailSheetReasoningAbility => '推理';
 
   @override
-  String get modelDetailSheetProviderOverrideDescription =>
-      '供应商重写：允许为特定模型自定义供应商设置。（暂未实现）';
-
-  @override
-  String get modelDetailSheetAddProviderOverride => '添加供应商重写';
-
-  @override
   String get modelDetailSheetCustomHeadersTitle => '自定义 Headers';
 
   @override
@@ -12247,7 +12347,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get modelSelectSheetFavoritesSection => '收藏';
 
   @override
-  String get modelSelectSheetFollowAssistant => '跟随助手';
+  String get modelSelectSheetInheritSourceAssistant => '助手默认';
+
+  @override
+  String get modelSelectSheetInheritSourceGlobal => '全局默认';
+
+  @override
+  String get modelSelectSheetInheritSubtitle => '本对话不单独指定模型';
 
   @override
   String get modelSelectSheetFavoriteTooltip => '收藏';
@@ -13487,14 +13593,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get themeSettingsPageUsePureBackgroundTitle => '纯色背景';
 
   @override
-  String get themeSettingsPageUsePureBackgroundSubtitle => '仅气泡与强调色随主题变化';
+  String get themeSettingsPageUsePureBackgroundSubtitle =>
+      '底色改为纯白或纯黑；气泡与强调色仍随主题变化';
 
   @override
   String get themeSettingsPageUseLayeredSurfacesTitle => '分层表面';
 
   @override
   String get themeSettingsPageUseLayeredSurfacesSubtitle =>
-      '让卡片和面板与页面背景形成更明显的层次';
+      '微调卡片与输入框底色；与纯色背景同开时页面底色不变，仅在输入框处可辨';
 
   @override
   String get searchProviderAnySearchDescription => 'AnySearch 统一网页搜索';
@@ -16382,6 +16489,17 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '压缩在添加图片时进行，已保存或已发送的图片不受影响；压缩后图片以 JPEG 格式随消息发送。';
 
   @override
+  String get imageSettingsPageSendSectionTitle => '发送';
+
+  @override
+  String get imageSettingsPageMarkdownImageLinksTitle =>
+      '将 Markdown 图片链接作为图片发送';
+
+  @override
+  String get imageSettingsPageMarkdownImageLinksSubtitle =>
+      '开启后，消息文本中的 ![alt](url) 会作为图片发送给视觉模型；关闭后仅作为普通文本发送。手动添加的图片附件不受影响。';
+
+  @override
   String get memoryTraceSettingsTitle => '流程追踪';
 
   @override
@@ -17022,7 +17140,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get healthDataSettingsTypeRestingHeartRateTitle => '静息心率';
 
   @override
-  String get healthDataSettingsTypeSleepSubtitle => '睡眠时长';
+  String get healthDataSettingsTypeSleepSubtitle => '最近 24 小时的睡眠、卧床、清醒与睡眠分期';
 
   @override
   String get healthDataSettingsTypeSleepTitle => '睡眠';
@@ -17056,6 +17174,88 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get healthDataSettingsTypeWorkoutsTitle => '健身训练';
+
+  @override
+  String get healthDataSettingsCategoryReproductive => '生殖健康';
+
+  @override
+  String get healthDataSettingsTypeMenstrualFlowTitle => '经期记录';
+
+  @override
+  String get healthDataSettingsTypeMenstrualFlowSubtitle =>
+      '最近 90 天记录的经量与周期开始日期';
+
+  @override
+  String get assistantEditLocationPermissionSettingsMessage =>
+      '定位权限已被禁止。请在系统设置中允许定位访问，然后重新开启此工具。';
+
+  @override
+  String get reasoningBudgetSliderLow => 'Low';
+
+  @override
+  String get reasoningBudgetSliderMedium => 'Medium';
+
+  @override
+  String get reasoningBudgetSliderHigh => 'High';
+
+  @override
+  String get reasoningBudgetSliderXhigh => 'XHigh';
+
+  @override
+  String get reasoningBudgetSliderMax => 'Max';
+
+  @override
+  String autoRetryCountdown(int seconds, int attempt, int maxRetries) {
+    return '$seconds 秒后重试 ($attempt/$maxRetries)';
+  }
+
+  @override
+  String get settingsPageAutoRetry => '自动重试';
+
+  @override
+  String get autoRetryEnableLabel => '开启自动重试';
+
+  @override
+  String get autoRetryMaxRetries => '最大重试次数';
+
+  @override
+  String get autoRetryInitialDelay => '首次延迟（毫秒）';
+
+  @override
+  String get autoRetryMultiplier => '等待递增倍数';
+
+  @override
+  String get autoRetryMultiplierSubtitle => '每多失败一次，等待时间乘以它；填 1 则每次等待同样长';
+
+  @override
+  String get autoRetryMaxDelay => '最大延迟（毫秒）';
+
+  @override
+  String get autoRetryJitter => '随机浮动';
+
+  @override
+  String get autoRetryJitterSubtitle => '每次等待随机 ±20%';
+
+  @override
+  String get autoRetryOnNetworkError => '网络错误时重试';
+
+  @override
+  String get autoRetryStatusCodes => '可重试状态码';
+
+  @override
+  String get autoRetryKeywords => '重试关键字';
+
+  @override
+  String get autoRetryStopKeywords => '停止重试关键字';
+
+  @override
+  String get autoRetryAddHint => '添加';
+
+  @override
+  String get autoRetryRestoreDefaults => '恢复默认';
+
+  @override
+  String get autoRetryFooter => '仅在当前这轮模型响应尚未产生任何输出时才会自动重试。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -17998,10 +18198,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get assistantEditUseAssistantNameTitle => '使用助理名字';
 
   @override
-  String get assistantEditChatModelTitle => '聊天模型';
+  String get assistantEditChatModelTitle => '預設聊天模型';
 
   @override
-  String get assistantEditChatModelSubtitle => '為該助理設定預設聊天模型（未設定時使用全域預設）';
+  String get assistantEditChatModelSubtitle => '該助理的預設聊天模型，未設定時使用全域預設';
 
   @override
   String get assistantEditTemperatureDescription => '控制輸出的隨機性，範圍 0–2';
@@ -20423,6 +20623,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get defaultModelPageChatModelSubtitle => '全域預設的聊天模型';
 
   @override
+  String get defaultModelPagePerChatModelTitle => '每個對話獨立模型';
+
+  @override
+  String get defaultModelPagePerChatModelSubtitle =>
+      '開啟後，在對話中切換模型只影響目前對話；關閉後會直接修改目前助理的模型，使用該助理的所有對話都會跟隨。';
+
+  @override
   String get defaultModelPageTitleModelTitle => '標題總結模型';
 
   @override
@@ -20654,13 +20861,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get modelDetailSheetReasoningAbility => '推理';
 
   @override
-  String get modelDetailSheetProviderOverrideDescription =>
-      '供應商覆寫：允許為特定模型自訂供應商設定。（暫未實現）';
-
-  @override
-  String get modelDetailSheetAddProviderOverride => '新增供應商覆寫';
-
-  @override
   String get modelDetailSheetCustomHeadersTitle => '自訂 Headers';
 
   @override
@@ -20774,7 +20974,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get modelSelectSheetFavoritesSection => '收藏';
 
   @override
-  String get modelSelectSheetFollowAssistant => '跟隨助手';
+  String get modelSelectSheetInheritSourceAssistant => '助理預設';
+
+  @override
+  String get modelSelectSheetInheritSourceGlobal => '全域預設';
+
+  @override
+  String get modelSelectSheetInheritSubtitle => '本對話不單獨指定模型';
 
   @override
   String get modelSelectSheetFavoriteTooltip => '收藏';
@@ -22014,14 +22220,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get themeSettingsPageUsePureBackgroundTitle => '純色背景';
 
   @override
-  String get themeSettingsPageUsePureBackgroundSubtitle => '僅氣泡與強調色隨主題變化';
+  String get themeSettingsPageUsePureBackgroundSubtitle =>
+      '底色改為純白或純黑；氣泡與強調色仍隨主題變化';
 
   @override
   String get themeSettingsPageUseLayeredSurfacesTitle => '分層表面';
 
   @override
   String get themeSettingsPageUseLayeredSurfacesSubtitle =>
-      '讓卡片和面板與頁面背景形成更明顯的層次';
+      '微調卡片與輸入框底色；與純色背景同開時頁面底色不變，僅在輸入框處可辨';
 
   @override
   String get searchProviderAnySearchDescription => 'AnySearch 統一網頁搜尋';
@@ -24911,6 +25118,17 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '壓縮會在加入圖片時進行，已儲存或已傳送的圖片不受影響；壓縮後圖片會以 JPEG 格式隨訊息傳送。';
 
   @override
+  String get imageSettingsPageSendSectionTitle => '傳送';
+
+  @override
+  String get imageSettingsPageMarkdownImageLinksTitle =>
+      '將 Markdown 圖片連結作為圖片傳送';
+
+  @override
+  String get imageSettingsPageMarkdownImageLinksSubtitle =>
+      '開啟後，訊息文字中的 ![alt](url) 會作為圖片傳送給視覺模型；關閉後僅以純文字傳送。手動加入的圖片附件不受影響。';
+
+  @override
   String get memoryTraceSettingsTitle => '流程追蹤';
 
   @override
@@ -25551,7 +25769,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get healthDataSettingsTypeRestingHeartRateTitle => '靜息心率';
 
   @override
-  String get healthDataSettingsTypeSleepSubtitle => '睡眠時長';
+  String get healthDataSettingsTypeSleepSubtitle => '最近 24 小時的睡眠、臥床、清醒與睡眠分期';
 
   @override
   String get healthDataSettingsTypeSleepTitle => '睡眠';
@@ -25585,4 +25803,86 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get healthDataSettingsTypeWorkoutsTitle => '健身訓練';
+
+  @override
+  String get healthDataSettingsCategoryReproductive => '生殖健康';
+
+  @override
+  String get healthDataSettingsTypeMenstrualFlowTitle => '經期記錄';
+
+  @override
+  String get healthDataSettingsTypeMenstrualFlowSubtitle =>
+      '最近 90 天記錄的經量與週期開始日期';
+
+  @override
+  String get assistantEditLocationPermissionSettingsMessage =>
+      '定位權限已被禁止。請在系統設定中允許定位存取，然後重新開啟此工具。';
+
+  @override
+  String get reasoningBudgetSliderLow => 'Low';
+
+  @override
+  String get reasoningBudgetSliderMedium => 'Medium';
+
+  @override
+  String get reasoningBudgetSliderHigh => 'High';
+
+  @override
+  String get reasoningBudgetSliderXhigh => 'XHigh';
+
+  @override
+  String get reasoningBudgetSliderMax => 'Max';
+
+  @override
+  String autoRetryCountdown(int seconds, int attempt, int maxRetries) {
+    return '$seconds 秒後重試 ($attempt/$maxRetries)';
+  }
+
+  @override
+  String get settingsPageAutoRetry => '自動重試';
+
+  @override
+  String get autoRetryEnableLabel => '開啟自動重試';
+
+  @override
+  String get autoRetryMaxRetries => '最大重試次數';
+
+  @override
+  String get autoRetryInitialDelay => '首次延遲（毫秒）';
+
+  @override
+  String get autoRetryMultiplier => '等待遞增倍數';
+
+  @override
+  String get autoRetryMultiplierSubtitle => '每多失敗一次，等待時間乘以它；填 1 則每次等待同樣長';
+
+  @override
+  String get autoRetryMaxDelay => '最大延遲（毫秒）';
+
+  @override
+  String get autoRetryJitter => '隨機浮動';
+
+  @override
+  String get autoRetryJitterSubtitle => '每次等待隨機 ±20%';
+
+  @override
+  String get autoRetryOnNetworkError => '網路錯誤時重試';
+
+  @override
+  String get autoRetryStatusCodes => '可重試狀態碼';
+
+  @override
+  String get autoRetryKeywords => '重試關鍵字';
+
+  @override
+  String get autoRetryStopKeywords => '停止重試關鍵字';
+
+  @override
+  String get autoRetryAddHint => '新增';
+
+  @override
+  String get autoRetryRestoreDefaults => '恢復預設';
+
+  @override
+  String get autoRetryFooter => '僅在目前這輪模型回應尚未產生任何輸出時才會自動重試。';
 }

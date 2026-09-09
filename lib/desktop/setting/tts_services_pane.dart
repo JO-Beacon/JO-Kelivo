@@ -376,12 +376,7 @@ void _showTtsSettingsDialog(BuildContext context) {
       shape: DesktopDialogStyle.shape(ctx),
       insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
       child: ConstrainedBox(
-        constraints: DesktopDialogStyle.proportionalConstraints(
-          ctx,
-          maxWidth: 620,
-          maxHeight: 720,
-          verticalInset: 24,
-        ),
+        constraints: DesktopDialogStyle.formConstraints(ctx),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

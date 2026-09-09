@@ -94,11 +94,7 @@ class _DesktopMcpJsonEditDialogState extends State<_DesktopMcpJsonEditDialog> {
 
     final codeFontFamily = resolveCodeFont();
     return ConstrainedBox(
-      constraints: DesktopDialogStyle.proportionalConstraints(
-        context,
-        maxWidth: 860,
-        maxHeight: 720,
-      ),
+      constraints: DesktopDialogStyle.editorConstraints(context),
       child: SizedBox(
         width: 860,
         height: 720,

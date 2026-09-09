@@ -12,6 +12,8 @@ import 'package:open_filex/open_filex.dart';
 // import 'package:easy_image_viewer/easy_image_viewer.dart';
 import 'dart:convert';
 import '../../home/widgets/file_processing_indicator.dart';
+import '../../home/controllers/streaming_content_notifier.dart'
+    show RetryStatus;
 import '../pages/image_viewer_page.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
@@ -785,6 +787,8 @@ class ChatMessageWidget extends StatefulWidget {
   final List<int>? toolCountAtSplit;
   // 全局置顶时隐藏流式圆点
   final bool hideStreamingIndicator;
+  // 自动重试倒计时状态（等待下一次尝试时非空）
+  final RetryStatus? retryStatus;
   // 文件是否正在处理中
   final bool isProcessingFiles;
   final bool enableStreamingTextMotion;
@@ -834,6 +838,7 @@ class ChatMessageWidget extends StatefulWidget {
     this.reasoningCountAtSplit,
     this.toolCountAtSplit,
     this.hideStreamingIndicator = false,
+    this.retryStatus,
     this.isProcessingFiles = false,
     this.enableStreamingTextMotion = true,
     this.suggestions = const <String>[],
@@ -2233,6 +2238,23 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         : SizedBox(width: double.infinity, child: bubble);
   }
 
+  /// 流式尾部的加载指示器；自动重试等待期间附带倒计时提示。
+  /// 首轮之后的轮次会在屏幕上保留先前输出，因此倒计时必须跟随
+  /// 该指示器显示，而不能只挂在空白等待气泡上。
+  Widget _streamingIndicator() {
+    if (widget.hideStreamingIndicator) return const SizedBox(height: 16);
+    final retryStatus = widget.retryStatus;
+    if (retryStatus == null) return const LoadingIndicator();
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const LoadingIndicator(),
+        const SizedBox(width: 8),
+        _RetryCountdownHint(status: retryStatus),
+      ],
+    );
+  }
+
   List<Widget> _buildAssistantTextBubbles(
     BuildContext context,
     String visualContent,
@@ -2717,10 +2739,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                           child: Align(
                             alignment: Alignment.centerLeft,
                             child: Semantics(
-                              label: l10n.chatMessageWidgetThinking,
-                              child: widget.hideStreamingIndicator
-                                  ? const SizedBox(height: 16)
-                                  : const LoadingIndicator(),
+                              label: widget.retryStatus == null
+                                  ? l10n.chatMessageWidgetThinking
+                                  : l10n.autoRetryCountdown(
+                                      _retrySecondsLeft(widget.retryStatus!),
+                                      widget.retryStatus!.attempt,
+                                      widget.retryStatus!.maxRetries,
+                                    ),
+                              child: _streamingIndicator(),
                             ),
                           ),
                         ),
@@ -2732,10 +2758,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                           child: Align(
                             alignment: Alignment.centerLeft,
                             child: Semantics(
-                              label: l10n.chatMessageWidgetThinking,
-                              child: widget.hideStreamingIndicator
-                                  ? const SizedBox(height: 16)
-                                  : const LoadingIndicator(),
+                              label: widget.retryStatus == null
+                                  ? l10n.chatMessageWidgetThinking
+                                  : l10n.autoRetryCountdown(
+                                      _retrySecondsLeft(widget.retryStatus!),
+                                      widget.retryStatus!.attempt,
+                                      widget.retryStatus!.maxRetries,
+                                    ),
+                              child: _streamingIndicator(),
                             ),
                           ),
                         ),
@@ -2789,13 +2819,13 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               }
             }
 
-            if (widget.message.isStreaming && visualContent.isNotEmpty) {
+            if (widget.message.isStreaming &&
+                (visualContent.isNotEmpty || widget.retryStatus != null)) {
+              // 只调用了工具的轮次不会留下可见文本，但待重试时仍要有提示。
               widgets.add(
                 Padding(
                   padding: const EdgeInsets.only(left: 4, top: 4),
-                  child: widget.hideStreamingIndicator
-                      ? const SizedBox(height: 16)
-                      : const LoadingIndicator(),
+                  child: _streamingIndicator(),
                 ),
               );
             }
@@ -3776,6 +3806,50 @@ class _BranchSelector extends StatelessWidget {
 }
 
 // 聊天思考状态的脉动三点加载指示器（共享）
+int _retrySecondsLeft(RetryStatus status) {
+  final remaining = status.retryAt.difference(DateTime.now());
+  if (remaining.isNegative) return 0;
+  return remaining.inMilliseconds == 0
+      ? 0
+      : (remaining.inMilliseconds / 1000).ceil();
+}
+
+class _RetryCountdownHint extends StatelessWidget {
+  const _RetryCountdownHint({required this.status});
+
+  final RetryStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final remaining = status.retryAt.difference(DateTime.now());
+    final startSeconds = remaining.inMilliseconds / 1000.0;
+    final style = TextStyle(
+      fontSize: 12,
+      color: cs.onSurface.withValues(alpha: 0.55),
+    );
+    if (startSeconds <= 0) {
+      return Text(
+        l10n.autoRetryCountdown(0, status.attempt, status.maxRetries),
+        style: style,
+      );
+    }
+    return TweenAnimationBuilder<double>(
+      key: ValueKey(status.retryAt),
+      tween: Tween<double>(begin: startSeconds, end: 0),
+      duration: remaining,
+      builder: (context, value, _) {
+        final seconds = value <= 0 ? 0 : value.ceil();
+        return Text(
+          l10n.autoRetryCountdown(seconds, status.attempt, status.maxRetries),
+          style: style,
+        );
+      },
+    );
+  }
+}
+
 class LoadingIndicator extends StatefulWidget {
   const LoadingIndicator({
     super.key,

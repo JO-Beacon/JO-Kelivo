@@ -512,11 +512,7 @@ Future<void> _showErrorDetails(
         shape: DesktopDialogStyle.shape(ctx),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
-          constraints: DesktopDialogStyle.proportionalConstraints(
-            ctx,
-            maxWidth: 640,
-            maxHeight: 640,
-          ),
+          constraints: DesktopDialogStyle.formConstraints(ctx),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
             child: Column(

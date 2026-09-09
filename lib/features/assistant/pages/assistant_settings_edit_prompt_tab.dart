@@ -1290,11 +1290,7 @@ class _SystemPromptDesktopDialogState
     final cs = Theme.of(context).colorScheme;
 
     return ConstrainedBox(
-      constraints: DesktopDialogStyle.proportionalConstraints(
-        context,
-        maxWidth: 860,
-        maxHeight: 660,
-      ),
+      constraints: DesktopDialogStyle.editorConstraints(context),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Column(

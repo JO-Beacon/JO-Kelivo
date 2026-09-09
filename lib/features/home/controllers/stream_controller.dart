@@ -1443,6 +1443,9 @@ class StreamingState {
   List<int> reasoningCountAtSplit = <int>[];
   List<int> toolCountAtSplit = <int>[];
 
+  /// 自动重试倒计时状态（气泡 UI 用）。
+  RetryStatus? retryStatus;
+
   String get messageId => ctx.assistantMessage.id;
   String get conversationId => ctx.assistantMessage.conversationId;
 }
