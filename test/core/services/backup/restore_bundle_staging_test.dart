@@ -25,6 +25,7 @@ Future<Directory> _createExtractedBundle(
   bool validDatabase = true,
   bool includeFiles = false,
   bool includeSettings = true,
+  Map<String, String> ledgerFiles = const {},
 }) async {
   final extracted = Directory(p.join(root.path, 'extracted'));
   await extracted.create(recursive: true);
@@ -49,6 +50,19 @@ Future<Directory> _createExtractedBundle(
     } else {
       await database.writeAsBytes([1, 2, 3, 4], flush: true);
     }
+  }
+  // 册子条目与附件根完全无关：它只按 manifest 声明走，不看 includeFiles。
+  final ledgerEntryMetadata = <String, Map<String, Object?>>{};
+  for (final entry in ledgerFiles.entries) {
+    final file = File(
+      p.join(extracted.path, 'device_local_settings', entry.key),
+    );
+    await file.parent.create(recursive: true);
+    await file.writeAsString(entry.value, flush: true);
+    ledgerEntryMetadata['device_local_settings/${entry.key}'] = {
+      'bytes': await file.length(),
+      'sha256': (await sha256.bind(file.openRead()).first).toString(),
+    };
   }
   await File(p.join(extracted.path, 'manifest.json')).writeAsString(
     jsonEncode({
@@ -80,6 +94,7 @@ Future<Directory> _createExtractedBundle(
             'bytes': await database.length(),
             'sha256': (await sha256.bind(database.openRead()).first).toString(),
           },
+        ...ledgerEntryMetadata,
       },
     }),
     flush: true,
@@ -141,6 +156,48 @@ void main() {
             )
             .toList(),
         isEmpty,
+      );
+    });
+
+    test('册子条目独立于附件开关：includeFiles=false 也照样复制并登记', () async {
+      const fingerprint = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+      final extracted = await _createExtractedBundle(
+        root,
+        includeFiles: false,
+        ledgerFiles: {
+          '$fingerprint.json':
+              '{"fingerprint":"$fingerprint","platform":"windows",'
+              '"savedAtUtc":"2026-09-10T00:00:00.000Z",'
+              '"values":{"window_width_v1":1280.0}}',
+        },
+      );
+
+      final staged = await RestoreBundleStaging.create(
+        appDataDirectory: root,
+        extractedDirectory: extracted,
+        includeChats: true,
+        includeFiles: false,
+        sourceManifestSha256: await _manifestSha256(extracted),
+      );
+
+      expect(
+        File(
+          p.join(
+            staged.payloadDirectory.path,
+            'device_local_settings',
+            '$fingerprint.json',
+          ),
+        ).existsSync(),
+        isTrue,
+        reason: '册子不是附件，不能挂进 includeFiles 分支',
+      );
+      final validated = await RestoreBundleStaging.validateExistingCandidate(
+        candidateDirectory: staged.payloadDirectory,
+        expectedManifestSha256: staged.candidateManifestSha256,
+      );
+      expect(
+        validated.entries.keys,
+        contains('device_local_settings/$fingerprint.json'),
       );
     });
 

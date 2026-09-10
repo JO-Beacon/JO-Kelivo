@@ -492,7 +492,7 @@ void main() {
       expect(await live.getAllConversations(), hasLength(2));
     });
 
-    test('同会话新增消息按消息级智能合并，重复导入保持幂等', () async {
+    test('同会话新增消息按消息级合并，重复导入保持幂等', () async {
       final anchor = DateTime.utc(2026, 8, 7, 12);
       await live.putMigrationBatch(
         conversations: [

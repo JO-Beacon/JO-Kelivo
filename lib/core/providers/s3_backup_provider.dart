@@ -10,6 +10,8 @@ import '../models/backup.dart';
 import '../models/progress_update.dart';
 import '../services/backup/data_sync.dart';
 import '../services/backup/backup_activity.dart';
+import '../services/backup/device_ledger_export_settings.dart';
+import '../services/backup/local_device_settings_ledger.dart';
 import '../services/backup/s3_client.dart';
 import '../services/backup/temporary_restore_file.dart';
 import '../services/chat/chat_service.dart';
@@ -40,6 +42,32 @@ class S3BackupProvider extends ChangeNotifier {
   String? get message => _message;
   int get skippedConversations =>
       _dataSync.lastMergeReport?.skippedConversations ?? 0;
+
+  /// 本机设置最后是否真的被写回（合并保留模式下就地写回）。
+  int get localSettingsApplied => _dataSync.lastLocalSettingsApplied;
+
+  /// 本次恢复吸收进册子的设备记录数。
+  int get ledgerAbsorbed => _dataSync.lastLedgerAbsorbed;
+
+  /// 本次恢复从包内解析出的设备记录（供收尾弹窗展示）。
+  List<DeviceSettingsRecord> get ledgerRecords => _dataSync.lastLedgerRecords;
+
+  bool _lastLedgerUnrecognized = false;
+
+  /// 最近一次「带」档云备份是否因指纹采集失败而没带上本机当前设置。
+  bool get lastLedgerUnrecognized => _lastLedgerUnrecognized;
+
+  /// 按档位采集要随包携带的册子内容；返回 null 表示退化为「不带」包结构。
+  Future<Map<String, String>?> _resolveLedgerEntries(bool include) async {
+    if (!include) {
+      _lastLedgerUnrecognized = false;
+      return null;
+    }
+    final payload = await DeviceLedgerExportCollector.collect();
+    _lastLedgerUnrecognized =
+        payload.entries.isNotEmpty && !payload.localDeviceRecognized;
+    return payload.entries.isEmpty ? null : payload.entries;
+  }
 
   void updateConfig(S3Config cfg) {
     _cfg = cfg;
@@ -105,6 +133,10 @@ class S3BackupProvider extends ChangeNotifier {
     notifyListeners();
     File? file;
     try {
+      // 云备份与导出本地备份共用同一「带本机设置」档位。
+      final ledgerEntries = await _resolveLedgerEntries(
+        await DeviceLedgerExportSettings.includeLedger(),
+      );
       file = await _dataSync.prepareJoaiclientFile(
         _scopeAsWebdavConfig(),
         onProgress: (update) => onProgress?.call(
@@ -112,6 +144,7 @@ class S3BackupProvider extends ChangeNotifier {
             value: update.fraction == null ? null : update.fraction! * 0.55,
           ),
         ),
+        ledgerEntries: ledgerEntries,
       );
       final prefix = _normalizePrefix(_cfg.prefix);
       final key = '$prefix${p.basename(file.path)}';

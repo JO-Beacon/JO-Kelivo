@@ -478,4 +478,359 @@ void main() {
       ]);
     },
   );
+
+  test(
+    'appendMessageVersion with editor parts keeps the reasoning chain',
+    () async {
+      final now = DateTime.utc(2026, 9, 9, 15);
+      const conversationId = 'conversation-append-reasoning';
+      const messageId = 'message-append-reasoning';
+      final startedAt = now.add(const Duration(minutes: 1));
+      final finishedAt = now.add(const Duration(minutes: 2));
+      await repository.putMigrationBatch(
+        conversations: [
+          Conversation(
+            id: conversationId,
+            title: 'Append reasoning',
+            createdAt: now,
+            updatedAt: now,
+            messageIds: const [messageId],
+          ),
+        ],
+        messages: [
+          (
+            message: ChatMessage(
+              id: messageId,
+              role: 'assistant',
+              conversationId: conversationId,
+              timestamp: now,
+              parts: const [
+                ReasoningPart('old chain'),
+                TextPart('original answer'),
+              ],
+              reasoningStartAt: startedAt,
+              reasoningFinishedAt: finishedAt,
+            ),
+            messageOrder: 0,
+          ),
+        ],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+
+      // 编辑器返回的部件保留了思维链卡片：新分支必须继承思维链与元数据。
+      final result = await repository.appendMessageVersion(
+        messageId: messageId,
+        parts: const [ReasoningPart('new chain'), TextPart('edited answer')],
+      );
+      expect(result, isNotNull);
+      expect(result!.message.reasoningText, 'new chain');
+      // 数据库往返后 DateTime 仅时区表示可能变化，按时刻比较。
+      expect(result.message.reasoningStartAt!.isAtSameMomentAs(startedAt), isTrue);
+      expect(
+        result.message.reasoningFinishedAt!.isAtSameMomentAs(finishedAt),
+        isTrue,
+      );
+
+      final persisted = await repository.getMessage(result.message.id);
+      expect(persisted, isNotNull);
+      expect(persisted!.reasoningText, 'new chain');
+      expect(persisted.parts, hasLength(2));
+      expect(persisted.parts[0], isA<ReasoningPart>());
+      expect((persisted.parts[0] as ReasoningPart).text, 'new chain');
+      expect((persisted.parts[1] as TextPart).text, 'edited answer');
+    },
+  );
+
+  test(
+    'appendMessageVersion drops reasoning when the editor removed the part',
+    () async {
+      final now = DateTime.utc(2026, 9, 9, 16);
+      const conversationId = 'conversation-append-reasoning-drop';
+      const messageId = 'message-append-reasoning-drop';
+      await repository.putMigrationBatch(
+        conversations: [
+          Conversation(
+            id: conversationId,
+            title: 'Append reasoning drop',
+            createdAt: now,
+            updatedAt: now,
+            messageIds: const [messageId],
+          ),
+        ],
+        messages: [
+          (
+            message: ChatMessage(
+              id: messageId,
+              role: 'assistant',
+              conversationId: conversationId,
+              timestamp: now,
+              parts: const [
+                ReasoningPart('doomed chain'),
+                TextPart('original answer'),
+              ],
+              reasoningStartAt: now.add(const Duration(minutes: 1)),
+            ),
+            messageOrder: 0,
+          ),
+        ],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+
+      final result = await repository.appendMessageVersion(
+        messageId: messageId,
+        parts: const [TextPart('edited answer')],
+      );
+      expect(result, isNotNull);
+      expect(result!.message.reasoningText, isNull);
+      expect(result.message.reasoningStartAt, isNull);
+
+      final persisted = await repository.getMessage(result.message.id);
+      expect(persisted, isNotNull);
+      expect(persisted!.reasoningText, isNull);
+      expect(persisted.parts, hasLength(1));
+      expect(persisted.parts.single, isA<TextPart>());
+
+      final raw = sqlite.sqlite3.open('${root.path}/parts.sqlite');
+      try {
+        final reasoningRows = raw.select(
+          "SELECT 1 FROM message_part_rows "
+          "WHERE revision_id = '${result.message.id}' AND kind = 'reasoning';",
+        );
+        expect(reasoningRows, isEmpty);
+      } finally {
+        raw.close();
+      }
+    },
+  );
+
+  test(
+    'updateMessage without reasoning parts clears a previous reasoning chain',
+    () async {
+      final now = DateTime.utc(2026, 9, 9, 17);
+      const conversationId = 'conversation-overwrite-reasoning';
+      const messageId = 'message-overwrite-reasoning';
+      await repository.putMigrationBatch(
+        conversations: [
+          Conversation(
+            id: conversationId,
+            title: 'Overwrite reasoning',
+            createdAt: now,
+            updatedAt: now,
+            messageIds: const [messageId],
+          ),
+        ],
+        messages: [
+          (
+            message: ChatMessage(
+              id: messageId,
+              role: 'assistant',
+              conversationId: conversationId,
+              timestamp: now,
+              parts: const [
+                ReasoningPart('chain to remove'),
+                TextPart('original answer'),
+              ],
+              reasoningStartAt: now.add(const Duration(minutes: 1)),
+            ),
+            messageOrder: 0,
+          ),
+        ],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+
+      // 覆盖保存路径：编辑器删除了思维链部件，消息层也不再携带
+      // reasoningText 与 reasoningStartAt，落库不得复活旧思考。
+      final cleared = ChatMessage(
+        id: messageId,
+        role: 'assistant',
+        conversationId: conversationId,
+        timestamp: now,
+        parts: const [TextPart('edited answer')],
+      );
+      await repository.updateMessage(cleared);
+
+      final persisted = await repository.getMessage(messageId);
+      expect(persisted, isNotNull);
+      expect(persisted!.reasoningText, isNull);
+      expect(persisted.parts, hasLength(1));
+      expect(persisted.parts.single, isA<TextPart>());
+    },
+  );
+
+  test('interleaved text/reasoning order survives persistence', () async {
+    final now = DateTime.utc(2026, 9, 10, 10);
+    const conversationId = 'conversation-interleaved';
+    const messageId = 'message-interleaved';
+    await repository.putMigrationBatch(
+      conversations: [
+        Conversation(
+          id: conversationId,
+          title: 'Interleaved',
+          createdAt: now,
+          updatedAt: now,
+          messageIds: const [messageId],
+        ),
+      ],
+      messages: [
+        (
+          message: ChatMessage(
+            id: messageId,
+            role: 'assistant',
+            conversationId: conversationId,
+            timestamp: now,
+            parts: const [
+              TextPart('正文1'),
+              ReasoningPart('思维链2'),
+              TextPart('正文3'),
+            ],
+          ),
+          messageOrder: 0,
+        ),
+      ],
+      toolEventsByMessageId: const {},
+      geminiSignaturesByMessageId: const {},
+    );
+
+    final reloaded = await repository.getMessage(messageId);
+    expect(reloaded, isNotNull);
+    expect(reloaded!.reasoningText, '思维链2');
+    expect(reloaded.parts, hasLength(3));
+    expect((reloaded.parts[0] as TextPart).text, '正文1');
+    expect((reloaded.parts[1] as ReasoningPart).text, '思维链2');
+    expect((reloaded.parts[2] as TextPart).text, '正文3');
+
+    final raw = sqlite.sqlite3.open('${root.path}/parts.sqlite');
+    try {
+      final rows = raw.select(
+        "SELECT kind, payload FROM message_part_rows "
+        "WHERE revision_id = '$messageId' ORDER BY ordinal;",
+      );
+      expect(rows.map((row) => row['kind']).toList(), [
+        'text',
+        'reasoning',
+        'text',
+      ]);
+      expect(rows[1]['payload'], '思维链2');
+    } finally {
+      raw.close();
+    }
+
+    // 双重保存幂等：原样写回再读，顺序不变。
+    await repository.updateMessage(reloaded);
+    final again = await repository.getMessage(messageId);
+    expect(again, isNotNull);
+    expect(again!.parts, hasLength(3));
+    expect((again.parts[0] as TextPart).text, '正文1');
+    expect((again.parts[1] as ReasoningPart).text, '思维链2');
+    expect((again.parts[2] as TextPart).text, '正文3');
+  });
+
+  test(
+    'appendMessageVersion keeps editor order with reasoning after text',
+    () async {
+      final now = DateTime.utc(2026, 9, 10, 11);
+      const conversationId = 'conversation-reorder-append';
+      const messageId = 'message-reorder-append';
+      await repository.putMigrationBatch(
+        conversations: [
+          Conversation(
+            id: conversationId,
+            title: 'Reorder append',
+            createdAt: now,
+            updatedAt: now,
+            messageIds: const [messageId],
+          ),
+        ],
+        messages: [
+          (
+            message: ChatMessage(
+              id: messageId,
+              role: 'assistant',
+              conversationId: conversationId,
+              timestamp: now,
+              parts: const [
+                ReasoningPart('old chain'),
+                TextPart('original answer'),
+              ],
+            ),
+            messageOrder: 0,
+          ),
+        ],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+
+      // 编辑器把正文拖到思维链前面：新分支必须原样保留这个顺序。
+      final result = await repository.appendMessageVersion(
+        messageId: messageId,
+        parts: const [TextPart('edited answer'), ReasoningPart('kept chain')],
+      );
+      expect(result, isNotNull);
+      expect(result!.message.reasoningText, 'kept chain');
+
+      final persisted = await repository.getMessage(result.message.id);
+      expect(persisted, isNotNull);
+      expect(persisted!.parts, hasLength(2));
+      expect((persisted.parts[0] as TextPart).text, 'edited answer');
+      expect((persisted.parts[1] as ReasoningPart).text, 'kept chain');
+      expect(persisted.reasoningText, 'kept chain');
+    },
+  );
+
+  test('tool call keeps its edited position and event roundtrips', () async {
+    final now = DateTime.utc(2026, 9, 10, 12);
+    const conversationId = 'conversation-tool-position';
+    const messageId = 'message-tool-position';
+    const toolJson = '{"id":"call_1","name":"web_search","arguments":{}}';
+    await repository.putMigrationBatch(
+      conversations: [
+        Conversation(
+          id: conversationId,
+          title: 'Tool position',
+          createdAt: now,
+          updatedAt: now,
+          messageIds: const [messageId],
+        ),
+      ],
+      messages: [
+        (
+          message: ChatMessage(
+            id: messageId,
+            role: 'assistant',
+            conversationId: conversationId,
+            timestamp: now,
+            parts: const [
+              TextPart('before'),
+              ToolCallPart(toolJson),
+              TextPart('after'),
+            ],
+          ),
+          messageOrder: 0,
+        ),
+      ],
+      toolEventsByMessageId: {
+        messageId: [
+          {'id': 'call_1', 'name': 'web_search', 'arguments': <String, dynamic>{}},
+        ],
+      },
+      geminiSignaturesByMessageId: const {},
+    );
+
+    final reloaded = await repository.getMessage(messageId);
+    expect(reloaded, isNotNull);
+    expect(reloaded!.parts, hasLength(3));
+    expect(reloaded.parts[0], isA<TextPart>());
+    expect(reloaded.parts[1], isA<ToolCallPart>());
+    expect((reloaded.parts[1] as ToolCallPart).payloadJson, toolJson);
+    expect(reloaded.parts[2], isA<TextPart>());
+
+    // 事件记录从部件行读回：位置重排后仍能完整取回，供回传使用。
+    final events = await repository.getToolEvents(messageId);
+    expect(events, hasLength(1));
+    expect(events.single['id'], 'call_1');
+    expect(events.single['name'], 'web_search');
+  });
 }

@@ -33,9 +33,13 @@ import '../../../shared/widgets/restart_app_action.dart';
 import '../../../core/services/backup/cherry_importer.dart';
 import '../../../core/services/backup/chatbox_importer.dart';
 import '../../../core/services/backup/deepseek_importer.dart';
+import '../../../core/services/backup/device_ledger_export_settings.dart';
+import '../../../core/services/backup/local_device_settings_ledger.dart';
+import '../../../core/services/device/device_identity.dart';
 import '../../../utils/platform_utils.dart';
 import '../backup_restore_error_message.dart';
 import '../backup_restart_dialog.dart';
+import '../device_ledger_labels.dart';
 import '../widgets/backup_reminder_helpers.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
@@ -60,6 +64,24 @@ class BackupPage extends StatefulWidget {
 class _BackupPageState extends State<BackupPage> {
   List<BackupFileItem> _remote = const <BackupFileItem>[];
   List<BackupFileItem> _remoteS3 = const <BackupFileItem>[];
+  bool _includeLocalSettings = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadIncludeLocalSettings();
+  }
+
+  Future<void> _loadIncludeLocalSettings() async {
+    final enabled = await DeviceLedgerExportSettings.includeLedger();
+    if (!mounted) return;
+    setState(() => _includeLocalSettings = enabled);
+  }
+
+  Future<void> _setIncludeLocalSettings(bool value) async {
+    setState(() => _includeLocalSettings = value);
+    await DeviceLedgerExportSettings.setIncludeLedger(value);
+  }
 
   Future<bool?> _confirmCherryImport(BuildContext context) async {
     final l10n = AppLocalizations.of(context)!;
@@ -359,6 +381,21 @@ class _BackupPageState extends State<BackupPage> {
                       label: l10n.backupPageWebDavServerSettings,
                       onTap: () =>
                           _showWebDavSettingsPage(context, settings, vm, cfg),
+                    ),
+                    _iosDivider(context),
+                    // 云备份与本地导出共用同一「带本机设置」档位。
+                    _iosSwitchRow(
+                      context,
+                      icon: Lucide.Settings2,
+                      label: l10n.backupIncludeLocalSettings,
+                      value: _includeLocalSettings,
+                      onChanged: _setIncludeLocalSettings,
+                    ),
+                    _BackupSubcategoryLabel(
+                      label: includeLocalSettingsSubtitle(
+                        l10n,
+                        _includeLocalSettings,
+                      ),
                     ),
                     _iosDivider(context),
                     _iosNavRow(
@@ -665,10 +702,14 @@ class _BackupPageState extends State<BackupPage> {
                                               );
                                               return;
                                             }
-                                            await showBackupRestartRequiredDialog(
+                                            await showRestoreCompletionDialog(
                                               context,
+                                              mode: mode,
                                               skippedConversations:
                                                   vm.skippedConversations,
+                                              localSettingsApplied:
+                                                  vm.localSettingsApplied,
+                                              ledgerRecords: vm.ledgerRecords,
                                             );
                                           },
                                         ),
@@ -729,10 +770,14 @@ class _BackupPageState extends State<BackupPage> {
                                       );
                                       return;
                                     }
-                                    await showBackupRestartRequiredDialog(
+                                    await showRestoreCompletionDialog(
                                       context,
+                                      mode: mode,
                                       skippedConversations:
                                           vm.skippedConversations,
+                                      localSettingsApplied:
+                                          vm.localSettingsApplied,
+                                      ledgerRecords: vm.ledgerRecords,
                                     );
                                   },
                                 ),
@@ -782,6 +827,21 @@ class _BackupPageState extends State<BackupPage> {
                       label: l10n.backupPageS3ServerSettings,
                       onTap: () =>
                           _showS3SettingsPage(context, settings, s3Vm, s3Cfg),
+                    ),
+                    _iosDivider(context),
+                    // 云备份与本地导出共用同一「带本机设置」档位。
+                    _iosSwitchRow(
+                      context,
+                      icon: Lucide.Settings2,
+                      label: l10n.backupIncludeLocalSettings,
+                      value: _includeLocalSettings,
+                      onChanged: _setIncludeLocalSettings,
+                    ),
+                    _BackupSubcategoryLabel(
+                      label: includeLocalSettingsSubtitle(
+                        l10n,
+                        _includeLocalSettings,
+                      ),
                     ),
                     _iosDivider(context),
                     _iosNavRow(
@@ -1072,10 +1132,13 @@ class _BackupPageState extends State<BackupPage> {
                                               );
                                               return;
                                             }
-                                            await showBackupRestartRequiredDialog(
+                                            await showRestoreCompletionDialog(
                                               context,
+                                              mode: mode,
                                               skippedConversations:
                                                   s3Vm.skippedConversations,
+                                              localSettingsApplied:
+                                                  s3Vm.localSettingsApplied,
                                             );
                                           },
                                         ),
@@ -1134,10 +1197,13 @@ class _BackupPageState extends State<BackupPage> {
                                       );
                                       return;
                                     }
-                                    await showBackupRestartRequiredDialog(
+                                    await showRestoreCompletionDialog(
                                       context,
+                                      mode: mode,
                                       skippedConversations:
                                           s3Vm.skippedConversations,
+                                      localSettingsApplied:
+                                          s3Vm.localSettingsApplied,
                                     );
                                   },
                                 ),
@@ -1208,8 +1274,20 @@ class _BackupPageState extends State<BackupPage> {
               onTap: () => _doImportLocal(context, vm, joaiclient: true),
             ),
           ),
+          _iosDivider(context),
+          _iosSwitchRow(
+            context,
+            icon: Lucide.Settings2,
+            label: l10n.backupIncludeLocalSettings,
+            value: _includeLocalSettings,
+            onChanged: _setIncludeLocalSettings,
+          ),
+          _BackupSubcategoryLabel(
+            label: includeLocalSettingsSubtitle(l10n, _includeLocalSettings),
+          ),
         ],
       ),
+      _LocalSettingsLedgerMobileSection(l10n: l10n),
       header(l10n.backupPageKelivoCompatibleBackup),
       _iosSectionCard(
         children: [
@@ -1376,11 +1454,15 @@ class _BackupPageState extends State<BackupPage> {
     try {
       await _runWithExportingOverlay(
         context,
-        (onProgress) => vm.exportToFile(onProgress: onProgress),
+        (onProgress) => vm.exportToFile(
+          onProgress: onProgress,
+          includeLedger: _includeLocalSettings,
+        ),
         cancellableTask: (onProgress, cancelToken) async {
           file = await vm.exportToFile(
             onProgress: onProgress,
             cancelToken: cancelToken,
+            includeLedger: _includeLocalSettings,
           );
           if (!context.mounted) return;
           final exportFile = file!;
@@ -1415,6 +1497,14 @@ class _BackupPageState extends State<BackupPage> {
           }
         },
       );
+      // 「带」档但指纹采集失败时提醒：历史档案照常带走了，本机当前值没进包。
+      if (context.mounted && vm.lastLedgerUnrecognized) {
+        showAppSnackBar(
+          context,
+          message: l10n.backupLocalSettingsUnrecognized,
+          type: NotificationType.warning,
+        );
+      }
     } catch (e) {
       if (e is BackupCancelledException) return;
       // 失败的归档或不可写目标不能显示为成功。
@@ -1477,9 +1567,12 @@ class _BackupPageState extends State<BackupPage> {
       return;
     }
     if (!context.mounted) return;
-    await showBackupRestartRequiredDialog(
+    await showRestoreCompletionDialog(
       context,
+      mode: mode,
       skippedConversations: vm.skippedConversations,
+      localSettingsApplied: vm.localSettingsApplied,
+      ledgerRecords: vm.ledgerRecords,
     );
   }
 
@@ -2104,6 +2197,280 @@ class _SmallTactileIconState extends State<_SmallTactileIcon> {
         padding: const EdgeInsets.all(6),
         child: Icon(widget.icon, size: 18, color: c),
       ),
+    );
+  }
+}
+
+class _LocalSettingsLedgerMobileSection extends StatefulWidget {
+  const _LocalSettingsLedgerMobileSection({required this.l10n});
+
+  final AppLocalizations l10n;
+
+  @override
+  State<_LocalSettingsLedgerMobileSection> createState() =>
+      _LocalSettingsLedgerMobileSectionState();
+}
+
+class _LocalSettingsLedgerMobileSectionState
+    extends State<_LocalSettingsLedgerMobileSection> {
+  static const _pageSize = 20;
+
+  List<DeviceSettingsRecord>? _records;
+  int _total = 0;
+  String? _currentFingerprint;
+  bool _busy = false;
+  bool _loadingMore = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final ledger = LocalDeviceSettingsLedger();
+    // 分页拉取第一页；册子可能累积到几千台，不能整册加载。
+    final records = await ledger.getAll(limit: _pageSize);
+    final total = await ledger.countAll();
+    final identity = await DeviceIdentityService.resolve();
+    if (!mounted) return;
+    setState(() {
+      _records = records;
+      _total = total;
+      _currentFingerprint = identity?.fingerprintHash;
+    });
+  }
+
+  Future<void> _loadMore() async {
+    final records = _records;
+    if (records == null || _loadingMore) return;
+    setState(() => _loadingMore = true);
+    try {
+      final more = await LocalDeviceSettingsLedger().getAll(
+        limit: _pageSize,
+        offset: records.length,
+      );
+      if (!mounted) return;
+      setState(() => _records = [...records, ...more]);
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  bool get _hasMore => (_records?.length ?? 0) < _total;
+
+  Future<void> _delete(DeviceSettingsRecord record) async {
+    final l10n = widget.l10n;
+    final cs = Theme.of(context).colorScheme;
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l10n.backupLedgerDelete,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: AppFontWeights.semibold,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(l10n.backupLedgerDeleteConfirm),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(false),
+                      child: Text(l10n.backupPageCancel),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(true),
+                      child: Text(l10n.backupPageOK),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    await LocalDeviceSettingsLedger().removeDevice(record.fingerprint);
+    await _load();
+    if (!mounted) return;
+    setState(() => _busy = false);
+  }
+
+  Future<void> _clearAll() async {
+    final l10n = widget.l10n;
+    final cs = Theme.of(context).colorScheme;
+    final count = _records?.length ?? 0;
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l10n.backupLedgerClear,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: AppFontWeights.semibold,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(l10n.backupLedgerClearConfirm(count)),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(false),
+                      child: Text(l10n.backupPageCancel),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(true),
+                      child: Text(l10n.backupPageOK),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    await LocalDeviceSettingsLedger().clearAll();
+    await _load();
+    if (!mounted) return;
+    setState(() => _busy = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = widget.l10n;
+    final cs = Theme.of(context).colorScheme;
+    final records = _records;
+
+    return _iosSectionCard(
+      children: [
+        _BackupSubcategoryLabel(label: l10n.backupLedgerTitle),
+        if (records == null)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Center(
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          )
+        else if (records.isEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.backupLedgerEmpty,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: cs.onSurface.withValues(alpha: 0.8),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  l10n.backupLedgerEmptyDescription,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: cs.onSurface.withValues(alpha: 0.58),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else ...[
+          for (var i = 0; i < records.length; i++) ...[
+            if (i > 0) _iosDivider(context),
+            Builder(
+              builder: (context) {
+                final isCurrent =
+                    records[i].fingerprint == _currentFingerprint;
+                return ListTile(
+                  dense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                  title: Text(
+                    isCurrent
+                        ? '${records[i].deviceName} ${l10n.backupLedgerThisDevice}'
+                        : records[i].deviceName,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  subtitle: Text(
+                    '${devicePlatformLabel(l10n, records[i].platform)} · '
+                    '${deviceLedgerTimestamp(records[i].savedAtUtc)} · '
+                    '${l10n.backupLedgerItemCount(records[i].values.length)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: cs.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  trailing: TextButton(
+                    onPressed: _busy ? null : () => _delete(records[i]),
+                    child: Text(l10n.backupLedgerDelete),
+                  ),
+                );
+              },
+            ),
+          ],
+          if (_hasMore) ...[
+            _iosDivider(context),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+              child: TextButton(
+                onPressed: _loadingMore ? null : _loadMore,
+                child: Text(l10n.backupLedgerLoadMore),
+              ),
+            ),
+          ],
+          _iosDivider(context),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            child: TextButton(
+              onPressed: _busy ? null : _clearAll,
+              child: Text(l10n.backupLedgerClear),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

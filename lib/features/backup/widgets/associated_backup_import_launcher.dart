@@ -151,9 +151,12 @@ class _AssociatedBackupImportLauncherState
       return;
     }
     if (!rootContext.mounted) return;
-    await showBackupRestartRequiredDialog(
+    await showRestoreCompletionDialog(
       rootContext,
+      mode: mode,
       skippedConversations: backupProvider.skippedConversations,
+      localSettingsApplied: backupProvider.localSettingsApplied,
+      ledgerRecords: backupProvider.ledgerRecords,
       suppressAssociatedPathOnRestart: true,
       associatedBackupPath: path,
     );

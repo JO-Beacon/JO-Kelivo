@@ -6,6 +6,7 @@ import 'restore_bundle_staging.dart';
 import 'restore_business_lease.dart';
 import 'restore_cutover_executor.dart';
 import 'restore_durability.dart';
+import 'restore_local_settings_applier.dart';
 import 'restore_previous_store.dart';
 import 'restore_receipt.dart';
 import 'restore_workspace_lock.dart';
@@ -343,6 +344,16 @@ final class RestoreStartupGate {
             pending.receipt.state == RestoreReceiptState.rolledBack) {
           final terminal = await executor
               .revalidateTerminalWhileWorkspaceLocked(pending.receipt);
+          // 续跑分支（上次已提交、这次续跑）：cutover 早已 committed，
+          // 若写回当时被杀就落空了，必须在这里补做。
+          // 挂点必须早于 archiveTerminalRunWhileWorkspaceLocked——归档后
+          // 候选文件虽仍在，但路径已经变了。
+          await _applyLocalSettingsIfCommitted(
+            appDataDirectory: appDataDirectory,
+            runId: pending.runId,
+            runInCompletedDirectory: pending.runInCompletedDirectory,
+            state: terminal.state,
+          );
           onStage?.call(RestoreStartupStage.finishing);
           await workspaceLock.archiveTerminalRunWhileWorkspaceLocked(
             runId: pending.runId,
@@ -360,6 +371,13 @@ final class RestoreStartupGate {
         final terminal = await executor.revalidateTerminalWhileWorkspaceLocked(
           result,
         );
+        // 本次刚提交分支：写回与业务数据同待遇，切库成功后才生效。
+        await _applyLocalSettingsIfCommitted(
+          appDataDirectory: appDataDirectory,
+          runId: pending.runId,
+          runInCompletedDirectory: pending.runInCompletedDirectory,
+          state: terminal.state,
+        );
         onStage?.call(RestoreStartupStage.finishing);
         await workspaceLock.archiveTerminalRunWhileWorkspaceLocked(
           runId: pending.runId,
@@ -369,6 +387,37 @@ final class RestoreStartupGate {
       });
     } finally {
       await ownedBusinessLease?.close();
+    }
+  }
+
+  /// 完全覆盖模式：切库提交成功后，把备份里的本机设置写回。
+  ///
+  /// 只在终态为 committed 时执行；rolledBack 表示数据已退回，
+  /// 设置也必须保持不动，否则会出现"设置变了、数据退回"的不一致。
+  ///
+  /// 写回本身**永不阻断启动**：任何失败都只被吞掉、留给下次冷启动重试。
+  /// 用 catch-all 包住是刻意的——测试环境没有 path_provider 插件，
+  /// 打开册子库会抛 MissingPluginException，若任其逃逸会把整个启动门带崩。
+  static Future<void> _applyLocalSettingsIfCommitted({
+    required Directory appDataDirectory,
+    required String runId,
+    required bool runInCompletedDirectory,
+    required RestoreReceiptState state,
+  }) async {
+    if (state != RestoreReceiptState.committed) return;
+    try {
+      final candidateDirectory = RestoreLocalSettingsApplier
+          .candidateDirectoryFor(
+            appDataDirectory: appDataDirectory,
+            runId: runId,
+            runInCompletedDirectory: runInCompletedDirectory,
+          );
+      await RestoreLocalSettingsApplier.applyIfNeeded(
+        candidateDirectory: candidateDirectory,
+        runId: runId,
+      );
+    } catch (_) {
+      // 写回失败不影响恢复结果。
     }
   }
 

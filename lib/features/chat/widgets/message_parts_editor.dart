@@ -130,7 +130,7 @@ class _MessagePartsEditorState extends State<MessagePartsEditor> {
     final initial = part is TextPart
         ? (_controllers[index]?.text ?? part.text)
         : _partSummary(part);
-    final title = '${_partLabel(l10n, part)} ${index + 1}';
+    final title = '${index + 1} ${_partLabel(l10n, part)}';
     final next = await showMessagePartExpandedEditor(
       context,
       title: title,
@@ -148,7 +148,7 @@ class _MessagePartsEditorState extends State<MessagePartsEditor> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    return Column(
+    final list = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ReorderableListView.builder(
@@ -209,6 +209,13 @@ class _MessagePartsEditorState extends State<MessagePartsEditor> {
           },
         ),
       ],
+    );
+    // 桌面端滚动条收敛：部件列表、正文框内部各自的可滚动区一律不绘制滚动条，
+    // 只保留外层弹窗内容区那一条（它才代表“整个编辑内容滚到哪了”）。
+    // 滚动能力不受影响——滚轮、拖选、内部自滚行为全部不变。
+    return ScrollConfiguration(
+      behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+      child: list,
     );
   }
 }

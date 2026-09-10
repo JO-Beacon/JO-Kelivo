@@ -452,7 +452,20 @@ void main() {
         );
         expect(desktopLegacyGesture.onTap, isNotNull);
         _expectAbove(tester, 'Chatbox (>=1.22)', 'Chatbox (<1.22)');
+        // 前面的断言把列表滚到了底部，靠上的区块已被滚出构建范围；
+        // 比较顺序前先滚回顶部，否则 find.text 取不到元素。
+        await tester.scrollUntilVisible(
+          find.text('Backup Reminder'),
+          -200,
+          scrollable: find.byType(Scrollable).first,
+        );
         _expectAbove(tester, 'Backup Reminder', 'Native Backup');
+        expect(find.text('Device settings records'), findsOneWidget);
+        await tester.scrollUntilVisible(
+          find.text('S3 Settings'),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
         _expectAbove(tester, 'External Import', 'WebDAV Server Settings');
         _expectAbove(tester, 'WebDAV Server Settings', 'S3 Settings');
       },

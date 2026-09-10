@@ -59,6 +59,15 @@ final class RestoreBundleStaging {
   static const _backupFormatVersion = 2;
   static const _assetRoots = ['upload', 'images', 'avatars', 'fonts'];
   static const _databaseEntry = 'database/kelivo.db';
+
+  /// 本机设置册子在包内的目录前缀。
+  ///
+  /// 它**不是**第五个附件根：册子是数据不是附件，copy 与登记都必须独立于
+  /// [includeFiles] 和 [_assetRoots]。并入 `_assetRoots` 会同时毁掉两件事：
+  /// cutover 的镜像清单会把它当附件搬进应用数据目录；以及它的存亡会被
+  /// 绑在"这次备份带不带附件"上，导致包里有册子却不落地的静默丢失。
+  static const _ledgerEntryPrefix = 'device_local_settings/';
+
   static const _maximumManifestBytes = 16 * 1024 * 1024;
   // 设置包含结构化偏好，绝不包含聊天记录或二进制资源。
   // 在复制/解析前限制 JSON 大小，以约束 UTF-8 和 DOM 放大。
@@ -211,12 +220,43 @@ final class RestoreBundleStaging {
         }
       }
 
+      // 本机设置册子：**独立于 includeFiles**。只要包里有册子条目，
+      // 就无条件复制到待应用目录——它必须跨冷重启存活，也是完全覆盖模式
+      // 写回本机设置的唯一取值来源。判断条件只看清单里有没有该前缀条目。
+      final ledgerEntries = declaredEntries.keys.where(
+        (name) => name.startsWith(_ledgerEntryPrefix),
+      );
+      for (final entryName in ledgerEntries) {
+        final target = File(
+          p.joinAll([payloadDirectory.path, ...entryName.split('/')]),
+        );
+        await _ensureDurableDirectory(
+          directory: target.parent,
+          boundary: payloadDirectory,
+          durability: resolvedDurability,
+        );
+        stagedEntries[entryName] = await _copyVerified(
+          File(p.joinAll([extractedDirectory.path, ...entryName.split('/')])),
+          target,
+          entryName,
+          declaredEntries[entryName]!,
+          payloadDirectory,
+          resolvedDurability,
+        );
+      }
+
       final expectedEntryNames = <String>{
         _databaseEntry,
         if (includeFiles)
           ...declaredEntries.keys.where(
             (name) => _assetRoots.any((root) => name.startsWith('$root/')),
           ),
+        // 册子条目**无条件**登记，不能写进上面那个 if (includeFiles) 里：
+        // ③ 复制了而这里漏登记，会与 stagedEntries 比对不一致，
+        // 当场抛 restore_staging_entries（响亮失败）。
+        ...declaredEntries.keys.where(
+          (name) => name.startsWith(_ledgerEntryPrefix),
+        ),
       };
       if (expectedEntryNames.length != stagedEntries.length ||
           !expectedEntryNames.containsAll(stagedEntries.keys)) {
@@ -730,6 +770,7 @@ final class RestoreBundleStaging {
       final knownName =
           (allowSettings && name == 'settings.json') ||
           name == _databaseEntry ||
+          name.startsWith(_ledgerEntryPrefix) ||
           _assetRoots.any((root) => name.startsWith('$root/'));
       if (!_isCanonicalEntryName(name) ||
           !caseFoldedNames.add(name.toLowerCase()) ||

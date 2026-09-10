@@ -157,6 +157,20 @@ class ChatMessage extends HiveObject {
     return next;
   }
 
+  /// 从部件列表推导思维链文本。
+  ///
+  /// 编辑保存路径与数据库读取共用同一约定：reasoning 以 [ReasoningPart]
+  /// 随部件传递，持久化时折叠进 [reasoningText] 字段；部件中不含
+  /// ReasoningPart（例如编辑器里被删除）时推导结果为 null。
+  /// 多段思维链按换行合并，与导入器的字段式构造保持一致。
+  static String? reasoningTextFromParts(List<MessagePart> parts) {
+    final text = [
+      for (final part in parts)
+        if (part is ReasoningPart && part.text.isNotEmpty) part.text,
+    ].join('\n');
+    return text.isEmpty ? null : text;
+  }
+
   ChatMessage copyWith({
     String? id,
     String? role,

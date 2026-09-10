@@ -8629,6 +8629,82 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get autoRetryFooter => '仅在当前这轮模型响应尚未产生任何输出时才会自动重试。';
+
+  @override
+  String get backupIncludeLocalSettings => '把本机设置一起带走';
+
+  @override
+  String get backupIncludeLocalSettingsOnSubtitle =>
+      '窗口大小与位置、桌面快捷键、聊天字号等本机专属设置随备份一起带走。含本机设置的备份仅新版 JO-AIClient 可恢复。';
+
+  @override
+  String get backupIncludeLocalSettingsOffSubtitle =>
+      '只导出聊天、文件与通用设置，本机专属设置留在本机。';
+
+  @override
+  String get backupLedgerTitle => '本机设置记录';
+
+  @override
+  String get backupLedgerEmpty => '还没有任何设备记录';
+
+  @override
+  String get backupLedgerEmptyDescription => '导出时选择“带”，本机设置就会随备份记录在这里。';
+
+  @override
+  String get backupLedgerThisDevice => '（本机）';
+
+  @override
+  String backupLedgerDeviceCount(int count) {
+    return '共 $count 台设备';
+  }
+
+  @override
+  String get backupLedgerDelete => '删除';
+
+  @override
+  String get backupLedgerDeleteConfirm =>
+      '删除后，这台设备的本机设置将不再随下次备份携带。已导出的备份包不受影响。';
+
+  @override
+  String get backupLedgerClear => '清空全部记录';
+
+  @override
+  String backupLedgerClearConfirm(int count) {
+    return '将删除全部 $count 台设备的记录，此操作不可撤销。已导出的备份包不受影响。';
+  }
+
+  @override
+  String backupLedgerItemCount(int count) {
+    return '$count 项设置';
+  }
+
+  @override
+  String get backupLedgerLoadMore => '加载更多';
+
+  @override
+  String get backupLedgerSettingsDescription =>
+      '窗口大小与位置、桌面快捷键、聊天字号、日志开关属于本机设置，只跟设备走，不影响聊天数据。';
+
+  @override
+  String get backupLocalSettingsUnrecognized => '未能识别本机设备，本次未包含本机当前设置';
+
+  @override
+  String backupLedgerAbsorbedNotice(int count) {
+    return '已并入 $count 台设备的设置记录';
+  }
+
+  @override
+  String backupLocalSettingsAppliedNotice(int count) {
+    return '本次已把备份里的 $count 项本机设置应用到这台设备';
+  }
+
+  @override
+  String get backupPageMergeCompleted => '合并完成';
+
+  @override
+  String backupPageMergeCompletedWithSkipped(int count) {
+    return '备份中有 $count 个会话因消息顺序异常被跳过，未并入本机。';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -17256,6 +17332,82 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get autoRetryFooter => '仅在当前这轮模型响应尚未产生任何输出时才会自动重试。';
+
+  @override
+  String get backupIncludeLocalSettings => '把本机设置一起带走';
+
+  @override
+  String get backupIncludeLocalSettingsOnSubtitle =>
+      '窗口大小与位置、桌面快捷键、聊天字号等本机专属设置随备份一起带走。含本机设置的备份仅新版 JO-AIClient 可恢复。';
+
+  @override
+  String get backupIncludeLocalSettingsOffSubtitle =>
+      '只导出聊天、文件与通用设置，本机专属设置留在本机。';
+
+  @override
+  String get backupLedgerTitle => '本机设置记录';
+
+  @override
+  String get backupLedgerEmpty => '还没有任何设备记录';
+
+  @override
+  String get backupLedgerEmptyDescription => '导出时选择“带”，本机设置就会随备份记录在这里。';
+
+  @override
+  String get backupLedgerThisDevice => '（本机）';
+
+  @override
+  String backupLedgerDeviceCount(int count) {
+    return '共 $count 台设备';
+  }
+
+  @override
+  String get backupLedgerDelete => '删除';
+
+  @override
+  String get backupLedgerDeleteConfirm =>
+      '删除后，这台设备的本机设置将不再随下次备份携带。已导出的备份包不受影响。';
+
+  @override
+  String get backupLedgerClear => '清空全部记录';
+
+  @override
+  String backupLedgerClearConfirm(int count) {
+    return '将删除全部 $count 台设备的记录，此操作不可撤销。已导出的备份包不受影响。';
+  }
+
+  @override
+  String backupLedgerItemCount(int count) {
+    return '$count 项设置';
+  }
+
+  @override
+  String get backupLedgerLoadMore => '加载更多';
+
+  @override
+  String get backupLedgerSettingsDescription =>
+      '窗口大小与位置、桌面快捷键、聊天字号、日志开关属于本机设置，只跟设备走，不影响聊天数据。';
+
+  @override
+  String get backupLocalSettingsUnrecognized => '未能识别本机设备，本次未包含本机当前设置';
+
+  @override
+  String backupLedgerAbsorbedNotice(int count) {
+    return '已并入 $count 台设备的设置记录';
+  }
+
+  @override
+  String backupLocalSettingsAppliedNotice(int count) {
+    return '本次已把备份里的 $count 项本机设置应用到这台设备';
+  }
+
+  @override
+  String get backupPageMergeCompleted => '合并完成';
+
+  @override
+  String backupPageMergeCompletedWithSkipped(int count) {
+    return '备份中有 $count 个会话因消息顺序异常被跳过，未并入本机。';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -25885,4 +26037,80 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get autoRetryFooter => '僅在目前這輪模型回應尚未產生任何輸出時才會自動重試。';
+
+  @override
+  String get backupIncludeLocalSettings => '把本機設定一起帶走';
+
+  @override
+  String get backupIncludeLocalSettingsOnSubtitle =>
+      '視窗大小與位置、桌面快捷鍵、聊天字號等本機專屬設定隨備份一起帶走。含本機設定的備份僅新版 JO-AIClient 可還原。';
+
+  @override
+  String get backupIncludeLocalSettingsOffSubtitle =>
+      '只匯出聊天、檔案與通用設定，本機專屬設定留在本機。';
+
+  @override
+  String get backupLedgerTitle => '本機設定記錄';
+
+  @override
+  String get backupLedgerEmpty => '還沒有任何裝置記錄';
+
+  @override
+  String get backupLedgerEmptyDescription => '匯出時選擇「帶」，本機設定就會隨備份記錄在這裡。';
+
+  @override
+  String get backupLedgerThisDevice => '（本機）';
+
+  @override
+  String backupLedgerDeviceCount(int count) {
+    return '共 $count 台裝置';
+  }
+
+  @override
+  String get backupLedgerDelete => '刪除';
+
+  @override
+  String get backupLedgerDeleteConfirm =>
+      '刪除後，這台裝置的本機設定將不再隨下次備份攜帶。已匯出的備份包不受影響。';
+
+  @override
+  String get backupLedgerClear => '清空全部記錄';
+
+  @override
+  String backupLedgerClearConfirm(int count) {
+    return '將刪除全部 $count 台裝置的記錄，此操作不可撤銷。已匯出的備份包不受影響。';
+  }
+
+  @override
+  String backupLedgerItemCount(int count) {
+    return '$count 項設定';
+  }
+
+  @override
+  String get backupLedgerLoadMore => '載入更多';
+
+  @override
+  String get backupLedgerSettingsDescription =>
+      '視窗大小與位置、桌面快捷鍵、聊天字號、日誌開關屬於本機設定，只跟裝置走，不影響聊天資料。';
+
+  @override
+  String get backupLocalSettingsUnrecognized => '未能識別本機裝置，本次未包含本機目前設定';
+
+  @override
+  String backupLedgerAbsorbedNotice(int count) {
+    return '已併入 $count 台裝置的設定記錄';
+  }
+
+  @override
+  String backupLocalSettingsAppliedNotice(int count) {
+    return '本次已把備份裡的 $count 項本機設定套用到這台裝置';
+  }
+
+  @override
+  String get backupPageMergeCompleted => '合併完成';
+
+  @override
+  String backupPageMergeCompletedWithSkipped(int count) {
+    return '備份中有 $count 個工作階段因訊息順序異常被略過，未併入本機。';
+  }
 }

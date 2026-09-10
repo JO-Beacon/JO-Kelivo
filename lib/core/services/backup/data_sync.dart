@@ -22,11 +22,14 @@ import '../../models/backup.dart';
 import '../../models/backup_task_progress.dart';
 import '../../models/progress_update.dart';
 import '../chat/chat_service.dart';
+import '../device/device_identity.dart';
 import '../migration/migration_backup_file_name.dart';
 import '../../../utils/app_directories.dart';
 import 'backup_settings_validator.dart';
 import 'backup_isolate_runner.dart';
+import 'device_local_settings_writer.dart';
 import 'joaiclient_archive.dart';
+import 'local_device_settings_ledger.dart';
 import 'restore_bundle_preparation.dart';
 import 'temporary_restore_file.dart';
 
@@ -55,6 +58,7 @@ final class _BackupPackArgs {
     required this.imagesDirPath,
     required this.fontsDirPath,
     required this.verifyDirPath,
+    this.ledgerDirectoryPath,
   });
 
   final String outPath;
@@ -71,6 +75,13 @@ final class _BackupPackArgs {
   final String imagesDirPath;
   final String fontsDirPath;
   final String verifyDirPath;
+
+  /// 本机设置册子的临时目录（内含 `device_local_settings/<指纹>.json`）。
+  /// 为空表示"不带"档——册子条目完全不进包。
+  ///
+  /// 注意：这条路径与 [includeFiles] 完全无关。册子不是附件，
+  /// 不能并入 `_assetRoots`，否则 cutover 会把它当附件搬走。
+  final String? ledgerDirectoryPath;
 }
 
 class DataSync {
@@ -78,6 +89,9 @@ class DataSync {
   static const _backupFormatVersion = 2;
   static const _manifestEntryName = 'manifest.json';
   static const _databaseEntryName = 'database/kelivo.db';
+
+  /// 本机设置册子在备份包内的目录前缀。每台设备一个独立 JSON 文件。
+  static const ledgerEntryPrefix = 'device_local_settings/';
   // 16 MiB 的元数据上限可让清单解析和条目元数据保持有界。
   static const _maxManifestBytes = 16 * 1024 * 1024;
   // 设置会被解析为单个 JSON 对象，因此要保持其解码输入有界。
@@ -92,6 +106,25 @@ class DataSync {
   final BusinessPreferences? businessPreferences;
   BackupMergeReport? _lastMergeReport;
   BackupMergeReport? get lastMergeReport => _lastMergeReport;
+
+  /// 本次恢复吸收进册子的设备记录数（0 表示包内没有册子或全部损坏）。
+  int _lastLedgerAbsorbed = 0;
+  int get lastLedgerAbsorbed => _lastLedgerAbsorbed;
+
+  /// 本次恢复从包内解析出的设备记录（含所有设备，不只本机）。
+  ///
+  /// 供恢复收尾弹窗展示「本机设置记录」区块——恢复流程结束时解包目录会被
+  /// 删除，所以必须在流程内就留一把，不能等 UI 再去读包。
+  List<DeviceSettingsRecord> _lastLedgerRecords = const [];
+  List<DeviceSettingsRecord> get lastLedgerRecords => _lastLedgerRecords;
+
+  /// 本次恢复真正写回本机的设置键数。
+  ///
+  /// 完全覆盖模式下写在冷重启后的启动门里，因此该值在本进程内通常为 0；
+  /// 合并保留模式是就地写回，这里会如实反映写入的键数。收尾提示
+  /// 只在"确实写入了键"时才弹（用户 2026-09-10 拍板）。
+  int _lastLocalSettingsApplied = 0;
+  int get lastLocalSettingsApplied => _lastLocalSettingsApplied;
 
   DataSync({
     required this.chatService,
@@ -220,6 +253,7 @@ class DataSync {
       avatarsDirPath: args.avatarsDirPath,
       imagesDirPath: args.imagesDirPath,
       fontsDirPath: args.fontsDirPath,
+      ledgerDirectoryPath: args.ledgerDirectoryPath,
       checkCancelled: context.throwIfCancelled,
     );
     final verifyDir = Directory(args.verifyDirPath);
@@ -367,6 +401,7 @@ class DataSync {
     WebDavConfig cfg, {
     ProgressCallback? onProgress,
     BackupCancelToken? cancelToken,
+    Map<String, String>? ledgerEntries,
   }) async {
     cancelToken?.throwIfCancelled();
     onProgress?.call(
@@ -422,6 +457,28 @@ class DataSync {
       final manifestFile = File(p.join(workDir.path, '_bk_manifest.json'));
       manifestTmp = manifestFile;
 
+      // 本机设置册子（"带"档）：把每台设备的记录逐台写成独立文件。
+      // 放在 workDir 下的临时目录里，随 workDir 一起在 finally 清掉。
+      String? ledgerDirectoryPath;
+      if (ledgerEntries != null && ledgerEntries.isNotEmpty) {
+        final ledgerDir = Directory(p.join(workDir.path, '_bk_ledger'));
+        await ledgerDir.create(recursive: true);
+        var written = 0;
+        for (final entry in ledgerEntries.entries) {
+          // entry.key 形如 device_local_settings/<指纹>.json；
+          // 写入时只取文件名，目录部分由 _addDirectoryToZip 的 zipPrefix 承担。
+          final fileName = p.basename(entry.key);
+          if (fileName.isEmpty || fileName == '.' || fileName == '..') {
+            continue;
+          }
+          await File(
+            p.join(ledgerDir.path, fileName),
+          ).writeAsString(entry.value, flush: true);
+          written++;
+        }
+        if (written > 0) ledgerDirectoryPath = ledgerDir.path;
+      }
+
       // 解析目录路径（需要在主 isolate 上使用 AppDirectories）
       final uploadDirPath = (await _getUploadDir()).path;
       final avatarsDirPath = (await _getAvatarsDir()).path;
@@ -455,6 +512,7 @@ class DataSync {
           imagesDirPath: imagesDirPath,
           fontsDirPath: fontsDirPath,
           verifyDirPath: verifyDirPath,
+          ledgerDirectoryPath: ledgerDirectoryPath,
         ),
         cancelToken: cancelToken,
         onProgress: onProgress,
@@ -635,6 +693,7 @@ class DataSync {
     required String avatarsDirPath,
     required String imagesDirPath,
     required String fontsDirPath,
+    String? ledgerDirectoryPath,
     void Function()? checkCancelled,
   }) {
     if (includeChats != (databasePath != null && snapshotInfo != null)) {
@@ -694,6 +753,22 @@ class DataSync {
           writer,
           fontsDirPath,
           'fonts',
+          entries,
+          collisionKeys,
+        );
+        checkCancelled?.call();
+      }
+
+      // 本机设置册子：**独立于 includeFiles**。册子是数据而不是附件，
+      // 它的存亡不能绑在"这次备份带不带附件"上；判断条件只看调用方是否
+      // 提供了册子目录（即用户是否选了"带"档）。
+      if (ledgerDirectoryPath != null) {
+        checkCancelled?.call();
+        _addDirectoryToZip(
+          writer,
+          ledgerDirectoryPath,
+          // 目录名固定；条目最终形如 device_local_settings/<指纹>.json
+          'device_local_settings',
           entries,
           collisionKeys,
         );
@@ -1038,6 +1113,7 @@ class DataSync {
   Future<void> backupToWebDav(
     WebDavConfig cfg, {
     ProgressCallback? onProgress,
+    Map<String, String>? ledgerEntries,
   }) async {
     final file = await prepareJoaiclientFile(
       cfg,
@@ -1046,6 +1122,7 @@ class DataSync {
           value: update.fraction == null ? null : update.fraction! * 0.55,
         ),
       ),
+      ledgerEntries: ledgerEntries,
     );
     try {
       onProgress?.call(const ProgressUpdate(value: 0.6));
@@ -1274,11 +1351,13 @@ class DataSync {
     WebDavConfig cfg, {
     ProgressCallback? onProgress,
     BackupCancelToken? cancelToken,
+    Map<String, String>? ledgerEntries,
   }) async {
     final zipFile = await prepareBackupFile(
       cfg.copyWith(includeChats: true, includeFiles: true),
       onProgress: onProgress,
       cancelToken: cancelToken,
+      ledgerEntries: ledgerEntries,
     );
     cancelToken?.throwIfCancelled();
     onProgress?.call(
@@ -1468,7 +1547,8 @@ class DataSync {
           name.startsWith('upload/') ||
           name.startsWith('avatars/') ||
           name.startsWith('images/') ||
-          name.startsWith('fonts/');
+          name.startsWith('fonts/') ||
+          name.startsWith(ledgerEntryPrefix);
       if (!knownEntry) {
         throw FormatException('manifest_entry_scope:$name');
       }
@@ -1708,6 +1788,76 @@ class DataSync {
     );
   }
 
+  /// 从解包目录吸收册子记录并并入正本册子（无条件，任何模式都执行）。
+  ///
+  /// 单设备文件损坏只跳过该设备，其余照常并入；整个环节的任何失败都不
+  /// 影响主恢复——它只是附带的数据累积。
+  Future<List<DeviceSettingsRecord>> _absorbDeviceLedger({
+    required Directory extractDir,
+    BackupCancelToken? cancelToken,
+  }) async {
+    final records = <DeviceSettingsRecord>[];
+    try {
+      final ledgerDir = Directory(
+        p.join(extractDir.path, 'device_local_settings'),
+      );
+      if (!await ledgerDir.exists()) return records;
+      await for (final entity in ledgerDir.list(followLinks: false)) {
+        cancelToken?.throwIfCancelled();
+        if (entity is! File) continue;
+        final name = p.basename(entity.path);
+        if (!name.endsWith('.json')) continue;
+        try {
+          final record = LocalDeviceSettingsLedger.parseArchiveFile(
+            'device_local_settings/$name',
+            await entity.readAsString(),
+          );
+          if (record != null) records.add(record);
+        } catch (_) {
+          // 单个文件损坏只跳过该设备。
+        }
+      }
+      if (records.isEmpty) return records;
+      final ledger = LocalDeviceSettingsLedger();
+      try {
+        await ledger.mergeFromArchive(records);
+      } finally {
+        await ledger.close();
+      }
+      _lastLedgerAbsorbed = records.length;
+      _lastLedgerRecords = records;
+    } catch (_) {
+      // 册子吸收是附带累积，绝不能影响主恢复。
+    }
+    return records;
+  }
+
+  /// 合并保留模式的就地写回：逐键补缺（本机已有不动、缺少才补）。
+  ///
+  /// 返回真正写入的键数。写入的都是本机原本不存在的键，因此不会出现
+  /// "设置变了、数据退回"的半成品状态——原本促使我们把写回推迟到 cutover
+  /// 的那个不一致风险，在本模式下不成立。
+  Future<int> _applyLocalSettingsForMerge(
+    List<DeviceSettingsRecord> records,
+  ) async {
+    if (records.isEmpty) return 0;
+    try {
+      final identity = await DeviceIdentityService.resolve();
+      if (identity == null) return 0;
+      final mine = records
+          .where((record) => record.fingerprint == identity.fingerprintHash)
+          .toList();
+      if (mine.isEmpty) return 0;
+      // 同指纹理论上只有一条；取最近的一条。
+      mine.sort((a, b) => b.savedAtUtc.compareTo(a.savedAtUtc));
+      return await DeviceLocalSettingsWriter.applyMissingOnly(
+        mine.first.values,
+      );
+    } catch (_) {
+      return 0;
+    }
+  }
+
   Future<void> _restoreFromBackupFile(
     File file,
     WebDavConfig cfg, {
@@ -1717,6 +1867,9 @@ class DataSync {
   }) async {
     cancelToken?.throwIfCancelled();
     _lastMergeReport = null;
+    _lastLedgerAbsorbed = 0;
+    _lastLocalSettingsApplied = 0;
+    _lastLedgerRecords = const [];
     // 使用文件流解码提取到临时目录，避免将整个 ZIP 加载到
     // RAM（旧方法调用 file.readAsBytes()，对于 600-800 MB 的
     // 文件会分配同样大小的连续字节数组）。
@@ -1729,12 +1882,12 @@ class DataSync {
     File? payloadFile;
     try {
       final isJoaiclient = await JoaiclientArchive.isJoaiclient(file);
-      // .joaiclient 是完整快照，其恢复语义刻意独立于
-      // provider 的可选旧版标志。
+      // .joaiclient 是整机完整快照：始终携带聊天与文件，不受 provider
+      // 的可选旧版标志影响。恢复模式则尊重用户的选择——合并保留会把备份
+      // 并入本机现有数据，而不是静默替换它。
       final effectiveConfig = isJoaiclient
           ? cfg.copyWith(includeChats: true, includeFiles: true)
           : cfg;
-      final effectiveMode = isJoaiclient ? RestoreMode.overwrite : mode;
       if (isJoaiclient) {
         payloadFile = File(p.join(extractDir.path, '_payload.zip'));
         await JoaiclientArchive.unwrapToZip(
@@ -1792,6 +1945,21 @@ class DataSync {
       final settings = await _readSettingsJsonInIsolate(settingsPath);
       cancelToken?.throwIfCancelled();
       BackupSettingsValidator.normalizeAndValidate(settings);
+
+      // --- 本机设置册子：无条件吸收 + 按模式分流写回 ---
+      // 吸收在流程内完成（解包目录此刻还可读），且不受恢复模式影响：
+      // 记录属于累积数据，扔掉会打断累积链路。
+      final ledgerRecords = await _absorbDeviceLedger(
+        extractDir: extractDir,
+        cancelToken: cancelToken,
+      );
+      if (mode == RestoreMode.merge) {
+        // 合并保留是就地写回、不重启，因此这里就能确定写入结果。
+        _lastLocalSettingsApplied = await _applyLocalSettingsForMerge(
+          ledgerRecords,
+        );
+      }
+
       final businessRestore = BusinessRestoreService(businessRepository);
       Future<void> Function()? pendingBusinessRestore;
       if (versionedBackup != null) {
@@ -1808,7 +1976,7 @@ class DataSync {
         }
         final restoreChats = effectiveConfig.includeChats && includeChats;
         final restoreFiles = effectiveConfig.includeFiles && includeFiles;
-        if (effectiveMode == RestoreMode.merge && restoreChats) {
+        if (mode == RestoreMode.merge && restoreChats) {
           // 聊天合并独立提交，因此在修改任何活跃域之前
           // 拒绝不匹配的业务载荷。
           BusinessSettingsRouter.normalizeAndRoute(
@@ -1818,7 +1986,7 @@ class DataSync {
             entityRowIds: entityRowIds,
           );
         }
-        if (effectiveMode == RestoreMode.overwrite) {
+        if (mode == RestoreMode.overwrite) {
           cancelToken?.throwIfCancelled();
           if (!restoreChats) {
             if (restoreFiles) {
@@ -1898,7 +2066,7 @@ class DataSync {
           preserveExplicitEmptyInstructionList: true,
           assumePreV3EmbeddingMigrationWhenVersionMissing: true,
         );
-        pendingBusinessRestore = effectiveMode == RestoreMode.overwrite
+        pendingBusinessRestore = mode == RestoreMode.overwrite
             ? () => businessRestore.overwrite(
                 settings,
                 preserveExplicitEmptyInstructionList: true,
@@ -1913,7 +2081,7 @@ class DataSync {
 
       // 恢复文件
       if (effectiveConfig.includeFiles) {
-        if (effectiveMode == RestoreMode.overwrite) {
+        if (mode == RestoreMode.overwrite) {
           // 覆盖模式：删除现有目录并复制全部
           // 恢复上传目录
           final uploadSrc = Directory(

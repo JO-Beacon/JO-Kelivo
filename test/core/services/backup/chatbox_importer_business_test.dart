@@ -1121,9 +1121,10 @@ void main() {
       );
       expect(assistant.reasoningText, 'first thought\nsecond thought');
       expect(assistant.content, 'Because.');
+      // 两段思考按导入时的真实结构保留为两张独立卡片，不再合并归位。
       expect(
-        assistant.parts.whereType<ReasoningPart>().single.text,
-        'first thought\nsecond thought',
+        assistant.parts.whereType<ReasoningPart>().map((part) => part.text),
+        ['first thought', 'second thought'],
       );
     });
 

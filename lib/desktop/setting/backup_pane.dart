@@ -21,12 +21,16 @@ import '../../core/services/backup/data_sync.dart';
 import '../../core/services/backup/cherry_importer.dart';
 import '../../core/services/backup/chatbox_importer.dart';
 import '../../core/services/backup/deepseek_importer.dart';
+import '../../core/services/backup/device_ledger_export_settings.dart';
+import '../../core/services/backup/local_device_settings_ledger.dart';
+import '../../core/services/device/device_identity.dart';
 import '../../shared/dialogs/loading_task_dialog.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../shared/widgets/restart_app_action.dart';
 import '../../shared/widgets/snackbar.dart';
 import '../../features/backup/backup_restore_error_message.dart';
 import '../../features/backup/backup_restart_dialog.dart';
+import '../../features/backup/device_ledger_labels.dart';
 import '../../features/backup/widgets/backup_reminder_helpers.dart';
 import '../../utils/platform_utils.dart';
 import '../../utils/app_directories.dart';
@@ -58,12 +62,14 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
   late TextEditingController _s3UserAgent;
   bool _includeChats = true;
   bool _includeFiles = true;
+  bool _includeLocalSettings = false;
   bool _s3PathStyle = true;
 
   @override
   void initState() {
     super.initState();
     final settings = context.read<SettingsProvider>();
+    _loadIncludeLocalSettings();
     final cfg = settings.webDavConfig;
     _url = TextEditingController(text: cfg.url);
     _username = TextEditingController(text: cfg.username);
@@ -101,6 +107,17 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     _webDavUserAgent.dispose();
     _s3UserAgent.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadIncludeLocalSettings() async {
+    final enabled = await DeviceLedgerExportSettings.includeLedger();
+    if (!mounted) return;
+    setState(() => _includeLocalSettings = enabled);
+  }
+
+  Future<void> _setIncludeLocalSettings(bool value) async {
+    setState(() => _includeLocalSettings = value);
+    await DeviceLedgerExportSettings.setIncludeLedger(value);
   }
 
   WebDavConfig _buildConfigFromForm() {
@@ -233,9 +250,12 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
       return;
     }
     if (!rootCtx.mounted) return;
-    await showBackupRestartRequiredDialog(
+    await showRestoreCompletionDialog(
       rootCtx,
+      mode: mode,
       skippedConversations: backupProvider.skippedConversations,
+      localSettingsApplied: backupProvider.localSettingsApplied,
+      ledgerRecords: backupProvider.ledgerRecords,
     );
   }
 
@@ -256,7 +276,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
         task: (onProgress) async {
           file = kelivoCompatible
               ? await backupProvider.exportKelivoBackupToFile()
-              : await backupProvider.exportToFile(onProgress: onProgress);
+              : await backupProvider.exportToFile(
+                  onProgress: onProgress,
+                  includeLedger: _includeLocalSettings,
+                );
           if (!context.mounted) return;
           final exportFile = file!;
           final savePath = await FilePicker.platform.saveFile(
@@ -278,6 +301,16 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
           }
         },
       );
+      // 「带」档但指纹采集失败时提醒：历史档案照常带走了，本机当前值没进包。
+      if (!kelivoCompatible &&
+          context.mounted &&
+          backupProvider.lastLedgerUnrecognized) {
+        showAppSnackBar(
+          context,
+          message: l10n.backupLocalSettingsUnrecognized,
+          type: NotificationType.warning,
+        );
+      }
     } catch (e) {
       if (!context.mounted) return;
       showAppSnackBar(
@@ -810,6 +843,8 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                       },
                                       skippedConversations: () =>
                                           backupProvider.skippedConversations,
+                                      localSettingsApplied: () =>
+                                          backupProvider.localSettingsApplied,
                                       deleteAndReload:
                                           backupProvider.deleteAndReload,
                                     );
@@ -847,6 +882,20 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                   },
                           ),
                         ],
+                      ),
+                    ),
+                    _rowDivider(context),
+                    // 云备份与本地导出共用同一「带本机设置」档位。
+                    _ItemRow(
+                      label: l10n.backupIncludeLocalSettings,
+                      subtitle: includeLocalSettingsSubtitle(
+                        l10n,
+                        _includeLocalSettings,
+                      ),
+                      vpad: 2,
+                      trailing: IosSwitch(
+                        value: _includeLocalSettings,
+                        onChanged: _setIncludeLocalSettings,
                       ),
                     ),
                   ],
@@ -1078,6 +1127,8 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                       },
                                       skippedConversations: () =>
                                           s3BackupProvider.skippedConversations,
+                                      localSettingsApplied: () =>
+                                          s3BackupProvider.localSettingsApplied,
                                       deleteAndReload:
                                           s3BackupProvider.deleteAndReload,
                                     );
@@ -1115,6 +1166,20 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                   },
                           ),
                         ],
+                      ),
+                    ),
+                    _rowDivider(context),
+                    // 云备份与本地导出共用同一「带本机设置」档位。
+                    _ItemRow(
+                      label: l10n.backupIncludeLocalSettings,
+                      subtitle: includeLocalSettingsSubtitle(
+                        l10n,
+                        _includeLocalSettings,
+                      ),
+                      vpad: 2,
+                      trailing: IosSwitch(
+                        value: _includeLocalSettings,
+                        onChanged: _setIncludeLocalSettings,
                       ),
                     ),
                   ],
@@ -1184,8 +1249,23 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                   ),
                 ],
               ),
+              _rowDivider(context),
+              _ItemRow(
+                label: l10n.backupIncludeLocalSettings,
+                subtitle: includeLocalSettingsSubtitle(
+                  l10n,
+                  _includeLocalSettings,
+                ),
+                vpad: 2,
+                trailing: IosSwitch(
+                  value: _includeLocalSettings,
+                  onChanged: _setIncludeLocalSettings,
+                ),
+              ),
             ],
           ),
+          const SizedBox(height: 10),
+          _LocalSettingsLedgerSection(l10n: l10n, cs: cs),
           const SizedBox(height: 10),
           _sectionCard(
             children: [
@@ -1657,6 +1737,8 @@ class _RemoteBackupsDialog extends StatefulWidget {
     required this.restoreFromItem,
     required this.skippedConversations,
     required this.deleteAndReload,
+    this.localSettingsApplied,
+    this.ledgerRecords,
   });
 
   final String title;
@@ -1664,6 +1746,8 @@ class _RemoteBackupsDialog extends StatefulWidget {
   final Future<void> Function(BackupFileItem item, RestoreMode mode)
   restoreFromItem;
   final int Function() skippedConversations;
+  final int Function()? localSettingsApplied;
+  final List<DeviceSettingsRecord> Function()? ledgerRecords;
   final Future<List<BackupFileItem>> Function(BackupFileItem item)
   deleteAndReload;
 
@@ -1740,9 +1824,12 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
       if (mounted) setState(() => _loading = false);
     }
     if (!rootCtx.mounted) return;
-    await showBackupRestartRequiredDialog(
+    await showRestoreCompletionDialog(
       rootCtx,
+      mode: mode,
       skippedConversations: widget.skippedConversations(),
+      localSettingsApplied: widget.localSettingsApplied?.call() ?? 0,
+      ledgerRecords: widget.ledgerRecords?.call() ?? const [],
     );
   }
 
@@ -1895,8 +1982,10 @@ void _showRemoteBackupsDialog(
   required Future<void> Function(BackupFileItem item, RestoreMode mode)
   restoreFromItem,
   required int Function() skippedConversations,
+  required int Function() localSettingsApplied,
   required Future<List<BackupFileItem>> Function(BackupFileItem item)
   deleteAndReload,
+  List<DeviceSettingsRecord> Function()? ledgerRecords,
 }) {
   showDialog(
     context: context,
@@ -1905,6 +1994,8 @@ void _showRemoteBackupsDialog(
       listRemote: listRemote,
       restoreFromItem: restoreFromItem,
       skippedConversations: skippedConversations,
+      localSettingsApplied: localSettingsApplied,
+      ledgerRecords: ledgerRecords,
       deleteAndReload: deleteAndReload,
     ),
   );
@@ -1920,8 +2011,14 @@ Widget _rowDivider(BuildContext context) {
 }
 
 class _ItemRow extends StatelessWidget {
-  const _ItemRow({required this.label, required this.trailing, this.vpad = 8});
+  const _ItemRow({
+    required this.label,
+    required this.trailing,
+    this.subtitle,
+    this.vpad = 8,
+  });
   final String label;
+  final String? subtitle;
   final Widget trailing;
   final double vpad;
   @override
@@ -1932,12 +2029,27 @@ class _ItemRow extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                color: cs.onSurface.withValues(alpha: 0.88),
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: cs.onSurface.withValues(alpha: 0.88),
+                  ),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: cs.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
           const SizedBox(width: 12),
@@ -2249,6 +2361,231 @@ class _BackupSubcategoryLabel extends StatelessWidget {
           color: cs.onSurface.withValues(alpha: 0.68),
         ),
       ),
+    );
+  }
+}
+
+class _LocalSettingsLedgerSection extends StatefulWidget {
+  const _LocalSettingsLedgerSection({required this.l10n, required this.cs});
+
+  final AppLocalizations l10n;
+  final ColorScheme cs;
+
+  @override
+  State<_LocalSettingsLedgerSection> createState() =>
+      _LocalSettingsLedgerSectionState();
+}
+
+class _LocalSettingsLedgerSectionState
+    extends State<_LocalSettingsLedgerSection> {
+  static const _pageSize = 20;
+
+  List<DeviceSettingsRecord>? _records;
+  int _total = 0;
+  String? _currentFingerprint;
+  bool _busy = false;
+  bool _loadingMore = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final ledger = LocalDeviceSettingsLedger();
+    // 分页拉取第一页；册子可能累积到几千台，不能整册加载。
+    final records = await ledger.getAll(limit: _pageSize);
+    final total = await ledger.countAll();
+    final identity = await DeviceIdentityService.resolve();
+    if (!mounted) return;
+    setState(() {
+      _records = records;
+      _total = total;
+      _currentFingerprint = identity?.fingerprintHash;
+    });
+  }
+
+  Future<void> _loadMore() async {
+    final records = _records;
+    if (records == null || _loadingMore) return;
+    setState(() => _loadingMore = true);
+    try {
+      final more = await LocalDeviceSettingsLedger().getAll(
+        limit: _pageSize,
+        offset: records.length,
+      );
+      if (!mounted) return;
+      setState(() => _records = [...records, ...more]);
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  bool get _hasMore => (_records?.length ?? 0) < _total;
+
+  Future<void> _delete(DeviceSettingsRecord record) async {
+    final l10n = widget.l10n;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        backgroundColor: Theme.of(dctx).colorScheme.surface,
+        shape: DesktopDialogStyle.shape(dctx),
+        title: Text(l10n.backupLedgerDelete),
+        content: Text(l10n.backupLedgerDeleteConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dctx).pop(false),
+            child: Text(l10n.backupPageCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dctx).pop(true),
+            child: Text(l10n.backupPageOK),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    await LocalDeviceSettingsLedger().removeDevice(record.fingerprint);
+    await _load();
+    if (!mounted) return;
+    setState(() => _busy = false);
+  }
+
+  Future<void> _clearAll() async {
+    final l10n = widget.l10n;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        backgroundColor: Theme.of(dctx).colorScheme.surface,
+        shape: DesktopDialogStyle.shape(dctx),
+        title: Text(l10n.backupLedgerClear),
+        content: Text(l10n.backupLedgerClearConfirm(_records?.length ?? 0)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dctx).pop(false),
+            child: Text(l10n.backupPageCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dctx).pop(true),
+            child: Text(l10n.backupPageOK),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    await LocalDeviceSettingsLedger().clearAll();
+    await _load();
+    if (!mounted) return;
+    setState(() => _busy = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = widget.l10n;
+    final cs = widget.cs;
+    final records = _records;
+
+    return _sectionCard(
+      children: [
+        _BackupCategoryLabel(label: l10n.backupLedgerTitle),
+        _BackupSubcategoryLabel(
+          label: records == null
+              ? l10n.backupLedgerSettingsDescription
+              : '${l10n.backupLedgerDeviceCount(_total)}·'
+                    '${l10n.backupLedgerSettingsDescription}',
+        ),
+        if (records == null)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: SizedBox(
+              height: 18,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: cs.primary,
+                  ),
+                ),
+              ),
+            ),
+          )
+        else if (records.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.backupLedgerEmpty,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: cs.onSurface.withValues(alpha: 0.8),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  l10n.backupLedgerEmptyDescription,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: cs.onSurface.withValues(alpha: 0.58),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else ...[
+          for (var i = 0; i < records.length; i++) ...[
+            if (i > 0) _rowDivider(context),
+            _ItemRow(
+              label:
+                  '${records[i].deviceName}'
+                  '${records[i].fingerprint == _currentFingerprint ? " ${l10n.backupLedgerThisDevice}" : ""}',
+              subtitle:
+                  '${devicePlatformLabel(l10n, records[i].platform)} · '
+                  '${deviceLedgerTimestamp(records[i].savedAtUtc)} · '
+                  '${l10n.backupLedgerItemCount(records[i].values.length)}',
+              vpad: 4,
+              trailing: _DeskIosButton(
+                label: l10n.backupLedgerDelete,
+                filled: false,
+                dense: true,
+                enabled: !_busy,
+                onTap: () => _delete(records[i]),
+              ),
+            ),
+          ],
+          if (_hasMore) ...[
+            _rowDivider(context),
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: _DeskIosButton(
+                label: l10n.backupLedgerLoadMore,
+                filled: false,
+                dense: true,
+                enabled: !_loadingMore,
+                onTap: _loadMore,
+              ),
+            ),
+          ],
+          _rowDivider(context),
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: _DeskIosButton(
+              label: l10n.backupLedgerClear,
+              filled: false,
+              dense: true,
+              enabled: !_busy,
+              onTap: _clearAll,
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

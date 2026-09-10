@@ -1,15 +1,6 @@
 {
   "chatImageCropFailed": "Could not crop \"{fileName}\": {error}",
-  "@chatImageCropFailed": {
-    "placeholders": {
-      "fileName": {
-        "type": "String"
-      },
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@chatImageCropFailed": {"placeholders": {"fileName": {"type": "String"}, "error": {"type": "String"}}},
   "helloWorld": "Hello World!",
   "settingsPageBackButton": "Back",
   "settingsPageTitle": "Settings",
@@ -37,36 +28,15 @@
   "settingsPageChatStorage": "Chat Storage",
   "settingsPageCalculating": "Calculating…",
   "settingsPageFilesCount": "{count} files · {size}",
-  "@settingsPageFilesCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      },
-      "size": {
-        "type": "String"
-      }
-    }
-  },
+  "@settingsPageFilesCount": {"placeholders": {"count": {"type": "int"}, "size": {"type": "String"}}},
   "storageSpacePageTitle": "Storage Space",
   "storageSpaceRefreshTooltip": "Refresh",
   "storageSpaceLoadFailed": "Failed to load storage usage",
   "storageSpaceTotalLabel": "Used",
   "storageSpaceClearableLabel": "Clearable: {size}",
-  "@storageSpaceClearableLabel": {
-    "placeholders": {
-      "size": {
-        "type": "String"
-      }
-    }
-  },
+  "@storageSpaceClearableLabel": {"placeholders": {"size": {"type": "String"}}},
   "storageSpaceClearableHint": "Safe to clear: {size}",
-  "@storageSpaceClearableHint": {
-    "placeholders": {
-      "size": {
-        "type": "String"
-      }
-    }
-  },
+  "@storageSpaceClearableHint": {"placeholders": {"size": {"type": "String"}}},
   "storageSpaceCategoryImages": "Images",
   "storageSpaceCategoryFiles": "Files",
   "storageSpaceCategoryFonts": "Fonts",
@@ -85,13 +55,7 @@
   "storageSpaceCategoryLogs": "Logs",
   "storageSpaceCategoryOther": "Other",
   "storageSpaceFilesCount": "{count} files",
-  "@storageSpaceFilesCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@storageSpaceFilesCount": {"placeholders": {"count": {"type": "int"}}},
   "storageSpaceSafeToClearHint": "Safe to clear. This will not affect your chat history.",
   "storageSpaceLegacyChatDataHint": "These are retained Hive files from before the SQLite migration. Clearing them does not delete your current chat records.",
   "storageSpaceNotSafeToClearHint": "May affect your chat history. Delete with care.",
@@ -113,89 +77,35 @@
   "storageSpaceSubLogsOther": "Other logs",
   "storageSpaceClearConfirmTitle": "Confirm clear",
   "storageSpaceClearConfirmMessage": "Clear {targetName}?",
-  "@storageSpaceClearConfirmMessage": {
-    "placeholders": {
-      "targetName": {
-        "type": "String"
-      }
-    }
-  },
+  "@storageSpaceClearConfirmMessage": {"placeholders": {"targetName": {"type": "String"}}},
   "storageSpaceClearButton": "Clear",
   "storageSpaceClearDone": "{targetName} cleared",
-  "@storageSpaceClearDone": {
-    "placeholders": {
-      "targetName": {
-        "type": "String"
-      }
-    }
-  },
+  "@storageSpaceClearDone": {"placeholders": {"targetName": {"type": "String"}}},
   "storageSpaceClearFailed": "Clear failed: {error}",
-  "@storageSpaceClearFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@storageSpaceClearFailed": {"placeholders": {"error": {"type": "String"}}},
   "storageSpaceClearAvatarCacheButton": "Clear Avatar Cache",
   "storageSpaceClearCacheButton": "Clear Cache",
   "storageSpaceClearLogsButton": "Clear Logs",
   "storageSpaceClearLegacyChatDataButton": "Clear Old Chat Records",
   "storageSpaceExportLegacyChatFileButton": "Export",
   "storageSpaceExportDone": "{fileName} exported",
-  "@storageSpaceExportDone": {
-    "placeholders": {
-      "fileName": {
-        "type": "String"
-      }
-    }
-  },
+  "@storageSpaceExportDone": {"placeholders": {"fileName": {"type": "String"}}},
   "storageSpaceExportFailed": "Export failed: {error}",
-  "@storageSpaceExportFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@storageSpaceExportFailed": {"placeholders": {"error": {"type": "String"}}},
   "storageSpaceClearLegacyChatDataConfirmMessage": "Clear the retained old chat files? Your current SQLite chat records will remain available.",
   "storageSpaceViewLogsButton": "View Logs",
   "storageSpaceDeleteConfirmTitle": "Confirm deletion",
   "storageSpaceDeleteUploadsConfirmMessage": "Delete {count} items? Attachments in chat history may become unavailable.",
-  "@storageSpaceDeleteUploadsConfirmMessage": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@storageSpaceDeleteUploadsConfirmMessage": {"placeholders": {"count": {"type": "int"}}},
   "storageSpaceDeletedUploadsDone": "Deleted {count} items",
-  "@storageSpaceDeletedUploadsDone": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@storageSpaceDeletedUploadsDone": {"placeholders": {"count": {"type": "int"}}},
   "storageSpaceNoUploads": "No items",
   "storageSpaceSelectAll": "Select all",
   "storageSpaceClearSelection": "Clear selection",
   "storageSpaceSelectedCount": "{count} selected",
-  "@storageSpaceSelectedCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@storageSpaceSelectedCount": {"placeholders": {"count": {"type": "int"}}},
   "storageSpaceUploadsCount": "{count} items",
-  "@storageSpaceUploadsCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@storageSpaceUploadsCount": {"placeholders": {"count": {"type": "int"}}},
   "storageSpaceSourceLabel": "Source",
   "storageSpaceSourceAll": "All",
   "storageSpaceSourceUserUpload": "User uploads",
@@ -262,16 +172,7 @@
   "languageSelectSheetClearButton": "Clear Translation",
   "homePageClearContext": "Temporarily Mask Context",
   "homePageClearContextWithCount": "Temporarily Mask Context ({actual}/{configured})",
-  "@homePageClearContextWithCount": {
-    "placeholders": {
-      "actual": {
-        "type": "String"
-      },
-      "configured": {
-        "type": "String"
-      }
-    }
-  },
+  "@homePageClearContextWithCount": {"placeholders": {"actual": {"type": "String"}, "configured": {"type": "String"}}},
   "homePageDefaultAssistant": "Default Assistant",
   "mermaidExportPng": "Export PNG",
   "mermaidExportFailed": "Export failed",
@@ -286,13 +187,7 @@
   "assistantProviderSampleAssistantName": "Sample Assistant",
   "assistantProviderNewAssistantName": "New Assistant",
   "assistantProviderSampleAssistantSystemPrompt": "You are {model_name}, a helpful AI assistant. Answer accurately and concisely; say when you are unsure. Prefer clear structure (short paragraphs or lists) when it helps. Reply in the user's language by default.",
-  "@assistantProviderSampleAssistantSystemPrompt": {
-    "placeholders": {
-      "model_name": {
-        "type": "String"
-      }
-    }
-  },
+  "@assistantProviderSampleAssistantSystemPrompt": {"placeholders": {"model_name": {"type": "String"}}},
   "displaySettingsPageLanguageTitle": "App Language",
   "displaySettingsPageLanguageSubtitle": "Choose interface language",
   "assistantGroupsManageTitle": "Manage Groups",
@@ -334,13 +229,7 @@
   "homePagePleaseSetupTranslateModel": "Please set a translation model first",
   "homePageTranslating": "Translating...",
   "homePageTranslateFailed": "Translation failed: {error}",
-  "@homePageTranslateFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@homePageTranslateFailed": {"placeholders": {"error": {"type": "String"}}},
   "chatServiceDefaultConversationTitle": "New Chat",
   "userProviderDefaultUserName": "User",
   "homePageDeleteMessage": "Delete Current Branch",
@@ -387,13 +276,7 @@
   "assistantEditTabLayoutResetTooltip": "Reset tab layout",
   "assistantEditTabLayoutAtLeastOneVisible": "Keep at least one tab visible",
   "assistantEditTabLayoutDragHandle": "Drag to reorder {tab}",
-  "@assistantEditTabLayoutDragHandle": {
-    "placeholders": {
-      "tab": {
-        "type": "String"
-      }
-    }
-  },
+  "@assistantEditTabLayoutDragHandle": {"placeholders": {"tab": {"type": "String"}}},
   "assistantEditRegexDescription": "Create regex rules to rewrite or visually adjust user/assistant messages.",
   "assistantEditAddRegexButton": "Add Regex Rule",
   "assistantRegexAddTitle": "Add Regex Rule",
@@ -505,13 +388,7 @@
   "iosBackgroundGenerationActiveDetail": "The assistant is replying in the background",
   "iosBackgroundGenerationStreamingDetail": "Receiving assistant response",
   "iosBackgroundGenerationTokenCount": "{count} tokens",
-  "@iosBackgroundGenerationTokenCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@iosBackgroundGenerationTokenCount": {"placeholders": {"count": {"type": "int"}}},
   "iosBackgroundGenerationCompleteTitle": "Generation complete",
   "iosBackgroundGenerationCompleteDetail": "Assistant reply is ready",
   "iosBackgroundGenerationInterruptedTitle": "Generation interrupted",
@@ -550,13 +427,7 @@
   "multiKeyPageAdd": "Add",
   "multiKeyPageAddHint": "Enter API keys, separated by comma or space",
   "multiKeyPageImportedSnackbar": "Imported {n} keys",
-  "@multiKeyPageImportedSnackbar": {
-    "placeholders": {
-      "n": {
-        "type": "int"
-      }
-    }
-  },
+  "@multiKeyPageImportedSnackbar": {"placeholders": {"n": {"type": "int"}}},
   "multiKeyPagePleaseAddModel": "Please add a model first",
   "multiKeyPageTotal": "Total",
   "multiKeyPageNormal": "Normal",
@@ -609,23 +480,11 @@
   "assistantEditPromptAppendTimeSubtitle": "Append the send time to the end of each user message. Time stays at the end of the request, so prompt caching is unaffected.",
   "assistantEditPromptAppendTimeInfoTitle": "Appended time format",
   "assistantEditPromptAppendTimeInfoBody": "When enabled, a blank line and then the following tag are appended at the end of each user message:\n\n{example}\n\nThe timestamp is that message’s own send time, so it stays stable when you retry.",
-  "@assistantEditPromptAppendTimeInfoBody": {
-    "placeholders": {
-      "example": {
-        "type": "String"
-      }
-    }
-  },
+  "@assistantEditPromptAppendTimeInfoBody": {"placeholders": {"example": {"type": "String"}}},
   "assistantEditPromptAppendTimeInfoClose": "Got it",
   "assistantEditPromptTimeVarDialogTitle": "System prompt contains time variables",
   "assistantEditPromptTimeVarDialogBody": "Your system prompt uses {variables}. The system prompt is re-rendered on every request, so time variables make the beginning of every request different and prompt caching cannot hit. Consider removing these variables and using \"Append current time\" instead — it puts the time at the end of the request and does not affect the prefix.",
-  "@assistantEditPromptTimeVarDialogBody": {
-    "placeholders": {
-      "variables": {
-        "type": "String"
-      }
-    }
-  },
+  "@assistantEditPromptTimeVarDialogBody": {"placeholders": {"variables": {"type": "String"}}},
   "assistantEditPromptTimeVarDialogRemove": "Go remove",
   "assistantEditPromptTimeVarDialogKeep": "Enable anyway",
   "codeBlockPreviewButton": "Preview",
@@ -640,13 +499,7 @@
   "markdownTableCopiedCsvSnackbar": "CSV copied. Long press Copy to copy as image.",
   "markdownTableCopiedMarkdownSnackbar": "Table copied.",
   "codeBlockCollapsedLines": "… {n} lines folded",
-  "@codeBlockCollapsedLines": {
-    "placeholders": {
-      "n": {
-        "type": "int"
-      }
-    }
-  },
+  "@codeBlockCollapsedLines": {"placeholders": {"n": {"type": "int"}}},
   "htmlPreviewNotSupportedOnLinux": "HTML preview is not supported on Linux",
   "assistantEditSampleUser": "User",
   "assistantEditSampleMessage": "Hello there",
@@ -654,16 +507,7 @@
   "assistantEditMcpNoServersMessage": "No running MCP servers",
   "assistantEditMcpConnectedTag": "Connected",
   "assistantEditMcpToolsCountTag": "Tools: {enabled}/{total}",
-  "@assistantEditMcpToolsCountTag": {
-    "placeholders": {
-      "enabled": {
-        "type": "String"
-      },
-      "total": {
-        "type": "String"
-      }
-    }
-  },
+  "@assistantEditMcpToolsCountTag": {"placeholders": {"enabled": {"type": "String"}, "total": {"type": "String"}}},
   "assistantEditModelUseGlobalDefault": "Use global default",
   "assistantSettingsPageTitle": "Assistant Settings",
   "assistantSettingsCopyButton": "Copy",
@@ -728,25 +572,13 @@
   "backupPageRestartRequired": "Restart Required",
   "backupPageRestartContent": "Import successful. Restart JO-AIClient to apply it safely.",
   "backupPageRestartContentWithSkipped": "Import completed, but {count} conversations with invalid message ordering were skipped. Restart JO-AIClient to apply the imported data safely.",
-  "@backupPageRestartContentWithSkipped": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@backupPageRestartContentWithSkipped": {"placeholders": {"count": {"type": "int"}}},
   "restartAppFailedMessage": "JO-AIClient could not restart automatically. Fully close it, then open it again.",
   "backupRestoreRolledBackTitle": "Restore was rolled back",
   "backupRestoreRolledBackContent": "The restore could not be completed. JO-AIClient verified and kept your previous data.",
   "contextTreeMigrationWarningsTitle": "Legacy chat migration repaired",
   "contextTreeMigrationWarningsContent": "JO-AIClient repaired {count} missing selected-version records while converting legacy chat branches. The repaired choices were written to the warning log. No message text was opened or changed.",
-  "@contextTreeMigrationWarningsContent": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@contextTreeMigrationWarningsContent": {"placeholders": {"count": {"type": "int"}}},
   "backupRestoreFailureTitle": "Restore requires attention",
   "backupRestoreFailureContent": "JO-AIClient could not verify a complete old or new data set, so chat data was not opened. Close JO-AIClient and try again. If this repeats, keep the diagnostic code for support.",
   "backupRestoreBusinessLeaseUnavailableTitle": "JO-AIClient is already running",
@@ -763,21 +595,9 @@
   "backupRestoreFailureCopyButton": "Copy diagnostic code",
   "backupRestoreFailureCopied": "Diagnostic code copied",
   "backupRestoreFailureDiagnostic": "Diagnostic code: {code}",
-  "@backupRestoreFailureDiagnostic": {
-    "placeholders": {
-      "code": {
-        "type": "String"
-      }
-    }
-  },
+  "@backupRestoreFailureDiagnostic": {"placeholders": {"code": {"type": "String"}}},
   "backupRestoreCorruptArchiveMessage": "The selected JO-AIClient backup is damaged or incomplete, so it was not restored. Your current data was not modified. Diagnostic code: {code}",
-  "@backupRestoreCorruptArchiveMessage": {
-    "placeholders": {
-      "code": {
-        "type": "String"
-      }
-    }
-  },
+  "@backupRestoreCorruptArchiveMessage": {"placeholders": {"code": {"type": "String"}}},
   "startupRecoveryMoreOptions": "More recovery options",
   "startupRecoveryRepairButton": "Repair and restart",
   "startupRecoveryExportButton": "Export a copy of my data",
@@ -809,21 +629,9 @@
   "startupRecoverySnapshotFailed": "The snapshot could not be prepared. Diagnostic code: {code}",
   "@startupRecoverySnapshotFailed": {"placeholders": {"code": {"type": "String"}}},
   "backupPageRestoreFailedMessage": "Restore failed: {error}",
-  "@backupPageRestoreFailedMessage": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@backupPageRestoreFailedMessage": {"placeholders": {"error": {"type": "String"}}},
   "backupPageExportFailedMessage": "Export failed: {error}",
-  "@backupPageExportFailedMessage": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@backupPageExportFailedMessage": {"placeholders": {"error": {"type": "String"}}},
   "backupPageOK": "OK",
   "backupPageCancel": "Cancel",
   "backupPageSelectImportMode": "Select Import Mode",
@@ -892,13 +700,7 @@
   "backupPageExternalImport": "External Import",
   "backupPageImportFromCherryStudio": "Import from Cherry Studio",
   "backupPageCherryStudioUnsupportedBackupVersion": "This backup uses Cherry Studio format version {version}, which JO-AIClient cannot import yet. Export from Cherry Studio v1 instead, or wait for a JO-AIClient update that supports Cherry Studio v2 backups.",
-  "@backupPageCherryStudioUnsupportedBackupVersion": {
-    "placeholders": {
-      "version": {
-        "type": "String"
-      }
-    }
-  },
+  "@backupPageCherryStudioUnsupportedBackupVersion": {"placeholders": {"version": {"type": "String"}}},
   "backupPageImportFromChatbox": "Import from Chatbox (>=1.22)",
   "backupPageImportFromChatboxLegacy": "Import from Chatbox (<1.22)",
   "backupPageChatboxLegacyStarredGroupName": "Chatbox Import (<1.22) · Pinned",
@@ -923,13 +725,7 @@
   "backupReminderEveryFourteenDays": "Every 14 days",
   "backupReminderEveryMonth": "Every month",
   "backupReminderCustomDays": "Every {days} days",
-  "@backupReminderCustomDays": {
-    "placeholders": {
-      "days": {
-        "type": "int"
-      }
-    }
-  },
+  "@backupReminderCustomDays": {"placeholders": {"days": {"type": "int"}}},
   "backupReminderCustomOption": "Custom...",
   "backupReminderCustomDialogTitle": "Custom Frequency",
   "backupReminderCustomDialogDescription": "Enter how many days to wait between backup reminders.",
@@ -968,13 +764,7 @@
   "messageEditRemoveAttachment": "Remove attachment",
   "messageEditAttachmentImportFailed": "Could not import attachment: {error}",
   "messageEditAttachmentCopyFailed": "Could not copy the selected attachment",
-  "@messageEditAttachmentImportFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@messageEditAttachmentImportFailed": {"placeholders": {"error": {"type": "String"}}},
   "messageEditCloseConfirmTitle": "Close without saving?",
   "messageEditCloseConfirmContent": "Your edits will be discarded.",
   "messageEditCloseConfirmCancel": "Cancel",
@@ -1019,11 +809,21 @@
   "@compressContextEstimatePreview": {
     "description": "Keep-recent compression preview: summarized/kept char counts and the estimated result token band",
     "placeholders": {
-      "summarized": {"type": "int"},
-      "kept": {"type": "int"},
-      "minTokens": {"type": "int"},
-      "maxTokens": {"type": "int"},
-      "totalTokens": {"type": "int"}
+      "summarized": {
+        "type": "int"
+      },
+      "kept": {
+        "type": "int"
+      },
+      "minTokens": {
+        "type": "int"
+      },
+      "maxTokens": {
+        "type": "int"
+      },
+      "totalTokens": {
+        "type": "int"
+      }
     }
   },
   "bottomToolsSheetLearningMode": "Learning Mode",
@@ -1061,13 +861,7 @@
   "reasoningBudgetSheetMax": "Maximum Reasoning",
   "reasoningBudgetSheetTitle": "Reasoning Chain Strength",
   "reasoningBudgetSheetCurrentLevel": "Current Level: {level}",
-  "@reasoningBudgetSheetCurrentLevel": {
-    "placeholders": {
-      "level": {
-        "type": "String"
-      }
-    }
-  },
+  "@reasoningBudgetSheetCurrentLevel": {"placeholders": {"level": {"type": "String"}}},
   "reasoningBudgetSheetOffSubtitle": "Turn off reasoning, answer directly",
   "reasoningBudgetSheetAutoSubtitle": "Let the model decide reasoning level automatically",
   "reasoningBudgetSheetLightSubtitle": "Use light reasoning to answer questions",
@@ -1077,29 +871,11 @@
   "reasoningBudgetSheetCustomLabel": "Custom Reasoning Budget",
   "reasoningBudgetSheetCustomHint": "e.g. 2048 (-1 auto, 0 off)",
   "chatMessageWidgetFileNotFound": "File not found: {fileName}",
-  "@chatMessageWidgetFileNotFound": {
-    "placeholders": {
-      "fileName": {
-        "type": "String"
-      }
-    }
-  },
+  "@chatMessageWidgetFileNotFound": {"placeholders": {"fileName": {"type": "String"}}},
   "chatMessageWidgetCannotOpenFile": "Cannot open file: {message}",
-  "@chatMessageWidgetCannotOpenFile": {
-    "placeholders": {
-      "message": {
-        "type": "String"
-      }
-    }
-  },
+  "@chatMessageWidgetCannotOpenFile": {"placeholders": {"message": {"type": "String"}}},
   "chatMessageWidgetOpenFileError": "Failed to open file: {error}",
-  "@chatMessageWidgetOpenFileError": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@chatMessageWidgetOpenFileError": {"placeholders": {"error": {"type": "String"}}},
   "chatMessageWidgetCopiedToClipboard": "Copied to clipboard",
   "chatMessageWidgetResendTooltip": "Resend",
   "chatMessageWidgetMoreTooltip": "More",
@@ -1108,23 +884,11 @@
   "chatMessageWidgetTranslating": "Translating...",
   "chatMessageWidgetCitationNotFound": "Citation source not found",
   "chatMessageWidgetCannotOpenUrl": "Cannot open link: {url}",
-  "@chatMessageWidgetCannotOpenUrl": {
-    "placeholders": {
-      "url": {
-        "type": "String"
-      }
-    }
-  },
+  "@chatMessageWidgetCannotOpenUrl": {"placeholders": {"url": {"type": "String"}}},
   "chatMessageWidgetOpenLinkError": "Failed to open link",
   "chatMessageWidgetAttachmentUnavailable": "Attachment unavailable",
   "chatMessageWidgetCitationsTitle": "Citations ({count})",
-  "@chatMessageWidgetCitationsTitle": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@chatMessageWidgetCitationsTitle": {"placeholders": {"count": {"type": "int"}}},
   "chatMessageWidgetSearchResultsTitle": "Search results",
   "chatMessageWidgetCitationSourcesTitle": "Citation sources",
   "chatMessageWidgetRegenerateTooltip": "Regenerate",
@@ -1139,25 +903,13 @@
   "chatMessageWidgetBuiltinSearchHideNote": "Hide builtin search tool cards",
   "chatMessageWidgetDeepThinking": "Deep Thinking",
   "chatMessageWidgetWebSearch": "Web Search: {query}",
-  "@chatMessageWidgetWebSearch": {
-    "placeholders": {
-      "query": {
-        "type": "String"
-      }
-    }
-  },
+  "@chatMessageWidgetWebSearch": {"placeholders": {"query": {"type": "String"}}},
   "chatMessageWidgetBuiltinSearch": "Built-in Search",
   "chatMessageWidgetReadClipboard": "Read Clipboard",
   "chatMessageWidgetWriteClipboard": "Write Clipboard",
   "chatMessageWidgetSpeakingTitle": "Speaking:",
   "chatMessageWidgetSpeakText": "Speaking: {text}",
-  "@chatMessageWidgetSpeakText": {
-    "placeholders": {
-      "text": {
-        "type": "String"
-      }
-    }
-  },
+  "@chatMessageWidgetSpeakText": {"placeholders": {"text": {"type": "String"}}},
   "chatMessageWidgetMemoryRead": "Read Memory",
   "chatMessageWidgetMemoryUpdate": "Update Memory",
   "chatMessageWidgetMemorySearchProfile": "Search Memory",
@@ -1167,41 +919,17 @@
   "chatMessageWidgetChatSearch": "Search Past Chats",
   "chatMessageWidgetCreateMemory": "Create Memory",
   "chatMessageWidgetToolCall": "Tool Call: {name}",
-  "@chatMessageWidgetToolCall": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
+  "@chatMessageWidgetToolCall": {"placeholders": {"name": {"type": "String"}}},
   "chatMessageWidgetToolResult": "Tool Result: {name}",
-  "@chatMessageWidgetToolResult": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
+  "@chatMessageWidgetToolResult": {"placeholders": {"name": {"type": "String"}}},
   "chatMessageWidgetNoResultYet": "(No result yet)",
   "chatMessageWidgetArguments": "Arguments",
   "chatMessageWidgetResult": "Result",
   "chatMessageWidgetImages": "Images",
   "chatMessageWidgetCitationsCount": "{count} citations",
-  "@chatMessageWidgetCitationsCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@chatMessageWidgetCitationsCount": {"placeholders": {"count": {"type": "int"}}},
   "chatSelectionSelectedCountTitle": "Selected {count} message(s)",
-  "@chatSelectionSelectedCountTitle": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@chatSelectionSelectedCountTitle": {"placeholders": {"count": {"type": "int"}}},
   "chatSelectionExportTxt": "TXT",
   "chatSelectionExportMd": "MD",
   "chatSelectionExportImage": "Image",
@@ -1210,40 +938,16 @@
   "chatSelectionDeleteSelected": "Delete Selected",
   "chatSelectionSelectMessagesToDelete": "Please select messages to delete",
   "chatSelectionDeleteSelectedConfirm": "Delete {count} selected message(s) as branch nodes? Every branch below their forks will be removed, and only the active lineage will remain. This cannot be undone.",
-  "@chatSelectionDeleteSelectedConfirm": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@chatSelectionDeleteSelectedConfirm": {"placeholders": {"count": {"type": "int"}}},
   "chatSelectionDeleteSelectedAllVersionsConfirm": "Delete the branches and descendants of {count} selected message(s)? This cannot be undone.",
-  "@chatSelectionDeleteSelectedAllVersionsConfirm": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@chatSelectionDeleteSelectedAllVersionsConfirm": {"placeholders": {"count": {"type": "int"}}},
   "messageExportSheetAssistant": "Assistant",
   "messageExportSheetDefaultTitle": "New Chat",
   "messageExportSheetExporting": "Exporting…",
   "messageExportSheetExportFailed": "Export failed: {error}",
-  "@messageExportSheetExportFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@messageExportSheetExportFailed": {"placeholders": {"error": {"type": "String"}}},
   "messageExportSheetExportedAs": "Exported as {filename}",
-  "@messageExportSheetExportedAs": {
-    "placeholders": {
-      "filename": {
-        "type": "String"
-      }
-    }
-  },
+  "@messageExportSheetExportedAs": {"placeholders": {"filename": {"type": "String"}}},
   "displaySettingsPageEnableDollarLatexTitle": "Inline $...$ Rendering",
   "displaySettingsPageEnableDollarLatexSubtitle": "Render inline math inside $...$",
   "displaySettingsPageEnableMathTitle": "Math Formula Rendering",
@@ -1273,22 +977,10 @@
   "imagePreviewSheetSaveImage": "Save Image",
   "imagePreviewSheetSaveSuccess": "Saved to gallery",
   "imagePreviewSheetSaveFailed": "Save failed: {error}",
-  "@imagePreviewSheetSaveFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@imagePreviewSheetSaveFailed": {"placeholders": {"error": {"type": "String"}}},
   "sideDrawerMenuSelect": "Select",
   "sideDrawerSelectionTitle": "Selected {count} items",
-  "@sideDrawerSelectionTitle": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@sideDrawerSelectionTitle": {"placeholders": {"count": {"type": "int"}}},
   "sideDrawerSelectionSelectAll": "Select all",
   "sideDrawerSelectionDeselectAll": "Deselect all",
   "sideDrawerSelectionPin": "Pin",
@@ -1297,40 +989,13 @@
   "sideDrawerSelectionDelete": "Delete",
   "sideDrawerSelectionDeleteConfirmTitle": "Delete conversations",
   "sideDrawerSelectionDeleteConfirmContent": "Delete {count} conversations?",
-  "@sideDrawerSelectionDeleteConfirmContent": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@sideDrawerSelectionDeleteConfirmContent": {"placeholders": {"count": {"type": "int"}}},
   "sideDrawerDeleteSelectedSnackbar": "Deleted {count} conversations",
-  "@sideDrawerDeleteSelectedSnackbar": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@sideDrawerDeleteSelectedSnackbar": {"placeholders": {"count": {"type": "int"}}},
   "sideDrawerMoveSelectedSnackbar": "Moved {count} conversations",
-  "@sideDrawerMoveSelectedSnackbar": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@sideDrawerMoveSelectedSnackbar": {"placeholders": {"count": {"type": "int"}}},
   "sideDrawerMoveSelectedWithSkippedSnackbar": "Moved {moved} conversations; skipped {skipped} that are generating",
-  "@sideDrawerMoveSelectedWithSkippedSnackbar": {
-    "placeholders": {
-      "moved": {
-        "type": "int"
-      },
-      "skipped": {
-        "type": "int"
-      }
-    }
-  },
+  "@sideDrawerMoveSelectedWithSkippedSnackbar": {"placeholders": {"moved": {"type": "int"}, "skipped": {"type": "int"}}},
   "sideDrawerMenuRename": "Rename",
   "sideDrawerMenuPin": "Pin",
   "sideDrawerMenuUnpin": "Unpin",
@@ -1339,13 +1004,7 @@
   "sideDrawerMenuMoveTo": "Move to",
   "sideDrawerMenuDelete": "Delete",
   "sideDrawerDeleteSnackbar": "Deleted \"{title}\"",
-  "@sideDrawerDeleteSnackbar": {
-    "placeholders": {
-      "title": {
-        "type": "String"
-      }
-    }
-  },
+  "@sideDrawerDeleteSnackbar": {"placeholders": {"title": {"type": "String"}}},
   "sideDrawerRenameHint": "Enter new name",
   "sideDrawerCancel": "Cancel",
   "sideDrawerOK": "OK",
@@ -1368,32 +1027,11 @@
   "sideDrawerGlobalSearchEmptyHint": "Search across titles and messages",
   "sideDrawerGlobalSearchNoResults": "No matching sessions",
   "sideDrawerGlobalSearchResultCount": "{count} results",
-  "@sideDrawerGlobalSearchResultCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@sideDrawerGlobalSearchResultCount": {"placeholders": {"count": {"type": "int"}}},
   "sideDrawerUpdateTitle": "Update: {version}",
-  "@sideDrawerUpdateTitle": {
-    "placeholders": {
-      "version": {
-        "type": "String"
-      }
-    }
-  },
+  "@sideDrawerUpdateTitle": {"placeholders": {"version": {"type": "String"}}},
   "sideDrawerUpdateTitleWithBuild": "Update: {version} ({build})",
-  "@sideDrawerUpdateTitleWithBuild": {
-    "placeholders": {
-      "version": {
-        "type": "String"
-      },
-      "build": {
-        "type": "int"
-      }
-    }
-  },
+  "@sideDrawerUpdateTitleWithBuild": {"placeholders": {"version": {"type": "String"}, "build": {"type": "int"}}},
   "sideDrawerLinkCopied": "Link copied",
   "sideDrawerPinnedLabel": "Pinned",
   "sideDrawerHistory": "History",
@@ -1462,16 +1100,7 @@
   "mcpPageOAuthRequired": "OAuth sign-in is required",
   "mcpPageOAuthSignIn": "Sign in with OAuth",
   "mcpPageToolsCount": "Tools: {enabled}/{total}",
-  "@mcpPageToolsCount": {
-    "placeholders": {
-      "enabled": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
-    }
-  },
+  "@mcpPageToolsCount": {"placeholders": {"enabled": {"type": "int"}, "total": {"type": "int"}}},
   "mcpPageConnectionFailed": "Connection failed",
   "mcpPageDetails": "Details",
   "mcpPageDelete": "Delete",
@@ -1487,16 +1116,7 @@
   "mcpConversationSheetNoRunning": "No running MCP servers",
   "mcpConversationSheetConnected": "Connected",
   "mcpConversationSheetToolsCount": "Tools: {enabled}/{total}",
-  "@mcpConversationSheetToolsCount": {
-    "placeholders": {
-      "enabled": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
-    }
-  },
+  "@mcpConversationSheetToolsCount": {"placeholders": {"enabled": {"type": "int"}, "total": {"type": "int"}}},
   "mcpServerEditSheetEnabledLabel": "Enabled",
   "mcpServerEditSheetNameLabel": "Name",
   "mcpServerEditSheetTransportLabel": "Transport",
@@ -1534,13 +1154,7 @@
   "assistantEditRecentChatsSummaryFrequencyTitle": "Summary Refresh Frequency",
   "assistantEditRecentChatsSummaryFrequencyDescription": "Refresh recent-chat summaries after the selected number of new messages.",
   "assistantEditRecentChatsSummaryFrequencyOption": "Every {count}",
-  "@assistantEditRecentChatsSummaryFrequencyOption": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@assistantEditRecentChatsSummaryFrequencyOption": {"placeholders": {"count": {"type": "int"}}},
   "assistantEditRecentChatsSummaryFrequencyCustomButton": "Custom",
   "assistantEditRecentChatsSummaryFrequencyCustomTitle": "Custom Summary Frequency",
   "assistantEditRecentChatsSummaryFrequencyCustomDescription": "Enter how many new messages should accumulate before refreshing the recent-chat summary.",
@@ -1551,12 +1165,7 @@
   "defaultModelPageTranslateModelSubtitle": "Used for translating message content; prefer fast & accurate models",
   "defaultModelPageOcrModelTitle": "OCR Model",
   "backgroundTaskFailed": "{task} failed: {error}",
-  "@backgroundTaskFailed": {
-    "placeholders": {
-      "task": {"type": "String"},
-      "error": {"type": "String"}
-    }
-  },
+  "@backgroundTaskFailed": {"placeholders": {"task": {"type": "String"}, "error": {"type": "String"}}},
   "defaultModelPageOcrModelSubtitle": "Used for extracting text and descriptions from images",
   "defaultModelPageOcrModelRequiresImageInput": "Select a model tagged with image input for OCR",
   "defaultModelPagePromptLabel": "Prompt",
@@ -1568,63 +1177,18 @@
   "defaultModelPageResetDefault": "Reset to default",
   "defaultModelPageSave": "Save",
   "defaultModelPageTitleVars": "Vars: content: {contentVar}, locale: {localeVar}",
-  "@defaultModelPageTitleVars": {
-    "placeholders": {
-      "contentVar": {
-        "type": "String"
-      },
-      "localeVar": {
-        "type": "String"
-      }
-    }
-  },
+  "@defaultModelPageTitleVars": {"placeholders": {"contentVar": {"type": "String"}, "localeVar": {"type": "String"}}},
   "defaultModelPageSummaryVars": "Variables: previous summary: {previousSummaryVar}, new messages: {userMessagesVar}",
-  "@defaultModelPageSummaryVars": {
-    "placeholders": {
-      "previousSummaryVar": {
-        "type": "String"
-      },
-      "userMessagesVar": {
-        "type": "String"
-      }
-    }
-  },
+  "@defaultModelPageSummaryVars": {"placeholders": {"previousSummaryVar": {"type": "String"}, "userMessagesVar": {"type": "String"}}},
   "defaultModelPageSuggestionVars": "Variables: conversation: {contentVar}, language: {localeVar}",
-  "@defaultModelPageSuggestionVars": {
-    "placeholders": {
-      "contentVar": {
-        "type": "String"
-      },
-      "localeVar": {
-        "type": "String"
-      }
-    }
-  },
+  "@defaultModelPageSuggestionVars": {"placeholders": {"contentVar": {"type": "String"}, "localeVar": {"type": "String"}}},
   "defaultModelPageCompressModelTitle": "Compress Model",
   "defaultModelPageCompressModelSubtitle": "Used for compressing conversation context; prefer fast models",
   "defaultModelPageCompressPromptHint": "Enter prompt template for context compression",
   "defaultModelPageCompressVars": "Variables: conversation: {contentVar}, language: {localeVar}",
-  "@defaultModelPageCompressVars": {
-    "placeholders": {
-      "contentVar": {
-        "type": "String"
-      },
-      "localeVar": {
-        "type": "String"
-      }
-    }
-  },
+  "@defaultModelPageCompressVars": {"placeholders": {"contentVar": {"type": "String"}, "localeVar": {"type": "String"}}},
   "defaultModelPageTranslateVars": "Variables: source text: {sourceVar}, target language: {targetVar}",
-  "@defaultModelPageTranslateVars": {
-    "placeholders": {
-      "sourceVar": {
-        "type": "String"
-      },
-      "targetVar": {
-        "type": "String"
-      }
-    }
-  },
+  "@defaultModelPageTranslateVars": {"placeholders": {"sourceVar": {"type": "String"}, "targetVar": {"type": "String"}}},
   "defaultModelPageUseCurrentModel": "Use current chat model",
   "defaultModelPageNotEnabled": "Not enabled",
   "defaultModelPageDisable": "Disable",
@@ -1644,13 +1208,7 @@
   "modelDetailSheetModelIdLabel": "Model ID",
   "modelDetailSheetModelIdHint": "Required, suggest lowercase/digits/hyphens",
   "modelDetailSheetModelIdDisabledHint": "{modelId}",
-  "@modelDetailSheetModelIdDisabledHint": {
-    "placeholders": {
-      "modelId": {
-        "type": "String"
-      }
-    }
-  },
+  "@modelDetailSheetModelIdDisabledHint": {"placeholders": {"modelId": {"type": "String"}}},
   "modelDetailSheetModelNameLabel": "Model Name",
   "modelDetailSheetModelTypeLabel": "Model Type",
   "modelDetailSheetChatType": "Chat",
@@ -1741,21 +1299,9 @@
   "providerDetailPageBalanceResetDefaultsButton": "Reset",
   "providerDetailPageBalanceResetDefaultsTooltip": "Reset balance settings",
   "providerDetailPageBalanceResult": "Balance: {value}",
-  "@providerDetailPageBalanceResult": {
-    "placeholders": {
-      "value": {
-        "type": "String"
-      }
-    }
-  },
+  "@providerDetailPageBalanceResult": {"placeholders": {"value": {"type": "String"}}},
   "providerDetailPageBalanceError": "Balance query failed: {message}",
-  "@providerDetailPageBalanceError": {
-    "placeholders": {
-      "message": {
-        "type": "String"
-      }
-    }
-  },
+  "@providerDetailPageBalanceError": {"placeholders": {"message": {"type": "String"}}},
   "providerDetailPageBalanceFullUrlRequired": "The main API endpoint is not OpenAI-compatible. Enter a full OpenAI-compatible balance API URL.",
   "providerDetailPageVertexAiTitle": "Vertex AI",
   "providerDetailPageLocationLabel": "Location",
@@ -1840,21 +1386,9 @@
   "importProviderSheetScanQrTooltip": "Scan QR",
   "importProviderSheetFromGalleryTooltip": "From Gallery",
   "importProviderSheetImportSuccessMessage": "Imported {count} provider(s)",
-  "@importProviderSheetImportSuccessMessage": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@importProviderSheetImportSuccessMessage": {"placeholders": {"count": {"type": "int"}}},
   "importProviderSheetImportFailedMessage": "Import failed: {error}",
-  "@importProviderSheetImportFailedMessage": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@importProviderSheetImportFailedMessage": {"placeholders": {"error": {"type": "String"}}},
   "importProviderSheetDescription": "Paste share strings (multi-line supported) or ChatBox JSON",
   "importProviderSheetInputHint": "ai-provider:v1:... or JSON",
   "importProviderSheetCancelButton": "Cancel",
@@ -1899,11 +1433,7 @@
   "miniMapTooltip": "Minimap",
   "miniMapScrollToBottomTooltip": "Scroll to bottom",
   "miniMapSearchMatchCount": "{count}",
-  "@miniMapSearchMatchCount": {
-    "placeholders": {
-      "count": {"type": "int"}
-    }
-  },
+  "@miniMapSearchMatchCount": {"placeholders": {"count": {"type": "int"}}},
   "miniMapSearchNoResults": "No matching messages",
   "miniMapFullWindow": "Show in full window",
   "miniMapRestoreWindow": "Restore window size",
@@ -1951,74 +1481,38 @@
   "searchServiceEditorMultiKeyTitle": "Multi-key rotation",
   "searchServiceEditorMultiKeyNone": "Not configured",
   "searchApiKeysPageDescription": "Keys rotate in the order listed; the first is the primary key. Usage is not queried to avoid provider rate limiting.",
-
   "searchApiKeysPagePrimaryBadge": "Primary",
   "searchApiKeysPageBatchHint": "Paste one or more keys — one per line or comma-separated",
   "searchApiKeysPageBatchResult": "Added {added}, skipped {skipped} duplicate(s)",
-  "@searchApiKeysPageBatchResult": {
-    "placeholders": {
-      "added": { "type": "String" },
-      "skipped": { "type": "String" }
-    }
-  },
+  "@searchApiKeysPageBatchResult": {"placeholders": {"added": {"type": "String"}, "skipped": {"type": "String"}}},
   "searchApiKeysPageAdd": "Add",
   "searchApiKeysPageEmpty": "No keys configured yet.",
   "searchServiceEditorMultiKeyCount": "{count} keys",
-
-  "@searchServiceEditorMultiKeyCount": {
-    "placeholders": {
-      "count": { "type": "String" }
-    }
-  },
+  "@searchServiceEditorMultiKeyCount": {"placeholders": {"count": {"type": "String"}}},
   "searchServiceEditorUsageTitle": "Account usage",
   "searchServiceEditorUsageNotQueried": "Usage has not been queried yet.",
   "searchServiceEditorUsageQuery": "Check usage",
   "searchServiceEditorUsageQuerying": "Checking…",
   "searchServiceEditorUsageRemaining": "{remaining} credits remaining",
-  "@searchServiceEditorUsageRemaining": {
-    "placeholders": {
-      "remaining": { "type": "String" }
-    }
-  },
+  "@searchServiceEditorUsageRemaining": {"placeholders": {"remaining": {"type": "String"}}},
   "searchServiceEditorUsageBalance": "Balance: {balance}",
-  "@searchServiceEditorUsageBalance": {
-    "placeholders": {
-      "balance": { "type": "String" }
-    }
-  },
+  "@searchServiceEditorUsageBalance": {"placeholders": {"balance": {"type": "String"}}},
   "searchServiceEditorUsageUsed": "{used} of {limit} credits used",
-  "@searchServiceEditorUsageUsed": {
-    "placeholders": {
-      "used": { "type": "String" },
-      "limit": { "type": "String" }
-    }
-  },
+  "@searchServiceEditorUsageUsed": {"placeholders": {"used": {"type": "String"}, "limit": {"type": "String"}}},
   "searchServiceEditorUsageFailed": "Could not query usage: {message}",
-  "@searchServiceEditorUsageFailed": {
-    "placeholders": {
-      "message": { "type": "String" }
-    }
-  },
+  "@searchServiceEditorUsageFailed": {"placeholders": {"message": {"type": "String"}}},
   "searchServiceEditorTestTitle": "Test search",
   "searchServiceEditorTestQueryHint": "Enter a query",
   "searchServiceEditorTestRun": "Run test search",
   "searchServiceEditorTestRunning": "Searching…",
   "searchServiceEditorTestNoResults": "The provider returned no results.",
   "searchServiceEditorTestFailed": "Search failed: {message}",
-  "@searchServiceEditorTestFailed": {
-    "placeholders": {
-      "message": { "type": "String" }
-    }
-  },
+  "@searchServiceEditorTestFailed": {"placeholders": {"message": {"type": "String"}}},
   "searchServiceEditorResultOpenTooltip": "Open result",
   "searchServiceEditorDeleteTooltip": "Delete search service",
   "searchServiceEditorDeleteTitle": "Delete search service?",
   "searchServiceEditorDeleteMessage": "Delete {provider}? This cannot be undone.",
-  "@searchServiceEditorDeleteMessage": {
-    "placeholders": {
-      "provider": { "type": "String" }
-    }
-  },
+  "@searchServiceEditorDeleteMessage": {"placeholders": {"provider": {"type": "String"}}},
   "searchServiceEditorDeleteConfirm": "Delete",
   "searchServiceEditorDiscardTitle": "Discard changes?",
   "searchServiceEditorDiscardMessage": "Your unsaved search service settings will be lost.",
@@ -2042,16 +1536,7 @@
   "aboutPageAppDescription": "JO-AIClient is an open-source AI assistant based on Kelivo",
   "aboutPageVersion": "Version",
   "aboutPageVersionDetail": "{version} / {buildNumber}",
-  "@aboutPageVersionDetail": {
-    "placeholders": {
-      "version": {
-        "type": "String"
-      },
-      "buildNumber": {
-        "type": "String"
-      }
-    }
-  },
+  "@aboutPageVersionDetail": {"placeholders": {"version": {"type": "String"}, "buildNumber": {"type": "String"}}},
   "aboutPageSystem": "System",
   "aboutPageLoadingPlaceholder": "...",
   "aboutPageUnknownPlaceholder": "-",
@@ -2061,13 +1546,7 @@
   "aboutPagePlatformAndroid": "Android",
   "aboutPagePlatformIos": "iOS",
   "aboutPagePlatformOther": "Other ({os})",
-  "@aboutPagePlatformOther": {
-    "placeholders": {
-      "os": {
-        "type": "String"
-      }
-    }
-  },
+  "@aboutPagePlatformOther": {"placeholders": {"os": {"type": "String"}}},
   "aboutPageWebsite": "Website",
   "aboutPageGithub": "GitHub",
   "aboutPageLicense": "License",
@@ -2075,13 +1554,7 @@
   "aboutPageCheckingForUpdates": "Checking for updates...",
   "aboutPageAlreadyLatest": "You're up to date",
   "aboutPageUpdateCheckFailed": "Failed to check for updates: {error}",
-  "@aboutPageUpdateCheckFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@aboutPageUpdateCheckFailed": {"placeholders": {"error": {"type": "String"}}},
   "displaySettingsPageShowUserAvatarTitle": "Show User Avatar",
   "displaySettingsPageShowUserAvatarSubtitle": "Display user avatar in chat messages",
   "displaySettingsPageShowUserNameTimestampTitle": "Show User Name & Timestamp",
@@ -2299,13 +1772,7 @@
   "ttsServicesPageSystemTtsTitle": "System TTS",
   "ttsServicesPageSystemTtsAvailableSubtitle": "Use system built-in TTS",
   "ttsServicesPageSystemTtsUnavailableSubtitle": "Unavailable: {error}",
-  "@ttsServicesPageSystemTtsUnavailableSubtitle": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@ttsServicesPageSystemTtsUnavailableSubtitle": {"placeholders": {"error": {"type": "String"}}},
   "ttsServicesPageSystemTtsUnavailableNotInitialized": "not initialized",
   "ttsServicesPageTestSpeechText": "Hello, this is a test speech.",
   "ttsServicesPageConfigureTooltip": "Configure",
@@ -2363,12 +1830,7 @@
   "ttsServicesValidationReferenceIdRequired": "Voice/reference ID is required",
   "ttsServicesValidationInstructionRequired": "A voice description is required",
   "ttsServicesValidationSampleRate": "{format} requires {rates} Hz.",
-  "@ttsServicesValidationSampleRate": {
-    "placeholders": {
-      "format": {"type": "String"},
-      "rates": {"type": "String"}
-    }
-  },
+  "@ttsServicesValidationSampleRate": {"placeholders": {"format": {"type": "String"}, "rates": {"type": "String"}}},
   "ttsServicesViewDetailsButton": "View details",
   "ttsServicesDialogErrorTitle": "Error Details",
   "ttsServicesCloseButton": "Close",
@@ -2405,29 +1867,11 @@
   "ttsSaveSuccess": "Audio saved successfully.",
   "ttsSaveNothing": "No audio is available to save.",
   "ttsSaveFailed": "Failed to save audio: {message}",
-  "@ttsSaveFailed": {
-    "placeholders": {
-      "message": {
-        "type": "String"
-      }
-    }
-  },
+  "@ttsSaveFailed": {"placeholders": {"message": {"type": "String"}}},
   "imageViewerPageShareFailedOpenFile": "Unable to share, tried to open file: {message}",
-  "@imageViewerPageShareFailedOpenFile": {
-    "placeholders": {
-      "message": {
-        "type": "String"
-      }
-    }
-  },
+  "@imageViewerPageShareFailedOpenFile": {"placeholders": {"message": {"type": "String"}}},
   "imageViewerPageShareFailed": "Share failed: {error}",
-  "@imageViewerPageShareFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@imageViewerPageShareFailed": {"placeholders": {"error": {"type": "String"}}},
   "imageViewerPageShareButton": "Share Image",
   "imageViewerPageCloseButton": "Close preview",
   "imageViewerPageSaveButton": "Save Image",
@@ -2442,37 +1886,13 @@
   "imageViewerPageRotateLeftButton": "Rotate Left",
   "imageViewerPageRotateRightButton": "Rotate Right",
   "imageViewerPageCounter": "{index}/{total}",
-  "@imageViewerPageCounter": {
-    "placeholders": {
-      "index": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
-    }
-  },
+  "@imageViewerPageCounter": {"placeholders": {"index": {"type": "int"}, "total": {"type": "int"}}},
   "imageViewerPageImageLabel": "Image {index} of {total}",
-  "@imageViewerPageImageLabel": {
-    "placeholders": {
-      "index": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
-    }
-  },
+  "@imageViewerPageImageLabel": {"placeholders": {"index": {"type": "int"}, "total": {"type": "int"}}},
   "imageViewerPageImageLoadFailed": "Unable to load image",
   "imageViewerPageSaveSuccess": "Saved to gallery",
   "imageViewerPageSaveFailed": "Save failed: {error}",
-  "@imageViewerPageSaveFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@imageViewerPageSaveFailed": {"placeholders": {"error": {"type": "String"}}},
   "settingsShare": "JO-AIClient - Open Source AI Assistant",
   "searchProviderBingLocalDescription": "Uses web scraping to fetch Bing results. No API key required; may be unstable.",
   "searchProviderDuckDuckGoDescription": "Privacy-focused DuckDuckGo search via DDGS. No API key required; supports region selection.",
@@ -2561,13 +1981,7 @@
   "instructionInjectionGroupLabel": "Group",
   "instructionInjectionGroupHint": "Optional",
   "instructionInjectionImportSuccess": "Imported {count} instruction(s)",
-  "@instructionInjectionImportSuccess": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@instructionInjectionImportSuccess": {"placeholders": {"count": {"type": "int"}}},
   "instructionInjectionSheetSubtitle": "Choose a prompt to apply before chatting",
   "mcpJsonEditButtonTooltip": "Edit JSON",
   "mcpJsonEditTitle": "Edit JSON",
@@ -2594,14 +2008,14 @@
   "assistantEditLocalToolAskUserSubtitle": "Let the assistant ask short questions and continue after you answer.",
   "assistantEditLocalToolCalculateTitle": "Calculator",
   "assistantEditLocalToolCalculateSubtitle": "Evaluate mathematical expressions, supports + - * / power sqrt sin cos etc.",
-   "assistantEditLocalToolScreenTimeTitle": "Screen Time",
-   "assistantEditLocalToolScreenTimeSubtitle": "Query app screen usage on this device, requires the Usage access permission.",
-   "chatMessageWidgetScreenTimeTotal": "Total screen time",
-   "chatMessageWidgetScreenTimePermissionRequired": "Usage access permission is not granted. Please enable it in system settings and try again.",
-   "assistantEditLocalToolCalendarQueryTitle": "Query Calendar",
-   "assistantEditLocalToolCalendarQuerySubtitle": "Read calendar events on this device, requires the calendar permission.",
-   "assistantEditLocalToolCalendarCreateTitle": "Create Event",
-   "assistantEditLocalToolCalendarCreateSubtitle": "Create calendar events on this device with your confirmation, requires the calendar permission.",
+  "assistantEditLocalToolScreenTimeTitle": "Screen Time",
+  "assistantEditLocalToolScreenTimeSubtitle": "Query app screen usage on this device, requires the Usage access permission.",
+  "chatMessageWidgetScreenTimeTotal": "Total screen time",
+  "chatMessageWidgetScreenTimePermissionRequired": "Usage access permission is not granted. Please enable it in system settings and try again.",
+  "assistantEditLocalToolCalendarQueryTitle": "Query Calendar",
+  "assistantEditLocalToolCalendarQuerySubtitle": "Read calendar events on this device, requires the calendar permission.",
+  "assistantEditLocalToolCalendarCreateTitle": "Create Event",
+  "assistantEditLocalToolCalendarCreateSubtitle": "Create calendar events on this device with your confirmation, requires the calendar permission.",
   "assistantEditMemorySwitchDescription": "Allow the assistant to create and use memories across chats.",
   "assistantEditRecentChatsSwitchTitle": "Recent Chats Reference",
   "assistantEditRecentChatsSwitchDescription": "Include recent conversation titles to help with context.",
@@ -2617,13 +2031,7 @@
   "multiKeyPageDeleteErrorsConfirmTitle": "Delete all error keys?",
   "multiKeyPageDeleteErrorsConfirmContent": "This will remove all keys marked as error.",
   "multiKeyPageDeletedErrorsSnackbar": "Deleted {n} error keys",
-  "@multiKeyPageDeletedErrorsSnackbar": {
-    "placeholders": {
-      "n": {
-        "type": "int"
-      }
-    }
-  },
+  "@multiKeyPageDeletedErrorsSnackbar": {"placeholders": {"n": {"type": "int"}}},
   "providerDetailPageProviderTypeTitle": "Provider Type",
   "displaySettingsPageChatItemDisplayTitle": "Chat item display",
   "displaySettingsPageRenderingSettingsTitle": "Rendering settings",
@@ -2634,13 +2042,7 @@
   "providersPageDeleteSelectedConfirmContent": "Delete selected providers? This cannot be undone.",
   "providersPageDeleteSelectedSnackbar": "Deleted selected providers",
   "providersPageExportSelectedTitle": "Export {count} providers",
-  "@providersPageExportSelectedTitle": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@providersPageExportSelectedTitle": {"placeholders": {"count": {"type": "int"}}},
   "providersPageExportCopyButton": "Copy",
   "providersPageExportShareButton": "Share",
   "providersPageExportCopiedSnackbar": "Copied export code",
@@ -2676,13 +2078,7 @@
   "networkProxyTesting": "Testing…",
   "networkProxyTestSuccess": "Connection successful",
   "networkProxyTestFailed": "Test failed: {error}",
-  "@networkProxyTestFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@networkProxyTestFailed": {"placeholders": {"error": {"type": "String"}}},
   "networkProxyNoUrl": "Please enter a URL",
   "networkProxyPriorityNote": "When both global and provider proxies are enabled, provider-level proxy takes priority.",
   "desktopShowProviderInModelCapsule": "Show provider in model capsule",
@@ -2701,31 +2097,13 @@
   "providerDetailPageDeleteSelectedModelsButton": "Delete",
   "providerDetailPageDeleteSelectedModelsTooltip": "Delete selected models",
   "providerDetailPageDeleteSelectedModelsConfirm": "Delete {count} selected model(s)? This cannot be undone.",
-  "@providerDetailPageDeleteSelectedModelsConfirm": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@providerDetailPageDeleteSelectedModelsConfirm": {"placeholders": {"count": {"type": "int"}}},
   "providerDetailPageDeleteFailedDetectedModelsButton": "Delete unavailable",
   "providerDetailPageDeleteFailedDetectedModelsTooltip": "Delete models that failed detection",
   "providerDetailPageDeleteFailedDetectedModelsConfirm": "Delete {count} model(s) that failed detection? This cannot be undone.",
-  "@providerDetailPageDeleteFailedDetectedModelsConfirm": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@providerDetailPageDeleteFailedDetectedModelsConfirm": {"placeholders": {"count": {"type": "int"}}},
   "providerDetailPageSelectedModelsDeletedSnackbar": "Deleted {count} model(s)",
-  "@providerDetailPageSelectedModelsDeletedSnackbar": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@providerDetailPageSelectedModelsDeletedSnackbar": {"placeholders": {"count": {"type": "int"}}},
   "providerDetailPageDeleteAllModelsTooltip": "Delete all models",
   "providerDetailPageDeleteAllModelsWarning": "This action cannot be undone.",
   "requestLogSettingTitle": "Request Logging",
@@ -2736,21 +2114,9 @@
   "contextLogSettingSubtitle": "When enabled, the exact messages sent to the model are written to logs/context_logs.txt (rotated daily).",
   "contextLogViewerTitle": "Context",
   "contextLogSnapshotMessages": "{count} messages",
-  "@contextLogSnapshotMessages": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@contextLogSnapshotMessages": {"placeholders": {"count": {"type": "int"}}},
   "contextLogSnapshotTokens": "{count} tokens",
-  "@contextLogSnapshotTokens": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@contextLogSnapshotTokens": {"placeholders": {"count": {"type": "int"}}},
   "contextLogSourceSystemPrompt": "System prompt",
   "contextLogSourceMemoryRules": "Memory rules",
   "contextLogSourceSearchPrompt": "Search prompt",
@@ -2762,13 +2128,7 @@
   "contextLogSourceToolResult": "Tool result",
   "contextLogTokensEstimateHint": "Token counts are estimates only; use the model's actual usage as the source of truth.",
   "contextLogSnapshotsCount": "{count} snapshots",
-  "@contextLogSnapshotsCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@contextLogSnapshotsCount": {"placeholders": {"count": {"type": "int"}}},
   "contextLogSnapshotFallbackTitle": "Snapshot",
   "contextLogKindFull": "Full snapshot",
   "contextLogKindUpdate": "Incremental update",
@@ -2782,13 +2142,7 @@
   "logViewerExport": "Export",
   "logViewerOpenFolder": "Open Logs Folder",
   "logViewerRequestsCount": "{count} requests",
-  "@logViewerRequestsCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@logViewerRequestsCount": {"placeholders": {"count": {"type": "int"}}},
   "logViewerFieldId": "ID",
   "logViewerFieldMethod": "Method",
   "logViewerFieldStatus": "Status",
@@ -2804,13 +2158,7 @@
   "logViewerSectionWarnings": "Warnings",
   "logViewerErrorTitle": "Error",
   "logViewerMoreCount": "+{count} more",
-  "@logViewerMoreCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@logViewerMoreCount": {"placeholders": {"count": {"type": "int"}}},
   "logViewerSectionAttachments": "Attachments",
   "logViewerPayloadOmitted": "omitted",
   "logViewerShowMore": "Show more",
@@ -2823,13 +2171,7 @@
   "logSettingsAutoDeleteSubtitle": "Delete logs older than specified days",
   "logSettingsAutoDeleteDisabled": "Disabled",
   "logSettingsAutoDeleteDays": "{count} days",
-  "@logSettingsAutoDeleteDays": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@logSettingsAutoDeleteDays": {"placeholders": {"count": {"type": "int"}}},
   "logSettingsMaxSize": "Max Log Size",
   "logSettingsMaxSizeSubtitle": "Oldest logs deleted when exceeded",
   "logSettingsMaxSizeUnlimited": "Unlimited",
@@ -2925,11 +2267,7 @@
   "memoryEntryScopeGlobal": "Global",
   "memoryEntryScopeAssistant": "This assistant",
   "memoryEntryScopeAssistantNamed": "{name}",
-  "@memoryEntryScopeAssistantNamed": {
-    "placeholders": {
-      "name": {"type": "String"}
-    }
-  },
+  "@memoryEntryScopeAssistantNamed": {"placeholders": {"name": {"type": "String"}}},
   "memoryEntrySourceManual": "Manual",
   "memoryEntrySourceTool": "Tool",
   "memoryEntrySourceExtracted": "Extracted",
@@ -2937,11 +2275,7 @@
   "memoryEntryStatusActive": "Active",
   "memoryEntryStatusArchived": "Archived",
   "memoryEntryUpdatedAt": "Updated {date}",
-  "@memoryEntryUpdatedAt": {
-    "placeholders": {
-      "date": {"type": "String"}
-    }
-  },
+  "@memoryEntryUpdatedAt": {"placeholders": {"date": {"type": "String"}}},
   "memoryEntryActionEdit": "Edit",
   "memoryEntryActionDelete": "Delete",
   "memoryEntryActionArchive": "Archive",
@@ -2952,11 +2286,7 @@
   "memoryEntryDeleteConfirmTitle": "Delete memory?",
   "memoryEntryDeleteConfirmContent": "This permanently deletes the memory. This cannot be undone.",
   "memoryEntryBatchDeleteConfirmTitle": "Delete {count} memories?",
-  "@memoryEntryBatchDeleteConfirmTitle": {
-    "placeholders": {
-      "count": {"type": "int"}
-    }
-  },
+  "@memoryEntryBatchDeleteConfirmTitle": {"placeholders": {"count": {"type": "int"}}},
   "memoryEntryBatchDeleteConfirmContent": "Selected memories will be permanently deleted.",
   "memoryEntrySwitchScopeConfirmTitle": "Change memory scope?",
   "memoryEntrySwitchScopeToGlobal": "Make this memory global (shared across assistants)?",
@@ -2979,63 +2309,31 @@
   "memorySearchHint": "Search memories",
   "memorySearchEmpty": "No matching memories",
   "memoryOrphanBanner": "{count} orphaned assistant memories (assistant deleted)",
-  "@memoryOrphanBanner": {
-    "placeholders": {
-      "count": {"type": "int"}
-    }
-  },
+  "@memoryOrphanBanner": {"placeholders": {"count": {"type": "int"}}},
   "memoryOrphanCleanupButton": "Clean up",
   "memoryOrphanConfirmTitle": "Clean up orphaned memories?",
   "memoryOrphanConfirmContent": "Permanently delete {count} memories whose assistant no longer exists.",
-  "@memoryOrphanConfirmContent": {
-    "placeholders": {
-      "count": {"type": "int"}
-    }
-  },
+  "@memoryOrphanConfirmContent": {"placeholders": {"count": {"type": "int"}}},
   "memoryOrganizeButton": "Organize",
   "memoryOrganizeNeedsConversation": "Open a chat with this assistant to organize memories",
   "memoryOrganizeNeedsModel": "Select a memory model in Settings → Memory first",
   "memoryOrganizeStatusNever": "Not organized yet",
   "memoryOrganizeStatusLast": "Last organized: {when}",
-  "@memoryOrganizeStatusLast": {
-    "placeholders": {
-      "when": {"type": "String"}
-    }
-  },
+  "@memoryOrganizeStatusLast": {"placeholders": {"when": {"type": "String"}}},
   "memoryOrganizeStatusExtracted": "extracted {count}",
-  "@memoryOrganizeStatusExtracted": {
-    "placeholders": {
-      "count": {"type": "int"}
-    }
-  },
+  "@memoryOrganizeStatusExtracted": {"placeholders": {"count": {"type": "int"}}},
   "memoryOrganizeStatusSkipped": "nothing to remember",
   "memoryOrganizeStatusSkippedReason": "skipped: {reason}",
   "@memoryOrganizeStatusSkippedReason": {"placeholders": {"reason": {"type": "String"}}},
   "memoryOrganizeStatusFailed": "Failed: {reason}",
-  "@memoryOrganizeStatusFailed": {
-    "placeholders": {
-      "reason": {"type": "String"}
-    }
-  },
+  "@memoryOrganizeStatusFailed": {"placeholders": {"reason": {"type": "String"}}},
   "memoryOrganizeJustNow": "just now",
   "memoryOrganizeMinutesAgo": "{n} min ago",
-  "@memoryOrganizeMinutesAgo": {
-    "placeholders": {
-      "n": {"type": "int"}
-    }
-  },
+  "@memoryOrganizeMinutesAgo": {"placeholders": {"n": {"type": "int"}}},
   "memoryOrganizeHoursAgo": "{n} h ago",
-  "@memoryOrganizeHoursAgo": {
-    "placeholders": {
-      "n": {"type": "int"}
-    }
-  },
+  "@memoryOrganizeHoursAgo": {"placeholders": {"n": {"type": "int"}}},
   "memoryOrganizeDaysAgo": "{n} d ago",
-  "@memoryOrganizeDaysAgo": {
-    "placeholders": {
-      "n": {"type": "int"}
-    }
-  },
+  "@memoryOrganizeDaysAgo": {"placeholders": {"n": {"type": "int"}}},
   "memoryModelMissingNotice": "Select a memory processing model in Settings → Memory first.",
   "memoryModelMissingGoSelect": "Choose model",
   "memoryEntriesPageTitle": "All memories",
@@ -3089,20 +2387,12 @@
   "legacyMemoryExport": "Export",
   "legacyMemoryExportTitle": "JO-AIClient legacy memory export",
   "legacyMemoryAssistantHeader": "Assistant: {name}",
-  "@legacyMemoryAssistantHeader": {
-    "placeholders": {
-      "name": {"type": "String"}
-    }
-  },
+  "@legacyMemoryAssistantHeader": {"placeholders": {"name": {"type": "String"}}},
   "legacyMemorySearchHint": "Search legacy memories",
   "legacyMemoryMigrate": "Migrate",
   "legacyMemoryMigrationTitle": "Migrate legacy memories",
   "legacyMemoryMigrationSubtitle": "Use a model to classify and clean up {count} legacy memories. The originals stay unchanged.",
-  "@legacyMemoryMigrationSubtitle": {
-    "placeholders": {
-      "count": {"type": "int"}
-    }
-  },
+  "@legacyMemoryMigrationSubtitle": {"placeholders": {"count": {"type": "int"}}},
   "legacyMemoryMigrationModel": "Migration model",
   "legacyMemoryMigrationChooseModel": "Choose a model",
   "legacyMemoryMigrationTarget": "Save to",
@@ -3116,20 +2406,10 @@
   "legacyMemoryMigrationAnalyzing": "Analyzing with model",
   "legacyMemoryMigrationWriting": "Saving memories",
   "legacyMemoryMigrationProgress": "{current} of {total}",
-  "@legacyMemoryMigrationProgress": {
-    "placeholders": {
-      "current": {"type": "int"},
-      "total": {"type": "int"}
-    }
-  },
+  "@legacyMemoryMigrationProgress": {"placeholders": {"current": {"type": "int"}, "total": {"type": "int"}}},
   "legacyMemoryMigrationComplete": "Migration complete",
   "legacyMemoryMigrationResult": "{created} migrated · {skipped} already existed",
-  "@legacyMemoryMigrationResult": {
-    "placeholders": {
-      "created": {"type": "int"},
-      "skipped": {"type": "int"}
-    }
-  },
+  "@legacyMemoryMigrationResult": {"placeholders": {"created": {"type": "int"}, "skipped": {"type": "int"}}},
   "legacyMemoryMigrationFailed": "Migration stopped. You can retry; memories already saved will be skipped.",
   "legacyMemoryMigrationContinue": "Continue migration",
   "legacyMemoryMigrationErrorAuth": "Authentication failed. Check the API key.",
@@ -3174,11 +2454,7 @@
   "assistantEditOrganizeFrequencyTitle": "Organize every N turns",
   "assistantEditOrganizeFrequencySubtitle": "Run auto-organize after this many assistant replies",
   "assistantEditOrganizeFrequencyOption": "Every {n}",
-  "@assistantEditOrganizeFrequencyOption": {
-    "placeholders": {
-      "n": {"type": "int"}
-    }
-  },
+  "@assistantEditOrganizeFrequencyOption": {"placeholders": {"n": {"type": "int"}}},
   "assistantEditOrganizeFrequencyCustomButton": "Custom",
   "assistantEditOrganizeFrequencyCustomTitle": "Custom frequency",
   "assistantEditOrganizeFrequencyCustomDescription": "Enter a number between 1 and 20.",
@@ -3196,33 +2472,15 @@
   "worldBookConfig": "Configure",
   "worldBookDeleteTitle": "Delete World Book",
   "worldBookDeleteMessage": "Delete “{name}”? This cannot be undone.",
-  "@worldBookDeleteMessage": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
+  "@worldBookDeleteMessage": {"placeholders": {"name": {"type": "String"}}},
   "worldBookCancel": "Cancel",
   "worldBookDelete": "Delete",
   "worldBookExportFailed": "Export failed: {error}",
-  "@worldBookExportFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@worldBookExportFailed": {"placeholders": {"error": {"type": "String"}}},
   "worldBookNoEntriesHint": "No entries",
   "worldBookUnnamedEntry": "Unnamed Entry",
   "worldBookKeywordsLine": "Keywords: {keywords}",
-  "@worldBookKeywordsLine": {
-    "placeholders": {
-      "keywords": {
-        "type": "String"
-      }
-    }
-  },
+  "@worldBookKeywordsLine": {"placeholders": {"keywords": {"type": "String"}}},
   "worldBookEditEntry": "Edit Entry",
   "worldBookDeleteEntry": "Delete Entry",
   "worldBookNameLabel": "Name",
@@ -3268,64 +2526,19 @@
   "askUserCardInactive": "This question is no longer active. Regenerate or continue the conversation.",
   "askUserCardCancelled": "Question cancelled",
   "askUserCardQuestionCount": "{count, plural, =1{Ask 1 question} other{Ask {count} questions}}",
-  "@askUserCardQuestionCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@askUserCardQuestionCount": {"placeholders": {"count": {"type": "int"}}},
   "tokenDetailPromptTokens": "{count} tokens",
-  "@tokenDetailPromptTokens": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@tokenDetailPromptTokens": {"placeholders": {"count": {"type": "int"}}},
   "tokenDetailPromptTokensWithCache": "{count} tokens ({cached} cached)",
-  "@tokenDetailPromptTokensWithCache": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      },
-      "cached": {
-        "type": "int"
-      }
-    }
-  },
+  "@tokenDetailPromptTokensWithCache": {"placeholders": {"count": {"type": "int"}, "cached": {"type": "int"}}},
   "tokenDetailCompletionTokens": "{count} tokens",
-  "@tokenDetailCompletionTokens": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@tokenDetailCompletionTokens": {"placeholders": {"count": {"type": "int"}}},
   "tokenDetailSpeed": "{value} tok/s",
-  "@tokenDetailSpeed": {
-    "placeholders": {
-      "value": {
-        "type": "String"
-      }
-    }
-  },
+  "@tokenDetailSpeed": {"placeholders": {"value": {"type": "String"}}},
   "tokenDetailDuration": "{value}s",
-  "@tokenDetailDuration": {
-    "placeholders": {
-      "value": {
-        "type": "String"
-      }
-    }
-  },
+  "@tokenDetailDuration": {"placeholders": {"value": {"type": "String"}}},
   "tokenDetailTotalTokens": "{count} tokens",
-  "@tokenDetailTotalTokens": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@tokenDetailTotalTokens": {"placeholders": {"count": {"type": "int"}}},
   "debugPageTitle": "Debug",
   "debugPageConversationToolsTitle": "Conversation tools",
   "debugPageCreateOversizedConversationButton": "Create oversized conversation (30 MB)",
@@ -3339,65 +2552,20 @@
   "debugPageCreatingLongReasoningConversation": "Creating a long reasoning debug conversation...",
   "debugPageNoCurrentAssistant": "No current assistant. Create or select an assistant first.",
   "debugPageConversationCreated": "Created debug conversation with {count} messages.",
-  "@debugPageConversationCreated": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@debugPageConversationCreated": {"placeholders": {"count": {"type": "int"}}},
   "debugPageCreateConversationFailed": "Failed to create debug conversation: {error}",
-  "@debugPageCreateConversationFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@debugPageCreateConversationFailed": {"placeholders": {"error": {"type": "String"}}},
   "debugPageOversizedConversationTitle": "Oversized conversation test ({sizeMB} MB)",
-  "@debugPageOversizedConversationTitle": {
-    "placeholders": {
-      "sizeMB": {
-        "type": "int"
-      }
-    }
-  },
+  "@debugPageOversizedConversationTitle": {"placeholders": {"sizeMB": {"type": "int"}}},
   "debugPageManyMessagesConversationTitle": "{count}-message conversation test",
-  "@debugPageManyMessagesConversationTitle": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@debugPageManyMessagesConversationTitle": {"placeholders": {"count": {"type": "int"}}},
   "debugPageDailyMixedMarkdownConversationTitle": "{count}-message daily mixed Markdown test",
-  "@debugPageDailyMixedMarkdownConversationTitle": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@debugPageDailyMixedMarkdownConversationTitle": {"placeholders": {"count": {"type": "int"}}},
   "debugPageLongReasoningConversationTitle": "{count}-message long reasoning test",
-  "@debugPageLongReasoningConversationTitle": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@debugPageLongReasoningConversationTitle": {"placeholders": {"count": {"type": "int"}}},
   "debugPageOversizedConversationSeedText": "This is long debug text for reproducing slow rendering in oversized conversations. It includes repeated Markdown-like text, punctuation, CJK content, and plain words so chat rendering, storage, and scrolling can be profiled.",
   "debugPageManyMessagesSeedText": "{role} message #{index}: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.",
-  "@debugPageManyMessagesSeedText": {
-    "placeholders": {
-      "role": {
-        "type": "String"
-      },
-      "index": {
-        "type": "int"
-      }
-    }
-  },
+  "@debugPageManyMessagesSeedText": {"placeholders": {"role": {"type": "String"}, "index": {"type": "int"}}},
   "migrationIntroTitle": "Upgrade Chat Storage",
   "migrationIntroSubtitle": "JO-AIClient is moving chat history to a faster SQLite database. The upgrade runs before the app opens so your data stays consistent.",
   "migrationBackupNote": "Before migration starts, JO-AIClient exports a ZIP backup with settings, chat history, and local files.",
@@ -3411,21 +2579,9 @@
   "migrationMigratingTitle": "Migrating to SQLite",
   "migrationMigratingSubtitle": "Writing conversations and messages in batches so large histories do not overload memory. Keep JO-AIClient in the foreground until migration finishes.",
   "migrationBackingUpDetail": "Backing up {fileName}",
-  "@migrationBackingUpDetail": {
-    "placeholders": {
-      "fileName": {
-        "type": "String"
-      }
-    }
-  },
+  "@migrationBackingUpDetail": {"placeholders": {"fileName": {"type": "String"}}},
   "migrationMigratingDetail": "Migrated {count} messages",
-  "@migrationMigratingDetail": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@migrationMigratingDetail": {"placeholders": {"count": {"type": "int"}}},
   "migrationMigratingPrepareDetail": "Preparing SQLite database",
   "migrationMigratingToolEventsDetail": "Migrating tool records",
   "migrationMigratingValidateDetail": "Validating migrated data",
@@ -3549,43 +2705,13 @@
   "memoryTraceAfter": "After",
   "memoryTraceEmptyValue": "(empty)",
   "memoryTraceStepsCount": "{count} steps",
-  "@memoryTraceStepsCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@memoryTraceStepsCount": {"placeholders": {"count": {"type": "int"}}},
   "memoryTraceMutationsCount": "{count} changes",
-  "@memoryTraceMutationsCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@memoryTraceMutationsCount": {"placeholders": {"count": {"type": "int"}}},
   "memoryTraceRepeatCount": "repeated {count}×",
-  "@memoryTraceRepeatCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@memoryTraceRepeatCount": {"placeholders": {"count": {"type": "int"}}},
   "memoryTraceWindowValue": "{size} messages · #{start}–#{end}",
-  "@memoryTraceWindowValue": {
-    "placeholders": {
-      "size": {
-        "type": "int"
-      },
-      "start": {
-        "type": "int"
-      },
-      "end": {
-        "type": "int"
-      }
-    }
-  },
+  "@memoryTraceWindowValue": {"placeholders": {"size": {"type": "int"}, "start": {"type": "int"}, "end": {"type": "int"}}},
   "memoryTraceShowMore": "Show full text",
   "memoryTraceShowLess": "Collapse",
   "sqliteMigrationTitle": "Prepare storage migration",
@@ -3668,13 +2794,7 @@
   "toolSchemaSettingsResetAllMessage": "This restores every built-in tool description to the app default. Your custom wording will be lost.",
   "toolSchemaSettingsResetAllConfirm": "Restore",
   "toolSchemaSettingsParamDescriptions": "Parameter descriptions ({count})",
-  "@toolSchemaSettingsParamDescriptions": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@toolSchemaSettingsParamDescriptions": {"placeholders": {"count": {"type": "int"}}},
   "toolSchemaSettingsMemoryLangNote": "Memory tool defaults follow the memory prompt language. A custom description is stored once per tool and will not switch when you change that language.",
   "toolSchemaSettingsDescriptionLabel": "Description",
   "toolSchemaSettingsToolName": "Tool name",
@@ -3683,12 +2803,7 @@
   "assistantEditLocalToolHealthSubtitle": "Read a privacy-preserving activity summary from Apple Health, requires Health access.",
   "assistantEditLocalToolHealthTitle": "Health Summary",
   "assistantEditLocalToolHealthSelectedCount": "{selected}/{total} selected",
-  "@assistantEditLocalToolHealthSelectedCount": {
-    "placeholders": {
-      "selected": { "type": "int" },
-      "total": { "type": "int" }
-    }
-  },
+  "@assistantEditLocalToolHealthSelectedCount": {"placeholders": {"selected": {"type": "int"}, "total": {"type": "int"}}},
   "assistantEditLocalToolLocationSubtitle": "Read a one-shot location from this device, requires the location permission.",
   "assistantEditLocalToolLocationTitle": "Current Location",
   "assistantEditLocalToolRemindersCompleteSubtitle": "Mark a reminder as done with your confirmation, requires full reminders access.",
@@ -3700,12 +2815,7 @@
   "assistantEditLocalToolWeatherSubtitle": "Get Apple Weather for the current or a specified location. WeatherKit attribution is shown in the result.",
   "assistantEditLocalToolWeatherTitle": "Weather",
   "healthDataSettingsBadge": "{selected}/{total} on",
-  "@healthDataSettingsBadge": {
-    "placeholders": {
-      "selected": { "type": "int" },
-      "total": { "type": "int" }
-    }
-  },
+  "@healthDataSettingsBadge": {"placeholders": {"selected": {"type": "int"}, "total": {"type": "int"}}},
   "healthDataSettingsCategoryActivity": "Activity",
   "healthDataSettingsCategoryBody": "Body",
   "healthDataSettingsCategoryHeart": "Heart",
@@ -3761,19 +2871,7 @@
   "reasoningBudgetSliderXhigh": "XHigh",
   "reasoningBudgetSliderMax": "Max",
   "autoRetryCountdown": "{seconds}s until retry ({attempt}/{maxRetries})",
-  "@autoRetryCountdown": {
-    "placeholders": {
-      "seconds": {
-        "type": "int"
-      },
-      "attempt": {
-        "type": "int"
-      },
-      "maxRetries": {
-        "type": "int"
-      }
-    }
-  },
+  "@autoRetryCountdown": {"placeholders": {"seconds": {"type": "int"}, "attempt": {"type": "int"}, "maxRetries": {"type": "int"}}},
   "settingsPageAutoRetry": "Auto Retry",
   "autoRetryEnableLabel": "Enable auto-retry",
   "autoRetryMaxRetries": "Max retries",
@@ -3789,5 +2887,31 @@
   "autoRetryStopKeywords": "Stop keywords",
   "autoRetryAddHint": "Add",
   "autoRetryRestoreDefaults": "Restore defaults",
-  "autoRetryFooter": "Auto-retry only runs if the current model response has not produced any output yet."
+  "autoRetryFooter": "Auto-retry only runs if the current model response has not produced any output yet.",
+  "backupIncludeLocalSettings": "Include device settings",
+  "backupIncludeLocalSettingsOnSubtitle": "Window size and position, desktop hotkeys and chat font size travel with the backup. Such backups can only be restored on newer versions of JO-AIClient.",
+  "backupIncludeLocalSettingsOffSubtitle": "Export chats, files and shared settings only; per-device settings stay on this device.",
+  "backupLedgerTitle": "Device settings records",
+  "backupLedgerEmpty": "No device records yet",
+  "backupLedgerEmptyDescription": "Choose “Include” when exporting and device settings will be recorded here with the backup.",
+  "backupLedgerThisDevice": "(this device)",
+  "backupLedgerDeviceCount": "{count} devices",
+  "@backupLedgerDeviceCount": {"placeholders": {"count": {"type": "int"}}},
+  "backupLedgerDelete": "Delete",
+  "backupLedgerDeleteConfirm": "After deletion this device's settings will no longer travel with future backups. Already exported files are unaffected.",
+  "backupLedgerClear": "Clear all records",
+  "backupLedgerClearConfirm": "This will delete records for all {count} devices. This cannot be undone. Already exported files are unaffected.",
+  "@backupLedgerClearConfirm": {"placeholders": {"count": {"type": "int"}}},
+  "backupLedgerItemCount": "{count} settings",
+  "@backupLedgerItemCount": {"placeholders": {"count": {"type": "int"}}},
+  "backupLedgerLoadMore": "Load more",
+  "backupLedgerSettingsDescription": "Window size and position, desktop hotkeys, chat font size and the log switch are per-device and never affect chat data.",
+  "backupLocalSettingsUnrecognized": "Could not identify this device, so its current settings were not included",
+  "backupLedgerAbsorbedNotice": "Merged settings records from {count} devices",
+  "@backupLedgerAbsorbedNotice": {"placeholders": {"count": {"type": "int"}}},
+  "backupLocalSettingsAppliedNotice": "Applied {count} device settings from the backup to this device",
+  "@backupLocalSettingsAppliedNotice": {"placeholders": {"count": {"type": "int"}}},
+  "backupPageMergeCompleted": "Merge completed",
+  "backupPageMergeCompletedWithSkipped": "{count} conversations from the backup were skipped because of invalid message order and were not merged.",
+  "@backupPageMergeCompletedWithSkipped": {"placeholders": {"count": {"type": "int"}}}
 }

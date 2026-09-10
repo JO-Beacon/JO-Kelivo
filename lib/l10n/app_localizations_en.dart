@@ -9008,4 +9008,82 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get autoRetryFooter =>
       'Auto-retry only runs if the current model response has not produced any output yet.';
+
+  @override
+  String get backupIncludeLocalSettings => 'Include device settings';
+
+  @override
+  String get backupIncludeLocalSettingsOnSubtitle =>
+      'Window size and position, desktop hotkeys and chat font size travel with the backup. Such backups can only be restored on newer versions of JO-AIClient.';
+
+  @override
+  String get backupIncludeLocalSettingsOffSubtitle =>
+      'Export chats, files and shared settings only; per-device settings stay on this device.';
+
+  @override
+  String get backupLedgerTitle => 'Device settings records';
+
+  @override
+  String get backupLedgerEmpty => 'No device records yet';
+
+  @override
+  String get backupLedgerEmptyDescription =>
+      'Choose “Include” when exporting and device settings will be recorded here with the backup.';
+
+  @override
+  String get backupLedgerThisDevice => '(this device)';
+
+  @override
+  String backupLedgerDeviceCount(int count) {
+    return '$count devices';
+  }
+
+  @override
+  String get backupLedgerDelete => 'Delete';
+
+  @override
+  String get backupLedgerDeleteConfirm =>
+      'After deletion this device\'s settings will no longer travel with future backups. Already exported files are unaffected.';
+
+  @override
+  String get backupLedgerClear => 'Clear all records';
+
+  @override
+  String backupLedgerClearConfirm(int count) {
+    return 'This will delete records for all $count devices. This cannot be undone. Already exported files are unaffected.';
+  }
+
+  @override
+  String backupLedgerItemCount(int count) {
+    return '$count settings';
+  }
+
+  @override
+  String get backupLedgerLoadMore => 'Load more';
+
+  @override
+  String get backupLedgerSettingsDescription =>
+      'Window size and position, desktop hotkeys, chat font size and the log switch are per-device and never affect chat data.';
+
+  @override
+  String get backupLocalSettingsUnrecognized =>
+      'Could not identify this device, so its current settings were not included';
+
+  @override
+  String backupLedgerAbsorbedNotice(int count) {
+    return 'Merged settings records from $count devices';
+  }
+
+  @override
+  String backupLocalSettingsAppliedNotice(int count) {
+    return 'Applied $count device settings from the backup to this device';
+  }
+
+  @override
+  String get backupPageMergeCompleted => 'Merge completed';
+
+  @override
+  String backupPageMergeCompletedWithSkipped(int count) {
+    return '$count conversations from the backup were skipped because of invalid message order and were not merged.';
+  }
 }

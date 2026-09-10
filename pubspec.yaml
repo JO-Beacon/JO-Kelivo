@@ -65,6 +65,8 @@ dependencies:
   hive_flutter: ^1.1.0
   url_launcher: ^6.3.2
   package_info_plus: ^8.3.1
+  # 本机设备指纹采集（移动端 ANDROID_ID / identifierForVendor）
+  device_info_plus: ^11.5.0
   gpt_markdown: #^1.1.7
     path: ./dependencies/gpt_markdown
   uuid: ^4.5.0

@@ -16320,6 +16320,126 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Auto-retry only runs if the current model response has not produced any output yet.'**
   String get autoRetryFooter;
+
+  /// No description provided for @backupIncludeLocalSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Include device settings'**
+  String get backupIncludeLocalSettings;
+
+  /// No description provided for @backupIncludeLocalSettingsOnSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Window size and position, desktop hotkeys and chat font size travel with the backup. Such backups can only be restored on newer versions of JO-AIClient.'**
+  String get backupIncludeLocalSettingsOnSubtitle;
+
+  /// No description provided for @backupIncludeLocalSettingsOffSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Export chats, files and shared settings only; per-device settings stay on this device.'**
+  String get backupIncludeLocalSettingsOffSubtitle;
+
+  /// No description provided for @backupLedgerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Device settings records'**
+  String get backupLedgerTitle;
+
+  /// No description provided for @backupLedgerEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No device records yet'**
+  String get backupLedgerEmpty;
+
+  /// No description provided for @backupLedgerEmptyDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose “Include” when exporting and device settings will be recorded here with the backup.'**
+  String get backupLedgerEmptyDescription;
+
+  /// No description provided for @backupLedgerThisDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'(this device)'**
+  String get backupLedgerThisDevice;
+
+  /// No description provided for @backupLedgerDeviceCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} devices'**
+  String backupLedgerDeviceCount(int count);
+
+  /// No description provided for @backupLedgerDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get backupLedgerDelete;
+
+  /// No description provided for @backupLedgerDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'After deletion this device\'s settings will no longer travel with future backups. Already exported files are unaffected.'**
+  String get backupLedgerDeleteConfirm;
+
+  /// No description provided for @backupLedgerClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear all records'**
+  String get backupLedgerClear;
+
+  /// No description provided for @backupLedgerClearConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'This will delete records for all {count} devices. This cannot be undone. Already exported files are unaffected.'**
+  String backupLedgerClearConfirm(int count);
+
+  /// No description provided for @backupLedgerItemCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} settings'**
+  String backupLedgerItemCount(int count);
+
+  /// No description provided for @backupLedgerLoadMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get backupLedgerLoadMore;
+
+  /// No description provided for @backupLedgerSettingsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Window size and position, desktop hotkeys, chat font size and the log switch are per-device and never affect chat data.'**
+  String get backupLedgerSettingsDescription;
+
+  /// No description provided for @backupLocalSettingsUnrecognized.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not identify this device, so its current settings were not included'**
+  String get backupLocalSettingsUnrecognized;
+
+  /// No description provided for @backupLedgerAbsorbedNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Merged settings records from {count} devices'**
+  String backupLedgerAbsorbedNotice(int count);
+
+  /// No description provided for @backupLocalSettingsAppliedNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied {count} device settings from the backup to this device'**
+  String backupLocalSettingsAppliedNotice(int count);
+
+  /// No description provided for @backupPageMergeCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Merge completed'**
+  String get backupPageMergeCompleted;
+
+  /// No description provided for @backupPageMergeCompletedWithSkipped.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} conversations from the backup were skipped because of invalid message order and were not merged.'**
+  String backupPageMergeCompletedWithSkipped(int count);
 }
 
 class _AppLocalizationsDelegate

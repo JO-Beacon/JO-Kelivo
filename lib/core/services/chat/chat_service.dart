@@ -2947,9 +2947,37 @@ class ChatService extends ChangeNotifier {
 
     final temporaryOriginal = _cachedTemporaryMessage(messageId);
     if (temporaryOriginal != null) {
-      final updated = temporaryOriginal.copyWith(
+      // 编辑保存以部件为唯一事实来源：reasoningText 按编辑后的部件推导，
+      // 删除思维链部件时连同元数据一起清空（copyWith 无法写 null）。
+      final derivedReasoning = ChatMessage.reasoningTextFromParts(parts);
+      final keepReasoningMeta = derivedReasoning != null;
+      final updated = ChatMessage(
+        id: temporaryOriginal.id,
+        role: temporaryOriginal.role,
         parts: parts,
+        timestamp: temporaryOriginal.timestamp,
+        modelId: temporaryOriginal.modelId,
+        providerId: temporaryOriginal.providerId,
+        totalTokens: temporaryOriginal.totalTokens,
+        conversationId: temporaryOriginal.conversationId,
         isStreaming: false,
+        reasoningText: derivedReasoning,
+        reasoningStartAt: keepReasoningMeta
+            ? temporaryOriginal.reasoningStartAt
+            : null,
+        reasoningFinishedAt: keepReasoningMeta
+            ? temporaryOriginal.reasoningFinishedAt
+            : null,
+        translation: temporaryOriginal.translation,
+        reasoningSegmentsJson: keepReasoningMeta
+            ? temporaryOriginal.reasoningSegmentsJson
+            : null,
+        groupId: temporaryOriginal.groupId,
+        version: temporaryOriginal.version,
+        promptTokens: temporaryOriginal.promptTokens,
+        completionTokens: temporaryOriginal.completionTokens,
+        cachedTokens: temporaryOriginal.cachedTokens,
+        durationMs: temporaryOriginal.durationMs,
       );
       _replaceCachedMessage(updated);
       notifyListeners();
@@ -2961,7 +2989,34 @@ class ChatService extends ChangeNotifier {
 
     // 即使新部件不含附件，也要让旧消息的资产引用进入清理队列。
     await _repo.markMessageAssetReferencesDirty(messageId);
-    final updated = original.copyWith(parts: parts, isStreaming: false);
+    final derivedReasoning = ChatMessage.reasoningTextFromParts(parts);
+    final keepReasoningMeta = derivedReasoning != null;
+    final updated = ChatMessage(
+      id: original.id,
+      role: original.role,
+      parts: parts,
+      timestamp: original.timestamp,
+      modelId: original.modelId,
+      providerId: original.providerId,
+      totalTokens: original.totalTokens,
+      conversationId: original.conversationId,
+      isStreaming: false,
+      reasoningText: derivedReasoning,
+      reasoningStartAt: keepReasoningMeta ? original.reasoningStartAt : null,
+      reasoningFinishedAt: keepReasoningMeta
+          ? original.reasoningFinishedAt
+          : null,
+      translation: original.translation,
+      reasoningSegmentsJson: keepReasoningMeta
+          ? original.reasoningSegmentsJson
+          : null,
+      groupId: original.groupId,
+      version: original.version,
+      promptTokens: original.promptTokens,
+      completionTokens: original.completionTokens,
+      cachedTokens: original.cachedTokens,
+      durationMs: original.durationMs,
+    );
     await _repo.updateMessage(updated);
     if (_messageCanOwnAssets(updated)) {
       await _synchronizeMessageAssetsBestEffort(updated);
@@ -4278,12 +4333,28 @@ class ChatService extends ChangeNotifier {
       final resolvedParts =
           parts ??
           ChatMessage.partsWithReplacedText(temporaryOriginal.parts, content);
+      final derivedReasoning = ChatMessage.reasoningTextFromParts(
+        resolvedParts,
+      );
+      final keepReasoningMeta = derivedReasoning != null;
       final newMsg = ChatMessage(
         role: temporaryOriginal.role,
         parts: resolvedParts,
         conversationId: conversationId,
         modelId: temporaryOriginal.modelId,
         providerId: temporaryOriginal.providerId,
+        totalTokens: null,
+        isStreaming: false,
+        reasoningText: derivedReasoning,
+        reasoningStartAt: keepReasoningMeta
+            ? temporaryOriginal.reasoningStartAt
+            : null,
+        reasoningFinishedAt: keepReasoningMeta
+            ? temporaryOriginal.reasoningFinishedAt
+            : null,
+        reasoningSegmentsJson: keepReasoningMeta
+            ? temporaryOriginal.reasoningSegmentsJson
+            : null,
         // 新分支是独立消息节点，不再写入旧版本字段。
         groupId: null,
         version: 0,
@@ -4363,22 +4434,35 @@ class ChatService extends ChangeNotifier {
         if (source == null) {
           throw StateError('clone_subtree_source_message_missing');
         }
+        final isEditedRoot = id == messageId;
+        final derivedReasoning = isEditedRoot
+            ? ChatMessage.reasoningTextFromParts(parts)
+            : null;
+        final keepReasoningMeta = !isEditedRoot || derivedReasoning != null;
         clones.add(
           ChatMessage(
             id: idMap[id],
             role: source.role,
-            parts: id == messageId ? parts : source.parts,
+            parts: isEditedRoot ? parts : source.parts,
             timestamp: source.timestamp,
             modelId: source.modelId,
             providerId: source.providerId,
             totalTokens: source.totalTokens,
             conversationId: conversationId,
             isStreaming: false,
-            reasoningText: source.reasoningText,
-            reasoningStartAt: source.reasoningStartAt,
-            reasoningFinishedAt: source.reasoningFinishedAt,
+            reasoningText: isEditedRoot
+                ? derivedReasoning
+                : source.reasoningText,
+            reasoningStartAt: keepReasoningMeta
+                ? source.reasoningStartAt
+                : null,
+            reasoningFinishedAt: keepReasoningMeta
+                ? source.reasoningFinishedAt
+                : null,
             translation: source.translation,
-            reasoningSegmentsJson: source.reasoningSegmentsJson,
+            reasoningSegmentsJson: keepReasoningMeta
+                ? source.reasoningSegmentsJson
+                : null,
             promptTokens: source.promptTokens,
             completionTokens: source.completionTokens,
             cachedTokens: source.cachedTokens,

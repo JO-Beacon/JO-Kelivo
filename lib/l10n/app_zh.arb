@@ -1,15 +1,6 @@
 {
   "chatImageCropFailed": "图片“{fileName}”裁剪失败：{error}",
-  "@chatImageCropFailed": {
-    "placeholders": {
-      "fileName": {
-        "type": "String"
-      },
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@chatImageCropFailed": {"placeholders": {"fileName": {"type": "String"}, "error": {"type": "String"}}},
   "helloWorld": "你好，世界！",
   "settingsPageBackButton": "返回",
   "settingsPageTitle": "设置",
@@ -183,13 +174,7 @@
   "assistantEditTabLayoutResetTooltip": "重置标签页布局",
   "assistantEditTabLayoutAtLeastOneVisible": "至少保留一个可见标签页",
   "assistantEditTabLayoutDragHandle": "拖动以调整 {tab} 的顺序",
-  "@assistantEditTabLayoutDragHandle": {
-    "placeholders": {
-      "tab": {
-        "type": "String"
-      }
-    }
-  },
+  "@assistantEditTabLayoutDragHandle": {"placeholders": {"tab": {"type": "String"}}},
   "assistantEditRegexDescription": "为用户/助手消息配置正则规则，可修改或仅调整显示效果。",
   "assistantEditAddRegexButton": "添加正则规则",
   "assistantRegexAddTitle": "添加正则规则",
@@ -299,13 +284,7 @@
   "iosBackgroundGenerationActiveDetail": "助手正在后台回复",
   "iosBackgroundGenerationStreamingDetail": "正在接收助手回复",
   "iosBackgroundGenerationTokenCount": "{count} tokens",
-  "@iosBackgroundGenerationTokenCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@iosBackgroundGenerationTokenCount": {"placeholders": {"count": {"type": "int"}}},
   "iosBackgroundGenerationCompleteTitle": "生成完成",
   "iosBackgroundGenerationCompleteDetail": "助手回复已准备好",
   "iosBackgroundGenerationInterruptedTitle": "生成已中断",
@@ -339,13 +318,7 @@
   "providersPageDeleteSelectedConfirmContent": "确定要删除选中的供应商吗？该操作不可撤销。",
   "providersPageDeleteSelectedSnackbar": "已删除选中的供应商",
   "providersPageExportSelectedTitle": "导出 {count} 个供应商",
-  "@providersPageExportSelectedTitle": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@providersPageExportSelectedTitle": {"placeholders": {"count": {"type": "int"}}},
   "providersPageExportCopyButton": "复制",
   "providersPageExportShareButton": "分享",
   "providersPageExportCopiedSnackbar": "已复制导出代码",
@@ -360,13 +333,7 @@
   "multiKeyPageAdd": "添加",
   "multiKeyPageAddHint": "请输入API Key（多个用逗号或空格分隔）",
   "multiKeyPageImportedSnackbar": "已导入{n}个key",
-  "@multiKeyPageImportedSnackbar": {
-    "placeholders": {
-      "n": {
-        "type": "int"
-      }
-    }
-  },
+  "@multiKeyPageImportedSnackbar": {"placeholders": {"n": {"type": "int"}}},
   "multiKeyPagePleaseAddModel": "请先添加模型",
   "multiKeyPageTotal": "总数",
   "multiKeyPageNormal": "正常",
@@ -419,23 +386,11 @@
   "assistantEditPromptAppendTimeSubtitle": "在每条用户消息末尾追加发送时刻。时间在请求末尾，不影响 Prompt 缓存。",
   "assistantEditPromptAppendTimeInfoTitle": "追加时间格式",
   "assistantEditPromptAppendTimeInfoBody": "开启后，会在每条用户消息末尾先空一行，再追加如下标签：\n\n{example}\n\n时间取该消息自己的发送时刻，重试时保持不变。",
-  "@assistantEditPromptAppendTimeInfoBody": {
-    "placeholders": {
-      "example": {
-        "type": "String"
-      }
-    }
-  },
+  "@assistantEditPromptAppendTimeInfoBody": {"placeholders": {"example": {"type": "String"}}},
   "assistantEditPromptAppendTimeInfoClose": "知道了",
   "assistantEditPromptTimeVarDialogTitle": "系统提示词中含时间变量",
   "assistantEditPromptTimeVarDialogBody": "你的系统提示词里用了 {variables}。系统提示词每次请求都会重新渲染，含时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中。建议移除这些变量，改用「追加当前时间」——它把时间放在请求末尾，不影响前缀。",
-  "@assistantEditPromptTimeVarDialogBody": {
-    "placeholders": {
-      "variables": {
-        "type": "String"
-      }
-    }
-  },
+  "@assistantEditPromptTimeVarDialogBody": {"placeholders": {"variables": {"type": "String"}}},
   "assistantEditPromptTimeVarDialogRemove": "去移除",
   "assistantEditPromptTimeVarDialogKeep": "仍然开启",
   "codeBlockPreviewButton": "预览",
@@ -450,13 +405,7 @@
   "markdownTableCopiedCsvSnackbar": "已复制 CSV，长按复制可复制为图片",
   "markdownTableCopiedMarkdownSnackbar": "已复制表格",
   "codeBlockCollapsedLines": "… 已折叠 {n} 行",
-  "@codeBlockCollapsedLines": {
-    "placeholders": {
-      "n": {
-        "type": "int"
-      }
-    }
-  },
+  "@codeBlockCollapsedLines": {"placeholders": {"n": {"type": "int"}}},
   "htmlPreviewNotSupportedOnLinux": "Linux 暂不支持 HTML 预览",
   "assistantEditSampleUser": "用户",
   "assistantEditSampleMessage": "你好啊",
@@ -514,13 +463,7 @@
   "assistantProviderSampleAssistantName": "示例助手",
   "assistantProviderNewAssistantName": "新助手",
   "assistantProviderSampleAssistantSystemPrompt": "你是{model_name}，一位乐于助人的 AI 助手。请准确、简洁地回答问题；不确定时如实说明。需要时可使用清晰结构（短段落或列表）。默认使用用户的语言回复。",
-  "@assistantProviderSampleAssistantSystemPrompt": {
-    "placeholders": {
-      "model_name": {
-        "type": "String"
-      }
-    }
-  },
+  "@assistantProviderSampleAssistantSystemPrompt": {"placeholders": {"model_name": {"type": "String"}}},
   "displaySettingsPageLanguageTitle": "应用语言",
   "displaySettingsPageLanguageSubtitle": "选择界面语言",
   "displaySettingsPageLanguageChineseLabel": "简体中文",
@@ -530,13 +473,7 @@
   "homePagePleaseSetupTranslateModel": "请先设置翻译模型",
   "homePageTranslating": "翻译中...",
   "homePageTranslateFailed": "翻译失败: {error}",
-  "@homePageTranslateFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@homePageTranslateFailed": {"placeholders": {"error": {"type": "String"}}},
   "chatServiceDefaultConversationTitle": "新对话",
   "userProviderDefaultUserName": "用户",
   "mcpAssistantSheetTitle": "MCP服务器",
@@ -557,25 +494,13 @@
   "backupPageRestartRequired": "需要重启应用",
   "backupPageRestartContent": "导入成功。重启 JO-AIClient 后将安全应用。",
   "backupPageRestartContentWithSkipped": "导入已完成，但已跳过 {count} 个消息顺序非法的会话。重启 JO-AIClient 后将安全应用已导入的数据。",
-  "@backupPageRestartContentWithSkipped": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@backupPageRestartContentWithSkipped": {"placeholders": {"count": {"type": "int"}}},
   "restartAppFailedMessage": "JO-AIClient 无法自动重启，请完全关闭后重新打开。",
   "backupRestoreRolledBackTitle": "恢复已回滚",
   "backupRestoreRolledBackContent": "恢复未能完成。JO-AIClient 已验证并保留原有数据。",
   "contextTreeMigrationWarningsTitle": "旧版对话迁移已修复",
   "contextTreeMigrationWarningsContent": "JO-AIClient 在转换旧版对话分支时修复了 {count} 条缺失的选中版本记录。修复结果已写入警告日志，未读取或修改消息正文。",
-  "@contextTreeMigrationWarningsContent": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@contextTreeMigrationWarningsContent": {"placeholders": {"count": {"type": "int"}}},
   "backupRestoreFailureTitle": "恢复需要处理",
   "backupRestoreFailureContent": "JO-AIClient 无法验证完整的原有或新数据，因此未打开聊天数据。请关闭 JO-AIClient 后重试；若问题反复出现，请保留诊断码以便支持人员排查。",
   "backupRestoreBusinessLeaseUnavailableTitle": "JO-AIClient 已在运行",
@@ -592,21 +517,9 @@
   "backupRestoreFailureCopyButton": "复制诊断码",
   "backupRestoreFailureCopied": "已复制诊断码",
   "backupRestoreFailureDiagnostic": "诊断码：{code}",
-  "@backupRestoreFailureDiagnostic": {
-    "placeholders": {
-      "code": {
-        "type": "String"
-      }
-    }
-  },
+  "@backupRestoreFailureDiagnostic": {"placeholders": {"code": {"type": "String"}}},
   "backupRestoreCorruptArchiveMessage": "所选的 JO-AIClient 备份文件已损坏或不完整，因此未执行还原。当前数据未被修改。诊断码：{code}",
-  "@backupRestoreCorruptArchiveMessage": {
-    "placeholders": {
-      "code": {
-        "type": "String"
-      }
-    }
-  },
+  "@backupRestoreCorruptArchiveMessage": {"placeholders": {"code": {"type": "String"}}},
   "startupRecoveryMoreOptions": "更多恢复选项",
   "startupRecoveryRepairButton": "修复并重启",
   "startupRecoveryExportButton": "导出我的数据副本",
@@ -731,13 +644,7 @@
   "backupReminderEveryFourteenDays": "每 14 天",
   "backupReminderEveryMonth": "每月",
   "backupReminderCustomDays": "每 {days} 天",
-  "@backupReminderCustomDays": {
-    "placeholders": {
-      "days": {
-        "type": "int"
-      }
-    }
-  },
+  "@backupReminderCustomDays": {"placeholders": {"days": {"type": "int"}}},
   "backupReminderCustomOption": "自定义...",
   "backupReminderCustomDialogTitle": "自定义频率",
   "backupReminderCustomDialogDescription": "输入两次备份提醒之间间隔多少天。",
@@ -815,13 +722,7 @@
   "messageEditRemoveAttachment": "移除附件",
   "messageEditAttachmentImportFailed": "无法导入附件：{error}",
   "messageEditAttachmentCopyFailed": "无法复制所选附件",
-  "@messageEditAttachmentImportFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@messageEditAttachmentImportFailed": {"placeholders": {"error": {"type": "String"}}},
   "messageEditCloseConfirmTitle": "关闭而不保存？",
   "messageEditCloseConfirmContent": "当前修改将被丢弃。",
   "messageEditCloseConfirmCancel": "取消",
@@ -866,11 +767,21 @@
   "@compressContextEstimatePreview": {
     "description": "保留最近消息模式的压缩预览",
     "placeholders": {
-      "summarized": {"type": "int"},
-      "kept": {"type": "int"},
-      "minTokens": {"type": "int"},
-      "maxTokens": {"type": "int"},
-      "totalTokens": {"type": "int"}
+      "summarized": {
+        "type": "int"
+      },
+      "kept": {
+        "type": "int"
+      },
+      "minTokens": {
+        "type": "int"
+      },
+      "maxTokens": {
+        "type": "int"
+      },
+      "totalTokens": {
+        "type": "int"
+      }
     }
   },
   "bottomToolsSheetLearningMode": "学习模式",
@@ -949,13 +860,7 @@
   "chatMessageWidgetWriteClipboard": "写入剪切板",
   "chatMessageWidgetSpeakingTitle": "正在朗读:",
   "chatMessageWidgetSpeakText": "正在朗读: {text}",
-  "@chatMessageWidgetSpeakText": {
-    "placeholders": {
-      "text": {
-        "type": "String"
-      }
-    }
-  },
+  "@chatMessageWidgetSpeakText": {"placeholders": {"text": {"type": "String"}}},
   "chatMessageWidgetMemoryRead": "读取记忆",
   "chatMessageWidgetMemoryUpdate": "更新记忆",
   "chatMessageWidgetMemorySearchProfile": "检索记忆",
@@ -1004,22 +909,10 @@
   "imagePreviewSheetSaveImage": "保存图片",
   "imagePreviewSheetSaveSuccess": "已保存到相册",
   "imagePreviewSheetSaveFailed": "保存失败: {error}",
-  "@imagePreviewSheetSaveFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@imagePreviewSheetSaveFailed": {"placeholders": {"error": {"type": "String"}}},
   "sideDrawerMenuSelect": "多选",
   "sideDrawerSelectionTitle": "已选 {count} 项",
-  "@sideDrawerSelectionTitle": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@sideDrawerSelectionTitle": {"placeholders": {"count": {"type": "int"}}},
   "sideDrawerSelectionSelectAll": "全选",
   "sideDrawerSelectionDeselectAll": "取消全选",
   "sideDrawerSelectionPin": "置顶",
@@ -1028,40 +921,13 @@
   "sideDrawerSelectionDelete": "删除",
   "sideDrawerSelectionDeleteConfirmTitle": "删除话题",
   "sideDrawerSelectionDeleteConfirmContent": "确定删除 {count} 个话题？",
-  "@sideDrawerSelectionDeleteConfirmContent": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@sideDrawerSelectionDeleteConfirmContent": {"placeholders": {"count": {"type": "int"}}},
   "sideDrawerDeleteSelectedSnackbar": "已删除 {count} 个话题",
-  "@sideDrawerDeleteSelectedSnackbar": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@sideDrawerDeleteSelectedSnackbar": {"placeholders": {"count": {"type": "int"}}},
   "sideDrawerMoveSelectedSnackbar": "已移动 {count} 个话题",
-  "@sideDrawerMoveSelectedSnackbar": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@sideDrawerMoveSelectedSnackbar": {"placeholders": {"count": {"type": "int"}}},
   "sideDrawerMoveSelectedWithSkippedSnackbar": "已移动 {moved} 个话题，跳过 {skipped} 个正在生成的话题",
-  "@sideDrawerMoveSelectedWithSkippedSnackbar": {
-    "placeholders": {
-      "moved": {
-        "type": "int"
-      },
-      "skipped": {
-        "type": "int"
-      }
-    }
-  },
+  "@sideDrawerMoveSelectedWithSkippedSnackbar": {"placeholders": {"moved": {"type": "int"}, "skipped": {"type": "int"}}},
   "sideDrawerMenuRename": "重命名",
   "sideDrawerMenuPin": "置顶",
   "sideDrawerMenuUnpin": "取消置顶",
@@ -1092,13 +958,7 @@
   "sideDrawerGlobalSearchEmptyHint": "在标题和消息中全局搜索",
   "sideDrawerGlobalSearchNoResults": "没有匹配的会话",
   "sideDrawerGlobalSearchResultCount": "共 {count} 条结果",
-  "@sideDrawerGlobalSearchResultCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@sideDrawerGlobalSearchResultCount": {"placeholders": {"count": {"type": "int"}}},
   "sideDrawerUpdateTitle": "新版：{version}",
   "sideDrawerUpdateTitleWithBuild": "新版：{version} ({build})",
   "sideDrawerLinkCopied": "已复制下载链接",
@@ -1221,13 +1081,7 @@
   "assistantEditRecentChatsSummaryFrequencyTitle": "摘要更新频率",
   "assistantEditRecentChatsSummaryFrequencyDescription": "累计达到所选条数的新消息后，会更新历史聊天摘要。",
   "assistantEditRecentChatsSummaryFrequencyOption": "每 {count} 条",
-  "@assistantEditRecentChatsSummaryFrequencyOption": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@assistantEditRecentChatsSummaryFrequencyOption": {"placeholders": {"count": {"type": "int"}}},
   "assistantEditRecentChatsSummaryFrequencyCustomButton": "自定义",
   "assistantEditRecentChatsSummaryFrequencyCustomTitle": "自定义摘要频率",
   "assistantEditRecentChatsSummaryFrequencyCustomDescription": "输入累计多少条新消息后再更新历史聊天摘要。",
@@ -1238,12 +1092,7 @@
   "defaultModelPageTranslateModelSubtitle": "用于翻译消息内容的模型，推荐使用快速且准确的模型",
   "defaultModelPageOcrModelTitle": "OCR 模型",
   "backgroundTaskFailed": "{task}失败：{error}",
-  "@backgroundTaskFailed": {
-    "placeholders": {
-      "task": {"type": "String"},
-      "error": {"type": "String"}
-    }
-  },
+  "@backgroundTaskFailed": {"placeholders": {"task": {"type": "String"}, "error": {"type": "String"}}},
   "defaultModelPageOcrModelSubtitle": "用于对图片执行文字识别的模型",
   "defaultModelPageOcrModelRequiresImageInput": "请选择标记为支持图片输入的模型用于 OCR",
   "defaultModelPagePromptLabel": "提示词",
@@ -1369,21 +1218,9 @@
   "providerDetailPageBalanceResetDefaultsButton": "重置",
   "providerDetailPageBalanceResetDefaultsTooltip": "重置余额设置",
   "providerDetailPageBalanceResult": "余额：{value}",
-  "@providerDetailPageBalanceResult": {
-    "placeholders": {
-      "value": {
-        "type": "String"
-      }
-    }
-  },
+  "@providerDetailPageBalanceResult": {"placeholders": {"value": {"type": "String"}}},
   "providerDetailPageBalanceError": "余额查询失败：{message}",
-  "@providerDetailPageBalanceError": {
-    "placeholders": {
-      "message": {
-        "type": "String"
-      }
-    }
-  },
+  "@providerDetailPageBalanceError": {"placeholders": {"message": {"type": "String"}}},
   "providerDetailPageBalanceFullUrlRequired": "主 API 端点不是 OpenAI 兼容格式，请填写完整的 OpenAI 兼容余额 API 地址。",
   "providerDetailPageVertexAiTitle": "Vertex AI",
   "providerDetailPageLocationLabel": "区域 Location",
@@ -1560,63 +1397,36 @@
   "searchServiceEditorMultiKeyTitle": "多 Key 轮询",
   "searchServiceEditorMultiKeyNone": "未配置",
   "searchApiKeysPageDescription": "列表中的 Key 按顺序轮询使用，第一个为主 Key；不查额度，以防触发服务商风控。",
-
   "searchApiKeysPagePrimaryBadge": "主",
   "searchApiKeysPageBatchHint": "可一次粘贴多个 Key：每行一个，或用逗号分隔",
   "searchApiKeysPageBatchResult": "已添加 {added} 个，跳过 {skipped} 个重复",
   "searchApiKeysPageAdd": "添加",
   "searchApiKeysPageEmpty": "尚未配置任何 Key。",
   "searchServiceEditorMultiKeyCount": "共 {count} 个 Key",
-
   "searchServiceEditorUsageTitle": "账户用量",
   "searchServiceEditorUsageNotQueried": "尚未查询用量。",
   "searchServiceEditorUsageQuery": "查询用量",
   "searchServiceEditorUsageQuerying": "查询中…",
   "searchServiceEditorUsageRemaining": "剩余 {remaining} 额度",
-  "@searchServiceEditorUsageRemaining": {
-    "placeholders": {
-      "remaining": { "type": "String" }
-    }
-  },
+  "@searchServiceEditorUsageRemaining": {"placeholders": {"remaining": {"type": "String"}}},
   "searchServiceEditorUsageBalance": "余额 {balance}",
-  "@searchServiceEditorUsageBalance": {
-    "placeholders": {
-      "balance": { "type": "String" }
-    }
-  },
+  "@searchServiceEditorUsageBalance": {"placeholders": {"balance": {"type": "String"}}},
   "searchServiceEditorUsageUsed": "已使用 {used} / {limit} 额度",
-  "@searchServiceEditorUsageUsed": {
-    "placeholders": {
-      "used": { "type": "String" },
-      "limit": { "type": "String" }
-    }
-  },
+  "@searchServiceEditorUsageUsed": {"placeholders": {"used": {"type": "String"}, "limit": {"type": "String"}}},
   "searchServiceEditorUsageFailed": "用量查询失败：{message}",
-  "@searchServiceEditorUsageFailed": {
-    "placeholders": {
-      "message": { "type": "String" }
-    }
-  },
+  "@searchServiceEditorUsageFailed": {"placeholders": {"message": {"type": "String"}}},
   "searchServiceEditorTestTitle": "测试搜索",
   "searchServiceEditorTestQueryHint": "输入测试关键词",
   "searchServiceEditorTestRun": "运行测试搜索",
   "searchServiceEditorTestRunning": "搜索中…",
   "searchServiceEditorTestNoResults": "提供商未返回任何结果。",
   "searchServiceEditorTestFailed": "搜索失败：{message}",
-  "@searchServiceEditorTestFailed": {
-    "placeholders": {
-      "message": { "type": "String" }
-    }
-  },
+  "@searchServiceEditorTestFailed": {"placeholders": {"message": {"type": "String"}}},
   "searchServiceEditorResultOpenTooltip": "打开结果",
   "searchServiceEditorDeleteTooltip": "删除搜索服务",
   "searchServiceEditorDeleteTitle": "删除搜索服务？",
   "searchServiceEditorDeleteMessage": "确定删除 {provider} 吗？此操作无法撤销。",
-  "@searchServiceEditorDeleteMessage": {
-    "placeholders": {
-      "provider": { "type": "String" }
-    }
-  },
+  "@searchServiceEditorDeleteMessage": {"placeholders": {"provider": {"type": "String"}}},
   "searchServiceEditorDeleteConfirm": "删除",
   "searchServiceEditorDiscardTitle": "放弃更改？",
   "searchServiceEditorDiscardMessage": "尚未保存的搜索服务设置将会丢失。",
@@ -1640,16 +1450,7 @@
   "aboutPageAppDescription": "JO-AIClient 是基于 Kelivo 的开源 AI 助手",
   "aboutPageVersion": "版本",
   "aboutPageVersionDetail": "{version} / {buildNumber}",
-  "@aboutPageVersionDetail": {
-    "placeholders": {
-      "version": {
-        "type": "String"
-      },
-      "buildNumber": {
-        "type": "String"
-      }
-    }
-  },
+  "@aboutPageVersionDetail": {"placeholders": {"version": {"type": "String"}, "buildNumber": {"type": "String"}}},
   "aboutPageSystem": "系统",
   "aboutPageLoadingPlaceholder": "...",
   "aboutPageUnknownPlaceholder": "-",
@@ -1659,13 +1460,7 @@
   "aboutPagePlatformAndroid": "Android",
   "aboutPagePlatformIos": "iOS",
   "aboutPagePlatformOther": "其他（{os}）",
-  "@aboutPagePlatformOther": {
-    "placeholders": {
-      "os": {
-        "type": "String"
-      }
-    }
-  },
+  "@aboutPagePlatformOther": {"placeholders": {"os": {"type": "String"}}},
   "aboutPageWebsite": "官网",
   "aboutPageGithub": "GitHub",
   "aboutPageLicense": "许可证",
@@ -1673,13 +1468,7 @@
   "aboutPageCheckingForUpdates": "正在检查更新...",
   "aboutPageAlreadyLatest": "当前已是最新版本",
   "aboutPageUpdateCheckFailed": "检查更新失败：{error}",
-  "@aboutPageUpdateCheckFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@aboutPageUpdateCheckFailed": {"placeholders": {"error": {"type": "String"}}},
   "displaySettingsPageShowUserAvatarTitle": "显示用户头像",
   "displaySettingsPageShowUserAvatarSubtitle": "是否在聊天消息中显示用户头像",
   "displaySettingsPageShowUserNameTimestampTitle": "显示用户名称和时间戳",
@@ -2000,37 +1789,13 @@
   "imageViewerPageRotateLeftButton": "向左旋转",
   "imageViewerPageRotateRightButton": "向右旋转",
   "imageViewerPageCounter": "{index}/{total}",
-  "@imageViewerPageCounter": {
-    "placeholders": {
-      "index": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
-    }
-  },
+  "@imageViewerPageCounter": {"placeholders": {"index": {"type": "int"}, "total": {"type": "int"}}},
   "imageViewerPageImageLabel": "第 {index} 张图片，共 {total} 张",
-  "@imageViewerPageImageLabel": {
-    "placeholders": {
-      "index": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
-    }
-  },
+  "@imageViewerPageImageLabel": {"placeholders": {"index": {"type": "int"}, "total": {"type": "int"}}},
   "imageViewerPageImageLoadFailed": "无法加载图片",
   "imageViewerPageSaveSuccess": "已保存到相册",
   "imageViewerPageSaveFailed": "保存失败: {error}",
-  "@imageViewerPageSaveFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@imageViewerPageSaveFailed": {"placeholders": {"error": {"type": "String"}}},
   "settingsShare": "JO-AIClient - 开源 AI 助手",
   "searchProviderBingLocalDescription": "使用网络抓取工具获取必应搜索结果。无需 API 密钥，但可能不够稳定。",
   "searchProviderDuckDuckGoDescription": "基于 DDGS 的 DuckDuckGo 隐私搜索，无需 API 密钥，支持设置地区。",
@@ -2134,13 +1899,7 @@
   "instructionInjectionGroupLabel": "分组",
   "instructionInjectionGroupHint": "可选",
   "instructionInjectionImportSuccess": "已导入 {count} 个指令注入",
-  "@instructionInjectionImportSuccess": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@instructionInjectionImportSuccess": {"placeholders": {"count": {"type": "int"}}},
   "mcpJsonEditButtonTooltip": "编辑 JSON",
   "mcpJsonEditTitle": "编辑json",
   "mcpJsonEditParseFailed": "JSON 解析失败",
@@ -2167,14 +1926,14 @@
   "assistantEditLocalToolAskUserSubtitle": "允许助手提出简短问题，并在你回答后继续生成。",
   "assistantEditLocalToolCalculateTitle": "计算器",
   "assistantEditLocalToolCalculateSubtitle": "计算数学表达式，支持加减乘除幂运算 sqrt sin cos 等。",
-   "assistantEditLocalToolScreenTimeTitle": "屏幕使用时间",
-   "assistantEditLocalToolScreenTimeSubtitle": "查询本设备的应用使用时长，需要授予使用情况访问权限。",
-   "chatMessageWidgetScreenTimeTotal": "总屏幕时间",
-   "chatMessageWidgetScreenTimePermissionRequired": "未授予使用情况访问权限，请在系统设置中开启后重试。",
-   "assistantEditLocalToolCalendarQueryTitle": "查询日历",
-   "assistantEditLocalToolCalendarQuerySubtitle": "读取本设备上的日历日程，需要授予日历权限。",
-   "assistantEditLocalToolCalendarCreateTitle": "创建日程",
-   "assistantEditLocalToolCalendarCreateSubtitle": "在你确认后于本设备创建日历日程，需要授予日历权限。",
+  "assistantEditLocalToolScreenTimeTitle": "屏幕使用时间",
+  "assistantEditLocalToolScreenTimeSubtitle": "查询本设备的应用使用时长，需要授予使用情况访问权限。",
+  "chatMessageWidgetScreenTimeTotal": "总屏幕时间",
+  "chatMessageWidgetScreenTimePermissionRequired": "未授予使用情况访问权限，请在系统设置中开启后重试。",
+  "assistantEditLocalToolCalendarQueryTitle": "查询日历",
+  "assistantEditLocalToolCalendarQuerySubtitle": "读取本设备上的日历日程，需要授予日历权限。",
+  "assistantEditLocalToolCalendarCreateTitle": "创建日程",
+  "assistantEditLocalToolCalendarCreateSubtitle": "在你确认后于本设备创建日历日程，需要授予日历权限。",
   "assistantEditMemorySwitchDescription": "允许助手主动存储并在对话间引用用户相关信息",
   "assistantEditOutlineModeTitle": "二级列表样式",
   "assistantEditOutlineModeSubtitle": "先显示助手概览，再从列表进入各个设置项。",
@@ -2192,13 +1951,7 @@
   "multiKeyPageDeleteErrorsConfirmTitle": "删除所有错误的 Key？",
   "multiKeyPageDeleteErrorsConfirmContent": "这将移除所有状态为错误的 Key。",
   "multiKeyPageDeletedErrorsSnackbar": "已删除 {n} 个错误 Key",
-  "@multiKeyPageDeletedErrorsSnackbar": {
-    "placeholders": {
-      "n": {
-        "type": "int"
-      }
-    }
-  },
+  "@multiKeyPageDeletedErrorsSnackbar": {"placeholders": {"n": {"type": "int"}}},
   "providerDetailPageProviderTypeTitle": "供应商类型",
   "displaySettingsPageChatItemDisplayTitle": "聊天项显示",
   "displaySettingsPageRenderingSettingsTitle": "渲染设置",
@@ -2268,13 +2021,7 @@
   "networkProxyTesting": "测试中…",
   "networkProxyTestSuccess": "连接成功",
   "networkProxyTestFailed": "测试失败：{error}",
-  "@networkProxyTestFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@networkProxyTestFailed": {"placeholders": {"error": {"type": "String"}}},
   "networkProxyNoUrl": "请输入测试地址",
   "networkProxyPriorityNote": "当同时开启全局代理与供应商代理时，将优先使用供应商代理。",
   "desktopShowProviderInModelCapsule": "模型胶囊显示供应商",
@@ -2292,31 +2039,13 @@
   "providerDetailPageDeleteSelectedModelsButton": "删除",
   "providerDetailPageDeleteSelectedModelsTooltip": "删除所选模型",
   "providerDetailPageDeleteSelectedModelsConfirm": "确定删除选中的 {count} 个模型吗？此操作不可撤回。",
-  "@providerDetailPageDeleteSelectedModelsConfirm": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@providerDetailPageDeleteSelectedModelsConfirm": {"placeholders": {"count": {"type": "int"}}},
   "providerDetailPageDeleteFailedDetectedModelsButton": "删除不可用",
   "providerDetailPageDeleteFailedDetectedModelsTooltip": "删除检测失败的模型",
   "providerDetailPageDeleteFailedDetectedModelsConfirm": "确定删除检测失败的 {count} 个模型吗？此操作不可撤回。",
-  "@providerDetailPageDeleteFailedDetectedModelsConfirm": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@providerDetailPageDeleteFailedDetectedModelsConfirm": {"placeholders": {"count": {"type": "int"}}},
   "providerDetailPageSelectedModelsDeletedSnackbar": "已删除 {count} 个模型",
-  "@providerDetailPageSelectedModelsDeletedSnackbar": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@providerDetailPageSelectedModelsDeletedSnackbar": {"placeholders": {"count": {"type": "int"}}},
   "providerDetailPageDeleteAllModelsTooltip": "删除全部模型",
   "providerDetailPageDeleteAllModelsWarning": "此操作不可撤回",
   "requestLogSettingTitle": "请求日志打印",
@@ -2474,11 +2203,7 @@
   "memoryEntryScopeGlobal": "全局",
   "memoryEntryScopeAssistant": "仅本助手",
   "memoryEntryScopeAssistantNamed": "{name}",
-  "@memoryEntryScopeAssistantNamed": {
-    "placeholders": {
-      "name": {"type": "String"}
-    }
-  },
+  "@memoryEntryScopeAssistantNamed": {"placeholders": {"name": {"type": "String"}}},
   "memoryEntrySourceManual": "手动",
   "memoryEntrySourceTool": "工具",
   "memoryEntrySourceExtracted": "提取",
@@ -2486,11 +2211,7 @@
   "memoryEntryStatusActive": "活跃",
   "memoryEntryStatusArchived": "已归档",
   "memoryEntryUpdatedAt": "更新于 {date}",
-  "@memoryEntryUpdatedAt": {
-    "placeholders": {
-      "date": {"type": "String"}
-    }
-  },
+  "@memoryEntryUpdatedAt": {"placeholders": {"date": {"type": "String"}}},
   "memoryEntryActionEdit": "编辑",
   "memoryEntryActionDelete": "删除",
   "memoryEntryActionArchive": "归档",
@@ -2501,11 +2222,7 @@
   "memoryEntryDeleteConfirmTitle": "删除这条记忆？",
   "memoryEntryDeleteConfirmContent": "将永久删除该记忆，且无法撤销。",
   "memoryEntryBatchDeleteConfirmTitle": "删除 {count} 条记忆？",
-  "@memoryEntryBatchDeleteConfirmTitle": {
-    "placeholders": {
-      "count": {"type": "int"}
-    }
-  },
+  "@memoryEntryBatchDeleteConfirmTitle": {"placeholders": {"count": {"type": "int"}}},
   "memoryEntryBatchDeleteConfirmContent": "所选记忆将被永久删除。",
   "memoryEntrySwitchScopeConfirmTitle": "更改记忆范围？",
   "memoryEntrySwitchScopeToGlobal": "将这条记忆设为全局（所有助手可见）？",
@@ -2528,63 +2245,31 @@
   "memorySearchHint": "搜索记忆",
   "memorySearchEmpty": "没有匹配的记忆",
   "memoryOrphanBanner": "有 {count} 条孤儿助手记忆（助手已删除）",
-  "@memoryOrphanBanner": {
-    "placeholders": {
-      "count": {"type": "int"}
-    }
-  },
+  "@memoryOrphanBanner": {"placeholders": {"count": {"type": "int"}}},
   "memoryOrphanCleanupButton": "清理",
   "memoryOrphanConfirmTitle": "清理孤儿记忆？",
   "memoryOrphanConfirmContent": "将永久删除 {count} 条所属助手已不存在的记忆。",
-  "@memoryOrphanConfirmContent": {
-    "placeholders": {
-      "count": {"type": "int"}
-    }
-  },
+  "@memoryOrphanConfirmContent": {"placeholders": {"count": {"type": "int"}}},
   "memoryOrganizeButton": "整理记忆",
   "memoryOrganizeNeedsConversation": "需要在与该助手的对话中使用",
   "memoryOrganizeNeedsModel": "请先在 设置 → 记忆 中选择记忆处理模型",
   "memoryOrganizeStatusNever": "尚未整理",
   "memoryOrganizeStatusLast": "上次整理：{when}",
-  "@memoryOrganizeStatusLast": {
-    "placeholders": {
-      "when": {"type": "String"}
-    }
-  },
+  "@memoryOrganizeStatusLast": {"placeholders": {"when": {"type": "String"}}},
   "memoryOrganizeStatusExtracted": "提取 {count} 条",
-  "@memoryOrganizeStatusExtracted": {
-    "placeholders": {
-      "count": {"type": "int"}
-    }
-  },
+  "@memoryOrganizeStatusExtracted": {"placeholders": {"count": {"type": "int"}}},
   "memoryOrganizeStatusSkipped": "无需记忆",
   "memoryOrganizeStatusSkippedReason": "已跳过：{reason}",
   "@memoryOrganizeStatusSkippedReason": {"placeholders": {"reason": {"type": "String"}}},
   "memoryOrganizeStatusFailed": "失败：{reason}",
-  "@memoryOrganizeStatusFailed": {
-    "placeholders": {
-      "reason": {"type": "String"}
-    }
-  },
+  "@memoryOrganizeStatusFailed": {"placeholders": {"reason": {"type": "String"}}},
   "memoryOrganizeJustNow": "刚刚",
   "memoryOrganizeMinutesAgo": "{n} 分钟前",
-  "@memoryOrganizeMinutesAgo": {
-    "placeholders": {
-      "n": {"type": "int"}
-    }
-  },
+  "@memoryOrganizeMinutesAgo": {"placeholders": {"n": {"type": "int"}}},
   "memoryOrganizeHoursAgo": "{n} 小时前",
-  "@memoryOrganizeHoursAgo": {
-    "placeholders": {
-      "n": {"type": "int"}
-    }
-  },
+  "@memoryOrganizeHoursAgo": {"placeholders": {"n": {"type": "int"}}},
   "memoryOrganizeDaysAgo": "{n} 天前",
-  "@memoryOrganizeDaysAgo": {
-    "placeholders": {
-      "n": {"type": "int"}
-    }
-  },
+  "@memoryOrganizeDaysAgo": {"placeholders": {"n": {"type": "int"}}},
   "memoryModelMissingNotice": "需要先在 设置 → 记忆 中选择记忆处理模型。",
   "memoryModelMissingGoSelect": "去选择",
   "memoryEntriesPageTitle": "全部记忆",
@@ -2638,20 +2323,12 @@
   "legacyMemoryExport": "导出",
   "legacyMemoryExportTitle": "JO-AIClient 旧版记忆导出",
   "legacyMemoryAssistantHeader": "助手：{name}",
-  "@legacyMemoryAssistantHeader": {
-    "placeholders": {
-      "name": {"type": "String"}
-    }
-  },
+  "@legacyMemoryAssistantHeader": {"placeholders": {"name": {"type": "String"}}},
   "legacyMemorySearchHint": "搜索旧版记忆",
   "legacyMemoryMigrate": "迁移",
   "legacyMemoryMigrationTitle": "迁移旧版记忆",
   "legacyMemoryMigrationSubtitle": "使用模型整理并分类 {count} 条旧版记忆，原数据不会改变。",
-  "@legacyMemoryMigrationSubtitle": {
-    "placeholders": {
-      "count": {"type": "int"}
-    }
-  },
+  "@legacyMemoryMigrationSubtitle": {"placeholders": {"count": {"type": "int"}}},
   "legacyMemoryMigrationModel": "迁移模型",
   "legacyMemoryMigrationChooseModel": "选择模型",
   "legacyMemoryMigrationTarget": "保存到",
@@ -2665,20 +2342,10 @@
   "legacyMemoryMigrationAnalyzing": "正在使用模型分析",
   "legacyMemoryMigrationWriting": "正在写入记忆",
   "legacyMemoryMigrationProgress": "{current} / {total}",
-  "@legacyMemoryMigrationProgress": {
-    "placeholders": {
-      "current": {"type": "int"},
-      "total": {"type": "int"}
-    }
-  },
+  "@legacyMemoryMigrationProgress": {"placeholders": {"current": {"type": "int"}, "total": {"type": "int"}}},
   "legacyMemoryMigrationComplete": "迁移完成",
   "legacyMemoryMigrationResult": "已迁移 {created} 条 · 跳过已有 {skipped} 条",
-  "@legacyMemoryMigrationResult": {
-    "placeholders": {
-      "created": {"type": "int"},
-      "skipped": {"type": "int"}
-    }
-  },
+  "@legacyMemoryMigrationResult": {"placeholders": {"created": {"type": "int"}, "skipped": {"type": "int"}}},
   "legacyMemoryMigrationFailed": "迁移已停止。可以重试，已保存的记忆会自动跳过。",
   "legacyMemoryMigrationContinue": "继续迁移",
   "legacyMemoryMigrationErrorAuth": "鉴权失败，请检查 API 密钥。",
@@ -2723,11 +2390,7 @@
   "assistantEditOrganizeFrequencyTitle": "整理频率",
   "assistantEditOrganizeFrequencySubtitle": "每累积 N 轮助手回复触发一次自动整理",
   "assistantEditOrganizeFrequencyOption": "每 {n} 轮",
-  "@assistantEditOrganizeFrequencyOption": {
-    "placeholders": {
-      "n": {"type": "int"}
-    }
-  },
+  "@assistantEditOrganizeFrequencyOption": {"placeholders": {"n": {"type": "int"}}},
   "assistantEditOrganizeFrequencyCustomButton": "自定义",
   "assistantEditOrganizeFrequencyCustomTitle": "自定义整理频率",
   "assistantEditOrganizeFrequencyCustomDescription": "请输入 1 到 20 之间的整数。",
@@ -2745,33 +2408,15 @@
   "worldBookConfig": "配置",
   "worldBookDeleteTitle": "删除世界书",
   "worldBookDeleteMessage": "确定删除「{name}」？此操作无法撤销。",
-  "@worldBookDeleteMessage": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
+  "@worldBookDeleteMessage": {"placeholders": {"name": {"type": "String"}}},
   "worldBookCancel": "取消",
   "worldBookDelete": "删除",
   "worldBookExportFailed": "导出失败：{error}",
-  "@worldBookExportFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@worldBookExportFailed": {"placeholders": {"error": {"type": "String"}}},
   "worldBookNoEntriesHint": "暂无条目",
   "worldBookUnnamedEntry": "未命名条目",
   "worldBookKeywordsLine": "关键词：{keywords}",
-  "@worldBookKeywordsLine": {
-    "placeholders": {
-      "keywords": {
-        "type": "String"
-      }
-    }
-  },
+  "@worldBookKeywordsLine": {"placeholders": {"keywords": {"type": "String"}}},
   "worldBookEditEntry": "编辑条目",
   "worldBookDeleteEntry": "删除条目",
   "worldBookNameLabel": "名称",
@@ -2836,65 +2481,20 @@
   "debugPageCreatingLongReasoningConversation": "正在创建长思考链调试对话...",
   "debugPageNoCurrentAssistant": "当前没有助手。请先创建或选择一个助手。",
   "debugPageConversationCreated": "已创建包含 {count} 条消息的调试对话。",
-  "@debugPageConversationCreated": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@debugPageConversationCreated": {"placeholders": {"count": {"type": "int"}}},
   "debugPageCreateConversationFailed": "创建调试对话失败：{error}",
-  "@debugPageCreateConversationFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "@debugPageCreateConversationFailed": {"placeholders": {"error": {"type": "String"}}},
   "debugPageOversizedConversationTitle": "超大对话测试（{sizeMB} MB）",
-  "@debugPageOversizedConversationTitle": {
-    "placeholders": {
-      "sizeMB": {
-        "type": "int"
-      }
-    }
-  },
+  "@debugPageOversizedConversationTitle": {"placeholders": {"sizeMB": {"type": "int"}}},
   "debugPageManyMessagesConversationTitle": "{count} 条消息测试",
-  "@debugPageManyMessagesConversationTitle": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@debugPageManyMessagesConversationTitle": {"placeholders": {"count": {"type": "int"}}},
   "debugPageDailyMixedMarkdownConversationTitle": "{count} 条日常混合 Markdown 消息测试",
-  "@debugPageDailyMixedMarkdownConversationTitle": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@debugPageDailyMixedMarkdownConversationTitle": {"placeholders": {"count": {"type": "int"}}},
   "debugPageLongReasoningConversationTitle": "{count} 条长思考链测试",
-  "@debugPageLongReasoningConversationTitle": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@debugPageLongReasoningConversationTitle": {"placeholders": {"count": {"type": "int"}}},
   "debugPageOversizedConversationSeedText": "这是一段用于复现超大对话渲染卡顿的长调试文本。它包含重复的 Markdown 风格文本、标点、中文内容和普通词语，方便测试聊天渲染、存储和滚动性能。",
   "debugPageManyMessagesSeedText": "{role} 消息 #{index}：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。",
-  "@debugPageManyMessagesSeedText": {
-    "placeholders": {
-      "role": {
-        "type": "String"
-      },
-      "index": {
-        "type": "int"
-      }
-    }
-  },
+  "@debugPageManyMessagesSeedText": {"placeholders": {"role": {"type": "String"}, "index": {"type": "int"}}},
   "migrationIntroTitle": "升级聊天记录存储",
   "migrationIntroSubtitle": "JO-AIClient 将聊天记录迁移到更快的 SQLite 数据库。升级会在应用打开前完成，避免新旧数据同时写入。",
   "migrationBackupNote": "迁移开始前，会先导出包含设置、聊天记录和本地文件的 ZIP 备份。",
@@ -2908,21 +2508,9 @@
   "migrationMigratingTitle": "正在迁移到 SQLite",
   "migrationMigratingSubtitle": "正在分批写入会话和消息，避免超大聊天记录占满内存。请保持 JO-AIClient 在前台，等待迁移完成。",
   "migrationBackingUpDetail": "正在备份 {fileName}",
-  "@migrationBackingUpDetail": {
-    "placeholders": {
-      "fileName": {
-        "type": "String"
-      }
-    }
-  },
+  "@migrationBackingUpDetail": {"placeholders": {"fileName": {"type": "String"}}},
   "migrationMigratingDetail": "已迁移 {count} 条消息",
-  "@migrationMigratingDetail": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@migrationMigratingDetail": {"placeholders": {"count": {"type": "int"}}},
   "migrationMigratingPrepareDetail": "正在准备 SQLite 数据库",
   "migrationMigratingToolEventsDetail": "正在迁移工具调用记录",
   "migrationMigratingValidateDetail": "正在校验迁移数据",
@@ -3224,5 +2812,31 @@
   "autoRetryStopKeywords": "停止重试关键字",
   "autoRetryAddHint": "添加",
   "autoRetryRestoreDefaults": "恢复默认",
-  "autoRetryFooter": "仅在当前这轮模型响应尚未产生任何输出时才会自动重试。"
+  "autoRetryFooter": "仅在当前这轮模型响应尚未产生任何输出时才会自动重试。",
+  "backupIncludeLocalSettings": "把本机设置一起带走",
+  "backupIncludeLocalSettingsOnSubtitle": "窗口大小与位置、桌面快捷键、聊天字号等本机专属设置随备份一起带走。含本机设置的备份仅新版 JO-AIClient 可恢复。",
+  "backupIncludeLocalSettingsOffSubtitle": "只导出聊天、文件与通用设置，本机专属设置留在本机。",
+  "backupLedgerTitle": "本机设置记录",
+  "backupLedgerEmpty": "还没有任何设备记录",
+  "backupLedgerEmptyDescription": "导出时选择“带”，本机设置就会随备份记录在这里。",
+  "backupLedgerThisDevice": "（本机）",
+  "backupLedgerDeviceCount": "共 {count} 台设备",
+  "@backupLedgerDeviceCount": {"placeholders": {"count": {"type": "int"}}},
+  "backupLedgerDelete": "删除",
+  "backupLedgerDeleteConfirm": "删除后，这台设备的本机设置将不再随下次备份携带。已导出的备份包不受影响。",
+  "backupLedgerClear": "清空全部记录",
+  "backupLedgerClearConfirm": "将删除全部 {count} 台设备的记录，此操作不可撤销。已导出的备份包不受影响。",
+  "@backupLedgerClearConfirm": {"placeholders": {"count": {"type": "int"}}},
+  "backupLedgerItemCount": "{count} 项设置",
+  "@backupLedgerItemCount": {"placeholders": {"count": {"type": "int"}}},
+  "backupLedgerLoadMore": "加载更多",
+  "backupLedgerSettingsDescription": "窗口大小与位置、桌面快捷键、聊天字号、日志开关属于本机设置，只跟设备走，不影响聊天数据。",
+  "backupLocalSettingsUnrecognized": "未能识别本机设备，本次未包含本机当前设置",
+  "backupLedgerAbsorbedNotice": "已并入 {count} 台设备的设置记录",
+  "@backupLedgerAbsorbedNotice": {"placeholders": {"count": {"type": "int"}}},
+  "backupLocalSettingsAppliedNotice": "本次已把备份里的 {count} 项本机设置应用到这台设备",
+  "@backupLocalSettingsAppliedNotice": {"placeholders": {"count": {"type": "int"}}},
+  "backupPageMergeCompleted": "合并完成",
+  "backupPageMergeCompletedWithSkipped": "备份中有 {count} 个会话因消息顺序异常被跳过，未并入本机。",
+  "@backupPageMergeCompletedWithSkipped": {"placeholders": {"count": {"type": "int"}}}
 }

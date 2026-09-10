@@ -10,6 +10,11 @@ void main() {
         'lib/core/database/business_migration_engine.dart',
         'lib/core/providers/hotkey_provider.dart',
         'lib/core/providers/settings_provider.dart',
+        // 本机设置随备份流转：导出档位记忆、写回 9 键、冷重启后补写，
+        // 三处都必须直接读写 SharedPreferences。
+        'lib/core/services/backup/device_ledger_export_settings.dart',
+        'lib/core/services/backup/device_local_settings_writer.dart',
+        'lib/core/services/backup/restore_local_settings_applier.dart',
         'lib/desktop/window_size_manager.dart',
         'lib/features/migration/hive_to_sqlite_migration_service.dart',
         'lib/main.dart',

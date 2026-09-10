@@ -4870,7 +4870,7 @@ class ChatDatabaseRepository {
                     ..orderBy([(row) => OrderingTerm.asc(row.ordinal)]))
                   .get())
               .map((part) => part.payload)
-              .join()
+              .join('\n')
         : null;
     if (effectiveReasoningText != null && effectiveReasoningText.isNotEmpty) {
       message = message.copyWith(reasoningText: effectiveReasoningText);
@@ -4895,8 +4895,7 @@ class ChatDatabaseRepository {
     var ordinal = 0;
     final now = DateTime.now().toUtc();
     final updatedAt = now.isBefore(message.timestamp) ? message.timestamp : now;
-    final reasoning = message.reasoningText;
-    if (reasoning != null && reasoning.isNotEmpty) {
+    Future<void> insertPartRow(String kind, String payload) async {
       await _db
           .into(_db.messagePartRows)
           .insert(
@@ -4904,43 +4903,71 @@ class ChatDatabaseRepository {
               conversationId: message.conversationId,
               revisionId: message.id,
               ordinal: ordinal++,
-              kind: 'reasoning',
-              payload: reasoning,
+              kind: kind,
+              payload: payload,
               createdAt: message.timestamp,
               updatedAt: updatedAt,
             ),
           );
     }
-    for (final event in preservedToolEvents) {
-      await _db
-          .into(_db.messagePartRows)
-          .insert(
-            MessagePartRowsCompanion.insert(
-              conversationId: message.conversationId,
-              revisionId: message.id,
-              ordinal: ordinal++,
-              kind: 'tool_call',
-              payload: jsonEncode(event),
-              createdAt: message.timestamp,
-              updatedAt: updatedAt,
-            ),
-          );
+
+    // 按消息部件的真实顺序落盘：思维链、工具调用不再强制归位到最前，
+    // 流式产出（含正文/思维链交错）与编辑器重排的顺序原样保留。
+    // 读取侧按 ordinal 排序，天然还原该顺序。
+    final hasReasoningInParts = message.parts.any(
+      (part) => part is ReasoningPart && part.text.isNotEmpty,
+    );
+    if (!hasReasoningInParts) {
+      // 部件里没有思维链（例如流式 checkpoint 回退只保留了字段），
+      // 退回旧行为：从 reasoningText 字段补一行，置于最前。
+      final reasoning = message.reasoningText;
+      if (reasoning != null && reasoning.isNotEmpty) {
+        await insertPartRow('reasoning', reasoning);
+      }
     }
-    final bodyParts = _bodyPartsForPersistence(message);
-    for (final part in bodyParts) {
-      await _db
-          .into(_db.messagePartRows)
-          .insert(
-            MessagePartRowsCompanion.insert(
-              conversationId: message.conversationId,
-              revisionId: message.id,
-              ordinal: ordinal++,
-              kind: part.kind,
-              payload: part.encodePayload(),
-              createdAt: message.timestamp,
-              updatedAt: updatedAt,
-            ),
-          );
+    var eventIndex = 0;
+    var bodyRowCount = 0;
+    // 部件未携带工具卡片（旧式 content/reasoningText 构造，如导入器）时，
+    // 工具事件保持旧布局位置：正文之前、思维链之后。
+    final partsHaveToolCards = message.parts.any((part) => part is ToolCallPart);
+    for (final part in message.parts) {
+      switch (part) {
+        case ReasoningPart(:final text) when text.isNotEmpty:
+          await insertPartRow('reasoning', text);
+        case ToolCallPart():
+          final payload = eventIndex < preservedToolEvents.length
+              ? jsonEncode(preservedToolEvents[eventIndex])
+              : part.payloadJson;
+          eventIndex++;
+          await insertPartRow('tool_call', payload);
+        case TextPart() ||
+            ImagePart() ||
+            FilePart() ||
+            MalformedPart() ||
+            UnknownPart():
+          if (!partsHaveToolCards && eventIndex < preservedToolEvents.length) {
+            for (; eventIndex < preservedToolEvents.length; eventIndex++) {
+              await insertPartRow(
+                'tool_call',
+                jsonEncode(preservedToolEvents[eventIndex]),
+              );
+            }
+          }
+          await insertPartRow(part.kind, part.encodePayload());
+          bodyRowCount++;
+        default:
+          break;
+      }
+    }
+    // 防御：事件多于部件时（不应发生），剩余事件按旧布局补在末尾，不丢数据。
+    for (; eventIndex < preservedToolEvents.length; eventIndex++) {
+      await insertPartRow(
+        'tool_call',
+        jsonEncode(preservedToolEvents[eventIndex]),
+      );
+    }
+    if (bodyRowCount == 0 && message.content.isNotEmpty) {
+      await insertPartRow(TextPart(message.content).kind, message.content);
     }
   }
 
@@ -5125,21 +5152,34 @@ class ChatDatabaseRepository {
       final clonedMessages = <String, ChatMessage>{};
       for (final sourceId in sourceIds) {
         final source = await _messageFromRowWithParts(sourceRows[sourceId]!);
+        final isEditedRoot = sourceId == messageId;
+        final derivedReasoning = isEditedRoot
+            ? ChatMessage.reasoningTextFromParts(parts)
+            : null;
+        final keepReasoningMeta = !isEditedRoot || derivedReasoning != null;
         clonedMessages[sourceId] = ChatMessage(
           id: idMap[sourceId],
           role: source.role,
-          parts: sourceId == messageId ? parts : source.parts,
+          parts: isEditedRoot ? parts : source.parts,
           timestamp: source.timestamp,
           modelId: source.modelId,
           providerId: source.providerId,
           totalTokens: source.totalTokens,
           conversationId: source.conversationId,
           isStreaming: false,
-          reasoningText: source.reasoningText,
-          reasoningStartAt: source.reasoningStartAt,
-          reasoningFinishedAt: source.reasoningFinishedAt,
+          reasoningText: isEditedRoot
+              ? derivedReasoning
+              : source.reasoningText,
+          reasoningStartAt: keepReasoningMeta
+              ? source.reasoningStartAt
+              : null,
+          reasoningFinishedAt: keepReasoningMeta
+              ? source.reasoningFinishedAt
+              : null,
           translation: source.translation,
-          reasoningSegmentsJson: source.reasoningSegmentsJson,
+          reasoningSegmentsJson: keepReasoningMeta
+              ? source.reasoningSegmentsJson
+              : null,
           promptTokens: source.promptTokens,
           completionTokens: source.completionTokens,
           cachedTokens: source.cachedTokens,
@@ -5385,6 +5425,10 @@ class ChatDatabaseRepository {
           content,
         );
       }
+      final derivedReasoning = ChatMessage.reasoningTextFromParts(
+        resolvedParts,
+      );
+      final keepReasoningMeta = derivedReasoning != null;
       final message = ChatMessage(
         role: originalRow.role,
         parts: resolvedParts,
@@ -5393,6 +5437,19 @@ class ChatDatabaseRepository {
         providerId: originalRow.providerId,
         totalTokens: null,
         isStreaming: false,
+        // 编辑保存以部件为唯一事实来源：编辑器保留的思维链部件折叠进
+        // reasoningText；被删除则连同元数据一起清空，避免 checkpoint
+        // 快照回退把思考复活。
+        reasoningText: derivedReasoning,
+        reasoningStartAt: keepReasoningMeta
+            ? originalRow.reasoningStartAt
+            : null,
+        reasoningFinishedAt: keepReasoningMeta
+            ? originalRow.reasoningFinishedAt
+            : null,
+        reasoningSegmentsJson: keepReasoningMeta
+            ? originalRow.reasoningSegmentsJson
+            : null,
         // 新分支是独立消息节点，不再写入旧版本字段。
         groupId: null,
         version: 0,
@@ -6058,7 +6115,7 @@ class ChatDatabaseRepository {
 
   /// 尝试把 source 会话中目标尚未拥有的修订并入同 ID 的本地会话。
   ///
-  /// 这是智能合并的安全边界：重叠修订必须逐条相同，且新增修订不能
+  /// 这是合并保留模式的安全边界：重叠修订必须逐条相同，且新增修订不能
   /// 占用其他会话的 ID；否则返回 false，由调用方创建独立的重映射会话。
   Future<bool> _tryMergeConversationDelta({
     required String sourceId,
@@ -8297,7 +8354,7 @@ class ChatDatabaseRepository {
       isStreaming: row.isStreaming,
       reasoningText: reasoningParts.isEmpty
           ? null
-          : reasoningParts.map((part) => part.text).join(),
+          : reasoningParts.map((part) => part.text).join('\n'),
       reasoningStartAt: row.reasoningStartAt,
       reasoningFinishedAt: row.reasoningFinishedAt,
       translation: row.translation,
@@ -8320,8 +8377,10 @@ class ChatDatabaseRepository {
     );
   }
 
-  /// Body parts 在 reasoning/tool_call 行之后持久化。reasoning 和
-  /// tool_call 仍从 [ChatMessage.reasoningText] / tool-event 参数获取，以保持流式叠加行为一致。
+  /// Body parts 的过滤规则：只保留随正文部件持久化的种类。
+  /// reasoning/tool_call 行的位置由 [_replaceMessageParts] 按部件真实顺序写入；
+  /// 此函数仅供仅重写 text/reasoning 的快速路径使用（该路径只在
+  /// "reasoning 在最前" 的标准布局下启用）。
   List<MessagePart> _bodyPartsForPersistence(ChatMessage message) {
     final body = <MessagePart>[
       for (final part in message.parts)
