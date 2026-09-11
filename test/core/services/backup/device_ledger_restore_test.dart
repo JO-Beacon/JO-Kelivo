@@ -7,6 +7,7 @@ import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+// ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -325,11 +326,7 @@ void main() {
       await restoreWith(archive, mode: RestoreMode.merge);
 
       final prefs = await SharedPreferences.getInstance();
-      expect(
-        prefs.getDouble(_widthKey),
-        500.0,
-        reason: '逐键补缺不得倒退本机已有的值',
-      );
+      expect(prefs.getDouble(_widthKey), 500.0, reason: '逐键补缺不得倒退本机已有的值');
       expect(await _readLedgerFor(_localFingerprint), isNotNull);
     });
 
@@ -449,7 +446,10 @@ void main() {
         ),
         isNull,
       );
-      expect((await SharedPreferences.getInstance()).getDouble(_widthKey), 4321.0);
+      expect(
+        (await SharedPreferences.getInstance()).getDouble(_widthKey),
+        4321.0,
+      );
     });
 
     test('完全覆盖：包内没有本机记录时不写回，但别的设备记录照样并入', () async {

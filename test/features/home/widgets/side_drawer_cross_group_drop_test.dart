@@ -21,7 +21,7 @@ void main() {
       String gB,
     })
   >
-  _seed() async {
+  seed() async {
     final harness = await BusinessPreferencesTestHarness.create();
     final session = await harness.open();
     addTearDown(harness.dispose);
@@ -43,7 +43,7 @@ void main() {
   }
 
   test('跨组落位必须跟随框架预览：插在谁之前就排在谁之前', () async {
-    final s = await _seed();
+    final s = await seed();
 
     // 框架路径 (4,2)：预览里 b1 落在 a1 与 a2 之间（a2 之前）。
     // 历史 bug：曾在此"纠正"为组尾（a2 之后），与预览冲突 → 松手跳一格。
@@ -73,7 +73,7 @@ void main() {
   });
 
   test('贴着分组标题上方松手＝加入上一组并排在末尾', () async {
-    final s = await _seed();
+    final s = await seed();
 
     // 框架路径 (4,3)：预览里 b1 落在 a2 与 hGB 之间（GA 组末尾）。
     final drop = resolveAssistantDropTarget(
@@ -158,9 +158,7 @@ void main() {
       isHeader: isHeader,
       groupIds: groupIds,
       assistantIds: assistantIds,
-      firstMemberOf: (g) => g == null
-          ? ungroupedIds.first
-          : 'g1',
+      firstMemberOf: (g) => g == null ? ungroupedIds.first : 'g1',
       lastMemberOf: (g) => g == null ? ungroupedIds.last : 'g2',
     );
     // 缝隙归属未分组段末尾：锚点必须是 u2（修复前这里是 null）。
@@ -187,7 +185,7 @@ void main() {
   });
 
   test('拖入折叠的分组前会先展开它（否则助手投进去就看不见）', () async {
-    final s = await _seed();
+    final s = await seed();
     await s.gp.setGroupCollapsed(s.gA, true);
     expect(s.gp.isGroupCollapsed(s.gA), isTrue);
 

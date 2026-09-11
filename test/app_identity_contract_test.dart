@@ -421,7 +421,7 @@ void main() {
       for (final MapEntry(key: path, value: expectations)
           in expectedTokens.entries) {
         final workflow = _read(path);
-        expect(workflow, contains("FLUTTER_VERSION: '3.44.1'"));
+        expect(workflow, contains("FLUTTER_VERSION: '3.44.9'"));
         expect(workflow, contains('workflow_dispatch:'));
         expect(
           workflow,

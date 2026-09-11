@@ -53,7 +53,12 @@ app.*.map.json
 /android/app/*.jks
 /android/app/*.keystore
 
+# 依赖锁文件：本项目是应用（不是被引用的库），根目录这一份有意纳入版本控制，
+# 这样云端构建与本机才会用完全相同的依赖版本（Dart 官方建议应用包提交锁文件）。
+# 先排除所有层级，再单独放行根目录那一份；dependencies/ 下的 fork 包是库，
+# 各自的锁文件继续排除。
 pubspec.lock
+!/pubspec.lock
 /linux/flutter/generated_plugin_registrant.cc
 /windows/flutter/generated_plugin_registrant.cc
 /linux/flutter/generated_plugin_registrant.h
@@ -98,5 +103,7 @@ internationalization.md
 # 临时诊断文件（本地备查，不进仓库）
 # 只屏蔽具体文件，不要屏蔽 test/goldens/ 整个目录——金标测试的标准答案图
 # 必须随代码入库，否则换机器跑测试会失败。
+# 注：滚动条探针（含其金标图）已于 2026-09-11 挪到 build/probes/，这两条规则
+# 保留作防御——万一有诊断文件被放回 test/，仍不会被误提交。
 test/tmp_scrollbar_probe_test.dart
 test/goldens/dialog_scrollbar_probe.png
