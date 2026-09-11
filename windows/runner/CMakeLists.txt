@@ -20,6 +20,13 @@ add_executable(${BINARY_NAME} WIN32
 # that need different build settings.
 apply_standard_settings(${BINARY_NAME})
 
+# 这个目标里含有中文字符串字面量（main.cpp 的重复启动提示）。源文件是无 BOM
+# 的 UTF-8，必须让编译器按 UTF-8 解析；否则中文 Windows 上会按本地代码页处理，
+# 弹窗里的中文会变成乱码。其余源文件都是纯 ASCII，不受影响。
+if(MSVC)
+  target_compile_options(${BINARY_NAME} PRIVATE "/utf-8")
+endif()
+
 # Add preprocessor definitions for the build version.
 target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION=\"${FLUTTER_VERSION}\"")
 target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION_MAJOR=${FLUTTER_VERSION_MAJOR}")

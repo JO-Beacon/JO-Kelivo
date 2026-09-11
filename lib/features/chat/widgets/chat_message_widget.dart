@@ -791,6 +791,8 @@ class ChatMessageWidget extends StatefulWidget {
   final RetryStatus? retryStatus;
   // 文件是否正在处理中
   final bool isProcessingFiles;
+  // 当前会话是否有回复正在生成。重新生成的确认弹窗据此说明会先中断当前回复。
+  final bool conversationStreaming;
   final bool enableStreamingTextMotion;
   final List<String> suggestions;
   final ValueChanged<String>? onSuggestionTap;
@@ -840,6 +842,7 @@ class ChatMessageWidget extends StatefulWidget {
     this.hideStreamingIndicator = false,
     this.retryStatus,
     this.isProcessingFiles = false,
+    this.conversationStreaming = false,
     this.enableStreamingTextMotion = true,
     this.suggestions = const <String>[],
     this.onSuggestionTap,
@@ -1075,7 +1078,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     }
 
     final l10n = AppLocalizations.of(context)!;
-    final content = l10n.chatMessageWidgetRegenerateConfirmContent;
+    final baseContent = l10n.chatMessageWidgetRegenerateConfirmContent;
+    // 会话正在生成时补一句说明：确认后当前回复会先被中断。
+    final content = widget.conversationStreaming
+        ? '$baseContent\n\n'
+              '${l10n.chatMessageWidgetRegenerateConfirmInterruptNotice}'
+        : baseContent;
     final ok = await showDialog<bool>(
       context: context,
       builder: (dctx) => AlertDialog(

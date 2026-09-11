@@ -363,6 +363,8 @@ Stream<ChatStreamChunk> _sendClaudeStream(
     }
   }
   flushPendingToolResults();
+  // 首条非 user 时补占位：Anthropic 会以 400 拒绝以 assistant 开头的请求。
+  ensureClaudeFirstTurnIsUser(initialMessages);
 
   // 将 OpenAI 风格的工具映射为 Anthropic 自定义工具（client tools）
   List<Map<String, dynamic>>? anthropicTools;

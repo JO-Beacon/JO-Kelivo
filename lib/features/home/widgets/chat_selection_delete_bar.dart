@@ -8,17 +8,21 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../theme/design_tokens.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
+/// 多选删除底栏：始终只呈现一个删除按钮。
+///
+/// 勾选里含分支节点时，删除会收拢所选目标所属的分叉、仅保留活动血脉，
+/// 按钮文案随之改为「删除此分支节点」以提示这一语义；不含分支节点时
+/// 为普通的「删除」。原先并列的「删除所有分支」入口已移除——它的作用
+/// 范围完全由树结构决定、与勾选内容无关，多选并不能带来任何选择余地。
 class ChatSelectionDeleteBar extends StatelessWidget {
   const ChatSelectionDeleteBar({
     super.key,
     required this.hasMultiVersionSelection,
     required this.onDeleteCurrentVersions,
-    required this.onDeleteAllVersions,
   });
 
   final bool hasMultiVersionSelection;
   final VoidCallback onDeleteCurrentVersions;
-  final VoidCallback onDeleteAllVersions;
 
   @override
   Widget build(BuildContext context) {
@@ -62,41 +66,17 @@ class ChatSelectionDeleteBar extends StatelessWidget {
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final compact = constraints.maxWidth < 380;
-                    if (!hasMultiVersionSelection) {
-                      return SizedBox(
-                        width: double.infinity,
-                        child: _DeleteButton(
-                          icon: Lucide.Trash2,
-                          label: l10n.homePageDelete,
-                          color: cs.error,
-                          onTap: onDeleteCurrentVersions,
-                          dense: compact,
-                        ),
-                      );
-                    }
-
-                    return Row(
-                      children: [
-                        Expanded(
-                          child: _DeleteButton(
-                            icon: Lucide.Trash2,
-                            label: l10n.homePageDeleteMessageNode,
-                            color: cs.error,
-                            onTap: onDeleteCurrentVersions,
-                            dense: compact,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _DeleteButton(
-                            icon: Lucide.Trash,
-                            label: l10n.homePageDeleteAllVersions,
-                            color: cs.error,
-                            onTap: onDeleteAllVersions,
-                            dense: compact,
-                          ),
-                        ),
-                      ],
+                    return SizedBox(
+                      width: double.infinity,
+                      child: _DeleteButton(
+                        icon: Lucide.Trash2,
+                        label: hasMultiVersionSelection
+                            ? l10n.homePageDeleteMessageNode
+                            : l10n.homePageDelete,
+                        color: cs.error,
+                        onTap: onDeleteCurrentVersions,
+                        dense: compact,
+                      ),
                     );
                   },
                 ),

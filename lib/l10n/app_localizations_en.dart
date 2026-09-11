@@ -2740,6 +2740,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Regenerating only updates this message and keeps the messages below it. Continue?';
 
   @override
+  String get chatMessageWidgetRegenerateConfirmInterruptNotice =>
+      'Regenerating will interrupt the reply that is currently being generated.';
+
+  @override
   String get chatMessageWidgetRegenerateConfirmDeleteTrailingContent =>
       'Regenerating will delete all messages below this message and cannot be undone. Continue?';
 
@@ -8961,6 +8965,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsPageAutoRetry => 'Auto Retry';
+
+  @override
+  String get settingsPageFirstTurnPlaceholder => 'First Message Placeholder';
+
+  @override
+  String get settingsPageFirstTurnPlaceholderSubtitle =>
+      'Some services reject a conversation that starts with a model reply. When on, a placeholder message is added to the front of such requests. It goes to the service only and never appears in your chat history.';
+
+  @override
+  String get settingsPageFirstTurnPlaceholderContent => 'Placeholder Content';
+
+  @override
+  String get settingsPageFirstTurnPlaceholderContentHint => 'e.g. #';
+
+  @override
+  String get settingsPageFirstTurnPlaceholderContentInvalid =>
+      'Cannot be empty or only spaces';
 
   @override
   String get autoRetryEnableLabel => 'Enable auto-retry';

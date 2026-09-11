@@ -9,6 +9,7 @@ import '../../../icons/lucide_adapter.dart';
 import 'package:syncfusion_flutter_sliders/sliders.dart';
 import 'package:syncfusion_flutter_core/theme.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/api/providers/claude/claude_role_normalizer.dart';
 import 'image_settings_page.dart';
 import 'message_style_settings_page.dart';
 import 'theme_settings_page.dart';
@@ -2004,6 +2005,147 @@ class _AutoCollapseCodeBlockLinesRowState
   }
 }
 
+/// 补位内容：用户可改成自己顺眼的字符。它只会出现在发给服务端的请求里，
+/// 不进聊天记录，所以这里只管"发出去的那一个 token 长什么样"。
+class _FirstTurnPlaceholderContentRow extends StatefulWidget {
+  const _FirstTurnPlaceholderContentRow();
+  @override
+  State<_FirstTurnPlaceholderContentRow> createState() =>
+      _FirstTurnPlaceholderContentRowState();
+}
+
+class _FirstTurnPlaceholderContentRowState
+    extends State<_FirstTurnPlaceholderContentRow> {
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+  bool _invalid = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: context.read<SettingsProvider>().claudeFirstTurnPlaceholderText,
+    );
+    _focusNode = FocusNode();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _onChanged(String value) {
+    final next = normalizeClaudeFirstTurnPlaceholder(value);
+    final invalid = next.isEmpty;
+    if (invalid != _invalid) setState(() => _invalid = invalid);
+    // 空白内容会被接口当空文本块拒收，所以不落库，留给用户自己改回来。
+    if (!invalid) {
+      context.read<SettingsProvider>().setClaudeFirstTurnPlaceholderText(next);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final sp = context.watch<SettingsProvider>();
+
+    // 失焦后把输入框拉回真正保存下来的值（去空白、截到上限之后的那份）。
+    if (!_focusNode.hasFocus &&
+        _controller.text != sp.claudeFirstTurnPlaceholderText) {
+      _controller.text = sp.claudeFirstTurnPlaceholderText;
+      _invalid = false;
+    }
+
+    final baseColor = cs.onSurface.withValues(alpha: 0.9);
+    final baseBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(
+        color: _invalid ? cs.error : cs.outlineVariant.withValues(alpha: 0.28),
+        width: 0.8,
+      ),
+    );
+    final focusBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(
+        color: _invalid ? cs.error : cs.primary,
+        width: 1.0,
+      ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 36,
+            child: Icon(Lucide.Hash, size: 20, color: baseColor),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.settingsPageFirstTurnPlaceholderContent,
+                  style: TextStyle(fontSize: 15, color: baseColor),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (_invalid) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    l10n.settingsPageFirstTurnPlaceholderContentInvalid,
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.2,
+                      color: cs.error,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          IntrinsicWidth(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 64, maxWidth: 140),
+              child: TextField(
+                controller: _controller,
+                focusNode: _focusNode,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                inputFormatters: [
+                  FilteringTextInputFormatter.deny(RegExp(r'[\r\n\t]')),
+                  LengthLimitingTextInputFormatter(
+                    claudeFirstTurnPlaceholderMaxLength,
+                  ),
+                ],
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: l10n.settingsPageFirstTurnPlaceholderContentHint,
+                  filled: true,
+                  fillColor: context.appColors.surfaceCard,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 8,
+                  ),
+                  border: baseBorder,
+                  enabledBorder: baseBorder,
+                  focusedBorder: focusBorder,
+                ),
+                onChanged: _onChanged,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class BehaviorStartupSettingsPage extends StatelessWidget {
   const BehaviorStartupSettingsPage({super.key});
   @override
@@ -2037,6 +2179,21 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                   MaterialPageRoute(builder: (_) => const AutoRetryPage()),
                 ),
               ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.Hash,
+                label: l10n.settingsPageFirstTurnPlaceholder,
+                subtitle: l10n.settingsPageFirstTurnPlaceholderSubtitle,
+                value: sp.claudeFirstTurnPlaceholderEnabled,
+                onChanged: (v) => context
+                    .read<SettingsProvider>()
+                    .setClaudeFirstTurnPlaceholderEnabled(v),
+              ),
+              if (sp.claudeFirstTurnPlaceholderEnabled) ...[
+                _iosDivider(context),
+                const _FirstTurnPlaceholderContentRow(),
+              ],
               _iosDivider(context),
               _iosSwitchRow(
                 context,

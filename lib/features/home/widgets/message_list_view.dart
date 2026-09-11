@@ -118,6 +118,7 @@ class MessageListView extends StatefulWidget {
     this.pinnedStreamingMessageId,
     this.isPinnedIndicatorActive = false,
     required this.isProcessingFiles,
+    this.isConversationGenerating = false,
     this.processingFilesMessageId,
     this.streamingContentNotifier,
     this.spotlightMessageId,
@@ -202,6 +203,9 @@ class MessageListView extends StatefulWidget {
   final String? pinnedStreamingMessageId;
   final bool isPinnedIndicatorActive;
   final ValueNotifier<bool> isProcessingFiles;
+
+  /// 当前会话是否有回复正在生成。用于重新生成确认弹窗的提醒文案。
+  final bool isConversationGenerating;
 
   /// Assistant message currently parsing attachments, or null. When omitted,
   /// [isProcessingFiles] remains available for legacy test callers.
@@ -1895,6 +1899,7 @@ class _MessageListViewState extends State<MessageListView> {
           (widget.isPinnedIndicatorActive &&
               (message.id == widget.pinnedStreamingMessageId)),
       retryStatus: retryStatus,
+      conversationStreaming: widget.isConversationGenerating,
       reasoningText: (message.role == 'assistant') ? (r?.text ?? '') : null,
       reasoningExpanded: (message.role == 'assistant')
           ? (r?.expanded ?? false)

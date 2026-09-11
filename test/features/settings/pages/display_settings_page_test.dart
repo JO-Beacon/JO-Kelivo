@@ -80,4 +80,49 @@ void main() {
     expect(find.text('Enable auto-retry'), findsOneWidget);
     expect(find.text('Max retries'), findsOneWidget);
   });
+
+  testWidgets('the first-turn placeholder starts off and reveals its field', (
+    tester,
+  ) async {
+    final preferences = createBusinessTestPreferences();
+    final settings = SettingsProvider(preferences);
+    addTearDown(settings.dispose);
+    await settings.loaded;
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider<SettingsProvider>.value(
+        value: settings,
+        child: const MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: DisplaySettingsPage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Behavior & startup'));
+    await tester.pumpAndSettle();
+
+    final switchLabel = find.text('First Message Placeholder');
+    // 补位内容那个输入框自己带一个 Scrollable，所以这里必须点名外层列表。
+    await tester.scrollUntilVisible(
+      switchLabel,
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    // 默认关闭：补位内容不显示。
+    expect(settings.claudeFirstTurnPlaceholderEnabled, isFalse);
+    expect(find.text('Placeholder Content'), findsNothing);
+
+    await tester.tap(switchLabel);
+    await tester.pumpAndSettle();
+
+    // 打开后才显示内容行，预填默认的井号。
+    expect(settings.claudeFirstTurnPlaceholderEnabled, isTrue);
+    expect(find.text('Placeholder Content'), findsOneWidget);
+    expect(find.text('#'), findsOneWidget);
+  });
 }

@@ -8,10 +8,17 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/providers/claude/claude_container.dart';
 import 'package:Kelivo/core/services/api/providers/claude/claude_files.dart';
 import 'package:Kelivo/core/services/api/providers/claude/claude_provider.dart';
+import 'package:Kelivo/core/services/api/providers/claude/claude_role_normalizer.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/core/utils/multimodal_input_utils.dart';
 
 const _model = 'claude-sonnet-4-5-20250929';
+
+/// 首条消息占位是进程级静态开关，用例改动后必须还原。
+void _resetPlaceholderConfig() {
+  ClaudeFirstTurnPlaceholderConfig.enabled = false;
+  ClaudeFirstTurnPlaceholderConfig.text = claudeFirstTurnPlaceholder;
+}
 
 ProviderConfig _config({List<String> builtInTools = const ['code_execution']}) {
   return ProviderConfig(
@@ -373,6 +380,40 @@ void main() {
           .toList();
       expect(artifacts.map((responses) => responses.length), [1, 2]);
       expect((artifacts.last[1] as List).single['text'], 'ok');
+    },
+  );
+
+  test(
+    'an assistant-first history is sent behind a user placeholder',
+    () async {
+      // 开关默认关闭（产品决定），这里显式打开才能验证补位逻辑。
+      ClaudeFirstTurnPlaceholderConfig.enabled = true;
+      addTearDown(_resetPlaceholderConfig);
+      final client = _ClaudeFakeClient();
+      addTearDown(client.close);
+
+      await sendClaudeStreamEvents(
+        client,
+        _config(builtInTools: const []),
+        _model,
+        [
+          {
+            'role': 'assistant',
+            'content': 'the reply the conversation starts on',
+          },
+          {'role': 'user', 'content': 'carry on'},
+        ],
+        stream: false,
+      ).toList();
+
+      final body =
+          jsonDecode(client.requests.single.body) as Map<String, dynamic>;
+      final messages = (body['messages'] as List).cast<Map>();
+      expect(messages.first['role'], 'user');
+      expect(messages.first['content'], claudeFirstTurnPlaceholder);
+      expect(messages[1]['role'], 'assistant');
+      expect(messages[1]['content'], 'the reply the conversation starts on');
+      expect(messages[2]['content'], 'carry on');
     },
   );
 }

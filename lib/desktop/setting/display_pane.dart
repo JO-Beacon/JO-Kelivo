@@ -108,6 +108,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                 children: const [
                   _ToggleRowAutoRetry(),
                   _RowDivider(),
+                  _FirstTurnPlaceholderSection(),
+                  _RowDivider(),
                   _ToggleRowAutoSwitchTopicsDesktop(),
                   _RowDivider(),
                   _ToggleRowAutoCollapseThinking(),
@@ -2616,6 +2618,229 @@ class _ToggleRowAutoRetry extends StatelessWidget {
             ? l10n.iosBackgroundStatusOn
             : l10n.iosBackgroundStatusOff,
         onTap: () => auto_retry.showDesktopAutoRetryDialog(context),
+      ),
+    );
+  }
+}
+
+/// 首条消息占位：请求以 AI 回复开头时补一条消息，否则接口直接拒收。
+/// 关掉之后补位内容那一行也就没有意义，跟着隐藏。
+class _FirstTurnPlaceholderSection extends StatelessWidget {
+  const _FirstTurnPlaceholderSection();
+  @override
+  Widget build(BuildContext context) {
+    final sp = context.watch<SettingsProvider>();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const _ToggleRowFirstTurnPlaceholder(),
+        if (sp.claudeFirstTurnPlaceholderEnabled) ...[
+          const _RowDivider(),
+          const _FirstTurnPlaceholderContentRow(),
+        ],
+      ],
+    );
+  }
+}
+
+class _ToggleRowFirstTurnPlaceholder extends StatelessWidget {
+  const _ToggleRowFirstTurnPlaceholder();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final sp = context.watch<SettingsProvider>();
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.settingsPageFirstTurnPlaceholder,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: AppFontWeights.regular,
+                    color: cs.onSurface.withValues(alpha: 0.9),
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  l10n.settingsPageFirstTurnPlaceholderSubtitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.2,
+                    color: cs.onSurface.withValues(alpha: 0.56),
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          IosSwitch(
+            value: sp.claudeFirstTurnPlaceholderEnabled,
+            onChanged: (v) => context
+                .read<SettingsProvider>()
+                .setClaudeFirstTurnPlaceholderEnabled(v),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FirstTurnPlaceholderContentRow extends StatefulWidget {
+  const _FirstTurnPlaceholderContentRow();
+  @override
+  State<_FirstTurnPlaceholderContentRow> createState() =>
+      _FirstTurnPlaceholderContentRowState();
+}
+
+class _FirstTurnPlaceholderContentRowState
+    extends State<_FirstTurnPlaceholderContentRow> {
+  late final SettingsProvider _settings;
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+  bool _invalid = false;
+  bool _disposing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _settings = context.read<SettingsProvider>();
+    _controller = TextEditingController(
+      text: _settings.claudeFirstTurnPlaceholderText,
+    );
+    _focusNode = FocusNode()
+      ..addListener(() {
+        if (!_focusNode.hasFocus) _commit(_controller.text);
+      });
+  }
+
+  @override
+  void dispose() {
+    // 关掉开关时本行会被整个移除，失焦回调可能在拆除过程中触发；
+    // 这时不能再 setState。
+    _disposing = true;
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _commit(String value) {
+    if (_disposing) return;
+    final next = normalizeClaudeFirstTurnPlaceholder(value);
+    if (next.isEmpty) {
+      // 空白内容会被接口当空文本块拒收，留在原地等用户改。
+      if (!_invalid) setState(() => _invalid = true);
+      return;
+    }
+    if (_invalid) setState(() => _invalid = false);
+    _settings.setClaudeFirstTurnPlaceholderText(next);
+    if (_controller.text != next) {
+      _controller.value = _controller.value.copyWith(
+        text: next,
+        selection: TextSelection.collapsed(offset: next.length),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final settings = context.watch<SettingsProvider>();
+
+    // 失焦后把输入框拉回真正保存下来的值（去空白、截到上限之后的那份）。
+    if (!_focusNode.hasFocus &&
+        _controller.text != settings.claudeFirstTurnPlaceholderText) {
+      _controller.text = settings.claudeFirstTurnPlaceholderText;
+      _invalid = false;
+    }
+
+    final baseColor = cs.onSurface.withValues(alpha: 0.9);
+    final baseBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(
+        color: _invalid ? cs.error : cs.outlineVariant.withValues(alpha: 0.28),
+        width: 0.8,
+      ),
+    );
+    final focusBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(
+        color: _invalid ? cs.error : cs.primary,
+        width: 1.0,
+      ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.settingsPageFirstTurnPlaceholderContent,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: AppFontWeights.regular,
+                    color: baseColor,
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+                if (_invalid) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    l10n.settingsPageFirstTurnPlaceholderContentInvalid,
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.2,
+                      color: cs.error,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 96,
+            child: TextField(
+              controller: _controller,
+              focusNode: _focusNode,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              style: TextStyle(fontSize: 14, color: baseColor),
+              inputFormatters: [
+                FilteringTextInputFormatter.deny(RegExp(r'[\r\n\t]')),
+                LengthLimitingTextInputFormatter(
+                  claudeFirstTurnPlaceholderMaxLength,
+                ),
+              ],
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: l10n.settingsPageFirstTurnPlaceholderContentHint,
+                filled: true,
+                fillColor: context.appColors.surfaceCard,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 8,
+                ),
+                border: baseBorder,
+                enabledBorder: baseBorder,
+                focusedBorder: focusBorder,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

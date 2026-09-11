@@ -5092,6 +5092,12 @@ abstract class AppLocalizations {
   /// **'Regenerating only updates this message and keeps the messages below it. Continue?'**
   String get chatMessageWidgetRegenerateConfirmContent;
 
+  /// No description provided for @chatMessageWidgetRegenerateConfirmInterruptNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Regenerating will interrupt the reply that is currently being generated.'**
+  String get chatMessageWidgetRegenerateConfirmInterruptNotice;
+
   /// No description provided for @chatMessageWidgetRegenerateConfirmDeleteTrailingContent.
   ///
   /// In en, this message translates to:
@@ -16230,6 +16236,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Auto Retry'**
   String get settingsPageAutoRetry;
+
+  /// No description provided for @settingsPageFirstTurnPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'First Message Placeholder'**
+  String get settingsPageFirstTurnPlaceholder;
+
+  /// No description provided for @settingsPageFirstTurnPlaceholderSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Some services reject a conversation that starts with a model reply. When on, a placeholder message is added to the front of such requests. It goes to the service only and never appears in your chat history.'**
+  String get settingsPageFirstTurnPlaceholderSubtitle;
+
+  /// No description provided for @settingsPageFirstTurnPlaceholderContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Placeholder Content'**
+  String get settingsPageFirstTurnPlaceholderContent;
+
+  /// No description provided for @settingsPageFirstTurnPlaceholderContentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. #'**
+  String get settingsPageFirstTurnPlaceholderContentHint;
+
+  /// No description provided for @settingsPageFirstTurnPlaceholderContentInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot be empty or only spaces'**
+  String get settingsPageFirstTurnPlaceholderContentInvalid;
 
   /// No description provided for @autoRetryEnableLabel.
   ///

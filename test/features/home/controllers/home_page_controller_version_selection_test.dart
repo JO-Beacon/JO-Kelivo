@@ -355,7 +355,6 @@ void main() {
               hasMultiVersionSelection:
                   controller!.selectedMessagesIncludeMultipleVersions,
               onDeleteCurrentVersions: () {},
-              onDeleteAllVersions: () {},
             ),
           ),
         ),

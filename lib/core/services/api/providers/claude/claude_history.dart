@@ -4,6 +4,7 @@ import '../../../../utils/multimodal_input_utils.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../chat_api_helpers.dart';
 import 'claude_container.dart';
+import 'claude_role_normalizer.dart';
 
 /// Provider artifact kind under which a Claude turn's responses are stored
 /// against the assistant message that made them: every response the API
@@ -139,7 +140,8 @@ class ClaudeHistory {
     return true;
   }
 
-  /// [messages] with the system prompt already taken out.
+  /// [messages] with the system prompt already taken out. The array opens with
+  /// a `user` turn, as the API requires — see [ensureClaudeFirstTurnIsUser].
   Future<List<Map<String, dynamic>>> build(
     List<Map<String, dynamic>> messages,
   ) async {
@@ -326,6 +328,9 @@ class ClaudeHistory {
       }
     }
     flushResults();
+    // A conversation cut to begin at a reply would open with an assistant turn,
+    // which the API rejects outright.
+    ensureClaudeFirstTurnIsUser(out);
     return out;
   }
 

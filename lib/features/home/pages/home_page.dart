@@ -1224,11 +1224,6 @@ class _HomePageState extends State<HomePage>
             _handleDeleteSelectedMessages(context, deleteAllVersions: false),
           );
         },
-        onDeleteAllVersions: () {
-          unawaited(
-            _handleDeleteSelectedMessages(context, deleteAllVersions: true),
-          );
-        },
       );
     }
 
@@ -1504,6 +1499,7 @@ class _HomePageState extends State<HomePage>
     final assistant = context.watch<AssistantProvider>().currentAssistant;
     return MessageListView(
       isProcessingFiles: _controller.isProcessingFiles,
+      isConversationGenerating: _controller.isCurrentConversationLoading,
       processingFilesMessageId: _controller.processingFilesMessageId,
       scrollController: _scrollController,
       listController: _controller.scrollCtrl.messageListController,

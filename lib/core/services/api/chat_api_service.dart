@@ -35,6 +35,7 @@ import 'stream/stream_chunk.dart';
 import 'stream/stream_chunk_emit.dart';
 import 'stream/stream_chunk_ids.dart';
 import 'providers/claude/claude_provider.dart';
+import 'providers/claude/claude_role_normalizer.dart';
 import 'providers/google/google_provider.dart';
 import 'providers/openai/openai_provider.dart';
 

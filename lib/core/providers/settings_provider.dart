@@ -37,6 +37,7 @@ import '../database/business_preferences.dart';
 import '../services/memory/memory_prompts.dart';
 import '../services/memory/memory_trace.dart';
 import '../services/api/retry_policy.dart';
+import '../services/api/providers/claude/claude_role_normalizer.dart';
 import '../../theme/palettes.dart';
 import '../../theme/custom_theme.dart';
 import '../../theme/chat_bubble_style.dart';
@@ -319,6 +320,11 @@ class SettingsProvider extends ChangeNotifier {
       'mobile_assistant_edit_tab_hidden_v1';
   static const String _mobileAssistantDetailOutlineEnabledKey =
       'mobile_assistant_detail_outline_enabled_v1';
+  // 首条消息占位：对话以 AI 回复开头时，请求前补一条 user 消息
+  static const String _claudeFirstTurnPlaceholderEnabledKey =
+      'claude_first_turn_placeholder_enabled_v1';
+  static const String _claudeFirstTurnPlaceholderTextKey =
+      'claude_first_turn_placeholder_text_v1';
   // 网络请求日志（调试）
   static const String _requestLogEnabledKey = 'request_log_enabled_v1';
   static const String _contextLogEnabledKey = 'context_log_enabled_v1';
@@ -1070,6 +1076,16 @@ class SettingsProvider extends ChangeNotifier {
       );
     }
     AutoRetryConfig.current = _autoRetry;
+    _claudeFirstTurnPlaceholderEnabled =
+        prefs.getBool(_claudeFirstTurnPlaceholderEnabledKey) ?? false;
+    final storedPlaceholder = normalizeClaudeFirstTurnPlaceholder(
+      prefs.getString(_claudeFirstTurnPlaceholderTextKey) ??
+          claudeFirstTurnPlaceholder,
+    );
+    _claudeFirstTurnPlaceholderText = storedPlaceholder.isEmpty
+        ? claudeFirstTurnPlaceholder
+        : storedPlaceholder;
+    _syncClaudeFirstTurnPlaceholder();
     _showUserAvatar = prefs.getBool(_displayShowUserAvatarKey) ?? true;
     _showModelIcon = prefs.getBool(_displayShowModelIconKey) ?? true;
     _showModelNameTimestamp =
@@ -4558,6 +4574,36 @@ Requirements:
     await setAutoRetryOptions(_autoRetry.copyWith(enabled: value));
   }
 
+  // 首条消息占位：请求以 AI 回复开头时补一条 user 消息，否则接口直接拒绝。
+  bool _claudeFirstTurnPlaceholderEnabled = false;
+  bool get claudeFirstTurnPlaceholderEnabled =>
+      _claudeFirstTurnPlaceholderEnabled;
+  Future<void> setClaudeFirstTurnPlaceholderEnabled(bool value) async {
+    if (_claudeFirstTurnPlaceholderEnabled == value) return;
+    _claudeFirstTurnPlaceholderEnabled = value;
+    _syncClaudeFirstTurnPlaceholder();
+    notifyListeners();
+    await _preferences.setBool(_claudeFirstTurnPlaceholderEnabledKey, value);
+  }
+
+  String _claudeFirstTurnPlaceholderText = claudeFirstTurnPlaceholder;
+  String get claudeFirstTurnPlaceholderText => _claudeFirstTurnPlaceholderText;
+  Future<void> setClaudeFirstTurnPlaceholderText(String value) async {
+    // 空白内容会被接口当空文本块拒绝，所以这种输入一律不落库。
+    final next = normalizeClaudeFirstTurnPlaceholder(value);
+    if (next.isEmpty || next == _claudeFirstTurnPlaceholderText) return;
+    _claudeFirstTurnPlaceholderText = next;
+    _syncClaudeFirstTurnPlaceholder();
+    notifyListeners();
+    await _preferences.setString(_claudeFirstTurnPlaceholderTextKey, next);
+  }
+
+  void _syncClaudeFirstTurnPlaceholder() {
+    ClaudeFirstTurnPlaceholderConfig.enabled =
+        _claudeFirstTurnPlaceholderEnabled;
+    ClaudeFirstTurnPlaceholderConfig.text = _claudeFirstTurnPlaceholderText;
+  }
+
   // 显示设置：用户头像和模型图标的可见性
   bool _showUserAvatar = true;
   bool get showUserAvatar => _showUserAvatar;
@@ -5732,6 +5778,9 @@ Requirements:
     copy._keepAssistantListExpandedOnSidebarClose =
         _keepAssistantListExpandedOnSidebarClose;
     copy._requestLogEnabled = _requestLogEnabled;
+    copy._claudeFirstTurnPlaceholderEnabled =
+        _claudeFirstTurnPlaceholderEnabled;
+    copy._claudeFirstTurnPlaceholderText = _claudeFirstTurnPlaceholderText;
     copy._contextLogEnabled = _contextLogEnabled;
     copy._flutterLogEnabled = _flutterLogEnabled;
     copy._logSaveOutput = _logSaveOutput;

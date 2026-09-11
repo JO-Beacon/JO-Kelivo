@@ -2640,6 +2640,10 @@ class AppLocalizationsZh extends AppLocalizations {
       '重新生成只会更新当前消息，不会删除下面的消息。确定要继续吗？';
 
   @override
+  String get chatMessageWidgetRegenerateConfirmInterruptNotice =>
+      '重新生成会中断正在生成的回复。';
+
+  @override
   String get chatMessageWidgetRegenerateConfirmDeleteTrailingContent =>
       '重新生成将会删除此消息下面的所有消息，且无法撤销。确定要继续吗？';
 
@@ -8586,6 +8590,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPageAutoRetry => '自动重试';
 
   @override
+  String get settingsPageFirstTurnPlaceholder => '首条消息占位';
+
+  @override
+  String get settingsPageFirstTurnPlaceholderSubtitle =>
+      '有些服务不接受以 AI 回复开头的对话。开启后遇到这种对话，会在请求最前面补一条消息；它只发给服务端，不会出现在聊天记录里。';
+
+  @override
+  String get settingsPageFirstTurnPlaceholderContent => '占位内容';
+
+  @override
+  String get settingsPageFirstTurnPlaceholderContentHint => '例如 #';
+
+  @override
+  String get settingsPageFirstTurnPlaceholderContentInvalid => '不能为空，也不能只有空格';
+
+  @override
   String get autoRetryEnableLabel => '开启自动重试';
 
   @override
@@ -11341,6 +11361,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get chatMessageWidgetRegenerateConfirmContent =>
       '重新生成只会更新当前消息，不会删除下面的消息。确定要继续吗？';
+
+  @override
+  String get chatMessageWidgetRegenerateConfirmInterruptNotice =>
+      '重新生成会中断正在生成的回复。';
 
   @override
   String get chatMessageWidgetRegenerateConfirmDeleteTrailingContent =>
@@ -17289,6 +17313,22 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get settingsPageAutoRetry => '自动重试';
 
   @override
+  String get settingsPageFirstTurnPlaceholder => '首条消息占位';
+
+  @override
+  String get settingsPageFirstTurnPlaceholderSubtitle =>
+      '有些服务不接受以 AI 回复开头的对话。开启后遇到这种对话，会在请求最前面补一条消息；它只发给服务端，不会出现在聊天记录里。';
+
+  @override
+  String get settingsPageFirstTurnPlaceholderContent => '占位内容';
+
+  @override
+  String get settingsPageFirstTurnPlaceholderContentHint => '例如 #';
+
+  @override
+  String get settingsPageFirstTurnPlaceholderContentInvalid => '不能为空，也不能只有空格';
+
+  @override
   String get autoRetryEnableLabel => '开启自动重试';
 
   @override
@@ -20044,6 +20084,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get chatMessageWidgetRegenerateConfirmContent =>
       '重新生成只會更新目前訊息，不會刪除下面的訊息。確定要繼續嗎？';
+
+  @override
+  String get chatMessageWidgetRegenerateConfirmInterruptNotice =>
+      '重新生成會中斷正在生成的回覆。';
 
   @override
   String get chatMessageWidgetRegenerateConfirmDeleteTrailingContent =>
@@ -25992,6 +26036,22 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get settingsPageAutoRetry => '自動重試';
+
+  @override
+  String get settingsPageFirstTurnPlaceholder => '首則訊息佔位';
+
+  @override
+  String get settingsPageFirstTurnPlaceholderSubtitle =>
+      '有些服務不接受以 AI 回覆開頭的對話。開啟後遇到這種對話，會在請求最前面補一則訊息；它只發給服務端，不會出現在聊天記錄裡。';
+
+  @override
+  String get settingsPageFirstTurnPlaceholderContent => '佔位內容';
+
+  @override
+  String get settingsPageFirstTurnPlaceholderContentHint => '例如 #';
+
+  @override
+  String get settingsPageFirstTurnPlaceholderContentInvalid => '不能為空，也不能只有空白';
 
   @override
   String get autoRetryEnableLabel => '開啟自動重試';

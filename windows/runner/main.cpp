@@ -5,6 +5,32 @@
 #include "flutter_window.h"
 #include "utils.h"
 
+namespace {
+
+// 重复启动时，占着运行权的那个实例已经找不到可以唤到前台的主窗口：它的窗口
+// 不在，但进程还没有退出。此时若直接静默结束，用户看到的就是双击图标后毫无
+// 反应，无从判断该做什么。给出说明，让他至少知道去哪里处理。
+//
+// 文案跟随系统界面语言。只有一段话，不值得引入完整的资源本地化；runner 的
+// 原生弹窗也不经过应用的 ARB 文案。
+void ShowExistingInstanceNotice() {
+  const LANGID language = ::GetUserDefaultUILanguage();
+  const bool chinese = PRIMARYLANGID(language) == LANG_CHINESE;
+  const wchar_t* message =
+      chinese
+          ? L"JO-AIClient 已经在运行，但它的窗口没有出现在屏幕上。\n\n"
+            L"如果找不到它，请在任务管理器中结束所有 JO-AIClient 进程，"
+            L"然后重新打开。"
+          : L"JO-AIClient is already running, but its window is not on "
+            L"screen.\n\n"
+            L"If you cannot find it, end every JO-AIClient process in "
+            L"Task Manager, then start it again.";
+  ::MessageBoxW(nullptr, message, L"JO-AIClient",
+                MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND | MB_TOPMOST);
+}
+
+}  // namespace
+
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command) {
   // Attach to console when present (e.g., 'flutter run') or create a
@@ -28,12 +54,18 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     // after the bounded wait.
     const DWORD wait_result = ::WaitForSingleObject(instance_mutex, 2000);
     if (wait_result != WAIT_OBJECT_0 && wait_result != WAIT_ABANDONED) {
+      bool handed_off = false;
       for (int attempt = 0; attempt < 20; ++attempt) {
         if (Win32Window::SendAppLinkToInstance(
                 L"JO-AIClient", associated_backup_path)) {
+          handed_off = true;
           break;
         }
         ::Sleep(100);
+      }
+      // 唤不到窗口就不再默默结束：那正是看起来毫无反应的来源。
+      if (!handed_off) {
+        ShowExistingInstanceNotice();
       }
       ::CloseHandle(instance_mutex);
       return 0;

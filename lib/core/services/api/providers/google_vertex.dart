@@ -361,6 +361,8 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
       initialMessages.add({'role': roleName, 'content': raw});
     }
   }
+  // 首条非 user 时补占位：Anthropic 会以 400 拒绝以 assistant 开头的请求。
+  ensureClaudeFirstTurnIsUser(initialMessages);
 
   // 工具设置（沿用 Claude 的逻辑）
   List<Map<String, dynamic>>? anthropicTools;
