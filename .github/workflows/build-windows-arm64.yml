@@ -1,0 +1,134 @@
+name: Build Windows ARM64
+
+# Windows on ARM（原生 ARM64 版）构建通道。与 build-windows.yml（x64）相互独立：
+# 这条线出问题不会影响 x64 的发版链路。
+#
+# 关键背景（2026-09-12 查证）：
+# - `flutter build windows` 没有选择目标架构的参数，目标跟主机走：ARM 机器编 ARM64。
+#   因此本流水线必须跑在 windows-11-arm 上，x64 构建机交叉编译不了。
+# - Flutter 官方没有发布 ARM64 主机的 SDK 包（releases_windows.json 全部是 x64），
+#   所以这里强制安装 x64 版 SDK，靠 Windows 11 ARM 的 x64 模拟运行工具链本身，
+#   编译产物仍是原生 ARM64（CMake/MSVC 按主机判定走 ARM64 目标）。
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: '上传到 GitHub Release 草稿'
+        required: false
+        default: false
+        type: boolean
+      release_tag:
+        description: 'Release 标签，例如 0.1.7+7'
+        required: false
+        default: ''
+        type: string
+      prerelease:
+        description: '标记为预发布版本'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: '3.44.9'
+
+jobs:
+  build-windows-arm64:
+    name: Build Windows ARM64
+    runs-on: windows-11-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+          # 必须显式指定 x64：Flutter 没有 ARM64 主机的 SDK 包，
+          # 不指定的话 action 会去找 arm64 归档并失败。
+          architecture: x64
+
+      - name: Resolve version
+        shell: pwsh
+        env:
+          PUBLISH_RELEASE: ${{ inputs.publish_release || false }}
+          RELEASE_TAG: ${{ inputs.release_tag || '' }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $rawVersion = ((Select-String -Path pubspec.yaml -Pattern '^version:\s*(\S+)' | Select-Object -First 1).Matches[0].Groups[1].Value)
+          $releaseVersion = $rawVersion.Split('+')[0]
+          $version = $rawVersion
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            if ($env:GITHUB_REF_NAME -ne $rawVersion) {
+              throw "Tag $env:GITHUB_REF_NAME does not match pubspec version $releaseVersion."
+            }
+          } elseif ($env:PUBLISH_RELEASE -eq 'true') {
+            if ($env:RELEASE_TAG -ne $rawVersion) {
+              throw "Release tag must be $rawVersion."
+            }
+          } else {
+            $shortSha = (git rev-parse --short HEAD).Trim()
+            $version = "${version}_${shortSha}"
+          }
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Resolved version: $version"
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build Windows
+        run: flutter build windows --release
+
+      - name: Package portable ZIP
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Compress-Archive -Path 'build/windows/arm64/runner/Release/*' -DestinationPath "JO-AIClient-v$env:VERSION-windows-arm64-portable.zip"
+
+      - name: Package setup EXE
+        shell: pwsh
+        run: |
+          ./scripts/windows/build_installer.ps1 -AppVersion $env:VERSION -SourceDir "build/windows/arm64/runner/Release" -SetupArch arm64 -OutputDir .
+
+      - name: Generate SHA-256 checksums
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Get-ChildItem -File "JO-AIClient-v$env:VERSION-windows-arm64-*" | ForEach-Object {
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash.ToLowerInvariant()
+            "$hash  $($_.Name)" | Set-Content -LiteralPath "$($_.FullName).sha256" -Encoding ascii
+          }
+
+      - name: Upload Windows ARM64 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-arm64
+          path: |
+            JO-AIClient-v*-windows-arm64-portable.zip
+            JO-AIClient-v*-windows-arm64-portable.zip.sha256
+            JO-AIClient-v*-windows-arm64-setup.exe
+            JO-AIClient-v*-windows-arm64-setup.exe.sha256
+          if-no-files-found: error
+
+      - name: Upload assets to draft GitHub Release
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_release && inputs.release_tag != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          name: ${{ inputs.release_tag }}
+          body_path: .github/release-notes/${{ inputs.release_tag }}.md
+          draft: true
+          prerelease: ${{ inputs.prerelease || false }}
+          files: |
+            JO-AIClient-v*-windows-arm64-portable.zip
+            JO-AIClient-v*-windows-arm64-portable.zip.sha256
+            JO-AIClient-v*-windows-arm64-setup.exe
+            JO-AIClient-v*-windows-arm64-setup.exe.sha256

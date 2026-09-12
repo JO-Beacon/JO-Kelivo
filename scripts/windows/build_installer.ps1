@@ -6,6 +6,10 @@ param(
 
   [string] $OutputDir = ".",
 
+  # 安装包架构：x64（默认，保持既有行为）或 arm64（CI 的 ARM64 构建通道传入）。
+  [ValidateSet("x64", "arm64")]
+  [string] $SetupArch = "x64",
+
   [string] $InnoSetupCompiler = ""
 )
 
@@ -83,7 +87,8 @@ $arguments = @(
   "/DAppVersion=$AppVersion",
   "/DSourceDir=$sourceDirResolved",
   "/DOutputDir=$outputDirResolved",
-  "/DIconSource=$iconSource"
+  "/DIconSource=$iconSource",
+  "/DSetupArch=$SetupArch"
 )
 
 if ($chineseMessagesFile) {

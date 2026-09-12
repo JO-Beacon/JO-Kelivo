@@ -1593,10 +1593,9 @@ packages:
   sherpa_onnx_windows:
     dependency: "direct overridden"
     description:
-      name: sherpa_onnx_windows
-      sha256: "1512243509d02713895067f960b9532c61bb43e125dcdf5e2780a5f967c5fe35"
-      url: "https://pub.dev"
-    source: hosted
+      path: "dependencies/sherpa_onnx_windows"
+      relative: true
+    source: path
     version: "1.12.20"
   shortid:
     dependency: transitive

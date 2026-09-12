@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 0.1.15+15
+version: 0.1.16+16
 
 environment:
   sdk: ^3.12.1
@@ -163,7 +163,13 @@ dependency_overrides:
   sherpa_onnx_ios: 1.12.20
   sherpa_onnx_linux: 1.12.20
   sherpa_onnx_macos: 1.12.20
-  sherpa_onnx_windows: 1.12.20
+  # Local fork of sherpa_onnx_windows 1.12.20: upstream only ships x64 prebuilt
+  # DLLs, so an ARM64 build would bundle DLLs an ARM64 process cannot load.
+  # The fork selects per-architecture DLLs (x64 vendored byte-identical,
+  # arm64 fetched from the pinned NuGet runtime package at build time);
+  # see dependencies/sherpa_onnx_windows/FORK_NOTES.md.
+  sherpa_onnx_windows:
+    path: ./dependencies/sherpa_onnx_windows
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

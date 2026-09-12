@@ -32,6 +32,13 @@
   #define IconDestName "app_icon_" + AppVersion + ".ico"
 #endif
 
+; 安装包架构（x64 / arm64）。默认 x64 保持既有行为；ARM64 包由 CI 的 ARM64
+; 构建通道传入（build_installer.ps1 的 -SetupArch 参数）。
+; 两种包的打包内容与方式一致，只差架构标识与输出文件名。
+#ifndef SetupArch
+  #define SetupArch "x64"
+#endif
+
 [Setup]
 AppId={#MyAppId}
 AppName={#MyAppName}
@@ -46,12 +53,24 @@ DefaultGroupName={#MyAppName}
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 OutputDir={#OutputDir}
-OutputBaseFilename=JO-AIClient-v{#AppVersion}-windows-x64-setup
+OutputBaseFilename=JO-AIClient-v{#AppVersion}-windows-{#SetupArch}-setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-ArchitecturesInstallIn64BitMode=x64
-ArchitecturesAllowed=x64
+#if SetupArch == "x64"
+; 架构标识用 x64compatible 而不是 x64：x64 只允许在 x64 Windows 上安装，
+; ARM64 的 Windows 11 会被直接拒绝；x64compatible 同时放行两者（Inno 6.3 起
+; 官方推荐给“x64 应用也要能装进 ARM 电脑”的场景用这个标识，x64 已弃用）。
+; 本包内的程序是 x64 版，装进 ARM 电脑后靠系统的 x64 模拟运行，功能完整。
+ArchitecturesInstallIn64BitMode=x64compatible
+ArchitecturesAllowed=x64compatible
+#else
+; ARM64 包只能装在 ARM64 的 Windows 上：x64 电脑没有模拟 ARM64 程序的能力
+; （模拟只存在于相反方向），装上也跑不起来，所以这里写死 ARM64，
+; 让 x64 电脑在安装阶段就被明确拒绝，而不是装出一个打不开的程序。
+ArchitecturesInstallIn64BitMode=ARM64
+ArchitecturesAllowed=ARM64
+#endif
 ChangesAssociations=yes
 ; 旧版本还在运行时，允许安装程序直接结束它。但安装程序不会悄悄动手：
 ; [Code] 段的 PrepareToInstall 会先弹一个三按钮对话框，由用户决定怎么处理。
