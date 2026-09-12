@@ -3,12 +3,16 @@ name: Build Windows ARM64
 # Windows on ARM（原生 ARM64 版）构建通道。与 build-windows.yml（x64）相互独立：
 # 这条线出问题不会影响 x64 的发版链路。
 #
-# 关键背景（2026-09-12 查证）：
-# - `flutter build windows` 没有选择目标架构的参数，目标跟主机走：ARM 机器编 ARM64。
-#   因此本流水线必须跑在 windows-11-arm 上，x64 构建机交叉编译不了。
-# - Flutter 官方没有发布 ARM64 主机的 SDK 包（releases_windows.json 全部是 x64），
-#   所以这里强制安装 x64 版 SDK，靠 Windows 11 ARM 的 x64 模拟运行工具链本身，
-#   编译产物仍是原生 ARM64（CMake/MSVC 按主机判定走 ARM64 目标）。
+# 关键背景（2026-09-12 查证，首跑失败后修正）：
+# - `flutter build windows` 没有选择目标架构的参数，目标跟 Dart 虚拟机的芯片走
+#   （dart:ffi 的 Abi.current() 读的是运行中的进程）。x64 的 Dart 在 ARM 机器上被
+#   系统模拟运行时会自认 x64、编出 x64 产物（首跑即栽在这里）。因此必须让工具链
+#   跑在原生 ARM64 的 Dart 上。
+# - Flutter 的发布包只自带 x64 Dart，但官方 CDN 为同一引擎版本提供原生 ARM64 的
+#   Dart SDK（dart-sdk-windows-arm64.zip，3.44.9 实测可达）。下面的
+#   Install native ARM64 Dart SDK 步骤负责换装；换掉 Dart 目录后保持引擎版本戳
+#   不动，Flutter 的自更新脚本比对戳一致就不会改回去。
+# - x64 交叉编译 ARM64 上游尚未实现，本流水线必须跑在 windows-11-arm 上。
 
 on:
   workflow_dispatch:
@@ -52,9 +56,29 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
-          # 必须显式指定 x64：Flutter 没有 ARM64 主机的 SDK 包，
-          # 不指定的话 action 会去找 arm64 归档并失败。
+          # 必须显式指定 x64：Flutter 的发布包没有 ARM64 版本（只有 Dart 有），
+          # 不指定的话 action 会去找 arm64 的 Flutter 归档并失败。Dart 随后换装。
           architecture: x64
+
+      - name: Install native ARM64 Dart SDK
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # Flutter 的构建目标跟 Dart 虚拟机的架构走：发布包自带的 x64 Dart 在 ARM
+          # 机器上被模拟运行时会误判主机、编出 x64。官方 CDN 为同一引擎版本提供
+          # 原生 ARM64 的 Dart SDK，这里换装它；引擎版本戳保持不动，Flutter 的
+          # 自更新脚本比对一致就不会把 x64 装回来。
+          $engineVersion = (Get-Content "$env:FLUTTER_ROOT\bin\cache\engine.stamp").Trim()
+          $url = "https://storage.googleapis.com/flutter_infra_release/flutter/$engineVersion/dart-sdk-windows-arm64.zip"
+          $cache = "$env:FLUTTER_ROOT\bin\cache"
+          $zip = "$cache\dart-sdk-windows-arm64.zip"
+          Write-Host "Downloading native ARM64 Dart SDK for engine $engineVersion"
+          Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+          Remove-Item -Recurse -Force "$cache\dart-sdk"
+          Expand-Archive -Path $zip -DestinationPath $cache -Force
+          Remove-Item -Force $zip
+          Write-Host "Dart in use now:"
+          & "$cache\dart-sdk\bin\dart.exe" --version
 
       - name: Resolve version
         shell: pwsh
