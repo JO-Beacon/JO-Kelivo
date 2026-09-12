@@ -46,6 +46,19 @@ void main() {
         'macos/Runner/Configs/AppInfo.xcconfig',
         'PRODUCT_BUNDLE_IDENTIFIER = io.github.jobeacon.joaiclient',
       );
+      // 版权串逐字写死：年号与措辞都是明确决定，不随年份自动更新。
+      // 同时禁止回退到上游模板的「All rights reserved」——那是保留全部权利的表述，
+      // 与按 AGPL 发布相悖；本项目此前从上游模板继承了它，且年号比项目本身还早一年。
+      _expectContains(
+        'macos/Runner/Configs/AppInfo.xcconfig',
+        'PRODUCT_COPYRIGHT = Copyright (C) 2026 JO-Beacon. '
+            'Based on Kelivo; licensed under AGPL-3.0.',
+      );
+      expect(
+        _read('macos/Runner/Configs/AppInfo.xcconfig'),
+        isNot(contains('All rights reserved')),
+        reason: 'macOS 版权串不得回退为保留所有权利的表述',
+      );
       _expectContains(
         'macos/Runner/Configs/RestoreHarness.xcconfig',
         'PRODUCT_BUNDLE_IDENTIFIER = '
@@ -77,6 +90,17 @@ void main() {
       _expectContains(
         'windows/runner/Runner.rc',
         'VALUE "OriginalFilename", "jo_aiclient.exe"',
+      );
+      // 同上：Windows 可执行文件的版权串也逐字写死。
+      _expectContains(
+        'windows/runner/Runner.rc',
+        'VALUE "LegalCopyright", "Copyright (C) 2026 JO-Beacon. '
+            'Based on Kelivo; licensed under AGPL-3.0."',
+      );
+      expect(
+        _read('windows/runner/Runner.rc'),
+        isNot(contains('All rights reserved')),
+        reason: 'Windows 版权串不得回退为保留所有权利的表述',
       );
 
       final windowsInstaller = _read('scripts/windows/kelivo_installer.iss');

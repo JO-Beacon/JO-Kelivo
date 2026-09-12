@@ -184,8 +184,16 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/icons/
+    # 桌面与启动器用的成品（自带纯黑底），也兼作 Linux 窗口图标
     - assets/app_icon.png
-    - assets/app_icon.ico
+    # 应用内展示用的透明版（关于页按界面明暗各取一份）
+    - assets/app_icon_light.png
+    - assets/app_icon_dark.png
+    # 托盘图形：面板与任务栏的底色可深可浅，深浅各一份，由程序按当前明暗切换
+    - assets/icon_tray_light.png
+    - assets/icon_tray_dark.png
+    - assets/icon_tray_light.ico
+    - assets/icon_tray_dark.ico
     - assets/icon_mac.png
     - assets/mermaid.min.js
     - assets/html/mark.html
@@ -222,14 +230,9 @@ flutter:
 #      fonts:
 #        - asset: assets/fonts/JetBrainsMono-Regular.ttf
 
-flutter_launcher_icons:
-  android: true
-  ios: true
-  image_path: assets/app_icon_foreground.png
-  adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: assets/app_icon_foreground.png
-  remove_alpha_ios: true
-
+# 启动器图标的配置在仓库根目录的 flutter_launcher_icons.yaml，不在这里。
+# 该工具会优先读取那个独立配置文件，写在 pubspec 里的同名段落不会被采用；
+# 此前这里残留过一段指向不存在文件的旧配置，容易误导，故移除。
 flutter_native_splash:
   # Apply to both platforms
   android: true
@@ -239,16 +242,18 @@ flutter_native_splash:
   color: "#FFFFFF"
   color_dark: "#000000"
 
-  # Center image (re-use app icon foreground)
+  # Center image（透明底图形，与底色一样按深浅各配一版）
   image: assets/start.png
-  image_dark: assets/start.png
+  image_dark: assets/start_dark.png
 
   # iOS content mode to keep logo centered
   ios_content_mode: center
 
-  # Android 12+ splash config (optional but keeps parity)
+  # Android 12+ 单独一份：系统给启动画面图标也套了遮罩，只保证中间 2/3 可见，
+  # 圆外完全不可见（官方文档：与自适应图标同一规范，前景的三分之一被遮盖）。
+  # 所以这份收进安全圆，不跟 iOS 与 Android 11 及以下共用。
   android_12:
     color: "#FFFFFF"
     color_dark: "#000000"
-    image: assets/start.png
-    image_dark: assets/start.png
+    image: assets/start_android12.png
+    image_dark: assets/start_android12_dark.png

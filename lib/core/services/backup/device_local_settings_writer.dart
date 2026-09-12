@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../database/business_settings_router.dart';
 import 'local_device_settings_ledger.dart';
 
-/// 把册子里记录的 9 个本机设置键写回本机。
+/// 把册子里记录的 10 个本机设置键写回本机。
 ///
 /// 这是唯一一处「把备份里的值落到 SharedPreferences」的地方，两个调用方：
 /// - 合并保留模式：恢复流程内**逐键补缺**（就地写回，不重启）；

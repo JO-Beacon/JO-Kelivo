@@ -26,6 +26,9 @@ final class BusinessKeyRegistry {
     'desktop_hotkeys_enabled_v1',
     'display_chat_font_scale_v1',
     'flutter_log_enabled_v1',
+    // 本机设置档位开关自己也是本机设置：直写 SharedPreferences，不经业务库，
+    // 必须随册子流转，否则换设备恢复后开关会静默回到默认值。
+    'backup_include_device_local_settings_v1',
   };
 
   static const discardedKeys = <String>{

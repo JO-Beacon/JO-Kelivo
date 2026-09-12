@@ -11,4 +11,4 @@ PRODUCT_NAME = JO-AIClient
 PRODUCT_BUNDLE_IDENTIFIER = io.github.jobeacon.joaiclient
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2025 JO-Beacon. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright (C) 2026 JO-Beacon. Based on Kelivo; licensed under AGPL-3.0.

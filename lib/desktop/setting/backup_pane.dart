@@ -884,6 +884,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 8),
                     _rowDivider(context),
                     // 云备份与本地导出共用同一「带本机设置」档位。
                     _ItemRow(
@@ -892,7 +893,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                         l10n,
                         _includeLocalSettings,
                       ),
-                      vpad: 2,
+                      vpad: 6,
                       trailing: IosSwitch(
                         value: _includeLocalSettings,
                         onChanged: _setIncludeLocalSettings,
@@ -1168,6 +1169,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 8),
                     _rowDivider(context),
                     // 云备份与本地导出共用同一「带本机设置」档位。
                     _ItemRow(
@@ -1176,7 +1178,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                         l10n,
                         _includeLocalSettings,
                       ),
-                      vpad: 2,
+                      vpad: 6,
                       trailing: IosSwitch(
                         value: _includeLocalSettings,
                         onChanged: _setIncludeLocalSettings,
@@ -1249,6 +1251,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                   ),
                 ],
               ),
+              const SizedBox(height: 8),
               _rowDivider(context),
               _ItemRow(
                 label: l10n.backupIncludeLocalSettings,
@@ -1256,7 +1259,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                   l10n,
                   _includeLocalSettings,
                 ),
-                vpad: 2,
+                vpad: 6,
                 trailing: IosSwitch(
                   value: _includeLocalSettings,
                   onChanged: _setIncludeLocalSettings,

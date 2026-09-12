@@ -26,7 +26,7 @@ class DeviceLocalSettingsLedgerRows extends Table {
   /// 该记录代表的本机设置取值时刻（UTC）。
   DateTimeColumn get savedAtUtc => dateTime()();
 
-  /// 9 个本机设置键的取值，JSON 对象；键序与内容由采集侧保证。
+  /// 10 个本机设置键的取值，JSON 对象；键序与内容由采集侧保证。
   TextColumn get valuesJson => text()();
 
   @override

@@ -30,8 +30,20 @@ class FlutterWindow : public Win32Window {
 
   // The Flutter instance hosted by this window.
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
+
   std::shared_ptr<flutter::MethodChannel<flutter::EncodableValue>>
       associated_backup_channel_;
+
+  // Lets Dart drive the window frame appearance (caption / text / border
+  // colours). Windows 11 honours the colours; older systems reject them and
+  // keep their default frame.
+  std::shared_ptr<flutter::MethodChannel<flutter::EncodableValue>>
+      window_appearance_channel_;
+
+  // Tells Dart that Windows switched between light and dark for the shell
+  // (taskbar, notification area). The shell repaints itself right away, so the
+  // tray icon has to be swapped without waiting for the app's next rebuild.
+  void NotifySystemBrightness();
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

@@ -16,6 +16,21 @@ namespace {
 #define DWMWA_USE_IMMERSIVE_DARK_MODE 20
 #endif
 
+/// Window attributes that let an app paint its own caption bar.
+///
+/// Introduced in Windows 11 (build 22000), so they are redefined here for
+/// SDKs older than that. On Windows 10 the calls fail and the frame keeps
+/// the system default.
+#ifndef DWMWA_BORDER_COLOR
+#define DWMWA_BORDER_COLOR 34
+#endif
+#ifndef DWMWA_CAPTION_COLOR
+#define DWMWA_CAPTION_COLOR 35
+#endif
+#ifndef DWMWA_TEXT_COLOR
+#define DWMWA_TEXT_COLOR 36
+#endif
+
 constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
 
 /// Registry key for app theme preference.
@@ -26,8 +41,40 @@ constexpr const wchar_t kGetPreferredBrightnessRegKey[] =
   L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize";
 constexpr const wchar_t kGetPreferredBrightnessRegValue[] = L"AppsUseLightTheme";
 
+/// Registry value for the shell: taskbar, notification area and Start menu.
+///
+/// Windows keeps this separate from the value above so applications and the
+/// shell can use different modes. A tray icon is drawn by the shell, so it has
+/// to follow this one instead of the app theme.
+constexpr const wchar_t kGetShellBrightnessRegValue[] = L"SystemUsesLightTheme";
+
 // The number of Win32Window objects that currently exist.
 static int g_active_window_count = 0;
+
+// Set once the application has taken over the caption's appearance. From that
+// point on the system theme must not repaint the frame; the Dart side re-pushes
+// whenever the in-app theme changes.
+static bool g_caption_overridden = false;
+
+// Converts a 0xAARRGGBB value to the 0x00BBGGRR COLORREF that DWM expects.
+COLORREF ToColorRef(unsigned int argb) {
+  return RGB((argb >> 16) & 0xFF, (argb >> 8) & 0xFF, argb & 0xFF);
+}
+
+// Reads one of the personalisation light/dark flags. Returns false when the
+// value is absent, which is normal on a machine that never changed the setting.
+bool ReadLightThemeFlag(const wchar_t* value_name, bool* light_mode) {
+  DWORD value = 1;
+  DWORD value_size = sizeof(value);
+  const LSTATUS result =
+      RegGetValue(HKEY_CURRENT_USER, kGetPreferredBrightnessRegKey, value_name,
+                  RRF_RT_REG_DWORD, nullptr, &value, &value_size);
+  if (result != ERROR_SUCCESS) {
+    return false;
+  }
+  *light_mode = value != 0;
+  return true;
+}
 
 using EnableNonClientDpiScaling = BOOL __stdcall(HWND hwnd);
 
@@ -338,6 +385,12 @@ void Win32Window::OnDestroy() {
 }
 
 void Win32Window::UpdateTheme(HWND const window) {
+  // The application already decided how the frame should look; repainting it
+  // from the system theme would fight with that.
+  if (g_caption_overridden) {
+    return;
+  }
+
   DWORD light_mode;
   DWORD light_mode_size = sizeof(light_mode);
   LSTATUS result = RegGetValue(HKEY_CURRENT_USER, kGetPreferredBrightnessRegKey,
@@ -350,4 +403,55 @@ void Win32Window::UpdateTheme(HWND const window) {
     DwmSetWindowAttribute(window, DWMWA_USE_IMMERSIVE_DARK_MODE,
                           &enable_dark_mode, sizeof(enable_dark_mode));
   }
+}
+
+void Win32Window::ApplyCaptionAppearance(HWND const window,
+                                         bool dark,
+                                         bool use_custom_colors,
+                                         unsigned int caption_argb,
+                                         unsigned int text_argb,
+                                         unsigned int border_argb) {
+  if (window == nullptr) {
+    return;
+  }
+
+  // The caption buttons are drawn by the system, so their glyph colour comes
+  // from this flag rather than from any colour we pass. It takes effect on
+  // Windows 10 as well, where it is the only part that does anything.
+  BOOL enable_dark_mode = dark ? TRUE : FALSE;
+  const HRESULT dark_result = DwmSetWindowAttribute(
+      window, DWMWA_USE_IMMERSIVE_DARK_MODE, &enable_dark_mode,
+      sizeof(enable_dark_mode));
+
+  // The handover is recorded here, not after the colour calls below: Windows 10
+  // rejects those colours, yet the dark-mode flag above still lands, and
+  // leaving the system free to repaint the frame would fight the in-app theme.
+  if (SUCCEEDED(dark_result)) {
+    g_caption_overridden = true;
+  }
+
+  if (!use_custom_colors) {
+    return;
+  }
+
+  const COLORREF caption = ToColorRef(caption_argb);
+  const COLORREF text = ToColorRef(text_argb);
+  const COLORREF border = ToColorRef(border_argb);
+
+  // A failure here means the OS does not support custom frame colours, so the
+  // window simply keeps the frame the system draws for it.
+  const HRESULT result = DwmSetWindowAttribute(
+      window, DWMWA_CAPTION_COLOR, &caption, sizeof(caption));
+  if (SUCCEEDED(result)) {
+    DwmSetWindowAttribute(window, DWMWA_TEXT_COLOR, &text, sizeof(text));
+    DwmSetWindowAttribute(window, DWMWA_BORDER_COLOR, &border, sizeof(border));
+  }
+}
+
+// static
+bool Win32Window::SystemUsesDarkMode() {
+  // Never configured means light, which is the Windows default.
+  bool light_mode = true;
+  ReadLightThemeFlag(kGetShellBrightnessRegValue, &light_mode);
+  return !light_mode;
 }

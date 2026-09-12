@@ -101,6 +101,14 @@ class DataSync {
   static const _maxRestoreTotalBytes = 16 * 1024 * 1024 * 1024;
   static const _maxRestoreEntries = 100000;
 
+  /// 恢复开始前中断全部进行中的生成。
+  ///
+  /// 恢复要么就地改写聊天库与设置，要么在收尾冷重启时替换整个数据库
+  /// 文件，都不能与流式检查点的写入并发。本服务位于 core 层，取不到
+  /// 界面层的取消能力，因此由界面层（ChatActions）在构造时注入。
+  /// 为 null 表示尚未注入，恢复流程照常进行。
+  static Future<void> Function()? onBeforeRestore;
+
   final ChatService chatService;
   final BusinessRepository businessRepository;
   final BusinessPreferences? businessPreferences;
@@ -1281,6 +1289,8 @@ class DataSync {
     RestoreMode mode = RestoreMode.overwrite,
     ProgressCallback? onProgress,
   }) async {
+    // 流程最开头中断进行中的生成：收尾再停没有意义，此时数据已被改写。
+    await onBeforeRestore?.call();
     // 将下载内容流式写入文件，而不是缓冲在内存中。
     final client = http.Client();
     File? file;
@@ -1412,6 +1422,8 @@ class DataSync {
     BackupCancelToken? cancelToken,
   }) async {
     cancelToken?.throwIfCancelled();
+    // 流程最开头中断进行中的生成：收尾再停没有意义，此时数据已被改写。
+    await onBeforeRestore?.call();
     if (!await file.exists()) throw Exception('备份文件不存在');
     await _restoreFromBackupFile(
       file,

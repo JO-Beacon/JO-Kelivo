@@ -35,6 +35,9 @@ migrate_working_dir/
 .pub/
 /build/
 
+# 图标派生工具链的 Node 依赖（scripts/icons 下执行 npm install 后产生）
+scripts/icons/node_modules/
+
 # Symbolication related
 app.*.symbols
 

@@ -1,0 +1,8 @@
+{
+  "name": "jo-aiclient-icon-tools",
+  "private": true,
+  "description": "图标派生工具链的 Node 依赖：把 assets/icon_sources 下的 SVG 母版光栅化",
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2"
+  }
+}

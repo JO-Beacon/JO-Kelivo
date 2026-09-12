@@ -1287,6 +1287,7 @@ class _BackupPageState extends State<BackupPage> {
           ),
         ],
       ),
+      header(l10n.backupLedgerTitle),
       _LocalSettingsLedgerMobileSection(l10n: l10n),
       header(l10n.backupPageKelivoCompatibleBackup),
       _iosSectionCard(
@@ -2382,7 +2383,9 @@ class _LocalSettingsLedgerMobileSectionState
 
     return _iosSectionCard(
       children: [
-        _BackupSubcategoryLabel(label: l10n.backupLedgerTitle),
+        _BackupSubcategoryLabel(
+          label: l10n.backupLedgerSettingsDescription,
+        ),
         if (records == null)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),

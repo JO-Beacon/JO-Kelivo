@@ -9,6 +9,8 @@ import 'dart:async';
 import 'hotkeys/hotkey_event_bus.dart';
 import 'hotkeys/chat_action_bus.dart';
 import 'desktop_settings_navigation_bus.dart';
+import 'desktop_tray_controller.dart';
+import 'window_appearance.dart';
 
 /// 桌面首页：左侧紧凑导航栏加主内容。
 /// 第一阶段关注结构以及适合平台端的交互和悬停效果。
@@ -155,6 +157,17 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
     const minWidth = 960.0;
     const minHeight = 640.0;
 
+    // Windows 上把当前主题的颜色交给系统，让原生标题栏与界面连成一片。
+    // 颜色没有变化时内部会跳过，因此每次重建都调用是安全的。
+    unawaited(WindowAppearanceSync.sync(Theme.of(context)));
+
+    // 托盘的深浅图形跟随应用主题：用户切浅色或深色时，托盘图标要跟着一起变。
+    // 明暗没变化时内部会跳过，所以每次重建都调用是安全的。
+    unawaited(
+      DesktopTrayController.instance.applyBrightness(
+        Theme.of(context).brightness,
+      ),
+    );
 
     return LayoutBuilder(
       builder: (context, constraints) {

@@ -16,6 +16,7 @@ import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/api/retry_policy.dart';
 import '../../../core/services/api/stream/stream_chunk.dart';
 import '../../../core/services/api/stream/stream_chunk_handler.dart';
+import '../../../core/services/backup/data_sync.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/ios_background_generation.dart';
 import '../../../core/services/logging/flutter_logger.dart';
@@ -165,6 +166,10 @@ class ChatActions {
     required this.viewModel,
   }) {
     _current = this;
+    // 恢复备份会就地改写聊天库与设置，完全覆盖模式还会在收尾冷重启时
+    // 替换整个数据库文件，两种模式都不能与流式写入并发。DataSync 位于
+    // core 层、取不到取消能力，因此由这里注入（注入是幂等的）。
+    DataSync.onBeforeRestore = cancelAllActiveGenerations;
   }
 
   /// 最新的存活实例。位于主页控制器图之外的删除入口
@@ -202,6 +207,24 @@ class ChatActions {
     final conversationIds = actions.chatService
         .getAllConversations()
         .where((c) => c.assistantId == assistantId)
+        .map((c) => c.id)
+        .toList();
+    for (final id in conversationIds) {
+      if (actions._hasActiveGeneration(id)) {
+        await actions.cancelStreamingById(id);
+      }
+    }
+  }
+
+  /// 停止所有会话的进行中生成。
+  ///
+  /// 用于恢复备份：恢复要么就地改写聊天库与设置，要么在收尾冷重启时
+  /// 替换整个数据库文件，两者都不能与流式写入并发。
+  static Future<void> cancelAllActiveGenerations() async {
+    final actions = _current;
+    if (actions == null) return;
+    final conversationIds = actions.chatService
+        .getAllConversations()
         .map((c) => c.id)
         .toList();
     for (final id in conversationIds) {

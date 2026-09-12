@@ -1755,9 +1755,13 @@ class HomePageController extends ChangeNotifier {
     final MessageEditResult? result = await future;
     if (result == null) return;
 
-    // 编辑正在生成中的会话时先完成取消和 checkpoint，避免编辑分支与
-    // 流式终结同时写入会话树和消息部件。
-    if (_chatController.isCurrentConversationLoading && ctx.mounted) {
+    // 会改动会话树的保存方式（另存为新分支、克隆子树）必须先完成取消和
+    // checkpoint，避免编辑分支与流式终结同时写入会话树和消息部件。
+    // 覆盖保存只改写这一条消息的内容部件，不动树、不碰其它消息，
+    // 因此不打断正在进行的生成（用户 2026-09-12 拍板）。
+    if (result.saveMode != MessageEditSaveMode.overwrite &&
+        _chatController.isCurrentConversationLoading &&
+        ctx.mounted) {
       await _viewModel.cancelStreaming();
     }
 

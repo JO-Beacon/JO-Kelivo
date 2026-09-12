@@ -48,7 +48,7 @@ const _localFingerprint = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const _otherFingerprint = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 const _thirdFingerprint = 'cccccccccccccccccccccccccccccccc';
 
-/// 本功能的 9 键里挑两个真实键做断言载体（一个是 double，一个是 bool）。
+/// 本功能的 10 键里挑两个真实键做断言载体（一个是 double，一个是 bool）。
 const _widthKey = 'window_width_v1';
 const _maximizedKey = 'window_maximized_v1';
 

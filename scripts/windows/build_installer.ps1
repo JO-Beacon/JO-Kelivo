@@ -14,6 +14,13 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $installerScript = Join-Path $repoRoot "scripts\windows\kelivo_installer.iss"
 
+# 快捷方式与文件类型图标的来源。安装脚本会把这份文件以带版本号的名字装进目标目录，
+# 让系统读不到旧的图标记录（原因见 kelivo_installer.iss 开头的说明）。
+$iconSource = Join-Path $repoRoot "windows\runner\resources\app_icon.ico"
+if (-not (Test-Path $iconSource)) {
+  throw "Icon source not found: $iconSource"
+}
+
 if (-not (Test-Path $installerScript)) {
   throw "Inno Setup script not found: $installerScript"
 }
@@ -75,7 +82,8 @@ New-Item -ItemType Directory -Force -Path $outputDirResolved | Out-Null
 $arguments = @(
   "/DAppVersion=$AppVersion",
   "/DSourceDir=$sourceDirResolved",
-  "/DOutputDir=$outputDirResolved"
+  "/DOutputDir=$outputDirResolved",
+  "/DIconSource=$iconSource"
 )
 
 if ($chineseMessagesFile) {

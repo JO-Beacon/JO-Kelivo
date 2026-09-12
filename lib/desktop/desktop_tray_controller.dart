@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart'
-    show kIsWeb, defaultTargetPlatform, TargetPlatform;
+    show kIsWeb, defaultTargetPlatform, TargetPlatform, Brightness;
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -21,6 +21,48 @@ class DesktopTrayController with TrayListener, WindowListener {
   bool _minimizeToTrayOnClose = false;
   String _localeKey = '';
   bool _contextMenuOpen = false;
+  Brightness _iconBrightness = Brightness.light;
+
+  /// 按应用当前的主题明暗换用对应的托盘图形。
+  ///
+  /// 面板底色可深可浅，一份图形不可能两头都看得见（实测浅色版描边置于深色底色，
+  /// 对比度只有 1.18，等于看不见），所以深浅各出一份，按 [appBrightness] 挑。
+  ///
+  /// 跟随的是**应用主题**，不是系统主题：用户在应用里选浅色、深色或跟随系统时，
+  /// 这里收到的就是界面实际呈现的明暗，托盘图形要跟着一起变（包括用户在设置里
+  /// 切主题的当下）。明暗没有变化时内部直接返回，所以随每次重建调用是安全的。
+  Future<void> applyBrightness(Brightness appBrightness) async {
+    if (kIsWeb) return;
+    await _setIconBrightness(appBrightness);
+  }
+
+  /// 记下托盘图形该用的明暗，并在托盘已建好时立刻换图。
+  ///
+  /// 先记下来是因为托盘可能还没建好：记下后建托盘时会直接用这一份。
+  Future<void> _setIconBrightness(Brightness brightness) async {
+    final changed = _iconBrightness != brightness;
+    _iconBrightness = brightness;
+    if (!changed || !_isDesktop || !_trayVisible) return;
+    await _applyTrayIcon();
+  }
+
+  /// 按平台与当前明暗设置托盘图标。
+  ///
+  /// - macOS：模板图，系统只取形状、自动适配浅色或深色菜单栏 → 不需要分深浅
+  /// - Windows：多尺寸 ICO，缩放更清晰
+  /// - Linux 及其他：普通 PNG
+  Future<void> _applyTrayIcon() async {
+    try {
+      if (defaultTargetPlatform == TargetPlatform.macOS) {
+        await trayManager.setIcon('assets/icon_mac.png', isTemplate: true);
+      } else {
+        final suffix = _iconBrightness == Brightness.dark ? 'dark' : 'light';
+        final extension =
+            defaultTargetPlatform == TargetPlatform.windows ? 'ico' : 'png';
+        await trayManager.setIcon('assets/icon_tray_$suffix.$extension');
+      }
+    } catch (_) {}
+  }
 
   /// 根据设置和当前本地化同步托盘状态。
   /// 可安全地多次调用；初始化会延迟执行。
@@ -67,8 +109,10 @@ class DesktopTrayController with TrayListener, WindowListener {
 
     if (_showTraySetting) {
       if (!_trayVisible || localeChanged) {
-        await _ensureTrayIconAndMenu(l10n);
+        // 先置位再建托盘：图标一放上去就可能有人按新明暗来换（见
+        // _setIconBrightness），那时必须已经算“托盘存在”，否则换图会被跳过。
         _trayVisible = true;
+        await _ensureTrayIconAndMenu(l10n);
       }
     } else {
       if (_trayVisible) {
@@ -83,20 +127,9 @@ class DesktopTrayController with TrayListener, WindowListener {
   Future<void> _ensureTrayIconAndMenu(AppLocalizations l10n) async {
     if (!_isDesktop) return;
 
-    // 使用平台特定的托盘图标（参考 Gopeed 的做法）：
-    // - Windows：多尺寸 ICO，缩放更清晰
-    // - macOS：模板 PNG，让系统适配浅色或深色菜单栏
-    // - Linux/其他：普通 PNG 资源
+    // 平台特定的托盘图标；深浅由 _applyTrayIcon 按当前明暗挑。
     final platform = defaultTargetPlatform;
-    try {
-      if (platform == TargetPlatform.windows) {
-        await trayManager.setIcon('assets/app_icon.ico');
-      } else if (platform == TargetPlatform.macOS) {
-        await trayManager.setIcon('assets/icon_mac.png', isTemplate: true);
-      } else {
-        await trayManager.setIcon('assets/icons/kelivo.png');
-      }
-    } catch (_) {}
+    await _applyTrayIcon();
 
     // 部分 Linux 环境不支持 tooltip；与 Gopeed 保持一致，在这些环境中跳过。
     if (platform != TargetPlatform.linux) {

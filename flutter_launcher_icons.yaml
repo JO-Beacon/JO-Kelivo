@@ -1,20 +1,31 @@
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: assets/app_icon_2.png
-  image_path_ios: "assets/app_icon_2.png"
-  image_path_ios_dark_transparent: "assets/app_icon_dark.png"
-  adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: assets/app_icon_2.png
+  # 桌面图标必须自带一块不透明的底：资源管理器、开始菜单、快捷方式、应用菜单、
+  # 启动器默认图标都只读构建期写死的这一张图，不会跟随系统明暗切换。成品由
+  # scripts/icons/build_icons.py 合成（纯黑圆角方块 + 深色版图形）。
+  image_path: assets/app_icon.png
+  image_path_ios: "assets/app_icon.png"
+  image_path_ios_dark_transparent: "assets/app_icon.png"
+  # 母版是透明底，而 iOS 图标不允许带透明通道：开启后按下面的底色压平。
+  # 深色图标走 image_path_ios_dark_transparent，不经过这一步。
+  remove_alpha_ios: true
+  background_color_ios: "#000000"
+  # Android 自适应图标：底层纯黑，前景是透明的深色版图形，由系统合成形状。
+  # 前景单独一份，不跟关于页共用：系统遮罩只留中间 2/3，前景得收进这个圆里，
+  # 比关于页那份小不少（比例见 build_icons.py 的 RATIO）。
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: assets/app_icon_android.png
   min_sdk_android: 21
   web:
     generate: true
-    image_path: "assets/app_icon.png"
-    background_color: "#FFFFFF"
+    # 标签图标只有 16 像素，取迷你图形（简化且顶满），跟主屏幕那份分开
+    image_path: "assets/app_icon_web.png"
+    background_color: "#000000"
   windows:
     generate: true
     image_path: "assets/app_icon.png"
     icon_size: 256
   macos:
     generate: true
-    image_path: "assets/app_icon_macos2.png"
+    image_path: "assets/app_icon_macos.png"

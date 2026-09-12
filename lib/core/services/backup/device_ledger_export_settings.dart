@@ -76,7 +76,7 @@ abstract final class DeviceLedgerExportCollector {
     }
   }
 
-  /// 采集本机当前的 9 键值。
+  /// 采集本机当前的 10 键值（含档位开关自身）。
   ///
   /// 只用 [BusinessKeyRegistry.localOnlyKeys] 集合成员判定——**不要**用
   /// `classify()`，它会把 `restore_` 前缀的键也算作 localOnly，

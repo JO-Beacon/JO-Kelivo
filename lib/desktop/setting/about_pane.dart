@@ -340,7 +340,10 @@ class _AppHeaderCardState extends State<_AppHeaderCard> {
                       width: 54,
                       height: 54,
                       child: Image.asset(
-                        'assets/app_icon.png',
+                        // 透明底，随界面明暗取对应版本
+                        Theme.of(context).brightness == Brightness.dark
+                            ? 'assets/app_icon_dark.png'
+                            : 'assets/app_icon_light.png',
                         fit: BoxFit.cover,
                       ),
                     ),

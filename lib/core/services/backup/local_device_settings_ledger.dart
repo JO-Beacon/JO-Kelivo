@@ -20,7 +20,7 @@ class DeviceSettingsRecord {
   final String platform;
   final DateTime savedAtUtc;
 
-  /// 9 个本机设置键的取值；键必须是 [BusinessKeyRegistry.localOnlyKeys]
+  /// 10 个本机设置键的取值；键必须是 [BusinessKeyRegistry.localOnlyKeys]
   /// 的成员。
   final Map<String, Object?> values;
 
@@ -79,7 +79,7 @@ class LocalDeviceSettingsLedger {
   // 写入
   // -------------------------------------------------------------------
 
-  /// 把本机此刻的 9 键值刷进册子（导出"带"档前的关键一步）。
+  /// 把本机此刻的 10 键值刷进册子（导出"带"档前的关键一步）。
   ///
   /// 只接受 [BusinessKeyRegistry.localOnlyKeys] 的成员，并复用
   /// [BackupSettingsValidator.validateValue] 校验取值类型。

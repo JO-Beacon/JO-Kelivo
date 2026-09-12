@@ -1,5 +1,7 @@
 #include "flutter_window.h"
 
+#include <cstdint>
+#include <cwchar>
 #include <optional>
 #include <fstream>
 #include <vector>
@@ -45,6 +47,67 @@ bool FlutterWindow::OnCreate() {
       [](const flutter::MethodCall<flutter::EncodableValue>&,
          std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
         result->NotImplemented();
+      });
+
+  // Method channel for the window frame appearance. The Dart side pushes the
+  // colours of the active theme so the caption bar blends into the app.
+  window_appearance_channel_ =
+      std::make_shared<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(),
+          "app.window_appearance",
+          &flutter::StandardMethodCodec::GetInstance());
+  window_appearance_channel_->SetMethodCallHandler(
+      [this](
+          const flutter::MethodCall<flutter::EncodableValue>& call,
+          std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+        if (call.method_name() == "getSystemBrightness") {
+          // Answers for the shell mode, not the app mode: the tray icon is
+          // drawn by the taskbar, and Windows lets the two be set differently.
+          result->Success(
+              flutter::EncodableValue(Win32Window::SystemUsesDarkMode()));
+          return;
+        }
+
+        if (call.method_name() != "setCaptionAppearance") {
+          result->NotImplemented();
+          return;
+        }
+
+        const auto* args = std::get_if<flutter::EncodableMap>(call.arguments());
+        if (args == nullptr) {
+          result->Error("invalid_arguments", "Expected a map of arguments.");
+          return;
+        }
+
+        auto read_bool = [args](const char* key, bool fallback) -> bool {
+          const auto it = args->find(flutter::EncodableValue(key));
+          if (it == args->end()) return fallback;
+          const auto* value = std::get_if<bool>(&it->second);
+          return value != nullptr ? *value : fallback;
+        };
+
+        // Dart ints arrive as int32 when they fit and as int64 otherwise.
+        auto read_uint = [args](const char* key,
+                                unsigned int fallback) -> unsigned int {
+          const auto it = args->find(flutter::EncodableValue(key));
+          if (it == args->end()) return fallback;
+          // 注意：Windows SDK 把 small/large 定义成了宏，不能用作变量名。
+          const auto* value32 = std::get_if<int32_t>(&it->second);
+          if (value32 != nullptr) {
+            return static_cast<unsigned int>(*value32);
+          }
+          const auto* value64 = std::get_if<int64_t>(&it->second);
+          if (value64 != nullptr) {
+            return static_cast<unsigned int>(*value64);
+          }
+          return fallback;
+        };
+
+        Win32Window::ApplyCaptionAppearance(
+            GetHandle(), read_bool("dark", true),
+            read_bool("useCustomColors", true), read_uint("captionColor", 0),
+            read_uint("textColor", 0), read_uint("borderColor", 0));
+        result->Success();
       });
 
   // Method channel for clipboard images.
@@ -297,6 +360,7 @@ bool FlutterWindow::OnCreate() {
 
 void FlutterWindow::OnDestroy() {
   associated_backup_channel_.reset();
+  window_appearance_channel_.reset();
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
@@ -336,7 +400,25 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
       break;
+    case WM_SETTINGCHANGE:
+      // "ImmersiveColorSet" is the broadcast that follows a light/dark switch.
+      if (lparam != 0 &&
+          std::wcscmp(reinterpret_cast<const wchar_t*>(lparam),
+                      L"ImmersiveColorSet") == 0) {
+        NotifySystemBrightness();
+      }
+      break;
   }
 
   return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
+}
+
+void FlutterWindow::NotifySystemBrightness() {
+  if (!window_appearance_channel_) {
+    return;
+  }
+  window_appearance_channel_->InvokeMethod(
+      "systemBrightnessChanged",
+      std::make_unique<flutter::EncodableValue>(
+          Win32Window::SystemUsesDarkMode()));
 }

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1032" viewBox="0 0 1024 1032"
+     role="img" aria-labelledby="ttl">
+  <title id="ttl">Isometric cube wireframe — dark theme</title>
+
+  <g fill="none" stroke="#FFC6A0"
+     stroke-linecap="round" stroke-linejoin="round">
+
+    <!-- ===== 外轮廓（粗线，100）===== -->
+    <path stroke-width="100"
+          d="M511 976 L913 744 L913 285 L511 52 L108 284 L108 566 L69 606 L69 771 L254 878 L326.5 868.1"/>
+    <path stroke-width="100" d="M326.5 868.1 L511 976"/>
+
+    <!-- ===== 面上的线 ===== -->
+    <!-- 顶面菱形（粗细与轮廓一致，100） -->
+    <path stroke-width="100" d="M108 284 L511 519 L913 285"/>
+    <!-- 前棱：中心顶点到底点（粗细与轮廓一致，100） -->
+    <path stroke-width="100" d="M511 519 L511 976"/>
+    <!-- 左面竖线（只剩交点以下） -->
+    <path stroke-width="33" d="M326.5 685.3 L326.5 868.1"/>
+    <!-- 左面横档（只剩交点以左） -->
+    <path stroke-width="33" d="M108 559 L326.5 685.3"/>
+    <!-- 小立方体：两条边线宽 20（试验值） -->
+    <path stroke-width="20" d="M69 607 L254 714 L254 878"/>
+
+    <!-- 小立方体旁边那一圈（本体留白，边界即它的上边与右边） -->
+    <polygon points="69,606 108,566 108,559 326.5,685.33 326.5,868.1 254,878 254,714" stroke="none" fill="#FFC6A0"/>
+
+    <!-- ===== 右面上的实心方块 ===== -->
+    <polygon points="657,600 767,536 767,663 657,727" stroke="none" fill="#FFC6A0"/>
+  </g>
+</svg>

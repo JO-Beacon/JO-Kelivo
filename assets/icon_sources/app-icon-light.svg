@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1032" viewBox="0 0 1024 1032"
+     role="img" aria-labelledby="ttl">
+  <title id="ttl">Isometric cube wireframe with red halo — light theme</title>
+
+  <defs>
+    <!-- 浅底上的柔光晕：同样的两层高斯，但强度压低，用普通混合叠出淡红晕 -->
+    <filter id="neon" filterUnits="userSpaceOnUse"
+            x="-180" y="-180" width="1384" height="1392"
+            color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="18" result="b18"/>
+      <feGaussianBlur in="SourceAlpha" stdDeviation="34" result="b34"/>
+      <feComponentTransfer in="b18" result="g18">
+        <feFuncA type="linear" slope="0.1800"/>
+      </feComponentTransfer>
+      <feComponentTransfer in="b34" result="g34">
+        <feFuncA type="linear" slope="0.1400"/>
+      </feComponentTransfer>
+      <feComposite in="g18" in2="g34" operator="arithmetic"
+                   k1="0" k2="1" k3="1" k4="0" result="halo"/>
+      <feFlood flood-color="#D93C36" result="red"/>
+      <feComposite in="red" in2="halo" operator="in" result="haloRed"/>
+      <feMerge>
+        <feMergeNode in="haloRed"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <g filter="url(#neon)" fill="none" stroke="#7A0A0D"
+     stroke-linecap="round" stroke-linejoin="round">
+
+    <!-- ===== 外轮廓（粗线，44）===== -->
+    <path stroke-width="44"
+          d="M511 976 L913 744 L913 285 L511 52 L108 284 L108 566 L69 606 L69 771 L254 878 L326.5 868.1"/>
+    <path stroke-width="44" d="M326.5 868.1 L511 976"/>
+
+    <!-- ===== 立方体面上的内线（细线，33）===== -->
+    <!-- 顶面菱形 -->
+    <path stroke-width="33" d="M108 284 L511 519 L913 285"/>
+    <!-- 前棱：中心顶点到底点 -->
+    <path stroke-width="33" d="M511 519 L511 976"/>
+    <!-- 左面竖线 -->
+    <path stroke-width="33" d="M326.5 411.4 L326.5 868.1"/>
+    <!-- 左面横档 -->
+    <path stroke-width="33" d="M108 559 L511 792"/>
+    <!-- 右面竖线 + 折角 -->
+    <path stroke-width="33" d="M760 376 L760 665 L511 806"/>
+    <!-- 顶面折线（人字形） -->
+    <path stroke-width="33" d="M727 178 L322 412"/>
+    <path stroke-width="33" d="M575 266 L765 376"/>
+    <!-- 左下方小立方体 -->
+    <path stroke-width="33" d="M69 607 L254 714 L254 878"/>
+
+    <!-- ===== 右面上的实心方块 ===== -->
+    <polygon points="594,568 682,518 682,618 594,668" stroke="none" fill="#7A0A0D"/>
+  </g>
+</svg>

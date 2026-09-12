@@ -52,6 +52,30 @@ class Win32Window {
   // If true, closing this window will quit the application.
   void SetQuitOnClose(bool quit_on_close);
 
+  // Paints the window frame with colours supplied by the application.
+  //
+  // |dark| only drives the system-drawn caption buttons, so it should always
+  // follow the app theme. The three colours are honoured on Windows 11
+  // (build 22000) and later; older systems reject them with E_INVALIDARG and
+  // keep their default frame, which is why the result decides whether the
+  // custom colours are considered active.
+  //
+  // Colour arguments are 0xAARRGGBB; the alpha byte is ignored.
+  static void ApplyCaptionAppearance(HWND const window,
+                                     bool dark,
+                                     bool use_custom_colors,
+                                     unsigned int caption_argb,
+                                     unsigned int text_argb,
+                                     unsigned int border_argb);
+
+  // Returns true when Windows is in dark mode for the shell: the taskbar, the
+  // notification area and the Start menu.
+  //
+  // Windows keeps this apart from the app mode that Flutter reports as
+  // platformBrightness, because the two can be set differently. A tray icon is
+  // drawn by the shell, so it has to follow the shell mode.
+  static bool SystemUsesDarkMode();
+
   // Return a RECT representing the bounds of the current client area.
   RECT GetClientArea();
 
