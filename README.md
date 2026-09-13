@@ -9,16 +9,16 @@
 
 # JO-AIClient 下载
 
-**Windows 用户必看**：请先安装 [64 位 VC++ Runtime](https://aka.ms/vc14/vc_redist.x64.exe) 或者 [（ARM 用户专属）ARM64 VC++ Runtime](https://aka.ms/vc14/vc_redist.arm64.exe)
+**Windows 用户必看**：请先安装与系统匹配的 VC++ Runtime：普通 x64 电脑装 [64 位版](https://aka.ms/vc14/vc_redist.x64.exe)，ARM 电脑（Windows on ARM）装 [ARM64 版](https://aka.ms/vc14/vc_redist.arm64.exe)
 
 [或者微软官网手动下载](https://learn.microsoft.com/zh-cn/cpp/windows/latest-supported-vc-redist?view=msvc-180#latest-supported-redistributable-version)
 
 - ✅ **[Android](https://github.com/JO-Beacon/JO-Kelivo/releases/latest)**（提供 arm64-v8a、armeabi-v7a、x86_64 三个安装包）
 - ✅ **[Windows AMD64](https://github.com/JO-Beacon/JO-Kelivo/releases/latest)**（中文安装程序与免安装便携版均提供）
+- ✅ **[Windows ARM64](https://github.com/JO-Beacon/JO-Kelivo/releases/latest)**（原生 ARM64，中文安装程序与免安装便携版均提供，`0.1.16` 起；x64 安装包也可直接装进 ARM 电脑）
 - ✅ **[Linux AMD64](https://github.com/JO-Beacon/JO-Kelivo/releases/latest)**（AppImage、deb、tar.gz）
 - ❌ iOS / macOS（暂无计划，可使用 [原版 Kelivo](https://github.com/Chevey339/kelivo)）
 - ❌ 鸿蒙 Harmony（暂无计划，可使用 [kelivo-ohos](https://github.com/Chevey339/kelivo-ohos)）
-- ❌ Windows on ARM（暂无计划）
 
 每个发布文件都附带同名 `.sha256` 校验文件。[Release 日志](Release日志.md)
 

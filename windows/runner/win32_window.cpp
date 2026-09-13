@@ -4,6 +4,7 @@
 #include <flutter_windows.h>
 
 #include "resource.h"
+#include "startup_probe.h"
 
 namespace {
 
@@ -200,11 +201,16 @@ bool Win32Window::Create(const std::wstring& title,
 
   UpdateTheme(window);
 
+  startup_probe::LogWindowState(window, "window created");
+
   return OnCreate();
 }
 
 bool Win32Window::Show() {
-  return ShowWindow(window_handle_, SW_SHOWNORMAL);
+  startup_probe::LogWindowState(window_handle_, "before show");
+  const BOOL result = ShowWindow(window_handle_, SW_SHOWNORMAL);
+  startup_probe::LogWindowState(window_handle_, "after show");
+  return result;
 }
 
 // static
@@ -258,6 +264,8 @@ Win32Window::MessageHandler(HWND hwnd,
         MoveWindow(child_content_, rect.left, rect.top, rect.right - rect.left,
                    rect.bottom - rect.top, TRUE);
       }
+      startup_probe::LogWindowStateRepeated("WM_SIZE", child_content_,
+                                            "WM_SIZE flutter view");
       return 0;
     }
 
@@ -265,7 +273,21 @@ Win32Window::MessageHandler(HWND hwnd,
       if (child_content_ != nullptr) {
         SetFocus(child_content_);
       }
+      startup_probe::LogRepeated("WM_ACTIVATE",
+                                 wparam != 0 ? "WM_ACTIVATE active"
+                                             : "WM_ACTIVATE inactive");
       return 0;
+
+    case WM_SHOWWINDOW:
+      startup_probe::Log(wparam != 0 ? "WM_SHOWWINDOW shown"
+                                     : "WM_SHOWWINDOW hidden");
+      break;
+
+    case WM_PAINT:
+      // 系统要求重画的次数本身就是判据（窗口在、内容没上屏时往往一次都收不到），
+      // 因此照常记录，只是同类消息由探针统一限次。
+      startup_probe::LogRepeated("WM_PAINT", "WM_PAINT");
+      break;
 
     case WM_DWMCOLORIZATIONCOLORCHANGED:
       UpdateTheme(hwnd);

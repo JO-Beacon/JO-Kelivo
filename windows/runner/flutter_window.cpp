@@ -14,6 +14,7 @@
 #include <flutter/standard_method_codec.h>
 
 #include "flutter/generated_plugin_registrant.h"
+#include "startup_probe.h"
 #include "utils.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
@@ -37,6 +38,9 @@ bool FlutterWindow::OnCreate() {
   }
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
+  startup_probe::Log("flutter engine and view ready");
+  startup_probe::LogWindowState(flutter_controller_->view()->GetNativeWindow(),
+                               "flutter view as child");
 
   associated_backup_channel_ =
       std::make_shared<flutter::MethodChannel<flutter::EncodableValue>>(
@@ -348,12 +352,18 @@ bool FlutterWindow::OnCreate() {
         result->NotImplemented();
       });
 
+  // 窗口要等第一帧准备好才显示，避免用户看见空窗口。若这一帧始终没能产出，
+  // 回调就不会触发，窗口会停在没有内容的表面上——启动白屏的可疑点正在这里。
+  startup_probe::Log("waiting for next frame before showing window");
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
+    startup_probe::Log("next frame callback fired; showing window");
     this->Show();
+    startup_probe::LogWindowState(GetHandle(), "after show (flutter window)");
   });
 
   // Ensure a frame is pending so the window shows.
   flutter_controller_->ForceRedraw();
+  startup_probe::Log("force redraw requested");
 
   return true;
 }

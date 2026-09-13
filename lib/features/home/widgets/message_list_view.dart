@@ -320,6 +320,17 @@ class _MessageListViewState extends State<MessageListView> {
     debugLabel: 'timeline-keyboard-scroll-region',
   );
 
+  /// 让列表把可视区域外的消息也真实排版一遍，用实测高度替换估算值。
+  ///
+  /// 聊天页的“底部”是所有消息高度之和算出来的，而上方任何一条的低估都会
+  /// 让总高变小、真实末尾永远够不到——误差是累积的，不会相互抵消。
+  /// 因此这里不加消息条数阈值：库文档中“大列表预计算收益递减”的说法针对
+  /// 的是滚动条位置精度，不适用于本场景。
+  ///
+  /// 代价是一次性的：待测条数约等于消息条数，按库每帧 3 毫秒的预算分摊，
+  /// 全部实测完成后不再产生开销。
+  final _extentPrecalculationPolicy = ChatExtentPrecalculationPolicy();
+
   String _slotId(ChatMessage message) => message.id;
 
   @override
@@ -1312,6 +1323,7 @@ class _MessageListViewState extends State<MessageListView> {
               addRepaintBoundaries: false,
               findChildIndexCallback: _findMessageIndexByKey,
               extentEstimation: _estimateItemExtent,
+              extentPrecalculationPolicy: _extentPrecalculationPolicy,
               padding: EdgeInsets.fromLTRB(
                 horizontalPad,
                 widget.topContentPadding,
@@ -2443,4 +2455,14 @@ class _WindowLoadingSkeletonState extends State<_WindowLoadingSkeleton>
       ),
     );
   }
+}
+
+/// 聊天消息列表的范围预计算策略。
+///
+/// 恒为启用：屏幕外的消息高度必须先有值，列表才能算出可滚动总长度，
+/// 而估算值天然带有误差。本策略让列表在布局预算内逐帧把屏幕外的消息
+/// 真实排版一次，实测结果随即替换估算值，使账面总高与实际总高一致。
+class ChatExtentPrecalculationPolicy extends ExtentPrecalculationPolicy {
+  @override
+  bool shouldPrecalculateExtents(ExtentPrecalculationContext context) => true;
 }

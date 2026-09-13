@@ -6293,7 +6293,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get flutterLogSettingSubtitle =>
-      '开启后会将 Flutter 错误与 print 输出写入 logs/flutter_logs.txt';
+      '开启后会把程序出错信息、打印输出与每次启动的经过写入 logs/flutter_logs.txt，用于排查异常';
 
   @override
   String get contextLogSettingTitle => '上下文日志';
@@ -15016,7 +15016,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get flutterLogSettingSubtitle =>
-      '开启后会将 Flutter 错误与 print 输出写入 logs/flutter_logs.txt';
+      '开启后会把程序出错信息、打印输出与每次启动的经过写入 logs/flutter_logs.txt，用于排查异常';
 
   @override
   String get contextLogSettingTitle => '上下文日志';
@@ -23741,7 +23741,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get flutterLogSettingSubtitle =>
-      '開啟後會將 Flutter 錯誤與 print 輸出寫入 logs/flutter_logs.txt';
+      '開啟後會把程式出錯資訊、列印輸出與每次啟動的經過寫入 logs/flutter_logs.txt，用於排查異常';
 
   @override
   String get contextLogSettingTitle => '上下文日誌';

@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
 import 'package:restart_app/restart_app.dart';
 
+import '../core/services/logging/flutter_logger.dart';
+
 abstract final class PlatformUtils {
   PlatformUtils._();
 
@@ -32,13 +34,24 @@ abstract final class PlatformUtils {
   static bool get isIOS => Platform.isIOS;
 
   static Future<void> restartApp() async {
-    if (defaultTargetPlatform == TargetPlatform.android || isDesktopTarget) {
-      final result = await Restart.restartApp(mode: RestartMode.process);
-      if (!result.success) {
-        throw StateError('restart_app:${result.code ?? 'unknown'}');
+    // 先留下本次重启的标记，再交还日志文件句柄：新进程启动时也会写同一个
+    // 日志文件，两个进程同时持句柄容易写出交错内容。
+    FlutterLogger.stage('restart requested');
+    final wasLogging = FlutterLogger.enabled;
+    await FlutterLogger.setEnabled(false);
+    try {
+      if (defaultTargetPlatform == TargetPlatform.android || isDesktopTarget) {
+        final result = await Restart.restartApp(mode: RestartMode.process);
+        if (!result.success) {
+          throw StateError('restart_app:${result.code ?? 'unknown'}');
+        }
+      } else {
+        exit(0);
       }
-    } else {
-      exit(0);
+    } catch (_) {
+      // 重启没成功，当前进程还要继续用，把日志恢复回去。
+      if (wasLogging) await FlutterLogger.setEnabled(true);
+      rethrow;
     }
   }
 }

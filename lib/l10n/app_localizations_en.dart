@@ -6555,7 +6555,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get flutterLogSettingSubtitle =>
-      'When enabled, Flutter errors and print output are written to logs/flutter_logs.txt (rotated daily).';
+      'When enabled, errors, print output and a record of each startup are written to logs/flutter_logs.txt (rotated daily).';
 
   @override
   String get contextLogSettingTitle => 'Context Logging';

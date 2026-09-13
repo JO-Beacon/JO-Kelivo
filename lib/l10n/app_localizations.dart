@@ -11974,7 +11974,7 @@ abstract class AppLocalizations {
   /// No description provided for @flutterLogSettingSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'When enabled, Flutter errors and print output are written to logs/flutter_logs.txt (rotated daily).'**
+  /// **'When enabled, errors, print output and a record of each startup are written to logs/flutter_logs.txt (rotated daily).'**
   String get flutterLogSettingSubtitle;
 
   /// No description provided for @contextLogSettingTitle.

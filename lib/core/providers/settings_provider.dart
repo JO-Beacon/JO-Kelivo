@@ -1158,7 +1158,8 @@ class SettingsProvider extends ChangeNotifier {
     _contextLogEnabled = prefs.getBool(_contextLogEnabledKey) ?? true;
     await ContextLogger.setEnabled(_contextLogEnabled);
     _flutterLogEnabled =
-        localPreferences.getBool(_flutterLogEnabledKey) ?? false;
+        localPreferences.getBool(_flutterLogEnabledKey) ??
+        FlutterLogger.defaultEnabled;
     await FlutterLogger.setEnabled(_flutterLogEnabled);
     _logSaveOutput = prefs.getBool(_logSaveOutputKey) ?? false;
     RequestLogger.saveOutput = _logSaveOutput;

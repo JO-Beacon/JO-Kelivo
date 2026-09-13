@@ -9,7 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// 这些断言不检查图标好不好看，只钉住几件容易悄悄坏掉的事：
 /// 生成配置指向的文件确实存在、没有游离的图标文件、Windows 图标是多尺寸、
-/// iOS 的深浅两套完整。此前「配置指向不存在的文件」与「图标只有单一尺寸」
+/// iOS 的深浅两套完整。此前“配置指向不存在的文件”与“图标只有单一尺寸”
 /// 都是靠人工发现的，本测试把它们变成自动拦截。
 void main() {
   // 下面的断言要解码 PNG 取像素，先准备好绑定。
@@ -204,9 +204,11 @@ void main() {
       // 两版必须指向不同的文件 —— 深色底上配浅色图形会直接看不见。
       final pubspec = _read('pubspec.yaml');
       expect(pubspec, contains('image: assets/start.png'));
+      // 普通与 Android 12 两处 image_dark 都要指向深色版。Android 12 用的是
+      // 带 android12 后缀的一套图，文件名不同但同为深色版，一并认。
       expect(
         RegExp(
-          r'image_dark:\s*assets/start_dark\.png',
+          r'image_dark:\s*assets/start(_android12)?_dark\.png',
         ).allMatches(pubspec).length,
         2,
         reason: 'pubspec 的普通与 Android 12 两处 image_dark 都要指向深色版',

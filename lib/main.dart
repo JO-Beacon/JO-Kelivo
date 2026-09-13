@@ -67,6 +67,7 @@ import 'core/services/backup/restore_startup_gate.dart';
 import 'core/services/backup/restore_receipt.dart';
 import 'core/services/mcp/mcp_tool_service.dart';
 import 'core/services/logging/flutter_logger.dart';
+import 'core/services/logging/startup_recorder.dart';
 import 'features/home/services/ask_user_interaction_service.dart';
 import 'features/home/services/tool_approval_service.dart';
 import 'utils/app_directories.dart';
@@ -100,9 +101,20 @@ Future<void> main(List<String> arguments) async {
       ? associatedJoaiclientPathFromArguments(arguments)
       : null;
   final startupProgress = ValueNotifier<ProgressUpdate?>(null);
+  Directory? bootstrappedAppData;
   await runZoned(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+      FlutterLogger.stage('main entered');
+      // 日志开关原本要等读完偏好设置才生效，启动全程因此没有记录。这里在最
+      // 早的时刻同步解析一次数据目录与开关，让启动脚印从一开始就能落盘。
+      try {
+        final dataDirectory = await AppDirectories.getAppDataDirectory();
+        bootstrappedAppData = dataDirectory;
+        FlutterLogger.bootstrap(dataDirectory);
+        FlutterLogger.stage('startup log channel ready');
+      } catch (_) {}
+      StartupRecorder.installFrameCounter();
       if (Platform.isWindows) AssociatedBackupPathEvents.instance.initialize();
       // 启动阶段只注册通知点击回调，不申请运行时通知权限。
       if (Platform.isAndroid) {
@@ -114,17 +126,24 @@ Future<void> main(List<String> arguments) async {
       // 恢复切换会在真正构建应用之前校验并移动可能很大的数据包；
       // 在此过程中，原生桌面窗口不能显示成无响应的白屏。
       runApp(_StartupApp(progress: startupProgress));
+      StartupRecorder.watchFirstFrame('shell', waitForRaster: true);
+      StartupRecorder.startHeartbeat();
+      FlutterLogger.stage('shell mounted');
       void reportStartupProgress(double value) {
         startupProgress.value = ProgressUpdate(value: value);
       }
 
       reportStartupProgress(0.02);
       FlutterLogger.installGlobalHandlers();
+      FlutterLogger.stage('global handlers installed');
       _initializeAndroidDisplayMode();
       // 在可能耗时的恢复或数据库准入流程开始前，先配置并显示桌面窗口。
       await _initDesktopWindow();
+      FlutterLogger.stage('desktop window ready');
       reportStartupProgress(0.08);
-      final appDataDirectory = await AppDirectories.getAppDataDirectory();
+      final appDataDirectory =
+          bootstrappedAppData ?? await AppDirectories.getAppDataDirectory();
+      FlutterLogger.stage('app data directory resolved');
       String? associatedJoaiclientPath = commandLineAssociatedJoaiclientPath;
       final suppressAssociatedPathOnRestart = Platform.isWindows
           ? await AssociatedBackupPathEvents.consumeRestartSuppression(
@@ -162,6 +181,7 @@ Future<void> main(List<String> arguments) async {
           )
           ? ValueNotifier(RestoreStartupStage.checkingBackup)
           : null;
+      FlutterLogger.stage('restore gate checked pending=${restoreStage != null}');
       if (restoreStage != null) {
         runApp(_RestoreProgressApp(stage: restoreStage));
       }
@@ -171,6 +191,7 @@ Future<void> main(List<String> arguments) async {
         final businessLease = await RestoreBusinessLease.acquire(
           appDataDirectory: appDataDirectory,
         );
+        FlutterLogger.stage('business lease acquired');
         restoreOutcome =
             await RestoreStartupGate.recoverAndRequireBusinessReady(
               appDataDirectory: appDataDirectory,
@@ -179,8 +200,10 @@ Future<void> main(List<String> arguments) async {
                   ? null
                   : (stage) => restoreStage.value = stage,
             );
+        FlutterLogger.stage('restore recover done');
         reportStartupProgress(0.24);
       } catch (error, stackTrace) {
+        FlutterLogger.stage('restore recover FAILED: $error');
         stderr.writeln('[RestoreStartupGate] $error\n$stackTrace');
         await _initRestoreFailureWindow();
         runApp(
@@ -193,8 +216,12 @@ Future<void> main(List<String> arguments) async {
       }
       try {
         final prefs = await SharedPreferences.getInstance();
-        final enabled = prefs.getBool('flutter_log_enabled_v1') ?? false;
+        // 兜底值必须与启动最早期那次解析一致，否则启动后半段会被这里关掉。
+        final enabled =
+            prefs.getBool('flutter_log_enabled_v1') ??
+            FlutterLogger.defaultEnabled;
         await FlutterLogger.setEnabled(enabled);
+        FlutterLogger.stage('log switch applied enabled=$enabled');
       } catch (_) {}
       reportStartupProgress(0.32);
       // 缩小 Flutter 全局图片缓存，减轻大图带来的内存压力
@@ -212,6 +239,7 @@ Future<void> main(List<String> arguments) async {
       // logging.Logger.root.onRecord.listen((rec) { ... });
       // 缓存当前 Documents 目录，以修复 iOS 上的沙箱绝对路径
       await SandboxPathResolver.init();
+      FlutterLogger.stage('sandbox resolver ready');
       reportStartupProgress(0.4);
       ChatDatabaseLease? processDatabaseLease;
       BusinessPreferences? businessPreferences;
@@ -220,6 +248,7 @@ Future<void> main(List<String> arguments) async {
         try {
           reportStartupProgress(0.46);
           final migrationDecision = await HiveToSqliteMigrationService.check();
+          FlutterLogger.stage('migration check done');
           if (migrationDecision.needsMigration) {
             runApp(
               MigrationApp(
@@ -249,6 +278,7 @@ Future<void> main(List<String> arguments) async {
                 ) ??
                 false,
           );
+          FlutterLogger.stage('database admission done');
           reportStartupProgress(0.66);
           final databaseFile = File(
             '${appDataDirectory.path}/${AppDatabase.databaseFileName}',
@@ -256,6 +286,7 @@ Future<void> main(List<String> arguments) async {
           final databaseLease = await ChatDatabaseGateway.instance.acquire(
             databaseFile,
           );
+          FlutterLogger.stage('chat database acquired');
           try {
             final legacyPreferences =
                 await SharedPreferencesLegacyBusinessPreferences.open();
@@ -264,6 +295,7 @@ Future<void> main(List<String> arguments) async {
                   repository: databaseLease.businessRepository,
                   legacyPreferences: legacyPreferences,
                 );
+            FlutterLogger.stage('business preferences loaded');
             reportStartupProgress(0.84);
             processDatabaseLease = databaseLease;
             businessPreferences = loadedBusinessPreferences;
@@ -324,6 +356,7 @@ Future<void> main(List<String> arguments) async {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       // 启动应用（Flutter 日志捕获可开关，默认关闭）
       startupProgress.value = const ProgressUpdate(value: 1);
+      FlutterLogger.stage('main app mounting');
       runApp(
         MyApp(
           databaseLease: processDatabaseLease,
@@ -333,6 +366,8 @@ Future<void> main(List<String> arguments) async {
           restoreOutcome: restoreOutcome?.state,
         ),
       );
+      StartupRecorder.watchFirstFrame('main app', waitForRaster: true);
+      FlutterLogger.stage('main app mounted');
     },
     zoneSpecification: ZoneSpecification(
       print: (self, parent, zone, line) {

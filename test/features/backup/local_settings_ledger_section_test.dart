@@ -91,14 +91,22 @@ Future<void> _settleLedger(WidgetTester tester) async {
 }
 
 /// 滚动到册子区块后再等加载——区块可能因为懒构建而尚未建立，先滚再等。
+///
+/// 目标区块此刻不在控件树上时（懒构建会回收视口外的内容），它既可能在当前
+/// 视口上方、也可能在下方，而 [WidgetTester.scrollUntilVisible] 只朝一个方向
+/// 滚动。清空记录后页面内容变短、视口停在原处，区块正好落在上方——单向向下
+/// 滚只会越滚越远。因此先回到列表顶部，再向下逐段找。
 Future<void> _settleLedgerSection(WidgetTester tester) async {
   await _settleLedger(tester);
   final target = find.text('Device settings records');
-  await tester.scrollUntilVisible(
-    target,
-    200,
-    scrollable: find.byType(Scrollable).first,
-  );
+  final scrollable = find.byType(Scrollable).first;
+  if (target.evaluate().isEmpty) {
+    tester.state<ScrollableState>(scrollable).position.jumpTo(
+      tester.state<ScrollableState>(scrollable).position.minScrollExtent,
+    );
+    await tester.pump();
+  }
+  await tester.scrollUntilVisible(target, 200, scrollable: scrollable);
   await tester.pump();
   await _settleLedger(tester);
 }

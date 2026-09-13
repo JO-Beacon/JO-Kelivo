@@ -2052,7 +2052,7 @@
   "requestLogSettingTitle": "请求日志打印",
   "requestLogSettingSubtitle": "开启后会将请求/响应详情写入 logs/logs.txt",
   "flutterLogSettingTitle": "应用日志打印",
-  "flutterLogSettingSubtitle": "开启后会将 Flutter 错误与 print 输出写入 logs/flutter_logs.txt",
+  "flutterLogSettingSubtitle": "开启后会把程序出错信息、打印输出与每次启动的经过写入 logs/flutter_logs.txt，用于排查异常",
   "contextLogSettingTitle": "上下文日志",
   "contextLogSettingSubtitle": "开启后会将每次实际发送给模型的完整上下文写入 logs/context_logs.txt",
   "contextLogViewerTitle": "上下文",
