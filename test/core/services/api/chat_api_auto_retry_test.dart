@@ -183,7 +183,7 @@ void main() {
     // JO 无 generateMessage 聚合入口：改用事件链路的非流式模式，
     // 手动聚合并观察 RetryPending / RetryAttemptStart 控制块。
     final handler = StreamChunkHandler();
-    await for (final chunk in ChatApiService.sendMessageStreamEvents(
+    await for (final chunk in ChatApiService.sendMessageStream(
       config: _openAIConfig(baseUrl),
       modelId: 'gpt-4o-mini',
       messages: [
@@ -267,7 +267,7 @@ void main() {
 
     // JO 双轨：带客户端工具的重试走事件链路（U10 每轮重试）；
     // 旧版 sendMessageStream 保守规则（带工具不重试）保持不变。
-    final chunks = await ChatApiService.sendMessageStreamEvents(
+    final chunks = await ChatApiService.sendMessageStream(
       config: _openAIConfig(baseUrl),
       modelId: 'gpt-4o-mini',
       messages: [

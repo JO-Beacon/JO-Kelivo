@@ -63,6 +63,9 @@ const _config = ImageCompressConfig(
 );
 
 void main() {
+  // 根目录只在注册阶段建一次：setUp 里必须保持纯异步，否则同步磁盘 IO 会
+  // 扰动 widget 测试的时序，导致粘贴用例偶发多落一个文件。
+  final tempRoot = _testTempRoot();
   late PathProviderPlatform previousPathProvider;
   late _FakePathProviderPlatform fakePathProvider;
   late Directory appSupportDir;
@@ -71,12 +74,8 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     previousPathProvider = PathProviderPlatform.instance;
-    appSupportDir = await Directory.systemTemp.createTemp(
-      'kelivo_input_cleanup_app_',
-    );
-    userDir = await Directory.systemTemp.createTemp(
-      'kelivo_input_cleanup_user_',
-    );
+    appSupportDir = await tempRoot.createTemp('kelivo_input_cleanup_app_');
+    userDir = await tempRoot.createTemp('kelivo_input_cleanup_user_');
     fakePathProvider = _FakePathProviderPlatform(appSupportDir.path);
     PathProviderPlatform.instance = fakePathProvider;
   });
@@ -290,11 +289,21 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.runAsync(() async {
       disposeGate.complete();
-      await Future<void>.delayed(const Duration(milliseconds: 100));
     });
     expect(
       fakePathProvider.completedAppDataRequests,
       greaterThan(completedRequestsBeforeDispose),
+    );
+    // 收尾不等固定时长：机器负载高时（并发跑整个套件）等待会不够，文件还在删除
+    // 途中就被判失败。改为等到上传目录回到基线条目数。
+    expect(
+      await pumpUntil(
+        tester,
+        () =>
+            !uploadDir.existsSync() ||
+            uploadDir.listSync().length <= existingPaths!.length,
+      ),
+      isTrue,
     );
     final remainingPaths = await tester.runAsync(
       () => uploadDir.list().map((entry) => entry.path).toSet(),
@@ -923,11 +932,34 @@ Future<void> _invokePasteShortcut(
   await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
 }
 
-Future<void> _forceDelete(Directory dir) async {
+/// 测试自建目录放在项目内，而不是系统临时目录。
+///
+/// Windows 上被图片加载映射过的文件（Flutter 走文件映射，句柄不带允许删除
+/// 标志）在进程结束前删不掉 —— 测试内重试、清图片缓存、提前拆 widget 树都
+/// 实测无效。落在系统临时目录里会一轮一轮累积，所以改放到 build/ 下。
+Directory _testTempRoot() {
   try {
-    if (await dir.exists()) {
-      await Process.run('chmod', ['-R', '0755', dir.path]);
+    final root = Directory(p.join(Directory.current.path, 'build', 'test_tmp'));
+    if (!root.existsSync()) root.createSync(recursive: true);
+    return root;
+  } catch (_) {
+    return Directory.systemTemp;
+  }
+}
+
+Future<void> _forceDelete(Directory dir) async {
+  // Windows 上 chmod 不存在，抛错会让后面的删除整段跳过；
+  // 另外刚写完的文件偶尔仍被占用，所以重试几次。
+  for (var attempt = 0; attempt < 5; attempt++) {
+    try {
+      if (!await dir.exists()) return;
+      if (!Platform.isWindows) {
+        await Process.run('chmod', ['-R', '0755', dir.path]);
+      }
       await dir.delete(recursive: true);
+      return;
+    } catch (_) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
     }
-  } catch (_) {}
+  }
 }

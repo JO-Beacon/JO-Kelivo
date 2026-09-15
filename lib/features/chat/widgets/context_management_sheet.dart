@@ -14,11 +14,15 @@ class ContextManagementSheet extends StatelessWidget {
     this.onCompress,
     this.onClear,
     this.clearLabel,
+    this.messageCountLabel,
   });
 
   final VoidCallback? onCompress;
   final VoidCallback? onClear;
   final String? clearLabel;
+
+  /// 当前上下文中的消息条数，例如“12 条消息”，显示在屏蔽那一行的右侧。
+  final String? messageCountLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -69,6 +73,7 @@ class ContextManagementSheet extends StatelessWidget {
             icon: Lucide.Eraser,
             label: clearLabel ?? l10n.bottomToolsSheetClearContext,
             description: l10n.clearContextDesc,
+            trailing: messageCountLabel,
             onTap: () {
               Haptics.light();
               onClear?.call();
@@ -87,12 +92,14 @@ class _OptionRow extends StatelessWidget {
     required this.label,
     required this.description,
     this.onTap,
+    this.trailing,
   });
 
   final IconData icon;
   final String label;
   final String description;
   final VoidCallback? onTap;
+  final String? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -134,6 +141,17 @@ class _OptionRow extends StatelessWidget {
               ],
             ),
           ),
+          if (trailing != null) ...[
+            const SizedBox(width: 12),
+            Text(
+              trailing!,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: AppFontWeights.medium,
+                color: cs.onSurface.withValues(alpha: 0.55),
+              ),
+            ),
+          ],
         ],
       ),
     );

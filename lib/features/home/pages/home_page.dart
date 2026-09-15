@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io' show File, Platform;
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:provider/provider.dart';
@@ -23,7 +23,6 @@ import '../../../core/models/quick_phrase.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/services/android_process_text.dart';
-import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../desktop/search_provider_popover.dart';
 import '../../../desktop/reasoning_budget_popover.dart';
@@ -58,6 +57,8 @@ import '../widgets/chat_selection_export_bar.dart';
 import '../utils/model_display_helper.dart';
 import '../utils/chat_layout_constants.dart';
 import '../controllers/home_page_controller.dart';
+import '../../chat/widgets/frosted/chat_frosted_backdrop.dart';
+import '../../chat/widgets/chat_assistant_background.dart';
 import '../services/chat_read_position_store.dart';
 import '../controllers/home_view_model.dart';
 import '../controllers/scroll_controller.dart' as scroll_ctrl;
@@ -1001,7 +1002,7 @@ class _HomePageState extends State<HomePage>
     return ChatInputOverlayLayout(
       topInset: _chatTopOverlayInset(context),
       topBackground: backgroundImageActive
-          ? _buildChatBackground(context, cs)
+          ? const ChatAssistantBackground(expand: false, pinnedToBackdrop: true)
           : null,
       backgroundImageActive: backgroundImageActive,
       content: Builder(
@@ -1256,7 +1257,12 @@ class _HomePageState extends State<HomePage>
     return ChatInputOverlayLayout(
       topInset: _chatTopOverlayInset(context),
       topBackground: backgroundImageActive
-          ? _buildAssistantBackground(context)
+          ? const ChatAssistantBackground(
+              desktop: true,
+              includeSurfaceFill: true,
+              applyMaskStrength: false,
+              pinnedToBackdrop: true,
+            )
           : null,
       backgroundImageActive: backgroundImageActive,
       content: FadeTransition(
@@ -1355,125 +1361,16 @@ class _HomePageState extends State<HomePage>
     await _controller.deleteCurrentConversation();
   }
 
-  Widget _buildChatBackground(BuildContext context, ColorScheme cs) {
-    return Builder(
-      builder: (context) {
-        final bg = context
-            .watch<AssistantProvider>()
-            .currentAssistant
-            ?.background;
-        final maskStrength = context
-            .watch<SettingsProvider>()
-            .chatBackgroundMaskStrength;
-        if (bg == null || bg.trim().isEmpty) return const SizedBox.shrink();
-        ImageProvider provider;
-        if (bg.startsWith('http')) {
-          provider = NetworkImage(bg);
-        } else {
-          final localPath = SandboxPathResolver.fix(bg);
-          final file = File(localPath);
-          if (!file.existsSync()) return const SizedBox.shrink();
-          provider = FileImage(file);
-        }
-        return Stack(
-          children: [
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  image: DecorationImage(
-                    image: provider,
-                    fit: BoxFit.cover,
-                    colorFilter: ColorFilter.mode(
-                      cs.shadow.withValues(alpha: 0.04),
-                      BlendMode.srcATop,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Positioned.fill(
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: () {
-                        final top = (0.20 * maskStrength).clamp(0.0, 1.0);
-                        final bottom = (0.50 * maskStrength).clamp(0.0, 1.0);
-                        return [
-                          cs.surface.withValues(alpha: top),
-                          cs.surface.withValues(alpha: bottom),
-                        ];
-                      }(),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   Widget _buildAssistantBackground(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final assistant = context.watch<AssistantProvider>().currentAssistant;
-    final bgRaw = (assistant?.background ?? '').trim();
-    Widget? bg;
-    if (bgRaw.isNotEmpty) {
-      if (bgRaw.startsWith('http')) {
-        bg = Image.network(
-          bgRaw,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-        );
-      } else {
-        try {
-          final fixed = SandboxPathResolver.fix(bgRaw);
-          final f = File(fixed);
-          if (f.existsSync()) {
-            bg = Image(image: FileImage(f), fit: BoxFit.cover);
-          }
-        } catch (_) {}
-      }
-    }
-    return IgnorePointer(
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          ColoredBox(color: cs.surface),
-          if (bg != null) Opacity(opacity: 0.9, child: bg),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  cs.surface.withValues(alpha: 0.08),
-                  cs.surface.withValues(alpha: 0.36),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
+    return const ChatAssistantBackground(
+      desktop: true,
+      includeSurfaceFill: true,
+      applyMaskStrength: false,
     );
   }
 
   bool _assistantBackgroundActive(BuildContext context) {
-    final bgRaw =
-        (context.watch<AssistantProvider>().currentAssistant?.background ?? '')
-            .trim();
-    if (bgRaw.isEmpty) return false;
-    if (bgRaw.startsWith('http')) return true;
-    try {
-      final fixed = SandboxPathResolver.fix(bgRaw);
-      return File(fixed).existsSync();
-    } catch (_) {
-      return false;
-    }
+    return ChatBackdropSpec.resolve(context).active;
   }
 
   double _chatTopOverlayInset(BuildContext context) {
@@ -2086,6 +1983,7 @@ class _HomePageState extends State<HomePage>
           top: false,
           child: ContextManagementSheet(
             clearLabel: _controller.clearContextLabel(),
+            messageCountLabel: _controller.contextMessageCountLabel(),
             onCompress: () async {
               await Navigator.of(ctx).maybePop();
               if (!mounted) return;

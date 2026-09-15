@@ -177,6 +177,17 @@ class ChatActions {
   /// 以维持“删除意味着停止生成”的约束。
   static ChatActions? _current;
 
+  /// 当前是否有任何会话正在生成。
+  ///
+  /// 供后台维护使用：这类工作宁可等待，也不愿与用户正在观看的回复
+  /// 抢磁盘和 CPU。
+  static bool get hasAnyActiveGeneration {
+    final actions = _current;
+    if (actions == null) return false;
+    return actions._conversationStreams.isNotEmpty ||
+        actions._activeAssistantMessages.isNotEmpty;
+  }
+
   /// 在应用退出前刷新最新的内存生成快照。
   static Future<void> flushActiveGenerationProgress() async {
     final actions = _current;
@@ -1797,7 +1808,7 @@ class ChatActions {
           ..stateRevision = run.stateRevision
           ..nextSeq = run.checkpointSeq + 1;
       }
-      final stream = ChatApiService.sendMessageStreamEvents(
+      final stream = ChatApiService.sendMessageStream(
         config: ctx.config,
         modelId: ctx.modelId,
         messages: ctx.apiMessages,

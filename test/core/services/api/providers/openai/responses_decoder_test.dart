@@ -1,8 +1,10 @@
 import 'dart:convert';
 
+import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/services/api/providers/openai/responses_decoder.dart';
 import 'package:Kelivo/core/services/api/stream/sse_event.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
+import 'package:Kelivo/core/services/api/stream/stream_chunk_handler.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 SseEvent _event(Map<String, dynamic> data) => SseEvent(data: jsonEncode(data));
@@ -214,6 +216,83 @@ void main() {
     expect(
       (end.chunks.whereType<ServerToolEnd>().single.output as Map)['query'],
       'kotlin',
+    );
+  });
+
+  test('keeps message items separate so a hosted search stays inline', () {
+    final decoder = ResponsesStreamDecoder();
+    final handler = StreamChunkHandler();
+    void feed(Map<String, dynamic> data) {
+      for (final chunk in decoder.accept(_event(data)).chunks) {
+        handler.handle(chunk);
+      }
+    }
+
+    // DeepSeek 的内置搜索会把一次响应拆成多个 `message` 项，
+    // 中间夹着一个 `web_search_call` 项。
+    feed({
+      'type': 'response.reasoning_text.delta',
+      'output_index': 0,
+      'delta': 'think A',
+    });
+    feed({
+      'type': 'response.output_text.delta',
+      'output_index': 1,
+      'delta': 'text A',
+    });
+    feed({
+      'type': 'response.output_item.added',
+      'output_index': 2,
+      'item': {
+        'id': 'call_0',
+        'type': 'web_search_call',
+        'status': 'in_progress',
+      },
+    });
+    feed({
+      'type': 'response.output_item.done',
+      'output_index': 2,
+      'item': {
+        'id': 'call_0',
+        'type': 'web_search_call',
+        'status': 'completed',
+        'action': {
+          'type': 'search',
+          'queries': ['news'],
+        },
+      },
+    });
+    feed({
+      'type': 'response.reasoning_text.delta',
+      'output_index': 3,
+      'delta': 'think B',
+    });
+    feed({
+      'type': 'response.output_text.delta',
+      'output_index': 4,
+      'delta': 'text B',
+    });
+    feed({
+      'type': 'response.completed',
+      'response': {'output': const []},
+    });
+
+    expect(
+      handler.parts.map(
+        (part) => switch (part) {
+          ReasoningPart(:final text) => 'reasoning:$text',
+          TextPart(:final text) => 'text:$text',
+          ToolCallPart() => 'tool',
+          _ => 'other',
+        },
+      ),
+      <String>[
+        'reasoning:think A',
+        'text:text A',
+        'tool',
+        'reasoning:think B',
+        'text:text B',
+      ],
     );
   });
 

@@ -524,6 +524,16 @@ class OpenAIProviderInfo {
       host.contains('chat.intern-ai.org.cn');
   bool get isKimiThinkingModel => _isKimiThinkingModel(upstreamModelId);
 
+  /// Google 的 OpenAI 兼容端点（Gemini 走 chat/completions 形状）会把
+  /// 思考签名挂在工具调用的 `extra_content` 上，回放时必须原样带回。
+  bool get supportsGoogleOpenAIThoughtSignatures {
+    final normalizedModelId = upstreamModelId.toLowerCase();
+    final isGoogleApiHost =
+        host == 'generativelanguage.googleapis.com' ||
+        host.endsWith('aiplatform.googleapis.com');
+    return isGoogleApiHost && normalizedModelId.contains('gemini');
+  }
+
   bool get needsReasoningEcho =>
       usesPoolsideThinking ||
       isDeepSeek ||

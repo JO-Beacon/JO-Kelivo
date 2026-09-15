@@ -492,7 +492,11 @@ Input:
   ];
 
   /// 将时间戳按本地时区包裹为四位年份的 `<current_time>` 标签（§9.1）。
-  static String formatCurrentTimeTag(DateTime timestamp) {
+  /// 默认带上星期缩写；[useIso8601] 为真时改写为带时区偏移的 ISO 8601。
+  static String formatCurrentTimeTag(
+    DateTime timestamp, {
+    bool useIso8601 = false,
+  }) {
     final local = timestamp.isUtc ? timestamp.toLocal() : timestamp;
     final eee = _weekdayAbbrev[local.weekday - 1];
     final yyyy = local.year.toString().padLeft(4, '0');
@@ -501,6 +505,15 @@ Input:
     final hh = local.hour.toString().padLeft(2, '0');
     final min = local.minute.toString().padLeft(2, '0');
     final ss = local.second.toString().padLeft(2, '0');
+    if (useIso8601) {
+      final offset = local.timeZoneOffset;
+      final sign = offset.isNegative ? '-' : '+';
+      final minutes = offset.inMinutes.abs();
+      final offsetHours = (minutes ~/ 60).toString().padLeft(2, '0');
+      final offsetMinutes = (minutes % 60).toString().padLeft(2, '0');
+      return '<current_time>$yyyy-$mm-${dd}T$hh:$min:$ss'
+          '$sign$offsetHours:$offsetMinutes</current_time>';
+    }
     return '<current_time>$eee $yyyy-$mm-$dd $hh:$min:$ss</current_time>';
   }
 

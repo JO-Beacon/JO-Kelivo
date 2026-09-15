@@ -200,7 +200,7 @@ void main() {
           await request.response.close();
         });
         final chunks = await HttpOverrides.runZoned(
-          () => ChatApiService.sendMessageStreamEvents(
+          () => ChatApiService.sendMessageStream(
             config: _config(),
             modelId: 'test-model',
             conversationId: conversationId,

@@ -9,6 +9,8 @@ import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/services/api/providers/openai/openai_vendor_compat.dart';
 import 'package:Kelivo/core/utils/openai_model_compat.dart';
 
+import 'support/collect_generation.dart';
+
 ProviderConfig _openAIConfig(
   String baseUrl, {
   bool useResponseApi = false,
@@ -78,7 +80,7 @@ Future<Map<String, dynamic>> _captureChatBody({
     tools: tools,
   ).toList();
 
-  expect(chunks.last.isDone, isTrue);
+  expect(chunks.isGenerationDone, isTrue);
   return requestBody;
 }
 
@@ -161,6 +163,15 @@ void main() {
       expect(
         openAINormalizeReasoningEffort('max', 'deepseek-v4-flash-vision-exp'),
         'max',
+      );
+      expect(
+        openAINormalizeReasoningEffort('medium', 'deepseek-flash'),
+        'high',
+      );
+      expect(openAINormalizeReasoningEffort('max', 'deepseek-flash'), 'max');
+      expect(
+        openAINormalizeReasoningEffort('off', 'deepseek/deepseek-flash'),
+        'off',
       );
       expect(openAINormalizeReasoningEffort('off', 'gpt-6-astra'), 'low');
       expect(
@@ -409,11 +420,8 @@ void main() {
       ).toList();
 
       expect((requestBody['reasoning'] as Map)['effort'], 'low');
-      expect(
-        chunks.map((chunk) => chunk.reasoning ?? '').join(),
-        contains('reasoning summary'),
-      );
-      expect(chunks.map((chunk) => chunk.content).join(), contains('answer'));
+      expect(chunks.joinedReasoning, contains('reasoning summary'));
+      expect(chunks.joinedContent, contains('answer'));
     });
   });
 }

@@ -1490,11 +1490,11 @@ class HomeViewModel extends ChangeNotifier {
     return _chatController.groupMessagesByGroup();
   }
 
-  /// 根据当前状态获取清除上下文标签。
-  String getClearContextLabel(
-    String Function(String, String) withCountFormatter,
-    String defaultLabel,
-  ) {
+  /// 当前会话上下文中实际参与请求的消息条数。
+  ///
+  /// [actual] 统计上下文分界点之后的消息数，助手设了上限时按上限截断；
+  /// [configured] 即该上限，未设上限时为 null。
+  ({int actual, int? configured}) getContextMessageCount() {
     final assistant = _contextProvider
         .read<AssistantProvider>()
         .currentAssistant;
@@ -1509,10 +1509,12 @@ class HomeViewModel extends ChangeNotifier {
           : _chatService.getContextStartIndex(currentConversation!.id),
     );
     if (configured > 0) {
-      final actual = remaining > configured ? configured : remaining;
-      return withCountFormatter(actual.toString(), configured.toString());
+      return (
+        actual: remaining > configured ? configured : remaining,
+        configured: configured,
+      );
     }
-    return defaultLabel;
+    return (actual: remaining, configured: null);
   }
 
   bool get isContextMasked {

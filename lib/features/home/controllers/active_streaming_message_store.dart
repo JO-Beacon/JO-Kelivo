@@ -9,6 +9,9 @@ class ActiveStreamingMessageStore {
     return _messagesByConversation[conversationId];
   }
 
+  /// 当前是否任一会话存在进行中的助手消息。
+  bool get isNotEmpty => _messagesByConversation.isNotEmpty;
+
   void put(ChatMessage message) {
     _messagesByConversation[message.conversationId] = message;
   }

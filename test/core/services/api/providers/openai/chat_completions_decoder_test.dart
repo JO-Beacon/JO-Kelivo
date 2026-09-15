@@ -195,10 +195,11 @@ void main() {
       ),
     );
 
-    expect(decoder.toolCalls[0], <String, String>{
+    expect(decoder.toolCalls[0], <String, dynamic>{
       'id': 'call_null',
       'name': 'lookup',
       'args': '{}',
+      'series_id': 'call_null',
     });
     expect(result.chunks.whereType<ToolCallStart>().single.id, 'call_null');
     expect(result.chunks.whereType<ToolCallEnd>().single.id, 'call_null');
@@ -541,5 +542,174 @@ void main() {
     expect(first.approxCompletionChars, 4);
     expect(second.approxCompletionChars, 8);
     expect(first.approxCompletionChars + second.approxCompletionChars, 12);
+  });
+
+  test(
+    'keeps Gemini extra_content.google.thought_signature on streamed tool calls',
+    () {
+      const extraContent = <String, dynamic>{
+        'google': <String, dynamic>{'thought_signature': 'sig-create-memory'},
+      };
+      final decoder = ChatCompletionsStreamDecoder();
+      final start = decoder.accept(
+        _event(
+          _choice(
+            delta: <String, dynamic>{
+              'tool_calls': [
+                <String, dynamic>{
+                  'index': 0,
+                  'id': 'call_mem',
+                  'type': 'function',
+                  'extra_content': extraContent,
+                  'function': <String, dynamic>{
+                    'name': 'create_memory',
+                    'arguments': '{"content":',
+                  },
+                },
+              ],
+            },
+          ),
+        ),
+      );
+      decoder.accept(
+        _event(
+          _choice(
+            delta: <String, dynamic>{
+              'tool_calls': [
+                <String, dynamic>{
+                  'index': 0,
+                  'function': <String, dynamic>{'arguments': '"note"}'},
+                },
+              ],
+            },
+            finishReason: 'tool_calls',
+          ),
+        ),
+      );
+
+      expect(decoder.toolCalls[0]!['extra_content'], extraContent);
+      expect(
+        start.chunks
+            .whereType<ToolCallStart>()
+            .single
+            .metadata?['google']['extra_content'],
+        extraContent,
+      );
+    },
+  );
+
+  test(
+    'keeps Gemini extra_content that arrives after the first tool-call delta',
+    () {
+      const extraContent = <String, dynamic>{
+        'google': <String, dynamic>{'thought_signature': 'sig-late'},
+      };
+      final decoder = ChatCompletionsStreamDecoder();
+      decoder.accept(
+        _event(
+          _choice(
+            delta: <String, dynamic>{
+              'tool_calls': [
+                <String, dynamic>{
+                  'index': 0,
+                  'id': 'call_late_sig',
+                  'function': <String, dynamic>{
+                    'name': 'create_memory',
+                    'arguments': '{}',
+                  },
+                },
+              ],
+            },
+          ),
+        ),
+      );
+      final late = decoder.accept(
+        _event(
+          _choice(
+            delta: <String, dynamic>{
+              'tool_calls': [
+                <String, dynamic>{'index': 0, 'extra_content': extraContent},
+              ],
+            },
+            finishReason: 'tool_calls',
+          ),
+        ),
+      );
+
+      expect(decoder.toolCalls[0]!['extra_content'], extraContent);
+      final extraDeltas = late.chunks.whereType<ToolCallDelta>().where((chunk) {
+        final google = chunk.metadata?['google'];
+        return google is Map && google['extra_content'] is Map;
+      });
+      expect(extraDeltas, isNotEmpty);
+      expect(
+        extraDeltas.first.metadata!['google']['extra_content'],
+        extraContent,
+      );
+    },
+  );
+
+  test('keeps Gemini extra_content on one-shot and root-level tool_calls', () {
+    const extraContent = <String, dynamic>{
+      'google': <String, dynamic>{'thought_signature': 'sig-complete'},
+    };
+    final complete = ChatCompletionsStreamDecoder();
+    final completeResult = complete.accept(
+      _event(
+        _choice(
+          message: <String, dynamic>{
+            'content': '',
+            'tool_calls': [
+              <String, dynamic>{
+                'id': 'call_ns',
+                'type': 'function',
+                'extra_content': extraContent,
+                'function': <String, dynamic>{
+                  'name': 'create_memory',
+                  'arguments': '{}',
+                },
+              },
+            ],
+          },
+          finishReason: 'tool_calls',
+        ),
+      ),
+    );
+    expect(complete.toolCalls[0]!['extra_content'], extraContent);
+    expect(
+      completeResult.chunks
+          .whereType<ToolCallStart>()
+          .single
+          .metadata?['google']['extra_content'],
+      extraContent,
+    );
+
+    final root = ChatCompletionsStreamDecoder();
+    final rootResult = root.accept(
+      _event(<String, dynamic>{
+        'tool_calls': [
+          <String, dynamic>{
+            'id': 'root_1',
+            'type': 'function',
+            'extra_content': extraContent,
+            'function': <String, dynamic>{
+              'name': 'create_memory',
+              'arguments': '{}',
+            },
+          },
+        ],
+        'choices': [
+          <String, dynamic>{'finish_reason': 'stop'},
+        ],
+      }),
+    );
+    expect(root.toolCalls[0]!['extra_content'], extraContent);
+    expect(
+      rootResult.chunks
+          .whereType<ToolCallStart>()
+          .single
+          .metadata?['google']['extra_content'],
+      extraContent,
+    );
   });
 }

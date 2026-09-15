@@ -94,6 +94,7 @@ class ClaudeHistory {
     required this.skipRedactedThinkingBlocks,
     this.skipImageParsing = false,
     this.userImagePaths,
+    this.remoteMediaBase64,
   });
 
   /// Only Anthropic runs a server tool or decrypts what one returned, so
@@ -103,6 +104,13 @@ class ClaudeHistory {
   final bool skipRedactedThinkingBlocks;
   final bool skipImageParsing;
   final List<String>? userImagePaths;
+
+  /// 把远程媒体 URL 取回为 base64 的函数，用于不接受 URL 图片源的供应商。
+  ///
+  /// Vertex 不接受 `image` 块里的远程 URL，必须下载后以 base64 内联；
+  /// 提供本函数即启用该行为。为空时远程 URL 照 official Claude 的既有
+  /// 行为原样作为文本发出。
+  final Future<String> Function(String url)? remoteMediaBase64;
 
   /// The container the conversation's last code execution ran in, stored
   /// against that assistant message. The latest one wins. Set by [build].
@@ -491,8 +499,35 @@ class ClaudeHistory {
       final normalized = normalizeSrc(source);
       if (!seenSources.add(normalized)) return;
       if (source.startsWith('http://') || source.startsWith('https://')) {
-        // Preserve prior official-Claude behavior for remote URLs.
-        text.add({'type': 'text', 'text': source});
+        final download = remoteMediaBase64;
+        if (download == null) {
+          // Preserve prior official-Claude behavior for remote URLs.
+          text.add({'type': 'text', 'text': source});
+          return;
+        }
+        // Vertex 不接受 URL 形式的图片源，必须先下载再以 base64 内联。
+        final mime = normalizeClaudeImageMime(
+          (explicitMime != null && explicitMime.trim().isNotEmpty)
+              ? explicitMime.trim()
+              : mimeFromPath(source),
+        );
+        // 视频、音频等非 Claude 图像 MIME 不输出图像块，改以文本发出原链接。
+        if (!isClaudeSupportedImageMime(mime)) {
+          text.add({'type': 'text', 'text': source});
+          return;
+        }
+        try {
+          final b64 = await download(source);
+          images.add({
+            'type': 'image',
+            'source': {'type': 'base64', 'media_type': mime, 'data': b64},
+          });
+        } catch (_) {
+          text.add({
+            'type': 'text',
+            'text': '(image failed to download) $source',
+          });
+        }
         return;
       }
       if (source.startsWith('data:')) {

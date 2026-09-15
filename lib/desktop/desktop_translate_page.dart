@@ -11,6 +11,7 @@ import '../utils/brand_assets.dart';
 import '../core/providers/settings_provider.dart';
 import '../core/providers/assistant_provider.dart';
 import '../core/services/api/chat_api_service.dart';
+import '../core/services/api/stream/stream_chunk.dart';
 import '../shared/widgets/snackbar.dart';
 import '../features/model/widgets/model_select_sheet.dart'
     show showModelSelector;
@@ -185,8 +186,9 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
 
       _subscription = stream.listen(
         (chunk) {
+          if (chunk is! TextDelta) return;
           // 实时更新；首个分块移除前导空白，避免顶部出现空隙
-          final s = chunk.content;
+          final s = chunk.text;
           if (_output.text.isEmpty) {
             _output.text = s.replaceFirst(RegExp(r'^\s+'), '');
           } else {

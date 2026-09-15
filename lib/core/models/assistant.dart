@@ -19,6 +19,7 @@ class Assistant {
   static const int minMemoryOrganizeEveryNTurns = 1;
   static const int maxMemoryOrganizeEveryNTurns = 20;
   static const double defaultTemperature = 1.0;
+  static const double defaultGradientBackgroundPhase = 7.0;
   static const int minContextMessageSize = 1;
   static const int maxContextMessageSize = 1024;
   static const List<int> recentChatsSummaryMessageCountOptions = <int>[
@@ -54,6 +55,11 @@ class Assistant {
   /// 以便重新开启时恢复。
   final List<String> healthDataTypeIds;
   final String? background; // 聊天背景（颜色/图片引用）
+  final bool useGradientBackground;
+  final bool gradientBackgroundAnimated;
+  final double gradientBackgroundPhase;
+  final double gradientBackgroundOffsetX;
+  final double gradientBackgroundOffsetY;
   // 自定义请求覆盖（每个助手）
   final List<Map<String, String>>
   customHeaders; // [{name:'X-Header', value:'v'}]
@@ -68,6 +74,7 @@ class Assistant {
   final bool generateConversationSummary;
   final int recentChatsSummaryMessageCount; // 每新增 N 条消息后刷新摘要
   final bool appendCurrentTimeToUserMessage;
+  final bool useIso8601TimeFormat;
   // 预设会话消息（有序）
   final List<PresetMessage> presetMessages;
   // 正则替换规则
@@ -96,6 +103,11 @@ class Assistant {
     this.localToolIds = const <String>[],
     this.healthDataTypeIds = HealthDataTypeIds.defaultSelected,
     this.background,
+    this.useGradientBackground = false,
+    this.gradientBackgroundAnimated = true,
+    this.gradientBackgroundPhase = defaultGradientBackgroundPhase,
+    this.gradientBackgroundOffsetX = 0,
+    this.gradientBackgroundOffsetY = 0,
     this.customHeaders = const <Map<String, String>>[],
     this.customBody = const <Map<String, String>>[],
     this.enableMemory = false,
@@ -107,6 +119,7 @@ class Assistant {
     this.generateConversationSummary = false,
     this.recentChatsSummaryMessageCount = defaultRecentChatsSummaryMessageCount,
     this.appendCurrentTimeToUserMessage = false,
+    this.useIso8601TimeFormat = false,
     this.presetMessages = const <PresetMessage>[],
     this.regexRules = const <AssistantRegex>[],
   });
@@ -134,6 +147,11 @@ class Assistant {
     List<String>? localToolIds,
     List<String>? healthDataTypeIds,
     String? background,
+    bool? useGradientBackground,
+    bool? gradientBackgroundAnimated,
+    double? gradientBackgroundPhase,
+    double? gradientBackgroundOffsetX,
+    double? gradientBackgroundOffsetY,
     List<Map<String, String>>? customHeaders,
     List<Map<String, String>>? customBody,
     bool? enableMemory,
@@ -145,6 +163,7 @@ class Assistant {
     bool? generateConversationSummary,
     int? recentChatsSummaryMessageCount,
     bool? appendCurrentTimeToUserMessage,
+    bool? useIso8601TimeFormat,
     List<PresetMessage>? presetMessages,
     List<AssistantRegex>? regexRules,
     bool clearChatModel = false,
@@ -185,6 +204,16 @@ class Assistant {
       localToolIds: localToolIds ?? this.localToolIds,
       healthDataTypeIds: healthDataTypeIds ?? this.healthDataTypeIds,
       background: clearBackground ? null : (background ?? this.background),
+      useGradientBackground:
+          useGradientBackground ?? this.useGradientBackground,
+      gradientBackgroundAnimated:
+          gradientBackgroundAnimated ?? this.gradientBackgroundAnimated,
+      gradientBackgroundPhase:
+          gradientBackgroundPhase ?? this.gradientBackgroundPhase,
+      gradientBackgroundOffsetX:
+          gradientBackgroundOffsetX ?? this.gradientBackgroundOffsetX,
+      gradientBackgroundOffsetY:
+          gradientBackgroundOffsetY ?? this.gradientBackgroundOffsetY,
       customHeaders: customHeaders ?? this.customHeaders,
       customBody: customBody ?? this.customBody,
       enableMemory: enableMemory ?? this.enableMemory,
@@ -201,6 +230,7 @@ class Assistant {
           recentChatsSummaryMessageCount ?? this.recentChatsSummaryMessageCount,
       appendCurrentTimeToUserMessage:
           appendCurrentTimeToUserMessage ?? this.appendCurrentTimeToUserMessage,
+      useIso8601TimeFormat: useIso8601TimeFormat ?? this.useIso8601TimeFormat,
       presetMessages: presetMessages ?? this.presetMessages,
       regexRules: regexRules ?? this.regexRules,
     );
@@ -229,6 +259,11 @@ class Assistant {
     'localToolIds': localToolIds,
     'healthDataTypeIds': healthDataTypeIds,
     'background': background,
+    'useGradientBackground': useGradientBackground,
+    'gradientBackgroundAnimated': gradientBackgroundAnimated,
+    'gradientBackgroundPhase': gradientBackgroundPhase,
+    'gradientBackgroundOffsetX': gradientBackgroundOffsetX,
+    'gradientBackgroundOffsetY': gradientBackgroundOffsetY,
     'customHeaders': customHeaders,
     'customBody': customBody,
     'enableMemory': enableMemory,
@@ -240,9 +275,15 @@ class Assistant {
     'generateConversationSummary': generateConversationSummary,
     'recentChatsSummaryMessageCount': recentChatsSummaryMessageCount,
     'appendCurrentTimeToUserMessage': appendCurrentTimeToUserMessage,
+    'useIso8601TimeFormat': useIso8601TimeFormat,
     'presetMessages': PresetMessage.encodeList(presetMessages),
     'regexRules': regexRules.map((e) => e.toJson()).toList(),
   };
+
+  static double _readGradientBackgroundPhase(Object? value) =>
+      value is num && value.isFinite && value >= 0
+      ? value.toDouble()
+      : defaultGradientBackgroundPhase;
 
   static Assistant fromJson(Map<String, dynamic> json) => Assistant(
     id: json['id'] as String,
@@ -271,6 +312,22 @@ class Assistant {
       json['healthDataTypeIds'],
     ),
     background: json['background'] as String?,
+    useGradientBackground: json['useGradientBackground'] as bool? ?? false,
+    gradientBackgroundAnimated:
+        json['gradientBackgroundAnimated'] as bool? ?? true,
+    gradientBackgroundPhase: _readGradientBackgroundPhase(
+      json['gradientBackgroundPhase'],
+    ),
+    gradientBackgroundOffsetX:
+        ((json['gradientBackgroundOffsetX'] as num?)?.toDouble() ?? 0).clamp(
+          -1.0,
+          1.0,
+        ),
+    gradientBackgroundOffsetY:
+        ((json['gradientBackgroundOffsetY'] as num?)?.toDouble() ?? 0).clamp(
+          -1.0,
+          1.0,
+        ),
     customHeaders: (() {
       final raw = json['customHeaders'];
       if (raw is List) {
@@ -334,6 +391,7 @@ class Assistant {
     })(),
     appendCurrentTimeToUserMessage:
         json['appendCurrentTimeToUserMessage'] as bool? ?? false,
+    useIso8601TimeFormat: json['useIso8601TimeFormat'] as bool? ?? false,
     presetMessages: (() {
       try {
         return PresetMessage.decodeList(json['presetMessages']);

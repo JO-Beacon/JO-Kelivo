@@ -9,6 +9,7 @@ import '../../../core/services/native_file_save.dart';
 import '../../../core/services/storage/storage_usage_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/utils/format_bytes.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
@@ -63,15 +64,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     }
   }
 
-  String _fmtBytes(int bytes) {
-    const kb = 1024;
-    const mb = kb * 1024;
-    const gb = mb * 1024;
-    if (bytes >= gb) return '${(bytes / gb).toStringAsFixed(2)} GB';
-    if (bytes >= mb) return '${(bytes / mb).toStringAsFixed(2)} MB';
-    if (bytes >= kb) return '${(bytes / kb).toStringAsFixed(1)} KB';
-    return '$bytes B';
-  }
+  String _fmtBytes(int bytes) => formatBytes(bytes);
 
   Color _barColorFor(
     StorageUsageCategoryKey key,

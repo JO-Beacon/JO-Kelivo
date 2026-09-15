@@ -26,7 +26,7 @@ import 'google_decoder.dart';
 ///
 /// Gemini 3 允许内置工具与 function_declarations（MCP）共存；Gemini 2.x 及更早版本中
 /// code_execution 互斥，search/url_context 不能与 MCP 同时使用。
-List<Map<String, dynamic>> _buildGeminiToolsArray({
+List<Map<String, dynamic>> buildGeminiToolsArray({
   required Set<String> builtIns,
   required bool allowCoexistence,
   List<Map<String, dynamic>>? geminiTools,
@@ -296,15 +296,20 @@ List<Map<String, dynamic>> _googleApiContents(
         if (content['parts'] is List)
           'parts': [
             for (final part in content['parts'] as List)
-              part is Map ? _googleApiPart(part) : part,
+              if ((part is Map ? _googleApiPart(part) : part)
+                  case final apiPart?)
+                apiPart,
           ],
       },
   ];
 }
 
-Map<String, dynamic> _googleApiPart(Map part) {
+Map<String, dynamic>? _googleApiPart(Map part) {
   final out = Map<String, dynamic>.from(part);
   out.remove('id');
+  // 部分中转会发出无签名的空文本块，但回放时又拒绝它。
+  // 保留签名与其他字段的 part 即便文本为空也照常保留。
+  if (out.length == 1 && out['text'] == '') return null;
   return out;
 }
 
@@ -642,7 +647,7 @@ Stream<StreamChunk> sendGoogleStreamEvents(
       assistantHeaders: extraHeaders,
     );
 
-    final toolsArr = _buildGeminiToolsArray(
+    final toolsArr = buildGeminiToolsArray(
       builtIns: builtIns,
       allowCoexistence: isGemini3,
       geminiTools: geminiTools,
@@ -1093,7 +1098,7 @@ Stream<StreamChunk> sendGoogleStreamEvents(
       ];
     }
   }
-  final toolsArr = _buildGeminiToolsArray(
+  final toolsArr = buildGeminiToolsArray(
     builtIns: builtIns,
     allowCoexistence: isGemini3,
     geminiTools: geminiTools,
@@ -1494,7 +1499,7 @@ Future<String> downloadRemoteAsBase64(
 ) async {
   final uri = Uri.parse(url);
   final request = http.Request('GET', uri);
-  if (config.vertexAI == true && _shouldAttachVertexMediaAuthForEvents(uri)) {
+  if (config.vertexAI == true && shouldAttachVertexMediaAuth(uri)) {
     final token = await maybeVertexAccessToken(config);
     if (token != null && token.isNotEmpty) {
       request.headers['Authorization'] = 'Bearer $token';
@@ -1516,7 +1521,7 @@ Future<String> downloadRemoteAsBase64(
   return base64Encode(bytes);
 }
 
-bool _shouldAttachVertexMediaAuthForEvents(Uri uri) {
+bool shouldAttachVertexMediaAuth(Uri uri) {
   if (uri.scheme.toLowerCase() != 'https') return false;
   final host = uri.host.trim().toLowerCase();
   return host == 'googleapis.com' ||

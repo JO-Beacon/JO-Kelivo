@@ -80,6 +80,8 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
   bool receivedImage;
   TokenUsage? usage;
   String? finishReason;
+  bool _hasSeenPart = false;
+  bool _stopAfterPart = false;
   bool retryMalformedResponse = false;
   bool streamComplete = false;
 
@@ -118,6 +120,7 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
 
   bool get canFinishNow =>
       finishReason != null &&
+      (finishReason != 'STOP' || _stopAfterPart) &&
       !retryMalformedResponse &&
       functionCalls.isEmpty &&
       (!expectImage || receivedImage);
@@ -274,6 +277,7 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
 
       for (final p in parts) {
         if (p is! Map) continue;
+        _hasSeenPart = true;
         _parsePart(
           p,
           chunks,
@@ -283,7 +287,13 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
       }
 
       final fr = cand['finishReason'];
-      if (fr is String && fr.isNotEmpty) finishReason = fr;
+      if (fr is String && fr.isNotEmpty) {
+        finishReason = fr;
+        // 部分代理会在任何 part 之前先发一个空的 STOP 帧。只有与 part 同时
+        // 或在其之后新收到的 STOP 才能结束流；后续出现的 part 不得让先前
+        // 那个空 STOP 事后变得有效。
+        if (fr == 'STOP') _stopAfterPart = _hasSeenPart;
+      }
 
       final gm = cand['groundingMetadata'] ?? obj['groundingMetadata'];
       final cite = _parseCitations(gm);

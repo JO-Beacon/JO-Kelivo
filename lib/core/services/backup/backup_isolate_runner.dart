@@ -1,12 +1,53 @@
 import 'dart:async';
 import 'dart:isolate';
 
+import 'package:flutter/foundation.dart';
+
 import '../../database/sqlite_interrupt.dart';
 import '../../models/backup_task_progress.dart';
 import '../../models/progress_update.dart';
 
 typedef BackupIsolateBody<R, P> =
     FutureOr<R> Function(BackupIsolateContext context, P payload);
+
+/// 隔离线程在杀掉它之后仍然没有退出的超时。
+///
+/// [isolateExited] 为 false 表示线程可能还活着——它正卡在某个既不响应
+/// 信号、也不响应 `Isolate.kill` 的本地调用里。[isolateExit] 是它真正
+/// 退出的那一刻，供调用方把临时目录的删除推迟到那之后。
+final class BackupIsolateTimeoutException extends TimeoutException {
+  BackupIsolateTimeoutException({
+    required this.isolateExited,
+    this.isolateExit,
+    Duration? duration,
+  }) : super('backup_isolate_timeout', duration);
+
+  final bool isolateExited;
+  final Future<void>? isolateExit;
+}
+
+/// 隔离线程是否可能还活着。
+///
+/// 只有这个为真时，调用方才不能立刻删除它的工作目录：那个目录可能正被
+/// 一个仍在运行的本地调用写入，删早了它会写进一个已删除的路径，或者
+/// 把文件重新创建出来。
+bool backupIsolateStillAlive(Object error) {
+  return (error is BackupIsolateTimeoutException && !error.isolateExited) ||
+      (error is BackupCancelledException && !error.isolateExited);
+}
+
+/// 隔离线程真正退出的那一刻；无法得知时为 null。
+Future<void>? backupIsolateExitFuture(Object error) {
+  return switch (error) {
+    BackupIsolateTimeoutException(:final isolateExit) => isolateExit,
+    BackupCancelledException(:final isolateExit) => isolateExit,
+    _ => null,
+  };
+}
+
+/// 仅供测试：跳过 `Isolate.kill`，用来模拟一个杀不掉的本地调用。
+@visibleForTesting
+bool debugSkipBackupIsolateKill = false;
 
 final class BackupIsolateContext {
   const BackupIsolateContext({
@@ -37,19 +78,23 @@ Future<R> runBackupIsolate<R, P>({
   required P payload,
   BackupCancelToken? cancelToken,
   ProgressCallback? onProgress,
-  Duration killGrace = const Duration(milliseconds: 250),
+  // 取消后先中断 SQLite 并给线程一段时间自己收尾，再硬杀。JO 原先只有
+  // 250ms，太短：正常收尾（关库、清中间文件）常常还没走完就被杀了。
+  Duration killGrace = const Duration(seconds: 3),
+  // 硬杀之后最多再等多久；超过就放弃等待并如实上报"线程可能还活着"。
+  Duration isolateExitDeadline = const Duration(seconds: 2),
   Duration? timeout,
 }) async {
   final progressPort = ReceivePort();
   final controlPort = ReceivePort();
   final exitPort = ReceivePort();
-  final exitCompleter = Completer<void>();
-  var exited = false;
+  final isolateExit = Completer<void>();
+  var isolateHasExited = false;
   var workerRetained = false;
 
-  void markExited() {
-    exited = true;
-    if (!exitCompleter.isCompleted) exitCompleter.complete();
+  void markIsolateExited() {
+    isolateHasExited = true;
+    if (!isolateExit.isCompleted) isolateExit.complete();
     if (workerRetained) {
       workerRetained = false;
       cancelToken?.releaseWorker();
@@ -88,6 +133,7 @@ Future<R> runBackupIsolate<R, P>({
   var timeoutRequested = false;
   var sqliteHandle = 0;
   Timer? killTimer;
+  Timer? abandonTimer;
   Timer? timeoutTimer;
   SendPort? commandPort;
 
@@ -95,10 +141,39 @@ Future<R> runBackupIsolate<R, P>({
     if (sqliteHandle != 0) interruptSqliteHandle(sqliteHandle);
   }
 
+  /// 放弃等待那个已经不响应杀掉的线程。
+  ///
+  /// 这里必须让 [result] 有个结果，否则调用方会被一个永远不退出的隔离
+  /// 线程吊死；而抛出的异常带上 `isolateExited: false` 与 [isolateExit]，
+  /// 让上层据此把临时目录的删除推迟到线程真正退出之后。
+  void abandonStuckIsolate() {
+    if (result.isCompleted) return;
+    if (timeoutRequested) {
+      result.completeError(
+        BackupIsolateTimeoutException(
+          isolateExited: isolateHasExited,
+          isolateExit: isolateExit.future,
+          duration: timeout,
+        ),
+      );
+      return;
+    }
+    result.completeError(
+      BackupCancelledException(
+        isolateExited: isolateHasExited,
+        isolateExit: isolateExit.future,
+      ),
+    );
+  }
+
   void scheduleKill() {
     interruptSqlite();
     killTimer ??= Timer(killGrace, () {
-      if (!exited) isolate.kill(priority: Isolate.immediate);
+      if (debugSkipBackupIsolateKill) return;
+      if (!isolateHasExited) isolate.kill(priority: Isolate.immediate);
+    });
+    abandonTimer ??= Timer(killGrace + isolateExitDeadline, () {
+      abandonStuckIsolate();
     });
   }
 
@@ -121,12 +196,20 @@ Future<R> runBackupIsolate<R, P>({
     }
   });
   final exitSub = exitPort.listen((_) {
-    markExited();
+    markIsolateExited();
     if (result.isCompleted) return;
     if (timeoutRequested) {
-      result.completeError(TimeoutException('backup_isolate_timeout', timeout));
+      result.completeError(
+        BackupIsolateTimeoutException(
+          isolateExited: true,
+          isolateExit: isolateExit.future,
+          duration: timeout,
+        ),
+      );
     } else if (cancellationRequested) {
-      result.completeError(const BackupCancelledException());
+      result.completeError(
+        BackupCancelledException(isolateExit: isolateExit.future),
+      );
     } else {
       result.completeError(StateError('backup_isolate_exited'));
     }
@@ -152,27 +235,20 @@ Future<R> runBackupIsolate<R, P>({
 
   try {
     return await result.future;
-  } catch (error) {
-    if (error is BackupCancelledException || error is TimeoutException) {
-      if (!cancellationRequested && error is BackupCancelledException) {
-        requestCancellation();
-      }
-      if (!exited) await exitCompleter.future;
-    }
-    rethrow;
   } finally {
     timeoutTimer?.cancel();
     killTimer?.cancel();
+    abandonTimer?.cancel();
     await progressSub.cancel();
     progressPort.close();
-    if (exited) {
+    if (isolateHasExited) {
       await controlSub.cancel();
       await exitSub.cancel();
       controlPort.close();
       exitPort.close();
     } else {
       unawaited(
-        exitCompleter.future.whenComplete(() async {
+        isolateExit.future.whenComplete(() async {
           await controlSub.cancel();
           await exitSub.cancel();
           controlPort.close();

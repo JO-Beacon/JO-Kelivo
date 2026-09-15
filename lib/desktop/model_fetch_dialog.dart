@@ -79,39 +79,14 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
       widget.providerKey,
       defaultName: widget.providerDisplayName,
     );
-    final bool isDefaultSilicon =
-        widget.providerKey.toLowerCase() == 'siliconflow';
-    final bool hasUserKey =
-        (cfg.multiKeyEnabled == true && (cfg.apiKeys?.isNotEmpty == true)) ||
-        cfg.apiKey.trim().isNotEmpty;
-    final bool restrictToFree = isDefaultSilicon && !hasUserKey;
     try {
-      if (restrictToFree) {
-        final list = <ModelInfo>[
-          ModelRegistry.infer(
-            ModelInfo(
-              id: 'THUDM/GLM-4-9B-0414',
-              displayName: 'THUDM/GLM-4-9B-0414',
-            ),
-          ),
-          ModelRegistry.infer(
-            ModelInfo(id: 'Qwen/Qwen3-8B', displayName: 'Qwen/Qwen3-8B'),
-          ),
-        ];
-        setState(() {
-          _items = list;
-          _loading = false;
-          _error = '';
-        });
-      } else {
-        final list = await ProviderManager.listModels(cfg);
-        if (!mounted) return;
-        setState(() {
-          _items = list;
-          _loading = false;
-          _error = '';
-        });
-      }
+      final list = await ProviderManager.listModels(cfg);
+      if (!mounted) return;
+      setState(() {
+        _items = list;
+        _loading = false;
+        _error = '';
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {

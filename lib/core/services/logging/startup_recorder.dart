@@ -78,14 +78,14 @@ class StartupRecorder {
     _heartbeat = Timer.periodic(_heartbeatInterval, (Timer timer) {
       _beats++;
       FlutterLogger.stage(
-        'heartbeat beats=$_beats frames=$_frames rss=${_rssMb()}MB',
+        'heartbeat beats=$_beats frames=$_frames rss=${_rssMib()}MiB',
         tag: 'Startup',
       );
       if (_beats >= totalBeats) timer.cancel();
     });
   }
 
-  static String _rssMb() {
+  static String _rssMib() {
     try {
       return (ProcessInfo.currentRss / (1024 * 1024)).toStringAsFixed(1);
     } catch (_) {

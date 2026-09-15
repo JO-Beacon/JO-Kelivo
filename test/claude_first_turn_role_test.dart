@@ -7,6 +7,8 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/services/api/providers/claude/claude_role_normalizer.dart';
 
+import 'support/collect_generation.dart';
+
 ProviderConfig _claudeConfig(String baseUrl) {
   return ProviderConfig(
     id: 'ClaudeFirstTurnTest',
@@ -53,7 +55,7 @@ Future<Map<String, dynamic>> _captureClaudeRequestBody(
     stream: false,
   ).toList();
 
-  expect(chunks.last.isDone, isTrue);
+  expect(chunks.isGenerationDone, isTrue);
   return requestBody;
 }
 

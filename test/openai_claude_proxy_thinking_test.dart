@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 
+import 'support/collect_generation.dart';
+
 /// Regression tests for https://github.com/Chevey339/kelivo/issues/764
 ///
 /// Claude models served through OpenAI-compatible proxies rebuild Anthropic
@@ -118,23 +120,11 @@ void main() {
         ).toList();
 
         expect(requestBodies, hasLength(2));
-        expect(chunks.last.usage?.promptTokens, 20);
-        expect(chunks.last.usage?.completionTokens, 4);
-        expect(chunks.last.usage?.totalTokens, 24);
+        expect(chunks.lastUsage?.promptTokens, 20);
+        expect(chunks.lastUsage?.completionTokens, 4);
+        expect(chunks.lastUsage?.totalTokens, 24);
       },
     );
-
-    test('merges reasoning fragments and drops signature-only leftovers', () {
-      final normalized = ChatApiService.normalizeClaudeReasoningDetailsForTest([
-        {'type': 'reasoning.text', 'text': 'part A'},
-        {'type': 'reasoning.text', 'text': 'part B', 'signature': 'sig-1'},
-        {'type': 'reasoning.text', 'text': '', 'signature': 'sig-1'},
-      ]);
-
-      expect(normalized, hasLength(1));
-      expect(normalized!.single['text'], 'part Apart B');
-      expect(normalized.single['signature'], 'sig-1');
-    });
 
     test('stream emits captured reasoning_details for persistence', () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -169,10 +159,12 @@ void main() {
         ],
       ).toList();
 
-      final done = chunks.last;
-      expect(done.isDone, isTrue);
-      expect(done.reasoningDetails, isA<List>());
-      expect((done.reasoningDetails as List).first['signature'], 'sig-proxy-1');
+      expect(chunks.isGenerationDone, isTrue);
+      expect(chunks.lastReasoningDetails, isA<List>());
+      expect(
+        (chunks.lastReasoningDetails as List).first['signature'],
+        'sig-proxy-1',
+      );
     });
 
     test(
@@ -216,7 +208,7 @@ void main() {
           ],
         ).toList();
 
-        expect(chunks.last.isDone, isTrue);
+        expect(chunks.isGenerationDone, isTrue);
         final messages = (requestBody['messages'] as List).cast<Map>();
         final assistant = messages[1];
         expect(assistant.containsKey('reasoning_content'), isFalse);
@@ -274,7 +266,7 @@ void main() {
           ],
         ).toList();
 
-        expect(chunks.last.isDone, isTrue);
+        expect(chunks.isGenerationDone, isTrue);
         final messages = (requestBody['messages'] as List).cast<Map>();
         final assistant = messages[1];
         expect(assistant.containsKey('reasoning_content'), isFalse);
@@ -284,6 +276,112 @@ void main() {
         );
       },
     );
+
+    test(
+      'streamed reasoning_details fragments replay as one signed block',
+      () async {
+        late Map<String, dynamic> requestBody;
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          requestBody =
+              (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
+                  .cast<String, dynamic>();
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+          );
+          request.response.write(
+            'data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}\n\n',
+          );
+          request.response.write('data: [DONE]\n\n');
+          await request.response.close();
+        });
+
+        // Persisted history keeps one entry per streamed delta; the signature
+        // arrives last with no text. Replaying that raw makes Bedrock-backed
+        // proxies reject the block for a null reasoningText.text.
+        const details = [
+          {'type': 'reasoning.text', 'text': 'part A', 'index': 0},
+          {'type': 'reasoning.text', 'text': ' part B', 'index': 0},
+          {'type': 'reasoning.text', 'signature': 'sig-proxy-1', 'index': 0},
+        ];
+        final chunks = await ChatApiService.sendMessageStream(
+          config: _openAIConfig(
+            'http://${server.address.address}:${server.port}/v1',
+          ),
+          modelId: 'claude-sonnet-4-6',
+          messages: const [
+            {'role': 'user', 'content': 'hello'},
+            {
+              'role': 'assistant',
+              'content': 'hi there',
+              'reasoning_details': details,
+            },
+            {'role': 'user', 'content': 'follow up'},
+          ],
+        ).toList();
+
+        expect(chunks.isGenerationDone, isTrue);
+        final messages = (requestBody['messages'] as List).cast<Map>();
+        final replayed = (messages[1]['reasoning_details'] as List).cast<Map>();
+        expect(replayed, hasLength(1));
+        expect(replayed.first['text'], 'part A part B');
+        expect(replayed.first['signature'], 'sig-proxy-1');
+      },
+    );
+
+    test('non-Claude upstreams replay the block sequence verbatim', () async {
+      late Map<String, dynamic> requestBody;
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        requestBody =
+            (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
+                .cast<String, dynamic>();
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType(
+          'text',
+          'event-stream',
+        );
+        request.response.write(
+          'data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}\n\n',
+        );
+        request.response.write('data: [DONE]\n\n');
+        await request.response.close();
+      });
+
+      const details = [
+        {'type': 'reasoning.text', 'text': 'part A', 'index': 0},
+        {'type': 'reasoning.text', 'text': ' part B', 'index': 0},
+      ];
+      final chunks = await ChatApiService.sendMessageStream(
+        config: _openAIConfig(
+          'http://${server.address.address}:${server.port}/v1',
+        ),
+        modelId: 'deepseek-reasoner',
+        messages: const [
+          {'role': 'user', 'content': 'hello'},
+          {
+            'role': 'assistant',
+            'content': 'hi there',
+            'reasoning_details': details,
+          },
+          {'role': 'user', 'content': 'follow up'},
+        ],
+      ).toList();
+
+      expect(chunks.isGenerationDone, isTrue);
+      final messages = (requestBody['messages'] as List).cast<Map>();
+      expect((messages[1]['reasoning_details'] as List), hasLength(2));
+    });
 
     test('streamed reasoning_details deltas are accumulated in order', () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -319,7 +417,7 @@ void main() {
         ],
       ).toList();
 
-      final details = chunks.last.reasoningDetails as List;
+      final details = chunks.lastReasoningDetails as List;
       expect(details, hasLength(2));
       expect(details[0]['signature'], 'sig-a');
       expect(details[1]['signature'], 'sig-b');
@@ -361,7 +459,7 @@ void main() {
         ],
       ).toList();
 
-      final details = chunks.last.reasoningDetails as List;
+      final details = chunks.lastReasoningDetails as List;
       expect(details, hasLength(2));
       expect(details[0]['signature'], 'sig-x');
       expect(details[1]['signature'], 'sig-x');
@@ -410,7 +508,7 @@ void main() {
           ],
         ).toList();
 
-        final details = chunks.last.reasoningDetails as List;
+        final details = chunks.lastReasoningDetails as List;
         expect(details, hasLength(3));
         expect(details[0]['signature'], 'sig-x');
         expect(details[1]['signature'], 'sig-x');
@@ -456,7 +554,7 @@ void main() {
         ],
       ).toList();
 
-      final details = chunks.last.reasoningDetails as List;
+      final details = chunks.lastReasoningDetails as List;
       expect(details, hasLength(2));
       expect(details[0]['signature'], 'sig-a');
       expect(details[1]['signature'], 'sig-b');
@@ -508,7 +606,7 @@ void main() {
             ],
           ).toList();
 
-          expect(chunks.last.isDone, isTrue);
+          expect(chunks.isGenerationDone, isTrue);
         }
 
         expect(requestBodies, hasLength(2));

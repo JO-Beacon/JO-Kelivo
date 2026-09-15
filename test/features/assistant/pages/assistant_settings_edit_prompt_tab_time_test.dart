@@ -56,7 +56,8 @@ const _assistantId = 'assistant-prompt-time-test';
 const _warningEn =
     'Using time variables in the system prompt makes the beginning of every request different';
 
-const _formatExample = '<current_time>Mon 2026-08-08 14:30:05</current_time>';
+// 示例文案由 formatCurrentTimeTag 现场生成，2026-08-08 是星期六。
+const _formatExample = '<current_time>Sat 2026-08-08 14:30:05</current_time>';
 
 Future<
   ({
@@ -368,5 +369,92 @@ void main() {
 
     expect(find.text('Appended time format'), findsWidgets);
     expect(find.textContaining(_formatExample), findsOneWidget);
+  });
+
+  testWidgets('ISO 8601 switch persists and changes the example', (
+    tester,
+  ) async {
+    final bundle = await _createAssistantProvider(
+      tester,
+      appendCurrentTimeToUserMessage: true,
+    );
+    final assistantProvider = bundle.assistantProvider;
+    _setLargeSurface(tester);
+    await tester.pumpWidget(
+      _buildHarness(
+        assistantProvider: assistantProvider,
+        chatService: bundle.chatService,
+        memoryV2: bundle.memoryV2,
+        pipeline: bundle.pipeline,
+        child: const AssistantSettingsEditPage(assistantId: _assistantId),
+      ),
+    );
+    await _openPromptsTab(tester);
+
+    expect(
+      assistantProvider.getById(_assistantId)!.useIso8601TimeFormat,
+      isFalse,
+    );
+    expect(find.text('Use ISO 8601 format'), findsOneWidget);
+
+    final isoRow = find.ancestor(
+      of: find.text('Use ISO 8601 format'),
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is Padding &&
+            widget.padding ==
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      ),
+    );
+    final sw = tester.widget<IosSwitch>(
+      find.descendant(of: isoRow, matching: find.byType(IosSwitch)),
+    );
+    expect(sw.value, isFalse);
+    sw.onChanged!(true);
+    await tester.pump();
+    for (var i = 0; i < 40; i++) {
+      if (assistantProvider.getById(_assistantId)!.useIso8601TimeFormat) {
+        break;
+      }
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(
+      assistantProvider.getById(_assistantId)!.useIso8601TimeFormat,
+      isTrue,
+    );
+
+    final saved = Assistant.decodeList(
+      assistantProvider.preferences.getString('assistants_v1')!,
+    ).single;
+    expect(saved.useIso8601TimeFormat, isTrue);
+
+    final infoButton = tester.widget<IosIconButton>(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is IosIconButton &&
+            widget.icon == Lucide.BadgeInfo &&
+            widget.semanticLabel == 'Appended time format',
+      ),
+    );
+    infoButton.onTap!();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(
+      find.textContaining('<current_time>2026-08-08T14:30:05'),
+      findsOneWidget,
+    );
+
+    await assistantProvider.updateAssistant(
+      assistantProvider
+          .getById(_assistantId)!
+          .copyWith(appendCurrentTimeToUserMessage: false),
+    );
+    await tester.pump();
+    expect(find.text('Use ISO 8601 format'), findsNothing);
+    expect(
+      assistantProvider.getById(_assistantId)!.useIso8601TimeFormat,
+      isTrue,
+      reason: '关闭追加时间不应清掉 ISO 选择',
+    );
   });
 }

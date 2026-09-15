@@ -16,6 +16,8 @@ import '../../core/providers/assistant_provider.dart';
 import '../../core/providers/s3_backup_provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/providers/local_snapshot_provider.dart';
+import '../../features/backup/pages/local_snapshots_page.dart';
+import '../../shared/utils/format_bytes.dart';
 import '../../core/services/chat/chat_service.dart';
 import '../../core/services/backup/data_sync.dart';
 import '../../core/services/backup/cherry_importer.dart';
@@ -301,7 +303,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
           }
         },
       );
-      // 「带」档但指纹采集失败时提醒：历史档案照常带走了，本机当前值没进包。
+      // “带”档但指纹采集失败时提醒：历史档案照常带走了，本机当前值没进包。
       if (!kelivoCompatible &&
           context.mounted &&
           backupProvider.lastLedgerUnrecognized) {
@@ -886,7 +888,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                     ),
                     const SizedBox(height: 8),
                     _rowDivider(context),
-                    // 云备份与本地导出共用同一「带本机设置」档位。
+                    // 云备份与本地导出共用同一“带本机设置”档位。
                     _ItemRow(
                       label: l10n.backupIncludeLocalSettings,
                       subtitle: includeLocalSettingsSubtitle(
@@ -1171,7 +1173,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                     ),
                     const SizedBox(height: 8),
                     _rowDivider(context),
-                    // 云备份与本地导出共用同一「带本机设置」档位。
+                    // 云备份与本地导出共用同一“带本机设置”档位。
                     _ItemRow(
                       label: l10n.backupIncludeLocalSettings,
                       subtitle: includeLocalSettingsSubtitle(
@@ -1209,11 +1211,30 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
               children: [
                 _BackupCategoryLabel(label: l10n.localSnapshotTitle),
                 _ItemRow(
-                  label: l10n.localSnapshotEnabled,
+                  label: l10n.localSnapshotEnabledTitle,
                   vpad: 2,
                   trailing: IosSwitch(
                     value: localSnapshot.settings.enabled,
-                    onChanged: localSnapshot.setEnabled,
+                    onChanged: (value) => localSnapshot.updateSettings(
+                      localSnapshot.settings.copyWith(enabled: value),
+                    ),
+                  ),
+                ),
+                _rowDivider(context),
+                _ItemRow(
+                  label: l10n.localSnapshotManageCopies,
+                  trailing: _DeskIosButton(
+                    label: l10n.localSnapshotUsage(
+                      localSnapshot.copies.length,
+                      formatBytes(localSnapshot.totalBytes),
+                    ),
+                    filled: false,
+                    dense: true,
+                    onTap: () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => const LocalSnapshotsPage(),
+                      ),
+                    ),
                   ),
                 ),
                 _rowDivider(context),
@@ -1296,31 +1317,6 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                       dense: true,
                       onTap: () =>
                           _restoreLocalBackup(context, kelivoCompatible: true),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              _BackupSubcategoryLabel(label: l10n.backupPageCuplivoFormat),
-              Row(
-                children: [
-                  Expanded(
-                    child: _DeskIosButton(
-                      key: const ValueKey('desktop-cuplivo-export-action'),
-                      label: l10n.backupPageExportAction,
-                      filled: false,
-                      dense: true,
-                      enabled: false,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: _DeskIosButton(
-                      key: const ValueKey('desktop-cuplivo-import-action'),
-                      label: l10n.backupPageImportAction,
-                      filled: false,
-                      dense: true,
-                      enabled: false,
                     ),
                   ),
                 ],
@@ -1659,16 +1655,7 @@ class _RemoteItemCardState extends State<_RemoteItemCard> {
     final dateStr =
         widget.item.lastModified?.toLocal().toString().split('.').first ?? '';
 
-    String prettySize(int size) {
-      const units = ['B', 'KB', 'MB', 'GB'];
-      double s = size.toDouble();
-      int u = 0;
-      while (s >= 1024 && u < units.length - 1) {
-        s /= 1024;
-        u++;
-      }
-      return '${s.toStringAsFixed(s >= 10 || u == 0 ? 0 : 1)} ${units[u]}';
-    }
+    String prettySize(int size) => formatBytes(size);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -2244,7 +2231,6 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
 
 class _DeskIosButton extends StatefulWidget {
   const _DeskIosButton({
-    super.key,
     required this.label,
     required this.filled,
     required this.dense,

@@ -8,6 +8,7 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/services/api/providers/claude/claude_provider.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
+import 'package:Kelivo/core/services/api/providers/zhipu_layout_parsing.dart';
 
 ProviderConfig _config(
   String baseUrl, {
@@ -95,7 +96,7 @@ void main() {
       await request.response.close();
     });
 
-    final events = await ChatApiService.sendMessageStreamEvents(
+    final events = await ChatApiService.sendMessageStream(
       config: _config('http://${server.address.address}:${server.port}/v1'),
       modelId: 'gpt-events-test',
       messages: const [
@@ -137,7 +138,7 @@ void main() {
       await request.response.close();
     });
 
-    final events = await ChatApiService.sendMessageStreamEvents(
+    final events = await ChatApiService.sendMessageStream(
       config: _config(
         'http://${server.address.address}:${server.port}',
         kind: ProviderKind.claude,
@@ -196,7 +197,7 @@ void main() {
         await request.response.close();
       });
 
-      final events = await ChatApiService.sendMessageStreamEvents(
+      final events = await ChatApiService.sendMessageStream(
         config: _config(
           'http://${server.address.address}:${server.port}',
           kind: ProviderKind.google,
@@ -253,7 +254,7 @@ void main() {
         kind: ProviderKind.google,
         modelId: 'gemini-vertex-events-test',
       ).copyWith(vertexAI: true, location: '', projectId: '');
-      final events = await ChatApiService.sendMessageStreamEvents(
+      final events = await ChatApiService.sendMessageStream(
         config: config,
         modelId: 'gemini-vertex-events-test',
         messages: const [
@@ -334,7 +335,7 @@ void main() {
       await request.response.close();
     });
 
-    final events = await ChatApiService.sendMessageStreamEvents(
+    final events = await ChatApiService.sendMessageStream(
       config: _config(
         'http://${server.address.address}:${server.port}',
         modelId: 'gpt-image-events-test',
@@ -371,7 +372,7 @@ void main() {
 
     final client = http.Client();
     addTearDown(client.close);
-    final events = await sendZhipuLayoutParsingEvents(
+    final events = await sendZhipuLayoutParsingStream(
       client,
       ProviderConfig(
         id: 'ZhipuEventsTest',

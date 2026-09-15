@@ -765,6 +765,14 @@ class AppDatabase extends _$AppDatabase {
   // 模式 4 将 Kelivo 的助手标签表迁移为 JO-Kelivo 的助手分组表，模式 5
   // 为冻结提示词绑定消息正文哈希，模式 6 持久化明确的分支关系和活动历史。
   static const currentSchemaVersion = 7;
+
+  /// 曾经发布过的全部 schema 版本。
+  ///
+  /// 启动失败诊断报告用它说明"本应用能读哪些版本的库"，因此**每发布一个新
+  /// schema 就要同步加进来**，否则报告会把一个其实支持的旧库说成不支持。
+  /// 与上游的差别：上游这套是 {1,2,3}，本仓库的迁移链覆盖 1..7（见
+  /// `migration.onUpgrade` 里的 from<2 / 2..3 / from<4 / from<5 / 2..6 / from<7）。
+  static const publishedSchemaVersions = <int>{1, 2, 3, 4, 5, 6, 7};
   // 保持 SQLite 既定的 1000 页节奏显式声明。按通常 4 KiB 页大小计算，
   // 这大约在 4 MiB 时触发一次检查点，但页大小仍是实际依据。
   static const walAutoCheckpointPages = 1000;

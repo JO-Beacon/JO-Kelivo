@@ -83,7 +83,7 @@ void main() {
           },
         },
       );
-      final events = await ChatApiService.sendMessageStreamEvents(
+      final events = await ChatApiService.sendMessageStream(
         config: config,
         modelId: modelId,
         messages: const [
@@ -175,7 +175,7 @@ void main() {
     );
 
     expect(
-      () => ChatApiService.sendMessageStreamEvents(
+      () => ChatApiService.sendMessageStream(
         config: config,
         modelId: modelId,
         messages: const [

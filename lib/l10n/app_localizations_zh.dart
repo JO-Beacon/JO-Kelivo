@@ -514,8 +514,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homePageClearContext => '临时屏蔽上下文';
 
   @override
-  String homePageClearContextWithCount(String actual, String configured) {
-    return '临时屏蔽上下文 ($actual/$configured)';
+  String contextMessageCount(int count) {
+    return '$count 条消息';
+  }
+
+  @override
+  String contextMessageCountLimited(int actual, int configured) {
+    return '$actual/$configured 条消息';
   }
 
   @override
@@ -1443,6 +1448,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '在系统提示词中使用时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中，费用和首字延迟都会上升。需要让模型知道当前时间时，请改用下方的「追加当前时间」开关。';
 
   @override
+  String get assistantEditPromptIso8601Title => '使用 ISO 8601 格式';
+
+  @override
+  String get assistantEditPromptIso8601Subtitle =>
+      '包含时区偏移，例如 2026-08-08T14:30:05+08:00';
+
+  @override
   String get assistantEditPromptAppendTimeTitle => '追加当前时间';
 
   @override
@@ -1850,28 +1862,28 @@ class AppLocalizationsZh extends AppLocalizations {
       '本设备上的聊天数据库由更新版本的 JO-AIClient 创建，当前版本无法打开。数据未被改动。请安装最新版 JO-AIClient 后重新打开。';
 
   @override
-  String get startupRecoverySnapshotButton => '恢复本地快照';
+  String get startupRecoverySnapshotButton => '恢复本地副本';
 
   @override
-  String get startupRecoveryDowngradeSnapshotButton => '高级：恢复较早的快照';
+  String get startupRecoveryDowngradeSnapshotButton => '高级：恢复较早的副本';
 
   @override
-  String get startupRecoveryChooseSnapshotTitle => '选择快照';
+  String get startupRecoveryChooseSnapshotTitle => '选择副本';
 
   @override
   String startupRecoverySnapshotDetails(String date, String time, String size) {
-    return '$date $time · $size MB';
+    return '$date $time · $size';
   }
 
   @override
-  String get startupRecoveryNoSnapshots => '没有可用的本地快照。';
+  String get startupRecoveryNoSnapshots => '没有可用的本地副本。';
 
   @override
-  String get startupRecoveryRestoreConfirmTitle => '恢复这份快照？';
+  String get startupRecoveryRestoreConfirmTitle => '恢复这份副本？';
 
   @override
   String startupRecoveryRestoreConfirmContent(String fileName) {
-    return 'JO-AIClient 将使用 $fileName 替换当前数据库。创建该快照后的改动可能丢失；在恢复通过验证前，当前数据库仍会由恢复日志保留。';
+    return 'JO-AIClient 将使用 $fileName 替换当前数据库。创建该副本后的改动可能丢失；在恢复通过验证前，当前数据库仍会由恢复日志保留。';
   }
 
   @override
@@ -1889,7 +1901,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String startupRecoverySnapshotFailed(String code) {
-    return '无法准备该快照。诊断代码：$code';
+    return '无法准备该副本。诊断代码：$code';
   }
 
   @override
@@ -2080,12 +2092,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get backupPageKelivoFormat => 'Kelivo';
-
-  @override
-  String get backupPageCuplivoFormat => 'Cuplivo';
-
-  @override
-  String get backupPageCuplivoBackup => 'Cuplivo 备份';
 
   @override
   String get backupPageExportAction => '导出';
@@ -2833,6 +2839,26 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageAutoCollapseCodeBlockLinesUnit => '行';
 
   @override
+  String get displaySettingsPageCollapseLongUserMessagesTitle => '折叠过长消息';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesSubtitle =>
+      '超过阈值的用户消息折叠显示，点击可展开';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesCharsTitle =>
+      '超过多少字符折叠';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesCharsUnit => '字符';
+
+  @override
+  String get chatMessageExpandLongText => '展开';
+
+  @override
+  String get chatMessageCollapseLongText => '收起';
+
+  @override
   String get messageExportSheetFormatTitle => '导出格式';
 
   @override
@@ -3528,13 +3554,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get defaultModelPageDisable => '禁用';
 
   @override
-  String get localSnapshotTitle => '本地数据库快照';
+  String get localSnapshotTitle => '本地副本';
 
   @override
-  String get localSnapshotEnabled => '保留自动本地快照';
+  String get localSnapshotEnabled => '保留自动本地副本';
 
   @override
-  String get localSnapshotTakeNow => '立即创建快照';
+  String get localSnapshotTakeNow => '立即备份一份';
 
   @override
   String get translatePagePasteButton => '粘贴';
@@ -7582,7 +7608,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get debugPageConversationToolsTitle => '对话工具';
 
   @override
-  String get debugPageCreateOversizedConversationButton => '创建超大对话（30 MB）';
+  String get debugPageCreateOversizedConversationButton => '创建超大对话（30 MiB）';
 
   @override
   String get debugPageCreateManyMessagesConversationButton => '创建 1024 条消息的对话';
@@ -7599,7 +7625,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get debugPageCreatingButton => '创建中...';
 
   @override
-  String get debugPageCreatingOversizedConversation => '正在创建 30 MB 超大对话...';
+  String get debugPageCreatingOversizedConversation => '正在创建 30 MiB 超大对话...';
 
   @override
   String get debugPageCreatingManyMessagesConversation => '正在创建 1024 条消息的对话...';
@@ -7626,7 +7652,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String debugPageOversizedConversationTitle(int sizeMB) {
-    return '超大对话测试（$sizeMB MB）';
+    return '超大对话测试（$sizeMB MiB）';
   }
 
   @override
@@ -8430,7 +8456,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get healthDataSettingsDescription =>
-      '当前助手在日常对话中可使用的 HealthKit 信号。开关表示 Kelivo 可以尝试读取该范围，实际授权仍由 iOS 管理。';
+      '当前助手在日常对话中可使用的 HealthKit 信号。开关表示 JO-AIClient 可以尝试读取该范围，实际授权仍由 iOS 管理。';
 
   @override
   String get healthDataSettingsDisableAll => '全部关闭';
@@ -8725,6 +8751,385 @@ class AppLocalizationsZh extends AppLocalizations {
   String backupPageMergeCompletedWithSkipped(int count) {
     return '备份中有 $count 个会话因消息顺序异常被跳过，未并入本机。';
   }
+
+  @override
+  String get assistantEditGradientBackgroundTitle => '渐变背景';
+
+  @override
+  String get assistantEditGradientStaticTitle => '静态模式';
+
+  @override
+  String get assistantEditGradientStaticDescription => '更省电，适合长对话和持续输出。';
+
+  @override
+  String get assistantEditGradientHorizontal => '水平位置';
+
+  @override
+  String get assistantEditGradientVertical => '垂直位置';
+
+  @override
+  String get assistantEditGradientPreview => '预览';
+
+  @override
+  String get assistantEditGradientNextFrame => '换一帧';
+
+  @override
+  String backupProgressBytes(String done, String total) {
+    return '$done / $total';
+  }
+
+  @override
+  String get backupProgressCancel => '取消';
+
+  @override
+  String get backupProgressCancelled => '已取消';
+
+  @override
+  String get backupProgressCommitting => '正在提交';
+
+  @override
+  String get backupProgressDownloading => '正在下载';
+
+  @override
+  String get backupProgressExtracting => '正在解压';
+
+  @override
+  String get backupProgressFinalizing => '正在完成';
+
+  @override
+  String get backupProgressImportingMessages => '正在导入消息';
+
+  @override
+  String get backupProgressImportingSessions => '正在导入会话';
+
+  @override
+  String backupProgressItems(String done, String total) {
+    return '$done / $total';
+  }
+
+  @override
+  String get backupProgressListingRemote => '正在列出远端备份';
+
+  @override
+  String get backupProgressMaterializingFiles => '正在写入文件';
+
+  @override
+  String get backupProgressPacking => '正在打包';
+
+  @override
+  String get backupProgressPreparing => '准备中';
+
+  @override
+  String get backupProgressReadingSettings => '正在读取设置';
+
+  @override
+  String get backupProgressSnapshotting => '正在创建数据库快照';
+
+  @override
+  String get backupProgressStaging => '正在暂存';
+
+  @override
+  String get backupProgressUploading => '正在上传';
+
+  @override
+  String get backupProgressValidating => '正在验证';
+
+  @override
+  String get backupProgressVerifying => '正在校验';
+
+  @override
+  String get localSnapshotActionDelete => '删除';
+
+  @override
+  String get localSnapshotActionExport => '导出';
+
+  @override
+  String get localSnapshotActionPin => '保留这份';
+
+  @override
+  String get localSnapshotActionRestore => '恢复';
+
+  @override
+  String get localSnapshotActionUnpin => '取消保留';
+
+  @override
+  String get localSnapshotAnnounceTitle => '备份完成时提示';
+
+  @override
+  String get localSnapshotCopiesEmpty => '还没有本地副本';
+
+  @override
+  String get localSnapshotCopiesEmptyHint => '数据有变化时会自动存一份，恢复数据前也一定会先存一份。';
+
+  @override
+  String get localSnapshotCopiesScopeNote =>
+      '本地副本只存在这台设备上。它防的是应用内数据被损坏或误删，防不了设备丢失或卸载应用——那要靠 WebDAV / S3 备份。';
+
+  @override
+  String get localSnapshotCopiesTitle => '本地副本';
+
+  @override
+  String localSnapshotCopyContents(int conversations, int messages) {
+    String _temp0 = intl.Intl.pluralLogic(
+      conversations,
+      locale: localeName,
+      other: '$conversations 个对话',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      messages,
+      locale: localeName,
+      other: '$messages 条消息',
+    );
+    return '$_temp0 · $_temp1';
+  }
+
+  @override
+  String get localSnapshotCopyContentsUnknown => '内容需恢复后才能确认';
+
+  @override
+  String get localSnapshotDeleteDone => '副本已删除';
+
+  @override
+  String get localSnapshotDeleteLastWarning => '这是唯一一份还有内容的副本。';
+
+  @override
+  String get localSnapshotDeleteMessage =>
+      '这份副本会从设备上永久删除。它里面有、而当前数据库里没有的数据将无法找回。';
+
+  @override
+  String get localSnapshotDeleteTitle => '删除这份副本？';
+
+  @override
+  String get localSnapshotEnabledSubtitle =>
+      'JO-AIClient 会定期在本机存一份数据库副本，让数据不只有一份。';
+
+  @override
+  String get localSnapshotEnabledTitle => '保留本地副本';
+
+  @override
+  String get localSnapshotExportDone => '副本已导出';
+
+  @override
+  String localSnapshotExportFailed(String reason) {
+    return '导出副本失败：$reason';
+  }
+
+  @override
+  String get localSnapshotExportPreparing => '正在准备导出';
+
+  @override
+  String get localSnapshotIntervalAutomatic => '自动';
+
+  @override
+  String get localSnapshotIntervalAutomaticDetail => '每天一次，数据库越大间隔越长';
+
+  @override
+  String localSnapshotIntervalDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '每 $days 天',
+      one: '每天',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotIntervalTitle => '备份频率';
+
+  @override
+  String get localSnapshotKeepMonthly => '保留一份上个月的';
+
+  @override
+  String get localSnapshotKeepProtectedNote => '无论设成几份，最近一份仍有内容的副本都不会被自动清理。';
+
+  @override
+  String get localSnapshotKeepTitle => '保留份数';
+
+  @override
+  String localSnapshotKeepValue(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 份',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotKeepWeekly => '保留一份上周的';
+
+  @override
+  String get localSnapshotKindRecovered => '故障恢复时留下的';
+
+  @override
+  String get localSnapshotMaximumTitle => '占用上限';
+
+  @override
+  String get localSnapshotMaximumUnlimited => '不限制';
+
+  @override
+  String get localSnapshotOriginAutomatic => '自动备份';
+
+  @override
+  String get localSnapshotOriginBeforeRestore => '恢复前备份';
+
+  @override
+  String get localSnapshotOriginManual => '手动备份';
+
+  @override
+  String localSnapshotRestoreMessage(String when) {
+    return '当前的对话和设置会被 $when 的这份副本替换。系统会先把现在的数据存一份，所以这一步可以撤销。';
+  }
+
+  @override
+  String get localSnapshotRestorePreparing => '正在准备副本';
+
+  @override
+  String get localSnapshotRestoreTitle => '恢复这份副本？';
+
+  @override
+  String get localSnapshotRunInBackground => '转到后台继续';
+
+  @override
+  String get localSnapshotRunningInBackground => '正在后台备份副本';
+
+  @override
+  String get localSnapshotSectionTitle => '本地副本';
+
+  @override
+  String localSnapshotStatusFailure(String when, String reason) {
+    return '上次备份失败（$when）：$reason';
+  }
+
+  @override
+  String get localSnapshotStatusNever => '还没有备份过';
+
+  @override
+  String get localSnapshotStatusSkippedSpace => '已跳过：本机剩余空间不足';
+
+  @override
+  String localSnapshotStatusSuccess(String when) {
+    return '上次备份：$when';
+  }
+
+  @override
+  String get localSnapshotTakeDone => '副本已保存';
+
+  @override
+  String localSnapshotTakeFailed(String reason) {
+    return '保存副本失败：$reason';
+  }
+
+  @override
+  String localSnapshotUsage(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 份',
+      zero: '暂无副本',
+    );
+    return '$_temp0 · $size';
+  }
+
+  @override
+  String startupRecoveryLocalCopiesAvailable(int count, String when) {
+    return '本机还保留着 $count 份本地副本，最新一份是 $when 的。重置不会删除它们——重启后可以在 设置 › 备份 › 本地副本 里恢复。';
+  }
+
+  @override
+  String startupRecoveryRecoveredCopiesDeleted(int count) {
+    return '另外还有 $count 份故障恢复时留下的数据库副本，重置会把它们一并永久删除。想留住的话请先导出数据。';
+  }
+
+  @override
+  String get backupProgressWrapping => '正在封装归档';
+
+  @override
+  String get backupProgressRestoring => '正在写回数据';
+
+  @override
+  String get localSnapshotManageCopies => '管理副本';
+
+  @override
+  String get startupRecoveryWhatFailed => '失败原因';
+
+  @override
+  String get startupRecoveryStageLabel => '失败阶段';
+
+  @override
+  String get startupRecoveryStageRestore => '恢复关卡';
+
+  @override
+  String get startupRecoveryStageDatabase => '数据库启动';
+
+  @override
+  String get startupRecoveryDiagnosticLabel => '诊断码';
+
+  @override
+  String get startupRecoverySchemaLabel => '数据库版本';
+
+  @override
+  String startupRecoverySchemaValue(String installed, int expected) {
+    return '磁盘上为 $installed · 当前版本需要 $expected';
+  }
+
+  @override
+  String get startupRecoveryAppVersionLabel => '应用';
+
+  @override
+  String get startupRecoveryUnknownValue => '未知';
+
+  @override
+  String get startupRecoveryCollecting => '正在收集诊断信息…';
+
+  @override
+  String get startupRecoveryHideDetails => '收起技术细节';
+
+  @override
+  String get startupRecoveryShowDetails => '展开技术细节';
+
+  @override
+  String get startupRecoveryCopyReport => '复制完整报告';
+
+  @override
+  String get startupRecoveryReportCopied => '已复制完整报告';
+
+  @override
+  String get startupRecoveryShareReport => '导出报告';
+
+  @override
+  String startupRecoveryReportStored(String path) {
+    return '报告已保存到 $path';
+  }
+
+  @override
+  String get startupRecoveryIntegrityButton => '检查数据库完整性';
+
+  @override
+  String get startupRecoveryIntegrityHealthy => 'SQLite 未在数据库文件中发现损坏。';
+
+  @override
+  String startupRecoveryIntegrityDamaged(String detail) {
+    return 'SQLite 报告了问题 —— $detail';
+  }
+
+  @override
+  String get startupRecoveryIntegrityFailed => '完整性检查无法运行。';
+
+  @override
+  String get startupRecoveryIntegrityMissing => '数据目录中没有找到数据库文件。';
+
+  @override
+  String startupRecoveryReportSaved(String path) {
+    return '报告已保存到 $path';
+  }
+
+  @override
+  String get startupRecoveryReportShared => '报告已导出。';
+
+  @override
+  String get startupRecoveryReportSaveFailed => '无法导出报告。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -9237,8 +9642,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get homePageClearContext => '临时屏蔽上下文';
 
   @override
-  String homePageClearContextWithCount(String actual, String configured) {
-    return '临时屏蔽上下文 ($actual/$configured)';
+  String contextMessageCount(int count) {
+    return '$count 条消息';
+  }
+
+  @override
+  String contextMessageCountLimited(int actual, int configured) {
+    return '$actual/$configured 条消息';
   }
 
   @override
@@ -10166,6 +10576,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '在系统提示词中使用时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中，费用和首字延迟都会上升。需要让模型知道当前时间时，请改用下方的「追加当前时间」开关。';
 
   @override
+  String get assistantEditPromptIso8601Title => '使用 ISO 8601 格式';
+
+  @override
+  String get assistantEditPromptIso8601Subtitle =>
+      '包含时区偏移，例如 2026-08-08T14:30:05+08:00';
+
+  @override
   String get assistantEditPromptAppendTimeTitle => '追加当前时间';
 
   @override
@@ -10573,28 +10990,28 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '本设备上的聊天数据库由更新版本的 JO-AIClient 创建，当前版本无法打开。数据未被改动。请安装最新版 JO-AIClient 后重新打开。';
 
   @override
-  String get startupRecoverySnapshotButton => '恢复本地快照';
+  String get startupRecoverySnapshotButton => '恢复本地副本';
 
   @override
-  String get startupRecoveryDowngradeSnapshotButton => '高级：恢复较早的快照';
+  String get startupRecoveryDowngradeSnapshotButton => '高级：恢复较早的副本';
 
   @override
-  String get startupRecoveryChooseSnapshotTitle => '选择快照';
+  String get startupRecoveryChooseSnapshotTitle => '选择副本';
 
   @override
   String startupRecoverySnapshotDetails(String date, String time, String size) {
-    return '$date $time · $size MB';
+    return '$date $time · $size';
   }
 
   @override
-  String get startupRecoveryNoSnapshots => '没有可用的本地快照。';
+  String get startupRecoveryNoSnapshots => '没有可用的本地副本。';
 
   @override
-  String get startupRecoveryRestoreConfirmTitle => '恢复这份快照？';
+  String get startupRecoveryRestoreConfirmTitle => '恢复这份副本？';
 
   @override
   String startupRecoveryRestoreConfirmContent(String fileName) {
-    return 'JO-AIClient 将使用 $fileName 替换当前数据库。创建该快照后的改动可能丢失；在恢复通过验证前，当前数据库仍会由恢复日志保留。';
+    return 'JO-AIClient 将使用 $fileName 替换当前数据库。创建该副本后的改动可能丢失；在恢复通过验证前，当前数据库仍会由恢复日志保留。';
   }
 
   @override
@@ -10612,7 +11029,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String startupRecoverySnapshotFailed(String code) {
-    return '无法准备该快照。诊断代码：$code';
+    return '无法准备该副本。诊断代码：$code';
   }
 
   @override
@@ -10803,12 +11220,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get backupPageKelivoFormat => 'Kelivo';
-
-  @override
-  String get backupPageCuplivoFormat => 'Cuplivo';
-
-  @override
-  String get backupPageCuplivoBackup => 'Cuplivo 备份';
 
   @override
   String get backupPageExportAction => '导出';
@@ -11556,6 +11967,26 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageAutoCollapseCodeBlockLinesUnit => '行';
 
   @override
+  String get displaySettingsPageCollapseLongUserMessagesTitle => '折叠过长消息';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesSubtitle =>
+      '超过阈值的用户消息折叠显示，点击可展开';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesCharsTitle =>
+      '超过多少字符折叠';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesCharsUnit => '字符';
+
+  @override
+  String get chatMessageExpandLongText => '展开';
+
+  @override
+  String get chatMessageCollapseLongText => '收起';
+
+  @override
   String get messageExportSheetFormatTitle => '导出格式';
 
   @override
@@ -12251,13 +12682,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get defaultModelPageDisable => '禁用';
 
   @override
-  String get localSnapshotTitle => '本地数据库快照';
+  String get localSnapshotTitle => '本地副本';
 
   @override
-  String get localSnapshotEnabled => '保留自动本地快照';
+  String get localSnapshotEnabled => '保留自动本地副本';
 
   @override
-  String get localSnapshotTakeNow => '立即创建快照';
+  String get localSnapshotTakeNow => '立即备份一份';
 
   @override
   String get translatePagePasteButton => '粘贴';
@@ -16305,7 +16736,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get debugPageConversationToolsTitle => '对话工具';
 
   @override
-  String get debugPageCreateOversizedConversationButton => '创建超大对话（30 MB）';
+  String get debugPageCreateOversizedConversationButton => '创建超大对话（30 MiB）';
 
   @override
   String get debugPageCreateManyMessagesConversationButton => '创建 1024 条消息的对话';
@@ -16322,7 +16753,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get debugPageCreatingButton => '创建中...';
 
   @override
-  String get debugPageCreatingOversizedConversation => '正在创建 30 MB 超大对话...';
+  String get debugPageCreatingOversizedConversation => '正在创建 30 MiB 超大对话...';
 
   @override
   String get debugPageCreatingManyMessagesConversation => '正在创建 1024 条消息的对话...';
@@ -16349,7 +16780,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String debugPageOversizedConversationTitle(int sizeMB) {
-    return '超大对话测试（$sizeMB MB）';
+    return '超大对话测试（$sizeMB MiB）';
   }
 
   @override
@@ -17153,7 +17584,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get healthDataSettingsDescription =>
-      '当前助手在日常对话中可使用的 HealthKit 信号。开关表示 Kelivo 可以尝试读取该范围，实际授权仍由 iOS 管理。';
+      '当前助手在日常对话中可使用的 HealthKit 信号。开关表示 JO-AIClient 可以尝试读取该范围，实际授权仍由 iOS 管理。';
 
   @override
   String get healthDataSettingsDisableAll => '全部关闭';
@@ -17448,6 +17879,385 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String backupPageMergeCompletedWithSkipped(int count) {
     return '备份中有 $count 个会话因消息顺序异常被跳过，未并入本机。';
   }
+
+  @override
+  String get assistantEditGradientBackgroundTitle => '渐变背景';
+
+  @override
+  String get assistantEditGradientStaticTitle => '静态模式';
+
+  @override
+  String get assistantEditGradientStaticDescription => '更省电，适合长对话和持续输出。';
+
+  @override
+  String get assistantEditGradientHorizontal => '水平位置';
+
+  @override
+  String get assistantEditGradientVertical => '垂直位置';
+
+  @override
+  String get assistantEditGradientPreview => '预览';
+
+  @override
+  String get assistantEditGradientNextFrame => '换一帧';
+
+  @override
+  String backupProgressBytes(String done, String total) {
+    return '$done / $total';
+  }
+
+  @override
+  String get backupProgressCancel => '取消';
+
+  @override
+  String get backupProgressCancelled => '已取消';
+
+  @override
+  String get backupProgressCommitting => '正在提交';
+
+  @override
+  String get backupProgressDownloading => '正在下载';
+
+  @override
+  String get backupProgressExtracting => '正在解压';
+
+  @override
+  String get backupProgressFinalizing => '正在完成';
+
+  @override
+  String get backupProgressImportingMessages => '正在导入消息';
+
+  @override
+  String get backupProgressImportingSessions => '正在导入会话';
+
+  @override
+  String backupProgressItems(String done, String total) {
+    return '$done / $total';
+  }
+
+  @override
+  String get backupProgressListingRemote => '正在列出远端备份';
+
+  @override
+  String get backupProgressMaterializingFiles => '正在写入文件';
+
+  @override
+  String get backupProgressPacking => '正在打包';
+
+  @override
+  String get backupProgressPreparing => '准备中';
+
+  @override
+  String get backupProgressReadingSettings => '正在读取设置';
+
+  @override
+  String get backupProgressSnapshotting => '正在创建数据库快照';
+
+  @override
+  String get backupProgressStaging => '正在暂存';
+
+  @override
+  String get backupProgressUploading => '正在上传';
+
+  @override
+  String get backupProgressValidating => '正在验证';
+
+  @override
+  String get backupProgressVerifying => '正在校验';
+
+  @override
+  String get localSnapshotActionDelete => '删除';
+
+  @override
+  String get localSnapshotActionExport => '导出';
+
+  @override
+  String get localSnapshotActionPin => '保留这份';
+
+  @override
+  String get localSnapshotActionRestore => '恢复';
+
+  @override
+  String get localSnapshotActionUnpin => '取消保留';
+
+  @override
+  String get localSnapshotAnnounceTitle => '备份完成时提示';
+
+  @override
+  String get localSnapshotCopiesEmpty => '还没有本地副本';
+
+  @override
+  String get localSnapshotCopiesEmptyHint => '数据有变化时会自动存一份，恢复数据前也一定会先存一份。';
+
+  @override
+  String get localSnapshotCopiesScopeNote =>
+      '本地副本只存在这台设备上。它防的是应用内数据被损坏或误删，防不了设备丢失或卸载应用——那要靠 WebDAV / S3 备份。';
+
+  @override
+  String get localSnapshotCopiesTitle => '本地副本';
+
+  @override
+  String localSnapshotCopyContents(int conversations, int messages) {
+    String _temp0 = intl.Intl.pluralLogic(
+      conversations,
+      locale: localeName,
+      other: '$conversations 个对话',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      messages,
+      locale: localeName,
+      other: '$messages 条消息',
+    );
+    return '$_temp0 · $_temp1';
+  }
+
+  @override
+  String get localSnapshotCopyContentsUnknown => '内容需恢复后才能确认';
+
+  @override
+  String get localSnapshotDeleteDone => '副本已删除';
+
+  @override
+  String get localSnapshotDeleteLastWarning => '这是唯一一份还有内容的副本。';
+
+  @override
+  String get localSnapshotDeleteMessage =>
+      '这份副本会从设备上永久删除。它里面有、而当前数据库里没有的数据将无法找回。';
+
+  @override
+  String get localSnapshotDeleteTitle => '删除这份副本？';
+
+  @override
+  String get localSnapshotEnabledSubtitle =>
+      'JO-AIClient 会定期在本机存一份数据库副本，让数据不只有一份。';
+
+  @override
+  String get localSnapshotEnabledTitle => '保留本地副本';
+
+  @override
+  String get localSnapshotExportDone => '副本已导出';
+
+  @override
+  String localSnapshotExportFailed(String reason) {
+    return '导出副本失败：$reason';
+  }
+
+  @override
+  String get localSnapshotExportPreparing => '正在准备导出';
+
+  @override
+  String get localSnapshotIntervalAutomatic => '自动';
+
+  @override
+  String get localSnapshotIntervalAutomaticDetail => '每天一次，数据库越大间隔越长';
+
+  @override
+  String localSnapshotIntervalDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '每 $days 天',
+      one: '每天',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotIntervalTitle => '备份频率';
+
+  @override
+  String get localSnapshotKeepMonthly => '保留一份上个月的';
+
+  @override
+  String get localSnapshotKeepProtectedNote => '无论设成几份，最近一份仍有内容的副本都不会被自动清理。';
+
+  @override
+  String get localSnapshotKeepTitle => '保留份数';
+
+  @override
+  String localSnapshotKeepValue(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 份',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotKeepWeekly => '保留一份上周的';
+
+  @override
+  String get localSnapshotKindRecovered => '故障恢复时留下的';
+
+  @override
+  String get localSnapshotMaximumTitle => '占用上限';
+
+  @override
+  String get localSnapshotMaximumUnlimited => '不限制';
+
+  @override
+  String get localSnapshotOriginAutomatic => '自动备份';
+
+  @override
+  String get localSnapshotOriginBeforeRestore => '恢复前备份';
+
+  @override
+  String get localSnapshotOriginManual => '手动备份';
+
+  @override
+  String localSnapshotRestoreMessage(String when) {
+    return '当前的对话和设置会被 $when 的这份副本替换。系统会先把现在的数据存一份，所以这一步可以撤销。';
+  }
+
+  @override
+  String get localSnapshotRestorePreparing => '正在准备副本';
+
+  @override
+  String get localSnapshotRestoreTitle => '恢复这份副本？';
+
+  @override
+  String get localSnapshotRunInBackground => '转到后台继续';
+
+  @override
+  String get localSnapshotRunningInBackground => '正在后台备份副本';
+
+  @override
+  String get localSnapshotSectionTitle => '本地副本';
+
+  @override
+  String localSnapshotStatusFailure(String when, String reason) {
+    return '上次备份失败（$when）：$reason';
+  }
+
+  @override
+  String get localSnapshotStatusNever => '还没有备份过';
+
+  @override
+  String get localSnapshotStatusSkippedSpace => '已跳过：本机剩余空间不足';
+
+  @override
+  String localSnapshotStatusSuccess(String when) {
+    return '上次备份：$when';
+  }
+
+  @override
+  String get localSnapshotTakeDone => '副本已保存';
+
+  @override
+  String localSnapshotTakeFailed(String reason) {
+    return '保存副本失败：$reason';
+  }
+
+  @override
+  String localSnapshotUsage(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 份',
+      zero: '暂无副本',
+    );
+    return '$_temp0 · $size';
+  }
+
+  @override
+  String startupRecoveryLocalCopiesAvailable(int count, String when) {
+    return '本机还保留着 $count 份本地副本，最新一份是 $when 的。重置不会删除它们——重启后可以在 设置 › 备份 › 本地副本 里恢复。';
+  }
+
+  @override
+  String startupRecoveryRecoveredCopiesDeleted(int count) {
+    return '另外还有 $count 份故障恢复时留下的数据库副本，重置会把它们一并永久删除。想留住的话请先导出数据。';
+  }
+
+  @override
+  String get backupProgressWrapping => '正在封装归档';
+
+  @override
+  String get backupProgressRestoring => '正在写回数据';
+
+  @override
+  String get localSnapshotManageCopies => '管理副本';
+
+  @override
+  String get startupRecoveryWhatFailed => '失败原因';
+
+  @override
+  String get startupRecoveryStageLabel => '失败阶段';
+
+  @override
+  String get startupRecoveryStageRestore => '恢复关卡';
+
+  @override
+  String get startupRecoveryStageDatabase => '数据库启动';
+
+  @override
+  String get startupRecoveryDiagnosticLabel => '诊断码';
+
+  @override
+  String get startupRecoverySchemaLabel => '数据库版本';
+
+  @override
+  String startupRecoverySchemaValue(String installed, int expected) {
+    return '磁盘上为 $installed · 当前版本需要 $expected';
+  }
+
+  @override
+  String get startupRecoveryAppVersionLabel => '应用';
+
+  @override
+  String get startupRecoveryUnknownValue => '未知';
+
+  @override
+  String get startupRecoveryCollecting => '正在收集诊断信息…';
+
+  @override
+  String get startupRecoveryHideDetails => '收起技术细节';
+
+  @override
+  String get startupRecoveryShowDetails => '展开技术细节';
+
+  @override
+  String get startupRecoveryCopyReport => '复制完整报告';
+
+  @override
+  String get startupRecoveryReportCopied => '已复制完整报告';
+
+  @override
+  String get startupRecoveryShareReport => '导出报告';
+
+  @override
+  String startupRecoveryReportStored(String path) {
+    return '报告已保存到 $path';
+  }
+
+  @override
+  String get startupRecoveryIntegrityButton => '检查数据库完整性';
+
+  @override
+  String get startupRecoveryIntegrityHealthy => 'SQLite 未在数据库文件中发现损坏。';
+
+  @override
+  String startupRecoveryIntegrityDamaged(String detail) {
+    return 'SQLite 报告了问题 —— $detail';
+  }
+
+  @override
+  String get startupRecoveryIntegrityFailed => '完整性检查无法运行。';
+
+  @override
+  String get startupRecoveryIntegrityMissing => '数据目录中没有找到数据库文件。';
+
+  @override
+  String startupRecoveryReportSaved(String path) {
+    return '报告已保存到 $path';
+  }
+
+  @override
+  String get startupRecoveryReportShared => '报告已导出。';
+
+  @override
+  String get startupRecoveryReportSaveFailed => '无法导出报告。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -17960,8 +18770,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get homePageClearContext => '暫時屏蔽上下文';
 
   @override
-  String homePageClearContextWithCount(String actual, String configured) {
-    return '暫時屏蔽上下文 ($actual/$configured)';
+  String contextMessageCount(int count) {
+    return '$count 則訊息';
+  }
+
+  @override
+  String contextMessageCountLimited(int actual, int configured) {
+    return '$actual/$configured 則訊息';
   }
 
   @override
@@ -18889,6 +19704,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '在系統提示詞中使用時間變數會讓每一輪請求的開頭都不同，Prompt 快取無法命中，費用和首字延遲都會上升。需要讓模型知道當前時間時，請改用下方的「追加當前時間」開關。';
 
   @override
+  String get assistantEditPromptIso8601Title => '使用 ISO 8601 格式';
+
+  @override
+  String get assistantEditPromptIso8601Subtitle =>
+      '包含時區偏移，例如 2026-08-08T14:30:05+08:00';
+
+  @override
   String get assistantEditPromptAppendTimeTitle => '追加當前時間';
 
   @override
@@ -19297,28 +20119,28 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '本裝置上的聊天資料庫由更新版本的 JO-AIClient 建立，目前版本無法開啟。資料未被改動。請安裝最新版 JO-AIClient 後重新開啟。';
 
   @override
-  String get startupRecoverySnapshotButton => '還原本機快照';
+  String get startupRecoverySnapshotButton => '還原本機副本';
 
   @override
-  String get startupRecoveryDowngradeSnapshotButton => '進階：還原較早的快照';
+  String get startupRecoveryDowngradeSnapshotButton => '進階：還原較早的副本';
 
   @override
-  String get startupRecoveryChooseSnapshotTitle => '選擇快照';
+  String get startupRecoveryChooseSnapshotTitle => '選擇副本';
 
   @override
   String startupRecoverySnapshotDetails(String date, String time, String size) {
-    return '$date $time · $size MB';
+    return '$date $time · $size';
   }
 
   @override
-  String get startupRecoveryNoSnapshots => '沒有可用的本機快照。';
+  String get startupRecoveryNoSnapshots => '沒有可用的本機副本。';
 
   @override
-  String get startupRecoveryRestoreConfirmTitle => '還原這份快照？';
+  String get startupRecoveryRestoreConfirmTitle => '還原這份副本？';
 
   @override
   String startupRecoveryRestoreConfirmContent(String fileName) {
-    return 'JO-AIClient 將使用 $fileName 取代目前資料庫。建立該快照後的變更可能遺失；在還原通過驗證前，目前資料庫仍會由還原日誌保留。';
+    return 'JO-AIClient 將使用 $fileName 取代目前資料庫。建立該副本後的變更可能遺失；在還原通過驗證前，目前資料庫仍會由還原日誌保留。';
   }
 
   @override
@@ -19336,7 +20158,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String startupRecoverySnapshotFailed(String code) {
-    return '無法準備該快照。診斷代碼：$code';
+    return '無法準備該副本。診斷代碼：$code';
   }
 
   @override
@@ -19527,12 +20349,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupPageKelivoFormat => 'Kelivo';
-
-  @override
-  String get backupPageCuplivoFormat => 'Cuplivo';
-
-  @override
-  String get backupPageCuplivoBackup => 'Cuplivo 備份';
 
   @override
   String get backupPageExportAction => '匯出';
@@ -20279,6 +21095,26 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get displaySettingsPageAutoCollapseCodeBlockLinesUnit => '行';
 
   @override
+  String get displaySettingsPageCollapseLongUserMessagesTitle => '摺疊過長訊息';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesSubtitle =>
+      '超過閾值的使用者訊息摺疊顯示，點擊可展開';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesCharsTitle =>
+      '超過多少字元摺疊';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesCharsUnit => '字元';
+
+  @override
+  String get chatMessageExpandLongText => '展開';
+
+  @override
+  String get chatMessageCollapseLongText => '收起';
+
+  @override
   String get messageExportSheetFormatTitle => '匯出格式';
 
   @override
@@ -20974,13 +21810,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get defaultModelPageDisable => '停用';
 
   @override
-  String get localSnapshotTitle => '本機資料庫快照';
+  String get localSnapshotTitle => '本機副本';
 
   @override
-  String get localSnapshotEnabled => '保留自動本機快照';
+  String get localSnapshotEnabled => '保留自動本機副本';
 
   @override
-  String get localSnapshotTakeNow => '立即建立快照';
+  String get localSnapshotTakeNow => '立即備份一份';
 
   @override
   String get translatePagePasteButton => '貼上';
@@ -25030,7 +25866,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get debugPageConversationToolsTitle => '對話工具';
 
   @override
-  String get debugPageCreateOversizedConversationButton => '建立超大對話（30 MB）';
+  String get debugPageCreateOversizedConversationButton => '建立超大對話（30 MiB）';
 
   @override
   String get debugPageCreateManyMessagesConversationButton => '建立 1024 條訊息的對話';
@@ -25047,7 +25883,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get debugPageCreatingButton => '建立中...';
 
   @override
-  String get debugPageCreatingOversizedConversation => '正在建立 30 MB 超大對話...';
+  String get debugPageCreatingOversizedConversation => '正在建立 30 MiB 超大對話...';
 
   @override
   String get debugPageCreatingManyMessagesConversation => '正在建立 1024 條訊息的對話...';
@@ -25074,7 +25910,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String debugPageOversizedConversationTitle(int sizeMB) {
-    return '超大對話測試（$sizeMB MB）';
+    return '超大對話測試（$sizeMB MiB）';
   }
 
   @override
@@ -25878,7 +26714,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get healthDataSettingsDescription =>
-      '目前助手在日常對話中可使用的 HealthKit 訊號。開關表示 Kelivo 可以嘗試讀取該範圍，實際授權仍由 iOS 管理。';
+      '目前助手在日常對話中可使用的 HealthKit 訊號。開關表示 JO-AIClient 可以嘗試讀取該範圍，實際授權仍由 iOS 管理。';
 
   @override
   String get healthDataSettingsDisableAll => '全部關閉';
@@ -26173,4 +27009,383 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String backupPageMergeCompletedWithSkipped(int count) {
     return '備份中有 $count 個工作階段因訊息順序異常被略過，未併入本機。';
   }
+
+  @override
+  String get assistantEditGradientBackgroundTitle => '漸層背景';
+
+  @override
+  String get assistantEditGradientStaticTitle => '靜態模式';
+
+  @override
+  String get assistantEditGradientStaticDescription => '更省電，適合長對話和持續輸出。';
+
+  @override
+  String get assistantEditGradientHorizontal => '水平位置';
+
+  @override
+  String get assistantEditGradientVertical => '垂直位置';
+
+  @override
+  String get assistantEditGradientPreview => '預覽';
+
+  @override
+  String get assistantEditGradientNextFrame => '換一幀';
+
+  @override
+  String backupProgressBytes(String done, String total) {
+    return '$done / $total';
+  }
+
+  @override
+  String get backupProgressCancel => '取消';
+
+  @override
+  String get backupProgressCancelled => '已取消';
+
+  @override
+  String get backupProgressCommitting => '正在提交';
+
+  @override
+  String get backupProgressDownloading => '正在下載';
+
+  @override
+  String get backupProgressExtracting => '正在解壓';
+
+  @override
+  String get backupProgressFinalizing => '正在完成';
+
+  @override
+  String get backupProgressImportingMessages => '正在匯入訊息';
+
+  @override
+  String get backupProgressImportingSessions => '正在匯入對話';
+
+  @override
+  String backupProgressItems(String done, String total) {
+    return '$done / $total';
+  }
+
+  @override
+  String get backupProgressListingRemote => '正在列出遠端備份';
+
+  @override
+  String get backupProgressMaterializingFiles => '正在寫入檔案';
+
+  @override
+  String get backupProgressPacking => '正在打包';
+
+  @override
+  String get backupProgressPreparing => '準備中';
+
+  @override
+  String get backupProgressReadingSettings => '正在讀取設定';
+
+  @override
+  String get backupProgressSnapshotting => '正在建立資料庫快照';
+
+  @override
+  String get backupProgressStaging => '正在暫存';
+
+  @override
+  String get backupProgressUploading => '正在上傳';
+
+  @override
+  String get backupProgressValidating => '正在驗證';
+
+  @override
+  String get backupProgressVerifying => '正在校驗';
+
+  @override
+  String get localSnapshotActionDelete => '刪除';
+
+  @override
+  String get localSnapshotActionExport => '匯出';
+
+  @override
+  String get localSnapshotActionPin => '保留這份';
+
+  @override
+  String get localSnapshotActionRestore => '還原';
+
+  @override
+  String get localSnapshotActionUnpin => '取消保留';
+
+  @override
+  String get localSnapshotAnnounceTitle => '備份完成時提示';
+
+  @override
+  String get localSnapshotCopiesEmpty => '還沒有本機副本';
+
+  @override
+  String get localSnapshotCopiesEmptyHint => '資料有變化時會自動存一份，還原資料前也一定會先存一份。';
+
+  @override
+  String get localSnapshotCopiesScopeNote =>
+      '本機副本只存在這台裝置上。它防的是應用內資料被損壞或誤刪，防不了裝置遺失或解除安裝應用——那要靠 WebDAV / S3 備份。';
+
+  @override
+  String get localSnapshotCopiesTitle => '本機副本';
+
+  @override
+  String localSnapshotCopyContents(int conversations, int messages) {
+    String _temp0 = intl.Intl.pluralLogic(
+      conversations,
+      locale: localeName,
+      other: '$conversations 個對話',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      messages,
+      locale: localeName,
+      other: '$messages 則訊息',
+    );
+    return '$_temp0 · $_temp1';
+  }
+
+  @override
+  String get localSnapshotCopyContentsUnknown => '內容需還原後才能確認';
+
+  @override
+  String get localSnapshotDeleteDone => '副本已刪除';
+
+  @override
+  String get localSnapshotDeleteLastWarning => '這是唯一一份還有內容的副本。';
+
+  @override
+  String get localSnapshotDeleteMessage =>
+      '這份副本會從裝置上永久刪除。它裡面有、而目前資料庫裡沒有的資料將無法找回。';
+
+  @override
+  String get localSnapshotDeleteTitle => '刪除這份副本？';
+
+  @override
+  String get localSnapshotEnabledSubtitle =>
+      'JO-AIClient 會定期在本機存一份資料庫副本，讓資料不只有一份。';
+
+  @override
+  String get localSnapshotEnabledTitle => '保留本機副本';
+
+  @override
+  String get localSnapshotExportDone => '副本已匯出';
+
+  @override
+  String localSnapshotExportFailed(String reason) {
+    return '匯出副本失敗：$reason';
+  }
+
+  @override
+  String get localSnapshotExportPreparing => '正在準備匯出';
+
+  @override
+  String get localSnapshotIntervalAutomatic => '自動';
+
+  @override
+  String get localSnapshotIntervalAutomaticDetail => '每天一次，資料庫越大間隔越長';
+
+  @override
+  String localSnapshotIntervalDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '每 $days 天',
+      one: '每天',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotIntervalTitle => '備份頻率';
+
+  @override
+  String get localSnapshotKeepMonthly => '保留一份上個月的';
+
+  @override
+  String get localSnapshotKeepProtectedNote => '無論設成幾份，最近一份仍有內容的副本都不會被自動清理。';
+
+  @override
+  String get localSnapshotKeepTitle => '保留份數';
+
+  @override
+  String localSnapshotKeepValue(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 份',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotKeepWeekly => '保留一份上週的';
+
+  @override
+  String get localSnapshotKindRecovered => '故障還原時留下的';
+
+  @override
+  String get localSnapshotMaximumTitle => '佔用上限';
+
+  @override
+  String get localSnapshotMaximumUnlimited => '不限制';
+
+  @override
+  String get localSnapshotOriginAutomatic => '自動備份';
+
+  @override
+  String get localSnapshotOriginBeforeRestore => '還原前備份';
+
+  @override
+  String get localSnapshotOriginManual => '手動備份';
+
+  @override
+  String localSnapshotRestoreMessage(String when) {
+    return '目前的對話和設定會被 $when 的這份副本替換。系統會先把現在的資料存一份，所以這一步可以復原。';
+  }
+
+  @override
+  String get localSnapshotRestorePreparing => '正在準備副本';
+
+  @override
+  String get localSnapshotRestoreTitle => '還原這份副本？';
+
+  @override
+  String get localSnapshotRunInBackground => '轉到背景繼續';
+
+  @override
+  String get localSnapshotRunningInBackground => '正在背景備份副本';
+
+  @override
+  String get localSnapshotSectionTitle => '本機副本';
+
+  @override
+  String localSnapshotStatusFailure(String when, String reason) {
+    return '上次備份失敗（$when）：$reason';
+  }
+
+  @override
+  String get localSnapshotStatusNever => '還沒有備份過';
+
+  @override
+  String get localSnapshotStatusSkippedSpace => '已跳過：本機剩餘空間不足';
+
+  @override
+  String localSnapshotStatusSuccess(String when) {
+    return '上次備份：$when';
+  }
+
+  @override
+  String get localSnapshotTakeDone => '副本已儲存';
+
+  @override
+  String localSnapshotTakeFailed(String reason) {
+    return '儲存副本失敗：$reason';
+  }
+
+  @override
+  String localSnapshotUsage(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 份',
+      zero: '暫無副本',
+    );
+    return '$_temp0 · $size';
+  }
+
+  @override
+  String startupRecoveryLocalCopiesAvailable(int count, String when) {
+    return '本機還保留著 $count 份本機副本，最新一份是 $when 的。重設不會刪除它們——重新啟動後可以在 設定 › 備份 › 本機副本 裡還原。';
+  }
+
+  @override
+  String startupRecoveryRecoveredCopiesDeleted(int count) {
+    return '另外還有 $count 份故障還原時留下的資料庫副本，重設會把它們一併永久刪除。想留住的話請先匯出資料。';
+  }
+
+  @override
+  String get backupProgressWrapping => '正在封裝封存檔';
+
+  @override
+  String get backupProgressRestoring => '正在寫回資料';
+
+  @override
+  String get localSnapshotManageCopies => '管理副本';
+
+  @override
+  String get startupRecoveryWhatFailed => '失敗原因';
+
+  @override
+  String get startupRecoveryStageLabel => '失敗階段';
+
+  @override
+  String get startupRecoveryStageRestore => '還原關卡';
+
+  @override
+  String get startupRecoveryStageDatabase => '資料庫啟動';
+
+  @override
+  String get startupRecoveryDiagnosticLabel => '診斷碼';
+
+  @override
+  String get startupRecoverySchemaLabel => '資料庫版本';
+
+  @override
+  String startupRecoverySchemaValue(String installed, int expected) {
+    return '磁碟上為 $installed · 目前版本需要 $expected';
+  }
+
+  @override
+  String get startupRecoveryAppVersionLabel => '應用程式';
+
+  @override
+  String get startupRecoveryUnknownValue => '未知';
+
+  @override
+  String get startupRecoveryCollecting => '正在收集診斷資訊…';
+
+  @override
+  String get startupRecoveryHideDetails => '收合技術細節';
+
+  @override
+  String get startupRecoveryShowDetails => '展開技術細節';
+
+  @override
+  String get startupRecoveryCopyReport => '複製完整報告';
+
+  @override
+  String get startupRecoveryReportCopied => '已複製完整報告';
+
+  @override
+  String get startupRecoveryShareReport => '匯出報告';
+
+  @override
+  String startupRecoveryReportStored(String path) {
+    return '報告已儲存至 $path';
+  }
+
+  @override
+  String get startupRecoveryIntegrityButton => '檢查資料庫完整性';
+
+  @override
+  String get startupRecoveryIntegrityHealthy => 'SQLite 未在資料庫檔案中發現損壞。';
+
+  @override
+  String startupRecoveryIntegrityDamaged(String detail) {
+    return 'SQLite 回報了問題 —— $detail';
+  }
+
+  @override
+  String get startupRecoveryIntegrityFailed => '完整性檢查無法執行。';
+
+  @override
+  String get startupRecoveryIntegrityMissing => '資料目錄中找不到資料庫檔案。';
+
+  @override
+  String startupRecoveryReportSaved(String path) {
+    return '報告已儲存至 $path';
+  }
+
+  @override
+  String get startupRecoveryReportShared => '報告已匯出。';
+
+  @override
+  String get startupRecoveryReportSaveFailed => '無法匯出報告。';
 }

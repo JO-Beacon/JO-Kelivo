@@ -24,8 +24,15 @@ class ChatMessage extends HiveObject {
   final List<MessagePart> parts;
 
   /// 派生文本正文：按 [parts] 顺序连接每个 [TextPart]。
-  String get content =>
-      parts.whereType<TextPart>().map((part) => part.text).join();
+  ///
+  /// 拼接结果在首次访问时算好并保留：长流式回复会在每一帧读取该值，
+  /// 每次重新遍历 parts 会让渲染开销随消息长度线性增长。
+  late final String _content = parts
+      .whereType<TextPart>()
+      .map((part) => part.text)
+      .join();
+
+  String get content => _content;
 
   /// 用于构建提示词的消息语义指纹。
   ///

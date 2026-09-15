@@ -62,8 +62,12 @@ class NotificationService {
 
   static Future<void> _initializeAndroid() async {
     // Android 初始化
+    //
+    // 这里必须用专门的单色剪影图，不能用启动器图标：通知栏小图标由系统按
+    // alpha 通道渲染并自行上色，而启动器图标带不透明的底，整块都会被当成
+    // 实心，通知栏里只会显示一个色块。
     const AndroidInitializationSettings androidInit =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings('@drawable/ic_notification');
     const InitializationSettings init = InitializationSettings(
       android: androidInit,
     );

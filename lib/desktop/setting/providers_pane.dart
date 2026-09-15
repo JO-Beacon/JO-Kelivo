@@ -1307,69 +1307,6 @@ class _DesktopProviderDetailPaneState
                 const SizedBox(height: 12),
               ],
 
-              if (widget.providerKey.toLowerCase() == 'siliconflow') ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: cs.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: cs.primary.withValues(alpha: 0.35),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '已内置硅基流动的免费模型，无需 API Key。若需更强大的模型，请申请并在此配置你自己的 API Key。',
-                        style: TextStyle(
-                          color: cs.onSurface.withValues(alpha: 0.8),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text.rich(
-                        TextSpan(
-                          text: '官网：',
-                          style: TextStyle(
-                            color: cs.onSurface.withValues(alpha: 0.8),
-                          ),
-                          children: [
-                            TextSpan(
-                              text: 'https://siliconflow.cn',
-                              style: TextStyle(
-                                color: cs.primary,
-                                fontWeight: AppFontWeights.emphasis,
-                              ),
-                              recognizer: TapGestureRecognizer()
-                                ..onTap = () async {
-                                  final uri = Uri.parse(
-                                    'https://siliconflow.cn',
-                                  );
-                                  try {
-                                    final ok = await launchUrl(
-                                      uri,
-                                      mode: LaunchMode.externalApplication,
-                                    );
-                                    if (!ok) {
-                                      await launchUrl(uri);
-                                    }
-                                  } catch (_) {
-                                    await launchUrl(uri);
-                                  }
-                                },
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-
               // API Key（Google Vertex 时隐藏）
               if (!(kind == ProviderKind.google && (cfg.vertexAI == true))) ...[
                 Row(

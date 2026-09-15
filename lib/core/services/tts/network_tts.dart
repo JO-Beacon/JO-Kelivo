@@ -1894,7 +1894,7 @@ void _validateMimoVoiceCloneReference(String voice) {
   }
   if (bytes.isEmpty || bytes.length > 10 * 1024 * 1024) {
     throw ArgumentError(
-      'MiMo Voice Clone reference audio must be between 1 byte and 10 MB.',
+      'MiMo Voice Clone reference audio must be between 1 byte and 10 MiB.',
     );
   }
 }

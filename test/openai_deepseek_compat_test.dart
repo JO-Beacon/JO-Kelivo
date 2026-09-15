@@ -4,7 +4,10 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/api/builtin_tools.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
+
+import 'support/collect_generation.dart';
 
 ProviderConfig _deepSeekConfig(
   String baseUrl, {
@@ -114,7 +117,7 @@ Future<List<Map<String, dynamic>>> _collectToolOnlyContinuationRequests({
   ];
 
   if (useEvents) {
-    await ChatApiService.sendMessageStreamEvents(
+    await ChatApiService.sendMessageStream(
       config: config,
       modelId: modelId,
       messages: messages,
@@ -197,13 +200,12 @@ void main() {
       ).toList();
 
       expect(requestBody['stream'], isFalse);
-      expect(chunks, hasLength(1));
-      expect(chunks.single.content, '9.8 is greater.');
-      expect(chunks.single.reasoning, 'Compare the decimal values.');
-      expect(chunks.single.usage?.promptTokens, 100);
-      expect(chunks.single.usage?.completionTokens, 30);
-      expect(chunks.single.usage?.cachedTokens, 64);
-      expect(chunks.single.usage?.totalTokens, 130);
+      expect(chunks.joinedContent, '9.8 is greater.');
+      expect(chunks.joinedReasoning, 'Compare the decimal values.');
+      expect(chunks.lastUsage?.promptTokens, 100);
+      expect(chunks.lastUsage?.completionTokens, 30);
+      expect(chunks.lastUsage?.cachedTokens, 64);
+      expect(chunks.lastUsage?.totalTokens, 130);
     });
 
     test('Responses stream reports cached tokens without DONE event', () async {
@@ -247,11 +249,11 @@ void main() {
         ],
       ).toList();
 
-      expect(chunks.last.isDone, isTrue);
-      expect(chunks.last.usage?.promptTokens, 80);
-      expect(chunks.last.usage?.completionTokens, 12);
-      expect(chunks.last.usage?.cachedTokens, 48);
-      expect(chunks.last.usage?.totalTokens, 92);
+      expect(chunks.isGenerationDone, isTrue);
+      expect(chunks.lastUsage?.promptTokens, 80);
+      expect(chunks.lastUsage?.completionTokens, 12);
+      expect(chunks.lastUsage?.cachedTokens, 48);
+      expect(chunks.lastUsage?.totalTokens, 92);
     });
 
     test('Responses off reasoning sends effort none', () async {
@@ -295,7 +297,7 @@ void main() {
         stream: false,
       ).toList();
 
-      expect(chunks.last.isDone, isTrue);
+      expect(chunks.isGenerationDone, isTrue);
       expect(requestBody['reasoning'], {'effort': 'none'});
     });
 
@@ -346,7 +348,7 @@ void main() {
           thinkingBudget: 64000,
         ).toList();
 
-        expect(chunks.last.isDone, isTrue);
+        expect(chunks.isGenerationDone, isTrue);
         expect(requests, hasLength(1));
         expect(requests.single['thinking'], {'type': 'enabled'});
         expect(requests.single['reasoning_effort'], 'high');
@@ -398,7 +400,7 @@ void main() {
         thinkingBudget: 0,
       ).toList();
 
-      expect(chunks.last.isDone, isTrue);
+      expect(chunks.isGenerationDone, isTrue);
       expect(requests, hasLength(1));
       expect(requests.single['thinking'], {'type': 'disabled'});
       expect(requests.single.containsKey('reasoning_effort'), isFalse);
@@ -512,7 +514,7 @@ void main() {
         });
 
         final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-        await ChatApiService.sendMessageStreamEvents(
+        await ChatApiService.sendMessageStream(
           config: _deepSeekConfig(
             baseUrl,
             modelOverrides: const {
@@ -673,6 +675,50 @@ void main() {
         final history = (requestBody['messages'] as List).cast<Map>();
         expect(history[1]['reasoning_content'], 'decide to call weather tool');
         expect(history[3]['reasoning_content'], 'summarize the tool result');
+      },
+    );
+
+    test(
+      'Responses API supports built-in search for the DeepSeek Flash / V4 family',
+      () {
+        for (final modelId in const [
+          'deepseek-flash',
+          'deepseek/deepseek-flash',
+          'deepseek-v4-pro',
+          'deepseek-v4-flash',
+        ]) {
+          final modelOverrides = <String, dynamic>{
+            modelId: <String, dynamic>{
+              'builtInTools': const <String>[BuiltInToolNames.search],
+            },
+          };
+          final responsesConfig = _deepSeekConfig(
+            'https://api.deepseek.com/v1',
+            useResponseApi: true,
+            modelOverrides: modelOverrides,
+          );
+          final chatConfig = _deepSeekConfig(
+            'https://api.deepseek.com/v1',
+            modelOverrides: modelOverrides,
+          );
+
+          expect(
+            BuiltInToolsHelper.supportsBuiltInSearchForModel(
+              cfg: responsesConfig,
+              modelId: modelId,
+            ),
+            isTrue,
+            reason: modelId,
+          );
+          expect(
+            BuiltInToolsHelper.supportsBuiltInSearchForModel(
+              cfg: chatConfig,
+              modelId: modelId,
+            ),
+            isFalse,
+            reason: modelId,
+          );
+        }
       },
     );
   });

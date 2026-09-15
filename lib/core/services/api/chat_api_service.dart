@@ -1,57 +1,37 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/model_provider.dart';
 import '../../models/token_usage.dart';
-import '../../../utils/sandbox_path_resolver.dart';
-import '../../../utils/app_directories.dart';
-import '../../utils/openai_model_compat.dart';
 import '../network/dio_http_client.dart';
-import 'google_service_account_auth.dart';
-import '../../services/api_key_manager.dart';
-import '../../../utils/markdown_media_sanitizer.dart';
 import '../../../utils/unicode_sanitizer.dart';
-import 'builtin_tools.dart';
-import 'kimi_formula_search.dart';
-import 'gemini_tool_config.dart';
 import '../logging/context_log_models.dart';
 import '../logging/flutter_logger.dart';
-import '../model_override_resolver.dart';
-import '../model_override_payload_parser.dart';
-import '../custom_request_merger.dart';
 import 'provider_request_headers.dart';
 import '../../models/auto_retry_options.dart';
 import 'retry_policy.dart';
 import 'generation/tool_loop_runner.dart' show StreamRoundRunner;
+import 'generation/text_generation_result.dart';
 import '../../utils/multimodal_input_utils.dart';
-import 'stream/legacy_stream_chunk_adapter.dart';
 import 'stream/retrying_stream.dart';
+import 'chat_api_helpers.dart';
 import 'stream/stream_chunk.dart';
-import 'stream/stream_chunk_emit.dart';
-import 'stream/stream_chunk_ids.dart';
+import 'stream/stream_chunk_handler.dart';
+import 'providers/claude/claude_history.dart' show normalizeClaudeImageMime;
 import 'providers/claude/claude_provider.dart';
-import 'providers/claude/claude_role_normalizer.dart';
 import 'providers/google/google_provider.dart';
 import 'providers/openai/openai_provider.dart';
+import 'providers/zhipu_layout_parsing.dart';
+import 'providers/openai_images.dart';
+import 'providers/openai/openai_tool_transcript.dart'
+    show openaiToolCallForRequest;
+import 'providers/openai/openai_vendor_compat.dart'
+    show isLongCatHost, shouldIncludeStreamingUsageOptions;
 
 export 'generation/tool_loop_runner.dart';
 export 'stream/stream_chunk_emit.dart';
-
-part 'chat_api_service_shims.dart';
-part 'providers/openai_common.dart';
-part 'providers/openai_chat_completions.dart';
-part 'providers/openai_images.dart';
-part 'providers/openai_responses.dart';
-part 'providers/google_common.dart';
-part 'providers/google_gemini.dart';
-part 'providers/google_vertex.dart';
-part 'providers/claude_official.dart';
-part 'providers/zhipu_layout_parsing.dart';
 
 typedef ToolCallHandler =
     Future<dynamic> Function(
@@ -60,46 +40,34 @@ typedef ToolCallHandler =
       String? toolCallId,
     });
 
-String _effectiveToolCallId(
-  dynamic rawId,
-  String fallbackPrefix,
-  Object index,
-) {
-  final id = rawId?.toString().trim() ?? '';
-  if (id.isNotEmpty) return id;
-  return '${fallbackPrefix}_${DateTime.now().microsecondsSinceEpoch}_$index';
-}
-
 class ChatApiService {
-  static const String _aihubmixAppCode = 'ZKRT3588';
   static final Map<String, CancelToken> _activeCancelTokens =
       <String, CancelToken>{};
 
   @visibleForTesting
   static bool shouldAttachVertexMediaAuthForTest(Uri uri) =>
-      _shouldAttachVertexMediaAuth(uri);
+      shouldAttachVertexMediaAuth(uri);
 
   @visibleForTesting
   static String normalizeClaudeImageMimeForTest(String mime) =>
-      _normalizeClaudeImageMime(mime);
+      normalizeClaudeImageMime(mime);
 
   @visibleForTesting
-  static bool isLongCatHostForTest(String baseUrl) => _isLongCatHost(baseUrl);
+  static int claudeVertexMaxOutputTokensForTest(String modelId) =>
+      claudeVertexMaxOutputTokens(modelId);
+
+  @visibleForTesting
+  static bool isLongCatHostForTest(String baseUrl) => isLongCatHost(baseUrl);
 
   @visibleForTesting
   static bool shouldIncludeStreamingUsageOptionsForTest(String host) =>
-      _shouldIncludeStreamingUsageOptions(host);
-
-  @visibleForTesting
-  static List<Map<String, dynamic>>? normalizeClaudeReasoningDetailsForTest(
-    dynamic raw,
-  ) => _normalizeClaudeReasoningDetails(raw);
+      shouldIncludeStreamingUsageOptions(host);
 
   @visibleForTesting
   static Map<String, dynamic> normalizeOpenAIToolCallForTest(
     Map<String, dynamic> toolCall, {
     required bool includeGoogleExtraContent,
-  }) => _openAIToolCallForRequest(
+  }) => openaiToolCallForRequest(
     toolCall,
     includeGoogleExtraContent: includeGoogleExtraContent,
   );
@@ -113,7 +81,7 @@ class ChatApiService {
       explicitType: config.providerType,
     );
     return kind == ProviderKind.openai &&
-        _shouldUseOpenAIImagesApi(config, modelId);
+        shouldUseOpenAIImagesApi(config, modelId);
   }
 
   static void cancelRequest(String requestId) {
@@ -126,384 +94,12 @@ class ChatApiService {
     } catch (_) {}
   }
 
-  /// 解析给定逻辑模型键对应的上游/供应商模型 id。
-  /// 当实例级覆盖指定了 `apiModelId` 时，该值用于外发 HTTP 请求和供应商特定启发式逻辑；
-  /// 否则逻辑 `modelId` 键会被视为上游 id（向后兼容）。
-  static String _apiModelId(ProviderConfig cfg, String modelId) {
-    try {
-      final ov = _modelOverride(cfg, modelId);
-      return resolveApiModelIdOverride(ov, modelId);
-    } catch (_) {}
-    return modelId;
-  }
-
-  static String _apiKeyForRequest(ProviderConfig cfg, String _) {
-    return _effectiveApiKey(cfg).trim();
-  }
-
-  static String _effectiveApiKey(ProviderConfig cfg) {
-    try {
-      if (cfg.multiKeyEnabled == true && (cfg.apiKeys?.isNotEmpty == true)) {
-        final sel = ApiKeyManager().selectForProvider(cfg);
-        if (sel.key != null) return sel.key!.key;
-      }
-    } catch (_) {}
-    return cfg.apiKey;
-  }
-
-  // 读取按模型配置的内置工具（例如 ['search', 'url_context']）。
-  // 存储在 ProviderConfig.modelOverrides[modelId].builtInTools 下。
-  static Set<String> _builtInTools(ProviderConfig cfg, String modelId) {
-    try {
-      return BuiltInToolNames.parseFromOverride(cfg.modelOverrides[modelId]);
-    } catch (_) {}
-    return const <String>{};
-  }
-
-  // 用于从 ProviderConfig 读取按模型覆盖配置（headers/body）的辅助方法
-  static Map<String, dynamic> _modelOverride(
-    ProviderConfig cfg,
-    String modelId,
-  ) {
-    return ModelOverridePayloadParser.modelOverride(
-      cfg.modelOverrides,
-      modelId,
-    );
-  }
-
-  static Map<String, String> _customHeaders(
-    ProviderConfig cfg,
-    String modelId, {
-    Map<String, String> baseHeaders = const <String, String>{},
-    Map<String, String>? assistantHeaders,
-  }) {
-    final ov = _modelOverride(cfg, modelId);
-    final automatic = <String, String>{...providerDefaultHeaders(cfg)};
-    // AIhubmix 推广标头（按提供商选择加入）
-    if (_isAihubmix(cfg) && cfg.aihubmixAppCodeEnabled == true) {
-      automatic.putIfAbsent('APP-Code', () => _aihubmixAppCode);
-    }
-    return CustomRequestMerger.mergeHeaders(
-      base: baseHeaders,
-      assistant: assistantHeaders,
-      providerAutomatic: automatic,
-      provider: ModelOverridePayloadParser.customHeadersFromRows(
-        cfg.customHeaders,
-      ),
-      model: ModelOverridePayloadParser.customHeaders(ov),
-    );
-  }
-
-  static Map<String, dynamic> _customBody(
-    ProviderConfig cfg,
-    String modelId, {
-    Map<String, dynamic>? assistantBody,
-  }) {
-    final ov = _modelOverride(cfg, modelId);
-    return CustomRequestMerger.mergeBody(
-      assistant: assistantBody,
-      providerRows: cfg.customBody,
-      model: ModelOverridePayloadParser.customBody(ov),
-    );
-  }
-
-  static bool _isAihubmix(ProviderConfig cfg) {
-    final base = cfg.baseUrl.toLowerCase();
-    return base.contains('aihubmix.com');
-  }
-
   // 通过遵循按模型覆盖配置解析有效模型信息；回退到推断
-  static ModelInfo _effectiveModelInfo(ProviderConfig cfg, String modelId) {
-    final upstreamId = _apiModelId(cfg, modelId);
-    final base = ModelRegistry.infer(
-      ModelInfo(id: upstreamId, displayName: upstreamId),
-    );
-    final ov = _modelOverride(cfg, modelId);
-    if (ov.isEmpty) return base;
-    try {
-      return ModelOverrideResolver.applyModelOverride(base, ov);
-    } catch (e, st) {
-      FlutterLogger.log(
-        '[ModelOverride] applyModelOverride failed: $e\n$st',
-        tag: 'ModelOverride',
-      );
-      return base;
-    }
-  }
-
-  static String _mimeFromPath(String path) {
-    return inferMediaMimeFromSource(path, fallbackMime: 'image/png');
-  }
-
-  static String _mimeFromDataUrl(String dataUrl) {
-    try {
-      final start = dataUrl.indexOf(':');
-      final semi = dataUrl.indexOf(';');
-      if (start >= 0 && semi > start) {
-        return dataUrl.substring(start + 1, semi);
-      }
-    } catch (_) {}
-    return 'image/png';
-  }
-
-  // 用于解析后的文本 + 图像引用的简单容器
-  static Future<bool> _isValidRemoteImageUrl(String url) async {
-    try {
-      final uri = Uri.tryParse(url);
-      if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) {
-        return false;
-      }
-      final client = http.Client();
-      try {
-        final resp = await client.head(uri).timeout(const Duration(seconds: 5));
-        // 将标准成功 / 重定向视为有效；将 4xx/5xx（例如 404）视为无效。
-        final code = resp.statusCode;
-        if (code >= 200 && code < 400) return true;
-        // 部分服务器不支持 HEAD，可能返回 405/501；将其视为不确定但有效。
-        if (code == 405 || code == 501) return true;
-        return false;
-      } finally {
-        client.close();
-      }
-    } catch (_) {
-      // 网络错误 / 超时 → 视为无效，以便回退到纯文本。
-      return false;
-    }
-  }
 
   // 用于保存解析后的文本 + 图片引用的简单容器
-  static Future<_ParsedTextAndImages> _parseTextAndImages(
-    String raw, {
-    required bool allowRemoteImages,
-    required bool allowLocalImages,
-    bool allowDataImages = true,
-    bool keepRemoteMarkdownText = true,
-    bool keepDisallowedImageText = true,
-    bool skipImageParsing = false,
-  }) async {
-    if (raw.isEmpty) return const _ParsedTextAndImages('', <_ImageRef>[]);
-    // 工具类/纯文本提示（标题、摘要、压缩）必须把 `![...](...)` 保持为
-    // 字面文本，绝不走 Markdown 扫描器。
-    if (skipImageParsing || !raw.contains('![')) {
-      return _ParsedTextAndImages(raw.trim(), const <_ImageRef>[]);
-    }
-    final mdImg = RegExp(r'!\[[^\]]*\]\(([^)]+)\)');
-    // 这里有意不识别自定义附件标记。
-    // 附件通过结构化 parts / media-path 键传入。
-    final images = <_ImageRef>[];
-    final buf = StringBuffer();
-    int i = 0;
-    while (i < raw.length) {
-      // 跳过围栏代码块（``` 或 ~~~）：其中的内容永远不是图片。
-      if ((raw.startsWith('```', i) || raw.startsWith('~~~', i)) &&
-          (i == 0 || raw[i - 1] == '\n')) {
-        final fence = raw.substring(i, i + 3);
-        buf.write(fence);
-        i += 3;
-        // 跳过开围栏行剩余内容（语言标签等）。
-        while (i < raw.length && raw[i] != '\n') {
-          buf.write(raw[i]);
-          i++;
-        }
-        // 继续推进，直到行首出现匹配的闭合围栏。
-        bool closed = false;
-        while (i < raw.length) {
-          if (raw[i] == '\n') {
-            buf.write(raw[i]);
-            i++;
-            if (raw.startsWith(fence, i)) {
-              buf.write(fence);
-              i += 3;
-              // 跳过闭合围栏行的尾随内容。
-              while (i < raw.length && raw[i] != '\n') {
-                buf.write(raw[i]);
-                i++;
-              }
-              closed = true;
-              break;
-            }
-          } else {
-            buf.write(raw[i]);
-            i++;
-          }
-        }
-        if (!closed) {
-          // 未闭合的围栏：剩余文本已按原样写出。
-        }
-        continue;
-      }
-      // 跳过行内代码片段（反引号序列）。
-      if (raw[i] == '`') {
-        // 确定开反引号序列的长度。
-        int tickLen = 0;
-        while (i + tickLen < raw.length && raw[i + tickLen] == '`') {
-          tickLen++;
-        }
-        final openTicks = raw.substring(i, i + tickLen);
-        buf.write(openTicks);
-        i += tickLen;
-        // 继续推进，直到匹配的闭合反引号序列。
-        bool closedTick = false;
-        while (i < raw.length) {
-          if (raw.startsWith(openTicks, i)) {
-            buf.write(openTicks);
-            i += tickLen;
-            closedTick = true;
-            break;
-          }
-          buf.write(raw[i]);
-          i++;
-        }
-        if (!closedTick) {
-          // 未闭合的行内代码：内容已写出。
-        }
-        continue;
-      }
-
-      final m1 = mdImg.matchAsPrefix(raw, i);
-      if (m1 != null) {
-        final full = raw.substring(m1.start, m1.end);
-        final url = (m1.group(1) ?? '').trim();
-        if (url.isEmpty) {
-          // 空 URL：按纯文本处理，不尝试解析为图片。
-          buf.write(full);
-          i = m1.end;
-          continue;
-        }
-        // 行内 base64 / data URL：始终视为图片，但不放入文本。
-        if (url.startsWith('data:')) {
-          if (allowDataImages) {
-            images.add(_ImageRef('data', url));
-          } else if (keepDisallowedImageText) {
-            buf.write(full);
-          }
-          i = m1.end;
-          continue;
-        }
-        // 远程 http(s) URL
-        if (url.startsWith('http://') || url.startsWith('https://')) {
-          if (!allowRemoteImages) {
-            // 远程链接不带数据载荷，丢弃等于悄悄删掉用户的一段文字；
-            // 是否保留跟随 keepRemoteMarkdownText。
-            if (keepRemoteMarkdownText) buf.write(full);
-            i = m1.end;
-            continue;
-          }
-          final ok = await _isValidRemoteImageUrl(url);
-          if (!ok) {
-            // 无效 / 无法访问的图片 URL（例如 404）→ 保留为纯文本。
-            buf.write(full);
-            i = m1.end;
-            continue;
-          }
-          images.add(_ImageRef('url', url));
-          if (keepRemoteMarkdownText) {
-            // 保留 markdown，让模型能看到模板语法和 URL。
-            buf.write(full);
-          }
-          i = m1.end;
-          continue;
-        }
-        // 本地 / 相对路径：仅当文件存在时视为图片。
-        if (!allowLocalImages) {
-          if (keepDisallowedImageText) buf.write(full);
-          i = m1.end;
-          continue;
-        }
-        try {
-          final resolved = SandboxPathResolver.resolveForIo(url);
-          if (resolved == null) {
-            buf.write(full);
-            i = m1.end;
-            continue;
-          }
-          final file = File(resolved);
-          if (!file.existsSync()) {
-            // 本地文件缺失：不要视为图片；保留原始 markdown。
-            buf.write(full);
-            i = m1.end;
-            continue;
-          }
-        } catch (_) {
-          // 探测文件时发生任何错误 → 回退到纯文本。
-          buf.write(full);
-          i = m1.end;
-          continue;
-        }
-        images.add(_ImageRef('path', url));
-        // 对于真实本地文件，我们保持之前的行为：仅作为图片附加，从文本中省略 markdown。
-        i = m1.end;
-        continue;
-      }
-      buf.write(raw[i]);
-      i++;
-    }
-    return _ParsedTextAndImages(buf.toString().trim(), images);
-  }
-
-  static Future<String> _encodeBase64File(
-    String path, {
-    bool withPrefix = false,
-  }) async {
-    final resolved = SandboxPathResolver.resolveForIo(path);
-    if (resolved == null) {
-      throw FileSystemException('rejected local path', path);
-    }
-    final file = File(resolved);
-    final bytes = await file.readAsBytes();
-    final b64 = base64Encode(bytes);
-    if (withPrefix) {
-      final mime = _mimeFromPath(resolved);
-      return 'data:$mime;base64,$b64';
-    }
-    return b64;
-  }
-
-  /// 与 [_encodeBase64File] 类似，但对于缺失 / 不可读的文件返回 null，
-  /// 以便 provider 请求构建器可以跳过不可用的附件。
-  static Future<String?> _tryEncodeBase64File(
-    String path, {
-    bool withPrefix = false,
-  }) async {
-    try {
-      final resolved = SandboxPathResolver.resolveForIo(path);
-      if (resolved == null) return null;
-      final file = File(resolved);
-      if (!await file.exists()) return null;
-      return _encodeBase64File(resolved, withPrefix: withPrefix);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  static String _textFromContentParts(dynamic content) {
-    if (content is String) return content.trim();
-    if (content is! List) return (content ?? '').toString().trim();
-
-    final buffer = StringBuffer();
-    for (final part in content) {
-      if (part is String) {
-        buffer.write(part);
-        continue;
-      }
-      if (part is! Map) continue;
-      final type = (part['type'] ?? '').toString();
-      if (type.isNotEmpty &&
-          type != 'text' &&
-          type != 'input_text' &&
-          type != 'output_text') {
-        continue;
-      }
-      final text = (part['text'] ?? part['content'] ?? '').toString();
-      if (text.isEmpty) continue;
-      if (buffer.isNotEmpty) buffer.write('\n');
-      buffer.write(text);
-    }
-    return buffer.toString().trim();
-  }
 
   static Future<String> _stripImageMarkersFromText(String raw) async {
-    final parsed = await _parseTextAndImages(
+    final parsed = await parseTextAndImages(
       raw,
       allowRemoteImages: false,
       allowLocalImages: false,
@@ -518,10 +114,10 @@ class ChatApiService {
   static Future<dynamic> _stripImageInputsFromContent(dynamic content) async {
     if (content is String) return _stripImageMarkersFromText(content);
     if (content is List) {
-      return _stripImageMarkersFromText(_textFromContentParts(content));
+      return _stripImageMarkersFromText(textFromContentParts(content));
     }
     if (content is Map) {
-      return _stripImageMarkersFromText(_textFromContentParts([content]));
+      return _stripImageMarkersFromText(textFromContentParts([content]));
     }
     return content;
   }
@@ -547,7 +143,7 @@ class ChatApiService {
   }
 
   static bool _supportsImageInput(ProviderConfig config, String modelId) {
-    return _effectiveModelInfo(config, modelId).input.contains(Modality.image);
+    return effectiveModelInfo(config, modelId).input.contains(Modality.image);
   }
 
   static http.Client _clientFor(ProviderConfig cfg, CancelToken cancelToken) {
@@ -573,319 +169,15 @@ class ChatApiService {
     return DioHttpClient(cancelToken: cancelToken);
   }
 
-  static String _decodeUtf8Body(
-    http.Response response, {
-    bool allowMalformed = false,
-  }) {
-    return utf8.decode(response.bodyBytes, allowMalformed: allowMalformed);
-  }
-
-  static Stream<ChatStreamChunk> sendMessageStream({
-    AutoRetryOptions? retryOverride,
-    required ProviderConfig config,
-    required String modelId,
-    required List<Map<String, dynamic>> messages,
-    List<String>? userImagePaths,
-    int? thinkingBudget,
-    double? temperature,
-    double? topP,
-    int? maxTokens,
-    List<Map<String, dynamic>>? tools,
-    ToolCallHandler? onToolCall,
-    Map<String, String>? extraHeaders,
-    Map<String, dynamic>? extraBody,
-    bool stream = true,
-    String? requestId,
-    String? conversationId,
-    bool allowImagesApiRouting = true,
-    bool ocrActive = false,
-    bool parseMarkdownImageLinks = true,
-  }) async* {
-    final kind = ProviderConfig.classify(
-      config.id,
-      explicitType: config.providerType,
-    );
-    final useImagesApi =
-        kind == ProviderKind.openai &&
-        allowImagesApiRouting &&
-        _shouldUseOpenAIImagesApi(config, modelId);
-    final useZhipuLayoutParsing = shouldUseZhipuLayoutParsing(config, modelId);
-    final imageOutput = _effectiveModelInfo(
-      config,
-      modelId,
-    ).output.contains(Modality.image);
-    final hasClientTools = (tools?.isNotEmpty ?? false) || onToolCall != null;
-    final replaySafe =
-        !useImagesApi &&
-        !useZhipuLayoutParsing &&
-        !imageOutput &&
-        !hasClientTools;
-    final options = retryOverride ?? AutoRetryConfig.current;
-    final sessionHeaders = providerSessionHeaders(
-      config,
-      conversationId: conversationId,
-      extraHeaders: extraHeaders,
-    );
-    final sessionToken = CancelToken();
-    final rid = (requestId ?? '').trim();
-    if (rid.isNotEmpty) {
-      final previous = _activeCancelTokens.remove(rid);
-      try {
-        previous?.cancel('replaced');
-      } catch (_) {}
-      _activeCancelTokens[rid] = sessionToken;
-    }
-
-    try {
-      yield* retryingStream<ChatStreamChunk>(
-        options: options,
-        isCancelled: () => sessionToken.isCancelled,
-        cancelled: _whenCancelled(sessionToken),
-        shouldRetry: (error) => replaySafe && shouldRetryError(error, options),
-        onRetry: (attempt, delay, error) async {
-          FlutterLogger.log(
-            'API request retry ${attempt + 1}/${options.maxRetries} '
-            'after ${delay.inMilliseconds} ms: $error',
-            tag: 'AutoRetry',
-          );
-        },
-        attempt: (_) => _sendMessageStreamOnce(
-          config: config,
-          modelId: modelId,
-          messages: messages,
-          userImagePaths: userImagePaths,
-          thinkingBudget: thinkingBudget,
-          temperature: temperature,
-          topP: topP,
-          maxTokens: maxTokens,
-          tools: tools,
-          onToolCall: onToolCall,
-          extraHeaders: sessionHeaders,
-          extraBody: extraBody,
-          stream: stream,
-          requestId: null,
-          allowImagesApiRouting: allowImagesApiRouting,
-          ocrActive: ocrActive,
-          skipImageParsing: !parseMarkdownImageLinks,
-          parentCancelToken: sessionToken,
-        ),
-      );
-    } finally {
-      if (rid.isNotEmpty) {
-        final current = _activeCancelTokens[rid];
-        if (identical(current, sessionToken)) {
-          _activeCancelTokens.remove(rid);
-        }
-      }
-    }
-  }
-
-  static Stream<ChatStreamChunk> _sendMessageStreamOnce({
-    required ProviderConfig config,
-    required String modelId,
-    required List<Map<String, dynamic>> messages,
-    List<String>? userImagePaths,
-    int? thinkingBudget,
-    double? temperature,
-    double? topP,
-    int? maxTokens,
-    List<Map<String, dynamic>>? tools,
-    ToolCallHandler? onToolCall,
-    Map<String, String>? extraHeaders,
-    Map<String, dynamic>? extraBody,
-    required bool stream,
-    String? requestId,
-    required bool allowImagesApiRouting,
-    required bool ocrActive,
-    required bool skipImageParsing,
-    CancelToken? parentCancelToken,
-  }) async* {
-    final kind = ProviderConfig.classify(
-      config.id,
-      explicitType: config.providerType,
-    );
-    final cancelToken = CancelToken();
-    if (parentCancelToken != null) {
-      _bridgeCancel(parentCancelToken, cancelToken);
-    }
-    final rid = (requestId ?? '').trim();
-    if (rid.isNotEmpty && parentCancelToken == null) {
-      final prev = _activeCancelTokens.remove(rid);
-      try {
-        prev?.cancel('replaced');
-      } catch (_) {}
-      _activeCancelTokens[rid] = cancelToken;
-    }
-    final useOpenAIImagesApi =
-        kind == ProviderKind.openai &&
-        allowImagesApiRouting &&
-        _shouldUseOpenAIImagesApi(config, modelId);
-    final useZhipuLayoutParsing = shouldUseZhipuLayoutParsing(config, modelId);
-    final unicodeSafeMessages = _sanitizeMessages(messages);
-    final stripUnsupportedImageInputs =
-        !ocrActive &&
-        !useOpenAIImagesApi &&
-        !useZhipuLayoutParsing &&
-        !_supportsImageInput(config, modelId);
-    final safeMessages = stripUnsupportedImageInputs
-        ? await _stripImageInputsFromMessages(unicodeSafeMessages)
-        : unicodeSafeMessages;
-    final safeUserImagePaths = stripUnsupportedImageInputs
-        ? const <String>[]
-        : userImagePaths;
-    final client = _clientFor(config, cancelToken);
-
-    try {
-      if (useZhipuLayoutParsing) {
-        yield* sendZhipuLayoutParsingStream(
-          client,
-          config,
-          modelId,
-          safeMessages,
-          userImagePaths: safeUserImagePaths,
-          extraHeaders: extraHeaders,
-        );
-      } else if (kind == ProviderKind.openai) {
-        if (useOpenAIImagesApi) {
-          yield* _sendOpenAIImagesStream(
-            client,
-            config,
-            modelId,
-            safeMessages,
-            userImagePaths: safeUserImagePaths,
-            extraHeaders: extraHeaders,
-            extraBody: extraBody,
-          );
-        } else if (config.useResponseApi == true) {
-          yield* _sendOpenAIResponsesStream(
-            client,
-            config,
-            modelId,
-            safeMessages,
-            userImagePaths: safeUserImagePaths,
-            thinkingBudget: thinkingBudget,
-            temperature: temperature,
-            topP: topP,
-            maxTokens: maxTokens,
-            tools: tools,
-            onToolCall: onToolCall,
-            extraHeaders: extraHeaders,
-            extraBody: extraBody,
-            stream: stream,
-          );
-        } else {
-          yield* _sendOpenAIChatCompletionsStream(
-            client,
-            config,
-            modelId,
-            safeMessages,
-            userImagePaths: safeUserImagePaths,
-            thinkingBudget: thinkingBudget,
-            temperature: temperature,
-            topP: topP,
-            maxTokens: maxTokens,
-            tools: tools,
-            onToolCall: onToolCall,
-            extraHeaders: extraHeaders,
-            extraBody: extraBody,
-            stream: stream,
-            skipImageParsing: skipImageParsing,
-          );
-        }
-      } else if (kind == ProviderKind.claude) {
-        yield* _sendClaudeStream(
-          client,
-          config,
-          modelId,
-          safeMessages,
-          userImagePaths: safeUserImagePaths,
-          thinkingBudget: thinkingBudget,
-          temperature: temperature,
-          topP: topP,
-          maxTokens: maxTokens,
-          tools: tools,
-          onToolCall: onToolCall,
-          extraHeaders: extraHeaders,
-          extraBody: extraBody,
-          stream: stream,
-          skipImageParsing: skipImageParsing,
-        );
-      } else if (kind == ProviderKind.google) {
-        final isVertex = config.vertexAI == true;
-        final isVertexClaude =
-            isVertex && modelId.toLowerCase().startsWith('claude-');
-        if (isVertexClaude) {
-          yield* _sendGoogleVertexClaudeStream(
-            client: client,
-            config: config,
-            modelId: modelId,
-            messages: safeMessages,
-            userImagePaths: safeUserImagePaths,
-            thinkingBudget: thinkingBudget,
-            temperature: temperature,
-            topP: topP,
-            maxTokens: maxTokens,
-            tools: tools,
-            onToolCall: onToolCall,
-            extraHeaders: extraHeaders,
-            extraBody: extraBody,
-            stream: stream,
-            skipImageParsing: skipImageParsing,
-          );
-        } else if (isVertex) {
-          yield* _sendGoogleVertexStream(
-            client,
-            config,
-            modelId,
-            safeMessages,
-            userImagePaths: safeUserImagePaths,
-            thinkingBudget: thinkingBudget,
-            temperature: temperature,
-            topP: topP,
-            maxTokens: maxTokens,
-            tools: tools,
-            onToolCall: onToolCall,
-            extraHeaders: extraHeaders,
-            extraBody: extraBody,
-            stream: stream,
-            skipImageParsing: skipImageParsing,
-          );
-        } else {
-          yield* _sendGoogleGeminiStream(
-            client,
-            config,
-            modelId,
-            safeMessages,
-            userImagePaths: safeUserImagePaths,
-            thinkingBudget: thinkingBudget,
-            temperature: temperature,
-            topP: topP,
-            maxTokens: maxTokens,
-            tools: tools,
-            onToolCall: onToolCall,
-            extraHeaders: extraHeaders,
-            extraBody: extraBody,
-            stream: stream,
-            skipImageParsing: skipImageParsing,
-          );
-        }
-      }
-    } finally {
-      client.close();
-      if (rid.isNotEmpty && parentCancelToken == null) {
-        final cur = _activeCancelTokens[rid];
-        if (identical(cur, cancelToken)) {
-          _activeCancelTokens.remove(rid);
-        }
-      }
-    }
-  }
-
   /// 兼容入口：把现有供应商流式结果转换为 provider-independent 事件。
   ///
   /// 请求和旧版 `ChatStreamChunk` 管线保持不变，便于下游逐步迁移到
   /// [StreamChunkHandler]，同时保留 JO-AIClient 当前工具循环和上下文树契约。
-  static Stream<StreamChunk> sendMessageStreamEvents({
+  /// 向供应商发起一次流式请求，产出与供应商无关的统一事件流。
+  ///
+  /// 与上游 Kelivo 同名同义：调用方按 [StreamChunk] 消费，
+  /// 不再有 [ChatStreamChunk] 这一层 JO 自有的兼容包装。
+  static Stream<StreamChunk> sendMessageStream({
     AutoRetryOptions? retryOverride,
     required ProviderConfig config,
     required String modelId,
@@ -904,6 +196,7 @@ class ChatApiService {
     String? conversationId,
     bool allowImagesApiRouting = true,
     bool ocrActive = false,
+    bool builtInSearchOnly = false,
     bool parseMarkdownImageLinks = true,
   }) async* {
     final kind = ProviderConfig.classify(
@@ -913,9 +206,9 @@ class ChatApiService {
     final useImagesApi =
         kind == ProviderKind.openai &&
         allowImagesApiRouting &&
-        _shouldUseOpenAIImagesApi(config, modelId);
+        shouldUseOpenAIImagesApi(config, modelId);
     final useZhipuLayoutParsing = shouldUseZhipuLayoutParsing(config, modelId);
-    final imageOutput = _effectiveModelInfo(
+    final imageOutput = effectiveModelInfo(
       config,
       modelId,
     ).output.contains(Modality.image);
@@ -987,6 +280,7 @@ class ChatApiService {
           stream: stream,
           allowImagesApiRouting: allowImagesApiRouting,
           ocrActive: ocrActive,
+          builtInSearchOnly: builtInSearchOnly,
           skipImageParsing: !parseMarkdownImageLinks,
           sessionToken: sessionToken,
           retryRound: retryRound,
@@ -1017,6 +311,7 @@ class ChatApiService {
     Map<String, dynamic>? extraBody,
     required bool stream,
     required bool allowImagesApiRouting,
+    required bool builtInSearchOnly,
     required bool ocrActive,
     required bool skipImageParsing,
     required CancelToken sessionToken,
@@ -1029,7 +324,7 @@ class ChatApiService {
     final useImagesApi =
         kind == ProviderKind.openai &&
         allowImagesApiRouting &&
-        _shouldUseOpenAIImagesApi(config, modelId);
+        shouldUseOpenAIImagesApi(config, modelId);
     final useZhipuLayoutParsing = shouldUseZhipuLayoutParsing(config, modelId);
 
     // Images 和 GLM-OCR 是一次性 JSON 特殊路由，直接转换为统一事件。
@@ -1041,7 +336,7 @@ class ChatApiService {
       final client = _clientFor(config, cancelToken);
       try {
         if (useZhipuLayoutParsing) {
-          yield* sendZhipuLayoutParsingEvents(
+          yield* sendZhipuLayoutParsingStream(
             client,
             config,
             modelId,
@@ -1050,7 +345,7 @@ class ChatApiService {
             extraHeaders: extraHeaders,
           );
         } else {
-          yield* _sendOpenAIImagesEvents(
+          yield* sendOpenAIImagesStream(
             client,
             config,
             modelId,
@@ -1100,6 +395,7 @@ class ChatApiService {
           extraHeaders: extraHeaders,
           extraBody: extraBody,
           stream: stream,
+          builtInSearchOnly: builtInSearchOnly,
           skipImageParsing: skipImageParsing,
           retryRound: retryRound,
         );
@@ -1110,7 +406,7 @@ class ChatApiService {
     }
 
     // 标准 Claude/Gemini 以及 Vertex Claude/Gemini 均直接产出统一事件。
-    final upstreamModelId = _apiModelId(config, modelId).toLowerCase();
+    final upstreamModelId = apiModelId(config, modelId).toLowerCase();
     final isVertexClaude =
         kind == ProviderKind.google &&
         config.vertexAI == true &&
@@ -1148,6 +444,7 @@ class ChatApiService {
             extraHeaders: extraHeaders,
             extraBody: extraBody,
             stream: stream,
+            builtInSearchOnly: builtInSearchOnly,
             skipImageParsing: skipImageParsing,
             retryRound: retryRound,
           );
@@ -1176,31 +473,6 @@ class ChatApiService {
       }
       return;
     }
-
-    await for (final chunk in _sendMessageStreamOnce(
-      config: config,
-      modelId: modelId,
-      messages: messages,
-      userImagePaths: userImagePaths,
-      thinkingBudget: thinkingBudget,
-      temperature: temperature,
-      topP: topP,
-      maxTokens: maxTokens,
-      tools: tools,
-      onToolCall: onToolCall,
-      extraHeaders: extraHeaders,
-      extraBody: extraBody,
-      stream: stream,
-      requestId: null,
-      allowImagesApiRouting: allowImagesApiRouting,
-      ocrActive: ocrActive,
-      skipImageParsing: skipImageParsing,
-      parentCancelToken: sessionToken,
-    )) {
-      for (final event in legacyChunkToEvents(chunk)) {
-        yield event;
-      }
-    }
   }
 
   static Future<void> _whenCancelled(CancelToken token) async {
@@ -1224,6 +496,62 @@ class ChatApiService {
     );
   }
 
+  /// 非流式生成：经统一流式入口产出事件后，由 [StreamChunkHandler] 聚合。
+  static Future<TextGenerationResult> generateMessage({
+    required ProviderConfig config,
+    required String modelId,
+    required List<Map<String, dynamic>> messages,
+    List<String>? userImagePaths,
+    int? thinkingBudget,
+    double? temperature,
+    double? topP,
+    int? maxTokens,
+    List<Map<String, dynamic>>? tools,
+    ToolCallHandler? onToolCall,
+    Map<String, String>? extraHeaders,
+    Map<String, dynamic>? extraBody,
+    String? requestId,
+    String? conversationId,
+    bool allowImagesApiRouting = true,
+    bool ocrActive = false,
+    bool builtInSearchOnly = false,
+    bool skipImageParsing = false,
+    AutoRetryOptions? retryOverride,
+    void Function(RetryPending? pending)? onRetry,
+  }) async {
+    final handler = StreamChunkHandler(
+      onRetry: onRetry == null ? null : (pending) => onRetry(pending),
+    );
+    await for (final chunk in sendMessageStream(
+      config: config,
+      modelId: modelId,
+      messages: messages,
+      userImagePaths: userImagePaths,
+      thinkingBudget: thinkingBudget,
+      temperature: temperature,
+      topP: topP,
+      maxTokens: maxTokens,
+      tools: tools,
+      onToolCall: onToolCall,
+      extraHeaders: extraHeaders,
+      extraBody: extraBody,
+      stream: false,
+      requestId: requestId,
+      conversationId: conversationId,
+      allowImagesApiRouting: allowImagesApiRouting,
+      ocrActive: ocrActive,
+      builtInSearchOnly: builtInSearchOnly,
+      parseMarkdownImageLinks: !skipImageParsing,
+      retryOverride: retryOverride,
+    )) {
+      if (chunk is RetryAttemptStart) {
+        onRetry?.call(null);
+      }
+      handler.handle(chunk);
+    }
+    return handler.toResult();
+  }
+
   // 用于标题摘要等工具的非流式文本生成
   static Future<String> generateText({
     AutoRetryOptions? retryOverride,
@@ -1238,454 +566,23 @@ class ChatApiService {
     /// 工具提示（标题、摘要、压缩）只处理文本；保留 Markdown 图片语法，不执行媒体发现。
     bool skipImageParsing = false,
   }) async {
-    final options = retryOverride ?? AutoRetryConfig.current;
-    final replaySafe = _builtInTools(config, modelId).isEmpty;
-    final sessionHeaders = providerSessionHeaders(
-      config,
+    final result = await generateMessage(
+      config: config,
+      modelId: modelId,
       conversationId: conversationId,
+      messages: [
+        {'role': 'user', 'content': prompt},
+      ],
       extraHeaders: extraHeaders,
+      extraBody: extraBody,
+      thinkingBudget: thinkingBudget,
+      // 工具类调用只需要搜索：绝不需要图片生成或代码解释器。
+      builtInSearchOnly: true,
+      skipImageParsing: skipImageParsing,
+      allowImagesApiRouting: !skipImageParsing,
+      retryOverride: retryOverride,
     );
-    return retryingStream<String>(
-      options: options,
-      isCancelled: () => false,
-      shouldRetry: (error) => replaySafe && shouldRetryError(error, options),
-      onRetry: (attempt, delay, error) async {
-        FlutterLogger.log(
-          'API request retry ${attempt + 1}/${options.maxRetries} '
-          'after ${delay.inMilliseconds} ms: $error',
-          tag: 'AutoRetry',
-        );
-      },
-      attempt: (_) async* {
-        yield await _generateTextOnce(
-          config: config,
-          modelId: modelId,
-          prompt: prompt,
-          extraHeaders: sessionHeaders,
-          extraBody: extraBody,
-          thinkingBudget: thinkingBudget,
-          skipImageParsing: skipImageParsing,
-        );
-      },
-    ).single;
-  }
-
-  static Future<String> _generateTextOnce({
-    required ProviderConfig config,
-    required String modelId,
-    required String prompt,
-    Map<String, String>? extraHeaders,
-    Map<String, dynamic>? extraBody,
-    int? thinkingBudget,
-    required bool skipImageParsing,
-  }) async {
-    final kind = ProviderConfig.classify(
-      config.id,
-      explicitType: config.providerType,
-    );
-    final client = _clientFor(config, CancelToken());
-    final upstreamModelId = _apiModelId(config, modelId);
-    // [generateText] 不接收结构化消息分片；调用方可明确标记纯文本提示，说明有意跳过图片解析。
-    // 两种模式都会继续执行清洗。
-    final safePrompt = UnicodeSanitizer.sanitize(prompt);
-    try {
-      if (kind == ProviderKind.openai) {
-        final url = _openAICompatibleUrl(config);
-        Map<String, dynamic> body;
-        final effectiveInfo = _effectiveModelInfo(config, modelId);
-        final isReasoning = effectiveInfo.abilities.contains(
-          ModelAbility.reasoning,
-        );
-        var effort = _openAIEffortForBudget(thinkingBudget, upstreamModelId);
-        // 标题生成走 DeepSeek 的非流式兼容接口；该接口接受 xhigh，
-        // 而普通聊天请求仍按 chat-completions 兼容矩阵归一化。
-        if (_isDeepSeekClaudeCompatible(upstreamModelId, config: config) &&
-            thinkingBudget != null &&
-            thinkingBudget >= 64000 &&
-            effort == 'high') {
-          effort = 'xhigh';
-        }
-        final info = _OpenAIProviderInfo(
-          host: Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '',
-          providerId: config.id.toLowerCase(),
-          upstreamModelId: upstreamModelId,
-        );
-        if (config.useResponseApi == true) {
-          // 在启用且受支持时注入内置 web_search 工具
-          final toolsList = <Map<String, dynamic>>[];
-          bool isResponsesWebSearchSupported(String id) {
-            if (BuiltInToolsHelper.isOpenAIResponsesBuiltInSearchSupportedModel(
-              id,
-            )) {
-              return true;
-            }
-            if (BuiltInToolsHelper.isDashScopeProvider(config)) {
-              return BuiltInToolsHelper.isDashScopeResponsesBuiltInSearchSupportedModel(
-                id,
-              );
-            }
-            if (BuiltInToolsHelper.isArkProvider(config)) {
-              return BuiltInToolsHelper.isDoubaoResponsesBuiltInSearchSupportedModel(
-                id,
-              );
-            }
-            return false;
-          }
-
-          if (isResponsesWebSearchSupported(upstreamModelId)) {
-            final builtIns = _builtInTools(config, modelId);
-            if (builtIns.contains(BuiltInToolNames.search)) {
-              if (BuiltInToolsHelper.isDashScopeProvider(config) ||
-                  BuiltInToolsHelper.isArkProvider(config)) {
-                toolsList.add({'type': 'web_search'});
-              } else {
-                Map<String, dynamic> ws = const <String, dynamic>{};
-                try {
-                  final ov = config.modelOverrides[modelId];
-                  if (ov is Map && ov['webSearch'] is Map) {
-                    ws = (ov['webSearch'] as Map).cast<String, dynamic>();
-                  }
-                } catch (_) {}
-                final usePreview =
-                    (ws['preview'] == true) ||
-                    ((ws['tool'] ?? '').toString() == 'preview');
-                final entry = <String, dynamic>{
-                  'type': usePreview ? 'web_search_preview' : 'web_search',
-                };
-                if (ws['allowed_domains'] is List &&
-                    (ws['allowed_domains'] as List).isNotEmpty) {
-                  entry['filters'] = {
-                    'allowed_domains': List<String>.from(
-                      (ws['allowed_domains'] as List).map((e) => e.toString()),
-                    ),
-                  };
-                }
-                if (ws['user_location'] is Map) {
-                  entry['user_location'] = (ws['user_location'] as Map)
-                      .cast<String, dynamic>();
-                }
-                if (usePreview && ws['search_context_size'] is String) {
-                  entry['search_context_size'] = ws['search_context_size'];
-                }
-                toolsList.add(entry);
-              }
-            }
-          }
-          body = {
-            'model': upstreamModelId,
-            'stream': false,
-            'input': [
-              {'role': 'user', 'content': safePrompt},
-            ],
-            if (toolsList.isNotEmpty)
-              'tools': _toResponsesToolsFormat(toolsList),
-            if (toolsList.isNotEmpty) 'tool_choice': 'auto',
-            if (isReasoning && effort != 'off')
-              'reasoning': {
-                'summary': 'auto',
-                if (effort != 'auto') 'effort': effort,
-              },
-          };
-        } else {
-          body = {
-            'model': upstreamModelId,
-            'stream': false,
-            'messages': [
-              {'role': 'user', 'content': safePrompt},
-            ],
-            if (isReasoning && effort != 'off' && effort != 'auto')
-              'reasoning_effort': effort,
-          };
-        }
-        _applyCompatibleBuiltInSearch(
-          body,
-          config: config,
-          modelId: modelId,
-          upstreamModelId: upstreamModelId,
-        );
-        _applyOpenRouterClaudePromptCaching(
-          body,
-          config: config,
-          upstreamModelId: upstreamModelId,
-        );
-        _applyCompatibleResponsesReasoning(
-          body,
-          config: config,
-          modelId: modelId,
-          upstreamModelId: upstreamModelId,
-          isReasoning: isReasoning,
-          thinkingBudget: thinkingBudget,
-        );
-        final headers = _customHeaders(
-          config,
-          modelId,
-          baseHeaders: <String, String>{
-            'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
-            'Content-Type': 'application/json',
-          },
-          assistantHeaders: extraHeaders,
-        );
-        final extra = _customBody(config, modelId, assistantBody: extraBody);
-        if (extra.isNotEmpty) body.addAll(extra);
-        // 面向兼容 chat-completions 的主机的供应商特定推理开关（非流式）
-        if (config.useResponseApi != true) {
-          _applyVendorReasoningKnobs(
-            body,
-            info: info,
-            isReasoning: isReasoning,
-            thinkingBudget: thinkingBudget,
-          );
-          if (info.isKimiThinkingModel) {
-            _normalizeMoonshotKimiChatBody(
-              body,
-              upstreamModelId: upstreamModelId,
-              isReasoning: isReasoning,
-              thinkingBudget: thinkingBudget,
-            );
-          }
-        }
-        // 确保 Responses 工具即使通过 overrides 提供也使用扁平化 schema
-        try {
-          if (config.useResponseApi == true && body['tools'] is List) {
-            final raw = (body['tools'] as List).cast<dynamic>();
-            body['tools'] = _toResponsesToolsFormat(
-              raw.map((e) => (e as Map).cast<String, dynamic>()).toList(),
-            );
-          }
-        } catch (_) {}
-        _sanitizeOpenAIGpt5SamplingParams(
-          body,
-          upstreamModelId,
-          fallbackEffort: effort,
-          isOpenRouter: info.isOpenRouter,
-        );
-        final resp = await client.post(
-          url,
-          headers: headers,
-          body: jsonEncode(body),
-        );
-        if (resp.statusCode < 200 || resp.statusCode >= 300) {
-          final responseText = _decodeUtf8Body(resp, allowMalformed: true);
-          throw HttpException('HTTP ${resp.statusCode}: $responseText');
-        }
-        final responseText = _decodeUtf8Body(resp);
-        final data = jsonDecode(responseText);
-        if (config.useResponseApi == true) {
-          // 当存在时优先使用 SDK 风格的便捷方式
-          final ot = data['output_text'];
-          if (ot is String && ot.isNotEmpty) return ot;
-          // 从 `output` 的消息块列表中聚合文本
-          final out = data['output'];
-          if (out is List) {
-            final buf = StringBuffer();
-            for (final item in out) {
-              if (item is! Map) continue;
-              final content = item['content'];
-              if (content is List) {
-                for (final c in content) {
-                  if (c is Map &&
-                      (c['type'] == 'output_text') &&
-                      (c['text'] is String)) {
-                    buf.write(c['text']);
-                  }
-                }
-              }
-            }
-            final s = buf.toString();
-            if (s.isNotEmpty) return s;
-          }
-          return '';
-        } else {
-          final choices = data['choices'] as List?;
-          if (choices != null && choices.isNotEmpty) {
-            final msg = choices.first['message'];
-            return (msg?['content'] ?? '').toString();
-          }
-          return '';
-        }
-      } else if (kind == ProviderKind.claude) {
-        final base = config.baseUrl.endsWith('/')
-            ? config.baseUrl.substring(0, config.baseUrl.length - 1)
-            : config.baseUrl;
-        final url = Uri.parse('$base/messages');
-        final effectiveInfo = _effectiveModelInfo(config, modelId);
-        final isReasoning = effectiveInfo.abilities.contains(
-          ModelAbility.reasoning,
-        );
-        final thinking = isReasoning
-            ? _claudeThinkingConfig(
-                upstreamModelId,
-                thinkingBudget,
-                config: config,
-              )
-            : null;
-        final outputConfig = isReasoning
-            ? _claudeOutputConfig(
-                upstreamModelId,
-                thinkingBudget,
-                config: config,
-              )
-            : null;
-        final body = <String, dynamic>{
-          'model': upstreamModelId,
-          'stream': false,
-          'max_tokens': 512,
-          'messages': [
-            {'role': 'user', 'content': safePrompt},
-          ],
-          if (thinking != null) 'thinking': thinking,
-          if (outputConfig != null) 'output_config': outputConfig,
-        };
-        final headers = _customHeaders(
-          config,
-          modelId,
-          baseHeaders: <String, String>{
-            'x-api-key': _apiKeyForRequest(config, modelId),
-            'anthropic-version': '2023-06-01',
-            'Content-Type': 'application/json',
-          },
-          assistantHeaders: extraHeaders,
-        );
-        final extra = _customBody(config, modelId, assistantBody: extraBody);
-        if (extra.isNotEmpty) body.addAll(extra);
-        final resp = await client.post(
-          url,
-          headers: headers,
-          body: jsonEncode(body),
-        );
-        if (resp.statusCode < 200 || resp.statusCode >= 300) {
-          final responseText = _decodeUtf8Body(resp, allowMalformed: true);
-          throw HttpException('HTTP ${resp.statusCode}: $responseText');
-        }
-        final responseText = _decodeUtf8Body(resp);
-        final data = jsonDecode(responseText);
-        final content = data['content'] as List?;
-        if (content != null && content.isNotEmpty) {
-          final buf = StringBuffer();
-          for (final item in content) {
-            if (item is! Map) continue;
-            if ((item['type'] ?? '').toString() != 'text') continue;
-            final text = item['text'];
-            if (text is String && text.isNotEmpty) {
-              buf.write(text);
-            }
-          }
-          return buf.toString();
-        }
-        return '';
-      } else {
-        // Google
-        // 检查 Vertex AI Claude 模型（前缀为 "claude-"）
-        if ((config.vertexAI == true) &&
-            modelId.toLowerCase().startsWith('claude-')) {
-          // 复用现有流式方法，但为非流式请求缓冲输出
-          final stream = _sendGoogleVertexClaudeStream(
-            client: client,
-            config: config,
-            modelId: modelId,
-            messages: [
-              {'role': 'user', 'content': prompt},
-            ],
-            extraHeaders: extraHeaders,
-            extraBody: extraBody,
-            thinkingBudget: thinkingBudget,
-            stream: false,
-          );
-          final chunk = await stream.last;
-          return chunk.content;
-        }
-
-        String url;
-        if (config.vertexAI == true &&
-            (config.location?.isNotEmpty == true) &&
-            (config.projectId?.isNotEmpty == true)) {
-          final loc = config.location!;
-          final proj = config.projectId!;
-          url =
-              'https://aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/google/models/$upstreamModelId:generateContent';
-        } else {
-          final base = config.baseUrl.endsWith('/')
-              ? config.baseUrl.substring(0, config.baseUrl.length - 1)
-              : config.baseUrl;
-          url = '$base/models/$upstreamModelId:generateContent';
-        }
-        final body = <String, dynamic>{
-          'contents': [
-            {
-              'role': 'user',
-              'parts': [
-                {'text': safePrompt},
-              ],
-            },
-          ],
-        };
-
-        // 注入 Gemini 内置工具，并按版本处理互斥关系。
-        // Gemini 2.x：code_execution 具有排他性（不能与其他工具共存）。
-        // Gemini 3：所有内置工具可以共存。
-        final builtIns = _builtInTools(config, modelId);
-        if (builtIns.isNotEmpty) {
-          final bool isGemini3 = upstreamModelId.toLowerCase().contains(
-            'gemini-3',
-          );
-          final toolsArr = _buildGeminiToolsArray(
-            builtIns: builtIns,
-            allowCoexistence: isGemini3,
-          );
-          if (toolsArr.isNotEmpty) {
-            body['tools'] = toolsArr;
-          }
-        }
-        final baseHeaders = <String, String>{
-          'Content-Type': 'application/json',
-        };
-        // 为非 Vertex 请求添加 API Key 请求头
-        if (!(config.vertexAI == true)) {
-          final apiKey = _apiKeyForRequest(config, modelId);
-          if (apiKey.isNotEmpty) {
-            baseHeaders['x-goog-api-key'] = apiKey;
-          }
-        }
-        // 通过服务账号 JSON 为 Vertex 添加 Bearer 令牌
-        if (config.vertexAI == true) {
-          final token = await _maybeVertexAccessToken(config);
-          if (token != null && token.isNotEmpty) {
-            baseHeaders['Authorization'] = 'Bearer $token';
-          }
-          final proj = (config.projectId ?? '').trim();
-          if (proj.isNotEmpty) baseHeaders['X-Goog-User-Project'] = proj;
-        }
-        final headers = _customHeaders(
-          config,
-          modelId,
-          baseHeaders: baseHeaders,
-          assistantHeaders: extraHeaders,
-        );
-        final extra = _customBody(config, modelId, assistantBody: extraBody);
-        if (extra.isNotEmpty) body.addAll(extra);
-        final resp = await client.post(
-          Uri.parse(url),
-          headers: headers,
-          body: jsonEncode(body),
-        );
-        if (resp.statusCode < 200 || resp.statusCode >= 300) {
-          final responseText = _decodeUtf8Body(resp, allowMalformed: true);
-          throw HttpException('HTTP ${resp.statusCode}: $responseText');
-        }
-        final responseText = _decodeUtf8Body(resp);
-        final data = jsonDecode(responseText);
-        final candidates = data['candidates'] as List?;
-        if (candidates != null && candidates.isNotEmpty) {
-          final parts = candidates.first['content']?['parts'] as List?;
-          if (parts != null && parts.isNotEmpty) {
-            return (parts.first['text'] ?? '').toString();
-          }
-        }
-        return '';
-      }
-    } finally {
-      client.close();
-    }
+    return result.text;
   }
 
   static List<Map<String, dynamic>> _sanitizeMessages(
@@ -1711,373 +608,6 @@ class ChatApiService {
     }
     return out ?? messages;
   }
-
-  static bool _isOff(int? budget) =>
-      (budget != null && budget != -1 && budget < 1024);
-  static String _effortForBudget(int? budget) {
-    if (budget == null || budget == -1) return 'auto';
-    if (_isOff(budget)) return 'off';
-    if (budget <= 2000) return 'low';
-    if (budget <= 20000) return 'medium';
-    return 'high';
-  }
-
-  static bool _isClaudeReasoningEnabled(int? budget) => budget != 0;
-
-  static bool _isDeepSeekClaudeCompatible(
-    String modelId, {
-    ProviderConfig? config,
-  }) {
-    final lowerModelId = modelId.trim().toLowerCase();
-    if (lowerModelId.contains('deepseek')) return true;
-    if (config == null) return false;
-    final baseUrl = config.baseUrl.trim().toLowerCase();
-    final providerId = config.id.trim().toLowerCase();
-    final providerName = config.name.trim().toLowerCase();
-    return baseUrl.contains('api.deepseek.com') ||
-        providerId.contains('deepseek') ||
-        providerName.contains('deepseek');
-  }
-
-  static bool _isClaude5AdaptiveThinkingModel(String modelId) {
-    return RegExp(
-      r'claude-(?:opus|sonnet)-5(?:$|[._:@/-])',
-      caseSensitive: false,
-    ).hasMatch(modelId.trim());
-  }
-
-  static bool _supportsClaudeAdaptiveThinking(String modelId) {
-    final lower = modelId.trim().toLowerCase();
-    if (!lower.contains('claude-')) return false;
-    if (lower.contains('fable') || lower.contains('mythos')) return true;
-    if (_isClaude5AdaptiveThinkingModel(lower)) return true;
-    final m = RegExp(
-      r'claude-(opus|sonnet)-(\d+)[-.](\d+)',
-      caseSensitive: false,
-    ).firstMatch(lower);
-    if (m != null) {
-      final major = int.tryParse(m.group(2) ?? '');
-      final minor = int.tryParse(m.group(3) ?? '');
-      if (major != null && minor != null) {
-        return major > 4 || (major == 4 && minor >= 6);
-      }
-    }
-    return lower.contains('4-6') || lower.contains('4.6');
-  }
-
-  static bool _isClaudeAdaptiveOnlyThinkingModel(String modelId) {
-    final lower = modelId.trim().toLowerCase();
-    if (!lower.contains('claude-')) return false;
-    if (lower.contains('fable') || lower.contains('mythos')) return true;
-    if (_isClaude5AdaptiveThinkingModel(lower)) return true;
-    final m = RegExp(
-      r'claude-(opus|sonnet)-(\d+)[-.](\d+)',
-      caseSensitive: false,
-    ).firstMatch(lower);
-    if (m == null) {
-      return lower.contains('4-7') ||
-          lower.contains('4.7') ||
-          lower.contains('4-8') ||
-          lower.contains('4.8');
-    }
-    final family = (m.group(1) ?? '').toLowerCase();
-    final major = int.tryParse(m.group(2) ?? '');
-    final minor = int.tryParse(m.group(3) ?? '');
-    if (major == null || minor == null) return false;
-    if (major > 4) return true;
-    if (major < 4) return false;
-    if (family == 'opus' && minor >= 7) return true;
-    return false;
-  }
-
-  static bool _isClaudeThinkingAlwaysOnModel(String modelId) {
-    final lower = modelId.trim().toLowerCase();
-    return lower.contains('claude-fable') || lower.contains('claude-mythos');
-  }
-
-  static String _claudeEffortForBudget(int? budget) {
-    if (budget == null || budget == -1) return 'auto';
-    if (_isOff(budget)) return 'off';
-    if (budget <= 2000) return 'low';
-    if (budget <= 20000) return 'medium';
-    if (budget <= 32000) return 'high';
-    if (budget <= 64000) return 'xhigh';
-    return 'max';
-  }
-
-  static String _normalizeClaudeEffort(String effort, String modelId) {
-    final normalizedEffort = effort.trim().toLowerCase();
-    if (normalizedEffort.isEmpty) return effort;
-    if (normalizedEffort == 'auto' || normalizedEffort == 'off') {
-      return normalizedEffort;
-    }
-
-    final lower = modelId.trim().toLowerCase();
-    final supportsXhigh =
-        _isClaude5AdaptiveThinkingModel(lower) ||
-        lower.contains('claude-opus-4-7') ||
-        lower.contains('claude-opus-4.7') ||
-        lower.contains('claude-opus-4-8') ||
-        lower.contains('claude-opus-4.8') ||
-        lower.contains('claude-fable') ||
-        lower.contains('claude-mythos');
-    final supportsMax =
-        supportsXhigh ||
-        lower.contains('claude-opus-4-6') ||
-        lower.contains('claude-opus-4.6') ||
-        lower.contains('claude-sonnet-4-6') ||
-        lower.contains('claude-sonnet-4.6') ||
-        lower.contains('mythos');
-
-    switch (normalizedEffort) {
-      case 'max':
-        if (supportsMax) return 'max';
-        return supportsXhigh ? 'xhigh' : 'high';
-      case 'xhigh':
-        if (supportsXhigh) return 'xhigh';
-        if (supportsMax) return 'max';
-        return 'high';
-      case 'high':
-      case 'medium':
-      case 'low':
-        return normalizedEffort;
-      default:
-        return normalizedEffort;
-    }
-  }
-
-  static Map<String, dynamic>? _claudeThinkingConfig(
-    String modelId,
-    int? budget, {
-    ProviderConfig? config,
-  }) {
-    if (_isClaudeThinkingAlwaysOnModel(modelId)) {
-      return <String, dynamic>{'type': 'adaptive', 'display': 'summarized'};
-    }
-    if (!_isClaudeReasoningEnabled(budget)) {
-      return <String, dynamic>{'type': 'disabled'};
-    }
-    if (_isDeepSeekClaudeCompatible(modelId, config: config)) {
-      return <String, dynamic>{'type': 'enabled'};
-    }
-    if (_supportsClaudeAdaptiveThinking(modelId)) {
-      return <String, dynamic>{'type': 'adaptive', 'display': 'summarized'};
-    }
-    if (budget != null && budget > 0) {
-      return <String, dynamic>{'type': 'enabled', 'budget_tokens': budget};
-    }
-    return <String, dynamic>{'type': 'disabled'};
-  }
-
-  static Map<String, dynamic>? _claudeOutputConfig(
-    String modelId,
-    int? budget, {
-    ProviderConfig? config,
-  }) {
-    if (_isClaudeThinkingAlwaysOnModel(modelId)) {
-      // 自适应思考无法关闭。省略 effort 会默认 high，
-      // 因此界面「关闭」必须发送最低合法档位。
-      var effort = _claudeEffortForBudget(budget);
-      if (effort == 'off') effort = 'low';
-      effort = _normalizeClaudeEffort(effort, modelId);
-      if (effort == 'auto') return null;
-      return <String, dynamic>{'effort': effort};
-    }
-    if (_isDeepSeekClaudeCompatible(modelId, config: config)) {
-      if (!_isClaudeReasoningEnabled(budget)) return null;
-      final effort = _claudeEffortForBudget(budget);
-      if (effort == 'auto' || effort == 'off') return null;
-      final mapped = switch (effort) {
-        'low' => 'low',
-        'xhigh' => 'xhigh',
-        'max' => 'max',
-        _ => 'high',
-      };
-      return <String, dynamic>{'effort': mapped};
-    }
-    if (!_supportsClaudeAdaptiveThinking(modelId) ||
-        !_isClaudeReasoningEnabled(budget)) {
-      return null;
-    }
-    final effort = _normalizeClaudeEffort(
-      _claudeEffortForBudget(budget),
-      modelId,
-    );
-    if (effort == 'auto' || effort == 'off') return null;
-    return <String, dynamic>{'effort': effort};
-  }
-
-  static bool _claudeShouldOmitSamplingParams(String modelId, int? budget) {
-    if (_isClaudeThinkingAlwaysOnModel(modelId)) return true;
-    final lower = modelId.trim().toLowerCase();
-    if (_isClaude5AdaptiveThinkingModel(lower) ||
-        lower.contains('claude-opus-4-8') ||
-        lower.contains('claude-opus-4.8')) {
-      return true;
-    }
-    return _isClaudeAdaptiveOnlyThinkingModel(modelId) &&
-        _isClaudeReasoningEnabled(budget);
-  }
-
-  static double? _claudeCompatibleTopP(
-    String modelId,
-    int? budget,
-    double? topP,
-  ) {
-    if (topP == null) return null;
-    if (_claudeShouldOmitSamplingParams(modelId, budget)) {
-      return null;
-    }
-    if (!_isClaudeReasoningEnabled(budget)) {
-      return topP;
-    }
-    if (topP < 0.95 || topP > 1.0) {
-      FlutterLogger.log(
-        '[ClaudeCompat] Omit top_p=$topP because thinking requires 0.95 <= top_p <= 1.0.',
-        tag: 'ChatApiService',
-      );
-      return null;
-    }
-    return topP;
-  }
-
-  // 清理 JSON Schema，以满足 Google Gemini API 的严格校验
-  // Google 要求数组类型必须包含 'items' 字段
-  static Map<String, dynamic> _cleanSchemaForGemini(
-    Map<String, dynamic> schema, {
-    bool stringEnumOnly = false,
-  }) {
-    return _cleanGeminiSchemaNode(schema, stringEnumOnly)
-        as Map<String, dynamic>;
-  }
-
-  static dynamic _cleanGeminiSchemaNode(dynamic node, bool stringEnumOnly) {
-    if (node is! Map) return node;
-    final result = Map<String, dynamic>.from(node);
-    final declaredType = (result['type'] ?? '').toString();
-    if (stringEnumOnly && result['enum'] is List) {
-      final values = result['enum'] as List;
-      final inferred = declaredType.isEmpty
-          ? _inferGeminiEnumType(values)
-          : null;
-      if (declaredType == 'string' || inferred == 'string') {
-        result['type'] = 'string';
-        result['enum'] = values
-            .map((value) => value?.toString() ?? '')
-            .toList();
-      } else if (declaredType.isNotEmpty || inferred != null) {
-        if (declaredType.isEmpty) result['type'] = inferred;
-        result.remove('enum');
-      } else {
-        final strings = values.whereType<String>().toList();
-        if (strings.isNotEmpty) {
-          result['type'] = 'string';
-          result['enum'] = strings;
-        } else {
-          result['type'] =
-              values
-                  .map(_geminiScalarType)
-                  .firstWhere((type) => type != null, orElse: () => null) ??
-              'string';
-          result.remove('enum');
-        }
-      }
-    }
-
-    Map<String, dynamic> props = const <String, dynamic>{};
-    if (result['properties'] is Map) {
-      props = Map<String, dynamic>.from(result['properties'] as Map);
-    } else if ((result['type'] ?? '').toString() == 'object') {
-      props = <String, dynamic>{};
-    }
-    if (props.isNotEmpty || result['type'] == 'object') {
-      props.updateAll(
-        (key, value) => _cleanGeminiSchemaNode(value, stringEnumOnly),
-      );
-
-      final req = result['required'];
-      if (req is List) {
-        for (final r in req) {
-          final name = r.toString();
-          if (!props.containsKey(name)) props[name] = {'type': 'string'};
-        }
-      }
-      result['properties'] = props;
-    }
-
-    if (result['items'] is Map) {
-      result['items'] = _cleanGeminiSchemaNode(result['items'], stringEnumOnly);
-    } else if ((result['type'] ?? '').toString() == 'array' &&
-        !result.containsKey('items')) {
-      result['items'] = {'type': 'string'};
-    }
-    return result;
-  }
-
-  static String? _geminiScalarType(dynamic value) {
-    if (value is String) return 'string';
-    if (value is bool) return 'boolean';
-    if (value is int) return 'integer';
-    if (value is num) return 'number';
-    return null;
-  }
-
-  static String? _inferGeminiEnumType(List<dynamic> values) {
-    if (values.isEmpty) return null;
-    String? type;
-    for (final value in values) {
-      final next = _geminiScalarType(value);
-      if (next == null) return null;
-      if (type == null) {
-        type = next;
-      } else if (type != next) {
-        if ((type == 'integer' && next == 'number') ||
-            (type == 'number' && next == 'integer')) {
-          type = 'number';
-        } else {
-          return null;
-        }
-      }
-    }
-    return type;
-  }
-}
-
-class _ImageRef {
-  final String kind; // 'data' | 'path' | 'url'
-  final String src;
-  final String? mime;
-  const _ImageRef(this.kind, this.src, {this.mime});
-}
-
-class _ParsedTextAndImages {
-  final String text;
-  final List<_ImageRef> images;
-  const _ParsedTextAndImages(this.text, this.images);
-}
-
-class _GeminiSignatureMeta {
-  final String cleanedText;
-  final String? textKey;
-  final dynamic textValue;
-  final List<Map<String, dynamic>> images;
-  const _GeminiSignatureMeta({
-    required this.cleanedText,
-    this.textKey,
-    this.textValue,
-    this.images = const <Map<String, dynamic>>[],
-  });
-
-  bool get hasText => (textKey ?? '').isNotEmpty && textValue != null;
-  bool get hasImages => images.isNotEmpty;
-  bool get hasAny => hasText || hasImages;
-}
-
-class _ResponsesImageGenerationResult {
-  final String base64;
-  final String? outputFormat;
-
-  const _ResponsesImageGenerationResult({this.base64 = '', this.outputFormat});
 }
 
 class ChatStreamChunk {

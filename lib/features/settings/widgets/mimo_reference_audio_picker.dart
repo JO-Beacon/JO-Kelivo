@@ -21,7 +21,7 @@ Future<String?> pickMimoReferenceAudioDataUri() async {
     throw const FormatException('The selected reference audio is empty.');
   }
   if (bytes.lengthInBytes > 10 * 1024 * 1024) {
-    throw const FormatException('Reference audio must not exceed 10 MB.');
+    throw const FormatException('Reference audio must not exceed 10 MiB.');
   }
 
   final name = file.name.toLowerCase();

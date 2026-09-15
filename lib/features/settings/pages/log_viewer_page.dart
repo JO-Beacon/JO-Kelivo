@@ -13,6 +13,7 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_switch.dart';
+import '../../../shared/utils/format_bytes.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/app_directories.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -133,16 +134,6 @@ class _LogViewerPageState extends State<LogViewerPage>
     }
   }
 
-  String _formatFileSize(int bytes) {
-    if (bytes < 1024) {
-      return '$bytes B';
-    }
-    if (bytes < 1024 * 1024) {
-      return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    }
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-  }
-
   String _formatDate(DateTime dt) {
     return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} '
         '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
@@ -218,7 +209,7 @@ class _LogViewerPageState extends State<LogViewerPage>
                         activeFileName: _activeContextLog,
                         emptyIcon: Lucide.MessagesSquare,
                         emptyText: l10n.logViewerEmpty,
-                        formatFileSize: _formatFileSize,
+                        formatFileSize: formatBytes,
                         formatDate: _formatDate,
                         onOpenFile: (file, title) {
                           Navigator.of(context).push(
@@ -234,7 +225,7 @@ class _LogViewerPageState extends State<LogViewerPage>
                         activeFileName: _activeRequestLog,
                         emptyIcon: Lucide.Globe,
                         emptyText: l10n.logViewerEmpty,
-                        formatFileSize: _formatFileSize,
+                        formatFileSize: formatBytes,
                         formatDate: _formatDate,
                         onOpenFile: (file, title) {
                           Navigator.of(context).push(
@@ -250,7 +241,7 @@ class _LogViewerPageState extends State<LogViewerPage>
                         activeFileName: _activeAppLog,
                         emptyIcon: Lucide.Terminal,
                         emptyText: l10n.logViewerEmpty,
-                        formatFileSize: _formatFileSize,
+                        formatFileSize: formatBytes,
                         formatDate: _formatDate,
                         onOpenFile: (file, title) {
                           Navigator.of(context).push(
@@ -2755,7 +2746,7 @@ class _AttachmentChips extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  '${a.mime} · ${_fmtBytes(a.byteLength)} · '
+                  '${a.mime} · ${formatBytes(a.byteLength)} · '
                   '${l10n.logViewerPayloadOmitted}',
                   style: TextStyle(
                     fontSize: 11.5,
@@ -2768,12 +2759,6 @@ class _AttachmentChips extends StatelessWidget {
       ],
     );
   }
-}
-
-String _fmtBytes(int bytes) {
-  if (bytes < 1024) return '$bytes B';
-  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
 }
 
 class _Kv {
@@ -3147,10 +3132,10 @@ class _LogSettingsSheet extends StatelessWidget {
               subtitle: l10n.logSettingsMaxSizeSubtitle,
               value: settings.logMaxSizeMB == 0
                   ? l10n.logSettingsMaxSizeUnlimited
-                  : '${settings.logMaxSizeMB} MB',
+                  : '${settings.logMaxSizeMB} MiB',
               options: _maxSizeOptions
                   .map(
-                    (s) => s == 0 ? l10n.logSettingsMaxSizeUnlimited : '$s MB',
+                    (s) => s == 0 ? l10n.logSettingsMaxSizeUnlimited : '$s MiB',
                   )
                   .toList(),
               selectedIndex: _maxSizeOptions

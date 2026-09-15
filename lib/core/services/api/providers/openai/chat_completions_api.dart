@@ -18,6 +18,7 @@ import '../../stream/stream_chunk_ids.dart';
 import 'chat_completions_decoder.dart';
 import 'openai_tool_transcript.dart';
 import 'openai_vendor_compat.dart';
+import 'reasoning_details_replay.dart';
 
 Map<String, dynamic> copyChatCompletionMessage(Map<String, dynamic> m) {
   final role = (m['role'] ?? 'user').toString();
@@ -36,13 +37,10 @@ Map<String, dynamic> copyChatCompletionMessage(Map<String, dynamic> m) {
   if (role == 'assistant') {
     final toolCalls = m['tool_calls'];
     if (toolCalls is List && toolCalls.isNotEmpty) {
-      out['tool_calls'] = toolCalls.whereType<Map>().map((toolCall) {
-        final copy = toolCall.map(
-          (key, value) => MapEntry(key.toString(), value),
-        );
-        copy.remove('metadata');
-        return copy;
-      }).toList();
+      out['tool_calls'] = [
+        for (final toolCall in toolCalls.whereType<Map>())
+          openaiToolCallForRequest(toolCall),
+      ];
     }
     final functionCall = m['function_call'];
     if (functionCall != null) {
@@ -185,7 +183,14 @@ List<EmitToolCall> openaiCallsFromCompletionMessage(Map<String, dynamic>? msg) {
     } catch (_) {
       args = <String, dynamic>{};
     }
-    calls.add(emitToolCall(id: id, name: name, arguments: args));
+    calls.add(
+      emitToolCall(
+        id: id,
+        name: name,
+        arguments: args,
+        metadata: openaiMetadataForExtraContent(t['extra_content']),
+      ),
+    );
   }
   return calls;
 }
@@ -242,7 +247,9 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
   required bool allowRemoteImages,
   required ReasoningContentReplayPolicy reasoningContentReplayPolicy,
   bool stripReasoningContent = false,
+  bool normalizeReasoningDetails = false,
   bool skipImageParsing = false,
+  bool supportsGoogleOpenAIThoughtSignatures = false,
 }) async {
   final out = <Map<String, dynamic>>[];
   // Assistant turns cannot carry image_url/video_url; stash for the last user
@@ -290,9 +297,23 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
     outMsg.remove(multimodalInternalDocumentPathsKey);
     outMsg.remove(multimodalInternalClaudeContainerKey);
     outMsg.remove(multimodalInternalClaudeTurnKey);
+    // JO 内部的 metadata（工具调用附加信息）不得发给服务端。
+    outMsg.remove('metadata');
     outMsg['role'] = role;
 
     if (isAssistant) {
+      // 工具调用回放：剥掉 JO 内部字段，并按需带回 Google 的 extra_content
+      // （思考签名）。丢了它，多轮工具对话会被服务端拒绝。
+      final toolCalls = outMsg['tool_calls'];
+      if (toolCalls is List && toolCalls.isNotEmpty) {
+        outMsg['tool_calls'] = [
+          for (final toolCall in toolCalls.whereType<Map>())
+            openaiToolCallForRequest(
+              toolCall,
+              includeGoogleExtraContent: supportsGoogleOpenAIThoughtSignatures,
+            ),
+        ];
+      }
       final keepReasoningContent =
           !stripReasoningContent &&
           (reasoningContentReplayPolicy == ReasoningContentReplayPolicy.all ||
@@ -302,6 +323,19 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
       if (!keepReasoningContent) {
         outMsg.remove('reasoning_content');
         outMsg.remove('reasoning');
+      }
+      // Only Anthropic upstreams need the streamed fragments rebuilt into
+      // whole blocks; other vendors document replaying the sequence verbatim.
+      final rawDetails = outMsg['reasoning_details'];
+      if (rawDetails != null &&
+          (normalizeReasoningDetails ||
+              reasoningDetailsLookAnthropic(rawDetails))) {
+        final details = normalizeReasoningDetailsForReplay(rawDetails);
+        if (details == null) {
+          outMsg.remove('reasoning_details');
+        } else {
+          outMsg['reasoning_details'] = details;
+        }
       }
     }
 
@@ -763,7 +797,10 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
           allowRemoteImages: allowRemoteImages,
           reasoningContentReplayPolicy: info.reasoningContentReplayPolicy,
           stripReasoningContent: isClaudeUpstream,
+          normalizeReasoningDetails: isClaudeUpstream,
           skipImageParsing: skipImageParsing,
+          supportsGoogleOpenAIThoughtSignatures:
+              info.supportsGoogleOpenAIThoughtSignatures,
         ),
         'stream': true,
         if (temperature != null) 'temperature': temperature,
@@ -956,7 +993,10 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
         allowRemoteImages: allowRemoteImages,
         reasoningContentReplayPolicy: info.reasoningContentReplayPolicy,
         stripReasoningContent: isClaudeUpstream,
+        normalizeReasoningDetails: isClaudeUpstream,
         skipImageParsing: skipImageParsing,
+        supportsGoogleOpenAIThoughtSignatures:
+            info.supportsGoogleOpenAIThoughtSignatures,
       );
       reqBody.remove('stream');
       req.body = jsonEncode(reqBody);

@@ -14,8 +14,7 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
     this.allowReasoningSnapshots = true,
     this.initialUsage,
     String sourceId = 'stream',
-  }) : usage = initialUsage,
-       _ids = StreamChunkIds(sourceId);
+  }) : _ids = StreamChunkIds(sourceId);
 
   final bool wantsImageOutput;
   final bool needsReasoningEcho;
@@ -23,12 +22,19 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
   final TokenUsage? initialUsage;
   final StreamChunkIds _ids;
 
-  TokenUsage? usage;
+  TokenUsage? _round;
+
+  TokenUsage? get usage {
+    if (_round == null) return initialUsage;
+    return (initialUsage ?? const TokenUsage()).merge(_round!);
+  }
+
   String? finishReason;
   int approxCompletionChars = 0;
   String reasoningEcho = '';
   String assistantContent = '';
-  final Map<int, Map<String, String>> toolCalls = <int, Map<String, String>>{};
+  final Map<int, Map<String, dynamic>> toolCalls =
+      <int, Map<String, dynamic>>{};
 
   final List<dynamic> _details = <dynamic>[];
   final Map<int, String> _toolIdsByIndex = <int, String>{};
@@ -165,15 +171,24 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
         if (name.isEmpty) continue;
         final idx = toolCalls.length;
         final eventId = _toolSeriesId(idx, vendorId: id);
+        final extraContent = _extraContentOf(t);
         final entry = toolCalls.putIfAbsent(
           idx,
-          () => <String, String>{'id': '', 'name': '', 'args': ''},
+          () => <String, dynamic>{'id': '', 'name': '', 'args': ''},
         );
-        entry['id'] = id.isNotEmpty ? id : eventId;
+        _assignToolIds(entry, eventId: eventId, vendorId: id);
         entry['name'] = name;
         entry['args'] = argsStr;
+        if (extraContent != null) {
+          entry['extra_content'] = extraContent;
+        }
         chunks.addAll(
-          _emitCompleteToolCall(eventId, name: name, args: argsStr),
+          _emitCompleteToolCall(
+            eventId,
+            name: name,
+            args: argsStr,
+            metadata: _metadataForExtraContent(extraContent),
+          ),
         );
       }
       if (rootToolCalls.isNotEmpty) {
@@ -182,7 +197,7 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
     }
 
     if (obj.containsKey('usage')) {
-      usage = _mergeUsage(usage, obj['usage']);
+      _round = _mergeUsage(_round, obj['usage']);
     }
 
     final citations = obj['citations'];
@@ -230,33 +245,47 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
       final name = rawName is String ? rawName : null;
       final rawArgs = func is Map ? func['arguments'] : null;
       final argsDelta = rawArgs is String ? rawArgs : null;
+      final extraContent = _extraContentOf(t);
       if (vendorId.isEmpty &&
           (name == null || name.isEmpty) &&
-          (argsDelta == null || argsDelta.isEmpty)) {
+          (argsDelta == null || argsDelta.isEmpty) &&
+          extraContent == null) {
         continue;
       }
       final firstSeen = !toolCalls.containsKey(idx);
       final entry = toolCalls.putIfAbsent(
         idx,
-        () => <String, String>{'id': '', 'name': '', 'args': ''},
+        () => <String, dynamic>{'id': '', 'name': '', 'args': ''},
       );
       final eventId = _toolSeriesId(idx, vendorId: vendorId);
-      if (vendorId.isNotEmpty) {
-        entry['id'] = vendorId;
-      } else if ((entry['id'] ?? '').isEmpty) {
-        entry['id'] = eventId;
-      }
-      final hadName = (entry['name'] ?? '').isNotEmpty;
+      _assignToolIds(entry, eventId: eventId, vendorId: vendorId);
+      final hadName = (entry['name'] ?? '').toString().isNotEmpty;
       if (name != null && name.isNotEmpty) entry['name'] = name;
       if (argsDelta != null && argsDelta.isNotEmpty) {
-        entry['args'] = (entry['args'] ?? '') + argsDelta;
+        entry['args'] = '${entry['args'] ?? ''}$argsDelta';
       }
+      // 首个带签名的块负责把 extra_content 记下来，并随工具调用事件发出。
+      final firstExtra = extraContent != null && entry['extra_content'] == null;
+      if (firstExtra) {
+        entry['extra_content'] = extraContent;
+      }
+      final metadata = firstExtra
+          ? _metadataForExtraContent(extraContent)
+          : null;
       if (_openToolIds.add(eventId) && !_endedToolIds.contains(eventId)) {
         chunks.add(
-          ToolCallStart(id: eventId, toolName: entry['name'] ?? name ?? ''),
+          ToolCallStart(
+            id: eventId,
+            toolName: (entry['name'] ?? name ?? '').toString(),
+            metadata: metadata,
+          ),
         );
       } else if (!firstSeen && !hadName && name != null && name.isNotEmpty) {
-        chunks.add(ToolCallDelta(id: eventId, toolNameDelta: name));
+        chunks.add(
+          ToolCallDelta(id: eventId, toolNameDelta: name, metadata: metadata),
+        );
+      } else if (metadata != null) {
+        chunks.add(ToolCallDelta(id: eventId, metadata: metadata));
       }
       if (argsDelta != null && argsDelta.isNotEmpty) {
         chunks.add(ToolCallDelta(id: eventId, inputDelta: argsDelta));
@@ -290,14 +319,25 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
       final argsStr = (func['arguments'] ?? '').toString();
       if (name.isEmpty) continue;
       final eventId = _toolSeriesId(idx, vendorId: id);
+      final extraContent = _extraContentOf(t);
       final entry = toolCalls.putIfAbsent(
         idx,
-        () => <String, String>{'id': '', 'name': '', 'args': ''},
+        () => <String, dynamic>{'id': '', 'name': '', 'args': ''},
       );
-      entry['id'] = id.isNotEmpty ? id : eventId;
+      _assignToolIds(entry, eventId: eventId, vendorId: id);
       entry['name'] = name;
       entry['args'] = argsStr;
-      chunks.addAll(_emitCompleteToolCall(eventId, name: name, args: argsStr));
+      if (extraContent != null) {
+        entry['extra_content'] = extraContent;
+      }
+      chunks.addAll(
+        _emitCompleteToolCall(
+          eventId,
+          name: name,
+          args: argsStr,
+          metadata: _metadataForExtraContent(extraContent),
+        ),
+      );
     }
     if (raw.isNotEmpty) {
       finishReason ??= 'tool_calls';
@@ -312,15 +352,38 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
     return id;
   }
 
+  /// 把首见的流内 id 记进 [series_id]，供应商 id 记进 [id]。
+  ///
+  /// OpenAI 兼容流可能在供应商的 `call_*` id 到达之前先发工具片段。界面分片
+  /// 用的是首见的 series id，处理方必须用同一个 id，审批匹配才不会错位；
+  /// 供应商 id 照旧存下来供 API 回放使用。
+  void _assignToolIds(
+    Map<String, dynamic> entry, {
+    required String eventId,
+    required String vendorId,
+  }) {
+    if ((entry['series_id'] ?? '').toString().isEmpty) {
+      entry['series_id'] = eventId;
+    }
+    if (vendorId.isNotEmpty) {
+      entry['id'] = vendorId;
+    } else if ((entry['id'] ?? '').toString().isEmpty) {
+      entry['id'] = eventId;
+    }
+  }
+
   List<StreamChunk> _emitCompleteToolCall(
     String id, {
     required String name,
     required String args,
+    Map<String, dynamic>? metadata,
   }) {
     if (_endedToolIds.contains(id)) return const <StreamChunk>[];
     final chunks = <StreamChunk>[];
     if (_openToolIds.add(id)) {
-      chunks.add(ToolCallStart(id: id, toolName: name));
+      chunks.add(ToolCallStart(id: id, toolName: name, metadata: metadata));
+    } else if (metadata != null && metadata.isNotEmpty) {
+      chunks.add(ToolCallDelta(id: id, metadata: metadata));
     }
     if (args.isNotEmpty) {
       chunks.add(ToolCallDelta(id: id, inputDelta: args));
@@ -395,23 +458,6 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
   }
 }
 
-int? _resolveToolCallIndex(Map toolCall, {required int fallback}) {
-  final value = toolCall['index'];
-  if (!toolCall.containsKey('index') || value == null) return fallback;
-
-  int? parsed;
-  if (value is int) {
-    parsed = value;
-  } else if (value is num &&
-      value.isFinite &&
-      value == value.truncateToDouble()) {
-    parsed = value.toInt();
-  } else if (value is String) {
-    parsed = int.tryParse(value);
-  }
-  return parsed != null && parsed >= 0 ? parsed : null;
-}
-
 String _extractDeltaText(Map? delta) {
   if (delta == null) return '';
   final deltaType = (delta['type'] ?? '').toString();
@@ -438,7 +484,8 @@ String _messageText(dynamic mc) {
     final sb = StringBuffer();
     for (final it in mc) {
       if (it is! Map) continue;
-      final t = (it['text'] ?? '') as String? ?? '';
+      final rawText = it['text'];
+      final t = rawText is String ? rawText : '';
       if (t.isNotEmpty && (it['type'] == null || it['type'] == 'text')) {
         sb.write(t);
       }
@@ -446,6 +493,23 @@ String _messageText(dynamic mc) {
     return sb.toString();
   }
   return (mc ?? '').toString();
+}
+
+int? _resolveToolCallIndex(Map toolCall, {required int fallback}) {
+  final value = toolCall['index'];
+  if (!toolCall.containsKey('index') || value == null) return fallback;
+
+  int? parsed;
+  if (value is int) {
+    parsed = value;
+  } else if (value is num &&
+      value.isFinite &&
+      value == value.truncateToDouble()) {
+    parsed = value.toInt();
+  } else if (value is String) {
+    parsed = int.tryParse(value);
+  }
+  return parsed != null && parsed >= 0 ? parsed : null;
 }
 
 List<dynamic> _imageItems(Map delta) {
@@ -492,4 +556,19 @@ int _readInt(dynamic value) {
   if (value is num) return value.toInt();
   if (value is String) return int.tryParse(value) ?? 0;
   return 0;
+}
+
+/// 取出工具调用上的 `extra_content`（Google 经 OpenAI 兼容端点回传的
+/// 思考签名就挂在这里），空值返回 null。
+Map<String, dynamic>? _extraContentOf(Map toolCall) {
+  final extra = toolCall['extra_content'];
+  if (extra is! Map || extra.isEmpty) return null;
+  return extra.map((key, value) => MapEntry(key.toString(), value));
+}
+
+Map<String, dynamic>? _metadataForExtraContent(Map<String, dynamic>? extra) {
+  if (extra == null) return null;
+  return <String, dynamic>{
+    'google': <String, dynamic>{'extra_content': extra},
+  };
 }

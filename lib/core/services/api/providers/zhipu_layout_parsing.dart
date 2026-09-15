@@ -1,10 +1,22 @@
-part of '../chat_api_service.dart';
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:http/http.dart' as http;
+
+import '../../../models/token_usage.dart';
+import '../../../providers/settings_provider.dart';
+import '../chat_api_helpers.dart';
+import '../stream/stream_chunk.dart';
+import '../stream/stream_chunk_emit.dart';
+import '../stream/stream_chunk_ids.dart';
 
 const String officialGlmOcrModelId = 'glm-ocr';
 
+/// Official GLM-OCR uses `/layout_parsing` with `{model, file}`, not Chat Completions.
 bool shouldUseZhipuLayoutParsing(ProviderConfig config, String modelId) {
   return isOfficialZhipuHost(config) &&
-      isOfficialGlmOcrModel(_apiModelId(config, modelId));
+      isOfficialGlmOcrModel(apiModelId(config, modelId));
 }
 
 bool isOfficialZhipuHost(ProviderConfig config) {
@@ -16,7 +28,7 @@ bool isOfficialGlmOcrModel(String modelId) {
   return modelId.trim().toLowerCase() == officialGlmOcrModelId;
 }
 
-Stream<ChatStreamChunk> sendZhipuLayoutParsingStream(
+Stream<StreamChunk> sendZhipuLayoutParsingStream(
   http.Client client,
   ProviderConfig config,
   String modelId,
@@ -28,70 +40,22 @@ Stream<ChatStreamChunk> sendZhipuLayoutParsingStream(
     messages: messages,
     userImagePaths: userImagePaths,
   );
+  final body = <String, dynamic>{'model': officialGlmOcrModelId, 'file': file};
   final response = await client.post(
     _layoutParsingUrl(config),
-    headers: _customHeaders(
+    headers: customHeaders(
       config,
       modelId,
       baseHeaders: <String, String>{
-        'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
+        'Authorization': 'Bearer ${apiKeyForRequest(config, modelId)}',
         'Content-Type': 'application/json',
       },
       assistantHeaders: extraHeaders,
     ),
-    body: jsonEncode(<String, dynamic>{
-      'model': officialGlmOcrModelId,
-      'file': file,
-    }),
+    body: jsonEncode(body),
   );
   final decoded = _decodeLayoutParsingResponse(response);
-  final text = _mdResultsFromResponse(decoded);
-  final usage = _usageFromResponse(decoded);
-  yield ChatStreamChunk(
-    content: text,
-    isDone: false,
-    totalTokens: usage?.totalTokens ?? 0,
-    usage: usage,
-  );
-  yield ChatStreamChunk(
-    content: '',
-    isDone: true,
-    totalTokens: usage?.totalTokens ?? 0,
-    usage: usage,
-  );
-}
-
-/// 智谱布局解析的事件化入口；该接口是一次性 JSON 响应，不使用 SSE。
-Stream<StreamChunk> sendZhipuLayoutParsingEvents(
-  http.Client client,
-  ProviderConfig config,
-  String modelId,
-  List<Map<String, dynamic>> messages, {
-  List<String>? userImagePaths,
-  Map<String, String>? extraHeaders,
-}) async* {
-  final file = await _resolveLayoutParsingFile(
-    messages: messages,
-    userImagePaths: userImagePaths,
-  );
-  final response = await client.post(
-    _layoutParsingUrl(config),
-    headers: _customHeaders(
-      config,
-      modelId,
-      baseHeaders: <String, String>{
-        'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
-        'Content-Type': 'application/json',
-      },
-      assistantHeaders: extraHeaders,
-    ),
-    body: jsonEncode(<String, dynamic>{
-      'model': officialGlmOcrModelId,
-      'file': file,
-    }),
-  );
-  final decoded = _decodeLayoutParsingResponse(response);
-  final ids = StreamChunkIds('layout');
+  final ids = StreamChunkIds('finish');
   yield* emitText(_mdResultsFromResponse(decoded), ids: ids);
   final usage = _usageFromResponse(decoded);
   yield* emitFinish(
@@ -160,7 +124,7 @@ Future<String?> _encodeLayoutParsingFile(String source) async {
       trimmed.startsWith('data:')) {
     return trimmed;
   }
-  return _tryEncodeBase64DataUrl(trimmed);
+  return tryEncodeBase64DataUrl(trimmed);
 }
 
 Map<String, dynamic> _decodeLayoutParsingResponse(http.Response response) {

@@ -1032,7 +1032,11 @@ class MessageBuilderService {
           now: now,
         );
         if (assistant?.appendCurrentTimeToUserMessage == true) {
-          content = '$content\n\n${MemoryPrompts.formatCurrentTimeTag(now)}';
+          final timeTag = MemoryPrompts.formatCurrentTimeTag(
+            now,
+            useIso8601: assistant!.useIso8601TimeFormat,
+          );
+          content = '$content\n\n$timeTag';
         }
         apiMessages[i]['content'] = content;
       }
@@ -1234,9 +1238,14 @@ class MessageBuilderService {
       message: processedUserBody,
       now: message.timestamp,
     );
-    final timeSuffix = (assistant?.appendCurrentTimeToUserMessage ?? false)
-        ? '\n\n${MemoryPrompts.formatCurrentTimeTag(message.timestamp)}'
-        : '';
+    var timeSuffix = '';
+    if (assistant?.appendCurrentTimeToUserMessage == true) {
+      final timeTag = MemoryPrompts.formatCurrentTimeTag(
+        message.timestamp,
+        useIso8601: assistant!.useIso8601TimeFormat,
+      );
+      timeSuffix = '\n\n$timeTag';
+    }
     final finalContent = '${memory.prefix}$templated$timeSuffix';
 
     if (ContextLogger.enabled) {

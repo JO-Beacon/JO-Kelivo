@@ -151,13 +151,26 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
     return _closeOpenSeries();
   }
 
+  /// 单个 `message` 输出项的文本序列 id。
+  ///
+  /// 内置搜索这类宿主工具会把一次响应拆成多个 `message` 输出项。粘性 id 会
+  /// 把它们全部并入第一个 [TextPart]，于是工具卡片落到整段回答之后，而不是
+  /// 它实际打断文本的位置。以 `output_index` 作为键，可让每个输出项各成一段，
+  /// 且各段保持到达顺序。
+  String _textSeriesId(Map<String, dynamic> obj) =>
+      _ids.indexed('text', _readInt(obj['output_index']));
+
+  /// 单个 `reasoning` 输出项的推理序列 id。说明见 [_textSeriesId]。
+  String _reasoningSeriesId(Map<String, dynamic> obj) =>
+      _ids.indexed('reasoning', _readInt(obj['output_index']));
+
   void _parseEvent(Map<String, dynamic> obj, List<StreamChunk> chunks) {
     final type = obj['type'];
     if (type == 'response.output_text.delta') {
       final delta = obj['delta'];
       if (delta is String && delta.isNotEmpty) {
         approxCompletionChars += delta.length;
-        chunks.add(TextDelta(id: _ids.text(), text: delta));
+        chunks.add(TextDelta(id: _textSeriesId(obj), text: delta));
       }
       return;
     }
@@ -165,7 +178,7 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
         type == 'response.reasoning_text.delta') {
       final delta = obj['delta'];
       if (delta is String && delta.isNotEmpty) {
-        chunks.add(ReasoningDelta(id: _ids.reasoning(), text: delta));
+        chunks.add(ReasoningDelta(id: _reasoningSeriesId(obj), text: delta));
       }
       return;
     }

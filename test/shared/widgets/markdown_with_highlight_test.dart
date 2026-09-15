@@ -1,5 +1,6 @@
 import "../../support/business_test_harness.dart";
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:Kelivo/core/database/business_preferences.dart';
@@ -382,6 +383,133 @@ Widget _settingsHarness({
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('source hints follow late syntax and rewritten image prefixes', (
+    tester,
+  ) async {
+    final directory = Directory.systemTemp.createTempSync('markdown-stream-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final file = File('${directory.path}/a b.png');
+    file.writeAsBytesSync(_transparentPngBytes);
+    final source = ValueNotifier('Paragraph **bold**');
+    addTearDown(source.dispose);
+    await tester.pumpWidget(_streamingMarkdownHarness(source, width: 360));
+    await tester.pumpAndSettle();
+    source.value += '\r\n\r\nNext ![alt](${file.path}';
+    await tester.pumpAndSettle();
+    source.value += ')';
+    await tester.pumpAndSettle();
+    final markdown = tester
+        .widgetList<GptMarkdown>(find.byType(GptMarkdown))
+        .map((widget) => widget.data)
+        .join('\n\n');
+    expect(markdown, isNot(contains('\r')));
+    expect(markdown, contains('![alt](${Uri.file(file.path)})'));
+    expect(find.byType(Image), findsOneWidget);
+    source.value += '\n\n<details><summary>更多</summary>隐藏</details>';
+    await tester.pumpAndSettle();
+    expect(find.text('更多'), findsOneWidget);
+    source.value = 'Replacement **bold**';
+    await tester.pumpAndSettle();
+    expect(find.byType(Image), findsNothing);
+    expect(find.text('更多'), findsNothing);
+    expect(
+      _paragraphContaining('Replacement').text.toPlainText(),
+      'Replacement bold',
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('root fence parsing preserves the renderer whitespace contract', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_markdownHarness('```text\n', streaming: true));
+    expect(find.byType(SelectableHighlightView), findsNothing);
+    await tester.pumpWidget(
+      _markdownHarness('```text\nx \n\n', streaming: true),
+    );
+    expect(
+      tester
+          .widget<SelectableHighlightView>(find.byType(SelectableHighlightView))
+          .source,
+      'x',
+    );
+    await tester.pumpWidget(
+      _markdownHarness('```text\nx \n\n```', streaming: true),
+    );
+    expect(
+      tester
+          .widget<SelectableHighlightView>(find.byType(SelectableHighlightView))
+          .source,
+      'x ',
+    );
+  });
+
+  for (final language in ['SVG', 'xml']) {
+    for (final streaming in [false, true]) {
+      testWidgets(
+        '$language displays an inline image and switches to source ($streaming)',
+        (tester) async {
+          MermaidImageCache.clear();
+          addTearDown(MermaidImageCache.clear);
+          addTearDown(() => debugMermaidBitmapRenderOverride = null);
+          const source = '<svg viewBox="0 0 20 20"><circle r="5" /></svg>';
+          String? rendered;
+          debugMermaidBitmapRenderOverride = (code, dark, vars) async {
+            rendered = code;
+            return MermaidBitmapRenderResult.success(
+              Uint8List.fromList(_transparentPngBytes),
+            );
+          };
+          await tester.pumpWidget(
+            _markdownHarness(
+              '```$language\n$source\n```',
+              width: 320,
+              streaming: streaming,
+            ),
+          );
+          await tester.pump(const Duration(milliseconds: 400));
+          await tester.pumpAndSettle();
+          final context = tester.element(
+            find.byType(MarkdownWithCodeHighlight),
+          );
+          final l10n = AppLocalizations.of(context)!;
+          expect(rendered?.trim(), source);
+          expect(find.byType(Image), findsOneWidget);
+          expect(find.byTooltip(l10n.codeBlockPreviewButton), findsNothing);
+          await tester.tap(find.text(l10n.mermaidCodeTab));
+          await tester.pumpAndSettle();
+          final code = tester.widget<SelectableHighlightView>(
+            find.byType(SelectableHighlightView),
+          );
+          expect(code.source.trim(), source);
+          expect(code.language, 'xml');
+          await tester.tap(find.text(l10n.mermaidImageTab));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byType(Image));
+          await tester.pumpAndSettle();
+          expect(find.byType(ImageViewerPage), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  testWidgets('ordinary XML keeps its source without a graphical preview', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _markdownHarness('```xml\n<config><name>Kelivo</name></config>\n```'),
+    );
+    await tester.pump();
+    expect(find.byType(SelectableHighlightView), findsOneWidget);
+    expect(find.byType(Image), findsNothing);
+    final context = tester.element(find.byType(MarkdownWithCodeHighlight));
+    expect(
+      find.byTooltip(AppLocalizations.of(context)!.codeBlockPreviewButton),
+      findsNothing,
+    );
+  });
 
   test('markdown table CSV export escapes boundary cell values', () {
     final csv = markdownTableRowsToCsvForTesting([
@@ -4121,9 +4249,9 @@ void main() {
 
       expect(
         find.byWidgetPredicate(
-          (widget) => widget.runtimeType.toString() == '_MarkdownBlockColumn',
+          (widget) => widget.runtimeType.toString() == 'MarkdownBlockList',
         ),
-        findsOneWidget,
+        findsWidgets,
       );
       expect(
         find.byWidgetPredicate(

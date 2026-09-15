@@ -198,7 +198,6 @@ void main() {
       expect(find.text('Native Backup'), findsOneWidget);
       expect(find.text('Kelivo-Compatible Backup'), findsOneWidget);
       expect(find.text('Kelivo'), findsOneWidget);
-      expect(find.text('Cuplivo'), findsOneWidget);
       expect(find.text('External Import'), findsOneWidget);
       expect(find.text('WebDAV Backup'), findsOneWidget);
       final s3Backup = find.text('S3 Backup');
@@ -247,8 +246,6 @@ void main() {
       for (final entry in const {
         'mobile-kelivo-export-action': false,
         'mobile-kelivo-import-action': true,
-        'mobile-cuplivo-export-action': false,
-        'mobile-cuplivo-import-action': false,
       }.entries) {
         final button = tester.widget<IosTileButton>(
           find.byKey(ValueKey<String>(entry.key)),
@@ -414,22 +411,6 @@ void main() {
         expect(
           tester.getSize(backupButton).width,
           closeTo(tester.getSize(restoreButton).width, 1),
-        );
-        final cuplivoExport = find.byKey(
-          const ValueKey('desktop-cuplivo-export-action'),
-        );
-        final cuplivoImport = find.byKey(
-          const ValueKey('desktop-cuplivo-import-action'),
-        );
-        expect(
-          (tester.getTopLeft(cuplivoExport).dy -
-                  tester.getTopLeft(cuplivoImport).dy)
-              .abs(),
-          lessThan(1),
-        );
-        expect(
-          tester.getSize(cuplivoExport).width,
-          closeTo(tester.getSize(cuplivoImport).width, 1),
         );
         final desktopCurrentImport = find.text('Chatbox (>=1.22)');
         final desktopCurrentGesture = tester.widget<GestureDetector>(

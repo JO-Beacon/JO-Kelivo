@@ -44,6 +44,8 @@ import 'core/providers/memory_provider_v2.dart';
 import 'core/providers/backup_provider.dart';
 import 'core/providers/local_snapshot_provider.dart';
 import 'features/backup/local_snapshot_scheduler.dart';
+import 'core/services/backup/backup_activity.dart';
+import 'core/services/backup/local_snapshot_schedule.dart';
 import 'core/models/progress_update.dart';
 import 'core/services/memory/memory_pipeline.dart';
 import 'core/services/memory/memory_repository.dart';
@@ -172,6 +174,7 @@ Future<void> main(List<String> arguments) async {
             await AssociatedBackupPathEvents.readPendingPath(appDataDirectory);
       }
       final RestoreReceipt? restoreOutcome;
+      RestoreBusinessLease? businessLease;
       // 大备份恢复可能耗时数秒，若期间一帧不画，用户无法区分这与应用
       // 卡死有何区别。仅当确有待处理工作时才绘制进度屏：普通启动不应
       // 为一个马上要被替换的帧买单。
@@ -188,7 +191,7 @@ Future<void> main(List<String> arguments) async {
       try {
         // 租约通过其内部注册表在进程退出前始终由进程持有，
         // 防止另一个实例与当前实例争抢业务 I/O。
-        final businessLease = await RestoreBusinessLease.acquire(
+        businessLease = await RestoreBusinessLease.acquire(
           appDataDirectory: appDataDirectory,
         );
         FlutterLogger.stage('business lease acquired');
@@ -208,8 +211,14 @@ Future<void> main(List<String> arguments) async {
         await _initRestoreFailureWindow();
         runApp(
           _RestoreFailureApp(
-            diagnosticCode: restoreFailureDiagnosticCode(error),
+            report: StartupFailureReport.capture(
+              stage: StartupFailureStage.restoreGate,
+              error: error,
+              step: 'recover_and_require_business_ready',
+              stackTrace: stackTrace,
+            ),
             appDataDirectory: appDataDirectory,
+            businessLease: businessLease,
           ),
         );
         return;
@@ -244,8 +253,12 @@ Future<void> main(List<String> arguments) async {
       ChatDatabaseLease? processDatabaseLease;
       BusinessPreferences? businessPreferences;
       var recoveryAttempted = false;
+      // 下面每一步都可能经由 drift 的 worker isolate 失败，而那会抹掉它们之间
+      // 的区别。给当前这一步起个名字，失败页面才能说清启动到底停在哪。
+      var admissionStep = 'legacy_migration_check';
       while (true) {
         try {
+          admissionStep = 'legacy_migration_check';
           reportStartupProgress(0.46);
           final migrationDecision = await HiveToSqliteMigrationService.check();
           FlutterLogger.stage('migration check done');
@@ -258,6 +271,7 @@ Future<void> main(List<String> arguments) async {
             );
             return;
           }
+          admissionStep = 'sqlite_schema_migration_check';
           final sqliteMigrationDecision =
               await SqliteSchemaMigrationService.check(appDataDirectory);
           reportStartupProgress(0.54);
@@ -270,6 +284,7 @@ Future<void> main(List<String> arguments) async {
             );
             return;
           }
+          admissionStep = 'installation_gate';
           await DatabaseInstallationGate.ensureReady(
             appDataDirectory: appDataDirectory,
             allowDatabaseIdentityChange:
@@ -283,11 +298,13 @@ Future<void> main(List<String> arguments) async {
           final databaseFile = File(
             '${appDataDirectory.path}/${AppDatabase.databaseFileName}',
           );
+          admissionStep = 'gateway_open';
           final databaseLease = await ChatDatabaseGateway.instance.acquire(
             databaseFile,
           );
           FlutterLogger.stage('chat database acquired');
           try {
+            admissionStep = 'business_migration';
             final legacyPreferences =
                 await SharedPreferencesLegacyBusinessPreferences.open();
             final loadedBusinessPreferences =
@@ -341,8 +358,14 @@ Future<void> main(List<String> arguments) async {
           await _initRestoreFailureWindow();
           runApp(
             _RestoreFailureApp(
-              diagnosticCode: restoreFailureDiagnosticCode(error),
+              report: StartupFailureReport.capture(
+                stage: StartupFailureStage.databaseAdmission,
+                error: error,
+                step: admissionStep,
+                stackTrace: stackTrace,
+              ),
               appDataDirectory: appDataDirectory,
+              businessLease: businessLease,
             ),
           );
           return;
@@ -516,12 +539,14 @@ class _RestoreProgressApp extends StatelessWidget {
 
 class _RestoreFailureApp extends StatelessWidget {
   const _RestoreFailureApp({
-    required this.diagnosticCode,
+    required this.report,
     this.appDataDirectory,
+    this.businessLease,
   });
 
-  final String diagnosticCode;
+  final StartupFailureReport report;
   final Directory? appDataDirectory;
+  final RestoreBusinessLease? businessLease;
 
   @override
   Widget build(BuildContext context) {
@@ -535,10 +560,10 @@ class _RestoreFailureApp extends StatelessWidget {
       theme: buildLightThemeForScheme(palette.light),
       darkTheme: buildDarkThemeForScheme(palette.dark),
       home: RestoreFailureScreen(
-        diagnosticCode: diagnosticCode,
+        report: report,
         restart: PlatformUtils.restartApp,
         appDataDirectory: appDataDirectory,
-        databaseTooNew: diagnosticCode == 'database_schema_too_new',
+        businessLease: businessLease,
       ),
     );
   }
@@ -826,6 +851,22 @@ class MyApp extends StatelessWidget {
             chatService: ctx.read<ChatService>(),
             businessRepository: databaseLease.businessRepository,
             businessPreferences: businessPreferences,
+            isBusy: () {
+              // 绝不与用户正在观看的回复抢资源，也不与已经在占用数据库的
+              // 备份、恢复或导入抢资源。这里问的是进程级的活动记录，而不是
+              // 本处的这几个 provider：移动端备份页会自建实例，所以这些根
+              // 实例在整个移动端备份期间都是空闲的，而本地文件恢复根本不会
+              // 把它们标记为忙。
+              if (ChatActions.hasAnyActiveGeneration) {
+                return LocalSnapshotSkipReason.generating;
+              }
+              if (BackupActivity.isActive ||
+                  ctx.read<BackupProvider>().busy ||
+                  ctx.read<S3BackupProvider>().busy) {
+                return LocalSnapshotSkipReason.busy;
+              }
+              return null;
+            },
           ),
         ),
       ],

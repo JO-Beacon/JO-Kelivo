@@ -61,6 +61,11 @@ Uint8List _blankPaddedPngWithEdgeNoise({
 
 Future<File> _writeBytes(Uint8List bytes) async {
   final dir = await Directory.systemTemp.createTemp('kelivo_preview_test_');
+  addTearDown(() async {
+    if (await dir.exists()) {
+      await dir.delete(recursive: true);
+    }
+  });
   final file = File('${dir.path}/preview.png');
   await file.writeAsBytes(bytes);
   return file;

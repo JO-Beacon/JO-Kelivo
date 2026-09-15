@@ -511,6 +511,7 @@ final class BusinessSettingsRouter {
             'allowPastConversationRecall',
             'generateConversationSummary',
             'appendCurrentTimeToUserMessage',
+            'useIso8601TimeFormat',
           },
           numbers: const {
             'temperature',

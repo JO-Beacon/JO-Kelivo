@@ -14,6 +14,7 @@ import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
 import '../../shared/widgets/ios_tile_button.dart';
 import '../../shared/widgets/restart_app_action.dart';
+import '../../shared/utils/format_bytes.dart';
 import '../../shared/widgets/snackbar.dart';
 import '../../theme/app_font_weights.dart';
 import '../../utils/app_directories.dart';
@@ -1154,15 +1155,7 @@ class _ProgressBlockState extends State<_ProgressBlock> {
   }
 }
 
-String _formatBytes(int bytes) {
-  const kb = 1024;
-  const mb = 1024 * kb;
-  const gb = 1024 * mb;
-  if (bytes >= gb) return '${(bytes / gb).toStringAsFixed(2)} GB';
-  if (bytes >= mb) return '${(bytes / mb).toStringAsFixed(2)} MB';
-  if (bytes >= kb) return '${(bytes / kb).toStringAsFixed(1)} KB';
-  return '$bytes B';
-}
+String _formatBytes(int bytes) => formatBytes(bytes);
 
 enum _TaskState { pending, active, done }
 

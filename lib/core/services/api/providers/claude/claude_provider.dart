@@ -16,6 +16,7 @@ import '../../stream/sse_framing.dart';
 import '../../stream/stream_chunk.dart';
 import '../../stream/stream_chunk_emit.dart';
 import '../../stream/stream_chunk_ids.dart';
+import '../google/google_provider.dart' show downloadRemoteAsBase64;
 import 'claude_decoder.dart';
 import 'claude_container.dart';
 import 'claude_files.dart';
@@ -32,21 +33,48 @@ int _defaultClaudeMaxOutputTokens(String modelId) {
   return 64000;
 }
 
-String normalizeClaudeImageMime(String mime) {
-  final normalized = mime.trim().toLowerCase();
-  if (normalized == 'image/jpg') return 'image/jpeg';
-  return normalized;
-}
-
-bool isClaudeSupportedImageMime(String mime) {
-  switch (normalizeClaudeImageMime(mime)) {
-    case 'image/jpeg':
-    case 'image/png':
-    case 'image/gif':
-    case 'image/webp':
-      return true;
+/// Vertex AI 上 Claude 各模型的输出上限，依据 Google Vertex AI 的模型说明。
+///
+/// **只在 Vertex 端点上使用**：官方 Anthropic 端点沿用上面的通用规则。
+/// Vertex 不认通用规则的理由是老模型的上限比 64000 小得多，按 64000 发会被拒。
+///
+/// 前 16 款与上游同名表逐字一致；末尾三款是上游表未收录、但本仓库的 Vertex
+/// 模型清单会注入的模型（见 `model_provider.dart` 的 `knownClaude`），若不补，
+/// 它们会落到兜底 4096，其中 `claude-3-7-sonnet@20250219` 会明显截断回答。
+int claudeVertexMaxOutputTokens(String modelId) {
+  switch (modelId) {
+    case 'claude-fable-5-1':
+    case 'claude-fable-5':
+    case 'claude-opus-5':
+    case 'claude-opus-4-8':
+    case 'claude-opus-4-7':
+    case 'claude-opus-4-6':
+    case 'claude-sonnet-5':
+    case 'claude-sonnet-4-6':
+      return 128000;
+    case 'claude-opus-4-5@20251101':
+    case 'claude-sonnet-4-5@20250929':
+    case 'claude-haiku-4-5@20251001':
+    case 'claude-sonnet-4@20250514':
+      return 64000;
+    case 'claude-opus-4-1@20250805':
+    case 'claude-opus-4@20250514':
+      return 32000;
+    case 'claude-3-haiku@20240307':
+      return 8000;
+    case 'claude-3-5-sonnet@20240620':
+    case 'claude-3-5-sonnet-v2@20241022':
+      return 8192;
+    // 以下三款上游表未覆盖（本仓库的 Vertex 模型清单里有）
+    case 'claude-3-7-sonnet@20250219':
+      return 64000;
+    case 'claude-3-5-haiku@20241022':
+      return 8192;
+    case 'claude-3-opus@20240229':
+      return 4096;
     default:
-      return false;
+      // 更老的模型
+      return 4096;
   }
 }
 
@@ -65,6 +93,7 @@ Stream<StreamChunk> sendClaudeStreamEvents(
   Map<String, String>? extraHeaders,
   Map<String, dynamic>? extraBody,
   bool stream = true,
+  bool builtInSearchOnly = false,
   bool skipImageParsing = false,
   StreamRoundRunner? retryRound,
 }) async* {
@@ -114,6 +143,10 @@ Stream<StreamChunk> sendClaudeStreamEvents(
     skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
     skipImageParsing: skipImageParsing,
     userImagePaths: userImagePaths,
+    // Vertex 不接受 URL 图片源，远程媒体必须先下载再内联为 base64。
+    remoteMediaBase64: isVertex
+        ? (url) => downloadRemoteAsBase64(client, config, url)
+        : null,
   );
   final initialMessages = await history.build(nonSystemMessages);
 
@@ -158,7 +191,14 @@ Stream<StreamChunk> sendClaudeStreamEvents(
       }
     }
   }
-  final builtIns = builtInTools(config, modelId);
+  // 后台调用（标题／摘要等）只注入搜索：托管抓取或容器执行既不合约定、也会被计费。
+  // Vertex 上的 Claude 与上游一致，不做收窄。
+  final builtIns = builtInSearchOnly && !isVertex
+      ? builtInTools(
+          config,
+          modelId,
+        ).where((name) => name == BuiltInToolNames.search).toSet()
+      : builtInTools(config, modelId);
   if (builtIns.contains(BuiltInToolNames.search)) {
     Map<String, dynamic> ws = const <String, dynamic>{};
     try {
@@ -191,6 +231,15 @@ Stream<StreamChunk> sendClaudeStreamEvents(
     if (ws['user_location'] is Map) {
       entry['user_location'] = (ws['user_location'] as Map)
           .cast<String, dynamic>();
+    }
+    // web_search 的 20260209 版本依赖 code execution 才能执行搜索片段，
+    // 缺失时服务端会拒绝该工具组合。
+    if (searchToolType == 'web_search_20260209' &&
+        declaredNames.add('code_execution')) {
+      allTools.add(<String, dynamic>{
+        'type': 'code_execution_20250825',
+        'name': 'code_execution',
+      });
     }
     if (declaredNames.add('web_search')) allTools.add(entry);
   }
@@ -288,6 +337,10 @@ Stream<StreamChunk> sendClaudeStreamEvents(
   var lastText = '';
   var pauseTurn = false;
 
+  /// One file is downloaded at most once per request, however many rounds and
+  /// however many blocks report it.
+  final downloadedFileIds = <String>{};
+
   yield* runProviderToolRounds(
     retryRound: retryRound,
     sendRound: () async* {
@@ -316,7 +369,10 @@ Stream<StreamChunk> sendClaudeStreamEvents(
         if (!isVertex) 'model': upstreamModelId,
         if (isVertex) 'anthropic_version': 'vertex-2023-10-16',
         'max_tokens':
-            maxTokens ?? _defaultClaudeMaxOutputTokens(upstreamModelId),
+            maxTokens ??
+            (isVertex
+                ? claudeVertexMaxOutputTokens(upstreamModelId)
+                : _defaultClaudeMaxOutputTokens(upstreamModelId)),
         'messages': convo,
         'stream': stream,
         if (systemPrompt.isNotEmpty) 'system': systemPrompt,
@@ -451,6 +507,7 @@ Stream<StreamChunk> sendClaudeStreamEvents(
           yield chunk;
           if (chunk case ServerToolEnd(:final output)) {
             for (final fileId in claudeGeneratedFileIds(output)) {
+              if (!downloadedFileIds.add(fileId)) continue;
               final file = await downloadClaudeGeneratedFile(
                 client: client,
                 base: base,
@@ -526,68 +583,87 @@ Stream<StreamChunk> sendClaudeStreamEvents(
         sourceId: 'round-${streamRound++}',
       );
       final executedToolIds = <String>{};
-
-      await for (final event in parseSseEventStrings(sse)) {
-        throwIfInBandStreamError(event.data);
-        final decoded = decoder.accept(event);
-        for (final chunk in decoded.chunks) {
-          yield chunk;
-          if (chunk case ServerToolEnd(:final output)) {
-            for (final fileId in claudeGeneratedFileIds(output)) {
-              final file = await downloadClaudeGeneratedFile(
-                client: client,
-                base: base,
-                headers: baseHeaders,
-                fileId: fileId,
-              );
-              if (file != null) yield file;
-            }
-          }
-          if (chunk is ToolCallEnd &&
-              decoder.isClientTool(chunk.id) &&
-              onToolCall != null &&
-              executedToolIds.add(chunk.id)) {
-            final tool = decoder.clientTools[chunk.id]!;
-            final args = tool.decodedArguments;
-            final call = emitToolCall(
-              id: tool.id,
-              name: tool.name,
-              arguments: args,
-              metadata: {
-                'anthropic': {'assistant_blocks': decoder.assistantBlocks},
-              },
-            );
-            await for (final resultChunk in executeClientTools(
-              calls: [call],
-              onToolCall: onToolCall,
-              usage: decoder.usage,
-              totalTokens: decoder.usage?.totalTokens ?? 0,
-            )) {
-              if (resultChunk is ToolCallResult) {
-                decoder.recordToolResult(
-                  tool.id,
-                  (resultChunk.output ?? '').toString(),
-                );
-              }
-              yield resultChunk;
-            }
-          }
-        }
-        if (decoded.completed) break;
-      }
-      for (final chunk in decoder.onClosed()) {
-        yield chunk;
-        if (chunk case ServerToolEnd(:final output)) {
-          for (final fileId in claudeGeneratedFileIds(output)) {
-            final file = await downloadClaudeGeneratedFile(
+      // Downloads run alongside the stream: awaiting one here would leave the
+      // SSE events unread, and the text after the tool frozen, for as long as
+      // the file takes.
+      final downloads = <Future<GeneratedFile?>>[];
+      var streamCompleted = false;
+      void collectDownloads(Object? output) {
+        for (final fileId in claudeGeneratedFileIds(output)) {
+          if (!downloadedFileIds.add(fileId)) continue;
+          downloads.add(
+            downloadClaudeGeneratedFile(
               client: client,
               base: base,
               headers: baseHeaders,
               fileId: fileId,
-            );
-            if (file != null) yield file;
+            ),
+          );
+        }
+      }
+
+      try {
+        await for (final event in parseSseEventStrings(sse)) {
+          throwIfInBandStreamError(event.data);
+          final decoded = decoder.accept(event);
+          for (final chunk in decoded.chunks) {
+            yield chunk;
+            if (chunk case ServerToolEnd(:final output)) {
+              collectDownloads(output);
+            }
+            if (chunk is ToolCallEnd &&
+                decoder.isClientTool(chunk.id) &&
+                onToolCall != null &&
+                executedToolIds.add(chunk.id)) {
+              final tool = decoder.clientTools[chunk.id]!;
+              final args = tool.decodedArguments;
+              final call = emitToolCall(
+                id: tool.id,
+                name: tool.name,
+                arguments: args,
+                metadata: {
+                  'anthropic': {'assistant_blocks': decoder.assistantBlocks},
+                },
+              );
+              await for (final resultChunk in executeClientTools(
+                calls: [call],
+                onToolCall: onToolCall,
+                usage: decoder.usage,
+                totalTokens: decoder.usage?.totalTokens ?? 0,
+              )) {
+                if (resultChunk is ToolCallResult) {
+                  decoder.recordToolResult(
+                    tool.id,
+                    (resultChunk.output ?? '').toString(),
+                  );
+                }
+                yield resultChunk;
+              }
+            }
+          }
+          if (decoded.completed) break;
+        }
+        streamCompleted = true;
+      } finally {
+        // A turn that stops here — cancelled, or on an in-band error — still
+        // sees its downloads out rather than closing the client under them;
+        // what they wrote has no message to go to, so it is removed again.
+        final files = await Future.wait(downloads);
+        if (!streamCompleted) {
+          for (final file in files) {
+            if (file != null) await discardClaudeGeneratedFile(file);
           }
         }
+      }
+      for (final chunk in decoder.onClosed()) {
+        yield chunk;
+        if (chunk case ServerToolEnd(:final output)) {
+          collectDownloads(output);
+        }
+      }
+      for (final download in downloads) {
+        final file = await download;
+        if (file != null) yield file;
       }
 
       final usage = decoder.usage;

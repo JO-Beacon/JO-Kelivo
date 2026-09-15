@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/api/retry_policy.dart';
+import '../../../core/services/api/stream/stream_chunk.dart';
 
 /// OCR 缓存条目
 class OcrCacheEntry {
@@ -151,8 +152,8 @@ class OcrService {
     String out = '';
     try {
       await for (final chunk in stream) {
-        if (chunk.content.isNotEmpty) {
-          out += chunk.content;
+        if (chunk is TextDelta && chunk.text.isNotEmpty) {
+          out += chunk.text;
         }
       }
     } catch (e) {

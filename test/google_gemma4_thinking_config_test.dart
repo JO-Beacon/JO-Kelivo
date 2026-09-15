@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 
+import 'support/collect_generation.dart';
+
 ProviderConfig _geminiConfig(String baseUrl) {
   return ProviderConfig(
     id: 'GeminiTest',
@@ -101,7 +103,7 @@ Future<Map<String, dynamic>> _captureThinkingConfig({
     stream: false,
   ).toList();
 
-  expect(chunks.last.isDone, isTrue, reason: modelId);
+  expect(chunks.isGenerationDone, isTrue, reason: modelId);
   return body;
 }
 
@@ -128,7 +130,7 @@ void main() {
         stream: false,
       ).toList();
 
-      expect(chunks.last.isDone, isTrue);
+      expect(chunks.isGenerationDone, isTrue);
       expect(_thinkingConfig(capturedBody), {
         'includeThoughts': true,
         'thinkingLevel': 'high',
@@ -159,7 +161,7 @@ void main() {
         thinkingBudget: 1024,
       ).toList();
 
-      expect(chunks.last.isDone, isTrue);
+      expect(chunks.isGenerationDone, isTrue);
       expect(_thinkingConfig(capturedBody), {
         'includeThoughts': true,
         'thinkingLevel': 'high',
@@ -190,7 +192,7 @@ void main() {
         thinkingBudget: 0,
       ).toList();
 
-      expect(chunks.last.isDone, isTrue);
+      expect(chunks.isGenerationDone, isTrue);
       expect(_thinkingConfig(capturedBody), {
         'includeThoughts': false,
         'thinkingLevel': 'minimal',
@@ -264,7 +266,7 @@ void main() {
         stream: false,
       ).toList();
 
-      expect(chunks.last.isDone, isTrue);
+      expect(chunks.isGenerationDone, isTrue);
       expect(_thinkingConfig(capturedBody), {
         'includeThoughts': true,
         'thinkingLevel': 'medium',
@@ -295,7 +297,7 @@ void main() {
         stream: false,
       ).toList();
 
-      expect(chunks.last.isDone, isTrue);
+      expect(chunks.isGenerationDone, isTrue);
       expect(_thinkingConfig(capturedBody), {
         'includeThoughts': true,
         'thinkingLevel': 'minimal',

@@ -12,6 +12,7 @@ import '../../../core/services/asr/system_asr_service.dart';
 import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/utils/format_bytes.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
@@ -2217,7 +2218,4 @@ String _valueOrDefault(String value, String fallback) {
   return trimmed.isEmpty ? fallback : trimmed;
 }
 
-String _formatBytes(int bytes) {
-  final mb = bytes / (1024 * 1024);
-  return '${mb.round()} MB';
-}
+String _formatBytes(int bytes) => formatBytes(bytes);

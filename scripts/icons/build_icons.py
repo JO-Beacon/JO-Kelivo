@@ -55,11 +55,22 @@ PROBE_PAD = 320       # 探测光晕范围时向四周临时外扩的像素
 # 原文「与自适应图标一样，前景的三分之一被遮盖」——内容必须装进直径 2/3 的
 # 圆，圆外完全不可见（带底 240dp 中 160dp，不带底 288dp 中 192dp，都是 2/3）。
 # 故这两处最多 0.667，这里取 0.60 给不同厂商的遮罩形状留余量。
+#
+# 各平台数值的取法：**桌面图标一律取 0.95**，让图形占底板的比例在各平台一致。
+# Windows / iOS / macOS 三者的底板都铺满画布、母版同一份，所以同一个数字在
+# 三处得到同样的观感 —— 不需要为平台各算一个系数。
+#
+# Android 是唯一要单独算的：它的底板被系统裁到画布的 2/3（72dp 视口），
+# 而且启动器读配置里的 inset 又把前景往里缩一截。设成 0.899 之后，
+# 前景的实际高度 = 108 × 0.899 × (1 - 2×16%) = 66dp，正好用满官方安全区
+# （图形不得超过画布中心 66dp 的圆）；落到 72dp 视口上即 91.7%（含辉光），
+# 实心线条约 86% —— 这已是它能到的上限，与 Windows 的 87% 只差一个百分点。
 RATIO = {
     'win':     0.95,   # Windows 桌面、任务栏、开始菜单、窗口标题栏
-    'android': 0.60,   # Android 桌面图标与 Android 12+ 启动画面（2/3 是硬顶）
-    'ios':     0.85,   # iOS 主屏幕
-    'macos':   0.72,   # macOS Dock / Finder（底板另收 PLATE_SHRINK_MACOS）
+    'android': 0.60,   # Android 12+ 启动画面（2/3 是硬顶；桌面图标见下一行）
+    'android_icon': 0.899,  # Android 桌面图标（用满 66dp 安全区，见上）
+    'ios':     0.95,   # iOS 主屏幕
+    'macos':   0.95,   # macOS Dock / Finder（底板另收 PLATE_SHRINK_MACOS）
     'web':     0.95,   # 网页标签，只有 16 像素，要顶满
     'mini':    0.95,   # 迷你图形：托盘、菜单栏、小尺寸档位
     'splash':  0.95,   # 启动画面（iOS 与 Android 11 及以下，系统不裁）
@@ -146,7 +157,7 @@ PNG_OUTPUTS = [
     # Android 自适应图标的前景：系统拿它和纯黑底合成再加遮罩，所以不带底，
     # 且必须收进 2/3 的安全圆（见 RATIO 的注释）。
     dict(roles=('dark',), out='assets/app_icon_android.png', size=CANVAS,
-         ratio='android', plate='none', note='Android 自适应前景'),
+         ratio='android_icon', plate='none', note='Android 自适应前景'),
     # 应用内展示：透明底，随界面明暗各取一份
     dict(roles=('dark',), out='assets/app_icon_dark.png', size=CANVAS,
          ratio='about', plate='none', note='关于页（深色）'),

@@ -20,6 +20,7 @@ import 'package:syncfusion_flutter_sliders/sliders.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../chat/widgets/chat_message_widget.dart';
+import '../../chat/widgets/chat_gradient_background.dart';
 import '../../home/widgets/assistant_avatar.dart';
 import '../../chat/widgets/reasoning_budget_sheet.dart';
 import '../../model/widgets/model_select_sheet.dart';
@@ -71,6 +72,7 @@ import 'health_data_settings_page.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 part 'assistant_settings_edit_basic_tab.dart';
+part '../widgets/assistant_gradient_settings.dart';
 part 'assistant_settings_edit_prompt_tab.dart';
 part 'assistant_settings_edit_memory_tab.dart';
 part 'assistant_settings_edit_memory_tab_legacy.dart';
@@ -1353,6 +1355,7 @@ Widget _iosSwitchRow(
   required String label,
   required bool value,
   required ValueChanged<bool> onChanged,
+  String? subtitle,
 }) {
   final cs = Theme.of(context).colorScheme;
   return _TactileRow(
@@ -1364,15 +1367,40 @@ Widget _iosSwitchRow(
         base: baseColor,
         builder: (c) {
           return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            padding: EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: subtitle == null ? 4 : 8,
+            ),
             child: Row(
               children: [
                 SizedBox(width: 36, child: Icon(icon, size: 20, color: c)),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(label, style: TextStyle(fontSize: 15, color: c)),
+                  child: subtitle == null
+                      ? Text(label, style: TextStyle(fontSize: 15, color: c))
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              label,
+                              style: TextStyle(fontSize: 15, color: c),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              subtitle,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: cs.onSurface.withValues(alpha: 0.6),
+                              ),
+                            ),
+                          ],
+                        ),
                 ),
-                IosSwitch(value: value, onChanged: onChanged),
+                IosSwitch(
+                  value: value,
+                  onChanged: onChanged,
+                  semanticLabel: label,
+                ),
               ],
             ),
           );

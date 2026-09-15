@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import '../../database/database_installation_gate.dart';
 import 'restore_bundle_staging.dart';
 import 'restore_business_lease.dart';
 import 'restore_cutover_executor.dart';
@@ -70,6 +71,7 @@ final class RestoreStartupGate {
   static Future<bool> hasPendingWork({
     required Directory appDataDirectory,
   }) async {
+    if (await _snapshotRecoveryIncomplete(appDataDirectory)) return true;
     final workspaceRoot = RestoreWorkspaceLock(
       appDataDirectory: appDataDirectory,
     ).workspaceRoot;
@@ -304,6 +306,9 @@ final class RestoreStartupGate {
       durability: resolvedDurability,
     );
     try {
+      if (await _snapshotRecoveryIncomplete(appDataDirectory)) {
+        throw StateError('restore_startup_snapshot_preparation_incomplete');
+      }
       final workspaceType = await FileSystemEntity.type(
         workspaceLock.workspaceRoot.path,
         followLinks: false,
@@ -344,6 +349,12 @@ final class RestoreStartupGate {
             pending.receipt.state == RestoreReceiptState.rolledBack) {
           final terminal = await executor
               .revalidateTerminalWhileWorkspaceLocked(pending.receipt);
+          if (terminal.state == RestoreReceiptState.committed) {
+            await DatabaseInstallationGate.reconcileCommittedRestore(
+              appDataDirectory: appDataDirectory,
+              durability: resolvedDurability,
+            );
+          }
           // 续跑分支（上次已提交、这次续跑）：cutover 早已 committed，
           // 若写回当时被杀就落空了，必须在这里补做。
           // 挂点必须早于 archiveTerminalRunWhileWorkspaceLocked——归档后
@@ -371,6 +382,12 @@ final class RestoreStartupGate {
         final terminal = await executor.revalidateTerminalWhileWorkspaceLocked(
           result,
         );
+        if (terminal.state == RestoreReceiptState.committed) {
+          await DatabaseInstallationGate.reconcileCommittedRestore(
+            appDataDirectory: appDataDirectory,
+            durability: resolvedDurability,
+          );
+        }
         // 本次刚提交分支：写回与业务数据同待遇，切库成功后才生效。
         await _applyLocalSettingsIfCommitted(
           appDataDirectory: appDataDirectory,
@@ -420,6 +437,22 @@ final class RestoreStartupGate {
       // 写回失败不影响恢复结果。
     }
   }
+
+  /// 快照恢复的“准备中”标记是否还在。
+  ///
+  /// 只要它在，恢复门就必须把这次启动当作有待办工作——写入方在数据库与安装
+  /// 回执双双落盘之前不会摘下它，所以此刻绝不能放行正常准入。
+  static Future<bool> _snapshotRecoveryIncomplete(
+    Directory appDataDirectory,
+  ) async =>
+      await FileSystemEntity.type(
+        p.join(
+          appDataDirectory.path,
+          RestoreWorkspaceLock.snapshotRecoveryMarkerName,
+        ),
+        followLinks: false,
+      ) !=
+      FileSystemEntityType.notFound;
 
   static Future<String> _readRunId(File markerFile) async {
     if (await markerFile.length() != 32) {

@@ -66,6 +66,7 @@ final class MarkdownLineLexer {
     final mark = _fenceMarkOf(line, 0);
     if (mark == null) return;
     if (_fenceMarker == null) {
+      if (!mark.canOpen) return;
       _fenceMarker = mark.marker;
       _fenceLength = mark.length;
       return;
@@ -567,6 +568,13 @@ final class MarkdownDetailsRegistry {
   }
 
   String rewrite(String text) {
+    if (!text.contains('<') || !MarkdownDetailsWalker.open.hasMatch(text)) {
+      // A nested fragment cannot introduce a tag absent from its parent.
+      // Still reserve literal tokens from a root without details, so later
+      // fragments can never alias a user-authored placeholder.
+      if (_rootSource == null && text.contains('\uE010')) _bindRoot(text);
+      return text;
+    }
     return _rewritten.putIfAbsent(text, () {
       _bindRoot(text);
       final segments = markdownExtractTopLevelDetails(
@@ -785,27 +793,24 @@ final class _FenceMark {
     required this.marker,
     required this.length,
     required this.canClose,
+    required this.canOpen,
   });
 
   final int start;
   final int marker;
   final int length;
   final bool canClose;
-}
-
-int _skipHorizontalIndent(String line, [int start = 0]) {
-  var i = start;
-  while (i < line.length) {
-    final unit = line.codeUnitAt(i);
-    if (unit != 0x20 && unit != 0x09) break;
-    _noteScanVisit();
-    i++;
-  }
-  return i;
+  final bool canOpen;
 }
 
 _FenceMark? _fenceMarkOf(String rawLine, int lineStart) {
-  final indent = _skipHorizontalIndent(rawLine);
+  var indent = 0;
+  while (indent < rawLine.length) {
+    final unit = rawLine.codeUnitAt(indent);
+    if (unit != 0x20 && unit != 0x09) break;
+    _noteScanVisit();
+    indent++;
+  }
   if (indent >= rawLine.length) return null;
   final marker = rawLine.codeUnitAt(indent);
   if (marker != 0x60 && marker != 0x7E) return null;
@@ -817,12 +822,17 @@ _FenceMark? _fenceMarkOf(String rawLine, int lineStart) {
   final length = n - indent;
   if (length < 3) return null;
   var canClose = true;
+  var canOpen = true;
   for (var i = n; i < rawLine.length; i++) {
     _noteScanVisit();
     final unit = rawLine.codeUnitAt(i);
     if (unit != 0x20 && unit != 0x09) {
       canClose = false;
-      break;
+    }
+    // CommonMark: a backtick fence info string cannot contain a backtick.
+    // Tilde fences allow backticks in the info string.
+    if (marker == 0x60 && unit == 0x60) {
+      canOpen = false;
     }
   }
   return _FenceMark(
@@ -830,6 +840,7 @@ _FenceMark? _fenceMarkOf(String rawLine, int lineStart) {
     marker: marker,
     length: length,
     canClose: canClose,
+    canOpen: canOpen,
   );
 }
 
@@ -872,6 +883,7 @@ final class MarkdownDisplayMathScanner {
   String _text = '';
   var _scannedTo = 0;
   var _lineStart = 0;
+  var _lineLeading = true;
   final _dollarOpens = <int>[];
   final _dollarCloses = <int>[];
   final _bracketOpens = <int>[];
@@ -898,6 +910,7 @@ final class MarkdownDisplayMathScanner {
     _text = '';
     _scannedTo = 0;
     _lineStart = 0;
+    _lineLeading = true;
     _dollarOpens.clear();
     _dollarCloses.clear();
     _bracketOpens.clear();
@@ -921,10 +934,13 @@ final class MarkdownDisplayMathScanner {
     _frozenFenceCloseAt = 0;
   }
 
+  /// [appendOnly] skips a second prefix comparison when the owning document
+  /// already validated the append and calls [reset] before every replacement.
   MarkdownDisplayMathScan synchronize(
     String text, {
     int? end,
     bool enableMath = true,
+    bool appendOnly = false,
   }) {
     final limit = end ?? text.length;
     if (!enableMath || limit <= 0) {
@@ -934,9 +950,10 @@ final class MarkdownDisplayMathScanner {
     if (_text.isNotEmpty &&
         (_scannedTo > limit ||
             _scannedTo > text.length ||
-            !text.startsWith(
-              _text.substring(0, _scannedTo.clamp(0, _text.length)),
-            ))) {
+            (!appendOnly &&
+                !text.startsWith(
+                  _text.substring(0, _scannedTo.clamp(0, _text.length)),
+                )))) {
       reset();
     }
     _text = text;
@@ -958,6 +975,7 @@ final class MarkdownDisplayMathScanner {
         _collectCompleteLine(_lineStart, _scannedTo);
         _scannedTo = _skipLogicalLineBreak(_text, _scannedTo, limit);
         _lineStart = _scannedTo;
+        _lineLeading = true;
         _checkpointCurrentLine();
         continue;
       }
@@ -985,22 +1003,26 @@ final class MarkdownDisplayMathScanner {
 
   void _consumeAt(int i, int limit) {
     if (i + 1 < limit && _atDoubleDollar(_text, i)) {
-      _dollarOpens.add(i);
+      if (_lineLeading) _dollarOpens.add(i);
       _dollarCloses.add(i);
+      _lineLeading = false;
       _scannedTo = i + 2;
       return;
     }
     if (i + 1 < limit && _atEscaped(_text, i, 0x5B)) {
-      _bracketOpens.add(i);
+      if (_lineLeading) _bracketOpens.add(i);
+      _lineLeading = false;
       _scannedTo = i + 2;
       return;
     }
     if (i + 1 < limit && _atEscaped(_text, i, 0x5D)) {
       _bracketCloses.add(i);
+      _lineLeading = false;
       _scannedTo = i + 2;
       return;
     }
     if (!markdownIsWhitespace(_text.codeUnitAt(i))) {
+      _lineLeading = false;
       _revokeClosersThrough(i);
     }
     _scannedTo = i + 1;
@@ -1025,26 +1047,30 @@ final class MarkdownDisplayMathScanner {
     final rawLine = _text.substring(start, end);
     final fence = _fenceMarkOf(rawLine, start);
     if (fence != null) {
-      _fenceOpens.add(fence);
+      if (fence.canOpen) _fenceOpens.add(fence);
       if (fence.canClose) _fenceCloses.add(fence);
     }
     final ticks = _LineBackticks.of(rawLine);
+    var lineLeading = true;
     var j = 0;
     while (j < rawLine.length) {
       _noteScanVisit();
       if (rawLine.codeUnitAt(j) == 0x60) {
         j = ticks.advance(j);
+        lineLeading = false;
         continue;
       }
       if (_atDoubleDollar(rawLine, j)) {
         final at = start + j;
-        _dollarOpens.add(at);
+        if (lineLeading) _dollarOpens.add(at);
         if (_onlyWhitespaceAfter(rawLine, j + 2)) _dollarCloses.add(at);
+        lineLeading = false;
         j += 2;
         continue;
       }
       if (_atEscaped(rawLine, j, 0x5B)) {
-        _bracketOpens.add(start + j);
+        if (lineLeading) _bracketOpens.add(start + j);
+        lineLeading = false;
         j += 2;
         continue;
       }
@@ -1052,9 +1078,11 @@ final class MarkdownDisplayMathScanner {
         if (_onlyWhitespaceAfter(rawLine, j + 2)) {
           _bracketCloses.add(start + j);
         }
+        lineLeading = false;
         j += 2;
         continue;
       }
+      if (!markdownIsWhitespace(rawLine.codeUnitAt(j))) lineLeading = false;
       j++;
     }
   }

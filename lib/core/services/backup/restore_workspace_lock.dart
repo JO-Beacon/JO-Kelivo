@@ -13,6 +13,7 @@ final class RestoreWorkspaceLock {
 
   static const workspaceRootName = '.kelivo_restore';
   static const lockFileName = '.receipt.lock';
+  static const snapshotRecoveryMarkerName = '.kelivo_snapshot_recovery_pending';
   static const activeRunFileName = '.active_run';
   static const publishingRunFileName = '.active_run.publishing';
   static const discardingRunFileName = '.active_run.discarding';
@@ -52,6 +53,77 @@ final class RestoreWorkspaceLock {
 
   Directory get completedRunsRoot =>
       Directory(p.join(workspaceRoot.path, completedRunsDirectoryName));
+
+  /// 在双租约下开始一次替换式快照恢复或一次显式重置。
+  ///
+  /// 先于操作落地的标记，能在“旧现场已被移开、新候选尚未发布”时中断准备的
+  /// 情况下挡住普通的启动准入。锁 inode 与有效的已完成历史保持原位。
+  Future<void> beginSnapshotRecoveryWhileLocked() async {
+    if (currentHold == null) throw StateError('restore_workspace_not_locked');
+    final entries = <FileSystemEntity>[];
+    await for (final entry in workspaceRoot.list(followLinks: false)) {
+      final name = p.basename(entry.path);
+      if (name == lockFileName) continue;
+      final type = await FileSystemEntity.type(entry.path, followLinks: false);
+      if (name == completedRunsDirectoryName &&
+          type == FileSystemEntityType.directory) {
+        try {
+          await validateCompletedRunsDirectory(Directory(entry.path));
+          continue;
+        } on StateError {
+          // 格式错误的 completed 目录同样必须挡住现行准入。
+        }
+      }
+      if (type != FileSystemEntityType.file &&
+          type != FileSystemEntityType.directory) {
+        throw StateError('restore_recovery_evidence_type');
+      }
+      entries.add(entry);
+    }
+    final marker = File(
+      p.join(appDataDirectory.path, snapshotRecoveryMarkerName),
+    );
+    final markerType = await FileSystemEntity.type(
+      marker.path,
+      followLinks: false,
+    );
+    if (markerType == FileSystemEntityType.notFound) {
+      await marker.create(exclusive: true);
+      await durability.restrictFile(marker);
+      await marker.writeAsString('preparing snapshot recovery', flush: true);
+      await durability.syncFile(marker, fullBarrier: true);
+      await durability.syncDirectory(appDataDirectory, fullBarrier: true);
+    } else if (markerType != FileSystemEntityType.file) {
+      throw StateError('restore_recovery_marker_type');
+    }
+    if (entries.isEmpty) return;
+    final archive = await appDataDirectory.createTemp(
+      '.kelivo_restore_failed_',
+    );
+    await durability.restrictDirectory(archive);
+    await durability.syncDirectory(appDataDirectory, fullBarrier: true);
+    for (final entry in entries) {
+      await durability.renameAndSync(
+        source: entry,
+        targetPath: p.join(archive.path, p.basename(entry.path)),
+      );
+    }
+  }
+
+  /// 只在替换候选与安装回执都已持久化，或一次显式重置已经建立起持久化的
+  /// 全新安装之后调用。
+  Future<void> finishSnapshotRecoveryWhileLocked() async {
+    if (currentHold == null) throw StateError('restore_workspace_not_locked');
+    final marker = File(
+      p.join(appDataDirectory.path, snapshotRecoveryMarkerName),
+    );
+    if (await FileSystemEntity.type(marker.path, followLinks: false) !=
+        FileSystemEntityType.file) {
+      throw StateError('restore_recovery_marker_type');
+    }
+    await marker.delete();
+    await durability.syncDirectory(appDataDirectory, fullBarrier: true);
+  }
 
   Future<T> withPublishingRun<T>({
     required String runId,

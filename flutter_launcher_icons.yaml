@@ -16,6 +16,12 @@ flutter_launcher_icons:
   # 比关于页那份小不少（比例见 build_icons.py 的 RATIO）。
   adaptive_icon_background: "#000000"
   adaptive_icon_foreground: assets/app_icon_android.png
+  # Android 13 起，系统设置里有「主题图标」开关（默认关）。用户打开后，系统按
+  # 壁纸取色、把桌面图标统一刷成一套色调；它需要应用给一份只有轮廓的剪影才能
+  # 这么做。缺这一层，开关一开我们就是满屏里唯一不合群的那个。
+  # 源图由 scripts/icons/build_android_monochrome.py 从前景层派生（位置逐像素
+  # 对齐，并滤掉母版的霓虹辉光），与前景层共用同一个 inset。
+  adaptive_icon_monochrome: assets/app_icon_android_monochrome.png
   min_sdk_android: 21
   web:
     generate: true

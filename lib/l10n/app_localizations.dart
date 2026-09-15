@@ -1048,11 +1048,17 @@ abstract class AppLocalizations {
   /// **'Temporarily Mask Context'**
   String get homePageClearContext;
 
-  /// No description provided for @homePageClearContextWithCount.
+  /// No description provided for @contextMessageCount.
   ///
   /// In en, this message translates to:
-  /// **'Temporarily Mask Context ({actual}/{configured})'**
-  String homePageClearContextWithCount(String actual, String configured);
+  /// **'{count} messages'**
+  String contextMessageCount(int count);
+
+  /// No description provided for @contextMessageCountLimited.
+  ///
+  /// In en, this message translates to:
+  /// **'{actual}/{configured} messages'**
+  String contextMessageCountLimited(int actual, int configured);
 
   /// No description provided for @homePageDefaultAssistant.
   ///
@@ -2842,6 +2848,18 @@ abstract class AppLocalizations {
   /// **'Using time variables in the system prompt makes the beginning of every request different, so prompt caching cannot hit and both cost and time-to-first-token go up. If the model needs to know the current time, use the \"Append current time\" switch below.'**
   String get assistantEditPromptTimeVarWarning;
 
+  /// No description provided for @assistantEditPromptIso8601Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Use ISO 8601 format'**
+  String get assistantEditPromptIso8601Title;
+
+  /// No description provided for @assistantEditPromptIso8601Subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Include the time zone offset, e.g. 2026-08-08T14:30:05+08:00'**
+  String get assistantEditPromptIso8601Subtitle;
+
   /// No description provided for @assistantEditPromptAppendTimeTitle.
   ///
   /// In en, this message translates to:
@@ -3607,43 +3625,43 @@ abstract class AppLocalizations {
   /// No description provided for @startupRecoverySnapshotButton.
   ///
   /// In en, this message translates to:
-  /// **'Restore a local snapshot'**
+  /// **'Restore a local copy'**
   String get startupRecoverySnapshotButton;
 
   /// No description provided for @startupRecoveryDowngradeSnapshotButton.
   ///
   /// In en, this message translates to:
-  /// **'Advanced: restore an older snapshot'**
+  /// **'Advanced: restore an older copy'**
   String get startupRecoveryDowngradeSnapshotButton;
 
   /// No description provided for @startupRecoveryChooseSnapshotTitle.
   ///
   /// In en, this message translates to:
-  /// **'Choose a snapshot'**
+  /// **'Choose a copy'**
   String get startupRecoveryChooseSnapshotTitle;
 
   /// No description provided for @startupRecoverySnapshotDetails.
   ///
   /// In en, this message translates to:
-  /// **'{date} {time} · {size} MB'**
+  /// **'{date} {time} · {size}'**
   String startupRecoverySnapshotDetails(String date, String time, String size);
 
   /// No description provided for @startupRecoveryNoSnapshots.
   ///
   /// In en, this message translates to:
-  /// **'No local snapshots are available.'**
+  /// **'No local copies are available.'**
   String get startupRecoveryNoSnapshots;
 
   /// No description provided for @startupRecoveryRestoreConfirmTitle.
   ///
   /// In en, this message translates to:
-  /// **'Restore this snapshot?'**
+  /// **'Restore this copy?'**
   String get startupRecoveryRestoreConfirmTitle;
 
   /// No description provided for @startupRecoveryRestoreConfirmContent.
   ///
   /// In en, this message translates to:
-  /// **'JO-AIClient will replace the current database with {fileName}. Changes made after this snapshot may be lost. The current database will remain recoverable through the restore journal until the operation is verified.'**
+  /// **'JO-AIClient will replace the current database with {fileName}. Changes made after this copy was created may be lost. The current database will remain recoverable through the restore journal until the operation is verified.'**
   String startupRecoveryRestoreConfirmContent(String fileName);
 
   /// No description provided for @startupRecoveryRestoreConfirmButton.
@@ -3673,7 +3691,7 @@ abstract class AppLocalizations {
   /// No description provided for @startupRecoverySnapshotFailed.
   ///
   /// In en, this message translates to:
-  /// **'The snapshot could not be prepared. Diagnostic code: {code}'**
+  /// **'The copy could not be prepared. Diagnostic code: {code}'**
   String startupRecoverySnapshotFailed(String code);
 
   /// No description provided for @backupPageRestoreFailedMessage.
@@ -4029,18 +4047,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Kelivo'**
   String get backupPageKelivoFormat;
-
-  /// No description provided for @backupPageCuplivoFormat.
-  ///
-  /// In en, this message translates to:
-  /// **'Cuplivo'**
-  String get backupPageCuplivoFormat;
-
-  /// No description provided for @backupPageCuplivoBackup.
-  ///
-  /// In en, this message translates to:
-  /// **'Cuplivo Backup'**
-  String get backupPageCuplivoBackup;
 
   /// No description provided for @backupPageExportAction.
   ///
@@ -5428,6 +5434,42 @@ abstract class AppLocalizations {
   /// **'lines'**
   String get displaySettingsPageAutoCollapseCodeBlockLinesUnit;
 
+  /// No description provided for @displaySettingsPageCollapseLongUserMessagesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse Long Messages'**
+  String get displaySettingsPageCollapseLongUserMessagesTitle;
+
+  /// No description provided for @displaySettingsPageCollapseLongUserMessagesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fold user messages past the threshold behind an expand button'**
+  String get displaySettingsPageCollapseLongUserMessagesSubtitle;
+
+  /// No description provided for @displaySettingsPageCollapseLongUserMessagesCharsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse threshold'**
+  String get displaySettingsPageCollapseLongUserMessagesCharsTitle;
+
+  /// No description provided for @displaySettingsPageCollapseLongUserMessagesCharsUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'chars'**
+  String get displaySettingsPageCollapseLongUserMessagesCharsUnit;
+
+  /// No description provided for @chatMessageExpandLongText.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand'**
+  String get chatMessageExpandLongText;
+
+  /// No description provided for @chatMessageCollapseLongText.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse'**
+  String get chatMessageCollapseLongText;
+
   /// No description provided for @messageExportSheetFormatTitle.
   ///
   /// In en, this message translates to:
@@ -6718,19 +6760,19 @@ abstract class AppLocalizations {
   /// No description provided for @localSnapshotTitle.
   ///
   /// In en, this message translates to:
-  /// **'Local database snapshots'**
+  /// **'Local copies'**
   String get localSnapshotTitle;
 
   /// No description provided for @localSnapshotEnabled.
   ///
   /// In en, this message translates to:
-  /// **'Keep automatic local snapshots'**
+  /// **'Keep automatic local copies'**
   String get localSnapshotEnabled;
 
   /// No description provided for @localSnapshotTakeNow.
   ///
   /// In en, this message translates to:
-  /// **'Take snapshot now'**
+  /// **'Save a copy now'**
   String get localSnapshotTakeNow;
 
   /// No description provided for @translatePagePasteButton.
@@ -14356,7 +14398,7 @@ abstract class AppLocalizations {
   /// No description provided for @debugPageCreateOversizedConversationButton.
   ///
   /// In en, this message translates to:
-  /// **'Create oversized conversation (30 MB)'**
+  /// **'Create oversized conversation (30 MiB)'**
   String get debugPageCreateOversizedConversationButton;
 
   /// No description provided for @debugPageCreateManyMessagesConversationButton.
@@ -14386,7 +14428,7 @@ abstract class AppLocalizations {
   /// No description provided for @debugPageCreatingOversizedConversation.
   ///
   /// In en, this message translates to:
-  /// **'Creating a 30 MB oversized conversation...'**
+  /// **'Creating a 30 MiB oversized conversation...'**
   String get debugPageCreatingOversizedConversation;
 
   /// No description provided for @debugPageCreatingManyMessagesConversation.
@@ -14428,7 +14470,7 @@ abstract class AppLocalizations {
   /// No description provided for @debugPageOversizedConversationTitle.
   ///
   /// In en, this message translates to:
-  /// **'Oversized conversation test ({sizeMB} MB)'**
+  /// **'Oversized conversation test ({sizeMB} MiB)'**
   String debugPageOversizedConversationTitle(int sizeMB);
 
   /// No description provided for @debugPageManyMessagesConversationTitle.
@@ -15928,7 +15970,7 @@ abstract class AppLocalizations {
   /// No description provided for @healthDataSettingsDescription.
   ///
   /// In en, this message translates to:
-  /// **'HealthKit signals available to the current assistant in daily conversation. Switches control what Kelivo may try to read; iOS still manages actual Health access.'**
+  /// **'HealthKit signals available to the current assistant in daily conversation. Switches control what JO-AIClient may try to read; iOS still manages actual Health access.'**
   String get healthDataSettingsDescription;
 
   /// No description provided for @healthDataSettingsDisableAll.
@@ -16476,6 +16518,636 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} conversations from the backup were skipped because of invalid message order and were not merged.'**
   String backupPageMergeCompletedWithSkipped(int count);
+
+  /// No description provided for @assistantEditGradientBackgroundTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Gradient background'**
+  String get assistantEditGradientBackgroundTitle;
+
+  /// No description provided for @assistantEditGradientStaticTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Static mode'**
+  String get assistantEditGradientStaticTitle;
+
+  /// No description provided for @assistantEditGradientStaticDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Saves power during long chats and streaming.'**
+  String get assistantEditGradientStaticDescription;
+
+  /// No description provided for @assistantEditGradientHorizontal.
+  ///
+  /// In en, this message translates to:
+  /// **'Horizontal position'**
+  String get assistantEditGradientHorizontal;
+
+  /// No description provided for @assistantEditGradientVertical.
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical position'**
+  String get assistantEditGradientVertical;
+
+  /// No description provided for @assistantEditGradientPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get assistantEditGradientPreview;
+
+  /// No description provided for @assistantEditGradientNextFrame.
+  ///
+  /// In en, this message translates to:
+  /// **'Another frame'**
+  String get assistantEditGradientNextFrame;
+
+  /// No description provided for @backupProgressBytes.
+  ///
+  /// In en, this message translates to:
+  /// **'{done} / {total}'**
+  String backupProgressBytes(String done, String total);
+
+  /// No description provided for @backupProgressCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get backupProgressCancel;
+
+  /// No description provided for @backupProgressCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get backupProgressCancelled;
+
+  /// No description provided for @backupProgressCommitting.
+  ///
+  /// In en, this message translates to:
+  /// **'Committing'**
+  String get backupProgressCommitting;
+
+  /// No description provided for @backupProgressDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading'**
+  String get backupProgressDownloading;
+
+  /// No description provided for @backupProgressExtracting.
+  ///
+  /// In en, this message translates to:
+  /// **'Extracting'**
+  String get backupProgressExtracting;
+
+  /// No description provided for @backupProgressFinalizing.
+  ///
+  /// In en, this message translates to:
+  /// **'Finishing'**
+  String get backupProgressFinalizing;
+
+  /// No description provided for @backupProgressImportingMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing messages'**
+  String get backupProgressImportingMessages;
+
+  /// No description provided for @backupProgressImportingSessions.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing sessions'**
+  String get backupProgressImportingSessions;
+
+  /// No description provided for @backupProgressItems.
+  ///
+  /// In en, this message translates to:
+  /// **'{done} / {total}'**
+  String backupProgressItems(String done, String total);
+
+  /// No description provided for @backupProgressListingRemote.
+  ///
+  /// In en, this message translates to:
+  /// **'Listing remote backups'**
+  String get backupProgressListingRemote;
+
+  /// No description provided for @backupProgressMaterializingFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Writing files'**
+  String get backupProgressMaterializingFiles;
+
+  /// No description provided for @backupProgressPacking.
+  ///
+  /// In en, this message translates to:
+  /// **'Packing'**
+  String get backupProgressPacking;
+
+  /// No description provided for @backupProgressPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing'**
+  String get backupProgressPreparing;
+
+  /// No description provided for @backupProgressReadingSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading settings'**
+  String get backupProgressReadingSettings;
+
+  /// No description provided for @backupProgressSnapshotting.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating database snapshot'**
+  String get backupProgressSnapshotting;
+
+  /// No description provided for @backupProgressStaging.
+  ///
+  /// In en, this message translates to:
+  /// **'Staging'**
+  String get backupProgressStaging;
+
+  /// No description provided for @backupProgressUploading.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading'**
+  String get backupProgressUploading;
+
+  /// No description provided for @backupProgressValidating.
+  ///
+  /// In en, this message translates to:
+  /// **'Validating'**
+  String get backupProgressValidating;
+
+  /// No description provided for @backupProgressVerifying.
+  ///
+  /// In en, this message translates to:
+  /// **'Verifying'**
+  String get backupProgressVerifying;
+
+  /// No description provided for @localSnapshotActionDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get localSnapshotActionDelete;
+
+  /// No description provided for @localSnapshotActionExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get localSnapshotActionExport;
+
+  /// No description provided for @localSnapshotActionPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep this copy'**
+  String get localSnapshotActionPin;
+
+  /// No description provided for @localSnapshotActionRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get localSnapshotActionRestore;
+
+  /// No description provided for @localSnapshotActionUnpin.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop keeping'**
+  String get localSnapshotActionUnpin;
+
+  /// No description provided for @localSnapshotAnnounceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notify when a copy is saved'**
+  String get localSnapshotAnnounceTitle;
+
+  /// No description provided for @localSnapshotCopiesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No local copies yet'**
+  String get localSnapshotCopiesEmpty;
+
+  /// No description provided for @localSnapshotCopiesEmptyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A copy is saved automatically as your data changes, and one is always saved before a restore.'**
+  String get localSnapshotCopiesEmptyHint;
+
+  /// No description provided for @localSnapshotCopiesScopeNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Local copies live on this device only. They protect against damage to your data inside the app, not against losing the device or uninstalling JO-AIClient — use WebDAV or S3 backup for that.'**
+  String get localSnapshotCopiesScopeNote;
+
+  /// No description provided for @localSnapshotCopiesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Local Copies'**
+  String get localSnapshotCopiesTitle;
+
+  /// No description provided for @localSnapshotCopyContents.
+  ///
+  /// In en, this message translates to:
+  /// **'{conversations, plural, =1{1 chat} other{{conversations} chats}} · {messages, plural, =1{1 message} other{{messages} messages}}'**
+  String localSnapshotCopyContents(int conversations, int messages);
+
+  /// No description provided for @localSnapshotCopyContentsUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Contents unknown until restored'**
+  String get localSnapshotCopyContentsUnknown;
+
+  /// No description provided for @localSnapshotDeleteDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy deleted'**
+  String get localSnapshotDeleteDone;
+
+  /// No description provided for @localSnapshotDeleteLastWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'This is the only copy that still contains data.'**
+  String get localSnapshotDeleteLastWarning;
+
+  /// No description provided for @localSnapshotDeleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This copy will be removed from the device permanently. Any data it holds that is not in your current database will be gone.'**
+  String get localSnapshotDeleteMessage;
+
+  /// No description provided for @localSnapshotDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this copy?'**
+  String get localSnapshotDeleteTitle;
+
+  /// No description provided for @localSnapshotEnabledSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'JO-AIClient periodically saves a copy of its database on this device, so it is never the only one.'**
+  String get localSnapshotEnabledSubtitle;
+
+  /// No description provided for @localSnapshotEnabledTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep local copies'**
+  String get localSnapshotEnabledTitle;
+
+  /// No description provided for @localSnapshotExportDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy exported'**
+  String get localSnapshotExportDone;
+
+  /// No description provided for @localSnapshotExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not export the copy: {reason}'**
+  String localSnapshotExportFailed(String reason);
+
+  /// No description provided for @localSnapshotExportPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing export'**
+  String get localSnapshotExportPreparing;
+
+  /// No description provided for @localSnapshotIntervalAutomatic.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get localSnapshotIntervalAutomatic;
+
+  /// No description provided for @localSnapshotIntervalAutomaticDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily, less often as the database grows'**
+  String get localSnapshotIntervalAutomaticDetail;
+
+  /// No description provided for @localSnapshotIntervalDays.
+  ///
+  /// In en, this message translates to:
+  /// **'{days, plural, =1{Every day} other{Every {days} days}}'**
+  String localSnapshotIntervalDays(int days);
+
+  /// No description provided for @localSnapshotIntervalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How often'**
+  String get localSnapshotIntervalTitle;
+
+  /// No description provided for @localSnapshotKeepMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep one from last month'**
+  String get localSnapshotKeepMonthly;
+
+  /// No description provided for @localSnapshotKeepProtectedNote.
+  ///
+  /// In en, this message translates to:
+  /// **'The most recent copy that still contains data is never removed automatically, whatever this is set to.'**
+  String get localSnapshotKeepProtectedNote;
+
+  /// No description provided for @localSnapshotKeepTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Copies to keep'**
+  String get localSnapshotKeepTitle;
+
+  /// No description provided for @localSnapshotKeepValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 copy} other{{count} copies}}'**
+  String localSnapshotKeepValue(int count);
+
+  /// No description provided for @localSnapshotKeepWeekly.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep one from last week'**
+  String get localSnapshotKeepWeekly;
+
+  /// No description provided for @localSnapshotKindRecovered.
+  ///
+  /// In en, this message translates to:
+  /// **'Set aside by recovery'**
+  String get localSnapshotKindRecovered;
+
+  /// No description provided for @localSnapshotMaximumTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Space limit'**
+  String get localSnapshotMaximumTitle;
+
+  /// No description provided for @localSnapshotMaximumUnlimited.
+  ///
+  /// In en, this message translates to:
+  /// **'No limit'**
+  String get localSnapshotMaximumUnlimited;
+
+  /// No description provided for @localSnapshotOriginAutomatic.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get localSnapshotOriginAutomatic;
+
+  /// No description provided for @localSnapshotOriginBeforeRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Before a restore'**
+  String get localSnapshotOriginBeforeRestore;
+
+  /// No description provided for @localSnapshotOriginManual.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved by you'**
+  String get localSnapshotOriginManual;
+
+  /// No description provided for @localSnapshotRestoreMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your current chats and settings will be replaced by this copy from {when}. A copy of what you have now is saved first, so this can be undone.'**
+  String localSnapshotRestoreMessage(String when);
+
+  /// No description provided for @localSnapshotRestorePreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing copy'**
+  String get localSnapshotRestorePreparing;
+
+  /// No description provided for @localSnapshotRestoreTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore this copy?'**
+  String get localSnapshotRestoreTitle;
+
+  /// No description provided for @localSnapshotRunInBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue in background'**
+  String get localSnapshotRunInBackground;
+
+  /// No description provided for @localSnapshotRunningInBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving a copy in the background'**
+  String get localSnapshotRunningInBackground;
+
+  /// No description provided for @localSnapshotSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Local Copies'**
+  String get localSnapshotSectionTitle;
+
+  /// No description provided for @localSnapshotStatusFailure.
+  ///
+  /// In en, this message translates to:
+  /// **'Last attempt failed {when}: {reason}'**
+  String localSnapshotStatusFailure(String when, String reason);
+
+  /// No description provided for @localSnapshotStatusNever.
+  ///
+  /// In en, this message translates to:
+  /// **'No copy saved yet'**
+  String get localSnapshotStatusNever;
+
+  /// No description provided for @localSnapshotStatusSkippedSpace.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped: not enough free space on this device'**
+  String get localSnapshotStatusSkippedSpace;
+
+  /// No description provided for @localSnapshotStatusSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Last copy {when}'**
+  String localSnapshotStatusSuccess(String when);
+
+  /// No description provided for @localSnapshotTakeDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy saved'**
+  String get localSnapshotTakeDone;
+
+  /// No description provided for @localSnapshotTakeFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save a copy: {reason}'**
+  String localSnapshotTakeFailed(String reason);
+
+  /// No description provided for @localSnapshotUsage.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No copies} =1{1 copy} other{{count} copies}} · {size}'**
+  String localSnapshotUsage(int count, String size);
+
+  /// No description provided for @startupRecoveryLocalCopiesAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This device still holds {count, plural, =1{1 local copy} other{{count} local copies}}, the most recent from {when}. Resetting does not delete them — after restarting you can restore one from Settings › Backup › Local Copies.'**
+  String startupRecoveryLocalCopiesAvailable(int count, String when);
+
+  /// No description provided for @startupRecoveryRecoveredCopiesDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'It also holds {count, plural, =1{1 database copy} other{{count} database copies}} set aside by an earlier repair, and resetting DOES delete {count, plural, =1{it} other{those}} permanently. Export your data first if you want to keep {count, plural, =1{it} other{them}}.'**
+  String startupRecoveryRecoveredCopiesDeleted(int count);
+
+  /// JO-AIClient only: sealing the ZIP payload into the .joaiclient container.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrapping the archive'**
+  String get backupProgressWrapping;
+
+  /// JO-AIClient only: writing the restored payload back to disk.
+  ///
+  /// In en, this message translates to:
+  /// **'Restoring data'**
+  String get backupProgressRestoring;
+
+  /// No description provided for @localSnapshotManageCopies.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage copies'**
+  String get localSnapshotManageCopies;
+
+  /// No description provided for @startupRecoveryWhatFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'What failed'**
+  String get startupRecoveryWhatFailed;
+
+  /// No description provided for @startupRecoveryStageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Stage'**
+  String get startupRecoveryStageLabel;
+
+  /// No description provided for @startupRecoveryStageRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore gate'**
+  String get startupRecoveryStageRestore;
+
+  /// No description provided for @startupRecoveryStageDatabase.
+  ///
+  /// In en, this message translates to:
+  /// **'Database startup'**
+  String get startupRecoveryStageDatabase;
+
+  /// No description provided for @startupRecoveryDiagnosticLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostic code'**
+  String get startupRecoveryDiagnosticLabel;
+
+  /// No description provided for @startupRecoverySchemaLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Database version'**
+  String get startupRecoverySchemaLabel;
+
+  /// No description provided for @startupRecoverySchemaValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{installed} on disk · {expected} expected by this build'**
+  String startupRecoverySchemaValue(String installed, int expected);
+
+  /// No description provided for @startupRecoveryAppVersionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'App'**
+  String get startupRecoveryAppVersionLabel;
+
+  /// No description provided for @startupRecoveryUnknownValue.
+  ///
+  /// In en, this message translates to:
+  /// **'unknown'**
+  String get startupRecoveryUnknownValue;
+
+  /// No description provided for @startupRecoveryCollecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Collecting diagnostics…'**
+  String get startupRecoveryCollecting;
+
+  /// No description provided for @startupRecoveryHideDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide technical details'**
+  String get startupRecoveryHideDetails;
+
+  /// No description provided for @startupRecoveryShowDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Show technical details'**
+  String get startupRecoveryShowDetails;
+
+  /// No description provided for @startupRecoveryCopyReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy full report'**
+  String get startupRecoveryCopyReport;
+
+  /// No description provided for @startupRecoveryReportCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Full report copied'**
+  String get startupRecoveryReportCopied;
+
+  /// No description provided for @startupRecoveryShareReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export report'**
+  String get startupRecoveryShareReport;
+
+  /// No description provided for @startupRecoveryReportStored.
+  ///
+  /// In en, this message translates to:
+  /// **'A copy of this report was saved to {path}'**
+  String startupRecoveryReportStored(String path);
+
+  /// No description provided for @startupRecoveryIntegrityButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Check database integrity'**
+  String get startupRecoveryIntegrityButton;
+
+  /// No description provided for @startupRecoveryIntegrityHealthy.
+  ///
+  /// In en, this message translates to:
+  /// **'SQLite found no damage in the database file.'**
+  String get startupRecoveryIntegrityHealthy;
+
+  /// No description provided for @startupRecoveryIntegrityDamaged.
+  ///
+  /// In en, this message translates to:
+  /// **'SQLite reported problems — {detail}'**
+  String startupRecoveryIntegrityDamaged(String detail);
+
+  /// No description provided for @startupRecoveryIntegrityFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The integrity check could not run.'**
+  String get startupRecoveryIntegrityFailed;
+
+  /// No description provided for @startupRecoveryIntegrityMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'No database file was found in the data folder.'**
+  String get startupRecoveryIntegrityMissing;
+
+  /// No description provided for @startupRecoveryReportSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Report saved to {path}'**
+  String startupRecoveryReportSaved(String path);
+
+  /// No description provided for @startupRecoveryReportShared.
+  ///
+  /// In en, this message translates to:
+  /// **'Report exported.'**
+  String get startupRecoveryReportShared;
+
+  /// No description provided for @startupRecoveryReportSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not export the report.'**
+  String get startupRecoveryReportSaveFailed;
 }
 
 class _AppLocalizationsDelegate

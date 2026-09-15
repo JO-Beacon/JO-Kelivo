@@ -114,6 +114,11 @@ typedef EmitToolCall = ({
   String name,
   Map<String, dynamic> arguments,
   Map<String, dynamic>? metadata,
+
+  /// 供应商自己给的调用 id（如 OpenAI 兼容端点的 `id`）。
+  ///
+  /// 回放历史时优先用它，避免 JO 自生成的 id 与供应商对不上。
+  String? providerCallId,
 });
 
 typedef EmitToolResult = ({
@@ -129,7 +134,14 @@ EmitToolCall emitToolCall({
   required String name,
   required Map<String, dynamic> arguments,
   Map<String, dynamic>? metadata,
-}) => (id: id, name: name, arguments: arguments, metadata: metadata);
+  String? providerCallId,
+}) => (
+  id: id,
+  name: name,
+  arguments: arguments,
+  metadata: metadata,
+  providerCallId: providerCallId,
+);
 
 EmitToolResult emitToolResult({
   required String id,

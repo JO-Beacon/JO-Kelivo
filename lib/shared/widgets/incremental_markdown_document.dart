@@ -37,22 +37,34 @@ final class IncrementalMarkdownDocument {
   final MarkdownLineLexer _lexer = MarkdownLineLexer();
   final MarkdownDisplayMathScanner _mathScanner = MarkdownDisplayMathScanner();
   int _rescannedCodeUnits = 0;
+  bool _lastUpdateAppended = true;
   int _scanCursor = 0;
   int _lineStart = 0;
   int _blockStart = 0;
   int? _pendingListBlankEnd;
+  int? _pendingListContentEnd;
   bool _blankRunCarriesWhitespace = false;
 
   List<IncrementalMarkdownBlock> get blocks => _blocks;
   int get rescannedCodeUnits => _rescannedCodeUnits;
 
+  /// The last source retained its previous prefix. Blocks at the same start
+  /// offset therefore retain their prefix too (apart from trailing whitespace).
+  bool get lastUpdateAppended => _lastUpdateAppended;
+
   /// Whether [_source] is still the caller's raw string. False after a CR
   /// forced a normalized copy.
   bool get debugReusesCallerSource => identical(_source, _rawSource);
 
-  List<IncrementalMarkdownBlock> update(String source) {
-    if (source == _rawSource) return _blocks;
-    if (!source.startsWith(_rawSource)) {
+  /// [appendOnly] may be supplied when the owner already compared this exact
+  /// source with the preceding update. Omit it for independently rewritten text.
+  List<IncrementalMarkdownBlock> update(String source, {bool? appendOnly}) {
+    if (source == _rawSource) {
+      _lastUpdateAppended = true;
+      return _blocks;
+    }
+    _lastUpdateAppended = appendOnly ?? source.startsWith(_rawSource);
+    if (!_lastUpdateAppended) {
       _stableBlocks.clear();
       _scanCursor = 0;
       _lineStart = 0;
@@ -60,6 +72,7 @@ final class IncrementalMarkdownDocument {
       _lexer.reset();
       _mathScanner.reset();
       _pendingListBlankEnd = null;
+      _pendingListContentEnd = null;
       _blankRunCarriesWhitespace = false;
       final normalized = _normalizeNewlines(source);
       _rescannedCodeUnits += normalized.length;
@@ -144,7 +157,8 @@ final class IncrementalMarkdownDocument {
   }
 
   void _scanCompletedLines() {
-    final mathScan = _mathScanner.synchronize(_source);
+    // update already validated the prefix and reset both scanners on edits.
+    final mathScan = _mathScanner.synchronize(_source, appendOnly: true);
     while (_scanCursor < _source.length) {
       final newline = _source.indexOf('\n', _scanCursor);
       if (newline < 0) {
@@ -169,15 +183,16 @@ final class IncrementalMarkdownDocument {
           if (_lineStart == _blockStart) _mergeLastBlockBack();
         } else if (_lineStart > _blockStart) {
           if (_currentBlockIsList()) {
+            _pendingListContentEnd ??= _contentEndBeforeBlank();
             _pendingListBlankEnd = end;
           } else {
-            _emitStableBlock(end);
+            _emitStableBlock(_contentEndBeforeBlank(), end);
           }
         } else {
           // A blank line with no content behind it continues the run that
           // ended the block before it. `NewLines` collapses the whole run
           // to one gap, so the completed block stays as it is.
-          _extendLastBlock(end);
+          _blockStart = end;
         }
       } else if (!protected && !isBlank) {
         _blankRunCarriesWhitespace = false;
@@ -185,11 +200,10 @@ final class IncrementalMarkdownDocument {
           if (_isListContinuation(rawLine, line)) {
             _clearPendingList();
           } else {
-            _emitStableBlock(_pendingListBlankEnd!);
+            _emitStableBlock(_pendingListContentEnd!, _pendingListBlankEnd!);
             _clearPendingList();
           }
-        } else if (_lineStart == _blockStart &&
-            (_isIndented(rawLine) || _isBareHashRun(line))) {
+        } else if (_lineStart == _blockStart && _isIndented(rawLine)) {
           // Indentation is part of the syntax — four spaces stop a heading
           // from being one — and a block-by-block render trims the leading
           // whitespace off every block. Keep the line with the block above
@@ -202,33 +216,21 @@ final class IncrementalMarkdownDocument {
     }
   }
 
-  void _emitStableBlock(int end) {
-    if (end > _blockStart) {
+  /// The last content character sits just before the `\n` that starts the
+  /// `\n\n+` run we are looking at.
+  int _contentEndBeforeBlank() => _lineStart > 0 ? _lineStart - 1 : 0;
+
+  void _emitStableBlock(int contentEnd, int nextStart) {
+    if (contentEnd > _blockStart) {
       _stableBlocks.add(
         IncrementalMarkdownBlock(
           start: _blockStart,
-          text: _source.substring(_blockStart, end),
+          text: _source.substring(_blockStart, contentEnd),
           stable: true,
         ),
       );
     }
-    _blockStart = end;
-  }
-
-  void _extendLastBlock(int end) {
-    if (_stableBlocks.isEmpty) {
-      _blockStart = end;
-      return;
-    }
-    final last = _stableBlocks.removeLast();
-    _stableBlocks.add(
-      IncrementalMarkdownBlock(
-        start: last.start,
-        text: _source.substring(last.start, end),
-        stable: true,
-      ),
-    );
-    _blockStart = end;
+    _blockStart = nextStart;
   }
 
   /// Reopens the last block so the line just scanned joins it.
@@ -239,19 +241,11 @@ final class IncrementalMarkdownDocument {
 
   void _clearPendingList() {
     _pendingListBlankEnd = null;
+    _pendingListContentEnd = null;
   }
 
   static bool _isIndented(String rawLine) =>
       rawLine.isNotEmpty && _isWhitespace(rawLine.codeUnitAt(0));
-
-  static bool _isBareHashRun(String line) {
-    final run = line.trimRight();
-    if (run.isEmpty || run.length > 6) return false;
-    for (var i = 0; i < run.length; i++) {
-      if (run.codeUnitAt(i) != 0x23) return false;
-    }
-    return true;
-  }
 
   static bool _startsWithIndent(String text) =>
       text.isNotEmpty && _isWhitespace(text.codeUnitAt(0));

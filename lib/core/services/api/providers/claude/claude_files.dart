@@ -1,17 +1,34 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
 import '../../../../../utils/app_directories.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../../../../utils/upload_dedupe.dart';
+import '../../../../utils/multimodal_input_utils.dart';
 import '../../stream/stream_chunk.dart';
 
-const int claudeGeneratedFileSizeLimit = 500 * 1024 * 1024;
+/// The download streams to disk, so memory is not the constraint: on desktop
+/// this is the API's own per-file limit, and on a phone it is what a chat is
+/// willing to spend of the device's storage on one file.
+final claudeGeneratedFileSizeLimit = (Platform.isIOS || Platform.isAndroid)
+    ? 200 * 1024 * 1024
+    : 500 * 1024 * 1024;
+
 const int claudeUploadSizeLimit = 100 * 1024 * 1024;
 const int _uploadExpirySeconds = 24 * 60 * 60;
+
+/// The message headers negotiate a JSON body and an SSE response; neither
+/// describes a file transfer.
+Map<String, String> _filesApiHeaders(Map<String, String> headers) => {
+  for (final entry in headers.entries)
+    if (entry.key.toLowerCase() != 'content-type' &&
+        entry.key.toLowerCase() != 'accept')
+      entry.key: entry.value,
+};
 
 class ClaudeFileUploadException implements Exception {
   const ClaudeFileUploadException(this.fileName, this.reason);
@@ -37,7 +54,10 @@ String claudeGeneratedFileName(String raw, {String fallback = 'download'}) {
   if (cleaned.isEmpty) return fallback;
   final stem = cleaned.split('.').first;
   if (_windowsReservedStem.hasMatch(stem)) cleaned = '_$cleaned';
-  return cleaned.length <= 255 ? cleaned : cleaned.substring(0, 255);
+  if (cleaned.length <= 255) return cleaned;
+  final lastDot = cleaned.lastIndexOf('.');
+  final ext = lastDot > 0 ? cleaned.substring(lastDot) : '';
+  return cleaned.substring(0, 255 - ext.length) + ext;
 }
 
 List<String> claudeGeneratedFileIds(Object? output) {
@@ -67,17 +87,11 @@ Future<String> uploadClaudeFile({
   if (size > claudeUploadSizeLimit) {
     throw ClaudeFileUploadException(
       displayName,
-      'it is larger than the ${claudeUploadSizeLimit ~/ (1024 * 1024)} MB limit',
+      'it is larger than the ${claudeUploadSizeLimit ~/ (1024 * 1024)} MiB limit',
     );
   }
-  final cleanHeaders = <String, String>{
-    for (final entry in headers.entries)
-      if (entry.key.toLowerCase() != 'content-type' &&
-          entry.key.toLowerCase() != 'accept')
-        entry.key: entry.value,
-  };
   final request = http.MultipartRequest('POST', Uri.parse('$base/files'))
-    ..headers.addAll(cleanHeaders)
+    ..headers.addAll(_filesApiHeaders(headers))
     ..fields['expires_in_seconds'] = '$_uploadExpirySeconds'
     ..files.add(
       http.MultipartFile(
@@ -135,79 +149,150 @@ String _apiErrorMessage(String body) {
   return text.length <= 300 ? text : '${text.substring(0, 300)}…';
 }
 
+/// Fetches [fileId] through the Files API and stores it as an upload, or null
+/// when it cannot be had.
+///
+/// Anthropic hands a generated file back as an id rather than as bytes, so a
+/// chart the model just drew is invisible until it is downloaded. Every
+/// failure here is cosmetic next to losing the turn, so none of them throw.
 Future<GeneratedFile?> downloadClaudeGeneratedFile({
   required http.Client client,
   required String base,
   required Map<String, String> headers,
   required String fileId,
 }) async {
-  File? reservedFile;
   try {
-    final cleanHeaders = <String, String>{
-      for (final entry in headers.entries)
-        if (entry.key.toLowerCase() != 'content-type' &&
-            entry.key.toLowerCase() != 'accept')
-          entry.key: entry.value,
-    };
+    final getHeaders = _filesApiHeaders(headers);
+
     final metaResponse = await client.get(
       Uri.parse('$base/files/$fileId'),
-      headers: cleanHeaders,
+      headers: getHeaders,
     );
     if (metaResponse.statusCode < 200 || metaResponse.statusCode >= 300) {
       return null;
     }
     final meta = jsonDecode(metaResponse.body);
-    if (meta is! Map || meta['downloadable'] == false) return null;
-    final size = meta['size_bytes'];
-    if (size is num && size > claudeGeneratedFileSizeLimit) return null;
+    if (meta is! Map) return null;
+    // Only what a skill or the container created may be downloaded; asking for
+    // anything else is a 400 that costs a round trip.
+    if (meta['downloadable'] == false) return null;
+    final declaredSize = meta['size_bytes'];
+    if (declaredSize is int && declaredSize > claudeGeneratedFileSizeLimit) {
+      return null;
+    }
+    // The container names the file, so it can name a path, a device, or
+    // nothing at all; the local filesystem has to take what is left.
     final name = claudeGeneratedFileName(
-      (meta['filename'] ?? fileId).toString(),
+      (meta['filename'] ?? '').toString(),
       fallback: fileId,
     );
+    final reported = (meta['mime_type'] ?? '').toString().trim().toLowerCase();
+    // The container named the file, so its extension is the reliable half: a
+    // chart handed back as application/octet-stream still belongs in the
+    // message as a picture rather than as something to download.
+    final mime = reported.startsWith('image/')
+        ? reported
+        : inferMediaMimeFromSource(name, fallbackMime: reported);
+
     final dir = await AppDirectories.getUploadDirectory();
-    await dir.create(recursive: true);
-    final file = await UploadDedupe.reserveUniqueFile(dir, name);
-    reservedFile = file;
-    final response = await client.send(
-      http.Request('GET', Uri.parse('$base/files/$fileId/content'))
-        ..headers.addAll(cleanHeaders),
-    );
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      try {
-        await file.delete();
-      } catch (_) {}
-      return null;
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
     }
-    final sink = file.openWrite();
-    var written = 0;
-    var complete = false;
+    // Written under its final name straight away and hashed on the way, so a
+    // file of any size costs a bounded amount of memory. Should an identical
+    // copy already be stored, this one is dropped again in its favour.
+    final destination = await UploadDedupe.reserveUniqueFile(dir, name);
+    ({int size, List<int> bytes})? digest;
     try {
-      await for (final chunk in response.stream) {
-        written += chunk.length;
-        if (written > claudeGeneratedFileSizeLimit) break;
-        sink.add(chunk);
-      }
-      complete = written <= claudeGeneratedFileSizeLimit;
+      digest = await _streamToFile(
+        client: client,
+        uri: Uri.parse('$base/files/$fileId/content'),
+        headers: getHeaders,
+        destination: destination,
+      );
     } finally {
-      await sink.close();
+      // A download cut off — the client closed under it, say — must not
+      // leave its half in the upload directory.
+      if (digest == null) await _discard(destination);
     }
-    if (!complete) {
-      try {
-        await file.delete();
-      } catch (_) {}
-      return null;
+    if (digest == null) return null;
+    var path = destination.path;
+    final identical = await UploadDedupe.findIdenticalDigest(
+      dir,
+      digest.size,
+      digest.bytes,
+      name,
+      exclude: path,
+    );
+    if (identical != null) {
+      await _discard(destination);
+      path = identical;
     }
-    if (!await file.exists()) return null;
-    final mime = (meta['mime_type'] ?? '').toString();
     return GeneratedFile(
-      uri: SandboxPathResolver.canonicalize(file.path),
+      uri: SandboxPathResolver.canonicalize(path),
       name: name,
       mime: mime.isEmpty ? null : mime,
     );
   } catch (_) {
-    try {
-      await reservedFile?.delete();
-    } catch (_) {}
     return null;
   }
+}
+
+/// Streams the body at [uri] into [destination], returning its size and
+/// SHA-256, or null when the body cannot be used (a failed request or one
+/// past [claudeGeneratedFileSizeLimit]). An empty body is a file: the Files
+/// API reports `size_bytes: 0` for an empty CSV or placeholder the code wrote.
+Future<({int size, List<int> bytes})?> _streamToFile({
+  required http.Client client,
+  required Uri uri,
+  required Map<String, String> headers,
+  required File destination,
+}) async {
+  final request = http.Request('GET', uri)..headers.addAll(headers);
+  final response = await client.send(request);
+  if (response.statusCode < 200 || response.statusCode >= 300) return null;
+
+  final sink = destination.openWrite();
+  final hash = _DigestSink();
+  final hasher = sha256.startChunkedConversion(hash);
+  var size = 0;
+  try {
+    await for (final chunk in response.stream) {
+      size += chunk.length;
+      if (size > claudeGeneratedFileSizeLimit) return null;
+      sink.add(chunk);
+      hasher.add(chunk);
+    }
+    await sink.flush();
+  } finally {
+    await sink.close();
+  }
+  hasher.close();
+  return (size: size, bytes: hash.digest!.bytes);
+}
+
+/// Receives the one digest a chunked SHA-256 conversion emits on close.
+class _DigestSink implements Sink<Digest> {
+  Digest? digest;
+
+  @override
+  void add(Digest data) => digest = data;
+
+  @override
+  void close() {}
+}
+
+Future<void> _discard(File file) async {
+  try {
+    await file.delete();
+  } catch (_) {}
+}
+
+/// Removes a downloaded file no message will refer to — a turn cancelled
+/// after the download completed. A file the download found already present
+/// belongs to whichever message had it first and stays.
+Future<void> discardClaudeGeneratedFile(GeneratedFile file) async {
+  final path = SandboxPathResolver.resolveForIo(file.uri);
+  if (path == null || UploadDedupe.isShared(path)) return;
+  await _discard(File(path));
 }

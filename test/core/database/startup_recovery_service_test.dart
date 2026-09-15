@@ -4,6 +4,10 @@ import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/database/database_installation_gate.dart';
 import 'package:Kelivo/core/database/startup_recovery_service.dart';
+import 'package:Kelivo/core/services/backup/restore_business_lease.dart';
+import 'package:Kelivo/core/services/backup/restore_durability.dart';
+import 'package:Kelivo/core/services/backup/restore_startup_gate.dart';
+import 'package:Kelivo/core/services/backup/restore_workspace_lock.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
@@ -179,51 +183,6 @@ void main() {
     });
   });
 
-  group('local snapshots', () {
-    test('lists published snapshots from newest to oldest', () async {
-      final snapshots = Directory(p.join(directory.path, 'snapshots'));
-      await snapshots.create();
-      await File(
-        p.join(snapshots.path, 'kelivo-snapshot-1.zip'),
-      ).writeAsString('old');
-      await File(
-        p.join(snapshots.path, 'kelivo-snapshot-2.zip'),
-      ).writeAsString('new');
-      await File(
-        p.join(snapshots.path, 'kelivo-snapshot-3.zip.tmp'),
-      ).writeAsString('incomplete');
-
-      final files = await StartupRecoveryService.listLocalSnapshots(
-        appDataDirectory: directory,
-      );
-
-      expect(files.map((file) => p.basename(file.path)), [
-        'kelivo-snapshot-2.zip',
-        'kelivo-snapshot-1.zip',
-      ]);
-    });
-
-    test('rejects a restore source outside the snapshot store', () async {
-      final outside = await File(
-        p.join(directory.path, 'outside.zip'),
-      ).writeAsString('not a snapshot');
-
-      await expectLater(
-        StartupRecoveryService.prepareLocalSnapshotRestore(
-          appDataDirectory: directory,
-          snapshot: outside,
-        ),
-        throwsA(
-          isA<StateError>().having(
-            (error) => error.message,
-            'message',
-            'startup_recovery_snapshot_outside_store',
-          ),
-        ),
-      );
-    });
-  });
-
   group('exportDataCopy destination guard', () {
     test('rejects a destination inside the data directory', () async {
       await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
@@ -268,5 +227,153 @@ void main() {
       expect(receipt.databaseId, isNot(originalId));
       expect(receiptFiles(directory), hasLength(1));
     });
+
+    test(
+      'ends interrupted snapshot recovery before the next cold startup',
+      () async {
+        await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
+        final originalId = installedDatabaseId(directory);
+        final lease = await RestoreBusinessLease.acquire(
+          appDataDirectory: directory,
+        );
+        try {
+          final lock = RestoreWorkspaceLock(appDataDirectory: directory);
+          await lock.synchronized(lock.beginSnapshotRecoveryWhileLocked);
+        } finally {
+          await lease.close();
+        }
+        await expectLater(
+          RestoreStartupGate.recoverAndRequireBusinessReady(
+            appDataDirectory: directory,
+          ),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              'restore_startup_snapshot_preparation_incomplete',
+            ),
+          ),
+        );
+        await StartupRecoveryService.reset(appDataDirectory: directory);
+        expect(
+          await RestoreStartupGate.hasPendingWork(appDataDirectory: directory),
+          isFalse,
+        );
+        expect(
+          await RestoreStartupGate.recoverAndRequireBusinessReady(
+            appDataDirectory: directory,
+          ),
+          isNull,
+        );
+        final receipt = await DatabaseInstallationGate.ensureReady(
+          appDataDirectory: directory,
+        );
+        expect(receipt.databaseId, isNot(originalId));
+      },
+    );
+
+    test('uses the startup lease and refuses a competing reset', () async {
+      await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
+      final originalId = installedDatabaseId(directory);
+      final lease = await RestoreBusinessLease.acquire(
+        appDataDirectory: directory,
+      );
+      try {
+        await expectLater(
+          StartupRecoveryService.reset(appDataDirectory: directory),
+          throwsA(isA<RestoreBusinessLeaseUnavailable>()),
+        );
+        expect(installedDatabaseId(directory), originalId);
+        await StartupRecoveryService.reset(
+          appDataDirectory: directory,
+          businessLease: lease,
+        );
+        expect(lease.isClosed, isFalse);
+        expect(
+          await RestoreStartupGate.recoverAndRequireBusinessReady(
+            appDataDirectory: directory,
+            businessLease: lease,
+          ),
+          isNull,
+        );
+        expect(installedDatabaseId(directory), isNot(originalId));
+      } finally {
+        await lease.close();
+      }
+    });
+
+    test(
+      'failed reset keeps admission blocked until a successful retry',
+      () async {
+        await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
+        await expectLater(
+          StartupRecoveryService.reset(
+            appDataDirectory: directory,
+            durability: _FailInstallationReceiptSync(),
+          ),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              'test_receipt_sync_failed',
+            ),
+          ),
+        );
+        // 数据库已经建立，但它新的安装回执尚未持久化。
+        expect(await databaseFile(directory).exists(), isTrue);
+        await expectLater(
+          RestoreStartupGate.recoverAndRequireBusinessReady(
+            appDataDirectory: directory,
+          ),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              'restore_startup_snapshot_preparation_incomplete',
+            ),
+          ),
+        );
+        await StartupRecoveryService.reset(appDataDirectory: directory);
+        expect(
+          await RestoreStartupGate.recoverAndRequireBusinessReady(
+            appDataDirectory: directory,
+          ),
+          isNull,
+        );
+        expect(
+          await DatabaseInstallationGate.read(appDataDirectory: directory),
+          isNotNull,
+        );
+      },
+    );
   });
+}
+
+final class _FailInstallationReceiptSync implements RestoreDurability {
+  final _delegate = RestorePlatformDurability();
+
+  @override
+  Future<void> restrictFile(File file) => _delegate.restrictFile(file);
+
+  @override
+  Future<void> restrictDirectory(Directory directory) =>
+      _delegate.restrictDirectory(directory);
+
+  @override
+  Future<void> syncFile(File file, {bool fullBarrier = false}) async {
+    if (p.basename(file.path).startsWith('.database_installation_receipt')) {
+      throw StateError('test_receipt_sync_failed');
+    }
+    await _delegate.syncFile(file, fullBarrier: fullBarrier);
+  }
+
+  @override
+  Future<void> syncDirectory(Directory directory, {bool fullBarrier = false}) =>
+      _delegate.syncDirectory(directory, fullBarrier: fullBarrier);
+
+  @override
+  Future<void> renameAndSync({
+    required FileSystemEntity source,
+    required String targetPath,
+  }) => _delegate.renameAndSync(source: source, targetPath: targetPath);
 }

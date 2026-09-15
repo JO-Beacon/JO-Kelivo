@@ -19,6 +19,7 @@ import '../../backup/pages/backup_page.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
 import '../../instruction_injection/pages/instruction_injection_page.dart';
 import '../../world_book/pages/world_book_page.dart';
+import '../../../shared/utils/format_bytes.dart';
 import 'network_proxy_page.dart';
 import 'storage_space_page.dart';
 import '../../stats/pages/stats_page.dart';
@@ -540,15 +541,7 @@ class _ChatStorageSummaryState extends State<_ChatStorageSummary> {
     _future = StorageUsageService.computeReport();
   }
 
-  String _fmtBytes(int bytes) {
-    const kb = 1024;
-    const mb = kb * 1024;
-    const gb = mb * 1024;
-    if (bytes >= gb) return '${(bytes / gb).toStringAsFixed(2)} GB';
-    if (bytes >= mb) return '${(bytes / mb).toStringAsFixed(2)} MB';
-    if (bytes >= kb) return '${(bytes / kb).toStringAsFixed(1)} KB';
-    return '$bytes B';
-  }
+  String _fmtBytes(int bytes) => formatBytes(bytes);
 
   @override
   Widget build(BuildContext context) {

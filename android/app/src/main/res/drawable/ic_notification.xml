@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  JO-AIClient 通知栏小图标（等距立方体，纯白剪影）。
+
+  通知栏那个图标由系统按 alpha 通道渲染，并自行上色（深色状态栏画白、
+  浅色状态栏画深灰），所以这里只需要一个「实心图形 + 透明底」的剪影，
+  颜色写成白色只是取惯例，实际显示不受它影响。
+
+  坐标由 assets/icon_sources/ 的立方体母版派生：只保留外轮廓、顶面两条棱、
+  前棱，以及左面两条短线与左下小立方体，并按 24dp 下的可见度加粗。
+  数值已烘进 pathData（未用 group 缩放），母版原坐标见 scripts 里的生成脚本。
+  图形装进 22/24 的内容安全区，四周各留 1dp。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="131.10"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M529.48 915.78 L880.82 713.02 L880.82 311.86 L529.48 108.22 L177.26 310.98 L177.26 557.45 L143.18 592.41 L143.18 736.62 L304.86 830.13 L368.23 821.48" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="131.10"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M368.23 821.48 L529.48 915.78" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="96.14"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M177.26 310.98 L529.48 516.37 L880.82 311.86" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="96.14"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M529.48 516.37 L529.48 915.78" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="78.66"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M368.23 661.71 L368.23 821.48" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="78.66"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M177.26 551.33 L368.23 661.71" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="69.92"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M143.18 593.28 L304.86 686.80 L304.86 830.13" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M657.08 587.16 L753.22 531.23 L753.22 642.22 L657.08 698.16 Z" />
+</vector>

@@ -30,7 +30,13 @@ class ThinkingSheenPalette {
     final opaque = _opaque(color);
     return ThinkingSheenPalette(
       base: opaque,
-      highlight: Color.lerp(opaque, Colors.white, isDark ? 0.82 : 0.78)!,
+      // 浅色模式向白色提亮；深色模式墨色本身已接近白色，
+      // 扫光带需反向走，否则会没入文字之中。
+      highlight: Color.lerp(
+        opaque,
+        isDark ? Colors.black : Colors.white,
+        isDark ? 0.82 : 0.78,
+      )!,
     );
   }
 

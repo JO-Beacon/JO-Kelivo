@@ -2842,6 +2842,16 @@ class HomePageController extends ChangeNotifier {
         : l10n.contextManagementMaskContext;
   }
 
+  /// 上下文管理面板右侧显示的消息条数标签，例如“12 条消息”。
+  String contextMessageCountLabel() {
+    final l10n = AppLocalizations.of(_context)!;
+    final count = _viewModel.getContextMessageCount();
+    final configured = count.configured;
+    return configured == null
+        ? l10n.contextMessageCount(count.actual)
+        : l10n.contextMessageCountLimited(count.actual, configured);
+  }
+
   String? currentStreamingMessageId() {
     for (int i = messages.length - 1; i >= 0; i--) {
       final m = messages[i];

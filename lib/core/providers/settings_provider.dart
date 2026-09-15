@@ -293,6 +293,10 @@ class SettingsProvider extends ChangeNotifier {
       'display_auto_collapse_code_block_v1';
   static const String _displayAutoCollapseCodeBlockLinesKey =
       'display_auto_collapse_code_block_lines_v1';
+  static const String _displayCollapseLongUserMessagesKey =
+      'display_collapse_long_user_messages_v1';
+  static const String _displayCollapseLongUserMessageCharsKey =
+      'display_collapse_long_user_message_chars_v1';
   static const String _displayDesktopAutoSwitchTopicsKey =
       'display_desktop_auto_switch_topics_v1';
   static const String _displayDesktopShowTrayKey =
@@ -1264,6 +1268,15 @@ class SettingsProvider extends ChangeNotifier {
           1,
           999,
         );
+    _collapseLongUserMessages =
+        prefs.getBool(_displayCollapseLongUserMessagesKey) ?? false;
+    _collapseLongUserMessageChars =
+        (prefs.getInt(_displayCollapseLongUserMessageCharsKey) ??
+                defaultCollapseLongUserMessageChars)
+            .clamp(
+              minCollapseLongUserMessageChars,
+              maxCollapseLongUserMessageChars,
+            );
     _desktopAutoSwitchTopics =
         prefs.getBool(_displayDesktopAutoSwitchTopicsKey) ?? false;
     // 桌面：托盘设置（桌面平台默认启用）
@@ -5324,6 +5337,35 @@ Requirements:
     await prefs.setInt(_displayAutoCollapseCodeBlockLinesKey, next);
   }
 
+  // 显示：过长的用户消息折叠显示，并提供展开开关
+  bool _collapseLongUserMessages = false;
+  bool get collapseLongUserMessages => _collapseLongUserMessages;
+  Future<void> setCollapseLongUserMessages(bool v) async {
+    if (_collapseLongUserMessages == v) return;
+    _collapseLongUserMessages = v;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.setBool(_displayCollapseLongUserMessagesKey, v);
+  }
+
+  // 显示：用户消息折叠阈值（字符数）
+  static const int defaultCollapseLongUserMessageChars = 500;
+  static const int minCollapseLongUserMessageChars = 50;
+  static const int maxCollapseLongUserMessageChars = 100000;
+  int _collapseLongUserMessageChars = defaultCollapseLongUserMessageChars;
+  int get collapseLongUserMessageChars => _collapseLongUserMessageChars;
+  Future<void> setCollapseLongUserMessageChars(int v) async {
+    final next = v.clamp(
+      minCollapseLongUserMessageChars,
+      maxCollapseLongUserMessageChars,
+    );
+    if (_collapseLongUserMessageChars == next) return;
+    _collapseLongUserMessageChars = next;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.setInt(_displayCollapseLongUserMessageCharsKey, next);
+  }
+
   // 仅桌面端：切换助手时自动切到“话题”标签页
   bool _desktopAutoSwitchTopics = false;
   bool get desktopAutoSwitchTopics => _desktopAutoSwitchTopics;
@@ -5814,6 +5856,8 @@ Requirements:
     copy._showChatListDate = _showChatListDate;
     copy._autoCollapseCodeBlock = _autoCollapseCodeBlock;
     copy._autoCollapseCodeBlockLines = _autoCollapseCodeBlockLines;
+    copy._collapseLongUserMessages = _collapseLongUserMessages;
+    copy._collapseLongUserMessageChars = _collapseLongUserMessageChars;
     copy._desktopAutoSwitchTopics = _desktopAutoSwitchTopics;
     copy._desktopShowTray = _desktopShowTray;
     copy._desktopMinimizeToTrayOnClose = _desktopMinimizeToTrayOnClose;
@@ -6068,8 +6112,6 @@ enum ChatMessageBackgroundStyle { defaultStyle, frosted, solid }
 enum AndroidBackgroundChatMode { off, on, onNotify }
 
 class ProviderConfig {
-  static const _kelivoInPublicApiKey = 'kelivo';
-
   final String id;
   final bool enabled;
   final String name;
@@ -6365,10 +6407,7 @@ class ProviderConfig {
   );
 
   static String _apiKeyFromJson(Map<String, dynamic> json) {
-    final stored = json['apiKey'] as String? ?? '';
-    if (stored.isNotEmpty) return stored;
-    final id = json['id'] as String? ?? json['name'] as String? ?? '';
-    return id.trim().toLowerCase() == 'kelivoin' ? _kelivoInPublicApiKey : '';
+    return json['apiKey'] as String? ?? '';
   }
 
   static List<Map<String, String>> _customRequestRowsFromJson(
@@ -6517,98 +6556,6 @@ class ProviderConfig {
           claudePromptCachingEnabled: false,
         );
       case ProviderKind.openai:
-        // 对 KelivoIN 的默认模型和覆盖项做特殊处理
-        if (lowerKey.contains('kelivoin')) {
-          return ProviderConfig(
-            id: key,
-            enabled: defaultEnabled(key),
-            name: displayName ?? key,
-            apiKey: _kelivoInPublicApiKey,
-            baseUrl: _defaultBase(key),
-            providerType: ProviderKind.openai,
-            chatPath: null, // UI 中保持为空；代码使用默认 '/chat/completions'
-            useResponseApi: false,
-            models: const [
-              // 'openai-fast',
-              'mistral',
-              'qwen-coder',
-            ],
-            modelOverrides: const {
-              // 'openai-fast': {
-              //   'type': 'chat',
-              //   'input': ['text'],
-              //   'output': ['text'],
-              //   'abilities': ['tool'],
-              // },
-              'mistral': {
-                'type': 'chat',
-                'input': ['text'],
-                'output': ['text'],
-                'abilities': ['tool'],
-              },
-              'qwen-coder': {
-                'type': 'chat',
-                'input': ['text'],
-                'output': ['text'],
-                'abilities': ['tool'],
-              },
-            },
-            proxyEnabled: false,
-            proxyHost: '',
-            proxyPort: '8080',
-            proxyUsername: '',
-            proxyPassword: '',
-            multiKeyEnabled: false,
-            apiKeys: const [],
-            keyManagement: const KeyManagementConfig(),
-            aihubmixAppCodeEnabled: false,
-            balanceEnabled: _defaultBalanceEnabled(key),
-            balanceApiPath: _defaultBalanceApiPath(key),
-            balanceResultPath: _defaultBalanceResultPath(key),
-            claudePromptCachingEnabled: false,
-          );
-        }
-        // 对 SiliconFlow 保留合作模型的能力覆盖，但首次启动不预选模型。
-        if (lowerKey.contains('silicon')) {
-          return ProviderConfig(
-            id: key,
-            enabled: defaultEnabled(key),
-            name: displayName ?? key,
-            apiKey: '',
-            baseUrl: _defaultBase(key),
-            providerType: ProviderKind.openai,
-            chatPath: '/chat/completions',
-            useResponseApi: false,
-            models: const [],
-            modelOverrides: const {
-              'THUDM/GLM-4-9B-0414': {
-                'type': 'chat',
-                'input': ['text'],
-                'output': ['text'],
-                'abilities': ['tool'],
-              },
-              'Qwen/Qwen3-8B': {
-                'type': 'chat',
-                'input': ['text'],
-                'output': ['text'],
-                'abilities': ['tool', 'reasoning'],
-              },
-            },
-            proxyEnabled: false,
-            proxyHost: '',
-            proxyPort: '8080',
-            proxyUsername: '',
-            proxyPassword: '',
-            multiKeyEnabled: false,
-            apiKeys: const [],
-            keyManagement: const KeyManagementConfig(),
-            aihubmixAppCodeEnabled: false,
-            balanceEnabled: _defaultBalanceEnabled(key),
-            balanceApiPath: _defaultBalanceApiPath(key),
-            balanceResultPath: _defaultBalanceResultPath(key),
-            claudePromptCachingEnabled: false,
-          );
-        }
         return ProviderConfig(
           id: key,
           enabled: defaultEnabled(key),

@@ -55,6 +55,8 @@ import '../../home/services/tool_approval_service.dart';
 import '../utils/assistant_paragraph_splitter.dart';
 import '../utils/thinking_tag_parser.dart';
 import 'citation_sources_sheet.dart';
+import 'chat_surface.dart';
+import 'collapsible_user_text.dart';
 import 'chat_suggestion_bubbles.dart';
 import 'token_display_widget.dart';
 import 'screen_time_tool_ui.dart';
@@ -801,6 +803,9 @@ class ChatMessageWidget extends StatefulWidget {
   final bool? showThinkingCards;
   final bool? showToolCards;
 
+  /// Off for exports, which must render the whole user message.
+  final bool collapseLongUserText;
+
   const ChatMessageWidget({
     super.key,
     required this.message,
@@ -849,6 +854,7 @@ class ChatMessageWidget extends StatefulWidget {
     this.onRecoveredAskUserAnswer,
     this.showThinkingCards,
     this.showToolCards,
+    this.collapseLongUserText = true,
   });
 
   @override
@@ -1470,6 +1476,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             bool showName,
             bool showTimestamp,
             bool enableMarkdown,
+            int collapseChars,
           })
         >(
           (s) => (
@@ -1477,6 +1484,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             showName: s.showUserName,
             showTimestamp: s.showUserTimestamp,
             enableMarkdown: s.enableUserMarkdown,
+            collapseChars: s.collapseLongUserMessages
+                ? s.collapseLongUserMessageChars
+                : 0,
           ),
         );
     // 附件仅来自结构化部分。TextPart 中类似标记的字面文本
@@ -1505,6 +1515,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 context,
                 visualText,
                 userMessageSettings.enableMarkdown,
+                widget.collapseLongUserText
+                    ? userMessageSettings.collapseChars
+                    : 0,
               ),
             ),
           )
@@ -1786,10 +1799,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     } catch (_) {}
   }
 
+  /// Number of text lines kept visible when a long user message is collapsed.
+  static const int _collapsedUserTextLines = 9;
+
   Widget _buildUserTextContent(
     BuildContext context,
     String visualText,
     bool enableUserMarkdown,
+    int collapseChars,
   ) {
     final bool isDesktop =
         defaultTargetPlatform == TargetPlatform.macOS ||
@@ -1817,12 +1834,24 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       );
     }
 
-    return isDesktop
-        ? SelectionArea(
-            key: ValueKey('user_${widget.message.id}'),
-            child: content,
-          )
-        : content;
+    if (isDesktop) {
+      content = SelectionArea(
+        key: ValueKey('user_${widget.message.id}'),
+        child: content,
+      );
+    }
+
+    if (collapseChars > 0 && visualText.length > collapseChars) {
+      final lineHeight =
+          MediaQuery.textScalerOf(context).scale(baseUser) * 1.45;
+      content = CollapsibleUserText(
+        key: ValueKey('user-collapse:${widget.message.id}'),
+        collapsedHeight: lineHeight * _collapsedUserTextLines,
+        child: content,
+      );
+    }
+
+    return content;
   }
 
   /// [parts] 顺序的附件预览（不是图片在前文件在后）。
@@ -2571,7 +2600,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
   Widget _buildAssistantMessage() {
     final cs = Theme.of(context).colorScheme;
-    final fg = _chatSurfaceForegroundPalette(context);
+    final fg = chatSurfaceForegroundPalette(context);
     final l10n = AppLocalizations.of(context)!;
     final settings = context.watch<SettingsProvider>();
     final assistant = _assistantForMessage();
@@ -3633,61 +3662,6 @@ Widget _buildSharedChatSurface(
   }
 }
 
-class _ChatSurfaceForegroundPalette {
-  const _ChatSurfaceForegroundPalette({
-    required this.strong,
-    required this.medium,
-    required this.muted,
-    required this.body,
-    required this.divider,
-    required this.accent,
-  });
-
-  final Color strong;
-  final Color medium;
-  final Color muted;
-  final Color body;
-  final Color divider;
-  final Color accent;
-}
-
-_ChatSurfaceForegroundPalette _chatSurfaceForegroundPalette(
-  BuildContext context, {
-  bool isUser = false,
-}) {
-  final theme = Theme.of(context);
-  final cs = theme.colorScheme;
-  final selection = _chatSurfaceStyleSelection(context, isUser: isUser);
-  if (selection.style == ChatMessageBackgroundStyle.defaultStyle) {
-    return _ChatSurfaceForegroundPalette(
-      strong: cs.secondary,
-      medium: cs.secondary.withValues(alpha: 0.9),
-      muted: cs.onSurface.withValues(alpha: 0.5),
-      body: cs.onSurface.withValues(alpha: 0.7),
-      divider: theme.brightness == Brightness.dark
-          ? cs.onSurface.withValues(alpha: 0.24)
-          : cs.outline.withValues(alpha: 0.15),
-      accent: cs.primary,
-    );
-  }
-
-  final base = resolveBubbleStyle(
-    cs,
-    theme.brightness,
-    selection.style,
-    selection.overrides,
-  ).text;
-  final bool isDark = theme.brightness == Brightness.dark;
-  return _ChatSurfaceForegroundPalette(
-    strong: base.withValues(alpha: isDark ? 0.88 : 0.78),
-    medium: base.withValues(alpha: isDark ? 0.76 : 0.66),
-    muted: base.withValues(alpha: isDark ? 0.56 : 0.46),
-    body: base.withValues(alpha: isDark ? 0.72 : 0.6),
-    divider: base.withValues(alpha: isDark ? 0.16 : 0.14),
-    accent: base.withValues(alpha: isDark ? 0.84 : 0.74),
-  );
-}
-
 class _MenuItem extends StatelessWidget {
   const _MenuItem({
     required this.icon,
@@ -4128,14 +4102,100 @@ class _ChainOfThoughtCard extends StatefulWidget {
 class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
   bool _showAllSteps = false;
 
+  /// 步骤指纹：把这一步渲染所依赖的全部输入拼成一个值。指纹不变时
+  /// [_CachedTimelineStep] 复用上一帧的 widget 实例，整棵子树跳过重建。
+  Object _reasoningStepSignature({
+    required ReasoningSegment step,
+    required bool isFirst,
+    required bool isLast,
+    required ChatSurfaceForegroundPalette fg,
+    required Brightness brightness,
+    required bool enableReasoningMarkdown,
+    required double textScale,
+    required bool hasToggle,
+  }) {
+    return (
+      'reasoning',
+      step.text,
+      step.expanded,
+      step.loading,
+      step.startAt,
+      step.finishedAt,
+      step.toolStartIndex,
+      isFirst,
+      isLast,
+      fg,
+      brightness,
+      enableReasoningMarkdown,
+      textScale,
+      hasToggle,
+    );
+  }
+
+  /// 工具步骤指纹。上游取 `part.cacheToken`（时间线投影层给的稳定标识）；
+  /// 本仓库没有投影层，直接对工具内容字段取哈希——`ToolUIPart` 不可变，
+  /// 内容变化必然换新实例，故内容字段的组合即稳定标识。
+  Object _toolStepSignature({
+    required ToolUIPart part,
+    required bool isFirst,
+    required bool isLast,
+    required ChatSurfaceForegroundPalette fg,
+    required Brightness brightness,
+    required bool showToolResultSummary,
+    required bool hideToolResultImages,
+    required bool pendingApproval,
+    required double textScale,
+  }) {
+    return Object.hash(
+      'tool',
+      widget.conversationId,
+      part.id,
+      part.toolName,
+      part.content,
+      part.loading,
+      _toolMapSignature(part.arguments),
+      _toolMapSignature(part.metadata),
+      isFirst,
+      isLast,
+      fg,
+      brightness,
+      showToolResultSummary,
+      hideToolResultImages,
+      pendingApproval,
+      textScale,
+    );
+  }
+
+  /// 按内容给工具参数／元数据取指纹。整体用 identity 会在“每次从 payload
+  /// 重新解析”的路径上永远不命中；逐条按值取哈希才能既稳定又覆盖变化。
+  static Object? _toolMapSignature(Map<String, dynamic>? map) {
+    if (map == null || map.isEmpty) return null;
+    return Object.hashAll(
+      map.entries.map((entry) => Object.hash(entry.key, entry.value)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final fg = _chatSurfaceForegroundPalette(context);
+    final fg = chatSurfaceForegroundPalette(context);
     final collapseThinkingSteps = context.select<SettingsProvider, bool>(
       (s) => s.collapseThinkingSteps,
     );
+    // 步骤级缓存（对齐上游 v1.2.4 起的 _CachedTimelineStep）需要把这些环境输入
+    // 一并纳入步骤指纹：它们由本组件读取后向下传递或参与判断，子树自己收不到通知。
+    final showToolResultSummary = context.select<SettingsProvider, bool>(
+      (s) => s.showToolResultSummary,
+    );
+    final hideToolResultImages = context.select<SettingsProvider, bool>(
+      (s) => s.hideToolResultImages,
+    );
+    final enableReasoningMarkdown = context.select<SettingsProvider, bool>(
+      (s) => s.enableReasoningMarkdown,
+    );
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    final approvalService = context.watch<ToolApprovalService>();
     final l10n = AppLocalizations.of(context)!;
     final enableAdaptiveWidth =
         widget.steps.isNotEmpty &&
@@ -4211,19 +4271,64 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
             ...visibleSteps.asMap().entries.map((entry) {
               final index = entry.key;
               final step = entry.value;
+              final isFirst = index == 0;
+              final isLast = index == visibleSteps.length - 1;
               if (step.isReasoning) {
-                return _ChainOfThoughtReasoningStep(
-                  step: step.reasoning!,
-                  isFirst: index == 0,
-                  isLast: index == visibleSteps.length - 1,
+                final reasoning = step.reasoning!;
+                final hasToggle = reasoning.onToggle != null;
+                return _CachedTimelineStep(
+                  key: ValueKey<String>(
+                    'reasoning-${step.reasoningCountAfter}',
+                  ),
+                  signature: _reasoningStepSignature(
+                    step: reasoning,
+                    isFirst: isFirst,
+                    isLast: isLast,
+                    fg: fg,
+                    brightness: theme.brightness,
+                    enableReasoningMarkdown: enableReasoningMarkdown,
+                    textScale: textScale,
+                    hasToggle: hasToggle,
+                  ),
+                  builder: () => _ChainOfThoughtReasoningStep(
+                    step: reasoning,
+                    isFirst: isFirst,
+                    isLast: isLast,
+                  ),
                 );
               }
-              return _ChainOfThoughtToolStep(
-                part: step.tool!,
-                conversationId: widget.conversationId,
-                isFirst: index == 0,
-                isLast: index == visibleSteps.length - 1,
-                onRecoveredAnswer: widget.onRecoveredAnswer,
+              final part = step.tool!;
+              final trimmedId = part.id.trim();
+              return _CachedTimelineStep(
+                key: ValueKey<String>(
+                  trimmedId.isNotEmpty
+                      ? 'tool-$trimmedId'
+                      : 'tool-ordinal-${step.toolCountAfter}-${part.toolName}',
+                ),
+                signature: _toolStepSignature(
+                  part: part,
+                  isFirst: isFirst,
+                  isLast: isLast,
+                  fg: fg,
+                  brightness: theme.brightness,
+                  showToolResultSummary: showToolResultSummary,
+                  hideToolResultImages: hideToolResultImages,
+                  pendingApproval:
+                      trimmedId.isNotEmpty &&
+                      approvalService.pendingFor(
+                            toolCallId: part.id,
+                            conversationId: widget.conversationId,
+                          ) !=
+                          null,
+                  textScale: textScale,
+                ),
+                builder: () => _ChainOfThoughtToolStep(
+                  part: part,
+                  conversationId: widget.conversationId,
+                  isFirst: isFirst,
+                  isLast: isLast,
+                  onRecoveredAnswer: widget.onRecoveredAnswer,
+                ),
               );
             }),
           ],
@@ -4236,6 +4341,49 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
       widthFactor: fillWidth ? null : 1,
       child: card,
     );
+  }
+}
+
+/// 测试用：步骤 builder 真正执行过的次数（缓存命中不计入）。
+@visibleForTesting
+int debugTimelineStepBuilderCount = 0;
+
+/// 步骤级 memo：指纹不变时把上一帧渲染好的子树原样返回。
+///
+/// 返回同一个 widget 实例会让 `Element.updateChild` 直接短路，整棵子树连
+/// build 都不跑（长思考／多工具调用时，已完成的步骤不必每帧重做）。
+/// 指纹必须覆盖 [builder] 读到的每一个外部输入，否则会吞掉更新。
+class _CachedTimelineStep extends StatefulWidget {
+  const _CachedTimelineStep({
+    super.key,
+    required this.signature,
+    required this.builder,
+  });
+
+  final Object signature;
+  final Widget Function() builder;
+
+  @override
+  State<_CachedTimelineStep> createState() => _CachedTimelineStepState();
+}
+
+class _CachedTimelineStepState extends State<_CachedTimelineStep> {
+  Widget? _rendered;
+
+  @override
+  void didUpdateWidget(covariant _CachedTimelineStep oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.signature != widget.signature) {
+      _rendered = null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rendered = _rendered;
+    if (rendered != null) return rendered;
+    debugTimelineStepBuilderCount++;
+    return _rendered = widget.builder();
   }
 }
 
@@ -4264,7 +4412,7 @@ class _TimelineStepShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fg = _chatSurfaceForegroundPalette(context);
+    final fg = chatSurfaceForegroundPalette(context);
     final headerContent = Padding(
       padding: const EdgeInsets.symmetric(vertical: _timelineStepPaddingV),
       child: Row(
@@ -4504,7 +4652,7 @@ class _ChainOfThoughtReasoningStepState
 
   @override
   Widget build(BuildContext context) {
-    final fg = _chatSurfaceForegroundPalette(context);
+    final fg = chatSurfaceForegroundPalette(context);
     final l10n = AppLocalizations.of(context)!;
     final enableReasoningMarkdown = context.select<SettingsProvider, bool>(
       (s) => s.enableReasoningMarkdown,
@@ -4760,7 +4908,7 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final fg = _chatSurfaceForegroundPalette(context);
+    final fg = chatSurfaceForegroundPalette(context);
     final showToolResultSummary = context.select<SettingsProvider, bool>(
       (s) => s.showToolResultSummary,
     );
@@ -5047,7 +5195,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final fg = _chatSurfaceForegroundPalette(context);
+    final fg = chatSurfaceForegroundPalette(context);
     final hideToolResultImages = context.select<SettingsProvider, bool>(
       (s) => s.hideToolResultImages,
     );
@@ -5390,7 +5538,7 @@ class _AskUserToolCardState extends State<_AskUserToolCard> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final fg = _chatSurfaceForegroundPalette(context);
+    final fg = chatSurfaceForegroundPalette(context);
     final l10n = AppLocalizations.of(context)!;
     final expanded = _expanded ?? true;
     return _buildSharedChatSurface(
@@ -5617,7 +5765,7 @@ class _AskUserInlineBodyState extends State<_AskUserInlineBody> {
 
   @override
   Widget build(BuildContext context) {
-    final fg = _chatSurfaceForegroundPalette(context);
+    final fg = chatSurfaceForegroundPalette(context);
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final askUserService = context.watch<AskUserInteractionService>();
@@ -5749,7 +5897,7 @@ class _AskUserQuestionView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fg = _chatSurfaceForegroundPalette(context);
+    final fg = chatSurfaceForegroundPalette(context);
     final isMulti = question.kind == AskUserQuestionKind.multi;
     final questionText = Text(
       question.question,
@@ -5810,7 +5958,7 @@ class _AskUserAnsweredQuestion extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final fg = _chatSurfaceForegroundPalette(context);
+    final fg = chatSurfaceForegroundPalette(context);
     final displayAnswer = answer.trim().isEmpty
         ? AppLocalizations.of(context)!.askUserCardSkipped
         : answer.trim();
@@ -5864,7 +6012,7 @@ class _AskUserOptionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final fg = _chatSurfaceForegroundPalette(context);
+    final fg = chatSurfaceForegroundPalette(context);
     final bg = selected
         ? cs.primary.withValues(alpha: 0.09)
         : Colors.transparent;
@@ -5936,7 +6084,7 @@ class _AskUserOtherRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final fg = _chatSurfaceForegroundPalette(context);
+    final fg = chatSurfaceForegroundPalette(context);
     final l10n = AppLocalizations.of(context)!;
     final effectiveSelected = selected;
     final bg = effectiveSelected
@@ -5998,7 +6146,7 @@ class _AskUserIndexBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final fg = _chatSurfaceForegroundPalette(context);
+    final fg = chatSurfaceForegroundPalette(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: 24,
@@ -6036,7 +6184,7 @@ class _AskUserSkipPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final fg = _chatSurfaceForegroundPalette(context);
+    final fg = chatSurfaceForegroundPalette(context);
     final l10n = AppLocalizations.of(context)!;
     return IosCardPress(
       borderRadius: BorderRadius.circular(7),
@@ -6418,7 +6566,7 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final fg = _chatSurfaceForegroundPalette(context);
+    final fg = chatSurfaceForegroundPalette(context);
     final l10n = AppLocalizations.of(context)!;
     final enableReasoningMarkdown = context.select<SettingsProvider, bool>(
       (s) => s.enableReasoningMarkdown,

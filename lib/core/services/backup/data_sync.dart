@@ -31,6 +31,8 @@ import 'device_local_settings_writer.dart';
 import 'joaiclient_archive.dart';
 import 'local_device_settings_ledger.dart';
 import 'restore_bundle_preparation.dart';
+import 'restore_business_lease.dart';
+import 'restore_workspace_lock.dart';
 import 'temporary_restore_file.dart';
 
 typedef _BackupEntryMetadata = ({int bytes, String sha256});
@@ -41,6 +43,34 @@ typedef _VersionedBackupInfo = ({
   Map<String, Object?>? businessEntityRowIds,
   String normalizedManifestSha256,
 });
+
+/// 一个打包好的归档，外加打包过程中顺带学到的信息。
+typedef PreparedBackupArchive = ({
+  File file,
+  ChatDatabaseSnapshotInfo? info,
+  String appVersion,
+});
+
+/// 把带单位的 [BackupProgressSink] 适配成本仓库老管线的 [ProgressCallback]。
+///
+/// 两套进度类型暂时并存：导入器与备份流水线仍上报 [ProgressUpdate]（只有一个
+/// 0..1 的比值），而新的本地副本界面用的是上游的 [BackupProgress]（带单位、
+/// 可取消标记与明细）。这里把比值放大成千分比交给进度条，阶段字段原样透传，
+/// 所以阶段图标与文案都是真的。明细副标题只在 [BackupProgress.total] 非空时
+/// 才显示，因此不填明细不会出现编造的文案。
+ProgressCallback? adaptBackupProgressSink(BackupProgressSink? sink) {
+  if (sink == null) return null;
+  return (update) {
+    final value = update.value;
+    sink(
+      BackupProgress(
+        phase: update.phase ?? BackupPhase.preparing,
+        processed: value == null ? 0 : (value.clamp(0, 1) * 1000).round(),
+        total: value == null ? null : 1000,
+      ),
+    );
+  };
+}
 
 final class _BackupPackArgs {
   const _BackupPackArgs({
@@ -121,7 +151,7 @@ class DataSync {
 
   /// 本次恢复从包内解析出的设备记录（含所有设备，不只本机）。
   ///
-  /// 供恢复收尾弹窗展示「本机设置记录」区块——恢复流程结束时解包目录会被
+  /// 供恢复收尾弹窗展示“本机设置记录”区块——恢复流程结束时解包目录会被
   /// 删除，所以必须在流程内就留一把，不能等 UI 再去读包。
   List<DeviceSettingsRecord> _lastLedgerRecords = const [];
   List<DeviceSettingsRecord> get lastLedgerRecords => _lastLedgerRecords;
@@ -148,18 +178,37 @@ class DataSync {
   static Future<PreparedRestoreBundle> prepareStartupRestoreFromFile({
     required Directory appDataDirectory,
     required File sourceFile,
+    RestoreBusinessLease? businessLease,
     BackupCancelToken? cancelToken,
   }) async {
     if (!await sourceFile.exists()) {
       throw const FormatException('startup_recovery_snapshot_missing');
     }
+    final ownedLease = businessLease == null
+        ? await RestoreBusinessLease.acquire(appDataDirectory: appDataDirectory)
+        : null;
+    final lease = businessLease ?? ownedLease!;
+    final workspaceLock = RestoreWorkspaceLock(
+      appDataDirectory: appDataDirectory,
+    );
     final tmp = await Directory.systemTemp.createTemp(
       'joaiclient_startup_restore_',
     );
     final extractDir = Directory(p.join(tmp.path, 'extract'));
     await extractDir.create(recursive: true);
+    registerLiveTempPath(tmp.path);
+    Object? restoreError;
     File? payloadFile;
     try {
+      final expectedLeasePath = p.join(
+        appDataDirectory.absolute.path,
+        RestoreBusinessLease.leaseDirectoryName,
+        RestoreBusinessLease.lockFileName,
+      );
+      if (lease.isClosed ||
+          !p.equals(lease.lockFile.absolute.path, expectedLeasePath)) {
+        throw StateError('restore_startup_business_lease');
+      }
       final isJoaiclient = await JoaiclientArchive.isJoaiclient(sourceFile);
       if (isJoaiclient) {
         payloadFile = File(p.join(tmp.path, 'payload.zip'));
@@ -187,7 +236,12 @@ class DataSync {
       if (!versioned.includeChats) {
         throw const FormatException('startup_recovery_snapshot_database');
       }
-      return await _prepareRestoreBundle(
+      // 在替换候选与安装回执双双落盘之前阻断准入：这次还原一旦被打断，
+      // 已发布的候选不得在下次启动覆盖刚建立的数据库。
+      await workspaceLock.synchronized(
+        workspaceLock.beginSnapshotRecoveryWhileLocked,
+      );
+      final prepared = await _prepareRestoreBundle(
         appDataPath: appDataDirectory.path,
         extractedPath: extractDir.path,
         sourceManifestSha256: versioned.normalizedManifestSha256,
@@ -195,9 +249,18 @@ class DataSync {
         includeFiles: versioned.includeFiles,
         restoreChats: true,
         restoreFiles: versioned.includeFiles,
+        useExistingLocalAttachments: true,
       );
+      await workspaceLock.synchronized(
+        workspaceLock.finishSnapshotRecoveryWhileLocked,
+      );
+      return prepared;
+    } catch (error) {
+      restoreError = error;
+      rethrow;
     } finally {
-      await _deleteDirectoryQuietly(tmp);
+      await deleteTempDirectoryWhenIsolateSafe(tmp, error: restoreError);
+      await ownedLease?.close();
     }
   }
 
@@ -216,6 +279,7 @@ class DataSync {
     required bool includeFiles,
     required bool restoreChats,
     required bool restoreFiles,
+    bool useExistingLocalAttachments = false,
   }) => Isolate.run(() async {
     return RestoreBundlePreparation.prepare(
       appDataDirectory: Directory(appDataPath),
@@ -225,6 +289,7 @@ class DataSync {
       bundleIncludesFiles: includeFiles,
       restoreChats: restoreChats,
       restoreFiles: restoreFiles,
+      useExistingLocalAttachments: useExistingLocalAttachments,
     );
   });
 
@@ -410,6 +475,138 @@ class DataSync {
     ProgressCallback? onProgress,
     BackupCancelToken? cancelToken,
     Map<String, String>? ledgerEntries,
+  }) async => (await _prepareBackupArchive(
+    includeChats: cfg.includeChats,
+    includeFiles: cfg.includeFiles,
+    ledgerEntries: ledgerEntries,
+    onProgress: onProgress,
+    cancelToken: cancelToken,
+  )).file;
+
+  /// 为本地副本目录打包实时数据库。
+  ///
+  /// 与普通备份同一套归档，只是不含附件；并把打包时已经算出的行数一并交回，
+  /// 好让保留策略不必重新打开归档就能判断每份副本装了多少数据。
+  Future<PreparedBackupArchive> prepareLocalSnapshotArchive({
+    BackupProgressSink? onProgress,
+    BackupCancelToken? cancelToken,
+  }) => _prepareBackupArchive(
+    includeChats: true,
+    includeFiles: false,
+    onProgress: adaptBackupProgressSink(onProgress),
+    cancelToken: cancelToken,
+  );
+
+  /// 把一份“不是实时库”的数据库变成普通备份归档。
+  ///
+  /// 用于崩溃恢复移开的数据库族：它是裸 SQLite 族，没有自己的还原通路，
+  /// 打成归档后导出与还原就都能复用既有链路。
+  ///
+  /// 更旧的 schema 会先就地升级；比本应用更新的 schema 直接拒绝
+  /// （`database_schema_too_new`），因为 JO 的准备流程只认当前 schema。
+  Future<File> prepareBackupFileFromDatabase(
+    File sourceDatabase, {
+    BackupProgressSink? onProgress,
+    BackupCancelToken? cancelToken,
+  }) async {
+    if (!await sourceDatabase.exists()) {
+      throw FileSystemException(
+        'Database copy does not exist',
+        sourceDatabase.path,
+      );
+    }
+    final tmp = await _ensureTempDir();
+    final stagingDirectory = await Directory(
+      p.join(tmp.path, 'kelivo_adopt_${DateTime.now().microsecondsSinceEpoch}'),
+    ).create(recursive: true);
+    registerLiveTempPath(stagingDirectory.path);
+    Object? adoptError;
+    try {
+      final working = File(
+        p.join(stagingDirectory.path, AppDatabase.databaseFileName),
+      );
+      // 整个族，不只是数据库本体：写入进行中取到的副本，已提交的事务还在日志
+      // 里，只打开数据库会静默丢掉它们。
+      for (final suffix in const ['', '-wal', '-shm', '-journal']) {
+        final sidecar = File('${sourceDatabase.path}$suffix');
+        if (await FileSystemEntity.type(sidecar.path, followLinks: false) ==
+            FileSystemEntityType.file) {
+          await sidecar.copy('${working.path}$suffix');
+        }
+      }
+
+      // 与还原一份备份走同一套准备：先按需升级旧的 schema，再回放日志、
+      // 终止残留的流式状态、切回 DELETE 模式并校验结果。
+      final schemaVersion =
+          ChatDatabaseRepository.readInstalledSchemaVersion(working);
+      if (schemaVersion > AppDatabase.currentSchemaVersion) {
+        throw StateError('database_schema_too_new');
+      }
+      if (schemaVersion < 1) {
+        throw StateError('database_schema_version');
+      }
+      if (schemaVersion < AppDatabase.currentSchemaVersion) {
+        await ChatDatabaseRepository.migrateInstalledDatabase(working);
+      }
+      await ChatDatabaseRepository.prepareSnapshotForRestore(working);
+
+      final database = AppDatabase.open(file: working);
+      final ({String settingsJson, Map<String, List<String>> entityRowIds})
+      businessExport;
+      try {
+        businessExport = await _exportSettingsFrom(
+          BusinessRepository(database),
+        );
+      } finally {
+        await database.close();
+      }
+
+      return (await _prepareBackupArchive(
+        includeChats: true,
+        includeFiles: false,
+        exportSettings: () async => businessExport,
+        snapshotDatabase:
+            (
+              destination, {
+              ProgressCallback? onProgress,
+              BackupCancelToken? cancelToken,
+            }) => ChatDatabaseRepository.createConsistentSnapshot(
+              sourceFile: working,
+              destinationFile: destination,
+            ),
+        onProgress: adaptBackupProgressSink(onProgress),
+        cancelToken: cancelToken,
+      )).file;
+    } catch (error) {
+      adoptError = error;
+      rethrow;
+    } finally {
+      await deleteTempDirectoryWhenIsolateSafe(
+        stagingDirectory,
+        error: adoptError,
+      );
+    }
+  }
+
+  /// 打包一份归档。聊天与附件的取舍、业务设置来源、数据库来源都由调用方给定。
+  ///
+  /// 从 [prepareBackupFile] 里拆出来，是为了让“不是实时库”的数据库——例如
+  /// 崩溃恢复移开的副本——也能变成一份普通备份，而不必自带一条还原通路。
+  Future<PreparedBackupArchive> _prepareBackupArchive({
+    required bool includeChats,
+    required bool includeFiles,
+    Map<String, String>? ledgerEntries,
+    Future<({String settingsJson, Map<String, List<String>> entityRowIds})>
+    Function()?
+    exportSettings,
+    Future<ChatDatabaseSnapshotInfo> Function(
+      File destination, {
+      ProgressCallback? onProgress,
+      BackupCancelToken? cancelToken,
+    })?
+    snapshotDatabase,
+    ProgressCallback? onProgress,
+    BackupCancelToken? cancelToken,
   }) async {
     cancelToken?.throwIfCancelled();
     onProgress?.call(
@@ -420,6 +617,7 @@ class DataSync {
     final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
     final workDir = Directory(p.join(tmp.path, 'kelivo_backup_$timestamp'));
     await workDir.create(recursive: true);
+    registerLiveTempPath(workDir.path);
 
     final outPath = p.join(workDir.path, 'kelivo_backup_$timestamp.zip');
     final outFile = File(outPath);
@@ -428,10 +626,12 @@ class DataSync {
     File? manifestTmp;
     File? settingsTmp;
     File? databaseTmp;
+    // 隔离线程可能还活着时置位：此时既不能删工作目录，也不能删里面的中间文件。
+    var abandonWorkDir = false;
     try {
       // --- 第 1 步：准备需要 ChatService 的临时文件（主 isolate）---
       // settings.json
-      final businessExport = await _exportBusinessSettings();
+      final businessExport = await (exportSettings ?? _exportBusinessSettings)();
       cancelToken?.throwIfCancelled();
       final settingsFile = await _writeTempText(
         workDir,
@@ -441,20 +641,21 @@ class DataSync {
       settingsTmp = settingsFile;
 
       ChatDatabaseSnapshotInfo? snapshotInfo;
-      if (cfg.includeChats) {
+      if (includeChats) {
         onProgress?.call(
-          const ProgressUpdate(phase: BackupPhase.snapshot, value: 0.1),
+          const ProgressUpdate(phase: BackupPhase.snapshottingDatabase, value: 0.1),
         );
         final databaseFile = File(p.join(workDir.path, '_bk_kelivo.db'));
         databaseTmp = databaseFile;
-        snapshotInfo = await chatService.createBackupDatabaseSnapshot(
+        snapshotInfo = await (snapshotDatabase ??
+            chatService.createBackupDatabaseSnapshot)(
           databaseFile,
           onProgress: onProgress,
           cancelToken: cancelToken,
         );
         cancelToken?.throwIfCancelled();
         onProgress?.call(
-          const ProgressUpdate(phase: BackupPhase.snapshot, value: 0.35),
+          const ProgressUpdate(phase: BackupPhase.snapshottingDatabase, value: 0.35),
         );
       }
 
@@ -495,7 +696,6 @@ class DataSync {
       final manifestPath = manifestFile.path;
       final settingsPath = settingsFile.path;
       final databasePath = databaseTmp?.path;
-      final includeFiles = cfg.includeFiles;
       final verifyDirPath = p.join(workDir.path, '_verify');
 
       // --- 第 2 步：在独立 isolate 中执行 CPU 密集的 ZIP 打包 ---
@@ -511,7 +711,7 @@ class DataSync {
           settingsPath: settingsPath,
           databasePath: databasePath,
           snapshotInfo: snapshotInfo,
-          includeChats: cfg.includeChats,
+          includeChats: includeChats,
           includeFiles: includeFiles,
           appVersion: appVersion,
           businessEntityRowIds: businessExport.entityRowIds,
@@ -533,16 +733,31 @@ class DataSync {
         const ProgressUpdate(phase: BackupPhase.finalizing, value: 1),
       );
 
-      return outFile;
-    } catch (_) {
-      await _deleteDirectoryQuietly(workDir);
+      return (
+        file: takePreparedBackupFile(outFile, cancelToken),
+        info: snapshotInfo,
+        appVersion: appVersion,
+      );
+    } catch (error) {
+      if (shouldDeleteTempPathsAfterIsolateError(error)) {
+        unregisterLiveTempPath(workDir.path);
+        await _deleteDirectoryQuietly(workDir);
+      } else {
+        // 隔离线程可能还活着：把工作目录的删除挂到它真正退出之后，
+        // 并且先别碰里面的中间文件。
+        abandonWorkDir = true;
+        await deleteTempDirectoryWhenIsolateSafe(workDir, error: error);
+      }
       rethrow;
     } finally {
       // 清理临时中间文件。最终 zip 会返回给调用方，
       // 并由上传/导出调用方在使用完毕后负责删除。
-      await _deleteFileQuietly(settingsTmp);
-      await _deleteFileQuietly(databaseTmp);
-      await _deleteFileQuietly(manifestTmp);
+      // 快照/打包的隔离线程可能还活着时，整个目录都不动。
+      if (!abandonWorkDir) {
+        await _deleteFileQuietly(settingsTmp);
+        await _deleteFileQuietly(databaseTmp);
+        await _deleteFileQuietly(manifestTmp);
+      }
     }
   }
 
@@ -564,6 +779,8 @@ class DataSync {
     final workDir = await Directory.systemTemp.createTemp(
       'kelivo_migration_backup_',
     );
+    registerLiveTempPath(workDir.path);
+    Object? migrationError;
     final outFile = File(
       p.join(outputDirectory.path, migrationBackupFileName()),
     );
@@ -593,23 +810,52 @@ class DataSync {
         );
       });
       return outFile;
-    } catch (_) {
+    } catch (error) {
       if (await outFile.exists()) await outFile.delete();
+      migrationError = error;
       rethrow;
     } finally {
-      if (await workDir.exists()) await workDir.delete(recursive: true);
+      await deleteTempDirectoryWhenIsolateSafe(workDir, error: migrationError);
     }
   }
 
   static Future<void> cleanupTemporaryBackupFile(File? file) async {
     if (file == null) return;
     final parent = file.parent;
+    // 这份归档用完了，它和它的工作目录都不再是"正在使用中的临时路径"，
+    // 于是重新交回按年龄回收的管辖。
+    unregisterLiveTempPath(file.path);
+    unregisterLiveTempPath(parent.path);
     await _deleteFileQuietly(file);
     try {
       if (await parent.exists() && await parent.list().isEmpty) {
         await parent.delete();
       }
     } catch (_) {}
+  }
+
+  /// 把打好的归档交给调用方前，最后确认一次没有被取消。
+  static File takePreparedBackupFile(
+    File outFile,
+    BackupCancelToken? cancelToken,
+  ) {
+    if (cancelToken?.isCancelled == true) {
+      throw const BackupCancelledException();
+    }
+    return outFile;
+  }
+
+  /// 导出到本地文件：无论落盘成功还是失败，都要把临时 zip 收走。
+  @visibleForTesting
+  static Future<void> completeLocalFileExport({
+    required File exported,
+    required Future<void> Function(File exported) persist,
+  }) async {
+    try {
+      await persist(exported);
+    } finally {
+      await cleanupTemporaryBackupFile(exported);
+    }
   }
 
   static Future<void> _deleteFileQuietly(File? file) async {
@@ -628,6 +874,64 @@ class DataSync {
         await directory.delete(recursive: true);
       }
     } catch (_) {}
+  }
+
+  @visibleForTesting
+  static bool shouldDeleteTempPathsAfterIsolateError(Object? error) {
+    if (error is BackupIsolateTimeoutException) return error.isolateExited;
+    if (error is BackupCancelledException) return error.isolateExited;
+    return true;
+  }
+
+  /// 删除一个临时目录，但只在隔离线程确实不会再写它的时候删。
+  ///
+  /// 线程已经退出（或这次失败与线程无关）就立刻删；线程可能还活着，就等它
+  /// 真正退出的那一刻再删。绝不能立刻删——那个目录可能正被一个卡在本地
+  /// 调用里的线程写入，删早了它会写进一个已删除的路径，或把文件重建出来。
+  static Future<void> deleteTempDirectoryWhenIsolateSafe(
+    Directory directory, {
+    Object? error,
+  }) async {
+    if (shouldDeleteTempPathsAfterIsolateError(error)) {
+      unregisterLiveTempPath(directory.path);
+      await _deleteDirectoryQuietly(directory);
+      return;
+    }
+    final isolateExit = error == null ? null : backupIsolateExitFuture(error);
+    if (isolateExit == null) return;
+    unawaited(
+      isolateExit.then((_) {
+        unregisterLiveTempPath(directory.path);
+        return _deleteDirectoryQuietly(directory);
+      }),
+    );
+  }
+
+  /// 正在被使用的临时路径。
+  ///
+  /// 按年龄清理（[_cleanupPreviousBackupTempFiles]）会回收超过 6 小时的
+  /// 临时条目，但一个跑得够久的备份同样会超过这个年龄，于是它的工作目录
+  /// 会被另一个提供者的清理顺手删掉。登记过的路径不参与这种回收。
+  static final Set<String> _liveTempPaths = {};
+
+  static void registerLiveTempPath(String path) {
+    _liveTempPaths.add(p.normalize(p.absolute(path)));
+  }
+
+  static void unregisterLiveTempPath(String path) {
+    _liveTempPaths.remove(p.normalize(p.absolute(path)));
+  }
+
+  static bool _isLiveTempPath(String path) {
+    final normalized = p.normalize(p.absolute(path));
+    for (final live in _liveTempPaths) {
+      if (normalized == live ||
+          p.isWithin(live, normalized) ||
+          p.isWithin(normalized, live)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /// 从 `kelivo_backup_<iso-with-dashes>` 名称中解析出创建时间
@@ -652,6 +956,11 @@ class DataSync {
     );
   }
 
+  @visibleForTesting
+  static Future<void> debugCleanupPreviousBackupTempFiles(Directory tmp) {
+    return _cleanupPreviousBackupTempFiles(tmp);
+  }
+
   static Future<void> _cleanupPreviousBackupTempFiles(Directory tmp) async {
     try {
       if (!await tmp.exists()) return;
@@ -671,6 +980,7 @@ class DataSync {
       }
 
       await for (final ent in tmp.list(followLinks: false)) {
+        if (_isLiveTempPath(ent.path)) continue;
         final name = p.basename(ent.path);
         if (ent is Directory && name.startsWith('kelivo_backup_')) {
           if (await isStale(ent, name)) await _deleteDirectoryQuietly(ent);
@@ -1787,9 +2097,13 @@ class DataSync {
   }
 
   Future<({String settingsJson, Map<String, List<String>> entityRowIds})>
-  _exportBusinessSettings() async {
+  _exportBusinessSettings() async => _exportSettingsFrom(businessRepository);
+
+  /// 从任意一个业务仓储导出设置，供“不是实时库”的数据库使用。
+  Future<({String settingsJson, Map<String, List<String>> entityRowIds})>
+  _exportSettingsFrom(BusinessRepository repository) async {
     final exported = BusinessSettingsRouter.exportSnapshotWithRowIds(
-      await businessRepository.readSnapshot(),
+      await repository.readSnapshot(),
     );
     final settings = Map<String, Object>.from(exported.settings);
     settings.removeWhere((key, _) => BackupSettingsValidator.shouldIgnore(key));
@@ -1890,7 +2204,9 @@ class DataSync {
       p.join(tmp.path, 'restore_${DateTime.now().millisecondsSinceEpoch}'),
     );
     await extractDir.create(recursive: true);
+    registerLiveTempPath(extractDir.path);
 
+    Object? restoreError;
     File? payloadFile;
     try {
       final isJoaiclient = await JoaiclientArchive.isJoaiclient(file);
@@ -2186,8 +2502,11 @@ class DataSync {
       if (restoreBusiness != null) {
         await _runLiveBusinessRestore(restoreBusiness);
       }
+    } catch (error) {
+      restoreError = error;
+      rethrow;
     } finally {
-      await _deleteDirectoryQuietly(extractDir);
+      await deleteTempDirectoryWhenIsolateSafe(extractDir, error: restoreError);
     }
   }
 }

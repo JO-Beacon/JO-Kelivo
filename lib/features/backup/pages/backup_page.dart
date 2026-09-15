@@ -30,6 +30,8 @@ import '../../../core/services/native_file_save.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/restart_app_action.dart';
+import '../../../shared/utils/format_bytes.dart';
+import 'local_snapshots_page.dart';
 import '../../../core/services/backup/cherry_importer.dart';
 import '../../../core/services/backup/chatbox_importer.dart';
 import '../../../core/services/backup/deepseek_importer.dart';
@@ -42,17 +44,6 @@ import '../backup_restart_dialog.dart';
 import '../device_ledger_labels.dart';
 import '../widgets/backup_reminder_helpers.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
-
-// 文件大小格式化器（B、KB、MB、GB）
-String _fmtBytes(int bytes) {
-  const kb = 1024;
-  const mb = kb * 1024;
-  const gb = mb * 1024;
-  if (bytes >= gb) return '${(bytes / gb).toStringAsFixed(2)} GB';
-  if (bytes >= mb) return '${(bytes / mb).toStringAsFixed(2)} MB';
-  if (bytes >= kb) return '${(bytes / kb).toStringAsFixed(2)} KB';
-  return '$bytes B';
-}
 
 class BackupPage extends StatefulWidget {
   const BackupPage({super.key});
@@ -321,12 +312,6 @@ class _BackupPageState extends State<BackupPage> {
             body: ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
               children: [
-                if (localSnapshot != null)
-                  _LocalSnapshotSection(
-                    enabled: localSnapshot.settings.enabled,
-                    onChanged: localSnapshot.setEnabled,
-                    onTakeNow: localSnapshot.takeNow,
-                  ),
                 // Section 1: 备份管理
                 header(l10n.backupPageBackupManagement, first: true),
                 _iosSectionCard(
@@ -368,6 +353,14 @@ class _BackupPageState extends State<BackupPage> {
                 header(l10n.backupReminderSectionTitle),
                 const _BackupReminderMobileSection(),
 
+                // 本地副本与桌面端同位置：备份提醒之后、本地备份之前。
+                // 它有自己的分节标题，是因为这一节的入口（开关、管理副本）
+                // 与下面“数据迁移与兼容入口”不是一回事。
+                if (localSnapshot != null) ...[
+                  header(l10n.localSnapshotSectionTitle),
+                  const _LocalSnapshotMobileSection(),
+                ],
+
                 // Section 2: 数据迁移与兼容入口
                 ..._buildMobileLocalBackupSection(context, l10n, vm, header),
 
@@ -383,7 +376,7 @@ class _BackupPageState extends State<BackupPage> {
                           _showWebDavSettingsPage(context, settings, vm, cfg),
                     ),
                     _iosDivider(context),
-                    // 云备份与本地导出共用同一「带本机设置」档位。
+                    // 云备份与本地导出共用同一“带本机设置”档位。
                     _iosSwitchRow(
                       context,
                       icon: Lucide.Settings2,
@@ -829,7 +822,7 @@ class _BackupPageState extends State<BackupPage> {
                           _showS3SettingsPage(context, settings, s3Vm, s3Cfg),
                     ),
                     _iosDivider(context),
-                    // 云备份与本地导出共用同一「带本机设置」档位。
+                    // 云备份与本地导出共用同一“带本机设置”档位。
                     _iosSwitchRow(
                       context,
                       icon: Lucide.Settings2,
@@ -1308,23 +1301,6 @@ class _BackupPageState extends State<BackupPage> {
               onTap: () => _doImportLocal(context, vm),
             ),
           ),
-          _BackupSubcategoryLabel(label: l10n.backupPageCuplivoFormat),
-          _mobileBackupActionPair(
-            first: IosTileButton(
-              key: const ValueKey('mobile-cuplivo-export-action'),
-              icon: Lucide.Export,
-              label: l10n.backupPageExportAction,
-              enabled: false,
-              onTap: () {},
-            ),
-            second: IosTileButton(
-              key: const ValueKey('mobile-cuplivo-import-action'),
-              icon: Lucide.Import2,
-              label: l10n.backupPageImportAction,
-              enabled: false,
-              onTap: () {},
-            ),
-          ),
         ],
       ),
       header(l10n.backupPageExternalImport),
@@ -1498,7 +1474,7 @@ class _BackupPageState extends State<BackupPage> {
           }
         },
       );
-      // 「带」档但指纹采集失败时提醒：历史档案照常带走了，本机当前值没进包。
+      // “带”档但指纹采集失败时提醒：历史档案照常带走了，本机当前值没进包。
       if (context.mounted && vm.lastLedgerUnrecognized) {
         showAppSnackBar(
           context,
@@ -1756,36 +1732,62 @@ class _BackupPageState extends State<BackupPage> {
   }
 }
 
-class _LocalSnapshotSection extends StatelessWidget {
-  const _LocalSnapshotSection({
-    required this.enabled,
-    required this.onChanged,
-    required this.onTakeNow,
-  });
-  final bool enabled;
-  final ValueChanged<bool> onChanged;
-  final Future<void> Function() onTakeNow;
+class _LocalSnapshotMobileSection extends StatelessWidget {
+  const _LocalSnapshotMobileSection();
+
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
+    final vm = context.watch<LocalSnapshotProvider>();
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _iosSectionCard(
           children: [
             _iosSwitchRow(
               context,
               icon: Lucide.Database,
-              label: l10n.localSnapshotEnabled,
-              value: enabled,
-              onChanged: onChanged,
+              label: l10n.localSnapshotEnabledTitle,
+              value: vm.settings.enabled,
+              onChanged: (value) => context
+                  .read<LocalSnapshotProvider>()
+                  .updateSettings(vm.settings.copyWith(enabled: value)),
+            ),
+            _iosDivider(context),
+            _iosNavRow(
+              context,
+              icon: Lucide.FolderOpen,
+              label: l10n.localSnapshotManageCopies,
+              detailText: l10n.localSnapshotUsage(
+                vm.copies.length,
+                formatBytes(vm.totalBytes),
+              ),
+              onTap: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(builder: (_) => const LocalSnapshotsPage()),
+              ),
             ),
             _iosDivider(context),
             IosTileButton(
               icon: Lucide.Download,
               label: l10n.localSnapshotTakeNow,
-              onTap: () => onTakeNow(),
+              onTap: () => vm.takeNow(),
             ),
           ],
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+          child: Text(
+            vm.settings.enabled
+                ? l10n.localSnapshotEnabledSubtitle
+                : l10n.localSnapshotCopiesScopeNote,
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.45,
+              color: cs.onSurface.withValues(alpha: 0.55),
+            ),
+          ),
         ),
         const SizedBox(height: 10),
       ],
@@ -2894,7 +2896,7 @@ class _RemoteListSheet extends StatelessWidget {
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
-                                          _fmtBytes(it.size),
+                                          formatBytes(it.size),
                                           style: TextStyle(
                                             fontSize: 12,
                                             color: cs.onSurface.withValues(

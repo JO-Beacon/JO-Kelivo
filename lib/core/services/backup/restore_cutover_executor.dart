@@ -2,8 +2,10 @@ import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../database/app_database.dart';
+import '../../database/database_installation_gate.dart';
 import 'restore_bundle_mover.dart';
 import 'restore_bundle_staging.dart';
 import 'restore_durability.dart';
@@ -401,12 +403,30 @@ final class RestoreCutoverExecutor {
       if (manifestType != FileSystemEntityType.notFound) {
         throw StateError('restore_cutover_previous_manifest_type');
       }
-      await RestoreLiveDatabase.normalize(
-        databaseFile: File(
-          p.join(appDataDirectory.path, AppDatabase.databaseFileName),
-        ),
-        durability: durability,
-      );
+      try {
+        await RestoreLiveDatabase.normalize(
+          databaseFile: File(
+            p.join(appDataDirectory.path, AppDatabase.databaseFileName),
+          ),
+          durability: durability,
+        );
+      } catch (error) {
+        // 一份已验证、已持久化的候选正被两把租约同时持有。现行数据缺失或
+        // 损坏不能阻止还原这份候选。原始文件族保留为现场；锁、I/O 与拓扑
+        // 类错误仍然快速失败，因为它们并不能证明数据库已损坏。
+        final orphanSidecar =
+            error is StateError &&
+            error.message == 'restore_live_database_orphan_sidecar';
+        final corruptDatabase =
+            error is sqlite.SqliteException &&
+            (error.resultCode == sqlite.SqlError.SQLITE_CORRUPT ||
+                error.resultCode == sqlite.SqlError.SQLITE_NOTADB);
+        if (!orphanSidecar && !corruptDatabase) rethrow;
+        await DatabaseInstallationGate.preserveFailedDatabaseForRestore(
+          appDataDirectory: appDataDirectory,
+          durability: durability,
+        );
+      }
       final bundle = await RestorePreviousBuilder.build(
         appDataDirectory: appDataDirectory,
         preparedReceipt: preparedReceipt,

@@ -78,6 +78,7 @@ final class RestoreBundleStaging {
     required Directory extractedDirectory,
     required bool includeChats,
     required bool includeFiles,
+    bool useExistingLocalAttachments = false,
     bool? sourceIncludesChats,
     bool? sourceIncludesFiles,
     required String sourceManifestSha256,
@@ -188,9 +189,13 @@ final class RestoreBundleStaging {
       if (!includeFiles) {
         // 仅覆盖聊天：在发布前将本地附件标记为不可用，
         // 这样目标同路径文件就不会被当作已恢复内容。
+        // 用户明确选择的**本机快照**例外：允许复核快照目录内真实存在的受管文件。
         await ChatDatabaseRepository.recomputeAttachmentAvailabilityOnDatabaseFile(
           databaseFile: stagedDatabaseFile,
           filesRestored: false,
+          localSnapshotAppDataDirectory: useExistingLocalAttachments
+              ? appDataDirectory
+              : null,
         );
       }
       stagedEntries[_databaseEntry] = (

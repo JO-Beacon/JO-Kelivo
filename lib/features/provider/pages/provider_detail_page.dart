@@ -818,47 +818,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       children: [
-        if (widget.keyName.toLowerCase() == 'kelivoin') ...[
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: cs.primary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: cs.primary.withValues(alpha: 0.35)),
-            ),
-            child: Text.rich(
-              TextSpan(
-                text: 'Powered by ',
-                style: TextStyle(color: cs.onSurface.withValues(alpha: 0.8)),
-                children: [
-                  TextSpan(
-                    text: 'Pollinations AI',
-                    style: TextStyle(
-                      color: cs.primary,
-                      fontWeight: AppFontWeights.emphasis,
-                    ),
-                    recognizer: TapGestureRecognizer()
-                      ..onTap = () async {
-                        final uri = Uri.parse('https://pollinations.ai');
-                        try {
-                          final ok = await launchUrl(
-                            uri,
-                            mode: LaunchMode.externalApplication,
-                          );
-                          if (!ok) {
-                            await launchUrl(uri);
-                          }
-                        } catch (_) {
-                          await launchUrl(uri);
-                        }
-                      },
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
         if (widget.keyName.toLowerCase() == 'tensdaq') ...[
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -914,59 +873,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           ),
           const SizedBox(height: 12),
         ],
-        if (widget.keyName.toLowerCase() == 'siliconflow') ...[
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: cs.primary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: cs.primary.withValues(alpha: 0.35)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '已内置硅基流动的免费模型，无需 API Key。若需更强大的模型，请申请并在此配置你自己的 API Key。',
-                  style: TextStyle(color: cs.onSurface.withValues(alpha: 0.8)),
-                ),
-                const SizedBox(height: 6),
-                Text.rich(
-                  TextSpan(
-                    text: '官网：',
-                    style: TextStyle(
-                      color: cs.onSurface.withValues(alpha: 0.8),
-                    ),
-                    children: [
-                      TextSpan(
-                        text: 'https://siliconflow.cn',
-                        style: TextStyle(
-                          color: cs.primary,
-                          fontWeight: AppFontWeights.emphasis,
-                        ),
-                        recognizer: TapGestureRecognizer()
-                          ..onTap = () async {
-                            final uri = Uri.parse('https://siliconflow.cn');
-                            try {
-                              final ok = await launchUrl(
-                                uri,
-                                mode: LaunchMode.externalApplication,
-                              );
-                              if (!ok) {
-                                await launchUrl(uri);
-                              }
-                            } catch (_) {
-                              await launchUrl(uri);
-                            }
-                          },
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
         // 顶部管理分组标题（左侧缩进以对齐卡片内容）
         Padding(
           padding: const EdgeInsets.only(left: 12),
@@ -982,8 +888,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         // 顶部 iOS 风格关键设置分区卡片
         _iosSectionCard(
           children: [
-            if (widget.keyName.toLowerCase() != 'kelivoin')
-              _providerKindRow(context),
+            _providerKindRow(context),
             _providerGroupRow(context, groupName: groupName),
             _iosRow(
               context,
@@ -1225,13 +1130,11 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           label: l10n.providerDetailPageNameLabel,
           controller: _nameCtrl,
           hint: widget.displayName,
-          enabled: widget.keyName.toLowerCase() != 'kelivoin',
           onChanged: (_) => _save(),
         ),
         const SizedBox(height: 12),
         if (!(_kind == ProviderKind.google && _vertexAI)) ...[
-          if (widget.keyName.toLowerCase() != 'kelivoin' &&
-              !_multiKeyEnabled) ...[
+          if (!_multiKeyEnabled) ...[
             _inputRow(
               context,
               label: l10n.multiKeyPageKey,
@@ -1261,13 +1164,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               widget.keyName,
               displayName: widget.displayName,
             ).baseUrl,
-            enabled: widget.keyName.toLowerCase() != 'kelivoin',
             onChanged: (_) => _save(),
           ),
         ],
-        if (_kind == ProviderKind.openai &&
-            widget.keyName.toLowerCase() != 'kelivoin' &&
-            !_useResp) ...[
+        if (_kind == ProviderKind.openai && !_useResp) ...[
           const SizedBox(height: 12),
           _inputRow(
             context,
@@ -1317,18 +1217,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           ],
         ],
         const SizedBox(height: 12),
-        if (widget.keyName.toLowerCase() == 'siliconflow') ...[
-          const SizedBox(height: 6),
-          Center(
-            child: Image.asset(
-              Theme.of(context).brightness == Brightness.dark
-                  ? 'assets/icons/Powered-by-dark.png'
-                  : 'assets/icons/Powered-by-light.png',
-              height: 64,
-              fit: BoxFit.contain,
-            ),
-          ),
-        ],
       ],
     );
   }
@@ -3240,11 +3128,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       widget.keyName,
       defaultName: widget.displayName,
     );
-    final bool isDefaultSilicon = widget.keyName.toLowerCase() == 'siliconflow';
-    final bool hasUserKey =
-        (cfg.multiKeyEnabled == true && (cfg.apiKeys?.isNotEmpty == true)) ||
-        cfg.apiKey.trim().isNotEmpty;
-    final bool restrictToFree = isDefaultSilicon && !hasUserKey;
     final controller = TextEditingController();
     List<dynamic> items = const [];
     bool loading = true;
@@ -3265,32 +3148,11 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             final l10n = AppLocalizations.of(ctx)!;
             Future<void> loadModels() async {
               try {
-                if (restrictToFree) {
-                  final list = <ModelInfo>[
-                    ModelRegistry.infer(
-                      ModelInfo(
-                        id: 'THUDM/GLM-4-9B-0414',
-                        displayName: 'THUDM/GLM-4-9B-0414',
-                      ),
-                    ),
-                    ModelRegistry.infer(
-                      ModelInfo(
-                        id: 'Qwen/Qwen3-8B',
-                        displayName: 'Qwen/Qwen3-8B',
-                      ),
-                    ),
-                  ];
-                  setLocal(() {
-                    items = list;
-                    loading = false;
-                  });
-                } else {
-                  final list = await ProviderManager.listModels(cfg);
-                  setLocal(() {
-                    items = list;
-                    loading = false;
-                  });
-                }
+                final list = await ProviderManager.listModels(cfg);
+                setLocal(() {
+                  items = list;
+                  loading = false;
+                });
               } catch (e) {
                 setLocal(() {
                   items = const [];

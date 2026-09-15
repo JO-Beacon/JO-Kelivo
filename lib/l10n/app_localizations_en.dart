@@ -521,8 +521,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homePageClearContext => 'Temporarily Mask Context';
 
   @override
-  String homePageClearContextWithCount(String actual, String configured) {
-    return 'Temporarily Mask Context ($actual/$configured)';
+  String contextMessageCount(int count) {
+    return '$count messages';
+  }
+
+  @override
+  String contextMessageCountLimited(int actual, int configured) {
+    return '$actual/$configured messages';
   }
 
   @override
@@ -1500,6 +1505,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Using time variables in the system prompt makes the beginning of every request different, so prompt caching cannot hit and both cost and time-to-first-token go up. If the model needs to know the current time, use the \"Append current time\" switch below.';
 
   @override
+  String get assistantEditPromptIso8601Title => 'Use ISO 8601 format';
+
+  @override
+  String get assistantEditPromptIso8601Subtitle =>
+      'Include the time zone offset, e.g. 2026-08-08T14:30:05+08:00';
+
+  @override
   String get assistantEditPromptAppendTimeTitle => 'Append current time';
 
   @override
@@ -1922,29 +1934,29 @@ class AppLocalizationsEn extends AppLocalizations {
       'The chat database on this device was created by a newer version of JO-AIClient and cannot be opened by this version. Your data has not been changed. Install the latest version of JO-AIClient, then open it again.';
 
   @override
-  String get startupRecoverySnapshotButton => 'Restore a local snapshot';
+  String get startupRecoverySnapshotButton => 'Restore a local copy';
 
   @override
   String get startupRecoveryDowngradeSnapshotButton =>
-      'Advanced: restore an older snapshot';
+      'Advanced: restore an older copy';
 
   @override
-  String get startupRecoveryChooseSnapshotTitle => 'Choose a snapshot';
+  String get startupRecoveryChooseSnapshotTitle => 'Choose a copy';
 
   @override
   String startupRecoverySnapshotDetails(String date, String time, String size) {
-    return '$date $time · $size MB';
+    return '$date $time · $size';
   }
 
   @override
-  String get startupRecoveryNoSnapshots => 'No local snapshots are available.';
+  String get startupRecoveryNoSnapshots => 'No local copies are available.';
 
   @override
-  String get startupRecoveryRestoreConfirmTitle => 'Restore this snapshot?';
+  String get startupRecoveryRestoreConfirmTitle => 'Restore this copy?';
 
   @override
   String startupRecoveryRestoreConfirmContent(String fileName) {
-    return 'JO-AIClient will replace the current database with $fileName. Changes made after this snapshot may be lost. The current database will remain recoverable through the restore journal until the operation is verified.';
+    return 'JO-AIClient will replace the current database with $fileName. Changes made after this copy was created may be lost. The current database will remain recoverable through the restore journal until the operation is verified.';
   }
 
   @override
@@ -1964,7 +1976,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String startupRecoverySnapshotFailed(String code) {
-    return 'The snapshot could not be prepared. Diagnostic code: $code';
+    return 'The copy could not be prepared. Diagnostic code: $code';
   }
 
   @override
@@ -2158,12 +2170,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupPageKelivoFormat => 'Kelivo';
-
-  @override
-  String get backupPageCuplivoFormat => 'Cuplivo';
-
-  @override
-  String get backupPageCuplivoBackup => 'Cuplivo Backup';
 
   @override
   String get backupPageExportAction => 'Export';
@@ -2941,6 +2947,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get displaySettingsPageAutoCollapseCodeBlockLinesUnit => 'lines';
 
   @override
+  String get displaySettingsPageCollapseLongUserMessagesTitle =>
+      'Collapse Long Messages';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesSubtitle =>
+      'Fold user messages past the threshold behind an expand button';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesCharsTitle =>
+      'Collapse threshold';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesCharsUnit => 'chars';
+
+  @override
+  String get chatMessageExpandLongText => 'Expand';
+
+  @override
+  String get chatMessageCollapseLongText => 'Collapse';
+
+  @override
   String get messageExportSheetFormatTitle => 'Export Format';
 
   @override
@@ -3665,13 +3692,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get defaultModelPageDisable => 'Disable';
 
   @override
-  String get localSnapshotTitle => 'Local database snapshots';
+  String get localSnapshotTitle => 'Local copies';
 
   @override
-  String get localSnapshotEnabled => 'Keep automatic local snapshots';
+  String get localSnapshotEnabled => 'Keep automatic local copies';
 
   @override
-  String get localSnapshotTakeNow => 'Take snapshot now';
+  String get localSnapshotTakeNow => 'Save a copy now';
 
   @override
   String get translatePagePasteButton => 'Paste';
@@ -7909,7 +7936,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get debugPageCreateOversizedConversationButton =>
-      'Create oversized conversation (30 MB)';
+      'Create oversized conversation (30 MiB)';
 
   @override
   String get debugPageCreateManyMessagesConversationButton =>
@@ -7928,7 +7955,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get debugPageCreatingOversizedConversation =>
-      'Creating a 30 MB oversized conversation...';
+      'Creating a 30 MiB oversized conversation...';
 
   @override
   String get debugPageCreatingManyMessagesConversation =>
@@ -7958,7 +7985,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String debugPageOversizedConversationTitle(int sizeMB) {
-    return 'Oversized conversation test ($sizeMB MB)';
+    return 'Oversized conversation test ($sizeMB MiB)';
   }
 
   @override
@@ -8794,7 +8821,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get healthDataSettingsDescription =>
-      'HealthKit signals available to the current assistant in daily conversation. Switches control what Kelivo may try to read; iOS still manages actual Health access.';
+      'HealthKit signals available to the current assistant in daily conversation. Switches control what JO-AIClient may try to read; iOS still manages actual Health access.';
 
   @override
   String get healthDataSettingsDisableAll => 'Disable all';
@@ -9107,4 +9134,422 @@ class AppLocalizationsEn extends AppLocalizations {
   String backupPageMergeCompletedWithSkipped(int count) {
     return '$count conversations from the backup were skipped because of invalid message order and were not merged.';
   }
+
+  @override
+  String get assistantEditGradientBackgroundTitle => 'Gradient background';
+
+  @override
+  String get assistantEditGradientStaticTitle => 'Static mode';
+
+  @override
+  String get assistantEditGradientStaticDescription =>
+      'Saves power during long chats and streaming.';
+
+  @override
+  String get assistantEditGradientHorizontal => 'Horizontal position';
+
+  @override
+  String get assistantEditGradientVertical => 'Vertical position';
+
+  @override
+  String get assistantEditGradientPreview => 'Preview';
+
+  @override
+  String get assistantEditGradientNextFrame => 'Another frame';
+
+  @override
+  String backupProgressBytes(String done, String total) {
+    return '$done / $total';
+  }
+
+  @override
+  String get backupProgressCancel => 'Cancel';
+
+  @override
+  String get backupProgressCancelled => 'Cancelled';
+
+  @override
+  String get backupProgressCommitting => 'Committing';
+
+  @override
+  String get backupProgressDownloading => 'Downloading';
+
+  @override
+  String get backupProgressExtracting => 'Extracting';
+
+  @override
+  String get backupProgressFinalizing => 'Finishing';
+
+  @override
+  String get backupProgressImportingMessages => 'Importing messages';
+
+  @override
+  String get backupProgressImportingSessions => 'Importing sessions';
+
+  @override
+  String backupProgressItems(String done, String total) {
+    return '$done / $total';
+  }
+
+  @override
+  String get backupProgressListingRemote => 'Listing remote backups';
+
+  @override
+  String get backupProgressMaterializingFiles => 'Writing files';
+
+  @override
+  String get backupProgressPacking => 'Packing';
+
+  @override
+  String get backupProgressPreparing => 'Preparing';
+
+  @override
+  String get backupProgressReadingSettings => 'Reading settings';
+
+  @override
+  String get backupProgressSnapshotting => 'Creating database snapshot';
+
+  @override
+  String get backupProgressStaging => 'Staging';
+
+  @override
+  String get backupProgressUploading => 'Uploading';
+
+  @override
+  String get backupProgressValidating => 'Validating';
+
+  @override
+  String get backupProgressVerifying => 'Verifying';
+
+  @override
+  String get localSnapshotActionDelete => 'Delete';
+
+  @override
+  String get localSnapshotActionExport => 'Export';
+
+  @override
+  String get localSnapshotActionPin => 'Keep this copy';
+
+  @override
+  String get localSnapshotActionRestore => 'Restore';
+
+  @override
+  String get localSnapshotActionUnpin => 'Stop keeping';
+
+  @override
+  String get localSnapshotAnnounceTitle => 'Notify when a copy is saved';
+
+  @override
+  String get localSnapshotCopiesEmpty => 'No local copies yet';
+
+  @override
+  String get localSnapshotCopiesEmptyHint =>
+      'A copy is saved automatically as your data changes, and one is always saved before a restore.';
+
+  @override
+  String get localSnapshotCopiesScopeNote =>
+      'Local copies live on this device only. They protect against damage to your data inside the app, not against losing the device or uninstalling JO-AIClient — use WebDAV or S3 backup for that.';
+
+  @override
+  String get localSnapshotCopiesTitle => 'Local Copies';
+
+  @override
+  String localSnapshotCopyContents(int conversations, int messages) {
+    String _temp0 = intl.Intl.pluralLogic(
+      conversations,
+      locale: localeName,
+      other: '$conversations chats',
+      one: '1 chat',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      messages,
+      locale: localeName,
+      other: '$messages messages',
+      one: '1 message',
+    );
+    return '$_temp0 · $_temp1';
+  }
+
+  @override
+  String get localSnapshotCopyContentsUnknown =>
+      'Contents unknown until restored';
+
+  @override
+  String get localSnapshotDeleteDone => 'Copy deleted';
+
+  @override
+  String get localSnapshotDeleteLastWarning =>
+      'This is the only copy that still contains data.';
+
+  @override
+  String get localSnapshotDeleteMessage =>
+      'This copy will be removed from the device permanently. Any data it holds that is not in your current database will be gone.';
+
+  @override
+  String get localSnapshotDeleteTitle => 'Delete this copy?';
+
+  @override
+  String get localSnapshotEnabledSubtitle =>
+      'JO-AIClient periodically saves a copy of its database on this device, so it is never the only one.';
+
+  @override
+  String get localSnapshotEnabledTitle => 'Keep local copies';
+
+  @override
+  String get localSnapshotExportDone => 'Copy exported';
+
+  @override
+  String localSnapshotExportFailed(String reason) {
+    return 'Could not export the copy: $reason';
+  }
+
+  @override
+  String get localSnapshotExportPreparing => 'Preparing export';
+
+  @override
+  String get localSnapshotIntervalAutomatic => 'Automatic';
+
+  @override
+  String get localSnapshotIntervalAutomaticDetail =>
+      'Daily, less often as the database grows';
+
+  @override
+  String localSnapshotIntervalDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'Every $days days',
+      one: 'Every day',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotIntervalTitle => 'How often';
+
+  @override
+  String get localSnapshotKeepMonthly => 'Keep one from last month';
+
+  @override
+  String get localSnapshotKeepProtectedNote =>
+      'The most recent copy that still contains data is never removed automatically, whatever this is set to.';
+
+  @override
+  String get localSnapshotKeepTitle => 'Copies to keep';
+
+  @override
+  String localSnapshotKeepValue(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count copies',
+      one: '1 copy',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotKeepWeekly => 'Keep one from last week';
+
+  @override
+  String get localSnapshotKindRecovered => 'Set aside by recovery';
+
+  @override
+  String get localSnapshotMaximumTitle => 'Space limit';
+
+  @override
+  String get localSnapshotMaximumUnlimited => 'No limit';
+
+  @override
+  String get localSnapshotOriginAutomatic => 'Automatic';
+
+  @override
+  String get localSnapshotOriginBeforeRestore => 'Before a restore';
+
+  @override
+  String get localSnapshotOriginManual => 'Saved by you';
+
+  @override
+  String localSnapshotRestoreMessage(String when) {
+    return 'Your current chats and settings will be replaced by this copy from $when. A copy of what you have now is saved first, so this can be undone.';
+  }
+
+  @override
+  String get localSnapshotRestorePreparing => 'Preparing copy';
+
+  @override
+  String get localSnapshotRestoreTitle => 'Restore this copy?';
+
+  @override
+  String get localSnapshotRunInBackground => 'Continue in background';
+
+  @override
+  String get localSnapshotRunningInBackground =>
+      'Saving a copy in the background';
+
+  @override
+  String get localSnapshotSectionTitle => 'Local Copies';
+
+  @override
+  String localSnapshotStatusFailure(String when, String reason) {
+    return 'Last attempt failed $when: $reason';
+  }
+
+  @override
+  String get localSnapshotStatusNever => 'No copy saved yet';
+
+  @override
+  String get localSnapshotStatusSkippedSpace =>
+      'Skipped: not enough free space on this device';
+
+  @override
+  String localSnapshotStatusSuccess(String when) {
+    return 'Last copy $when';
+  }
+
+  @override
+  String get localSnapshotTakeDone => 'Copy saved';
+
+  @override
+  String localSnapshotTakeFailed(String reason) {
+    return 'Could not save a copy: $reason';
+  }
+
+  @override
+  String localSnapshotUsage(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count copies',
+      one: '1 copy',
+      zero: 'No copies',
+    );
+    return '$_temp0 · $size';
+  }
+
+  @override
+  String startupRecoveryLocalCopiesAvailable(int count, String when) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count local copies',
+      one: '1 local copy',
+    );
+    return 'This device still holds $_temp0, the most recent from $when. Resetting does not delete them — after restarting you can restore one from Settings › Backup › Local Copies.';
+  }
+
+  @override
+  String startupRecoveryRecoveredCopiesDeleted(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count database copies',
+      one: '1 database copy',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'those',
+      one: 'it',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'them',
+      one: 'it',
+    );
+    return 'It also holds $_temp0 set aside by an earlier repair, and resetting DOES delete $_temp1 permanently. Export your data first if you want to keep $_temp2.';
+  }
+
+  @override
+  String get backupProgressWrapping => 'Wrapping the archive';
+
+  @override
+  String get backupProgressRestoring => 'Restoring data';
+
+  @override
+  String get localSnapshotManageCopies => 'Manage copies';
+
+  @override
+  String get startupRecoveryWhatFailed => 'What failed';
+
+  @override
+  String get startupRecoveryStageLabel => 'Stage';
+
+  @override
+  String get startupRecoveryStageRestore => 'Restore gate';
+
+  @override
+  String get startupRecoveryStageDatabase => 'Database startup';
+
+  @override
+  String get startupRecoveryDiagnosticLabel => 'Diagnostic code';
+
+  @override
+  String get startupRecoverySchemaLabel => 'Database version';
+
+  @override
+  String startupRecoverySchemaValue(String installed, int expected) {
+    return '$installed on disk · $expected expected by this build';
+  }
+
+  @override
+  String get startupRecoveryAppVersionLabel => 'App';
+
+  @override
+  String get startupRecoveryUnknownValue => 'unknown';
+
+  @override
+  String get startupRecoveryCollecting => 'Collecting diagnostics…';
+
+  @override
+  String get startupRecoveryHideDetails => 'Hide technical details';
+
+  @override
+  String get startupRecoveryShowDetails => 'Show technical details';
+
+  @override
+  String get startupRecoveryCopyReport => 'Copy full report';
+
+  @override
+  String get startupRecoveryReportCopied => 'Full report copied';
+
+  @override
+  String get startupRecoveryShareReport => 'Export report';
+
+  @override
+  String startupRecoveryReportStored(String path) {
+    return 'A copy of this report was saved to $path';
+  }
+
+  @override
+  String get startupRecoveryIntegrityButton => 'Check database integrity';
+
+  @override
+  String get startupRecoveryIntegrityHealthy =>
+      'SQLite found no damage in the database file.';
+
+  @override
+  String startupRecoveryIntegrityDamaged(String detail) {
+    return 'SQLite reported problems — $detail';
+  }
+
+  @override
+  String get startupRecoveryIntegrityFailed =>
+      'The integrity check could not run.';
+
+  @override
+  String get startupRecoveryIntegrityMissing =>
+      'No database file was found in the data folder.';
+
+  @override
+  String startupRecoveryReportSaved(String path) {
+    return 'Report saved to $path';
+  }
+
+  @override
+  String get startupRecoveryReportShared => 'Report exported.';
+
+  @override
+  String get startupRecoveryReportSaveFailed => 'Could not export the report.';
 }

@@ -6,6 +6,7 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/api/retry_policy.dart';
+import '../../../core/services/api/stream/stream_chunk.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../settings/widgets/language_select_sheet.dart';
 
@@ -167,10 +168,10 @@ class TranslationService {
         if (!translationRunIsCurrent(runToken, _runs[message.id])) {
           return TranslationResult(type: TranslationResultType.cancelled);
         }
-        // 推理/用量块不携带可见文本。在翻译文本到达前保持加载卡片，
+        // 推理、用量等事件不携带可见文本。在翻译文本到达前保持加载卡片，
         // 而不是将其替换为空内容。
-        if (chunk.content.isEmpty && !chunk.isDone) continue;
-        buffer.write(chunk.content);
+        if (chunk is! TextDelta || chunk.text.isEmpty) continue;
+        buffer.write(chunk.text);
         // 实时更新翻译
         onTranslationUpdate(buffer.toString());
       }

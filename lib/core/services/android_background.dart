@@ -18,10 +18,12 @@ class AndroidBackgroundManager {
         notificationTitle: notificationTitle,
         notificationText: notificationText,
         notificationImportance: AndroidNotificationImportance.normal,
-        // 显式使用 mipmap 中的应用启动图标，以避免资源解析问题
+        // 必须用专门的单色剪影图。这里曾指向应用启动图标，但那是一张带不透明
+        // 底的图，通知栏小图标只取 alpha 通道，整块都会被当成实心，显示成一个
+        // 色块。ic_notification 是为此单独做的矢量剪影。
         notificationIcon: const AndroidResource(
-          name: 'ic_launcher',
-          defType: 'mipmap',
+          name: 'ic_notification',
+          defType: 'drawable',
         ),
       );
       final ok = await FlutterBackground.initialize(

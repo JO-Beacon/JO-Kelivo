@@ -248,7 +248,8 @@ void main() {
       );
 
       expect(title, '标题');
-      expect(requestBody.containsKey('generationConfig'), isFalse);
+      expect(requestBody.containsKey('temperature'), isFalse);
+      expect(requestBody['generationConfig'], isA<Map>());
     });
 
     test(
@@ -338,7 +339,7 @@ void main() {
         );
 
         expect(enabledBody['thinking'], {'type': 'enabled'});
-        expect(enabledBody['reasoning_effort'], 'xhigh');
+        expect(enabledBody['reasoning_effort'], 'high');
         expect(disabledBody['thinking'], {'type': 'disabled'});
         expect(disabledBody.containsKey('reasoning_effort'), isFalse);
       },

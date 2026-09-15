@@ -29,7 +29,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../shared/widgets/markdown_with_highlight.dart';
 import '../../../shared/widgets/export_capture_scope.dart';
-import '../../../shared/widgets/mermaid_exporter.dart';
+import '../../../shared/widgets/diagram_exporter.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_switch.dart';
@@ -667,10 +667,10 @@ Future<File?> _renderAndSaveMessageImage(
   final title =
       chatService.getConversation(message.conversationId)?.title ??
       l10n.messageExportSheetDefaultTitle;
-  // 为导出预渲染 mermaid 图表为图片
+  // 为导出预渲染 Mermaid 与 SVG 图表为图片
   try {
-    final codes = extractMermaidCodes(message.content);
-    await preRenderMermaidCodesForExport(context, codes);
+    final codes = extractDiagramCodes(message.content);
+    await preRenderDiagramCodesForExport(context, codes);
   } catch (_) {}
 
   final bool isDesktop =
@@ -710,13 +710,13 @@ Future<File?> _renderAndSaveChatImage(
   final cs = theme.colorScheme;
   final settings = context.read<SettingsProvider>();
   final l10n = AppLocalizations.of(context)!;
-  // 预渲染选中消息中的所有 mermaid 图表
+  // 预渲染选中消息中的所有 Mermaid 与 SVG 图表
   try {
     final codes = messages
-        .map((m) => extractMermaidCodes(m.content))
+        .map((m) => extractDiagramCodes(m.content))
         .expand((e) => e)
         .toList();
-    await preRenderMermaidCodesForExport(context, codes);
+    await preRenderDiagramCodesForExport(context, codes);
   } catch (_) {}
 
   final bool isDesktop =
@@ -2677,6 +2677,7 @@ class _ExportedMessageCard extends StatelessWidget {
             SizedBox(height: isDesktop ? 10.0 : 12.0),
             ChatMessageWidget(
               message: messageForExport,
+              collapseLongUserText: false,
               modelIcon:
                   (!useAssistAvatar &&
                       message.role == 'assistant' &&

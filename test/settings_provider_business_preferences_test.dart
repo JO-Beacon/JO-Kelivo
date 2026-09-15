@@ -72,14 +72,11 @@ void main() {
     },
   );
 
-  test('fresh business storage only keeps KelivoIN built-in models', () async {
+  test('fresh business storage preselects no built-in models', () async {
     final settings = SettingsProvider(BusinessPreferences(repository));
     await settings.loaded;
 
-    expect(settings.getProviderConfig('KelivoIN').models, [
-      'mistral',
-      'qwen-coder',
-    ]);
+    expect(settings.getProviderConfig('KelivoIN').models, isEmpty);
     expect(settings.getProviderConfig('SiliconFlow').models, isEmpty);
   });
 

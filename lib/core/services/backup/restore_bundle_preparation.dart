@@ -43,6 +43,7 @@ final class RestoreBundlePreparation {
     required bool bundleIncludesFiles,
     required bool restoreChats,
     required bool restoreFiles,
+    bool useExistingLocalAttachments = false,
     DateTime? createdAtUtc,
   }) async {
     StagedRestoreBundle? staged;
@@ -61,6 +62,7 @@ final class RestoreBundlePreparation {
         sourceIncludesChats: bundleIncludesChats,
         sourceIncludesFiles: bundleIncludesFiles,
         sourceManifestSha256: sourceManifestSha256,
+        useExistingLocalAttachments: useExistingLocalAttachments,
       );
       final receipt = RestoreReceipt.prepared(
         runId: staged.runId,

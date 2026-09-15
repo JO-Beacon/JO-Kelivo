@@ -4,6 +4,7 @@ import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
+import 'package:path/path.dart' as p;
 import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:uuid/uuid.dart';
@@ -12,6 +13,7 @@ import '../models/chat_message.dart';
 import '../models/conversation.dart';
 import '../models/conversation_tree.dart';
 import '../models/message_part.dart';
+import '../services/backup/restore_previous_plan.dart';
 import '../utils/multimodal_input_utils.dart';
 import '../../utils/sandbox_path_resolver.dart';
 import '../../utils/kelivo_file_uri.dart';
@@ -6064,12 +6066,13 @@ class ChatDatabaseRepository {
   /// 将本地附件标记为不可用（覆盖发布前仅聊天候选的处理逻辑）。避免在恢复
   /// 暂存阶段打开 Drift isolate。
   ///
-  /// 最小策略：每个非 remote/data 的本地附件都会变为不可用。这里刻意**不复用**
-  /// 候选项 `asset_rows` 的 content_hash + 路径存在性——那会把候选项目自己的
-  /// 绝对路径（或字节不同的目标冲突文件）当成证明。
+  /// 普通导入不能凭路径巧合复用文件。只有用户明确选择的**本机快照**（
+  /// [localSnapshotAppDataDirectory] 非空）才允许复核该目录下的受管文件，
+  /// 包括快照里已被标记为不可用的部分。
   static Future<int> recomputeAttachmentAvailabilityOnDatabaseFile({
     required File databaseFile,
     required bool filesRestored,
+    Directory? localSnapshotAppDataDirectory,
   }) async {
     if (filesRestored) return 0;
     if (!await databaseFile.exists()) {
@@ -6085,6 +6088,9 @@ class ChatDatabaseRepository {
           "SELECT revision_id, ordinal, kind, payload "
           "FROM message_part_rows WHERE kind IN ('image', 'file');",
         );
+        final localRoot = localSnapshotAppDataDirectory?.absolute.path;
+        final resolvedRoot = localSnapshotAppDataDirectory
+            ?.resolveSymbolicLinksSync();
         var updated = 0;
         final stmt = db.prepare(
           'UPDATE message_part_rows SET payload = ? '
@@ -6097,9 +6103,30 @@ class ChatDatabaseRepository {
             if (decoded is! Map) continue;
             final map = Map<String, dynamic>.from(decoded);
             final uri = (map['uri'] ?? '').toString();
-            if (uri.isEmpty || isRemoteOrDataUri(uri)) continue;
-            if (map['unavailable'] == true) continue;
-            map['unavailable'] = true;
+            if (uri.isEmpty) continue;
+            var restoredUri = uri;
+            var unavailable = true;
+            if (localRoot != null) {
+              if (isRemoteOrDataUri(uri)) {
+                unavailable = false;
+              } else {
+                final local = _localSnapshotAttachment(
+                  uri,
+                  appDataPath: localRoot,
+                  resolvedAppDataPath: resolvedRoot!,
+                );
+                restoredUri = local.uri;
+                unavailable = !local.available;
+              }
+            } else if (isRemoteOrDataUri(uri)) {
+              continue;
+            }
+            if ((map['unavailable'] == true) == unavailable &&
+                restoredUri == uri) {
+              continue;
+            }
+            map['uri'] = restoredUri;
+            map['unavailable'] = unavailable;
             stmt.execute([jsonEncode(map), row['revision_id'], row['ordinal']]);
             updated += 1;
           }
@@ -6111,6 +6138,57 @@ class ChatDatabaseRepository {
         db.close();
       }
     });
+  }
+
+  /// 复核单条附件 URI 是否指向本机快照目录内真实存在的受管文件。
+  ///
+  /// 返回规范化的 URI 与可用性。只接受落在 [appDataPath] 内的受管根
+  /// （`upload`／`images`／`avatars`／`fonts`）且解析后仍在同一物理目录下的文件。
+  static ({String uri, bool available}) _localSnapshotAttachment(
+    String uri, {
+    required String appDataPath,
+    required String resolvedAppDataPath,
+  }) {
+    final missing = (uri: uri, available: false);
+    try {
+      var raw = uri;
+      if (uri.startsWith('file:')) {
+        final parsed = Uri.parse(uri);
+        if (parsed.hasAuthority && parsed.host.isNotEmpty ||
+            parsed.hasQuery ||
+            parsed.hasFragment) {
+          return missing;
+        }
+        raw = parsed.toFilePath();
+      }
+      final logical = KelivoFileUri.isKelivoFileUri(uri)
+          ? uri
+          : KelivoFileUri.encodeFromAbsolute(raw, root: appDataPath) ??
+                KelivoFileUri.tryEncodeLegacyAbsolutePath(
+                  raw,
+                  allowGenericFallback: false,
+                );
+      final path = logical == null
+          ? raw
+          : KelivoFileUri.resolveToAbsolute(logical, root: appDataPath);
+      if (path == null || !p.isWithin(appDataPath, path)) return missing;
+      final relative = p.split(p.relative(path, from: appDataPath));
+      if (relative.length < 2 ||
+          !RestorePreviousAssetsPlan.rootNames.contains(relative.first)) {
+        return missing;
+      }
+      final file = File(path);
+      if (!file.existsSync()) return missing;
+      final resolved = file.resolveSymbolicLinksSync();
+      if (!p.isWithin(resolvedAppDataPath, resolved)) return missing;
+      return (uri: logical ?? uri, available: true);
+    } on FileSystemException {
+      return missing;
+    } on FormatException {
+      return missing;
+    } on ArgumentError {
+      return missing;
+    }
   }
 
   /// 尝试把 source 会话中目标尚未拥有的修订并入同 ID 的本地会话。
