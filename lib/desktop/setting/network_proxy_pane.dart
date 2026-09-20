@@ -7,6 +7,7 @@ import 'package:http/io_client.dart';
 import 'package:socks5_proxy/socks_client.dart' as socks;
 import 'package:provider/provider.dart';
 import '../../shared/widgets/ios_switch.dart';
+import '../../shared/widgets/section_card.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../core/providers/settings_provider.dart';
@@ -296,13 +297,15 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
                     ),
                     child: Align(
                       alignment: Alignment.centerRight,
-                      child: _DeskIosButton(
-                        label: _testing
-                            ? l10n.networkProxyTesting
-                            : l10n.networkProxyTestButton,
-                        filled: false,
-                        dense: true,
-                        onTap: _testing ? () {} : _onTest,
+                      child: IntrinsicWidth(
+                        child: _DeskIosButton(
+                          label: _testing
+                              ? l10n.networkProxyTesting
+                              : l10n.networkProxyTestButton,
+                          filled: false,
+                          dense: true,
+                          onTap: _testing ? () {} : _onTest,
+                        ),
                       ),
                     ),
                   ),
@@ -510,27 +513,11 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
 }
 
 Widget _sectionCard({required List<Widget> children}) {
-  return Builder(
-    builder: (context) {
-      final cs = Theme.of(context).colorScheme;
-      final isDark = Theme.of(context).brightness == Brightness.dark;
-      final baseBg = context.appColors.surfaceCard;
-      return Container(
-        decoration: BoxDecoration(
-          color: baseBg,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08),
-            width: 0.8,
-          ),
-        ),
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: children,
-        ),
-      );
-    },
+  return SectionCard(
+    padding: const EdgeInsets.all(12),
+    radius: 18,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: children,
   );
 }
 

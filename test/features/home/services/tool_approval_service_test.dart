@@ -35,7 +35,11 @@ void main() {
       isNotNull,
     );
 
-    service.deny('call-1', 'cancelled', 'conversation-b');
+    service.deny(
+      'call-1',
+      reason: 'cancelled',
+      conversationId: 'conversation-b',
+    );
     expect((await second).approved, isFalse);
     expect(service.hasPending, isFalse);
     service.dispose();

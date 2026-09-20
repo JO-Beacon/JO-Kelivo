@@ -1,15 +1,15 @@
 import 'dart:convert';
 
-/// 结构化消息 part —— 附件和文本的唯一事实来源。
+/// 结构化的消息 part —— 附件与文本的唯一权威表示。
 ///
 /// 载荷约定：
 /// - `text` / `reasoning`：原始字符串
 /// - `tool_call`：原样保留的 JSON 字符串
 /// - `image`：`{"uri","mime"?,"assetId"?,"unavailable"?}`
 /// - `file`：`{"uri","name","mime"?,"assetId"?,"unavailable"?}`
-/// - 未知类型：存储在 [UnknownPart] 中，并按原样写回
-/// - 已知类型的损坏数据：仅在从数据库行水合时创建，并
-///   存储在 [MalformedPart] 中以便无损写回
+/// - 未知类型：存入 [UnknownPart]，写回时保持原样
+/// - 已知类型但格式损坏：仅在从数据库行填充时创建，
+///   存入 [MalformedPart] 以便无损写回
 sealed class MessagePart {
   const MessagePart();
 
@@ -45,6 +45,13 @@ final class TextPart extends MessagePart {
 
   @override
   String encodePayload() => text;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || other is TextPart && text == other.text;
+
+  @override
+  int get hashCode => text.hashCode;
 }
 
 final class ReasoningPart extends MessagePart {
@@ -57,6 +64,13 @@ final class ReasoningPart extends MessagePart {
 
   @override
   String encodePayload() => text;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || other is ReasoningPart && text == other.text;
+
+  @override
+  int get hashCode => text.hashCode;
 }
 
 final class ToolCallPart extends MessagePart {
@@ -69,6 +83,14 @@ final class ToolCallPart extends MessagePart {
 
   @override
   String encodePayload() => payloadJson;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ToolCallPart && payloadJson == other.payloadJson;
+
+  @override
+  int get hashCode => payloadJson.hashCode;
 }
 
 final class ImagePart extends MessagePart {
@@ -76,6 +98,7 @@ final class ImagePart extends MessagePart {
     required this.uri,
     this.mime,
     this.assetId,
+    this.id,
     this.unavailable = false,
   });
 
@@ -96,6 +119,9 @@ final class ImagePart extends MessagePart {
   final String uri;
   final String? mime;
   final String? assetId;
+
+  /// 流式图片 id。仅运行时使用 —— 不写入 [encodePayload]。
+  final String? id;
   final bool unavailable;
 
   @override
@@ -108,6 +134,19 @@ final class ImagePart extends MessagePart {
     if (assetId != null) 'assetId': assetId,
     if (unavailable) 'unavailable': true,
   });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ImagePart &&
+          uri == other.uri &&
+          mime == other.mime &&
+          assetId == other.assetId &&
+          id == other.id &&
+          unavailable == other.unavailable;
+
+  @override
+  int get hashCode => Object.hash(uri, mime, assetId, id, unavailable);
 }
 
 final class FilePart extends MessagePart {
@@ -155,9 +194,22 @@ final class FilePart extends MessagePart {
     if (assetId != null) 'assetId': assetId,
     if (unavailable) 'unavailable': true,
   });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FilePart &&
+          uri == other.uri &&
+          name == other.name &&
+          mime == other.mime &&
+          assetId == other.assetId &&
+          unavailable == other.unavailable;
+
+  @override
+  int get hashCode => Object.hash(uri, name, mime, assetId, unavailable);
 }
 
-/// 用于此构建无法理解的 kind 的前向兼容载体。
+/// 本构建尚不认识的类型的向前兼容载体。
 final class UnknownPart extends MessagePart {
   const UnknownPart({required this.rawKind, required this.payload});
 
@@ -169,13 +221,23 @@ final class UnknownPart extends MessagePart {
 
   @override
   String encodePayload() => payload;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is UnknownPart &&
+          rawKind == other.rawKind &&
+          payload == other.payload;
+
+  @override
+  int get hashCode => Object.hash(rawKind, payload);
 }
 
-/// 已知的 part 类型，但其持久化载荷无法解析。
+/// 已知类型，但持久化载荷无法解析。
 ///
-/// 与 [UnknownPart] 不同，一个附件形态的损坏 part 仍可能拥有
-/// 资源引用。数据库水合使用此载体隔离损坏的
-/// 行，同时保留其精确载荷，以便后续修复或写回。
+/// 与 [UnknownPart] 不同，形似附件的损坏 part 仍可能持有
+/// 资源引用。数据库填充阶段用这个载体隔离损坏的
+/// 行，同时保留其原始载荷，以便日后修复或写回。
 final class MalformedPart extends MessagePart {
   const MalformedPart({
     required this.rawKind,
@@ -194,6 +256,17 @@ final class MalformedPart extends MessagePart {
 
   @override
   String encodePayload() => rawPayload;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MalformedPart &&
+          rawKind == other.rawKind &&
+          rawPayload == other.rawPayload &&
+          parseError == other.parseError;
+
+  @override
+  int get hashCode => Object.hash(rawKind, rawPayload, parseError);
 }
 
 String messagePartParseErrorCategory(FormatException error) {
@@ -244,10 +317,11 @@ bool _optionalBool(Map<String, dynamic> map, String key) {
   return value;
 }
 
-/// 判断持久化的 content split 三元组是否足以驱动历史交错渲染。
+/// 持久化的切分三元组能否驱动历史交错
+/// 渲染。
 ///
-/// 空数组、长度不一致、负数和计数倒退都不能安全地重建消息时间线，
-/// 这类数据必须回退到 [MessagePart] 的到达顺序。
+/// 空数组、长度不匹配、负值以及计数回退都视为不可用。
+/// 这类消息必须保持 [MessagePart] 的到达顺序。
 bool contentSplitsAreUsable(
   List<int>? offsets,
   List<int>? reasoningCounts,
@@ -269,7 +343,9 @@ bool contentSplitsAreUsable(
     final offset = offsets[i];
     final reasoning = reasoningCounts[i];
     final tool = toolCounts[i];
-    if (offset < 0 || reasoning < 0 || tool < 0) return false;
+    if (offset < 0 || reasoning < 0 || tool < 0) {
+      return false;
+    }
     if (i > 0 &&
         (offset < previousOffset ||
             reasoning < previousReasoning ||
@@ -283,9 +359,11 @@ bool contentSplitsAreUsable(
   return true;
 }
 
-/// 只解析通过结构校验的持久化 content split 三元组。
+/// 仅在通过 [contentSplitsAreUsable] 时才解析持久化的切分三元组。
 ///
-/// 长度不一致时不能像旧逻辑一样截短到最短数组，否则损坏数据会被误判为有效。
+/// 长度不匹配会被拒绝，而不是截断到最短的
+/// 数组，因此损坏的载荷无法被“修复”成一个看似合法的
+/// 交错。
 ({List<int> offsets, List<int> reasoningCounts, List<int> toolCounts})?
 tryParseContentSplits(dynamic raw) {
   if (raw is! Map) return null;
@@ -306,20 +384,25 @@ tryParseContentSplits(dynamic raw) {
 List<int>? _tryContentSplitIntList(dynamic value) {
   if (value == null) return const <int>[];
   if (value is! List) return null;
-  final result = <int>[];
+  final out = <int>[];
   for (final item in value) {
     if (item is int) {
-      result.add(item);
+      out.add(item);
     } else if (item is num && item == item.roundToDouble()) {
-      result.add(item.toInt());
+      out.add(item.toInt());
     } else {
       return null;
     }
   }
-  return result;
+  return out;
 }
 
-/// 判断有效的 split 三元组是否完整覆盖当前思考/工具时间线。
+/// 结构上合法的切分三元组是否真正覆盖了整条时间线。
+///
+/// 偏移量必须落在 [contentLength] 以内，每个目标计数对必须
+/// 按序出现在渲染出的步骤上，且最后一个目标必须消费
+/// 所有步骤。否则覆盖不完整时，会在尾部正文之后
+/// 追加多余的推理/工具卡片。
 bool contentSplitsMatchTimeline({
   required List<int> offsets,
   required List<int> reasoningCounts,
@@ -356,10 +439,12 @@ bool contentSplitsMatchTimeline({
   return stepIndex == stepReasoningCounts.length;
 }
 
-/// 判断是否应该按结构化 parts 的到达顺序渲染助手消息。
+/// 助手气泡应遍历 [parts] 还是 contentSplits。
 ///
-/// 有有效 split 的历史消息继续使用历史交错渲染；没有有效 split 时，
-/// 新消息中的思考、工具调用和图片必须保持 parts 顺序。
+/// 历史行保持扁平的 `[reasoning, tools…, body]` 布局，另存
+/// 重建交错所需的切分三元组，这类走切分渲染器。
+/// 新的流式消息按到达顺序持久化 [ReasoningPart] / [ToolCallPart]
+///（以及生成的 [ImagePart]），没有切分。
 bool renderAssistantFromParts({
   required List<MessagePart> parts,
   required bool hasContentSplits,

@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../icons/lucide_adapter.dart';
+import '../../l10n/app_localizations.dart';
 import '../../theme/app_font_weights.dart';
 import 'ios_tactile.dart';
 
@@ -32,11 +33,22 @@ Future<T?> showCustomBottomSheet<T>({
         closeSemanticLabel: closeSemanticLabel,
         partialHeightFactor: partialHeightFactor,
         expandedHeightFactor: expandedHeightFactor,
-        onDismiss: () => Navigator.of(dialogContext).maybePop(),
+        onDismiss: () => _closeSheetRoute(dialogContext),
         builder: builder,
       );
     },
   );
+}
+
+/// Takes the sheet route off the navigator instead of asking through
+/// [Navigator.maybePop]. Content is free to install a [PopScope] to steer the
+/// system back gesture — the file browser does, to walk up its folder stack —
+/// and a refused pop would strand the route with the panel already animated off
+/// screen, where its full-screen barrier silently swallows every touch.
+void _closeSheetRoute(BuildContext dialogContext) {
+  final route = ModalRoute.of(dialogContext);
+  if (route == null || !route.isActive) return;
+  Navigator.of(dialogContext).removeRoute(route);
 }
 
 class CustomBottomSheet extends StatefulWidget {
@@ -86,9 +98,17 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
   double _handleDragStartTop = 0;
   double _contentDragStartTop = 0;
   int? _contentPointer;
+  Offset? _contentPointerStart;
   double? _lastContentPointerY;
+  bool? _contentDragIsVertical;
   VelocityTracker? _contentVelocityTracker;
   bool _contentDragChangedSheetTop = false;
+
+  /// 记录关闭开始的时刻。此后由关闭动画接管面板，
+  /// 因此下面每个拖拽处理器都要让位：若某个处理器停掉动画，
+  /// 就会丢掉负责 pop 路由的完成回调，面板要么
+  /// 留在屏幕上、关闭按钮失效，要么变成不可见却压在
+  /// 已经不再接收触摸的应用之上。
   bool _dismissScheduled = false;
 
   @override
@@ -217,9 +237,11 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onVerticalDragStart: (_) {
+                  if (_dismissScheduled) return;
                   _handleDragStartTop = _currentTop(partialTop);
                 },
                 onVerticalDragUpdate: (details) {
+                  if (_dismissScheduled) return;
                   _dragSheetBy(
                     details.delta.dy,
                     expandedTop: expandedTop,
@@ -227,6 +249,7 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
                   );
                 },
                 onVerticalDragEnd: (details) {
+                  if (_dismissScheduled) return;
                   _settleDrag(
                     startTop: _handleDragStartTop,
                     currentTop: _currentTop(partialTop),
@@ -237,6 +260,7 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
                   );
                 },
                 onVerticalDragCancel: () {
+                  if (_dismissScheduled) return;
                   _animateToTop(partialTop);
                 },
                 child: _DragHandle(color: handleColor),
@@ -316,9 +340,12 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
   double _currentTop(double fallback) => _sheetTop.value ?? fallback;
 
   void _startContentDrag(PointerDownEvent event, {required double partialTop}) {
+    if (_dismissScheduled) return;
     if (_contentPointer != null) return;
     _contentPointer = event.pointer;
+    _contentPointerStart = event.position;
     _lastContentPointerY = event.position.dy;
+    _contentDragIsVertical = null;
     _contentVelocityTracker = VelocityTracker.withKind(event.kind)
       ..addPosition(event.timeStamp, event.position);
     _contentDragStartTop = _currentTop(partialTop);
@@ -331,6 +358,7 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
     required double partialTop,
     required double hiddenTop,
   }) {
+    if (_dismissScheduled) return;
     if (_contentPointer != event.pointer) return;
     _contentVelocityTracker?.addPosition(event.timeStamp, event.position);
     final lastY = _lastContentPointerY;
@@ -338,6 +366,16 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
     final positionY = event.position.dy;
     final deltaY = positionY - lastY;
     _lastContentPointerY = positionY;
+    if (_contentDragIsVertical == false) return;
+    if (_contentDragIsVertical == null) {
+      final start = _contentPointerStart;
+      if (start == null) return;
+      final dx = event.position.dx - start.dx;
+      final dy = event.position.dy - start.dy;
+      if (dx.abs() < kTouchSlop && dy.abs() < kTouchSlop) return;
+      _contentDragIsVertical = dy.abs() >= dx.abs();
+      if (_contentDragIsVertical == false) return;
+    }
     if (deltaY == 0) return;
 
     final currentTop = _currentTop(partialTop);
@@ -357,11 +395,14 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
     required double partialTop,
     required double hiddenTop,
   }) {
+    if (_dismissScheduled) return;
     if (_contentPointer != event.pointer) return;
     final velocityY =
         _contentVelocityTracker?.getVelocity().pixelsPerSecond.dy ?? 0;
     _contentPointer = null;
+    _contentPointerStart = null;
     _lastContentPointerY = null;
+    _contentDragIsVertical = null;
     _contentVelocityTracker = null;
     if (!_contentDragChangedSheetTop) return;
     _contentDragChangedSheetTop = false;
@@ -376,9 +417,12 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
   }
 
   void _cancelContentDrag(int pointer, {required double partialTop}) {
+    if (_dismissScheduled) return;
     if (_contentPointer != pointer) return;
     _contentPointer = null;
+    _contentPointerStart = null;
     _lastContentPointerY = null;
+    _contentDragIsVertical = null;
     _contentVelocityTracker = null;
     _contentDragChangedSheetTop = false;
     _animateToTop(partialTop);
@@ -512,9 +556,7 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
     _animateToTop(
       hiddenTop,
       duration: const Duration(milliseconds: 220),
-      onComplete: () {
-        if (mounted) widget.onDismiss();
-      },
+      onComplete: widget.onDismiss,
     );
   }
 }
@@ -599,13 +641,19 @@ class _SheetHeader extends StatelessWidget {
             key: CustomBottomSheet.closeButtonKey,
             width: 24,
             height: 24,
-            child: IosIconButton(
-              icon: Lucide.X,
-              size: 20,
-              padding: EdgeInsets.zero,
-              color: cs.onSurface.withValues(alpha: 0.62),
-              semanticLabel: closeSemanticLabel,
-              onTap: onClose,
+            child: Tooltip(
+              message:
+                  AppLocalizations.of(context)?.commonClose ??
+                  closeSemanticLabel ??
+                  MaterialLocalizations.of(context).closeButtonTooltip,
+              child: IosIconButton(
+                icon: Lucide.X,
+                size: 20,
+                padding: EdgeInsets.zero,
+                color: cs.onSurface.withValues(alpha: 0.62),
+                semanticLabel: closeSemanticLabel,
+                onTap: onClose,
+              ),
             ),
           ),
         ],

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:archive/archive_io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:xml/xml.dart';
+import 'package:path/path.dart' as p;
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/unicode_sanitizer.dart';
@@ -13,6 +14,13 @@ class _ExtractorParams {
   final String path;
   final String mime;
   _ExtractorParams(this.path, this.mime);
+}
+
+class AttachmentRequiresWorkspace implements Exception {
+  const AttachmentRequiresWorkspace(this.name);
+  final String name;
+  @override
+  String toString() => 'Attachment requires workspace file tools: $name';
 }
 
 class DocumentTextExtractor {
@@ -46,6 +54,13 @@ class DocumentTextExtractor {
     final mime = params.mime;
 
     try {
+      final source = File(path);
+      if (!source.existsSync()) return '[[File not found: $path]]';
+      // 接收文件与把它内联到模型请求里是两回事。
+      // 更大的文件仍可供工作区工具使用，无需整份读取。
+      if (source.lengthSync() > 16 * 1024 * 1024) {
+        throw AttachmentRequiresWorkspace(p.basename(path));
+      }
       if (mime == 'application/pdf') {
         try {
           final file = File(path);
@@ -76,13 +91,35 @@ class DocumentTextExtractor {
         return _extractDocxSync(path);
       }
 
-      // 回退：按纯文本读取
+      // 未知类型可能是压缩包或可执行文件。先探测一小段前缀，
+      // 再判断按文本读取是否有意义。
+      final probe = source.openSync();
+      try {
+        final prefix = probe.readSync(8192);
+        if (prefix.contains(0)) {
+          throw AttachmentRequiresWorkspace(p.basename(path));
+        }
+        final decoder = utf8.decoder.startChunkedConversion(
+          StringConversionSink.fromStringSink(StringBuffer()),
+        );
+        try {
+          decoder.add(prefix);
+          if (source.lengthSync() <= prefix.length) decoder.close();
+        } on FormatException {
+          throw AttachmentRequiresWorkspace(p.basename(path));
+        }
+      } finally {
+        probe.closeSync();
+      }
+      // 只读取有大小上限、且看起来是文本的文件。
       final file = File(path);
       if (!file.existsSync()) return '[[File not found: $path]]';
       final bytes = file.readAsBytesSync();
       return UnicodeSanitizer.sanitize(
         utf8.decode(bytes, allowMalformed: true),
       );
+    } on AttachmentRequiresWorkspace {
+      rethrow;
     } catch (e) {
       return '[[Failed to read file: $e]]';
     }

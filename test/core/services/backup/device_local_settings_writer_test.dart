@@ -70,10 +70,10 @@ void main() {
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getDouble('window_pos_x_v1'), 12.5);
       expect(prefs.getBool('window_maximized_v1'), isFalse);
-      expect(
-        prefs.getStringList('desktop_hotkeys_commands_v1'),
-        <String>['a', 'b'],
-      );
+      expect(prefs.getStringList('desktop_hotkeys_commands_v1'), <String>[
+        'a',
+        'b',
+      ]);
     });
 
     test('int 形状的窗口值统一落到 double', () async {

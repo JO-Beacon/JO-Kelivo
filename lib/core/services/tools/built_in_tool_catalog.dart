@@ -3,8 +3,9 @@ import '../../models/assistant.dart';
 import '../memory/memory_prompts.dart';
 import '../memory/memory_tools.dart';
 import '../search/search_tool_service.dart';
+import '../workspace/workspace_tools_service.dart';
 
-enum BuiltInToolGroup { search, memory, local }
+enum BuiltInToolGroup { search, memory, local, workspace }
 
 class BuiltInToolCatalogEntry {
   const BuiltInToolCatalogEntry({
@@ -71,6 +72,18 @@ abstract final class BuiltInToolCatalog {
             name: name,
             defaultDefinition: definition,
             group: BuiltInToolGroup.local,
+          ),
+        );
+      }
+    }
+    for (final definition in WorkspaceToolsService.definitions()) {
+      final name = _nameOf(definition);
+      if (name != null) {
+        result.add(
+          BuiltInToolCatalogEntry(
+            name: name,
+            defaultDefinition: definition,
+            group: BuiltInToolGroup.workspace,
           ),
         );
       }

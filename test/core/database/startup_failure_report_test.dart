@@ -75,11 +75,11 @@ void main() {
       'unwraps a failure raised on drift\'s worker isolate',
       () async {
         // 上游这个用例用的是"未发布的 schema"（它只认 {1,2,3}）。本仓库的受理
-        // 契约不同：1..7 都接受，只拒绝比 currentSchemaVersion 更新的版本
-        // （见 AppDatabase._openExecutor）。所以这里用 8——同样会让实时执行器的
+        // 契约不同：1..8 都接受，只拒绝比 currentSchemaVersion 更新的版本
+        // （见 AppDatabase._openExecutor）。所以这里用 9——同样会让实时执行器的
         // setup 在 drift 的 worker isolate 上抛错，调用方同样只看到
         // DriftRemoteException，而被夹带出来的诊断码变成 database_schema_too_new。
-        await createDatabaseAtVersion(directory, 8);
+        await createDatabaseAtVersion(directory, 9);
         final database = AppDatabase.open(file: databaseFile(directory));
         Object? caught;
         StackTrace? caughtStack;

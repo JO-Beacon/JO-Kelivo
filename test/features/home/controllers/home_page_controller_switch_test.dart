@@ -11,6 +11,7 @@ import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/notification_service.dart';
 import 'package:Kelivo/features/home/controllers/home_page_controller.dart';
 import 'package:Kelivo/features/home/controllers/scroll_controller.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
@@ -277,6 +278,146 @@ void main() {
   }
 
   group('HomePageController conversation switch pipeline', () {
+    testWidgets(
+      'desktop task history opens the saved conversation through the bus',
+      (tester) async {
+        await runAsDesktop(() async {
+          final service = _ControlledChatService({
+            'conv-a': [_message('conv-a', 0)],
+            'conv-b': [_message('conv-b', 0)],
+          });
+          final controller = await pumpHarness(tester, service);
+          await switchAndSettle(tester, controller, service, 'conv-a');
+          controller.debugSetChatInitialized();
+          NotificationService.openConversation('conv-b');
+          for (var i = 0; i < 40 && service.pageRequests.length < 2; i++) {
+            await tester.pump(const Duration(milliseconds: 10));
+          }
+          expect(service.pageRequests, hasLength(2));
+          service.completePage(
+            service.pageRequests.last,
+            service.messagesOf('conv-b'),
+            startIndex: 0,
+          );
+          for (
+            var i = 0;
+            i < 40 && controller.currentConversation?.id != 'conv-b';
+            i++
+          ) {
+            await tester.pump(const Duration(milliseconds: 10));
+          }
+          expect(controller.currentConversation?.id, 'conv-b');
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox());
+        });
+      },
+    );
+
+    testWidgets(
+      'notification tap closes settings and opens the saved conversation',
+      (tester) async {
+        // FakeAsync cannot advance to a frame while idle tasks continuously
+        // reschedule zero-delay timers during the route-pop animation.
+        final previousStrategy = tester.binding.schedulingStrategy;
+        tester.binding.schedulingStrategy =
+            ({required priority, required scheduler}) => true;
+        addTearDown(() => tester.binding.schedulingStrategy = previousStrategy);
+        await runAsMobile(() async {
+          final service = _ControlledChatService({
+            'conv-a': [_message('conv-a', 0)],
+            'conv-b': [_message('conv-b', 0)],
+          });
+          final controller = await pumpHarness(tester, service);
+          var revealed = false;
+          controller.onRevealConversation = () => revealed = true;
+          await switchAndSettle(tester, controller, service, 'conv-a');
+          controller.debugSetChatInitialized();
+          final navigator = tester.state<NavigatorState>(
+            find.byType(Navigator),
+          );
+          unawaited(
+            navigator
+                .push<void>(
+                  MaterialPageRoute(
+                    builder: (_) => const Scaffold(body: Text('Settings page')),
+                  ),
+                )
+                .then((_) => controller.onDidPopNext()),
+          );
+          controller.onDidPushNext();
+          await tester.pumpAndSettle();
+          expect(find.text('Settings page'), findsOneWidget);
+          controller.debugHandleNotificationConversationTap('conv-b');
+          for (var i = 0; i < 40 && service.pageRequests.length < 2; i++) {
+            await tester.pump(const Duration(milliseconds: 10));
+          }
+          expect(service.pageRequests, hasLength(2));
+          service.completePage(
+            service.pageRequests.last,
+            service.messagesOf('conv-b'),
+            startIndex: 0,
+          );
+          for (
+            var i = 0;
+            i < 40 &&
+                (controller.currentConversation?.id != 'conv-b' ||
+                    controller.convoFadeController.value != 1.0 ||
+                    find.text('Settings page').evaluate().isNotEmpty);
+            i++
+          ) {
+            await tester.pump(const Duration(milliseconds: 100));
+          }
+          expect(find.text('Settings page'), findsNothing);
+          expect(controller.currentConversation?.id, 'conv-b');
+          expect(revealed, isTrue);
+        });
+      },
+    );
+
+    testWidgets(
+      'notification target waits until the Home route is visible again',
+      (tester) async {
+        await runAsMobile(() async {
+          final service = _ControlledChatService({
+            'conv-a': [_message('conv-a', 0)],
+            'conv-b': [_message('conv-b', 0)],
+          });
+          final controller = await pumpHarness(tester, service);
+          await switchAndSettle(tester, controller, service, 'conv-a');
+          controller.debugSetChatInitialized();
+
+          controller.onDidPushNext();
+          controller.debugHandleNotificationConversationTap('conv-b');
+          await tester.pump();
+
+          expect(controller.currentConversation?.id, 'conv-a');
+          expect(service.pageRequests, hasLength(1));
+
+          controller.onDidPopNext();
+          for (var i = 0; i < 40 && service.pageRequests.length < 2; i++) {
+            await tester.pump(const Duration(milliseconds: 10));
+          }
+          expect(service.pageRequests, hasLength(2));
+          service.completePage(
+            service.pageRequests.last,
+            service.messagesOf('conv-b'),
+            startIndex: 0,
+          );
+          for (
+            var i = 0;
+            i < 40 &&
+                (controller.currentConversation?.id != 'conv-b' ||
+                    controller.convoFadeController.value != 1.0);
+            i++
+          ) {
+            await tester.pump(const Duration(milliseconds: 100));
+          }
+
+          expect(controller.currentConversation?.id, 'conv-b');
+        });
+      },
+    );
+
     testWidgets('same-id tap short-circuits before flush and fetch', (
       tester,
     ) async {

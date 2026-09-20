@@ -110,3 +110,7 @@ internationalization.md
 # 保留作防御——万一有诊断文件被放回 test/，仍不会被误提交。
 test/tmp_scrollbar_probe_test.dart
 test/goldens/dialog_scrollbar_probe.png
+
+# 上游 1.2.7 引入 / 本仓库一并采用
+# proot 的原生库由构建时 tool/fetch_proot.sh 拉取，不入库
+android/app/src/main/jniLibs/**/*.so

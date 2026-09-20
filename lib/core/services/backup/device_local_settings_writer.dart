@@ -84,8 +84,11 @@ abstract final class CandidateLedgerReader {
   }) {
     try {
       final file = File(
-        p.join(candidateDirectory.path, 'device_local_settings',
-            '$fingerprint.json'),
+        p.join(
+          candidateDirectory.path,
+          'device_local_settings',
+          '$fingerprint.json',
+        ),
       );
       if (!file.existsSync()) return null;
       return LocalDeviceSettingsLedger.parseArchiveFile(
@@ -98,7 +101,10 @@ abstract final class CandidateLedgerReader {
   }
 
   /// 候选目录里的册子文件路径（供启动门推导，勿硬编码 run 位置）。
-  static String ledgerFilePath(Directory candidateDirectory, String fingerprint) {
+  static String ledgerFilePath(
+    Directory candidateDirectory,
+    String fingerprint,
+  ) {
     return p.join(
       candidateDirectory.path,
       'device_local_settings',

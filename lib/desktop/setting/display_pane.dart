@@ -83,6 +83,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _ToggleRowShowThinkingCards(),
                   _RowDivider(),
                   _ToggleRowShowToolCards(),
+                  _RowDivider(),
+                  _ToggleRowShowProducedFiles(),
                 ],
               ),
               const SizedBox(height: 16),
@@ -1769,6 +1771,8 @@ class _DesktopAppFontRow extends StatelessWidget {
     final current = sp.appFontFamily;
     final displayText = (current == null || current.isEmpty)
         ? l10n.desktopFontFamilySystemDefault
+        : sp.appFontLocalAlias != null
+        ? l10n.displaySettingsPageFontLocalFileLabel
         : current;
     return _LabeledRow(
       label: l10n.desktopFontAppLabel,
@@ -1794,6 +1798,14 @@ class _DesktopAppFontRow extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Tooltip(
+            message: l10n.googleFontsTitle,
+            child: _IconBtn(
+              icon: lucide.Lucide.Download,
+              onTap: () => showGoogleFontsPicker(context, forCode: false),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Tooltip(
             message: l10n.displaySettingsPageFontResetLabel,
             child: _IconBtn(
               icon: lucide.Lucide.RotateCcw,
@@ -1816,6 +1828,8 @@ class _DesktopCodeFontRow extends StatelessWidget {
     final current = sp.codeFontFamily;
     final displayText = (current == null || current.isEmpty)
         ? l10n.desktopFontFamilyMonospaceDefault
+        : sp.codeFontLocalAlias != null
+        ? l10n.displaySettingsPageFontLocalFileLabel
         : current;
     return _LabeledRow(
       label: l10n.desktopFontCodeLabel,
@@ -1838,6 +1852,14 @@ class _DesktopCodeFontRow extends StatelessWidget {
                 await settingsProvider.setCodeFontSystemFamily(fam);
               }
             },
+          ),
+          const SizedBox(width: 8),
+          Tooltip(
+            message: l10n.googleFontsTitle,
+            child: _IconBtn(
+              icon: lucide.Lucide.Download,
+              onTap: () => showGoogleFontsPicker(context, forCode: true),
+            ),
           ),
           const SizedBox(width: 8),
           Tooltip(
@@ -2500,6 +2522,22 @@ class _ToggleRowCollapseThinkingSteps extends StatelessWidget {
   }
 }
 
+class _ToggleRowShowProducedFiles extends StatelessWidget {
+  const _ToggleRowShowProducedFiles();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageShowProducedFilesTitle,
+      tip: l10n.displaySettingsPageShowProducedFilesSubtitle,
+      value: sp.showProducedFiles,
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setShowProducedFiles(v),
+    );
+  }
+}
+
 class _ToggleRowShowToolResultSummary extends StatelessWidget {
   const _ToggleRowShowToolResultSummary();
   @override
@@ -2609,10 +2647,7 @@ class _ToggleRowAutoRetry extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final enabled = context
-        .watch<SettingsProvider>()
-        .autoRetryOptions
-        .enabled;
+    final enabled = context.watch<SettingsProvider>().autoRetryOptions.enabled;
     return _LabeledRow(
       label: l10n.settingsPageAutoRetry,
       trailing: _DesktopFontDropdownButton(
@@ -3249,8 +3284,13 @@ class _ToggleRow extends StatelessWidget {
     required this.label,
     required this.value,
     required this.onChanged,
+    this.tip,
   });
   final String label;
+
+  /// 可选的说明文字。上游用问号图标 ＋ 悬停提示（`MemoryTipIcon`）承载它，
+  /// 本仓库没有那个控件，改为在标签下方直接显示一行小字。
+  final String? tip;
   final bool value;
   final ValueChanged<bool>? onChanged;
   @override
@@ -3274,6 +3314,16 @@ class _ToggleRow extends StatelessWidget {
                     decoration: TextDecoration.none,
                   ),
                 ),
+                if (tip != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    tip!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: cs.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

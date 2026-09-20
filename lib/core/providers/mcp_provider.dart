@@ -6,9 +6,14 @@ import '../database/business_preferences.dart';
 import '../services/mcp/kelivo_fetch/kelivo_fetch_server.dart';
 import '../services/mcp/mcp_oauth_service.dart';
 import '../services/mcp/stdio_command_resolver.dart';
+import '../services/mcp/workspace_stdio_transport.dart';
+import '../services/mcp/workspace_stdio_command.dart';
+import '../services/workspace/workspace_runtime.dart';
+import '../models/environment_state.dart';
+import 'environment_provider.dart';
 import 'package:uuid/uuid.dart';
 
-/// 传输类型：SSE、Streamable HTTP 和 STDIO（仅限桌面端）。
+/// 传输类型：SSE、Streamable HTTP 和 STDIO（桌面主机或移动端沙盒）。
 enum McpTransportType { sse, http, stdio, inmemory }
 
 /// MCP 服务器的连接状态。
@@ -43,7 +48,7 @@ class _ServerConnection {
   McpStatus status = McpStatus.idle;
   String? error;
   _Cooldown? cooldown;
-  Future<void>? refreshFuture;
+  Future<bool>? refreshFuture;
   Future<McpOAuthState?>? oauthRefreshFuture;
   Future<mcp.Client?>? oauthRecoveryFuture;
   List<String> oauthChallenges = const [];
@@ -159,7 +164,7 @@ class McpServerConfig {
   final Map<String, String> headers; // 自定义 HTTP 头
   final McpOAuthState? oauth;
   final McpOAuthClientRegistration? oauthClient;
-  // 适用于 STDIO（仅限桌面端）
+  // 适用于 STDIO（桌面主机或移动端沙盒）
   final String? command;
   final List<String> args;
   final Map<String, String> env;
@@ -332,6 +337,7 @@ class McpProvider extends ChangeNotifier {
   );
 
   final BusinessPreferences preferences;
+  late final Future<void> loaded;
   final McpOAuthService _oauthService;
   final bool _ownsOAuthService;
   final Map<String, _ServerConnection> _connections = {};
@@ -342,13 +348,55 @@ class McpProvider extends ChangeNotifier {
   final McpStdioCommandResolver _stdioCommandResolver =
       McpStdioCommandResolver();
 
-  McpProvider({required this.preferences, McpOAuthService? oauthService})
-    : _oauthService = oauthService ?? McpOAuthService(),
-      _ownsOAuthService = oauthService == null {
-    unawaited(_serializeServerMutation(_load));
+  final WorkspaceRuntimeProvider? workspaceRuntime;
+  final EnvironmentProvider? environment;
+  bool _stdioWasAvailable = false;
+
+  bool get supportsStdio =>
+      _isDesktopPlatform() ||
+      (!kIsWeb &&
+          workspaceRuntime?.runtime is WorkspaceStdioRuntime &&
+          workspaceRuntime?.lastStatus?.ready == true &&
+          environment?.state.phase == EnvironmentPhase.ready);
+
+  void _onEnvironmentChanged() {
+    if (_disposed) return;
+    final available = supportsStdio;
+    if (available != _stdioWasAvailable) {
+      _stdioWasAvailable = available;
+      for (final server in _servers.where(
+        (s) => s.transport == McpTransportType.stdio,
+      )) {
+        if (available && server.enabled) {
+          // 断开后的旧初始化可能仍在收尾，等待它结束后再连接新环境。
+          unawaited(reconnect(server.id));
+        } else if (!available) {
+          unawaited(disconnect(server.id));
+        }
+      }
+    }
+    _notify();
   }
 
-  List<McpServerConfig> get servers => List.unmodifiable(_servers);
+  McpProvider({
+    required this.preferences,
+    McpOAuthService? oauthService,
+    this.workspaceRuntime,
+    this.environment,
+  }) : _oauthService = oauthService ?? McpOAuthService(),
+       _ownsOAuthService = oauthService == null {
+    _stdioWasAvailable = supportsStdio;
+    workspaceRuntime?.addListener(_onEnvironmentChanged);
+    environment?.addListener(_onEnvironmentChanged);
+    loaded = _serializeServerMutation(_load);
+    unawaited(loaded);
+  }
+
+  List<McpServerConfig> get servers => List.unmodifiable(
+    _servers.where(
+      (s) => s.transport != McpTransportType.stdio || supportsStdio,
+    ),
+  );
   McpStatus statusFor(String id) => _connections[id]?.status ?? McpStatus.idle;
   String? errorFor(String id) => _connections[id]?.error;
   bool get hasAnyEnabled => _servers.any((s) => s.enabled);
@@ -459,61 +507,57 @@ class McpProvider extends ChangeNotifier {
   ///   }
   /// }
   String exportServersAsUiJson() {
-    // 在移动端，导出的 JSON 中跳过 stdio 条目。
-    final isDesktop = _isDesktopPlatform();
     final map = <String, dynamic>{
       'mcpServers': {
         for (final s in _servers)
-          if (s.transport != McpTransportType.stdio || isDesktop)
-            s.id: {
-              'name': s.name,
-              if (s.transport == McpTransportType.http)
-                'type': 'streamableHttp',
-              if (s.transport == McpTransportType.sse) 'type': 'sse',
-              if (s.transport == McpTransportType.inmemory) 'type': 'inmemory',
-              'description': '',
-              'isActive': s.enabled,
-              if (s.transport != McpTransportType.stdio &&
-                  s.transport != McpTransportType.inmemory)
-                'baseUrl': s.url,
-              if (s.transport != McpTransportType.stdio &&
-                  s.transport != McpTransportType.inmemory &&
-                  s.headers.isNotEmpty)
-                'headers': s.headers,
-              if (s.transport != McpTransportType.stdio &&
-                  s.transport != McpTransportType.inmemory &&
-                  s.oauthClient != null)
-                'oauthClient': {
-                  'clientId': s.oauthClient!.clientId,
-                  'tokenEndpointAuthMethod':
-                      s.oauthClient!.tokenEndpointAuthMethod,
-                  'registrationSource': s.oauthClient!.registrationSource.name,
-                  if (s.oauthClient!.authorizationServer != null)
-                    'authorizationServer': s.oauthClient!.authorizationServer,
-                },
-              // 对于 stdio，包含一个可选的 type 以保持兼容性
-              if (s.transport == McpTransportType.stdio) 'type': 'stdio',
-              // 包含 command/args/env
-              if (s.transport == McpTransportType.stdio &&
-                  (s.command ?? '').isNotEmpty)
-                'command': s.command,
-              if (s.transport == McpTransportType.stdio && s.args.isNotEmpty)
-                'args': s.args,
-              if (s.transport == McpTransportType.stdio && s.env.isNotEmpty)
-                'env': s.env,
-              if (s.transport == McpTransportType.stdio)
-                ...() {
-                  final reg =
-                      s.env['NPM_CONFIG_REGISTRY'] ??
-                      s.env['npm_config_registry'];
-                  return reg != null && reg.isNotEmpty
-                      ? {'registryUrl': reg}
-                      : <String, dynamic>{};
-                }(),
-              if (s.transport == McpTransportType.stdio &&
-                  (s.workingDirectory ?? '').isNotEmpty)
-                'workingDirectory': s.workingDirectory,
-            },
+          s.id: {
+            'name': s.name,
+            if (s.transport == McpTransportType.http) 'type': 'streamableHttp',
+            if (s.transport == McpTransportType.sse) 'type': 'sse',
+            if (s.transport == McpTransportType.inmemory) 'type': 'inmemory',
+            'description': '',
+            'isActive': s.enabled,
+            if (s.transport != McpTransportType.stdio &&
+                s.transport != McpTransportType.inmemory)
+              'baseUrl': s.url,
+            if (s.transport != McpTransportType.stdio &&
+                s.transport != McpTransportType.inmemory &&
+                s.headers.isNotEmpty)
+              'headers': s.headers,
+            if (s.transport != McpTransportType.stdio &&
+                s.transport != McpTransportType.inmemory &&
+                s.oauthClient != null)
+              'oauthClient': {
+                'clientId': s.oauthClient!.clientId,
+                'tokenEndpointAuthMethod':
+                    s.oauthClient!.tokenEndpointAuthMethod,
+                'registrationSource': s.oauthClient!.registrationSource.name,
+                if (s.oauthClient!.authorizationServer != null)
+                  'authorizationServer': s.oauthClient!.authorizationServer,
+              },
+            // STDIO 保留可选类型字段以兼容配置格式
+            if (s.transport == McpTransportType.stdio) 'type': 'stdio',
+            // 保留命令、参数和环境变量
+            if (s.transport == McpTransportType.stdio &&
+                (s.command ?? '').isNotEmpty)
+              'command': s.command,
+            if (s.transport == McpTransportType.stdio && s.args.isNotEmpty)
+              'args': s.args,
+            if (s.transport == McpTransportType.stdio && s.env.isNotEmpty)
+              'env': s.env,
+            if (s.transport == McpTransportType.stdio)
+              ...() {
+                final reg =
+                    s.env['NPM_CONFIG_REGISTRY'] ??
+                    s.env['npm_config_registry'];
+                return reg != null && reg.isNotEmpty
+                    ? {'registryUrl': reg}
+                    : <String, dynamic>{};
+              }(),
+            if (s.transport == McpTransportType.stdio &&
+                (s.workingDirectory ?? '').isNotEmpty)
+              'workingDirectory': s.workingDirectory,
+          },
       },
     };
     return const JsonEncoder.withIndent('  ').convert(map);
@@ -543,7 +587,6 @@ class McpProvider extends ChangeNotifier {
       }
 
       if (serversFromMap != null) {
-        final isDesktop = _isDesktopPlatform();
         bool builtinSeen = false;
         bool builtinEnabled = true;
         serversFromMap.forEach((id, cfgAny) {
@@ -562,10 +605,6 @@ class McpProvider extends ChangeNotifier {
               cfg.containsKey('env') ||
               (cfg['type']?.toString().toLowerCase() == 'stdio');
           if (hasStdioShape) {
-            if (!isDesktop) {
-              // 移动端：完全跳过 stdio 条目
-              return;
-            }
             final enabled = (cfg['isActive'] as bool?) ?? true;
             final name = (cfg['name'] as String?)?.trim();
             final cmd = (cfg['command'] as String?)?.trim();
@@ -774,6 +813,28 @@ class McpProvider extends ChangeNotifier {
         _finishDisconnect(connection, terminateSession: true),
     ]);
     for (final server in _servers.where((server) => server.enabled)) {
+      unawaited(connect(server.id));
+    }
+  }
+
+  /// 一次写入已验证的导入配置，保留已有连接。
+  Future<void> importServers(List<McpServerConfig> imported) async {
+    if (imported.isEmpty) return;
+    await _serializeServerMutation(() async {
+      final ids = _servers.map((server) => server.id).toSet();
+      for (final server in imported) {
+        if (!ids.add(server.id)) {
+          throw const FormatException('Duplicate MCP server ID');
+        }
+      }
+      await _persistServers([..._servers, ...imported]);
+      _servers = [..._servers, ...imported];
+      for (final server in imported) {
+        _connections[server.id] = _ServerConnection();
+      }
+      _notify();
+    });
+    for (final server in imported.where((server) => server.enabled)) {
       unawaited(connect(server.id));
     }
   }
@@ -1233,6 +1294,9 @@ class McpProvider extends ChangeNotifier {
     if (server == null || !server.enabled || _disposed) {
       return Future<bool>.value(false);
     }
+    if (server.transport == McpTransportType.stdio && !supportsStdio) {
+      return Future<bool>.value(false);
+    }
     final state = _connections.putIfAbsent(id, _ServerConnection.new);
     final active = state.connectFuture;
     if (active != null) return active;
@@ -1304,6 +1368,7 @@ class McpProvider extends ChangeNotifier {
     bool retryUnauthorized = true,
   }) async {
     mcp.Client? client;
+    WorkspaceStdioTransport? workspaceTransport;
     final startedAt = DateTime.now();
     try {
       server = await _withFreshOAuth(server, state);
@@ -1324,6 +1389,43 @@ class McpProvider extends ChangeNotifier {
         await client.connect(
           KelivoInMemoryClientTransport(KelivoFetchMcpServerEngine()),
         );
+      } else if (server.transport == McpTransportType.stdio &&
+          !_isDesktopPlatform()) {
+        final runtime = workspaceRuntime?.runtime;
+        if (!supportsStdio || runtime is! WorkspaceStdioRuntime) {
+          throw StateError('Workspace environment is not ready');
+        }
+        final config = await environment!.loadExecutionConfig();
+        await requireWorkspaceStdioCommand(
+          runtime: runtime,
+          command: server.command ?? '',
+          cwd: server.workingDirectory ?? '/root',
+          environment: {...config.variables, ...server.env},
+          timeout: _requestTimeout,
+          isCancelled: () =>
+              _disposed || state.generation != generation || !supportsStdio,
+        );
+        final transport = await WorkspaceStdioTransport.start(
+          runtime: runtime,
+          command: server.command ?? '',
+          arguments: server.args,
+          cwd: server.workingDirectory ?? '/root',
+          environment: {...config.variables, ...server.env},
+          startupTimeout: _requestTimeout,
+          isCancelled: () => _disposed || state.generation != generation,
+        );
+        workspaceTransport = transport;
+        client = mcp.McpClient.createClient(clientConfig);
+        // 包启动器可能在初始化前安装依赖，此等待时间与工具调用超时分开。
+        const installTimeout = Duration(minutes: 2);
+        client.setRequestTimeout(
+          _requestTimeout > installTimeout ? _requestTimeout : installTimeout,
+        );
+        try {
+          await client.connect(transport);
+        } finally {
+          client.setRequestTimeout(_requestTimeout);
+        }
       } else {
         final transportConfig = await _transportConfig(server);
         final result = await mcp.McpClient.createAndConnect(
@@ -1350,7 +1452,13 @@ class McpProvider extends ChangeNotifier {
       state.error = null;
       _finishScopeUpgrade(state, 'connect');
       _clearCooldownAfterSuccess(state, startedAt);
-      _attachClient(id, state, connectedClient, generation);
+      _attachClient(
+        id,
+        state,
+        connectedClient,
+        generation,
+        workspaceTransport: workspaceTransport,
+      );
       _notify();
       return true;
     } catch (error) {
@@ -1391,7 +1499,9 @@ class McpProvider extends ChangeNotifier {
         _enterCooldown(state, effectiveError.retryAfter);
       }
       state.status = McpStatus.error;
-      state.error = effectiveError.toString();
+      state.error =
+          workspaceTransport?.describeError(effectiveError) ??
+          effectiveError.toString();
       _notify();
       return false;
     }
@@ -1662,8 +1772,9 @@ class McpProvider extends ChangeNotifier {
     String id,
     _ServerConnection state,
     mcp.Client client,
-    int generation,
-  ) {
+    int generation, {
+    WorkspaceStdioTransport? workspaceTransport,
+  }) {
     client.onDisconnect.listen((_) {
       if (_disposed ||
           state.generation != generation ||
@@ -1671,8 +1782,11 @@ class McpProvider extends ChangeNotifier {
         return;
       }
       state.client = null;
-      state.status = McpStatus.idle;
-      state.error = null;
+      final failed = workspaceTransport?.failed == true;
+      state.status = failed ? McpStatus.error : McpStatus.idle;
+      state.error = failed
+          ? workspaceTransport!.describeError('STDIO transport disconnected')
+          : null;
       _notify();
     });
     client.onError.listen((error) {
@@ -2172,9 +2286,10 @@ class McpProvider extends ChangeNotifier {
     return const [];
   }
 
-  Future<void> refreshTools(String id) {
+  /// 返回本次发现是否成功并更新了缓存。发现成功也可能返回空工具列表。
+  Future<bool> refreshTools(String id) {
     final state = _connections[id];
-    if (state?.client == null || _disposed) return Future<void>.value();
+    if (state?.client == null || _disposed) return Future<bool>.value(false);
     state!.refreshDirty = true;
     final active = state.refreshFuture;
     if (active != null) return active;
@@ -2190,7 +2305,7 @@ class McpProvider extends ChangeNotifier {
     });
   }
 
-  Future<void> _drainToolRefresh(String id, _ServerConnection state) async {
+  Future<bool> _drainToolRefresh(String id, _ServerConnection state) async {
     var sessionRecoveries = 0;
     while (state.refreshDirty && !_disposed) {
       state.refreshDirty = false;
@@ -2207,8 +2322,9 @@ class McpProvider extends ChangeNotifier {
         state.refreshDirty = true;
         continue;
       }
-      if (outcome != _ToolRefreshOutcome.success) return;
+      if (outcome != _ToolRefreshOutcome.success) return false;
     }
+    return !_disposed && isConnected(id);
   }
 
   Future<_ToolRefreshOutcome> _refreshToolsOnce(
@@ -2652,7 +2768,7 @@ class McpProvider extends ChangeNotifier {
 
   List<McpToolConfig> getEnabledToolsForServers(Set<String> serverIds) {
     final tools = <McpToolConfig>[];
-    for (final s in _servers.where((s) => serverIds.contains(s.id))) {
+    for (final s in servers.where((s) => serverIds.contains(s.id))) {
       if (!s.enabled) continue;
       tools.addAll(s.tools.where((t) => t.enabled));
     }
@@ -2663,6 +2779,8 @@ class McpProvider extends ChangeNotifier {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    workspaceRuntime?.removeListener(_onEnvironmentChanged);
+    environment?.removeListener(_onEnvironmentChanged);
     for (final state in _connections.values) {
       state.generation++;
       state.client?.dispose();

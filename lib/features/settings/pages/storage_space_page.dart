@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
+import 'package:provider/provider.dart';
 
+import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
 import '../../../core/services/native_file_save.dart';
 import '../../../core/services/storage/storage_usage_service.dart';
@@ -15,11 +17,28 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/app_directories.dart';
-import '../../../utils/platform_utils.dart';
-import '../../chat/pages/image_viewer_page.dart';
-import 'log_viewer_page.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../utils/platform_utils.dart';
+import '../../backup/pages/local_snapshots_page.dart';
+import '../../chat/pages/image_viewer_page.dart';
+import '../../workspace/pages/environment_page.dart';
+import '../../workspace/pages/skills_page.dart';
+import '../../workspace/pages/workspaces_page.dart';
+import 'log_viewer_page.dart';
+import '../widgets/storage_contents_list.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+
+Set<String>? _conversationIdsOrNull(BuildContext context) {
+  try {
+    return context
+        .read<ChatService>()
+        .getAllConversations()
+        .map((conversation) => conversation.id)
+        .toSet();
+  } catch (_) {
+    return null;
+  }
+}
 
 class StorageSpacePage extends StatefulWidget {
   const StorageSpacePage({super.key, this.embedded = false});
@@ -80,9 +99,15 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
       StorageUsageCategoryKey.chatData,
       StorageUsageCategoryKey.legacyChatData,
       StorageUsageCategoryKey.restoreTraces,
+      StorageUsageCategoryKey.displacedDatabases,
+      StorageUsageCategoryKey.localSnapshots,
       StorageUsageCategoryKey.assistantData,
       StorageUsageCategoryKey.cache,
       StorageUsageCategoryKey.logs,
+      StorageUsageCategoryKey.workspaceFiles,
+      StorageUsageCategoryKey.sandboxEnvironment,
+      StorageUsageCategoryKey.skills,
+      StorageUsageCategoryKey.sessionFiles,
     ];
     final series = appColors.chartSeries;
     return series[order.indexOf(key) % series.length];
@@ -100,6 +125,10 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return Lucide.History;
       case StorageUsageCategoryKey.restoreTraces:
         return Lucide.RotateCcw;
+      case StorageUsageCategoryKey.displacedDatabases:
+        return Lucide.Database;
+      case StorageUsageCategoryKey.localSnapshots:
+        return Lucide.Shield;
       case StorageUsageCategoryKey.assistantData:
         return Lucide.Bot;
       case StorageUsageCategoryKey.cache:
@@ -108,6 +137,14 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return Lucide.FileText;
       case StorageUsageCategoryKey.other:
         return Lucide.Box;
+      case StorageUsageCategoryKey.workspaceFiles:
+        return Lucide.FolderCode;
+      case StorageUsageCategoryKey.sandboxEnvironment:
+        return Lucide.Box;
+      case StorageUsageCategoryKey.skills:
+        return Lucide.WandSparkles;
+      case StorageUsageCategoryKey.sessionFiles:
+        return Lucide.Paperclip;
     }
   }
 
@@ -123,6 +160,10 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return l10n.storageSpaceCategoryLegacyChatData;
       case StorageUsageCategoryKey.restoreTraces:
         return l10n.storageSpaceCategoryRestoreTraces;
+      case StorageUsageCategoryKey.displacedDatabases:
+        return l10n.storageSpaceCategoryDisplacedDatabases;
+      case StorageUsageCategoryKey.localSnapshots:
+        return l10n.localSnapshotSectionTitle;
       case StorageUsageCategoryKey.assistantData:
         return l10n.storageSpaceCategoryAssistantData;
       case StorageUsageCategoryKey.cache:
@@ -131,6 +172,14 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return l10n.storageSpaceCategoryLogs;
       case StorageUsageCategoryKey.other:
         return l10n.storageSpaceCategoryOther;
+      case StorageUsageCategoryKey.workspaceFiles:
+        return l10n.storageSpaceCategoryWorkspaceFiles;
+      case StorageUsageCategoryKey.sandboxEnvironment:
+        return l10n.storageSpaceCategorySandboxEnvironment;
+      case StorageUsageCategoryKey.skills:
+        return l10n.storageSpaceCategorySkills;
+      case StorageUsageCategoryKey.sessionFiles:
+        return l10n.storageSpaceCategorySessionFiles;
     }
   }
 
@@ -150,6 +199,10 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return l10n.storageSpaceSubChatSharedMemory;
       case 'completed_restore_runs':
         return l10n.storageSpaceSubCompletedRestoreRuns;
+      case 'displaced_databases':
+        return l10n.storageSpaceSubDisplacedDatabases;
+      case 'local_snapshots':
+        return l10n.localSnapshotEnabledSubtitle;
       case 'fonts':
         return l10n.storageSpaceCategoryFonts;
       case 'local_models':
@@ -414,6 +467,40 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     }
   }
 
+  Future<void> _doClearDisplacedDatabases() async {
+    if (_clearing) return;
+    final l10n = AppLocalizations.of(context)!;
+    final targetName = l10n.storageSpaceCategoryDisplacedDatabases;
+    final ok = await _confirmAction(
+      context,
+      title: l10n.storageSpaceClearConfirmTitle,
+      message: l10n.storageSpaceClearDisplacedDatabasesConfirmMessage,
+      actionLabel: l10n.storageSpaceClearButton,
+    );
+    if (!ok) return;
+
+    setState(() => _clearing = true);
+    try {
+      await StorageUsageService.clearDisplacedDatabases();
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearDone(targetName),
+        type: NotificationType.success,
+      );
+      await _refreshReport();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearFailed(e.toString()),
+        type: NotificationType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _clearing = false);
+    }
+  }
+
   Future<void> _doClearFonts() async {
     if (_clearing) return;
     final l10n = AppLocalizations.of(context)!;
@@ -482,6 +569,50 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     }
   }
 
+  Future<void> _doCleanOrphanSessionFiles() async {
+    if (_clearing) return;
+    final l10n = AppLocalizations.of(context)!;
+    final conversationIds = _conversationIdsOrNull(context);
+    final reclaimable = await StorageUsageService.measureOrphanSessionFiles(
+      conversationIds: conversationIds,
+    );
+    if (!mounted) return;
+    final ok = await _confirmAction(
+      context,
+      title: l10n.storageSpaceClearConfirmTitle,
+      message: l10n.storageSessionFilesCleanOrphansHint(
+        _fmtBytes(reclaimable.bytes),
+      ),
+      actionLabel: l10n.storageSpaceClearButton,
+    );
+    if (!ok) return;
+
+    setState(() => _clearing = true);
+    try {
+      await StorageUsageService.clearOrphanSessionFiles(
+        conversationIds: conversationIds,
+      );
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearDone(
+          l10n.storageSpaceCategorySessionFiles,
+        ),
+        type: NotificationType.success,
+      );
+      await _refreshReport();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearFailed(e.toString()),
+        type: NotificationType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _clearing = false);
+    }
+  }
+
   Future<void> _openCategoryDetail(StorageUsageCategoryKey key) async {
     final report = _report;
     if (report == null) return;
@@ -498,22 +629,6 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
           refreshReport: _refreshReport,
         ),
       ),
-    );
-  }
-
-  Future<void> _openUserDataDirectory() async {
-    final l10n = AppLocalizations.of(context)!;
-    try {
-      final directory = await AppDirectories.getAppDataDirectory();
-      final opened = await AppDirectories.openDirectory(directory);
-      if (opened || !mounted) return;
-    } catch (_) {
-      if (!mounted) return;
-    }
-    showAppSnackBar(
-      context,
-      message: l10n.backupPageOpenUserDataFailed,
-      type: NotificationType.error,
     );
   }
 
@@ -537,9 +652,9 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         : _buildMobile(context, _report!);
 
     if (widget.embedded) {
-      // 主 IndexedStack 中的桌面页面不会由 Scaffold 或 AppBar 包裹。
-      // 确保存在 Material 祖先和正确背景，避免奇怪的文本伪影
-      // （例如黄色下划线）以及浅色模式下对比度不足。
+      // 主 IndexedStack 里的桌面页没有被 Scaffold/AppBar 包裹。
+      // 这里确保有 Material 祖先 + 正确底色，避免奇怪的文本残影
+      //（例如黄色下划线）以及浅色模式下对比度不可读。
       if (isDesktop) {
         return Material(
           color: Theme.of(context).scaffoldBackgroundColor,
@@ -573,6 +688,24 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         ],
       ),
       body: body,
+    );
+  }
+
+  /// 在系统文件管理器中打开用户数据目录。
+  /// 上游没有这个入口，属本仓库自有功能。
+  Future<void> _openUserDataDirectory() async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final directory = await AppDirectories.getAppDataDirectory();
+      final opened = await AppDirectories.openDirectory(directory);
+      if (opened || !mounted) return;
+    } catch (_) {
+      if (!mounted) return;
+    }
+    showAppSnackBar(
+      context,
+      message: l10n.backupPageOpenUserDataFailed,
+      type: NotificationType.error,
     );
   }
 
@@ -691,10 +824,16 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                         onClearRestoreTraces: _clearing
                             ? null
                             : _doClearRestoreTraces,
+                        onClearDisplacedDatabases: _clearing
+                            ? null
+                            : _doClearDisplacedDatabases,
                         onClearFonts: _clearing ? null : _doClearFonts,
                         onClearLocalModels: _clearing
                             ? null
                             : _doClearLocalModels,
+                        onCleanOrphanSessionFiles: _clearing
+                            ? null
+                            : _doCleanOrphanSessionFiles,
                         refreshReport: _refreshReport,
                       ),
                     ),
@@ -797,8 +936,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                   context,
                   icon: _iconFor(report.categories[i].key),
                   label: _titleFor(report.categories[i].key, l10n),
-                  detailText:
-                      '${_fmtBytes(report.categories[i].stats.bytes)} · ${l10n.storageSpaceFilesCount(report.categories[i].stats.fileCount)}',
+                  detailText: _fmtBytes(report.categories[i].stats.bytes),
                   onTap: () => _openCategoryDetail(report.categories[i].key),
                 ),
                 if (i != report.categories.length - 1) _iosDivider(context),
@@ -1054,6 +1192,46 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
     }
   }
 
+  Future<void> _clearDisplacedDatabases() async {
+    if (_clearing) return;
+    final l10n = AppLocalizations.of(context)!;
+    final targetName = l10n.storageSpaceCategoryDisplacedDatabases;
+    final ok = await _confirmAction(
+      title: l10n.storageSpaceClearConfirmTitle,
+      message: l10n.storageSpaceClearDisplacedDatabasesConfirmMessage,
+      actionLabel: l10n.storageSpaceClearButton,
+    );
+    if (!ok) return;
+
+    setState(() => _clearing = true);
+    try {
+      await StorageUsageService.clearDisplacedDatabases();
+      final next = await widget.refreshReport();
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearDone(targetName),
+        type: NotificationType.success,
+      );
+      if (next != null &&
+          !next.categories.any(
+            (category) =>
+                category.key == StorageUsageCategoryKey.displacedDatabases,
+          )) {
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearFailed(e.toString()),
+        type: NotificationType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _clearing = false);
+    }
+  }
+
   Future<void> _clearRestoreTraces() async {
     if (_clearing) return;
     final l10n = AppLocalizations.of(context)!;
@@ -1159,6 +1337,49 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
     }
   }
 
+  Future<void> _clearOrphanSessionFiles() async {
+    if (_clearing) return;
+    final l10n = AppLocalizations.of(context)!;
+    final conversationIds = _conversationIdsOrNull(context);
+    final reclaimable = await StorageUsageService.measureOrphanSessionFiles(
+      conversationIds: conversationIds,
+    );
+    if (!mounted) return;
+    final ok = await _confirmAction(
+      title: l10n.storageSpaceClearConfirmTitle,
+      message: l10n.storageSessionFilesCleanOrphansHint(
+        widget.fmtBytes(reclaimable.bytes),
+      ),
+      actionLabel: l10n.storageSpaceClearButton,
+    );
+    if (!ok) return;
+
+    setState(() => _clearing = true);
+    try {
+      await StorageUsageService.clearOrphanSessionFiles(
+        conversationIds: conversationIds,
+      );
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearDone(
+          l10n.storageSpaceCategorySessionFiles,
+        ),
+        type: NotificationType.success,
+      );
+      await _refresh();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearFailed(e.toString()),
+        type: NotificationType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _clearing = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -1215,11 +1436,19 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
               (category.key == StorageUsageCategoryKey.restoreTraces)
               ? _clearRestoreTraces
               : null,
+          onClearDisplacedDatabases:
+              (category.key == StorageUsageCategoryKey.displacedDatabases)
+              ? _clearDisplacedDatabases
+              : null,
           onClearFonts: (category.key == StorageUsageCategoryKey.other)
               ? _clearFonts
               : null,
           onClearLocalModels: (category.key == StorageUsageCategoryKey.other)
               ? _clearLocalModels
+              : null,
+          onCleanOrphanSessionFiles:
+              (category.key == StorageUsageCategoryKey.sessionFiles)
+              ? _clearOrphanSessionFiles
               : null,
           refreshReport: _refresh,
         ),
@@ -1421,8 +1650,10 @@ class _CategoryDetail extends StatelessWidget {
     required this.onClearLogs,
     required this.onClearLegacyChatData,
     required this.onClearRestoreTraces,
+    required this.onClearDisplacedDatabases,
     required this.onClearFonts,
     required this.onClearLocalModels,
+    required this.onCleanOrphanSessionFiles,
     required this.refreshReport,
   });
 
@@ -1437,8 +1668,10 @@ class _CategoryDetail extends StatelessWidget {
   final Future<void> Function()? onClearLogs;
   final Future<void> Function()? onClearLegacyChatData;
   final Future<void> Function()? onClearRestoreTraces;
+  final Future<void> Function()? onClearDisplacedDatabases;
   final Future<void> Function()? onClearFonts;
   final Future<void> Function()? onClearLocalModels;
+  final Future<void> Function()? onCleanOrphanSessionFiles;
   final Future<void> Function() refreshReport;
 
   @override
@@ -1446,8 +1679,7 @@ class _CategoryDetail extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
 
-    final subtitle =
-        '${fmtBytes(category.stats.bytes)} · ${l10n.storageSpaceFilesCount(category.stats.fileCount)}';
+    final subtitle = fmtBytes(category.stats.bytes);
     final bool safeToClear =
         category.key == StorageUsageCategoryKey.cache ||
         category.key == StorageUsageCategoryKey.logs ||
@@ -1459,11 +1691,25 @@ class _CategoryDetail extends StatelessWidget {
       StorageUsageCategoryKey.restoreTraces =>
         l10n.storageSpaceRestoreTracesHint,
       StorageUsageCategoryKey.other => l10n.storageSpaceOtherHint,
+      StorageUsageCategoryKey.workspaceFiles =>
+        l10n.storageSpaceCategoryWorkspaceFilesHint,
+      StorageUsageCategoryKey.sandboxEnvironment =>
+        l10n.storageSpaceCategorySandboxEnvironmentHint,
+      StorageUsageCategoryKey.skills => l10n.storageSpaceCategorySkillsHint,
+      StorageUsageCategoryKey.sessionFiles =>
+        l10n.storageSpaceCategorySessionFilesHint,
       _ =>
         safeToClear
             ? l10n.storageSpaceSafeToClearHint
             : l10n.storageSpaceNotSafeToClearHint,
     };
+
+    Future<void> openManager(Widget page) async {
+      await Navigator.of(
+        context,
+      ).push<void>(MaterialPageRoute(builder: (_) => page));
+      await refreshReport();
+    }
 
     Widget? actions;
     if (category.key == StorageUsageCategoryKey.cache) {
@@ -1526,6 +1772,52 @@ class _CategoryDetail extends StatelessWidget {
         backgroundColor: cs.primary,
         enabled: !clearing && onClearRestoreTraces != null,
         onTap: () => onClearRestoreTraces?.call(),
+      );
+    } else if (category.key == StorageUsageCategoryKey.displacedDatabases) {
+      actions = IosTileButton(
+        label: l10n.storageSpaceClearDisplacedDatabasesButton,
+        icon: Lucide.Trash2,
+        backgroundColor: cs.error,
+        enabled: !clearing && onClearDisplacedDatabases != null,
+        onTap: () => onClearDisplacedDatabases?.call(),
+      );
+    } else if (category.key == StorageUsageCategoryKey.localSnapshots) {
+      // 只管理、不清理：这里每一项都是可恢复的副本，
+      // 列出它们的那个页面能说清每一项到底是什么。
+      actions = IosTileButton(
+        label: l10n.localSnapshotManageCopies,
+        icon: Lucide.ChevronRight,
+        enabled: !clearing,
+        onTap: () => openLocalSnapshotsPage(context),
+      );
+    } else if (category.key == StorageUsageCategoryKey.workspaceFiles) {
+      actions = IosTileButton(
+        label: l10n.workspaceEntryManage,
+        icon: Lucide.ChevronRight,
+        enabled: !clearing,
+        onTap: () => openManager(const WorkspacesPage()),
+      );
+    } else if (category.key == StorageUsageCategoryKey.sandboxEnvironment) {
+      actions = IosTileButton(
+        label: l10n.workspaceEnvTitle,
+        icon: Lucide.ChevronRight,
+        enabled: !clearing,
+        onTap: () => openManager(const EnvironmentPage()),
+      );
+    } else if (category.key == StorageUsageCategoryKey.skills) {
+      actions = IosTileButton(
+        label: l10n.storageSpaceManageSkills,
+        icon: Lucide.ChevronRight,
+        enabled: !clearing,
+        onTap: () => openManager(const SkillsPage()),
+      );
+    } else if (category.key == StorageUsageCategoryKey.sessionFiles) {
+      actions = IosTileButton(
+        label: l10n.storageSessionFilesCleanOrphans,
+        icon: Lucide.Trash2,
+        backgroundColor: cs.primary,
+        enabled: !clearing && onCleanOrphanSessionFiles != null,
+        onTap: () => onCleanOrphanSessionFiles?.call(),
       );
     }
 
@@ -1593,139 +1885,146 @@ class _CategoryDetail extends StatelessWidget {
         const SizedBox(height: 14),
         if (actions != null) actions,
         if (actions != null) const SizedBox(height: 14),
-        Expanded(
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (category.subcategories.isNotEmpty) ...[
-                  Text(
-                    l10n.storageSpaceBreakdownTitle,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: AppFontWeights.emphasis,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  for (final s in category.subcategories)
-                    Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                      decoration: BoxDecoration(
-                        color: cs.onSurface.withValues(alpha: 0.03),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: cs.onSurface.withValues(alpha: 0.08),
-                        ),
+        if (StorageContentsList.supports(category.key))
+          Expanded(
+            child: StorageContentsList(category: category, fmtBytes: fmtBytes),
+          ),
+        if (!StorageContentsList.supports(category.key))
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (category.subcategories.isNotEmpty) ...[
+                    Text(
+                      l10n.storageSpaceBreakdownTitle,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: AppFontWeights.emphasis,
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      subTitleFor(s.id),
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: AppFontWeights.semibold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '${fmtBytes(s.stats.bytes)} · ${l10n.storageSpaceFilesCount(s.stats.fileCount)}',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: cs.onSurface.withValues(
-                                          alpha: 0.65,
+                    ),
+                    const SizedBox(height: 8),
+                    for (final s in category.subcategories)
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                        decoration: BoxDecoration(
+                          color: cs.onSurface.withValues(alpha: 0.03),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: cs.onSurface.withValues(alpha: 0.08),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        subTitleFor(s.id),
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: AppFontWeights.semibold,
                                         ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              if (category.key ==
-                                      StorageUsageCategoryKey.cache &&
-                                  s.id == 'avatar_cache')
-                                _MiniActionButton(
-                                  label: l10n.storageSpaceClearButton,
-                                  enabled: !clearing,
-                                  onTap: () =>
-                                      onClearCache?.call(avatarsOnly: true),
-                                ),
-                              if (category.key ==
-                                      StorageUsageCategoryKey.cache &&
-                                  s.id == 'other_cache')
-                                _MiniActionButton(
-                                  label: l10n.storageSpaceClearButton,
-                                  enabled: !clearing,
-                                  onTap: () => onClearOtherCache?.call(),
-                                ),
-                              if (category.key ==
-                                      StorageUsageCategoryKey.cache &&
-                                  s.id == 'system_cache')
-                                _MiniActionButton(
-                                  label: l10n.storageSpaceClearButton,
-                                  enabled: !clearing,
-                                  onTap: () => onClearSystemCache?.call(),
-                                ),
-                              if (category.key ==
-                                      StorageUsageCategoryKey.legacyChatData &&
-                                  s.path != null &&
-                                  s.path!.isNotEmpty)
-                                _MiniActionButton(
-                                  label: l10n
-                                      .storageSpaceExportLegacyChatFileButton,
-                                  enabled: true,
-                                  onTap: () => _exportLegacyHiveFile(
-                                    context,
-                                    sourcePath: s.path!,
-                                    fileName: s.id,
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        fmtBytes(s.stats.bytes),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: cs.onSurface.withValues(
+                                            alpha: 0.65,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              if (category.key ==
-                                      StorageUsageCategoryKey.other &&
-                                  s.id == 'fonts')
-                                _MiniActionButton(
-                                  label: l10n.storageSpaceClearButton,
-                                  enabled: !clearing && onClearFonts != null,
-                                  onTap: () => onClearFonts?.call(),
-                                ),
-                              if (category.key ==
-                                      StorageUsageCategoryKey.other &&
-                                  s.id == 'local_models')
-                                _MiniActionButton(
-                                  label: l10n.storageSpaceClearButton,
-                                  enabled:
-                                      !clearing && onClearLocalModels != null,
-                                  onTap: () => onClearLocalModels?.call(),
-                                ),
-                            ],
-                          ),
-                          if (s.path != null && s.path!.isNotEmpty) ...[
-                            const SizedBox(height: 6),
-                            Text(
-                              _wrapableFilePath(s.path!),
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                height: 1.35,
-                                color: cs.onSurface.withValues(alpha: 0.55),
-                              ),
+                                if (category.key ==
+                                        StorageUsageCategoryKey.cache &&
+                                    s.id == 'avatar_cache')
+                                  _MiniActionButton(
+                                    label: l10n.storageSpaceClearButton,
+                                    enabled: !clearing,
+                                    onTap: () =>
+                                        onClearCache?.call(avatarsOnly: true),
+                                  ),
+                                if (category.key ==
+                                        StorageUsageCategoryKey.cache &&
+                                    s.id == 'other_cache')
+                                  _MiniActionButton(
+                                    label: l10n.storageSpaceClearButton,
+                                    enabled: !clearing,
+                                    onTap: () => onClearOtherCache?.call(),
+                                  ),
+                                if (category.key ==
+                                        StorageUsageCategoryKey.cache &&
+                                    s.id == 'system_cache')
+                                  _MiniActionButton(
+                                    label: l10n.storageSpaceClearButton,
+                                    enabled: !clearing,
+                                    onTap: () => onClearSystemCache?.call(),
+                                  ),
+                                if (category.key ==
+                                        StorageUsageCategoryKey
+                                            .legacyChatData &&
+                                    s.path != null &&
+                                    s.path!.isNotEmpty)
+                                  _MiniActionButton(
+                                    label: l10n
+                                        .storageSpaceExportLegacyChatFileButton,
+                                    enabled: true,
+                                    onTap: () => _exportLegacyHiveFile(
+                                      context,
+                                      sourcePath: s.path!,
+                                      fileName: s.id,
+                                    ),
+                                  ),
+                                if (category.key ==
+                                        StorageUsageCategoryKey.other &&
+                                    s.id == 'fonts')
+                                  _MiniActionButton(
+                                    label: l10n.storageSpaceClearButton,
+                                    enabled: !clearing && onClearFonts != null,
+                                    onTap: () => onClearFonts?.call(),
+                                  ),
+                                if (category.key ==
+                                        StorageUsageCategoryKey.other &&
+                                    s.id == 'local_models')
+                                  _MiniActionButton(
+                                    label: l10n.storageSpaceClearButton,
+                                    enabled:
+                                        !clearing && onClearLocalModels != null,
+                                    onTap: () => onClearLocalModels?.call(),
+                                  ),
+                              ],
                             ),
+                            if (s.path != null && s.path!.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text(
+                                _wrapableFilePath(s.path!),
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  height: 1.35,
+                                  color: cs.onSurface.withValues(alpha: 0.55),
+                                ),
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
-                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -1818,7 +2117,7 @@ class _UploadManagerState extends State<_UploadManager> {
   void didUpdateWidget(covariant _UploadManager oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.images != widget.images) {
-      // 桌面端在图片和文件之间切换时，确保按新筛选条件重新加载。
+      // 桌面端在“图片”与“文件”之间切换时，确保按新的筛选条件重新加载。
       setState(() {
         _selected.clear();
         _entries = const <StorageFileEntry>[];
@@ -1939,18 +2238,26 @@ class _UploadManagerState extends State<_UploadManager> {
     );
     if (ok != true) return;
 
-    final deleted = await StorageUsageService.deleteUploadFiles(
-      _selected,
-      images: widget.images,
-    );
-    if (!mounted) return;
-
-    _clearSelection();
-    showAppSnackBar(
-      context,
-      message: l10n.storageSpaceDeletedUploadsDone(deleted),
-      type: NotificationType.success,
-    );
+    try {
+      final deleted = await StorageUsageService.deleteUploadFiles(
+        _selected,
+        images: widget.images,
+      );
+      if (!mounted) return;
+      _clearSelection();
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceDeletedUploadsDone(deleted),
+        type: NotificationType.success,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearFailed(error.toString()),
+        type: NotificationType.error,
+      );
+    }
     await _load();
     await widget.refreshReport();
   }
@@ -2573,29 +2880,6 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   }
 }
 
-Widget _iosSectionCard({required Widget child}) {
-  return Builder(
-    builder: (context) {
-      final theme = Theme.of(context);
-      final cs = theme.colorScheme;
-      final isDark = theme.brightness == Brightness.dark;
-      final Color bg = context.appColors.surfaceCard;
-      return Container(
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-            width: 0.6,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: child,
-      );
-    },
-  );
-}
-
 String _wrapableFilePath(String path) {
   return path.replaceAllMapped(RegExp(r'[/\\]'), (m) => '${m[0]}\u200B');
 }
@@ -2671,5 +2955,29 @@ Widget _iosNavRow(
         ),
       ],
     ),
+  );
+}
+
+/// 本仓库自有的区块卡片：描边比共享 SectionCard 更浅（配色属本仓库自有资产）。
+Widget _iosSectionCard({required Widget child}) {
+  return Builder(
+    builder: (context) {
+      final theme = Theme.of(context);
+      final cs = theme.colorScheme;
+      final isDark = theme.brightness == Brightness.dark;
+      final Color bg = context.appColors.surfaceCard;
+      return Container(
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
+            width: 0.6,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: child,
+      );
+    },
   );
 }

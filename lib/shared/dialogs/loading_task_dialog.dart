@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart'
 import 'package:flutter/material.dart';
 
 import '../../core/models/progress_update.dart';
-import '../../core/models/backup_task_progress.dart';
+import '../../core/services/backup/backup_cancel_token.dart';
 import '../widgets/loading_dialog_card.dart';
 
 /// 只有在不可关闭的加载对话框绘制完成后才运行 [task]。

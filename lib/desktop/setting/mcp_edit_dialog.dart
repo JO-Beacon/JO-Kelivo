@@ -1,8 +1,9 @@
 import 'dart:math' as math;
-import 'package:flutter/foundation.dart'
-    show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import '../../core/services/mcp/stdio_arguments.dart';
+import '../../features/mcp/widgets/mcp_environment_picker.dart';
 
 import 'package:flutter/material.dart';
+import '../widgets/desktop_dialog_style.dart';
 import 'package:provider/provider.dart';
 
 import '../../icons/lucide_adapter.dart' as lucide;
@@ -10,9 +11,10 @@ import '../../l10n/app_localizations.dart';
 import '../../core/providers/mcp_provider.dart';
 import '../../shared/widgets/snackbar.dart';
 import '../../shared/widgets/ios_switch.dart';
+import '../../shared/widgets/ios_tile_button.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
-import '../widgets/desktop_dialog_style.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 
 Future<void> showDesktopMcpEditDialog(
   BuildContext context, {
@@ -79,7 +81,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
       });
       if (server.transport == McpTransportType.stdio) {
         _cmdCtrl.text = server.command ?? '';
-        _argsCtrl.text = server.args.join(' ');
+        _argsCtrl.text = StdioArguments.format(server.args);
         _cwdCtrl.text = server.workingDirectory ?? '';
         server.env.forEach((k, v) {
           _env.add(
@@ -120,19 +122,19 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
       if (mounted) Navigator.of(context).maybePop();
       return;
     }
-    final name = _nameCtrl.text.trim().isEmpty ? 'MCP' : _nameCtrl.text.trim();
+    final name = _nameCtrl.text.trim().isEmpty
+        ? l10n.mcpServerEditSheetDefaultName
+        : _nameCtrl.text.trim();
     final headers = <String, String>{
       for (final h in _headers)
         if (h.key.text.trim().isNotEmpty)
           h.key.text.trim(): h.value.text.trim(),
     };
     if (_transport == McpTransportType.stdio) {
-      if (!_isDesktopPlatform()) {
+      if (!mcp.supportsStdio) {
         showAppSnackBar(
           context,
-          message: AppLocalizations.of(
-            context,
-          )!.mcpServerEditSheetStdioOnlyDesktop,
+          message: AppLocalizations.of(context)!.mcpStdioEnvironmentRequired,
           type: NotificationType.warning,
         );
         return;
@@ -148,11 +150,20 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
         );
         return;
       }
-      final args = _parseArgs(_argsCtrl.text.trim());
+      final List<String> args;
+      try {
+        args = StdioArguments.parse(_argsCtrl.text);
+      } on FormatException {
+        showAppSnackBar(
+          context,
+          message: AppLocalizations.of(context)!.mcpArgumentsInvalid,
+          type: NotificationType.warning,
+        );
+        return;
+      }
       final env = <String, String>{
         for (final e in _env)
-          if (e.key.text.trim().isNotEmpty)
-            e.key.text.trim(): e.value.text.trim(),
+          if (e.key.text.trim().isNotEmpty) e.key.text.trim(): e.value.text,
       };
       final cwd = _cwdCtrl.text.trim();
       if (isEdit) {
@@ -318,7 +329,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
           _labeledField(
             label: l10n.mcpServerEditSheetNameLabel,
             controller: _nameCtrl,
-            hint: 'My MCP',
+            hint: l10n.mcpServerEditSheetNameHint,
             bold: true,
           ),
           const SizedBox(height: 10),
@@ -329,10 +340,14 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
           const SizedBox(height: 6),
           Builder(
             builder: (context) {
-              final isDesktop = _isDesktopPlatform();
+              final isDesktop = context.watch<McpProvider>().supportsStdio;
               final labels = isDesktop
-                  ? ['Streamable HTTP', 'SSE', l10n.mcpTransportOptionStdio]
-                  : ['Streamable HTTP', 'SSE'];
+                  ? [
+                      l10n.mcpTransportTagHttp,
+                      l10n.mcpTransportTagSse,
+                      l10n.mcpTransportOptionStdio,
+                    ]
+                  : [l10n.mcpTransportTagHttp, l10n.mcpTransportTagSse];
               int selectedIdx;
               if (_transport == McpTransportType.http) {
                 selectedIdx = 0;
@@ -360,38 +375,28 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
           ),
         ],
         const SizedBox(height: 10),
-        if (!isBuiltin && _transport == McpTransportType.sse)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Text(
-              l10n.mcpServerEditSheetSseRetryHint,
-              style: TextStyle(
-                fontSize: 12,
-                color: cs.onSurface.withValues(alpha: 0.7),
-              ),
-            ),
-          ),
         if (!isBuiltin && _transport != McpTransportType.stdio)
           _labeledField(
             label: l10n.mcpServerEditSheetUrlLabel,
             controller: _urlCtrl,
             hint: _transport == McpTransportType.sse
-                ? 'http://localhost:3000/sse'
-                : 'http://localhost:3000',
+                ? l10n.mcpServerEditSheetSseUrlHint
+                : l10n.mcpServerEditSheetHttpUrlHint,
             bold: true,
           ),
         if (!isBuiltin && _transport == McpTransportType.stdio) ...[
           _labeledField(
             label: l10n.mcpServerEditSheetStdioCommandLabel,
             controller: _cmdCtrl,
-            hint: 'npx',
+            hint: l10n.mcpServerEditSheetStdioCommandHint,
             bold: false,
           ),
           const SizedBox(height: 10),
           _labeledField(
             label: l10n.mcpServerEditSheetStdioArgumentsLabel,
             controller: _argsCtrl,
-            hint: "-y @modelcontextprotocol/server-filesystem",
+            hint: l10n.mcpArgumentsHint,
+            maxLines: 4,
             bold: false,
           ),
           const SizedBox(height: 10),
@@ -407,24 +412,58 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
             style: TextStyle(fontSize: 13, fontWeight: AppFontWeights.semibold),
           ),
           const SizedBox(height: 8),
+          Text(
+            l10n.mcpEnvironmentHint,
+            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: IosTileButton(
+              icon: lucide.Lucide.Download,
+              label: l10n.mcpImportEnvironment,
+              onTap: () async {
+                final variable = await pickMcpEnvironmentVariable(context);
+                if (variable == null || !mounted) return;
+                setState(() {
+                  final index = _env.indexWhere(
+                    (entry) => entry.key.text.trim() == variable.name,
+                  );
+                  if (index < 0) {
+                    _env.add(
+                      _HeaderEntry(
+                        TextEditingController(text: variable.name),
+                        TextEditingController(text: variable.value),
+                      ),
+                    );
+                  } else {
+                    _env[index].value.text = variable.value;
+                  }
+                });
+              },
+            ),
+          ),
           Column(
             children: [
               for (int i = 0; i < _env.length; i++) ...[
-                _card(
+                SectionCard(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _labeledField(
                         label: l10n.mcpServerEditSheetStdioEnvNameLabel,
                         controller: _env[i].key,
-                        hint: 'ENV_NAME',
+                        hint: l10n.mcpServerEditSheetStdioEnvNameHint,
                         bold: false,
                       ),
                       const SizedBox(height: 10),
                       _labeledField(
                         label: l10n.mcpServerEditSheetStdioEnvValueLabel,
                         controller: _env[i].value,
-                        hint: 'value',
+                        hint: l10n.mcpServerEditSheetStdioEnvValueHint,
                         bold: false,
                       ),
                       Align(
@@ -492,7 +531,11 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
           Column(
             children: [
               for (int i = 0; i < _headers.length; i++) ...[
-                _card(
+                SectionCard(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -588,7 +631,8 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
     return ListView(
       children: [
         for (final tool in tools) ...[
-          _card(
+          SectionCard(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -704,20 +748,6 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
     );
   }
 
-  bool _isDesktopPlatform() {
-    if (kIsWeb) return false;
-    return defaultTargetPlatform == TargetPlatform.windows ||
-        defaultTargetPlatform == TargetPlatform.macOS ||
-        defaultTargetPlatform == TargetPlatform.linux;
-  }
-
-  List<String> _parseArgs(String text) {
-    if (text.isEmpty) return const <String>[];
-    // 暂时使用简单的空白分割；用户可以把带引号参数作为单个 token 提供。
-    // 后续如需高级引号处理，可考虑类似 shell 的解析器。
-    return text.split(RegExp(r"\s+")).where((e) => e.isNotEmpty).toList();
-  }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -807,6 +837,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
     required TextEditingController controller,
     String? hint,
     bool bold = false,
+    int maxLines = 1,
   }) {
     final cs = Theme.of(context).colorScheme;
     return Column(
@@ -823,6 +854,12 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
         const SizedBox(height: 6),
         TextField(
           controller: controller,
+          maxLines: maxLines,
+          minLines: 1,
+          autocorrect: false,
+          enableSuggestions: false,
+          smartDashesType: SmartDashesType.disabled,
+          smartQuotesType: SmartQuotesType.disabled,
           style: TextStyle(
             fontSize: 14,
             fontWeight: AppFontWeights.regular,
@@ -855,23 +892,6 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
           ),
         ),
       ],
-    );
-  }
-
-  Widget _card({required Widget child}) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      decoration: BoxDecoration(
-        color: context.appColors.surfaceCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-          width: 0.6,
-        ),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      child: child,
     );
   }
 }

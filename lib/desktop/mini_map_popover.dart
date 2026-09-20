@@ -7,6 +7,7 @@ import '../core/database/chat_database_repository.dart';
 import '../core/models/chat_message.dart';
 import '../core/models/conversation_tree.dart';
 import '../core/models/message_part.dart';
+import '../theme/design_tokens.dart';
 import '../icons/lucide_adapter.dart';
 import '../l10n/app_localizations.dart';
 import '../shared/widgets/ios_tactile.dart';
@@ -566,24 +567,26 @@ class _GlassPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cs = Theme.of(context).colorScheme;
+    final radius = borderRadius ?? BorderRadius.circular(14);
     return ClipRRect(
-      borderRadius: borderRadius ?? BorderRadius.circular(14),
+      borderRadius: radius,
       child: BackdropFilter(
         filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: cs.surface.withValues(alpha: isDark ? 0.28 : 0.56),
+            color: AppOverlayColors.desktopPopoverSurface(cs),
+            borderRadius: radius,
             border: Border(
               top: BorderSide(
-                color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.18),
+                color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.12),
                 width: 0.7,
               ),
               left: BorderSide(
-                color: cs.onSurface.withValues(alpha: isDark ? 0.04 : 0.12),
+                color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.12),
                 width: 0.6,
               ),
               right: BorderSide(
-                color: cs.onSurface.withValues(alpha: isDark ? 0.04 : 0.12),
+                color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.12),
                 width: 0.6,
               ),
             ),

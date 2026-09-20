@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../core/services/mcp/stdio_arguments.dart';
+import '../../../shared/widgets/ios_form_text_field.dart';
+import 'mcp_environment_picker.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import 'dart:math' as math;
@@ -11,6 +14,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 
 class _HeaderEntry {
   final TextEditingController key;
@@ -26,12 +30,11 @@ Future<void> showMcpServerEditSheet(
   BuildContext context, {
   String? serverId,
 }) async {
-  final cs = Theme.of(context).colorScheme;
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
-    // 匹配供应商弹层的圆角
+    backgroundColor: context.overlaySurface,
+    // Match provider sheet corner radius
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -56,6 +59,11 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
   final _nameCtrl = TextEditingController();
   McpTransportType _transport = McpTransportType.http;
   final _urlCtrl = TextEditingController();
+  final _cmdCtrl = TextEditingController();
+  final _argsCtrl = TextEditingController();
+  String? _argsError;
+  final _cwdCtrl = TextEditingController();
+  final List<_HeaderEntry> _env = [];
   final List<_HeaderEntry> _headers = [];
 
   @override
@@ -69,6 +77,17 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
       _nameCtrl.text = server.name;
       _transport = server.transport;
       _urlCtrl.text = server.url;
+      _cmdCtrl.text = server.command ?? '';
+      _argsCtrl.text = StdioArguments.format(server.args);
+      _cwdCtrl.text = server.workingDirectory ?? '';
+      server.env.forEach(
+        (k, v) => _env.add(
+          _HeaderEntry(
+            TextEditingController(text: k),
+            TextEditingController(text: v),
+          ),
+        ),
+      );
       server.headers.forEach((k, v) {
         _headers.add(
           _HeaderEntry(
@@ -90,6 +109,12 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     _tab?.dispose();
     _nameCtrl.dispose();
     _urlCtrl.dispose();
+    _cmdCtrl.dispose();
+    _argsCtrl.dispose();
+    _cwdCtrl.dispose();
+    for (final entry in _env) {
+      entry.dispose();
+    }
     for (final h in _headers) {
       h.dispose();
     }
@@ -115,100 +140,50 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     );
   }
 
-  // 与供应商弹层一致的简洁 iOS 风格卡片包装
-  Widget _iosCard({required List<Widget> children}) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      decoration: BoxDecoration(
-        color: context.appColors.surfaceCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-          width: 0.6,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Column(
-          children: [
-            for (int i = 0; i < children.length; i++) ...[
-              if (i > 0)
-                Divider(
-                  height: 10,
-                  thickness: 0.6,
-                  color: cs.outlineVariant.withValues(alpha: 0.18),
-                ),
-              children[i],
-            ],
-          ],
-        ),
-      ),
-    );
-  }
+  // Simple iOS-style card wrapper, same as provider sheet
 
   Widget _inputRow({
     required String label,
     required TextEditingController controller,
     String? hint,
+    int maxLines = 1,
+    bool literalInput = false,
   }) {
-    final cs = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            color: cs.onSurface.withValues(alpha: 0.8),
-          ),
-        ),
-        const SizedBox(height: 6),
-        TextField(
-          controller: controller,
-          decoration: InputDecoration(
-            hintText: hint,
-            filled: true,
-            // 匹配供应商弹层输入背景
-            fillColor: context.appColors.surfaceCard,
-            // 匹配供应商弹层边框样式
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: cs.outlineVariant.withValues(alpha: 0.4),
-              ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: cs.outlineVariant.withValues(alpha: 0.4),
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: cs.primary.withValues(alpha: 0.5)),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 12,
-            ),
-          ),
-        ),
-      ],
+    return IosFormTextField(
+      label: label,
+      controller: controller,
+      hintText: hint,
+      inlineLabel: false,
+      maxLines: maxLines,
+      minLines: 1,
+      outerPadding: EdgeInsets.zero,
+      autocorrect: !literalInput,
+      enableSuggestions: !literalInput,
     );
   }
 
   // 分段选择栏（类似顶部标签），用于传输类型
   Widget _transportPicker() {
-    final labels = ['Streamable HTTP', 'SSE'];
-    final idx = _transport == McpTransportType.http ? 0 : 1;
+    final types = [
+      McpTransportType.http,
+      McpTransportType.sse,
+      if (context.watch<McpProvider>().supportsStdio) McpTransportType.stdio,
+    ];
     return _SegChoiceBar(
-      labels: labels,
-      selectedIndex: idx,
-      onSelected: (i) => setState(
-        () =>
-            _transport = i == 0 ? McpTransportType.http : McpTransportType.sse,
-      ),
+      labels: [
+        for (final type in types)
+          switch (type) {
+            McpTransportType.http => AppLocalizations.of(
+              context,
+            )!.mcpTransportTagHttp,
+            McpTransportType.sse => AppLocalizations.of(
+              context,
+            )!.mcpTransportTagSse,
+            _ => AppLocalizations.of(context)!.mcpTransportOptionStdio,
+          },
+      ],
+      selectedIndex: types.indexOf(_transport),
+      onSelected: (i) => setState(() => _transport = types[i]),
     );
   }
 
@@ -219,7 +194,9 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _iosCard(
+        SectionCard(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          dividers: true,
           children: [
             _switchRow(
               label: l10n.mcpServerEditSheetEnabledLabel,
@@ -230,7 +207,9 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
         ),
         const SizedBox(height: 10),
         if (isBuiltin)
-          _iosCard(
+          SectionCard(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            dividers: true,
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
@@ -259,7 +238,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
           _inputRow(
             label: l10n.mcpServerEditSheetNameLabel,
             controller: _nameCtrl,
-            hint: 'My MCP',
+            hint: l10n.mcpServerEditSheetNameHint,
           ),
           const SizedBox(height: 10),
           Text(
@@ -269,44 +248,117 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
           const SizedBox(height: 6),
           _transportPicker(),
           const SizedBox(height: 10),
-          if (_transport == McpTransportType.sse) ...[
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(
-                l10n.mcpServerEditSheetSseRetryHint,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: cs.onSurface.withValues(alpha: 0.7),
-                ),
+          if (_transport == McpTransportType.stdio) ...[
+            _inputRow(
+              label: l10n.mcpServerEditSheetStdioCommandLabel,
+              controller: _cmdCtrl,
+              literalInput: true,
+              hint: l10n.mcpServerEditSheetStdioCommandHint,
+            ),
+            const SizedBox(height: 10),
+            _argumentsEditor(),
+            const SizedBox(height: 10),
+            _inputRow(
+              label: l10n.mcpServerEditSheetStdioWorkingDirectoryLabel,
+              controller: _cwdCtrl,
+              literalInput: true,
+              hint: l10n.mcpServerEditSheetStdioWorkingDirectoryHint,
+            ),
+            const SizedBox(height: 16),
+            Text(l10n.mcpServerEditSheetStdioEnvironmentTitle),
+            const SizedBox(height: 8),
+            Text(
+              l10n.mcpEnvironmentHint,
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+            ),
+            const SizedBox(height: 8),
+            _headersEditor(entries: _env, isStdio: true),
+            const SizedBox(height: 8),
+            IosTileButton(
+              icon: Lucide.Download,
+              label: l10n.mcpImportEnvironment,
+              onTap: _importEnvironment,
+            ),
+          ] else ...[
+            _inputRow(
+              label: l10n.mcpServerEditSheetUrlLabel,
+              controller: _urlCtrl,
+              hint: _transport == McpTransportType.sse
+                  ? l10n.mcpServerEditSheetSseUrlHint
+                  : l10n.mcpServerEditSheetHttpUrlHint,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              l10n.mcpServerEditSheetCustomHeadersTitle,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: AppFontWeights.semibold,
               ),
             ),
+            const SizedBox(height: 8),
+            _headersEditor(entries: _headers),
           ],
-          _inputRow(
-            label: l10n.mcpServerEditSheetUrlLabel,
-            controller: _urlCtrl,
-            hint: _transport == McpTransportType.sse
-                ? 'http://localhost:3000/sse'
-                : 'http://localhost:3000',
-          ),
-          const SizedBox(height: 16),
-          Text(
-            l10n.mcpServerEditSheetCustomHeadersTitle,
-            style: TextStyle(fontSize: 13, fontWeight: AppFontWeights.semibold),
-          ),
-          const SizedBox(height: 8),
-          _headersEditor(),
         ],
       ],
     );
   }
 
-  Widget _headersEditor() {
+  Widget _argumentsEditor() {
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _inputRow(
+          label: l10n.mcpServerEditSheetStdioArgumentsLabel,
+          controller: _argsCtrl,
+          hint: l10n.mcpServerEditSheetStdioArgumentsHint,
+          maxLines: 4,
+          literalInput: true,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          _argsError ?? l10n.mcpArgumentsHint,
+          style: TextStyle(
+            fontSize: 12,
+            color: _argsError == null
+                ? Theme.of(context).colorScheme.onSurfaceVariant
+                : Theme.of(context).colorScheme.error,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _importEnvironment() async {
+    final variable = await pickMcpEnvironmentVariable(context);
+    if (variable == null || !mounted) return;
+    setState(() {
+      final index = _env.indexWhere(
+        (entry) => entry.key.text.trim() == variable.name,
+      );
+      if (index < 0) {
+        _env.add(
+          _HeaderEntry(
+            TextEditingController(text: variable.name),
+            TextEditingController(text: variable.value),
+          ),
+        );
+      } else {
+        _env[index].value.text = variable.value;
+      }
+    });
+  }
+
+  Widget _headersEditor({
+    required List<_HeaderEntry> entries,
+    bool isStdio = false,
+  }) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (int i = 0; i < _headers.length; i++) ...[
+        for (int i = 0; i < entries.length; i++) ...[
           Container(
             margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.all(12),
@@ -321,15 +373,25 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _inputRow(
-                  label: l10n.mcpServerEditSheetHeaderNameLabel,
-                  controller: _headers[i].key,
-                  hint: l10n.mcpServerEditSheetHeaderNameHint,
+                  label: (isStdio
+                      ? l10n.mcpServerEditSheetStdioEnvNameLabel
+                      : l10n.mcpServerEditSheetHeaderNameLabel),
+                  controller: entries[i].key,
+                  literalInput: isStdio,
+                  hint: isStdio
+                      ? l10n.mcpServerEditSheetStdioEnvNameHint
+                      : l10n.mcpServerEditSheetHeaderNameHint,
                 ),
                 const SizedBox(height: 10),
                 _inputRow(
-                  label: l10n.mcpServerEditSheetHeaderValueLabel,
-                  controller: _headers[i].value,
-                  hint: l10n.mcpServerEditSheetHeaderValueHint,
+                  label: (isStdio
+                      ? l10n.mcpServerEditSheetStdioEnvValueLabel
+                      : l10n.mcpServerEditSheetHeaderValueLabel),
+                  controller: entries[i].value,
+                  literalInput: isStdio,
+                  hint: isStdio
+                      ? l10n.mcpServerEditSheetStdioEnvValueHint
+                      : l10n.mcpServerEditSheetHeaderValueHint,
                 ),
                 Align(
                   alignment: Alignment.centerRight,
@@ -337,7 +399,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                     icon: Lucide.Trash,
                     color: cs.error,
                     semanticLabel: l10n.mcpServerEditSheetRemoveHeaderTooltip,
-                    onTap: () => setState(() => _headers.removeAt(i)),
+                    onTap: () => setState(() => entries.removeAt(i).dispose()),
                   ),
                 ),
               ],
@@ -348,11 +410,13 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
           alignment: Alignment.centerLeft,
           child: IosTileButton(
             icon: Lucide.Plus,
-            label: l10n.mcpServerEditSheetAddHeader,
+            label: (isStdio
+                ? l10n.mcpServerEditSheetStdioAddEnv
+                : l10n.mcpServerEditSheetAddHeader),
             backgroundColor: cs.primary,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             onTap: () => setState(
-              () => _headers.add(
+              () => entries.add(
                 _HeaderEntry(TextEditingController(), TextEditingController()),
               ),
             ),
@@ -363,6 +427,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
   }
 
   Future<void> _onSave() async {
+    final l10n = AppLocalizations.of(context)!;
     final mcp = context.read<McpProvider>();
     // 内置服务器：只能切换启用状态
     if (isEdit && _transport == McpTransportType.inmemory) {
@@ -371,7 +436,75 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
       if (mounted) Navigator.of(context).pop();
       return;
     }
-    final name = _nameCtrl.text.trim().isEmpty ? 'MCP' : _nameCtrl.text.trim();
+    final name = _nameCtrl.text.trim().isEmpty
+        ? l10n.mcpServerEditSheetDefaultName
+        : _nameCtrl.text.trim();
+    if (_transport == McpTransportType.stdio) {
+      if (!mcp.supportsStdio) {
+        showAppSnackBar(
+          context,
+          message: AppLocalizations.of(context)!.mcpStdioEnvironmentRequired,
+          type: NotificationType.warning,
+        );
+        return;
+      }
+      final cmd = _cmdCtrl.text.trim();
+      if (cmd.isEmpty) {
+        showAppSnackBar(
+          context,
+          message: AppLocalizations.of(
+            context,
+          )!.mcpServerEditSheetStdioCommandRequired,
+          type: NotificationType.warning,
+        );
+        return;
+      }
+      final List<String> args;
+      try {
+        args = StdioArguments.parse(_argsCtrl.text);
+      } on FormatException {
+        setState(
+          () => _argsError = AppLocalizations.of(context)!.mcpArgumentsInvalid,
+        );
+        return;
+      }
+      setState(() => _argsError = null);
+      final env = <String, String>{
+        for (final e in _env)
+          if (e.key.text.trim().isNotEmpty) e.key.text.trim(): e.value.text,
+      };
+      final cwd = _cwdCtrl.text.trim();
+      if (isEdit) {
+        final old = mcp.getById(widget.serverId!)!;
+        final clearing = cwd.isEmpty;
+        await mcp.updateServerMetadata(
+          old.copyWith(
+            enabled: _enabled,
+            name: name,
+            transport: McpTransportType.stdio,
+            url: '',
+            headers: const {},
+            command: cmd,
+            args: args,
+            env: env,
+            workingDirectory: clearing ? null : cwd,
+            clearWorkingDirectory: clearing,
+          ),
+        );
+      } else {
+        await mcp.addServer(
+          enabled: _enabled,
+          name: name,
+          transport: McpTransportType.stdio,
+          command: cmd,
+          args: args,
+          env: env,
+          workingDirectory: cwd.isEmpty ? null : cwd,
+        );
+      }
+      if (mounted) Navigator.of(context).pop();
+      return;
+    }
     final url = _urlCtrl.text.trim();
     if (url.isEmpty) {
       final l10n = AppLocalizations.of(context)!;
@@ -425,7 +558,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
         ),
         child: DraggableScrollableSheet(
           expand: false,
-          initialChildSize: isEdit ? 0.85 : 0.6,
+          initialChildSize: 0.85,
           maxChildSize: 0.9,
           minChildSize: 0.5,
           builder: (c, controller) => Column(
@@ -815,7 +948,7 @@ class _TactileRowState extends State<_TactileRow> {
       onTapUp: widget.onTap == null
           ? null
           : (_) {
-              /* 保持短暂按压以获得更好手感 */
+              /* keep pressed a bit for better feel */
             },
       onTapCancel: widget.onTap == null ? null : () => _set(false),
       onTap: widget.onTap == null

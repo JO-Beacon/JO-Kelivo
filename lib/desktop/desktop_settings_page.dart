@@ -8,6 +8,7 @@ import 'dart:ui' as ui;
 
 import '../icons/lucide_adapter.dart' as lucide;
 import '../l10n/app_localizations.dart';
+import '../features/settings/pages/google_fonts_picker_page.dart';
 import '../theme/app_font_weights.dart';
 import '../theme/palettes.dart';
 import '../core/providers/settings_provider.dart';
@@ -53,12 +54,16 @@ import 'setting/default_model_pane.dart';
 import 'setting/search_services_pane.dart';
 import 'setting/tool_schemas_pane.dart';
 import 'setting/mcp_pane.dart';
+import 'setting/workspace_pane.dart';
+import 'setting/skills_settings_pane.dart';
 import 'setting/tts_services_pane.dart';
 import 'setting/memory_settings_pane.dart';
 import 'setting/quick_phrases_pane.dart';
 import 'setting/instruction_injection_pane.dart';
 import 'setting/world_book_pane.dart';
 import 'setting/backup_pane.dart';
+import 'setting/scheduled_tasks_pane.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart' show LucideIcons;
 import 'setting/hotkeys_pane.dart';
 import 'setting/network_proxy_pane.dart';
 import 'setting/about_pane.dart';
@@ -106,6 +111,8 @@ enum _SettingsMenuItem {
   search,
   toolSchemas,
   mcp,
+  workspace,
+  skills,
   quickPhrases,
   instructionInjection,
   worldBook,
@@ -113,6 +120,7 @@ enum _SettingsMenuItem {
   tts,
   networkProxy,
   backup,
+  scheduledTasks,
   hotkeys,
   stats,
   about,
@@ -233,6 +241,14 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                           );
                         case _SettingsMenuItem.mcp:
                           return const DesktopMcpPane(key: ValueKey('mcp'));
+                        case _SettingsMenuItem.workspace:
+                          return const DesktopWorkspacePane(
+                            key: ValueKey('workspace'),
+                          );
+                        case _SettingsMenuItem.skills:
+                          return const DesktopSkillsSettingsPane(
+                            key: ValueKey('skills'),
+                          );
                         case _SettingsMenuItem.networkProxy:
                           return const DesktopNetworkProxyPane(
                             key: ValueKey('networkProxy'),
@@ -240,6 +256,10 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                         case _SettingsMenuItem.backup:
                           return const DesktopBackupPane(
                             key: ValueKey('backup'),
+                          );
+                        case _SettingsMenuItem.scheduledTasks:
+                          return const DesktopScheduledTasksPane(
+                            key: ValueKey('scheduledTasks'),
                           );
                         case _SettingsMenuItem.hotkeys:
                           return const DesktopHotkeysPane(
@@ -330,6 +350,16 @@ class _SettingsMenu extends StatelessWidget {
       ),
       (_SettingsMenuItem.mcp, lucide.Lucide.Terminal, l10n.settingsPageMcp),
       (
+        _SettingsMenuItem.workspace,
+        lucide.Lucide.FolderCode,
+        l10n.workspaceDeskMenuWorkspace,
+      ),
+      (
+        _SettingsMenuItem.skills,
+        lucide.Lucide.WandSparkles,
+        l10n.workspaceDeskMenuSkills,
+      ),
+      (
         _SettingsMenuItem.quickPhrases,
         lucide.Lucide.Zap,
         l10n.settingsPageQuickPhrase,
@@ -360,6 +390,11 @@ class _SettingsMenu extends StatelessWidget {
         _SettingsMenuItem.backup,
         lucide.Lucide.Database,
         l10n.settingsPageBackup,
+      ),
+      (
+        _SettingsMenuItem.scheduledTasks,
+        LucideIcons.clock,
+        l10n.scheduledTasksTitle,
       ),
       (
         _SettingsMenuItem.hotkeys,

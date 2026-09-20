@@ -125,18 +125,22 @@ void main() {
     onSend,
     ChatInputBarController? mediaController,
     bool longPasteAsFile = false,
+    // 允许调用方传入自己配好的 settings（用于测「开关／阈值被改动后」的行为）。
+    // 不传时按 longPasteAsFile 构造，与既有用例行为一致。
+    SettingsProvider? settings,
   }) {
+    final resolvedSettings =
+        settings ??
+        SettingsProvider(
+          createBusinessTestPreferences(
+            localInitial: longPasteAsFile
+                ? {'display_long_paste_as_file_v1': true}
+                : const {},
+          ),
+        );
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider.value(
-          value: SettingsProvider(
-            createBusinessTestPreferences(
-              localInitial: longPasteAsFile
-                  ? {'display_long_paste_as_file_v1': true}
-                  : const {},
-            ),
-          ),
-        ),
+        ChangeNotifierProvider.value(value: resolvedSettings),
         ChangeNotifierProvider.value(
           value: AssistantProvider(
             preferences: createBusinessTestPreferences(
@@ -342,6 +346,8 @@ void main() {
     await tester.tap(find.byType(TextField));
     await tester.pump();
 
+    final beforePaste = mediaController.draftMediaIdentity;
+
     await tester.runAsync(() async {
       tester
           .state<EditableTextState>(find.byType(EditableText))
@@ -356,6 +362,8 @@ void main() {
     });
 
     expect(mediaController.hasUnreadyImages, isTrue);
+    expect(mediaController.snapshotInput('').imagePaths, isEmpty);
+    expect(mediaController.draftMediaIdentity, isNot(equals(beforePaste)));
     await tester.tap(find.byIcon(Lucide.ArrowUp));
     await tester.pump();
     expect(submitted, isNull);
@@ -899,6 +907,146 @@ void main() {
     } finally {
       debugPrint = previousDebugPrint;
     }
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+  testWidgets('关闭超长粘贴转文件后保持为输入文本', (tester) async {
+    final nativeClipboardContext = MockMessageChannelContext()
+      ..registerMockMethodCallHandler('ClipboardReader', (_) {
+        throw PlatformException(code: 'unavailable-in-widget-test');
+      });
+    setContextOverride(nativeClipboardContext);
+
+    var clipboardText = '';
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.getData') {
+        return <String, dynamic>{'text': clipboardText};
+      }
+      return null;
+    });
+    const clipboardFilesChannel = MethodChannel('app.clipboard');
+    messenger.setMockMethodCallHandler(
+      clipboardFilesChannel,
+      (_) async => null,
+    );
+    addTearDown(() {
+      messenger.setMockMethodCallHandler(SystemChannels.platform, null);
+      messenger.setMockMethodCallHandler(clipboardFilesChannel, null);
+    });
+
+    // 开关关闭时，超长粘贴必须原样留在输入框，不产生任何文件附件。
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    addTearDown(settings.dispose);
+    await settings.loaded;
+    await settings.setLongPasteAsFile(false);
+
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+    final mediaController = ChatInputBarController();
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        mediaController: mediaController,
+        settings: settings,
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+      ),
+    );
+    await tester.tap(find.byType(TextField));
+    await tester.pump();
+
+    clipboardText = List.filled(5001, 'a').join();
+    await _invokePasteShortcut(tester, focusNode);
+    expect(
+      await pumpUntil(tester, () => controller.text == clipboardText),
+      isTrue,
+    );
+    expect(mediaController.snapshotInput(controller.text).documents, isEmpty);
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('自定义阈值决定是否将粘贴转为文本附件', (tester) async {
+    final nativeClipboardContext = MockMessageChannelContext()
+      ..registerMockMethodCallHandler('ClipboardReader', (_) {
+        throw PlatformException(code: 'unavailable-in-widget-test');
+      });
+    setContextOverride(nativeClipboardContext);
+
+    var clipboardText = '';
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.getData') {
+        return <String, dynamic>{'text': clipboardText};
+      }
+      return null;
+    });
+    const clipboardFilesChannel = MethodChannel('app.clipboard');
+    messenger.setMockMethodCallHandler(
+      clipboardFilesChannel,
+      (_) async => null,
+    );
+    addTearDown(() {
+      messenger.setMockMethodCallHandler(SystemChannels.platform, null);
+      messenger.setMockMethodCallHandler(clipboardFilesChannel, null);
+    });
+
+    // 阈值边界：等于阈值不转，超过阈值才转。
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    addTearDown(settings.dispose);
+    await settings.loaded;
+    await settings.setLongPasteAsFileThreshold(100);
+    await settings.setLongPasteAsFile(true);
+
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+    final mediaController = ChatInputBarController();
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        mediaController: mediaController,
+        settings: settings,
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+      ),
+    );
+    await tester.tap(find.byType(TextField));
+    await tester.pump();
+
+    clipboardText = List.filled(100, 'a').join();
+    await _invokePasteShortcut(tester, focusNode);
+    expect(
+      await pumpUntil(tester, () => controller.text == clipboardText),
+      isTrue,
+    );
+    expect(mediaController.snapshotInput(controller.text).documents, isEmpty);
+
+    controller.text = '';
+    clipboardText = List.filled(101, 'b').join();
+    await _invokePasteShortcut(tester, focusNode);
+    expect(
+      await pumpUntil(
+        tester,
+        () =>
+            controller.text.isEmpty &&
+            mediaController.snapshotInput(controller.text).documents.length ==
+                1,
+      ),
+      isTrue,
+    );
+    expect(
+      await tester.runAsync(
+        () => File(
+          mediaController.snapshotInput(controller.text).documents.single.path,
+        ).readAsString(),
+      ),
+      clipboardText,
+    );
 
     controller.dispose();
     focusNode.dispose();

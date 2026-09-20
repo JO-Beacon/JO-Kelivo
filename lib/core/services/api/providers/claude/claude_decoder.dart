@@ -1,20 +1,27 @@
 import 'dart:convert';
 
+import '../../../../../utils/utf16_safe_cut.dart';
+
 import '../../../../models/token_usage.dart';
 import '../../stream/sse_event.dart';
 import '../../stream/stream_chunk.dart';
+import 'claude_container.dart';
 import '../../stream/stream_chunk_decoder.dart';
 import '../../stream/stream_chunk_ids.dart';
 
-/// Stateful Claude Messages SSE decoder. One instance per HTTP response.
+/// 有状态的 Claude Messages SSE 解码器。每个 HTTP 响应一个实例。
 class ClaudeStreamDecoder implements StreamChunkDecoder {
   ClaudeStreamDecoder({
     this.skipRedactedThinkingBlocks = false,
+    this.initialUsage,
     this.serverToolNames = const <String>{},
     String sourceId = 'stream',
   }) : _ids = StreamChunkIds(sourceId);
 
   final bool skipRedactedThinkingBlocks;
+  final TokenUsage? initialUsage;
+
+  /// 本次请求声明为 Anthropic 托管服务端工具的工具名。
   final Set<String> serverToolNames;
   final StreamChunkIds _ids;
 
@@ -23,14 +30,28 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
       <String, ClaudeClientTool>{};
   final Map<String, String> toolResults = <String, String>{};
 
-  TokenUsage? usage;
-  String? containerId;
+  TokenUsage? _round;
+
+  TokenUsage? get usage {
+    if (_round == null) return initialUsage;
+    return (initialUsage ?? const TokenUsage()).merge(_round!);
+  }
+
   String? lastStopReason;
+
+  /// 本次响应运行所在的容器，由 API 首次给出。
+  ///
+  /// 文件与 REPL 状态都活在容器里，所以后续轮次若不把这个 id 回传，
+  /// 就会从空容器重新开始。
+  ClaudeContainerRef? container;
   bool messageStopped = false;
 
   final Map<int, String> _clientIndexToId = <int, String>{};
   final Map<int, String> _serverIndexToId = <int, String>{};
   final Map<String, StringBuffer> _serverArgs = <String, StringBuffer>{};
+
+  /// 已追加到 [assistantBlocks] 的每个 `server_tool_use` 块，用于在其关闭后
+  /// 回填流式输入。
   final Map<String, Map<String, dynamic>> _serverBlocks =
       <String, Map<String, dynamic>>{};
   final Map<String, String> _serverToolNames = <String, String>{};
@@ -46,30 +67,24 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
   final List<Map<String, dynamic>> _citationItems = <Map<String, dynamic>>[];
   bool _closed = false;
 
-  Map<String, dynamic> get _anthropicMetadata => <String, dynamic>{
-    'anthropic': <String, dynamic>{
-      'assistant_blocks': assistantBlocks,
-      if (containerId != null && containerId!.isNotEmpty)
-        'container_id': containerId,
-    },
-  };
-
   bool isClientTool(String id) => clientTools.containsKey(id);
 
   void recordToolResult(String id, String content) {
     toolResults[id] = content;
   }
 
-  /// 解析非流式响应中的服务端工具块，使其与 SSE 路径使用同一套展示和
-  /// 失败语义。调用方同时可读取 [assistantBlocks] 用于后续请求回放。
+  /// 从完整的非流式响应中提取托管调用。
+  ///
+  /// 请求侧已经为后续回放解析过 [blocks]。这里保留卡片映射，使流式与非流式
+  /// 响应使用同一套展示名、输出裁剪与错误处理。
   List<StreamChunk> decodeCompleteServerTools(
     List<Map<String, dynamic>> blocks,
   ) {
+    assistantBlocks.addAll(blocks);
     final chunks = <StreamChunk>[];
     for (final block in blocks) {
       final type = (block['type'] ?? '').toString();
       if (type == 'server_tool_use') {
-        assistantBlocks.add(Map<String, dynamic>.from(block));
         final id = (block['id'] ?? '').toString();
         final name = (block['name'] ?? '').toString();
         final display = _serverToolDisplayName(name);
@@ -82,14 +97,14 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         if (_serverToolStarted.add(id)) {
           chunks.add(ServerToolStart(id: id, toolName: display, input: args));
         }
-      } else if (type.endsWith('_tool_result')) {
-        assistantBlocks.add(Map<String, dynamic>.from(block));
-        final name = type.substring(0, type.length - '_tool_result'.length);
-        if (name == 'web_search') {
-          chunks.addAll(_webSearchResult(block));
-        } else if (_serverToolDisplayName(name) != null) {
-          chunks.addAll(_serverToolResult(block, name));
-        }
+        continue;
+      }
+      if (!type.endsWith('_tool_result')) continue;
+      final name = type.substring(0, type.length - '_tool_result'.length);
+      if (name == 'web_search') {
+        chunks.addAll(_webSearchResult(block));
+      } else if (_serverToolDisplayName(name) != null) {
+        chunks.addAll(_serverToolResult(block, name));
       }
     }
     return chunks;
@@ -133,19 +148,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         case 'content_block_stop':
           chunks.addAll(_onBlockStop(obj));
         case 'message_start':
-          final message = obj['message'];
-          final container = message is Map ? message['container'] : null;
-          if (container is Map &&
-              (container['id'] ?? '').toString().isNotEmpty) {
-            containerId = (container['id'] ?? '').toString();
-          }
-          chunks.addAll(_onMessageDelta(obj));
         case 'message_delta':
-          final container = obj['container'];
-          if (container is Map &&
-              (container['id'] ?? '').toString().isNotEmpty) {
-            containerId = (container['id'] ?? '').toString();
-          }
           chunks.addAll(_onMessageDelta(obj));
         case 'message_stop':
           _flushTextBlock();
@@ -177,6 +180,9 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
     if (cb is! Map) return const <StreamChunk>[];
     final block = cb.cast<String, dynamic>();
     var kind = (block['type'] ?? '').toString();
+    // 部分 Claude 兼容中转会真的在服务端跑声明的服务端工具，却把它的块标成
+    // `tool_use`。若当成客户端工具执行，拿回来的结果是空的，所以这里仍按
+    // 服务端工具处理。
     if (kind == 'tool_use' &&
         serverToolNames.contains((block['name'] ?? '').toString())) {
       kind = 'server_tool_use';
@@ -218,9 +224,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
           'input': <String, dynamic>{},
         });
         if (idx != null) _clientIndexToId[idx] = id;
-        chunks.add(
-          ToolCallStart(id: id, toolName: name, metadata: _anthropicMetadata),
-        );
+        chunks.add(ToolCallStart(id: id, toolName: name));
       }
     } else if (kind == 'server_tool_use') {
       _flushTextBlock();
@@ -231,6 +235,9 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         _serverArgs[id] = StringBuffer();
       }
       if (id.isNotEmpty) {
+        // 服务端工具必须以 API 发来的原始块回放，不能当作客户端工具调用：
+        // 只有原块完整回传，结果才能解密；未运行的块也只有回传才会运行。
+        // 是否允许发送由请求侧决定。
         final serverBlock = <String, dynamic>{
           'type': 'server_tool_use',
           'id': id,
@@ -246,17 +253,13 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         _serverToolNames[id] = display;
         _serverToolStarted.add(id);
         chunks.add(ServerToolStart(id: id, toolName: display));
-        chunks.add(
-          ToolCallStart(
-            id: id,
-            toolName: display,
-            metadata: _anthropicMetadata,
-          ),
-        );
+        chunks.add(ToolCallStart(id: id, toolName: display));
       }
     } else if (kind.endsWith('_tool_result')) {
       _flushTextBlock();
       assistantBlocks.add(Map<String, dynamic>.from(block));
+      // 结果块的命名是 `<tool>_tool_result`，所以由展示名白名单决定哪些要呈现；
+      // 联网搜索保留它自己的引用映射。
       final name = kind.substring(0, kind.length - '_tool_result'.length);
       if (name == 'web_search') {
         chunks.addAll(_webSearchResult(block));
@@ -335,6 +338,8 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
       } else {
         final serverId = _serverIndexToId[idx];
         if (serverId != null) {
+          // 该缓冲区用于回放块，所以无论哪种情况都要写入。卡片 chunk 只对
+          // 已开启卡片的工具发出：一张没有名字的卡片比没有卡片更糟。
           _serverArgs.putIfAbsent(serverId, StringBuffer.new).write(part);
           if (_serverToolStarted.contains(serverId)) {
             chunks.add(ToolCallDelta(id: serverId, inputDelta: part));
@@ -398,7 +403,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         (obj['message'] is Map ? (obj['message'] as Map)['usage'] : null);
     if (rawUsage is Map) {
       final parsed = claudeUsageFromMap(rawUsage.cast<String, dynamic>());
-      usage = (usage ?? const TokenUsage()).merge(parsed);
+      _round = (_round ?? const TokenUsage()).merge(parsed);
       chunks.add(Usage(usage!));
     }
     try {
@@ -410,7 +415,97 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         lastStopReason = reason;
       }
     } catch (_) {}
+    // message 对象开启整个流，所以容器信息通常在那里出现；delta 也一并检查，
+    // 以防它只在末尾才确定。
+    for (final holder in [obj['message'], obj['delta'], obj]) {
+      final found = ClaudeContainerRef.fromResponse(
+        holder is Map ? holder['container'] : null,
+      );
+      if (found != null) {
+        container = found;
+        break;
+      }
+    }
     return chunks;
+  }
+
+  /// 界面上展示的工具名；对我们不呈现的服务端工具返回 null。
+  static String? _serverToolDisplayName(String name) {
+    switch (name) {
+      case 'web_search':
+        return 'search_web';
+      case 'web_fetch':
+      case 'code_execution':
+      case 'bash_code_execution':
+      case 'text_editor_code_execution':
+        return name;
+      default:
+        return null;
+    }
+  }
+
+  /// 抓取的页面与容器输出可能有好几 MB；卡片与持久化的消息只需要一段可读的
+  /// 摘录。
+  static const _serverToolOutputLimit = 4000;
+
+  static Object? _clipServerToolValue(Object? value) {
+    if (value is String) {
+      if (value.length <= _serverToolOutputLimit) return value;
+      return '${truncateHeadUtf16Safe(value, _serverToolOutputLimit)}…';
+    }
+    if (value is List) {
+      return value.map(_clipServerToolValue).toList();
+    }
+    if (value is Map) {
+      return <String, dynamic>{
+        for (final entry in value.entries)
+          entry.key.toString(): _clipServerToolValue(entry.value),
+      };
+    }
+    return value;
+  }
+
+  /// [blockToolName] 是结果块自身写明的工具名，也是“运行上一轮遗留的服务端
+  /// 工具”这种轮次唯一携带的名字：API 只发结果，不会重发请求块。
+  List<StreamChunk> _serverToolResult(
+    Map<String, dynamic> block,
+    String blockToolName,
+  ) {
+    final toolUseId = (block['tool_use_id'] ?? '').toString();
+    final id = toolUseId.isEmpty ? _ids.next('server_tool') : toolUseId;
+    if (!_serverToolEnded.add(id)) return const <StreamChunk>[];
+    final toolName =
+        _serverToolNames[id] ??
+        _serverToolDisplayName(blockToolName) ??
+        'server_tool';
+    final args = _serverArgsOrNull(id);
+    final content = block['content'];
+    // Anthropic 用 `*_tool_result_error` 内容块报告服务端工具失败。
+    // 若没有失败卡片，被限流的轮次会什么都不显示，看起来像这个工具从未启用。
+    final errorCode =
+        content is Map && (content['type'] ?? '').toString().endsWith('_error')
+        ? (content['error_code'] ?? '').toString()
+        : '';
+    final clipped = _clipServerToolValue(content);
+    return <StreamChunk>[
+      if (_serverToolStarted.add(id))
+        ServerToolStart(id: id, toolName: toolName, input: args),
+      ServerToolEnd(
+        id: id,
+        input: args,
+        output: errorCode.isNotEmpty
+            ? <String, dynamic>{
+                'items': const <Map<String, dynamic>>[],
+                'error': errorCode,
+              }
+            : (clipped is Map<String, dynamic>
+                  ? clipped
+                  : <String, dynamic>{'content': clipped}),
+        status: errorCode.isNotEmpty
+            ? ServerToolStatus.failed
+            : ServerToolStatus.completed,
+      ),
+    ];
   }
 
   List<StreamChunk> _webSearchResult(Map<String, dynamic> block) {
@@ -435,13 +530,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         (contentBlock['type'] == 'web_search_tool_result_error')) {
       errorCode = (contentBlock['error_code'] ?? '').toString();
     }
-    Map<String, dynamic> args = const <String, dynamic>{};
-    final raw = _serverArgs[toolUseId]?.toString();
-    if (raw != null && raw.isNotEmpty) {
-      try {
-        args = (jsonDecode(raw) as Map).cast<String, dynamic>();
-      } catch (_) {}
-    }
+    final args = _serverArgsOrNull(toolUseId);
     final id = toolUseId.isEmpty ? _ids.search() : toolUseId;
     _serverToolEnded.add(id);
     return <StreamChunk>[
@@ -454,70 +543,6 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
           'items': items,
           if ((errorCode ?? '').isNotEmpty) 'error': errorCode,
         },
-        metadata: _anthropicMetadata,
-      ),
-    ];
-  }
-
-  static String? _serverToolDisplayName(String name) {
-    switch (name) {
-      case 'web_search':
-        return 'search_web';
-      case 'web_fetch':
-      case 'code_execution':
-      case 'bash_code_execution':
-      case 'text_editor_code_execution':
-        return name;
-      default:
-        return null;
-    }
-  }
-
-  static const _serverToolOutputLimit = 4000;
-
-  static Object? _clipServerToolValue(Object? value) {
-    if (value is String) {
-      return value.length <= _serverToolOutputLimit
-          ? value
-          : '${value.substring(0, _serverToolOutputLimit)}…';
-    }
-    if (value is List) return value.map(_clipServerToolValue).toList();
-    if (value is Map) {
-      return <String, dynamic>{
-        for (final entry in value.entries)
-          entry.key.toString(): _clipServerToolValue(entry.value),
-      };
-    }
-    return value;
-  }
-
-  List<StreamChunk> _serverToolResult(
-    Map<String, dynamic> block,
-    String blockToolName,
-  ) {
-    final id = (block['tool_use_id'] ?? '').toString();
-    if (id.isEmpty || !_serverToolEnded.add(id)) {
-      return const <StreamChunk>[];
-    }
-    final toolName = _serverToolNames[id] ?? blockToolName;
-    final content = block['content'];
-    final error =
-        content is Map && (content['type'] ?? '').toString().endsWith('_error')
-        ? (content['error_code'] ?? '').toString()
-        : '';
-    return <StreamChunk>[
-      if (_serverToolStarted.add(id))
-        ServerToolStart(id: id, toolName: toolName, input: _serverArgsFor(id)),
-      ServerToolEnd(
-        id: id,
-        input: _serverArgsFor(id),
-        output: error.isNotEmpty
-            ? <String, dynamic>{'error': error}
-            : _clipServerToolValue(content),
-        status: error.isNotEmpty
-            ? ServerToolStatus.failed
-            : ServerToolStatus.completed,
-        metadata: _anthropicMetadata,
       ),
     ];
   }
@@ -542,22 +567,19 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
           input: _serverArgsFor(id),
           output: const <String, dynamic>{'items': <Map<String, dynamic>>[]},
           status: ServerToolStatus.failed,
-          metadata: _anthropicMetadata,
         ),
       );
     }
     return chunks;
   }
 
-  Map<String, dynamic> _serverArgsFor(String id) {
-    final raw = _serverArgs[id]?.toString();
-    if (raw == null || raw.isEmpty) return const <String, dynamic>{};
-    try {
-      return (jsonDecode(raw) as Map).cast<String, dynamic>();
-    } catch (_) {
-      return const <String, dynamic>{};
-    }
-  }
+  /// 本次响应开启的调用的流式输入；若该调用在本回合更早的响应里就已开启则返回
+  /// null —— 输入由那个解码器持有，这里给空 map 会把卡片上的参数擦掉。
+  Map<String, dynamic>? _serverArgsOrNull(String id) =>
+      _serverArgs.containsKey(id) ? decodeStreamedInput(_serverArgs[id]) : null;
+
+  Map<String, dynamic> _serverArgsFor(String id) =>
+      decodeStreamedInput(_serverArgs[id]);
 
   List<StreamChunk> _flushCitations() {
     if (_citationItems.isEmpty) return const <StreamChunk>[];
@@ -576,13 +598,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
     if (!_serverToolEnded.add(id)) {
       return const <StreamChunk>[];
     }
-    Map<String, dynamic> args = const <String, dynamic>{};
-    final raw = _serverArgs[id]?.toString();
-    if (raw != null && raw.isNotEmpty) {
-      try {
-        args = (jsonDecode(raw) as Map).cast<String, dynamic>();
-      } catch (_) {}
-    }
+    final args = _serverArgsFor(id);
     return <StreamChunk>[
       if (_serverToolStarted.add(id))
         ServerToolStart(id: id, toolName: 'search_web', input: args),
@@ -590,7 +606,6 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         id: id,
         input: args,
         output: <String, dynamic>{'items': items},
-        metadata: _anthropicMetadata,
       ),
     ];
   }
@@ -625,6 +640,18 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
   }
 }
 
+/// 工具的流式输入以不完整 JSON 的形式到达缓冲区；不完整或缺失时
+/// 一律按“没有参数”处理。
+Map<String, dynamic> decodeStreamedInput(StringBuffer? buffer) {
+  final raw = buffer?.toString() ?? '';
+  if (raw.isEmpty) return const <String, dynamic>{};
+  try {
+    return (jsonDecode(raw) as Map).cast<String, dynamic>();
+  } catch (_) {
+    return const <String, dynamic>{};
+  }
+}
+
 class ClaudeClientTool {
   ClaudeClientTool({required this.id, this.name = ''});
 
@@ -632,14 +659,7 @@ class ClaudeClientTool {
   String name;
   final StringBuffer input = StringBuffer();
 
-  Map<String, dynamic> get decodedArguments {
-    try {
-      return (jsonDecode(input.isEmpty ? '{}' : input.toString()) as Map)
-          .cast<String, dynamic>();
-    } catch (_) {
-      return <String, dynamic>{};
-    }
-  }
+  Map<String, dynamic> get decodedArguments => decodeStreamedInput(input);
 }
 
 TokenUsage claudeUsageFromMap(Map<String, dynamic> usage) {

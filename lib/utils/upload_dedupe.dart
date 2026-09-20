@@ -10,8 +10,22 @@ class UploadDedupe {
 
   /// Paths resolved by an import are protected from draft cleanup.
   static final Set<String> _shared = <String>{};
+  static final Set<String> _deleting = <String>{};
 
   static bool isShared(String path) => _shared.contains(_key(path));
+
+  /// 删除一个尚未被认领的上传文件，且不与新的去重读取者竞争。
+  /// 删除标记与读取者的共享标记都在任何 await 之前完成。
+  static Future<void> deleteIfUnshared(String path) async {
+    final key = _key(path);
+    if (_shared.contains(key) || !_deleting.add(key)) return;
+    try {
+      final file = File(path);
+      if (await file.exists()) await file.delete();
+    } finally {
+      _deleting.remove(key);
+    }
+  }
 
   /// Finds a byte-identical file with the same name (or its numbered family).
   ///
@@ -88,6 +102,7 @@ class UploadDedupe {
     List<int> digest,
   ) async {
     for (final candidate in candidates) {
+      if (_deleting.contains(_key(candidate.path))) continue;
       // Marked before the read, not after: a concurrent import must not delete
       // this file out from under the stream we are about to open.
       _shared.add(_key(candidate.path));

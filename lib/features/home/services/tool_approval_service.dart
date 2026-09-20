@@ -107,7 +107,7 @@ class ToolApprovalService extends ChangeNotifier {
   }
 
   /// 拒绝一个待处理工具调用，可附原因。
-  void deny(String toolCallId, [String? reason, String? conversationId]) {
+  void deny(String toolCallId, {String? reason, String? conversationId}) {
     final req = _take(toolCallId, conversationId);
     if (req != null && !req._completer.isCompleted) {
       req._completer.complete(ToolApprovalResult.denied(reason));

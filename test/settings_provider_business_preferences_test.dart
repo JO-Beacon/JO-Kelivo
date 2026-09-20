@@ -211,7 +211,14 @@ void main() {
 
     expect(settings.insertNewAssistantAtTop, isFalse);
     expect(settings.wideChatLayout, isFalse);
-    expect(settings.longPasteAsFile, isFalse);
+    // 超长粘贴转文件：本仓库默认**关闭**（产品决定，勿改）。
+    // 上游 Kelivo 该项默认开启；本仓库刻意不同，不得按
+    // 「与上游分歧默认换成上游」的口径改回去。
+    // 断言引用具名常量，改默认值必须同时改常量与这条断言。
+    expect(
+      settings.longPasteAsFile,
+      SettingsProvider.defaultLongPasteAsFileEnabled,
+    );
     expect(
       settings.longPasteAsFileThreshold,
       SettingsProvider.defaultLongPasteAsFileThreshold,
@@ -310,6 +317,32 @@ void main() {
       expect(settings.selectedAsrServiceId, first.id);
       await settings.setAsrServices(const <AsrServiceOptions>[]);
       expect(settings.selectedAsrServiceId, isNull);
+    },
+  );
+
+  test(
+    'long paste file conversion stays OFF by default (product decision)',
+    () async {
+      // ⛔ 防回改用例（2026-09-17 产品明确定：默认关闭是有意为之）。
+      //
+      // 上游 Kelivo 把这一项默认设为 true（超长粘贴自动转成文件附件），
+      // 本仓库刻意保持 false（粘贴的长文本仍直接进入输入框，
+      // 由用户主动开启该开关才会转文件）。
+      //
+      // 这条用例的作用是：任何把默认值改成 true 的改动都会在此失败。
+      // 若将来产品决定改为默认开启，应连同本用例一起改，而不是忽略失败。
+      expect(SettingsProvider.defaultLongPasteAsFileEnabled, isFalse);
+
+      final settings = SettingsProvider(BusinessPreferences(repository));
+      await settings.loaded;
+
+      // 全新偏好（没有任何已存值）时必须落到「关闭」。
+      expect(settings.longPasteAsFile, isFalse);
+      // 阈值常量本身与上游一致，差异只在默认开关状态。
+      expect(
+        settings.longPasteAsFileThreshold,
+        SettingsProvider.defaultLongPasteAsFileThreshold,
+      );
     },
   );
 }

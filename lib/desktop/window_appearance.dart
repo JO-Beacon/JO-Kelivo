@@ -63,8 +63,9 @@ class WindowAppearanceSync {
     }
 
     try {
-      final bool? dark =
-          await _channel.invokeMethod<bool>('getSystemBrightness');
+      final bool? dark = await _channel.invokeMethod<bool>(
+        'getSystemBrightness',
+      );
       if (dark == null) {
         return null;
       }
@@ -94,10 +95,8 @@ class WindowAppearanceSync {
     // 窗口边框沿用界面里直接描边的颜色（outline）。系统窗口边框不接受透明
     // 度，所以先把它合成到背景上取实色。outline 与背景的差值在九个主题下
     // 都固定为 70（见 palettes.dart），轮廓在各主题下轻重一致。
-    final int border = Color.alphaBlend(
-          theme.colorScheme.outline,
-          background,
-        ).toARGB32() &
+    final int border =
+        Color.alphaBlend(theme.colorScheme.outline, background).toARGB32() &
         0xFFFFFF;
 
     if (_lastCaption == caption &&
@@ -112,13 +111,14 @@ class WindowAppearanceSync {
     _lastDark = dark;
 
     try {
-      await _channel.invokeMethod<void>('setCaptionAppearance', <String, Object>{
-        'dark': dark,
-        'useCustomColors': true,
-        'captionColor': caption,
-        'textColor': text,
-        'borderColor': border,
-      });
+      await _channel
+          .invokeMethod<void>('setCaptionAppearance', <String, Object>{
+            'dark': dark,
+            'useCustomColors': true,
+            'captionColor': caption,
+            'textColor': text,
+            'borderColor': border,
+          });
     } catch (_) {
       // 旧系统不认这些颜色，失败是预期内的。
     }

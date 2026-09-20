@@ -6,19 +6,16 @@ import '../../chat_api_helpers.dart';
 import 'claude_container.dart';
 import 'claude_role_normalizer.dart';
 
-/// Provider artifact kind under which a Claude turn's responses are stored
-/// against the assistant message that made them: every response the API
-/// produced for the turn, in order, as block lists. A turn that hands off
-/// between a hosted and a client tool, or resumes after `pause_turn`, spans
-/// several responses, and the protocol replays each as its own assistant
-/// message with the client results between them — so the boundary is
-/// recorded here rather than inferred from the blocks later.
+/// 一次 Claude 回合的各个响应以此 artifact 类型存放在发起它们的助手消息上：
+/// 按顺序记录该回合 API 产出的每一个响应，各自是一串块列表。一个回合若在托管
+/// 工具与客户端工具之间交接，或是在 `pause_turn` 之后继续，会跨越多个响应；
+/// 协议会把每个响应各自作为一条助手消息重放，客户端工具结果夹在它们之间
+/// —— 所以这里显式记下边界，而不是事后从块里推断。
 ///
-/// Written after every response once the turn has called a tool, so a turn
-/// cut short still replays up to the last response that completed. A turn
-/// without one replays from its text alone and stores nothing. It travels
-/// into the next request under [multimodalInternalClaudeTurnKey], on the
-/// assistant message that holds the turn's tool calls.
+/// 该回合一旦调用过工具，此后每个响应写完都会更新它，因此被中断的回合也能
+/// 重放到最后一个完整响应。没有记录的回合仅凭文本重放，不存任何东西。
+/// 它会随下一条请求、以 [multimodalInternalClaudeTurnKey] 的形式发送，
+/// 挂在持有该回合工具调用的那条助手消息上。
 const String claudeTurnArtifactKind = 'claude_turn';
 
 String encodeClaudeTurn(List<List<Map<String, dynamic>>> responses) =>
@@ -33,7 +30,7 @@ List<List<Map<String, dynamic>>>? decodeClaudeTurn(Object? payload) {
   }
 }
 
-/// Block lists read off persisted JSON, empty ones dropped.
+/// 从持久化 JSON 中读出的块列表，空的会被丢弃。
 List<List<Map<String, dynamic>>>? _responsesOf(Object? raw) {
   if (raw is! List) return null;
   final read = [
@@ -47,9 +44,8 @@ List<List<Map<String, dynamic>>>? _responsesOf(Object? raw) {
   return read.isEmpty ? null : read;
 }
 
-/// Anthropic rejects an empty text block, and dropping `content` altogether
-/// leaves the tool call unanswered, which reads to the model as a malformed
-/// turn. A tool that produced nothing gets an explicit placeholder instead.
+/// Anthropic 拒绝空的文本块，而整个丢掉 `content` 会让这次工具调用无人应答，
+/// 在模型看来就是一个畸形回合。什么都没产出的工具会收到一个显式占位符。
 String claudeToolResultContent(String result) =>
     result.trim().isEmpty ? '(no output)' : result;
 
@@ -80,14 +76,13 @@ Set<String> toolResultIdsInBlocks(Iterable<Map> blocks) {
   };
 }
 
-/// Turns the app's message history into the Anthropic `messages` array.
+/// 把应用的消息历史转换成 Anthropic 的 `messages` 数组。
 ///
-/// A tool turn is persisted as one assistant message holding the cards, the
-/// `tool` message of each card, and the text of the whole turn as a plain
-/// assistant message after them. Replayed, it becomes the responses the API
-/// produced — see [claudeTurnArtifactKind] — each its own assistant message
-/// behind the client results it waited for, with the turn's text folded into
-/// them rather than sent again.
+/// 工具回合被持久化为一条放着各个卡片的助手消息、每张卡片对应的 `tool`
+/// 消息，以及紧跟其后的、以普通助手消息承载的整回合文本。重放时它会还原成
+/// API 实际产出的那些响应 —— 见 [claudeTurnArtifactKind] —— 每个响应各自
+/// 是一条助手消息，排在其等待的客户端工具结果之后，回合文本折进它们之中，
+/// 而不是再发一次。
 class ClaudeHistory {
   ClaudeHistory({
     required this.replayServerToolBlocks,
@@ -97,9 +92,8 @@ class ClaudeHistory {
     this.remoteMediaBase64,
   });
 
-  /// Only Anthropic runs a server tool or decrypts what one returned, so
-  /// everywhere else its blocks are dropped and the call replays as the
-  /// synthesised client pair, exactly as it did before these tools existed.
+  /// 只有 Anthropic 会真正执行服务端工具或解密其返回值，所以在别处这些块会被
+  /// 丢弃，调用以合成出的客户端工具对形式重放，与这些工具出现之前完全一致。
   final bool replayServerToolBlocks;
   final bool skipRedactedThinkingBlocks;
   final bool skipImageParsing;
@@ -112,25 +106,22 @@ class ClaudeHistory {
   /// 行为原样作为文本发出。
   final Future<String> Function(String url)? remoteMediaBase64;
 
-  /// The container the conversation's last code execution ran in, stored
-  /// against that assistant message. The latest one wins. Set by [build].
+  /// 该会话最后一次代码执行所在的容器，存放在对应那条助手消息上。
+  /// 以最新的一个为准。由 [build] 设置。
   ClaudeContainerRef? storedContainer;
 
-  /// The data files the user attached, in conversation order — what a fresh
-  /// container needs; [unseenDataFiles] are those attached after the message
-  /// that recorded [storedContainer] — what that container still lacks, all
-  /// of them when there is none. A deleted reply, a send that failed before
-  /// its request, a turn with the tool off: each leaves files between the
-  /// container and the last message, so "the last message's" is the wrong
-  /// rule. [turnDataFiles] names the last message's, the ones this turn is
-  /// about. Only a user's own attachments count; what the model produced
-  /// lives on its messages and is the container's to keep or lose. Set by
-  /// [build].
+  /// 用户附加的数据文件，按会话顺序排列 —— 新建容器需要这些；
+  /// [unseenDataFiles] 是记下 [storedContainer] 那条消息之后才附加的，
+  /// 也就是该容器仍缺的（没有容器时就是全部）。一条被删掉的回复、一次在发出
+  /// 请求前就失败的发送、一个关掉了工具的回合：每一种都会在容器与最后一条
+  /// 消息之间留下文件，所以“取最后一条消息的”是错的规则。[turnDataFiles]
+  /// 指的是最后一条消息的那些，也就是本回合相关的那些。只算用户自己附加的；
+  /// 模型产出的内容存在它自己的消息上，由容器决定留或丢。由 [build] 设置。
   final dataFiles = <InternalDocumentRef>[];
   final unseenDataFiles = <InternalDocumentRef>[];
   final turnDataFiles = <InternalDocumentRef>[];
 
-  /// The blocks of one response as this endpoint may be sent them.
+  /// 一个响应的块列表，已按本端点可发送的形式整理过。
   List<Map<String, dynamic>> sanitize(Iterable<Map> blocks) {
     return [
       for (final block in blocks)
@@ -148,22 +139,21 @@ class ClaudeHistory {
     return true;
   }
 
-  /// [messages] with the system prompt already taken out. The array opens with
-  /// a `user` turn, as the API requires — see [ensureClaudeFirstTurnIsUser].
+  /// 已剔除系统提示词的 [messages]。数组以 `user` 回合开头，这是 API 的要求
+  /// —— 见 [ensureClaudeFirstTurnIsUser]。
   Future<List<Map<String, dynamic>>> build(
     List<Map<String, dynamic>> messages,
   ) async {
     final out = <Map<String, dynamic>>[];
     final pendingResults = <Map<String, dynamic>>[];
     final replayedClientCalls = <String>{};
-    // The API refuses `image` blocks in an assistant turn, yet a chart the
-    // model drew is what the user's next question is about. Such images wait
-    // here and open the following user message, so the model still sees them.
+    // API 拒绝助手回合里的 `image` 块，但模型画的图表往往正是用户下一个问题
+    // 所指。这类图片在此暂存，并作为下一条用户消息的开头，模型仍能看到它们。
     final carriedImages = <Map<String, dynamic>>[];
     _ReplayedTurn? turn;
 
-    /// A result is sent only once the call it answers has been: the API
-    /// rejects one pointing at a `tool_use` that is not in the history.
+    /// 结果只在其所应答的调用发出之后才发送：API 会拒绝指向历史上并不存在的
+    /// `tool_use` 的结果。
     void flushResults({Set<String>? only}) {
       final taken = <Map<String, dynamic>>[];
       pendingResults.removeWhere((result) {
@@ -175,8 +165,8 @@ class ClaudeHistory {
       if (taken.isNotEmpty) out.add({'role': 'user', 'content': taken});
     }
 
-    /// Emits the next response of [turn], behind the client results of the
-    /// one before it. Without any in between the two are one assistant turn.
+    /// 发出 [turn] 的下一个响应，排在前一个响应所等待的客户端工具结果之后。
+    /// 两者之间若没有结果，它们就是同一个助手回合。
     void emitResponse(_ReplayedTurn turn) {
       final blocks = turn.responses[turn.emitted];
       if (turn.emitted > 0) {
@@ -202,11 +192,10 @@ class ClaudeHistory {
       turn.emitted++;
     }
 
-    /// The persisted assistant message after a replayed turn aggregates the
-    /// text of every response of it, which the replayed blocks already carry.
-    /// Only what they stop short of — a snapshot cut mid-stream, or a last
-    /// response that had no card to record it — is still to be sent; on any
-    /// other disagreement the blocks win, being what the API produced.
+    /// 重放回合之后的那条持久化助手消息汇总了该回合每个响应的文本，而重放的块
+    /// 本身已经带着这些文本。只有它们没覆盖到的部分 —— 流中途被截断的快照，
+    /// 或是最后一个没有卡片记录它的响应 —— 仍需发送；出现其它不一致时以块为准，
+    /// 因为那才是 API 实际产出的。
     void foldTurnText(_ReplayedTurn turn, Map<String, dynamic> m) {
       final said = turn.text.trim();
       final text = (m['content'] ?? '').toString().trim();
@@ -215,8 +204,8 @@ class ClaudeHistory {
           : text.startsWith(said)
           ? text.substring(said.length).trim()
           : '';
-      // Nothing left to say. The results may now sit next to the user message
-      // after them, which the API combines into the one turn they already were.
+      // 没有别的要说。此时这些结果可以与紧随其后的用户消息并排，
+      // API 会把它们合并成本来就是的同一个回合。
       if (rest.isEmpty) return;
       final last = turn.messages.lastOrNull;
       if (pendingResults.isEmpty && last != null && identical(out.last, last)) {
@@ -249,7 +238,7 @@ class ClaudeHistory {
       }
       if (role == 'tool') {
         final id = (m['tool_call_id'] ?? '').toString();
-        // A server tool replayed as its own blocks already carries its result.
+        // 以自己块形式重放的服务端工具，已经带着它的结果。
         if (id.isNotEmpty && !(turn?.serverToolIds.contains(id) ?? false)) {
           pendingResults.add({
             'type': 'tool_result',
@@ -263,7 +252,7 @@ class ClaudeHistory {
       if (role == 'assistant' && m['tool_calls'] is! List && _hasMedia(m)) {
         final split = await _splitParts(m, includeUserPaths: false);
         carriedImages.addAll(split.images);
-        // What is left of the message once its images have moved on.
+        // 图片搬走之后，这条消息剩下的内容。
         m = {
           ...m,
           'content': split.text.map((block) => block['text']).join('\n'),
@@ -274,7 +263,7 @@ class ClaudeHistory {
         while (turn.emitted < turn.responses.length) {
           emitResponse(turn);
         }
-        // With its images carried forward, an assistant message is plain text.
+        // 图片前移之后，这条助手消息就是纯文本。
         if (role == 'assistant' && m['tool_calls'] is! List) {
           foldTurnText(turn, m);
           turn = null;
@@ -290,7 +279,7 @@ class ClaudeHistory {
         if (turn != null) {
           if (turn.responses.isNotEmpty) emitResponse(turn);
         } else {
-          // Nothing recorded of the turn: rebuild it from the calls.
+          // 该回合没有任何记录：从工具调用重建它。
           final blocks = <Map<String, dynamic>>[];
           final text = (m['content'] ?? '').toString();
           if (text.trim().isNotEmpty && text.trim() != '\n\n') {
@@ -319,9 +308,8 @@ class ClaudeHistory {
     }
 
     if (turn != null && turn.emitted < turn.responses.length) {
-      // History cut off at a client result: the responses still to come would
-      // prefill the answer, so they go, and with them the hosted calls whose
-      // results were only in them — replayed open, the API rejects those.
+      // 历史在某个客户端工具结果处截断：后续还没到的响应会预填答案，所以要去掉；
+      // 随之去掉的还有那些结果只存在于其中的托管调用 —— 敞开重放，API 会拒绝。
       final lostResults = toolResultIdsInBlocks(
         turn.responses.skip(turn.emitted).expand((blocks) => blocks),
       );
@@ -336,16 +324,15 @@ class ClaudeHistory {
       }
     }
     flushResults();
-    // A conversation cut to begin at a reply would open with an assistant turn,
-    // which the API rejects outright.
+    // 若把会话截断到从某条回复开始，开头就会是助手回合，API 会直接拒绝。
     ensureClaudeFirstTurnIsUser(out);
     return out;
   }
 
-  /// The turn a persisted tool message records: the stored turn artifact, or
-  /// for a message written before there was one, the fullest of its cards —
-  /// each held the responses up to the one that last wrote it, so the last
-  /// one written holds them all. Null when nothing recorded any.
+  /// 一条持久化的工具消息所记录的回合：优先取存下的回合 artifact；
+  /// 若该消息写在 artifact 出现之前，则取其各卡片中最完整的一张 —— 每张卡片
+  /// 都持有直到最后写入它的那个响应为止的内容，所以最后写入的那张最全。
+  /// 完全没有记录时返回 null。
   _ReplayedTurn? _readTurn(Map<String, dynamic> m, List toolCalls) {
     var recorded = decodeClaudeTurn(m[multimodalInternalClaudeTurnKey]);
     if (recorded == null) {
@@ -367,16 +354,16 @@ class ClaudeHistory {
     final declared = <String>{};
     final responses = <List<Map<String, dynamic>>>[];
     for (final raw in recorded) {
-      // A `server_tool_use` whose result never arrived — the stream stopped
-      // between the two — would replay as a call with no output.
+      // 结果始终没到的 `server_tool_use`（流在两者之间中断）会重放成一次
+      // 没有输出的调用。
       final blocks = sanitize(raw)
         ..removeWhere(
           (block) =>
               block['type'] == 'server_tool_use' &&
               !resolved.contains((block['id'] ?? '').toString()),
         );
-      // A hosted call this endpoint drops the block of replays as the client
-      // pair instead, as every call did before these tools existed.
+      // 本端点丢弃其块的托管调用，改为以客户端工具对的形式重放，
+      // 与这些工具出现之前的每次调用一样。
       final kept = toolUseIdsInBlocks(blocks);
       for (final id in toolUseIdsInBlocks(raw)) {
         declared.add(id);
@@ -386,14 +373,14 @@ class ClaudeHistory {
       }
       responses.add(blocks);
     }
-    // A call the recording stopped short of — the turn was cut in the response
-    // that made it — comes after everything that was recorded.
+    // 记录没覆盖到的调用（该回合在发出它的那个响应里就被截断了）
+    // 排在所有已记录内容之后。
     for (final entry in cards.entries) {
       if (declared.contains(entry.key)) continue;
       final block = _toolUseBlockFromToolCall(entry.value);
       if (block != null) responses.last.add(block);
     }
-    // A turn left with nothing to send still owns its `tool` messages.
+    // 一个最后没东西可发的回合，仍然拥有它自己的 `tool` 消息。
     responses.removeWhere((blocks) => blocks.isEmpty);
     return _ReplayedTurn(
       responses: responses,
@@ -408,9 +395,9 @@ class ClaudeHistory {
     );
   }
 
-  /// The responses a card written by an earlier version of the app recorded
-  /// in its metadata: the turn's responses up to its own under `responses`,
-  /// or before that its one response as `assistant_blocks`.
+  /// 旧版本应用写下的卡片在其 metadata 里记录的响应：较新的格式把该回合直到
+  /// 自己为止的响应放在 `responses` 下；更早的格式只有一个响应，键名为
+  /// `assistant_blocks`。
   static List<List<Map<String, dynamic>>>? _recordedResponses(Map tc) {
     final meta = tc['metadata'];
     if (meta is! Map) return null;
@@ -439,9 +426,8 @@ class ClaudeHistory {
     };
   }
 
-  /// Semantic media detection only - custom attachment markers are not
-  /// recognized. Attachments arrive via structured media-path keys /
-  /// userImagePaths, plus Markdown ![](...).
+  /// 只做语义层面的媒体识别 —— 自定义附件标记不予识别。附件通过结构化的
+  /// media-path 键 / userImagePaths，以及 Markdown 的 ![](...) 传入。
   bool _hasMedia(Map<String, dynamic> m) =>
       shouldParseMarkdownImages(
         (m['content'] ?? '').toString(),
@@ -466,7 +452,7 @@ class ClaudeHistory {
     final split = await _splitParts(m, includeUserPaths: hasAttachedImages);
     final parts = <Map<String, dynamic>>[
       if (carriedImages.isNotEmpty) ...[
-        // Without the label the model takes its own chart for an upload.
+        // 没有这个标注，模型会把自己画的图表当成用户上传。
         {'type': 'text', 'text': 'Images from your previous reply:'},
         ...carriedImages,
       ],
@@ -477,9 +463,8 @@ class ClaudeHistory {
     return {'role': role, 'content': parts.isEmpty ? raw : parts};
   }
 
-  /// Splits a message into the text and image blocks Claude accepts: Markdown
-  /// images and internal media refs become image blocks, remote URLs and
-  /// unsupported media stay as text.
+  /// 把一条消息拆成 Claude 接受的文本块与图片块：Markdown 图片和内部媒体引用
+  /// 变成图片块，远程 URL 与不支持的媒体保持为文本。
   Future<({List<Map<String, dynamic>> text, List<Map<String, dynamic>> images})>
   _splitParts(Map<String, dynamic> m, {required bool includeUserPaths}) async {
     final raw = (m['content'] ?? '').toString();
@@ -501,7 +486,7 @@ class ClaudeHistory {
       if (source.startsWith('http://') || source.startsWith('https://')) {
         final download = remoteMediaBase64;
         if (download == null) {
-          // Preserve prior official-Claude behavior for remote URLs.
+          // 远程 URL 保持官方 Claude 一贯的行为。
           text.add({'type': 'text', 'text': source});
           return;
         }
@@ -567,6 +552,9 @@ class ClaudeHistory {
       allowRemoteImages: true,
       allowLocalImages: true,
       keepRemoteMarkdownText: true,
+      // 本处与上面的调用一样要把“跳过图片解析”透传下去，否则沙盒/工作区
+      // 场景下本路径仍会去解析图片，与调用方的意图不符。
+      skipImageParsing: skipImageParsing,
     );
     if (parsed.text.isNotEmpty) {
       text.add({'type': 'text', 'text': parsed.text});
@@ -583,8 +571,8 @@ class ClaudeHistory {
     );
     for (final mediaRef in supplementalRefs) {
       final mime = mimeForInternalMediaRef(mediaRef);
-      // Never emit Anthropic image blocks for video/audio or other
-      // non-Claude image MIME types (e.g. video/mp4).
+      // 视频/音频以及其它非 Claude 图片类型（例如 video/mp4），一律不生成
+      // Anthropic 图片块。
       if (isVideoMime(mime) ||
           isAudioMime(mime) ||
           !isClaudeSupportedImageMime(mime)) {
@@ -623,8 +611,8 @@ bool isClaudeSupportedImageMime(String mime) {
   }
 }
 
-/// A persisted tool turn being replayed: its responses in the order the API
-/// produced them, sanitised for this endpoint, and how far the replay got.
+/// 正在重放的持久化工具回合：它的各个响应（按 API 产出的顺序、已按本端点
+/// 清洗过），以及重放进行到了哪里。
 class _ReplayedTurn {
   _ReplayedTurn({
     required this.responses,
@@ -634,12 +622,12 @@ class _ReplayedTurn {
 
   final List<List<Map<String, dynamic>>> responses;
 
-  /// The text of the whole turn, every response joined — what the persisted
-  /// assistant message after it aggregates.
+  /// 整回合的文本，由每个响应拼接而成 —— 也就是其后那条持久化助手消息
+  /// 所汇总的内容。
   final String text;
 
-  /// Server tools replayed as their own blocks; the synthesised `tool` message
-  /// for one of these would be an orphan `tool_result`.
+  /// 以自己块形式重放的服务端工具；若为它们合成 `tool` 消息，
+  /// 就会产生孤立的 `tool_result`。
   final Set<String> serverToolIds;
 
   int emitted = 0;

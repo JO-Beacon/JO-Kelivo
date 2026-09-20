@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:Kelivo/core/models/chat_input_data.dart';
 import 'package:Kelivo/features/home/services/file_upload_service.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -11,8 +12,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-class _Picker extends FilePicker {
-  _Picker(this.paths);
+class _StaticPathPicker extends FilePicker {
+  _StaticPathPicker(this.paths);
   final List<String> paths;
 
   @override
@@ -57,7 +58,7 @@ void main() {
       final source = File('${directory.path}/source.png')..writeAsBytesSync([]);
       final second = File('${directory.path}/second.png')..writeAsBytesSync([]);
       final cropped = '${directory.path}/cropped.png';
-      FilePicker.platform = _Picker([
+      FilePicker.platform = _StaticPathPicker([
         source.path,
         if (scenario == 'mixed') second.path,
       ]);
@@ -140,5 +141,97 @@ void main() {
         expect(notifications, isEmpty);
       }
     });
+  }
+  // ---- 以下两个用例来自上游 P5（fe8cb760 新增的 file_upload_service_test）----
+  // 它们测的是「工作区模式下文件选择器的参数透传」，与本文件上半部分的
+  // 「选图片裁剪流程」互补，故两份并存。
+
+  test(
+    'picker follows workspace binding without enabling byte buffering',
+    () async {
+      final picker = _RecordingPicker();
+      FilePicker.platform = picker;
+      var bound = false;
+      final service = FileUploadService(
+        getContext: () => throw StateError('Cancelled picker needs no UI'),
+        mediaController: ChatInputBarController(),
+        isImageCropperEnabled: () => false,
+        getImageCompressConfig: () => throw StateError('No images selected'),
+        hasWorkspace: () => bound,
+      );
+      await service.onPickFiles();
+      expect(picker.type, FileType.custom);
+      expect(picker.extensions, containsAll(['pdf', 'docx', 'txt']));
+      expect(picker.extensions, isNot(contains('apk')));
+      bound = true;
+      await service.onPickFiles();
+      expect(picker.type, FileType.any);
+      expect(picker.extensions, isNull);
+      expect(picker.buffered, isFalse);
+      expect(
+        service.inferMimeByExtension('Dockerfile'),
+        'application/octet-stream',
+      );
+    },
+  );
+
+  test(
+    'archives need a workspace; media and cloud-sandbox data keep existing routes',
+    () {
+      DocumentAttachment file(String name, String mime) =>
+          DocumentAttachment(path: '/upload/$name', fileName: name, mime: mime);
+      expect(
+        FileUploadService.supportsWithoutWorkspace(
+          file('app.apk', 'application/octet-stream'),
+        ),
+        isFalse,
+      );
+      expect(
+        FileUploadService.supportsWithoutWorkspace(
+          file('notes.pdf', 'application/pdf'),
+        ),
+        isTrue,
+      );
+      expect(
+        FileUploadService.supportsWithoutWorkspace(
+          file('song.m4a', 'audio/mp4'),
+        ),
+        isTrue,
+      );
+      expect(
+        FileUploadService.supportsWithoutWorkspace(
+          file('data.xlsx', 'application/octet-stream'),
+        ),
+        isTrue,
+      );
+    },
+  );
+}
+
+/// 记录一次调用收到的参数（上游 P5 测试用）。
+class _RecordingPicker extends FilePicker {
+  FileType? type;
+  List<String>? extensions;
+  bool? buffered;
+
+  @override
+  Future<FilePickerResult?> pickFiles({
+    String? dialogTitle,
+    String? initialDirectory,
+    FileType type = FileType.any,
+    List<String>? allowedExtensions,
+    Function(FilePickerStatus)? onFileLoading,
+    bool allowCompression = false,
+    int compressionQuality = 0,
+    bool allowMultiple = false,
+    bool withData = false,
+    bool withReadStream = false,
+    bool lockParentWindow = false,
+    bool readSequential = false,
+  }) async {
+    this.type = type;
+    extensions = allowedExtensions;
+    buffered = withData;
+    return null;
   }
 }

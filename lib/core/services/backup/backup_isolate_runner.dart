@@ -1,14 +1,68 @@
 import 'dart:async';
+import 'dart:ffi';
+import 'dart:io';
 import 'dart:isolate';
 
+import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../database/sqlite_interrupt.dart';
-import '../../models/backup_task_progress.dart';
-import '../../models/progress_update.dart';
+import 'backup_cancel_token.dart';
+import 'backup_task_progress.dart';
 
-typedef BackupIsolateBody<R, P> =
-    FutureOr<R> Function(BackupIsolateContext context, P payload);
+export '../../database/sqlite_interrupt.dart'
+    show debugOnInterruptSqliteHandle, interruptSqliteHandle;
+
+/// 仅供测试：跳过 `Isolate.kill`，用来模拟一个杀不掉的本地调用。
+@visibleForTesting
+bool debugSkipBackupIsolateKill = false;
+
+/// 仅供测试：让调用线程阻塞在一个既不理会 `Isolate.kill`、也不理会信号的本地
+/// sleep 里，用来模拟杀不掉的本地调用。
+///
+/// libc 的 `sleep` 遇到任何信号都会提前返回，而 Linux 上 Dart VM 的分析器
+/// 会用 SIGPROF 采样线程，所以这里先把线程的信号屏蔽掉；不做这一步，
+/// 那个“卡住”的隔离线程会在毫秒内就结束。
+void debugNativeSleepIgnoringKill(int seconds) {
+  if (Platform.isWindows) {
+    DynamicLibrary.open('kernel32.dll')
+        .lookupFunction<Void Function(Uint32), void Function(int)>('Sleep')
+        .call(seconds * 1000);
+    return;
+  }
+  final libc = DynamicLibrary.process();
+  final pthreadSigmask = libc
+      .lookupFunction<
+        Int32 Function(Int32, Pointer<Void>, Pointer<Void>),
+        int Function(int, Pointer<Void>, Pointer<Void>)
+      >('pthread_sigmask');
+  // 比任何平台的 sigset_t 都大（glibc 是 128 字节）。
+  final set = calloc<Uint8>(256);
+  final oldSet = calloc<Uint8>(256);
+  var maskChanged = false;
+  try {
+    libc
+        .lookupFunction<
+          Int32 Function(Pointer<Void>),
+          int Function(Pointer<Void>)
+        >('sigfillset')
+        .call(set.cast());
+    // SIG_BLOCK 在 Linux/Android 上是 0，在 BSD 系的 Apple libc 上是 1。
+    final sigBlock = Platform.isMacOS || Platform.isIOS ? 1 : 0;
+    maskChanged = pthreadSigmask(sigBlock, set.cast(), oldSet.cast()) == 0;
+    libc
+        .lookupFunction<Int32 Function(Uint32), int Function(int)>('sleep')
+        .call(seconds);
+  } finally {
+    if (maskChanged) {
+      // SIG_SETMASK 在 Linux/Android 上是 2，在 BSD 系的 Apple libc 上是 3。
+      final sigSetMask = Platform.isMacOS || Platform.isIOS ? 3 : 2;
+      pthreadSigmask(sigSetMask, oldSet.cast(), nullptr);
+    }
+    calloc.free(oldSet);
+    calloc.free(set);
+  }
+}
 
 /// 隔离线程在杀掉它之后仍然没有退出的超时。
 ///
@@ -36,7 +90,6 @@ bool backupIsolateStillAlive(Object error) {
       (error is BackupCancelledException && !error.isolateExited);
 }
 
-/// 隔离线程真正退出的那一刻；无法得知时为 null。
 Future<void>? backupIsolateExitFuture(Object error) {
   return switch (error) {
     BackupIsolateTimeoutException(:final isolateExit) => isolateExit,
@@ -45,43 +98,41 @@ Future<void>? backupIsolateExitFuture(Object error) {
   };
 }
 
-/// 仅供测试：跳过 `Isolate.kill`，用来模拟一个杀不掉的本地调用。
-@visibleForTesting
-bool debugSkipBackupIsolateKill = false;
-
 final class BackupIsolateContext {
-  const BackupIsolateContext({
+  BackupIsolateContext({
     required this.cancelFlag,
-    required this.reportCallback,
-    this.registerSqliteHandleCallback,
-    this.waitForSqliteCloseCallback,
+    required this._reportProgress,
+    this._registerSqliteInterruptHandle,
+    this._waitForSqliteCloseAck,
   });
 
   final IsolateCancelFlag cancelFlag;
-  final void Function(ProgressUpdate update) reportCallback;
-  final void Function(int address)? registerSqliteHandleCallback;
-  final Future<void> Function()? waitForSqliteCloseCallback;
+  final void Function(BackupProgress progress) _reportProgress;
+  final void Function(int handleAddress)? _registerSqliteInterruptHandle;
+  final Future<void> Function()? _waitForSqliteCloseAck;
 
   void throwIfCancelled() => cancelFlag.throwIfCancelled();
 
-  void reportProgress(ProgressUpdate update) => reportCallback(update);
+  void reportProgress(BackupProgress progress) => _reportProgress(progress);
 
-  void registerSqliteHandle(int address) =>
-      registerSqliteHandleCallback?.call(address);
+  void registerSqliteInterruptHandle(int address) {
+    _registerSqliteInterruptHandle?.call(address);
+  }
 
-  Future<void> waitForSqliteClose() async =>
-      await waitForSqliteCloseCallback?.call();
+  Future<void> waitForSqliteCloseAck() async {
+    await _waitForSqliteCloseAck?.call();
+  }
 }
 
 Future<R> runBackupIsolate<R, P>({
-  required BackupIsolateBody<R, P> body,
+  required FutureOr<R> Function(BackupIsolateContext context, P payload) body,
   required P payload,
   BackupCancelToken? cancelToken,
-  ProgressCallback? onProgress,
+  BackupProgressSink? onProgress,
   // 取消后先中断 SQLite 并给线程一段时间自己收尾，再硬杀。JO 原先只有
   // 250ms，太短：正常收尾（关库、清中间文件）常常还没走完就被杀了。
   Duration killGrace = const Duration(seconds: 3),
-  // 硬杀之后最多再等多久；超过就放弃等待并如实上报"线程可能还活着"。
+  // 硬杀之后最多再等多久；超过就放弃等待并如实上报“线程可能还活着”。
   Duration isolateExitDeadline = const Duration(seconds: 2),
   Duration? timeout,
 }) async {
@@ -90,168 +141,190 @@ Future<R> runBackupIsolate<R, P>({
   final exitPort = ReceivePort();
   final isolateExit = Completer<void>();
   var isolateHasExited = false;
-  var workerRetained = false;
+  var workerReleased = false;
 
   void markIsolateExited() {
     isolateHasExited = true;
-    if (!isolateExit.isCompleted) isolateExit.complete();
-    if (workerRetained) {
-      workerRetained = false;
+    if (!isolateExit.isCompleted) {
+      isolateExit.complete();
+    }
+    if (!workerReleased) {
+      workerReleased = true;
       cancelToken?.releaseWorker();
     }
   }
 
-  if (cancelToken != null) {
-    cancelToken.retainWorker();
-    workerRetained = true;
-  }
-
+  var retained = false;
   late final Isolate isolate;
   try {
-    isolate = await Isolate.spawn<_SpawnMessage>(
-      _entry,
-      _SpawnMessage(
-        progressPort.sendPort,
-        controlPort.sendPort,
-        cancelToken?.cellAddress,
-        payload,
-        body,
+    if (cancelToken != null) {
+      cancelToken.retainWorker();
+      retained = true;
+    }
+    isolate = await Isolate.spawn(
+      _backupIsolateEntry,
+      _BackupIsolateSpawnMessage(
+        progressPort: progressPort.sendPort,
+        controlPort: controlPort.sendPort,
+        cancelCellAddress: cancelToken?.cellAddress,
+        payload: payload,
+        body: body,
       ),
       errorsAreFatal: true,
       onExit: exitPort.sendPort,
     );
-  } catch (_) {
-    if (workerRetained) cancelToken?.releaseWorker();
+  } catch (error) {
+    if (retained && !workerReleased) {
+      workerReleased = true;
+      cancelToken?.releaseWorker();
+    }
     progressPort.close();
     controlPort.close();
     exitPort.close();
     rethrow;
   }
 
-  final result = Completer<R>();
-  var cancellationRequested = cancelToken?.isCancelled == true;
-  var timeoutRequested = false;
-  var sqliteHandle = 0;
-  Timer? killTimer;
-  Timer? abandonTimer;
-  Timer? timeoutTimer;
-  SendPort? commandPort;
+  final done = Completer<R>();
+  var killScheduled = false;
+  var timedOut = false;
+  var sqliteHandleAddress = 0;
+  SendPort? workerCommandPort;
+  Timer? exitFallback;
 
-  void interruptSqlite() {
-    if (sqliteHandle != 0) interruptSqliteHandle(sqliteHandle);
-  }
-
-  /// 放弃等待那个已经不响应杀掉的线程。
-  ///
-  /// 这里必须让 [result] 有个结果，否则调用方会被一个永远不退出的隔离
-  /// 线程吊死；而抛出的异常带上 `isolateExited: false` 与 [isolateExit]，
-  /// 让上层据此把临时目录的删除推迟到线程真正退出之后。
-  void abandonStuckIsolate() {
-    if (result.isCompleted) return;
-    if (timeoutRequested) {
-      result.completeError(
-        BackupIsolateTimeoutException(
-          isolateExited: isolateHasExited,
-          isolateExit: isolateExit.future,
-          duration: timeout,
-        ),
-      );
-      return;
-    }
-    result.completeError(
-      BackupCancelledException(
-        isolateExited: isolateHasExited,
-        isolateExit: isolateExit.future,
-      ),
-    );
-  }
-
-  void scheduleKill() {
-    interruptSqlite();
-    killTimer ??= Timer(killGrace, () {
-      if (debugSkipBackupIsolateKill) return;
-      if (!isolateHasExited) isolate.kill(priority: Isolate.immediate);
-    });
-    abandonTimer ??= Timer(killGrace + isolateExitDeadline, () {
-      abandonStuckIsolate();
-    });
+  void interruptIfOpen() {
+    if (sqliteHandleAddress == 0) return;
+    interruptSqliteHandle(sqliteHandleAddress);
   }
 
   final progressSub = progressPort.listen((message) {
-    if (message is ProgressUpdate) onProgress?.call(message);
+    if (message is! BackupProgress) return;
+    if (!message.cancellable) {
+      cancelToken?.setCancellable(false);
+    }
+    onProgress?.call(message);
   });
   final controlSub = controlPort.listen((message) {
-    if (message is _Ready) {
-      commandPort = message.commandPort;
-    } else if (message is _SqliteOpened) {
-      sqliteHandle = message.address;
-      if (cancellationRequested || timeoutRequested) interruptSqlite();
-    } else if (message is _SqliteClosing) {
-      sqliteHandle = 0;
-      commandPort?.send(const _SqliteCloseAck());
-    } else if (!result.isCompleted && message is _Success) {
-      result.complete(message.value as R);
-    } else if (!result.isCompleted && message is _Failure) {
-      result.completeError(message.error, message.stackTrace);
+    if (message is _BackupIsolateReady) {
+      workerCommandPort = message.commandPort;
+      return;
+    }
+    if (message is _BackupSqliteOpened) {
+      sqliteHandleAddress = message.address;
+      if (killScheduled) {
+        interruptIfOpen();
+      }
+      return;
+    }
+    if (message is _BackupSqliteClosing) {
+      sqliteHandleAddress = 0;
+      workerCommandPort?.send(const _BackupSqliteCloseAck());
+      return;
+    }
+    if (done.isCompleted || timedOut) return;
+    if (message is _BackupIsolateSuccess) {
+      done.complete(message.value as R);
+    } else if (message is _BackupIsolateFailure) {
+      done.completeError(message.error, message.stackTrace);
     }
   });
   final exitSub = exitPort.listen((_) {
     markIsolateExited();
-    if (result.isCompleted) return;
-    if (timeoutRequested) {
-      result.completeError(
+    if (done.isCompleted) return;
+    if (timedOut) {
+      done.completeError(
         BackupIsolateTimeoutException(
           isolateExited: true,
           isolateExit: isolateExit.future,
           duration: timeout,
         ),
       );
-    } else if (cancellationRequested) {
-      result.completeError(
+      return;
+    }
+    if (killScheduled) {
+      done.completeError(
         BackupCancelledException(isolateExit: isolateExit.future),
       );
-    } else {
-      result.completeError(StateError('backup_isolate_exited'));
+      return;
     }
+    exitFallback = Timer(const Duration(milliseconds: 20), () {
+      if (!done.isCompleted) {
+        done.completeError(StateError('backup_isolate_exited'));
+      }
+    });
   });
 
-  void requestCancellation() {
-    if (cancellationRequested) return;
-    cancellationRequested = true;
-    scheduleKill();
-  }
-
-  if (cancelToken != null) {
-    cancelToken.whenCancelled.then((_) => requestCancellation());
-  }
-  if (timeout != null) {
-    timeoutTimer = Timer(timeout, () {
-      timeoutRequested = true;
-      cancelToken?.cancel();
-      requestCancellation();
+  Timer? killTimer;
+  Timer? abandonTimer;
+  void scheduleKill() {
+    interruptIfOpen();
+    killScheduled = true;
+    killTimer ??= Timer(killGrace, () {
+      if (debugSkipBackupIsolateKill) return;
+      isolate.kill(priority: Isolate.immediate);
+    });
+    // 放弃等待那个已经不响应杀掉的线程。
+    //
+    // 这里必须让 done 有个结果，否则调用方会被一个永远不退出的隔离线程
+    // 吊死；而抛出的异常带上 isolateExited 与 isolateExit，让上层据此把
+    // 临时目录的删除推迟到线程真正退出之后。
+    abandonTimer ??= Timer(killGrace + isolateExitDeadline, () {
+      if (done.isCompleted) return;
+      if (timedOut) {
+        done.completeError(
+          BackupIsolateTimeoutException(
+            isolateExited: isolateHasExited,
+            isolateExit: isolateExit.future,
+            duration: timeout,
+          ),
+        );
+        return;
+      }
+      done.completeError(
+        BackupCancelledException(
+          isolateExited: isolateHasExited,
+          isolateExit: isolateExit.future,
+        ),
+      );
     });
   }
-  if (cancellationRequested) scheduleKill();
+
+  Timer? timeoutTimer;
+  if (timeout != null) {
+    timeoutTimer = Timer(timeout, () {
+      timedOut = true;
+      cancelToken?.cancel();
+      scheduleKill();
+    });
+  }
+
+  if (cancelToken != null && cancelToken.isCancelled) {
+    scheduleKill();
+  }
+  final cancelSub = cancelToken?.whenCancelled.asStream().listen((_) {
+    scheduleKill();
+  });
 
   try {
-    return await result.future;
+    return await done.future;
   } finally {
     timeoutTimer?.cancel();
     killTimer?.cancel();
     abandonTimer?.cancel();
+    exitFallback?.cancel();
+    await cancelSub?.cancel();
     await progressSub.cancel();
     progressPort.close();
     if (isolateHasExited) {
       await controlSub.cancel();
-      await exitSub.cancel();
       controlPort.close();
+      await exitSub.cancel();
       exitPort.close();
     } else {
       unawaited(
         isolateExit.future.whenComplete(() async {
           await controlSub.cancel();
-          await exitSub.cancel();
           controlPort.close();
+          await exitSub.cancel();
           exitPort.close();
         }),
       );
@@ -260,47 +333,53 @@ Future<R> runBackupIsolate<R, P>({
 }
 
 @pragma('vm:entry-point')
-void _entry(_SpawnMessage message) async {
+void _backupIsolateEntry(_BackupIsolateSpawnMessage message) async {
   final commandPort = ReceivePort();
-  message.controlPort.send(_Ready(commandPort.sendPort));
-  Completer<void>? closeAck;
-  final commandSub = commandPort.listen((value) {
-    if (value is _SqliteCloseAck) closeAck?.complete();
+  message.controlPort.send(_BackupIsolateReady(commandPort.sendPort));
+  Completer<void>? closingAck;
+  final commandSub = commandPort.listen((incoming) {
+    if (incoming is _BackupSqliteCloseAck) {
+      closingAck?.complete();
+    }
   });
-  final flag = message.cancelCellAddress == null
+  final cancelFlag = message.cancelCellAddress == null
       ? IsolateCancelFlag.disabled()
       : IsolateCancelFlag.fromAddress(message.cancelCellAddress!);
+  final reporter = _ThrottledProgressReporter(message.progressPort);
   final context = BackupIsolateContext(
-    cancelFlag: flag,
-    reportCallback: (update) => message.progressPort.send(update),
-    registerSqliteHandleCallback: (address) =>
-        message.controlPort.send(_SqliteOpened(address)),
-    waitForSqliteCloseCallback: () async {
-      final completer = Completer<void>();
-      closeAck = completer;
-      message.controlPort.send(const _SqliteClosing());
-      await completer.future;
+    cancelFlag: cancelFlag,
+    reportProgress: reporter.report,
+    registerSqliteInterruptHandle: (address) {
+      message.controlPort.send(_BackupSqliteOpened(address));
+    },
+    waitForSqliteCloseAck: () async {
+      final ack = Completer<void>();
+      closingAck = ack;
+      message.controlPort.send(const _BackupSqliteClosing());
+      await ack.future;
     },
   );
   try {
-    final value = await message.body(context, message.payload);
-    message.controlPort.send(_Success(value));
+    final value = await (message.body as dynamic)(context, message.payload);
+    reporter.flush();
+    message.controlPort.send(_BackupIsolateSuccess(value));
   } catch (error, stackTrace) {
-    message.controlPort.send(_Failure(error, stackTrace));
+    reporter.flush();
+    message.controlPort.send(_BackupIsolateFailure(error, stackTrace));
   } finally {
     await commandSub.cancel();
     commandPort.close();
   }
 }
 
-final class _SpawnMessage {
-  const _SpawnMessage(
-    this.progressPort,
-    this.controlPort,
-    this.cancelCellAddress,
-    this.payload,
-    this.body,
-  );
+final class _BackupIsolateSpawnMessage {
+  const _BackupIsolateSpawnMessage({
+    required this.progressPort,
+    required this.controlPort,
+    required this.cancelCellAddress,
+    required this.payload,
+    required this.body,
+  });
 
   final SendPort progressPort;
   final SendPort controlPort;
@@ -309,31 +388,87 @@ final class _SpawnMessage {
   final Function body;
 }
 
-final class _Ready {
-  const _Ready(this.commandPort);
-  final SendPort commandPort;
-}
+final class _BackupIsolateSuccess {
+  const _BackupIsolateSuccess(this.value);
 
-final class _Success {
-  const _Success(this.value);
   final Object? value;
 }
 
-final class _Failure {
-  const _Failure(this.error, this.stackTrace);
+final class _BackupIsolateFailure {
+  const _BackupIsolateFailure(this.error, this.stackTrace);
+
   final Object error;
   final StackTrace stackTrace;
 }
 
-final class _SqliteOpened {
-  const _SqliteOpened(this.address);
+final class _BackupIsolateReady {
+  const _BackupIsolateReady(this.commandPort);
+
+  final SendPort commandPort;
+}
+
+final class _BackupSqliteOpened {
+  const _BackupSqliteOpened(this.address);
+
   final int address;
 }
 
-final class _SqliteClosing {
-  const _SqliteClosing();
+final class _BackupSqliteClosing {
+  const _BackupSqliteClosing();
 }
 
-final class _SqliteCloseAck {
-  const _SqliteCloseAck();
+final class _BackupSqliteCloseAck {
+  const _BackupSqliteCloseAck();
+}
+
+final class _ThrottledProgressReporter {
+  _ThrottledProgressReporter(this._port) {
+    _elapsed.start();
+  }
+
+  static const _minIntervalMs = 100;
+
+  final SendPort _port;
+  final Stopwatch _elapsed = Stopwatch();
+  int? _lastEmitMs;
+  BackupPhase? _lastPhase;
+  int? _lastTotal;
+  BackupProgress? _pending;
+  var _emittedPhaseFinal = false;
+
+  void report(BackupProgress progress) {
+    final nowMs = _elapsed.elapsedMilliseconds;
+    final phaseChanged = progress.phase != _lastPhase;
+    if (phaseChanged) {
+      _emittedPhaseFinal = false;
+    }
+    final becameIndeterminate = progress.total == null && _lastTotal != null;
+    final reachedEnd =
+        progress.total != null && progress.processed >= progress.total!;
+    final isFinal = reachedEnd && !_emittedPhaseFinal;
+    final due = _lastEmitMs == null || nowMs - _lastEmitMs! >= _minIntervalMs;
+    if (phaseChanged || isFinal || due || becameIndeterminate) {
+      if (reachedEnd) {
+        _emittedPhaseFinal = true;
+      }
+      _emit(progress, nowMs);
+    } else {
+      _pending = progress;
+    }
+  }
+
+  void flush() {
+    final pending = _pending;
+    if (pending != null) {
+      _emit(pending, _elapsed.elapsedMilliseconds);
+    }
+  }
+
+  void _emit(BackupProgress progress, int nowMs) {
+    _pending = null;
+    _lastEmitMs = nowMs;
+    _lastPhase = progress.phase;
+    _lastTotal = progress.total;
+    _port.send(progress);
+  }
 }

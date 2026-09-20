@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../database/backup_portability.dart';
 import '../../database/business_settings_router.dart';
 
 /// 由备份预检和业务数据恢复共享的纯校验。
@@ -60,7 +61,10 @@ final class BackupSettingsValidator {
   static bool isDiscarded(String key) =>
       BusinessKeyRegistry.classify(key) == BusinessKeyDisposition.discarded;
 
-  static bool shouldIgnore(String key) => isLocalOnly(key) || isDiscarded(key);
+  static bool shouldIgnore(String key) =>
+      isLocalOnly(key) ||
+      isDiscarded(key) ||
+      BackupPortability.devicePreferenceKeys.contains(key);
 
   static void normalizeAndValidate(Map<String, dynamic> data) {
     normalizeLegacyStringLists(data);

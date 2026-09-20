@@ -6,7 +6,9 @@ import 'package:provider/provider.dart';
 import '../../core/models/tool_schema_override.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/services/tools/built_in_tool_catalog.dart';
-import '../../features/settings/widgets/tool_schema_widgets.dart';
+import '../../features/home/services/local_tools_service.dart';
+import '../../features/settings/widgets/tool_schema_editor_form.dart';
+import '../../features/settings/widgets/tool_schema_ui.dart';
 import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
 import '../../shared/widgets/ios_tile_button.dart';
@@ -25,6 +27,14 @@ class _DesktopToolSchemasPaneState extends State<DesktopToolSchemasPane> {
   SettingsProvider? _settings;
 
   @override
+  void initState() {
+    super.initState();
+    DeviceLocalTools.prefetchIosCapabilities().then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _settings = context.read<SettingsProvider>();
@@ -36,10 +46,12 @@ class _DesktopToolSchemasPaneState extends State<DesktopToolSchemasPane> {
     super.dispose();
   }
 
-  Future<void> _resetAll() async {
-    if (!await confirmResetAllToolSchemas(context) || !mounted) return;
+  Future<void> _confirmResetAll(BuildContext context) async {
+    final confirmed = await confirmResetAllToolSchemas(context);
+    if (!confirmed || !context.mounted) return;
     await context.read<SettingsProvider>().resetAllToolSchemaOverrides();
-    if (mounted) setState(() => _formEpoch++);
+    if (!mounted) return;
+    setState(() => _formEpoch++);
   }
 
   @override
@@ -51,11 +63,13 @@ class _DesktopToolSchemasPaneState extends State<DesktopToolSchemasPane> {
       lang: settings.resolvedMemoryPromptLang,
       legacyMemoryMode: settings.legacyMemoryMode,
     );
-    if (catalog.isEmpty) return const SizedBox.shrink();
-    final selectedName = catalog.any((entry) => entry.name == _selectedName)
+    if (catalog.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final selectedName = catalog.any((e) => e.name == _selectedName)
         ? _selectedName!
         : catalog.first.name;
-    final selected = catalog.firstWhere((entry) => entry.name == selectedName);
+    final selected = catalog.firstWhere((e) => e.name == selectedName);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -71,6 +85,7 @@ class _DesktopToolSchemasPaneState extends State<DesktopToolSchemasPane> {
                     l10n.toolSchemaSettingsPageTitle,
                     style: TextStyle(
                       fontSize: 14,
+                      fontWeight: AppFontWeights.regular,
                       color: cs.onSurface.withValues(alpha: 0.9),
                     ),
                   ),
@@ -83,7 +98,7 @@ class _DesktopToolSchemasPaneState extends State<DesktopToolSchemasPane> {
                     vertical: 6,
                   ),
                   fontSize: 13,
-                  onTap: _resetAll,
+                  onTap: () => _confirmResetAll(context),
                 ),
               ],
             ),
@@ -99,14 +114,14 @@ class _DesktopToolSchemasPaneState extends State<DesktopToolSchemasPane> {
                     padding: const EdgeInsets.only(right: 8),
                     children: [
                       for (final group in BuiltInToolGroup.values)
-                        ..._groupWidgets(
+                        ..._groupTiles(
                           context,
-                          group,
-                          catalog
-                              .where((entry) => entry.group == group)
+                          group: group,
+                          entries: catalog
+                              .where((e) => e.group == group)
                               .toList(),
-                          selectedName,
-                          settings.toolSchemaOverrides,
+                          selectedName: selectedName,
+                          overrides: settings.toolSchemaOverrides,
                         ),
                     ],
                   ),
@@ -120,10 +135,12 @@ class _DesktopToolSchemasPaneState extends State<DesktopToolSchemasPane> {
                       defaultDefinition: selected.defaultDefinition,
                       initialOverride:
                           settings.toolSchemaOverrides[selected.name],
-                      onChanged: (value) => settings.setToolSchemaOverrideLive(
-                        selected.name,
-                        value,
-                      ),
+                      onChanged: (value) {
+                        settings.setToolSchemaOverrideLive(
+                          selected.name,
+                          value,
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -135,22 +152,23 @@ class _DesktopToolSchemasPaneState extends State<DesktopToolSchemasPane> {
     );
   }
 
-  List<Widget> _groupWidgets(
-    BuildContext context,
-    BuiltInToolGroup group,
-    List<BuiltInToolCatalogEntry> entries,
-    String selectedName,
-    Map<String, ToolSchemaOverride> overrides,
-  ) {
-    if (entries.isEmpty) return const <Widget>[];
+  List<Widget> _groupTiles(
+    BuildContext context, {
+    required BuiltInToolGroup group,
+    required List<BuiltInToolCatalogEntry> entries,
+    required String selectedName,
+    required Map<String, ToolSchemaOverride> overrides,
+  }) {
+    if (entries.isEmpty) return const [];
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final title = switch (group) {
       BuiltInToolGroup.search => l10n.toolSchemaSettingsGroupSearch,
       BuiltInToolGroup.memory => l10n.toolSchemaSettingsGroupMemory,
       BuiltInToolGroup.local => l10n.toolSchemaSettingsGroupLocal,
+      BuiltInToolGroup.workspace => l10n.workspacesTitle,
     };
-    return <Widget>[
+    return [
       Padding(
         padding: const EdgeInsets.fromLTRB(10, 12, 10, 6),
         child: Text(
@@ -169,6 +187,7 @@ class _DesktopToolSchemasPaneState extends State<DesktopToolSchemasPane> {
             l10n.toolSchemaSettingsMemoryLangNote,
             style: TextStyle(
               fontSize: 11,
+              height: 1.35,
               color: cs.onSurface.withValues(alpha: 0.5),
             ),
           ),
@@ -180,8 +199,8 @@ class _DesktopToolSchemasPaneState extends State<DesktopToolSchemasPane> {
             entry: entry,
             schemaOverride: overrides[entry.name],
             selected: entry.name == selectedName,
-            compact: true,
             showChevron: false,
+            compact: true,
             onTap: () {
               unawaited(_settings?.flushPendingToolSchemaOverridePersist());
               setState(() => _selectedName = entry.name);

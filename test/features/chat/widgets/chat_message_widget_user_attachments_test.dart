@@ -6,11 +6,20 @@ import 'package:Kelivo/core/providers/user_provider.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
+import 'package:Kelivo/utils/safe_resize_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+/// 渲染层会用 [SafeResizeImage] 包一层做有界解码（避免大图 OOM）。
+/// 断言图片类型时要解开这一层，看内层真正的 provider。
+T? _innerProvider<T extends ImageProvider>(Image image) {
+  final provider = image.image;
+  final inner = provider is SafeResizeImage ? provider.imageProvider : provider;
+  return inner is T ? inner : null;
+}
 
 Widget _harness(Widget child) {
   return MultiProvider(
@@ -269,8 +278,10 @@ void main() {
     final image = tester.widget<Image>(
       find.descendant(of: imageFinder, matching: find.byType(Image)),
     );
-    expect(image.image, isA<NetworkImage>());
-    expect((image.image as NetworkImage).url, 'https://example.com/second.png');
+    expect(
+      _innerProvider<NetworkImage>(image)?.url,
+      'https://example.com/second.png',
+    );
   });
 
   testWidgets('http ImagePart 使用 Image.network 而不是 Image.file', (tester) async {
@@ -294,8 +305,8 @@ void main() {
     );
 
     final image = tester.widget<Image>(find.byType(Image));
-    expect(image.image, isA<NetworkImage>());
-    expect(image.image, isNot(isA<FileImage>()));
+    expect(_innerProvider<NetworkImage>(image), isA<NetworkImage>());
+    expect(_innerProvider<FileImage>(image), isNull);
   });
 
   testWidgets('tapping https FilePart launches external URL', (tester) async {

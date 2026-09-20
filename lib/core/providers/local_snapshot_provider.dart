@@ -5,7 +5,8 @@ import 'package:flutter/foundation.dart';
 
 import '../database/business_preferences.dart';
 import '../database/business_repository.dart';
-import '../models/backup_task_progress.dart';
+import '../services/backup/backup_cancel_token.dart';
+import '../services/backup/backup_task_progress.dart';
 import '../services/backup/data_sync.dart';
 import '../services/backup/local_copy_catalog.dart';
 import '../services/backup/local_snapshot_schedule.dart';
@@ -168,7 +169,7 @@ class LocalSnapshotProvider extends ChangeNotifier {
     () => _dataSync.restoreFromLocalFile(
       archive,
       LocalSnapshotService.archiveConfig,
-      onProgress: adaptBackupProgressSink(onProgress),
+      onProgress: onProgress,
       cancelToken: cancelToken,
     ),
   );

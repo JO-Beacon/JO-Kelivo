@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/providers/external_mounts_provider.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:drift/drift.dart' show Value;
@@ -13,6 +14,7 @@ import '../../../core/models/instruction_injection.dart';
 import '../../../core/models/memory_entry.dart';
 import '../../../core/models/world_book.dart';
 import '../../../core/providers/memory_provider.dart';
+import '../../../core/providers/environment_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -23,7 +25,12 @@ import '../../../core/services/logging/context_log_models.dart';
 import '../../../core/services/logging/context_logger.dart';
 import '../../../core/services/memory/memory_block_builder.dart';
 import '../../../core/services/memory/memory_prompts.dart';
+import '../../../core/models/skills_binding.dart';
+import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/search/search_tool_service.dart';
+import '../../../core/services/skills/skills_service.dart';
+import '../../../core/services/workspace/workspace_runtime.dart';
+import '../../../core/services/workspace/workspace_tools_service.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
@@ -598,6 +605,7 @@ class MessageBuilderService {
     Conversation? conversation,
     List<ChatMessage>? sourceMessages,
     bool sandboxDataFiles = false,
+    Map<String, AttachmentInfo> workspaceAttachments = const {},
   }) {
     final ocrActive =
         settings.ocrEnabled &&
@@ -627,6 +635,7 @@ class MessageBuilderService {
           if (path.isNotEmpty) mediaPaths.add(path);
           continue;
         }
+        if (workspaceAttachments.containsKey(document.path)) continue;
         if (sandboxDataFiles &&
             isSandboxDataFile(fileName: document.fileName, mime: mime)) {
           continue;
@@ -653,6 +662,7 @@ class MessageBuilderService {
     Conversation? conversation,
     List<ChatMessage>? sourceMessages,
     bool sandboxDataFiles = false,
+    Map<String, AttachmentInfo> workspaceAttachments = const {},
   }) async {
     final bool ocrActive =
         settings.ocrEnabled &&
@@ -765,7 +775,7 @@ class MessageBuilderService {
       try {
         final text = await DocumentTextExtractor.extractResolved(
           path: resolvedPath,
-          mime: d.mime,
+          mime: _effectiveAttachmentMime(d),
         );
         // 仅在有文件状态时缓存；否则避免过期数据。
         if (stat != null) {
@@ -776,6 +786,8 @@ class MessageBuilderService {
           );
         }
         return text;
+      } on AttachmentRequiresWorkspace {
+        throw AttachmentRequiresWorkspace(d.fileName);
       } catch (_) {
         if (stat != null) {
           _docTextCache[resolvedPath] = _DocTextCacheEntry(
@@ -808,6 +820,23 @@ class MessageBuilderService {
       final parsedUser = chatMessageForParts != null
           ? parseInputFromMessage(chatMessageForParts)
           : parseInputFromApiMap(apiMessages[i]);
+      final hasWorkspaceDocuments = parsedUser.documents.any(
+        (d) => workspaceAttachments.containsKey(d.path),
+      );
+      // 本地工作区已经持有这些文档。不要再把它们额外
+      // 上传到提供方的代码执行沙盒。
+      if (hasWorkspaceDocuments) {
+        final remaining = parseInternalDocumentRefs(
+          apiMessages[i][multimodalInternalDocumentPathsKey],
+        ).where((ref) => !workspaceAttachments.containsKey(ref.uri)).toList();
+        if (remaining.isEmpty) {
+          apiMessages[i].remove(multimodalInternalDocumentPathsKey);
+        } else {
+          apiMessages[i][multimodalInternalDocumentPathsKey] = remaining
+              .map(encodeInternalDocumentRef)
+              .toList();
+        }
+      }
       final videoPaths = <String>{
         for (final d in parsedUser.documents)
           if (isVideoMime(_effectiveAttachmentMime(d))) d.path.trim(),
@@ -900,16 +929,8 @@ class MessageBuilderService {
       // 记录没有 sourceContentHash，或消息 parts 已被覆盖编辑时，走重建路径。
       final existing = frozenPrompts?[revisionId];
       final currentSourceHash = chatMessageForParts?.semanticContentHash;
-      final hasSandboxDataFiles =
-          sandboxDataFiles &&
-          parsedUser.documents.any(
-            (document) => isSandboxDataFile(
-              fileName: document.fileName,
-              mime: _effectiveAttachmentMime(document),
-            ),
-          );
-      if (!hasSandboxDataFiles &&
-          existing != null &&
+      // 切换沙盒只影响尚未发送的附件，不能改写已经发送过的历史内容。
+      if (existing != null &&
           currentSourceHash != null &&
           existing.sourceContentHash == currentSourceHash) {
         final sendPayload = _legacyAwareFrozenPayload(
@@ -946,6 +967,16 @@ class MessageBuilderService {
       final filePrompts = StringBuffer();
       var leftToSandbox = false;
       for (final d in parsedUser.documents) {
+        final local = workspaceAttachments[d.path];
+        if (local != null) {
+          leftToSandbox = true;
+          filePrompts.writeln('Attached file: ${d.fileName}');
+          filePrompts.writeln('Path: ${local.modelPath} (${local.size} bytes)');
+          filePrompts.writeln(
+            'Use workspace file tools to inspect it as needed.',
+          );
+          continue;
+        }
         final effectiveMime = _effectiveAttachmentMime(d);
         if (isVideoMime(effectiveMime) || isAudioMime(effectiveMime)) {
           continue;
@@ -1507,7 +1538,8 @@ class MessageBuilderService {
   /// 的纯函数，不得随记忆内容或时钟变化（§11.1）。
   /// 其余系统注入的相对顺序由调用方保持：
   /// （`injectSystemPrompt` → 此方法 → `injectSearchPrompt` →
-  /// `injectInstructionPrompts` → `injectWorldBookPrompts`）。
+  /// `injectInstructionPrompts` → `injectWorldBookPrompts` →
+  /// `injectWorkspacePrompt` → `injectSkillsPrompt`）。
   Future<void> injectMemoryAndRecentChats(
     List<Map<String, dynamic>> apiMessages,
     Assistant? assistant, {
@@ -1677,6 +1709,79 @@ class MessageBuilderService {
     } catch (_) {}
   }
 
+  /// 在其他系统注入之后注入工作区路径／工具提示。
+  Future<void> injectWorkspacePrompt(
+    List<Map<String, dynamic>> apiMessages,
+    Assistant? assistant, {
+    String? conversationId,
+    WorkspaceToolContext? workspaceContext,
+    List<AttachmentInfo> attachments = const [],
+  }) async {
+    try {
+      final environmentProvider = contextProvider.read<EnvironmentProvider?>();
+      final ctx =
+          workspaceContext ??
+          await WorkspaceToolsService.resolve(
+            externalMounts: contextProvider.read<ExternalMountsProvider?>(),
+            conversationId: conversationId,
+            workspaceProvider: contextProvider.read<WorkspaceProvider>(),
+            runtimeProvider: contextProvider.read<WorkspaceRuntimeProvider>(),
+            chatService: chatService,
+          );
+      if (ctx == null) return;
+      final environment = await environmentProvider?.loadExecutionConfig();
+      final fragment = WorkspaceToolsService.buildPromptFragment(
+        ctx,
+        attachments: attachments,
+        environmentVariableNames: environment?.variables.keys ?? const [],
+      );
+      if (fragment.trim().isEmpty) return;
+      _appendToSystemMessage(
+        apiMessages,
+        fragment,
+        source: ContextSource.instructionInjection,
+      );
+    } catch (_) {}
+  }
+
+  /// 在工作区提示之后注入 `<available_skills>` 列表。
+  Future<void> injectSkillsPrompt(
+    List<Map<String, dynamic>> apiMessages,
+    Assistant? assistant, {
+    String? conversationId,
+    WorkspaceToolContext? workspaceContext,
+  }) async {
+    try {
+      final skillsService = contextProvider.read<SkillsService>();
+      await skillsService.loaded;
+      List<String>? override;
+      if (conversationId != null && conversationId.isNotEmpty) {
+        final conversation = chatService.getConversation(conversationId);
+        if (conversation != null) {
+          override = SkillsBinding.fromExtras(conversation.extras).skillIds;
+        }
+      }
+      final skills = skillsService.resolveForAssistant(
+        assistant,
+        conversationOverride: override,
+      );
+      if (skills.isEmpty) return;
+      final skillsModelRoot =
+          workspaceContext?.paths.modelSkillsDir ?? '/skills';
+      final fragment = buildAvailableSkillsFragment(
+        skills,
+        skillsModelRoot: skillsModelRoot,
+      );
+      if (fragment.trim().isEmpty) return;
+      _appendToSystemMessage(
+        apiMessages,
+        fragment,
+        source: ContextSource.instructionInjection,
+      );
+    } catch (_) {}
+  }
+
+  /// 将 World Book（世界书）条目注入 apiMessages。
   /// 将 WorldBook（世界书）条目注入 apiMessages。
   Future<void> injectWorldBookPrompts(
     List<Map<String, dynamic>> apiMessages,

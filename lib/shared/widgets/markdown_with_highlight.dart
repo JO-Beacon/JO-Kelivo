@@ -38,6 +38,8 @@ import 'package:Kelivo/theme/theme_factory.dart' show getPlatformFontFallback;
 import 'package:provider/provider.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import '../../core/providers/settings_provider.dart';
+import '../../core/services/workspace/file_link_resolver.dart';
+import '../../features/workspace/workspace_file_navigation.dart';
 import 'package:Kelivo/desktop/html_preview_dialog.dart';
 import '../cache/byte_lru_cache.dart';
 import 'incremental_markdown_document.dart';
@@ -97,9 +99,11 @@ class MarkdownWithCodeHighlight extends StatefulWidget {
     this.citationIndexResolver,
     this.baseStyle,
     this.streaming = false,
+    this.conversationId,
   });
 
   final String text;
+  final String? conversationId;
   final void Function(String id)? onCitationTap;
 
   /// 使用所在消息的搜索工具结果，将引用 id（来自 `[cite:id]` 标记）
@@ -428,6 +432,14 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
         components: [DetailsHtmlMd(detailsRegistry), ...components],
         inlineComponents: inlineComponents,
         imageBuilder: (ctx, url, width, height) {
+          if (KelivoLink.tryParse(url) != null) {
+            return _KelivoMarkdownImage(
+              url: url,
+              width: width,
+              height: height,
+              conversationId: widget.conversationId,
+            );
+          }
           final imgs = imageUrls.isNotEmpty ? imageUrls : <String>[url];
           final idx = imgs.indexOf(url);
           final initial = idx >= 0 ? idx : 0;
@@ -784,6 +796,15 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
   }
 
   Future<void> _handleLinkTap(BuildContext context, String url) async {
+    final kelivo = KelivoLink.tryParse(_stripFormatChars(url));
+    if (kelivo != null) {
+      await openWorkspaceLinkedFile(
+        context,
+        _stripFormatChars(url),
+        conversationId: widget.conversationId,
+      );
+      return;
+    }
     Uri uri;
     try {
       uri = _normalizeUrl(url);
@@ -813,6 +834,121 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
       u = 'https://$u';
     }
     return Uri.parse(u);
+  }
+}
+
+class _KelivoMarkdownImage extends StatefulWidget {
+  const _KelivoMarkdownImage({
+    required this.url,
+    this.width,
+    this.height,
+    this.conversationId,
+  });
+
+  final String url;
+  final double? width;
+  final double? height;
+  final String? conversationId;
+
+  @override
+  State<_KelivoMarkdownImage> createState() => _KelivoMarkdownImageState();
+}
+
+class _KelivoMarkdownImageState extends State<_KelivoMarkdownImage> {
+  Future<File?>? _future;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _future ??= _resolve();
+  }
+
+  @override
+  void didUpdateWidget(covariant _KelivoMarkdownImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url ||
+        oldWidget.conversationId != widget.conversationId) {
+      _future = _resolve();
+    }
+  }
+
+  Future<File?> _resolve() async {
+    final link = KelivoLink.tryParse(widget.url);
+    if (link == null) return null;
+    return resolveWorkspaceLinkedFile(
+      context,
+      widget.url,
+      conversationId: widget.conversationId,
+    );
+  }
+
+  Widget _broken(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return SizedBox(
+      width: widget.width ?? 36,
+      height: widget.height ?? 36,
+      child: Center(
+        child: Icon(
+          Lucide.ImageOff,
+          size: 22,
+          color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<File?>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return SizedBox(
+            width: widget.width ?? 36,
+            height: widget.height ?? 36,
+            child: const Center(
+              child: SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          );
+        }
+        final file = snapshot.data;
+        if (file == null) return _broken(context);
+        return GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              PageRouteBuilder<void>(
+                pageBuilder: (_, __, ___) =>
+                    ImageViewerPage(images: [file.path]),
+                transitionDuration: const Duration(milliseconds: 360),
+                reverseTransitionDuration: const Duration(milliseconds: 280),
+                transitionsBuilder: (context, anim, sec, child) {
+                  final curved = CurvedAnimation(
+                    parent: anim,
+                    curve: Curves.easeOutCubic,
+                    reverseCurve: Curves.easeInCubic,
+                  );
+                  return FadeTransition(opacity: curved, child: child);
+                },
+              ),
+            );
+          },
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.file(
+              file,
+              width: widget.width,
+              height: widget.height,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stack) => _broken(context),
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -2327,6 +2463,23 @@ int _findMatchingOpenBracket(String tex, int close) {
   return -1;
 }
 
+String _stripFormatChars(String input) {
+  return input.replaceAll(RegExp(r'[\u200B\u200C\u200D\uFEFF]'), '');
+}
+
+String _softBreakLongTableTokens(String input) {
+  return input.replaceAllMapped(
+    RegExp(r'[^\s/\\-_]{22,}'),
+    (match) => _insertSoftBreaks(match.group(0)!, every: 18),
+  );
+}
+
+String _softBreakInline(String input) {
+  // 为包含长 token 的行内代码段插入零宽换行机会。
+  if (input.length < 60) return input;
+  return _insertSoftBreaks(input, every: 24);
+}
+
 /// 每隔 [every] 个 UTF-16 码元插入一个零宽空格（U+200B），
 /// 但绝不插在代理对的两半之间（否则字符串不合法，`Paragraph.addText` 会抛异常）。
 @visibleForTesting
@@ -2345,19 +2498,6 @@ String _insertSoftBreaks(String value, {required int every}) {
     }
   }
   return buffer.toString();
-}
-
-String _softBreakLongTableTokens(String input) {
-  return input.replaceAllMapped(
-    RegExp(r'[^\s/\\-_]{22,}'),
-    (match) => _insertSoftBreaks(match.group(0)!, every: 18),
-  );
-}
-
-String _softBreakInline(String input) {
-  // 为包含长 token 的行内代码段插入零宽换行机会。
-  if (input.length < 60) return input;
-  return _insertSoftBreaks(input, every: 24);
 }
 
 List<String> _extractImageUrls(String md) {

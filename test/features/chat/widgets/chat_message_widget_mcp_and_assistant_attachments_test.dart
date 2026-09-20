@@ -9,10 +9,20 @@ import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart'
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/utils/safe_resize_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+/// 渲染层会用 [SafeResizeImage] / [ResizeImage] 包一层做有界解码。
+/// 断言图片类型时解开这一层，看内层真正的 provider。
+T? _innerProvider<T extends ImageProvider>(Image image) {
+  var provider = image.image;
+  if (provider is SafeResizeImage) provider = provider.imageProvider;
+  if (provider is ResizeImage) provider = provider.imageProvider;
+  return provider is T ? provider : null;
+}
 
 Widget _harness(Widget child, {SettingsProvider? settings}) {
   final effectiveSettings =
@@ -126,8 +136,8 @@ more text
     expect(
       images.any(
         (image) =>
-            image.image is NetworkImage &&
-            (image.image as NetworkImage).url == 'https://example.com/mcp.png',
+            _innerProvider<NetworkImage>(image)?.url ==
+            'https://example.com/mcp.png',
       ),
       isTrue,
     );
@@ -207,9 +217,8 @@ more text
     expect(
       sheetImages.any(
         (image) =>
-            image.image is NetworkImage &&
-            (image.image as NetworkImage).url ==
-                'https://example.com/detail.png',
+            _innerProvider<NetworkImage>(image)?.url ==
+            'https://example.com/detail.png',
       ),
       isTrue,
     );
@@ -237,9 +246,8 @@ more text
     expect(
       images.any(
         (image) =>
-            image.image is NetworkImage &&
-            (image.image as NetworkImage).url ==
-                'https://example.com/tool-role.png',
+            _innerProvider<NetworkImage>(image)?.url ==
+            'https://example.com/tool-role.png',
       ),
       isTrue,
     );
@@ -309,26 +317,25 @@ more text
       findsOneWidget,
     );
 
-    final fileFinder = find.byKey(
-      const ValueKey('assistant-message-attachment:$messageId:1'),
-    );
-    final imageFinder = find.byKey(
-      const ValueKey('assistant-message-attachment:$messageId:2'),
-    );
-    expect(fileFinder, findsOneWidget);
-    expect(imageFinder, findsOneWidget);
+    // 助手消息的附件条只放文件类附件（序号是附件条内的次序）；
+    // 图片走时间线上的内联图片，不占附件条。
     expect(
-      tester.getRect(fileFinder).left,
-      lessThan(tester.getRect(imageFinder).left),
+      find.byKey(const ValueKey('assistant-message-attachment:$messageId:0')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('assistant-message-attachment:$messageId:1')),
+      findsNothing,
     );
 
-    final image = tester.widget<Image>(
-      find.descendant(of: imageFinder, matching: find.byType(Image)),
-    );
-    expect(image.image, isA<NetworkImage>());
+    final images = tester.widgetList<Image>(find.byType(Image)).toList();
     expect(
-      (image.image as NetworkImage).url,
-      'https://example.com/assistant.png',
+      images.any(
+        (image) =>
+            _innerProvider<NetworkImage>(image)?.url ==
+            'https://example.com/assistant.png',
+      ),
+      isTrue,
     );
 
     final align = tester.widget<Align>(attachmentsFinder);
@@ -359,6 +366,6 @@ more text
     await tester.pump();
 
     final image = tester.widget<Image>(find.byType(Image));
-    expect(image.image, isA<MemoryImage>());
+    expect(_innerProvider<MemoryImage>(image), isA<MemoryImage>());
   });
 }

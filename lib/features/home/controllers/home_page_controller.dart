@@ -1,4 +1,7 @@
+import '../../../core/services/scheduled_tasks_service.dart';
+import '../../scheduled_tasks/scheduled_task_runner.dart';
 import 'dart:async';
+import 'package:flutter/foundation.dart' show listEquals, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -10,6 +13,8 @@ import '../../../core/database/business_preferences.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/conversation_tree.dart';
+import '../../../core/models/workspace_binding.dart';
+import '../../../core/providers/workspace_provider.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -23,6 +28,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/tts/tts_text_selection.dart';
 import '../../../core/services/haptics.dart';
 import '../../../core/services/notification_service.dart';
+import '../../../core/services/mobile_background.dart';
 import '../../../core/services/screen_wakelock.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -52,6 +58,7 @@ import '../services/chat_read_position_store.dart';
 import '../services/chat_sidebar_state_store.dart';
 import '../utils/chat_layout_constants.dart';
 import '../widgets/chat_input_bar.dart';
+import '../widgets/share_destination_sheet.dart';
 import '../../model/widgets/model_select_sheet.dart';
 
 enum ChatSelectionMode { share, delete }
@@ -84,7 +91,6 @@ class HomePageController extends ChangeNotifier {
     required ChatInputBarController mediaController,
     required ScrollController scrollController,
     bool? isAndroidOverride,
-    ChatCompletionNotificationSender? chatCompletionNotificationSender,
     ChatReadPositionStore? readPositionStore,
   }) : this._(
          context,
@@ -97,9 +103,6 @@ class HomePageController extends ChangeNotifier {
          scrollController,
          readPositionStore,
          isAndroid: isAndroidOverride ?? PlatformUtils.isAndroid,
-         chatCompletionNotificationSender:
-             chatCompletionNotificationSender ??
-             NotificationService.showChatCompleted,
        );
 
   HomePageController._(
@@ -113,7 +116,6 @@ class HomePageController extends ChangeNotifier {
     this._scrollController,
     this._readPositionStore, {
     required this._isAndroid,
-    required this._chatCompletionNotificationSender,
   }) {
     _initialize();
   }
@@ -130,7 +132,6 @@ class HomePageController extends ChangeNotifier {
   final TextEditingController _inputController;
   final ChatInputBarController _mediaController;
   final bool _isAndroid;
-  final ChatCompletionNotificationSender _chatCompletionNotificationSender;
   ScrollController _scrollController;
   final ChatReadPositionStore? _readPositionStore;
   ChatSidebarStateStore? _sidebarStateStore;
@@ -227,8 +228,7 @@ class HomePageController extends ChangeNotifier {
   // 桌面端拖放
   bool _isDragHovering = false;
 
-  // 应用和路由可见性用于避免当前可见会话重复收到完成通知。
-  bool _appInForeground = true;
+  // 首页路由是否可见：可见时当前会话不必再发完成通知。
   bool _homeRouteVisible = true;
   bool _chatInitialized = false;
   bool _openingNotificationConversation = false;
@@ -243,6 +243,9 @@ class HomePageController extends ChangeNotifier {
 
   // 抽屉状态
   double _lastDrawerValue = 0.0;
+
+  /// 从通知或定时任务记录打开会话时，通知 UI 把会话显示出来。
+  VoidCallback? onRevealConversation;
 
   // 桌面端全局搜索模式
   bool _isGlobalSearchMode = false;
@@ -429,8 +432,6 @@ class HomePageController extends ChangeNotifier {
 
   QueuedChatInput? get currentQueuedInput => _viewModel.currentQueuedInput;
 
-  ValueNotifier<bool> get isProcessingFiles => _viewModel.isProcessingFiles;
-
   ValueNotifier<String?> get processingFilesMessageId =>
       _viewModel.processingFilesMessageId;
 
@@ -529,6 +530,7 @@ class HomePageController extends ChangeNotifier {
           _context.read<SettingsProvider>().imageCropperEnabled,
       getImageCompressConfig: () =>
           _context.read<SettingsProvider>().resolveImageCompressConfig(),
+      hasWorkspace: () => hasWorkspace,
     );
     _messageBuilderService = MessageBuilderService(
       chatService: _chatService,
@@ -782,7 +784,17 @@ class HomePageController extends ChangeNotifier {
   }
 
   void _setupNotificationActions() {
-    if (!_isAndroid) return;
+    if (!_isAndroid &&
+        !const {
+          TargetPlatform.iOS,
+          TargetPlatform.macOS,
+          TargetPlatform.windows,
+          TargetPlatform.linux,
+        }.contains(defaultTargetPlatform)) {
+      return;
+    }
+    MobileBackgroundCoordinator.instance.visibleConversation =
+        _visibleBackgroundConversation;
     _notificationTapSub = NotificationService.conversationTaps.listen(
       _handleNotificationConversationTap,
     );
@@ -793,8 +805,21 @@ class HomePageController extends ChangeNotifier {
     }
   }
 
+  String? _visibleBackgroundConversation() =>
+      _context.mounted && _homeRouteVisible ? currentConversation?.id : null;
+
   void _handleNotificationConversationTap(String conversationId) {
     _pendingNotificationConversationId = conversationId;
+    if (_context.mounted) {
+      final homeRoute = ModalRoute.of(_context);
+      if (homeRoute != null && !homeRoute.isCurrent) {
+        Navigator.of(_context).popUntil(
+          (route) =>
+              route == homeRoute ||
+              route.popDisposition == RoutePopDisposition.doNotPop,
+        );
+      }
+    }
     unawaited(_openPendingNotificationConversation());
   }
 
@@ -816,6 +841,7 @@ class HomePageController extends ChangeNotifier {
           _pendingNotificationConversationId = conversationId;
           break;
         }
+        onRevealConversation?.call();
         await switchConversationAnimated(conversationId);
       }
     } catch (error) {
@@ -931,6 +957,17 @@ class HomePageController extends ChangeNotifier {
         }
       }
       _chatInitialized = true;
+      if (ScheduledTasksService.supported) {
+        final executor = _scheduledExecutor =
+            (task, cancellation, onConversation) => runScheduledTask(
+              _context,
+              _viewModel,
+              task,
+              cancellation,
+              onConversation,
+            );
+        unawaited(ScheduledTasksService.instance.attach(executor));
+      }
     } finally {
       _startupConversationPending = false;
       notifyListeners();
@@ -1016,12 +1053,34 @@ class HomePageController extends ChangeNotifier {
   // 公共方法 - 消息操作
   // ============================================================================
 
+  bool get hasWorkspace {
+    final provider = _context.read<WorkspaceProvider?>();
+    return provider != null &&
+        WorkspaceBinding.extrasHaveWorkspace(
+          currentConversation?.extras,
+          (id) => provider.byId(id) != null,
+        );
+  }
+
   Future<ChatInputSubmissionResult> sendMessage(ChatInputData input) async {
     final content = input.text.trim();
     if (content.isEmpty &&
         input.imagePaths.isEmpty &&
         input.documents.isEmpty) {
       return ChatInputSubmissionResult.rejected;
+    }
+    if (!hasWorkspace) {
+      for (final file in input.documents) {
+        if (FileUploadService.supportsWithoutWorkspace(file)) continue;
+        showAppSnackBar(
+          _context,
+          message: AppLocalizations.of(
+            _context,
+          )!.attachmentRequiresWorkspace(file.fileName),
+          type: NotificationType.warning,
+        );
+        return ChatInputSubmissionResult.rejected;
+      }
     }
     _warmupSerial++;
     if (currentConversation == null) {
@@ -1265,7 +1324,9 @@ class HomePageController extends ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<void> createNewConversationAnimated() async {
+  Future<void> createNewConversationAnimated({
+    bool preserveDraft = false,
+  }) async {
     // 取消任何进行中的会话切换获取。
     _switchSerial++;
     _warmupSerial++;
@@ -1278,7 +1339,7 @@ class HomePageController extends ChangeNotifier {
         await _convoFadeController.reverse();
       } catch (_) {}
     }
-    await _createNewConversation();
+    await _createNewConversation(preserveDraft: preserveDraft);
     if (!isDesktopPlatform) {
       try {
         await WidgetsBinding.instance.endOfFrame;
@@ -1313,7 +1374,7 @@ class HomePageController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _createNewConversation() async {
+  Future<void> _createNewConversation({bool preserveDraft = false}) async {
     unawaited(_flushReadPosition());
     _translations.clear();
     final previousId = currentConversation?.id;
@@ -1541,8 +1602,8 @@ class HomePageController extends ChangeNotifier {
     ChatMessage message,
     Map<String, List<ChatMessage>> byGroup,
   ) {
-    // Tree projections use one entry per message. Legacy linear projections
-    // may still group migrated rows by groupId for compatibility only.
+    // 树投影每条消息只产生一个条目。旧版线性投影
+    // 仍可能仅为兼容而按 groupId 聚合迁移过来的行。
     return byGroup.containsKey(message.id)
         ? message.id
         : (message.groupId ?? message.id);
@@ -1885,54 +1946,17 @@ class HomePageController extends ChangeNotifier {
     }
   }
 
-  void _handleAssistantMessageFinished(ChatMessage message) {
+  Future<void> _handleAssistantMessageFinished(ChatMessage message) async {
     if (!_context.mounted || message.role != 'assistant') return;
     final settings = _context.read<SettingsProvider>();
-    final shouldNotify = NotificationService.shouldShowChatCompleted(
-      isAndroid: _isAndroid,
-      notifyModeEnabled:
-          settings.androidBackgroundChatMode ==
-          AndroidBackgroundChatMode.onNotify,
-      appInForeground: _appInForeground,
-      homeRouteVisible: _homeRouteVisible,
-      isCurrentConversation: currentConversation?.id == message.conversationId,
-    );
-    if (shouldNotify) {
-      final l10n = AppLocalizations.of(_context)!;
-      unawaited(
-        _showChatCompletedNotification(
-          conversationId: message.conversationId,
-          title: l10n.notificationChatCompletedTitle,
-          body: l10n.notificationChatCompletedBody,
-        ),
-      );
-    }
-
     if (settings.ttsAutoPlayAssistantReplies) {
-      unawaited(_speakAssistantMessage(message, autoPlay: true));
-    }
-  }
-
-  Future<void> _showChatCompletedNotification({
-    required String conversationId,
-    required String title,
-    required String body,
-  }) async {
-    try {
-      await _chatCompletionNotificationSender(
-        conversationId: conversationId,
-        title: title,
-        body: body,
-      );
-    } catch (error) {
-      debugPrint('Failed to show chat completion notification: $error');
+      await _speakAssistantMessage(message, autoPlay: true);
     }
   }
 
   @visibleForTesting
-  void debugHandleAssistantMessageFinished(ChatMessage message) {
-    _handleAssistantMessageFinished(message);
-  }
+  Future<void> debugHandleAssistantMessageFinished(ChatMessage message) =>
+      _handleAssistantMessageFinished(message);
 
   Future<void> speakMessage(ChatMessage message) async {
     await _speakAssistantMessage(message, autoPlay: false);
@@ -1967,7 +1991,9 @@ class HomePageController extends ChangeNotifier {
       mode: sp.ttsTextSelectionMode,
     );
     if (text.trim().isEmpty) return;
-    await tts.speak(text);
+    // 自动朗读只确认已经准备好，这样 ChatActions 可以释放生成资源，
+    // 而朗读会话本身继续独立跑完。
+    await tts.speak(text, waitForCompletion: !autoPlay);
   }
 
   void shareMessage(int messageIndex, List<ChatMessage> messageList) {
@@ -2561,6 +2587,111 @@ class HomePageController extends ChangeNotifier {
   Future<void> onPickPhotos() => _fileUploadService.onPickPhotos();
   Future<void> onPickCamera() => _fileUploadService.onPickCamera(_context);
   Future<void> onPickFiles() => _fileUploadService.onPickFiles();
+
+  Future<bool> confirmIncomingShare() async {
+    if (_inputController.text.isEmpty &&
+        !_mediaController.hasDraftMedia &&
+        !_mediaController.hasUnreadyImages) {
+      return true;
+    }
+    final l10n = AppLocalizations.of(_context)!;
+    return await showDialog<bool>(
+          context: _context,
+          builder: (context) => AlertDialog(
+            title: Text(l10n.incomingShareTitle),
+            content: Text(l10n.incomingShareReplaceDraft),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text(l10n.homePageCancel),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: Text(l10n.modelDetailSheetConfirmButton),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  Future<bool> openIncomingShareDraft(ChatInputData input) async {
+    final approvedText = _inputController.text;
+    final approvedMedia = _mediaController.draftMediaIdentity;
+    // 直到下面真正替换之前，连正在编辑的消息草稿也要保留。
+    // 会话创建与两段动画都可能在编辑过程中让出执行权。
+    await createNewConversationAnimated(preserveDraft: true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (!_context.mounted || !_mediaController.isAttached) {
+      throw StateError('The chat composer is not ready');
+    }
+    if ((approvedText != _inputController.text ||
+            !listEquals(approvedMedia, _mediaController.draftMediaIdentity)) &&
+        !await confirmIncomingShare()) {
+      return false;
+    }
+    if (!_context.mounted || !_mediaController.isAttached) {
+      throw StateError('The chat composer is not ready');
+    }
+    // 从最终确认到写入新草稿之间不再有 await。
+    _mediaController.clearDraft();
+    _inputController.value = TextEditingValue(
+      text: input.text,
+      selection: TextSelection.collapsed(offset: input.text.length),
+    );
+    _mediaController.addFiles(input.documents);
+    _mediaController.enqueueImages(
+      input.imagePaths,
+      _context.read<SettingsProvider>().resolveImageCompressConfig(),
+      deleteSourcesAfterProcessing: true,
+    );
+    _mediaController.sharedDraftAction.value = () =>
+        unawaited(moveSharedDraft());
+    _inputFocus.requestFocus();
+    return true;
+  }
+
+  Future<bool> acceptIncomingShareDraft(ChatInputData input) async {
+    if (!_context.mounted || !await confirmIncomingShare()) return false;
+    if (!_context.mounted) return false;
+    return openIncomingShareDraft(input);
+  }
+
+  Future<void> moveSharedDraft() async {
+    final sourceId = currentConversation?.id;
+    final destination = await showShareDestinationSheet(
+      _context,
+      conversations: _context
+          .read<ChatService>()
+          .getAllConversations()
+          .where((conversation) => conversation.id != sourceId)
+          .toList(),
+    );
+    if (destination == null ||
+        !_context.mounted ||
+        currentConversation?.id != sourceId) {
+      return;
+    }
+    // 稳定的输入区会保留其文本、文件与图片处理队列。
+    // 只做跳转；移动过程中绝不清除或重新复制草稿附件。
+    try {
+      if (destination.isEmpty) {
+        await createNewConversationAnimated();
+      } else {
+        await switchConversationAnimated(destination);
+      }
+    } catch (_) {
+      if (_context.mounted) {
+        showAppSnackBar(
+          _context,
+          message: AppLocalizations.of(_context)!.incomingShareMoveFailed,
+          type: NotificationType.error,
+        );
+      }
+    }
+    if (_context.mounted) _inputFocus.requestFocus();
+  }
+
   Future<void> onFilesDroppedDesktop(List<XFile> files) =>
       _fileUploadService.onFilesDroppedDesktop(files);
 
@@ -2886,7 +3017,6 @@ class HomePageController extends ChangeNotifier {
   // ============================================================================
 
   void onAppLifecycleStateChanged(AppLifecycleState state) {
-    _appInForeground = (state == AppLifecycleState.resumed);
     if (state == AppLifecycleState.resumed) {
       ScreenWakelock.reassert();
     }
@@ -3018,8 +3148,17 @@ class HomePageController extends ChangeNotifier {
   // 释放
   // ============================================================================
 
+  ScheduledTaskExecutor? _scheduledExecutor;
+
   @override
   void dispose() {
+    if (_scheduledExecutor case final executor?) {
+      ScheduledTasksService.instance.detach(executor);
+    }
+    final background = MobileBackgroundCoordinator.instance;
+    if (background.visibleConversation == _visibleBackgroundConversation) {
+      background.visibleConversation = null;
+    }
     unawaited(_flushReadPosition());
     _viewModel.resetFileProcessingIndicator();
     _viewModel.onBackgroundTaskError = null;

@@ -23,8 +23,6 @@ void main() {
       addTearDown(scrollController.dispose);
       final listController = ListController();
       addTearDown(listController.dispose);
-      final processing = ValueNotifier(false);
-      addTearDown(processing.dispose);
       var userScrollIntentCount = 0;
 
       await tester.pumpWidget(
@@ -43,7 +41,6 @@ void main() {
               selecting: false,
               selectedItems: const {},
               dividerPadding: EdgeInsets.zero,
-              isProcessingFiles: processing,
               onUserScrollIntent: () => userScrollIntentCount++,
             ),
           ),

@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/providers/environment_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/memory_provider_v2.dart';
@@ -18,6 +19,11 @@ import '../../../core/services/memory/memory_pipeline.dart';
 import '../../../core/services/memory/memory_tools.dart';
 import '../../../core/services/search/search_tool_service.dart';
 import '../../../core/services/tools/tool_schema_overrides.dart';
+import '../../../core/services/skills/skills_service.dart';
+import '../../../core/services/workspace/tool_run_registry.dart';
+import '../../../core/services/workspace/workspace_runtime.dart';
+import '../../../core/services/workspace/workspace_tools_service.dart';
+import '../../../core/providers/workspace_provider.dart';
 import 'ask_user_interaction_service.dart';
 import 'built_in_tool_names.dart';
 import 'local_tools_service.dart';
@@ -34,6 +40,35 @@ class ToolHandlerService {
 
   /// 构建上下文（用于访问 providers）
   final BuildContext contextProvider;
+
+  WorkspaceToolsService _workspaceTools() {
+    try {
+      final chat = contextProvider.read<ChatService>();
+      final workspaces = contextProvider.read<WorkspaceProvider>();
+      Future<void> Function(String skillId)? onSkillRead;
+      Future<void> Function()? onShellCompleted;
+      try {
+        final skills = contextProvider.read<SkillsService>();
+        onSkillRead = skills.incrementUseCount;
+        onShellCompleted = skills.rescan;
+      } catch (_) {}
+      return WorkspaceToolsService(
+        registry: contextProvider.read<ToolRunRegistry>(),
+        runtimeProvider: contextProvider.read<WorkspaceRuntimeProvider>(),
+        updateConversationExtras: chat.updateConversationExtras,
+        touchLastUsed: workspaces.touchLastUsed,
+        onSkillRead: onSkillRead,
+        onShellCompleted: onShellCompleted,
+        loadEnvironment: contextProvider
+            .read<EnvironmentProvider?>()
+            ?.loadExecutionConfig,
+        isToolEnabled: (id, name) =>
+            workspaces.byId(id)?.isToolEnabled(name) ?? false,
+      );
+    } catch (_) {
+      return WorkspaceToolsService();
+    }
+  }
 
   // ============================================================================
   // 工具 Schema 清洗
@@ -203,13 +238,12 @@ class ToolHandlerService {
   /// - MCP 工具（来自助手选择的服务器）
   /// 正在生成的聊天是否为临时的。
   ///
-  /// 工具定义构建时不带会话 id，因此此方法以与工具处理器
-  /// 相同的方式读取活动会话。
-  bool _isTemporaryConversation() {
+  /// 定时发送可能指向与当前可见会话不同的会话。
+  bool _isTemporaryConversation(String? conversationId) {
     try {
       final chatService = contextProvider.read<ChatService>();
       return chatService.isTemporaryConversation(
-        chatService.currentConversationId,
+        conversationId ?? chatService.currentConversationId,
       );
     } catch (_) {
       return false;
@@ -224,6 +258,8 @@ class ToolHandlerService {
     bool hasBuiltInSearch, {
     required bool Function(String providerKey, String modelId) isToolModel,
     McpToolRouteSnapshot? mcpRouteSnapshot,
+    WorkspaceToolContext? workspaceContext,
+    String? conversationId,
   }) {
     final List<Map<String, dynamic>> toolDefs = <Map<String, dynamic>>[];
     final supportsTools = isToolModel(providerKey, modelId);
@@ -249,7 +285,7 @@ class ToolHandlerService {
           writeScope: assistant.memoryWriteScope,
           enableMemory: assistant.enableMemory,
           allowPastConversationRecall: assistant.allowPastConversationRecall,
-          allowMemoryWrites: !_isTemporaryConversation(),
+          allowMemoryWrites: !_isTemporaryConversation(conversationId),
         ),
       );
     }
@@ -271,6 +307,10 @@ class ToolHandlerService {
       mcpRouteSnapshot: mcpRouteSnapshot,
     );
     toolDefs.addAll(mcpTools);
+
+    if (supportsTools && workspaceContext != null) {
+      toolDefs.addAll(_workspaceTools().buildToolDefinitions(workspaceContext));
+    }
 
     final overrides = settings.toolSchemaOverrides;
     if (overrides.isEmpty) return toolDefs;
@@ -355,6 +395,7 @@ class ToolHandlerService {
     AskUserInteractionService? askUserService,
     String? conversationId,
     McpToolRouteSnapshot? mcpRouteSnapshot,
+    WorkspaceToolContext? workspaceContext,
   }) {
     final mcp = contextProvider.read<McpProvider>();
     final toolSvc = contextProvider.read<McpToolService>();
@@ -412,8 +453,23 @@ class ToolHandlerService {
       );
     }
 
+    final workspaceTools = workspaceContext == null ? null : _workspaceTools();
+
     return (name, args, {toolCallId}) async {
       try {
+        if (workspaceContext != null &&
+            workspaceTools != null &&
+            WorkspaceToolsService.toolNames.contains(name)) {
+          return await workspaceTools.handle(
+            workspaceContext,
+            name,
+            args,
+            toolCallId: toolCallId ?? '',
+            approvalService: approvalService,
+            conversationId: conversationId,
+          );
+        }
+
         if (routes.containsExposedName(name)) {
           return await approveAndExecuteMcp(name, args, toolCallId: toolCallId);
         }

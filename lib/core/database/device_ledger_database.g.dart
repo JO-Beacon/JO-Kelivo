@@ -189,7 +189,7 @@ class DeviceLocalSettingsLedgerRow extends DataClass
   /// 该记录代表的本机设置取值时刻（UTC）。
   final DateTime savedAtUtc;
 
-  /// 9 个本机设置键的取值，JSON 对象；键序与内容由采集侧保证。
+  /// 10 个本机设置键的取值，JSON 对象；键序与内容由采集侧保证。
   final String valuesJson;
   const DeviceLocalSettingsLedgerRow({
     required this.fingerprint,

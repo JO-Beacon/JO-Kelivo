@@ -13,6 +13,8 @@ class ToolDetailTextSection extends StatelessWidget {
     required this.label,
     required this.text,
     this.textStyle = const TextStyle(fontSize: 12),
+    this.trailing,
+    this.belowLabel,
   });
 
   /// 超过此行数（或字符数）后，文本会分块并延迟构建。
@@ -27,6 +29,12 @@ class ToolDetailTextSection extends StatelessWidget {
   final String label;
   final String text;
   final TextStyle textStyle;
+
+  /// 可选控件，右对齐到 [label] 旁（例如复制按钮）。
+  final Widget? trailing;
+
+  /// 可选内容，渲染在标签行与文本框之间。
+  final Widget? belowLabel;
 
   static bool shouldChunk(String text) {
     if (text.length > lazyCharThreshold) return true;
@@ -59,23 +67,39 @@ class ToolDetailTextSection extends StatelessWidget {
       border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.2)),
     );
 
+    final labelStyle = TextStyle(
+      fontSize: 12,
+      color: cs.onSurface.withValues(alpha: 0.6),
+    );
+    final labelText = Text(label, style: labelStyle);
     final header = SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.only(bottom: 6),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: cs.onSurface.withValues(alpha: 0.6),
-          ),
-        ),
+        child: trailing == null
+            ? labelText
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(child: labelText),
+                  trailing!,
+                ],
+              ),
       ),
     );
+    final below = belowLabel == null
+        ? null
+        : SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: belowLabel,
+            ),
+          );
 
     if (!shouldChunk(text)) {
       return SliverMainAxisGroup(
         slivers: [
           header,
+          if (below != null) below,
           SliverToBoxAdapter(
             child: Container(
               width: double.infinity,
@@ -92,6 +116,7 @@ class ToolDetailTextSection extends StatelessWidget {
     return SliverMainAxisGroup(
       slivers: [
         header,
+        if (below != null) below,
         DecoratedSliver(
           decoration: decoration,
           sliver: SliverPadding(

@@ -41,6 +41,7 @@ final class BusinessKeyRegistry {
   };
 
   static const preferenceKeys = <String>{
+    'desktop_scheduled_tasks_v1',
     'current_assistant_id_v1',
     'selected_model_v1',
     'per_chat_model_enabled_v1',
@@ -183,6 +184,10 @@ final class BusinessKeyRegistry {
     'chat_bubble_style_overrides_v1',
     'chat_bubble_style_overrides_user_v1',
     'tool_schema_overrides_v1',
+    'environment_state_v1',
+    'environment_mirrors_v1',
+    'environment_variables_v1',
+    'environment_privacy_mode_v1',
   };
 
   static BusinessKeyDisposition classify(String key) {
@@ -688,6 +693,22 @@ final class BusinessSettingsRouter {
         if (content.trim().isEmpty) {
           throw FormatException(kind.sourceKey);
         }
+        return;
+      case BusinessEntityKind.workspace:
+        _validateKnownFields(
+          kind,
+          payload,
+          requiredStrings: const {'id', 'name'},
+        );
+        return;
+      case BusinessEntityKind.skill:
+        _validateKnownFields(
+          kind,
+          payload,
+          requiredStrings: const {'id', 'source', 'installedAt', 'updatedAt'},
+          booleans: const {'enabled'},
+          numbers: const {'useCount'},
+        );
         return;
       case BusinessEntityKind.userProfileField:
         _validateKnownFields(

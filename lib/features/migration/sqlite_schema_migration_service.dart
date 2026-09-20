@@ -202,18 +202,10 @@ final class SqliteSchemaMigrationService implements MigrationWorkflow {
         snapshotInfo: snapshotInfo,
         settingsJson: settings.settingsJson,
         businessEntityRowIds: settings.entityRowIds,
-        uploadDirectory: Directory(
-          p.join(decision.appDataDirectory.path, 'upload'),
-        ),
-        avatarsDirectory: Directory(
-          p.join(decision.appDataDirectory.path, 'avatars'),
-        ),
-        imagesDirectory: Directory(
-          p.join(decision.appDataDirectory.path, 'images'),
-        ),
-        fontsDirectory: Directory(
-          p.join(decision.appDataDirectory.path, 'fonts'),
-        ),
+        // 资源目录由 data_sync 按 7 个同名子目录统一解析（与普通备份一致），
+        // 这里只交出 app-data 根目录。迁移前 skills／workspaces／sessions
+        // 通常还不存在，会按空目录处理。
+        appDataDirectory: decision.appDataDirectory,
       );
       _emit(
         HiveToSqliteMigrationStage.backingUp,

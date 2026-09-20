@@ -30,6 +30,8 @@ linter:
 # https://dart.dev/guides/language/analysis-options
 analyzer:
   exclude:
+    # 构建输出和本地合并草稿不是应用源码，避免扫描历史临时副本。
+    - build/**
     - dependencies/flutter_math_fork/**
     - dependencies/flutter_tts/**
     - 参考文件/**

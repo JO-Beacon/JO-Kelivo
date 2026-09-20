@@ -101,9 +101,12 @@ Future<void> _settleLedgerSection(WidgetTester tester) async {
   final target = find.text('Device settings records');
   final scrollable = find.byType(Scrollable).first;
   if (target.evaluate().isEmpty) {
-    tester.state<ScrollableState>(scrollable).position.jumpTo(
-      tester.state<ScrollableState>(scrollable).position.minScrollExtent,
-    );
+    tester
+        .state<ScrollableState>(scrollable)
+        .position
+        .jumpTo(
+          tester.state<ScrollableState>(scrollable).position.minScrollExtent,
+        );
     await tester.pump();
   }
   await tester.scrollUntilVisible(target, 200, scrollable: scrollable);
@@ -173,10 +176,7 @@ Widget _desktopHarness({
 }
 
 /// 双端共用一套断言：册子区块在两个页面上的行为必须一致。
-void _runLedgerSectionSuite({
-  required String label,
-  required bool desktop,
-}) {
+void _runLedgerSectionSuite({required String label, required bool desktop}) {
   group('$label 本机设置记录区块', () {
     late Directory tempDir;
 
@@ -185,11 +185,12 @@ void _runLedgerSectionSuite({
       tempDir = Directory.systemTemp.createTempSync('ledger_section_');
       PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
       DeviceIdentityService.resetCache();
-      DeviceIdentityService.debugCollectorOverride = () async => const DeviceIdentity(
-        fingerprintHash: _localFingerprint,
-        displayName: 'This PC',
-        platform: 'windows',
-      );
+      DeviceIdentityService.debugCollectorOverride = () async =>
+          const DeviceIdentity(
+            fingerprintHash: _localFingerprint,
+            displayName: 'This PC',
+            platform: 'windows',
+          );
     });
 
     tearDown(() {

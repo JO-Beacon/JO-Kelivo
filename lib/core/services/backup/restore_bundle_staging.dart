@@ -1,16 +1,24 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
 import '../../database/app_database.dart';
+import '../../database/backup_portability.dart';
+import '../../database/extension_entity_store.dart';
+import '../../database/schema_migrations.dart';
 import '../../database/business_repository.dart';
 import '../../database/business_restore_service.dart';
 import '../../database/chat_database_repository.dart';
+import 'backup_cancel_token.dart';
+import 'backup_isolate_runner.dart';
 import 'backup_settings_validator.dart';
+import 'backup_task_progress.dart';
 import 'restore_durability.dart';
 import 'restore_workspace_lock.dart';
 
@@ -57,7 +65,19 @@ final class RestoreBundleStaging {
   static const workspaceRootName = RestoreWorkspaceLock.workspaceRootName;
   static const _backupFormat = 'kelivo-backup';
   static const _backupFormatVersion = 2;
-  static const _assetRoots = ['upload', 'images', 'avatars', 'fonts'];
+
+  /// 与 DataSync 里同名常量保持一致。像上面的 _backupFormatVersion 一样
+  /// 在这里复制一份而不是 import，因为 DataSync 依赖本文件。
+  static const _minimumReadableFormatKey = 'minimumReadableFormatVersion';
+  static const _assetRoots = [
+    'upload',
+    'images',
+    'avatars',
+    'fonts',
+    'skills',
+    'workspaces',
+    'sessions',
+  ];
   static const _databaseEntry = 'database/kelivo.db';
 
   /// 本机设置册子在包内的目录前缀。
@@ -65,13 +85,37 @@ final class RestoreBundleStaging {
   /// 它**不是**第五个附件根：册子是数据不是附件，copy 与登记都必须独立于
   /// [includeFiles] 和 [_assetRoots]。并入 `_assetRoots` 会同时毁掉两件事：
   /// cutover 的镜像清单会把它当附件搬进应用数据目录；以及它的存亡会被
-  /// 绑在"这次备份带不带附件"上，导致包里有册子却不落地的静默丢失。
+  /// 绑在“这次备份带不带附件”上，导致包里有册子却不落地的静默丢失。
   static const _ledgerEntryPrefix = 'device_local_settings/';
-
   static const _maximumManifestBytes = 16 * 1024 * 1024;
   // 设置包含结构化偏好，绝不包含聊天记录或二进制资源。
   // 在复制/解析前限制 JSON 大小，以约束 UTF-8 和 DOM 放大。
   static const _maximumSettingsBytes = 1024 * 1024 * 1024;
+
+  /// 仅供测试：候选数据库隔离线程里的停顿（毫秒）。
+  @visibleForTesting
+  static int debugCandidateDbStallMs = 0;
+
+  /// 仅供测试：忽略取消的挂起（秒）。走原生 sleep。
+  @visibleForTesting
+  static int debugCandidateDbHangSeconds = 0;
+
+  /// 仅供测试：候选重新校验隔离线程里的停顿（毫秒）。
+  @visibleForTesting
+  static int debugCandidateValidateStallMs = 0;
+
+  /// 仅供测试：忽略取消的挂起（秒）。走原生 sleep。
+  @visibleForTesting
+  static int debugCandidateValidateHangSeconds = 0;
+
+  @visibleForTesting
+  static Duration? debugIsolateKillGrace;
+
+  @visibleForTesting
+  static Duration? debugIsolateExitDeadline;
+
+  @visibleForTesting
+  static Duration? debugIsolateTimeout;
 
   static Future<StagedRestoreBundle> create({
     required Directory appDataDirectory,
@@ -83,6 +127,9 @@ final class RestoreBundleStaging {
     bool? sourceIncludesFiles,
     required String sourceManifestSha256,
     RestoreDurability? durability,
+    Map<String, dynamic>? validatedSettings,
+    BackupProgressSink? onProgress,
+    BackupCancelToken? cancelToken,
   }) async {
     final declaredIncludeChats = sourceIncludesChats ?? includeChats;
     final declaredIncludeFiles = sourceIncludesFiles ?? includeFiles;
@@ -109,6 +156,14 @@ final class RestoreBundleStaging {
     final stagedEntries = <String, _StagedRestoreEntry>{};
 
     try {
+      _throwIfCancelled(cancelToken);
+      onProgress?.call(
+        const BackupProgress(
+          phase: BackupPhase.stagingCandidate,
+          processed: 0,
+          cancellable: true,
+        ),
+      );
       await _ensureDurableDirectory(
         directory: payloadDirectory,
         boundary: workspace,
@@ -121,6 +176,7 @@ final class RestoreBundleStaging {
         sourceManifestFile,
         maximumBytes: _maximumManifestBytes,
         error: 'restore_staging_manifest',
+        cancelToken: cancelToken,
       );
       if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(sourceManifestSha256) ||
           sha256.convert(sourceManifestBytes).toString() !=
@@ -157,16 +213,30 @@ final class RestoreBundleStaging {
       final sourceSettingsFile = File(
         p.join(extractedDirectory.path, settingsEntry),
       );
+      _throwIfCancelled(cancelToken);
       await _verifySourceDescriptor(
         sourceSettingsFile,
         settingsEntry,
         declaredEntries[settingsEntry]!,
+        cancelToken: cancelToken,
       );
-      final settings = await _validateSettings(sourceSettingsFile);
+      final Map<String, dynamic> settings;
+      if (validatedSettings != null) {
+        settings = Map<String, dynamic>.from(validatedSettings);
+        BackupSettingsValidator.normalizeAndValidate(settings);
+      } else {
+        settings = await runBackupIsolate<Map<String, dynamic>, String>(
+          body: _validateSettingsInIsolate,
+          payload: sourceSettingsFile.path,
+          cancelToken: cancelToken,
+          onProgress: onProgress,
+        );
+      }
 
       final stagedDatabaseFile = File(
         p.joinAll([payloadDirectory.path, ..._databaseEntry.split('/')]),
       );
+      _throwIfCancelled(cancelToken);
       stagedEntries[_databaseEntry] = await _copyVerified(
         File(
           p.joinAll([extractedDirectory.path, ..._databaseEntry.split('/')]),
@@ -176,31 +246,38 @@ final class RestoreBundleStaging {
         declaredEntries[_databaseEntry]!,
         payloadDirectory,
         resolvedDurability,
+        cancelToken: cancelToken,
       );
+      onProgress?.call(
+        const BackupProgress(
+          phase: BackupPhase.stagingCandidate,
+          processed: 1,
+          cancellable: true,
+        ),
+      );
+      _throwIfCancelled(cancelToken);
 
       final databaseInfo = await _replaceCandidateBusinessSettings(
         databaseFile: stagedDatabaseFile,
+        // 启动恢复绝不能打开缺失或损坏的活动数据库。
+        deviceDatabasePath: useExistingLocalAttachments
+            ? null
+            : p.join(appDataDirectory.path, AppDatabase.databaseFileName),
         settings: settings,
         entityRowIds: businessEntityRowIds,
         preserveExplicitEmptyInstructionList: businessEntityRowIds == null,
         expectedDatabaseInfo: declaredDatabaseInfo,
         durability: resolvedDurability,
+        recomputeAttachmentsUnavailable: !includeFiles,
+        localSnapshotAppDataPath: useExistingLocalAttachments
+            ? appDataDirectory.path
+            : null,
+        onProgress: onProgress,
+        cancelToken: cancelToken,
       );
-      if (!includeFiles) {
-        // 仅覆盖聊天：在发布前将本地附件标记为不可用，
-        // 这样目标同路径文件就不会被当作已恢复内容。
-        // 用户明确选择的**本机快照**例外：允许复核快照目录内真实存在的受管文件。
-        await ChatDatabaseRepository.recomputeAttachmentAvailabilityOnDatabaseFile(
-          databaseFile: stagedDatabaseFile,
-          filesRestored: false,
-          localSnapshotAppDataDirectory: useExistingLocalAttachments
-              ? appDataDirectory
-              : null,
-        );
-      }
       stagedEntries[_databaseEntry] = (
         bytes: await stagedDatabaseFile.length(),
-        sha256: await _sha256(stagedDatabaseFile),
+        sha256: await _sha256(stagedDatabaseFile, cancelToken: cancelToken),
       );
       if (includeFiles) {
         for (final rootName in _assetRoots) {
@@ -213,7 +290,9 @@ final class RestoreBundleStaging {
         final assetEntries = declaredEntries.keys.where(
           (name) => _assetRoots.any((root) => name.startsWith('$root/')),
         );
+        var processed = 1;
         for (final entryName in assetEntries) {
+          _throwIfCancelled(cancelToken);
           stagedEntries[entryName] = await _copyVerified(
             File(p.joinAll([extractedDirectory.path, ...entryName.split('/')])),
             File(p.joinAll([payloadDirectory.path, ...entryName.split('/')])),
@@ -221,6 +300,15 @@ final class RestoreBundleStaging {
             declaredEntries[entryName]!,
             payloadDirectory,
             resolvedDurability,
+            cancelToken: cancelToken,
+          );
+          processed++;
+          onProgress?.call(
+            BackupProgress(
+              phase: BackupPhase.stagingCandidate,
+              processed: processed,
+              cancellable: true,
+            ),
           );
         }
       }
@@ -232,6 +320,7 @@ final class RestoreBundleStaging {
         (name) => name.startsWith(_ledgerEntryPrefix),
       );
       for (final entryName in ledgerEntries) {
+        _throwIfCancelled(cancelToken);
         final target = File(
           p.joinAll([payloadDirectory.path, ...entryName.split('/')]),
         );
@@ -247,6 +336,7 @@ final class RestoreBundleStaging {
           declaredEntries[entryName]!,
           payloadDirectory,
           resolvedDurability,
+          cancelToken: cancelToken,
         );
       }
 
@@ -257,7 +347,7 @@ final class RestoreBundleStaging {
             (name) => _assetRoots.any((root) => name.startsWith('$root/')),
           ),
         // 册子条目**无条件**登记，不能写进上面那个 if (includeFiles) 里：
-        // ③ 复制了而这里漏登记，会与 stagedEntries 比对不一致，
+        // 复制了而这里漏登记，会与 stagedEntries 比对不一致，
         // 当场抛 restore_staging_entries（响亮失败）。
         ...declaredEntries.keys.where(
           (name) => name.startsWith(_ledgerEntryPrefix),
@@ -273,6 +363,10 @@ final class RestoreBundleStaging {
       manifest['includeFiles'] = includeFiles;
       manifest.remove('secretsIncluded');
       manifest.remove('businessEntityRowIds');
+      // 前向兼容声明描述的是**来源**归档。候选内容只会被同一个构建读回，
+      // 因此它不携带声明 —— 与下面 database 块的处理方式一致（重建而不是
+      // 照抄）。
+      manifest.remove(_minimumReadableFormatKey);
       manifest['database'] = {
         'entry': _databaseEntry,
         'schemaVersion': databaseInfo.schemaVersion,
@@ -293,6 +387,7 @@ final class RestoreBundleStaging {
       if (stagedManifestBytes.length > _maximumManifestBytes) {
         throw const FormatException('restore_staging_manifest_size');
       }
+      _throwIfCancelled(cancelToken);
       await stagedManifestFile.writeAsBytes(stagedManifestBytes, flush: true);
       await resolvedDurability.restrictFile(stagedManifestFile);
       await resolvedDurability.syncFile(stagedManifestFile, fullBarrier: true);
@@ -300,9 +395,12 @@ final class RestoreBundleStaging {
         payloadDirectory,
         fullBarrier: true,
       );
+      _throwIfCancelled(cancelToken);
       final validated = await validateExistingCandidate(
         candidateDirectory: payloadDirectory,
         expectedManifestSha256: sha256.convert(stagedManifestBytes).toString(),
+        cancelToken: cancelToken,
+        onProgress: onProgress,
       );
       if (!validated.includeChats || validated.includeFiles != includeFiles) {
         throw const FormatException('restore_staging_candidate_selection');
@@ -314,11 +412,25 @@ final class RestoreBundleStaging {
         payloadDirectory: payloadDirectory,
         candidateManifestSha256: validated.manifestSha256,
       );
-    } catch (_) {
-      await _discardUnpublishedWorkspace(
-        workspaceLock: workspaceLock,
-        workspace: workspace,
-      );
+    } catch (error) {
+      if (backupIsolateStillAlive(error)) {
+        final isolateExit = backupIsolateExitFuture(error);
+        if (isolateExit != null) {
+          unawaited(
+            isolateExit.then((_) {
+              return _discardUnpublishedWorkspace(
+                workspaceLock: workspaceLock,
+                workspace: workspace,
+              );
+            }),
+          );
+        }
+      } else {
+        await _discardUnpublishedWorkspace(
+          workspaceLock: workspaceLock,
+          workspace: workspace,
+        );
+      }
       rethrow;
     }
   }
@@ -327,33 +439,28 @@ final class RestoreBundleStaging {
   static Future<ValidatedRestoreCandidate> validateExistingCandidate({
     required Directory candidateDirectory,
     required String expectedManifestSha256,
+    BackupCancelToken? cancelToken,
+    BackupProgressSink? onProgress,
   }) async {
-    final candidate = await readCandidateManifest(
-      candidateDirectory: candidateDirectory,
-      expectedManifestSha256: expectedManifestSha256,
+    return runBackupIsolate<ValidatedRestoreCandidate, _ValidateCandidateArgs>(
+      body: _validateExistingCandidateInIsolate,
+      payload: _ValidateCandidateArgs(
+        candidatePath: candidateDirectory.path,
+        expectedManifestSha256: expectedManifestSha256,
+        stallMs: debugCandidateValidateStallMs,
+        hangSeconds: debugCandidateValidateHangSeconds,
+      ),
+      cancelToken: cancelToken,
+      onProgress: onProgress,
+      timeout: debugIsolateTimeout,
+      killGrace: debugIsolateKillGrace ?? const Duration(seconds: 3),
+      isolateExitDeadline:
+          debugIsolateExitDeadline ?? const Duration(seconds: 2),
     );
-    if (candidate.includeChats) {
-      final actual = await ChatDatabaseRepository.inspectPreparedSnapshot(
-        File(
-          p.joinAll([candidateDirectory.path, ..._databaseEntry.split('/')]),
-        ),
-      );
-      if (actual != candidate.databaseInfo) {
-        throw const FormatException('restore_staging_database');
-      }
-    }
-    await _validateCandidateTopology(
-      candidateDirectory,
-      expectedFiles: {...candidate.entries.keys, 'manifest.json'},
-      includeChats: candidate.includeChats,
-      includeFiles: candidate.includeFiles,
-    );
-    await _validateCandidateEntries(candidateDirectory, candidate.entries);
-    return candidate;
   }
 
-  /// 读取不可变的候选控制模型，而不要求在切换开始后
-  /// 所选载荷文件仍保留在候选内容中。
+  /// 读取不可变的候选控制模型，而不要求在切换开始后所选载荷文件
+  /// 仍保留在候选内容中。
   static Future<ValidatedRestoreCandidate> readCandidateManifest({
     required Directory candidateDirectory,
     required String expectedManifestSha256,
@@ -415,6 +522,7 @@ final class RestoreBundleStaging {
       manifest['database'],
       includeChats: true,
       payloadKind: 'sqlite',
+      requireCurrentSchema: true,
     );
 
     return ValidatedRestoreCandidate(
@@ -620,18 +728,27 @@ final class RestoreBundleStaging {
     return buffer.toString();
   }
 
+  static void _throwIfCancelled(BackupCancelToken? cancelToken) {
+    if (cancelToken?.isCancelled == true) {
+      throw const BackupCancelledException();
+    }
+  }
+
   static Future<_StagedRestoreEntry> _copyVerified(
     File source,
     File target,
     String entryName,
     _StagedRestoreEntry expected,
     Directory payloadDirectory,
-    RestoreDurability durability,
-  ) async {
+    RestoreDurability durability, {
+    BackupCancelToken? cancelToken,
+  }) async {
+    _throwIfCancelled(cancelToken);
     final sourceDescriptor = await _verifySourceDescriptor(
       source,
       entryName,
       expected,
+      cancelToken: cancelToken,
     );
     await _ensureDurableDirectory(
       directory: target.parent,
@@ -642,12 +759,14 @@ final class RestoreBundleStaging {
         FileSystemEntityType.notFound) {
       throw StateError('restore_staging_target:$entryName');
     }
-    await source.copy(target.path);
+    await _copyChunked(source, target, cancelToken: cancelToken);
+    _throwIfCancelled(cancelToken);
     await durability.restrictFile(target);
     await durability.syncFile(target);
     await durability.syncDirectory(target.parent);
+    _throwIfCancelled(cancelToken);
     final targetBytes = await target.length();
-    final targetSha256 = await _sha256(target);
+    final targetSha256 = await _sha256(target, cancelToken: cancelToken);
     if (targetBytes != sourceDescriptor.bytes ||
         targetSha256 != sourceDescriptor.sha256) {
       throw StateError('restore_staging_copy:$entryName');
@@ -658,15 +777,16 @@ final class RestoreBundleStaging {
   static Future<_StagedRestoreEntry> _verifySourceDescriptor(
     File source,
     String entryName,
-    _StagedRestoreEntry expected,
-  ) async {
+    _StagedRestoreEntry expected, {
+    BackupCancelToken? cancelToken,
+  }) async {
     if (await FileSystemEntity.type(source.path, followLinks: false) !=
         FileSystemEntityType.file) {
       throw FormatException('restore_staging_source:$entryName');
     }
     final actual = (
       bytes: await source.length(),
-      sha256: await _sha256(source),
+      sha256: await _sha256(source, cancelToken: cancelToken),
     );
     if (actual != expected) {
       throw FormatException('restore_staging_descriptor:$entryName');
@@ -794,39 +914,212 @@ final class RestoreBundleStaging {
     return entries;
   }
 
-  static Future<Map<String, dynamic>> _validateSettings(
-    File settingsFile,
-  ) async {
-    final settings = await _readJsonMap(
-      settingsFile,
-      maximumBytes: _maximumSettingsBytes,
-      error: 'restore_staging_settings',
+  static Map<String, dynamic> _validateSettingsInIsolate(
+    BackupIsolateContext ctx,
+    String path,
+  ) {
+    ctx.throwIfCancelled();
+    ctx.reportProgress(
+      const BackupProgress(
+        phase: BackupPhase.readingSettings,
+        processed: 0,
+        cancellable: true,
+      ),
     );
+    final file = File(path);
+    if (!file.existsSync()) {
+      throw const FormatException('restore_staging_settings');
+    }
+    final length = file.lengthSync();
+    if (length <= 0 || length > _maximumSettingsBytes) {
+      throw const FormatException('restore_staging_settings');
+    }
+    final decoded = jsonDecode(file.readAsStringSync());
+    if (decoded is! Map || decoded.keys.any((key) => key is! String)) {
+      throw const FormatException('restore_staging_settings');
+    }
+    final settings = decoded.cast<String, dynamic>();
     BackupSettingsValidator.normalizeAndValidate(settings);
+    ctx.throwIfCancelled();
     return settings;
   }
 
   static Future<ChatDatabaseSnapshotInfo> _replaceCandidateBusinessSettings({
     required File databaseFile,
+    required String? deviceDatabasePath,
     required Map<String, dynamic> settings,
     required Map<String, Object?>? entityRowIds,
     required bool preserveExplicitEmptyInstructionList,
     required ChatDatabaseSnapshotInfo expectedDatabaseInfo,
     required RestoreDurability durability,
+    required bool recomputeAttachmentsUnavailable,
+    String? localSnapshotAppDataPath,
+    BackupProgressSink? onProgress,
+    BackupCancelToken? cancelToken,
   }) async {
+    final databaseInfo =
+        await runBackupIsolate<
+          ChatDatabaseSnapshotInfo,
+          _CandidateDbIsolateArgs
+        >(
+          body: _prepareCandidateDatabaseInIsolate,
+          payload: _CandidateDbIsolateArgs(
+            databasePath: databaseFile.path,
+            deviceDatabasePath: deviceDatabasePath,
+            settings: settings,
+            entityRowIds: entityRowIds,
+            preserveExplicitEmptyInstructionList:
+                preserveExplicitEmptyInstructionList,
+            expectedDatabaseInfo: expectedDatabaseInfo,
+            recomputeAttachmentsUnavailable: recomputeAttachmentsUnavailable,
+            localSnapshotAppDataPath: localSnapshotAppDataPath,
+            stallMs: debugCandidateDbStallMs,
+            hangSeconds: debugCandidateDbHangSeconds,
+          ),
+          cancelToken: cancelToken,
+          onProgress: onProgress,
+          timeout: debugIsolateTimeout,
+          killGrace: debugIsolateKillGrace ?? const Duration(seconds: 3),
+          isolateExitDeadline:
+              debugIsolateExitDeadline ?? const Duration(seconds: 2),
+        );
+    await durability.restrictFile(databaseFile);
+    await durability.syncFile(databaseFile, fullBarrier: true);
+    await durability.syncDirectory(databaseFile.parent, fullBarrier: true);
+    return databaseInfo;
+  }
+
+  static Future<ValidatedRestoreCandidate> _validateExistingCandidateInIsolate(
+    BackupIsolateContext ctx,
+    _ValidateCandidateArgs args,
+  ) async {
+    ctx.reportProgress(
+      const BackupProgress(
+        phase: BackupPhase.validating,
+        processed: 0,
+        cancellable: true,
+        detail: 'candidate-revalidate',
+      ),
+    );
+    ctx.throwIfCancelled();
+    if (args.hangSeconds > 0) {
+      debugNativeSleepIgnoringKill(args.hangSeconds);
+    }
+    if (args.stallMs > 0) {
+      final until = DateTime.now().add(Duration(milliseconds: args.stallMs));
+      while (DateTime.now().isBefore(until)) {
+        ctx.throwIfCancelled();
+      }
+    }
+    final candidateDirectory = Directory(args.candidatePath);
+    final candidate = await readCandidateManifest(
+      candidateDirectory: candidateDirectory,
+      expectedManifestSha256: args.expectedManifestSha256,
+    );
+    ctx.throwIfCancelled();
+    if (candidate.includeChats) {
+      final actual = await ChatDatabaseRepository.inspectPreparedSnapshot(
+        File(
+          p.joinAll([candidateDirectory.path, ..._databaseEntry.split('/')]),
+        ),
+      );
+      if (actual != candidate.databaseInfo) {
+        throw const FormatException('restore_staging_database');
+      }
+    }
+    ctx.throwIfCancelled();
+    await _validateCandidateTopology(
+      candidateDirectory,
+      expectedFiles: {...candidate.entries.keys, 'manifest.json'},
+      includeChats: candidate.includeChats,
+      includeFiles: candidate.includeFiles,
+    );
+    ctx.throwIfCancelled();
+    await _validateCandidateEntries(candidateDirectory, candidate.entries);
+    ctx.throwIfCancelled();
+    return candidate;
+  }
+
+  static Future<ChatDatabaseSnapshotInfo> _prepareCandidateDatabaseInIsolate(
+    BackupIsolateContext ctx,
+    _CandidateDbIsolateArgs args,
+  ) async {
+    ctx.reportProgress(
+      const BackupProgress(
+        phase: BackupPhase.stagingCandidate,
+        processed: 1,
+        cancellable: true,
+        detail: 'candidate-db',
+      ),
+    );
+    ctx.throwIfCancelled();
+    if (args.hangSeconds > 0) {
+      debugNativeSleepIgnoringKill(args.hangSeconds);
+    }
+    if (args.stallMs > 0) {
+      final until = DateTime.now().add(Duration(milliseconds: args.stallMs));
+      while (DateTime.now().isBefore(until)) {
+        ctx.throwIfCancelled();
+      }
+    }
+    final databaseFile = File(args.databasePath);
+    // 由更旧构建写出的备份携带更旧的 schema。先把暂存副本向前迁移：
+    // 下面所有的东西 —— 快照校验器、业务覆盖、候选清单 —— 描述的都只是
+    // 当前 schema。暂存副本可丢弃，而来源归档本身就是那份备份，
+    // 所以不再额外留副本。
+    final stagedSchemaVersion = SchemaMigrations.readSchemaVersion(
+      databaseFile,
+    );
+    if (SchemaMigrations.needsUpgrade(stagedSchemaVersion)) {
+      await SchemaMigrations.upgradeFileInPlace(databaseFile);
+      await ChatDatabaseRepository.normalizeSnapshotJournal(databaseFile);
+    }
     final sourceDatabaseInfo =
         await ChatDatabaseRepository.inspectPreparedSnapshot(databaseFile);
-    if (sourceDatabaseInfo != expectedDatabaseInfo) {
+    // 声明的信息记录的是备份**写出时**的 schema，它与迁移后的 schema
+    // 合法地不同。行数是那个不变量：迁移绝不能增加或减少行。
+    if (sourceDatabaseInfo.conversationCount !=
+            args.expectedDatabaseInfo.conversationCount ||
+        sourceDatabaseInfo.messageCount !=
+            args.expectedDatabaseInfo.messageCount) {
       throw const FormatException('restore_staging_database');
     }
     final database = AppDatabase.open(file: databaseFile);
     try {
+      await BackupPortability.sanitizeDatabase(database);
       await BusinessRestoreService(BusinessRepository(database)).overwrite(
-        settings,
-        entityRowIds: entityRowIds,
+        args.settings,
+        entityRowIds: args.entityRowIds,
         preserveExplicitEmptyInstructionList:
-            preserveExplicitEmptyInstructionList,
+            args.preserveExplicitEmptyInstructionList,
       );
+      final devicePath = args.deviceDatabasePath;
+      if (devicePath != null && await File(devicePath).exists()) {
+        final localDatabase = AppDatabase.open(file: File(devicePath));
+        try {
+          final local = await BusinessRepository(localDatabase).readSnapshot();
+          await BusinessRepository(database).transformSnapshot(
+            (incoming) =>
+                BackupPortability.preserveDeviceState(incoming, local),
+            writeReceipt: true,
+          );
+          final mounts = await ExtensionEntityStore(
+            localDatabase,
+          ).listByKind('externalMounts');
+          final targetStore = ExtensionEntityStore(database);
+          for (final mount in mounts) {
+            await targetStore.upsert(
+              mount.kind,
+              mount.id,
+              mount.payload,
+              sortOrder: mount.sortOrder,
+              ownerId: mount.ownerId,
+            );
+          }
+        } finally {
+          await localDatabase.close();
+        }
+      }
     } finally {
       await database.close();
     }
@@ -836,9 +1129,16 @@ final class RestoreBundleStaging {
     if (databaseInfo != sourceDatabaseInfo) {
       throw const FormatException('restore_staging_database');
     }
-    await durability.restrictFile(databaseFile);
-    await durability.syncFile(databaseFile, fullBarrier: true);
-    await durability.syncDirectory(databaseFile.parent, fullBarrier: true);
+    if (args.recomputeAttachmentsUnavailable) {
+      await ChatDatabaseRepository.recomputeAttachmentAvailabilityOnDatabaseFile(
+        databaseFile: databaseFile,
+        filesRestored: false,
+        localSnapshotAppDataDirectory: args.localSnapshotAppDataPath == null
+            ? null
+            : Directory(args.localSnapshotAppDataPath!),
+      );
+    }
+    ctx.throwIfCancelled();
     return databaseInfo;
   }
 
@@ -863,10 +1163,16 @@ final class RestoreBundleStaging {
     return Map<String, Object?>.unmodifiable(result);
   }
 
+  /// 解析清单里的 `database` 块。
+  ///
+  /// [requireCurrentSchema] 区分了它处理的两种清单：来源清单记录的是备份
+  /// **写出时**的 schema，可能是任何一个已发布版本；而暂存候选的清单是在
+  /// 快照迁移之后写出的，必须精确记录当前 schema。
   static ChatDatabaseSnapshotInfo? _parseDatabaseInfo(
     dynamic rawDatabase, {
     required bool includeChats,
     required String payloadKind,
+    bool requireCurrentSchema = false,
   }) {
     if (!includeChats) {
       if (payloadKind != 'settings-only' || rawDatabase != null) {
@@ -889,11 +1195,19 @@ final class RestoreBundleStaging {
     final schemaVersion = database['schemaVersion'];
     final conversationCount = database['conversationCount'];
     final messageCount = database['messageCount'];
-    if (database.length != expectedKeys.length ||
-        !database.keys.toSet().containsAll(expectedKeys) ||
+    // 来源清单还可能带前向兼容声明；暂存候选永远不需要它，因为它只会
+    // 被同一个构建读回。
+    const optionalKeys = {SchemaMigrations.minimumReadableManifestKey};
+    final presentKeys = database.keys.toSet();
+    if (!presentKeys.containsAll(expectedKeys) ||
+        !presentKeys.difference(expectedKeys).every(optionalKeys.contains) ||
         database['entry'] != _databaseEntry ||
         schemaVersion is! int ||
-        schemaVersion < 0 ||
+        // 来源清单可以合法地写着一个本构建从未听过的 schema；只有暂存候选
+        // 必须是当前 schema。
+        (requireCurrentSchema
+            ? schemaVersion != AppDatabase.currentSchemaVersion
+            : schemaVersion < 1) ||
         conversationCount is! int ||
         conversationCount < 0 ||
         messageCount is! int ||
@@ -956,21 +1270,74 @@ final class RestoreBundleStaging {
 
   static Future<void> _validateCandidateEntries(
     Directory candidate,
-    Map<String, _StagedRestoreEntry> expectedEntries,
-  ) async {
+    Map<String, _StagedRestoreEntry> expectedEntries, {
+    BackupCancelToken? cancelToken,
+  }) async {
     for (final entry in expectedEntries.entries) {
+      _throwIfCancelled(cancelToken);
       final file = File(p.joinAll([candidate.path, ...entry.key.split('/')]));
       if (await FileSystemEntity.type(file.path, followLinks: false) !=
               FileSystemEntityType.file ||
           await file.length() != entry.value.bytes ||
-          await _sha256(file) != entry.value.sha256) {
+          await _sha256(file, cancelToken: cancelToken) != entry.value.sha256) {
         throw FormatException('restore_staging_candidate:${entry.key}');
       }
     }
   }
 
-  static Future<String> _sha256(File file) async {
-    return (await sha256.bind(file.openRead()).first).toString();
+  @visibleForTesting
+  static Future<String> debugSha256(
+    File file, {
+    BackupCancelToken? cancelToken,
+  }) {
+    return _sha256(file, cancelToken: cancelToken);
+  }
+
+  static Future<void> _copyChunked(
+    File source,
+    File target, {
+    BackupCancelToken? cancelToken,
+  }) async {
+    final input = await source.open();
+    final output = await target.open(mode: FileMode.writeOnly);
+    final buffer = Uint8List(64 * 1024);
+    try {
+      while (true) {
+        _throwIfCancelled(cancelToken);
+        final n = await input.readInto(buffer);
+        if (n == 0) break;
+        await output.writeFrom(buffer, 0, n);
+      }
+    } finally {
+      await input.close();
+      await output.close();
+    }
+  }
+
+  static Future<String> _sha256(
+    File file, {
+    BackupCancelToken? cancelToken,
+  }) async {
+    final digestSink = _Sha256DigestSink();
+    final hashSink = sha256.startChunkedConversion(digestSink);
+    final handle = await file.open();
+    final buffer = Uint8List(64 * 1024);
+    try {
+      while (true) {
+        _throwIfCancelled(cancelToken);
+        final n = await handle.readInto(buffer);
+        if (n == 0) break;
+        hashSink.add(Uint8List.sublistView(buffer, 0, n));
+      }
+      hashSink.close();
+    } finally {
+      await handle.close();
+    }
+    final digest = digestSink.digest;
+    if (digest == null) {
+      throw StateError('sha256');
+    }
+    return digest.toString();
   }
 
   static bool _isCanonicalEntryName(String name) {
@@ -987,21 +1354,11 @@ final class RestoreBundleStaging {
         p.posix.normalize(name) == name;
   }
 
-  static Future<Map<String, dynamic>> _readJsonMap(
-    File file, {
-    required int maximumBytes,
-    required String error,
-  }) async {
-    return _decodeJsonMap(
-      await _readBoundedBytes(file, maximumBytes: maximumBytes, error: error),
-      error: error,
-    );
-  }
-
   static Future<List<int>> _readBoundedBytes(
     File file, {
     required int maximumBytes,
     required String error,
+    BackupCancelToken? cancelToken,
   }) async {
     if (await FileSystemEntity.type(file.path, followLinks: false) !=
         FileSystemEntityType.file) {
@@ -1011,6 +1368,7 @@ final class RestoreBundleStaging {
     final bytes = BytesBuilder(copy: false);
     try {
       while (bytes.length <= maximumBytes) {
+        _throwIfCancelled(cancelToken);
         final chunk = await handle.read(
           min(1024 * 1024, maximumBytes + 1 - bytes.length),
         );
@@ -1036,4 +1394,56 @@ final class RestoreBundleStaging {
     }
     return decoded.cast<String, dynamic>();
   }
+}
+
+final class _ValidateCandidateArgs {
+  const _ValidateCandidateArgs({
+    required this.candidatePath,
+    required this.expectedManifestSha256,
+    required this.stallMs,
+    required this.hangSeconds,
+  });
+
+  final String candidatePath;
+  final String expectedManifestSha256;
+  final int stallMs;
+  final int hangSeconds;
+}
+
+final class _CandidateDbIsolateArgs {
+  const _CandidateDbIsolateArgs({
+    required this.databasePath,
+    required this.deviceDatabasePath,
+    required this.settings,
+    required this.entityRowIds,
+    required this.preserveExplicitEmptyInstructionList,
+    required this.expectedDatabaseInfo,
+    required this.recomputeAttachmentsUnavailable,
+    required this.localSnapshotAppDataPath,
+    required this.stallMs,
+    required this.hangSeconds,
+  });
+
+  final String databasePath;
+  final String? deviceDatabasePath;
+  final Map<String, dynamic> settings;
+  final Map<String, Object?>? entityRowIds;
+  final bool preserveExplicitEmptyInstructionList;
+  final ChatDatabaseSnapshotInfo expectedDatabaseInfo;
+  final bool recomputeAttachmentsUnavailable;
+  final String? localSnapshotAppDataPath;
+  final int stallMs;
+  final int hangSeconds;
+}
+
+class _Sha256DigestSink implements Sink<Digest> {
+  Digest? digest;
+
+  @override
+  void add(Digest data) {
+    digest = data;
+  }
+
+  @override
+  void close() {}
 }

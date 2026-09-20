@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../database/business_preferences.dart';
 import '../database/business_repository.dart';
 import '../models/backup.dart';
-import '../models/backup_task_progress.dart';
+import '../services/backup/backup_cancel_token.dart';
 import '../models/progress_update.dart';
 import '../services/chat/chat_service.dart';
 import '../services/backup/data_sync.dart';
@@ -70,7 +70,9 @@ class BackupProvider extends ChangeNotifier {
       );
       await _dataSync.backupToWebDav(
         _cfg,
-        onProgress: onProgress,
+        // 本仓库的加载对话框仍用旧的比值型回调，这里做一次适配；
+        // core 层（data_sync / chat_service）统一用上游的新类型。
+        onProgress: adaptProgressCallbackToSink(onProgress),
         ledgerEntries: ledgerEntries,
       );
       _message = 'Backup uploaded';
@@ -99,7 +101,7 @@ class BackupProvider extends ChangeNotifier {
         _cfg,
         item,
         mode: mode,
-        onProgress: onProgress,
+        onProgress: adaptProgressCallbackToSink(onProgress),
       );
       _message = 'Restored';
     } catch (e) {
@@ -193,7 +195,7 @@ class BackupProvider extends ChangeNotifier {
         file,
         _cfg,
         mode: mode,
-        onProgress: onProgress,
+        onProgress: adaptProgressCallbackToSink(onProgress),
         cancelToken: cancelToken,
       );
     } finally {

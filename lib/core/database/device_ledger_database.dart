@@ -55,9 +55,7 @@ class DeviceLedgerStateRows extends Table {
 /// 与 [AppDatabase] 完全隔离：业务库 schemaVersion 保持不变、不写任何业务库
 /// 迁移、也不参与 cutover 换库。库文件与业务库同目录（都走
 /// [AppDirectories.getAppDataDirectory]），因此卸载清理策略自动一致。
-@DriftDatabase(
-  tables: [DeviceLocalSettingsLedgerRows, DeviceLedgerStateRows],
-)
+@DriftDatabase(tables: [DeviceLocalSettingsLedgerRows, DeviceLedgerStateRows])
 class DeviceLedgerDatabase extends _$DeviceLedgerDatabase {
   DeviceLedgerDatabase(super.executor);
 
@@ -130,12 +128,10 @@ class DeviceLedgerDatabase extends _$DeviceLedgerDatabase {
     return row.read(expression) ?? 0;
   }
 
-  Future<DeviceLocalSettingsLedgerRow?> findByFingerprint(
-    String fingerprint,
-  ) {
-    return (select(deviceLocalSettingsLedgerRows)
-          ..where((t) => t.fingerprint.equals(fingerprint)))
-        .getSingleOrNull();
+  Future<DeviceLocalSettingsLedgerRow?> findByFingerprint(String fingerprint) {
+    return (select(
+      deviceLocalSettingsLedgerRows,
+    )..where((t) => t.fingerprint.equals(fingerprint))).getSingleOrNull();
   }
 
   /// 写入或覆盖一条记录（同指纹覆盖）。
@@ -144,9 +140,9 @@ class DeviceLedgerDatabase extends _$DeviceLedgerDatabase {
   }
 
   Future<int> removeByFingerprint(String fingerprint) {
-    return (delete(deviceLocalSettingsLedgerRows)
-          ..where((t) => t.fingerprint.equals(fingerprint)))
-        .go();
+    return (delete(
+      deviceLocalSettingsLedgerRows,
+    )..where((t) => t.fingerprint.equals(fingerprint))).go();
   }
 
   Future<int> clearAll() => delete(deviceLocalSettingsLedgerRows).go();

@@ -317,6 +317,22 @@ void main() {
     expect(decoder.takeBufferedImage()!.data, 'iVBORw0KGgo=');
   });
 
+  test('keeps a signature-only trailing part for the next text turn', () {
+    final decoder = GoogleStreamDecoder(persistThoughtSigs: true);
+    decoder.accept(
+      _event(
+        _candidate(
+          parts: [
+            <String, dynamic>{'thoughtSignature': 'turn-sig'},
+          ],
+        ),
+      ),
+    );
+
+    expect(decoder.textThoughtSigKey, 'thoughtSignature');
+    expect(decoder.textThoughtSigVal, 'turn-sig');
+  });
+
   test('marks MALFORMED_RESPONSE for retry when there are no tool calls', () {
     final decoder = GoogleStreamDecoder();
     final result = decoder.accept(

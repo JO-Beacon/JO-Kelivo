@@ -138,11 +138,7 @@ abstract final class DeviceIdentityService {
     if (result.exitCode != 0) return null;
     final uuid = _parseIoregValue(result.stdout as String, 'IOPlatformUUID');
     if (uuid == null || !_isUsableHardwareId(uuid)) return null;
-    return _build(
-      rawId: uuid,
-      displayName: _macHostName(),
-      platform: 'macos',
-    );
+    return _build(rawId: uuid, displayName: _macHostName(), platform: 'macos');
   }
 
   static String _macHostName() {
@@ -178,9 +174,7 @@ abstract final class DeviceIdentityService {
 
   /// 从 `ioreg` 输出中取出形如 `"IOPlatformUUID" = "XXXX"` 的值。
   static String? _parseIoregValue(String output, String key) {
-    final match = RegExp(
-      '"$key"\\s*=\\s*"([^"]*)"',
-    ).firstMatch(output);
+    final match = RegExp('"$key"\\s*=\\s*"([^"]*)"').firstMatch(output);
     return match?.group(1);
   }
 
@@ -192,10 +186,10 @@ abstract final class DeviceIdentityService {
     final info = await DeviceInfoPlugin().androidInfo;
     final raw = info.id; // ANDROID_ID
     if (!_isUsableHardwareId(raw)) return null;
-    final name = [info.brand, info.model]
-        .where((part) => part.trim().isNotEmpty)
-        .join(' ')
-        .trim();
+    final name = [
+      info.brand,
+      info.model,
+    ].where((part) => part.trim().isNotEmpty).join(' ').trim();
     return _build(
       rawId: raw,
       displayName: name.isEmpty ? 'Android' : name,

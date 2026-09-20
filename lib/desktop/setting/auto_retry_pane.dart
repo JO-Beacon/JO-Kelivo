@@ -389,6 +389,7 @@ Widget _chipCard(
   final l10n = AppLocalizations.of(context)!;
   final cs = Theme.of(context).colorScheme;
   return SectionCard(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       Padding(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
@@ -516,9 +517,7 @@ class _Chip extends StatelessWidget {
 Widget _rowDivider(BuildContext context) {
   return Container(
     height: 1,
-    color: Theme.of(
-      context,
-    ).colorScheme.outlineVariant.withValues(alpha: 0.12),
+    color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.12),
   );
 }
 

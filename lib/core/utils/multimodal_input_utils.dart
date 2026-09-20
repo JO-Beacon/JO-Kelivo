@@ -9,6 +9,8 @@ const String multimodalInternalRevisionIdKey = '_kelivo_revision_id';
 const String multimodalInternalDocumentPathsKey = '_kelivo_document_paths';
 const String multimodalInternalClaudeContainerKey = '_kelivo_claude_container';
 const String multimodalInternalClaudeTurnKey = '_kelivo_claude_turn';
+const String multimodalInternalGeminiThoughtSignatureKey =
+    '_kelivo_gemini_thought_signature';
 
 const Set<String> _sandboxDataFileExtensions = <String>{
   'csv',
@@ -118,11 +120,25 @@ String resolveMediaAttachmentMime({
 }
 
 String resolveDocumentAttachmentMime(DocumentAttachment attachment) {
-  return resolveMediaAttachmentMime(
+  final mime = resolveMediaAttachmentMime(
     explicitMime: attachment.mime,
     fileName: attachment.fileName,
     path: attachment.path,
   );
+  if (!const {
+    '',
+    '*/*',
+    'application/octet-stream',
+    'binary/octet-stream',
+  }.contains(mime.split(';').first.trim())) {
+    return mime;
+  }
+  final name = attachment.fileName.toLowerCase();
+  if (name.endsWith('.pdf')) return 'application/pdf';
+  if (name.endsWith('.docx')) {
+    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  }
+  return mime;
 }
 
 /// 单个 `_kelivo_media_paths` 条目（旧版 [String] 或 map）的解析形式。

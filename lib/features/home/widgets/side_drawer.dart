@@ -5072,8 +5072,7 @@ void _dragDiagLog(String message) {
   FlutterLogger.log(message, tag: 'Drag');
 }
 
-String _dragDiagShortId(String id) =>
-    id.length <= 4 ? id : id.substring(0, 4);
+String _dragDiagShortId(String id) => id.length <= 4 ? id : id.substring(0, 4);
 
 String _dragDiagEntryLabel(_AssistantListEntry e) => e.isHeader
     ? '【组:${e.groupName ?? e.groupId}】'
@@ -5082,10 +5081,8 @@ String _dragDiagEntryLabel(_AssistantListEntry e) => e.isHeader
 String _dragDiagEntries(List<_AssistantListEntry> entries) =>
     entries.map(_dragDiagEntryLabel).join(' ');
 
-String _dragDiagDirectory(
-  AssistantProvider ap,
-  AssistantGroupProvider gp,
-) => ap.assistantDirectory
+String _dragDiagDirectory(AssistantProvider ap, AssistantGroupProvider gp) => ap
+    .assistantDirectory
     .map(
       (a) =>
           '${a.name}(${_dragDiagShortId(a.id)},组:'

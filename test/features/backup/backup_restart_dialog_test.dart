@@ -165,14 +165,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Merge completed'), findsOneWidget);
-    expect(
-      find.textContaining('Applied 3 device settings'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('Applied 3 device settings'), findsOneWidget);
     expect(find.textContaining('Restart'), findsNothing);
   });
 
-  testWidgets('merge mode combines skipped and applied notices', (tester) async {
+  testWidgets('merge mode combines skipped and applied notices', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('en'),
@@ -198,9 +197,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('2 conversations'), findsOneWidget);
-    expect(
-      find.textContaining('Applied 4 device settings'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('Applied 4 device settings'), findsOneWidget);
   });
 }

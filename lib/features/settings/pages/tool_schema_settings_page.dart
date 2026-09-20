@@ -4,17 +4,34 @@ import 'package:provider/provider.dart';
 import '../../../core/models/tool_schema_override.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/tools/built_in_tool_catalog.dart';
+import '../../../features/home/services/local_tools_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/section_card.dart';
 import '../../../theme/app_font_weights.dart';
-import '../widgets/tool_schema_widgets.dart';
+import '../widgets/tool_schema_ui.dart';
+import 'tool_schema_editor_page.dart';
 
-class ToolSchemaSettingsPage extends StatelessWidget {
+class ToolSchemaSettingsPage extends StatefulWidget {
   const ToolSchemaSettingsPage({super.key});
 
-  Future<void> _resetAll(BuildContext context) async {
-    if (!await confirmResetAllToolSchemas(context) || !context.mounted) return;
+  @override
+  State<ToolSchemaSettingsPage> createState() => _ToolSchemaSettingsPageState();
+}
+
+class _ToolSchemaSettingsPageState extends State<ToolSchemaSettingsPage> {
+  @override
+  void initState() {
+    super.initState();
+    DeviceLocalTools.prefetchIosCapabilities().then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  Future<void> _confirmResetAll() async {
+    final confirmed = await confirmResetAllToolSchemas(context);
+    if (!confirmed || !mounted) return;
     await context.read<SettingsProvider>().resetAllToolSchemaOverrides();
   }
 
@@ -27,6 +44,7 @@ class ToolSchemaSettingsPage extends StatelessWidget {
       lang: settings.resolvedMemoryPromptLang,
       legacyMemoryMode: settings.legacyMemoryMode,
     );
+
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
@@ -51,7 +69,7 @@ class ToolSchemaSettingsPage extends StatelessWidget {
               size: 20,
               minSize: 44,
               semanticLabel: l10n.toolSchemaSettingsResetAll,
-              onTap: () => _resetAll(context),
+              onTap: _confirmResetAll,
             ),
           ),
           const SizedBox(width: 4),
@@ -61,32 +79,33 @@ class ToolSchemaSettingsPage extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         children: [
           for (final group in BuiltInToolGroup.values)
-            ..._groupWidgets(
+            ..._groupSection(
               context,
-              group,
-              catalog.where((entry) => entry.group == group).toList(),
-              settings,
+              group: group,
+              entries: catalog.where((e) => e.group == group).toList(),
+              overrides: settings.toolSchemaOverrides,
             ),
         ],
       ),
     );
   }
 
-  List<Widget> _groupWidgets(
-    BuildContext context,
-    BuiltInToolGroup group,
-    List<BuiltInToolCatalogEntry> entries,
-    SettingsProvider settings,
-  ) {
-    if (entries.isEmpty) return const <Widget>[];
+  List<Widget> _groupSection(
+    BuildContext context, {
+    required BuiltInToolGroup group,
+    required List<BuiltInToolCatalogEntry> entries,
+    required Map<String, ToolSchemaOverride> overrides,
+  }) {
+    if (entries.isEmpty) return const [];
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final title = switch (group) {
       BuiltInToolGroup.search => l10n.toolSchemaSettingsGroupSearch,
       BuiltInToolGroup.memory => l10n.toolSchemaSettingsGroupMemory,
       BuiltInToolGroup.local => l10n.toolSchemaSettingsGroupLocal,
+      BuiltInToolGroup.workspace => l10n.workspacesTitle,
     };
-    return <Widget>[
+    return [
       Padding(
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
         child: Text(
@@ -105,25 +124,20 @@ class ToolSchemaSettingsPage extends StatelessWidget {
             l10n.toolSchemaSettingsMemoryLangNote,
             style: TextStyle(
               fontSize: 12,
+              height: 1.35,
               color: cs.onSurface.withValues(alpha: 0.55),
             ),
           ),
         ),
-      ToolSchemaSectionCard(
+      SectionCard(
+        padding: EdgeInsets.zero,
         children: [
-          for (var index = 0; index < entries.length; index++) ...[
-            if (index > 0)
-              Divider(
-                height: 1,
-                indent: 54,
-                color: cs.outlineVariant.withValues(alpha: 0.18),
-              ),
+          for (final entry in entries)
             ToolSchemaToolRow(
-              entry: entries[index],
-              schemaOverride: settings.toolSchemaOverrides[entries[index].name],
-              onTap: () => _openEditor(context, entries[index], settings),
+              entry: entry,
+              schemaOverride: overrides[entry.name],
+              onTap: () => _openEditor(context, entry, overrides[entry.name]),
             ),
-          ],
         ],
       ),
       const SizedBox(height: 18),
@@ -133,86 +147,21 @@ class ToolSchemaSettingsPage extends StatelessWidget {
   Future<void> _openEditor(
     BuildContext context,
     BuiltInToolCatalogEntry entry,
-    SettingsProvider settings,
+    ToolSchemaOverride? schemaOverride,
   ) async {
-    final value = await Navigator.of(context).push<ToolSchemaOverride?>(
-      MaterialPageRoute<ToolSchemaOverride?>(
+    final result = await Navigator.of(context).push<ToolSchemaOverride?>(
+      MaterialPageRoute(
         builder: (_) => ToolSchemaEditorPage(
+          toolName: entry.name,
           defaultDefinition: entry.defaultDefinition,
-          initialOverride: settings.toolSchemaOverrides[entry.name],
+          initialOverride: schemaOverride,
         ),
       ),
     );
-    if (value == null || !context.mounted) return;
+    if (result == null || !context.mounted) return;
     await context.read<SettingsProvider>().setToolSchemaOverride(
       entry.name,
-      value,
-    );
-  }
-}
-
-class ToolSchemaEditorPage extends StatefulWidget {
-  const ToolSchemaEditorPage({
-    super.key,
-    required this.defaultDefinition,
-    this.initialOverride,
-  });
-
-  final Map<String, dynamic> defaultDefinition;
-  final ToolSchemaOverride? initialOverride;
-
-  @override
-  State<ToolSchemaEditorPage> createState() => _ToolSchemaEditorPageState();
-}
-
-class _ToolSchemaEditorPageState extends State<ToolSchemaEditorPage> {
-  late ToolSchemaOverride _current =
-      widget.initialOverride ?? const ToolSchemaOverride();
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
-    return Scaffold(
-      backgroundColor: cs.surface,
-      appBar: AppBar(
-        leading: Tooltip(
-          message: l10n.settingsPageBackButton,
-          child: IosIconButton(
-            icon: Lucide.ArrowLeft,
-            color: cs.onSurface,
-            size: 22,
-            minSize: 44,
-            semanticLabel: l10n.settingsPageBackButton,
-            onTap: () => Navigator.of(context).pop(),
-          ),
-        ),
-        title: Text(l10n.toolSchemaEditorPageTitle),
-        actions: [
-          Tooltip(
-            message: l10n.searchServicesEditDialogSave,
-            child: IosIconButton(
-              icon: Lucide.Check,
-              color: cs.onSurface,
-              size: 22,
-              minSize: 44,
-              semanticLabel: l10n.searchServicesEditDialogSave,
-              onTap: () => Navigator.of(context).pop(_current),
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-        children: [
-          ToolSchemaEditorForm(
-            defaultDefinition: widget.defaultDefinition,
-            initialOverride: widget.initialOverride,
-            onChanged: (value) => _current = value,
-          ),
-        ],
-      ),
+      result,
     );
   }
 }

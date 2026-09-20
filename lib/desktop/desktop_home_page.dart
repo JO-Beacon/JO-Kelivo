@@ -11,6 +11,7 @@ import 'hotkeys/chat_action_bus.dart';
 import 'desktop_settings_navigation_bus.dart';
 import 'desktop_tray_controller.dart';
 import 'window_appearance.dart';
+import '../core/services/notification_service.dart';
 
 /// 桌面首页：左侧紧凑导航栏加主内容。
 /// 第一阶段关注结构以及适合平台端的交互和悬停效果。
@@ -35,6 +36,7 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
   StreamSubscription<HotkeyAction>? _hotkeySub;
   StreamSubscription<ChatAction>? _chatActionSub;
   StreamSubscription<DesktopSettingsNavigationTarget>? _settingsNavSub;
+  StreamSubscription<String>? _conversationOpenSub;
 
   @override
   void initState() {
@@ -43,6 +45,14 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
       _tabIndex = widget.initialTabIndex!.clamp(0, 3);
     }
     _storageVisited = _tabIndex == 2;
+    _conversationOpenSub = NotificationService.conversationTaps.listen((_) {
+      if (!mounted) return;
+      setState(() {
+        _tabIndex = 0;
+        _globalSearchActive = false;
+      });
+      ChatActionBus.instance.fire(ChatAction.exitGlobalSearch);
+    });
     // 初始进入时如果就是聊天页，则聚焦聊天输入框
     if (_tabIndex == 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -277,6 +287,7 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
 
   @override
   void dispose() {
+    unawaited(_conversationOpenSub?.cancel());
     try {
       _hotkeySub?.cancel();
     } catch (_) {}
@@ -291,4 +302,3 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
 }
 
 // 没有额外路由或垫片；我们直接在上方导入 DesktopSettingsPage。
-

@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 
 import '../../models/progress_update.dart';
-import '../../models/backup_task_progress.dart';
+import 'backup_cancel_token.dart';
 
 /// JO-AIClient 外部归档的隐式外层容器。
 ///

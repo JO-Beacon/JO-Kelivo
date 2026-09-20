@@ -57,8 +57,9 @@ class DesktopTrayController with TrayListener, WindowListener {
         await trayManager.setIcon('assets/icon_mac.png', isTemplate: true);
       } else {
         final suffix = _iconBrightness == Brightness.dark ? 'dark' : 'light';
-        final extension =
-            defaultTargetPlatform == TargetPlatform.windows ? 'ico' : 'png';
+        final extension = defaultTargetPlatform == TargetPlatform.windows
+            ? 'ico'
+            : 'png';
         await trayManager.setIcon('assets/icon_tray_$suffix.$extension');
       }
     } catch (_) {}

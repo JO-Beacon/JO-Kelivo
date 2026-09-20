@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../scheduled_tasks/pages/scheduled_tasks_page.dart';
 import 'package:flutter/material.dart';
 import '../../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
@@ -7,6 +10,8 @@ import '../../model/pages/default_model_page.dart';
 import '../../provider/pages/providers_page.dart';
 import 'display_settings_page.dart';
 import '../../mcp/pages/mcp_page.dart';
+import '../../workspace/pages/skills_page.dart';
+import '../../workspace/pages/workspace_settings_page.dart';
 import '../../assistant/pages/assistant_settings_page.dart';
 import 'about_page.dart';
 import 'debug_page.dart';
@@ -263,6 +268,43 @@ class SettingsPage extends StatelessWidget {
                   Navigator.of(
                     context,
                   ).push(MaterialPageRoute(builder: (_) => const McpPage()));
+                },
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.FolderCode,
+                label: l10n.settingsPageWorkspace,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const WorkspaceSettingsPage(),
+                    ),
+                  );
+                },
+              ),
+              _iosDivider(context),
+              if (defaultTargetPlatform == TargetPlatform.android) ...[
+                _iosNavRow(
+                  context,
+                  icon: LucideIcons.clock,
+                  label: l10n.scheduledTasksTitle,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ScheduledTasksPage(),
+                    ),
+                  ),
+                ),
+                _iosDivider(context),
+              ],
+              _iosNavRow(
+                context,
+                icon: Lucide.WandSparkles,
+                label: l10n.settingsPageSkills,
+                onTap: () {
+                  Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute(builder: (_) => const SkillsPage()));
                 },
               ),
               _iosDivider(context),
@@ -559,9 +601,8 @@ class _ChatStorageSummaryState extends State<_ChatStorageSummary> {
         if (snapshot.connectionState != ConnectionState.done) {
           return Text(l10n.settingsPageCalculating, style: style);
         }
-        final count = data?.totalFiles ?? 0;
         final size = _fmtBytes(data?.totalBytes ?? 0);
-        return Text(l10n.settingsPageFilesCount(count, size), style: style);
+        return Text(size, style: style);
       },
     );
   }

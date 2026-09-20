@@ -35,8 +35,10 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    // 与上游 ToolSchemaEditorForm 的 key 对齐（本仓库旧实现的 key 是
+    // 'tool-schema-description'，同步上游后改为 'tool-schema-desc'）。
     final descriptionField = find.descendant(
-      of: find.byKey(const ValueKey('tool-schema-description')),
+      of: find.byKey(const ValueKey('tool-schema-desc')),
       matching: find.byType(TextField),
     );
     await tester.enterText(descriptionField, 'Custom desktop wording');

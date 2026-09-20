@@ -4,12 +4,20 @@
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.VIBRATE"/>
     <!-- Microphone access for voice input waveform -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Foreground service + notifications for background execution (Android only) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
      <!-- Assistant local tools: calendar query/create -->
      <uses-permission android:name="android.permission.READ_CALENDAR" />
@@ -31,16 +39,17 @@
          export), so system backup is disabled. -->
     <application
         android:label="JO-AIClient"
-        android:name="${applicationName}"
+        android:name=".KelivoApplication"
         android:allowBackup="false"
         android:fullBackupContent="false"
         android:usesCleartextTraffic="true"
         android:requestLegacyExternalStorage="true"
         android:icon="@mipmap/ic_launcher">
+        <!-- Shares from another task must reach the existing chat composer. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTop"
+            android:launchMode="singleTask"
             android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
@@ -63,6 +72,19 @@
                 <category android:name="android.intent.category.DEFAULT"/>
                 <data android:mimeType="text/plain"/>
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
         </activity>
         <activity
             android:name=".McpOAuthCallbackActivity"
@@ -80,9 +102,32 @@
                 <data android:scheme="psyche.jokelivo" android:host="mcp-oauth-callback"/>
             </intent-filter>
         </activity>
+        <!-- A separate process keeps Android SQLite handles separate from Drift's
+             native SQLite connection and works without starting a Flutter engine. -->
+        <provider
+            android:name=".workspace.WorkspaceDocumentsProvider"
+            android:authorities="${applicationId}.workspace.documents"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS"
+            android:process=":workspace_documents">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider>
+        <receiver android:name=".scheduled.ScheduledTaskReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
         <!-- Foreground service to keep Flutter isolate alive for background generation -->
         <service
-            android:name="de.julianassmann.flutter_background.IsolateHolderService"
+            android:name=".background.GenerationForegroundService"
+            android:stopWithTask="false"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
         <activity

@@ -293,9 +293,10 @@ void main() {
           settings: const {},
         );
 
-        final prepared = await DataSync.prepareStartupRestoreFromFile(
+        // 启动恢复入口已与上游收敛成一套（保留上游名与参数名）。
+        final prepared = await DataSync.prepareStartupSnapshotRestore(
           appDataDirectory: root,
-          sourceFile: zipFile,
+          snapshot: zipFile,
         );
 
         expect(prepared.receipt.state, RestoreReceiptState.prepared);
@@ -521,7 +522,9 @@ void main() {
           expect(utf8.decode(entry!.readBytes()!), ledgerJson);
           final manifest =
               jsonDecode(
-                    utf8.decode(archive.findFile('manifest.json')!.readBytes()!),
+                    utf8.decode(
+                      archive.findFile('manifest.json')!.readBytes()!,
+                    ),
                   )
                   as Map<String, dynamic>;
           final manifestEntries = manifest['entries'] as Map;
@@ -545,7 +548,11 @@ void main() {
         const WebDavConfig(includeChats: false, includeFiles: false),
       );
       addTearDown(() => DataSync.cleanupTemporaryBackupFile(backupFile));
-      addTearDown(chatService.dispose);
+      addTearDown(() async {
+        // 等待数据库真正关闭，再允许外层清理临时目录。
+        await chatService.close();
+        chatService.dispose();
+      });
 
       expect(p.extension(backupFile.path), '.joaiclient');
       expect(
@@ -577,7 +584,11 @@ void main() {
 
         final progressSignal = Completer<void>();
         final chatService = ChatService();
-        addTearDown(chatService.dispose);
+        addTearDown(() async {
+          // 等待数据库真正关闭，再允许外层清理临时目录。
+          await chatService.close();
+          chatService.dispose();
+        });
         await DataSync(
           businessRepository: businessRepository,
           chatService: chatService,
@@ -638,7 +649,11 @@ void main() {
         await migrationService.dispose();
 
         final chatService = ChatService();
-        addTearDown(chatService.dispose);
+        addTearDown(() async {
+          // 等待数据库真正关闭，再允许外层清理临时目录。
+          await chatService.close();
+          chatService.dispose();
+        });
         final sync = DataSync(
           businessRepository: businessRepository,
           chatService: chatService,
@@ -1714,74 +1729,73 @@ void main() {
       },
     );
 
-    test('joaiclient merge keeps local conversations and imports backups', () async {
-      final chatService = ChatService();
-      addTearDown(chatService.close);
-      await chatService.init();
-      final localConversation = await chatService.createConversation(
-        title: 'Local',
-      );
+    test(
+      'joaiclient merge keeps local conversations and imports backups',
+      () async {
+        final chatService = ChatService();
+        addTearDown(chatService.close);
+        await chatService.init();
+        final localConversation = await chatService.createConversation(
+          title: 'Local',
+        );
 
-      final fixtureZip = await _createSqliteBackupFixture(
-        root: root,
-        prefix: 'joaiclient_merge',
-        settings: const {'backup_test_key': 'from-backup'},
-        includeFiles: true,
-        assetContent: 'fixture-asset',
-        conversations: [
-          Conversation(
-            id: 'backup-conversation',
-            title: 'Backup',
-            messageIds: const ['backup-message'],
-          ),
-        ],
-        messages: [
-          (
-            message: ChatMessage(
-              id: 'backup-message',
-              role: 'assistant',
-              content: 'backup content',
-              conversationId: 'backup-conversation',
+        final fixtureZip = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'joaiclient_merge',
+          settings: const {'backup_test_key': 'from-backup'},
+          includeFiles: true,
+          assetContent: 'fixture-asset',
+          conversations: [
+            Conversation(
+              id: 'backup-conversation',
+              title: 'Backup',
+              messageIds: const ['backup-message'],
             ),
-            messageOrder: 0,
-          ),
-        ],
-      );
-      final archiveFile = await JoaiclientArchive.wrapZipPayload(
-        zipFile: fixtureZip,
-        outputFile: File('${root.path}/joaiclient_merge.joaiclient'),
-      );
+          ],
+          messages: [
+            (
+              message: ChatMessage(
+                id: 'backup-message',
+                role: 'assistant',
+                content: 'backup content',
+                conversationId: 'backup-conversation',
+              ),
+              messageOrder: 0,
+            ),
+          ],
+        );
+        final archiveFile = await JoaiclientArchive.wrapZipPayload(
+          zipFile: fixtureZip,
+          outputFile: File('${root.path}/joaiclient_merge.joaiclient'),
+        );
 
-      final sync = DataSync(
-        businessRepository: businessRepository,
-        chatService: chatService,
-      );
-      await sync.restoreFromLocalFile(
-        archiveFile,
-        const WebDavConfig(includeChats: true, includeFiles: true),
-        mode: RestoreMode.merge,
-      );
+        final sync = DataSync(
+          businessRepository: businessRepository,
+          chatService: chatService,
+        );
+        await sync.restoreFromLocalFile(
+          archiveFile,
+          const WebDavConfig(includeChats: true, includeFiles: true),
+          mode: RestoreMode.merge,
+        );
 
-      expect(
-        sync.lastMergeReport,
-        isNotNull,
-        reason: '新版包应走聊天合并分支，而不是被强制覆盖',
-      );
-      expect(
-        chatService.getConversation(localConversation.id),
-        isNotNull,
-        reason: '合并保留不得删除本机已有会话',
-      );
-      expect(
-        chatService.getConversation('backup-conversation'),
-        isNotNull,
-        reason: '备份中的会话应被并入本机',
-      );
-      final restored = await BusinessRestoreService(
-        businessRepository,
-      ).exportSettings();
-      expect(restored['backup_test_key'], 'value', reason: '冲突时本机设置优先');
-    });
+        expect(sync.lastMergeReport, isNotNull, reason: '新版包应走聊天合并分支，而不是被强制覆盖');
+        expect(
+          chatService.getConversation(localConversation.id),
+          isNotNull,
+          reason: '合并保留不得删除本机已有会话',
+        );
+        expect(
+          chatService.getConversation('backup-conversation'),
+          isNotNull,
+          reason: '备份中的会话应被并入本机',
+        );
+        final restored = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
+        expect(restored['backup_test_key'], 'value', reason: '冲突时本机设置优先');
+      },
+    );
 
     test(
       'rejects a linked same-volume staging root before live writes',

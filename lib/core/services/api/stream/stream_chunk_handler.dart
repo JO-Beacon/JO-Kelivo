@@ -28,9 +28,11 @@ class StreamChunkHandler {
   final Map<String, int> _textIndex = <String, int>{};
   final Map<String, int> _reasoningIndex = <String, int>{};
   final Map<String, int> _imageIndex = <String, int>{};
+  final Map<String, int> _toolIndex = <String, int>{};
   final Map<String, _ToolBuffer> _tools = <String, _ToolBuffer>{};
   final Map<String, StringBuffer> _serverInput = <String, StringBuffer>{};
   final Map<String, String> _imageMime = <String, String>{};
+  final Map<String, StringBuffer> _imageBuffers = <String, StringBuffer>{};
 
   TokenUsage? usage;
   dynamic reasoningDetails;
@@ -92,6 +94,7 @@ class StreamChunkHandler {
       if (decoded is! Map) return;
       final id = (decoded['id'] ?? '').toString();
       if (id.isEmpty) return;
+      _toolIndex[id] = _parts.length - 1;
       final buffer = _tools.putIfAbsent(id, _ToolBuffer.new);
       final name = (decoded['name'] ?? '').toString();
       if (name.isNotEmpty) buffer.name = name;
@@ -199,39 +202,29 @@ class StreamChunkHandler {
       case ImageDelta(:final id, :final data):
         if (data.isEmpty) return;
         final mime = _imageMime[id] ?? 'image/png';
-        final index = _imageIndex[id];
-        if (isCompleteImageUri(data) ||
-            index == null ||
-            _parts[index] is! ImagePart) {
+        if (isCompleteImageUri(data)) {
           _ensureImage(id, mimeType: mime, data: data);
-        } else {
-          final current = _parts[index] as ImagePart;
-          _parts[index] = ImagePart(
-            uri: '${current.uri}$data',
-            mime: current.mime ?? mime,
-          );
+          return;
         }
+        _imageBuffers.putIfAbsent(id, StringBuffer.new).write(data);
       case ImageSnapshot(:final id, :final data):
         if (data.isEmpty) return;
         final mime = _imageMime[id] ?? 'image/png';
+        _ensureImage(id, mimeType: mime, data: data);
+        if (!isCompleteImageUri(data)) {
+          _imageBuffers[id] = StringBuffer(data);
+        }
+      case ImageEnd(:final id):
+        final mime = _imageMime[id] ?? 'image/png';
+        final buffered = _imageBuffers.remove(id)?.toString() ?? '';
         final index = _imageIndex[id];
         final current = index != null && _parts[index] is ImagePart
             ? _parts[index] as ImagePart
             : null;
-        if (isCompleteImageUri(data) ||
-            current == null ||
-            !current.uri.startsWith('data:')) {
-          _ensureImage(id, mimeType: mime, data: data);
-        } else {
-          final prefix = current.uri.contains(',')
-              ? current.uri.substring(0, current.uri.indexOf(',') + 1)
-              : 'data:$mime;base64,';
-          _parts[index!] = ImagePart(
-            uri: '$prefix$data',
-            mime: current.mime ?? mime,
-          );
+        if (buffered.isNotEmpty &&
+            (current == null || current.uri.startsWith('data:'))) {
+          _ensureImage(id, mimeType: mime, data: buffered);
         }
-      case ImageEnd(:final id):
         _imageIndex.remove(id);
         _imageMime.remove(id);
       case Annotations(:final id, :final annotations):
@@ -264,12 +257,21 @@ class StreamChunkHandler {
       case Finish(:final finishReason):
         this.finishReason = finishReason;
         finished = true;
+        // Tool payloads were encoded while the turn was still streaming, so
+        // their replay metadata stops at whatever had arrived by then. The
+        // metadata holds a live reference to the provider's block list, so
+        // re-encoding now captures the finished turn.
+        for (final id in _tools.keys.toList()) {
+          _upsertTool(id);
+        }
         _textIndex.clear();
         _reasoningIndex.clear();
         _imageIndex.clear();
+        _toolIndex.clear();
         _tools.clear();
         _serverInput.clear();
         _imageMime.clear();
+        _imageBuffers.clear();
     }
   }
 
@@ -297,7 +299,7 @@ class StreamChunkHandler {
     _imageMime[id] = mimeType;
     final uri = isCompleteImageUri(data) ? data : 'data:$mimeType;base64,$data';
     final index = _imageIndex[id];
-    final part = ImagePart(uri: uri, mime: mimeType);
+    final part = ImagePart(uri: uri, mime: mimeType, id: id);
     if (index != null && _parts[index] is ImagePart) {
       _parts[index] = part;
       return index;
@@ -320,7 +322,12 @@ class StreamChunkHandler {
     if (name != null && name.isNotEmpty) buffer.name = name;
     if (nameDelta.isNotEmpty) buffer.name += nameDelta;
     if (inputDelta.isNotEmpty) buffer.input.write(inputDelta);
-    if (argumentsObject != null) buffer.arguments = argumentsObject;
+    // A decoder that never saw the call reports no arguments; empty ones are
+    // no news either, and would erase the input already streamed for it.
+    if (argumentsObject != null &&
+        !(argumentsObject is Map && argumentsObject.isEmpty)) {
+      buffer.arguments = argumentsObject;
+    }
     if (content != null) buffer.content = content;
     buffer.server = buffer.server || server;
     if (metadata != null && metadata.isNotEmpty) {
@@ -337,14 +344,13 @@ class StreamChunkHandler {
         'metadata': buffer.metadata,
     });
 
-    final index = _parts.indexWhere(
-      (part) => part is ToolCallPart && _toolId(part) == id,
-    );
+    final index = _toolIndex[id];
     final part = ToolCallPart(payload);
-    if (index < 0) {
-      _parts.add(part);
-    } else {
+    if (index != null && _parts[index] is ToolCallPart) {
       _parts[index] = part;
+    } else {
+      _parts.add(part);
+      _toolIndex[id] = _parts.length - 1;
     }
   }
 
@@ -414,14 +420,6 @@ class StreamChunkHandler {
         if (decoded is Map) return Map<String, dynamic>.from(decoded);
       } catch (_) {}
     }
-    return null;
-  }
-
-  String? _toolId(ToolCallPart part) {
-    try {
-      final decoded = jsonDecode(part.payloadJson);
-      if (decoded is Map) return (decoded['id'] ?? '').toString();
-    } catch (_) {}
     return null;
   }
 }

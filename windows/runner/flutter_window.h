@@ -7,6 +7,7 @@
 #include <memory>
 #include <flutter/method_channel.h>
 #include <flutter/standard_method_codec.h>
+#include <cstdint>
 
 #include "win32_window.h"
 
@@ -25,6 +26,9 @@ class FlutterWindow : public Win32Window {
                          LPARAM const lparam) noexcept override;
 
  private:
+  bool system_sleeping_ = false;
+  int64_t last_system_wake_at_ = 0;
+
   // The project to run.
   flutter::DartProject project_;
 

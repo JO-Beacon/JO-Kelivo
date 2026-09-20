@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
 import '../../shared/widgets/ios_switch.dart';
+import '../../shared/widgets/section_card.dart';
 import '../../core/providers/hotkey_provider.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
@@ -81,22 +82,10 @@ class _DesktopHotkeysPaneState extends State<DesktopHotkeysPane> {
   }
 
   Widget _sectionCard({required List<Widget> children}) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(16),
-        // 未选中时匹配 TTS 卡片较浅的边框
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08),
-          width: 0.6,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-        child: Column(children: children),
-      ),
+    return SectionCard(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      radius: 16,
+      children: children,
     );
   }
 

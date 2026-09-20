@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/services/backup/restore_bundle_preparation.dart';
+import 'package:Kelivo/core/services/backup/restore_previous_plan.dart';
 import 'package:Kelivo/core/services/backup/restore_receipt.dart';
 import 'package:Kelivo/core/services/backup/restore_workspace_lock.dart';
 
@@ -140,7 +141,7 @@ void main() {
         ).exists(),
         isFalse,
       );
-      for (final rootName in const ['upload', 'images', 'avatars', 'fonts']) {
+      for (final rootName in RestorePreviousAssetsPlan.rootNames) {
         expect(
           await Directory(
             p.join(prepared.candidateDirectory.path, rootName),

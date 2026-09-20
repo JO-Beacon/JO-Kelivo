@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../core/providers/assistant_provider.dart';
 import '../core/providers/settings_provider.dart';
+import '../theme/design_tokens.dart';
 import '../icons/lucide_adapter.dart';
 import '../icons/reasoning_icons.dart';
 import '../l10n/app_localizations.dart';
@@ -196,25 +197,27 @@ class _GlassPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cs = Theme.of(context).colorScheme;
+    final radius = borderRadius ?? BorderRadius.circular(14);
     return ClipRRect(
-      borderRadius: borderRadius ?? BorderRadius.circular(14),
+      borderRadius: radius,
       child: BackdropFilter(
         filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: DecoratedBox(
           decoration: BoxDecoration(
             // 匹配偏好的灰色柔和样式
-            color: cs.surface.withValues(alpha: isDark ? 0.28 : 0.56),
+            color: AppOverlayColors.desktopPopoverSurface(cs),
+            borderRadius: radius,
             border: Border(
               top: BorderSide(
-                color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.18),
+                color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.12),
                 width: 0.7,
               ),
               left: BorderSide(
-                color: cs.onSurface.withValues(alpha: isDark ? 0.04 : 0.12),
+                color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.12),
                 width: 0.6,
               ),
               right: BorderSide(
-                color: cs.onSurface.withValues(alpha: isDark ? 0.04 : 0.12),
+                color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.12),
                 width: 0.6,
               ),
             ),

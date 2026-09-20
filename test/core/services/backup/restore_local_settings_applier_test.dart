@@ -42,9 +42,7 @@ void main() {
   });
 
   void writeCandidate(Map<String, Object?> values, {String fp = _fp}) {
-    final dir = Directory(
-      '${candidateDirectory.path}/device_local_settings',
-    );
+    final dir = Directory('${candidateDirectory.path}/device_local_settings');
     dir.createSync(recursive: true);
     File('${dir.path}/$fp.json').writeAsStringSync(
       jsonEncode({
@@ -140,9 +138,8 @@ void main() {
   });
 
   test('候选文件损坏时静默失败且不记位（留给下次冷启动重试）', () async {
-    final dir = Directory(
-      '${candidateDirectory.path}/device_local_settings',
-    )..createSync(recursive: true);
+    final dir = Directory('${candidateDirectory.path}/device_local_settings')
+      ..createSync(recursive: true);
     File('${dir.path}/$_fp.json').writeAsStringSync('{ not json');
 
     final written = await RestoreLocalSettingsApplier.applyIfNeeded(

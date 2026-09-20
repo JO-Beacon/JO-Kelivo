@@ -107,6 +107,36 @@ void main() {
     expect(decoder.outputItems, isNotEmpty);
   });
 
+  test('keeps the first-seen item id when call_id arrives later', () {
+    final decoder = ResponsesStreamDecoder();
+    decoder.accept(
+      _event({
+        'type': 'response.output_item.added',
+        'output_index': 0,
+        'item': {'id': 'fc_1', 'type': 'function_call', 'name': 'lookup'},
+      }),
+    );
+    decoder.accept(
+      _event({
+        'type': 'response.output_item.done',
+        'output_index': 0,
+        'item': {
+          'id': 'fc_1',
+          'type': 'function_call',
+          'call_id': 'call_1',
+          'name': 'lookup',
+          'arguments': '{"q":"kelivo"}',
+        },
+      }),
+    );
+
+    final call = decoder.takeFunctionCalls().single;
+    expect(call.seriesId, 'fc_1');
+    expect(call.callId, 'call_1');
+    expect(call.toIndexFields()['series_id'], 'fc_1');
+    expect(call.toIndexFields()['call_id'], 'call_1');
+  });
+
   test('emits ToolCall and citation events from parsed side-channels', () {
     final decoder = ResponsesStreamDecoder();
     final start = decoder.accept(

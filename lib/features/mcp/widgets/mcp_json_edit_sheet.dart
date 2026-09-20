@@ -12,11 +12,10 @@ import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 Future<void> showMcpJsonEditSheet(BuildContext context) async {
-  final cs = Theme.of(context).colorScheme;
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -161,6 +160,10 @@ class _McpJsonEditSheetState extends State<_McpJsonEditSheet> {
                     padding: const EdgeInsets.all(12),
                     child: TextField(
                       controller: _controller,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      smartDashesType: SmartDashesType.disabled,
+                      smartQuotesType: SmartQuotesType.disabled,
                       keyboardType: TextInputType.multiline,
                       maxLines: null,
                       style: TextStyle(

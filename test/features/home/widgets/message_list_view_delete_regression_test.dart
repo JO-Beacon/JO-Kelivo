@@ -150,7 +150,6 @@ class _DeleteHarnessState extends State<_DeleteHarness> {
               selecting: false,
               selectedItems: const {},
               dividerPadding: EdgeInsets.zero,
-              isProcessingFiles: isProcessingFiles,
               removingSlotIds: removing,
               showTokenStats: false,
             ),

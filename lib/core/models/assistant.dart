@@ -51,6 +51,13 @@ class Assistant {
   final bool searchEnabled; // 每个助手的联网搜索开关
   final List<String> mcpServerIds; // 绑定的 MCP 服务器 ID
   final List<String> localToolIds; // 启用的本地工具 ID
+
+  /// 该助手新建会话时默认使用的工作区。
+  final String? defaultWorkspaceId;
+
+  /// 启用的技能 ID。`null` 表示所有已安装技能都可用。
+  final List<String>? skillIds;
+
   /// 该助手可读取的 HealthKit 指标 ID。健康总开关关闭时保留选择，
   /// 以便重新开启时恢复。
   final List<String> healthDataTypeIds;
@@ -101,6 +108,8 @@ class Assistant {
     this.searchEnabled = false,
     this.mcpServerIds = const <String>[],
     this.localToolIds = const <String>[],
+    this.defaultWorkspaceId,
+    this.skillIds,
     this.healthDataTypeIds = HealthDataTypeIds.defaultSelected,
     this.background,
     this.useGradientBackground = false,
@@ -145,6 +154,8 @@ class Assistant {
     bool? searchEnabled,
     List<String>? mcpServerIds,
     List<String>? localToolIds,
+    String? defaultWorkspaceId,
+    List<String>? skillIds,
     List<String>? healthDataTypeIds,
     String? background,
     bool? useGradientBackground,
@@ -167,6 +178,8 @@ class Assistant {
     List<PresetMessage>? presetMessages,
     List<AssistantRegex>? regexRules,
     bool clearChatModel = false,
+    bool clearDefaultWorkspaceId = false,
+    bool clearSkillIds = false,
     bool clearAvatar = false,
     bool clearAvatarTransform = false,
     bool clearTemperature = false,
@@ -202,6 +215,10 @@ class Assistant {
       searchEnabled: searchEnabled ?? this.searchEnabled,
       mcpServerIds: mcpServerIds ?? this.mcpServerIds,
       localToolIds: localToolIds ?? this.localToolIds,
+      defaultWorkspaceId: clearDefaultWorkspaceId
+          ? null
+          : (defaultWorkspaceId ?? this.defaultWorkspaceId),
+      skillIds: clearSkillIds ? null : (skillIds ?? this.skillIds),
       healthDataTypeIds: healthDataTypeIds ?? this.healthDataTypeIds,
       background: clearBackground ? null : (background ?? this.background),
       useGradientBackground:
@@ -257,6 +274,8 @@ class Assistant {
     'searchEnabled': searchEnabled,
     'mcpServerIds': mcpServerIds,
     'localToolIds': localToolIds,
+    'defaultWorkspaceId': defaultWorkspaceId,
+    'skillIds': skillIds,
     'healthDataTypeIds': healthDataTypeIds,
     'background': background,
     'useGradientBackground': useGradientBackground,
@@ -308,6 +327,10 @@ class Assistant {
         (json['mcpServerIds'] as List?)?.cast<String>() ?? const <String>[],
     localToolIds:
         (json['localToolIds'] as List?)?.cast<String>() ?? const <String>[],
+    defaultWorkspaceId: json['defaultWorkspaceId'] as String?,
+    skillIds: json['skillIds'] == null
+        ? null
+        : (json['skillIds'] as List).map((e) => e.toString()).toList(),
     healthDataTypeIds: HealthDataTypeIds.parseStoredIds(
       json['healthDataTypeIds'],
     ),

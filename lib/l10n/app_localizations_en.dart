@@ -94,11 +94,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPageCalculating => 'Calculating…';
 
   @override
-  String settingsPageFilesCount(int count, String size) {
-    return '$count files · $size';
-  }
-
-  @override
   String get storageSpacePageTitle => 'Storage Space';
 
   @override
@@ -174,11 +169,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageSpaceCategoryOther => 'Other';
-
-  @override
-  String storageSpaceFilesCount(int count) {
-    return '$count files';
-  }
 
   @override
   String get storageSpaceSafeToClearHint =>
@@ -2211,6 +2201,21 @@ class AppLocalizationsEn extends AppLocalizations {
       'Chatbox Import (<1.22) · Pinned';
 
   @override
+  String get backupPageChatboxModernDeletedProviderGroupName =>
+      'Chatbox Import (>=1.22) · Deleted';
+
+  @override
+  String get backupPageChatboxModernGroupName => 'Chatbox Import (>=1.22)';
+
+  @override
+  String get backupPageChatboxModernStarredGroupName =>
+      'Chatbox Import (>=1.22) · Pinned';
+
+  @override
+  String get backupPageChatboxModernNote =>
+      'Chatbox personas and agent notes are not imported. Providers, assistants, conversations, messages and files are.';
+
+  @override
   String get backupPageImportFromDeepSeek => 'Import from DeepSeek Web/App';
 
   @override
@@ -2748,10 +2753,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get chatMessageWidgetRegenerateConfirmInterruptNotice =>
       'Regenerating will interrupt the reply that is currently being generated.';
-
-  @override
-  String get chatMessageWidgetRegenerateConfirmDeleteTrailingContent =>
-      'Regenerating will delete all messages below this message and cannot be undone. Continue?';
 
   @override
   String get chatMessageWidgetRegenerateConfirmCancel => 'Cancel';
@@ -4929,10 +4930,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get displaySettingsPageHideToolResultImagesSubtitle =>
       'Hide Markdown images displayed in tool results';
-
-  @override
-  String get displaySettingsPageRegenerateDeleteTrailingMessagesTitle =>
-      'Delete messages below when regenerating';
 
   @override
   String get displaySettingsPageShowRegenerateConfirmDialogTitle =>
@@ -7566,8 +7563,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Global setting for all assistants. Both datasets are kept; you can switch back anytime. Legacy memory is per-assistant only — no global memory, user profile, background organize, traces, or past-conversation search.';
 
   @override
-  String get legacyMemoryModeCacheWarning =>
-      'Legacy mode writes all memories and the current time into the system prompt every turn, so prompt cache cannot hit and long chats cost more.';
+  String legacyMemoryModeCacheWarning(String token) {
+    return 'Legacy mode writes all memories and the current time into the system prompt every turn, so prompt cache cannot hit and long chats cost more.';
+  }
 
   @override
   String get memoryUiContentLabel => 'Content';
@@ -9062,7 +9060,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupIncludeLocalSettingsOnSubtitle =>
-      'Window size and position, desktop hotkeys and chat font size travel with the backup. Such backups can only be restored on newer versions of JO-AIClient.';
+      'Window size and position, desktop hotkeys and chat font size travel with the backup.';
 
   @override
   String get backupIncludeLocalSettingsOffSubtitle =>
@@ -9552,4 +9550,2965 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get startupRecoveryReportSaveFailed => 'Could not export the report.';
+
+  @override
+  String get storageSpaceCategoryDisplacedDatabases => 'Set-Aside Databases';
+
+  @override
+  String get storageSpaceSubDisplacedDatabases =>
+      'Kept before an automatic rebuild';
+
+  @override
+  String get storageSpaceClearDisplacedDatabasesConfirmMessage =>
+      'Delete these set-aside databases? JO-AIClient kept them when it rebuilt its database, and they may be the only surviving copy of those chats and settings. This cannot be undone.';
+
+  @override
+  String get storageSpaceClearDisplacedDatabasesButton =>
+      'Delete Set-Aside Databases';
+
+  @override
+  String get assistantTagsManageTitle => 'Manage Tags';
+
+  @override
+  String get assistantTagsCreateButton => 'Create';
+
+  @override
+  String get assistantTagsCreateDialogTitle => 'Create Tag';
+
+  @override
+  String get assistantTagsCreateDialogOk => 'Create';
+
+  @override
+  String get assistantTagsCreateDialogCancel => 'Cancel';
+
+  @override
+  String get assistantTagsNameHint => 'Tag name';
+
+  @override
+  String get assistantTagsRenameButton => 'Rename';
+
+  @override
+  String get assistantTagsRenameDialogTitle => 'Rename Tag';
+
+  @override
+  String get assistantTagsRenameDialogOk => 'Rename';
+
+  @override
+  String get assistantTagsDeleteButton => 'Delete';
+
+  @override
+  String get assistantTagsDeleteConfirmTitle => 'Delete Tag';
+
+  @override
+  String get assistantTagsDeleteConfirmContent =>
+      'Are you sure you want to delete this tag?';
+
+  @override
+  String get assistantTagsDeleteConfirmOk => 'Delete';
+
+  @override
+  String get assistantTagsDeleteConfirmCancel => 'Cancel';
+
+  @override
+  String get assistantTagsContextMenuEditAssistant => 'Edit Assistant';
+
+  @override
+  String get assistantTagsContextMenuManageTags => 'Manage Tags';
+
+  @override
+  String get assistantTagsContextMenuDeleteAssistant => 'Delete Assistant';
+
+  @override
+  String get assistantTagsClearTag => 'Clear Tag';
+
+  @override
+  String get assistantEditPageWorkspaceTab => 'Workspace';
+
+  @override
+  String get startupRecoverySectionDataTitle => 'Your data';
+
+  @override
+  String get startupRecoverySectionDataBody =>
+      'Nothing has been deleted. Save a copy somewhere safe before trying anything below.';
+
+  @override
+  String startupRecoveryExportSavedTo(String path) {
+    return 'A copy of your data was saved to $path';
+  }
+
+  @override
+  String get startupRecoverySectionRepairTitle => 'Diagnose and repair';
+
+  @override
+  String get startupRecoverySectionRepairBody =>
+      'The integrity check only reads the database. Repair clears leftover metadata from an interrupted update and retries startup; it never deletes chats.';
+
+  @override
+  String get startupRecoveryDangerZone => 'Danger zone';
+
+  @override
+  String get startupRecoveryDangerBody =>
+      'Resetting permanently deletes JO-AIClient\'s database on this device. Export a copy of your data first — a reset also destroys the evidence needed to fix the underlying problem.';
+
+  @override
+  String get startupRecoveryResetAcknowledge =>
+      'I exported a copy, or I do not need this data.';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeTitle =>
+      'If you need an older version';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeIntro =>
+      'This version cannot open the database on this device. If you must keep using an older version, follow the steps below. Do not delete or overwrite the data here until you have a backup.';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeStep1 =>
+      'Install and open the latest JO-AIClient, then export a backup from Settings → Backup.';
+
+  @override
+  String startupDatabaseUpdateRequiredDowngradeStep2(String url) {
+    return 'Open $url and convert that backup to the older version you want to use.';
+  }
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeStep3 =>
+      'After you have confirmed the data on this device is backed up, install the older version and import the converted backup.';
+
+  @override
+  String get startupDatabaseUpdateRequiredOpenTool => 'Open conversion tool';
+
+  @override
+  String get backupPageForwardCompatTitle => 'Backup is from a newer version';
+
+  @override
+  String backupPageForwardCompatBody(int backupVersion, int currentVersion) {
+    return 'This backup was created by a newer version of JO-AIClient (data format $backupVersion; this version supports $currentVersion), and it does not say whether older versions can read it.\n\nYou can continue: anything this version does not recognise will be skipped, and the backup file itself is not modified. But if the newer version changed how existing data is stored, some content may be imported incorrectly.\n\nUpdating JO-AIClient first is the safer choice.';
+  }
+
+  @override
+  String get backupPageForwardCompatContinue => 'Import anyway';
+
+  @override
+  String get backupPageForwardCompatCancel => 'Cancel';
+
+  @override
+  String get backupPageSchemaTooNewMessage =>
+      'This backup was created by a newer version of JO-AIClient and cannot be read by this version. Please update JO-AIClient and try again.';
+
+  @override
+  String get messageEditPageSave => 'Save';
+
+  @override
+  String get messageEditPageSaveAndSend => 'Save & Send';
+
+  @override
+  String get userMessageEditSaveOnly => 'Save Only';
+
+  @override
+  String get userMessageEditUnsupportedSnackbar =>
+      'This content does not support editing';
+
+  @override
+  String get userMessageEditOverwriteTitle => 'Notice';
+
+  @override
+  String get userMessageEditOverwriteContent =>
+      'Editing will overwrite the existing input. Overwrite it?';
+
+  @override
+  String get messageMoreSheetCreateBranch => 'Create Branch';
+
+  @override
+  String get chatInputBarToolsTooltip => 'Tools';
+
+  @override
+  String get modelDetailSheetWebFetchTool => 'Web Fetch';
+
+  @override
+  String get modelDetailSheetOpenrouterWebFetchToolDescription =>
+      'Enable OpenRouter web fetch server tool';
+
+  @override
+  String get modelDetailSheetClaudeWebFetchToolDescription =>
+      'Let Claude fetch pages and PDFs from URLs in the conversation';
+
+  @override
+  String get modelDetailSheetClaudeCodeExecutionToolDescription =>
+      'Let Claude run Python and Bash in Anthropic\'s sandbox';
+
+  @override
+  String get modelDetailSheetOpenrouterShellTool => 'Shell';
+
+  @override
+  String get modelDetailSheetOpenrouterShellToolDescription =>
+      'Run Shell commands in a hosted, isolated sandbox';
+
+  @override
+  String get modelSelectSheetFollowAssistant => 'Follow assistant';
+
+  @override
+  String get aboutPageKelivoSearchUnlocked =>
+      'An unnamed door opened a crack. You might find it in Settings.';
+
+  @override
+  String get aboutPageKelivoSearchAlreadyUnlocked =>
+      'You\'ve already been through this door.';
+
+  @override
+  String get aboutPageQQGroupThree => 'Kelivo Group 3';
+
+  @override
+  String get displaySettingsPageForkKeepMessageVersionsTitle =>
+      'Keep Message Versions When Forking';
+
+  @override
+  String get displaySettingsPageEditAssistantKeepThinkingToolCardsTitle =>
+      'Keep thinking and tool cards when editing assistant';
+
+  @override
+  String get displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle =>
+      'When off, the edited version keeps only the assistant text. Switching back still shows previous thinking and tool cards.';
+
+  @override
+  String get themeAdvancedSettingsPageTitle => 'Theme Advanced';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSurfacesTitle =>
+      'Layered surfaces (experimental)';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSurfacesSubtitle =>
+      'Darker page, brighter cards; both keep theme hue. Turn off to restore the previous look.';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSheetTilesTitle =>
+      'Layered sheet tiles';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSheetTilesSubtitle =>
+      'By default, tiles match the sheet background.';
+
+  @override
+  String get searchServiceNameKelivo => 'Kelivo';
+
+  @override
+  String memorySettingsInjectionMaxItemsOption(int n) {
+    return '$n';
+  }
+
+  @override
+  String get assistantEditMemorySwitchSubtitle =>
+      'Inject saved memories into chats and let this assistant write new ones';
+
+  @override
+  String get assistantEditWriteScopeAlwaysGlobalSubtitle =>
+      'New memories are shared with every assistant';
+
+  @override
+  String get assistantEditWriteScopeAlwaysAssistantSubtitle =>
+      'New memories stay private to this assistant';
+
+  @override
+  String get assistantEditWriteScopeToolDefaultGlobalSubtitle =>
+      'The model may pick global or this assistant; default is global';
+
+  @override
+  String get assistantEditWriteScopeToolDefaultAssistantSubtitle =>
+      'The model may pick global or this assistant; default is this assistant';
+
+  @override
+  String get assistantEditDedupeModeBatchedSubtitle =>
+      'Judge all new candidates in one request. Faster and cheaper; less precise when many items arrive at once.';
+
+  @override
+  String get assistantEditDedupeModePerItemSubtitle =>
+      'Judge each candidate in its own request. More accurate; uses more model calls.';
+
+  @override
+  String get migrationStartWithoutBackupButton => 'Migrate Without Backing Up';
+
+  @override
+  String get migrationSkipChatsJsonOption => 'Skip chats.json';
+
+  @override
+  String get migrationSkipChatsJsonDescription =>
+      'Still backs up the original Hive files, settings, and local files. Recommended for very large histories.';
+
+  @override
+  String get migrationSkipBackupOption => 'Skip this backup';
+
+  @override
+  String get migrationSkipBackupDescription =>
+      'Only select this if you already have a verified backup. Migration will start immediately.';
+
+  @override
+  String get migrationChatsExportDegradedNote =>
+      'The chats.json export was skipped because of an error. The backup ZIP still contains the raw Hive files with your complete chat history.';
+
+  @override
+  String get localSnapshotKeepSubtitle =>
+      'Plus one from last week and one from last month, so a problem that went unnoticed is still recoverable.';
+
+  @override
+  String get localSnapshotAnnounceSubtitle =>
+      'Failures are always reported. This only adds a brief message on success.';
+
+  @override
+  String get localSnapshotStatusUnchanged =>
+      'Nothing has changed since the last copy';
+
+  @override
+  String get localSnapshotCopyPinned => 'Kept';
+
+  @override
+  String get localSnapshotBusyMessage =>
+      'Another backup task is already running';
+
+  @override
+  String get workspaceFileNotAvailable => 'File not available';
+
+  @override
+  String get workspaceTerminalNotAvailable => 'Terminal not available';
+
+  @override
+  String get workspacePreviewCopyPath => 'Copy path';
+
+  @override
+  String get workspacePreviewShare => 'Share';
+
+  @override
+  String get workspacePreviewOpenExternally => 'Open externally';
+
+  @override
+  String get workspacePreviewOpenWith => 'Open with…';
+
+  @override
+  String get workspacePreviewFileTooLarge =>
+      'This file is too large to preview. Open it externally instead.';
+
+  @override
+  String get workspacePreviewSource => 'Source';
+
+  @override
+  String get workspacePreviewRendered => 'Rendered';
+
+  @override
+  String get workspacePreviewFileName => 'Name';
+
+  @override
+  String get workspacePreviewFileSize => 'Size';
+
+  @override
+  String get workspacePreviewFileModified => 'Modified';
+
+  @override
+  String get workspacePreviewPathCopied => 'Path copied';
+
+  @override
+  String workspacePreviewLineCount(int count) {
+    return '$count lines';
+  }
+
+  @override
+  String get workspaceFilesSort => 'Sort';
+
+  @override
+  String get workspaceFilesSortName => 'Name';
+
+  @override
+  String get workspaceFilesSortModified => 'Modified';
+
+  @override
+  String get workspaceFilesSortSize => 'Size';
+
+  @override
+  String get workspaceFilesSortAscending => 'Ascending';
+
+  @override
+  String get workspaceFilesSortDescending => 'Descending';
+
+  @override
+  String get workspaceFilesShowHidden => 'Show hidden files';
+
+  @override
+  String get workspaceFilesHideHidden => 'Hide hidden files';
+
+  @override
+  String get workspaceFilesRefresh => 'Refresh';
+
+  @override
+  String get workspaceFilesNewFolder => 'New folder';
+
+  @override
+  String get workspaceFilesNewFile => 'New file';
+
+  @override
+  String get workspaceFilesImport => 'Import';
+
+  @override
+  String get workspaceFilesExport => 'Export';
+
+  @override
+  String get workspaceFilesExportFolder => 'Export folder';
+
+  @override
+  String get workspaceFilesEmpty => 'This folder is empty';
+
+  @override
+  String get workspaceFilesError => 'Couldn’t load these files';
+
+  @override
+  String get workspaceFilesRetry => 'Retry';
+
+  @override
+  String get workspaceFilesPreview => 'Preview';
+
+  @override
+  String get workspaceFilesRename => 'Rename';
+
+  @override
+  String get workspaceFilesMove => 'Move';
+
+  @override
+  String get workspaceFilesDelete => 'Delete';
+
+  @override
+  String get workspaceFilesShare => 'Share';
+
+  @override
+  String get workspaceFilesCopyPath => 'Copy path';
+
+  @override
+  String get workspaceFilesExportItem => 'Export';
+
+  @override
+  String get workspaceFilesNameLabel => 'Name';
+
+  @override
+  String get workspaceFilesNameHint => 'Enter a name';
+
+  @override
+  String get workspaceFilesCreate => 'Create';
+
+  @override
+  String get workspaceFilesCancel => 'Cancel';
+
+  @override
+  String get workspaceFilesConfirm => 'Confirm';
+
+  @override
+  String get workspaceFilesSave => 'Save';
+
+  @override
+  String get workspaceFilesDeleteTitle => 'Delete this item?';
+
+  @override
+  String workspaceFilesDeleteMessage(String name) {
+    return 'Delete $name?';
+  }
+
+  @override
+  String workspaceFilesDeleteFolderMessage(String name) {
+    return 'Delete folder $name and everything inside?';
+  }
+
+  @override
+  String get workspaceFilesMoveTitle => 'Move to folder';
+
+  @override
+  String get workspaceFilesMoveHere => 'Move here';
+
+  @override
+  String get workspaceFilesPathCopied => 'Path copied';
+
+  @override
+  String get workspaceFilesInvalidName => 'That name isn’t valid';
+
+  @override
+  String get workspaceFilesInvalidPath => 'That path is outside this folder';
+
+  @override
+  String workspaceFilesOperationFailed(String error) {
+    return 'Couldn’t complete that action: $error';
+  }
+
+  @override
+  String get workspaceFilesActions => 'Actions';
+
+  @override
+  String get workspaceFilesMore => 'More';
+
+  @override
+  String get workspaceFilesJustNow => 'Just now';
+
+  @override
+  String workspaceFilesMinutesAgo(int count) {
+    return '${count}m ago';
+  }
+
+  @override
+  String workspaceFilesHoursAgo(int count) {
+    return '${count}h ago';
+  }
+
+  @override
+  String workspaceFilesDaysAgo(int count) {
+    return '${count}d ago';
+  }
+
+  @override
+  String get workspaceFilesPanelTitle => 'Conversation files';
+
+  @override
+  String get workspaceFilesTabAttachments => 'Attachments';
+
+  @override
+  String get workspaceFilesTabOutputs => 'Outputs';
+
+  @override
+  String get workspaceFilesTabWorkspace => 'Workspace';
+
+  @override
+  String get workspaceFilesNoWorkspaceBound => 'No workspace bound';
+
+  @override
+  String get workspaceFilesKindManaged => 'Managed';
+
+  @override
+  String get workspaceFilesKindLinked => 'Linked';
+
+  @override
+  String get workspaceFilesMissingWorkspace => 'Workspace not found';
+
+  @override
+  String get workspaceFilesClose => 'Close';
+
+  @override
+  String get workspacesTitle => 'Workspaces';
+
+  @override
+  String get workspacesCreate => 'Create';
+
+  @override
+  String get workspacesCreateTitle => 'New workspace';
+
+  @override
+  String get workspacesNameLabel => 'Name';
+
+  @override
+  String get workspacesNameHint => 'Workspace name';
+
+  @override
+  String get workspacesLinkFolder => 'Link folder';
+
+  @override
+  String get workspacesEmpty => 'No workspaces yet';
+
+  @override
+  String get workspacesEmptyCta => 'Create a workspace';
+
+  @override
+  String get workspacesSettings => 'Settings';
+
+  @override
+  String get workspacesOpenFiles => 'Open files';
+
+  @override
+  String get workspacesLastUsedNever => 'Never used';
+
+  @override
+  String workspacesLastUsed(String when) {
+    return 'Last used $when';
+  }
+
+  @override
+  String get workspacesDeleteTitle => 'Delete this workspace?';
+
+  @override
+  String workspacesDeleteMessage(String name) {
+    return 'Delete workspace $name?';
+  }
+
+  @override
+  String get workspacesDeleteAlsoFiles => 'Also delete files';
+
+  @override
+  String get workspacesUnlinkTitle => 'Unlink this workspace?';
+
+  @override
+  String workspacesUnlinkMessage(String name) {
+    return 'Unlink $name? Files on disk will be kept.';
+  }
+
+  @override
+  String get workspacesSettingsTitle => 'Workspace settings';
+
+  @override
+  String get workspacesShellNeedsApproval =>
+      'Ask before running shell commands';
+
+  @override
+  String get workspacesDefaultCwd => 'Default working directory';
+
+  @override
+  String get workspacesDefaultCwdHint => 'Relative path, e.g. src';
+
+  @override
+  String get workspacesDefaultCwdInvalid => 'Use a relative path without ..';
+
+  @override
+  String get workspacesCreateManaged => 'Create workspace';
+
+  @override
+  String get workspacesLinkExisting => 'Link an existing folder';
+
+  @override
+  String get workspacesUnlink => 'Unlink';
+
+  @override
+  String get workspacesItemMore => 'Workspace actions';
+
+  @override
+  String get workspaceToolDenied => 'Denied';
+
+  @override
+  String get workspaceToolTimeout => 'timeout';
+
+  @override
+  String get workspaceToolCancelled => 'cancelled';
+
+  @override
+  String get workspaceToolInterrupted => 'interrupted';
+
+  @override
+  String get workspaceToolEnvironmentNotReady =>
+      'Sandbox environment not installed';
+
+  @override
+  String get workspaceToolInstall => 'Install';
+
+  @override
+  String get workspaceToolFuzzy => 'fuzzy';
+
+  @override
+  String get workspaceToolCreated => 'created';
+
+  @override
+  String get workspaceToolUpdated => 'updated';
+
+  @override
+  String get workspaceToolTruncated => 'truncated';
+
+  @override
+  String get workspaceToolImageTag => 'image';
+
+  @override
+  String get workspaceToolAllowAll => 'Allow all this session';
+
+  @override
+  String get workspaceToolStdout => 'stdout';
+
+  @override
+  String get workspaceToolStderr => 'stderr';
+
+  @override
+  String get workspaceToolOpenFullOutput => 'Open full output';
+
+  @override
+  String get workspaceToolChangedFiles => 'Changed files';
+
+  @override
+  String get workspaceToolCancel => 'Cancel';
+
+  @override
+  String get workspaceToolCopyCommand => 'Copy command';
+
+  @override
+  String get workspaceToolCopyOutput => 'Copy output';
+
+  @override
+  String get workspaceToolCopyDiff => 'Copy diff';
+
+  @override
+  String get workspaceToolCopied => 'Copied';
+
+  @override
+  String get workspaceToolDiffTruncated => 'Diff truncated';
+
+  @override
+  String get workspaceToolOpenPreview => 'Open preview';
+
+  @override
+  String get workspaceToolNoOutput => 'No output';
+
+  @override
+  String get workspaceToolNotAvailable => 'Not available';
+
+  @override
+  String get workspaceToolClose => 'Close';
+
+  @override
+  String get workspaceToolTitleShell => 'Run command';
+
+  @override
+  String get workspaceToolTitleReadFile => 'Read file';
+
+  @override
+  String get workspaceToolTitleWriteFile => 'Write file';
+
+  @override
+  String get workspaceToolTitleEditFile => 'Edit file';
+
+  @override
+  String get workspaceToolTitleListDir => 'List directory';
+
+  @override
+  String get workspaceToolTitleGlob => 'Glob';
+
+  @override
+  String get workspaceToolTitleGrep => 'Grep';
+
+  @override
+  String workspaceToolCount(int count) {
+    return '$count';
+  }
+
+  @override
+  String workspaceToolMoreFiles(int count) {
+    return '+$count';
+  }
+
+  @override
+  String workspaceToolDurationMs(int ms) {
+    return '${ms}ms';
+  }
+
+  @override
+  String workspaceToolDurationSec(String sec) {
+    return '${sec}s';
+  }
+
+  @override
+  String get workspaceEnvTitle => 'Environment';
+
+  @override
+  String workspaceEnvEngineUbuntu(String version) {
+    return 'Ubuntu $version (PRoot)';
+  }
+
+  @override
+  String workspaceEnvEngineAlpine(String version) {
+    return 'Alpine $version (iSH)';
+  }
+
+  @override
+  String get workspaceEnvEngineNative => 'Native shell';
+
+  @override
+  String get workspaceEnvPhaseNotInstalled => 'Not installed';
+
+  @override
+  String get workspaceEnvPhaseDownloading => 'Downloading';
+
+  @override
+  String get workspaceEnvPhaseVerifying => 'Verifying';
+
+  @override
+  String get workspaceEnvPhaseExtracting => 'Extracting';
+
+  @override
+  String get workspaceEnvPhasePatching => 'Patching';
+
+  @override
+  String get workspaceEnvPhaseReady => 'Ready';
+
+  @override
+  String get workspaceEnvPhaseError => 'Error';
+
+  @override
+  String get workspaceEnvPhaseNeedsRestart => 'Restart required';
+
+  @override
+  String workspaceEnvMetaLine(String version, String arch) {
+    return '$version · $arch';
+  }
+
+  @override
+  String workspaceEnvInstalledAt(String date) {
+    return 'Installed $date';
+  }
+
+  @override
+  String workspaceEnvDiskUsage(String size) {
+    return 'Disk usage $size';
+  }
+
+  @override
+  String workspaceEnvRuntimeReason(String reason) {
+    return '$reason';
+  }
+
+  @override
+  String get workspaceEnvInstall => 'Install';
+
+  @override
+  String get workspaceEnvInstallSubtitleAndroid =>
+      'Choose Ubuntu, Alpine, Debian, or import a local rootfs image.';
+
+  @override
+  String get workspaceEnvInstallSubtitleIos => 'Bundled, no download';
+
+  @override
+  String get workspaceEnvCancel => 'Cancel';
+
+  @override
+  String get workspaceEnvRetry => 'Retry';
+
+  @override
+  String get workspaceEnvRepair => 'Repair';
+
+  @override
+  String get workspaceEnvReset => 'Reset';
+
+  @override
+  String get workspaceEnvResetConfirmTitle => 'Reset environment?';
+
+  @override
+  String get workspaceEnvResetConfirmBody =>
+      'This deletes installed packages and the sandbox filesystem.';
+
+  @override
+  String get workspaceEnvCheckForUpdate => 'Check for update';
+
+  @override
+  String get workspaceEnvUpdate => 'Update';
+
+  @override
+  String workspaceEnvAvailableVersion(String version) {
+    return 'Version $version is available';
+  }
+
+  @override
+  String get workspaceEnvUpToDate => 'You\'re up to date';
+
+  @override
+  String get workspaceEnvRestartBanner => 'Restart JO-AIClient to finish';
+
+  @override
+  String get workspaceEnvDetectingMirrors => 'Detecting fastest mirrors…';
+
+  @override
+  String workspaceEnvApplyingMirror(String category) {
+    return 'Applying $category mirror…';
+  }
+
+  @override
+  String get workspaceEnvMirrorsSection => 'Mirrors';
+
+  @override
+  String get workspaceEnvUseMirror => 'Use mirror';
+
+  @override
+  String get workspaceEnvDetect => 'Detect';
+
+  @override
+  String get workspaceEnvOfficial => 'Official';
+
+  @override
+  String get workspaceEnvMirrorsDisabled =>
+      'Mirror changes run in the sandbox and are unavailable until it is ready.';
+
+  @override
+  String workspaceEnvMirrorsDisabledReason(String reason) {
+    return 'Mirror changes run in the sandbox and are unavailable: $reason';
+  }
+
+  @override
+  String get workspaceEnvMirrorDetectTitle => 'Mirror speed';
+
+  @override
+  String workspaceEnvMirrorLatency(int ms) {
+    return '$ms ms';
+  }
+
+  @override
+  String workspaceEnvMirrorFailed(String reason) {
+    return '$reason';
+  }
+
+  @override
+  String get workspaceEnvErrorUnsupportedAbi =>
+      'This device architecture is not supported.';
+
+  @override
+  String get workspaceEnvErrorArchitectureMismatch =>
+      'The installed sandbox architecture does not match this app. Reinstall the sandbox to continue. Your existing sandbox files have been preserved.';
+
+  @override
+  String get workspaceEnvErrorProotMissing => 'The PRoot binary is missing.';
+
+  @override
+  String get workspaceEnvErrorInsufficientDisk =>
+      'Not enough free storage to install the sandbox.';
+
+  @override
+  String get workspaceEnvErrorInsufficientDiskHint =>
+      'Free more storage for the selected image and try again.';
+
+  @override
+  String get workspaceEnvErrorNetwork =>
+      'Download failed. Check your connection and try again.';
+
+  @override
+  String get workspaceEnvErrorChecksumMismatch =>
+      'The download was corrupted. Try again.';
+
+  @override
+  String get workspaceEnvErrorExtractFailed =>
+      'Could not extract the sandbox image.';
+
+  @override
+  String get workspaceEnvErrorPatchFailed =>
+      'Could not finish setting up the sandbox.';
+
+  @override
+  String get workspaceEnvErrorCancelled => 'Installation was cancelled.';
+
+  @override
+  String get workspaceEnvErrorGeneric =>
+      'Something went wrong installing the sandbox.';
+
+  @override
+  String get workspaceEnvChipInstall => 'Install sandbox';
+
+  @override
+  String workspaceEnvChipInstalling(int percent) {
+    return 'Installing… $percent %';
+  }
+
+  @override
+  String get workspaceEnvChipInstallingIndeterminate => 'Installing…';
+
+  @override
+  String get workspaceEnvChipError => 'Sandbox error';
+
+  @override
+  String get workspaceEnvChipRestart => 'Restart required';
+
+  @override
+  String get workspaceEnvNativeExplanation =>
+      'On desktop, JO-AIClient uses your system shell instead of a Linux sandbox.';
+
+  @override
+  String workspaceEnvNativeShellPath(String path) {
+    return 'Shell: $path';
+  }
+
+  @override
+  String get workspaceEnvNativeShellApproval =>
+      'The shell tool needs approval unless this session allows all tools.';
+
+  @override
+  String workspaceEnvDownloadProgress(
+    String downloaded,
+    String total,
+    int percent,
+  ) {
+    return '$downloaded / $total MB ($percent%)';
+  }
+
+  @override
+  String get workspaceEnvMirrorsFailed => 'Could not detect mirrors';
+
+  @override
+  String get workspaceEnvCategoryApt => 'APT';
+
+  @override
+  String get workspaceEnvCategoryApk => 'APK';
+
+  @override
+  String get workspaceEnvCategoryPip => 'pip';
+
+  @override
+  String get workspaceEnvCategoryNpm => 'npm';
+
+  @override
+  String get skillsTitle => 'Skills';
+
+  @override
+  String get skillsTab => 'Skills';
+
+  @override
+  String get skillsSearchHint => 'Search skills';
+
+  @override
+  String get skillsEmptyTitle => 'No skills yet';
+
+  @override
+  String get skillsEmptyBody =>
+      'A skill is a folder with a SKILL.md file. Import markdown, a .md or .zip file, or a GitHub URL.';
+
+  @override
+  String get skillsEmptyFormat =>
+      '---\nname: my-skill\ndescription: What this skill does\n---\n\n# Instructions';
+
+  @override
+  String get skillsImport => 'Import';
+
+  @override
+  String get skillsImportPaste => 'Paste markdown';
+
+  @override
+  String get skillsImportFile => 'From file';
+
+  @override
+  String get skillsImportGitHub => 'From GitHub';
+
+  @override
+  String get skillsImportPasteLabel => 'SKILL.md';
+
+  @override
+  String get skillsImportPasteHint => 'Paste a SKILL.md with YAML frontmatter';
+
+  @override
+  String get skillsImportGitHubLabel => 'GitHub URL';
+
+  @override
+  String get skillsImportGitHubHint =>
+      'github.com/owner/repo or github.com/owner/repo/tree/ref/path';
+
+  @override
+  String get skillsImportConfirm => 'Import';
+
+  @override
+  String get skillsCancel => 'Cancel';
+
+  @override
+  String get skillsSave => 'Save';
+
+  @override
+  String skillsUsedCount(int count) {
+    return 'used $count times';
+  }
+
+  @override
+  String get skillsEnabled => 'Enabled';
+
+  @override
+  String get skillsBrowseFiles => 'Browse files';
+
+  @override
+  String get skillsEdit => 'Edit';
+
+  @override
+  String get skillsExport => 'Export';
+
+  @override
+  String get skillsDelete => 'Delete';
+
+  @override
+  String get skillsDeleteTitle => 'Delete this skill?';
+
+  @override
+  String skillsDeleteMessage(String name) {
+    return 'Delete $name? This cannot be undone.';
+  }
+
+  @override
+  String get skillsUseAll => 'Use all skills';
+
+  @override
+  String get skillsUseAllSubtitle =>
+      'Every enabled skill is available to this assistant.';
+
+  @override
+  String get skillsDisabledHint =>
+      'Enable this skill in Skills to use it here.';
+
+  @override
+  String get skillsOpenPage => 'Manage skills';
+
+  @override
+  String get skillsInheritAssistant => 'Inherit from assistant';
+
+  @override
+  String get skillsInheritAssistantSubtitle =>
+      'Use the same skills as this conversation’s assistant.';
+
+  @override
+  String get skillsActiveLabel => 'Active';
+
+  @override
+  String get skillsSessionTitle => 'Skills for this chat';
+
+  @override
+  String get skillsEditTitle => 'Edit skill';
+
+  @override
+  String get skillsDetailKindLabel => 'Skill';
+
+  @override
+  String get skillsNoEnabled => 'No enabled skills';
+
+  @override
+  String get terminalTitle => 'Terminal';
+
+  @override
+  String get terminalOpenInSystem => 'Open in system terminal';
+
+  @override
+  String get terminalHostDirectory => 'Host directory';
+
+  @override
+  String get terminalBindWorkspaceFirst => 'Bind a workspace first';
+
+  @override
+  String get terminalNotAvailable => 'Not available';
+
+  @override
+  String get terminalRuntimeUnavailable => 'Terminal environment is not ready';
+
+  @override
+  String get terminalRename => 'Rename';
+
+  @override
+  String get terminalClose => 'Close';
+
+  @override
+  String get terminalClear => 'Clear';
+
+  @override
+  String get terminalCloseSession => 'Close session';
+
+  @override
+  String get terminalCopy => 'Copy';
+
+  @override
+  String get terminalPaste => 'Paste';
+
+  @override
+  String get terminalNewSession => 'New session';
+
+  @override
+  String get terminalMore => 'More';
+
+  @override
+  String get terminalNameLabel => 'Name';
+
+  @override
+  String get terminalCancel => 'Cancel';
+
+  @override
+  String get terminalSave => 'Save';
+
+  @override
+  String get workspaceDeskMenuWorkspace => 'Workspace';
+
+  @override
+  String get workspaceDeskMenuSkills => 'Skills';
+
+  @override
+  String get workspaceDeskBarTitle => 'Workspace';
+
+  @override
+  String get workspaceDeskBarNoWorkspace => 'No workspace';
+
+  @override
+  String get workspaceDeskBarEmptyHint =>
+      'Bind a workspace from the toolbar to browse files here';
+
+  @override
+  String get workspaceDeskBarToggle => 'Workspace files';
+
+  @override
+  String get workspaceDeskOpenSystemTerminal => 'Open in system terminal';
+
+  @override
+  String get workspaceDeskReveal => 'Reveal in file manager';
+
+  @override
+  String get workspaceDeskBarClose => 'Close workspace bar';
+
+  @override
+  String get workspaceEntryBind => 'Bind workspace';
+
+  @override
+  String get workspaceEntryUnbind => 'Unbind';
+
+  @override
+  String get workspaceEntryChange => 'Change';
+
+  @override
+  String get workspaceEntryLocked => 'Locked';
+
+  @override
+  String get workspaceEntryChangeConfirmTitle => 'Change workspace?';
+
+  @override
+  String get workspaceEntryUnbindConfirmTitle => 'Unbind?';
+
+  @override
+  String get workspaceEntryChangeConfirmBody =>
+      'This conversation has already used workspace tools. File links in earlier messages may no longer work.';
+
+  @override
+  String get workspaceEntryCwd => 'Working directory';
+
+  @override
+  String get workspaceEntryCwdHint => 'Relative to the workspace root';
+
+  @override
+  String get workspaceEntryCwdInvalid =>
+      'That path is invalid or leaves the workspace';
+
+  @override
+  String get workspaceEntryCwdMissing => 'That directory does not exist';
+
+  @override
+  String get workspaceEntryCwdCreate => 'Create it';
+
+  @override
+  String get workspaceEntryFiles => 'Files';
+
+  @override
+  String get workspaceEntryTerminal => 'Terminal';
+
+  @override
+  String get workspaceEntryOpenSystemTerminal => 'Open in system terminal';
+
+  @override
+  String get workspaceEntryReveal => 'Reveal in file manager';
+
+  @override
+  String get workspaceEntrySessionSkills => 'Skills';
+
+  @override
+  String get workspaceEntryAllowAll => 'Allow all this session';
+
+  @override
+  String get workspaceEntryAllowAllSubtitle =>
+      'Shell commands in this conversation will run without approval.';
+
+  @override
+  String get workspaceEntryEnvironment => 'Environment';
+
+  @override
+  String get workspaceEntryManage => 'Manage workspaces';
+
+  @override
+  String get workspaceEntryCreate => 'Create new workspace…';
+
+  @override
+  String get workspaceEntryDefaultWorkspace => 'Default workspace';
+
+  @override
+  String get workspaceEntryDefaultWorkspaceSubtitle =>
+      'New conversations with this assistant start bound to this workspace.';
+
+  @override
+  String get workspaceEntryNone => 'None';
+
+  @override
+  String get workspaceEntryStartConversationFirst =>
+      'Start a conversation first';
+
+  @override
+  String get workspaceEntryTooltip => 'Workspace';
+
+  @override
+  String get workspaceEntryPickerTitle => 'Choose a workspace';
+
+  @override
+  String get settingsPageWorkspace => 'Workspace & environment';
+
+  @override
+  String get settingsPageSkills => 'Skills';
+
+  @override
+  String get commonClose => 'Close';
+
+  @override
+  String get terminalCopyAllOutput => 'Copy all output';
+
+  @override
+  String get terminalFontDecrease => 'Font size −';
+
+  @override
+  String get terminalFontIncrease => 'Font size +';
+
+  @override
+  String get terminalCloseSessionConfirmMessage =>
+      'This session is still running. Closing it will end the process.';
+
+  @override
+  String get terminalCopiedAll => 'Copied all output';
+
+  @override
+  String get terminalConfirm => 'Confirm';
+
+  @override
+  String terminalExitCode(int code) {
+    return 'exit $code';
+  }
+
+  @override
+  String get workspaceMgmtNewWorkspace => 'New workspace';
+
+  @override
+  String get workspaceMgmtEmptyHint =>
+      'Create a workspace to keep project files together.';
+
+  @override
+  String get workspaceMgmtKindManagedTitle => 'Managed workspace';
+
+  @override
+  String get workspaceMgmtKindManagedSubtitle =>
+      'App-managed folder, sandbox read/write';
+
+  @override
+  String get workspaceMgmtKindLinkedTitle => 'Linked folder';
+
+  @override
+  String get workspaceMgmtKindLinkedSubtitle => 'Use a folder on this computer';
+
+  @override
+  String get workspaceMgmtImportFromFolder => 'Import from folder';
+
+  @override
+  String get workspaceMgmtImportFromFolderSubtitle =>
+      'Copy a folder into a new managed workspace';
+
+  @override
+  String get workspaceMgmtKindSection => 'Type';
+
+  @override
+  String get workspaceMgmtCreate => 'Create';
+
+  @override
+  String get workspaceMgmtShellApprovalSubtitle => 'Ask before each command';
+
+  @override
+  String get workspaceMgmtDefaultCwdRoot => '/';
+
+  @override
+  String get workspaceMgmtPickCwdTitle => 'Default working directory';
+
+  @override
+  String get workspaceMgmtFolderPickerUnavailable =>
+      'Folder picker is not available.';
+
+  @override
+  String get workspaceMgmtImportProgressTitle => 'Importing folder';
+
+  @override
+  String get workspaceMgmtImportProgressPhase => 'Copying files…';
+
+  @override
+  String get workspaceMgmtImportFailed => 'Could not import that folder.';
+
+  @override
+  String workspaceMgmtImportDone(String name) {
+    return 'Imported $name';
+  }
+
+  @override
+  String get workspaceMgmtLastUsedJustNow => 'just now';
+
+  @override
+  String workspaceMgmtLastUsedMinutesAgo(int n) {
+    return '$n min ago';
+  }
+
+  @override
+  String workspaceMgmtLastUsedHoursAgo(int n) {
+    return '$n hr ago';
+  }
+
+  @override
+  String workspaceMgmtLastUsedDaysAgo(int n) {
+    return '$n d ago';
+  }
+
+  @override
+  String workspaceMgmtRowDetail(String kind, String when) {
+    return '$kind · Last used $when';
+  }
+
+  @override
+  String workspaceMgmtRowDetailNever(String kind) {
+    return '$kind · Never used';
+  }
+
+  @override
+  String get workspacePreviewBack => 'Back';
+
+  @override
+  String get workspacePreviewWrap => 'Wrap lines';
+
+  @override
+  String get workspacePreviewFontDecrease => 'Smaller text';
+
+  @override
+  String get workspacePreviewFontIncrease => 'Larger text';
+
+  @override
+  String get workspacePreviewCopy => 'Copy';
+
+  @override
+  String get workspacePreviewRetry => 'Retry';
+
+  @override
+  String get workspacePreviewLoadError => 'Couldn’t load this file.';
+
+  @override
+  String get workspacePreviewRevealInFinder => 'Show in Finder';
+
+  @override
+  String get workspacePreviewOpenInSystemApp => 'Open with system app';
+
+  @override
+  String get workspacePreviewOpenInBrowser => 'Open in browser';
+
+  @override
+  String get workspacePreviewTable => 'Table';
+
+  @override
+  String get workspacePreviewPlainLanguage => 'Code';
+
+  @override
+  String get workspacePreviewOpen => 'Open';
+
+  @override
+  String get workspacePreviewRevealFailed =>
+      'Couldn’t show this file in the file manager.';
+
+  @override
+  String get workspacePreviewEmptyTable => 'This table is empty.';
+
+  @override
+  String get workspaceFilesNew => 'New';
+
+  @override
+  String get workspaceFilesFoldersFirst => 'Folders first';
+
+  @override
+  String get workspaceFilesSelectDirectory => 'Select this folder';
+
+  @override
+  String get workspaceFilesEmptyHint => 'Use New or Import to add files';
+
+  @override
+  String get workspaceFilesEmptyAttachments => 'No attachments yet';
+
+  @override
+  String get workspaceFilesEmptyOutputs =>
+      'The assistant hasn’t produced any files yet';
+
+  @override
+  String get workspaceFilesMoveTo => 'Move to…';
+
+  @override
+  String workspaceFilesItemCount(int count) {
+    return '$count items';
+  }
+
+  @override
+  String get skillsImportTooltip => 'Import skill';
+
+  @override
+  String get skillsImportPasteSubtitle =>
+      'Paste SKILL.md with YAML frontmatter';
+
+  @override
+  String get skillsImportFileSubtitle => 'Choose a .md or .zip file';
+
+  @override
+  String get skillsImportGitHubSubtitle => 'Import SKILL.md from a repository';
+
+  @override
+  String get skillsImportResolving => 'Resolving repository…';
+
+  @override
+  String get skillsImportDownloading => 'Downloading…';
+
+  @override
+  String get skillsImportExtracting => 'Extracting…';
+
+  @override
+  String get skillsImportInstalling => 'Installing…';
+
+  @override
+  String get skillsImportGitHubRepoLabel => 'Repository URL';
+
+  @override
+  String get skillsImportGitHubUrlHint =>
+      'https://github.com/owner/repo or owner/repo[/path]';
+
+  @override
+  String get skillsImportGitHubHelp =>
+      'SKILL.md at the repo root or in a subdirectory is supported.';
+
+  @override
+  String get skillsEmptyHint =>
+      'A skill is a SKILL.md with frontmatter. After import, the assistant can use it on demand.';
+
+  @override
+  String get skillsMoreActions => 'More';
+
+  @override
+  String get skillsSearchClear => 'Clear';
+
+  @override
+  String get skillsSessionEmpty =>
+      'No enabled skills yet. Enable skills in the library first.';
+
+  @override
+  String get workspaceToolRunning => 'Running';
+
+  @override
+  String workspaceToolExitCode(int code) {
+    return 'exit $code';
+  }
+
+  @override
+  String get workspaceToolAwaitingApproval => 'Awaiting approval';
+
+  @override
+  String get workspaceToolCompleted => 'Done';
+
+  @override
+  String workspaceToolLines(int count) {
+    return '$count lines';
+  }
+
+  @override
+  String workspaceToolItems(int count) {
+    return '$count items';
+  }
+
+  @override
+  String workspaceToolFileMatches(int count) {
+    return '$count matches';
+  }
+
+  @override
+  String workspaceToolContentMatches(int count) {
+    return '$count matches';
+  }
+
+  @override
+  String get workspaceToolExpand => 'Expand';
+
+  @override
+  String get workspaceToolSectionCommand => 'Command';
+
+  @override
+  String get workspaceToolSectionPath => 'Path';
+
+  @override
+  String get workspaceToolSectionPattern => 'Pattern';
+
+  @override
+  String get workspaceToolSectionOutput => 'Output';
+
+  @override
+  String get workspaceToolSectionDiff => 'Diff';
+
+  @override
+  String get workspaceToolSectionError => 'Error';
+
+  @override
+  String get workspaceToolSavedOutput => 'Full output saved';
+
+  @override
+  String get workspaceToolApprove => 'Allow';
+
+  @override
+  String get workspaceToolDeny => 'Deny';
+
+  @override
+  String get workspaceToolCopy => 'Copy';
+
+  @override
+  String get workspaceEnvEngineLocalShell => 'Local shell';
+
+  @override
+  String get workspaceEnvInstallEnvironment => 'Install environment';
+
+  @override
+  String get workspaceEnvInstallDescription =>
+      'Install a Linux environment to run tools in a sandbox.';
+
+  @override
+  String get workspaceEnvStatusLabel => 'Status';
+
+  @override
+  String get workspaceEnvStatusInstalled => 'Installed';
+
+  @override
+  String get workspaceEnvSizeLabel => 'Size';
+
+  @override
+  String get workspaceEnvPathLabel => 'Path';
+
+  @override
+  String get workspaceEnvInstalledAtLabel => 'Installed';
+
+  @override
+  String get workspaceEnvArchLabel => 'Architecture';
+
+  @override
+  String workspaceEnvArchVersion(String arch, String version) {
+    return '$arch · $version';
+  }
+
+  @override
+  String get workspaceEnvBrowseSection => 'Browse';
+
+  @override
+  String get workspaceEnvBrowseFiles => 'Browse file system';
+
+  @override
+  String get workspaceEnvBrowseFilesDetail =>
+      'View the full directory tree inside the sandbox';
+
+  @override
+  String get workspaceEnvDetectFastMirrors => 'Detect fast mirrors';
+
+  @override
+  String get workspaceEnvActionsSection => 'Actions';
+
+  @override
+  String get workspaceEnvInfoSection => 'Info';
+
+  @override
+  String get workspaceEnvInfoBody =>
+      'The environment is a Linux root filesystem used by the sandbox. Workspaces are stored separately and are not deleted when you reset. Files live in the extracted rootfs on this device.';
+
+  @override
+  String get workspaceEnvRepairDetail => 'Re-verify and patch files';
+
+  @override
+  String get workspaceEnvUpdateCurrent => 'You\'re up to date';
+
+  @override
+  String workspaceEnvUpdateAvailableShort(String version) {
+    return 'Update available: $version';
+  }
+
+  @override
+  String get workspaceEnvResetConfirmMessage =>
+      'This will delete the entire Linux environment and any packages installed in it. Workspace files are not affected.';
+
+  @override
+  String get workspaceEnvRestartDoneBanner =>
+      'Reset finished. Restart the app to complete installation.';
+
+  @override
+  String get workspaceEnvPathCopied => 'Path copied';
+
+  @override
+  String get workspaceEnvUseMirrorSubtitle =>
+      'Write the selected mirror into the sandbox';
+
+  @override
+  String get workspaceEnvRegionGlobal => 'Global';
+
+  @override
+  String get workspaceEnvRegionChina => 'China';
+
+  @override
+  String get workspaceEnvRegionEurope => 'Europe';
+
+  @override
+  String get workspaceEnvRegionAsia => 'Asia';
+
+  @override
+  String get workspaceEnvMirrorTimeout => 'Timeout';
+
+  @override
+  String get workspaceEnvSpeedTest => 'Test speed';
+
+  @override
+  String get workspaceEnvApplySuccess => 'Mirror applied';
+
+  @override
+  String get workspaceEnvApplyFailed => 'Could not apply mirror';
+
+  @override
+  String get workspaceEnvRestoreSuccess => 'Official source restored';
+
+  @override
+  String get workspaceEnvMirrorsTested => 'Fastest mirrors applied';
+
+  @override
+  String get workspaceEnvRelativeJustNow => 'Just now';
+
+  @override
+  String workspaceEnvRelativeMinutesAgo(int count) {
+    return '${count}m ago';
+  }
+
+  @override
+  String workspaceEnvRelativeHoursAgo(int count) {
+    return '${count}h ago';
+  }
+
+  @override
+  String workspaceEnvRelativeDaysAgo(int count) {
+    return '${count}d ago';
+  }
+
+  @override
+  String workspaceEnvDownloadLine(
+    String downloaded,
+    String total,
+    String phase,
+  ) {
+    return '$downloaded / $total · $phase';
+  }
+
+  @override
+  String get workspaceEnvNativeUnsandboxed =>
+      'Commands run on this computer, not in a sandbox, and need approval unless this session allows all tools.';
+
+  @override
+  String get workspaceEnvRootfsTitle => '/';
+
+  @override
+  String get workspaceEnvBrowserUnavailable =>
+      'The sandbox file system is not available.';
+
+  @override
+  String get workspaceEnvMirrorNameOfficial => 'Official';
+
+  @override
+  String get workspaceEnvMirrorNameOfficialCdn => 'Official CDN';
+
+  @override
+  String get workspaceEnvMirrorNameOfficialPypi => 'Official PyPI';
+
+  @override
+  String get workspaceEnvMirrorNameOfficialNpm => 'Official npm';
+
+  @override
+  String get workspaceEnvMirrorNameTuna => 'Tsinghua TUNA';
+
+  @override
+  String get workspaceEnvMirrorNameAlibaba => 'Alibaba';
+
+  @override
+  String get workspaceEnvMirrorNameUstc => 'USTC';
+
+  @override
+  String get workspaceEnvMirrorNameHuawei => 'Huawei';
+
+  @override
+  String get workspaceEnvMirrorNameTencent => 'Tencent';
+
+  @override
+  String get workspaceEnvMirrorNameNetease => 'NetEase';
+
+  @override
+  String get workspaceEnvMirrorNameLeaseweb => 'LEASEWEB UK';
+
+  @override
+  String get workspaceEnvMirrorNameRwth => 'RWTH Germany';
+
+  @override
+  String get workspaceEnvMirrorNameJaist => 'JAIST Japan';
+
+  @override
+  String get workspaceEnvMirrorNameKakao => 'Kakao Korea';
+
+  @override
+  String get workspaceEnvMirrorNameNpmmirror => 'npmmirror';
+
+  @override
+  String workspaceEnvSelectionNamed(String name, String region) {
+    return '$name · $region';
+  }
+
+  @override
+  String get workspaceFilesEmptyPickerHint =>
+      'Use New folder to add a subfolder';
+
+  @override
+  String get skillsDetailBodyEmpty => 'No skill body yet';
+
+  @override
+  String get workspaceEnvSizeTimeout => 'Timed out';
+
+  @override
+  String get workspaceEnvInfoCopied => 'Environment info copied';
+
+  @override
+  String get workspacePreviewEmptyFile => 'This file is empty';
+
+  @override
+  String get workspacePreviewEmptyHint => 'There\'s nothing to preview.';
+
+  @override
+  String get workspacePreviewRevealInExplorer => 'Show in File Explorer';
+
+  @override
+  String get workspacePreviewRevealInFileManager => 'Show in Files';
+
+  @override
+  String workspaceBindingSetAssistantDefault(String assistant) {
+    return 'Set as default workspace for “$assistant”';
+  }
+
+  @override
+  String get workspaceUnbindHint =>
+      'Unbound this conversation; change the assistant\'s default workspace in assistant settings';
+
+  @override
+  String get storageSpaceCategoryWorkspaceFiles => 'Workspace files';
+
+  @override
+  String get storageSpaceCategoryWorkspaceFilesHint =>
+      'Files stored in managed workspaces.';
+
+  @override
+  String get storageSpaceCategorySandboxEnvironment => 'Sandbox environment';
+
+  @override
+  String get storageSpaceCategorySandboxEnvironmentHint =>
+      'Sandbox install and root filesystem.';
+
+  @override
+  String get storageSpaceCategorySkills => 'Skills';
+
+  @override
+  String get storageSpaceCategorySkillsHint => 'Installed skill files.';
+
+  @override
+  String get storageSpaceCategorySessionFiles => 'Conversation files';
+
+  @override
+  String get storageSpaceCategorySessionFilesHint =>
+      'Per-conversation attachments and outputs.';
+
+  @override
+  String get storageSpaceManageSkills => 'Manage skills';
+
+  @override
+  String get storageSessionFilesCleanOrphans =>
+      'Clean orphaned conversation files';
+
+  @override
+  String storageSessionFilesCleanOrphansHint(String size) {
+    return 'Deletes session folders that no longer have a conversation. Reclaimable: $size.';
+  }
+
+  @override
+  String get workspaceDesktopFolderPath => 'Folder path';
+
+  @override
+  String get workspaceDesktopFolderMissing =>
+      'Choose an existing folder or enter its absolute path.';
+
+  @override
+  String get workspaceDesktopManagedHint =>
+      'JO-AIClient creates and manages a folder for this project.';
+
+  @override
+  String get workspaceDesktopHostHint =>
+      'Files and commands use this computer.';
+
+  @override
+  String get workspaceDesktopSearch => 'Search workspaces';
+
+  @override
+  String get workspaceDesktopNoResults => 'No matching workspaces';
+
+  @override
+  String get workspaceEnvDependencies => 'Environment presets';
+
+  @override
+  String get workspaceEnvDependenciesDetail =>
+      'Install tools in the shared sandbox. All workspaces can use them.';
+
+  @override
+  String get workspaceEnvDependencyPython =>
+      'Python, pip and virtual environments';
+
+  @override
+  String get workspaceEnvDependencyNode => 'Node.js and npm';
+
+  @override
+  String get workspaceEnvDependencyGit =>
+      'Clone repositories and manage versions';
+
+  @override
+  String get workspaceEnvDependencySsh => 'SSH, SCP, SFTP and key generation';
+
+  @override
+  String get workspaceEnvDependencyNetwork => 'Network tools';
+
+  @override
+  String get workspaceEnvDependencyArchive => 'Archive tools';
+
+  @override
+  String get workspaceEnvDependencyInstalled => 'Installed';
+
+  @override
+  String get workspaceEnvDependencyUnknown => 'Not checked';
+
+  @override
+  String get workspaceEnvDependencyChecking => 'Checking tools…';
+
+  @override
+  String get workspaceEnvDependencyInstalling => 'Installing…';
+
+  @override
+  String get workspaceEnvDependencyCheckFailed =>
+      'Could not check tools. Tap refresh to try again.';
+
+  @override
+  String get workspaceEnvDependencyInstallFailed =>
+      'Installation did not finish. Check the log or change the package source, then retry.';
+
+  @override
+  String get workspaceEnvDependencyLog => 'Installation log';
+
+  @override
+  String get workspaceEnvDependencyRefresh => 'Refresh tool status';
+
+  @override
+  String get workspaceEnvDependencyReadyFirst =>
+      'Install the sandbox first to add these tools.';
+
+  @override
+  String get workspaceEnvDependencySources => 'Package sources';
+
+  @override
+  String get workspaceEnvDependencySourcesDetail =>
+      'Installation uses the selected apt/apk source. pip and npm sources apply to packages you install later.';
+
+  @override
+  String get workspaceEnvDownloadSource => 'Sandbox download source';
+
+  @override
+  String get workspaceEnvDownloadAutomatic => 'Auto-select fastest';
+
+  @override
+  String get workspaceEnvDownloadAutomaticDetail =>
+      'Test the official source and built-in mirrors before downloading.';
+
+  @override
+  String get workspaceEnvDownloadCustom => 'Custom URL';
+
+  @override
+  String get workspaceEnvDownloadCustomHint =>
+      'https://example.com/ubuntu-base/releases/24.04/release/';
+
+  @override
+  String get workspaceEnvDownloadCustomDetail =>
+      'Enter a release directory or a complete archive URL. The archive must match the selected system, version, and device architecture.';
+
+  @override
+  String get workspaceEnvDownloadInvalidUrl =>
+      'Enter a valid HTTP or HTTPS URL.';
+
+  @override
+  String get workspaceEnvDownloadVerified =>
+      'Downloads are verified against the selected image’s official SHA-256. Package sources are configured separately.';
+
+  @override
+  String get workspaceEnvDownloadStart => 'Download and install';
+
+  @override
+  String get workspaceEnvDownloadSave => 'Save source';
+
+  @override
+  String get workspaceToolsTitle => 'Tools';
+
+  @override
+  String get workspaceToolsDescription =>
+      'Choose which tools conversations can use in this workspace. Changes are saved automatically.';
+
+  @override
+  String get workspaceToolHelpShell =>
+      'Run commands in the workspace environment.';
+
+  @override
+  String get workspaceToolHelpRead =>
+      'Read files with line numbers and paging.';
+
+  @override
+  String get workspaceToolHelpWrite =>
+      'Create files or overwrite their contents.';
+
+  @override
+  String get workspaceToolHelpEdit =>
+      'Replace specific text in an existing file.';
+
+  @override
+  String get workspaceToolHelpList => 'Browse directories and their entries.';
+
+  @override
+  String get workspaceToolHelpGlob => 'Find files by name or path pattern.';
+
+  @override
+  String get workspaceToolHelpGrep => 'Search text inside files.';
+
+  @override
+  String get workspaceEnvVariablesTitle => 'Environment variables';
+
+  @override
+  String get workspaceEnvVariablesEntryDetail =>
+      'Variables for commands, with output privacy controls';
+
+  @override
+  String get workspaceEnvVariablesEmpty =>
+      'No variables yet. Add API keys or other configuration for your tools.';
+
+  @override
+  String get workspaceEnvVariablesScope =>
+      'Shared by all workspaces. Changes apply to new Agent commands and new in-app terminal sessions; reopen existing sessions to apply them. External system terminals keep their own environment.';
+
+  @override
+  String get workspaceEnvPrivacyMode => 'Privacy mode';
+
+  @override
+  String get workspaceEnvPrivacyDetail =>
+      'Commands can use the real values. Before workspace tool output is sent to the model, matching values of at least 5 characters are replaced with [REDACTED]. Local logs remain unchanged. Shorter values are not masked, to avoid replacing common flags and numbers.';
+
+  @override
+  String get workspaceEnvVariableAdd => 'Add variable';
+
+  @override
+  String get workspaceEnvVariableEdit => 'Edit variable';
+
+  @override
+  String get workspaceEnvVariableName => 'Name';
+
+  @override
+  String get workspaceEnvVariableValue => 'Value';
+
+  @override
+  String get workspaceEnvVariableNote => 'Note (optional)';
+
+  @override
+  String get workspaceEnvVariableNameHint =>
+      'Use letters, digits and underscores; do not start with a digit. Names are case-sensitive. Reference variables in commands with \$NAME.';
+
+  @override
+  String get workspaceEnvVariableInvalidName => 'Enter a valid variable name.';
+
+  @override
+  String get workspaceEnvVariableInvalidValue =>
+      'Enter a nonempty value without NUL characters.';
+
+  @override
+  String get workspaceEnvVariableDuplicate =>
+      'A variable with this name already exists.';
+
+  @override
+  String get workspaceEnvVariablesSaveFailed =>
+      'Could not save the environment settings. Please try again.';
+
+  @override
+  String get incomingShareTitle => 'Shared content';
+
+  @override
+  String get incomingShareReplaceDraft =>
+      'There is unsent content in the input box. Replace it with the shared content in a new chat?';
+
+  @override
+  String get incomingShareFailed =>
+      'Some shared content could not be imported. Check file access and available storage. Up to 32 files can be shared at once.';
+
+  @override
+  String get incomingShareImporting => 'Importing';
+
+  @override
+  String get incomingShareMoveTo => 'Move to…';
+
+  @override
+  String get incomingShareNewChat => 'New conversation';
+
+  @override
+  String get incomingShareMoveHint =>
+      'Move this draft and its attachments to another conversation. Nothing will be sent automatically.';
+
+  @override
+  String get incomingShareNoConversations => 'No matching conversations';
+
+  @override
+  String get chatInputBarRemoveAttachment => 'Remove attachment';
+
+  @override
+  String get incomingShareMoveFailed =>
+      'Could not switch conversations. Your draft has been kept.';
+
+  @override
+  String attachmentRequiresWorkspace(String name) {
+    return 'To use “$name”, bind a workspace and enable file tools, or move this draft to a conversation with a workspace. This file cannot be read directly in a regular chat.';
+  }
+
+  @override
+  String get storageSessionFilesUnlinked => 'Unlinked conversation';
+
+  @override
+  String get workspaceExternalMount => 'Mount external folder';
+
+  @override
+  String get workspaceExternalMountSubtitle =>
+      'Selected folders are mounted at /mounts/<name> and shared across workspaces. AI tools, Shell and the file browser can access them. Up to 10 folders.';
+
+  @override
+  String get workspaceExternalStorageTitle => 'Allow file access';
+
+  @override
+  String get workspaceExternalStorageMessage =>
+      'To read and write external folders in the workspace and Shell, allow JO-AIClient to manage files in Android settings. On Android 11 or later, enable All files access. Then select an on-device folder to mount.';
+
+  @override
+  String get workspaceExternalGrantAccess => 'Grant access';
+
+  @override
+  String get workspaceExternalLocalOnly =>
+      'Android can mount on-device folders only. This document provider does not expose a local folder to Shell.';
+
+  @override
+  String get workspaceExternalUnavailable =>
+      'The external folder is unavailable. Check its storage connection and permissions, then select the folder again to restore access.';
+
+  @override
+  String get workspaceExternalReconnect => 'Select folder again';
+
+  @override
+  String get workspaceMountAdd => 'Add folder';
+
+  @override
+  String get workspaceMountEdit => 'Edit mount';
+
+  @override
+  String get workspaceMountEmpty => 'No mounted folders';
+
+  @override
+  String get workspaceMountReadOnly => 'Read-only';
+
+  @override
+  String get workspaceMountReadWrite => 'Read-write';
+
+  @override
+  String get workspaceMountAllowWrite => 'Allow writes';
+
+  @override
+  String get workspaceMountPermissionsHint =>
+      'AI file tools and the file browser respect this setting. Shell guards cover common file commands; arbitrary scripts may bypass them. Saving mount changes stops running commands and terminal sessions.';
+
+  @override
+  String get workspaceMountBrowse => 'Browse files';
+
+  @override
+  String get workspaceMountUnmount => 'Unmount';
+
+  @override
+  String get workspaceMountUnmountMessage =>
+      'Remove this mount? The original folder and its files will be kept.';
+
+  @override
+  String get workspaceMountInactive => 'Unavailable — select the folder again';
+
+  @override
+  String get workspaceMountInvalidName =>
+      'Use a name of up to 64 characters without slashes, colons or control characters. Do not use . or ..';
+
+  @override
+  String get workspaceMountDuplicate =>
+      'A mount with this name already exists.';
+
+  @override
+  String get workspaceMountLimit =>
+      'Up to 10 folders can be mounted. Remove a mount before adding another.';
+
+  @override
+  String get workspaceMountOverlap =>
+      'This folder overlaps an existing mount. Choose a different folder so permissions remain unambiguous.';
+
+  @override
+  String get workspaceMountTargetOccupied =>
+      'A mount target under /mounts already contains local files. Choose a different mount name or move those files first. No files were removed.';
+
+  @override
+  String get workspaceEnvSystemImage => 'System image';
+
+  @override
+  String get workspaceEnvDistribution => 'Distribution';
+
+  @override
+  String get workspaceEnvSystemVersion => 'Version';
+
+  @override
+  String get workspaceEnvLocalImage => 'Local image';
+
+  @override
+  String get workspaceEnvChooseImage => 'Choose rootfs archive';
+
+  @override
+  String get workspaceEnvLocalImageHint =>
+      'Import a root filesystem archive (.tar.gz, .tar.xz, or .tar), not an ISO or a disk image. It must match this device’s CPU architecture and contain /bin/sh. The system and version are detected after extraction.';
+
+  @override
+  String get workspaceEnvImportImage => 'Import image';
+
+  @override
+  String get workspaceEnvInvalidImage =>
+      'Select a valid rootfs archive for this device. It must contain an executable /bin/sh with the matching CPU architecture.';
+
+  @override
+  String get workspaceEnvReplaceSystem => 'Replace system';
+
+  @override
+  String get workspaceEnvReplaceSystemHint =>
+      'This replaces installed packages and files inside the current environment and stops its commands and terminal sessions. Workspaces, chat files, and external folders are kept. If preparing the new image fails, the current environment is preserved.';
+
+  @override
+  String get workspaceEnvProotOptions => 'PRoot options';
+
+  @override
+  String get workspaceEnvShellPath => 'Shell path';
+
+  @override
+  String get workspaceEnvShellAutomatic => 'Automatic';
+
+  @override
+  String get workspaceEnvShellHint =>
+      'Leave empty to use /bin/bash when available, otherwise /bin/sh. A custom shell must use an absolute path inside the environment.';
+
+  @override
+  String get workspaceEnvProotArguments => 'Extra PRoot arguments';
+
+  @override
+  String get workspaceEnvProotArgumentsHint =>
+      'One argument per line, without shell quotes. For example, put -k and 5.10.0 on separate lines, or use --kernel-release=5.10.0. Changes apply to new commands and terminal sessions.';
+
+  @override
+  String get workspaceEnvProotInvalid =>
+      'Enter a valid absolute shell path and one PRoot argument per line.';
+
+  @override
+  String get workspaceFileMissing => 'File no longer exists';
+
+  @override
+  String get workspaceFilePreviewUnavailable => 'Preview unavailable';
+
+  @override
+  String get workspaceToolRelatedFiles => 'Related files';
+
+  @override
+  String get workspaceToolFilesTruncated => 'Only some files are listed.';
+
+  @override
+  String get displaySettingsPageShowProducedFilesTitle =>
+      'Show Files Below Replies';
+
+  @override
+  String get displaySettingsPageShowProducedFilesSubtitle =>
+      'Show files created or modified by tools below replies.';
+
+  @override
+  String get googleFontsTitle => 'Google Fonts';
+
+  @override
+  String get googleFontsRefresh => 'Refresh font list';
+
+  @override
+  String get googleFontsSearchHint => 'Search fonts or languages';
+
+  @override
+  String get googleFontsHint =>
+      'Download a regular font to preview and apply it. Installed fonts work offline. Catalog: Expo Google Fonts; downloads: Google Fonts.';
+
+  @override
+  String get googleFontsNoResults => 'No matching fonts';
+
+  @override
+  String get googleFontsFailed =>
+      'Could not load, download, or apply the font. Check your connection and try again.';
+
+  @override
+  String get googleFontsDownloading => 'Downloading font…';
+
+  @override
+  String get googleFontsPreview => 'The quick brown fox 0123456789 · 字体预览';
+
+  @override
+  String get googleFontsLicense => 'Font license';
+
+  @override
+  String get backgroundSettingsTitle => 'Background tasks';
+
+  @override
+  String get backgroundTaskTitle => 'JO-AIClient task';
+
+  @override
+  String get backgroundCompleted => 'Generation complete';
+
+  @override
+  String get backgroundFailed =>
+      'Generation failed. Open the chat for details.';
+
+  @override
+  String get backgroundCancelled => 'Generation cancelled';
+
+  @override
+  String get backgroundInterrupted =>
+      'Background generation was interrupted. Open the chat to continue.';
+
+  @override
+  String get backgroundRequesting => 'Connecting';
+
+  @override
+  String get backgroundGenerating => 'Generating reply';
+
+  @override
+  String get backgroundThinking => 'Thinking';
+
+  @override
+  String get backgroundToolRunning => 'Running tool';
+
+  @override
+  String get backgroundRetrying => 'Waiting to retry';
+
+  @override
+  String get backgroundWorking => 'Working';
+
+  @override
+  String get backgroundTasks => 'Tasks';
+
+  @override
+  String get backgroundStopTasks => 'Stop tasks';
+
+  @override
+  String get backgroundOpenChat => 'Open chat';
+
+  @override
+  String get backgroundAndroidEnabled => 'Background generation';
+
+  @override
+  String get backgroundAndroidEnabledDetail =>
+      'Keep current tasks running when locked, in the background, or removed from recent apps. A system notification is required while tasks run.';
+
+  @override
+  String get backgroundIosEnabled => 'Enhanced background execution';
+
+  @override
+  String get backgroundIosEnabledDetail =>
+      'Request time to finish current tasks. Enable location or silent audio separately for additional background support.';
+
+  @override
+  String get backgroundNotifications => 'Task notifications';
+
+  @override
+  String get backgroundNotificationsDetail =>
+      'Notify when a task completes or fails outside the chat you are viewing. Does not control Android’s required ongoing notification.';
+
+  @override
+  String get backgroundPrivacy => 'Task status privacy';
+
+  @override
+  String get backgroundPrivacyDetail =>
+      'Hide conversation titles and tool details in notifications and live status. Only generic status, task count and elapsed time are shown.';
+
+  @override
+  String get backgroundLiveActivities => 'Live Activities';
+
+  @override
+  String get backgroundLiveActivitiesDetail =>
+      'Show current tasks on the Lock Screen and Dynamic Island. Availability and visibility depend on the system.';
+
+  @override
+  String get backgroundOverlay => 'Floating task status';
+
+  @override
+  String get backgroundOverlayDetail =>
+      'Show a draggable task capsule over other apps. Tap it to open the chat; closing it only hides the capsule.';
+
+  @override
+  String get backgroundLiveUpdates => 'Live Updates';
+
+  @override
+  String get backgroundLiveUpdatesDetail =>
+      'Use Android 16 Live Updates on supported devices. A promoted notification takes priority over the floating capsule.';
+
+  @override
+  String get backgroundLocation => 'Location-assisted execution';
+
+  @override
+  String get backgroundLocationDetail =>
+      'Use coarse location updates during background tasks. Coordinates are not stored or sent to AI services. Requires enhanced background execution and location permission.';
+
+  @override
+  String get backgroundSilentAudio => 'Silent audio keep-alive';
+
+  @override
+  String get backgroundSilentAudioDetail =>
+      'Play silent audio while background tasks run. Yields to recording and speech playback. Requires enhanced background execution; no microphone permission is needed.';
+
+  @override
+  String get backgroundSpeech => 'Background read-aloud';
+
+  @override
+  String get backgroundSpeechDetail =>
+      'Continue system and network read-aloud when locked or in the background. When disabled, moving to the background pauses speech.';
+
+  @override
+  String get backgroundFinishVisibility => 'Completed status duration';
+
+  @override
+  String get backgroundFinishImmediately => 'Immediately dismiss';
+
+  @override
+  String get backgroundFinishOneMinute => '1 minute';
+
+  @override
+  String get backgroundFinishFiveMinutes => '5 minutes';
+
+  @override
+  String get backgroundFinishUntilForeground => 'Until returning to the app';
+
+  @override
+  String get backgroundFinishVisibilityDetail =>
+      'Applies to the Android capsule and iOS Lock Screen completion card. Returning to the app clears completed status; the maximum is 15 minutes. Cancellation dismisses immediately.';
+
+  @override
+  String get backgroundOverlayIcon => 'Floating icon';
+
+  @override
+  String get backgroundIconDefault => 'JO-AIClient icon';
+
+  @override
+  String get backgroundIconImage => 'Choose image';
+
+  @override
+  String get backgroundIconEmoji => 'Choose Emoji';
+
+  @override
+  String get backgroundPermissionsTitle => 'Permissions and system settings';
+
+  @override
+  String get backgroundNotificationsPermission => 'Notification permission';
+
+  @override
+  String get backgroundBatteryOptimization => 'Battery optimization';
+
+  @override
+  String get backgroundBatteryOptimizationDetail =>
+      'Allow unrestricted battery usage for more reliable background work.';
+
+  @override
+  String get backgroundAutostart => 'Autostart and background usage';
+
+  @override
+  String get backgroundAutostartDetail =>
+      'Check your device’s autostart and background restrictions manually. Android does not provide a reliable permission query for these vendor settings.';
+
+  @override
+  String get backgroundLocationPermission => 'Location permission';
+
+  @override
+  String get backgroundLocationAlways => 'Allow location in the background';
+
+  @override
+  String get backgroundLocationAlwaysDetail =>
+      'You can grant Always access for background location. Permission is requested only when you choose this action.';
+
+  @override
+  String get backgroundSystemSettings => 'App system settings';
+
+  @override
+  String get backgroundPermissionGranted => 'Allowed';
+
+  @override
+  String get backgroundPermissionDenied => 'Not allowed';
+
+  @override
+  String get backgroundPermissionLimited => 'While using the app';
+
+  @override
+  String get backgroundPermissionUnknown => 'Check manually';
+
+  @override
+  String get backgroundPermissionNotDetermined => 'Not requested';
+
+  @override
+  String get backgroundRuntimeTitle => 'Current status';
+
+  @override
+  String get backgroundRuntimeActive => 'Running';
+
+  @override
+  String get backgroundRuntimeIdle => 'Inactive';
+
+  @override
+  String get backgroundLocationActive => 'Background location';
+
+  @override
+  String get backgroundAudioActive => 'Silent audio';
+
+  @override
+  String get backgroundActivityActive => 'Live Activity';
+
+  @override
+  String get backgroundOverlayActive => 'Floating window';
+
+  @override
+  String get backgroundLastError => 'Last interruption or error';
+
+  @override
+  String get backgroundNoError => 'None recorded';
+
+  @override
+  String get backgroundUnsupported =>
+      'Unavailable on this device or disabled in system settings';
+
+  @override
+  String get backgroundIosLimit =>
+      'iOS controls background execution. Live Activities alone do not keep the app running. Force-quitting can stop generation and delay removal of live status until the app opens again.';
+
+  @override
+  String get backgroundAndroidLimit =>
+      'Check notification, battery and vendor background settings if tasks stop. Force stop and system process termination can still interrupt generation.';
+
+  @override
+  String get backgroundStale =>
+      'Status has not updated. Open the app to check.';
+
+  @override
+  String get backgroundIconError =>
+      'Unable to import this image. Please choose another image.';
+
+  @override
+  String get backgroundNotificationChannels => 'Notification channels';
+
+  @override
+  String get backgroundCompletionChannel => 'Completion notification channel';
+
+  @override
+  String get backgroundOngoingChannel => 'Running task notification channel';
+
+  @override
+  String get backgroundOverlayAppearance => 'Floating window appearance';
+
+  @override
+  String get backgroundOverlayAppearanceDetail =>
+      'Size, artwork, progress ring and visible content';
+
+  @override
+  String get backgroundOverlayPreviewHint =>
+      'Drag to move · Tap to open chat · Hold to dismiss';
+
+  @override
+  String get backgroundOverlayCard => 'Card';
+
+  @override
+  String get backgroundOverlayCircle => 'Circular icon';
+
+  @override
+  String get backgroundOverlaySize => 'Size and shape';
+
+  @override
+  String get backgroundOverlayWidth => 'Width';
+
+  @override
+  String get backgroundOverlayHeight => 'Height';
+
+  @override
+  String get backgroundOverlayCornerRadius => 'Corner radius';
+
+  @override
+  String get backgroundOverlayIconSize => 'Icon size';
+
+  @override
+  String get backgroundOverlayProgressSize => 'Progress ring diameter';
+
+  @override
+  String get backgroundOverlayProgressStroke => 'Progress ring thickness';
+
+  @override
+  String get backgroundOverlayContent => 'Visible content';
+
+  @override
+  String get backgroundOverlayShowProgress => 'Show progress ring';
+
+  @override
+  String get backgroundOverlayShowTitle => 'Show title';
+
+  @override
+  String get backgroundOverlayShowSubtitle => 'Show subtitle';
+
+  @override
+  String get backgroundOverlayShowTime => 'Show elapsed time';
+
+  @override
+  String get backgroundOverlayShowClose => 'Show close button';
+
+  @override
+  String get backgroundOverlayShowBackground => 'Show background';
+
+  @override
+  String get backgroundOverlayShowBorder => 'Show border';
+
+  @override
+  String get backgroundOverlayReset => 'Restore default appearance';
+
+  @override
+  String get mcpStdioEnvironmentRequired =>
+      'Install the workspace environment to use STDIO on mobile.';
+
+  @override
+  String get mcpArgumentsHint =>
+      'Separate arguments with spaces; quote values containing spaces. Use \'\' for an empty argument.';
+
+  @override
+  String get mcpArgumentsInvalid =>
+      'Check for an unclosed quote or trailing escape in arguments.';
+
+  @override
+  String get mcpImportEnvironment => 'Import from Environment';
+
+  @override
+  String get mcpEnvironmentEmpty =>
+      'No environment variables. Add them in Environment settings.';
+
+  @override
+  String get mcpEnvironmentHint =>
+      'Inherits environment variables. Import a variable to customize its value for this server.';
+
+  @override
+  String get mcpImportJson => 'Import JSON';
+
+  @override
+  String get mcpImportJsonHint =>
+      'Paste a Claude Desktop or Cursor MCP configuration. Preview and add servers without replacing existing ones.';
+
+  @override
+  String get mcpImportPaste => 'Paste from Clipboard';
+
+  @override
+  String get mcpImportPreview => 'Preview';
+
+  @override
+  String get mcpImportConfirm => 'Import';
+
+  @override
+  String get startupRecoverySnapshotTitle => 'Restore from a database snapshot';
+
+  @override
+  String get startupRecoverySnapshotBody =>
+      'Choose a snapshot on this device to recover your chats and settings, even when the database cannot open. Do not uninstall JO-AIClient: uninstalling also removes these snapshots.';
+
+  @override
+  String get startupRecoverySnapshotEmpty =>
+      'No database snapshots were found on this device. Export your data before trying other recovery actions.';
+
+  @override
+  String startupRecoverySnapshotConfirm(String when) {
+    return 'Restore chats and settings from $when? Changes made after this snapshot will not be included. Existing attachment files and the snapshot will be kept. JO-AIClient will restart to complete the restore.';
+  }
+
+  @override
+  String get startupRecoverySnapshotReady =>
+      'The snapshot is ready. Restart JO-AIClient to complete the restore.';
+
+  @override
+  String get scheduledTasksTitle => 'Scheduled tasks';
+
+  @override
+  String get scheduledTasksDescription =>
+      'Run tasks automatically at your chosen time: start a new chat, follow up, or run a question again.';
+
+  @override
+  String get scheduledTasksEmpty => 'Your day, on a schedule';
+
+  @override
+  String get scheduledTasksEmptyDetail =>
+      'Add a task for a morning briefing, a daily review, or anything you want to run regularly.';
+
+  @override
+  String get scheduledTasksAdd => 'Add task';
+
+  @override
+  String get scheduledTasksEdit => 'Edit task';
+
+  @override
+  String get scheduledTasksName => 'Name';
+
+  @override
+  String get scheduledTasksNameHint => 'Morning briefing';
+
+  @override
+  String get scheduledTasksPrompt => 'Prompt';
+
+  @override
+  String get scheduledTasksPromptHint =>
+      'What would you like your assistant to do?';
+
+  @override
+  String get scheduledTasksAssistant => 'Assistant';
+
+  @override
+  String get scheduledTasksChooseAssistant => 'Choose an assistant';
+
+  @override
+  String get scheduledTasksAssistantMissing => 'Assistant unavailable';
+
+  @override
+  String get scheduledTasksTime => 'Time';
+
+  @override
+  String get scheduledTasksTimeHint => '24-hour time, e.g. 08:00';
+
+  @override
+  String get scheduledTasksRepeat => 'Repeat';
+
+  @override
+  String get scheduledTasksEveryDay => 'Every day';
+
+  @override
+  String get scheduledTasksWeekdays => 'Weekdays';
+
+  @override
+  String get scheduledTasksEnabled => 'Enabled';
+
+  @override
+  String get scheduledTasksPermission => 'Alarms & reminders';
+
+  @override
+  String get scheduledTasksPermissionDetail =>
+      'Allow exact alarms to run tasks at your chosen time. Enabled tasks will wait until permission is granted.';
+
+  @override
+  String get scheduledTasksPermissionAction => 'Allow';
+
+  @override
+  String get scheduledTasksReliability =>
+      'Keep JO-AIClient unrestricted in battery settings for more reliable execution. Force stopping the app cancels alarms until you reopen it. Missed runs are skipped; tasks follow the device time zone.';
+
+  @override
+  String get scheduledTasksExecutionDetail =>
+      'Results are saved in chats. A completion notification previews the reply and opens the conversation when tapped. Runs stop after 10 minutes or when user input or tool approval is needed.';
+
+  @override
+  String get scheduledTasksRunNow => 'Run now';
+
+  @override
+  String get scheduledTasksHistory => 'Run history';
+
+  @override
+  String get scheduledTasksNoRuns => 'No runs yet';
+
+  @override
+  String get scheduledTasksRunning => 'Running';
+
+  @override
+  String get scheduledTasksCompleted => 'Completed';
+
+  @override
+  String get scheduledTasksFailed => 'Failed';
+
+  @override
+  String get scheduledTasksInterrupted => 'Interrupted';
+
+  @override
+  String get scheduledTasksPaused => 'Paused';
+
+  @override
+  String get scheduledTasksWaitingPermission => 'Waiting for permission';
+
+  @override
+  String scheduledTasksNextRun(String time) {
+    return 'Next: $time';
+  }
+
+  @override
+  String get scheduledTasksDelete => 'Delete task';
+
+  @override
+  String get scheduledTasksDeleteDetail =>
+      'Delete this schedule and its run history? Conversations already created will be kept.';
+
+  @override
+  String get scheduledTasksSave => 'Save';
+
+  @override
+  String get scheduledTasksCancel => 'Cancel';
+
+  @override
+  String get scheduledTasksInvalid =>
+      'Enter a name, prompt and assistant, and select at least one day for a custom schedule.';
+
+  @override
+  String get scheduledTasksLoading => 'Loading…';
+
+  @override
+  String get scheduledTasksOpenChat => 'View conversation';
+
+  @override
+  String get scheduledTasksNeedsInput =>
+      'Stopped because user input or tool approval was required. Open the conversation to continue.';
+
+  @override
+  String get scheduledTasksTimeout => 'The execution time limit was reached.';
+
+  @override
+  String get scheduledTasksProcessTerminated =>
+      'Android stopped the previous run.';
+
+  @override
+  String get scheduledTasksOnce => 'Once';
+
+  @override
+  String get scheduledTasksCustom => 'Custom';
+
+  @override
+  String get scheduledTasksExecution => 'Task';
+
+  @override
+  String get scheduledTasksMode => 'Action';
+
+  @override
+  String get scheduledTasksNewChat => 'New chat';
+
+  @override
+  String get scheduledTasksFollowUp => 'Follow up';
+
+  @override
+  String get scheduledTasksRegenerate => 'Run again';
+
+  @override
+  String get scheduledTasksChat => 'Conversation';
+
+  @override
+  String get scheduledTasksChooseChat => 'Choose a conversation';
+
+  @override
+  String get scheduledTasksMessage => 'Question to run again';
+
+  @override
+  String get scheduledTasksChooseMessage => 'Choose a question';
+
+  @override
+  String get scheduledTasksAttachmentMessage => 'Message with attachments';
+
+  @override
+  String get scheduledTasksModel => 'Model';
+
+  @override
+  String get scheduledTasksChooseModel => 'Choose a model';
+
+  @override
+  String get scheduledTasksModelDefault =>
+      'Use the conversation or assistant model';
+
+  @override
+  String get scheduledTasksSchedule => 'Schedule';
+
+  @override
+  String get scheduledTasksActiveWindow => 'Active dates';
+
+  @override
+  String get scheduledTasksStartDate => 'Start date';
+
+  @override
+  String get scheduledTasksEndDate => 'End date';
+
+  @override
+  String get scheduledTasksActiveWindowDetail =>
+      'Runs only within these dates, including the end date. Leave a date unset for no limit.';
+
+  @override
+  String get scheduledTasksDate => 'Date';
+
+  @override
+  String get scheduledTasksDateUnrestricted => 'No limit';
+
+  @override
+  String get scheduledTasksClear => 'Clear';
+
+  @override
+  String get scheduledTasksSearch => 'Search';
+
+  @override
+  String get scheduledTasksNoTargets => 'No matching items for this assistant';
+
+  @override
+  String get scheduledTasksFutureDate =>
+      'Choose a future execution date and time.';
+
+  @override
+  String get scheduledTasksDateRangeInvalid =>
+      'The end date must be on or after the start date.';
+
+  @override
+  String get scheduledTasksRegenerateDetail =>
+      'Generates another answer to the selected question using its original context. Existing answers and later messages are kept.';
+
+  @override
+  String get scheduledTasksSaving => 'Saving…';
+
+  @override
+  String get scheduledTasksFinished => 'Schedule ended';
+
+  @override
+  String get scheduledTasksModelMissing =>
+      'The selected model is unavailable. Edit this task to choose another model.';
+
+  @override
+  String get scheduledTasksChatMissing =>
+      'The conversation is unavailable or belongs to another assistant.';
+
+  @override
+  String get scheduledTasksMessageMissing =>
+      'The selected question is no longer available.';
+
+  @override
+  String get scheduledTasksChatBusy =>
+      'This conversation is generating a reply. The scheduled run was skipped.';
+
+  @override
+  String get scheduledTasksDesktopEmpty => 'No scheduled tasks';
+
+  @override
+  String get scheduledTasksDesktopReliability =>
+      'Tasks run only while JO-AIClient is running, including when minimized or in the system tray. Missed times are skipped after quitting or computer sleep. JO-AIClient will not start automatically.';
+
+  @override
+  String get scheduledTasksDesktopExecutionDetail =>
+      'Results are saved in chats. Open them from the task’s run history. Runs stop after 10 minutes or when user input or tool approval is needed.';
+
+  @override
+  String get mcpServerEditSheetNameHint => 'My MCP';
+
+  @override
+  String get mcpServerEditSheetDefaultName => 'MCP';
+
+  @override
+  String get mcpServerEditSheetStdioCommandHint => 'npx';
+
+  @override
+  String get mcpServerEditSheetStdioArgumentsHint =>
+      '-y @modelcontextprotocol/server-filesystem';
+
+  @override
+  String get mcpServerEditSheetStdioWorkingDirectoryHint => '/root';
+
+  @override
+  String get mcpServerEditSheetStdioEnvNameHint => 'ENV_NAME';
+
+  @override
+  String get mcpServerEditSheetStdioEnvValueHint => 'Value';
+
+  @override
+  String get mcpServerEditSheetSseUrlHint => 'http://localhost:3000/sse';
+
+  @override
+  String get mcpServerEditSheetHttpUrlHint => 'http://localhost:3000';
 }

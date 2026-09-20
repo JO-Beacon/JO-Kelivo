@@ -12,7 +12,7 @@ import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/database/business_restore_service.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/backup.dart';
-import 'package:Kelivo/core/models/backup_task_progress.dart';
+import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/conversation.dart';
@@ -381,7 +381,7 @@ void main() {
     );
 
     test(
-      'puts configured providers with only an unknown ID into the deleted group',
+      'puts configured providers with only an unknown ID into the deleted group and disables them',
       () async {
         final fixture = _chatboxFixture();
         final settings = Map<String, dynamic>.from(fixture['settings'] as Map);
@@ -408,9 +408,15 @@ void main() {
         ).exportSettings();
         final providersOut =
             jsonDecode(exported['provider_configs_v1'] as String) as Map;
+        final idOnlyProvider =
+            providersOut[_legacyId('provider_id-only-provider')] as Map;
+        expect(idOnlyProvider['name'], 'id-only-provider');
+        expect(idOnlyProvider['apiKey'], 'orphan-secret');
+        expect(idOnlyProvider['enabled'], isFalse, reason: '已删除分组中的供应商必须默认禁用');
         expect(
-          (providersOut[_legacyId('provider_id-only-provider')] as Map)['name'],
-          'id-only-provider',
+          (providersOut[_legacyId('provider_openai')] as Map)['enabled'],
+          isTrue,
+          reason: '正常导入的供应商仍应保持启用',
         );
 
         final groups =
@@ -436,6 +442,52 @@ void main() {
       },
     );
 
+    test(
+      'does not change existing provider enabled state when importing a deleted provider',
+      () async {
+        await BusinessRestoreService(businessRepository).overwrite({
+          'provider_configs_v1': jsonEncode({
+            _legacyId('provider_id-only-provider'): {
+              'id': _legacyId('provider_id-only-provider'),
+              'name': 'Existing provider',
+              'apiKey': 'local-secret',
+              'enabled': true,
+            },
+          }),
+          'providers_order_v1': [_legacyId('provider_id-only-provider')],
+        });
+
+        final fixture = _chatboxFixture();
+        final settings = Map<String, dynamic>.from(fixture['settings'] as Map);
+        final providers = Map<String, dynamic>.from(
+          settings['providers'] as Map,
+        );
+        providers['id-only-provider'] = {
+          'apiKey': 'orphan-secret',
+          'apiHost': 'https://orphan.example.test',
+        };
+        settings['providers'] = providers;
+        fixture['settings'] = settings;
+        await backup.writeAsString(jsonEncode(fixture), flush: true);
+
+        await ChatboxImporter.importFromChatbox(
+          file: backup,
+          mode: RestoreMode.overwrite,
+          businessRepository: businessRepository,
+          chatService: chatService,
+        );
+
+        final exported = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
+        final providersOut =
+            jsonDecode(exported['provider_configs_v1'] as String) as Map;
+        final existing =
+            providersOut[_legacyId('provider_id-only-provider')] as Map;
+        expect(existing['enabled'], isTrue);
+        expect(existing['apiKey'], 'orphan-secret');
+      },
+    );
     test('imports used Chatbox AI as disabled provider', () async {
       final fixture = _chatboxFixture();
       final settings = Map<String, dynamic>.from(fixture['settings'] as Map);

@@ -10,6 +10,20 @@ class AppShadows {
   ];
 }
 
+class AppOverlayColors {
+  static const double desktopPopoverAlphaDark = 0.28;
+  static const double desktopPopoverAlphaLight = 0.56;
+
+  /// 桌面端浮层的共享底色。alpha 与原先散落在各浮层里的字面值一致
+  /// （深色 surface @ 0.28、浅色 @ 0.56）。
+  static Color desktopPopoverSurface(ColorScheme cs) {
+    final isDark = cs.brightness == Brightness.dark;
+    return cs.surface.withValues(
+      alpha: isDark ? desktopPopoverAlphaDark : desktopPopoverAlphaLight,
+    );
+  }
+}
+
 class AppRadii {
   static const double capsule = 28;
 }

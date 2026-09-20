@@ -283,7 +283,9 @@ void main() {
       matching: find.byType(Scrollable),
     );
     expect(innerScrollable, findsWidgets);
-    final position = tester.state<ScrollableState>(innerScrollable.first).position;
+    final position = tester
+        .state<ScrollableState>(innerScrollable.first)
+        .position;
     expect(position.maxScrollExtent, greaterThan(0));
   });
 

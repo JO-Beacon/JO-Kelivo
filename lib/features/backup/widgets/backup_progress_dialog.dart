@@ -3,7 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../../core/models/backup_task_progress.dart';
+import '../../../core/services/backup/backup_cancel_token.dart';
+import '../../../core/services/backup/backup_task_progress.dart';
 import '../../../core/services/backup/backup_activity.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';

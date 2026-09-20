@@ -1,3 +1,4 @@
+import '../models/mobile_background_settings.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -193,6 +194,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _displayShowThinkingCardsKey =
       'display_show_thinking_cards_v1';
   static const String _displayShowToolCardsKey = 'display_show_tool_cards_v1';
+  static const String _displayShowProducedFilesKey =
+      'display_show_produced_files_v1';
   static const String _displayAutoCollapseThinkingKey =
       'display_auto_collapse_thinking_v1';
   static const String _displayCollapseThinkingStepsKey =
@@ -344,22 +347,11 @@ class SettingsProvider extends ChangeNotifier {
   static const String _desktopTopicPositionKey = 'desktop_topic_position_v1';
   static const String _desktopRightSidebarOpenKey =
       'desktop_right_sidebar_open_v1';
-  // Android 后台聊天生成模式
-  static const String _androidBackgroundChatModeKey =
-      'android_background_chat_mode_v1';
-  // iOS 后台生成设置
-  static const String _iosBackgroundGenerationEnabledKey =
-      'ios_background_generation_enabled_v1';
-  static const String _iosBackgroundTaskRefreshEnabledKey =
-      'ios_background_task_refresh_enabled_v1';
-  static const String _iosLiveActivityEnabledKey =
-      'ios_live_activity_enabled_v1';
-  static const String _iosBackgroundNotificationsEnabledKey =
-      'ios_background_notifications_enabled_v1';
+  static const String _mobileBackgroundKey = 'mobile_background_settings_v1';
   // 字体
   static const String _displayAppFontFamilyKey = 'display_app_font_family_v1';
   static const String _displayCodeFontFamilyKey = 'display_code_font_family_v1';
-  // 已移除的 Google Fonts 选择器遗留键：只在加载时读取一次，
+  // 旧版在线字体标志：与本轮下载为本地文件的机制无关，只在加载时读取一次，
   // 用于把旧选择回退到系统默认，然后删除。
   static const String _legacyAppFontIsGoogleKey =
       'display_app_font_is_google_v1';
@@ -414,6 +406,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _desktopSidebarOpenKey = 'desktop_sidebar_open_v1';
   static const String _desktopRightSidebarWidthKey =
       'desktop_right_sidebar_width_v1';
+  static const String _desktopWorkspaceBarOpenKey =
+      'desktop_workspace_bar_open_v1';
 
   // ===== 网络 TTS 服务 =====
   List<TtsServiceOptions> _ttsServices = const <TtsServiceOptions>[];
@@ -539,6 +533,8 @@ class SettingsProvider extends ChangeNotifier {
       _desktopTopicPosition == DesktopTopicPosition.right;
   bool _desktopRightSidebarOpen = true;
   bool get desktopRightSidebarOpen => _desktopRightSidebarOpen;
+  bool _desktopWorkspaceBarOpen = false;
+  bool get desktopWorkspaceBarOpen => _desktopWorkspaceBarOpen;
 
   Map<String, ProviderConfig> _providerConfigs = {};
   Map<String, ProviderConfig> get providerConfigs =>
@@ -1111,6 +1107,7 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayShowUserMessageActionsKey) ?? true;
     _showThinkingCards = prefs.getBool(_displayShowThinkingCardsKey) ?? true;
     _showToolCards = prefs.getBool(_displayShowToolCardsKey) ?? true;
+    _showProducedFiles = prefs.getBool(_displayShowProducedFilesKey) ?? true;
     _autoCollapseThinking =
         prefs.getBool(_displayAutoCollapseThinkingKey) ?? true;
     _collapseThinkingSteps =
@@ -1195,7 +1192,9 @@ class SettingsProvider extends ChangeNotifier {
     } else {
       _enterToSendOnMobile = enterToSendPref;
     }
-    _longPasteAsFile = prefs.getBool(_displayLongPasteAsFileKey) ?? false;
+    _longPasteAsFile =
+        prefs.getBool(_displayLongPasteAsFileKey) ??
+        defaultLongPasteAsFileEnabled;
     _longPasteAsFileThreshold =
         (prefs.getInt(_displayLongPasteAsFileThresholdKey) ??
                 defaultLongPasteAsFileThreshold)
@@ -1320,6 +1319,8 @@ class SettingsProvider extends ChangeNotifier {
     }
     _desktopRightSidebarOpen =
         prefs.getBool(_desktopRightSidebarOpenKey) ?? true;
+    _desktopWorkspaceBarOpen =
+        prefs.getBool(_desktopWorkspaceBarOpenKey) ?? false;
     // 聊天消息背景样式（default | frosted | solid）
     final bgStyleStr =
         prefs.getString(_displayChatMessageBackgroundStyleKey) ?? 'default';
@@ -1396,37 +1397,16 @@ class SettingsProvider extends ChangeNotifier {
       await prefs.setString(_appLocaleKey, 'system');
     }
 
-    // Android 后台聊天模式（仅 Android；首次运行默认开启）
-    try {
-      final rawBg = prefs.getString(_androidBackgroundChatModeKey);
-      if (rawBg == null) {
-        // 默认关闭，避免首次启动时弹出权限提示
-        _androidBackgroundChatMode = AndroidBackgroundChatMode.off;
-        await prefs.setString(_androidBackgroundChatModeKey, 'off');
-      } else {
-        switch (rawBg) {
-          case 'on_notify':
-            _androidBackgroundChatMode = AndroidBackgroundChatMode.onNotify;
-            break;
-          case 'on':
-            _androidBackgroundChatMode = AndroidBackgroundChatMode.on;
-            break;
-          case 'off':
-          default:
-            _androidBackgroundChatMode = AndroidBackgroundChatMode.off;
-        }
+    final backgroundJson = prefs.getString(_mobileBackgroundKey);
+    if (backgroundJson != null) {
+      try {
+        _mobileBackground = MobileBackgroundSettings.fromJson(
+          jsonDecode(backgroundJson) as Map<String, dynamic>,
+        );
+      } catch (_) {
+        _mobileBackground = const MobileBackgroundSettings();
       }
-    } catch (_) {
-      _androidBackgroundChatMode = AndroidBackgroundChatMode.off;
     }
-    _iosBackgroundGenerationEnabled =
-        prefs.getBool(_iosBackgroundGenerationEnabledKey) ?? false;
-    _iosBackgroundTaskRefreshEnabled =
-        prefs.getBool(_iosBackgroundTaskRefreshEnabledKey) ?? false;
-    _iosLiveActivityEnabled =
-        prefs.getBool(_iosLiveActivityEnabledKey) ?? false;
-    _iosBackgroundNotificationsEnabled =
-        prefs.getBool(_iosBackgroundNotificationsEnabledKey) ?? false;
 
     // 加载搜索设置
     final searchServicesStr = prefs.getString(_searchServicesKey);
@@ -1821,10 +1801,11 @@ class SettingsProvider extends ChangeNotifier {
       (_codeFontLocalAlias?.isNotEmpty == true) ? _codeFontLocalAlias : null;
 
   Future<void> setAppFontSystemFamily(String? family) async {
+    final previousPath = _appFontLocalPath;
     _appFontFamily = (family == null || family.trim().isEmpty)
         ? null
         : family.trim();
-    // 切换到系统字体时清除本地别名
+    // 切换系统字体时清除旧本地选择，并清理已不用的字体及许可。
     _appFontLocalAlias = null;
     _appFontLocalPath = null;
     notifyListeners();
@@ -1832,9 +1813,11 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setString(_displayAppFontFamilyKey, _appFontFamily ?? '');
     await prefs.remove(_displayAppFontLocalAliasKey);
     await prefs.remove(_displayAppFontLocalPathKey);
+    await _deleteManagedFontFileIfUnused(previousPath);
   }
 
   Future<void> setCodeFontSystemFamily(String? family) async {
+    final previousPath = _codeFontLocalPath;
     _codeFontFamily = (family == null || family.trim().isEmpty)
         ? null
         : family.trim();
@@ -1845,58 +1828,81 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setString(_displayCodeFontFamilyKey, _codeFontFamily ?? '');
     await prefs.remove(_displayCodeFontLocalAliasKey);
     await prefs.remove(_displayCodeFontLocalPathKey);
+    await _deleteManagedFontFileIfUnused(previousPath);
   }
 
-  Future<void> setAppFontFromLocal({
+  Future<bool> setAppFontFromLocal({
     required String path,
     String? alias,
+    String? licenseText,
   }) async {
     final previousPath = _appFontLocalPath;
-    final localPath = await _importLocalFontFile(path);
-    if (localPath == null) return;
+    final localPath = await _importLocalFontFile(
+      path,
+      licenseText: licenseText,
+    );
+    if (localPath == null) return false;
     final fam = await _registerLocalFont(
       path: localPath,
       aliasPrefix: alias ?? 'kelivo_local_app',
     );
     if (fam == null) {
       await _deleteManagedFontFileIfUnused(localPath);
-      return;
+      return false;
+    }
+    final prefs = _preferences;
+    try {
+      await prefs.setString(_displayAppFontFamilyKey, fam);
+      await prefs.setString(_displayAppFontLocalAliasKey, fam);
+      await prefs.setString(_displayAppFontLocalPathKey, localPath);
+    } catch (_) {
+      // 设置未保存时仍使用原字体，不能先切换界面再报告应用失败。
+      await _deleteManagedFontFileIfUnused(localPath);
+      rethrow;
     }
     _appFontFamily = fam;
     _appFontLocalAlias = fam;
     _appFontLocalPath = localPath;
     notifyListeners();
-    final prefs = _preferences;
-    await prefs.setString(_displayAppFontFamilyKey, _appFontFamily!);
-    await prefs.setString(_displayAppFontLocalAliasKey, _appFontLocalAlias!);
-    await prefs.setString(_displayAppFontLocalPathKey, _appFontLocalPath!);
     await _deleteManagedFontFileIfUnused(previousPath);
+    return true;
   }
 
-  Future<void> setCodeFontFromLocal({
+  Future<bool> setCodeFontFromLocal({
     required String path,
     String? alias,
+    String? licenseText,
   }) async {
     final previousPath = _codeFontLocalPath;
-    final localPath = await _importLocalFontFile(path);
-    if (localPath == null) return;
+    final localPath = await _importLocalFontFile(
+      path,
+      licenseText: licenseText,
+    );
+    if (localPath == null) return false;
     final fam = await _registerLocalFont(
       path: localPath,
       aliasPrefix: alias ?? 'kelivo_local_code',
     );
     if (fam == null) {
       await _deleteManagedFontFileIfUnused(localPath);
-      return;
+      return false;
+    }
+    final prefs = _preferences;
+    try {
+      await prefs.setString(_displayCodeFontFamilyKey, fam);
+      await prefs.setString(_displayCodeFontLocalAliasKey, fam);
+      await prefs.setString(_displayCodeFontLocalPathKey, localPath);
+    } catch (_) {
+      // 设置未保存时仍使用原字体，不能先切换界面再报告应用失败。
+      await _deleteManagedFontFileIfUnused(localPath);
+      rethrow;
     }
     _codeFontFamily = fam;
     _codeFontLocalAlias = fam;
     _codeFontLocalPath = localPath;
     notifyListeners();
-    final prefs = _preferences;
-    await prefs.setString(_displayCodeFontFamilyKey, _codeFontFamily!);
-    await prefs.setString(_displayCodeFontLocalAliasKey, _codeFontLocalAlias!);
-    await prefs.setString(_displayCodeFontLocalPathKey, _codeFontLocalPath!);
     await _deleteManagedFontFileIfUnused(previousPath);
+    return true;
   }
 
   Future<void> clearAppFont() async {
@@ -2052,7 +2058,11 @@ class SettingsProvider extends ChangeNotifier {
     }
   }
 
-  Future<String?> _importLocalFontFile(String sourcePath) async {
+  Future<String?> _importLocalFontFile(
+    String sourcePath, {
+    String? licenseText,
+  }) async {
+    File? dest;
     try {
       final source = File(sourcePath);
       if (!await source.exists()) return null;
@@ -2068,15 +2078,22 @@ class SettingsProvider extends ChangeNotifier {
       final base = safeBase.isEmpty ? 'font' : safeBase;
       final ext = p.extension(sourceName).toLowerCase();
       final safeExt = (ext == '.ttf' || ext == '.otf') ? ext : '.ttf';
-      final dest = File(
+      dest = File(
         p.join(
           dir.path,
           '${base}_${DateTime.now().microsecondsSinceEpoch}$safeExt',
         ),
       );
       await dest.writeAsBytes(await source.readAsBytes(), flush: true);
+      if (licenseText != null) {
+        await File(
+          '${dest.path}.license.txt',
+        ).writeAsString(licenseText, flush: true);
+      }
       return dest.path;
-    } catch (_) {
+    } catch (error, stack) {
+      debugPrint('[FontImport] $error\n$stack');
+      await _deleteManagedFontFileIfUnused(dest?.path);
       return null;
     }
   }
@@ -2093,7 +2110,11 @@ class SettingsProvider extends ChangeNotifier {
       if (await file.exists()) {
         await file.delete();
       }
-    } catch (_) {}
+      final license = File('${file.path}.license.txt');
+      if (await license.exists()) await license.delete();
+    } catch (error, stack) {
+      debugPrint('[FontCleanup] $error\n$stack');
+    }
   }
 
   Future<String?> _registerLocalFont({
@@ -2113,7 +2134,8 @@ class SettingsProvider extends ChangeNotifier {
       loader.addFont(Future.value(bd));
       await loader.load();
       return alias;
-    } catch (_) {
+    } catch (error, stack) {
+      debugPrint('[FontRegister] $error\n$stack');
       return null;
     }
   }
@@ -2174,6 +2196,14 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = _preferences;
     await prefs.setBool(_desktopRightSidebarOpenKey, _desktopRightSidebarOpen);
+  }
+
+  Future<void> setDesktopWorkspaceBarOpen(bool open) async {
+    if (_desktopWorkspaceBarOpen == open) return;
+    _desktopWorkspaceBarOpen = open;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.setBool(_desktopWorkspaceBarOpenKey, _desktopWorkspaceBarOpen);
   }
 
   // ===== 应用语言环境（UI 语言） =====
@@ -3080,107 +3110,16 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setBool(_mobileAssistantDetailOutlineEnabledKey, enabled);
   }
 
-  // ===== Android 后台聊天生成 =====
-  AndroidBackgroundChatMode _androidBackgroundChatMode =
-      AndroidBackgroundChatMode.off;
-  AndroidBackgroundChatMode get androidBackgroundChatMode =>
-      _androidBackgroundChatMode;
-  Future<void> setAndroidBackgroundChatMode(
-    AndroidBackgroundChatMode mode,
-  ) async {
-    if (_androidBackgroundChatMode == mode) return;
-    _androidBackgroundChatMode = mode;
-    notifyListeners();
-    final prefs = _preferences;
-    final v = switch (mode) {
-      AndroidBackgroundChatMode.onNotify => 'on_notify',
-      AndroidBackgroundChatMode.on => 'on',
-      AndroidBackgroundChatMode.off => 'off',
-    };
-    await prefs.setString(_androidBackgroundChatModeKey, v);
-    // 尽力而为：立即更新 Android 后台执行状态
-    try {
-      if (Platform.isAndroid) {
-        // 直接调用；该文件已存在于项目中，并通过 Platform 进行平台判断
-        // ignore: depend_on_referenced_packages
-        // ignore_for_file: unnecessary_import
-        // ignore: avoid_print
-        // 此处无法延迟导入；依赖 main.dart 中的同步。这是一个 no-op 占位符。
-      }
-    } catch (_) {}
-  }
+  MobileBackgroundSettings _mobileBackground = const MobileBackgroundSettings();
+  MobileBackgroundSettings get mobileBackground => _mobileBackground;
 
-  // ===== iOS 后台聊天生成 =====
-  bool _iosBackgroundGenerationEnabled = false;
-  bool get iosBackgroundGenerationEnabled => _iosBackgroundGenerationEnabled;
-  Future<void> setIosBackgroundGenerationEnabled(bool v) async {
-    if (_iosBackgroundGenerationEnabled == v) return;
-    _iosBackgroundGenerationEnabled = v;
-    if (!v) {
-      _iosBackgroundTaskRefreshEnabled = false;
-      _iosLiveActivityEnabled = false;
-      _iosBackgroundNotificationsEnabled = false;
-    }
+  Future<void> setMobileBackground(MobileBackgroundSettings settings) async {
+    _mobileBackground = settings;
     notifyListeners();
-    final prefs = _preferences;
-    await prefs.setBool(
-      _iosBackgroundGenerationEnabledKey,
-      _iosBackgroundGenerationEnabled,
+    await _preferences.setString(
+      _mobileBackgroundKey,
+      jsonEncode(settings.toJson()),
     );
-    if (!v) {
-      await prefs.setBool(_iosBackgroundTaskRefreshEnabledKey, false);
-      await prefs.setBool(_iosLiveActivityEnabledKey, false);
-      await prefs.setBool(_iosBackgroundNotificationsEnabledKey, false);
-    }
-  }
-
-  bool _iosBackgroundTaskRefreshEnabled = false;
-  bool get iosBackgroundTaskRefreshEnabled => _iosBackgroundTaskRefreshEnabled;
-  Future<void> setIosBackgroundTaskRefreshEnabled(bool v) async {
-    if (_iosBackgroundTaskRefreshEnabled == v) return;
-    _iosBackgroundTaskRefreshEnabled = v;
-    if (v) _iosBackgroundGenerationEnabled = true;
-    notifyListeners();
-    final prefs = _preferences;
-    await prefs.setBool(
-      _iosBackgroundTaskRefreshEnabledKey,
-      _iosBackgroundTaskRefreshEnabled,
-    );
-    if (v) {
-      await prefs.setBool(_iosBackgroundGenerationEnabledKey, true);
-    }
-  }
-
-  bool _iosLiveActivityEnabled = false;
-  bool get iosLiveActivityEnabled => _iosLiveActivityEnabled;
-  Future<void> setIosLiveActivityEnabled(bool v) async {
-    if (_iosLiveActivityEnabled == v) return;
-    _iosLiveActivityEnabled = v;
-    if (v) _iosBackgroundGenerationEnabled = true;
-    notifyListeners();
-    final prefs = _preferences;
-    await prefs.setBool(_iosLiveActivityEnabledKey, _iosLiveActivityEnabled);
-    if (v) {
-      await prefs.setBool(_iosBackgroundGenerationEnabledKey, true);
-    }
-  }
-
-  bool _iosBackgroundNotificationsEnabled = false;
-  bool get iosBackgroundNotificationsEnabled =>
-      _iosBackgroundNotificationsEnabled;
-  Future<void> setIosBackgroundNotificationsEnabled(bool v) async {
-    if (_iosBackgroundNotificationsEnabled == v) return;
-    _iosBackgroundNotificationsEnabled = v;
-    if (v) _iosBackgroundGenerationEnabled = true;
-    notifyListeners();
-    final prefs = _preferences;
-    await prefs.setBool(
-      _iosBackgroundNotificationsEnabledKey,
-      _iosBackgroundNotificationsEnabled,
-    );
-    if (v) {
-      await prefs.setBool(_iosBackgroundGenerationEnabledKey, true);
-    }
   }
 
   void setDynamicColorSupported(bool v) {
@@ -4726,6 +4665,16 @@ Requirements:
     await prefs.setBool(_displayShowTokenStatsKey, v);
   }
 
+  // 显示：工具产出的文件，位于助手消息底部。
+  bool _showProducedFiles = true;
+  bool get showProducedFiles => _showProducedFiles;
+  Future<void> setShowProducedFiles(bool v) async {
+    if (_showProducedFiles == v) return;
+    _showProducedFiles = v;
+    notifyListeners();
+    await _preferences.setBool(_displayShowProducedFilesKey, v);
+  }
+
   // 显示：自动折叠推理/思考部分
   bool _autoCollapseThinking = true;
   bool get autoCollapseThinking => _autoCollapseThinking;
@@ -4900,6 +4849,14 @@ Requirements:
     await prefs.setBool(_displayEnterToSendOnMobileKey, v);
   }
 
+  /// “超长粘贴自动转为文件”的默认开关状态。
+  ///
+  /// ⛔ 这是产品决定（2026-09-17 明确定：默认关闭是有意为之）：粘贴超长文本时
+  /// 仍然直接贴在输入框，只有用户主动打开这个开关，才会按阈值转成文件附件。
+  /// 上游 Kelivo 这一项默认为 `true`，**本仓库刻意与之不同**；
+  /// 不得按“与上游分歧默认换成上游”的口径改回 `true`。
+  static const bool defaultLongPasteAsFileEnabled = false;
+
   static const int defaultLongPasteAsFileThreshold = 5000;
   static const int minLongPasteAsFileThreshold = 1;
   static const int maxLongPasteAsFileThreshold = 999999;
@@ -4916,7 +4873,8 @@ Requirements:
     );
   }
 
-  bool _longPasteAsFile = false;
+  // 初始值取 [defaultLongPasteAsFileEnabled]（产品明定默认关闭，勿改）。
+  bool _longPasteAsFile = defaultLongPasteAsFileEnabled;
   bool get longPasteAsFile => _longPasteAsFile;
   Future<void> setLongPasteAsFile(bool v) async {
     if (_longPasteAsFile == v) return;
@@ -5798,6 +5756,9 @@ Requirements:
     copy._showUserTimestamp = _showUserTimestamp;
     copy._showModelName = _showModelName;
     copy._showModelTimestamp = _showModelTimestamp;
+    copy._showThinkingCards = _showThinkingCards;
+    copy._showToolCards = _showToolCards;
+    copy._showProducedFiles = _showProducedFiles;
     copy._autoCollapseThinking = _autoCollapseThinking;
     copy._collapseThinkingSteps = _collapseThinkingSteps;
     copy._showToolResultSummary = _showToolResultSummary;
@@ -5838,11 +5799,7 @@ Requirements:
     copy._newChatAfterDelete = _newChatAfterDelete;
     copy._longPasteAsFile = _longPasteAsFile;
     copy._longPasteAsFileThreshold = _longPasteAsFileThreshold;
-    copy._iosBackgroundGenerationEnabled = _iosBackgroundGenerationEnabled;
-    copy._iosBackgroundTaskRefreshEnabled = _iosBackgroundTaskRefreshEnabled;
-    copy._iosLiveActivityEnabled = _iosLiveActivityEnabled;
-    copy._iosBackgroundNotificationsEnabled =
-        _iosBackgroundNotificationsEnabled;
+    copy._mobileBackground = _mobileBackground;
     copy._desktopSendShortcut = _desktopSendShortcut;
     copy._desktopMessageNavButtonsMode = _desktopMessageNavButtonsMode;
     copy._chatFontScale = _chatFontScale;
@@ -6108,8 +6065,6 @@ enum ProviderKind { openai, google, claude }
 
 // 聊天消息气泡的后台渲染模式
 enum ChatMessageBackgroundStyle { defaultStyle, frosted, solid }
-
-enum AndroidBackgroundChatMode { off, on, onNotify }
 
 class ProviderConfig {
   final String id;

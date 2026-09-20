@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import '../widgets/desktop_dialog_style.dart';
 import 'package:provider/provider.dart';
 
 import '../../icons/lucide_adapter.dart' as lucide;
@@ -10,7 +11,6 @@ import '../../l10n/app_localizations.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
-import '../widgets/desktop_dialog_style.dart';
 
 Future<void> showDesktopMcpJsonEditDialog(BuildContext context) async {
   final cs = Theme.of(context).colorScheme;
@@ -142,6 +142,10 @@ class _DesktopMcpJsonEditDialogState extends State<_DesktopMcpJsonEditDialog> {
                     padding: const EdgeInsets.all(12),
                     child: TextField(
                       controller: _controller,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      smartDashesType: SmartDashesType.disabled,
+                      smartQuotesType: SmartQuotesType.disabled,
                       keyboardType: TextInputType.multiline,
                       maxLines: null,
                       style: TextStyle(

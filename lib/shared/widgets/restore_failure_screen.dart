@@ -83,7 +83,8 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
       Platform.isWindows || Platform.isMacOS || Platform.isLinux;
 
   /// 库比本应用新：没有可用的降级路径，只能更新应用或还原更早的副本。
-  bool get _databaseTooNew => _report.diagnosticCode == 'database_schema_too_new';
+  bool get _databaseTooNew =>
+      _report.diagnosticCode == 'database_schema_too_new';
 
   @override
   void initState() {
@@ -140,9 +141,7 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
     final directory = widget.appDataDirectory;
     if (directory == null) return;
     try {
-      final copies = await LocalCopyCatalog(
-        appDataDirectory: directory,
-      ).list();
+      final copies = await LocalCopyCatalog(appDataDirectory: directory).list();
       if (!mounted) return;
       setState(() => _localCopies = copies);
     } catch (_) {
@@ -165,10 +164,10 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
       _recoveryMessage = null;
     });
     try {
-      final stamp = DateTime.now()
-          .toUtc()
-          .toIso8601String()
-          .replaceAll(RegExp(r'[:.]'), '-');
+      final stamp = DateTime.now().toUtc().toIso8601String().replaceAll(
+        RegExp(r'[:.]'),
+        '-',
+      );
       final file = File(
         '${Directory.systemTemp.path}/joaiclient-startup-failure-$stamp.txt',
       );
@@ -418,9 +417,7 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
       _recoveryMessage = null;
     });
     try {
-      final copies = await LocalCopyCatalog(
-        appDataDirectory: directory,
-      ).list();
+      final copies = await LocalCopyCatalog(appDataDirectory: directory).list();
       if (!mounted) return;
       setState(() {
         _localCopies = copies;
@@ -445,9 +442,11 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
         _recoveryBusy = true;
         _recoveryMessage = null;
       });
-      await DataSync.prepareStartupRestoreFromFile(
+      // 启动恢复入口已与上游收敛成一套（保留上游名，内部兼容
+      // .joaiclient 容器），故这里用上游的参数名 snapshot。
+      await DataSync.prepareStartupSnapshotRestore(
         appDataDirectory: directory,
-        sourceFile: selected.file,
+        snapshot: selected.file,
         businessLease: widget.businessLease,
       );
       await widget.restart();
@@ -721,13 +720,16 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
                           width: double.infinity,
                           child: OutlinedButton.icon(
                             onPressed:
-                                (_restarting || _recoveryBusy || _checkingIntegrity)
+                                (_restarting ||
+                                    _recoveryBusy ||
+                                    _checkingIntegrity)
                                 ? null
                                 : _checkIntegrity,
-                            icon: const Icon(Icons.fact_check_rounded, size: 18),
-                            label: Text(
-                              l10n.startupRecoveryIntegrityButton,
+                            icon: const Icon(
+                              Icons.fact_check_rounded,
+                              size: 18,
                             ),
+                            label: Text(l10n.startupRecoveryIntegrityButton),
                           ),
                         ),
                         if (_integrity != null || _integrityError != null) ...[
@@ -910,9 +912,7 @@ class _DiagnosticsCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: colors.surfaceContainerLow,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: colors.outlineVariant.withValues(alpha: 0.6),
-        ),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: 0.6)),
       ),
       padding: const EdgeInsets.all(18),
       child: Column(

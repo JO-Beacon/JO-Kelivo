@@ -105,6 +105,7 @@ void main() {
         ),
       );
       await _pumpUntilFound(tester, find.text('Chat Records (Old)'));
+      expect(find.textContaining(RegExp(r'\d+ files')), findsNothing);
 
       await tester.tap(find.text('Chat Records (Old)').last);
       await _pumpUntilFound(tester, find.text('Clear Old Chat Records'));

@@ -1,0 +1,9 @@
+"saved" = "Saved to JO-AIClient";
+"savedMessage" = "Open JO-AIClient to review and send this draft.";
+"partialMessage" = "Some files could not be saved. Open JO-AIClient to review the content that was received.";
+"done" = "Done";
+"failed" = "Could not save";
+"failedMessage" = "Check that the files are available and there is enough storage, then try again. Up to 32 files are supported.";
+"importing" = "Importing";
+"cancel" = "Cancel";
+"opening" = "Opening JO-AIClient…";

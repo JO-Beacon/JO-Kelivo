@@ -518,8 +518,9 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                           child: _IosButton(
                             label: l10n.assistantEditClearButton,
                             icon: Lucide.X,
-                            onTap: () =>
-                                context.read<AssistantProvider>().updateAssistant(
+                            onTap: () => context
+                                .read<AssistantProvider>()
+                                .updateAssistant(
                                   a.copyWith(clearBackground: true),
                                 ),
                           ),

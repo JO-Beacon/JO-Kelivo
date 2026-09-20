@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import "../../../support/business_test_harness.dart";
 import 'dart:convert';
 
@@ -9,7 +10,6 @@ import 'package:provider/provider.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
-import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
 import 'package:Kelivo/features/home/controllers/stream_controller.dart'
@@ -89,7 +89,11 @@ class _RecordingTtsProvider extends TtsProvider {
   bool get isAvailable => true;
 
   @override
-  Future<void> speak(String text, {bool flush = true}) async {
+  Future<void> speak(
+    String text, {
+    bool flush = true,
+    bool waitForCompletion = true,
+  }) async {
     spokenTexts.add(text);
   }
 }
@@ -272,6 +276,8 @@ void main() {
           ),
         );
 
+        state.pendingToolNames['builtin_search'] = 'builtin_search';
+
         Future<void> upsertToolEventInDb(
           String messageId, {
           required String id,
@@ -282,37 +288,19 @@ void main() {
         }) async {}
 
         await controller.handleToolResultsChunk(
-          ChatStreamChunk(
-            content: '',
-            isDone: false,
-            totalTokens: 0,
-            toolResults: [
-              ToolResultInfo(
-                id: 'builtin_search',
-                name: 'builtin_search',
-                arguments: const <String, dynamic>{},
-                content:
-                    '{"items":[{"title":"First source","url":"https://one.example.com/a","text":"A"}]}',
-              ),
-            ],
+          ToolCallResult(
+            id: 'builtin_search',
+            output:
+                '{"items":[{"title":"First source","url":"https://one.example.com/a","text":"A"}]}',
           ),
           state,
           upsertToolEventInDb: upsertToolEventInDb,
         );
         await controller.handleToolResultsChunk(
-          ChatStreamChunk(
-            content: '',
-            isDone: false,
-            totalTokens: 0,
-            toolResults: [
-              ToolResultInfo(
-                id: 'builtin_search',
-                name: 'builtin_search',
-                arguments: const <String, dynamic>{},
-                content:
-                    '{"items":[{"title":"First source","url":"https://one.example.com/a","text":"A"},{"title":"Second source","url":"https://two.example.com/b","text":"B"}]}',
-              ),
-            ],
+          ToolCallResult(
+            id: 'builtin_search',
+            output:
+                '{"items":[{"title":"First source","url":"https://one.example.com/a","text":"A"},{"title":"Second source","url":"https://two.example.com/b","text":"B"}]}',
           ),
           state,
           upsertToolEventInDb: upsertToolEventInDb,
@@ -837,26 +825,30 @@ void main() {
       expect(label, findsOneWidget);
       expect(tester.getSize(label).height, greaterThan(20));
 
-      final iconRect = tester.getRect(
-        find.byWidgetPredicate(
-          (widget) => widget is Icon && widget.icon == Lucide.Earth,
+      final earth = find.byWidgetPredicate(
+        (widget) => widget is Icon && widget.icon == Lucide.Earth,
+      );
+      final iconRect = tester.getRect(earth);
+      // 合并上游渲染层后，连接线不再是带独立 key 的两条线，
+      // 改为量「图标列容器」与图标的上下间距（上游同一用例的做法）。
+      final columnRect = tester.getRect(
+        find.ancestor(
+          of: earth,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget.key is ValueKey<String> &&
+                (widget.key! as ValueKey<String>).value.startsWith(
+                  'chatMessageTimelineIconColumn',
+                ),
+          ),
         ),
       );
-      final topLineRect = tester.getRect(
-        find.byKey(const ValueKey('chatMessageTimelineHeaderTopLine')).first,
-      );
-      final bottomLineRect = tester.getRect(
-        find.byKey(const ValueKey('chatMessageTimelineHeaderBottomLine')).last,
-      );
 
-      final topGap = iconRect.top - topLineRect.bottom;
-      final bottomGap = bottomLineRect.top - iconRect.bottom;
+      final topGap = iconRect.top - columnRect.top;
+      final bottomGap = columnRect.bottom - iconRect.bottom;
       expect(topGap, greaterThanOrEqualTo(3));
-      expect(topGap, lessThanOrEqualTo(4));
       expect(bottomGap, greaterThanOrEqualTo(3));
-      expect(bottomGap, lessThanOrEqualTo(4));
       expect(topGap, closeTo(bottomGap, 0.1));
-      expect(topLineRect.height, closeTo(bottomLineRect.height, 0.1));
     });
 
     testWidgets('text to speech replay button speaks the tool text', (

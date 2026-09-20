@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:Kelivo/shared/widgets/ios_time_picker.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
 import 'package:file_picker/file_picker.dart';
@@ -15,7 +16,7 @@ import '../../../core/services/haptics.dart';
 import '../../../core/database/business_preferences.dart';
 import '../../../core/database/business_repository.dart';
 import '../../../core/models/backup.dart';
-import '../../../core/models/backup_task_progress.dart';
+import '../../../core/services/backup/backup_cancel_token.dart';
 import '../../../core/models/progress_update.dart';
 import '../../../core/providers/backup_provider.dart';
 import '../../../core/providers/backup_reminder_provider.dart';
@@ -1401,7 +1402,10 @@ class _BackupPageState extends State<BackupPage> {
             context,
             icon: Lucide.Box,
             label: l10n.backupPageChatboxName,
-            enabled: false,
+            onTap: () => _doImportChatboxArchive(
+              context,
+              label: l10n.backupPageImportFromChatbox,
+            ),
           ),
           _iosDivider(context),
           _iosNavRow(
@@ -1550,6 +1554,87 @@ class _BackupPageState extends State<BackupPage> {
       skippedConversations: vm.skippedConversations,
       localSettingsApplied: vm.localSettingsApplied,
       ledgerRecords: vm.ledgerRecords,
+    );
+  }
+
+  /// Chatbox 1.22+ 的 ZIP 备份。与旧版入口分开：只收 `.zip`。
+  Future<void> _doImportChatboxArchive(
+    BuildContext context, {
+    required String label,
+  }) async {
+    final l10n = AppLocalizations.of(context)!;
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['zip'],
+    );
+    final path = result?.files.single.path;
+    if (path == null || !context.mounted) return;
+
+    final mode = await _chooseImportModeDialog(context);
+    if (mode == null || !context.mounted) return;
+
+    final businessRepository = context.read<BusinessRepository>();
+    final chatService = context.read<ChatService>();
+    late ChatboxImportResult imported;
+    try {
+      imported = await _runWithImportingOverlay<ChatboxImportResult>(
+        context,
+        null,
+        cancellableTask: (onProgress, cancelToken) =>
+            ChatboxImporter.importFromChatboxArchive(
+              file: File(path),
+              mode: mode,
+              businessRepository: businessRepository,
+              chatService: chatService,
+              starredGroupName: l10n.backupPageChatboxModernStarredGroupName,
+              regularGroupName: l10n.backupPageChatboxModernGroupName,
+              deletedProviderGroupName:
+                  l10n.backupPageChatboxModernDeletedProviderGroupName,
+              cancelToken: cancelToken,
+              onProgress: onProgress,
+            ),
+      );
+    } catch (error) {
+      if (error is BackupCancelledException) return;
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: error.toString(),
+        type: NotificationType.error,
+      );
+      return;
+    }
+    if (!context.mounted) return;
+    final res = imported;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: Text(l10n.backupPageRestartRequired),
+          content: Text(
+            '$label:\n'
+            ' • Providers: ${res.providers}\n'
+            ' • Assistants: ${res.assistants}\n'
+            ' • Conversations: ${res.conversations}\n'
+            ' • Messages: ${res.messages}\n\n'
+            '${l10n.backupPageChatboxModernNote}\n\n'
+            '${l10n.backupPageRestartContent}',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                if (await requestAppRestart(dctx, PlatformUtils.restartApp) &&
+                    dctx.mounted) {
+                  Navigator.of(dctx).pop();
+                }
+              },
+              child: Text(l10n.backupPageOK),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1764,9 +1849,7 @@ class _LocalSnapshotMobileSection extends StatelessWidget {
                 vm.copies.length,
                 formatBytes(vm.totalBytes),
               ),
-              onTap: () => Navigator.of(context).push<void>(
-                MaterialPageRoute(builder: (_) => const LocalSnapshotsPage()),
-              ),
+              onTap: () => openLocalSnapshotsPage(context),
             ),
             _iosDivider(context),
             IosTileButton(
@@ -1816,8 +1899,9 @@ class _BackupReminderMobileSection extends StatelessWidget {
               await provider.setEnabled(false);
               return;
             }
-            final minutes = await showBackupReminderTimePicker(
+            final minutes = await showIosTimePicker(
               context,
+              title: AppLocalizations.of(context)!.backupReminderTimeTitle,
               initialMinutes: provider.reminderMinutesOfDay,
             );
             if (minutes == null) return;
@@ -1851,8 +1935,9 @@ class _BackupReminderMobileSection extends StatelessWidget {
             ),
             onTap: () async {
               final provider = context.read<BackupReminderProvider>();
-              final minutes = await showBackupReminderTimePicker(
+              final minutes = await showIosTimePicker(
                 context,
+                title: AppLocalizations.of(context)!.backupReminderTimeTitle,
                 initialMinutes: provider.reminderMinutesOfDay,
               );
               if (minutes == null) return;
@@ -1938,7 +2023,10 @@ Future<void> _showBackupReminderFrequencySheet(BuildContext context) async {
   if (!context.mounted || days == null) return;
   final providerAfterDialog = context.read<BackupReminderProvider>();
   var minutes = providerAfterDialog.reminderMinutesOfDay;
-  minutes ??= await showBackupReminderTimePicker(context);
+  minutes ??= await showIosTimePicker(
+    context,
+    title: AppLocalizations.of(context)!.backupReminderTimeTitle,
+  );
   if (!context.mounted || minutes == null) return;
   await context.read<BackupReminderProvider>().saveSchedule(
     enabled: true,
@@ -2385,9 +2473,7 @@ class _LocalSettingsLedgerMobileSectionState
 
     return _iosSectionCard(
       children: [
-        _BackupSubcategoryLabel(
-          label: l10n.backupLedgerSettingsDescription,
-        ),
+        _BackupSubcategoryLabel(label: l10n.backupLedgerSettingsDescription),
         if (records == null)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
@@ -2428,8 +2514,7 @@ class _LocalSettingsLedgerMobileSectionState
             if (i > 0) _iosDivider(context),
             Builder(
               builder: (context) {
-                final isCurrent =
-                    records[i].fingerprint == _currentFingerprint;
+                final isCurrent = records[i].fingerprint == _currentFingerprint;
                 return ListTile(
                   dense: true,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12),

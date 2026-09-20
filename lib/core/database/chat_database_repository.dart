@@ -25,6 +25,7 @@ import 'business_repository.dart';
 import 'chat_database_observer.dart';
 import 'generation_run.dart';
 import 'generation_run_commands.dart';
+import 'schema_migrations.dart';
 
 typedef ChatDatabaseSnapshotInfo = ({
   int schemaVersion,
@@ -409,7 +410,7 @@ class ChatDatabaseRepository {
     try {
       final source = sqlite.sqlite3.open(sourcePath);
       try {
-        // VACUUM INTO requires the destination path to be absent.
+        // VACUUM INTO 要求目标路径不存在。
         source.execute('PRAGMA busy_timeout = 5000;');
         registerSourceHandle?.call(source.handle.address);
         final escapedDestination = destinationPath.replaceAll("'", "''");
@@ -432,9 +433,101 @@ class ChatDatabaseRepository {
     }
   }
 
+  /// 把“由更新版本导出的数据库”裁成本构建认识的形状，
+  /// 使向前兼容的备份仍能恢复。
+  ///
+  /// 会删掉本构建不认识的表、从认识的表里删掉不认识的列，并把版本戳成
+  /// [AppDatabase.currentSchemaVersion]。之后常规校验器看到的就是一份
+  /// 完全符合当前 schema 的库 —— 这正是它们只需处理单一版本的原因。
+  ///
+  /// 它只对齐**结构**，无法发现更新版本改变了某个已有列的**含义** ——
+  /// 那要靠清单里的 `minimumReadableSchemaVersion` 声明。调用方必须在
+  /// 调用前自行确认“允许继续”。
+  ///
+  /// 作用于暂存副本；归档本身永不被改动，因此这里丢掉的数据
+  /// 在日后被导入到认识它的构建时依然完整存在。
+  static Future<void> normalizeForwardCompatibleSnapshot(File file) async {
+    final database = sqlite.sqlite3.open(file.absolute.path);
+    try {
+      // 重写期间保持外键关闭：删掉一张不认识的表时，可能短暂地在
+      // 另一张稍后才删的不认识表里留下孤儿行。
+      database.execute('PRAGMA foreign_keys = OFF;');
+      database.execute('BEGIN IMMEDIATE;');
+      try {
+        final presentTables = database
+            .select("SELECT name FROM sqlite_master WHERE type = 'table';")
+            .map((row) => row['name'])
+            .whereType<String>()
+            .where((name) => !name.startsWith('sqlite_'))
+            .toList(growable: false);
+
+        for (final table in presentTables) {
+          if (!currentSchemaColumns.containsKey(table)) {
+            database.execute('DROP TABLE IF EXISTS "$table";');
+          }
+        }
+
+        for (final entry in currentSchemaColumns.entries) {
+          if (!presentTables.contains(entry.key)) continue;
+          final known = entry.value.toSet();
+          final actual = database
+              .select('PRAGMA table_info("${entry.key}");')
+              .map((row) => row['name'])
+              .whereType<String>()
+              .toList(growable: false);
+          for (final column in actual) {
+            if (known.contains(column)) continue;
+            // 覆盖该列的所有索引必须先删；SQLite 不允许删除被索引的列。
+            final indexes = database
+                .select('PRAGMA index_list("${entry.key}");')
+                .map((row) => row['name'])
+                .whereType<String>()
+                .toList(growable: false);
+            for (final index in indexes) {
+              if (index.startsWith('sqlite_autoindex_')) continue;
+              final covers = database
+                  .select('PRAGMA index_info("$index");')
+                  .map((row) => row['name'])
+                  .whereType<String>()
+                  .contains(column);
+              if (covers) database.execute('DROP INDEX IF EXISTS "$index";');
+            }
+            database.execute(
+              'ALTER TABLE "${entry.key}" DROP COLUMN "$column";',
+            );
+          }
+        }
+
+        database.execute('COMMIT;');
+      } catch (_) {
+        database.execute('ROLLBACK;');
+        rethrow;
+      }
+      // 结构对齐之后才盖新版本戳，这样重写中途崩溃留下的文件仍带着
+      // 它原本（被拒绝的）版本，而不是一个谎。
+      database.userVersion = AppDatabase.currentSchemaVersion;
+      database.execute('PRAGMA foreign_keys = ON;');
+      if (database.select('PRAGMA foreign_key_check;').isNotEmpty) {
+        throw StateError('database_forward_compat_foreign_keys');
+      }
+    } on sqlite.SqliteException {
+      throw StateError('database_forward_compat_failed');
+    } finally {
+      database.close();
+    }
+    await normalizeSnapshotJournal(file);
+  }
+
+  /// 为恢复准备一份快照，把它的 schema 带到本构建的版本。
+  ///
+  /// 更旧的已发布 schema 会被向前迁移。更新的 schema 只有设置了
+  /// [allowForwardCompatible] 才被接受 —— 调用方依据备份清单里的
+  /// 兼容声明或用户的明确同意来设置 —— 之后会被裁成本构建
+  /// 认识的范围。见 [normalizeForwardCompatibleSnapshot]。
   static Future<ChatDatabaseSnapshotInfo> prepareSnapshotForRestore(
-    File snapshotFile,
-  ) async {
+    File snapshotFile, {
+    bool allowForwardCompatible = false,
+  }) async {
     if (!await snapshotFile.exists()) {
       throw FileSystemException(
         'Snapshot database does not exist',
@@ -442,15 +535,39 @@ class ChatDatabaseRepository {
       );
     }
 
+    // 由更旧构建写出的快照带的是旧 schema；必须在校验之前先向前迁移，
+    // 因为校验器只描述当前 schema。先迁移也是下面“DELETE 模式”
+    // 契约成立的前提：升级过程可能留下 WAL 附属文件，而本方法末尾会
+    // 做 checkpoint、切到 DELETE 模式并删除附属文件。
+    final snapshotSchemaVersion = SchemaMigrations.readSchemaVersion(
+      snapshotFile,
+    );
+    if (SchemaMigrations.needsUpgrade(snapshotSchemaVersion)) {
+      await SchemaMigrations.upgradeFileInPlace(snapshotFile);
+    } else if (snapshotSchemaVersion > AppDatabase.currentSchemaVersion) {
+      if (!allowForwardCompatible) {
+        throw StateError('database_schema_too_new');
+      }
+      await normalizeForwardCompatibleSnapshot(snapshotFile);
+    } else if (snapshotSchemaVersion != AppDatabase.currentSchemaVersion) {
+      throw StateError('database_schema_version');
+    }
+
     final database = sqlite.sqlite3.open(snapshotFile.absolute.path);
     late final ChatDatabaseSnapshotInfo initialInfo;
     try {
       initialInfo = _validateRawSnapshot(database);
+      // 此时它已成后置条件：上面的迁移保证了这一点。
       if (initialInfo.schemaVersion != AppDatabase.currentSchemaVersion) {
         throw StateError('database_schema_version');
       }
       database.execute('BEGIN IMMEDIATE;');
       try {
+        // 本仓库的 message_rows 还没有 updated_at 列（上游 1.2.7 的基座比
+        // 本仓库多出 updated_at／sender_id／extras_json 三列），所以这里
+        // 只终止流式状态。上游那条语句会在同一条 UPDATE 里盖上 updated_at，
+        // 好让 LWW／同步消费方看到“已终止”而不是崩溃前的旧值 —— 等这三列
+        // 按基座补齐之后，再把上游的写法恢复过来。
         database.execute(
           'UPDATE message_rows SET is_streaming = 0 '
           'WHERE is_streaming != 0;',
@@ -647,170 +764,179 @@ class ChatDatabaseRepository {
     _validateRawSchema(database);
   }
 
+  /// [AppDatabase.currentSchemaVersion] 的权威结构定义。
+  ///
+  /// [_validateRawSchema] 用它断言数据库结构完全一致；
+  /// [normalizeForwardCompatibleSnapshot] 用它把“更新版本导出的数据库”
+  /// 裁到本构建认识的范围。
+  ///
+  /// 必须与表 DSL 同步 —— 升 schema 版本时按 `SchemaMigrations` 里那份
+  /// 清单逐项检查。
+  static const currentSchemaColumns = <String, List<String>>{
+    'conversation_rows': [
+      'id',
+      'title',
+      'created_at',
+      'updated_at',
+      'is_pinned',
+      'assistant_id',
+      'truncate_index',
+      'version_selections_json',
+      'summary',
+      'last_summarized_message_count',
+      'chat_suggestions_json',
+      'injected_memory_hash',
+      'last_memory_extracted_order',
+      'chat_model_provider',
+      'chat_model_id',
+      'extras_json',
+    ],
+    'conversation_mcp_server_rows': ['conversation_id', 'server_id', 'ordinal'],
+    'message_rows': [
+      'id',
+      'conversation_id',
+      'role',
+      'timestamp',
+      'model_id',
+      'provider_id',
+      'total_tokens',
+      'is_streaming',
+      'reasoning_start_at',
+      'reasoning_finished_at',
+      'translation',
+      'reasoning_segments_json',
+      'group_id',
+      'version',
+      'prompt_tokens',
+      'completion_tokens',
+      'cached_tokens',
+      'duration_ms',
+      'message_order',
+    ],
+    'message_tree_edge_rows': [
+      'conversation_id',
+      'message_id',
+      'parent_message_id',
+    ],
+    'conversation_branch_rows': [
+      'id',
+      'conversation_id',
+      'tip_message_id',
+      'name',
+      'created_at',
+      'parent_branch_id',
+      'fork_anchor_message_id',
+    ],
+    'conversation_tree_state_rows': [
+      'conversation_id',
+      'active_branch_id',
+      'branch_selections_json',
+      'active_branch_history_json',
+    ],
+    'chat_storage_meta_rows': ['key', 'value'],
+    'message_part_rows': [
+      'part_id',
+      'conversation_id',
+      'revision_id',
+      'ordinal',
+      'kind',
+      'payload',
+      'created_at',
+      'updated_at',
+    ],
+    'generation_run_rows': [
+      'id',
+      'conversation_id',
+      'target_revision_id',
+      'state',
+      'state_revision',
+      'checkpoint_seq',
+      'error_code',
+      'created_at',
+      'updated_at',
+      'terminal_at',
+    ],
+    'provider_artifact_rows': [
+      'conversation_id',
+      'revision_id',
+      'kind',
+      'payload',
+      'created_at',
+      'updated_at',
+    ],
+    'asset_rows': [
+      'id',
+      'content_hash',
+      'path',
+      'byte_size',
+      'width',
+      'height',
+      'thumbnail_path',
+      'created_at',
+      'last_referenced_at',
+    ],
+    'message_asset_rows': [
+      'conversation_id',
+      'revision_id',
+      'asset_id',
+      'kind',
+    ],
+    'asset_gc_rows': ['asset_id', 'not_before', 'attempts', 'generation'],
+    'gc_audit_rows': ['id', 'kind', 'entity_id', 'completed_at'],
+    'asset_reference_dirty_rows': ['revision_id'],
+    'assistant_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+    'provider_rows': ['provider_key', 'sort_order', 'payload', 'updated_at'],
+    'provider_group_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+    'mcp_server_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+    'world_book_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+    'assistant_memory_rows': [
+      'id',
+      'sort_order',
+      'assistant_id',
+      'payload',
+      'updated_at',
+    ],
+    'quick_phrase_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+    'search_service_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+    'tts_service_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+    'instruction_injection_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+    'assistant_group_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+    'preference_rows': ['key', 'value', 'updated_at'],
+    'memory_entry_rows': [
+      'id',
+      'sort_order',
+      'scope',
+      'assistant_id',
+      'type',
+      'status',
+      'content',
+      'content_normalized',
+      'entry_created_at',
+      'entry_updated_at',
+      'payload',
+      'updated_at',
+    ],
+    'user_profile_field_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+    'message_prompt_rows': [
+      'revision_id',
+      'conversation_id',
+      'payload',
+      'source_content_hash',
+      'carries_memory_snapshot',
+      'created_at',
+    ],
+    'extension_entity_rows': [
+      'kind',
+      'id',
+      'sort_order',
+      'owner_id',
+      'payload',
+      'updated_at',
+    ],
+  };
+
   static void _validateRawSchema(sqlite.Database database) {
-    const expectedColumns = <String, List<String>>{
-      'conversation_rows': [
-        'id',
-        'title',
-        'created_at',
-        'updated_at',
-        'is_pinned',
-        'assistant_id',
-        'truncate_index',
-        'version_selections_json',
-        'summary',
-        'last_summarized_message_count',
-        'chat_suggestions_json',
-        'injected_memory_hash',
-        'last_memory_extracted_order',
-        'chat_model_provider',
-        'chat_model_id',
-      ],
-      'conversation_mcp_server_rows': [
-        'conversation_id',
-        'server_id',
-        'ordinal',
-      ],
-      'message_rows': [
-        'id',
-        'conversation_id',
-        'role',
-        'timestamp',
-        'model_id',
-        'provider_id',
-        'total_tokens',
-        'is_streaming',
-        'reasoning_start_at',
-        'reasoning_finished_at',
-        'translation',
-        'reasoning_segments_json',
-        'group_id',
-        'version',
-        'prompt_tokens',
-        'completion_tokens',
-        'cached_tokens',
-        'duration_ms',
-        'message_order',
-      ],
-      'message_tree_edge_rows': [
-        'conversation_id',
-        'message_id',
-        'parent_message_id',
-      ],
-      'conversation_branch_rows': [
-        'id',
-        'conversation_id',
-        'tip_message_id',
-        'name',
-        'created_at',
-        'parent_branch_id',
-        'fork_anchor_message_id',
-      ],
-      'conversation_tree_state_rows': [
-        'conversation_id',
-        'active_branch_id',
-        'branch_selections_json',
-        'active_branch_history_json',
-      ],
-      'chat_storage_meta_rows': ['key', 'value'],
-      'message_part_rows': [
-        'part_id',
-        'conversation_id',
-        'revision_id',
-        'ordinal',
-        'kind',
-        'payload',
-        'created_at',
-        'updated_at',
-      ],
-      'generation_run_rows': [
-        'id',
-        'conversation_id',
-        'target_revision_id',
-        'state',
-        'state_revision',
-        'checkpoint_seq',
-        'error_code',
-        'created_at',
-        'updated_at',
-        'terminal_at',
-      ],
-      'provider_artifact_rows': [
-        'conversation_id',
-        'revision_id',
-        'kind',
-        'payload',
-        'created_at',
-        'updated_at',
-      ],
-      'asset_rows': [
-        'id',
-        'content_hash',
-        'path',
-        'byte_size',
-        'width',
-        'height',
-        'thumbnail_path',
-        'created_at',
-        'last_referenced_at',
-      ],
-      'message_asset_rows': [
-        'conversation_id',
-        'revision_id',
-        'asset_id',
-        'kind',
-      ],
-      'asset_gc_rows': ['asset_id', 'not_before', 'attempts', 'generation'],
-      'gc_audit_rows': ['id', 'kind', 'entity_id', 'completed_at'],
-      'asset_reference_dirty_rows': ['revision_id'],
-      'assistant_rows': ['id', 'sort_order', 'payload', 'updated_at'],
-      'provider_rows': ['provider_key', 'sort_order', 'payload', 'updated_at'],
-      'provider_group_rows': ['id', 'sort_order', 'payload', 'updated_at'],
-      'mcp_server_rows': ['id', 'sort_order', 'payload', 'updated_at'],
-      'world_book_rows': ['id', 'sort_order', 'payload', 'updated_at'],
-      'assistant_memory_rows': [
-        'id',
-        'sort_order',
-        'assistant_id',
-        'payload',
-        'updated_at',
-      ],
-      'quick_phrase_rows': ['id', 'sort_order', 'payload', 'updated_at'],
-      'search_service_rows': ['id', 'sort_order', 'payload', 'updated_at'],
-      'tts_service_rows': ['id', 'sort_order', 'payload', 'updated_at'],
-      'instruction_injection_rows': [
-        'id',
-        'sort_order',
-        'payload',
-        'updated_at',
-      ],
-      'assistant_group_rows': ['id', 'sort_order', 'payload', 'updated_at'],
-      'preference_rows': ['key', 'value', 'updated_at'],
-      'memory_entry_rows': [
-        'id',
-        'sort_order',
-        'scope',
-        'assistant_id',
-        'type',
-        'status',
-        'content',
-        'content_normalized',
-        'entry_created_at',
-        'entry_updated_at',
-        'payload',
-        'updated_at',
-      ],
-      'user_profile_field_rows': ['id', 'sort_order', 'payload', 'updated_at'],
-      'message_prompt_rows': [
-        'revision_id',
-        'conversation_id',
-        'payload',
-        'source_content_hash',
-        'carries_memory_snapshot',
-        'created_at',
-      ],
-    };
-    for (final entry in expectedColumns.entries) {
+    for (final entry in currentSchemaColumns.entries) {
       final tableInfo = database.select('PRAGMA table_info(${entry.key});');
       final actual = tableInfo
           .map((row) => row['name'])
@@ -845,6 +971,7 @@ class ChatDatabaseRepository {
       'memory_entry_rows': ['id'],
       'user_profile_field_rows': ['id'],
       'message_prompt_rows': ['revision_id'],
+      'extension_entity_rows': ['kind', 'id'],
     };
     const sortOrderTables = {
       'assistant_rows',
@@ -860,6 +987,7 @@ class ChatDatabaseRepository {
       'assistant_group_rows',
       'memory_entry_rows',
       'user_profile_field_rows',
+      'extension_entity_rows',
     };
     for (final entry in expectedPrimaryKeys.entries) {
       final primaryRows =
@@ -1093,6 +1221,22 @@ class ChatDatabaseRepository {
         await file.delete();
       }
     }
+  }
+
+  /// 让 [databaseFile] 回到归档快照应有的形态：
+  /// 日志已折叠、DELETE 日志模式、没有附属文件。
+  ///
+  /// 为任何目的打开快照——包括 schema 升级——都可能留下 WAL，而
+  /// [inspectPreparedSnapshot] 会拒绝带附属文件的快照。
+  static Future<void> normalizeSnapshotJournal(File databaseFile) async {
+    final database = sqlite.sqlite3.open(databaseFile.absolute.path);
+    try {
+      database.execute('PRAGMA wal_checkpoint(TRUNCATE);');
+      database.select('PRAGMA journal_mode = DELETE;');
+    } finally {
+      database.close();
+    }
+    await _deleteDatabaseSidecars(databaseFile);
   }
 
   static Future<void> _deleteDatabaseSidecars(File databaseFile) async {
@@ -2191,7 +2335,8 @@ class ChatDatabaseRepository {
   /// 加载模型上下文所需的选定线性消息版本。
   ///
   /// 版本折叠、截断索引应用、尾部限制和 part hydration 有意放在一条 SQL 语句中，
-  /// 这样大型会话不会仅仅为了丢弃前缀而被物化。
+  /// 这样大型会话不会仅仅为了丢弃前缀而被物化。请求版本之后的重置不适用于
+  /// 更早的那一轮。
   Future<List<ChatMessage>> getSelectedContextMessages(
     String conversationId, {
     required int truncateIndex,
@@ -2269,7 +2414,8 @@ class ChatDatabaseRepository {
                   selected.logical_index
                 )
                 ELSE selected.logical_index
-              END AS logical_index
+              END AS logical_index,
+              selected.logical_index AS target_index
               FROM target
               JOIN ordered selected ON selected.group_id = target.group_id
             ),
@@ -2277,7 +2423,9 @@ class ChatDatabaseRepository {
               SELECT revision_id, logical_index
               FROM ordered
               WHERE logical_index >= CASE
-                WHEN ? >= 0 AND ? <= total_count THEN ?
+                WHEN ? >= 0 AND ? <= total_count
+                  AND (NOT EXISTS (SELECT 1 FROM cutoff)
+                    OR ? <= (SELECT target_index FROM cutoff)) THEN ?
                 ELSE 0
               END
                 AND (
@@ -2307,6 +2455,7 @@ class ChatDatabaseRepository {
               Variable<String>(conversationId),
               Variable<String>(throughRevisionId ?? ''),
               Variable<bool>(includeFollowingAssistant),
+              Variable<int>(truncateIndex),
               Variable<int>(truncateIndex),
               Variable<int>(truncateIndex),
               Variable<int>(truncateIndex),
@@ -3922,6 +4071,35 @@ class ChatDatabaseRepository {
     );
   }
 
+  /// 读取 [conversationId] 的 extras，套用 [update]，在同一个事务里写回。
+  /// 只有当 map 真的变化时才顺带推进 [updatedAt]。
+  Future<void> updateConversationExtras(
+    String conversationId,
+    Map<String, dynamic> Function(Map<String, dynamic> current) update,
+  ) {
+    return _db.transaction(() async {
+      final row = await (_db.select(
+        _db.conversationRows,
+      )..where((t) => t.id.equals(conversationId))).getSingleOrNull();
+      if (row == null) {
+        throw StateError('conversation_not_found');
+      }
+      final current = _decodeExtrasJson(row.extrasJson);
+      final next = update(Map<String, dynamic>.from(current));
+      if (jsonEncode(current) == jsonEncode(next)) {
+        return;
+      }
+      await (_db.update(
+        _db.conversationRows,
+      )..where((t) => t.id.equals(conversationId))).write(
+        ConversationRowsCompanion(
+          extrasJson: Value(jsonEncode(next)),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    });
+  }
+
   Future<Conversation?> duplicateConversation(String sourceId) {
     return _db.transaction(() async {
       final sourceRow = await (_db.select(
@@ -4305,10 +4483,10 @@ class ChatDatabaseRepository {
     final edgeRows = await (_db.select(
       _db.messageTreeEdgeRows,
     )..where((row) => row.conversationId.equals(conversationId))).get();
-    // The tree edge table has no persisted ordinal. Rehydrate its map in the
-    // conversation's message order so sibling projections remain stable after
-    // reloads and conversation duplication instead of depending on SQLite's
-    // primary-key ordering.
+    // 树边表没有持久化的序号。重建它的映射时按会话的消息顺序来，
+    // 这样在重新加载与会话复制之后，同级投影仍然稳定，
+    // 而不必依赖 SQLite 的主键顺序。
+    //
     final orderedMessageRows =
         await (_db.select(_db.messageRows)
               ..where((row) => row.conversationId.equals(conversationId))
@@ -4931,7 +5109,9 @@ class ChatDatabaseRepository {
     var bodyRowCount = 0;
     // 部件未携带工具卡片（旧式 content/reasoningText 构造，如导入器）时，
     // 工具事件保持旧布局位置：正文之前、思维链之后。
-    final partsHaveToolCards = message.parts.any((part) => part is ToolCallPart);
+    final partsHaveToolCards = message.parts.any(
+      (part) => part is ToolCallPart,
+    );
     for (final part in message.parts) {
       switch (part) {
         case ReasoningPart(:final text) when text.isNotEmpty:
@@ -5169,12 +5349,8 @@ class ChatDatabaseRepository {
           totalTokens: source.totalTokens,
           conversationId: source.conversationId,
           isStreaming: false,
-          reasoningText: isEditedRoot
-              ? derivedReasoning
-              : source.reasoningText,
-          reasoningStartAt: keepReasoningMeta
-              ? source.reasoningStartAt
-              : null,
+          reasoningText: isEditedRoot ? derivedReasoning : source.reasoningText,
+          reasoningStartAt: keepReasoningMeta ? source.reasoningStartAt : null,
           reasoningFinishedAt: keepReasoningMeta
               ? source.reasoningFinishedAt
               : null,
@@ -5548,8 +5724,8 @@ class ChatDatabaseRepository {
     required Map<String, List<Map<String, dynamic>>> toolEventsByMessageId,
     required Map<String, String> geminiSignaturesByMessageId,
 
-    /// When supplied, replace the compatibility tree projection with this
-    /// already-resolved message tree in the same transaction.
+    /// 传了它时，在同一事务里用这棵已经解析好的消息树
+    /// 替换掉兼容用的树投影。
     ConversationTree? conversationTree,
   }) async {
     if (conversations.isEmpty &&
@@ -5859,6 +6035,15 @@ class ChatDatabaseRepository {
       ]);
       attached = true;
       return await _db.transaction(() async {
+        // 先把 workspace／skill 实体合并进来：被导入的会话会引用它们，
+        // 不先插入的话这些引用就是悬空的。
+        // 设备本地的“外部目录授权”刻意排除在外（它是本机专属，不该随快照流转）。
+        await _db.customStatement(
+          "INSERT OR IGNORE INTO extension_entity_rows "
+          "(kind, id, sort_order, owner_id, payload, updated_at) "
+          "SELECT kind, id, sort_order, owner_id, payload, updated_at "
+          "FROM merge_source.extension_entity_rows WHERE kind IN ('workspace', 'skill');",
+        );
         final sourceRows = await _db
             .customSelect(
               'SELECT id FROM merge_source.conversation_rows ORDER BY id;',
@@ -6604,7 +6789,7 @@ class ChatDatabaseRepository {
         return jsonEncode(decoded);
       }
     } catch (_) {
-      // _decodeBranchSelections already validates the value before this call.
+      // _decodeBranchSelections 在这次调用之前已经校验过该值。
     }
     return jsonEncode(selections);
   }
@@ -7470,7 +7655,7 @@ class ChatDatabaseRepository {
     );
   }
 
-  /// 批量「删除此分支节点」：分支节点目标收掉所属分叉的全部分支，
+  /// 批量“删除此分支节点”：分支节点目标收掉所属分叉的全部分支，
   /// 仅保留活动血脉（契约 §4.4 修订）；非分支节点目标删除消息本身。
   Future<DeletedMessagesResult?> deleteMessageNodes({
     required String conversationId,
@@ -8348,6 +8533,7 @@ class ChatDatabaseRepository {
       lastMemoryExtractedOrder: row.lastMemoryExtractedOrder,
       chatModelProvider: row.chatModelProvider,
       chatModelId: row.chatModelId,
+      extras: _decodeExtrasJson(row.extrasJson),
     );
   }
 
@@ -8374,6 +8560,7 @@ class ChatDatabaseRepository {
       lastMemoryExtractedOrder: Value(conversation.lastMemoryExtractedOrder),
       chatModelProvider: Value(conversation.chatModelProvider),
       chatModelId: Value(conversation.chatModelId),
+      extrasJson: Value(jsonEncode(conversation.extras)),
     );
   }
 
@@ -8560,6 +8747,10 @@ class ChatDatabaseRepository {
     } catch (_) {
       return <String, int>{};
     }
+  }
+
+  Map<String, dynamic> _decodeExtrasJson(String raw) {
+    return Conversation.decodeExtras(raw);
   }
 
   List<String> _decodeStringList(String raw) {

@@ -16,7 +16,7 @@ abstract class BuiltInToolNames {
   // 通用
   static const search = 'search';
 
-  // OpenRouter server tools
+  // OpenRouter 服务端工具
   static const webFetch = 'web_fetch';
   static const shell = 'shell';
 
@@ -661,6 +661,15 @@ abstract class BuiltInToolsHelper {
     return isClaudeDynamicWebSearchEnabled(cfg: cfg, modelId: modelId)
         ? 'web_search_20260209'
         : 'web_search_20250305';
+  }
+
+  /// 客户端工具定义所声明的名字，同时也是它从同名托管工具那里“占下”的名字：
+  /// 在应用拼装的 OpenAI 形状里就是 `function.name`，其他形状一律为空字符串
+  /// （Claude 适配器的转换同样会丢弃它们）。所有读取工具名的地方都走这里，
+  /// 免得某个调用方找错位置，也免得这个判定把一个请求根本不会携带的定义算进去。
+  static String claimedToolName(Map<String, dynamic> tool) {
+    final fn = tool['function'];
+    return fn is Map ? (fn['name'] ?? '').toString() : '';
   }
 
   static Map<String, dynamic> dashScopeSearchOptionsFromOverride(

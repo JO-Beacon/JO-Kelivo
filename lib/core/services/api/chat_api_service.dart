@@ -19,7 +19,8 @@ import 'stream/retrying_stream.dart';
 import 'chat_api_helpers.dart';
 import 'stream/stream_chunk.dart';
 import 'stream/stream_chunk_handler.dart';
-import 'providers/claude/claude_history.dart' show normalizeClaudeImageMime;
+// `normalizeClaudeImageMime` 等符号由 claude_provider 转出（见它的 export 块），
+// 这里不再重复导入 claude_history。
 import 'providers/claude/claude_provider.dart';
 import 'providers/google/google_provider.dart';
 import 'providers/openai/openai_provider.dart';
@@ -29,6 +30,8 @@ import 'providers/openai/openai_tool_transcript.dart'
     show openaiToolCallForRequest;
 import 'providers/openai/openai_vendor_compat.dart'
     show isLongCatHost, shouldIncludeStreamingUsageOptions;
+import 'tool_call_cancellation.dart';
+import 'stream/stream_chunk_emit.dart';
 
 export 'generation/tool_loop_runner.dart';
 export 'stream/stream_chunk_emit.dart';
@@ -220,6 +223,10 @@ class ChatApiService {
       extraHeaders: extraHeaders,
     );
     final sessionToken = CancelToken();
+    final toolCancellation = ToolCallCancellation(
+      isCancelled: () => sessionToken.isCancelled,
+      cancelled: _whenCancelled(sessionToken),
+    );
     final rid = (requestId ?? '').trim();
     if (rid.isNotEmpty) {
       final previous = _activeCancelTokens.remove(rid);
@@ -255,7 +262,7 @@ class ChatApiService {
               )
             : null,
         attemptStartEvent: emitRetryUi ? () => const RetryAttemptStart() : null,
-        attempt: (_) => sendRound(),
+        attempt: (_) => carrySplitSurrogates(sendRound()),
       );
     }
 
@@ -274,7 +281,11 @@ class ChatApiService {
           topP: topP,
           maxTokens: maxTokens,
           tools: tools,
-          onToolCall: onToolCall,
+          onToolCall: onToolCall == null
+              ? null
+              : (name, args, {toolCallId}) => toolCancellation.run(
+                  () => onToolCall(name, args, toolCallId: toolCallId),
+                ),
           extraHeaders: sessionHeaders,
           extraBody: extraBody,
           stream: stream,

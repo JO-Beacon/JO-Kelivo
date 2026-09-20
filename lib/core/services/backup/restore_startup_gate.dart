@@ -423,8 +423,8 @@ final class RestoreStartupGate {
   }) async {
     if (state != RestoreReceiptState.committed) return;
     try {
-      final candidateDirectory = RestoreLocalSettingsApplier
-          .candidateDirectoryFor(
+      final candidateDirectory =
+          RestoreLocalSettingsApplier.candidateDirectoryFor(
             appDataDirectory: appDataDirectory,
             runId: runId,
             runInCompletedDirectory: runInCompletedDirectory,

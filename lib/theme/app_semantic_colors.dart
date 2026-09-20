@@ -32,6 +32,13 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     this.layered = false,
   });
 
+  /// 对话框／面板／菜单的填充色。
+  ///
+  /// 分层模式落在较亮的卡片层；传统模式沿用页面 [ColorScheme.surface]，
+  /// 使浮层与旧观感一致。
+  Color overlaySurface(ColorScheme scheme) =>
+      layered ? surfaceCard : scheme.surface;
+
   /// 用于输入框、标签、小卡片和标签容器的柔和填充色。
   /// 替代旧的 `isDark ? Colors.white10 : Color(0xFFF2F3F5/F7F7F9)` 写法。
   ///
@@ -192,4 +199,8 @@ extension AppSemanticColorsX on BuildContext {
         ? AppSemanticColors.dark(theme.colorScheme)
         : AppSemanticColors.light(theme.colorScheme);
   }
+
+  /// 对话框／面板／菜单。见 [AppSemanticColors.overlaySurface]。
+  Color get overlaySurface =>
+      appColors.overlaySurface(Theme.of(this).colorScheme);
 }

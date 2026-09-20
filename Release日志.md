@@ -1,10 +1,11 @@
 # 当前发布索引
 
-当前代码版本：`0.1.16+16`（已合入 main，待发布；发布正文未备）。当前实现基座：Kelivo `1.2.6+73`（关于页声明值 `1.2.7 / 76`，基座合入完成前不出包发版）。GitHub 上最新已公开 Release 为 `0.1.14+14`。`0.1.16` 起新增 Windows ARM64 原生安装包。
+当前代码版本：`0.1.16+16`（已合入 main，待发布；发布正文未备）。当前实现基座：Kelivo `1.2.7+76`（来源 tag `v1.2.7`，commit `4d4448a07d033dc78ca01b8f83acb1c967f74dfa`；关于页声明值同为 `1.2.7 / 76`）。GitHub 上最新已公开 Release 为 `0.1.15+15`（2026-09-12 发布）。`0.1.16` 起新增 Windows ARM64 原生安装包。
+本地技术收口状态（2026-09-20，未发布）：全量测试 4914 通过／41 跳过／0 失败，全仓库分析无问题；Android 三个 ABI 正式版 APK、Windows x64 便携包和安装包均已本地重建。Android 真机、真实字体联网下载和真实使用场景人工验收仍未执行。
 
 | 版本 | 状态 | 发布正文 |
 | --- | --- | --- |
-| `0.1.15+15` | 待发布（正文已备好） | [.github/release-notes/0.1.15+15.md](.github/release-notes/0.1.15+15.md) |
+| `0.1.15+15` | 已发布（2026-09-12） | [.github/release-notes/0.1.15+15.md](.github/release-notes/0.1.15+15.md) · [GitHub Release](https://github.com/JO-Beacon/JO-Kelivo/releases/tag/0.1.15%2B15) |
 | `0.1.14+14` | 已发布（2026-09-07） | [.github/release-notes/0.1.14+14.md](.github/release-notes/0.1.14+14.md) · [GitHub Release](https://github.com/JO-Beacon/JO-Kelivo/releases/tag/0.1.14%2B14) |
 | `0.1.13+13` | 已发布（2026-09-02） | [.github/release-notes/0.1.13+13.md](.github/release-notes/0.1.13+13.md) · [GitHub Release](https://github.com/JO-Beacon/JO-Kelivo/releases/tag/0.1.13%2B13) |
 | `0.1.12+12` | 历史草稿 | [.github/release-notes/0.1.12+12.md](.github/release-notes/0.1.12+12.md) |

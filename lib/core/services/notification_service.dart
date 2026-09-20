@@ -40,7 +40,7 @@ class NotificationService {
   }
 
   static Future<void> ensureInitialized() async {
-    if (!Platform.isAndroid) return;
+    if (!Platform.isAndroid && !Platform.isIOS) return;
     if (_inited) return;
 
     final existing = _initialization;
@@ -70,6 +70,11 @@ class NotificationService {
         AndroidInitializationSettings('@drawable/ic_notification');
     const InitializationSettings init = InitializationSettings(
       android: androidInit,
+      iOS: DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false,
+      ),
     );
     await _plugin.initialize(
       init,
@@ -100,6 +105,7 @@ class NotificationService {
   /// 确保已授予 Android 13+ 通知权限（在更低版本和其他平台上为空操作）。
   static Future<bool> ensureAndroidNotificationsPermission() async {
     if (!Platform.isAndroid) return true;
+    await ensureInitialized();
     final android = _plugin
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
@@ -122,7 +128,7 @@ class NotificationService {
     String? title,
     String? body,
   }) async {
-    if (!Platform.isAndroid) return;
+    if (!Platform.isAndroid && !Platform.isIOS) return;
     if (conversationId.trim().isEmpty) return;
     await ensureInitialized();
     await _plugin.show(
@@ -141,7 +147,14 @@ class NotificationService {
           category: AndroidNotificationCategory.message,
           visibility: NotificationVisibility.public,
           ticker: 'JO-AIClient',
-          styleInformation: const DefaultStyleInformation(true, true),
+          styleInformation: BigTextStyleInformation(
+            body ?? 'Assistant reply has been generated',
+          ),
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentSound: true,
+          threadIdentifier: 'kelivo.chat-completion',
         ),
       ),
       payload: '$_chatCompletionPayloadPrefix$conversationId',
@@ -151,6 +164,13 @@ class NotificationService {
   static void _handleNotificationResponse(NotificationResponse response) {
     final conversationId = conversationIdFromPayload(response.payload);
     if (conversationId == null) return;
+    openConversation(conversationId);
+  }
+
+  /// Also receives taps from the native ongoing notification, overlay and
+  /// ActivityKit. Keep the target until the home route has initialized.
+  static void openConversation(String conversationId) {
+    if (conversationId.trim().isEmpty) return;
     if (_conversationTapController.hasListener) {
       _conversationTapController.add(conversationId);
     } else {
@@ -180,16 +200,5 @@ class NotificationService {
     const firstChatNotificationId = 10000;
     return firstChatNotificationId +
         (hash % (0x7fffffff - firstChatNotificationId));
-  }
-
-  static bool shouldShowChatCompleted({
-    required bool isAndroid,
-    required bool notifyModeEnabled,
-    required bool appInForeground,
-    required bool homeRouteVisible,
-    required bool isCurrentConversation,
-  }) {
-    if (!isAndroid || !notifyModeEnabled) return false;
-    return !(appInForeground && homeRouteVisible && isCurrentConversation);
   }
 }

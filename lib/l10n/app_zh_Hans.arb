@@ -1,6 +1,15 @@
 {
   "chatImageCropFailed": "图片“{fileName}”裁剪失败：{error}",
-  "@chatImageCropFailed": {"placeholders": {"fileName": {"type": "String"}, "error": {"type": "String"}}},
+  "@chatImageCropFailed": {
+    "placeholders": {
+      "fileName": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "helloWorld": "你好，世界！",
   "settingsPageBackButton": "返回",
   "settingsPageTitle": "设置",
@@ -27,7 +36,6 @@
   "settingsPageHotkeys": "快捷键",
   "settingsPageChatStorage": "聊天记录存储",
   "settingsPageCalculating": "统计中…",
-  "settingsPageFilesCount": "共 {count} 个文件 · {size}",
   "storageSpacePageTitle": "存储空间",
   "storageSpaceRefreshTooltip": "刷新",
   "storageSpaceLoadFailed": "加载失败",
@@ -51,7 +59,6 @@
   "storageSpaceCategoryCache": "缓存",
   "storageSpaceCategoryLogs": "日志",
   "storageSpaceCategoryOther": "其他",
-  "storageSpaceFilesCount": "{count} 个文件",
   "storageSpaceSafeToClearHint": "可安全清理，不影响聊天记录。",
   "storageSpaceLegacyChatDataHint": "这是迁移到 SQLite 前保留的 Hive 旧文件。清理后不会删除当前聊天记录。",
   "storageSpaceNotSafeToClearHint": "可能影响聊天记录，请谨慎删除。",
@@ -174,7 +181,13 @@
   "assistantEditTabLayoutResetTooltip": "重置标签页布局",
   "assistantEditTabLayoutAtLeastOneVisible": "至少保留一个可见标签页",
   "assistantEditTabLayoutDragHandle": "拖动以调整 {tab} 的顺序",
-  "@assistantEditTabLayoutDragHandle": {"placeholders": {"tab": {"type": "String"}}},
+  "@assistantEditTabLayoutDragHandle": {
+    "placeholders": {
+      "tab": {
+        "type": "String"
+      }
+    }
+  },
   "assistantEditRegexDescription": "为用户/助手消息配置正则规则，可修改或仅调整显示效果。",
   "assistantEditAddRegexButton": "添加正则规则",
   "assistantRegexAddTitle": "添加正则规则",
@@ -284,7 +297,13 @@
   "iosBackgroundGenerationActiveDetail": "助手正在后台回复",
   "iosBackgroundGenerationStreamingDetail": "正在接收助手回复",
   "iosBackgroundGenerationTokenCount": "{count} tokens",
-  "@iosBackgroundGenerationTokenCount": {"placeholders": {"count": {"type": "int"}}},
+  "@iosBackgroundGenerationTokenCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "iosBackgroundGenerationCompleteTitle": "生成完成",
   "iosBackgroundGenerationCompleteDetail": "助手回复已准备好",
   "iosBackgroundGenerationInterruptedTitle": "生成已中断",
@@ -318,7 +337,13 @@
   "providersPageDeleteSelectedConfirmContent": "确定要删除选中的供应商吗？该操作不可撤销。",
   "providersPageDeleteSelectedSnackbar": "已删除选中的供应商",
   "providersPageExportSelectedTitle": "导出 {count} 个供应商",
-  "@providersPageExportSelectedTitle": {"placeholders": {"count": {"type": "int"}}},
+  "@providersPageExportSelectedTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "providersPageExportCopyButton": "复制",
   "providersPageExportShareButton": "分享",
   "providersPageExportCopiedSnackbar": "已复制导出代码",
@@ -334,7 +359,13 @@
   "multiKeyPageAdd": "添加",
   "multiKeyPageAddHint": "请输入API Key（多个用逗号或空格分隔）",
   "multiKeyPageImportedSnackbar": "已导入{n}个key",
-  "@multiKeyPageImportedSnackbar": {"placeholders": {"n": {"type": "int"}}},
+  "@multiKeyPageImportedSnackbar": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
   "multiKeyPagePleaseAddModel": "请先添加模型",
   "multiKeyPageTotal": "总数",
   "multiKeyPageNormal": "正常",
@@ -388,11 +419,23 @@
   "assistantEditPromptAppendTimeSubtitle": "在每条用户消息末尾追加发送时刻。时间在请求末尾，不影响 Prompt 缓存。",
   "assistantEditPromptAppendTimeInfoTitle": "追加时间格式",
   "assistantEditPromptAppendTimeInfoBody": "开启后，会在每条用户消息末尾先空一行，再追加如下标签：\n\n{example}\n\n时间取该消息自己的发送时刻，重试时保持不变。",
-  "@assistantEditPromptAppendTimeInfoBody": {"placeholders": {"example": {"type": "String"}}},
+  "@assistantEditPromptAppendTimeInfoBody": {
+    "placeholders": {
+      "example": {
+        "type": "String"
+      }
+    }
+  },
   "assistantEditPromptAppendTimeInfoClose": "知道了",
   "assistantEditPromptTimeVarDialogTitle": "系统提示词中含时间变量",
   "assistantEditPromptTimeVarDialogBody": "你的系统提示词里用了 {variables}。系统提示词每次请求都会重新渲染，含时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中。建议移除这些变量，改用「追加当前时间」——它把时间放在请求末尾，不影响前缀。",
-  "@assistantEditPromptTimeVarDialogBody": {"placeholders": {"variables": {"type": "String"}}},
+  "@assistantEditPromptTimeVarDialogBody": {
+    "placeholders": {
+      "variables": {
+        "type": "String"
+      }
+    }
+  },
   "assistantEditPromptTimeVarDialogRemove": "去移除",
   "assistantEditPromptTimeVarDialogKeep": "仍然开启",
   "codeBlockPreviewButton": "预览",
@@ -407,7 +450,13 @@
   "markdownTableCopiedCsvSnackbar": "已复制 CSV，长按复制可复制为图片",
   "markdownTableCopiedMarkdownSnackbar": "已复制表格",
   "codeBlockCollapsedLines": "… 已折叠 {n} 行",
-  "@codeBlockCollapsedLines": {"placeholders": {"n": {"type": "int"}}},
+  "@codeBlockCollapsedLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
   "htmlPreviewNotSupportedOnLinux": "Linux 暂不支持 HTML 预览",
   "assistantEditSampleUser": "用户",
   "assistantEditSampleMessage": "你好啊",
@@ -427,14 +476,26 @@
   "assistantSettingsAddSheetCancel": "取消",
   "assistantSettingsAddSheetSave": "保存",
   "assistantSelectionTitle": "已选择 {count} 个",
-  "@assistantSelectionTitle": {"placeholders": {"count": {"type": "int"}}},
+  "@assistantSelectionTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "assistantSelectionSelectAll": "全选",
   "assistantSelectionDeselectAll": "取消全选",
   "assistantSelectionDelete": "删除",
   "assistantSelectionMoveToGroup": "移动到分组",
   "assistantSelectionDeleteConfirmTitle": "删除助手",
   "assistantSelectionDeleteConfirmContent": "确定删除选中的 {count} 个助手吗？此操作不可撤销。",
-  "@assistantSelectionDeleteConfirmContent": {"placeholders": {"count": {"type": "int"}}},
+  "@assistantSelectionDeleteConfirmContent": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "assistantSelectionGroupPickerTitle": "将助手移动到分组",
   "assistantSelectionGroupUngrouped": "未分组",
   "assistantSelectionActionSelect": "选择助手",
@@ -497,7 +558,13 @@
   "assistantProviderSampleAssistantName": "示例助手",
   "assistantProviderNewAssistantName": "新助手",
   "assistantProviderSampleAssistantSystemPrompt": "你是{model_name}，一位乐于助人的 AI 助手。请准确、简洁地回答问题；不确定时如实说明。需要时可使用清晰结构（短段落或列表）。默认使用用户的语言回复。",
-  "@assistantProviderSampleAssistantSystemPrompt": {"placeholders": {"model_name": {"type": "String"}}},
+  "@assistantProviderSampleAssistantSystemPrompt": {
+    "placeholders": {
+      "model_name": {
+        "type": "String"
+      }
+    }
+  },
   "displaySettingsPageLanguageTitle": "应用语言",
   "displaySettingsPageLanguageSubtitle": "选择界面语言",
   "displaySettingsPageLanguageChineseLabel": "简体中文",
@@ -507,11 +574,23 @@
   "homePagePleaseSetupTranslateModel": "请先设置翻译模型",
   "homePageTranslating": "翻译中...",
   "homePageTranslateFailed": "翻译失败: {error}",
-  "@homePageTranslateFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@homePageTranslateFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "imagePreviewSheetSaveImage": "保存图片",
   "imagePreviewSheetSaveSuccess": "已保存到相册",
   "imagePreviewSheetSaveFailed": "保存失败: {error}",
-  "@imagePreviewSheetSaveFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@imagePreviewSheetSaveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "chatServiceDefaultConversationTitle": "新对话",
   "userProviderDefaultUserName": "用户",
   "mcpAssistantSheetTitle": "MCP服务器",
@@ -532,13 +611,25 @@
   "backupPageRestartRequired": "需要重启应用",
   "backupPageRestartContent": "导入成功。重启 JO-AIClient 后将安全应用。",
   "backupPageRestartContentWithSkipped": "导入已完成，但已跳过 {count} 个消息顺序非法的会话。重启 JO-AIClient 后将安全应用已导入的数据。",
-  "@backupPageRestartContentWithSkipped": {"placeholders": {"count": {"type": "int"}}},
+  "@backupPageRestartContentWithSkipped": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "restartAppFailedMessage": "JO-AIClient 无法自动重启，请完全关闭后重新打开。",
   "backupRestoreRolledBackTitle": "恢复已回滚",
   "backupRestoreRolledBackContent": "恢复未能完成。JO-AIClient 已验证并保留原有数据。",
   "contextTreeMigrationWarningsTitle": "旧版对话迁移已修复",
   "contextTreeMigrationWarningsContent": "JO-AIClient 在转换旧版对话分支时修复了 {count} 条缺失的选中版本记录。修复结果已写入警告日志，未读取或修改消息正文。",
-  "@contextTreeMigrationWarningsContent": {"placeholders": {"count": {"type": "int"}}},
+  "@contextTreeMigrationWarningsContent": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "backupRestoreFailureTitle": "恢复需要处理",
   "backupRestoreFailureContent": "JO-AIClient 无法验证完整的原有或新数据，因此未打开聊天数据。请关闭 JO-AIClient 后重试；若问题反复出现，请保留诊断码以便支持人员排查。",
   "backupRestoreBusinessLeaseUnavailableTitle": "JO-AIClient 已在运行",
@@ -555,9 +646,21 @@
   "backupRestoreFailureCopyButton": "复制诊断码",
   "backupRestoreFailureCopied": "已复制诊断码",
   "backupRestoreFailureDiagnostic": "诊断码：{code}",
-  "@backupRestoreFailureDiagnostic": {"placeholders": {"code": {"type": "String"}}},
+  "@backupRestoreFailureDiagnostic": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
   "backupRestoreCorruptArchiveMessage": "所选的 JO-AIClient 备份文件已损坏或不完整，因此未执行还原。当前数据未被修改。诊断码：{code}",
-  "@backupRestoreCorruptArchiveMessage": {"placeholders": {"code": {"type": "String"}}},
+  "@backupRestoreCorruptArchiveMessage": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
   "startupRecoveryMoreOptions": "更多恢复选项",
   "startupRecoveryRepairButton": "修复并重启",
   "startupRecoveryExportButton": "导出我的数据副本",
@@ -577,17 +680,41 @@
   "startupRecoveryDowngradeSnapshotButton": "高级：恢复较早的副本",
   "startupRecoveryChooseSnapshotTitle": "选择副本",
   "startupRecoverySnapshotDetails": "{date} {time} · {size}",
-  "@startupRecoverySnapshotDetails": {"placeholders": {"date": {"type": "String"}, "time": {"type": "String"}, "size": {"type": "String"}}},
+  "@startupRecoverySnapshotDetails": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
   "startupRecoveryNoSnapshots": "没有可用的本地副本。",
   "startupRecoveryRestoreConfirmTitle": "恢复这份副本？",
   "startupRecoveryRestoreConfirmContent": "JO-AIClient 将使用 {fileName} 替换当前数据库。创建该副本后的改动可能丢失；在恢复通过验证前，当前数据库仍会由恢复日志保留。",
-  "@startupRecoveryRestoreConfirmContent": {"placeholders": {"fileName": {"type": "String"}}},
+  "@startupRecoveryRestoreConfirmContent": {
+    "placeholders": {
+      "fileName": {
+        "type": "String"
+      }
+    }
+  },
   "startupRecoveryRestoreConfirmButton": "恢复并重启",
   "startupRecoveryProtectionFailedTitle": "无法保护当前数据",
   "startupRecoveryProtectionFailedContent": "降级前必须创建的数据副本失败。继续操作可能永久丢失由较新版本写入的数据。",
   "startupRecoveryContinueWithoutProtection": "不创建副本并继续",
   "startupRecoverySnapshotFailed": "无法准备该副本。诊断代码：{code}",
-  "@startupRecoverySnapshotFailed": {"placeholders": {"code": {"type": "String"}}},
+  "@startupRecoverySnapshotFailed": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
   "backupPageRestoreFailedMessage": "恢复失败：{error}",
   "backupPageExportFailedMessage": "导出失败：{error}",
   "backupPageOK": "好的",
@@ -657,6 +784,10 @@
   "backupPageImportFromChatbox": "从 Chatbox 导入（≥1.22）",
   "backupPageImportFromChatboxLegacy": "从 Chatbox 导入（<1.22）",
   "backupPageChatboxLegacyStarredGroupName": "Chatbox 导入（<1.22）·置顶",
+  "backupPageChatboxModernDeletedProviderGroupName": "Chatbox 导入（≥1.22）·已删除",
+  "backupPageChatboxModernGroupName": "Chatbox 导入（≥1.22）",
+  "backupPageChatboxModernStarredGroupName": "Chatbox 导入（≥1.22）·置顶",
+  "backupPageChatboxModernNote": "Chatbox 的人设与智能体笔记不会导入；会导入供应商、助手、会话、消息与文件。",
   "backupPageImportFromDeepSeek": "从 DeepSeek 网页版/App 导入",
   "backupPageDeepSeekImportAssistantGroupName": "DeepSeek Web 导入",
   "backupPageDeepSeekImportProviderName": "DeepSeek Web",
@@ -678,7 +809,13 @@
   "backupReminderEveryFourteenDays": "每 14 天",
   "backupReminderEveryMonth": "每月",
   "backupReminderCustomDays": "每 {days} 天",
-  "@backupReminderCustomDays": {"placeholders": {"days": {"type": "int"}}},
+  "@backupReminderCustomDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
   "backupReminderCustomOption": "自定义...",
   "backupReminderCustomDialogTitle": "自定义频率",
   "backupReminderCustomDialogDescription": "输入两次备份提醒之间间隔多少天。",
@@ -758,7 +895,13 @@
   "messageEditRemoveAttachment": "移除附件",
   "messageEditAttachmentImportFailed": "无法导入附件：{error}",
   "messageEditAttachmentCopyFailed": "无法复制所选附件",
-  "@messageEditAttachmentImportFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@messageEditAttachmentImportFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "messageEditCloseConfirmTitle": "关闭而不保存？",
   "messageEditCloseConfirmContent": "当前修改将被丢弃。",
   "messageEditCloseConfirmCancel": "取消",
@@ -883,7 +1026,6 @@
   "chatMessageWidgetRegenerateConfirmTitle": "确认重新生成",
   "chatMessageWidgetRegenerateConfirmContent": "重新生成只会更新当前消息，不会删除下面的消息。确定要继续吗？",
   "chatMessageWidgetRegenerateConfirmInterruptNotice": "重新生成会中断正在生成的回复。",
-  "chatMessageWidgetRegenerateConfirmDeleteTrailingContent": "重新生成将会删除此消息下面的所有消息，且无法撤销。确定要继续吗？",
   "chatMessageWidgetRegenerateConfirmCancel": "取消",
   "chatMessageWidgetRegenerateConfirmOk": "重新生成",
   "chatMessageWidgetStopTooltip": "停止",
@@ -897,7 +1039,13 @@
   "chatMessageWidgetWriteClipboard": "写入剪切板",
   "chatMessageWidgetSpeakingTitle": "正在朗读:",
   "chatMessageWidgetSpeakText": "正在朗读: {text}",
-  "@chatMessageWidgetSpeakText": {"placeholders": {"text": {"type": "String"}}},
+  "@chatMessageWidgetSpeakText": {
+    "placeholders": {
+      "text": {
+        "type": "String"
+      }
+    }
+  },
   "chatMessageWidgetMemoryRead": "读取记忆",
   "chatMessageWidgetMemoryUpdate": "更新记忆",
   "chatMessageWidgetMemorySearchProfile": "检索记忆",
@@ -945,7 +1093,13 @@
   "exportDisclaimerAiGenerated": "内容由 AI 生成，请仔细甄别",
   "sideDrawerMenuSelect": "多选",
   "sideDrawerSelectionTitle": "已选 {count} 项",
-  "@sideDrawerSelectionTitle": {"placeholders": {"count": {"type": "int"}}},
+  "@sideDrawerSelectionTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "sideDrawerSelectionSelectAll": "全选",
   "sideDrawerSelectionDeselectAll": "取消全选",
   "sideDrawerSelectionPin": "置顶",
@@ -954,13 +1108,40 @@
   "sideDrawerSelectionDelete": "删除",
   "sideDrawerSelectionDeleteConfirmTitle": "删除话题",
   "sideDrawerSelectionDeleteConfirmContent": "确定删除 {count} 个话题？",
-  "@sideDrawerSelectionDeleteConfirmContent": {"placeholders": {"count": {"type": "int"}}},
+  "@sideDrawerSelectionDeleteConfirmContent": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "sideDrawerDeleteSelectedSnackbar": "已删除 {count} 个话题",
-  "@sideDrawerDeleteSelectedSnackbar": {"placeholders": {"count": {"type": "int"}}},
+  "@sideDrawerDeleteSelectedSnackbar": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "sideDrawerMoveSelectedSnackbar": "已移动 {count} 个话题",
-  "@sideDrawerMoveSelectedSnackbar": {"placeholders": {"count": {"type": "int"}}},
+  "@sideDrawerMoveSelectedSnackbar": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "sideDrawerMoveSelectedWithSkippedSnackbar": "已移动 {moved} 个话题，跳过 {skipped} 个正在生成的话题",
-  "@sideDrawerMoveSelectedWithSkippedSnackbar": {"placeholders": {"moved": {"type": "int"}, "skipped": {"type": "int"}}},
+  "@sideDrawerMoveSelectedWithSkippedSnackbar": {
+    "placeholders": {
+      "moved": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
   "sideDrawerMenuRename": "重命名",
   "sideDrawerMenuPin": "置顶",
   "sideDrawerMenuUnpin": "取消置顶",
@@ -991,7 +1172,13 @@
   "sideDrawerGlobalSearchEmptyHint": "在标题和消息中全局搜索",
   "sideDrawerGlobalSearchNoResults": "没有匹配的会话",
   "sideDrawerGlobalSearchResultCount": "共 {count} 条结果",
-  "@sideDrawerGlobalSearchResultCount": {"placeholders": {"count": {"type": "int"}}},
+  "@sideDrawerGlobalSearchResultCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "sideDrawerUpdateTitle": "新版：{version}",
   "sideDrawerUpdateTitleWithBuild": "新版：{version} ({build})",
   "sideDrawerLinkCopied": "已复制下载链接",
@@ -1114,7 +1301,13 @@
   "assistantEditRecentChatsSummaryFrequencyTitle": "摘要更新频率",
   "assistantEditRecentChatsSummaryFrequencyDescription": "累计达到所选条数的新消息后，会更新历史聊天摘要。",
   "assistantEditRecentChatsSummaryFrequencyOption": "每 {count} 条",
-  "@assistantEditRecentChatsSummaryFrequencyOption": {"placeholders": {"count": {"type": "int"}}},
+  "@assistantEditRecentChatsSummaryFrequencyOption": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "assistantEditRecentChatsSummaryFrequencyCustomButton": "自定义",
   "assistantEditRecentChatsSummaryFrequencyCustomTitle": "自定义摘要频率",
   "assistantEditRecentChatsSummaryFrequencyCustomDescription": "输入累计多少条新消息后再更新历史聊天摘要。",
@@ -1125,7 +1318,16 @@
   "defaultModelPageTranslateModelSubtitle": "用于翻译消息内容的模型，推荐使用快速且准确的模型",
   "defaultModelPageOcrModelTitle": "OCR 模型",
   "backgroundTaskFailed": "{task}失败：{error}",
-  "@backgroundTaskFailed": {"placeholders": {"task": {"type": "String"}, "error": {"type": "String"}}},
+  "@backgroundTaskFailed": {
+    "placeholders": {
+      "task": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "defaultModelPageOcrModelSubtitle": "用于对图片执行文字识别的模型",
   "defaultModelPageOcrModelRequiresImageInput": "请选择标记为支持图片输入的模型用于 OCR",
   "defaultModelPagePromptLabel": "提示词",
@@ -1251,9 +1453,21 @@
   "providerDetailPageBalanceResetDefaultsButton": "重置",
   "providerDetailPageBalanceResetDefaultsTooltip": "重置余额设置",
   "providerDetailPageBalanceResult": "余额：{value}",
-  "@providerDetailPageBalanceResult": {"placeholders": {"value": {"type": "String"}}},
+  "@providerDetailPageBalanceResult": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
   "providerDetailPageBalanceError": "余额查询失败：{message}",
-  "@providerDetailPageBalanceError": {"placeholders": {"message": {"type": "String"}}},
+  "@providerDetailPageBalanceError": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
   "providerDetailPageBalanceFullUrlRequired": "主 API 端点不是 OpenAI 兼容格式，请填写完整的 OpenAI 兼容余额 API 地址。",
   "providerDetailPageVertexAiTitle": "Vertex AI",
   "providerDetailPageLocationLabel": "区域 Location",
@@ -1427,25 +1641,64 @@
   "searchServiceEditorUsageQuery": "查询用量",
   "searchServiceEditorUsageQuerying": "查询中…",
   "searchServiceEditorUsageRemaining": "剩余 {remaining} 额度",
-  "@searchServiceEditorUsageRemaining": {"placeholders": {"remaining": {"type": "String"}}},
+  "@searchServiceEditorUsageRemaining": {
+    "placeholders": {
+      "remaining": {
+        "type": "String"
+      }
+    }
+  },
   "searchServiceEditorUsageBalance": "余额 {balance}",
-  "@searchServiceEditorUsageBalance": {"placeholders": {"balance": {"type": "String"}}},
+  "@searchServiceEditorUsageBalance": {
+    "placeholders": {
+      "balance": {
+        "type": "String"
+      }
+    }
+  },
   "searchServiceEditorUsageUsed": "已使用 {used} / {limit} 额度",
-  "@searchServiceEditorUsageUsed": {"placeholders": {"used": {"type": "String"}, "limit": {"type": "String"}}},
+  "@searchServiceEditorUsageUsed": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "String"
+      }
+    }
+  },
   "searchServiceEditorUsageFailed": "用量查询失败：{message}",
-  "@searchServiceEditorUsageFailed": {"placeholders": {"message": {"type": "String"}}},
+  "@searchServiceEditorUsageFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
   "searchServiceEditorTestTitle": "测试搜索",
   "searchServiceEditorTestQueryHint": "输入测试关键词",
   "searchServiceEditorTestRun": "运行测试搜索",
   "searchServiceEditorTestRunning": "搜索中…",
   "searchServiceEditorTestNoResults": "提供商未返回任何结果。",
   "searchServiceEditorTestFailed": "搜索失败：{message}",
-  "@searchServiceEditorTestFailed": {"placeholders": {"message": {"type": "String"}}},
+  "@searchServiceEditorTestFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
   "searchServiceEditorResultOpenTooltip": "打开结果",
   "searchServiceEditorDeleteTooltip": "删除搜索服务",
   "searchServiceEditorDeleteTitle": "删除搜索服务？",
   "searchServiceEditorDeleteMessage": "确定删除 {provider} 吗？此操作无法撤销。",
-  "@searchServiceEditorDeleteMessage": {"placeholders": {"provider": {"type": "String"}}},
+  "@searchServiceEditorDeleteMessage": {
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
   "searchServiceEditorDeleteConfirm": "删除",
   "searchServiceEditorDiscardTitle": "放弃更改？",
   "searchServiceEditorDiscardMessage": "尚未保存的搜索服务设置将会丢失。",
@@ -1469,7 +1722,16 @@
   "aboutPageAppDescription": "JO-AIClient 是基于 Kelivo 的开源 AI 助手",
   "aboutPageVersion": "版本",
   "aboutPageVersionDetail": "{version} / {buildNumber}",
-  "@aboutPageVersionDetail": {"placeholders": {"version": {"type": "String"}, "buildNumber": {"type": "String"}}},
+  "@aboutPageVersionDetail": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      },
+      "buildNumber": {
+        "type": "String"
+      }
+    }
+  },
   "aboutPageSystem": "系统",
   "aboutPageLoadingPlaceholder": "...",
   "aboutPageUnknownPlaceholder": "-",
@@ -1479,7 +1741,13 @@
   "aboutPagePlatformAndroid": "Android",
   "aboutPagePlatformIos": "iOS",
   "aboutPagePlatformOther": "其他（{os}）",
-  "@aboutPagePlatformOther": {"placeholders": {"os": {"type": "String"}}},
+  "@aboutPagePlatformOther": {
+    "placeholders": {
+      "os": {
+        "type": "String"
+      }
+    }
+  },
   "aboutPageWebsite": "官网",
   "aboutPageGithub": "GitHub",
   "aboutPageLicense": "许可证",
@@ -1487,7 +1755,13 @@
   "aboutPageCheckingForUpdates": "正在检查更新...",
   "aboutPageAlreadyLatest": "当前已是最新版本",
   "aboutPageUpdateCheckFailed": "检查更新失败：{error}",
-  "@aboutPageUpdateCheckFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@aboutPageUpdateCheckFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "displaySettingsPageShowUserAvatarTitle": "显示用户头像",
   "displaySettingsPageShowUserAvatarSubtitle": "是否在聊天消息中显示用户头像",
   "displaySettingsPageShowUserNameTimestampTitle": "显示用户名称和时间戳",
@@ -1519,7 +1793,6 @@
   "displaySettingsPageShowToolResultSummarySubtitle": "在工具步骤下方显示摘要文本",
   "displaySettingsPageHideToolResultImagesTitle": "隐藏工具结果图片",
   "displaySettingsPageHideToolResultImagesSubtitle": "隐藏工具结果中显示的 Markdown 图片",
-  "displaySettingsPageRegenerateDeleteTrailingMessagesTitle": "重新生成时删除下面的消息",
   "displaySettingsPageShowRegenerateConfirmDialogTitle": "重新生成前弹出确认",
   "displaySettingsPageAutoRetryTitle": "自动重试",
   "displaySettingsPageAutoRetrySubtitle": "在收到任何回复前遇到临时网络错误或限流时自动重试",
@@ -1808,13 +2081,37 @@
   "imageViewerPageRotateLeftButton": "向左旋转",
   "imageViewerPageRotateRightButton": "向右旋转",
   "imageViewerPageCounter": "{index}/{total}",
-  "@imageViewerPageCounter": {"placeholders": {"index": {"type": "int"}, "total": {"type": "int"}}},
+  "@imageViewerPageCounter": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "imageViewerPageImageLabel": "第 {index} 张图片，共 {total} 张",
-  "@imageViewerPageImageLabel": {"placeholders": {"index": {"type": "int"}, "total": {"type": "int"}}},
+  "@imageViewerPageImageLabel": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "imageViewerPageImageLoadFailed": "无法加载图片",
   "imageViewerPageSaveSuccess": "已保存到相册",
   "imageViewerPageSaveFailed": "保存失败: {error}",
-  "@imageViewerPageSaveFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@imageViewerPageSaveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "settingsShare": "JO-AIClient - 开源 AI 助手",
   "searchProviderBingLocalDescription": "使用网络抓取工具获取必应搜索结果。无需 API 密钥，但可能不够稳定。",
   "searchProviderDuckDuckGoDescription": "基于 DDGS 的 DuckDuckGo 隐私搜索，无需 API 密钥，支持设置地区。",
@@ -1938,7 +2235,13 @@
   "instructionInjectionGroupLabel": "分组",
   "instructionInjectionGroupHint": "可选",
   "instructionInjectionImportSuccess": "已导入 {count} 个指令注入",
-  "@instructionInjectionImportSuccess": {"placeholders": {"count": {"type": "int"}}},
+  "@instructionInjectionImportSuccess": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "mcpJsonEditButtonTooltip": "编辑 JSON",
   "mcpJsonEditTitle": "编辑json",
   "mcpJsonEditParseFailed": "JSON 解析失败",
@@ -1990,7 +2293,13 @@
   "multiKeyPageDeleteErrorsConfirmTitle": "删除所有错误的 Key？",
   "multiKeyPageDeleteErrorsConfirmContent": "这将移除所有状态为错误的 Key。",
   "multiKeyPageDeletedErrorsSnackbar": "已删除 {n} 个错误 Key",
-  "@multiKeyPageDeletedErrorsSnackbar": {"placeholders": {"n": {"type": "int"}}},
+  "@multiKeyPageDeletedErrorsSnackbar": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
   "providerDetailPageProviderTypeTitle": "供应商类型",
   "displaySettingsPageChatItemDisplayTitle": "聊天项显示",
   "displaySettingsPageRenderingSettingsTitle": "渲染设置",
@@ -2028,7 +2337,13 @@
   "networkProxyTesting": "测试中…",
   "networkProxyTestSuccess": "连接成功",
   "networkProxyTestFailed": "测试失败：{error}",
-  "@networkProxyTestFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@networkProxyTestFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "networkProxyNoUrl": "请输入测试地址",
   "networkProxyPriorityNote": "当同时开启全局代理与供应商代理时，将优先使用供应商代理。",
   "desktopShowProviderInModelCapsule": "模型胶囊显示供应商",
@@ -2046,13 +2361,31 @@
   "providerDetailPageDeleteSelectedModelsButton": "删除",
   "providerDetailPageDeleteSelectedModelsTooltip": "删除所选模型",
   "providerDetailPageDeleteSelectedModelsConfirm": "确定删除选中的 {count} 个模型吗？此操作不可撤回。",
-  "@providerDetailPageDeleteSelectedModelsConfirm": {"placeholders": {"count": {"type": "int"}}},
+  "@providerDetailPageDeleteSelectedModelsConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "providerDetailPageDeleteFailedDetectedModelsButton": "删除不可用",
   "providerDetailPageDeleteFailedDetectedModelsTooltip": "删除检测失败的模型",
   "providerDetailPageDeleteFailedDetectedModelsConfirm": "确定删除检测失败的 {count} 个模型吗？此操作不可撤回。",
-  "@providerDetailPageDeleteFailedDetectedModelsConfirm": {"placeholders": {"count": {"type": "int"}}},
+  "@providerDetailPageDeleteFailedDetectedModelsConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "providerDetailPageSelectedModelsDeletedSnackbar": "已删除 {count} 个模型",
-  "@providerDetailPageSelectedModelsDeletedSnackbar": {"placeholders": {"count": {"type": "int"}}},
+  "@providerDetailPageSelectedModelsDeletedSnackbar": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "providerDetailPageDeleteAllModelsTooltip": "删除全部模型",
   "providerDetailPageDeleteAllModelsWarning": "此操作不可撤回",
   "requestLogSettingTitle": "请求日志打印",
@@ -2211,7 +2544,13 @@
   "memoryEntryScopeGlobal": "全局",
   "memoryEntryScopeAssistant": "仅本助手",
   "memoryEntryScopeAssistantNamed": "{name}",
-  "@memoryEntryScopeAssistantNamed": {"placeholders": {"name": {"type": "String"}}},
+  "@memoryEntryScopeAssistantNamed": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "memoryEntrySourceManual": "手动",
   "memoryEntrySourceTool": "工具",
   "memoryEntrySourceExtracted": "提取",
@@ -2219,7 +2558,13 @@
   "memoryEntryStatusActive": "活跃",
   "memoryEntryStatusArchived": "已归档",
   "memoryEntryUpdatedAt": "更新于 {date}",
-  "@memoryEntryUpdatedAt": {"placeholders": {"date": {"type": "String"}}},
+  "@memoryEntryUpdatedAt": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
   "memoryEntryActionEdit": "编辑",
   "memoryEntryActionDelete": "删除",
   "memoryEntryActionArchive": "归档",
@@ -2230,7 +2575,13 @@
   "memoryEntryDeleteConfirmTitle": "删除这条记忆？",
   "memoryEntryDeleteConfirmContent": "将永久删除该记忆，且无法撤销。",
   "memoryEntryBatchDeleteConfirmTitle": "删除 {count} 条记忆？",
-  "@memoryEntryBatchDeleteConfirmTitle": {"placeholders": {"count": {"type": "int"}}},
+  "@memoryEntryBatchDeleteConfirmTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "memoryEntryBatchDeleteConfirmContent": "所选记忆将被永久删除。",
   "memoryEntrySwitchScopeConfirmTitle": "更改记忆范围？",
   "memoryEntrySwitchScopeToGlobal": "将这条记忆设为全局（所有助手可见）？",
@@ -2253,31 +2604,85 @@
   "memorySearchHint": "搜索记忆",
   "memorySearchEmpty": "没有匹配的记忆",
   "memoryOrphanBanner": "有 {count} 条孤儿助手记忆（助手已删除）",
-  "@memoryOrphanBanner": {"placeholders": {"count": {"type": "int"}}},
+  "@memoryOrphanBanner": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "memoryOrphanCleanupButton": "清理",
   "memoryOrphanConfirmTitle": "清理孤儿记忆？",
   "memoryOrphanConfirmContent": "将永久删除 {count} 条所属助手已不存在的记忆。",
-  "@memoryOrphanConfirmContent": {"placeholders": {"count": {"type": "int"}}},
+  "@memoryOrphanConfirmContent": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "memoryOrganizeButton": "整理记忆",
   "memoryOrganizeNeedsConversation": "需要在与该助手的对话中使用",
   "memoryOrganizeNeedsModel": "请先在 设置 → 记忆 中选择记忆处理模型",
   "memoryOrganizeStatusNever": "尚未整理",
   "memoryOrganizeStatusLast": "上次整理：{when}",
-  "@memoryOrganizeStatusLast": {"placeholders": {"when": {"type": "String"}}},
+  "@memoryOrganizeStatusLast": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
   "memoryOrganizeStatusExtracted": "提取 {count} 条",
-  "@memoryOrganizeStatusExtracted": {"placeholders": {"count": {"type": "int"}}},
+  "@memoryOrganizeStatusExtracted": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "memoryOrganizeStatusSkipped": "无需记忆",
   "memoryOrganizeStatusSkippedReason": "已跳过：{reason}",
-  "@memoryOrganizeStatusSkippedReason": {"placeholders": {"reason": {"type": "String"}}},
+  "@memoryOrganizeStatusSkippedReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
   "memoryOrganizeStatusFailed": "失败：{reason}",
-  "@memoryOrganizeStatusFailed": {"placeholders": {"reason": {"type": "String"}}},
+  "@memoryOrganizeStatusFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
   "memoryOrganizeJustNow": "刚刚",
   "memoryOrganizeMinutesAgo": "{n} 分钟前",
-  "@memoryOrganizeMinutesAgo": {"placeholders": {"n": {"type": "int"}}},
+  "@memoryOrganizeMinutesAgo": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
   "memoryOrganizeHoursAgo": "{n} 小时前",
-  "@memoryOrganizeHoursAgo": {"placeholders": {"n": {"type": "int"}}},
+  "@memoryOrganizeHoursAgo": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
   "memoryOrganizeDaysAgo": "{n} 天前",
-  "@memoryOrganizeDaysAgo": {"placeholders": {"n": {"type": "int"}}},
+  "@memoryOrganizeDaysAgo": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
   "memoryModelMissingNotice": "需要先在 设置 → 记忆 中选择记忆处理模型。",
   "memoryModelMissingGoSelect": "去选择",
   "memoryEntriesPageTitle": "全部记忆",
@@ -2331,12 +2736,24 @@
   "legacyMemoryExport": "导出",
   "legacyMemoryExportTitle": "JO-AIClient 旧版记忆导出",
   "legacyMemoryAssistantHeader": "助手：{name}",
-  "@legacyMemoryAssistantHeader": {"placeholders": {"name": {"type": "String"}}},
+  "@legacyMemoryAssistantHeader": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "legacyMemorySearchHint": "搜索旧版记忆",
   "legacyMemoryMigrate": "迁移",
   "legacyMemoryMigrationTitle": "迁移旧版记忆",
   "legacyMemoryMigrationSubtitle": "使用模型整理并分类 {count} 条旧版记忆，原数据不会改变。",
-  "@legacyMemoryMigrationSubtitle": {"placeholders": {"count": {"type": "int"}}},
+  "@legacyMemoryMigrationSubtitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "legacyMemoryMigrationModel": "迁移模型",
   "legacyMemoryMigrationChooseModel": "选择模型",
   "legacyMemoryMigrationTarget": "保存到",
@@ -2350,19 +2767,55 @@
   "legacyMemoryMigrationAnalyzing": "正在使用模型分析",
   "legacyMemoryMigrationWriting": "正在写入记忆",
   "legacyMemoryMigrationProgress": "{current} / {total}",
-  "@legacyMemoryMigrationProgress": {"placeholders": {"current": {"type": "int"}, "total": {"type": "int"}}},
+  "@legacyMemoryMigrationProgress": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "legacyMemoryMigrationComplete": "迁移完成",
   "legacyMemoryMigrationResult": "已迁移 {created} 条 · 跳过已有 {skipped} 条",
-  "@legacyMemoryMigrationResult": {"placeholders": {"created": {"type": "int"}, "skipped": {"type": "int"}}},
+  "@legacyMemoryMigrationResult": {
+    "placeholders": {
+      "created": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
   "legacyMemoryMigrationFailed": "迁移已停止。可以重试，已保存的记忆会自动跳过。",
   "legacyMemoryMigrationContinue": "继续迁移",
   "legacyMemoryMigrationErrorAuth": "鉴权失败，请检查 API 密钥。",
   "legacyMemoryMigrationErrorFormat": "模型返回格式不正确。",
   "legacyMemoryMigrationErrorNetwork": "网络异常，请检查连接后重试。",
   "legacyMemoryMigrationErrorOther": "迁移失败：{message}",
-  "@legacyMemoryMigrationErrorOther": {"placeholders": {"message": {"type": "String"}}},
+  "@legacyMemoryMigrationErrorOther": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
   "legacyMemoryMigrationPartial": "已迁移 {created} · 跳过 {skipped} · 失败 {failed}",
-  "@legacyMemoryMigrationPartial": {"placeholders": {"created": {"type": "int"}, "skipped": {"type": "int"}, "failed": {"type": "int"}}},
+  "@legacyMemoryMigrationPartial": {
+    "placeholders": {
+      "created": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
   "legacyMemoryMigrationRetry": "重试",
   "legacyMemoryMigrationClose": "完成",
   "legacyMemoryModeTitle": "使用旧版记忆",
@@ -2398,7 +2851,13 @@
   "assistantEditOrganizeFrequencyTitle": "整理频率",
   "assistantEditOrganizeFrequencySubtitle": "每累积 N 轮助手回复触发一次自动整理",
   "assistantEditOrganizeFrequencyOption": "每 {n} 轮",
-  "@assistantEditOrganizeFrequencyOption": {"placeholders": {"n": {"type": "int"}}},
+  "@assistantEditOrganizeFrequencyOption": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
   "assistantEditOrganizeFrequencyCustomButton": "自定义",
   "assistantEditOrganizeFrequencyCustomTitle": "自定义整理频率",
   "assistantEditOrganizeFrequencyCustomDescription": "请输入 1 到 20 之间的整数。",
@@ -2416,15 +2875,33 @@
   "worldBookConfig": "配置",
   "worldBookDeleteTitle": "删除世界书",
   "worldBookDeleteMessage": "确定删除「{name}」？此操作无法撤销。",
-  "@worldBookDeleteMessage": {"placeholders": {"name": {"type": "String"}}},
+  "@worldBookDeleteMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "worldBookCancel": "取消",
   "worldBookDelete": "删除",
   "worldBookExportFailed": "导出失败：{error}",
-  "@worldBookExportFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@worldBookExportFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "worldBookNoEntriesHint": "暂无条目",
   "worldBookUnnamedEntry": "未命名条目",
   "worldBookKeywordsLine": "关键词：{keywords}",
-  "@worldBookKeywordsLine": {"placeholders": {"keywords": {"type": "String"}}},
+  "@worldBookKeywordsLine": {
+    "placeholders": {
+      "keywords": {
+        "type": "String"
+      }
+    }
+  },
   "worldBookEditEntry": "编辑条目",
   "worldBookDeleteEntry": "删除条目",
   "worldBookNameLabel": "名称",
@@ -2489,20 +2966,65 @@
   "debugPageCreatingLongReasoningConversation": "正在创建长思考链调试对话...",
   "debugPageNoCurrentAssistant": "当前没有助手。请先创建或选择一个助手。",
   "debugPageConversationCreated": "已创建包含 {count} 条消息的调试对话。",
-  "@debugPageConversationCreated": {"placeholders": {"count": {"type": "int"}}},
+  "@debugPageConversationCreated": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "debugPageCreateConversationFailed": "创建调试对话失败：{error}",
-  "@debugPageCreateConversationFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@debugPageCreateConversationFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "debugPageOversizedConversationTitle": "超大对话测试（{sizeMB} MiB）",
-  "@debugPageOversizedConversationTitle": {"placeholders": {"sizeMB": {"type": "int"}}},
+  "@debugPageOversizedConversationTitle": {
+    "placeholders": {
+      "sizeMB": {
+        "type": "int"
+      }
+    }
+  },
   "debugPageManyMessagesConversationTitle": "{count} 条消息测试",
-  "@debugPageManyMessagesConversationTitle": {"placeholders": {"count": {"type": "int"}}},
+  "@debugPageManyMessagesConversationTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "debugPageDailyMixedMarkdownConversationTitle": "{count} 条日常混合 Markdown 消息测试",
-  "@debugPageDailyMixedMarkdownConversationTitle": {"placeholders": {"count": {"type": "int"}}},
+  "@debugPageDailyMixedMarkdownConversationTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "debugPageLongReasoningConversationTitle": "{count} 条长思考链测试",
-  "@debugPageLongReasoningConversationTitle": {"placeholders": {"count": {"type": "int"}}},
+  "@debugPageLongReasoningConversationTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "debugPageOversizedConversationSeedText": "这是一段用于复现超大对话渲染卡顿的长调试文本。它包含重复的 Markdown 风格文本、标点、中文内容和普通词语，方便测试聊天渲染、存储和滚动性能。",
   "debugPageManyMessagesSeedText": "{role} 消息 #{index}：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。",
-  "@debugPageManyMessagesSeedText": {"placeholders": {"role": {"type": "String"}, "index": {"type": "int"}}},
+  "@debugPageManyMessagesSeedText": {
+    "placeholders": {
+      "role": {
+        "type": "String"
+      },
+      "index": {
+        "type": "int"
+      }
+    }
+  },
   "migrationIntroTitle": "升级聊天记录存储",
   "migrationIntroSubtitle": "JO-AIClient 将聊天记录迁移到更快的 SQLite 数据库。升级会在应用打开前完成，避免新旧数据同时写入。",
   "migrationBackupNote": "迁移开始前，会先导出包含设置、聊天记录和本地文件的 ZIP 备份。",
@@ -2516,9 +3038,21 @@
   "migrationMigratingTitle": "正在迁移到 SQLite",
   "migrationMigratingSubtitle": "正在分批写入会话和消息，避免超大聊天记录占满内存。请保持 JO-AIClient 在前台，等待迁移完成。",
   "migrationBackingUpDetail": "正在备份 {fileName}",
-  "@migrationBackingUpDetail": {"placeholders": {"fileName": {"type": "String"}}},
+  "@migrationBackingUpDetail": {
+    "placeholders": {
+      "fileName": {
+        "type": "String"
+      }
+    }
+  },
   "migrationMigratingDetail": "已迁移 {count} 条消息",
-  "@migrationMigratingDetail": {"placeholders": {"count": {"type": "int"}}},
+  "@migrationMigratingDetail": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "migrationMigratingPrepareDetail": "正在准备 SQLite 数据库",
   "migrationMigratingToolEventsDetail": "正在迁移工具调用记录",
   "migrationMigratingValidateDetail": "正在校验迁移数据",
@@ -2553,7 +3087,13 @@
   "migrationSkipDialogConfirm": "跳过并全新开始",
   "timelineJumpToLatest": "跳到最新",
   "largeContentShowMore": "再显示 {count} 项",
-  "@largeContentShowMore": {"placeholders": {"count": {"type": "int"}}},
+  "@largeContentShowMore": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "largeContentCollapse": "收起",
   "imageSettingsPageTitle": "图片处理",
   "imageSettingsPageEditSectionTitle": "编辑",
@@ -2642,13 +3182,43 @@
   "memoryTraceAfter": "改动后",
   "memoryTraceEmptyValue": "（空）",
   "memoryTraceStepsCount": "{count} 个步骤",
-  "@memoryTraceStepsCount": {"placeholders": {"count": {"type": "int"}}},
+  "@memoryTraceStepsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "memoryTraceMutationsCount": "{count} 项改动",
-  "@memoryTraceMutationsCount": {"placeholders": {"count": {"type": "int"}}},
+  "@memoryTraceMutationsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "memoryTraceRepeatCount": "重复 {count} 次",
-  "@memoryTraceRepeatCount": {"placeholders": {"count": {"type": "int"}}},
+  "@memoryTraceRepeatCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "memoryTraceWindowValue": "{size} 条消息 · #{start}–#{end}",
-  "@memoryTraceWindowValue": {"placeholders": {"size": {"type": "int"}, "start": {"type": "int"}, "end": {"type": "int"}}},
+  "@memoryTraceWindowValue": {
+    "placeholders": {
+      "size": {
+        "type": "int"
+      },
+      "start": {
+        "type": "int"
+      },
+      "end": {
+        "type": "int"
+      }
+    }
+  },
   "memoryTraceShowMore": "展开全文",
   "memoryTraceShowLess": "收起",
   "sqliteMigrationTitle": "准备存储迁移",
@@ -2827,31 +3397,67 @@
   "autoRetryRestoreDefaults": "恢复默认",
   "autoRetryFooter": "仅在当前这轮模型响应尚未产生任何输出时才会自动重试。",
   "backupIncludeLocalSettings": "把本机设置一起带走",
-  "backupIncludeLocalSettingsOnSubtitle": "窗口大小与位置、桌面快捷键、聊天字号等本机专属设置随备份一起带走。含本机设置的备份仅新版 JO-AIClient 可恢复。",
+  "backupIncludeLocalSettingsOnSubtitle": "窗口大小与位置、桌面快捷键、聊天字号等本机专属设置随备份一起带走。",
   "backupIncludeLocalSettingsOffSubtitle": "只导出聊天、文件与通用设置，本机专属设置留在本机。",
   "backupLedgerTitle": "本机设置记录",
   "backupLedgerEmpty": "还没有任何设备记录",
   "backupLedgerEmptyDescription": "导出时选择“带”，本机设置就会随备份记录在这里。",
   "backupLedgerThisDevice": "（本机）",
   "backupLedgerDeviceCount": "共 {count} 台设备",
-  "@backupLedgerDeviceCount": {"placeholders": {"count": {"type": "int"}}},
+  "@backupLedgerDeviceCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "backupLedgerDelete": "删除",
   "backupLedgerDeleteConfirm": "删除后，这台设备的本机设置将不再随下次备份携带。已导出的备份包不受影响。",
   "backupLedgerClear": "清空全部记录",
   "backupLedgerClearConfirm": "将删除全部 {count} 台设备的记录，此操作不可撤销。已导出的备份包不受影响。",
-  "@backupLedgerClearConfirm": {"placeholders": {"count": {"type": "int"}}},
+  "@backupLedgerClearConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "backupLedgerItemCount": "{count} 项设置",
-  "@backupLedgerItemCount": {"placeholders": {"count": {"type": "int"}}},
+  "@backupLedgerItemCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "backupLedgerLoadMore": "加载更多",
   "backupLedgerSettingsDescription": "窗口大小与位置、桌面快捷键、聊天字号、日志开关属于本机设置，只跟设备走，不影响聊天数据。",
   "backupLocalSettingsUnrecognized": "未能识别本机设备，本次未包含本机当前设置",
   "backupLedgerAbsorbedNotice": "已并入 {count} 台设备的设置记录",
-  "@backupLedgerAbsorbedNotice": {"placeholders": {"count": {"type": "int"}}},
+  "@backupLedgerAbsorbedNotice": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "backupLocalSettingsAppliedNotice": "本次已把备份里的 {count} 项本机设置应用到这台设备",
-  "@backupLocalSettingsAppliedNotice": {"placeholders": {"count": {"type": "int"}}},
+  "@backupLocalSettingsAppliedNotice": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "backupPageMergeCompleted": "合并完成",
   "backupPageMergeCompletedWithSkipped": "备份中有 {count} 个会话因消息顺序异常被跳过，未并入本机。",
-  "@backupPageMergeCompletedWithSkipped": {"placeholders": {"count": {"type": "int"}}},
+  "@backupPageMergeCompletedWithSkipped": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "assistantEditGradientBackgroundTitle": "渐变背景",
   "assistantEditGradientStaticTitle": "静态模式",
   "assistantEditGradientStaticDescription": "更省电，适合长对话和持续输出。",
@@ -2860,7 +3466,16 @@
   "assistantEditGradientPreview": "预览",
   "assistantEditGradientNextFrame": "换一帧",
   "backupProgressBytes": "{done} / {total}",
-  "@backupProgressBytes": {"placeholders": {"done": {"type": "String"}, "total": {"type": "String"}}},
+  "@backupProgressBytes": {
+    "placeholders": {
+      "done": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
   "backupProgressCancel": "取消",
   "backupProgressCancelled": "已取消",
   "backupProgressCommitting": "正在提交",
@@ -2870,7 +3485,16 @@
   "backupProgressImportingMessages": "正在导入消息",
   "backupProgressImportingSessions": "正在导入会话",
   "backupProgressItems": "{done} / {total}",
-  "@backupProgressItems": {"placeholders": {"done": {"type": "String"}, "total": {"type": "String"}}},
+  "@backupProgressItems": {
+    "placeholders": {
+      "done": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
   "backupProgressListingRemote": "正在列出远端备份",
   "backupProgressMaterializingFiles": "正在写入文件",
   "backupProgressPacking": "正在打包",
@@ -2958,5 +3582,1027 @@
   "startupRecoveryIntegrityMissing": "数据目录中没有找到数据库文件。",
   "startupRecoveryReportSaved": "报告已保存到 {path}",
   "startupRecoveryReportShared": "报告已导出。",
-  "startupRecoveryReportSaveFailed": "无法导出报告。"
+  "startupRecoveryReportSaveFailed": "无法导出报告。",
+  "storageSpaceCategoryDisplacedDatabases": "保留的旧数据库",
+  "storageSpaceSubDisplacedDatabases": "自动重建前保留的数据库",
+  "storageSpaceClearDisplacedDatabasesConfirmMessage": "确定删除这些保留的旧数据库吗？它们是 JO-AIClient 重建数据库时留下的，可能是那些聊天记录和设置仅存的一份。删除后无法恢复。",
+  "storageSpaceClearDisplacedDatabasesButton": "删除保留的旧数据库",
+  "assistantEditPageWorkspaceTab": "工作区设置",
+  "assistantTagsManageTitle": "管理标签",
+  "assistantTagsCreateButton": "创建",
+  "assistantTagsCreateDialogTitle": "创建标签",
+  "assistantTagsCreateDialogOk": "创建",
+  "assistantTagsCreateDialogCancel": "取消",
+  "assistantTagsNameHint": "标签名称",
+  "assistantTagsRenameButton": "重命名",
+  "assistantTagsRenameDialogTitle": "重命名标签",
+  "assistantTagsRenameDialogOk": "重命名",
+  "assistantTagsDeleteButton": "删除",
+  "assistantTagsDeleteConfirmTitle": "删除标签",
+  "assistantTagsDeleteConfirmContent": "确定要删除该标签吗？",
+  "assistantTagsDeleteConfirmOk": "删除",
+  "assistantTagsDeleteConfirmCancel": "取消",
+  "assistantTagsContextMenuEditAssistant": "编辑助手",
+  "assistantTagsContextMenuManageTags": "管理标签",
+  "assistantTagsContextMenuDeleteAssistant": "删除助手",
+  "assistantTagsClearTag": "清除标签",
+  "startupRecoverySectionDataTitle": "你的数据",
+  "startupRecoverySectionDataBody": "目前没有任何数据被删除。在尝试下面的操作前，先把副本保存到安全的地方。",
+  "startupRecoveryExportSavedTo": "数据副本已保存到 {path}",
+  "startupRecoverySectionRepairTitle": "诊断与修复",
+  "startupRecoverySectionRepairBody": "完整性检查只读取数据库。修复会清理上次更新中断留下的元数据并重新启动，不会删除聊天记录。",
+  "startupRecoveryDangerZone": "危险操作",
+  "startupRecoveryDangerBody": "重置会永久删除本设备上 JO-AIClient 的数据库。请先导出数据副本——重置同时会销毁排查根本问题所需的证据。",
+  "startupRecoveryResetAcknowledge": "我已导出副本，或不需要这些数据。",
+  "startupDatabaseUpdateRequiredDowngradeTitle": "若要改用旧版",
+  "startupDatabaseUpdateRequiredDowngradeIntro": "当前版本打不开本机这份数据库。若你必须留在旧版，请按下面的步骤处理；在备份完成之前，不要删除或覆盖这里的数据。",
+  "startupDatabaseUpdateRequiredDowngradeStep1": "先安装并打开最新版 JO-AIClient，在「设置 → 数据备份」导出一份备份文件。",
+  "startupDatabaseUpdateRequiredDowngradeStep2": "打开 {url}，把备份转换成你打算使用的旧版格式。",
+  "@startupDatabaseUpdateRequiredDowngradeStep2": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "startupDatabaseUpdateRequiredDowngradeStep3": "确认本机数据已经另外备份好之后，再安装旧版，并导入转换后的备份。",
+  "startupDatabaseUpdateRequiredOpenTool": "打开转换工具",
+  "backupPageForwardCompatTitle": "备份来自更新的版本",
+  "backupPageForwardCompatBody": "这份备份由更新版本的 JO-AIClient 创建（数据格式 {backupVersion}，当前版本支持 {currentVersion}），且未声明旧版本能否读取。\n\n你可以继续导入：当前版本不认识的内容会被跳过，备份文件本身不会被修改。但如果新版本改变了已有数据的存储方式，部分内容可能会被错误导入。\n\n更稳妥的做法是先升级 JO-AIClient。",
+  "@backupPageForwardCompatBody": {
+    "placeholders": {
+      "backupVersion": {
+        "type": "int"
+      },
+      "currentVersion": {
+        "type": "int"
+      }
+    }
+  },
+  "backupPageForwardCompatContinue": "仍然导入",
+  "backupPageForwardCompatCancel": "取消",
+  "backupPageSchemaTooNewMessage": "这份备份由更新版本的 JO-AIClient 创建，当前版本无法读取。请先升级 JO-AIClient 后重试。",
+  "messageEditPageSave": "保存",
+  "messageEditPageSaveAndSend": "保存并发送",
+  "userMessageEditSaveOnly": "仅保存",
+  "userMessageEditUnsupportedSnackbar": "该内容不支持编辑",
+  "userMessageEditOverwriteTitle": "提示",
+  "userMessageEditOverwriteContent": "修改将覆盖输入框已有内容，是否覆盖？",
+  "messageMoreSheetCreateBranch": "创建分支",
+  "chatInputBarToolsTooltip": "工具",
+  "modelDetailSheetWebFetchTool": "网页抓取",
+  "modelDetailSheetOpenrouterWebFetchToolDescription": "启用 OpenRouter 网页抓取服务端工具",
+  "modelDetailSheetClaudeWebFetchToolDescription": "允许 Claude 抓取对话中出现的网页与 PDF",
+  "modelDetailSheetClaudeCodeExecutionToolDescription": "允许 Claude 在 Anthropic 沙箱中运行 Python 与 Bash",
+  "modelDetailSheetOpenrouterShellTool": "Shell",
+  "modelDetailSheetOpenrouterShellToolDescription": "在托管的隔离沙箱中运行 Shell 命令",
+  "modelSelectSheetFollowAssistant": "跟随助手",
+  "aboutPageKelivoSearchUnlocked": "有扇没有名字的门开了一条缝。去设置里找找看。",
+  "aboutPageKelivoSearchAlreadyUnlocked": "这扇门你已经推开过了。",
+  "aboutPageQQGroupThree": "Kelivo 三群",
+  "displaySettingsPageForkKeepMessageVersionsTitle": "创建分支时保留消息版本",
+  "displaySettingsPageEditAssistantKeepThinkingToolCardsTitle": "编辑助手时保留思考与工具卡片",
+  "displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle": "关闭后，当前编辑版本只保留助手正文；切回上一版本仍可查看思考与工具卡片",
+  "themeAdvancedSettingsPageTitle": "主题高级设置",
+  "themeAdvancedSettingsPageUseLayeredSurfacesTitle": "新版分层配色（实验）",
+  "themeAdvancedSettingsPageUseLayeredSurfacesSubtitle": "页面更深、卡片更亮，两者都保留主题色相；关闭可恢复旧外观",
+  "themeAdvancedSettingsPageUseLayeredSheetTilesTitle": "弹窗内瓦片分层",
+  "themeAdvancedSettingsPageUseLayeredSheetTilesSubtitle": "默认瓦片与弹窗同色",
+  "searchServiceNameKelivo": "Kelivo",
+  "@autoRetryCountdown": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      },
+      "attempt": {
+        "type": "int"
+      },
+      "maxRetries": {
+        "type": "int"
+      }
+    }
+  },
+  "memorySettingsInjectionMaxItemsOption": "{n}",
+  "@memorySettingsInjectionMaxItemsOption": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "assistantEditMemorySwitchSubtitle": "把已保存的记忆注入对话，并允许此助手写入新记忆",
+  "assistantEditWriteScopeAlwaysGlobalSubtitle": "新记忆对所有助手可见",
+  "assistantEditWriteScopeAlwaysAssistantSubtitle": "新记忆只对本助手可见",
+  "assistantEditWriteScopeToolDefaultGlobalSubtitle": "模型可选择全局或本助手，缺省写入全局",
+  "assistantEditWriteScopeToolDefaultAssistantSubtitle": "模型可选择全局或本助手，缺省写入本助手",
+  "assistantEditDedupeModeBatchedSubtitle": "一次请求判断本轮全部候选。更快更省；条目多时精度较差。",
+  "assistantEditDedupeModePerItemSubtitle": "每条候选单独请求判断。更准确，但会增加处理模型调用。",
+  "migrationStartWithoutBackupButton": "不备份，直接迁移",
+  "migrationSkipChatsJsonOption": "跳过 chats.json",
+  "migrationSkipChatsJsonDescription": "仍会备份原始 Hive、设置和本地文件，超大聊天记录建议选择。",
+  "migrationSkipBackupOption": "跳过本次备份",
+  "migrationSkipBackupDescription": "仅在已有并确认备份可用时选择，之后将立即开始迁移。",
+  "migrationChatsExportDegradedNote": "chats.json 导出因出错而被跳过。备份 ZIP 仍包含原始 Hive 文件，完整聊天记录未丢失。",
+  "localSnapshotKeepSubtitle": "另外各留一份上周和上个月的，万一问题过了很久才发现也还能找回来。",
+  "localSnapshotAnnounceSubtitle": "失败一定会告诉你。这里只是成功时多一句提示。",
+  "localSnapshotStatusUnchanged": "距上次备份数据没有变化",
+  "localSnapshotCopyPinned": "已保留",
+  "localSnapshotBusyMessage": "已有备份任务在进行中",
+  "workspaceFileNotAvailable": "文件不可用",
+  "workspaceTerminalNotAvailable": "终端不可用",
+  "workspacePreviewCopyPath": "复制路径",
+  "workspacePreviewShare": "分享",
+  "workspacePreviewOpenExternally": "用其他应用打开",
+  "workspacePreviewOpenWith": "打开方式…",
+  "workspacePreviewFileTooLarge": "文件过大，无法预览，请用其他应用打开。",
+  "workspacePreviewSource": "源码",
+  "workspacePreviewRendered": "渲染",
+  "workspacePreviewFileName": "名称",
+  "workspacePreviewFileSize": "大小",
+  "workspacePreviewFileModified": "修改时间",
+  "workspacePreviewPathCopied": "已复制路径",
+  "workspacePreviewLineCount": "{count} 行",
+  "workspaceFilesSort": "排序",
+  "workspaceFilesSortName": "名称",
+  "workspaceFilesSortModified": "修改时间",
+  "workspaceFilesSortSize": "大小",
+  "workspaceFilesSortAscending": "升序",
+  "workspaceFilesSortDescending": "降序",
+  "workspaceFilesShowHidden": "显示隐藏文件",
+  "workspaceFilesHideHidden": "隐藏隐藏文件",
+  "workspaceFilesRefresh": "刷新",
+  "workspaceFilesNewFolder": "新建文件夹",
+  "workspaceFilesNewFile": "新建文件",
+  "workspaceFilesImport": "导入",
+  "workspaceFilesExport": "导出",
+  "workspaceFilesExportFolder": "导出当前文件夹",
+  "workspaceFilesEmpty": "此文件夹为空",
+  "workspaceFilesError": "无法加载这些文件",
+  "workspaceFilesRetry": "重试",
+  "workspaceFilesPreview": "预览",
+  "workspaceFilesRename": "重命名",
+  "workspaceFilesMove": "移动",
+  "workspaceFilesDelete": "删除",
+  "workspaceFilesShare": "分享",
+  "workspaceFilesCopyPath": "复制路径",
+  "workspaceFilesExportItem": "导出",
+  "workspaceFilesNameLabel": "名称",
+  "workspaceFilesNameHint": "输入名称",
+  "workspaceFilesCreate": "创建",
+  "workspaceFilesCancel": "取消",
+  "workspaceFilesConfirm": "确认",
+  "workspaceFilesSave": "保存",
+  "workspaceFilesDeleteTitle": "删除此项？",
+  "workspaceFilesDeleteMessage": "删除 {name}？",
+  "workspaceFilesDeleteFolderMessage": "删除文件夹 {name} 及其全部内容？",
+  "workspaceFilesMoveTitle": "移动到文件夹",
+  "workspaceFilesMoveHere": "移动到此处",
+  "workspaceFilesPathCopied": "已复制路径",
+  "workspaceFilesInvalidName": "名称无效",
+  "workspaceFilesInvalidPath": "该路径超出当前文件夹",
+  "workspaceFilesOperationFailed": "操作失败：{error}",
+  "workspaceFilesActions": "操作",
+  "workspaceFilesMore": "更多",
+  "workspaceFilesJustNow": "刚刚",
+  "workspaceFilesMinutesAgo": "{count} 分钟前",
+  "workspaceFilesHoursAgo": "{count} 小时前",
+  "workspaceFilesDaysAgo": "{count} 天前",
+  "workspaceFilesPanelTitle": "对话文件",
+  "workspaceFilesTabAttachments": "附件",
+  "workspaceFilesTabOutputs": "输出",
+  "workspaceFilesTabWorkspace": "工作区",
+  "workspaceFilesNoWorkspaceBound": "尚未绑定工作区",
+  "workspaceFilesKindManaged": "托管",
+  "workspaceFilesKindLinked": "链接",
+  "workspaceFilesMissingWorkspace": "找不到工作区",
+  "workspaceFilesClose": "关闭",
+  "workspacesTitle": "工作区",
+  "workspacesCreate": "创建",
+  "workspacesCreateTitle": "新建工作区",
+  "workspacesNameLabel": "名称",
+  "workspacesNameHint": "工作区名称",
+  "workspacesLinkFolder": "链接文件夹",
+  "workspacesEmpty": "还没有工作区",
+  "workspacesEmptyCta": "创建工作区",
+  "workspacesSettings": "设置",
+  "workspacesOpenFiles": "打开文件",
+  "workspacesLastUsedNever": "从未使用",
+  "workspacesLastUsed": "最近使用 {when}",
+  "workspacesDeleteTitle": "删除此工作区？",
+  "workspacesDeleteMessage": "删除工作区 {name}？",
+  "workspacesDeleteAlsoFiles": "同时删除文件",
+  "workspacesUnlinkTitle": "取消链接此工作区？",
+  "workspacesUnlinkMessage": "取消链接 {name}？磁盘上的文件会保留。",
+  "workspacesSettingsTitle": "工作区设置",
+  "workspacesShellNeedsApproval": "运行终端命令前询问",
+  "workspacesDefaultCwd": "默认工作目录",
+  "workspacesDefaultCwdHint": "相对路径，例如 src",
+  "workspacesDefaultCwdInvalid": "请使用不含 .. 的相对路径",
+  "workspacesCreateManaged": "创建工作区",
+  "workspacesLinkExisting": "链接已有文件夹",
+  "workspacesUnlink": "取消链接",
+  "workspacesItemMore": "工作区操作",
+  "workspaceToolDenied": "已拒绝",
+  "workspaceToolTimeout": "超时",
+  "workspaceToolCancelled": "已取消",
+  "workspaceToolInterrupted": "已中断",
+  "workspaceToolEnvironmentNotReady": "沙箱环境未安装",
+  "workspaceToolInstall": "安装",
+  "workspaceToolFuzzy": "模糊",
+  "workspaceToolCreated": "已创建",
+  "workspaceToolUpdated": "已更新",
+  "workspaceToolTruncated": "已截断",
+  "workspaceToolImageTag": "图片",
+  "workspaceToolAllowAll": "本会话全部允许",
+  "workspaceToolStdout": "stdout",
+  "workspaceToolStderr": "stderr",
+  "workspaceToolOpenFullOutput": "打开完整输出",
+  "workspaceToolChangedFiles": "变更的文件",
+  "workspaceToolCancel": "取消",
+  "workspaceToolCopyCommand": "复制命令",
+  "workspaceToolCopyOutput": "复制输出",
+  "workspaceToolCopyDiff": "复制差异",
+  "workspaceToolCopied": "已复制",
+  "workspaceToolDiffTruncated": "差异已截断",
+  "workspaceToolOpenPreview": "打开预览",
+  "workspaceToolNoOutput": "无输出",
+  "workspaceToolNotAvailable": "不可用",
+  "workspaceToolClose": "关闭",
+  "workspaceToolTitleShell": "运行命令",
+  "workspaceToolTitleReadFile": "读取文件",
+  "workspaceToolTitleWriteFile": "写入文件",
+  "workspaceToolTitleEditFile": "编辑文件",
+  "workspaceToolTitleListDir": "列出目录",
+  "workspaceToolTitleGlob": "Glob",
+  "workspaceToolTitleGrep": "Grep",
+  "workspaceToolCount": "{count}",
+  "workspaceToolMoreFiles": "+{count}",
+  "workspaceToolDurationMs": "{ms}ms",
+  "workspaceToolDurationSec": "{sec}s",
+  "workspaceEnvTitle": "环境",
+  "workspaceEnvEngineUbuntu": "Ubuntu {version} (PRoot)",
+  "workspaceEnvEngineAlpine": "Alpine {version} (iSH)",
+  "workspaceEnvEngineNative": "系统终端",
+  "workspaceEnvPhaseNotInstalled": "未安装",
+  "workspaceEnvPhaseDownloading": "下载中",
+  "workspaceEnvPhaseVerifying": "校验中",
+  "workspaceEnvPhaseExtracting": "解压中",
+  "workspaceEnvPhasePatching": "配置中",
+  "workspaceEnvPhaseReady": "就绪",
+  "workspaceEnvPhaseError": "错误",
+  "workspaceEnvPhaseNeedsRestart": "需要重启",
+  "workspaceEnvMetaLine": "{version} · {arch}",
+  "workspaceEnvInstalledAt": "安装于 {date}",
+  "workspaceEnvDiskUsage": "占用空间 {size}",
+  "workspaceEnvRuntimeReason": "{reason}",
+  "workspaceEnvInstall": "安装",
+  "workspaceEnvInstallSubtitleAndroid": "可选择 Ubuntu、Alpine、Debian，也可导入本地 rootfs 镜像。",
+  "workspaceEnvInstallSubtitleIos": "已内置，无需下载",
+  "workspaceEnvCancel": "取消",
+  "workspaceEnvRetry": "重试",
+  "workspaceEnvRepair": "修复",
+  "workspaceEnvReset": "重置",
+  "workspaceEnvResetConfirmTitle": "重置环境？",
+  "workspaceEnvResetConfirmBody": "这将删除已安装的软件包和沙箱文件系统。",
+  "workspaceEnvCheckForUpdate": "检查更新",
+  "workspaceEnvUpdate": "更新",
+  "workspaceEnvAvailableVersion": "新版本 {version} 可用",
+  "workspaceEnvUpToDate": "已是最新",
+  "workspaceEnvRestartBanner": "请重启 JO-AIClient 以完成安装",
+  "workspaceEnvDetectingMirrors": "正在检测最快镜像…",
+  "workspaceEnvApplyingMirror": "正在应用 {category} 镜像…",
+  "@workspaceEnvApplyingMirror": {
+    "placeholders": {
+      "category": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceEnvMirrorsSection": "镜像",
+  "workspaceEnvUseMirror": "使用镜像",
+  "workspaceEnvDetect": "测速",
+  "workspaceEnvOfficial": "官方",
+  "workspaceEnvMirrorsDisabled": "镜像设置在沙箱中执行，就绪后才能更改。",
+  "workspaceEnvMirrorsDisabledReason": "镜像设置在沙箱中执行，当前不可用：{reason}",
+  "workspaceEnvMirrorDetectTitle": "镜像测速",
+  "workspaceEnvMirrorLatency": "{ms} ms",
+  "workspaceEnvMirrorFailed": "{reason}",
+  "workspaceEnvErrorUnsupportedAbi": "当前设备架构不受支持。",
+  "workspaceEnvErrorArchitectureMismatch": "已安装的沙盒架构与当前应用不匹配，请重新安装沙盒后使用。原沙盒文件已保留。",
+  "workspaceEnvErrorProotMissing": "缺少 PRoot 可执行文件。",
+  "workspaceEnvErrorInsufficientDisk": "存储空间不足，无法安装沙箱。",
+  "workspaceEnvErrorInsufficientDiskHint": "请为所选镜像释放更多存储空间后重试。",
+  "workspaceEnvErrorNetwork": "下载失败，请检查网络后重试。",
+  "workspaceEnvErrorChecksumMismatch": "下载文件已损坏，请重试。",
+  "workspaceEnvErrorExtractFailed": "无法解压沙箱镜像。",
+  "workspaceEnvErrorPatchFailed": "无法完成沙箱配置。",
+  "workspaceEnvErrorCancelled": "安装已取消。",
+  "workspaceEnvErrorGeneric": "安装沙箱时出错。",
+  "workspaceEnvChipInstall": "安装沙箱",
+  "workspaceEnvChipInstalling": "正在安装… {percent} %",
+  "workspaceEnvChipInstallingIndeterminate": "正在安装…",
+  "workspaceEnvChipError": "沙箱错误",
+  "workspaceEnvChipRestart": "需要重启",
+  "workspaceEnvNativeExplanation": "在桌面端，JO-AIClient 使用系统终端，而不是 Linux 沙箱。",
+  "workspaceEnvNativeShellPath": "终端：{path}",
+  "workspaceEnvNativeShellApproval": "除非此会话允许全部工具，否则 shell 工具需要批准。",
+  "workspaceEnvDownloadProgress": "{downloaded} / {total} MB ({percent}%)",
+  "workspaceEnvMirrorsFailed": "无法检测镜像",
+  "workspaceEnvCategoryApt": "APT",
+  "workspaceEnvCategoryApk": "APK",
+  "workspaceEnvCategoryPip": "pip",
+  "workspaceEnvCategoryNpm": "npm",
+  "skillsTitle": "技能",
+  "skillsTab": "技能",
+  "skillsSearchHint": "搜索技能",
+  "skillsEmptyTitle": "还没有技能",
+  "skillsEmptyBody": "技能是包含 SKILL.md 的文件夹。可粘贴 Markdown、导入 .md/.zip，或从 GitHub 安装。",
+  "skillsEmptyFormat": "---\nname: my-skill\ndescription: 这个技能做什么\n---\n\n# 说明",
+  "skillsImport": "导入",
+  "skillsImportPaste": "粘贴 Markdown",
+  "skillsImportFile": "从文件",
+  "skillsImportGitHub": "从 GitHub",
+  "skillsImportPasteLabel": "SKILL.md",
+  "skillsImportPasteHint": "粘贴带 YAML 前置元数据的 SKILL.md",
+  "skillsImportGitHubLabel": "GitHub 链接",
+  "skillsImportGitHubHint": "github.com/owner/repo 或 github.com/owner/repo/tree/ref/path",
+  "skillsImportConfirm": "导入",
+  "skillsCancel": "取消",
+  "skillsSave": "保存",
+  "skillsUsedCount": "已使用 {count} 次",
+  "skillsEnabled": "启用",
+  "skillsBrowseFiles": "浏览文件",
+  "skillsEdit": "编辑",
+  "skillsExport": "导出",
+  "skillsDelete": "删除",
+  "skillsDeleteTitle": "删除此技能？",
+  "skillsDeleteMessage": "删除 {name}？此操作无法撤销。",
+  "skillsUseAll": "使用全部技能",
+  "skillsUseAllSubtitle": "此助手可以使用所有已启用的技能。",
+  "skillsDisabledHint": "请先在技能页启用此技能。",
+  "skillsOpenPage": "管理技能",
+  "skillsInheritAssistant": "跟随助手",
+  "skillsInheritAssistantSubtitle": "使用与此对话助手相同的技能。",
+  "skillsActiveLabel": "生效中",
+  "skillsSessionTitle": "此对话的技能",
+  "skillsEditTitle": "编辑技能",
+  "skillsDetailKindLabel": "Skill",
+  "skillsNoEnabled": "没有已启用的技能",
+  "terminalTitle": "终端",
+  "terminalOpenInSystem": "在系统终端中打开",
+  "terminalHostDirectory": "主机目录",
+  "terminalBindWorkspaceFirst": "请先绑定工作区",
+  "terminalNotAvailable": "不可用",
+  "terminalRuntimeUnavailable": "终端环境尚未就绪",
+  "terminalRename": "重命名",
+  "terminalClose": "关闭",
+  "terminalClear": "清屏",
+  "terminalCloseSession": "关闭会话",
+  "terminalCopy": "复制",
+  "terminalPaste": "粘贴",
+  "terminalNewSession": "新建会话",
+  "terminalMore": "更多",
+  "terminalNameLabel": "名称",
+  "terminalCancel": "取消",
+  "terminalSave": "保存",
+  "workspaceDeskMenuWorkspace": "工作区",
+  "workspaceDeskMenuSkills": "技能",
+  "workspaceDeskBarTitle": "工作区",
+  "workspaceDeskBarNoWorkspace": "无工作区",
+  "workspaceDeskBarEmptyHint": "从工具栏绑定工作区后即可在此浏览文件",
+  "workspaceDeskBarToggle": "工作区文件",
+  "workspaceDeskOpenSystemTerminal": "在系统终端中打开",
+  "workspaceDeskReveal": "在文件管理器中显示",
+  "workspaceDeskBarClose": "关闭工作区栏",
+  "workspaceEntryBind": "绑定工作区",
+  "workspaceEntryUnbind": "解除绑定",
+  "workspaceEntryChange": "更换",
+  "workspaceEntryLocked": "已锁定",
+  "workspaceEntryChangeConfirmTitle": "更换工作区？",
+  "workspaceEntryUnbindConfirmTitle": "解除绑定？",
+  "workspaceEntryChangeConfirmBody": "此对话已使用过工作区工具，之前消息中的文件链接可能不再可用。",
+  "workspaceEntryCwd": "工作目录",
+  "workspaceEntryCwdHint": "相对于工作区根目录",
+  "workspaceEntryCwdInvalid": "路径无效或已超出工作区",
+  "workspaceEntryCwdMissing": "该目录不存在",
+  "workspaceEntryCwdCreate": "创建它",
+  "workspaceEntryFiles": "文件",
+  "workspaceEntryTerminal": "终端",
+  "workspaceEntryOpenSystemTerminal": "在系统终端中打开",
+  "workspaceEntryReveal": "在文件管理器中显示",
+  "workspaceEntrySessionSkills": "技能",
+  "workspaceEntryAllowAll": "本会话全部允许",
+  "workspaceEntryAllowAllSubtitle": "此对话中的 Shell 命令将不再需要批准。",
+  "workspaceEntryEnvironment": "环境",
+  "workspaceEntryManage": "管理工作区",
+  "workspaceEntryCreate": "新建工作区…",
+  "workspaceEntryDefaultWorkspace": "默认工作区",
+  "workspaceEntryDefaultWorkspaceSubtitle": "使用此助手的新对话将绑定到该工作区。",
+  "workspaceEntryNone": "无",
+  "workspaceEntryStartConversationFirst": "请先开始对话",
+  "workspaceEntryTooltip": "工作区",
+  "workspaceEntryPickerTitle": "选择工作区",
+  "settingsPageWorkspace": "工作区与环境",
+  "settingsPageSkills": "技能",
+  "commonClose": "关闭",
+  "terminalCopyAllOutput": "复制全部输出",
+  "terminalFontDecrease": "字号 −",
+  "terminalFontIncrease": "字号 +",
+  "terminalCloseSessionConfirmMessage": "会话仍在运行。关闭将结束该进程。",
+  "terminalCopiedAll": "已复制全部输出",
+  "terminalConfirm": "确认",
+  "terminalExitCode": "exit {code}",
+  "@terminalExitCode": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceMgmtNewWorkspace": "新建工作区",
+  "workspaceMgmtEmptyHint": "新建一个工作区来存放项目文件和工作目录。",
+  "workspaceMgmtKindManagedTitle": "托管工作区",
+  "workspaceMgmtKindManagedSubtitle": "应用内目录，沙盒可读写",
+  "workspaceMgmtKindLinkedTitle": "链接文件夹",
+  "workspaceMgmtKindLinkedSubtitle": "直接使用本机文件夹",
+  "workspaceMgmtImportFromFolder": "从文件夹导入",
+  "workspaceMgmtImportFromFolderSubtitle": "将文件夹复制到新的托管工作区",
+  "workspaceMgmtKindSection": "类型",
+  "workspaceMgmtCreate": "创建",
+  "workspaceMgmtShellApprovalSubtitle": "每次运行命令前询问",
+  "workspaceMgmtDefaultCwdRoot": "/",
+  "workspaceMgmtPickCwdTitle": "默认工作目录",
+  "workspaceMgmtFolderPickerUnavailable": "此设备不支持选择文件夹。",
+  "workspaceMgmtImportProgressTitle": "正在导入文件夹",
+  "workspaceMgmtImportProgressPhase": "正在复制文件…",
+  "workspaceMgmtImportFailed": "无法导入该文件夹。",
+  "workspaceMgmtImportDone": "已导入 {name}",
+  "@workspaceMgmtImportDone": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceMgmtLastUsedJustNow": "刚刚",
+  "workspaceMgmtLastUsedMinutesAgo": "{n} 分钟前",
+  "@workspaceMgmtLastUsedMinutesAgo": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceMgmtLastUsedHoursAgo": "{n} 小时前",
+  "@workspaceMgmtLastUsedHoursAgo": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceMgmtLastUsedDaysAgo": "{n} 天前",
+  "@workspaceMgmtLastUsedDaysAgo": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceMgmtRowDetail": "{kind} · 上次使用 {when}",
+  "@workspaceMgmtRowDetail": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      },
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceMgmtRowDetailNever": "{kind} · 从未使用",
+  "@workspaceMgmtRowDetailNever": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      }
+    }
+  },
+  "workspacePreviewBack": "返回",
+  "workspacePreviewWrap": "自动换行",
+  "workspacePreviewFontDecrease": "减小字号",
+  "workspacePreviewFontIncrease": "增大字号",
+  "workspacePreviewCopy": "复制",
+  "workspacePreviewRetry": "重试",
+  "workspacePreviewLoadError": "无法加载此文件。",
+  "workspacePreviewRevealInFinder": "在 Finder 中显示",
+  "workspacePreviewOpenInSystemApp": "用系统应用打开",
+  "workspacePreviewOpenInBrowser": "在浏览器中打开",
+  "workspacePreviewTable": "表格",
+  "workspacePreviewPlainLanguage": "代码",
+  "workspacePreviewOpen": "打开",
+  "workspacePreviewRevealFailed": "无法在文件管理器中显示此文件。",
+  "workspacePreviewEmptyTable": "此表格为空。",
+  "workspaceFilesNew": "新建",
+  "workspaceFilesFoldersFirst": "文件夹优先",
+  "workspaceFilesSelectDirectory": "选择此目录",
+  "workspaceFilesEmptyHint": "用「新建」或「导入」添加文件",
+  "workspaceFilesEmptyAttachments": "还没有附件",
+  "workspaceFilesEmptyOutputs": "助手还没有产出文件",
+  "workspaceFilesMoveTo": "移动到…",
+  "workspaceFilesItemCount": "{count} 项",
+  "@workspaceFilesItemCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "skillsImportTooltip": "导入技能",
+  "skillsImportPasteSubtitle": "粘贴带 frontmatter 的 SKILL.md",
+  "skillsImportFileSubtitle": "选择 .md 或 .zip 文件",
+  "skillsImportGitHubSubtitle": "从仓库导入 SKILL.md",
+  "skillsImportResolving": "正在解析仓库…",
+  "skillsImportDownloading": "正在下载…",
+  "skillsImportExtracting": "正在解压…",
+  "skillsImportInstalling": "正在安装…",
+  "skillsImportGitHubRepoLabel": "仓库地址",
+  "skillsImportGitHubHelp": "支持仓库根目录或子目录下的 SKILL.md",
+  "skillsImportGitHubUrlHint": "https://github.com/owner/repo 或 owner/repo[/path]",
+  "skillsEmptyHint": "技能是带 frontmatter 的 SKILL.md，导入后助手可按需调用",
+  "skillsMoreActions": "更多",
+  "skillsSearchClear": "清除",
+  "skillsSessionEmpty": "还没有已启用的技能，请先在技能库中启用",
+  "workspaceToolRunning": "运行中",
+  "workspaceToolExitCode": "exit {code}",
+  "@workspaceToolExitCode": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceToolAwaitingApproval": "等待批准",
+  "workspaceToolCompleted": "完成",
+  "workspaceToolLines": "{count} 行",
+  "@workspaceToolLines": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceToolItems": "{count} 项",
+  "@workspaceToolItems": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceToolFileMatches": "{count} 个匹配",
+  "@workspaceToolFileMatches": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceToolContentMatches": "{count} 处匹配",
+  "@workspaceToolContentMatches": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceToolExpand": "展开",
+  "workspaceToolSectionCommand": "命令",
+  "workspaceToolSectionPath": "路径",
+  "workspaceToolSectionPattern": "模式",
+  "workspaceToolSectionOutput": "输出",
+  "workspaceToolSectionDiff": "差异",
+  "workspaceToolSectionError": "错误",
+  "workspaceToolSavedOutput": "已保存完整输出",
+  "workspaceToolApprove": "允许",
+  "workspaceToolDeny": "拒绝",
+  "workspaceToolCopy": "复制",
+  "workspaceEnvEngineLocalShell": "本机 Shell",
+  "workspaceEnvInstallEnvironment": "安装环境",
+  "workspaceEnvInstallDescription": "安装 Linux 环境，以便在沙盒中运行工具。",
+  "workspaceEnvStatusLabel": "状态",
+  "workspaceEnvStatusInstalled": "已安装",
+  "workspaceEnvSizeLabel": "大小",
+  "workspaceEnvPathLabel": "路径",
+  "workspaceEnvInstalledAtLabel": "安装于",
+  "workspaceEnvArchLabel": "架构",
+  "workspaceEnvArchVersion": "{arch} · {version}",
+  "workspaceEnvBrowseSection": "浏览",
+  "workspaceEnvBrowseFiles": "浏览文件系统",
+  "workspaceEnvBrowseFilesDetail": "查看沙盒中的完整目录",
+  "workspaceEnvDetectFastMirrors": "检测快速镜像",
+  "workspaceEnvActionsSection": "操作",
+  "workspaceEnvInfoSection": "信息",
+  "workspaceEnvInfoBody": "环境是沙盒使用的 Linux 根文件系统。工作区单独存放，重置环境不会删除工作区文件。数据保存在本机已解压的 rootfs 中。",
+  "workspaceEnvRepairDetail": "重新校验并修补文件",
+  "workspaceEnvUpdateCurrent": "已是最新",
+  "workspaceEnvUpdateAvailableShort": "可更新到 {version}",
+  "workspaceEnvResetConfirmMessage": "这将删除整个 Linux 环境及其中安装的软件包。工作区文件不受影响。",
+  "workspaceEnvRestartDoneBanner": "重置已完成，请重启应用以完成安装。",
+  "workspaceEnvPathCopied": "已复制路径",
+  "workspaceEnvUseMirrorSubtitle": "将所选镜像写入沙盒",
+  "workspaceEnvRegionGlobal": "全球",
+  "workspaceEnvRegionChina": "中国",
+  "workspaceEnvRegionEurope": "欧洲",
+  "workspaceEnvRegionAsia": "亚洲",
+  "workspaceEnvMirrorTimeout": "超时",
+  "workspaceEnvSpeedTest": "测速",
+  "workspaceEnvApplySuccess": "镜像已应用",
+  "workspaceEnvApplyFailed": "无法应用镜像",
+  "workspaceEnvRestoreSuccess": "已恢复官方源",
+  "workspaceEnvMirrorsTested": "已应用最快镜像",
+  "workspaceEnvRelativeJustNow": "刚刚",
+  "workspaceEnvRelativeMinutesAgo": "{count} 分钟前",
+  "workspaceEnvRelativeHoursAgo": "{count} 小时前",
+  "workspaceEnvRelativeDaysAgo": "{count} 天前",
+  "workspaceEnvDownloadLine": "{downloaded} / {total} · {phase}",
+  "workspaceEnvNativeUnsandboxed": "命令在本机直接运行（无沙盒），除非允许本会话全部工具，否则需要批准。",
+  "workspaceEnvRootfsTitle": "/",
+  "workspaceEnvBrowserUnavailable": "沙盒文件系统不可用。",
+  "workspaceEnvMirrorNameOfficial": "官方",
+  "workspaceEnvMirrorNameOfficialCdn": "官方 CDN",
+  "workspaceEnvMirrorNameOfficialPypi": "官方 PyPI",
+  "workspaceEnvMirrorNameOfficialNpm": "官方 npm",
+  "workspaceEnvMirrorNameTuna": "清华 TUNA",
+  "workspaceEnvMirrorNameAlibaba": "阿里云",
+  "workspaceEnvMirrorNameUstc": "中科大 USTC",
+  "workspaceEnvMirrorNameHuawei": "华为云",
+  "workspaceEnvMirrorNameTencent": "腾讯云",
+  "workspaceEnvMirrorNameNetease": "网易",
+  "workspaceEnvMirrorNameLeaseweb": "LEASEWEB UK",
+  "workspaceEnvMirrorNameRwth": "RWTH Germany",
+  "workspaceEnvMirrorNameJaist": "JAIST Japan",
+  "workspaceEnvMirrorNameKakao": "Kakao Korea",
+  "workspaceEnvMirrorNameNpmmirror": "npmmirror",
+  "workspaceEnvSelectionNamed": "{name} · {region}",
+  "workspaceFilesEmptyPickerHint": "点「新建文件夹」添加子文件夹",
+  "skillsDetailBodyEmpty": "还没有技能正文",
+  "workspaceEnvSizeTimeout": "计算超时",
+  "workspaceEnvInfoCopied": "已复制环境信息",
+  "workspacePreviewEmptyFile": "文件为空",
+  "workspacePreviewEmptyHint": "此文件没有任何可预览的内容。",
+  "workspacePreviewRevealInExplorer": "在文件资源管理器中显示",
+  "workspacePreviewRevealInFileManager": "在文件管理器中显示",
+  "workspaceBindingSetAssistantDefault": "已设为「{assistant}」的默认工作区",
+  "workspaceUnbindHint": "已解绑本对话；助手默认工作区可在助手设置中修改",
+  "storageSpaceCategoryWorkspaceFiles": "工作区文件",
+  "storageSpaceCategoryWorkspaceFilesHint": "托管工作区中保存的文件。",
+  "storageSpaceCategorySandboxEnvironment": "沙箱环境",
+  "storageSpaceCategorySandboxEnvironmentHint": "沙箱安装目录与根文件系统。",
+  "storageSpaceCategorySkills": "技能",
+  "storageSpaceCategorySkillsHint": "已安装的技能文件。",
+  "storageSpaceCategorySessionFiles": "会话文件",
+  "storageSpaceCategorySessionFilesHint": "各对话的附件与输出。",
+  "storageSpaceManageSkills": "管理技能",
+  "storageSessionFilesCleanOrphans": "清理无对话的会话文件",
+  "storageSessionFilesCleanOrphansHint": "删除已无对应对话的会话目录。可回收 {size}。",
+  "workspaceDesktopFolderPath": "文件夹路径",
+  "workspaceDesktopFolderMissing": "请选择已存在的文件夹，或输入它的绝对路径。",
+  "workspaceDesktopManagedHint": "由 JO-AIClient 为此项目创建并管理文件夹。",
+  "workspaceDesktopHostHint": "在本机访问文件和执行命令。",
+  "workspaceDesktopSearch": "搜索工作区",
+  "workspaceDesktopNoResults": "没有匹配的工作区",
+  "workspaceEnvDependencies": "环境预设",
+  "workspaceEnvDependenciesDetail": "安装到共享沙盒，所有工作区均可使用。",
+  "workspaceEnvDependencyPython": "Python、pip 和虚拟环境",
+  "workspaceEnvDependencyNode": "Node.js 和 npm",
+  "workspaceEnvDependencyGit": "克隆仓库与版本管理",
+  "workspaceEnvDependencySsh": "SSH、SCP、SFTP 与密钥生成",
+  "workspaceEnvDependencyNetwork": "网络工具",
+  "workspaceEnvDependencyArchive": "压缩工具",
+  "workspaceEnvDependencyInstalled": "已安装",
+  "workspaceEnvDependencyUnknown": "未检测",
+  "workspaceEnvDependencyChecking": "正在检测工具…",
+  "workspaceEnvDependencyInstalling": "正在安装…",
+  "workspaceEnvDependencyCheckFailed": "未能检测工具，请刷新重试。",
+  "workspaceEnvDependencyInstallFailed": "安装未完成，请查看日志或更换软件包源后重试。",
+  "workspaceEnvDependencyLog": "安装日志",
+  "workspaceEnvDependencyRefresh": "刷新工具状态",
+  "workspaceEnvDependencyReadyFirst": "请先安装沙盒环境，再安装这些工具。",
+  "workspaceEnvDependencySources": "软件包源",
+  "workspaceEnvDependencySourcesDetail": "预设使用所选 apt/apk 源安装；pip 和 npm 源用于后续安装的软件包。",
+  "workspaceEnvDownloadSource": "沙盒下载源",
+  "workspaceEnvDownloadAutomatic": "自动选择最快源",
+  "workspaceEnvDownloadAutomaticDetail": "下载前检测官方源和内置镜像的速度。",
+  "workspaceEnvDownloadCustom": "自定义链接",
+  "workspaceEnvDownloadCustomHint": "https://example.com/ubuntu-base/releases/24.04/release/",
+  "workspaceEnvDownloadCustomDetail": "填写镜像目录或完整下载链接，镜像需匹配所选系统、版本及设备架构。",
+  "workspaceEnvDownloadInvalidUrl": "请输入有效的 HTTP 或 HTTPS 链接。",
+  "workspaceEnvDownloadVerified": "下载后会校验所选镜像的官方 SHA-256。软件包源可单独配置。",
+  "workspaceEnvDownloadStart": "下载并安装",
+  "workspaceEnvDownloadSave": "保存下载源",
+  "workspaceToolsTitle": "工具",
+  "workspaceToolsDescription": "选择此工作区的对话可以使用哪些工具，修改后自动保存。",
+  "workspaceToolHelpShell": "在工作区环境中执行命令。",
+  "workspaceToolHelpRead": "按行读取文件内容，支持分页。",
+  "workspaceToolHelpWrite": "创建文件或覆盖文件内容。",
+  "workspaceToolHelpEdit": "替换已有文件中的指定文本。",
+  "workspaceToolHelpList": "浏览目录及其中的文件。",
+  "workspaceToolHelpGlob": "按文件名或路径模式查找文件。",
+  "workspaceToolHelpGrep": "搜索文件中的文本内容。",
+  "workspaceEnvVariablesTitle": "环境变量",
+  "workspaceEnvVariablesEntryDetail": "管理命令使用的变量与输出隐私",
+  "workspaceEnvVariablesEmpty": "还没有环境变量。可以添加工具需要的 API 密钥等配置。",
+  "workspaceEnvVariablesScope": "所有工作区共用。修改会用于新的 Agent 命令和应用内终端会话，已有终端需重新打开。外部系统终端使用其自身的环境变量。",
+  "workspaceEnvPrivacyMode": "隐私模式",
+  "workspaceEnvPrivacyDetail": "命令仍能使用真实值。工作区工具输出发给模型前，匹配到的至少 5 个字符的变量值会替换为 [REDACTED]，本地日志保留原文。较短的值不做遮蔽，以免误替换常见开关和数字。",
+  "workspaceEnvVariableAdd": "添加变量",
+  "workspaceEnvVariableEdit": "编辑变量",
+  "workspaceEnvVariableName": "名称",
+  "workspaceEnvVariableValue": "值",
+  "workspaceEnvVariableNote": "备注（可选）",
+  "workspaceEnvVariableNameHint": "名称使用字母、数字和下划线，不能以数字开头，区分大小写。命令中可通过 $NAME 使用变量。",
+  "workspaceEnvVariableInvalidName": "请输入有效的变量名称。",
+  "workspaceEnvVariableInvalidValue": "值不能为空，也不能包含空字符（NUL）。",
+  "workspaceEnvVariableDuplicate": "已存在同名变量。",
+  "workspaceEnvVariablesSaveFailed": "环境设置保存失败，请重试。",
+  "incomingShareTitle": "接收分享",
+  "incomingShareReplaceDraft": "输入框中有尚未发送的内容。是否替换为分享的内容，并开始新对话？",
+  "incomingShareFailed": "部分分享内容未能导入，请检查文件访问权限和可用存储空间。一次最多分享 32 个文件。",
+  "incomingShareImporting": "正在导入",
+  "incomingShareMoveTo": "移动到…",
+  "incomingShareNewChat": "新对话",
+  "incomingShareMoveHint": "将草稿和附件移到其他对话，内容不会自动发送。",
+  "incomingShareNoConversations": "没有匹配的对话",
+  "chatInputBarRemoveAttachment": "移除附件",
+  "incomingShareMoveFailed": "无法切换对话，草稿已保留。",
+  "attachmentRequiresWorkspace": "「{name}」无法在普通对话中直接读取。请绑定工作区并启用文件工具，或将草稿移到已有工作区的对话。",
+  "storageSessionFilesUnlinked": "未关联的会话",
+  "workspaceExternalMount": "挂载外部文件夹",
+  "workspaceExternalMountSubtitle": "所选文件夹挂载到 /mounts/<name>，供各工作区的 AI 工具、Shell 和文件浏览器访问。最多挂载 10 个文件夹。",
+  "workspaceExternalStorageTitle": "允许访问文件",
+  "workspaceExternalStorageMessage": "工作区和 Shell 需要直接读写外部文件夹，请在 Android 系统设置中允许 JO-AIClient 访问文件。Android 11 及以上需开启“所有文件访问权限”，然后选择要挂载的本地文件夹。",
+  "workspaceExternalGrantAccess": "前往授权",
+  "workspaceExternalLocalOnly": "Android 仅支持挂载本地文件夹，此文件提供方没有可供 Shell 访问的本地目录。",
+  "workspaceExternalUnavailable": "外部文件夹不可用。请检查存储连接和访问权限，重新选择文件夹以恢复访问。",
+  "workspaceExternalReconnect": "重新选择文件夹",
+  "workspaceMountAdd": "添加文件夹",
+  "workspaceMountEdit": "编辑挂载",
+  "workspaceMountEmpty": "尚未挂载文件夹",
+  "workspaceMountReadOnly": "只读",
+  "workspaceMountReadWrite": "读写",
+  "workspaceMountAllowWrite": "允许写入",
+  "workspaceMountPermissionsHint": "关闭后，AI 文件工具和文件浏览器会拒绝修改此文件夹。Shell 会检查部分常用文件命令，但任意脚本不保证受限。保存挂载变更时会停止正在运行的命令和终端会话。",
+  "workspaceMountBrowse": "浏览文件",
+  "workspaceMountUnmount": "卸载",
+  "workspaceMountUnmountMessage": "卸载此挂载？原文件夹及其中的文件会保留。",
+  "workspaceMountInactive": "不可用，请重新选择文件夹",
+  "workspaceMountInvalidName": "名称最多 64 个字符，不能包含斜杠、冒号或控制字符，也不能为 . 或 ..。",
+  "workspaceMountDuplicate": "已存在同名挂载。",
+  "workspaceMountLimit": "最多挂载 10 个文件夹，请先卸载一个挂载。",
+  "workspaceMountOverlap": "此文件夹与已有挂载相同或互相包含。请选择其他文件夹，以避免权限冲突。",
+  "workspaceMountTargetOccupied": "/mounts 下的同名位置已有本地文件。请更换挂载名称，或先移走这些文件。原有文件未被删除。",
+  "workspaceEnvSystemImage": "系统镜像",
+  "workspaceEnvDistribution": "发行版",
+  "workspaceEnvSystemVersion": "版本",
+  "workspaceEnvLocalImage": "本地镜像",
+  "workspaceEnvChooseImage": "选择 rootfs 镜像文件",
+  "workspaceEnvLocalImageHint": "支持根文件系统压缩包（.tar.gz、.tar.xz、.tar），不支持 ISO 或磁盘镜像。镜像需匹配设备 CPU 架构并包含 /bin/sh，解压后自动识别系统和版本。",
+  "workspaceEnvImportImage": "导入镜像",
+  "workspaceEnvInvalidImage": "请选择适用于此设备的 rootfs 镜像，需包含可执行的 /bin/sh，且 CPU 架构匹配。",
+  "workspaceEnvReplaceSystem": "更换系统",
+  "workspaceEnvReplaceSystemHint": "更换会替换当前环境内的软件包和文件，并停止运行中的命令与终端会话。工作区、聊天文件和外部文件夹会保留。新镜像准备失败时保留原有环境。",
+  "workspaceEnvProotOptions": "PRoot 配置",
+  "workspaceEnvShellPath": "Shell 路径",
+  "workspaceEnvShellAutomatic": "自动选择",
+  "workspaceEnvShellHint": "留空时优先使用 /bin/bash，否则使用 /bin/sh。自定义 Shell 需填写环境内的绝对路径。",
+  "workspaceEnvProotArguments": "额外 PRoot 参数",
+  "workspaceEnvProotArgumentsHint": "每行填写一个参数，无需 Shell 引号。例如将 -k 和 5.10.0 分别放在两行，或使用 --kernel-release=5.10.0。配置对之后启动的命令和终端会话生效。",
+  "workspaceEnvProotInvalid": "请填写有效的 Shell 绝对路径，并将 PRoot 参数逐行填写。",
+  "workspaceFileMissing": "文件已不存在",
+  "workspaceFilePreviewUnavailable": "无法预览",
+  "workspaceToolRelatedFiles": "相关文件",
+  "workspaceToolFilesTruncated": "仅列出部分文件。",
+  "displaySettingsPageShowProducedFilesTitle": "显示回复底部文件卡片",
+  "displaySettingsPageShowProducedFilesSubtitle": "在回复底部显示工具创建或修改的文件。",
+  "googleFontsTitle": "Google Fonts",
+  "googleFontsRefresh": "刷新字体列表",
+  "googleFontsSearchHint": "搜索字体或语言",
+  "googleFontsHint": "下载常规字重字体后预览并应用，已安装字体可离线使用。目录来自 Expo Google Fonts，字体从 Google Fonts 下载。",
+  "googleFontsNoResults": "没有匹配的字体",
+  "googleFontsFailed": "无法加载、下载或应用字体，请检查网络后重试。",
+  "googleFontsDownloading": "正在下载字体…",
+  "googleFontsPreview": "字体预览：你好，世界！Hello world 0123456789",
+  "googleFontsLicense": "字体许可证",
+  "backgroundSettingsTitle": "后台任务",
+  "backgroundTaskTitle": "JO-AIClient 任务",
+  "backgroundCompleted": "生成完成",
+  "backgroundFailed": "生成失败，请打开会话查看详情。",
+  "backgroundCancelled": "生成已取消",
+  "backgroundInterrupted": "后台生成已中断，请打开会话继续。",
+  "backgroundRequesting": "正在请求",
+  "backgroundGenerating": "正在生成回复",
+  "backgroundThinking": "正在思考",
+  "backgroundToolRunning": "正在执行工具",
+  "backgroundRetrying": "等待重试",
+  "backgroundWorking": "正在处理",
+  "backgroundTasks": "任务",
+  "backgroundStopTasks": "停止任务",
+  "backgroundOpenChat": "打开会话",
+  "backgroundAndroidEnabled": "后台生成",
+  "backgroundAndroidEnabledDetail": "在锁屏、切到后台或划掉最近任务后继续当前生成。任务运行期间会显示系统常驻通知。",
+  "backgroundIosEnabled": "增强后台运行",
+  "backgroundIosEnabledDetail": "为当前任务申请后台执行时间。可另外开启定位或静音音频辅助保活。",
+  "backgroundNotifications": "任务通知",
+  "backgroundNotificationsDetail": "在当前查看的会话之外完成或失败时通知。此开关不控制 Android 必需的常驻通知。",
+  "backgroundPrivacy": "任务状态隐私",
+  "backgroundPrivacyDetail": "在通知和实时状态中隐藏会话标题及工具详情，仅显示通用状态、任务数量和耗时。",
+  "backgroundLiveActivities": "实时活动",
+  "backgroundLiveActivitiesDetail": "在锁屏和灵动岛显示当前任务，是否可用及展示位置由系统决定。",
+  "backgroundOverlay": "任务悬浮窗",
+  "backgroundOverlayDetail": "在其他应用上显示可拖动的任务悬浮窗。点击进入会话；关闭按钮仅隐藏悬浮窗。",
+  "backgroundLiveUpdates": "实时通知 / 灵动岛",
+  "backgroundLiveUpdatesDetail": "在支持的设备上使用 Android 16 实时通知。系统成功展示实时通知时优先于悬浮窗。",
+  "backgroundLocation": "定位辅助保活",
+  "backgroundLocationDetail": "在后台任务期间使用低精度定位辅助运行，不保存坐标或发送给 AI 服务。需要开启增强后台运行并授权定位。",
+  "backgroundSilentAudio": "静音音频保活",
+  "backgroundSilentAudioDetail": "后台任务运行时播放静音音频，并让位于录音和朗读。需要开启增强后台运行，无需麦克风权限。",
+  "backgroundSpeech": "后台朗读",
+  "backgroundSpeechDetail": "锁屏或切到后台时继续系统及网络朗读。关闭时，切到后台会暂停朗读。",
+  "backgroundFinishVisibility": "完成状态保留时间",
+  "backgroundFinishImmediately": "立即收起",
+  "backgroundFinishOneMinute": "1 分钟",
+  "backgroundFinishFiveMinutes": "5 分钟",
+  "backgroundFinishUntilForeground": "回到应用时收起",
+  "backgroundFinishVisibilityDetail": "用于 Android 悬浮窗和 iOS 锁屏完成卡片。回到应用时清理完成状态，最长保留 15 分钟；取消任务立即收起。",
+  "backgroundOverlayIcon": "悬浮窗图标",
+  "backgroundIconDefault": "JO-AIClient 图标",
+  "backgroundIconImage": "选择图片",
+  "backgroundIconEmoji": "选择 Emoji",
+  "backgroundPermissionsTitle": "权限与系统设置",
+  "backgroundNotificationsPermission": "通知权限",
+  "backgroundBatteryOptimization": "电池优化",
+  "backgroundBatteryOptimizationDetail": "允许不受限制地使用电池可改善后台运行。",
+  "backgroundAutostart": "自启动与后台运行",
+  "backgroundAutostartDetail": "请手动检查设备的自启动和后台限制。Android 无法可靠查询这些厂商设置的授权状态。",
+  "backgroundLocationPermission": "定位权限",
+  "backgroundLocationAlways": "允许持续后台定位",
+  "backgroundLocationAlwaysDetail": "可进一步授予“始终允许”定位权限，仅在点击此入口时申请。",
+  "backgroundSystemSettings": "应用系统设置",
+  "backgroundPermissionGranted": "已允许",
+  "backgroundPermissionDenied": "未允许",
+  "backgroundPermissionLimited": "使用应用期间",
+  "backgroundPermissionUnknown": "需手动检查",
+  "backgroundPermissionNotDetermined": "尚未申请",
+  "backgroundRuntimeTitle": "当前状态",
+  "backgroundRuntimeActive": "正在运行",
+  "backgroundRuntimeIdle": "未运行",
+  "backgroundLocationActive": "后台定位",
+  "backgroundAudioActive": "静音音频",
+  "backgroundActivityActive": "实时活动",
+  "backgroundOverlayActive": "悬浮窗",
+  "backgroundLastError": "最近中断或错误",
+  "backgroundNoError": "暂无记录",
+  "backgroundUnsupported": "当前设备不支持或系统设置未允许",
+  "backgroundIosLimit": "后台执行由 iOS 控制，实时活动本身不能保活。强退可能停止生成，实时状态可能要等再次打开应用后才能清理。",
+  "backgroundAndroidLimit": "如任务中断，请检查通知、电池及厂商后台设置。系统强行停止或终止进程仍可能中断生成。",
+  "backgroundStale": "状态暂未更新，请打开应用查看。",
+  "backgroundIconError": "无法导入此图片，请选择其他图片。",
+  "backgroundNotificationChannels": "通知渠道",
+  "backgroundCompletionChannel": "任务完成通知渠道",
+  "backgroundOngoingChannel": "任务运行通知渠道",
+  "backgroundOverlayAppearance": "悬浮窗外观",
+  "backgroundOverlayAppearanceDetail": "调整尺寸、图标、进度环和显示内容",
+  "backgroundOverlayPreviewHint": "拖动可移动 · 点击进入会话 · 长按可收起",
+  "backgroundOverlayCard": "信息卡片",
+  "backgroundOverlayCircle": "圆形图标",
+  "backgroundOverlaySize": "尺寸与形状",
+  "backgroundOverlayWidth": "宽度",
+  "backgroundOverlayHeight": "高度",
+  "backgroundOverlayCornerRadius": "圆角",
+  "backgroundOverlayIconSize": "图标大小",
+  "backgroundOverlayProgressSize": "进度环直径",
+  "backgroundOverlayProgressStroke": "进度环粗细",
+  "backgroundOverlayContent": "显示内容",
+  "backgroundOverlayShowProgress": "显示进度环",
+  "backgroundOverlayShowTitle": "显示标题",
+  "backgroundOverlayShowSubtitle": "显示副标题",
+  "backgroundOverlayShowTime": "显示耗时",
+  "backgroundOverlayShowClose": "显示关闭按钮",
+  "backgroundOverlayShowBackground": "显示背景",
+  "backgroundOverlayShowBorder": "显示边框",
+  "backgroundOverlayReset": "恢复默认样式",
+  "mcpStdioEnvironmentRequired": "请先安装工作区运行环境，再使用移动端 STDIO。",
+  "mcpArgumentsHint": "用空格分隔参数，包含空格的内容用引号包裹；空参数写成 ''。",
+  "mcpArgumentsInvalid": "请检查参数中的引号是否闭合、末尾是否有未完成的转义。",
+  "mcpImportEnvironment": "从环境导入",
+  "mcpEnvironmentEmpty": "还没有环境变量，请先在环境设置中添加。",
+  "mcpEnvironmentHint": "默认继承运行环境的变量，导入后可为此服务器单独修改。",
+  "mcpImportJson": "导入 JSON",
+  "mcpImportJsonHint": "粘贴 Claude Desktop 或 Cursor 的 MCP 配置，预览后添加服务器，不覆盖现有配置。",
+  "mcpImportPaste": "从剪贴板粘贴",
+  "mcpImportPreview": "预览",
+  "mcpImportConfirm": "导入",
+  "startupRecoverySnapshotTitle": "从数据库快照恢复",
+  "startupRecoverySnapshotBody": "即使数据库无法打开，也可以选择本机快照恢复聊天和设置。请勿卸载 JO-AIClient，卸载会一并删除这些快照。",
+  "startupRecoverySnapshotEmpty": "未在本机找到数据库快照。请先导出数据，再尝试其他恢复操作。",
+  "startupRecoverySnapshotConfirm": "将聊天和设置恢复到 {when} 的快照？快照之后的更改不会包含在内。现有附件文件和快照会保留，JO-AIClient 将重启以完成恢复。",
+  "startupRecoverySnapshotReady": "快照已准备好，请重启 JO-AIClient 完成恢复。",
+  "@startupRecoverySnapshotConfirm": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "scheduledTasksTitle": "定时任务",
+  "scheduledTasksDescription": "在指定时间自动执行任务，支持新建聊天、继续追问或重新运行。",
+  "scheduledTasksEmpty": "把任务交给时间",
+  "scheduledTasksEmptyDetail": "晨间简报、每日复盘，或任何希望定期完成的事。",
+  "scheduledTasksAdd": "添加任务",
+  "scheduledTasksEdit": "编辑任务",
+  "scheduledTasksName": "任务名称",
+  "scheduledTasksNameHint": "晨间简报",
+  "scheduledTasksPrompt": "任务内容",
+  "scheduledTasksPromptHint": "希望助手为你完成什么？",
+  "scheduledTasksAssistant": "执行助手",
+  "scheduledTasksChooseAssistant": "选择助手",
+  "scheduledTasksAssistantMissing": "助手已不存在",
+  "scheduledTasksTime": "执行时间",
+  "scheduledTasksTimeHint": "24 小时制，例如 08:00",
+  "scheduledTasksRepeat": "重复",
+  "scheduledTasksEveryDay": "每天",
+  "scheduledTasksWeekdays": "工作日",
+  "scheduledTasksEnabled": "启用任务",
+  "scheduledTasksPermission": "闹钟和提醒",
+  "scheduledTasksPermissionDetail": "允许设置闹钟，才能按指定时间执行。未授权时，已启用的任务会等待授权。",
+  "scheduledTasksPermissionAction": "去授权",
+  "scheduledTasksReliability": "建议在电池设置中允许 JO-AIClient 后台运行。强行停止后需重新打开应用。错过的任务不会补跑，执行时间跟随设备时区。",
+  "scheduledTasksExecutionDetail": "结果保存在对话中，完成后会发送回复预览通知，点击可打开对话。单次最多运行 10 分钟；需要用户回答或工具确认时会停止。",
+  "scheduledTasksRunNow": "立即运行",
+  "scheduledTasksHistory": "执行记录",
+  "scheduledTasksNoRuns": "尚无执行记录",
+  "scheduledTasksRunning": "正在运行",
+  "scheduledTasksCompleted": "已完成",
+  "scheduledTasksFailed": "执行失败",
+  "scheduledTasksInterrupted": "已中断",
+  "scheduledTasksPaused": "已暂停",
+  "scheduledTasksWaitingPermission": "等待授权",
+  "scheduledTasksNextRun": "下次：{time}",
+  "scheduledTasksDelete": "删除任务",
+  "scheduledTasksDeleteDetail": "删除此任务及执行记录？已经生成的对话会保留。",
+  "scheduledTasksSave": "保存",
+  "scheduledTasksCancel": "取消",
+  "scheduledTasksInvalid": "请填写名称、任务内容和助手，自定义重复需至少选择一天。",
+  "scheduledTasksLoading": "正在加载…",
+  "scheduledTasksOpenChat": "查看对话",
+  "scheduledTasksNeedsInput": "任务需要用户回答或工具确认，已停止。可打开对话继续。",
+  "scheduledTasksTimeout": "已达到执行时限。",
+  "scheduledTasksProcessTerminated": "上次执行被系统终止。",
+  "scheduledTasksOnce": "仅一次",
+  "scheduledTasksCustom": "自定义",
+  "scheduledTasksExecution": "执行任务",
+  "scheduledTasksMode": "执行方式",
+  "scheduledTasksNewChat": "新建聊天",
+  "scheduledTasksFollowUp": "继续追问",
+  "scheduledTasksRegenerate": "重新运行",
+  "scheduledTasksChat": "目标聊天",
+  "scheduledTasksChooseChat": "选择聊天",
+  "scheduledTasksMessage": "重新运行的问题",
+  "scheduledTasksChooseMessage": "选择问题",
+  "scheduledTasksAttachmentMessage": "含附件的消息",
+  "scheduledTasksModel": "模型",
+  "scheduledTasksChooseModel": "选择模型",
+  "scheduledTasksModelDefault": "跟随聊天或助手的模型",
+  "scheduledTasksSchedule": "执行时间",
+  "scheduledTasksActiveWindow": "活动时段",
+  "scheduledTasksStartDate": "开始日期",
+  "scheduledTasksEndDate": "结束日期",
+  "scheduledTasksActiveWindowDetail": "仅在此日期范围内执行，包含结束当天。未设置的日期不作限制。",
+  "scheduledTasksDate": "日期",
+  "scheduledTasksDateUnrestricted": "不限",
+  "scheduledTasksClear": "清除",
+  "scheduledTasksSearch": "搜索",
+  "scheduledTasksNoTargets": "此助手下没有符合条件的内容",
+  "scheduledTasksFutureDate": "请选择未来的执行日期和时间。",
+  "scheduledTasksDateRangeInvalid": "结束日期不能早于开始日期。",
+  "scheduledTasksRegenerateDetail": "使用原有上下文，为所选问题生成新的回答，保留已有回答和后续消息。",
+  "scheduledTasksSaving": "正在保存…",
+  "scheduledTasksFinished": "计划已结束",
+  "scheduledTasksModelMissing": "所选模型已不可用，请编辑任务重新选择。",
+  "scheduledTasksChatMissing": "目标聊天已不存在或已移至其他助手。",
+  "scheduledTasksMessageMissing": "所选问题已不存在，请重新选择。",
+  "scheduledTasksChatBusy": "此聊天正在生成回答，本次任务已跳过。",
+  "scheduledTasksDesktopEmpty": "暂无定时任务",
+  "scheduledTasksDesktopReliability": "仅在 JO-AIClient 运行时执行，最小化或驻留托盘时也会继续。退出或电脑休眠期间错过的任务不会补运行，也不会自动启动应用。",
+  "scheduledTasksDesktopExecutionDetail": "结果保存在对话中，可从任务的运行记录打开。单次最多运行 10 分钟；需要用户回答或工具确认时会停止。",
+  "mcpServerEditSheetNameHint": "我的 MCP",
+  "mcpServerEditSheetDefaultName": "MCP",
+  "mcpServerEditSheetStdioCommandHint": "npx",
+  "mcpServerEditSheetStdioArgumentsHint": "-y @modelcontextprotocol/server-filesystem",
+  "mcpServerEditSheetStdioWorkingDirectoryHint": "/root",
+  "mcpServerEditSheetStdioEnvNameHint": "ENV_NAME",
+  "mcpServerEditSheetStdioEnvValueHint": "值",
+  "mcpServerEditSheetSseUrlHint": "http://localhost:3000/sse",
+  "mcpServerEditSheetHttpUrlHint": "http://localhost:3000"
 }

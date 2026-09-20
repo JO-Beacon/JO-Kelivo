@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:Kelivo/shared/widgets/ios_time_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -8,7 +9,7 @@ import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
 import '../../core/database/business_repository.dart';
 import '../../core/models/backup.dart';
-import '../../core/models/backup_task_progress.dart';
+import '../../core/services/backup/backup_cancel_token.dart';
 import '../../core/providers/backup_provider.dart';
 import '../../core/providers/backup_reminder_provider.dart';
 import '../../core/providers/assistant_group_provider.dart';
@@ -29,6 +30,7 @@ import '../../core/services/device/device_identity.dart';
 import '../../shared/dialogs/loading_task_dialog.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../shared/widgets/restart_app_action.dart';
+import '../../shared/widgets/section_card.dart';
 import '../../shared/widgets/snackbar.dart';
 import '../../features/backup/backup_restore_error_message.dart';
 import '../../features/backup/backup_restart_dialog.dart';
@@ -350,6 +352,94 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
         ),
       );
     });
+  }
+
+  /// Chatbox 1.22+ 的 ZIP 备份：只收 `.zip`，走新版导入器。
+  Future<void> _importArchiveChatbox() async {
+    final l10n = AppLocalizations.of(context)!;
+    final rootCtx = Navigator.of(context, rootNavigator: true).context;
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['zip'],
+      allowMultiple: false,
+    );
+    final path = result?.files.single.path;
+    if (path == null || !mounted) return;
+    final mode = await showDialog<RestoreMode>(
+      context: context,
+      builder: (_) => const _RestoreModeDialog(),
+    );
+    if (mode == null || !mounted) return;
+
+    final businessRepository = context.read<BusinessRepository>();
+    final chatService = context.read<ChatService>();
+    try {
+      final imported = await runWithLoadingTaskDialog<ChatboxImportResult>(
+        context: context,
+        cancellableTask: (onProgress, cancelToken) =>
+            ChatboxImporter.importFromChatboxArchive(
+              file: File(path),
+              mode: mode,
+              businessRepository: businessRepository,
+              chatService: chatService,
+              starredGroupName: l10n.backupPageChatboxModernStarredGroupName,
+              regularGroupName: l10n.backupPageChatboxModernGroupName,
+              deletedProviderGroupName:
+                  l10n.backupPageChatboxModernDeletedProviderGroupName,
+              cancelToken: cancelToken,
+              onProgress: onProgress,
+            ),
+        label: l10n.backupPageRestore,
+        cancelLabel: l10n.backupPageCancel,
+      );
+      if (!rootCtx.mounted) return;
+      await showDialog(
+        context: rootCtx,
+        builder: (dctx) => AlertDialog(
+          title: Text(l10n.backupPageRestartRequired),
+          content: Text(
+            '${l10n.backupPageImportFromChatbox}:\n'
+            ' • Providers: ${imported.providers}\n'
+            ' • Assistants: ${imported.assistants}\n'
+            ' • Conversations: ${imported.conversations}\n'
+            ' • Messages: ${imported.messages}\n\n'
+            '${l10n.backupPageChatboxModernNote}\n\n'
+            '${l10n.backupPageRestartContent}',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                if (await requestAppRestart(
+                      rootCtx,
+                      PlatformUtils.restartApp,
+                    ) &&
+                    rootCtx.mounted) {
+                  Navigator.of(rootCtx).pop();
+                }
+              },
+              child: Text(l10n.backupPageOK),
+            ),
+          ],
+        ),
+      );
+    } on BackupCancelledException {
+      return;
+    } catch (e) {
+      if (!rootCtx.mounted) return;
+      await showDialog(
+        context: rootCtx,
+        builder: (dctx) => AlertDialog(
+          title: Text(l10n.backupPageImportFromChatbox),
+          content: Text(e.toString()),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dctx).pop(),
+              child: Text(l10n.backupPageOK),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   Future<void> _importLegacyChatbox() async {
@@ -1230,11 +1320,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                     ),
                     filled: false,
                     dense: true,
-                    onTap: () => Navigator.of(context).push<void>(
-                      MaterialPageRoute(
-                        builder: (_) => const LocalSnapshotsPage(),
-                      ),
-                    ),
+                    onTap: () => openLocalSnapshotsPage(context),
                   ),
                 ),
                 _rowDivider(context),
@@ -1250,7 +1336,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
           ],
           _sectionCard(
             children: [
-              _BackupCategoryLabel(label: l10n.backupPageNativeBackup),
+              _BackupCategoryLabel(label: l10n.backupPageLocalBackup),
               Row(
                 children: [
                   Expanded(
@@ -1436,7 +1522,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                     label: l10n.backupPageChatboxName,
                     filled: false,
                     dense: true,
-                    enabled: false,
+                    onTap: _importArchiveChatbox,
                   ),
                   const SizedBox(height: 6),
                   _DeskIosButton(
@@ -1488,8 +1574,9 @@ class _BackupReminderDesktopSection extends StatelessWidget {
                 await provider.setEnabled(false);
                 return;
               }
-              final minutes = await showBackupReminderTimePicker(
+              final minutes = await showIosTimePicker(
                 context,
+                title: AppLocalizations.of(context)!.backupReminderTimeTitle,
                 initialMinutes: provider.reminderMinutesOfDay,
               );
               if (minutes == null) return;
@@ -1519,8 +1606,9 @@ class _BackupReminderDesktopSection extends StatelessWidget {
               dense: true,
               onTap: () async {
                 final provider = context.read<BackupReminderProvider>();
-                final minutes = await showBackupReminderTimePicker(
+                final minutes = await showIosTimePicker(
                   context,
+                  title: AppLocalizations.of(context)!.backupReminderTimeTitle,
                   initialMinutes: provider.reminderMinutesOfDay,
                 );
                 if (minutes == null) return;
@@ -1591,7 +1679,10 @@ class _FrequencyDropdown extends StatelessWidget {
         if (!context.mounted) return;
         if (days == null) return;
         var minutes = provider.reminderMinutesOfDay;
-        minutes ??= await showBackupReminderTimePicker(context);
+        minutes ??= await showIosTimePicker(
+          context,
+          title: AppLocalizations.of(context)!.backupReminderTimeTitle,
+        );
         if (!context.mounted) return;
         if (minutes == null) return;
         await provider.saveSchedule(
@@ -2580,27 +2671,11 @@ class _LocalSettingsLedgerSectionState
 }
 
 Widget _sectionCard({required List<Widget> children}) {
-  return Builder(
-    builder: (context) {
-      final cs = Theme.of(context).colorScheme;
-      final isDark = Theme.of(context).brightness == Brightness.dark;
-      final baseBg = context.appColors.surfaceCard;
-      return Container(
-        decoration: BoxDecoration(
-          color: baseBg,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08),
-            width: 0.8,
-          ),
-        ),
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: children,
-        ),
-      );
-    },
+  return SectionCard(
+    padding: const EdgeInsets.all(12),
+    radius: 18,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: children,
   );
 }
 

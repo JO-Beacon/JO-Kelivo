@@ -371,4 +371,142 @@ void main() {
       expect(dismissed, isTrue);
     },
   );
+
+  testWidgets('a grab during the closing animation still lets the sheet go', (
+    tester,
+  ) async {
+    setTallTestWindow(tester);
+    var dismissed = false;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: CustomBottomSheet(
+            title: '搜索结果',
+            closeSemanticLabel: '关闭',
+            onDismiss: () => dismissed = true,
+            builder: (context, controller) {
+              return ListView.builder(
+                controller: controller,
+                itemCount: 40,
+                itemBuilder: (context, index) =>
+                    SizedBox(height: 44, child: Text('Source $index')),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(CustomBottomSheet.closeButtonKey));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 80));
+
+    // 面板还在滑出时又来一次不耐烦的触摸：它不得取消关闭，
+    // 否则面板会滞留在屏幕上，关闭按钮失效且无法退出。
+    final grab = await tester.startGesture(
+      tester.getCenter(find.byKey(CustomBottomSheet.dragHandleKey)),
+    );
+    await grab.moveBy(const Offset(0, -120));
+    await tester.pump();
+    await grab.up();
+    await tester.pumpAndSettle();
+
+    expect(dismissed, isTrue);
+  });
+
+  testWidgets('close pops the sheet route even when content refuses pops', (
+    tester,
+  ) async {
+    setTallTestWindow(tester);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => showCustomBottomSheet<void>(
+                context: context,
+                title: '对话文件',
+                builder: (sheetContext, controller) => PopScope(
+                  // 自行接管系统返回手势的内容，就像
+                  // 文件浏览器沿着文件夹层级向上返回那样。
+                  canPop: false,
+                  child: ListView(
+                    controller: controller,
+                    children: const [SizedBox(height: 200, child: Text('列表'))],
+                  ),
+                ),
+              ),
+              child: const Text('打开'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('打开'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(CustomBottomSheet.panelKey), findsOneWidget);
+
+    await tester.tap(find.byKey(CustomBottomSheet.closeButtonKey));
+    await tester.pumpAndSettle();
+    expect(find.byKey(CustomBottomSheet.panelKey), findsNothing);
+
+    // 该路由已销毁，其全屏遮罩不再吞掉触摸事件。
+    await tester.tap(find.text('打开'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(CustomBottomSheet.panelKey), findsOneWidget);
+  });
+
+  testWidgets('horizontal content drag does not pull the sheet down', (
+    tester,
+  ) async {
+    setTallTestWindow(tester);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: CustomBottomSheet(
+            title: '差异',
+            closeSemanticLabel: '关闭',
+            onDismiss: () {},
+            builder: (context, controller) {
+              return ListView(
+                controller: controller,
+                children: const [
+                  SizedBox(
+                    height: 160,
+                    child: SingleChildScrollView(
+                      key: ValueKey<String>('sheet-horizontal-diff'),
+                      scrollDirection: Axis.horizontal,
+                      child: SizedBox(width: 800, child: Text('diff line')),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final panel = find.byKey(CustomBottomSheet.panelKey);
+    final partialTop = tester.getTopLeft(panel).dy;
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(
+        find.byKey(const ValueKey<String>('sheet-horizontal-diff')),
+      ),
+    );
+    await gesture.moveBy(const Offset(-96, 20));
+    await tester.pump();
+    expect(tester.getTopLeft(panel).dy, partialTop);
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(panel).dy, partialTop);
+  });
 }

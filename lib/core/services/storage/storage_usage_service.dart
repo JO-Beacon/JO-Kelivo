@@ -1,15 +1,21 @@
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:path/path.dart' as p;
+import 'package:sqlite3/sqlite3.dart';
 
 import '../../database/app_database.dart';
+import '../../database/database_installation_gate.dart';
 import '../hive_migration_marker.dart';
 import '../legacy_data_retirement_service.dart';
+import '../backup/local_snapshot_schedule.dart';
 import '../backup/restore_trace_service.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/avatar_cache.dart';
 import '../logging/flutter_logger.dart';
 import '../network/request_logger.dart';
+import '../sandbox/rootfs_disk_usage.dart';
+import '../workspace/workspace_session_sync.dart';
 
 enum StorageUsageCategoryKey {
   images,
@@ -17,10 +23,16 @@ enum StorageUsageCategoryKey {
   chatData,
   legacyChatData,
   restoreTraces,
+  displacedDatabases,
+  localSnapshots,
   assistantData,
   cache,
   logs,
   other,
+  workspaceFiles,
+  sandboxEnvironment,
+  skills,
+  sessionFiles,
 }
 
 class StorageUsageStats {
@@ -40,10 +52,12 @@ class StorageUsageSubcategory {
   final String id;
   final StorageUsageStats stats;
   final String? path;
+  final bool isDirectory;
   const StorageUsageSubcategory({
     required this.id,
     required this.stats,
     this.path,
+    this.isDirectory = false,
   });
 }
 
@@ -88,6 +102,10 @@ class StorageFileEntry {
   });
 }
 
+/// 无人值守的数据库重建之前写下的只增记录的文件名。
+/// 它放在 `logs/` 下，便于应用内查看器展示，但**刻意豁免**于"清理日志"。
+const String startupRecoveryLogFileName = 'startup-recovery.log';
+
 abstract final class StorageUsageService {
   StorageUsageService._();
 
@@ -117,6 +135,10 @@ abstract final class StorageUsageService {
     }
   }
 
+  static const _displacedDatabasePrefix =
+      '${AppDatabase.databaseFileName}'
+      '${DatabaseInstallationGate.displacedDatabasePrefix}';
+
   static String _chatDatabaseFileName(String subcategoryId) {
     switch (subcategoryId) {
       case 'sqlite_wal':
@@ -129,7 +151,13 @@ abstract final class StorageUsageService {
     }
   }
 
-  static Future<StorageUsageReport> computeReport() async {
+  static Future<StorageUsageReport> computeReport({
+    Future<Directory> Function()? workspacesDirectory,
+    Future<Directory> Function()? environmentDirectory,
+    Future<Directory> Function()? skillsDirectory,
+    Future<Directory> Function()? sessionsDirectory,
+    Future<Directory> Function()? rootfsUsageDirectory,
+  }) async {
     final root = await AppDirectories.getAppDataDirectory();
     var migrationCompleted = false;
     try {
@@ -190,17 +218,22 @@ abstract final class StorageUsageService {
         clearable: const StorageUsageStats(fileCount: 0, bytes: 0),
         categories: [
           for (final k in _categoryOrder)
-            StorageUsageCategory(
-              key: k,
-              stats: const StorageUsageStats(fileCount: 0, bytes: 0),
-            ),
+            if (_isAlwaysVisibleCategory(k))
+              StorageUsageCategory(
+                key: k,
+                stats: const StorageUsageStats(fileCount: 0, bytes: 0),
+              ),
         ],
       );
     }
 
     try {
-      await for (final ent in root.list(recursive: true, followLinks: false)) {
-        if (ent is! File) continue;
+      await for (final ent in _listFiles(
+        root,
+        excludedTopDirectories: _isolateMeasuredTopDirs,
+      )) {
+        final rel = p.relative(ent.path, from: root.path);
+        final parts = p.split(rel);
         int bytes = 0;
         try {
           bytes = await ent.length();
@@ -210,8 +243,6 @@ abstract final class StorageUsageService {
         totalFiles += 1;
         totalBytes += bytes;
 
-        final rel = p.relative(ent.path, from: root.path);
-        final parts = p.split(rel);
         if (parts.isEmpty) {
           byCat[StorageUsageCategoryKey.other]!.add(bytes);
           otherSubs['app']!.add(bytes);
@@ -224,7 +255,9 @@ abstract final class StorageUsageService {
         if (parts.length == 1) {
           final name = parts.first;
           final chatSubId = _chatDatabaseSubcategoryId(name);
-          if (chatSubId != null) {
+          if (name.startsWith(_displacedDatabasePrefix)) {
+            byCat[StorageUsageCategoryKey.displacedDatabases]!.add(bytes);
+          } else if (chatSubId != null) {
             byCat[StorageUsageCategoryKey.chatData]!.add(bytes);
             chatSubs[chatSubId]!.add(bytes);
           } else if (migrationCompleted &&
@@ -248,7 +281,11 @@ abstract final class StorageUsageService {
           continue;
         }
         switch (top) {
+          case LocalSnapshotPaths.directoryName:
+            byCat[StorageUsageCategoryKey.localSnapshots]!.add(bytes);
+            break;
           case 'upload':
+          case 'images':
             final name = parts.last;
             if (_isImageExt(name)) {
               byCat[StorageUsageCategoryKey.images]!.add(bytes);
@@ -267,11 +304,6 @@ abstract final class StorageUsageService {
           case 'asr_models':
             byCat[StorageUsageCategoryKey.other]!.add(bytes);
             otherSubs['local_models']!.add(bytes);
-            break;
-          case 'images':
-            // 内联/生成的图片存储在 appData/images 下。
-            // 将其归为“图片”，以便用户统一管理。
-            byCat[StorageUsageCategoryKey.images]!.add(bytes);
             break;
           case 'cache':
             byCat[StorageUsageCategoryKey.cache]!.add(bytes);
@@ -301,8 +333,46 @@ abstract final class StorageUsageService {
         }
       }
     } catch (_) {
-      // 若因任何原因列目录失败，回退为 0；UI 会显示加载失败。
+      // 扫描期间若有文件消失，保留已成功计量的部分。
     }
+
+    final [
+      workspaceUsage,
+      skillsUsage,
+      sessionsUsage,
+      sandboxUsage,
+    ] = await Future.wait([
+      _measureContentsOf(
+        workspacesDirectory ?? AppDirectories.getWorkspacesDirectory,
+      ),
+      _measureContentsOf(skillsDirectory ?? AppDirectories.getSkillsDirectory),
+      _measureContentsOf(
+        sessionsDirectory ?? AppDirectories.getSessionsDirectory,
+      ),
+      _measureSandboxEnvironment(
+        environmentDirectory:
+            environmentDirectory ?? AppDirectories.getEnvironmentDirectory,
+        rootfsUsageDirectory: rootfsUsageDirectory,
+      ),
+    ]);
+    byCat[StorageUsageCategoryKey.workspaceFiles]!.addStats(
+      workspaceUsage.stats,
+    );
+    byCat[StorageUsageCategoryKey.skills]!.addStats(skillsUsage.stats);
+    byCat[StorageUsageCategoryKey.sessionFiles]!.addStats(sessionsUsage.stats);
+    byCat[StorageUsageCategoryKey.sandboxEnvironment]!.addStats(
+      sandboxUsage.stats,
+    );
+    totalFiles +=
+        workspaceUsage.stats.fileCount +
+        skillsUsage.stats.fileCount +
+        sessionsUsage.stats.fileCount +
+        sandboxUsage.stats.fileCount;
+    totalBytes +=
+        workspaceUsage.stats.bytes +
+        skillsUsage.stats.bytes +
+        sessionsUsage.stats.bytes +
+        sandboxUsage.stats.bytes;
 
     final avatarsDir = await AppDirectories.getAvatarsDirectory();
     final fontsDir = await AppDirectories.getFontsDirectory();
@@ -334,6 +404,10 @@ abstract final class StorageUsageService {
       }
     } catch (_) {}
 
+    // 这里刻意不把“被挤掉的数据库副本”计入。这个总数是
+    // "可回收空间"的提示，而被挤掉的副本可能是用户数据唯一幸存的
+    // 版本 —— 诱导一键扫掉它，与当初保留它的理由正好相反。
+    // 它仍可从自己那一行单独清理，那里会说明它到底是什么。
     final clearable = StorageUsageStats(
       fileCount:
           byCat[StorageUsageCategoryKey.cache]!.fileCount +
@@ -392,6 +466,31 @@ abstract final class StorageUsageService {
               id: 'completed_restore_runs',
               stats: byCat[StorageUsageCategoryKey.restoreTraces]!.toStats(),
               path: p.join(root.path, '.kelivo_restore', 'completed'),
+            ),
+          ],
+        ),
+      if (byCat[StorageUsageCategoryKey.displacedDatabases]!.fileCount > 0)
+        StorageUsageCategory(
+          key: StorageUsageCategoryKey.displacedDatabases,
+          stats: byCat[StorageUsageCategoryKey.displacedDatabases]!.toStats(),
+          subcategories: [
+            StorageUsageSubcategory(
+              id: 'displaced_databases',
+              stats: byCat[StorageUsageCategoryKey.displacedDatabases]!
+                  .toStats(),
+              path: root.path,
+            ),
+          ],
+        ),
+      if (byCat[StorageUsageCategoryKey.localSnapshots]!.fileCount > 0)
+        StorageUsageCategory(
+          key: StorageUsageCategoryKey.localSnapshots,
+          stats: byCat[StorageUsageCategoryKey.localSnapshots]!.toStats(),
+          subcategories: [
+            StorageUsageSubcategory(
+              id: 'local_snapshots',
+              stats: byCat[StorageUsageCategoryKey.localSnapshots]!.toStats(),
+              path: LocalSnapshotPaths.directoryIn(root).path,
             ),
           ],
         ),
@@ -481,6 +580,26 @@ abstract final class StorageUsageService {
             ),
         ],
       ),
+      StorageUsageCategory(
+        key: StorageUsageCategoryKey.workspaceFiles,
+        stats: byCat[StorageUsageCategoryKey.workspaceFiles]!.toStats(),
+        subcategories: workspaceUsage.subcategories,
+      ),
+      StorageUsageCategory(
+        key: StorageUsageCategoryKey.sandboxEnvironment,
+        stats: byCat[StorageUsageCategoryKey.sandboxEnvironment]!.toStats(),
+        subcategories: sandboxUsage.subcategories,
+      ),
+      StorageUsageCategory(
+        key: StorageUsageCategoryKey.skills,
+        stats: byCat[StorageUsageCategoryKey.skills]!.toStats(),
+        subcategories: skillsUsage.subcategories,
+      ),
+      StorageUsageCategory(
+        key: StorageUsageCategoryKey.sessionFiles,
+        stats: byCat[StorageUsageCategoryKey.sessionFiles]!.toStats(),
+        subcategories: sessionsUsage.subcategories,
+      ),
     ];
 
     // 确保一致的排序。
@@ -557,7 +676,13 @@ abstract final class StorageUsageService {
     try {
       final root = await AppDirectories.getAppDataDirectory();
       final logsDir = Directory(p.join(root.path, 'logs'));
-      await _deleteDirectoryContents(logsDir);
+      // 启动恢复记录是无人值守重建的唯一痕迹 —— 也是唯一会在
+      // 不询问的情况下破坏状态的启动结局。清理日志不能
+      // 连它一起抹掉。
+      await _deleteDirectoryContents(
+        logsDir,
+        keepFileNames: const {startupRecoveryLogFileName},
+      );
     } finally {
       try {
         if (flutterOn) await FlutterLogger.setEnabled(true);
@@ -580,6 +705,13 @@ abstract final class StorageUsageService {
   static Future<void> clearRestoreTraces() async {
     final root = await AppDirectories.getAppDataDirectory();
     await RestoreTraceService(root).clear();
+  }
+
+  static Future<void> clearDisplacedDatabases() async {
+    final root = await AppDirectories.getAppDataDirectory();
+    await DatabaseInstallationGate.clearDisplacedDatabases(
+      appDataDirectory: root,
+    );
   }
 
   static Future<void> clearFonts() async {
@@ -606,8 +738,7 @@ abstract final class StorageUsageService {
     }) async {
       if (!await d.exists()) return;
       try {
-        await for (final ent in d.list(recursive: true, followLinks: false)) {
-          if (ent is! File) continue;
+        await for (final ent in _listFiles(d)) {
           final name = p.basename(ent.path);
           final isImg = _isImageExt(name);
           if (isImg && !includeImages) continue;
@@ -645,14 +776,12 @@ abstract final class StorageUsageService {
       includeNonImages: !images,
       source: StorageFileSource.userUpload,
     );
-    if (images) {
-      await addFromDir(
-        imagesDir,
-        includeImages: true,
-        includeNonImages: false,
-        source: StorageFileSource.assistant,
-      );
-    }
+    await addFromDir(
+      imagesDir,
+      includeImages: images,
+      includeNonImages: !images,
+      source: StorageFileSource.assistant,
+    );
     out.sort((a, b) => b.modifiedAt.compareTo(a.modifiedAt));
     return out;
   }
@@ -664,33 +793,254 @@ abstract final class StorageUsageService {
     final dir = await AppDirectories.getUploadDirectory();
     final imagesDir = await AppDirectories.getImagesDirectory();
     final roots = <String>[
-      p.normalize(Directory(dir.path).absolute.path),
-      if (images) p.normalize(Directory(imagesDir.path).absolute.path),
+      p.normalize(dir.absolute.path),
+      p.normalize(imagesDir.absolute.path),
     ];
-    int deleted = 0;
+    final realRoots = await Future.wait(
+      roots.map((root) async {
+        try {
+          return await Directory(root).resolveSymbolicLinks();
+        } catch (_) {
+          return root;
+        }
+      }),
+    );
+    final removedPaths = <String>{};
     for (final raw in paths) {
       try {
         final abs = p.normalize(File(raw).absolute.path);
-        final allowed = roots.any(
-          (root) => p.isWithin(root, abs) || abs == root,
-        );
+        if (_isImageExt(abs) != images) continue;
+        final allowed = roots.any((root) => p.isWithin(root, abs));
         if (!allowed) continue;
-        final f = File(abs);
-        if (await f.exists()) {
-          await f.delete();
-          deleted += 1;
+        // 符号链接的子目录不得让存储清理逃出应用的 upload 根目录。
+        // 只有常规文件才有资格被删除。
+        final parent = await File(abs).parent.resolveSymbolicLinks();
+        if (!realRoots.any(
+          (root) => p.equals(root, parent) || p.isWithin(root, parent),
+        )) {
+          continue;
         }
+        if (await FileSystemEntity.type(abs, followLinks: false) !=
+            FileSystemEntityType.file) {
+          continue;
+        }
+        await File(abs).delete();
+        removedPaths.add(abs);
       } catch (_) {}
     }
-    return deleted;
+    if (removedPaths.isNotEmpty) {
+      await deleteSessionAttachmentCopies(
+        removedPaths,
+        sessionsDirectory: await AppDirectories.getSessionsDirectory(),
+      );
+    }
+    return removedPaths.length;
   }
 
-  static Future<void> _deleteDirectoryContents(Directory dir) async {
+  static Future<StorageUsageStats> measureOrphanSessionFiles({
+    Set<String>? conversationIds,
+    Future<Directory> Function()? sessionsDirectory,
+  }) async {
+    final ids = conversationIds ?? await _readConversationIdsFromDatabase();
+    final sessions =
+        await (sessionsDirectory ?? AppDirectories.getSessionsDirectory)();
+    return _orphanSessionStats(sessions: sessions, conversationIds: ids);
+  }
+
+  static Future<StorageUsageStats> clearOrphanSessionFiles({
+    Set<String>? conversationIds,
+    Future<Directory> Function()? sessionsDirectory,
+  }) async {
+    final ids = conversationIds ?? await _readConversationIdsFromDatabase();
+    final sessions =
+        await (sessionsDirectory ?? AppDirectories.getSessionsDirectory)();
+    final stats = await _orphanSessionStats(
+      sessions: sessions,
+      conversationIds: ids,
+    );
+    if (!await sessions.exists()) return stats;
+    try {
+      await for (final ent in sessions.list(
+        recursive: false,
+        followLinks: false,
+      )) {
+        if (ent is! Directory) continue;
+        if (ids.contains(p.basename(ent.path))) continue;
+        try {
+          await ent.delete(recursive: true);
+        } catch (_) {}
+      }
+    } catch (_) {}
+    return stats;
+  }
+
+  static Future<StorageUsageStats> _orphanSessionStats({
+    required Directory sessions,
+    required Set<String> conversationIds,
+  }) async {
+    if (!await sessions.exists()) {
+      return const StorageUsageStats(fileCount: 0, bytes: 0);
+    }
+    var bytes = 0;
+    var fileCount = 0;
+    try {
+      await for (final ent in sessions.list(
+        recursive: false,
+        followLinks: false,
+      )) {
+        if (ent is! Directory) continue;
+        if (conversationIds.contains(p.basename(ent.path))) continue;
+        final usage = await measureDirectoryUsage(ent);
+        bytes += usage.bytes;
+        fileCount += usage.fileCount;
+      }
+    } catch (_) {}
+    return StorageUsageStats(fileCount: fileCount, bytes: bytes);
+  }
+
+  static Future<Set<String>> _readConversationIdsFromDatabase() async {
+    try {
+      final root = await AppDirectories.getAppDataDirectory();
+      final dbFile = File(p.join(root.path, AppDatabase.databaseFileName));
+      if (!await dbFile.exists()) return <String>{};
+      final database = sqlite3.open(dbFile.path, mode: OpenMode.readOnly);
+      try {
+        final rows = database.select('SELECT id FROM conversation_rows');
+        return {for (final row in rows) row['id'] as String};
+      } finally {
+        database.close();
+      }
+    } catch (_) {
+      return <String>{};
+    }
+  }
+
+  static Future<StorageUsageStats> _measureUsage(Directory dir) async {
+    final usage = await measureDirectoryUsage(dir);
+    return StorageUsageStats(fileCount: usage.fileCount, bytes: usage.bytes);
+  }
+
+  static Future<_StorageContents> _measureContentsOf(
+    Future<Directory> Function() directory,
+  ) async {
+    final path = (await directory()).path;
+    // 在同一次后台遍历里同时收集明细与总量。
+    return Isolate.run(() {
+      final entries = <StorageUsageSubcategory>[];
+      try {
+        for (final child in Directory(path).listSync(followLinks: false)) {
+          try {
+            final isDirectory = child is Directory;
+            if (!isDirectory && child is! File) continue;
+            final usage = isDirectory
+                ? measureDirectoryUsageSync(child.path)
+                : (bytes: child.statSync().size, fileCount: 1);
+            if (usage.fileCount == 0) continue;
+            entries.add(
+              StorageUsageSubcategory(
+                id: p.basename(child.path),
+                path: child.path,
+                isDirectory: isDirectory,
+                stats: StorageUsageStats(
+                  fileCount: usage.fileCount,
+                  bytes: usage.bytes,
+                ),
+              ),
+            );
+          } catch (_) {}
+        }
+      } catch (_) {}
+      return _StorageContents(entries);
+    });
+  }
+
+  static Future<_StorageContents> _measureSandboxEnvironment({
+    required Future<Directory> Function() environmentDirectory,
+    Future<Directory> Function()? rootfsUsageDirectory,
+  }) async {
+    final envDir = await environmentDirectory();
+    final rootfsDir = await (rootfsUsageDirectory ?? resolveRootfsUsageDir)();
+    final unique = _dedupeNestedDirectories([envDir, rootfsDir]);
+    final entries = <StorageUsageSubcategory>[];
+    for (final dir in unique) {
+      if (p.equals(dir.path, envDir.absolute.path)) {
+        entries.addAll(
+          (await _measureContentsOf(() async => dir)).subcategories,
+        );
+      } else {
+        final stats = await _measureUsage(dir);
+        if (stats.fileCount == 0) continue;
+        entries.add(
+          StorageUsageSubcategory(
+            id: p.basename(dir.path),
+            path: dir.path,
+            isDirectory: true,
+            stats: stats,
+          ),
+        );
+      }
+    }
+    return _StorageContents(entries);
+  }
+
+  /// 下探前先剪掉单独计量的子树；失败只影响那个不可读目录，
+  /// 不连带中止其余同级目录。
+  static Stream<File> _listFiles(
+    Directory root, {
+    Set<String> excludedTopDirectories = const {},
+  }) async* {
+    final pending = <Directory>[root];
+    while (pending.isNotEmpty) {
+      final dir = pending.removeLast();
+      try {
+        await for (final entity in dir.list(followLinks: false)) {
+          if (entity is Directory) {
+            if (dir.path == root.path &&
+                excludedTopDirectories.contains(
+                  p.basename(entity.path).toLowerCase(),
+                )) {
+              continue;
+            }
+            pending.add(entity);
+          } else if (entity is File) {
+            yield entity;
+          }
+        }
+      } on FileSystemException {
+        // 其他目录仍可继续计量/列举。
+      }
+    }
+  }
+
+  static List<Directory> _dedupeNestedDirectories(Iterable<Directory> dirs) {
+    final normalized = <String>{};
+    for (final dir in dirs) {
+      final path = dir.path;
+      if (path.isEmpty) continue;
+      normalized.add(p.normalize(Directory(path).absolute.path));
+    }
+    final sorted = normalized.toList()
+      ..sort((a, b) => a.length.compareTo(b.length));
+    final kept = <String>[];
+    for (final path in sorted) {
+      final nested = kept.any(
+        (outer) => p.equals(outer, path) || p.isWithin(outer, path),
+      );
+      if (!nested) kept.add(path);
+    }
+    return [for (final path in kept) Directory(path)];
+  }
+
+  static Future<void> _deleteDirectoryContents(
+    Directory dir, {
+    Set<String> keepFileNames = const <String>{},
+  }) async {
     if (!await dir.exists()) return;
     try {
       await for (final ent in dir.list(recursive: true, followLinks: false)) {
         try {
           if (ent is File) {
+            if (keepFileNames.contains(p.basename(ent.path))) continue;
             try {
               await ent.delete();
             } catch (_) {
@@ -734,6 +1084,11 @@ class _MutableStats {
     bytes += b;
   }
 
+  void addStats(StorageUsageStats stats) {
+    fileCount += stats.fileCount;
+    bytes += stats.bytes;
+  }
+
   StorageUsageStats toStats() =>
       StorageUsageStats(fileCount: fileCount, bytes: bytes);
 }
@@ -744,8 +1099,56 @@ const List<StorageUsageCategoryKey> _categoryOrder = <StorageUsageCategoryKey>[
   StorageUsageCategoryKey.chatData,
   StorageUsageCategoryKey.legacyChatData,
   StorageUsageCategoryKey.restoreTraces,
+  StorageUsageCategoryKey.displacedDatabases,
+  StorageUsageCategoryKey.localSnapshots,
   StorageUsageCategoryKey.assistantData,
   StorageUsageCategoryKey.cache,
   StorageUsageCategoryKey.logs,
   StorageUsageCategoryKey.other,
+  StorageUsageCategoryKey.workspaceFiles,
+  StorageUsageCategoryKey.sandboxEnvironment,
+  StorageUsageCategoryKey.skills,
+  StorageUsageCategoryKey.sessionFiles,
 ];
+
+const Set<String> _isolateMeasuredTopDirs = {
+  'workspaces',
+  'sessions',
+  'skills',
+  'environment',
+};
+
+bool _isAlwaysVisibleCategory(StorageUsageCategoryKey key) {
+  switch (key) {
+    case StorageUsageCategoryKey.legacyChatData:
+    case StorageUsageCategoryKey.restoreTraces:
+    case StorageUsageCategoryKey.displacedDatabases:
+    case StorageUsageCategoryKey.localSnapshots:
+      return false;
+    case StorageUsageCategoryKey.images:
+    case StorageUsageCategoryKey.files:
+    case StorageUsageCategoryKey.chatData:
+    case StorageUsageCategoryKey.assistantData:
+    case StorageUsageCategoryKey.cache:
+    case StorageUsageCategoryKey.logs:
+    case StorageUsageCategoryKey.other:
+    case StorageUsageCategoryKey.workspaceFiles:
+    case StorageUsageCategoryKey.sandboxEnvironment:
+    case StorageUsageCategoryKey.skills:
+    case StorageUsageCategoryKey.sessionFiles:
+      return true;
+  }
+}
+
+class _StorageContents {
+  _StorageContents(List<StorageUsageSubcategory> entries)
+    : subcategories = entries
+        ..sort((a, b) => b.stats.bytes.compareTo(a.stats.bytes));
+
+  final List<StorageUsageSubcategory> subcategories;
+
+  StorageUsageStats get stats => subcategories.fold(
+    const StorageUsageStats(fileCount: 0, bytes: 0),
+    (total, entry) => total + entry.stats,
+  );
+}

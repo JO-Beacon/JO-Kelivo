@@ -16,7 +16,10 @@ void main() {
         ),
         isFalse,
       );
-      expect(DeviceIdentityService.isUsableHardwareId('0000000000000000'), isFalse);
+      expect(
+        DeviceIdentityService.isUsableHardwareId('0000000000000000'),
+        isFalse,
+      );
       expect(DeviceIdentityService.isUsableHardwareId('0000-0000'), isFalse);
     });
 
@@ -49,7 +52,10 @@ void main() {
         isTrue,
       );
       // Android 的 16 位十六进制 ANDROID_ID
-      expect(DeviceIdentityService.isUsableHardwareId('9774d56d682e549c'), isTrue);
+      expect(
+        DeviceIdentityService.isUsableHardwareId('9774d56d682e549c'),
+        isTrue,
+      );
       // 含 0 但也有非 0 字符，不应被误杀
       expect(DeviceIdentityService.isUsableHardwareId('0a0b0c0d0e0f'), isTrue);
     });
@@ -94,7 +100,10 @@ void main() {
       final identity = await DeviceIdentityService.resolve();
       if (identity != null) {
         expect(identity.fingerprintHash, hasLength(32));
-        expect(RegExp(r'^[a-f0-9]{32}$').hasMatch(identity.fingerprintHash), isTrue);
+        expect(
+          RegExp(r'^[a-f0-9]{32}$').hasMatch(identity.fingerprintHash),
+          isTrue,
+        );
         expect(identity.displayName, isNotEmpty);
         expect(identity.platform, isNotEmpty);
       }
@@ -103,8 +112,8 @@ void main() {
 
   group('异常与降级', () {
     test('采集器抛异常时返回 null，不向上抛', () async {
-      DeviceIdentityService.debugCollectorOverride =
-          () async => throw StateError('boom');
+      DeviceIdentityService.debugCollectorOverride = () async =>
+          throw StateError('boom');
       expect(await DeviceIdentityService.resolve(), isNull);
     });
 

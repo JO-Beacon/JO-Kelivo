@@ -526,7 +526,10 @@ void main() {
       expect(result, isNotNull);
       expect(result!.message.reasoningText, 'new chain');
       // 数据库往返后 DateTime 仅时区表示可能变化，按时刻比较。
-      expect(result.message.reasoningStartAt!.isAtSameMomentAs(startedAt), isTrue);
+      expect(
+        result.message.reasoningStartAt!.isAtSameMomentAs(startedAt),
+        isTrue,
+      );
       expect(
         result.message.reasoningFinishedAt!.isAtSameMomentAs(finishedAt),
         isTrue,
@@ -813,7 +816,11 @@ void main() {
       ],
       toolEventsByMessageId: {
         messageId: [
-          {'id': 'call_1', 'name': 'web_search', 'arguments': <String, dynamic>{}},
+          {
+            'id': 'call_1',
+            'name': 'web_search',
+            'arguments': <String, dynamic>{},
+          },
         ],
       },
       geminiSignaturesByMessageId: const {},

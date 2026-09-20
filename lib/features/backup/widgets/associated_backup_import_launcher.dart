@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/models/backup.dart';
-import '../../../core/models/backup_task_progress.dart';
+import '../../../core/services/backup/backup_cancel_token.dart';
 import '../../../core/providers/backup_provider.dart';
 import '../../../core/services/backup/associated_backup_path.dart';
 import '../../../l10n/app_localizations.dart';

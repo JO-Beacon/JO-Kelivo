@@ -1,10 +1,10 @@
+import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'dart:convert';
 
 import "../../../support/business_test_harness.dart";
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
-import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart'
     show ToolUIPart;
@@ -227,15 +227,7 @@ void main() {
     final state = buildStreamingState(settings);
     addTearDown(() => controller.cleanupTimers(state.messageId));
 
-    await controller.handleReasoningChunk(
-      ChatStreamChunk(
-        content: '',
-        reasoning: 'thinking',
-        isDone: false,
-        totalTokens: 0,
-      ),
-      state,
-    );
+    await controller.handleReasoningChunk('thinking', state);
 
     expect(
       controller.reasoningSegments[state.messageId]!.single.expanded,
@@ -414,6 +406,8 @@ void main() {
       );
       final state = buildStreamingState(settings);
 
+      state.pendingToolNames['builtin_search'] = 'builtin_search';
+
       Future<void> upsertToolEventInDb(
         String messageId, {
         required String id,
@@ -424,36 +418,18 @@ void main() {
       }) async {}
 
       await controller.handleToolResultsChunk(
-        ChatStreamChunk(
-          content: '',
-          isDone: false,
-          totalTokens: 0,
-          toolResults: [
-            ToolResultInfo(
-              id: 'builtin_search',
-              name: 'builtin_search',
-              arguments: const <String, dynamic>{},
-              content: '{"items":[{"title":"First"}]}',
-            ),
-          ],
+        ToolCallResult(
+          id: 'builtin_search',
+          output: '{"items":[{"title":"First"}]}',
         ),
         state,
         upsertToolEventInDb: upsertToolEventInDb,
       );
 
       await controller.handleToolResultsChunk(
-        ChatStreamChunk(
-          content: '',
-          isDone: false,
-          totalTokens: 0,
-          toolResults: [
-            ToolResultInfo(
-              id: 'builtin_search',
-              name: 'builtin_search',
-              arguments: const <String, dynamic>{},
-              content: '{"items":[{"title":"First"},{"title":"Second"}]}',
-            ),
-          ],
+        ToolCallResult(
+          id: 'builtin_search',
+          output: '{"items":[{"title":"First"},{"title":"Second"}]}',
         ),
         state,
         upsertToolEventInDb: upsertToolEventInDb,

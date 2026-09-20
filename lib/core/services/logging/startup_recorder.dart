@@ -59,9 +59,11 @@ class StartupRecorder {
       FlutterLogger.stage('$label first frame built', tag: 'Frame');
     });
     if (!waitForRaster) return;
-    WidgetsBinding.instance.waitUntilFirstFrameRasterized.then((_) {
-      FlutterLogger.stage('$label first frame rasterized', tag: 'Frame');
-    }).catchError((Object _) {});
+    WidgetsBinding.instance.waitUntilFirstFrameRasterized
+        .then((_) {
+          FlutterLogger.stage('$label first frame rasterized', tag: 'Frame');
+        })
+        .catchError((Object _) {});
   }
 
   /// 启动心跳。

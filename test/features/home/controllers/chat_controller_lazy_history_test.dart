@@ -117,6 +117,7 @@ class _FakeLazyChatService extends ChatService {
     String conversationId, {
     required int start,
     required int limit,
+    bool cacheInTimeline = true,
   }) async => getMessagesRange(conversationId, start: start, limit: limit);
 
   @override

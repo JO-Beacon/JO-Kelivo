@@ -11,11 +11,15 @@ import 'package:provider/provider.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 
 import '../../../core/models/chat_message.dart';
+import '../../../core/models/message_part.dart';
 import '../../../core/models/assistant.dart';
+import '../../../core/models/assistant_regex.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../utils/assistant_regex.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../chat/widgets/chat_message_widget.dart';
+import '../../chat/widgets/timeline_projection.dart';
 import '../../chat/widgets/timeline_visibility.dart';
 import '../../chat/utils/thinking_tag_parser.dart';
 import '../../chat/widgets/message_more_sheet.dart';
@@ -29,11 +33,14 @@ import '../services/tool_approval_service.dart';
 import '../utils/chat_layout_constants.dart';
 import 'model_icon.dart';
 
-/// 消息列表视图动作的回调类型
+/// 消息列表控件各动作的回调类型
+typedef OnVersionChange = Future<void> Function(String groupId, int version);
 typedef OnRegenerateMessage = void Function(ChatMessage message);
 typedef OnResendMessage = void Function(ChatMessage message);
 typedef OnTranslateMessage = void Function(ChatMessage message);
 typedef OnEditMessage = void Function(ChatMessage message);
+
+/// 切换消息角色（本仓库自有）。
 typedef OnSwitchMessageRole =
     Future<void> Function(ChatMessage message, String role);
 typedef OnDeleteMessage =
@@ -46,9 +53,20 @@ typedef OnDeleteAllVersions =
       ChatMessage message,
       Map<String, List<ChatMessage>> byGroup,
     );
+
+/// 以这条消息为起点分叉出新分支（本仓库自有）。
 typedef OnMessageFork = Future<void> Function(ChatMessage message);
+
+/// 分叉会话，可选择保留所有分支或只保留当前分支（本仓库自有）。
 typedef OnConversationFork =
     Future<void> Function(ChatMessage message, ConversationForkMode mode);
+
+/// 上游扁平模型的分叉回调（整条会话分叉，不带模式）。
+///
+/// 本仓库的等价能力是 [OnConversationFork]（多一档模式选择），保留这个
+/// typedef 是为了让上游形态的调用方也能编译；实际渲染走
+/// [MessageListView.onConversationFork]。
+typedef OnForkConversation = Future<void> Function(ChatMessage message);
 typedef OnShareMessage =
     void Function(int messageIndex, List<ChatMessage> messages);
 typedef OnSelectMessages =
@@ -62,7 +80,7 @@ typedef OnRecoveredAskUserAnswer =
       AskUserResult result,
     );
 
-/// 推理 UI 状态的数据类
+/// 推理界面状态的数据类
 class ReasoningUiState {
   final String? text;
   final bool expanded;
@@ -81,7 +99,7 @@ class ReasoningUiState {
   });
 }
 
-/// 翻译 UI 状态的数据类
+/// 翻译界面状态的数据类
 class TranslationUiState {
   final bool expanded;
   final VoidCallback? onToggle;
@@ -89,11 +107,12 @@ class TranslationUiState {
   const TranslationUiState({this.expanded = true, this.onToggle});
 }
 
-/// 显示聊天消息列表的 widget。
+/// 展示聊天消息列表的控件。
 ///
-/// 接受来自控制器的预折叠消息和预计算 byGroup，
-/// 避免每次构建重复计算。使用可变范围懒加载列表，使大型历史记录
-/// 无需布局每条前置消息即可滚动并按索引导航。
+/// 接收控制器预折叠好的消息与预计算的 byGroup，
+/// 避免每次构建都重复计算。用变高度的惰性列表，
+/// 让超长历史也能按索引滚动与定位，而无需排版
+/// 它前面的每一条消息。
 class MessageListView extends StatefulWidget {
   const MessageListView({
     super.key,
@@ -102,7 +121,24 @@ class MessageListView extends StatefulWidget {
     required this.messages,
     this.renderModels,
     required this.byGroup,
+
+    /// 上游扁平模型的“每个消息组选中的版本号”。
+    ///
+    /// 本仓库用真树模型（库里有 message_tree_edge_rows / conversation_branch_rows
+    /// / conversation_tree_state_rows 三张表），当前走哪条由 activePath() 决定，
+    /// 因此**不使用**这个映射表 —— 它只在调用方显式传入时才参与版本折叠。
+    /// ⛔ 不要为了“与上游一致”而接上它：会把树上的兄弟节点重新混进上下文。
+    this.versionSelections = const <String, int>{},
+
+    /// 有子消息的消息 ID 集合。本仓库的树模型用它判断“删除这条及之后”
+    /// 会不会连带删掉别处仍在引用的节点。
     this.messageIdsWithChildren = const <String>{},
+
+    /// 内容最大宽度。桌面端用它约束消息气泡的横向伸展。
+    this.maxContentWidth = ChatLayoutConstants.maxContentWidth,
+
+    /// 会话是否正在生成中。影响流式指示与部分卡片的可见性。
+    this.isConversationGenerating = false,
     this.truncCollapsedIndex = -1,
     required this.reasoning,
     required this.reasoningSegments,
@@ -114,31 +150,56 @@ class MessageListView extends StatefulWidget {
     required this.dividerPadding,
     this.topContentPadding = 8,
     this.bottomContentPadding = 16,
-    this.maxContentWidth = ChatLayoutConstants.maxContentWidth,
     this.pinnedStreamingMessageId,
     this.isPinnedIndicatorActive = false,
-    required this.isProcessingFiles,
-    this.isConversationGenerating = false,
+
+    /// 正在解析附件的助手消息 ID；为 null 表示不监听。
+    ///
+    /// 本仓库把它做成可选：读取方按“null 即不监听”处理，行为与必填版一致，
+    /// 便于测试只关心布局时不必构造这个通知器。
     this.processingFilesMessageId,
     this.streamingContentNotifier,
     this.spotlightMessageId,
     this.spotlightToken = 0,
     this.removingSlotIds = const <String>{},
+
+    /// 本仓库树模型：每个消息的兄弟分支 ID 列表（用于分支切换器）。
     this.siblingBranchIdsByMessageId = const <String, List<String>>{},
+
+    /// 本仓库树模型：当前激活的分支 ID。
     this.activeBranchId,
+
+    /// 本仓库树模型：切换分支时的回调。
     this.onBranchChange,
+    this.onVersionChange,
     this.onRegenerateMessage,
     this.onResendMessage,
     this.onTranslateMessage,
     this.onEditMessage,
+
+    /// 切换消息角色（用户⇄助手）。
     this.onSwitchMessageRole,
+
+    /// 删除单条消息（保留其子节点）。
     this.onDeleteMessageOnly,
+
+    /// 删除这条消息及其之后的内容。
     this.onDeleteMessageAndFollowing,
+
+    /// 只删除这一个树节点（连同其子树）。
     this.onDeleteMessageNode,
+
+    /// 删除当前分支（保留兄弟分支）。
     this.onDeleteCurrentBranch,
+    this.onDeleteMessage,
     this.onDeleteAllVersions,
+
+    /// 以这条消息为起点分叉出一个新分支（消息树自有）。
     this.onMessageFork,
+
+    /// 以这条消息为起点分叉会话：可选择保留所有分支或只保留当前分支。
     this.onConversationFork,
+    this.onForkConversation,
     this.onShareMessage,
     this.onSelectMessages,
     this.onSpeakMessage,
@@ -161,6 +222,7 @@ class MessageListView extends StatefulWidget {
     this.collapseThinkingSteps = false,
     this.showThinkingCards = true,
     this.showToolCards = true,
+    this.showProducedFiles = true,
     this.showToolResultSummary = false,
     this.hideToolResultImages = false,
     this.collapsedCodeLines,
@@ -174,19 +236,28 @@ class MessageListView extends StatefulWidget {
   final ScrollController scrollController;
   final ListController listController;
 
-  /// 预折叠消息（来自 ChatController.collapsedMessages）。
+  /// 预折叠的消息（来自 ChatController.collapsedMessages）。
   final List<ChatMessage> messages;
 
-  /// 为每个插槽预计算的渲染输入，必须与 [messages] 顺序一致。
+  /// 预计算的“每个槽位一项”渲染输入。必须与 [messages] 顺序一致。
   final List<MessageRenderModel>? renderModels;
 
-  /// 按 groupId 分组的所有消息（来自 ChatController.groupedMessages）。
+  /// 按 groupId 归组后的全部消息（来自 ChatController.groupedMessages）。
   final Map<String, List<ChatMessage>> byGroup;
 
-  /// 具有至少一个直接子消息的消息 ID，用于线性删除入口适用性。
+  /// 每个消息组选中的版本（供版本导航控件使用）。
+  final Map<String, int> versionSelections;
+
+  /// 有子消息的消息 ID 集合（本仓库树模型自有）。
   final Set<String> messageIdsWithChildren;
 
-  /// 折叠消息空间中预计算的截断索引（-1 表示无截断）。
+  /// 内容最大宽度（本仓库自有，桌面端约束气泡宽度）。
+  final double? maxContentWidth;
+
+  /// 会话是否正在生成中（本仓库自有）。
+  final bool isConversationGenerating;
+
+  /// 预计算的截断下标（折叠消息空间内，-1 表示无）。
   final int truncCollapsedIndex;
 
   final Map<String, stream_ctrl.ReasoningData> reasoning;
@@ -199,53 +270,57 @@ class MessageListView extends StatefulWidget {
   final EdgeInsetsGeometry dividerPadding;
   final double topContentPadding;
   final double bottomContentPadding;
-  final double? maxContentWidth;
   final String? pinnedStreamingMessageId;
   final bool isPinnedIndicatorActive;
-  final ValueNotifier<bool> isProcessingFiles;
 
-  /// 当前会话是否有回复正在生成。用于重新生成确认弹窗的提醒文案。
-  final bool isConversationGenerating;
-
-  /// Assistant message currently parsing attachments, or null. When omitted,
-  /// [isProcessingFiles] remains available for legacy test callers.
+  /// 正在解析附件的助手消息 ID；为 null 表示不监听。
+  ///
+  /// 作用域限定到单条消息，避免“有文件在处理”的指示器出现在每一条助手回复上。
   final ValueNotifier<String?>? processingFilesMessageId;
 
-  /// 用于流式内容更新的轻量 notifier。
-  /// 提供后，流式消息会使用 ValueListenableBuilder，避免整页重建。
+  /// 流式内容更新的轻量通知器。
+  /// 提供后，流式消息会改用 ValueListenableBuilder，
+  /// 以避免整页重建。
   final StreamingContentNotifier? streamingContentNotifier;
 
-  /// 设置后，此 ID 对应的消息会收到聚焦脉冲动画。
+  /// 设置后，该 ID 的消息会播放一次高亮脉冲动画。
   final String? spotlightMessageId;
 
-  /// 每次触发新的聚焦时递增。用作动画键，使重新选择同一条消息时重新触发脉冲。
+  /// 每次触发新的高亮都会自增。用作动画 key，
+  /// 使重复选中同一条消息也能重新播放脉冲。
   final int spotlightToken;
 
-  /// 当前在删除前淡出的插槽。插槽数据会保留在 [messages] 中，
-  /// 直到移除动画完成。
+  /// 正在删除前淡出的槽位。在移除动画结束前，
+  /// 其数据仍留在 [messages] 里。
   final Set<String> removingSlotIds;
 
-  /// 将分叉边界上的消息映射到共享其前缀的分支 ID。
-  /// 存在时，旧版本选择器由兄弟分支而非消息版本驱动。
-  final Map<String, List<String>> siblingBranchIdsByMessageId;
-
-  final String? activeBranchId;
-
-  final ValueChanged<String>? onBranchChange;
-
   // 回调
+  final OnVersionChange? onVersionChange;
+
+  /// 本仓库树模型：每个消息的兄弟分支 ID 列表与当前激活分支。
+  final Map<String, List<String>> siblingBranchIdsByMessageId;
+  final String? activeBranchId;
+  final ValueChanged<String>? onBranchChange;
   final OnRegenerateMessage? onRegenerateMessage;
   final OnResendMessage? onResendMessage;
   final OnTranslateMessage? onTranslateMessage;
   final OnEditMessage? onEditMessage;
+
+  /// 切换消息角色（本仓库自有）。
   final OnSwitchMessageRole? onSwitchMessageRole;
+
+  /// 本仓库自有的四种删除粒度 + 上游的单条删除。
   final OnDeleteMessage? onDeleteMessageOnly;
   final OnDeleteMessage? onDeleteMessageAndFollowing;
   final OnDeleteMessage? onDeleteMessageNode;
   final OnDeleteMessage? onDeleteCurrentBranch;
+  final OnDeleteMessage? onDeleteMessage;
   final OnDeleteAllVersions? onDeleteAllVersions;
+
+  /// 本仓库自有的消息分叉与会话分叉（后者带两种模式）。
   final OnMessageFork? onMessageFork;
   final OnConversationFork? onConversationFork;
+  final OnForkConversation? onForkConversation;
   final OnShareMessage? onShareMessage;
   final OnSelectMessages? onSelectMessages;
   final OnSpeakMessage? onSpeakMessage;
@@ -260,8 +335,8 @@ class MessageListView extends StatefulWidget {
   final Widget Function()? buildPinnedStreamingIndicator;
   final bool hasMoreBefore;
 
-  /// 仅在冷启动初始窗口加载期间为 true；快速路径缓存命中会在一帧批次内完成，
-  /// 不会显示骨架。
+  /// 仅在冷启动首窗加载进行中为真；快路径缓存命中
+  /// 会在一批帧内完成，不会露出骨架屏。
   final bool isLoadingWindow;
   final Future<bool> Function()? onLoadMoreBefore;
   final bool hasMoreAfter;
@@ -269,18 +344,34 @@ class MessageListView extends StatefulWidget {
   final VoidCallback? onUserScrollIntent;
   final double chatFontScale;
 
-  /// 已完成的思考块是否折叠显示（显示设置）。
+  /// 已结束的思考块是否折叠渲染（显示设置）。
   final bool collapseThinking;
+
+  /// 每个时间线区块是否只保留最后两步加一行展开入口。
+  /// 必须与渲染器一致，否则估算会误以为每个工具标题
+  /// 都可见。
   final bool collapseThinkingSteps;
+
+  /// 聊天中是否渲染思考过程卡片。
   final bool showThinkingCards;
+
+  /// 聊天中是否渲染工具调用卡片。
   final bool showToolCards;
+
+  /// 回复下方的文件摘要是否占高度。
+  final bool showProducedFiles;
+
+  /// 折叠的工具卡片是否也显示一行简短结果摘要。
   final bool showToolResultSummary;
+
+  /// 工具结果的图片缩略图是否藏在卡片下。
   final bool hideToolResultImages;
 
-  /// 长代码块折叠到的行数；为 null 时保持展开。
+  /// 长代码块折叠后的行数；保持展开时为 null。
   final int? collapsedCodeLines;
 
-  /// 代码块是否换行（桌面端或移动端换行设置），而不是水平滚动。
+  /// 代码块是否换行（桌面端，或移动端开启了换行设置）
+  /// 而不是横向滚动。
   final bool wrapCodeBlocks;
 
   final bool showModelIcon;
@@ -302,11 +393,18 @@ class _MessageListViewState extends State<MessageListView> {
 
   bool _historyLoadScheduled = false;
   bool _pointerDragInProgress = false;
-  bool _userScrollActive = false;
   ScrollMetrics? _latestPointerDragMetrics;
+  bool _userScrollActive = false;
   final ValueNotifier<bool> _deferStreamingMessageUpdates = ValueNotifier<bool>(
     false,
   );
+
+  /// 按消息 id 索引的冻结流式载荷，在延迟更新开始时
+  /// 捕获。SuperSliverList 不得对行做 AutomaticKeepAlive ——
+  /// 那会把行停到舞台外，使 [find.text] 与屏幕上的气泡都拿不到
+  /// 初始文本。可见项 builder 改为绘制这份快照。
+  final Map<String, StreamingContentData> _deferredStreamingHolds =
+      <String, StreamingContentData>{};
   DateTime? _lastHistoryLoadAt;
   Timer? _scrollIdleTimer;
   bool _pointerScrollActivityCheckScheduled = false;
@@ -314,8 +412,10 @@ class _MessageListViewState extends State<MessageListView> {
   late Map<String, int> _slotIndexById;
   late Map<String, int> _messageIndexById;
   final Map<String, int> _lastToolSignatures = <String, int>{};
-  final Set<String> _pendingToolExtentIds = <String>{};
-  var _toolExtentFlushScheduled = false;
+  final ToolExtentInvalidationQueue _toolExtentQueue =
+      ToolExtentInvalidationQueue();
+  var _awaitingAttachFlush = false;
+  var _attachFlushScheduled = false;
   final FocusNode _keyboardFocusNode = FocusNode(
     debugLabel: 'timeline-keyboard-scroll-region',
   );
@@ -331,7 +431,7 @@ class _MessageListViewState extends State<MessageListView> {
   /// 全部实测完成后不再产生开销。
   final _extentPrecalculationPolicy = ChatExtentPrecalculationPolicy();
 
-  String _slotId(ChatMessage message) => message.id;
+  String _slotId(ChatMessage message) => message.groupId ?? message.id;
 
   @override
   void initState() {
@@ -353,6 +453,10 @@ class _MessageListViewState extends State<MessageListView> {
       widget.streamingContentNotifier?.toolHeightEvents.addListener(
         _handleToolHeightEvent,
       );
+    }
+    if (!identical(oldWidget.listController, widget.listController)) {
+      _awaitingAttachFlush = _toolExtentQueue.pendingIds.isNotEmpty;
+      _scheduleAttachAwareFlush();
     }
     final oldRenderModels = _effectiveRenderModels;
     _refreshRenderModels();
@@ -394,26 +498,106 @@ class _MessageListViewState extends State<MessageListView> {
     _invalidateToolExtentForMessage(event.messageId);
   }
 
+  void _onInlineImageAspect(
+    String messageId,
+    String imageKey,
+    double aspectRatio,
+  ) {
+    if (aspectRatio <= 0 || !aspectRatio.isFinite) return;
+    final previous = timelineImageAspects[imageKey];
+    if (previous != null && (previous - aspectRatio).abs() < 0.001) return;
+    timelineImageAspects[imageKey] = aspectRatio;
+    _invalidateToolExtentForMessage(messageId);
+  }
+
   void _invalidateToolExtentForMessage(String messageId) {
     _extentEstimateCache.remove(messageId);
     final controller = widget.listController;
-    if (!controller.isAttached) return;
-    if (controller.isLocked) {
-      _pendingToolExtentIds.add(messageId);
-      if (_toolExtentFlushScheduled) return;
-      _toolExtentFlushScheduled = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _toolExtentFlushScheduled = false;
-        if (!mounted) return;
-        final ids = List<String>.of(_pendingToolExtentIds);
-        _pendingToolExtentIds.clear();
-        for (final id in ids) {
-          _applyToolExtentInvalidation(id);
-        }
-      });
+    if (!controller.isAttached) {
+      _toolExtentQueue.retain(messageId);
+      _awaitingAttachFlush = true;
+      _scheduleAttachAwareFlush();
       return;
     }
-    _applyToolExtentInvalidation(messageId);
+    if (!controller.isLocked) {
+      _applyToolExtentInvalidation(messageId);
+      return;
+    }
+    if (_toolExtentQueue.enqueue(messageId)) {
+      _scheduleToolExtentFlush();
+    }
+  }
+
+  void _scheduleAttachAwareFlush() {
+    if (_attachFlushScheduled) return;
+    if (!_awaitingAttachFlush && _toolExtentQueue.pendingIds.isEmpty) {
+      return;
+    }
+    _attachFlushScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _attachFlushScheduled = false;
+      if (!mounted) return;
+      if (!widget.listController.isAttached) return;
+      _awaitingAttachFlush = false;
+      if (_toolExtentQueue.pendingIds.isEmpty) return;
+      _scheduleToolExtentFlush();
+    });
+  }
+
+  void _scheduleToolExtentFlush() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final controller = widget.listController;
+      final result = _toolExtentQueue.takeForFlush(
+        mounted: mounted,
+        isAttached: controller.isAttached,
+        isLocked: controller.isLocked,
+      );
+      for (final id in result.ids) {
+        _applyToolExtentInvalidation(id);
+      }
+      if (result.reschedule) {
+        _scheduleToolExtentFlush();
+      } else if (_toolExtentQueue.pendingIds.isNotEmpty) {
+        _awaitingAttachFlush = true;
+        _scheduleAttachAwareFlush();
+      }
+    });
+  }
+
+  void _invalidateExtentsForApprovalChange(
+    List<PendingApprovalKey> previous,
+    List<PendingApprovalKey> next,
+  ) {
+    final previousSet = previous.toSet();
+    final nextSet = next.toSet();
+    final changed = <PendingApprovalKey>{
+      ...previousSet.difference(nextSet),
+      ...nextSet.difference(previousSet),
+    };
+    if (changed.isEmpty && previous.length != next.length) {
+      changed.addAll(nextSet);
+    }
+    if (changed.isEmpty) return;
+    for (final model in _effectiveRenderModels) {
+      final parts = widget.toolParts[model.message.id];
+      if (parts == null || parts.isEmpty) continue;
+      final conversationId = model.message.conversationId;
+      final affected = parts.any((part) {
+        for (final key in changed) {
+          if (key.matches(
+            conversationId: conversationId,
+            toolCallId: part.id,
+          )) {
+            return true;
+          }
+        }
+        return false;
+      });
+      if (affected) {
+        _invalidateToolExtentForMessage(model.message.id);
+      }
+    }
   }
 
   void _applyToolExtentInvalidation(String messageId) {
@@ -437,33 +621,34 @@ class _MessageListViewState extends State<MessageListView> {
     controller.invalidateExtent(index);
   }
 
-  /// 消息气泡周围的标题行、操作栏和垂直边距。
+  /// 气泡外的标题行 ＋ 动作栏 ＋ 上下间距。
   static const double _estimateChrome = 96.0;
 
-  /// 折叠行内思考卡片的高度。
+  /// 折叠后的内联思考卡片高度。
   static const double _estimateCollapsedCard = 44.0;
 
-  /// 折叠时间线显示的展开行高度。
+  /// 时间线区块折叠时显示的展开步骤行。
   static const double _estimateExpandRow = 36.0;
 
-  /// 在按观察密度外推前扫描的字符数。
+  /// 推算消息行密度之前扫描的字符数。
   static const int _estimateScanLimit = 8000;
 
-  /// 围栏代码在缩放前渲染的字体大小。
+  /// 围栏代码渲染时的字号（缩放前）。
   static const double _estimateCodeFontSize = 13.0;
 
-  /// 思考解析器会处理的最长消息长度。
+  /// 思考解析器最多处理的字符数。
   static const int _estimateParseLimit = 64000;
 
-  /// 在整体丢弃 memo 前保留的缓存估算值。
+  /// 整份缓存丢弃之前保留的估算条目数。
   static const int _extentEstimateCacheLimit = 512;
 
   final Map<String, _ExtentEstimate> _extentEstimateCache = {};
 
-  /// 系统无障碍文本缩放，会乘以聊天字体缩放。
+  /// 系统无障碍字号缩放，会与聊天字号相乘。
   double _systemTextScale = 1.0;
 
-  /// 估算所依赖的显示设置，在 [build] 中刷新。
+  /// 估算依赖的显示设置，在 [build] 中刷新。
+  ToolApprovalService? _approvalForEstimate;
   _EstimateSettings _estimateSettings = const _EstimateSettings(
     collapseThinking: true,
     collapseThinkingSteps: false,
@@ -473,17 +658,19 @@ class _MessageListViewState extends State<MessageListView> {
     hideToolResultImages: false,
     collapsedCodeLines: null,
     wrapCodeBlocks: false,
-    pendingApprovalIds: <String>{},
+    visualRegexSignature: 0,
+    pendingApprovals: <PendingApprovalKey>[],
   );
 
-  /// 当前已存储范围估算时的字体缩放。
+  /// 当前已存高度是按哪个字号缩放估算的。
   double? _estimatedFontScale;
 
-  /// 系统文本缩放变化后丢弃已存储范围。
+  /// 系统字号缩放变化后丢弃已存高度。
   ///
-  /// 只有 widget 驱动输入会经过 [_synchronizeExtentCache]；系统无障碍变化
-  /// 通过 MediaQuery 到达，不会改变条目数量，因此 SuperSliverList 否则会
-  /// 继续保留旧缩放下为屏幕外项目生成的估算值，直到每个项目滚入视野。
+  /// 只有控件驱动的输入会走 [_synchronizeExtentCache]；
+  /// 系统无障碍变更经 MediaQuery 到达，不改变条目数，
+  /// 否则 SuperSliverList 会一直沿用旧缩放下算出的屏外
+  /// 高度，直到它们各自被滚进视野。
   void _invalidateEstimatesIfScaleChanged() {
     final scale = widget.chatFontScale * _systemTextScale;
     if (_estimatedFontScale == scale) return;
@@ -497,27 +684,29 @@ class _MessageListViewState extends State<MessageListView> {
     });
   }
 
-  /// 消息气泡的大致高度，用于从未实际布局的项目。
+  /// 消息气泡的粗略高度，用于从未被排版过的条目。
   ///
-  /// SuperSliverList 默认估算值固定为 100px。长聊天中真实气泡比这高一到两个
-  /// 数量级，因此每次布局用实测替换估算时，总范围以及底部固定的滚动偏移
-  /// 都会移动数万像素。如果这发生在两帧之间，时间线会明显从底部闪开再回来。
-  /// 基于内容派生的估算可让这些修正变小；它不需要精确，只需数量级正确。
+  /// SuperSliverList 的默认估算一律是 100px。长对话里一条真实
+  /// 气泡比它高一到两个数量级，于是每次排版用实测替换估算时，
+  /// 总高度 —— 以及随之而来的贴底滚动偏移 —— 会移动
+  /// 数万像素。
+  /// 若这一替换跨两帧发生，时间线会明显弹离底部再弹回来。
+  /// 按内容推导的估算能让这些修正量保持很小；
+  /// 它不必精确，只要量级对就够。
   double _estimateItemExtent(int? index, double crossAxisExtent) {
-    // null 索引询问一个范围是否适用于所有项目。返回正数会让 SuperSliverList
-    // 对整个列表使用该值，而不会查询下方按项目分支，因此这里必须返回 0。
+    // 索引为 null 时是在问“是否有一个高度适用于所有条目”。
+    // 若回答正数，SuperSliverList 会把它套用到整个列表，
+    // 不再走下面的逐条分支，所以这里必须是 0。
     if (index == null) return 0;
     final models = _effectiveRenderModels;
     if (index < 0 || index >= models.length) return _estimateChrome;
 
     final message = models[index].message;
-    final text = message.content;
-    final settings = _estimateSettings;
-    if (message.role == 'tool' &&
-        !settings.showToolCards &&
-        !_hiddenStandaloneToolMessageRemainsVisible(text)) {
-      return 0;
-    }
+    final snapshot = _streamingSnapshot(message);
+    final estimateParts = snapshot?.parts ?? message.parts;
+    final text = snapshot != null && snapshot.content.isNotEmpty
+        ? snapshot.content
+        : message.content;
     final reasoning = message.role == 'assistant'
         ? widget.reasoning[message.id]
         : null;
@@ -531,36 +720,86 @@ class _MessageListViewState extends State<MessageListView> {
         ? widget.toolParts[message.id]
         : null;
     final hasTools = toolParts != null && toolParts.isNotEmpty;
-    if (text.isEmpty && !hasReasoning && !hasTools) return _estimateChrome;
+    final hasStructuredTimeline =
+        message.role == 'assistant' &&
+        estimateParts.any(
+          (part) =>
+              part is ReasoningPart ||
+              part is ToolCallPart ||
+              part is ImagePart,
+        );
+    if (text.isEmpty && !hasReasoning && !hasTools && !hasStructuredTimeline) {
+      return _estimateChrome;
+    }
 
-    // 布局会反复查询同一个项目（每次调整大小、窗口变化都会），而下方扫描
-    // 随消息长度线性增长，因此按结果依赖的全部因素缓存，可保持布局阶段廉价。
-    // 内容按对象身份比较：编辑或流式消息总会携带新字符串，等长重写不能命中缓存。
+    // 排版会反复询问同一个条目（每次尺寸变化、每次窗口
+    // 变化），而下面的扫描与消息长度线性相关，因此用一份
+    // 以“结果所依赖的一切”为键的记忆缓存，可让排版阶段保持轻量。
+    // 内容按身份比较：编辑过或正在流式输出的消息一定
+    // 带来新字符串，而等长度改写不得命中该缓存。
     final fontScale = widget.chatFontScale * _systemTextScale;
+    final settings = _estimateSettings;
     final reasoningSignature = _reasoningEstimateSignature(
       reasoning,
       reasoningSegments,
+      isStreaming: message.isStreaming,
     );
     final toolSignature = _toolEstimateSignature(toolParts);
+    final partsSignature = _partsEstimateSignature(estimateParts);
+    final streamingSignature = Object.hash(
+      snapshot?.timelineStructureSignature ?? 0,
+      snapshot?.reasoningFinishedAt,
+      message.isStreaming,
+    );
+    final estimateContent = text;
     final cached = _extentEstimateCache[message.id];
     if (cached != null &&
-        identical(cached.content, text) &&
+        identical(cached.content, estimateContent) &&
         cached.crossAxisExtent == crossAxisExtent &&
         cached.fontScale == fontScale &&
         cached.settings == settings &&
         cached.reasoningSignature == reasoningSignature &&
-        cached.toolSignature == toolSignature) {
+        cached.toolSignature == toolSignature &&
+        cached.partsSignature == partsSignature &&
+        cached.streamingSignature == streamingSignature) {
       return cached.extent;
     }
 
-    // 行内思考会作为独立卡片渲染。折叠时只有可见剩余内容占空间，
-    // 因此使用渲染器同样的解析器解析，而不是猜测标签语法。
+    // 独立的工具行渲染成自己的卡片 —— 用户隐藏工具卡片时
+    // 则不渲染。追问用户的卡片始终显示，以免生成被阻塞。
+    // 待审批例外在此不适用：`_buildToolMessage`
+    // 构建这些行时 `loading` 恒为 false。
+    if (message.role == 'tool' &&
+        !settings.showToolCards &&
+        !_hiddenStandaloneToolMessageRemainsVisible(text)) {
+      if (_extentEstimateCache.length > _extentEstimateCacheLimit) {
+        _extentEstimateCache.clear();
+      }
+      _extentEstimateCache[message.id] = _ExtentEstimate(
+        content: estimateContent,
+        crossAxisExtent: crossAxisExtent,
+        fontScale: fontScale,
+        settings: settings,
+        reasoningSignature: reasoningSignature,
+        toolSignature: toolSignature,
+        partsSignature: partsSignature,
+        streamingSignature: streamingSignature,
+        extent: 0,
+      );
+      return 0;
+    }
+
+    // 内联思考渲染成自己的卡片。它被折叠时 —— 或
+    // 思考卡片整体被隐藏时 —— 只有可见的部分占高度，
+    // 因此要用与渲染器相同的解析器把它切出来。
     var body = text;
     var collapsedCards = 0;
-    if ((settings.collapseThinking || !settings.showThinkingCards) &&
+    final shouldStripInlineThink =
         message.role != 'user' &&
         text.length <= _estimateParseLimit &&
-        text.contains('<')) {
+        text.contains('<') &&
+        (!settings.showThinkingCards || settings.collapseThinking);
+    if (shouldStripInlineThink) {
       final parsed = ThinkingTagParser.parseLegacyInlineBlocks(text);
       if (parsed.hasThinking) {
         body = parsed.visibleContent;
@@ -572,19 +811,51 @@ class _MessageListViewState extends State<MessageListView> {
 
     final fontSize = 15.6 * fontScale;
     final lineHeight = fontSize * 1.5;
-    // 用户气泡有内缩，永远不会占满全宽。
+    // 用户气泡有内缩，从不占满整宽。
     final bubbleWidth = crossAxisExtent * (message.role == 'user' ? 0.85 : 1.0);
     final textWidth = math.max(80.0, bubbleWidth - 28);
-    // 宽字符（CJK）大约两倍于拉丁字符宽度，因此混排决定每行可容纳多少字符。
+    // 全角（中日韩）字符约为拉丁字符的两倍宽，
+    // 两者的比例决定了每行能放多少个字符。
     final charWidth = fontSize * (0.5 + 0.55 * _wideCharRatio(body));
     final charsPerLine = math.max(1.0, textWidth / charWidth);
-    // 代码使用固定 13px 等宽字体渲染，因此换行列数和行高与正文不同。
+    // 代码用固定 13px 等宽字体渲染，因此换行位置与
+    // 正文不同，行高也不同。
     final codeFontSize = _estimateCodeFontSize * fontScale;
     final codeCharsPerLine = math.max(1.0, textWidth / (codeFontSize * 0.6));
-    final bodyLines = body.isEmpty
+    // 空正文也会报出一行；跳过它，
+    // 使“只有工具”的助手轮次是边框 ＋ 卡片，而不是多一行幽灵文本。
+    final visualBody = _estimateVisualTransform(
+      body,
+      scope: message.role == 'user'
+          ? AssistantRegexScope.user
+          : AssistantRegexScope.assistant,
+    );
+    final timeline = _estimateTimelineExtent(
+      message: message,
+      parts: estimateParts,
+      toolParts: toolParts,
+      reasoning: reasoning,
+      reasoningSegments: reasoningSegments,
+      visualContent: visualBody,
+      contentSplitOffsets:
+          snapshot?.contentSplitOffsets ??
+          widget.contentSplits[message.id]?.offsets,
+      reasoningCountAtSplit:
+          snapshot?.reasoningCountAtSplit ??
+          widget.contentSplits[message.id]?.reasoningCounts,
+      toolCountAtSplit:
+          snapshot?.toolCountAtSplit ??
+          widget.contentSplits[message.id]?.toolCounts,
+      textWidth: textWidth,
+      fontScale: fontScale,
+    );
+    final bodyForLines = message.role == 'assistant'
+        ? (timeline.extent > 0 ? '' : visualBody)
+        : visualBody;
+    final bodyLines = bodyForLines.isEmpty
         ? 0.0
         : _wrappedLineCount(
-            body,
+            bodyForLines,
             charsPerLine: charsPerLine,
             codeCharsPerLine: settings.wrapCodeBlocks ? codeCharsPerLine : null,
             codeLineRatio: codeFontSize / fontSize,
@@ -594,122 +865,204 @@ class _MessageListViewState extends State<MessageListView> {
         bodyLines * lineHeight +
         _estimateChrome +
         collapsedCards * _estimateCollapsedCard +
-        (settings.showThinkingCards
-            ? _estimateReasoningExtent(
-                reasoning,
-                reasoningSegments,
-                textWidth: textWidth,
-                fontScale: fontScale,
-              )
-            : 0) +
-        _estimateToolExtent(
-          toolParts,
-          messageId: message.id,
-          textWidth: textWidth,
-          fontScale: fontScale,
-        );
+        timeline.extent;
 
     if (_extentEstimateCache.length > _extentEstimateCacheLimit) {
       _extentEstimateCache.clear();
     }
     _extentEstimateCache[message.id] = _ExtentEstimate(
-      content: text,
+      content: estimateContent,
       crossAxisExtent: crossAxisExtent,
       fontScale: fontScale,
       settings: settings,
       reasoningSignature: reasoningSignature,
       toolSignature: toolSignature,
+      partsSignature: partsSignature,
+      streamingSignature: streamingSignature,
       extent: extent,
     );
     return extent;
   }
 
-  /// 渲染在答案上方的推理卡片估算高度。
-  ///
-  /// 推理内容不在 [ChatMessage.content] 中，仅按内容估算会完全遗漏它；
-  /// 推理较多的消息会被低估一个数量级，跨未测量区域的每次滚动或锚点计算
-  /// 也会产生相同偏差。这与渲染器在存在分段时显示分段、否则显示单个推理块的
-  /// 选择保持一致。
-  double _estimateReasoningExtent(
-    stream_ctrl.ReasoningData? reasoning,
-    List<stream_ctrl.ReasoningSegmentData>? segments, {
-    required double textWidth,
-    required double fontScale,
-  }) {
-    var extent = 0.0;
-    void addCard(String reasoningText, bool expanded) {
-      if (reasoningText.isEmpty) return;
-      extent += _estimateCollapsedCard;
-      if (!expanded) return;
-      final fontSize = 13.0 * fontScale;
-      final charWidth = fontSize * (0.5 + 0.55 * _wideCharRatio(reasoningText));
-      final charsPerLine = math.max(1.0, textWidth / charWidth);
-      extent +=
-          _wrappedLineCount(
-            reasoningText,
-            charsPerLine: charsPerLine,
-            codeCharsPerLine: null,
-            codeLineRatio: 1.0,
-            collapsedCodeLines: null,
-          ) *
-          (fontSize * 1.5);
+  /// 用与渲染器相同的投影器算出的时间线高度。
+  StreamingContentData? _streamingSnapshot(ChatMessage message) {
+    if (!message.isStreaming) return null;
+    if (_deferStreamingMessageUpdates.value) {
+      final hold = _deferredStreamingHolds[message.id];
+      if (hold != null) return hold;
     }
-
-    if (segments != null && segments.isNotEmpty) {
-      for (final segment in segments) {
-        addCard(segment.text, segment.expanded);
-      }
-    } else if (reasoning != null) {
-      addCard(reasoning.text, reasoning.expanded);
-    }
-    return extent;
+    final notifier = widget.streamingContentNotifier;
+    if (notifier == null || !notifier.hasNotifier(message.id)) return null;
+    return notifier.getNotifier(message.id).value;
   }
 
-  double _estimateToolExtent(
-    List<ToolUIPart>? parts, {
-    required String messageId,
+  ({double extent, bool fromParts}) _estimateTimelineExtent({
+    required ChatMessage message,
+    required List<MessagePart> parts,
+    required List<ToolUIPart>? toolParts,
+    required stream_ctrl.ReasoningData? reasoning,
+    required List<stream_ctrl.ReasoningSegmentData>? reasoningSegments,
+    required String visualContent,
+    required List<int>? contentSplitOffsets,
+    required List<int>? reasoningCountAtSplit,
+    required List<int>? toolCountAtSplit,
     required double textWidth,
     required double fontScale,
   }) {
-    if (parts == null || parts.isEmpty) return 0;
+    if (message.role != 'assistant') {
+      return (extent: 0, fromParts: false);
+    }
     final settings = _estimateSettings;
-    final cardTools = [
-      for (final part in parts)
-        if (toolCreatesTimelineCard(part.toolName)) part,
+    final liveTools = <TimelineToolRef>[
+      for (var i = 0; i < (toolParts?.length ?? 0); i++)
+        TimelineToolRef(
+          providerId: toolParts![i].id,
+          fallbackOrdinal: i,
+          toolName: toolParts[i].toolName,
+          arguments: toolParts[i].arguments,
+          content: toolParts[i].content,
+          metadata: toolParts[i].metadata,
+          loading: toolParts[i].loading,
+          memoToken: identityHashCode(toolParts[i]),
+        ),
     ];
-    if (cardTools.isEmpty) return 0;
-    final splits = widget.contentSplits[messageId];
-    final blocks = splitToolsIntoTimelineBlocks(
-      cardTools,
-      toolCounts: splits?.toolCounts,
+    final reasoningRefs = <TimelineReasoningRef>[
+      if (reasoningSegments != null && reasoningSegments.isNotEmpty)
+        for (final segment in reasoningSegments)
+          TimelineReasoningRef(
+            text: segment.text,
+            expanded: segment.expanded,
+            loading: timelineReasoningLoading(
+              finishedAt: segment.finishedAt,
+              isStreaming: message.isStreaming,
+            ),
+            startAt: segment.startAt,
+            finishedAt: segment.finishedAt,
+            toolStartIndex: segment.toolStartIndex,
+          )
+      else if (reasoning != null && reasoning.text.isNotEmpty)
+        TimelineReasoningRef(
+          text: reasoning.text,
+          expanded: reasoning.expanded,
+          loading: timelineReasoningLoading(
+            finishedAt: reasoning.finishedAt,
+            isStreaming: message.isStreaming,
+          ),
+          startAt: reasoning.startAt,
+          finishedAt: reasoning.finishedAt,
+        ),
+    ];
+    final projected = projectAssistantTimeline(
+      parts: parts,
+      liveTools: liveTools,
+      reasoningSegments: reasoningRefs,
+      visualContent: visualContent,
+      contentSplitOffsets: contentSplitOffsets,
+      reasoningCountAtSplit: reasoningCountAtSplit,
+      toolCountAtSplit: toolCountAtSplit,
+      transformText: _estimateVisualTransform,
+      partsArrivalOrdered: message.isStreaming,
+      inlineThinkingExpanded: !settings.collapseThinking,
+    );
+    bool isPending(TimelineToolRef tool) => _isPendingApproval(
+      conversationId: message.conversationId,
+      toolCallId: tool.providerId,
     );
     var extent = 0.0;
-    for (final block in blocks) {
-      final visible = [
-        for (final part in block)
-          if (isTimelineToolVisible(
-            toolName: part.toolName,
-            loading: part.loading,
-            showToolCards: settings.showToolCards,
-            pendingApproval: settings.pendingApprovalIds.contains(part.id),
-          ))
-            part,
-      ];
-      if (visible.isEmpty) continue;
+    var visibleBlockCount = 0;
+    void addVisible(double height) {
+      if (visibleBlockCount > 0) extent += 8.0;
+      extent += height;
+      visibleBlockCount++;
+    }
+
+    final fontSize = 15.6 * fontScale;
+    final lineHeight = fontSize * 1.5;
+    final codeFontSize = _estimateCodeFontSize * fontScale;
+    final codeCharsPerLine = math.max(1.0, textWidth / (codeFontSize * 0.6));
+    for (final block in visibleAssistantTimeline(
+      projected,
+      showThinkingCards: settings.showThinkingCards,
+      showToolCards: settings.showToolCards,
+      isPendingApproval: isPending,
+    )) {
+      if (block.isImage) {
+        addVisible(
+          estimateTimelineImageHeight(
+            maxWidth: textWidth,
+            aspectRatio:
+                block.aspectRatio ?? timelineImageAspects[block.imageKey],
+          ),
+        );
+        continue;
+      }
+      if (block.isText && block.text != null) {
+        final charWidth = fontSize * (0.5 + 0.55 * _wideCharRatio(block.text!));
+        final charsPerLine = math.max(1.0, textWidth / charWidth);
+        addVisible(
+          _wrappedLineCount(
+                block.text!,
+                charsPerLine: charsPerLine,
+                codeCharsPerLine: settings.wrapCodeBlocks
+                    ? codeCharsPerLine
+                    : null,
+                codeLineRatio: codeFontSize / fontSize,
+                collapsedCodeLines: settings.collapsedCodeLines,
+              ) *
+              lineHeight,
+        );
+        continue;
+      }
+      if (!block.isThinking) continue;
       final collapsed = collapseTimelineSteps(
-        visible,
+        block.thinkingSteps,
         collapseThinkingSteps: settings.collapseThinkingSteps,
       );
-      if (collapsed.hasExpandRow) extent += _estimateExpandRow;
-      for (final part in collapsed.visibleSteps) {
+      addVisible(
+        _estimateVisibleThinkingHeight(
+          VisibleTimelineBlock(
+            visibleSteps: collapsed.visibleSteps,
+            hiddenCount: collapsed.hiddenCount,
+          ),
+          conversationId: message.conversationId,
+          textWidth: textWidth,
+          fontScale: fontScale,
+        ),
+      );
+    }
+    return (extent: extent, fromParts: projected.fromParts);
+  }
+
+  double _estimateVisibleThinkingHeight(
+    VisibleTimelineBlock visible, {
+    required String conversationId,
+    required double textWidth,
+    required double fontScale,
+  }) {
+    final settings = _estimateSettings;
+    var extent = 0.0;
+    if (visible.hasExpandRow) extent += _estimateExpandRow;
+    for (final step in visible.visibleSteps) {
+      if (step.isReasoning) {
+        extent += _estimateReasoningStepHeight(
+          step.reasoning!,
+          textWidth: textWidth,
+          fontScale: fontScale,
+        );
+      } else {
+        final tool = step.tool!;
         extent += _estimateCollapsedCard;
         extent += estimateToolExtraHeight(
-          toolName: part.toolName,
-          arguments: part.arguments,
-          content: part.content,
+          toolName: tool.toolName,
+          arguments: tool.arguments,
+          content: tool.content,
+          metadata: tool.metadata,
           showToolResultSummary: settings.showToolResultSummary,
           hideToolResultImages: settings.hideToolResultImages,
-          pendingApproval: settings.pendingApprovalIds.contains(part.id),
+          pendingApproval: _isPendingApproval(
+            conversationId: conversationId,
+            toolCallId: tool.providerId,
+          ),
           textWidth: textWidth,
           fontScale: fontScale,
           wrappedLineCount: _wrappedLineCount,
@@ -719,40 +1072,113 @@ class _MessageListViewState extends State<MessageListView> {
     return extent;
   }
 
+  String _estimateVisualTransform(
+    String text, {
+    AssistantRegexScope scope = AssistantRegexScope.assistant,
+  }) {
+    return applyAssistantRegexes(
+      text,
+      assistant: widget.assistant,
+      scope: scope,
+      target: AssistantRegexTransformTarget.visual,
+    );
+  }
+
+  bool _isPendingApproval({
+    required String conversationId,
+    required String toolCallId,
+  }) {
+    return _approvalForEstimate?.pendingFor(
+          toolCallId: toolCallId,
+          conversationId: conversationId,
+        ) !=
+        null;
+  }
+
+  double _estimateReasoningStepHeight(
+    TimelineReasoningRef reasoning, {
+    required double textWidth,
+    required double fontScale,
+  }) {
+    if (reasoning.text.isEmpty) return 0;
+    var extent = _estimateCollapsedCard;
+    if (!reasoning.expanded) {
+      if (reasoning.loading) return extent + 100;
+      return extent;
+    }
+    final fontSize = 13.0 * fontScale;
+    final charWidth = fontSize * (0.5 + 0.55 * _wideCharRatio(reasoning.text));
+    final charsPerLine = math.max(1.0, textWidth / charWidth);
+    return extent +
+        _wrappedLineCount(
+              reasoning.text,
+              charsPerLine: charsPerLine,
+              codeCharsPerLine: null,
+              codeLineRatio: 1.0,
+              collapsedCodeLines: null,
+            ) *
+            (fontSize * 1.5);
+  }
+
+  /// 该估算所依据的工具卡片输入的身份标识。
+  ///
+  /// 流式更新会把每个 [ToolUIPart] 换成新实例，因此对象
+  /// 身份就是变更信号 —— 与实时工具表同一条规则。
+  int _partsEstimateSignature(List<MessagePart> parts) {
+    if (parts.isEmpty) return 0;
+    return Object.hashAll([for (final part in parts) identityHashCode(part)]);
+  }
+
   int _toolEstimateSignature(List<ToolUIPart>? parts) {
     if (parts == null || parts.isEmpty) return 0;
     return Object.hashAll([for (final part in parts) identityHashCode(part)]);
   }
 
-  /// 估算所依据的推理输入身份。
+  /// 该估算所依据的推理输入的身份标识。
   ///
-  /// 推理状态对象会原地变化，但其文本在每次变化时都会替换为新字符串，
-  /// 因此文本身份加上展开标志可以区分估算依赖的每个状态。
+  /// 推理状态对象是原地修改的，但它们的文本每次变更都会被
+  /// 换成新字符串，所以“文本身份 ＋ 展开标志”足以
+  /// 区分估算依赖的每一种状态。
   int _reasoningEstimateSignature(
     stream_ctrl.ReasoningData? reasoning,
-    List<stream_ctrl.ReasoningSegmentData>? segments,
-  ) {
+    List<stream_ctrl.ReasoningSegmentData>? segments, {
+    required bool isStreaming,
+  }) {
     if (reasoning == null && (segments == null || segments.isEmpty)) return 0;
     return Object.hashAll([
+      isStreaming,
       if (reasoning != null) ...[
         identityHashCode(reasoning.text),
         reasoning.expanded,
+        reasoning.finishedAt,
+        timelineReasoningLoading(
+          finishedAt: reasoning.finishedAt,
+          isStreaming: isStreaming,
+        ),
       ],
       if (segments != null)
         for (final segment in segments) ...[
           identityHashCode(segment.text),
           segment.expanded,
+          segment.finishedAt,
+          timelineReasoningLoading(
+            finishedAt: segment.finishedAt,
+            isStreaming: isStreaming,
+          ),
         ],
     ]);
   }
 
-  /// 按正文行数计算的渲染高度，逐硬换行分别换行。
+  /// 按正文行数表示的渲染高度，每个硬换行分别计算。
   ///
-  /// 将总长度除以 [charsPerLine] 会合并空行和短行，而这恰好是聊天消息常见形态。
-  /// 两种结构否则会计算错误：Markdown 链接隐藏目标，围栏代码块使用自己的字体，
-  /// 渲染器换行时按 [codeCharsPerLine] 换行；水平滚动时（[codeCharsPerLine] 为 null）
-  /// 每个源码行占一行，每行高度为正文行的 [codeLineRatio]。
-  /// 代码块还可能折叠到 [collapsedCodeLines] 个源码行。
+  /// 用总长度除以 [charsPerLine] 会把空行与短行压平，
+  /// 而聊天消息恰恰多是这种形状。有两类结构
+  /// 会被算错：Markdown 链接只渲染标签、不渲染目标，
+  /// 围栏代码块用自己的字体渲染 —— 渲染器换行时按
+  /// [codeCharsPerLine] 折行，横向滚动时则每个源码行占一行
+  ///（此时 [codeCharsPerLine] 为 null），每行高度是正文行的
+  /// [codeLineRatio] 倍。代码块还可能被折叠到
+  /// [collapsedCodeLines] 个源码行。
   double _wrappedLineCount(
     String text, {
     required double charsPerLine,
@@ -761,9 +1187,9 @@ class _MessageListViewState extends State<MessageListView> {
     required int? collapsedCodeLines,
   }) {
     var lines = 0.0;
-    var visible = 0; // 当前行已渲染的字符数
-    var fenceRows = 0.0; // 打开的代码围栏内已渲染的行数
-    var fenceSourceLines = 0; // 打开的代码围栏内硬行数
+    var visible = 0; // rendered characters on the current line
+    var fenceRows = 0.0; // rendered rows inside the open code fence
+    var fenceSourceLines = 0; // hard lines inside the open code fence
     var inFence = false;
     var index = 0;
 
@@ -771,7 +1197,7 @@ class _MessageListViewState extends State<MessageListView> {
       if (inFence) {
         fenceSourceLines++;
         fenceRows += visible == 0 || codeCharsPerLine == null
-            ? 1.0 // 每个源码行一行：代码横向滚动
+            ? 1.0 // one row per source line: code scrolls sideways
             : (visible / codeCharsPerLine).ceilToDouble();
       } else {
         lines += visible == 0 ? 1.0 : (visible / charsPerLine).ceilToDouble();
@@ -780,7 +1206,7 @@ class _MessageListViewState extends State<MessageListView> {
     }
 
     void endFence() {
-      // 折叠会隐藏源码行，因此换行后的行数也随之减少。
+      // 折叠会隐藏源码行，折行后的行数随之减少。
       final shown = collapsedCodeLines == null || fenceSourceLines == 0
           ? fenceRows
           : fenceRows * math.min(1.0, collapsedCodeLines / fenceSourceLines);
@@ -789,8 +1215,9 @@ class _MessageListViewState extends State<MessageListView> {
       fenceSourceLines = 0;
     }
 
-    // 非常长的消息只需数量级正确，因此扫描按字符预算；单行兆字节 JSON
-    // 不能遍历整串，尾部按观察密度外推。
+    // 超长消息只需要量级正确，因此扫描按字符数设预算 ——
+    // 一行 1MB 的 JSON 不能整串遍历 —— 尾部按
+    // 观测到的密度外推。
     while (index < text.length && index < _estimateScanLimit) {
       final unit = text.codeUnitAt(index);
       if (unit == 0x0A) {
@@ -811,7 +1238,7 @@ class _MessageListViewState extends State<MessageListView> {
         continue;
       }
       if (unit == 0x5D && index + 1 < text.length) {
-        // Markdown 链接只渲染标签，从不渲染目标。
+        // Markdown 链接渲染的是标签，绝不是目标地址。
         if (text.codeUnitAt(index + 1) == 0x28) {
           final close = text.indexOf(')', index + 2);
           if (close > 0) {
@@ -830,7 +1257,7 @@ class _MessageListViewState extends State<MessageListView> {
     return lines * (text.length / math.max(1, index));
   }
 
-  /// 判断 ``` 围栏标记是否从 [index] 开始。
+  /// [index] 处是否是一个 ``` 围栏标记的起点。
   bool _isFenceMarker(String text, int index) {
     if (index + 2 >= text.length) return false;
     if (text.codeUnitAt(index + 1) != 0x60 ||
@@ -840,7 +1267,7 @@ class _MessageListViewState extends State<MessageListView> {
     return index == 0 || text.codeUnitAt(index - 1) == 0x0A;
   }
 
-  /// 宽字符占比，采样使超大消息的成本保持稳定。
+  /// 全角字符占比，采用抽样以免超长消息上开销变大。
   double _wideCharRatio(String text) {
     const samples = 256;
     final step = math.max(1, text.length ~/ samples);
@@ -887,6 +1314,7 @@ class _MessageListViewState extends State<MessageListView> {
         oldWidget.collapseThinkingSteps != widget.collapseThinkingSteps ||
         oldWidget.showThinkingCards != widget.showThinkingCards ||
         oldWidget.showToolCards != widget.showToolCards ||
+        oldWidget.showProducedFiles != widget.showProducedFiles ||
         oldWidget.showToolResultSummary != widget.showToolResultSummary ||
         oldWidget.hideToolResultImages != widget.hideToolResultImages ||
         oldWidget.collapsedCodeLines != widget.collapsedCodeLines ||
@@ -924,8 +1352,10 @@ class _MessageListViewState extends State<MessageListView> {
     if (newModels.length < oldModels.length) {
       final removedOldIndices = _removedOldIndices(oldModels, newModels);
       if (removedOldIndices != null) {
-        // 删除索引处范围后，每个幸存插槽的实测高度保持关联到新索引；
-        // 否则下方回退会丢弃所有测量，让列表在数帧内重新测量整个窗口时漂移。
+        // 删掉被移除下标处的高度，能让每个存活槽位的实测高度
+        // 仍挂在它的新下标上；否则会走下面的兜底分支，
+        // 丢掉全部实测值，让列表在随后几帧重新测量整个窗口时
+        // 发生漂移。
         final anchor = _captureVisibleAnchorForRemoval(
           controller,
           removedOldIndices,
@@ -1011,8 +1441,9 @@ class _MessageListViewState extends State<MessageListView> {
     controller.invalidateAllExtents();
   }
 
-  /// 本帧是否由布局阶段定位请求（底部固定、保持距离、流式自动跟随）
-  /// 拥有滚动位置。锚点恢复必须让步，而不是与其争抢。
+  /// 本帧滚动位置是否由排版阶段的定位请求接管（贴底、保持
+  /// 距离、流式自动跟随）。
+  /// 此时锚点恢复必须让位，而不是与它互抢。
   bool get _layoutPositionOwnedElsewhere {
     final scrollController = widget.scrollController;
     return scrollController is scroll_ctrl.ChatAutoFollowScrollController &&
@@ -1030,10 +1461,12 @@ class _MessageListViewState extends State<MessageListView> {
     return _anchorAtIndex(controller, visible.$1);
   }
 
-  /// 捕获删除后仍存在的最上方可见插槽，作为以删除后索引空间表示的锚点。
+  /// 记录移除后仍存活的最上方可见槽位，作为以“移除后下标空间”
+  /// 表示的锚点。
   ///
-  /// 当所有可见插槽都被删除时，锚点落到下方最近的幸存插槽，其内容会上滑
-  /// 进入腾出的视口；若没有，则落到上方最近的幸存插槽。
+  /// 当所有可见槽位都在被移除时，锚点落到下方最近的存活槽位
+  ///（其内容会滑入腾出的视口）；下方没有时，
+  /// 则取上方最近的存活槽位。
   ({int index, double alignment})? _captureVisibleAnchorForRemoval(
     ListController controller,
     List<int> removedOldIndices,
@@ -1074,13 +1507,18 @@ class _MessageListViewState extends State<MessageListView> {
   ) {
     final position = widget.scrollController.position;
     final itemExtent = controller.extentForIndex(index).$1;
-    // 滚动位置由子项实际绘制位置定义，而范围列表偏移部分来自从未进入布局的
-    // 行的估算高度。混用两种坐标会把累计误差烘焙进对齐，恢复跳转会准确
-    // 偏移该误差；对估算密集历史（长推理载荷、超大消息）会表现为视口跳到
-    // 随机位置。应锚定实际绘制偏移，仅当子项未构建时回退到估算偏移。
+    // 滚动位置由子项实际被绘制的位置定义，
+    // 而高度列表的偏移有一部分来自那些从未参与排版的行的
+    // 估算高度。混用这两套坐标，会把它们累积的差值
+    // 烙进对齐结果，锚点恢复的跳转会正好偏移这个误差 ——
+    // 在估算占比高的历史（长推理载荷、超大消息）里，
+    // 看起来就是视口跳到了一个莫名其妙的位置。
+    // 因此以“已绘制偏移”为锚，
+    // 只有子项尚未构建时才回退到估算偏移。
     final itemLeading =
         _paintedLeadingOffset(index) ??
-        // 这与 jumpToItem 使用的偏移查询相同。在新子列表进入布局前使用是安全的。
+        // 这里用的是 jumpToItem 同款偏移查询。在子项列表进入排版之前
+        // 调用它是安全的。
         // ignore: invalid_use_of_visible_for_testing_member
         controller.getOffsetToReveal(index, 0);
     final availableAlignmentExtent = position.viewportDimension - itemExtent;
@@ -1090,7 +1528,8 @@ class _MessageListViewState extends State<MessageListView> {
     return (index: index, alignment: alignment);
   }
 
-  /// [index] 对应子项实际布局时的滚动偏移；该子项当前未构建时返回 null。
+  /// [index] 的子项实际被排版时所处的滚动偏移，
+  /// 该子项当前未构建时为 null。
   double? _paintedLeadingOffset(int index) {
     final root = context.findRenderObject();
     if (root == null) return null;
@@ -1123,7 +1562,8 @@ class _MessageListViewState extends State<MessageListView> {
     return null;
   }
 
-  /// 新列表中缺失的旧列表索引；如果新列表不只是旧列表移除部分插槽，则返回 null。
+  /// 旧列表中在新列表里缺失的槽位下标；
+  /// 当新列表并非“旧列表删掉若干槽位”时为 null。
   List<int>? _removedOldIndices(
     List<MessageRenderModel> oldModels,
     List<MessageRenderModel> newModels,
@@ -1178,7 +1618,17 @@ class _MessageListViewState extends State<MessageListView> {
         old.promptTokens != current.promptTokens ||
         old.completionTokens != current.completionTokens ||
         old.cachedTokens != current.cachedTokens ||
-        old.durationMs != current.durationMs;
+        old.durationMs != current.durationMs ||
+        _partsIdentityChanged(old.parts, current.parts);
+  }
+
+  bool _partsIdentityChanged(List<MessagePart> old, List<MessagePart> current) {
+    if (identical(old, current)) return false;
+    if (old.length != current.length) return true;
+    for (var i = 0; i < old.length; i++) {
+      if (!identical(old[i], current[i])) return true;
+    }
+    return false;
   }
 
   bool _isPrefix(
@@ -1244,7 +1694,7 @@ class _MessageListViewState extends State<MessageListView> {
     super.dispose();
   }
 
-  /// 构建显示在截断位置的上下文分隔 widget。
+  /// 构建显示在截断位置的分隔线控件。
   Widget _buildContextDivider(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
@@ -1281,9 +1731,27 @@ class _MessageListViewState extends State<MessageListView> {
 
   @override
   Widget build(BuildContext context) {
-    // 项目以系统缩放乘聊天缩放渲染（参见 _buildMessageItem 中的 MediaQuery
-    // 覆盖），因此估算必须同时使用两者。
+    // 条目按“系统缩放 × 聊天缩放”渲染（见 _buildMessageItem 里的
+    // MediaQuery 覆盖），因此估算必须同时用到两者。
     _systemTextScale = MediaQuery.textScalerOf(context).scale(1);
+    var pendingApprovals = const <PendingApprovalKey>[];
+    try {
+      _approvalForEstimate = context.read<ToolApprovalService>();
+      pendingApprovals = context.select<ToolApprovalService, _EstimateIdSet>((
+        approval,
+      ) {
+        return _EstimateIdSet([
+          for (final req in approval.pendingRequests)
+            PendingApprovalKey(
+              conversationId: req.conversationId ?? '',
+              toolCallId: req.toolCallId,
+            ),
+        ]);
+      }).ids;
+    } catch (_) {
+      _approvalForEstimate = null;
+    }
+    final previousApprovals = _estimateSettings.pendingApprovals;
     _estimateSettings = _EstimateSettings(
       collapseThinking: widget.collapseThinking,
       collapseThinkingSteps: widget.collapseThinkingSteps,
@@ -1293,9 +1761,16 @@ class _MessageListViewState extends State<MessageListView> {
       hideToolResultImages: widget.hideToolResultImages,
       collapsedCodeLines: widget.collapsedCodeLines,
       wrapCodeBlocks: widget.wrapCodeBlocks,
-      pendingApprovalIds: _readPendingApprovalIds(context),
+      visualRegexSignature: _visualRegexEstimateSignature(widget.assistant),
+      pendingApprovals: pendingApprovals,
     );
+    if (!listEquals(previousApprovals, pendingApprovals)) {
+      _invalidateExtentsForApprovalChange(previousApprovals, pendingApprovals);
+    }
     _invalidateEstimatesIfScaleChanged();
+    if (_awaitingAttachFlush && widget.listController.isAttached) {
+      _scheduleAttachAwareFlush();
+    }
     final presentation = _MessagePresentation(
       chatFontScale: widget.chatFontScale,
       showModelIcon: widget.showModelIcon,
@@ -1305,6 +1780,8 @@ class _MessageListViewState extends State<MessageListView> {
     );
     return LayoutBuilder(
       builder: (context, constraints) {
+        // 本仓库自有：宽屏布局开关会传 null，表示不限制内容宽度，
+        // 此时左右各留 0 内边距（上游这里写死了常量，读不到这个开关）。
         final horizontalPad = widget.maxContentWidth == null
             ? 0.0
             : ((constraints.maxWidth - widget.maxContentWidth!) / 2).clamp(
@@ -1312,9 +1789,8 @@ class _MessageListViewState extends State<MessageListView> {
                 double.infinity,
               );
 
-        return ValueListenableBuilder<bool>(
-          valueListenable: widget.isProcessingFiles,
-          builder: (context, isProcessing, child) {
+        return Builder(
+          builder: (context) {
             final list = SuperListView.builder(
               controller: widget.scrollController,
               listController: widget.listController,
@@ -1340,7 +1816,6 @@ class _MessageListViewState extends State<MessageListView> {
                 return _buildMessageItem(
                   context,
                   index: index,
-                  isProcessingFiles: isProcessing,
                   presentation: presentation,
                 );
               },
@@ -1358,12 +1833,14 @@ class _MessageListViewState extends State<MessageListView> {
                     event.buttons != kSecondaryMouseButton) {
                   _pointerDragInProgress = true;
                   _latestPointerDragMetrics = null;
+                  _setDeferStreamingMessageUpdates(true);
                 }
               },
               onPointerUp: (_) => _settlePointerDrag(),
               onPointerCancel: (_) => _settlePointerDrag(),
               onPointerSignal: (event) {
                 if (event is PointerScrollEvent) {
+                  _setDeferStreamingMessageUpdates(true);
                   _schedulePointerScrollActivityCheck();
                 }
               },
@@ -1504,22 +1981,56 @@ class _MessageListViewState extends State<MessageListView> {
 
   bool _isWithinStreamingAutoFollowBand([ScrollMetrics? metrics]) {
     if (metrics != null) {
-      final gap = _contentMaxScrollExtent(metrics) - metrics.pixels;
+      final gap = metrics.maxScrollExtent - metrics.pixels;
       return gap <= _streamingUpdateDeferBottomTolerance;
     }
     if (!widget.scrollController.hasClients) return true;
     final position = widget.scrollController.position;
-    final gap = _contentMaxScrollExtent(position) - position.pixels;
+    final gap = position.maxScrollExtent - position.pixels;
     return gap <= _streamingUpdateDeferBottomTolerance;
-  }
-
-  double _contentMaxScrollExtent(ScrollMetrics metrics) {
-    return metrics.maxScrollExtent;
   }
 
   void _setDeferStreamingMessageUpdates(bool value) {
     if (_deferStreamingMessageUpdates.value == value) return;
+    if (value) {
+      _captureDeferredStreamingHolds();
+    } else {
+      _deferredStreamingHolds.clear();
+    }
     _deferStreamingMessageUpdates.value = value;
+  }
+
+  void _captureDeferredStreamingHolds() {
+    _deferredStreamingHolds.clear();
+    final notifier = widget.streamingContentNotifier;
+    if (notifier == null) return;
+    for (final message in widget.messages) {
+      if (!message.isStreaming || !notifier.hasNotifier(message.id)) {
+        continue;
+      }
+      final data = notifier.getNotifier(message.id).value;
+      _deferredStreamingHolds[message.id] =
+          data.content.isEmpty && message.content.isNotEmpty
+          ? StreamingContentData(
+              content: message.content,
+              totalTokens: data.totalTokens,
+              parts: data.parts,
+              reasoningText: data.reasoningText,
+              reasoningStartAt: data.reasoningStartAt,
+              reasoningFinishedAt: data.reasoningFinishedAt,
+              contentSplitOffsets: data.contentSplitOffsets,
+              reasoningCountAtSplit: data.reasoningCountAtSplit,
+              toolCountAtSplit: data.toolCountAtSplit,
+              toolPartsVersion: data.toolPartsVersion,
+              uiVersion: data.uiVersion,
+              promptTokens: data.promptTokens,
+              completionTokens: data.completionTokens,
+              cachedTokens: data.cachedTokens,
+              durationMs: data.durationMs,
+              retryStatus: data.retryStatus,
+            )
+          : data;
+    }
   }
 
   void _scheduleStreamingUpdateResume() {
@@ -1535,7 +2046,7 @@ class _MessageListViewState extends State<MessageListView> {
     _scrollIdleTimer?.cancel();
     _scrollIdleTimer = null;
     if (!mounted || !_deferStreamingMessageUpdates.value) return;
-    _deferStreamingMessageUpdates.value = false;
+    _setDeferStreamingMessageUpdates(false);
   }
 
   void _scheduleHistoryLoad({required Future<bool> Function() load}) {
@@ -1557,7 +2068,7 @@ class _MessageListViewState extends State<MessageListView> {
         return;
       }
 
-      // 在重建与锚点恢复期间保持分页锁定。
+      // 在整个重建与锚点恢复过程中保持分页锁定。
       await WidgetsBinding.instance.endOfFrame;
       if (!mounted) return;
       _historyLoadScheduled = false;
@@ -1567,7 +2078,6 @@ class _MessageListViewState extends State<MessageListView> {
   Widget _buildMessageItem(
     BuildContext context, {
     required int index,
-    required bool isProcessingFiles,
     required _MessagePresentation presentation,
   }) {
     final model = _effectiveRenderModels[index];
@@ -1578,6 +2088,10 @@ class _MessageListViewState extends State<MessageListView> {
     final useAssistAvatar = assistant?.useAssistantAvatar == true;
     final useAssistName = assistant?.useAssistantName == true;
     final gid = model.slotId;
+
+    // 本仓库用真树模型：分支不是“同一条消息的多个版本”，而是树上同一
+    // 位置的兄弟节点。下面四个变量都由当前消息的兄弟分支推导，
+    // “版本”相关的语义与之等价（同一位置可选几条）。
     final siblingBranchIds =
         widget.siblingBranchIdsByMessageId[message.id] ?? const <String>[];
     final useBranchSelector = siblingBranchIds.length > 1;
@@ -1594,7 +2108,7 @@ class _MessageListViewState extends State<MessageListView> {
         ? widget.suggestions
         : const <String>[];
 
-    // 检查是否为应使用 ValueListenableBuilder 的流式消息
+    // 判断这是否是一条应当走 ValueListenableBuilder 的流式消息
     final isStreaming =
         message.isStreaming &&
         message.role == 'assistant' &&
@@ -1623,7 +2137,7 @@ class _MessageListViewState extends State<MessageListView> {
               ),
             Expanded(
               child: (() {
-                Widget buildContent(bool processing) => Builder(
+                Widget buildContent(bool isProcessingFiles) => Builder(
                   builder: (context) {
                     final baseMediaQuery = context
                         .getInheritedWidgetOfExactType<MediaQuery>();
@@ -1631,7 +2145,7 @@ class _MessageListViewState extends State<MessageListView> {
                     final data = baseData ?? MediaQuery.of(context);
                     final textScale = data.textScaler.scale(1);
                     return MediaQuery(
-                      // 保持聊天字体缩放，且不在键盘内边距变化时重建。
+                      // 保留聊天字号缩放，但不因键盘内边距变化而重建。
                       data: data.copyWith(
                         textScaler: TextScaler.linear(
                           textScale * presentation.chatFontScale,
@@ -1653,7 +2167,7 @@ class _MessageListViewState extends State<MessageListView> {
                               useBranchSelector: useBranchSelector,
                               canDeleteMessageAndFollowing:
                                   canDeleteMessageAndFollowing,
-                              isProcessingFiles: processing,
+                              isProcessingFiles: isProcessingFiles,
                               suggestions: messageSuggestions,
                               presentation: presentation,
                             )
@@ -1672,7 +2186,7 @@ class _MessageListViewState extends State<MessageListView> {
                               useBranchSelector: useBranchSelector,
                               canDeleteMessageAndFollowing:
                                   canDeleteMessageAndFollowing,
-                              isProcessingFiles: processing,
+                              isProcessingFiles: isProcessingFiles,
                               suggestions: messageSuggestions,
                               presentation: presentation,
                             ),
@@ -1680,15 +2194,19 @@ class _MessageListViewState extends State<MessageListView> {
                   },
                 );
 
+                // 只有拥有该指示器的那条助手消息会监听，
+                // 因此解析过程不会重建时间线的其余部分。
+                final processingFilesMessageId =
+                    widget.processingFilesMessageId;
                 Widget content =
                     message.role == 'assistant' &&
-                        widget.processingFilesMessageId != null
+                        processingFilesMessageId != null
                     ? ValueListenableBuilder<String?>(
-                        valueListenable: widget.processingFilesMessageId!,
+                        valueListenable: processingFilesMessageId,
                         builder: (context, processingId, _) =>
                             buildContent(processingId == message.id),
                       )
-                    : buildContent(isProcessingFiles);
+                    : buildContent(false);
 
                 final canSelect =
                     (message.role == 'user' || message.role == 'assistant');
@@ -1749,9 +2267,9 @@ class _MessageListViewState extends State<MessageListView> {
           )
         : RepaintBoundary(child: messageColumn);
 
-    // 动画器包裹 item 的 RepaintBoundary，使淡入淡出仅
-    // 重新合成该边界的缓存图层，而不是每个动画帧都重绘
-    // 整个消息子树。
+    // 动画器包在条目的 RepaintBoundary 外层，使淡出只重新合成
+    // 该边界已缓存的图层，而不是每帧重绘整棵
+    // 消息子树。
     return _SlotRemovalAnimator(
       key: ValueKey<String>(model.slotId),
       removing: widget.removingSlotIds.contains(model.slotId),
@@ -1759,8 +2277,8 @@ class _MessageListViewState extends State<MessageListView> {
     );
   }
 
-  /// 使用 ValueListenableBuilder 构建流式消息 widget，
-  /// 以避免流式过程中整页重建。
+  /// 构建使用 ValueListenableBuilder 的流式消息控件，
+  /// 以避免流式期间整页重建。
   Widget _buildStreamingMessageWidget(
     BuildContext context, {
     required ChatMessage message,
@@ -1782,37 +2300,43 @@ class _MessageListViewState extends State<MessageListView> {
     return _StreamingMessageDataGate(
       notifier: widget.streamingContentNotifier!.getNotifier(message.id),
       deferUpdates: _deferStreamingMessageUpdates,
+      deferredHold: _deferredStreamingHolds[message.id],
       builder: (context, data, deferUpdates) {
-        // 优先使用流式内容，否则回退到消息内容
-        final displayContent = data.content.isNotEmpty
-            ? data.content
+        final painted = deferUpdates
+            ? (_deferredStreamingHolds[message.id] ?? data)
+            : data;
+        // 有流式内容就用它，否则回退到消息自身内容
+        final displayContent = painted.content.isNotEmpty
+            ? painted.content
             : message.content;
-        final displayTokens = data.totalTokens > 0
-            ? data.totalTokens
+        final displayTokens = painted.totalTokens > 0
+            ? painted.totalTokens
             : message.totalTokens;
 
-        // 用流式内容创建修改后的消息
+        // 用流式内容构造一条改过的消息
         final streamingMessage = message.copyWith(
-          content: displayContent,
+          parts: painted.parts,
+          content: painted.parts == null ? displayContent : null,
           totalTokens: displayTokens,
-          promptTokens: data.promptTokens,
-          completionTokens: data.completionTokens,
-          cachedTokens: data.cachedTokens,
-          durationMs: data.durationMs,
+          promptTokens: painted.promptTokens,
+          completionTokens: painted.completionTokens,
+          cachedTokens: painted.cachedTokens,
+          durationMs: painted.durationMs,
         );
 
-        // 从流式数据更新推理文本，同时保留来自 r 的展开状态
-        // 这样用户可在流式过程中切换展开状态而不被重置
+        // 用流式数据更新推理文本，同时保留 r 里的展开状态
+        // 这样流式期间用户手动切换的展开状态不会被重置
         stream_ctrl.ReasoningData? streamingReasoning = r;
-        if (data.reasoningText != null && data.reasoningText!.isNotEmpty) {
+        if (painted.reasoningText != null &&
+            painted.reasoningText!.isNotEmpty) {
           streamingReasoning = stream_ctrl.ReasoningData()
-            ..text = data.reasoningText!
-            ..startAt = data.reasoningStartAt ?? r?.startAt
-            ..finishedAt = data.reasoningFinishedAt ?? r?.finishedAt
+            ..text = painted.reasoningText!
+            ..startAt = painted.reasoningStartAt ?? r?.startAt
+            ..finishedAt = painted.reasoningFinishedAt ?? r?.finishedAt
             ..expanded = r?.expanded ?? false;
         }
 
-        // 用 RepaintBoundary 包裹，隔离重绘以免影响其他 widget
+        // 用 RepaintBoundary 包住，隔离重绘、不影响其他控件
         return RepaintBoundary(
           child: _buildChatMessageWidget(
             context,
@@ -1831,15 +2355,18 @@ class _MessageListViewState extends State<MessageListView> {
             isProcessingFiles: isProcessingFiles,
             suggestions: suggestions,
             presentation: presentation,
-            retryStatus: data.retryStatus,
             enableStreamingTextMotion: !deferUpdates,
+            contentSplitOffsets: painted.contentSplitOffsets,
+            reasoningCountAtSplit: painted.reasoningCountAtSplit,
+            toolCountAtSplit: painted.toolCountAtSplit,
+            retryStatus: painted.retryStatus,
           ),
         );
       },
     );
   }
 
-  /// 用全部属性构建实际的 ChatMessageWidget。
+  /// 构建真正的 ChatMessageWidget，并带上它的全部属性。
   Widget _buildChatMessageWidget(
     BuildContext context, {
     required ChatMessage message,
@@ -1857,25 +2384,32 @@ class _MessageListViewState extends State<MessageListView> {
     required bool isProcessingFiles,
     required List<String> suggestions,
     required _MessagePresentation presentation,
-    RetryStatus? retryStatus,
     bool enableStreamingTextMotion = true,
+    List<int>? contentSplitOffsets,
+    List<int>? reasoningCountAtSplit,
+    List<int>? toolCountAtSplit,
+    RetryStatus? retryStatus,
   }) {
     final currentIdx = useBranchSelector ? selectedBranchIndex : 0;
+    // “删除所有分支”只在当前节点确实还有子节点时才有意义：
+    // 叶子节点删掉整条分支就等同于删掉自己，入口应收起。
     final canDeleteAllVersions =
         useBranchSelector && widget.messageIdsWithChildren.contains(message.id);
     return ChatMessageWidget(
       message: message,
       enableStreamingTextMotion: enableStreamingTextMotion,
-      branchIndex: currentIdx < 0 ? 0 : currentIdx,
-      branchCount: useBranchSelector ? siblingBranchIds.length : 1,
-      onPreviousBranch: useBranchSelector
+      // 上游把“分支切换”命名为 version（同一功能的两个叫法），
+      // 这里传的是本仓库树模型算出的索引与前后切换回调，语义不变。
+      versionIndex: currentIdx < 0 ? 0 : currentIdx,
+      versionCount: useBranchSelector ? siblingBranchIds.length : 1,
+      onPrevVersion: useBranchSelector
           ? (currentIdx > 0)
                 ? () => widget.onBranchChange?.call(
                     siblingBranchIds[currentIdx - 1],
                   )
                 : null
           : null,
-      onNextBranch: useBranchSelector
+      onNextVersion: useBranchSelector
           ? (currentIdx >= 0 && currentIdx < siblingBranchIds.length - 1)
                 ? () => widget.onBranchChange?.call(
                     siblingBranchIds[currentIdx + 1],
@@ -1900,9 +2434,6 @@ class _MessageListViewState extends State<MessageListView> {
           ? (assistant?.name ?? 'Assistant')
           : null,
       assistantAvatar: useAssistAvatar ? (assistant?.avatar ?? '') : null,
-      assistantAvatarTransform: useAssistAvatar
-          ? assistant?.avatarTransform
-          : null,
       showUserAvatar: presentation.showUserAvatar,
       showTokenStats: presentation.showTokenStats,
       canDeleteMessageAndFollowing: canDeleteMessageAndFollowing,
@@ -1911,7 +2442,6 @@ class _MessageListViewState extends State<MessageListView> {
           (widget.isPinnedIndicatorActive &&
               (message.id == widget.pinnedStreamingMessageId)),
       retryStatus: retryStatus,
-      conversationStreaming: widget.isConversationGenerating,
       reasoningText: (message.role == 'assistant') ? (r?.text ?? '') : null,
       reasoningExpanded: (message.role == 'assistant')
           ? (r?.expanded ?? false)
@@ -1948,6 +2478,8 @@ class _MessageListViewState extends State<MessageListView> {
       onEdit: (message.role == 'assistant' || message.role == 'user')
           ? () => widget.onEditMessage?.call(message)
           : null,
+      // 本仓库自有：用户消息的快捷“删除”是“删除这条及之后”，
+      // 且只在树模型允许时才出现。
       onDelete: message.role == 'user' && canDeleteMessageAndFollowing
           ? () => widget.onDeleteMessageAndFollowing?.call(
               message,
@@ -1988,16 +2520,16 @@ class _MessageListViewState extends State<MessageListView> {
         } else if (action == MessageMoreAction.messageFork) {
           await widget.onMessageFork?.call(message);
         } else if (action ==
-            MessageMoreAction.conversationForkPreserveBranches) {
-          await widget.onConversationFork?.call(
-            message,
-            ConversationForkMode.preserveBranches,
-          );
-        } else if (action ==
             MessageMoreAction.conversationForkActiveBranchOnly) {
           await widget.onConversationFork?.call(
             message,
             ConversationForkMode.activeBranchOnly,
+          );
+        } else if (action ==
+            MessageMoreAction.conversationForkPreserveBranches) {
+          await widget.onConversationFork?.call(
+            message,
+            ConversationForkMode.preserveBranches,
           );
         } else if (action == MessageMoreAction.share) {
           widget.onShareMessage?.call(index, widget.messages);
@@ -2009,13 +2541,14 @@ class _MessageListViewState extends State<MessageListView> {
           ? widget.toolParts[message.id]
           : null,
       contentSplitOffsets: message.role == 'assistant'
-          ? widget.contentSplits[message.id]?.offsets
+          ? (contentSplitOffsets ?? widget.contentSplits[message.id]?.offsets)
           : null,
       reasoningCountAtSplit: message.role == 'assistant'
-          ? widget.contentSplits[message.id]?.reasoningCounts
+          ? (reasoningCountAtSplit ??
+                widget.contentSplits[message.id]?.reasoningCounts)
           : null,
       toolCountAtSplit: message.role == 'assistant'
-          ? widget.contentSplits[message.id]?.toolCounts
+          ? (toolCountAtSplit ?? widget.contentSplits[message.id]?.toolCounts)
           : null,
       reasoningSegments: message.role == 'assistant'
           ? (() {
@@ -2028,10 +2561,10 @@ class _MessageListViewState extends State<MessageListView> {
                     (entry) => ReasoningSegment(
                       text: entry.value.text,
                       expanded: entry.value.expanded,
-                      loading:
-                          message.isStreaming &&
-                          entry.value.finishedAt == null &&
-                          entry.value.text.isNotEmpty,
+                      loading: timelineReasoningLoading(
+                        finishedAt: entry.value.finishedAt,
+                        isStreaming: message.isStreaming,
+                      ),
                       startAt: entry.value.startAt,
                       finishedAt: entry.value.finishedAt,
                       onToggle: () => widget.onToggleReasoningSegment?.call(
@@ -2053,48 +2586,56 @@ class _MessageListViewState extends State<MessageListView> {
                 widget.onRecoveredAskUserAnswer!(message, part, result),
       showThinkingCards: widget.showThinkingCards,
       showToolCards: widget.showToolCards,
+      onInlineImageAspect: (imageKey, aspectRatio) {
+        _onInlineImageAspect(message.id, imageKey, aspectRatio);
+      },
     );
   }
 
+  /// 被隐藏的独立工具行是否仍占高度。
+  ///
+  /// 与 `_shouldShowToolCard` 对 `role == 'tool'` 消息的判定一致：
+  /// 追问用户的卡片始终可见，以免生成被阻塞。待审批卡片
+  /// 不适用 —— 那些行从不以 loading 状态构建。
   bool _hiddenStandaloneToolMessageRemainsVisible(String content) {
     try {
       final obj = jsonDecode(content);
-      return obj is Map && obj['tool']?.toString() == LocalToolNames.askUser;
-    } catch (_) {
-      return false;
-    }
+      if (obj is Map) {
+        return (obj['tool'] ?? '').toString() == LocalToolNames.askUser;
+      }
+    } catch (_) {}
+    return false;
   }
 
-  Set<String> _readPendingApprovalIds(BuildContext context) {
-    try {
-      return context
-          .select<ToolApprovalService, _EstimateIdSet>(
-            (approval) => _EstimateIdSet({
-              for (final request in approval.pendingRequests)
-                request.toolCallId,
-            }),
-          )
-          .ids;
-    } on ProviderNotFoundException {
-      return const <String>{};
-    }
+  int _visualRegexEstimateSignature(Assistant? assistant) {
+    if (assistant == null || assistant.regexRules.isEmpty) return 0;
+    return Object.hashAll([
+      for (final rule in assistant.regexRules)
+        Object.hash(
+          rule.enabled,
+          rule.pattern,
+          rule.replacement,
+          rule.visualOnly,
+          rule.replaceOnly,
+          Object.hashAll(rule.scopes.map((scope) => scope.index)),
+        ),
+    ]);
   }
 }
 
 final class _EstimateIdSet {
   const _EstimateIdSet(this.ids);
-
-  final Set<String> ids;
+  final List<PendingApprovalKey> ids;
 
   @override
   bool operator ==(Object other) =>
-      other is _EstimateIdSet && setEquals(other.ids, ids);
+      other is _EstimateIdSet && listEquals(other.ids, ids);
 
   @override
-  int get hashCode => Object.hashAllUnordered(ids);
+  int get hashCode => Object.hashAll(ids);
 }
 
-/// 影响消息渲染高度的显示设置。
+/// 会改变消息渲染高度的显示设置。
 final class _EstimateSettings {
   const _EstimateSettings({
     required this.collapseThinking,
@@ -2105,23 +2646,42 @@ final class _EstimateSettings {
     required this.hideToolResultImages,
     required this.collapsedCodeLines,
     required this.wrapCodeBlocks,
-    required this.pendingApprovalIds,
+    required this.visualRegexSignature,
+    required this.pendingApprovals,
   });
 
-  /// 已完成的思考块是否折叠为卡片渲染。
+  /// 已结束的思考块是否渲染为折叠卡片。
   final bool collapseThinking;
+
+  /// 每个时间线区块是否只保留最后两步加一个展开入口。
   final bool collapseThinkingSteps;
+
+  /// 思考过程卡片是否计入估算高度。
   final bool showThinkingCards;
+
+  /// 工具调用卡片是否计入估算高度。
   final bool showToolCards;
+
+  /// 折叠的工具卡片是否也显示一行简短结果摘要。
   final bool showToolResultSummary;
+
+  /// 工具结果的图片缩略图是否藏在卡片下。
   final bool hideToolResultImages;
 
-  /// 长代码块折叠到的行数；保持展开时为 null。
+  /// 长代码块折叠后的行数；保持展开时为 null。
   final int? collapsedCodeLines;
 
-  /// 代码块是否换行而非水平滚动。
+  /// 代码块是否换行而不是横向滚动。
   final bool wrapCodeBlocks;
-  final Set<String> pendingApprovalIds;
+
+  /// 估算变换所用“助手视觉正则规则”的身份标识。
+  final int visualRegexSignature;
+
+  /// 在 [build] 期间快照的待审批项，按会话限定作用域。
+  ///
+  /// 用 List 是为了让两个无作用域的同 id 请求保持区分；[Set] 会把
+  /// 它们合并，导致估算认为是待审批而渲染器认为不是。
+  final List<PendingApprovalKey> pendingApprovals;
 
   @override
   bool operator ==(Object other) =>
@@ -2134,7 +2694,8 @@ final class _EstimateSettings {
       other.hideToolResultImages == hideToolResultImages &&
       other.collapsedCodeLines == collapsedCodeLines &&
       other.wrapCodeBlocks == wrapCodeBlocks &&
-      setEquals(other.pendingApprovalIds, pendingApprovalIds);
+      other.visualRegexSignature == visualRegexSignature &&
+      listEquals(other.pendingApprovals, pendingApprovals);
 
   @override
   int get hashCode => Object.hash(
@@ -2146,11 +2707,12 @@ final class _EstimateSettings {
     hideToolResultImages,
     collapsedCodeLines,
     wrapCodeBlocks,
-    Object.hashAllUnordered(pendingApprovalIds),
+    visualRegexSignature,
+    Object.hashAll(pendingApprovals),
   );
 }
 
-/// 记忆化的范围估算及其全部推导依据。
+/// 一份带记忆的高度估算，连同它所依据的全部输入。
 final class _ExtentEstimate {
   const _ExtentEstimate({
     required this.content,
@@ -2159,6 +2721,8 @@ final class _ExtentEstimate {
     required this.settings,
     required this.reasoningSignature,
     required this.toolSignature,
+    required this.partsSignature,
+    required this.streamingSignature,
     required this.extent,
   });
 
@@ -2168,6 +2732,8 @@ final class _ExtentEstimate {
   final _EstimateSettings settings;
   final int reasoningSignature;
   final int toolSignature;
+  final int partsSignature;
+  final int streamingSignature;
   final double extent;
 }
 
@@ -2187,11 +2753,12 @@ final class _MessagePresentation {
   final Assistant? assistant;
 }
 
-/// 在删除时间线插槽前先淡出再折叠。
+/// 在时间线槽位被删除前先淡出再收起。
 ///
-/// 先执行淡出让消息视觉上消失，随后高度折叠使相邻消息拼接。插槽数据仅在
-/// [ChatLayoutConstants.slotRemovalAnimationDuration] 之后才移除；
-/// 此时插槽已为零高度，移除不可见。
+/// 先淡出，让消息在视觉上消失；再收起高度，
+/// 使相邻消息拼接起来。槽位数据要等到
+/// [ChatLayoutConstants.slotRemovalAnimationDuration] 之后才移除，
+/// 那时它已是零高度，移除不可见。
 class _SlotRemovalAnimator extends StatefulWidget {
   const _SlotRemovalAnimator({
     super.key,
@@ -2222,9 +2789,9 @@ class _SlotRemovalAnimatorState extends State<_SlotRemovalAnimator>
     if (widget.removing && !oldWidget.removing) {
       _startRemoval();
     } else if (!widget.removing && oldWidget.removing) {
-      // 删除被中止（插槽通常直接卸载而不会
-      // 到达此处），因此恢复消息。该 element 的重建已经在进行，
-      // 无需 setState。
+      // 删除被中止了（槽位通常直接卸载，根本走不到这里），
+      // 因此把消息恢复回来。该元素的重建本来就在进行中，
+      // 所以不需要 setState。
       _controller?.dispose();
       _controller = null;
     }
@@ -2260,9 +2827,10 @@ class _SlotRemovalAnimatorState extends State<_SlotRemovalAnimator>
                 math.max(0.0, (progress - 0.2) / 0.8),
               )
         : 1.0;
-    // 即使空闲时 wrapper 链也存在：动画开始时切换 widget 类型会导致重父级化
-    // ——从而重建——整个消息子树，对巨型消息会造成可见卡顿。所有
-    // wrapper 在空闲值下都是直通。
+    // 即使空闲，这层包装链也一直存在：动画开始时再换控件类型
+    // 会改变父级关系，从而重建整棵消息子树，
+    // 对超大消息来说就是肉眼可见的卡顿。
+    // 所有包装层在空闲取值下都是直通。
     return ClipRect(
       clipBehavior: removing ? Clip.hardEdge : Clip.none,
       child: Align(
@@ -2281,11 +2849,13 @@ class _StreamingMessageDataGate extends StatefulWidget {
   const _StreamingMessageDataGate({
     required this.notifier,
     required this.deferUpdates,
+    this.deferredHold,
     required this.builder,
   });
 
   final ValueNotifier<StreamingContentData> notifier;
   final ValueListenable<bool> deferUpdates;
+  final StreamingContentData? deferredHold;
   final Widget Function(
     BuildContext context,
     StreamingContentData data,
@@ -2305,9 +2875,10 @@ class _StreamingMessageDataGateState extends State<_StreamingMessageDataGate> {
 
   @override
   void initState() {
-    super.initState();
-    _visibleData = widget.notifier.value;
     _deferUpdates = widget.deferUpdates.value;
+    final hold = widget.deferredHold;
+    _visibleData = _deferUpdates && hold != null ? hold : widget.notifier.value;
+    super.initState();
     widget.notifier.addListener(_handleNotifierChanged);
     widget.deferUpdates.addListener(_handleDeferUpdatesChanged);
   }
@@ -2377,12 +2948,13 @@ class _StreamingMessageDataGateState extends State<_StreamingMessageDataGate> {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      widget.builder(context, _visibleData, _deferUpdates);
+  Widget build(BuildContext context) {
+    return widget.builder(context, _visibleData, _deferUpdates);
+  }
 }
 
-/// 气泡形骨架屏，仅在冷启动初始窗口加载进行中
-/// 且列表尚无消息时显示。
+/// 气泡形状的微光骨架屏，仅在冷启动首窗加载进行中
+/// 且列表还没有消息时显示。
 class _WindowLoadingSkeleton extends StatefulWidget {
   const _WindowLoadingSkeleton({
     super.key,
@@ -2454,6 +3026,59 @@ class _WindowLoadingSkeletonState extends State<_WindowLoadingSkeleton>
         ),
       ),
     );
+  }
+}
+
+/// 合并那些在锁定状态下无法执行的 SuperList 高度失效请求。
+///
+/// 在刷新观察到控制器未锁定且已挂载之前，ID 一直排队。
+/// 同一时刻最多只安排一个下一帧回调。
+@visibleForTesting
+class ToolExtentInvalidationQueue {
+  final Set<String> _pending = <String>{};
+  var _scheduled = false;
+
+  @visibleForTesting
+  Set<String> get pendingIds => Set<String>.unmodifiable(_pending);
+
+  @visibleForTesting
+  bool get isScheduled => _scheduled;
+
+  /// 调用方应当安排下一帧刷新时返回 true。
+  bool enqueue(String id) {
+    _pending.add(id);
+    if (_scheduled) return false;
+    _scheduled = true;
+    return true;
+  }
+
+  /// 让 [id] 继续排队，但不把“已安排刷新”置位。
+  ///
+  /// 用于列表控制器已分离时，使之后的挂载能把队列排空，
+  /// 而无需每帧空转。
+  void retain(String id) {
+    _pending.add(id);
+  }
+
+  ({List<String> ids, bool reschedule}) takeForFlush({
+    required bool mounted,
+    required bool isAttached,
+    required bool isLocked,
+  }) {
+    _scheduled = false;
+    if (!mounted || !isAttached) {
+      return (ids: const <String>[], reschedule: false);
+    }
+    if (isLocked) {
+      if (_pending.isEmpty) {
+        return (ids: const <String>[], reschedule: false);
+      }
+      _scheduled = true;
+      return (ids: const <String>[], reschedule: true);
+    }
+    final ids = List<String>.of(_pending);
+    _pending.clear();
+    return (ids: ids, reschedule: false);
   }
 }
 

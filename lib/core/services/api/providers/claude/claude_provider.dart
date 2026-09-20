@@ -8,6 +8,7 @@ import '../../../../models/token_usage.dart';
 import '../../../../providers/model_provider.dart';
 import '../../../../providers/settings_provider.dart';
 import '../../../../utils/multimodal_input_utils.dart';
+import '../../../../../utils/mcp_structured_image.dart';
 import '../../builtin_tools.dart';
 import '../../chat_api_helpers.dart';
 import '../../generation/tool_loop_runner.dart';
@@ -17,10 +18,16 @@ import '../../stream/stream_chunk.dart';
 import '../../stream/stream_chunk_emit.dart';
 import '../../stream/stream_chunk_ids.dart';
 import '../google/google_provider.dart' show downloadRemoteAsBase64;
-import 'claude_decoder.dart';
 import 'claude_container.dart';
+import 'claude_decoder.dart';
 import 'claude_files.dart';
 import 'claude_history.dart';
+
+export 'claude_history.dart'
+    show
+        normalizeClaudeImageMime,
+        isClaudeSupportedImageMime,
+        claudeToolResultContent;
 
 int _defaultClaudeMaxOutputTokens(String modelId) {
   final lower = modelId.trim().toLowerCase();
@@ -114,8 +121,10 @@ Stream<StreamChunk> sendClaudeStreamEvents(
   final skipRedactedThinkingBlocks = BuiltInToolsHelper.isOpenRouterProvider(
     config,
   );
+  final replayServerToolBlocks =
+      !isVertex && BuiltInToolsHelper.isOfficialAnthropicEndpoint(config);
 
-  // 提取系统提示（Anthropic 使用顶层 `system` 字段）。
+  // 取出 system prompt（Anthropic 用顶层的 `system` 字段）
   String systemPrompt = '';
   final nonSystemMessages = <Map<String, dynamic>>[];
   for (final m in messages) {
@@ -127,19 +136,18 @@ Stream<StreamChunk> sendClaudeStreamEvents(
       }
       continue;
     }
-    // 转换时保留媒体路径；最终 Anthropic 请求体不会直接发送这些字段，下面会重建 role/content。
+    // 变换过程中保留 media-paths；它们不会出现在最终发给 Anthropic 的
+    // 请求体里（角色与内容在下面重建）。
     nonSystemMessages.add(
       Map<String, dynamic>.from(m)
         ..remove(multimodalInternalRevisionIdKey)
+        ..remove(multimodalInternalGeminiThoughtSignatureKey)
         ..['role'] = role.isEmpty ? 'user' : role,
     );
   }
 
-  // 使用统一历史适配器重建 Anthropic 消息，保留多响应轮次、服务端工具结果、
-  // pause_turn 和附件引用的协议顺序。
   final history = ClaudeHistory(
-    replayServerToolBlocks:
-        !isVertex && BuiltInToolsHelper.isOfficialAnthropicEndpoint(config),
+    replayServerToolBlocks: replayServerToolBlocks,
     skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
     skipImageParsing: skipImageParsing,
     userImagePaths: userImagePaths,
@@ -150,14 +158,14 @@ Stream<StreamChunk> sendClaudeStreamEvents(
   );
   final initialMessages = await history.build(nonSystemMessages);
 
-  // 将 OpenAI 风格工具映射为 Anthropic 自定义工具（客户端工具）。
+  // 把 OpenAI 风格的 tools 映射成 Anthropic 的 custom tools（客户端工具）
   List<Map<String, dynamic>>? anthropicTools;
   if (tools != null && tools.isNotEmpty) {
     anthropicTools = [];
     for (final t in tools) {
       final fn = (t['function'] as Map<String, dynamic>?);
       if (fn == null) continue;
-      final name = (fn['name'] ?? '').toString();
+      final name = BuiltInToolsHelper.claimedToolName(t);
       if (name.isEmpty) continue;
       final desc = (fn['description'] ?? '').toString();
       final params =
@@ -171,28 +179,34 @@ Stream<StreamChunk> sendClaudeStreamEvents(
     }
   }
 
-  // 汇总最终工具列表：客户端工具、服务端工具和内置 web_search。
+  // 汇总最终的 tools 列表：客户端工具 ＋ 服务端工具 ＋ 内置 web_search
   final List<Map<String, dynamic>> allTools = [];
-  final declaredNames = <String>{};
   if (anthropicTools != null && anthropicTools.isNotEmpty) {
-    for (final tool in anthropicTools) {
-      final name = (tool['name'] ?? '').toString();
-      if (name.isNotEmpty && declaredNames.add(name)) allTools.add(tool);
+    allTools.addAll(anthropicTools);
+  }
+  // Anthropic 会拒绝 `tools` 里出现两个同名条目，而 MCP 服务器完全可以
+  // 暴露一个叫 `web_search`／`web_fetch`／`code_execution` 的工具。客户端
+  // 工具是调用方按名字点名要的，所以与之同名的托管条目会被丢弃，而不是
+  // 一起发出去。
+  final claimedToolNames = <String>{
+    for (final t in allTools) (t['name'] ?? '').toString(),
+  };
+  void addHostedTool(Map<String, dynamic> tool) {
+    if (claimedToolNames.add((tool['name'] ?? '').toString())) {
+      allTools.add(tool);
     }
   }
+
   if (tools != null && tools.isNotEmpty) {
     for (final t in tools) {
       final type = (t['type'] ?? '').toString();
-      final name = (t['name'] ?? '').toString();
-      if (type.startsWith('web_search_') &&
-          name.isNotEmpty &&
-          declaredNames.add(name)) {
-        allTools.add(t);
+      if (type.startsWith('web_search_')) {
+        addHostedTool(t);
       }
     }
   }
-  // 后台调用（标题／摘要等）只注入搜索：托管抓取或容器执行既不合约定、也会被计费。
-  // Vertex 上的 Claude 与上游一致，不做收窄。
+  // 工具类调用（生成标题／摘要）只该注入搜索；在这类调用里跑托管 fetch
+  // 或容器，既不合约定也会产生计费。
   final builtIns = builtInSearchOnly && !isVertex
       ? builtInTools(
           config,
@@ -232,34 +246,48 @@ Stream<StreamChunk> sendClaudeStreamEvents(
       entry['user_location'] = (ws['user_location'] as Map)
           .cast<String, dynamic>();
     }
-    // web_search 的 20260209 版本依赖 code execution 才能执行搜索片段，
-    // 缺失时服务端会拒绝该工具组合。
-    if (searchToolType == 'web_search_20260209' &&
-        declaredNames.add('code_execution')) {
-      allTools.add(<String, dynamic>{
+    // 本仓库自有：web_search 的 20260209 版本依赖 code execution 才能执行
+    // 搜索片段，缺失时服务端会拒绝该工具组合。
+    //
+    // ⛔ 上游已改成另一套做法：把标记名（20260209）映射成实际发送的
+    // `web_search_20260318`（见 builtin_tools 的 claudeSearchToolTypeDynamic），
+    // 那套不需要补这个工具。本仓库的 claudeBuiltInSearchToolType 仍直接发
+    // 20260209，且搜索结果版本的说明写在用户可见文案里，所以这段必须保留。
+    if (searchToolType == 'web_search_20260209') {
+      addHostedTool(<String, dynamic>{
         'type': 'code_execution_20250825',
         'name': 'code_execution',
       });
     }
-    if (declaredNames.add('web_search')) allTools.add(entry);
+    addHostedTool(entry);
   }
   for (final entry in BuiltInToolsHelper.claudeServerToolEntries(
     cfg: config,
     modelId: modelId,
     enabled: builtIns,
   )) {
-    final name = (entry['name'] ?? '').toString();
-    if (name.isNotEmpty && declaredNames.add(name)) allTools.add(entry);
+    addHostedTool(entry);
   }
 
-  final hasCodeExecution = allTools.any(
-    (tool) =>
-        (tool['name'] ?? '').toString() == 'code_execution' &&
-        (tool['type'] ?? '').toString().startsWith('code_execution_'),
-  );
-  final dataFiles = history.dataFiles;
-  final unseenDataFiles = history.unseenDataFiles;
-  final turnDataFiles = history.turnDataFiles;
+  // 客户端工具用 `input_schema` 声明，Anthropic 托管工具用 `type` 声明。
+  // 解码器要靠后者才能识别被降级的区块。
+  final declaredServerToolNames = <String>{
+    for (final t in allTools)
+      if (t['input_schema'] == null && (t['type'] ?? '').toString().isNotEmpty)
+        (t['name'] ?? '').toString(),
+  }..remove('');
+  // `container` 参数只有和用到它的工具同时出现时才被接受。
+  final hasCodeExecution = declaredServerToolNames.contains('code_execution');
+  // 消息构建器依据同一个判定从提示词里省略掉的数据文件，改为上传到容器。
+  // 要让 `container_upload` 被接受，这个工具必须在本次请求里；而工具类
+  // 调用则永远不会声明它。
+  final uploadsDataFiles =
+      hasCodeExecution &&
+      BuiltInToolsHelper.sendsDataFilesToSandbox(
+        cfg: config,
+        modelId: modelId,
+        clientTools: tools ?? const [],
+      );
 
   // 请求头在各轮次之间保持不变。
   final vertexToken = isVertex ? await _vertexAccessToken(config) : null;
@@ -279,20 +307,55 @@ Stream<StreamChunk> sendClaudeStreamEvents(
     assistantHeaders: extraHeaders,
   );
 
-  // 跨轮次维护会话内容。
+  // 跨轮次维持的会话内容
   List<Map<String, dynamic>> convo = List<Map<String, dynamic>>.from(
     initialMessages,
   );
-  String? carriedContainerId = history.storedContainer?.id;
-
-  final uploadedPaths = <String>{};
-  final turnFileUris = {for (final doc in turnDataFiles) doc.uri};
+  TokenUsage? totalUsage;
+  var streamRound = 0;
+  var pendingCalls = <EmitToolCall>[];
+  var lastAssistantBlocks = <Map<String, dynamic>>[];
+  // 在本次回合的每一轮之间传递 —— 客户端工具之后、pause 之后都算 —— 并
+  // 在每轮之后存下来，好让下一个回合也从这个容器继续。
+  ClaudeContainerRef? container = history.storedContainer;
+  // 本回合目前为止的每一个响应；每轮之后都存到消息上，好让这个回合能按
+  // 它当时的响应序列重放。没有工具调用的回合只靠文本重放，不存东西。
   final turnResponses = <List<Map<String, dynamic>>>[];
+  Stream<StreamChunk> recordTurn(List<Map<String, dynamic>> response) async* {
+    turnResponses.add(response);
+    if (toolUseIdsInBlocks(turnResponses.expand((b) => b)).isNotEmpty) {
+      yield ProviderArtifact(
+        kind: claudeTurnArtifactKind,
+        payload: encodeClaudeTurn(turnResponses),
+      );
+    }
+    // 现在就存到本回合的消息上（而不是等到最后 —— 被取消的回合永远走不到
+    // 最后），好让下一个回合能在同一个容器里继续。
+    if (hasCodeExecution && container != null) {
+      yield ProviderArtifact(
+        kind: claudeContainerArtifactKind,
+        payload: container!.encode(),
+      );
+    }
+  }
+
+  final downloadedFileIds = <String>{};
+  var lastStreamResults = <Map<String, dynamic>>[];
+  final nonStreamText = StringBuffer();
+  var pauseTurn = false;
+
+  // 沿用中的容器只收它还没见过的文件；新建的容器（没存过，或存的那个已
+  // 过期）则收下用户附带的全部文件。两种情况下上传都挂在最后一条用户消息
+  // 上，每个文件只传一次。本回合要用到、却传不上去的文件，会在发出任何请求
+  // 之前让本回合失败；若是更早回合的文件，则改为上报那一次的问题，免得很久
+  // 以前丢的一个附件把整段对话终结掉。
+  final uploadedPaths = <String>{};
+  final turnFileUris = {for (final doc in history.turnDataFiles) doc.uri};
   Future<void> uploadDataFiles() async {
-    if (!hasCodeExecution || dataFiles.isEmpty || convo.isEmpty) return;
+    if (!uploadsDataFiles) return;
     final blocks = <Map<String, dynamic>>[];
-    final source = carriedContainerId == null ? dataFiles : unseenDataFiles;
-    for (final doc in source) {
+    for (final doc
+        in container == null ? history.dataFiles : history.unseenDataFiles) {
       if (!uploadedPaths.add(doc.uri)) continue;
       try {
         final fileId = await uploadClaudeFile(
@@ -310,13 +373,9 @@ Stream<StreamChunk> sendClaudeStreamEvents(
       }
     }
     if (blocks.isEmpty) return;
-    final index = convo.lastIndexWhere(
-      (message) => (message['role'] ?? '').toString() == 'user',
-    );
-    if (index < 0) return;
-    final last = convo[index];
+    final last = convo.last;
     final content = last['content'];
-    convo[index] = {
+    convo[convo.length - 1] = {
       ...last,
       'content': [
         if (content is List)
@@ -329,17 +388,6 @@ Stream<StreamChunk> sendClaudeStreamEvents(
   }
 
   await uploadDataFiles();
-  TokenUsage? totalUsage;
-  var streamRound = 0;
-  var pendingCalls = <EmitToolCall>[];
-  var lastAssistantBlocks = <Map<String, dynamic>>[];
-  var lastStreamResults = <Map<String, dynamic>>[];
-  var lastText = '';
-  var pauseTurn = false;
-
-  /// One file is downloaded at most once per request, however many rounds and
-  /// however many blocks report it.
-  final downloadedFileIds = <String>{};
 
   yield* runProviderToolRounds(
     retryRound: retryRound,
@@ -364,7 +412,7 @@ Stream<StreamChunk> sendClaudeStreamEvents(
           ? claudeOutputConfig(upstreamModelId, thinkingBudget, config: config)
           : null;
 
-      // 为当前轮次准备请求体。
+      // 每轮单独准备请求体
       final body = <String, dynamic>{
         if (!isVertex) 'model': upstreamModelId,
         if (isVertex) 'anthropic_version': 'vertex-2023-10-16',
@@ -387,39 +435,37 @@ Stream<StreamChunk> sendClaudeStreamEvents(
         if (compatibleTopP != null) 'top_p': compatibleTopP,
         if (allTools.isNotEmpty) 'tools': allTools,
         if (allTools.isNotEmpty) 'tool_choice': {'type': 'auto'},
-        if (hasCodeExecution &&
-            carriedContainerId != null &&
-            carriedContainerId!.isNotEmpty)
-          'container': carriedContainerId,
         if (thinking != null) 'thinking': thinking,
         if (outputConfig != null) 'output_config': outputConfig,
+        if (hasCodeExecution && container != null) 'container': container!.id,
       };
       final extraClaude = customBody(config, modelId, assistantBody: extraBody);
       if (extraClaude.isNotEmpty) {
         body.addAll(extraClaude);
       }
 
-      final request = http.Request('POST', url);
-      request.headers.addAll(baseHeaders);
-      request.body = jsonEncode(body);
+      http.Request buildRequest() {
+        final request = http.Request('POST', url);
+        request.headers.addAll(baseHeaders);
+        request.body = jsonEncode(body);
+        return request;
+      }
 
-      var response = await client.send(request);
+      var response = await client.send(buildRequest());
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final errorBody = await response.stream.bytesToString();
-        final stale =
-            hasCodeExecution &&
-            carriedContainerId != null &&
+        // 存下来的容器可能从上一回合起就过期了；丢掉它，让这一轮开一个
+        // 新的。
+        final staleContainer =
+            body.containsKey('container') &&
             isClaudeStaleContainerError(response.statusCode, errorBody);
-        if (!stale) {
+        if (!staleContainer) {
           throw HttpException('HTTP ${response.statusCode}: $errorBody');
         }
-        carriedContainerId = null;
+        container = null;
         body.remove('container');
         await uploadDataFiles();
-        final retry = http.Request('POST', url);
-        retry.headers.addAll(baseHeaders);
-        retry.body = jsonEncode(body);
-        response = await client.send(retry);
+        response = await client.send(buildRequest());
         if (response.statusCode < 200 || response.statusCode >= 300) {
           final retryBody = await response.stream.bytesToString();
           throw HttpException('HTTP ${response.statusCode}: $retryBody');
@@ -428,15 +474,14 @@ Stream<StreamChunk> sendClaudeStreamEvents(
 
       pendingCalls = [];
       lastStreamResults = [];
-      lastText = '';
       lastAssistantBlocks = [];
       pauseTurn = false;
 
-      // 非流式路径：解析完整 JSON，处理 tool_use，必要时继续工具循环。
+      // 非流式路径：解析完整 JSON、处理 tool_use，需要时继续循环。
       if (!stream) {
         final txt = await decodeUtf8Stream(response.stream);
         final obj = jsonDecode(txt) as Map;
-        // 统计用量。
+        // 用量
         try {
           final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
           if (u != null) {
@@ -445,12 +490,13 @@ Stream<StreamChunk> sendClaudeStreamEvents(
             );
           }
         } catch (_) {}
+        container =
+            ClaudeContainerRef.fromResponse(obj['container']) ?? container;
         final content = (obj['content'] as List?) ?? const <dynamic>[];
         final List<Map<String, dynamic>> assistantBlocks =
             <Map<String, dynamic>>[];
         final Map<String, Map<String, dynamic>> toolUses =
-            <String, Map<String, dynamic>>{}; // 按 id 映射工具名称和参数。
-        final buf = StringBuffer();
+            <String, Map<String, dynamic>>{}; // id -> {name,args}
         for (final it in content) {
           if (it is! Map) continue;
           final type = (it['type'] ?? '').toString();
@@ -458,12 +504,12 @@ Stream<StreamChunk> sendClaudeStreamEvents(
             final t = (it['text'] ?? '').toString();
             if (t.isNotEmpty) {
               assistantBlocks.add({'type': 'text', 'text': t});
-              buf.write(t);
             }
           } else if (type == 'thinking' ||
               (type == 'redacted_thinking' && !skipRedactedThinkingBlocks)) {
-            // 为工具续轮原样保留思考分片；启用思考时，下一次请求必须以 thinking 或
-            // redacted_thinking 分片开头发送上一条 assistant 消息。
+            // 为工具调用的续轮原样保留 thinking 区块。开启思考时，下一次
+            // 请求必须以一条 thinking／redacted_thinking 区块开头的助手
+            // 消息收尾。
             try {
               assistantBlocks.add(
                 Map<String, dynamic>.from(it.cast<String, dynamic>()),
@@ -484,29 +530,16 @@ Stream<StreamChunk> sendClaudeStreamEvents(
                 'input': args,
               });
             }
-          }
-        }
-        final serverDecoder = ClaudeStreamDecoder(
-          serverToolNames: {
-            for (final tool in allTools)
-              if ((tool['type'] ?? '').toString().startsWith('web_') ||
-                  (tool['type'] ?? '').toString().startsWith('code_execution_'))
-                (tool['name'] ?? '').toString(),
-          },
-        );
-        final responseContainer = (obj['container'] is Map)
-            ? (obj['container'] as Map)['id']?.toString()
-            : null;
-        final serverBlocks = [
-          for (final item in content)
-            if (item is Map) item.cast<String, dynamic>(),
-        ];
-        for (final chunk in serverDecoder.decodeCompleteServerTools(
-          serverBlocks,
-        )) {
-          yield chunk;
-          if (chunk case ServerToolEnd(:final output)) {
-            for (final fileId in claudeGeneratedFileIds(output)) {
+          } else if (type == 'server_tool_use' ||
+              type.endsWith('_tool_result')) {
+            // 托管调用及其结果属于模型自己的这一轮：续轮里丢掉其中任何
+            // 一个都会被拒绝。
+            try {
+              assistantBlocks.add(
+                Map<String, dynamic>.from(it.cast<String, dynamic>()),
+              );
+            } catch (_) {}
+            for (final fileId in claudeGeneratedFileIds(it['content'])) {
               if (!downloadedFileIds.add(fileId)) continue;
               final file = await downloadClaudeGeneratedFile(
                 client: client,
@@ -518,35 +551,26 @@ Stream<StreamChunk> sendClaudeStreamEvents(
             }
           }
         }
-        // The complete response already contains the authoritative block
-        // order; keep it intact for Anthropic replay.
-        assistantBlocks
-          ..clear()
-          ..addAll(serverBlocks);
-        final responseHasTool = assistantBlocks.any(
-          (block) =>
-              block['type'] == 'tool_use' || block['type'] == 'server_tool_use',
+        // 续轮会把这些发出去，所以它们要和重放历史一样过一遍清理；存下来
+        // 的那份保持完整。
+        lastAssistantBlocks = history.sanitize(assistantBlocks);
+        nonStreamText.write(joinedTextOfBlocks(assistantBlocks));
+        final decoder = ClaudeStreamDecoder(
+          skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
+          serverToolNames: declaredServerToolNames,
+          sourceId: 'round-${streamRound++}',
         );
-        if (responseHasTool || turnResponses.isNotEmpty) {
-          turnResponses.add([
-            for (final block in assistantBlocks)
-              Map<String, dynamic>.from(block),
-          ]);
-          yield ProviderArtifact(
-            kind: 'claude_turn',
-            payload: jsonEncode(turnResponses),
-          );
+        for (final chunk in decoder.decodeCompleteServerTools(
+          assistantBlocks,
+        )) {
+          yield chunk;
         }
-        if (hasCodeExecution &&
-            responseContainer != null &&
-            responseContainer.isNotEmpty) {
-          yield ProviderArtifact(
-            kind: 'claude_container',
-            payload: ClaudeContainerRef(id: responseContainer).encode(),
-          );
+        yield* recordTurn(assistantBlocks);
+        if (toolUses.isEmpty) {
+          // 超出轮次上限的托管工具会请求续跑，而前面没有需要先回答的
+          // 客户端工具。
+          pauseTurn = (obj['stop_reason'] ?? '').toString() == 'pause_turn';
         }
-        lastAssistantBlocks = assistantBlocks;
-        lastText = buf.toString();
         if (toolUses.isNotEmpty && onToolCall != null) {
           pendingCalls = [
             for (final e in toolUses.entries)
@@ -554,19 +578,8 @@ Stream<StreamChunk> sendClaudeStreamEvents(
                 id: e.key,
                 name: (e.value['name'] ?? '').toString(),
                 arguments: (e.value['args'] as Map<String, dynamic>),
-                metadata: {
-                  'anthropic': {
-                    'assistant_blocks': assistantBlocks,
-                    if (responseContainer != null &&
-                        responseContainer.isNotEmpty)
-                      'container_id': responseContainer,
-                  },
-                },
               ),
           ];
-        }
-        if (toolUses.isEmpty) {
-          pauseTurn = (obj['stop_reason'] ?? '').toString() == 'pause_turn';
         }
         return;
       }
@@ -574,33 +587,15 @@ Stream<StreamChunk> sendClaudeStreamEvents(
       final sse = response.stream.transform(utf8.decoder);
       final decoder = ClaudeStreamDecoder(
         skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
-        serverToolNames: {
-          for (final tool in allTools)
-            if ((tool['type'] ?? '').toString().startsWith('web_') ||
-                (tool['type'] ?? '').toString().startsWith('code_execution_'))
-              (tool['name'] ?? '').toString(),
-        },
+        initialUsage: totalUsage,
+        serverToolNames: declaredServerToolNames,
         sourceId: 'round-${streamRound++}',
       );
       final executedToolIds = <String>{};
-      // Downloads run alongside the stream: awaiting one here would leave the
-      // SSE events unread, and the text after the tool frozen, for as long as
-      // the file takes.
+      // 下载与流并行进行：在这里 await 一次，会让 SSE 事件在那段时间里
+      // 无人读取，工具之后的文本也会一直冻住。
       final downloads = <Future<GeneratedFile?>>[];
       var streamCompleted = false;
-      void collectDownloads(Object? output) {
-        for (final fileId in claudeGeneratedFileIds(output)) {
-          if (!downloadedFileIds.add(fileId)) continue;
-          downloads.add(
-            downloadClaudeGeneratedFile(
-              client: client,
-              base: base,
-              headers: baseHeaders,
-              fileId: fileId,
-            ),
-          );
-        }
-      }
 
       try {
         await for (final event in parseSseEventStrings(sse)) {
@@ -608,8 +603,20 @@ Stream<StreamChunk> sendClaudeStreamEvents(
           final decoded = decoder.accept(event);
           for (final chunk in decoded.chunks) {
             yield chunk;
-            if (chunk case ServerToolEnd(:final output)) {
-              collectDownloads(output);
+            if (chunk is ServerToolEnd) {
+              // 代码执行上报的是它写了什么，给的是卡片用不上的 id；所以
+              // 这里把字节取回来，由消息自己承载文件。
+              for (final fileId in claudeGeneratedFileIds(chunk.output)) {
+                if (!downloadedFileIds.add(fileId)) continue;
+                downloads.add(
+                  downloadClaudeGeneratedFile(
+                    client: client,
+                    base: base,
+                    headers: baseHeaders,
+                    fileId: fileId,
+                  ),
+                );
+              }
             }
             if (chunk is ToolCallEnd &&
                 decoder.isClientTool(chunk.id) &&
@@ -621,9 +628,6 @@ Stream<StreamChunk> sendClaudeStreamEvents(
                 id: tool.id,
                 name: tool.name,
                 arguments: args,
-                metadata: {
-                  'anthropic': {'assistant_blocks': decoder.assistantBlocks},
-                },
               );
               await for (final resultChunk in executeClientTools(
                 calls: [call],
@@ -645,9 +649,9 @@ Stream<StreamChunk> sendClaudeStreamEvents(
         }
         streamCompleted = true;
       } finally {
-        // A turn that stops here — cancelled, or on an in-band error — still
-        // sees its downloads out rather than closing the client under them;
-        // what they wrote has no message to go to, so it is removed again.
+        // 在这一步停下的回合（被取消，或遇到带内错误）仍然会让下载跑完，
+        // 而不是把它们脚下的客户端关掉；这些下载写出来的东西没有消息可归，
+        // 因此随后会被删掉。
         final files = await Future.wait(downloads);
         if (!streamCompleted) {
           for (final file in files) {
@@ -657,9 +661,6 @@ Stream<StreamChunk> sendClaudeStreamEvents(
       }
       for (final chunk in decoder.onClosed()) {
         yield chunk;
-        if (chunk case ServerToolEnd(:final output)) {
-          collectDownloads(output);
-        }
       }
       for (final download in downloads) {
         final file = await download;
@@ -672,30 +673,12 @@ Stream<StreamChunk> sendClaudeStreamEvents(
       final toolResultsContent = decoder.toolResults;
 
       totalUsage = usage ?? totalUsage;
-      final responseHasTool = assistantBlocks.any(
-        (block) =>
-            block['type'] == 'tool_use' || block['type'] == 'server_tool_use',
-      );
-      if (responseHasTool || turnResponses.isNotEmpty) {
-        turnResponses.add([
-          for (final block in assistantBlocks) Map<String, dynamic>.from(block),
-        ]);
-        yield ProviderArtifact(
-          kind: 'claude_turn',
-          payload: jsonEncode(turnResponses),
-        );
-      }
-      if (hasCodeExecution &&
-          decoder.containerId != null &&
-          decoder.containerId!.isNotEmpty) {
-        carriedContainerId = decoder.containerId;
-        yield ProviderArtifact(
-          kind: 'claude_container',
-          payload: ClaudeContainerRef(id: decoder.containerId!).encode(),
-        );
-      }
+      container = decoder.container ?? container;
 
-      lastAssistantBlocks = assistantBlocks;
+      // 续轮会原样发出这些，所以它们要和重放历史一样过一遍清理 —— 存下来
+      // 的那份保持完整。
+      lastAssistantBlocks = history.sanitize(assistantBlocks);
+      yield* recordTurn(assistantBlocks);
       if (decoder.clientTools.isEmpty) {
         pauseTurn = (lastStopReason ?? '') == 'pause_turn';
         return;
@@ -707,24 +690,23 @@ Stream<StreamChunk> sendClaudeStreamEvents(
             id: tool.id,
             name: tool.name,
             arguments: tool.decodedArguments,
-            metadata: {
-              'anthropic': {'assistant_blocks': assistantBlocks},
-            },
           ),
       ];
       for (final tool in decoder.clientTools.values) {
         var res = toolResultsContent[tool.id] ?? '';
         if (res.isEmpty && onToolCall != null) {
-          res = await onToolCall(
-            tool.name,
-            tool.decodedArguments,
-            toolCallId: tool.id,
-          );
+          res = ClientToolResult.fromHandler(
+            await onToolCall(
+              tool.name,
+              tool.decodedArguments,
+              toolCallId: tool.id,
+            ),
+          ).content;
         }
         lastStreamResults.add({
           'type': 'tool_result',
           'tool_use_id': tool.id,
-          if (res.isNotEmpty) 'content': res,
+          'content': claudeToolResultContent(res),
         });
       }
     },
@@ -748,7 +730,7 @@ Stream<StreamChunk> sendClaudeStreamEvents(
                 <String, dynamic>{
                   'type': 'tool_result',
                   'tool_use_id': item.call.id,
-                  'content': item.content,
+                  'content': claudeToolResultContent(item.content),
                 },
             ];
       convo = [
@@ -757,12 +739,14 @@ Stream<StreamChunk> sendClaudeStreamEvents(
         {'role': 'user', 'content': results},
       ];
     },
-    finish: () => emitDone(
-      ids: StreamChunkIds('finish'),
-      content: lastText,
-      usage: totalUsage,
-      totalTokens: totalUsage?.totalTokens ?? 0,
-    ),
+    finish: () async* {
+      yield* emitDone(
+        ids: StreamChunkIds('finish'),
+        content: nonStreamText.toString(),
+        usage: totalUsage,
+        totalTokens: totalUsage?.totalTokens ?? 0,
+      );
+    },
     usageOf: () => totalUsage,
   );
 }

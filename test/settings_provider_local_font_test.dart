@@ -58,6 +58,163 @@ void main() {
       }
     });
 
+    for (final forCode in [false, true]) {
+      test('设置写入被拒绝时保留原字体并清理新文件，code=$forCode', () async {
+        final harness = await createBusinessTestHarness(initial: {});
+        final settings = SettingsProvider(harness.preferences);
+        addTearDown(settings.dispose);
+        await settings.loaded;
+        final source = await _fixtureFontFile();
+        Future<bool> apply(String license) => forCode
+            ? settings.setCodeFontFromLocal(
+                path: source.path,
+                licenseText: license,
+              )
+            : settings.setAppFontFromLocal(
+                path: source.path,
+                licenseText: license,
+              );
+        expect(await apply('Original license'), isTrue);
+        final original = forCode
+            ? settings.codeFontFamily
+            : settings.appFontFamily;
+        final pathKey = forCode
+            ? 'display_code_font_local_path_v1'
+            : 'display_app_font_local_path_v1';
+        final originalPath = harness.preferences.getString(pathKey)!;
+        await harness.preferences.runWithRestoreWriteFence(() async {});
+        await expectLater(apply('Rejected license'), throwsStateError);
+        expect(
+          forCode ? settings.codeFontFamily : settings.appFontFamily,
+          original,
+        );
+        expect(harness.preferences.getString(pathKey), originalPath);
+        expect(await File(originalPath).exists(), isTrue);
+        expect(
+          await File('$originalPath.license.txt').readAsString(),
+          'Original license',
+        );
+        expect(await Directory(p.join(tempDir.path, 'fonts')).list().length, 2);
+      });
+    }
+
+    test('两处共用字体时，只在最后一处解除使用后删除字体和许可', () async {
+      final dir = await Directory(p.join(tempDir.path, 'fonts')).create();
+      final source = await (await _fixtureFontFile()).copy(
+        p.join(dir.path, 'shared.ttf'),
+      );
+      await File('${source.path}.license.txt').writeAsString('Shared license');
+      final harness = await createBusinessTestHarness(
+        initial: {
+          'display_app_font_local_path_v1': source.path,
+          'display_app_font_local_alias_v1': 'shared_app',
+          'display_code_font_local_path_v1': source.path,
+          'display_code_font_local_alias_v1': 'shared_code',
+        },
+      );
+      final settings = SettingsProvider(harness.preferences);
+      addTearDown(settings.dispose);
+      await settings.loaded;
+      await settings.clearAppFont();
+      expect(await source.exists(), isTrue);
+      expect(await File('${source.path}.license.txt').exists(), isTrue);
+      expect(settings.codeFontLocalAlias, isNotEmpty);
+      await settings.clearCodeFont();
+      expect(await source.exists(), isFalse);
+      expect(await File('${source.path}.license.txt').exists(), isFalse);
+    });
+
+    test(
+      'downloaded font and license survive reload and clear together',
+      () async {
+        final harness = await createBusinessTestHarness(initial: {});
+        final settings = SettingsProvider(harness.preferences);
+        await settings.loaded;
+        final sourceFile = await _fixtureFontFile();
+        expect(
+          await settings.setAppFontFromLocal(
+            path: sourceFile.path,
+            licenseText: 'Example license',
+          ),
+          isTrue,
+        );
+        final path = harness.preferences.getString(
+          'display_app_font_local_path_v1',
+        )!;
+        expect(
+          await File('$path.license.txt').readAsString(),
+          'Example license',
+        );
+        final restored = SettingsProvider(harness.preferences);
+        await restored.loaded;
+        expect(restored.appFontLocalAlias, isNotEmpty);
+        expect(await File(path).exists(), isTrue);
+        await restored.clearAppFont();
+        expect(await File(path).exists(), isFalse);
+        expect(await File('$path.license.txt').exists(), isFalse);
+      },
+    );
+
+    test(
+      'failed code font import retains current font and removes new license',
+      () async {
+        final harness = await createBusinessTestHarness(initial: {});
+        final settings = SettingsProvider(harness.preferences);
+        await settings.loaded;
+        expect(
+          await settings.setCodeFontFromLocal(
+            path: (await _fixtureFontFile()).path,
+            licenseText: 'Valid license',
+          ),
+          isTrue,
+        );
+        final path = harness.preferences.getString(
+          'display_code_font_local_path_v1',
+        )!;
+        final invalid = File('${tempDir.path}/broken.ttf');
+        await invalid.writeAsString('broken');
+        expect(
+          await settings.setCodeFontFromLocal(
+            path: invalid.path,
+            licenseText: 'Rejected license',
+          ),
+          isFalse,
+        );
+        expect(
+          harness.preferences.getString('display_code_font_local_path_v1'),
+          path,
+        );
+        expect(await File('$path.license.txt').readAsString(), 'Valid license');
+        expect(await Directory('${tempDir.path}/fonts').list().length, 2);
+      },
+    );
+
+    test(
+      'switching downloaded fonts to system families removes files and licenses',
+      () async {
+        final harness = await createBusinessTestHarness(initial: {});
+        final settings = SettingsProvider(harness.preferences);
+        await settings.loaded;
+        final source = (await _fixtureFontFile()).path;
+        await settings.setAppFontFromLocal(
+          path: source,
+          licenseText: 'App license',
+        );
+        await settings.setCodeFontFromLocal(
+          path: source,
+          licenseText: 'Code license',
+        );
+        await settings.setAppFontSystemFamily('Arial');
+        await settings.setCodeFontSystemFamily('Courier');
+        expect(settings.appFontFamily, 'Arial');
+        expect(settings.codeFontFamily, 'Courier');
+        expect(
+          await Directory('${tempDir.path}/fonts').list().toList(),
+          isEmpty,
+        );
+      },
+    );
+
     test('local font import stores managed copy path', () async {
       final harness = await createBusinessTestHarness(initial: {});
       final settings = SettingsProvider(harness.preferences);

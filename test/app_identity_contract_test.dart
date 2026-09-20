@@ -204,6 +204,41 @@ void main() {
       expect(localBackup, greaterThan(userDataDirectory));
     });
 
+    test('恢复、后台和定时任务文案以 JO-AIClient 称呼当前应用', () {
+      const keys = [
+        'storageSpaceClearDisplacedDatabasesConfirmMessage', 'startupRecoveryDangerBody',
+        'startupDatabaseUpdateRequiredDowngradeStep1', 'backupPageForwardCompatBody',
+        'backupPageSchemaTooNewMessage', 'backgroundTaskTitle', 'backgroundIconDefault',
+        'startupRecoverySnapshotBody', 'startupRecoverySnapshotConfirm', 'startupRecoverySnapshotReady',
+        'scheduledTasksReliability', 'scheduledTasksDesktopReliability',
+      ];
+      for (final locale in ['en', 'zh', 'zh_Hans', 'zh_Hant']) {
+        final path = 'lib/l10n/app_$locale.arb';
+        final arb = jsonDecode(_read(path)) as Map<String, dynamic>;
+        for (final key in keys) {
+          expect(arb[key], contains('JO-AIClient'), reason: '$path: $key');
+          expect(arb[key], isNot(contains('Kelivo')), reason: '$path: $key');
+        }
+      }
+    });
+
+    test('工作区界面以 JO-AIClient 称呼当前应用', () {
+      const keys = [
+        'workspaceDesktopManagedHint',
+        'workspaceEnvRestartBanner',
+        'workspaceEnvNativeExplanation',
+        'workspaceExternalStorageMessage',
+      ];
+      for (final locale in ['en', 'zh', 'zh_Hans', 'zh_Hant']) {
+        final path = 'lib/l10n/app_$locale.arb';
+        final arb = jsonDecode(_read(path)) as Map<String, dynamic>;
+        for (final key in keys) {
+          expect(arb[key], contains('JO-AIClient'), reason: '$path: $key');
+          expect(arb[key], isNot(contains('Kelivo')), reason: '$path: $key');
+        }
+      }
+    });
+
     test(
       'keeps JO-AIClient About copy without community or sponsorship actions',
       () {
@@ -408,7 +443,7 @@ void main() {
 
     test('opens desktop user-data directories without blocking the app', () {
       final source = _read('lib/utils/app_directories.dart');
-      expect(source, contains("Process.start('explorer.exe'"));
+      expect(source, matches(RegExp(r"Process\.start\(\s*'explorer\.exe'")));
       expect(source, contains("Process.start('open'"));
       expect(source, contains("Process.start('xdg-open'"));
       expect(

@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/shared/dialogs/loading_task_dialog.dart';
-import 'package:Kelivo/core/models/backup_task_progress.dart';
+import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
 
 void main() {
   testWidgets(

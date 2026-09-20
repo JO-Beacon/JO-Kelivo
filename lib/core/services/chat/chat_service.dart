@@ -17,11 +17,12 @@ import '../../models/chat_message.dart';
 import '../../models/message_part.dart';
 import '../../models/conversation.dart';
 import '../../models/conversation_tree.dart';
-import '../../models/backup_task_progress.dart';
-import '../../models/progress_update.dart';
+import '../../models/workspace_binding.dart';
+import '../backup/backup_cancel_token.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/app_directories.dart';
 import '../backup/backup_isolate_runner.dart';
+import '../backup/backup_task_progress.dart';
 import '../api/providers/claude/claude_container.dart';
 
 final class LoadedTimelineSlot {
@@ -192,6 +193,31 @@ class ChatService extends ChangeNotifier {
   void setDefaultConversationTitle(String title) {
     if (title.trim().isEmpty) return;
     _defaultConversationTitle = title.trim();
+  }
+
+  /// 可选：新建会话（非恢复）时并入的 extras。
+  Map<String, dynamic> Function(String? assistantId)? newConversationExtras;
+
+  Map<String, dynamic> _extrasForNewConversation(String? assistantId) {
+    final extras = newConversationExtras?.call(assistantId);
+    if (extras == null || extras.isEmpty) {
+      return const <String, dynamic>{};
+    }
+    return Map<String, dynamic>.from(extras);
+  }
+
+  Future<void> _copyWorkspaceBindingFrom(
+    String conversationId,
+    Map<String, dynamic> sourceExtras,
+  ) {
+    return updateConversationExtras(conversationId, (_) {
+      final source = WorkspaceBinding.fromExtras(sourceExtras);
+      return WorkspaceBinding(
+        workspaceId: source.workspaceId,
+        cwd: source.cwd,
+        allowAll: source.allowAll,
+      ).applyTo({});
+    });
   }
 
   bool _initialized = false;
@@ -1507,6 +1533,7 @@ class ChatService extends ChangeNotifier {
     String conversationId, {
     required int start,
     required int limit,
+    bool cacheInTimeline = true,
   }) async {
     if (!_initialized || limit <= 0) return const <ChatMessage>[];
 
@@ -1545,8 +1572,11 @@ class ChatService extends ChangeNotifier {
       }
       messages.add(message);
     }
-    _cacheLoadedMessages(conversationId, messages);
-    await _cacheMessageArtifacts(messages);
+    // 只读扫描（如工作区「会话文件」面板翻页）不应把整段历史塞进时间线缓存。
+    if (cacheInTimeline) {
+      _cacheLoadedMessages(conversationId, messages);
+      await _cacheMessageArtifacts(messages);
+    }
     return messages;
   }
 
@@ -1631,17 +1661,19 @@ class ChatService extends ChangeNotifier {
   Future<Conversation> createConversation({
     String? title,
     String? assistantId,
+    bool activate = true,
   }) async {
     if (!_initialized) await init();
-    _discardTemporaryConversation(_currentConversationId);
+    if (activate) _discardTemporaryConversation(_currentConversationId);
 
     final conversation = Conversation(
       title: title ?? _defaultConversationTitle,
       assistantId: assistantId,
+      extras: _extrasForNewConversation(assistantId),
     );
 
     await _saveConversation(conversation);
-    _currentConversationId = conversation.id;
+    if (activate) _currentConversationId = conversation.id;
     _enforceMessageCacheLimits();
     _bumpConversationListRevision();
     notifyListeners();
@@ -1678,6 +1710,7 @@ class ChatService extends ChangeNotifier {
     final conversation = Conversation(
       title: title ?? _defaultConversationTitle,
       assistantId: assistantId,
+      extras: _extrasForNewConversation(assistantId),
     );
     _draftConversations[conversation.id] = conversation;
     if (temporary) {
@@ -2183,6 +2216,13 @@ class ChatService extends ChangeNotifier {
       summary: conversation.summary,
       lastSummarizedMessageCount: conversation.lastSummarizedMessageCount,
       chatSuggestions: List<String>.of(conversation.chatSuggestions),
+      // 以下 5 个字段必须一并带上：本方法是「逐字段重建」Conversation，
+      // 漏掉任何一项都会在导入时静默丢失（见同文件测试用例的说明）。
+      injectedMemoryHash: conversation.injectedMemoryHash,
+      lastMemoryExtractedOrder: conversation.lastMemoryExtractedOrder,
+      chatModelProvider: conversation.chatModelProvider,
+      chatModelId: conversation.chatModelId,
+      extras: conversation.extras,
     );
     await _repo.putMigrationBatch(
       conversations: [restored],
@@ -2304,7 +2344,8 @@ class ChatService extends ChangeNotifier {
 
   Future<ChatDatabaseSnapshotInfo> createBackupDatabaseSnapshot(
     File destinationFile, {
-    ProgressCallback? onProgress,
+    // 与上游一致：收带单位与阶段的新进度类型（core 层统一口径）。
+    BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
     Duration timeout = const Duration(minutes: 10),
   }) async {
@@ -2344,8 +2385,8 @@ class ChatService extends ChangeNotifier {
     return ChatDatabaseRepository.createConsistentSnapshot(
       sourceFile: File(paths[0]),
       destinationFile: File(paths[1]),
-      registerSourceHandle: context.registerSqliteHandle,
-      waitForSourceCloseAck: context.waitForSqliteClose,
+      registerSourceHandle: context.registerSqliteInterruptHandle,
+      waitForSourceCloseAck: context.waitForSqliteCloseAck,
     );
   }
 
@@ -2546,6 +2587,25 @@ class ChatService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 读取 extras，套用 [update]，写回并刷新缓存。
+  Future<void> updateConversationExtras(
+    String conversationId,
+    Map<String, dynamic> Function(Map<String, dynamic> current) update,
+  ) async {
+    final draft = _draftConversations[conversationId];
+    if (draft != null) {
+      _draftConversations[conversationId] = draft.copyWith(
+        extras: update(Map<String, dynamic>.from(draft.extras)),
+      );
+      notifyListeners();
+      return;
+    }
+    if (!_initialized) return;
+    await _repo.updateConversationExtras(conversationId, update);
+    await _refreshConversation(conversationId);
+    notifyListeners();
+  }
+
   Future<void> updateConversationSuggestions(
     String conversationId,
     List<String> suggestions,
@@ -2675,6 +2735,7 @@ class ChatService extends ChangeNotifier {
         conversation = Conversation(
           id: conversationId,
           title: _defaultConversationTitle,
+          extras: _extrasForNewConversation(null),
         );
         if (temporary) {
           _draftConversations[conversationId] = conversation;
@@ -2793,7 +2854,11 @@ class ChatService extends ChangeNotifier {
     final conversation =
         _conversationsCache[conversationId] ??
         _draftConversations[conversationId] ??
-        Conversation(id: conversationId, title: _defaultConversationTitle);
+        Conversation(
+          id: conversationId,
+          title: _defaultConversationTitle,
+          extras: _extrasForNewConversation(null),
+        );
     if (_conversationsCache.containsKey(conversationId)) {
       await _loadMessageOrder(conversationId);
     }
@@ -4115,10 +4180,20 @@ class ChatService extends ChangeNotifier {
     required List<ChatMessage> sourceMessages,
   }) async {
     if (!_initialized) await init();
+    // 分叉继承源会话的工作区绑定（toolsUsed 不继承）。
+    Map<String, dynamic> sourceExtras = const <String, dynamic>{};
+    for (final message in sourceMessages) {
+      final existing = getConversation(message.conversationId);
+      if (existing != null) {
+        sourceExtras = Map<String, dynamic>.from(existing.extras);
+        break;
+      }
+    }
     final persisted = await createConversation(
       title: title,
       assistantId: assistantId,
     );
+    await _copyWorkspaceBindingFrom(persisted.id, sourceExtras);
     final sourceIds = sourceMessages
         .map((message) => message.id)
         .where((id) => id.isNotEmpty)

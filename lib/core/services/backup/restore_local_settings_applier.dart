@@ -79,10 +79,7 @@ abstract final class RestoreLocalSettingsApplier {
     required String runId,
     required bool runInCompletedDirectory,
   }) {
-    final workspaceRoot = p.join(
-      appDataDirectory.path,
-      '.kelivo_restore',
-    );
+    final workspaceRoot = p.join(appDataDirectory.path, '.kelivo_restore');
     final base = runInCompletedDirectory
         ? p.join(workspaceRoot, 'completed')
         : workspaceRoot;

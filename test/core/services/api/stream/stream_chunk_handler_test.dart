@@ -99,6 +99,19 @@ void main() {
     expect((handler.parts[1] as TextPart).text, 'caption');
   });
 
+  test('combines streamed image deltas before an image snapshot', () {
+    final handler = StreamChunkHandler();
+    handler.handle(const ImageStart(id: 'img', mimeType: 'image/png'));
+    handler.handle(const ImageDelta(id: 'img', data: 'aaa'));
+    handler.handle(const ImageDelta(id: 'img', data: 'bbb'));
+    handler.handle(const ImageSnapshot(id: 'img', data: 'ccc'));
+    handler.handle(const ImageEnd('img'));
+
+    final image = handler.parts.single as ImagePart;
+    expect(image.id, 'img');
+    expect(image.uri, 'data:image/png;base64,ccc');
+  });
+
   test('ImageStart without data does not create an image part', () {
     final handler = StreamChunkHandler();
     handler.handle(const ImageStart(id: 'img', mimeType: 'image/png'));
@@ -278,6 +291,22 @@ void main() {
     expect(payload['server'], isTrue);
     expect(payload['metadata']['server_tool_use']['id'], 'srv_1');
     expect(payload['metadata']['web_search_tool_result']['id'], 'srv_1');
+  });
+
+  test('does not erase streamed arguments with an empty server result', () {
+    final handler = StreamChunkHandler();
+    handler.handle(const ToolCallStart(id: 'srv_1', toolName: 'search_web'));
+    handler.handle(
+      const ToolCallDelta(id: 'srv_1', inputDelta: '{"query":"Kyoto"}'),
+    );
+    handler.handle(
+      const ServerToolEnd(id: 'srv_1', output: <String, dynamic>{}),
+    );
+
+    final payload = jsonDecode(
+      (handler.parts.single as ToolCallPart).payloadJson,
+    );
+    expect(payload['arguments'], <String, dynamic>{'query': 'Kyoto'});
   });
 
   test('keeps tool name and args when ServerToolEnd follows ToolCallEnd', () {

@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'windows_explorer_arguments.dart';
+
 /// 平台相关的应用数据目录工具。
 ///
 /// - Windows/macOS/Linux：使用 `path_provider` 提供的 Application Support
@@ -37,9 +39,12 @@ class AppDirectories {
 
     switch (defaultTargetPlatform) {
       case TargetPlatform.windows:
-        await Process.start('explorer.exe', [
-          directory.path,
-        ], mode: ProcessStartMode.detached);
+        final args = windowsExplorerArguments(directory.path);
+        await Process.start(
+          'explorer.exe',
+          args,
+          mode: ProcessStartMode.detached,
+        );
         return true;
       case TargetPlatform.macOS:
         await Process.start('open', [
@@ -91,6 +96,49 @@ class AppDirectories {
   static Future<Directory> getCacheDirectory() async {
     final root = await getAppDataDirectory();
     return Directory('${root.path}/cache');
+  }
+
+  /// 受管工作区根目录：`<appData>/workspaces`。
+  static Future<Directory> getWorkspacesDirectory() =>
+      _ensureSubdir('workspaces');
+
+  /// 按会话划分的会话根目录：`<appData>/sessions`。
+  static Future<Directory> getSessionsDirectory() => _ensureSubdir('sessions');
+
+  /// 已安装技能的主体目录：`<appData>/skills`。
+  static Future<Directory> getSkillsDirectory() => _ensureSubdir('skills');
+
+  /// 沙盒环境安装根目录：`<appData>/environment`。
+  static Future<Directory> getEnvironmentDirectory() =>
+      _ensureSubdir('environment');
+
+  /// 受管工作区的文件根目录：`<appData>/workspaces/<id>/files`。
+  static Future<Directory> workspaceFilesDir(String workspaceId) {
+    return _ensurePath('workspaces/$workspaceId/files');
+  }
+
+  /// 会话根目录，含 `attachments/` 与 `outputs/` 两个子目录。
+  static Future<Directory> sessionDir(String conversationId) async {
+    final dir = await _ensurePath('sessions/$conversationId');
+    await Directory('${dir.path}/attachments').create(recursive: true);
+    await Directory('${dir.path}/outputs').create(recursive: true);
+    return dir;
+  }
+
+  /// 技能主体目录：`<appData>/skills/<id>`。
+  static Future<Directory> skillDir(String skillId) {
+    return _ensurePath('skills/$skillId');
+  }
+
+  static Future<Directory> _ensureSubdir(String name) => _ensurePath(name);
+
+  static Future<Directory> _ensurePath(String relativePath) async {
+    final root = await getAppDataDirectory();
+    final dir = Directory('${root.path}/$relativePath');
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return dir;
   }
 
   /// 获取平台提供的应用缓存目录。

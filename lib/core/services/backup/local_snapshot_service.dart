@@ -4,7 +4,8 @@ import 'package:path/path.dart' as p;
 
 import '../../database/app_database.dart';
 import '../../models/backup.dart';
-import '../../models/backup_task_progress.dart';
+import 'backup_cancel_token.dart';
+import 'backup_task_progress.dart';
 import '../storage/device_storage_probe.dart';
 import 'data_sync.dart';
 import 'local_snapshot_schedule.dart';

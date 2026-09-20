@@ -118,6 +118,9 @@ class HomeViewModel extends ChangeNotifier {
   final ChatSuggestionService _suggestionService =
       const ChatSuggestionService();
   late final ChatActions _chatActions;
+
+  @visibleForTesting
+  ChatActions get debugChatActions => _chatActions;
   ConversationTree? _conversationTree;
   ConversationTreeIntegrityException? _conversationTreeIntegrityError;
   int _conversationTreeReloadSerial = 0;
@@ -145,7 +148,7 @@ class HomeViewModel extends ChangeNotifier {
   void Function(String conversationId)? onStreamFinished;
 
   /// 成功的助手回复最终化时调用。
-  void Function(ChatMessage message)? onAssistantMessageFinished;
+  FutureOr<void> Function(ChatMessage message)? onAssistantMessageFinished;
 
   /// 调用以安排行内图片清理。
   void Function(String messageId, String content, {bool immediate})?
@@ -222,10 +225,6 @@ class HomeViewModel extends ChangeNotifier {
   /// 所属助手消息正在解析附件的 ID；没有解析时为 null。
   ValueNotifier<String?> get processingFilesMessageId =>
       _fileProcessingIndicator.messageId;
-
-  /// 兼容旧的列表调用方；生产列表使用 [processingFilesMessageId]。
-  @Deprecated('Use processingFilesMessageId')
-  final ValueNotifier<bool> isProcessingFiles = ValueNotifier<bool>(false);
 
   // ============================================================================
   // 内部回调
@@ -304,8 +303,8 @@ class HomeViewModel extends ChangeNotifier {
     onStreamFinished?.call(conversationId);
   }
 
-  void _onAssistantMessageFinished(ChatMessage message) {
-    onAssistantMessageFinished?.call(message);
+  Future<void> _onAssistantMessageFinished(ChatMessage message) async {
+    await onAssistantMessageFinished?.call(message);
     _onMaybeOrganizeMemory(message.conversationId);
   }
 
@@ -353,6 +352,49 @@ class HomeViewModel extends ChangeNotifier {
   // ============================================================================
   // 公共方法 - 消息操作
   // ============================================================================
+
+  /// 定时发送：即使当前可见的不是目标会话，也能往指定会话里发消息。
+  Future<ChatActionResult> sendScheduledMessage({
+    required ChatInputData input,
+    required Conversation conversation,
+    required Assistant assistant,
+    ({String providerKey, String modelId})? modelOverride,
+    ValueChanged<String>? onGenerationStarted,
+  }) {
+    if (_chatController.isConversationLoading(conversation.id) ||
+        _chatActions.activeStreamingMessageId(conversation.id) != null) {
+      return Future.value(ChatActionResult.inFlight());
+    }
+    return _chatActions.sendMessage(
+      input: input,
+      conversation: conversation,
+      assistantOverride: assistant,
+      scheduled: true,
+      modelOverride: modelOverride,
+      onGenerationStarted: onGenerationStarted,
+    );
+  }
+
+  Future<ChatActionResult> regenerateScheduledMessage({
+    required ChatMessage message,
+    required Conversation conversation,
+    required Assistant assistant,
+    ({String providerKey, String modelId})? modelOverride,
+    ValueChanged<String>? onGenerationStarted,
+  }) {
+    if (_chatController.isConversationLoading(conversation.id) ||
+        _chatActions.activeStreamingMessageId(conversation.id) != null) {
+      return Future.value(ChatActionResult.inFlight());
+    }
+    return _chatActions.regenerateAtMessage(
+      message: message,
+      conversation: conversation,
+      assistantOverride: assistant,
+      scheduled: true,
+      modelOverride: modelOverride,
+      onGenerationStarted: onGenerationStarted,
+    );
+  }
 
   /// 发送新消息；如果当前会话忙则将其排队。
   Future<ChatInputSubmissionResult> sendMessage(ChatInputData input) async {
@@ -1946,7 +1988,6 @@ class HomeViewModel extends ChangeNotifier {
     _disposed = true;
     _conversationTreeReloadSerial++;
     _fileProcessingIndicator.dispose();
-    isProcessingFiles.dispose();
     super.dispose();
   }
 }

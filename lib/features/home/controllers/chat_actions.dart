@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'dart:collection';
-import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/database/generation_run.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../core/models/message_part.dart';
+import '../../../utils/app_directories.dart';
+import '../../../utils/sandbox_path_resolver.dart';
+import '../../../utils/markdown_media_sanitizer.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/conversation_tree.dart';
 import '../../../core/models/token_usage.dart';
@@ -15,15 +18,14 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/api/retry_policy.dart';
 import '../../../core/services/api/stream/stream_chunk.dart';
-import '../../../core/services/api/stream/stream_chunk_handler.dart';
 import '../../../core/services/backup/data_sync.dart';
 import '../../../core/services/chat/chat_service.dart';
-import '../../../core/services/ios_background_generation.dart';
+import '../../../core/services/mobile_background.dart';
 import '../../../core/services/logging/flutter_logger.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
-import '../../../utils/markdown_media_sanitizer.dart';
+import '../../chat/utils/thinking_tag_parser.dart';
 import '../services/ask_user_interaction_service.dart';
 import '../services/message_generation_service.dart';
 import '../services/tool_approval_service.dart';
@@ -74,22 +76,6 @@ final class _BarrierStreamSubscription<T> implements StreamSubscription<T> {
   Future<E> asFuture<E>([E? futureValue]) => _delegate.asFuture(futureValue);
 }
 
-final class _EventToolBuffer {
-  _EventToolBuffer({this.name = '', this.metadata});
-
-  String name;
-  String input = '';
-  Map<String, dynamic>? metadata;
-
-  Map<String, dynamic> get arguments {
-    try {
-      final decoded = jsonDecode(input);
-      if (decoded is Map) return decoded.cast<String, dynamic>();
-    } catch (_) {}
-    return const <String, dynamic>{};
-  }
-}
-
 class _StreamingCheckpoint {
   const _StreamingCheckpoint({
     required this.message,
@@ -123,15 +109,23 @@ class ChatActionResult {
   final bool success;
   final String? errorMessage;
   final ChatMessage? assistantMessage;
+  final String? generationRunId;
 
   ChatActionResult({
     required this.success,
     this.errorMessage,
     this.assistantMessage,
+    this.generationRunId,
   });
 
-  factory ChatActionResult.success(ChatMessage assistantMessage) =>
-      ChatActionResult(success: true, assistantMessage: assistantMessage);
+  factory ChatActionResult.success(
+    ChatMessage assistantMessage, {
+    String? generationRunId,
+  }) => ChatActionResult(
+    success: true,
+    assistantMessage: assistantMessage,
+    generationRunId: generationRunId,
+  );
 
   factory ChatActionResult.error(String message) =>
       ChatActionResult(success: false, errorMessage: message);
@@ -164,7 +158,9 @@ class ChatActions {
     required this.messageGenerationService,
     required this.contextProvider,
     required this.viewModel,
-  }) {
+    MobileBackgroundCoordinator? backgroundCoordinator,
+  }) : _background =
+           backgroundCoordinator ?? MobileBackgroundCoordinator.instance {
     _current = this;
     // 恢复备份会就地改写聊天库与设置，完全覆盖模式还会在收尾冷重启时
     // 替换整个数据库文件，两种模式都不能与流式写入并发。DataSync 位于
@@ -176,6 +172,10 @@ class ChatActions {
   /// （例如抽屉中的会话删除）通过它访问活动生成状态，
   /// 以维持“删除意味着停止生成”的约束。
   static ChatActions? _current;
+
+  /// 移动端后台执行协调器：把进行中的生成登记给系统，
+  /// 让应用退到后台时任务仍能被跟踪和取消。
+  final MobileBackgroundCoordinator _background;
 
   /// 当前是否有任何会话正在生成。
   ///
@@ -199,9 +199,16 @@ class ChatActions {
 
   /// 在 [conversationId] 对应行被删除前停止其进行中的生成，
   /// 使流式检查点不能写入已删除消息。
-  static Future<void> cancelActiveGenerationFor(String conversationId) async {
+  static Future<void> cancelActiveGenerationFor(
+    String conversationId, {
+    String? expectedMessageId,
+  }) async {
     final actions = _current;
     if (actions == null || !actions._hasActiveGeneration(conversationId)) {
+      return;
+    }
+    if (expectedMessageId != null &&
+        actions.activeStreamingMessageId(conversationId) != expectedMessageId) {
       return;
     }
     await actions.cancelStreamingById(conversationId);
@@ -289,8 +296,9 @@ class ChatActions {
   /// [conversationId] 的流结束时调用。
   void Function(String conversationId)? onStreamFinished;
 
-  /// 成功的助手回复最终化时调用。
-  void Function(ChatMessage message)? onAssistantMessageFinished;
+  /// 成功的助手回复最终化时调用。落库之后等待下游把后台执行接过去，
+  /// 而不是等它整段跑完。
+  FutureOr<void> Function(ChatMessage message)? onAssistantMessageFinished;
 
   /// 文件处理开始时调用，参数为所属助手消息 ID。
   void Function(String messageId)? onFileProcessingStarted;
@@ -304,82 +312,77 @@ class ChatActions {
 
   AppLocalizations? get _l10n => AppLocalizations.of(contextProvider);
 
-  void _logIosBackgroundGenerationFailure(
-    String operation,
-    Object error,
-    StackTrace stackTrace,
-  ) {
-    debugPrint('[IosBackgroundGeneration] $operation failed: $error');
-    debugPrint('$stackTrace');
-  }
+  /// 后台任务的稳定标识：优先用生成运行 id，回退到助手消息 id。
+  String _backgroundTaskId(stream_ctrl.GenerationContext ctx) =>
+      ctx.generationRunId ?? ctx.assistantMessage.id;
+
+  /// 从助手消息 id 反查后台任务标识，用于取消与收尾路径。
+  String _backgroundTaskIdFor(String messageId) =>
+      _generationCheckpointCursors[messageId]?.runId ?? messageId;
 
   Future<void> _startIosBackgroundGeneration(
     stream_ctrl.GenerationContext ctx,
   ) async {
-    final settings = ctx.settings;
     final l10n = _l10n;
     if (l10n == null) return;
-    try {
-      await IosBackgroundGenerationService.instance.start(
-        enabled: settings.iosBackgroundGenerationEnabled,
-        liveActivityEnabled: settings.iosLiveActivityEnabled,
-        notificationsEnabled: settings.iosBackgroundNotificationsEnabled,
-        refreshEnabled: settings.iosBackgroundTaskRefreshEnabled,
-        title: l10n.iosBackgroundGenerationActiveTitle,
-        detail: l10n.iosBackgroundGenerationActiveDetail,
-        tokenLabel: l10n.iosBackgroundGenerationTokenCount(0),
-      );
-    } catch (error, stackTrace) {
-      _logIosBackgroundGenerationFailure('start', error, stackTrace);
+    if (_background.supported) {
+      await _background.configureFromSettings(ctx.settings, l10n);
     }
+    final conversationId = ctx.assistantMessage.conversationId;
+    await _background.start(
+      id: _backgroundTaskId(ctx),
+      scheduled: ctx.scheduled,
+      conversationId: conversationId,
+      title:
+          chatService.getConversation(conversationId)?.title ?? 'JO-AIClient',
+      cancel: () async {
+        if (!_activeAssistantMessages.isActive(ctx.assistantMessage)) return;
+        if (ctx.generationRunId != null &&
+            _generationCheckpointCursors[ctx.assistantMessage.id]?.runId !=
+                ctx.generationRunId) {
+          return;
+        }
+        await cancelStreamingById(conversationId);
+      },
+    );
   }
 
   void _scheduleIosBackgroundGenerationUpdate(
     stream_ctrl.StreamingState state,
   ) {
-    final l10n = _l10n;
-    if (l10n == null) return;
-    IosBackgroundGenerationService.instance.scheduleUpdate(
-      detail: l10n.iosBackgroundGenerationStreamingDetail,
-      tokenLabel: l10n.iosBackgroundGenerationTokenCount(state.totalTokens),
-      tokenCount: state.totalTokens,
-      onError: (error, stackTrace) =>
-          _logIosBackgroundGenerationFailure('update', error, stackTrace),
+    final tools = streamController.toolParts[state.messageId] ?? const [];
+    final loadingTools = tools.where((tool) => tool.loading);
+    final activeTool = loadingTools.isEmpty ? null : loadingTools.last;
+    _background.update(
+      _backgroundTaskId(state.ctx),
+      phase: state.retryStatus != null
+          ? BackgroundTaskPhase.retrying
+          : activeTool != null
+          ? BackgroundTaskPhase.tool
+          : state.fullContentRaw.isEmpty && state.reasoningStartAt != null
+          ? BackgroundTaskPhase.thinking
+          : BackgroundTaskPhase.generating,
+      tokens: state.totalTokens,
+      toolName: activeTool?.toolName ?? '',
     );
   }
 
-  Future<void> _finishIosBackgroundGeneration({
+  Future<void> _finishIosBackgroundGeneration(
+    String id, {
     required bool success,
-    String? detail,
+    bool resultPersisted = true,
+    String? replyPreview,
   }) async {
-    final l10n = _l10n;
-    if (l10n == null) return;
-    try {
-      await IosBackgroundGenerationService.instance.finish(
-        title: success
-            ? l10n.iosBackgroundGenerationCompleteTitle
-            : l10n.iosBackgroundGenerationInterruptedTitle,
-        detail:
-            detail ??
-            (success
-                ? l10n.iosBackgroundGenerationCompleteDetail
-                : l10n.iosBackgroundGenerationInterruptedDetail),
-        success: success,
-      );
-    } catch (error, stackTrace) {
-      _logIosBackgroundGenerationFailure('finish', error, stackTrace);
-    }
+    await _background.finish(
+      id,
+      success ? BackgroundTaskOutcome.completed : BackgroundTaskOutcome.failed,
+      resultPersisted: resultPersisted,
+      replyPreview: replyPreview,
+    );
   }
 
-  Future<void> _cancelIosBackgroundGeneration() async {
-    final l10n = _l10n;
-    try {
-      await IosBackgroundGenerationService.instance.cancel(
-        detail: l10n?.iosBackgroundGenerationCancelledDetail,
-      );
-    } catch (error, stackTrace) {
-      _logIosBackgroundGenerationFailure('cancel', error, stackTrace);
-    }
+  Future<void> _cancelIosBackgroundGeneration(String id) async {
+    await _background.finish(id, BackgroundTaskOutcome.cancelled);
   }
 
   /// 跟踪进行中的 _finishStreaming Future，使 _handleStreamDone
@@ -391,10 +394,7 @@ class ChatActions {
       <String, LatestWinsCheckpointWriter<_StreamingCheckpoint>>{};
   final Map<String, List<Map<String, dynamic>>> _streamingToolEvents =
       <String, List<Map<String, dynamic>>>{};
-  final Map<String, StreamChunkHandler> _streamEventHandlers =
-      <String, StreamChunkHandler>{};
-  final Map<String, Map<String, _EventToolBuffer>> _streamEventTools =
-      <String, Map<String, _EventToolBuffer>>{};
+  final Map<String, stream_ctrl.StreamingState> _streamingStates = {};
   final Map<String, _GenerationCheckpointCursor> _generationCheckpointCursors =
       <String, _GenerationCheckpointCursor>{};
   final ActiveStreamingMessageStore _activeAssistantMessages =
@@ -417,7 +417,6 @@ class ChatActions {
       _cancelStreamingFutures.containsKey(conversationId);
 
   List<ChatMessage> get _messages => chatController.messages;
-  Conversation? get _currentConversation => chatController.currentConversation;
   Set<String> get _loadingConversationIds =>
       chatController.loadingConversationIds;
   Map<String, StreamSubscription<dynamic>> get _conversationStreams =>
@@ -531,15 +530,13 @@ class ChatActions {
     final base = _messageWithCurrentReasoning(
       index < 0 ? state.ctx.assistantMessage : _messages[index],
     );
-    final eventParts = _streamEventHandlers[messageId]?.parts;
     return base.copyWith(
-      content: _transformAssistantContent(state),
-      parts: eventParts == null || eventParts.isEmpty ? null : eventParts,
+      parts: _assistantPartsForState(state),
       totalTokens: state.totalTokens,
       promptTokens: state.usage?.promptTokens,
       completionTokens: state.usage?.completionTokens,
       cachedTokens: state.usage?.cachedTokens,
-      // 当此处解析为 null 时，copyWith 保留 base.durationMs。
+      // copyWith keeps base.durationMs when this resolves to null.
       durationMs: _elapsedMsFrom(state.streamStartedAt),
     );
   }
@@ -630,15 +627,36 @@ class ChatActions {
   void _clearGenerationRuntimeState(ChatMessage message) {
     _generationCheckpointCursors.remove(message.id);
     _streamingToolEvents.remove(message.id);
-    _streamEventHandlers.remove(message.id);
-    _streamEventTools.remove(message.id);
+    _streamingStates.remove(message.id);
     _activeAssistantMessages.removeIfMatches(message);
+  }
+
+  Future<void> _finishPrepareError(
+    String conversationId,
+    ChatMessage fallback,
+    PrepareErrorAction action,
+  ) async {
+    switch (action) {
+      case PrepareErrorAction.skip:
+        return;
+      case PrepareErrorAction.cancelled:
+        await _finishPreparingMessage(
+          conversationId,
+          fallback,
+          terminalState: GenerationRunState.cancelled,
+          errorCode: null,
+        );
+      case PrepareErrorAction.failed:
+        await _finishPreparingMessage(conversationId, fallback);
+    }
   }
 
   Future<void> _finishPreparingMessage(
     String conversationId,
-    ChatMessage fallback,
-  ) async {
+    ChatMessage fallback, {
+    GenerationRunState terminalState = GenerationRunState.failed,
+    String? errorCode = 'preparation_failed',
+  }) async {
     final active = _activeAssistantMessages[conversationId];
     final message = _messageWithCurrentReasoning(
       active?.id == fallback.id ? active! : fallback,
@@ -649,8 +667,8 @@ class ChatActions {
     try {
       await _finalizeStreamingCheckpoint(
         message,
-        terminalState: GenerationRunState.failed,
-        errorCode: 'preparation_failed',
+        terminalState: terminalState,
+        errorCode: errorCode,
       );
     } finally {
       _clearGenerationRuntimeState(message);
@@ -697,12 +715,162 @@ class ChatActions {
     if (index < 0) {
       events.add(record);
     } else {
-      final existingMetadata = events[index]['metadata'];
-      if (!record.containsKey('metadata') && existingMetadata is Map) {
-        record['metadata'] = Map<String, dynamic>.from(existingMetadata);
-      }
-      events[index] = record;
+      events[index] = mergeStreamingToolEventRecord(events[index], record);
     }
+  }
+
+  static Map<String, dynamic> mergeStreamingToolEventRecord(
+    Map<String, dynamic> existing,
+    Map<String, dynamic> incoming,
+  ) {
+    final merged = Map<String, dynamic>.from(existing);
+    for (final entry in incoming.entries) {
+      if (entry.key == 'metadata') continue;
+      if (_isEmptyToolOverlay(entry.value) &&
+          !_isEmptyToolOverlay(merged[entry.key])) {
+        continue;
+      }
+      merged[entry.key] = entry.value;
+    }
+    if (existing['server'] == true && incoming['server'] != false) {
+      merged['server'] = true;
+    }
+    final incomingMetadata = incoming['metadata'];
+    if (incomingMetadata is Map && incomingMetadata.isNotEmpty) {
+      final existingMetadata = merged['metadata'];
+      merged['metadata'] = <String, dynamic>{
+        if (existingMetadata is Map)
+          ...Map<String, dynamic>.from(existingMetadata),
+        ...Map<String, dynamic>.from(incomingMetadata),
+      };
+    } else if (!merged.containsKey('metadata')) {
+      final existingMetadata = existing['metadata'];
+      if (existingMetadata is Map) {
+        merged['metadata'] = Map<String, dynamic>.from(existingMetadata);
+      }
+    }
+    return merged;
+  }
+
+  static bool _isEmptyToolOverlay(Object? value) {
+    if (value == null) return true;
+    if (value is String) return value.isEmpty;
+    if (value is Map) return value.isEmpty;
+    if (value is List) return value.isEmpty;
+    return false;
+  }
+
+  static List<MessagePart> assistantPartsForVisibleText({
+    required List<MessagePart> parts,
+    required String visibleText,
+  }) {
+    if (parts.isEmpty) return <MessagePart>[TextPart(visibleText)];
+    var remaining = visibleText.length;
+    final out = <MessagePart>[];
+    for (final part in parts) {
+      if (part is! TextPart) {
+        out.add(part);
+        continue;
+      }
+      if (remaining <= 0) continue;
+      if (part.text.length <= remaining) {
+        out.add(part);
+        remaining -= part.text.length;
+      } else {
+        out.add(TextPart(part.text.substring(0, remaining)));
+        remaining = 0;
+      }
+    }
+    return out;
+  }
+
+  static List<MessagePart> assistantPartsForStreamError({
+    required List<MessagePart> parts,
+    required String partialContent,
+    required String errorText,
+  }) {
+    final displayContent = resolveStreamErrorContent(
+      partialContent: partialContent,
+      errorText: errorText,
+    );
+    if (partialContent.isEmpty) {
+      if (parts.any((part) => part is TextPart)) {
+        return ChatMessage.partsWithReplacedText(parts, displayContent);
+      }
+      return [...parts, TextPart(displayContent)];
+    }
+    return List<MessagePart>.of(parts);
+  }
+
+  List<MessagePart> _assistantPartsForState(
+    stream_ctrl.StreamingState state, {
+    String? visibleText,
+  }) {
+    final parts = state.partsHandler.parts;
+    if (parts.isEmpty) {
+      return <MessagePart>[
+        TextPart(visibleText ?? _transformAssistantContent(state)),
+      ];
+    }
+    final transformed = [
+      for (final part in parts)
+        if (part is TextPart)
+          TextPart(_transformAssistantContent(state, part.text))
+        else if (part is! ImagePart || !isBlankImageUri(part.uri))
+          part,
+    ];
+    if (visibleText == null) return transformed;
+    return assistantPartsForVisibleText(
+      parts: transformed,
+      visibleText: visibleText,
+    );
+  }
+
+  Future<List<MessagePart>> _sanitizeAssistantImageParts(
+    List<MessagePart> parts,
+  ) async {
+    final out = <MessagePart>[];
+    for (final part in parts) {
+      if (part is TextPart && part.text.contains('data:image')) {
+        // 保留已有 Markdown 图片落盘行为，但不能合并跨工具卡片的文字部件。
+        out.add(
+          TextPart(
+            await MarkdownMediaSanitizer.replaceInlineBase64Images(part.text),
+          ),
+        );
+        continue;
+      }
+      if (part is! ImagePart || !part.uri.startsWith('data:')) {
+        out.add(part);
+        continue;
+      }
+      final comma = part.uri.indexOf(',');
+      if (comma < 0) {
+        out.add(part);
+        continue;
+      }
+      final header = part.uri.substring(5, comma);
+      final semi = header.indexOf(';');
+      final mime = semi < 0 ? header : header.substring(0, semi);
+      final saved = await AppDirectories.saveBase64Image(
+        mime.isEmpty ? 'image/png' : mime,
+        part.uri.substring(comma + 1),
+      );
+      if (saved == null || saved.isEmpty) {
+        out.add(part);
+        continue;
+      }
+      out.add(
+        ImagePart(
+          uri: SandboxPathResolver.canonicalize(saved),
+          mime: part.mime ?? (mime.isEmpty ? 'image/png' : mime),
+          assetId: part.assetId,
+          id: part.id,
+          unavailable: part.unavailable,
+        ),
+      );
+    }
+    return out;
   }
 
   bool _isReasoningModel(String providerKey, String modelId) {
@@ -748,6 +916,16 @@ class ChatActions {
     required String partialContent,
     required String errorText,
   }) => partialContent.isEmpty ? errorText : partialContent;
+
+  @visibleForTesting
+  Future<void> debugFinishStreaming(stream_ctrl.StreamingState state) =>
+      _finishStreaming(state);
+
+  @visibleForTesting
+  Future<void> debugHandleStreamError(
+    Object error,
+    stream_ctrl.StreamingState state,
+  ) => _handleStreamError(error, state);
 
   @visibleForTesting
   static StreamSubscription<T> listenSequentiallyToStream<T>({
@@ -927,6 +1105,10 @@ class ChatActions {
   Future<ChatActionResult> sendMessage({
     required ChatInputData input,
     required Conversation conversation,
+    Assistant? assistantOverride,
+    bool scheduled = false,
+    ({String providerKey, String modelId})? modelOverride,
+    ValueChanged<String>? onGenerationStarted,
   }) async {
     final claimToken = ++_sendInFlightClaimSerial;
     if (isSendInFlight(conversation.id)) {
@@ -937,6 +1119,10 @@ class ChatActions {
       return await _sendMessageClaimed(
         input: input,
         conversation: conversation,
+        assistantOverride: assistantOverride,
+        scheduled: scheduled,
+        modelOverride: modelOverride,
+        onGenerationStarted: onGenerationStarted,
       );
     } finally {
       if (_sendInFlightClaims[conversation.id] == claimToken) {
@@ -948,6 +1134,10 @@ class ChatActions {
   Future<ChatActionResult> _sendMessageClaimed({
     required ChatInputData input,
     required Conversation conversation,
+    Assistant? assistantOverride,
+    bool scheduled = false,
+    ({String providerKey, String modelId})? modelOverride,
+    ValueChanged<String>? onGenerationStarted,
   }) async {
     final content = input.text.trim();
     if (content.isEmpty &&
@@ -972,13 +1162,15 @@ class ChatActions {
     } catch (e) {
       return ChatActionResult.error(e.toString());
     }
-    final assistant = assistantProvider.currentAssistant;
+    final assistant = assistantOverride ?? assistantProvider.currentAssistant;
     final assistantId = assistant?.id;
-    final modelConfig = messageGenerationService.getModelConfig(
-      settings,
-      assistant,
-      conversation,
-    );
+    final modelConfig =
+        modelOverride ??
+        messageGenerationService.getModelConfig(
+          settings,
+          assistant,
+          conversation,
+        );
 
     if (modelConfig.providerKey == null || modelConfig.modelId == null) {
       return ChatActionResult.noModel();
@@ -986,7 +1178,10 @@ class ChatActions {
     final providerKey = modelConfig.providerKey!;
     final modelId = modelConfig.modelId!;
 
-    if (chatController.hasMoreAfter) {
+    // 定时发送的目标会话可能不是当前显示的会话，
+    // 只有同一会话时才调整已加载窗口。
+    if (chatController.currentConversation?.id == conversation.id &&
+        chatController.hasMoreAfter) {
       final loaded = await chatController.loadEndWindow();
       if (loaded) {
         viewModel.restoreMessageUiState();
@@ -1026,6 +1221,7 @@ class ChatActions {
     _setConversationLoading(conversation.id, true);
     // 此时加载守卫拥有此会话的重入排除。
     _sendInFlightClaims.remove(conversation.id);
+    onGenerationStarted?.call(assistantMessage.id);
 
     // 在将消息加入列表前预先创建流式通知器，
     // 使 MessageListView 在首次渲染时就能识别到流式状态。
@@ -1038,7 +1234,9 @@ class ChatActions {
       viewModel.restoreMessageUiState();
     }
     onMessagesChanged?.call();
-    onSendPairAppended?.call();
+    if (chatController.currentConversation?.id == conversation.id) {
+      onSendPairAppended?.call();
+    }
 
     // 消息对已可见；准备上下文和生成在后台继续，输入框无需等待整段回复。
     unawaited(
@@ -1053,11 +1251,15 @@ class ChatActions {
         userMessage: userMessage,
         assistantMessage: assistantMessage,
         generationRunId: generationRunId,
+        scheduled: scheduled,
         approvalService: approvalService,
         askUserService: askUserService,
       ),
     );
-    return ChatActionResult.success(assistantMessage);
+    return ChatActionResult.success(
+      assistantMessage,
+      generationRunId: generationRunId,
+    );
   }
 
   Future<void> _runSendGeneration({
@@ -1071,6 +1273,7 @@ class ChatActions {
     required ChatMessage userMessage,
     required ChatMessage assistantMessage,
     required String? generationRunId,
+    required bool scheduled,
     required ToolApprovalService? approvalService,
     required AskUserInteractionService? askUserService,
   }) async {
@@ -1126,6 +1329,7 @@ class ChatActions {
             approvalService: approvalService,
             askUserService: askUserService,
             processingMessageId: assistantMessage.id,
+            requiredAttachmentMessageId: userMessage.id,
           );
       final userImagePaths = messageGenerationService.buildUserImagePaths(
         input: input,
@@ -1147,6 +1351,7 @@ class ChatActions {
         enableReasoning: enableReasoning,
         generateTitleOnFinish: true,
         generationRunId: generationRunId,
+        scheduled: scheduled,
       );
       if (!_activeAssistantMessages.isActive(assistantMessage)) return;
       await _executeGeneration(ctx);
@@ -1165,9 +1370,14 @@ class ChatActions {
     required String conversationId,
     required ChatMessage assistantMessage,
   }) async {
+    // 仅清理当前消息的文件处理指示器。
     onFileProcessingFinished?.call(assistantMessage.id);
+    final action = prepareErrorAction(
+      error,
+      requestCancelled: isStopping(conversationId),
+    );
     try {
-      await _finishPreparingMessage(conversationId, assistantMessage);
+      await _finishPrepareError(conversationId, assistantMessage, action);
     } catch (cleanupError, stackTrace) {
       FlutterLogger.log(
         '[ChatActions] finishPreparingMessage failed after send error: '
@@ -1175,6 +1385,7 @@ class ChatActions {
         tag: 'ChatActions',
       );
     }
+    if (action != PrepareErrorAction.failed) return;
     onStreamError?.call(error.toString());
   }
 
@@ -1252,6 +1463,10 @@ class ChatActions {
     bool assistantAsNewReply = false,
     String? existingBranchId,
     bool allowImagesApiRouting = true,
+    Assistant? assistantOverride,
+    bool scheduled = false,
+    ({String providerKey, String modelId})? modelOverride,
+    ValueChanged<String>? onGenerationStarted,
   }) async {
     final claimToken = ++_sendInFlightClaimSerial;
     if (isSendInFlight(conversation.id)) {
@@ -1265,6 +1480,10 @@ class ChatActions {
         assistantAsNewReply: assistantAsNewReply,
         existingBranchId: existingBranchId,
         allowImagesApiRouting: allowImagesApiRouting,
+        assistantOverride: assistantOverride,
+        scheduled: scheduled,
+        modelOverride: modelOverride,
+        onGenerationStarted: onGenerationStarted,
       );
     } finally {
       if (_sendInFlightClaims[conversation.id] == claimToken) {
@@ -1279,6 +1498,10 @@ class ChatActions {
     bool assistantAsNewReply = false,
     String? existingBranchId,
     bool allowImagesApiRouting = true,
+    Assistant? assistantOverride,
+    bool scheduled = false,
+    ({String providerKey, String modelId})? modelOverride,
+    ValueChanged<String>? onGenerationStarted,
   }) async {
     // 避免跨异步间隙使用 BuildContext（此类持有 BuildContext）。
     final settings = contextProvider.read<SettingsProvider>();
@@ -1298,7 +1521,7 @@ class ChatActions {
     } catch (e) {
       return ChatActionResult.error(e.toString());
     }
-    final assistant = assistantProvider.currentAssistant;
+    final assistant = assistantOverride ?? assistantProvider.currentAssistant;
 
     await cancelStreaming(conversation);
 
@@ -1330,11 +1553,13 @@ class ChatActions {
 
     // 获取模型配置
     final assistantId = assistant?.id;
-    final modelConfig = messageGenerationService.getModelConfig(
-      settings,
-      assistant,
-      conversation,
-    );
+    final modelConfig =
+        modelOverride ??
+        messageGenerationService.getModelConfig(
+          settings,
+          assistant,
+          conversation,
+        );
 
     if (modelConfig.providerKey == null || modelConfig.modelId == null) {
       return ChatActionResult.noModel();
@@ -1402,10 +1627,11 @@ class ChatActions {
 
     // 将已加载窗口保持在持久化生成消息附近，而不是用会话尾部
     // 替换较远的阅读位置（长会话中这可能会排除此流式版本）。
-    if (await chatController.openAroundPersistedMessage(
-      assistantMessage,
-      truncateFollowingSlots: !isTemporaryConversation && truncateFuture,
-    )) {
+    if (chatController.currentConversation?.id == conversation.id &&
+        await chatController.openAroundPersistedMessage(
+          assistantMessage,
+          truncateFollowingSlots: !isTemporaryConversation && truncateFuture,
+        )) {
       viewModel.restoreMessageUiState();
     }
     onMessagesChanged?.call();
@@ -1414,69 +1640,101 @@ class ChatActions {
     // 此时加载守卫拥有此会话的重入排除。
     _sendInFlightClaims.remove(conversation.id);
 
-    // 初始化推理
-    final supportsReasoning = _isReasoningModel(providerKey, modelId);
-    final enableReasoning =
-        supportsReasoning &&
-        _isReasoningEnabled(
-          assistant?.thinkingBudget ?? settings.thinkingBudget,
-        );
-    _bindFileProcessingCallbacks();
-    try {
-      await messageGenerationService.initializeReasoningState(
-        messageId: assistantMessage.id,
-        enableReasoning: enableReasoning,
-      );
+    onGenerationStarted?.call(assistantMessage.id);
 
-      // 准备 API 消息
-      final prepared = await messageGenerationService
-          .prepareApiMessagesWithInjections(
-            messages: regenerationMessages,
-            currentConversation: conversation.copyWith(truncateIndex: -1),
-            settings: settings,
-            assistant: assistant,
-            assistantId: assistantId,
-            providerKey: providerKey,
-            modelId: modelId,
-            approvalService: regenApprovalService,
-            askUserService: regenAskUserService,
-            processingMessageId: assistantMessage.id,
+    Future<ChatActionResult> generate() async {
+      // 初始化推理
+      final supportsReasoning = _isReasoningModel(providerKey, modelId);
+      final enableReasoning =
+          supportsReasoning &&
+          _isReasoningEnabled(
+            assistant?.thinkingBudget ?? settings.thinkingBudget,
           );
+      _bindFileProcessingCallbacks();
+      try {
+        await messageGenerationService.initializeReasoningState(
+          messageId: assistantMessage.id,
+          enableReasoning: enableReasoning,
+        );
 
-      // 构建用户图片路径
-      final userImagePaths = messageGenerationService.buildUserImagePaths(
-        input: null,
-        lastUserImagePaths: prepared.lastUserImagePaths,
-        settings: settings,
-        providerKey: providerKey,
-        modelId: modelId,
-      );
+        // 准备 API 消息
+        final prepared = await messageGenerationService
+            .prepareApiMessagesWithInjections(
+              messages: regenerationMessages,
+              currentConversation: conversation.copyWith(truncateIndex: -1),
+              settings: settings,
+              assistant: assistant,
+              assistantId: assistantId,
+              providerKey: providerKey,
+              modelId: modelId,
+              approvalService: regenApprovalService,
+              askUserService: regenAskUserService,
+              processingMessageId: assistantMessage.id,
+            );
 
-      // 执行生成
-      final ctx = messageGenerationService.buildGenerationContext(
-        assistantMessage: assistantMessage,
-        prepared: prepared,
-        userImagePaths: userImagePaths,
-        allowImagesApiRouting: allowImagesApiRouting,
-        providerKey: providerKey,
-        modelId: modelId,
-        assistant: assistant,
-        settings: settings,
-        supportsReasoning: supportsReasoning,
-        enableReasoning: enableReasoning,
-        generateTitleOnFinish: false,
+        // 构建用户图片路径
+        final userImagePaths = messageGenerationService.buildUserImagePaths(
+          input: null,
+          lastUserImagePaths: prepared.lastUserImagePaths,
+          settings: settings,
+          providerKey: providerKey,
+          modelId: modelId,
+        );
+
+        // 执行生成
+        final ctx = messageGenerationService.buildGenerationContext(
+          assistantMessage: assistantMessage,
+          prepared: prepared,
+          userImagePaths: userImagePaths,
+          allowImagesApiRouting: allowImagesApiRouting,
+          providerKey: providerKey,
+          modelId: modelId,
+          assistant: assistant,
+          settings: settings,
+          supportsReasoning: supportsReasoning,
+          enableReasoning: enableReasoning,
+          scheduled: scheduled,
+          generateTitleOnFinish: false,
+          generationRunId: begin.runId,
+        );
+
+        if (!_activeAssistantMessages.isActive(assistantMessage)) {
+          return ChatActionResult.success(
+            assistantMessage,
+            generationRunId: begin.runId,
+          );
+        }
+        await _executeGeneration(ctx);
+        return ChatActionResult.success(
+          assistantMessage,
+          generationRunId: begin.runId,
+        );
+      } catch (e) {
+        final action = prepareErrorAction(
+          e,
+          requestCancelled: isStopping(conversation.id),
+        );
+        await _finishPrepareError(conversation.id, assistantMessage, action);
+        if (action != PrepareErrorAction.failed) {
+          return ChatActionResult.success(
+            assistantMessage,
+            generationRunId: begin.runId,
+          );
+        }
+        return ChatActionResult.error(e.toString());
+      }
+    }
+
+    if (scheduled) {
+      // 执行器必须能在准备阶段或非流式工具轮次等待输入时继续监视审批与取消，
+      // 因此定时任务不等待生成结束。
+      unawaited(generate());
+      return ChatActionResult.success(
+        assistantMessage,
         generationRunId: begin.runId,
       );
-
-      if (!_activeAssistantMessages.isActive(assistantMessage)) {
-        return ChatActionResult.success(assistantMessage);
-      }
-      await _executeGeneration(ctx);
-      return ChatActionResult.success(assistantMessage);
-    } catch (e) {
-      await _finishPreparingMessage(conversation.id, assistantMessage);
-      return ChatActionResult.error(e.toString());
     }
+    return generate();
   }
 
   Future<ChatActionResult> continueAssistantMessageAfterToolAnswer({
@@ -1596,7 +1854,14 @@ class ChatActions {
       await _executeGeneration(ctx);
       return ChatActionResult.success(streamingMessage);
     } catch (e) {
-      await _finishPreparingMessage(conversation.id, streamingMessage);
+      final action = prepareErrorAction(
+        e,
+        requestCancelled: isStopping(conversation.id),
+      );
+      await _finishPrepareError(conversation.id, streamingMessage, action);
+      if (action != PrepareErrorAction.failed) {
+        return ChatActionResult.success(streamingMessage);
+      }
       return ChatActionResult.error(e.toString());
     }
   }
@@ -1714,20 +1979,40 @@ class ChatActions {
       }
 
       streamController.finishReasoningIfNeeded(streaming.id);
-      final finalizedMessage = _messageWithCurrentReasoning(
-        latestStreaming,
-      ).copyWith(isStreaming: false);
+      final state = _streamingStates[streaming.id];
+      final parts = await _sanitizeAssistantImageParts(
+        state == null ? latestStreaming.parts : _assistantPartsForState(state),
+      );
+      final finalizedMessage =
+          (state == null
+                  ? _messageWithCurrentReasoning(latestStreaming)
+                  : _streamingMessageSnapshot(state))
+              .copyWith(parts: parts, isStreaming: false);
+      final backgroundTaskId = _backgroundTaskIdFor(streaming.id);
+      var cancellationPersisted = false;
       try {
         await _finalizeStreamingCheckpoint(
           finalizedMessage,
-          terminalState: GenerationRunState.cancelled,
+          terminalState: _background.wasInterrupted(backgroundTaskId)
+              ? GenerationRunState.interrupted
+              : GenerationRunState.cancelled,
+          errorCode: _background.wasInterrupted(backgroundTaskId)
+              ? 'background_interrupted'
+              : null,
         );
+        cancellationPersisted = true;
       } finally {
         _clearGenerationRuntimeState(finalizedMessage);
         if (chatController.publishTerminalMessage(finalizedMessage)) {
           onMessagesChanged?.call();
         }
         streamController.removeStreamingNotifier(streaming.id);
+        // 取消写入失败也必须释放后台任务，但不能通知为已持久化成功。
+        await _background.finish(
+          backgroundTaskId,
+          BackgroundTaskOutcome.cancelled,
+          resultPersisted: cancellationPersisted,
+        );
       }
 
       // 如果流式输出包含行内 base64 图片，即使手动取消也要清理它们
@@ -1736,7 +2021,6 @@ class ChatActions {
         latestStreaming.content,
         immediate: true,
       );
-      await _cancelIosBackgroundGeneration();
     } else {
       chatController.publishGenerationState(cid, isGenerating: false);
     }
@@ -1749,6 +2033,7 @@ class ChatActions {
   /// 使用给定上下文执行生成。
   Future<void> _executeGeneration(stream_ctrl.GenerationContext ctx) async {
     final state = stream_ctrl.StreamingState(ctx);
+    _streamingStates[state.messageId] = state;
     final assistant = ctx.assistant;
     final conversationId = state.conversationId;
     final existingSplit = streamController.getContentSplitData(state.messageId);
@@ -1757,14 +2042,9 @@ class ChatActions {
       state.reasoningCountAtSplit = List<int>.of(existingSplit.reasoningCounts);
       state.toolCountAtSplit = List<int>.of(existingSplit.toolCounts);
     }
-    if (streamController.getToolPartsCount(state.messageId) > 0) {
-      state.hadThinkingBlock = true;
-    }
 
     // 将此消息标记为正在流式处理，以抑制 UI 重建
     streamController.markStreamingStarted(state.messageId);
-    _streamEventHandlers[state.messageId] = StreamChunkHandler();
-    _streamEventTools[state.messageId] = <String, _EventToolBuffer>{};
     _activeAssistantMessages.put(state.ctx.assistantMessage);
     _streamingToolEvents[state.messageId] = chatService
         .getToolEvents(state.messageId)
@@ -1787,7 +2067,7 @@ class ChatActions {
     try {
       await _startIosBackgroundGeneration(ctx);
       if (!_activeAssistantMessages.isActive(ctx.assistantMessage)) {
-        await _cancelIosBackgroundGeneration();
+        await _cancelIosBackgroundGeneration(_backgroundTaskId(ctx));
         return;
       }
       final runId = ctx.generationRunId;
@@ -1840,7 +2120,7 @@ class ChatActions {
       }
       final sub = listenSequentiallyToStream<StreamChunk>(
         stream: stream,
-        onData: (chunk) => _handleStreamEvent(chunk, state),
+        onData: (chunk) => _handleStreamChunk(chunk, state),
         onError: (error, stackTrace) => _handleStreamError(error, state),
         onDone: () => _handleStreamDone(state),
       );
@@ -1855,238 +2135,78 @@ class ChatActions {
   // ============================================================================
 
   /// 将统一事件投影到现有流式 UI，同时由 StreamChunkHandler 保留结构化结果。
-  Future<void> _handleStreamEvent(
-    StreamChunk event,
+  Future<void> _handleStreamChunk(
+    StreamChunk chunk,
     stream_ctrl.StreamingState state,
   ) async {
-    if (event case ProviderArtifact(:final kind, :final payload)) {
-      if (kind == 'claude_container' || kind == 'claude_turn') {
-        await chatService.setProviderArtifact(state.messageId, kind, payload);
-      }
-      if (kind == 'claude_container') {
-        final events = _streamingToolEvents[state.messageId];
-        if (events != null) {
-          for (final tool in events) {
-            final metadata = tool['metadata'];
-            final merged = <String, dynamic>{
-              if (metadata is Map) ...metadata.cast<String, dynamic>(),
-            };
-            final anthropic = <String, dynamic>{
-              if (merged['anthropic'] is Map)
-                ...(merged['anthropic'] as Map).cast<String, dynamic>(),
-              'container_id': payload,
-            };
-            merged['anthropic'] = anthropic;
-            tool['metadata'] = merged;
-          }
-        }
-      }
-      return;
-    }
-    final handler = _streamEventHandlers.putIfAbsent(
-      state.messageId,
-      StreamChunkHandler.new,
-    );
-    // 自动重试控制块：更新倒计时 UI，不进入内容管线。
-    if (event is RetryPending) {
-      _setRetryStatus(state, event);
-      return;
-    }
-    if (event is RetryAttemptStart) {
+    if (chunk is RetryPending) {
+      _setRetryStatus(state, chunk);
+    } else {
       _setRetryStatus(state, null);
-      return;
     }
-    handler.handle(event);
-
-    final legacy = _legacyChunkFromEvent(event, state.messageId);
-    if (legacy != null) {
-      await _handleStreamChunk(legacy, state);
+    if (chunk is! RetryPending && chunk is! RetryAttemptStart) {
+      await _markGenerationStreaming(state);
     }
-  }
-
-  ChatStreamChunk? _legacyChunkFromEvent(StreamChunk event, String messageId) {
-    final tools = _streamEventTools.putIfAbsent(
-      messageId,
-      () => <String, _EventToolBuffer>{},
-    );
-    ChatStreamChunk chunk({
-      String content = '',
-      String? reasoning,
-      dynamic reasoningDetails,
-      bool isDone = false,
-      TokenUsage? usage,
-      List<ToolCallInfo>? toolCalls,
-      List<ToolResultInfo>? toolResults,
-    }) {
-      return ChatStreamChunk(
-        content: content,
-        reasoning: reasoning,
-        reasoningDetails: reasoningDetails,
-        isDone: isDone,
-        totalTokens: usage?.totalTokens ?? 0,
-        usage: usage,
-        toolCalls: toolCalls,
-        toolResults: toolResults,
-      );
-    }
-
-    switch (event) {
-      case TextDelta(:final text):
-        return chunk(content: text);
-      case ReasoningDelta(:final text, :final details):
-        return chunk(reasoning: text, reasoningDetails: details);
-      case ToolCallStart(:final id, :final toolName, :final metadata):
-        tools[id] = _EventToolBuffer(name: toolName, metadata: metadata);
-        return null;
-      case ToolCallDelta(
-        :final id,
-        :final toolNameDelta,
-        :final inputDelta,
-        :final metadata,
-      ):
-        final buffer = tools.putIfAbsent(id, _EventToolBuffer.new);
-        if (toolNameDelta.isNotEmpty) buffer.name += toolNameDelta;
-        if (inputDelta.isNotEmpty) buffer.input += inputDelta;
-        if (metadata != null) buffer.metadata = metadata;
-        return null;
-      case ToolCallEnd(:final id):
-        final buffer = tools[id] ?? _EventToolBuffer();
-        return chunk(
-          toolCalls: [
-            ToolCallInfo(
-              id: id,
-              name: buffer.name,
-              arguments: buffer.arguments,
-              metadata: buffer.metadata,
-            ),
-          ],
-        );
-      case ToolCallResult(:final id, :final output, :final metadata):
-        final buffer = tools[id] ?? _EventToolBuffer();
-        return chunk(
-          toolResults: [
-            ToolResultInfo(
-              id: id,
-              name: buffer.name,
-              arguments: buffer.arguments,
-              content: (output ?? '').toString(),
-              metadata: metadata ?? buffer.metadata,
-            ),
-          ],
-        );
-      case ServerToolStart(
-        :final id,
-        :final toolName,
-        :final input,
-        :final metadata,
-      ):
-        final buffer = _EventToolBuffer(name: toolName, metadata: metadata);
-        if (input is Map) buffer.input = jsonEncode(input);
-        tools[id] = buffer;
-        return chunk(
-          toolCalls: [
-            ToolCallInfo(
-              id: id,
-              name: toolName,
-              arguments: buffer.arguments,
-              metadata: metadata,
-            ),
-          ],
-        );
-      case ServerToolInputDelta(:final id, :final inputDelta):
-        tools.putIfAbsent(id, _EventToolBuffer.new).input += inputDelta;
-        return null;
-      case ServerToolInputEnd():
-        return null;
-      case ServerToolEnd(
-        :final id,
-        :final input,
-        :final output,
-        :final status,
-        :final metadata,
-      ):
-        final buffer = tools[id] ?? _EventToolBuffer();
-        final arguments = input is Map
-            ? input.cast<String, dynamic>()
-            : buffer.arguments;
-        return chunk(
-          toolResults: [
-            ToolResultInfo(
-              id: id,
-              name: buffer.name,
-              arguments: arguments,
-              content: output?.toString() ?? status.name,
-              metadata: metadata ?? buffer.metadata,
-            ),
-          ],
-        );
-      case Usage(:final usage):
-        return chunk(usage: usage);
+    state.partsHandler.handle(chunk);
+    switch (chunk) {
       case RetryPending() || RetryAttemptStart():
-        // 重试控制块不投影为旧版聊天分块（已在事件入口处理 UI）。
-        return null;
+        break;
+      case TextDelta(:final text):
+        await _handleContentChunk(state, text);
+        _scheduleStreamingCheckpoint(state);
+      case ReasoningDelta(:final text, :final details):
+        if (details != null) {
+          streamController.setReasoningDetails(state.messageId, details);
+        }
+        if (text.isNotEmpty && state.ctx.supportsReasoning) {
+          await _handleReasoningChunk(text, state);
+        }
+        _scheduleStreamingCheckpoint(state);
+      case ToolCallStart(:final id, :final toolName):
+        if (toolName.isNotEmpty) state.pendingToolNames[id] = toolName;
+        await _handleToolCallsChunk(chunk, state);
+        _scheduleStreamingCheckpoint(state);
+      case ToolCallDelta(:final id, :final toolNameDelta):
+        if (toolNameDelta.isNotEmpty) {
+          state.pendingToolNames[id] =
+              '${state.pendingToolNames[id] ?? ''}$toolNameDelta';
+        }
+      case ToolCallEnd():
+        await _handleToolCallsChunk(chunk, state);
+        _scheduleStreamingCheckpoint(state);
+      case ServerToolStart(:final id, :final toolName):
+        if (toolName.isNotEmpty) state.pendingToolNames[id] = toolName;
+        await _handleToolCallsChunk(chunk, state);
+        _scheduleStreamingCheckpoint(state);
+      case ServerToolEnd() || ToolCallResult() || Annotations():
+        await _handleToolResultsChunk(chunk, state);
+        _scheduleStreamingCheckpoint(state);
+      case Usage(:final usage):
+        _applyUsage(state, usage);
+      case ProviderArtifact(:final kind, :final payload):
+        await chatService.setProviderArtifact(state.messageId, kind, payload);
       case Finish():
-        final usage = _streamEventHandlers[messageId]?.usage;
-        return chunk(isDone: true, usage: usage);
-      case ProviderArtifact() || GeneratedFile():
-        return null;
+        await _handleStreamFinish(state);
+      case ImageStart() ||
+          ImageDelta() ||
+          ImageSnapshot() ||
+          ImageEnd() ||
+          GeneratedFile():
+        _publishAssistantParts(state);
+        _scheduleStreamingCheckpoint(state);
       case TextStart() ||
           TextEnd() ||
           ReasoningStart() ||
           ReasoningEnd() ||
-          ImageStart() ||
-          ImageDelta() ||
-          ImageSnapshot() ||
-          ImageEnd() ||
-          Annotations():
-        return null;
+          ServerToolInputDelta() ||
+          ServerToolInputEnd():
+        break;
     }
   }
 
-  /// 将流式分块分发到合适的处理器。
-  Future<void> _handleStreamChunk(
-    ChatStreamChunk chunk,
-    stream_ctrl.StreamingState state,
-  ) async {
-    await _markGenerationStreaming(state);
-    final chunkContent = chunk.content.isNotEmpty
-        ? streamController.captureGeminiThoughtSignature(
-            chunk.content,
-            state.messageId,
-          )
-        : '';
-
-    // 持久化供应商推理详情（可能携带思考签名），
-    // 以便在后续轮次中回传。
-    if (chunk.reasoningDetails != null) {
-      streamController.setReasoningDetails(
-        state.messageId,
-        chunk.reasoningDetails,
-      );
-    }
-
-    // 处理推理
-    if ((chunk.reasoning ?? '').isNotEmpty && state.ctx.supportsReasoning) {
-      await _handleReasoningChunk(chunk, state);
-    }
-
-    // 处理工具调用
-    if ((chunk.toolCalls ?? const []).isNotEmpty) {
-      await _handleToolCallsChunk(chunk, state);
-    }
-
-    // 处理工具结果
-    if ((chunk.toolResults ?? const []).isNotEmpty) {
-      await _handleToolResultsChunk(chunk, state);
-    }
-
-    // 处理完成或内容
-    if (chunk.isDone) {
-      await _handleStreamFinish(chunk, state, chunkContent);
-    } else {
-      await _handleContentChunk(chunk, state, chunkContent);
-      _scheduleStreamingCheckpoint(state);
-    }
+  void _applyUsage(stream_ctrl.StreamingState state, TokenUsage usage) {
+    state.usage = (state.usage ?? const TokenUsage()).merge(usage);
+    state.totalTokens = state.usage!.totalTokens;
   }
 
   Future<void> _markGenerationStreaming(
@@ -2118,22 +2238,23 @@ class ChatActions {
 
   /// 处理流中的推理分块。
   Future<void> _handleReasoningChunk(
-    ChatStreamChunk chunk,
+    String reasoning,
     stream_ctrl.StreamingState state,
   ) async {
-    await streamController.handleReasoningChunk(chunk, state);
+    await streamController.handleReasoningChunk(reasoning, state);
+    _publishAssistantParts(state);
   }
 
-  /// 处理流中的工具调用分块。
+  /// Handle tool calls chunk from stream.
   Future<void> _handleToolCallsChunk(
-    ChatStreamChunk chunk,
+    StreamChunk chunk,
     stream_ctrl.StreamingState state,
   ) async {
     await streamController.handleToolCallsChunk(
       chunk,
       state,
       updateReasoningSegmentsInDb: (String messageId, String json) async {
-        // 完整推理快照在此分块后合并。
+        // 本分块之后合并完整的思考快照。
       },
       setToolEventsInDb:
           (String messageId, List<Map<String, dynamic>> events) async {
@@ -2143,11 +2264,12 @@ class ChatActions {
           },
       getToolEventsFromDb: _copyToolEvents,
     );
+    _publishAssistantParts(state);
   }
 
-  /// 处理流中的工具结果分块。
+  /// Handle tool results chunk from stream.
   Future<void> _handleToolResultsChunk(
-    ChatStreamChunk chunk,
+    StreamChunk chunk,
     stream_ctrl.StreamingState state,
   ) async {
     await streamController.handleToolResultsChunk(
@@ -2172,121 +2294,53 @@ class ChatActions {
             );
           },
     );
+    _publishAssistantParts(state);
   }
 
-  /// 处理流中的内容分块（未完成）。
+  void _publishAssistantParts(stream_ctrl.StreamingState state) {
+    if (!state.ctx.streamOutput || state.finishHandled) return;
+    streamController.streamingContentNotifier.getNotifier(state.messageId);
+    streamController.streamingContentNotifier.updateContent(
+      state.messageId,
+      _transformAssistantContent(state),
+      state.totalTokens,
+      parts: _assistantPartsForState(state),
+    );
+  }
+
+  /// 处理尚未结束的文字增量。
   Future<void> _handleContentChunk(
-    ChatStreamChunk chunk,
     stream_ctrl.StreamingState state,
     String chunkContent,
   ) async {
-    // 快速退出：如果 _finishStreaming 已运行，则完全不修改状态。
+    // 完成收尾后不再修改本轮状态。
     if (state.finishHandled) return;
 
     final messageId = state.messageId;
     final conversationId = state.conversationId;
 
-    if (state.hadThinkingBlock && chunkContent.isNotEmpty) {
-      state.contentSplitOffsets.add(state.fullContentRaw.length);
-      state.reasoningCountAtSplit.add(
-        streamController.getReasoningSegmentCount(messageId),
-      );
-      state.toolCountAtSplit.add(streamController.getToolPartsCount(messageId));
-      state.hadThinkingBlock = false;
-      streamController.setContentSplitData(
-        messageId,
-        stream_ctrl.ContentSplitData(
-          offsets: List<int>.of(state.contentSplitOffsets),
-          reasoningCounts: List<int>.of(state.reasoningCountAtSplit),
-          toolCounts: List<int>.of(state.toolCountAtSplit),
-        ),
-      );
-    }
-
-    state.fullContentRaw += chunkContent;
+    _recordContent(state, chunkContent);
     state.streamStartedAt ??= DateTime.now();
-    if (chunk.totalTokens > 0) {
-      state.totalTokens = chunk.totalTokens;
-    }
-    if (chunk.usage != null) {
-      state.usage = (state.usage ?? const TokenUsage()).merge(chunk.usage!);
-      state.totalTokens = state.usage!.totalTokens;
-    }
 
-    final probe = state.inlineBase64TailProbe + chunkContent;
-    if (!state.hasInlineBase64 && probe.contains('data:image')) {
-      state.hasInlineBase64 = true;
-    }
-    if (chunkContent.isNotEmpty) {
-      state.inlineBase64TailProbe = chunkContent.length > 16
-          ? chunkContent.substring(chunkContent.length - 16)
-          : chunkContent;
-    }
-
-    if (state.hasInlineBase64) {
-      String streamingProcessed = _transformAssistantContent(state);
-      if (streamingProcessed.contains('data:image') &&
-          streamingProcessed.contains('base64,')) {
-        try {
-          final sanitized =
-              await MarkdownMediaSanitizer.replaceInlineBase64Images(
-                streamingProcessed,
-              );
-          if (sanitized != streamingProcessed) {
-            streamingProcessed = sanitized;
-            state.fullContentRaw = sanitized;
-          }
-        } catch (e) {
-          // ignore
-        }
-      }
-
-      // 在任何 await 点之后，_finishStreaming 可能已经运行并用完整最终内容
-      // 更新了 _messages[index]。如果继续使用这份过期的
-      // streamingProcessed，就会用部分快照覆盖最终内容。
-      // 因此提前退出以避免这种情况。
-      if (state.finishHandled) return;
-
-      onScheduleImageSanitize?.call(
-        messageId,
-        streamingProcessed,
-        immediate: true,
-      );
-      if (state.ctx.streamOutput &&
-          _currentConversation?.id == conversationId) {
-        final index = _messages.indexWhere((m) => m.id == messageId);
-        if (index != -1) {
-          chatController.replaceMessageSnapshot(
-            _messages[index].copyWith(
-              content: streamingProcessed,
-              totalTokens: state.totalTokens,
-            ),
-          );
-        }
-      }
-    }
-
-    // 内容开始时结束推理
+    // 正文开始时结束当前思考片段。
     if (state.ctx.streamOutput && chunkContent.isNotEmpty) {
       await _finishReasoningOnContent(state);
     }
 
     _scheduleIosBackgroundGenerationUpdate(state);
 
-    // 在调度计时器前重新检查：在 _finishStreaming 之后创建计时器
-    // 会产生一个周期性用过期部分内容覆盖 _messages[index] 的新计时器。
+    // 异步处理期间可能已完成；不能再创建计时器，用旧片段覆盖终态。
     if (state.finishHandled) return;
 
-    // 通过 StreamController 调度节流的 UI 更新
+    // 通过流控制器按可见文字进度发布部件。
     if (state.ctx.streamOutput) {
       streamController.scheduleThrottledUpdate(
         messageId,
         conversationId,
         () => _transformAssistantContent(state),
+        partsBuilder: (visibleText) =>
+            _assistantPartsForState(state, visibleText: visibleText),
         totalTokens: state.totalTokens,
-        contentSplitOffsets: state.contentSplitOffsets,
-        reasoningCountAtSplit: state.reasoningCountAtSplit,
-        toolCountAtSplit: state.toolCountAtSplit,
         promptTokens: state.usage?.promptTokens,
         completionTokens: state.usage?.completionTokens,
         cachedTokens: state.usage?.cachedTokens,
@@ -2298,7 +2352,13 @@ class ChatActions {
     }
   }
 
-  /// 当内容开始到达时结束推理片段。
+  /// 正文到达时完成思考片段。
+  void _recordContent(stream_ctrl.StreamingState state, String chunkContent) {
+    if (chunkContent.isNotEmpty) {
+      state.fullContentRaw += chunkContent;
+    }
+  }
+
   Future<void> _finishReasoningOnContent(
     stream_ctrl.StreamingState state,
   ) async {
@@ -2317,12 +2377,7 @@ class ChatActions {
   }
 
   /// 处理流完成（isDone == true）。
-  Future<void> _handleStreamFinish(
-    ChatStreamChunk chunk,
-    stream_ctrl.StreamingState state,
-    String chunkContent,
-  ) async {
-    _setRetryStatus(state, null);
+  Future<void> _handleStreamFinish(stream_ctrl.StreamingState state) async {
     final messageId = state.messageId;
     final conversationId = state.conversationId;
     final autoCollapseThinking =
@@ -2330,43 +2385,14 @@ class ChatActions {
         ? contextProvider.read<SettingsProvider>().autoCollapseThinking
         : null;
 
-    if (state.hadThinkingBlock && chunkContent.isNotEmpty) {
-      state.contentSplitOffsets.add(state.fullContentRaw.length);
-      state.reasoningCountAtSplit.add(
-        streamController.getReasoningSegmentCount(messageId),
-      );
-      state.toolCountAtSplit.add(streamController.getToolPartsCount(messageId));
-      state.hadThinkingBlock = false;
-      streamController.setContentSplitData(
-        messageId,
-        stream_ctrl.ContentSplitData(
-          offsets: List<int>.of(state.contentSplitOffsets),
-          reasoningCounts: List<int>.of(state.reasoningCountAtSplit),
-          toolCounts: List<int>.of(state.toolCountAtSplit),
-        ),
-      );
-    }
-
-    if (chunkContent.isNotEmpty) {
-      state.fullContentRaw += chunkContent;
-    }
-
-    // 如果工具仍在加载，则不要完成
+    // 工具仍在执行时不能结束本轮。
     final hasLoadingTool =
         (streamController.toolParts[messageId]?.any((p) => p.loading) ?? false);
     if (hasLoadingTool) {
       return;
     }
 
-    if (chunk.totalTokens > 0) {
-      state.totalTokens = chunk.totalTokens;
-    }
-    if (chunk.usage != null) {
-      state.usage = (state.usage ?? const TokenUsage()).merge(chunk.usage!);
-      state.totalTokens = state.usage!.totalTokens;
-    }
-
-    // 在最终检查点前将缓冲的推理具体化。
+    // 最终检查点前补齐非流式的思考内容。
     if (!state.ctx.streamOutput && state.bufferedReasoning.isNotEmpty) {
       final now = DateTime.now();
       final startAt = state.reasoningStartAt ?? now;
@@ -2377,23 +2403,23 @@ class ChatActions {
         ..expanded = !(autoCollapseThinking ?? false);
     }
 
-    // 跟踪 _finishStreaming Future，使 _handleStreamDone 在并发触发时
-    // 可以等待它（stream.onDone 可能在我们仍等待
-    // _finishStreaming 中的异步工作时触发）。
+    // Track the _finishStreaming future so _handleStreamDone can await it
+    // if it fires concurrently (stream.onDone can fire while we're still
+    // awaiting async work inside _finishStreaming).
     final finishFuture = _finishStreaming(state);
     _finishStreamingFutures[messageId] = finishFuture;
     await finishFuture;
     _finishStreamingFutures.remove(messageId);
 
-    // 需要时触发后台通知
+    // 必要时通知后台生成已结束。
     if (!state.finishHandled) {
       onStreamFinished?.call(conversationId);
     }
 
-    // 此完成处理器运行在顺序排空逻辑内，因此在此等待屏障取消
-    // 会等待当前排空流程本身，永远无法完成。
-    // 源流正在自行结束（已到达完成分块）；
-    // onDone 会执行剩余清理，所以这里只移除映射条目。
+    // This finish handler runs inside the sequential drain, so awaiting the
+    // barrier cancel here would wait on this very drain and never complete.
+    // The source stream is finishing on its own (a done chunk arrived);
+    // onDone performs the remaining cleanup, so only drop the map entry.
     _conversationStreams.remove(conversationId);
   }
 
@@ -2445,6 +2471,7 @@ class ChatActions {
       messageId,
       processedContent,
       state.totalTokens,
+      parts: _assistantPartsForState(state),
       contentSplitOffsets: state.contentSplitOffsets,
       reasoningCountAtSplit: state.reasoningCountAtSplit,
       toolCountAtSplit: state.toolCountAtSplit,
@@ -2454,12 +2481,11 @@ class ChatActions {
       durationMs: finalDurationMs,
     );
 
-    final sanitizedContent =
-        await MarkdownMediaSanitizer.replaceInlineBase64Images(
-          processedContent,
-        );
+    final sanitizedParts = await _sanitizeAssistantImageParts(
+      _assistantPartsForState(state),
+    );
     final finalizedMessage = _streamingMessageSnapshot(state).copyWith(
-      content: sanitizedContent,
+      parts: sanitizedParts,
       totalTokens: state.totalTokens,
       isStreaming: false,
       promptTokens: finalPromptTokens,
@@ -2472,8 +2498,11 @@ class ChatActions {
         finalizedMessage,
         terminalState: GenerationRunState.completed,
       );
+      state.terminalPersisted = true;
 
-      onAssistantMessageFinished?.call(finalizedMessage);
+      // 等下游把后台执行接过去再释放本次生成的资源，
+      // 而不是等它整段跑完。
+      await onAssistantMessageFinished?.call(finalizedMessage);
 
       if (shouldGenerateTitle) {
         onMaybeGenerateTitle?.call(conversationId);
@@ -2484,8 +2513,18 @@ class ChatActions {
 
       // 最终助手回复存储后触发后续建议。
       onMaybeGenerateSuggestions?.call(conversationId);
-      await _finishIosBackgroundGeneration(success: true);
     } finally {
+      // 完成写入失败会紧接着走 _handleStreamError；
+      // 在那次失败结果也落盘前先保留后台任务。
+      if (state.terminalPersisted) {
+        await _finishIosBackgroundGeneration(
+          _backgroundTaskId(state.ctx),
+          success: true,
+          replyPreview: ThinkingTagParser.parseWithRanges(
+            finalizedMessage.content,
+          ).visibleContent,
+        );
+      }
       // UI 生命周期清理独立于最终持久化是否成功。
       if (chatController.publishTerminalMessage(finalizedMessage)) {
         onMessagesChanged?.call();
@@ -2530,12 +2569,13 @@ class ChatActions {
     final partialContent = state.fullContentRaw.isEmpty
         ? ''
         : _transformAssistantContent(state, state.fullContentRaw);
-    final displayContent = resolveStreamErrorContent(
+    final errorParts = assistantPartsForStreamError(
+      parts: _assistantPartsForState(state),
       partialContent: partialContent,
       errorText: errorText,
     );
     final errorMessage = _streamingMessageSnapshot(state).copyWith(
-      content: displayContent,
+      parts: errorParts,
       totalTokens: state.totalTokens,
       isStreaming: false,
     );
@@ -2545,6 +2585,7 @@ class ChatActions {
         terminalState: GenerationRunState.failed,
         errorCode: 'generation_failed',
       );
+      state.terminalPersisted = true;
     } finally {
       _clearGenerationRuntimeState(errorMessage);
       if (chatController.publishTerminalMessage(errorMessage)) {
@@ -2562,7 +2603,11 @@ class ChatActions {
       _conversationStreams.remove(conversationId);
       onStreamError?.call(errorText);
       onStreamFinished?.call(conversationId);
-      await _finishIosBackgroundGeneration(success: false, detail: errorText);
+      await _finishIosBackgroundGeneration(
+        _backgroundTaskId(state.ctx),
+        success: false,
+        resultPersisted: state.terminalPersisted,
+      );
     }
   }
 
@@ -2644,13 +2689,17 @@ class ChatActions {
             reasoningDetails: details,
           )
         : streaming.reasoningSegmentsJson;
-    final snapshot = streaming.copyWith(
-      content: latestContent,
-      reasoningText: r?.text,
-      reasoningStartAt: r?.startAt,
-      reasoningFinishedAt: r?.finishedAt,
-      reasoningSegmentsJson: reasoningSegmentsJson,
-    );
+    final state = _streamingStates[streaming.id];
+    // 列表快照可能只包含打字进度，刷新时必须取流的最新完整部件。
+    final snapshot = state != null
+        ? _streamingMessageSnapshot(state)
+        : streaming.copyWith(
+            content: latestContent,
+            reasoningText: r?.text,
+            reasoningStartAt: r?.startAt,
+            reasoningFinishedAt: r?.finishedAt,
+            reasoningSegmentsJson: reasoningSegmentsJson,
+          );
     final writer = _checkpointWriters[streaming.id];
     if (writer == null) {
       await chatService.updateStreamingCheckpointSilent(

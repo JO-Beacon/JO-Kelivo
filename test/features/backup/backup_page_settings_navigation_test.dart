@@ -267,7 +267,8 @@ void main() {
             .ancestor(of: currentImport, matching: find.byType(GestureDetector))
             .first,
       );
-      expect(currentImportGesture.onTap, isNull);
+      // 新版入口已接线：Chatbox >=1.22 的 ZIP 备份可以导入。
+      expect(currentImportGesture.onTap, isNotNull);
       final legacyImportGesture = tester.widget<GestureDetector>(
         find
             .ancestor(of: legacyImport, matching: find.byType(GestureDetector))
@@ -364,7 +365,7 @@ void main() {
         );
 
         expect(find.text('Backup Reminder'), findsOneWidget);
-        expect(find.text('Native Backup'), findsOneWidget);
+        expect(find.text('Local Backup'), findsOneWidget);
         expect(find.text('Kelivo-Compatible Backup'), findsOneWidget);
         expect(find.text('External Import'), findsOneWidget);
         expect(find.text('WebDAV Server Settings'), findsOneWidget);
@@ -421,7 +422,8 @@ void main() {
               )
               .first,
         );
-        expect(desktopCurrentGesture.onTap, isNull);
+        // 新版入口已接线：桌面端同样可用。
+        expect(desktopCurrentGesture.onTap, isNotNull);
         final desktopLegacyImport = find.text('Chatbox (<1.22)');
         final desktopLegacyGesture = tester.widget<GestureDetector>(
           find
@@ -440,7 +442,7 @@ void main() {
           -200,
           scrollable: find.byType(Scrollable).first,
         );
-        _expectAbove(tester, 'Backup Reminder', 'Native Backup');
+        _expectAbove(tester, 'Backup Reminder', 'Local Backup');
         expect(find.text('Device settings records'), findsOneWidget);
         await tester.scrollUntilVisible(
           find.text('S3 Settings'),

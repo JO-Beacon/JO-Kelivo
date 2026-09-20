@@ -181,6 +181,18 @@ class $ConversationRowsTable extends ConversationRows
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _extrasJsonMeta = const VerificationMeta(
+    'extrasJson',
+  );
+  @override
+  late final GeneratedColumn<String> extrasJson = GeneratedColumn<String>(
+    'extras_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -198,6 +210,7 @@ class $ConversationRowsTable extends ConversationRows
     lastMemoryExtractedOrder,
     chatModelProvider,
     chatModelId,
+    extrasJson,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -317,6 +330,12 @@ class $ConversationRowsTable extends ConversationRows
         ),
       );
     }
+    if (data.containsKey('extras_json')) {
+      context.handle(
+        _extrasJsonMeta,
+        extrasJson.isAcceptableOrUnknown(data['extras_json']!, _extrasJsonMeta),
+      );
+    }
     return context;
   }
 
@@ -390,6 +409,10 @@ class $ConversationRowsTable extends ConversationRows
         DriftSqlType.string,
         data['${effectivePrefix}chat_model_id'],
       ),
+      extrasJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}extras_json'],
+      )!,
     );
   }
 
@@ -420,6 +443,7 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
   final int lastMemoryExtractedOrder;
   final String? chatModelProvider;
   final String? chatModelId;
+  final String extrasJson;
   const ConversationRow({
     required this.id,
     required this.title,
@@ -436,6 +460,7 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
     required this.lastMemoryExtractedOrder,
     this.chatModelProvider,
     this.chatModelId,
+    required this.extrasJson,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -477,6 +502,7 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
     if (!nullToAbsent || chatModelId != null) {
       map['chat_model_id'] = Variable<String>(chatModelId);
     }
+    map['extras_json'] = Variable<String>(extrasJson);
     return map;
   }
 
@@ -507,6 +533,7 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
       chatModelId: chatModelId == null && nullToAbsent
           ? const Value.absent()
           : Value(chatModelId),
+      extrasJson: Value(extrasJson),
     );
   }
 
@@ -543,6 +570,7 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
         json['chatModelProvider'],
       ),
       chatModelId: serializer.fromJson<String?>(json['chatModelId']),
+      extrasJson: serializer.fromJson<String>(json['extrasJson']),
     );
   }
   @override
@@ -568,6 +596,7 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
       ),
       'chatModelProvider': serializer.toJson<String?>(chatModelProvider),
       'chatModelId': serializer.toJson<String?>(chatModelId),
+      'extrasJson': serializer.toJson<String>(extrasJson),
     };
   }
 
@@ -587,6 +616,7 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
     int? lastMemoryExtractedOrder,
     Value<String?> chatModelProvider = const Value.absent(),
     Value<String?> chatModelId = const Value.absent(),
+    String? extrasJson,
   }) => ConversationRow(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -609,6 +639,7 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
         ? chatModelProvider.value
         : this.chatModelProvider,
     chatModelId: chatModelId.present ? chatModelId.value : this.chatModelId,
+    extrasJson: extrasJson ?? this.extrasJson,
   );
   ConversationRow copyWithCompanion(ConversationRowsCompanion data) {
     return ConversationRow(
@@ -645,6 +676,9 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
       chatModelId: data.chatModelId.present
           ? data.chatModelId.value
           : this.chatModelId,
+      extrasJson: data.extrasJson.present
+          ? data.extrasJson.value
+          : this.extrasJson,
     );
   }
 
@@ -665,7 +699,8 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
           ..write('injectedMemoryHash: $injectedMemoryHash, ')
           ..write('lastMemoryExtractedOrder: $lastMemoryExtractedOrder, ')
           ..write('chatModelProvider: $chatModelProvider, ')
-          ..write('chatModelId: $chatModelId')
+          ..write('chatModelId: $chatModelId, ')
+          ..write('extrasJson: $extrasJson')
           ..write(')'))
         .toString();
   }
@@ -687,6 +722,7 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
     lastMemoryExtractedOrder,
     chatModelProvider,
     chatModelId,
+    extrasJson,
   );
   @override
   bool operator ==(Object other) =>
@@ -706,7 +742,8 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
           other.injectedMemoryHash == this.injectedMemoryHash &&
           other.lastMemoryExtractedOrder == this.lastMemoryExtractedOrder &&
           other.chatModelProvider == this.chatModelProvider &&
-          other.chatModelId == this.chatModelId);
+          other.chatModelId == this.chatModelId &&
+          other.extrasJson == this.extrasJson);
 }
 
 class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
@@ -725,6 +762,7 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
   final Value<int> lastMemoryExtractedOrder;
   final Value<String?> chatModelProvider;
   final Value<String?> chatModelId;
+  final Value<String> extrasJson;
   final Value<int> rowid;
   const ConversationRowsCompanion({
     this.id = const Value.absent(),
@@ -742,6 +780,7 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
     this.lastMemoryExtractedOrder = const Value.absent(),
     this.chatModelProvider = const Value.absent(),
     this.chatModelId = const Value.absent(),
+    this.extrasJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ConversationRowsCompanion.insert({
@@ -760,6 +799,7 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
     this.lastMemoryExtractedOrder = const Value.absent(),
     this.chatModelProvider = const Value.absent(),
     this.chatModelId = const Value.absent(),
+    this.extrasJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title),
@@ -781,6 +821,7 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
     Expression<int>? lastMemoryExtractedOrder,
     Expression<String>? chatModelProvider,
     Expression<String>? chatModelId,
+    Expression<String>? extrasJson,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -804,6 +845,7 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
         'last_memory_extracted_order': lastMemoryExtractedOrder,
       if (chatModelProvider != null) 'chat_model_provider': chatModelProvider,
       if (chatModelId != null) 'chat_model_id': chatModelId,
+      if (extrasJson != null) 'extras_json': extrasJson,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -824,6 +866,7 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
     Value<int>? lastMemoryExtractedOrder,
     Value<String?>? chatModelProvider,
     Value<String?>? chatModelId,
+    Value<String>? extrasJson,
     Value<int>? rowid,
   }) {
     return ConversationRowsCompanion(
@@ -845,6 +888,7 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
           lastMemoryExtractedOrder ?? this.lastMemoryExtractedOrder,
       chatModelProvider: chatModelProvider ?? this.chatModelProvider,
       chatModelId: chatModelId ?? this.chatModelId,
+      extrasJson: extrasJson ?? this.extrasJson,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -909,6 +953,9 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
     if (chatModelId.present) {
       map['chat_model_id'] = Variable<String>(chatModelId.value);
     }
+    if (extrasJson.present) {
+      map['extras_json'] = Variable<String>(extrasJson.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -933,6 +980,7 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
           ..write('lastMemoryExtractedOrder: $lastMemoryExtractedOrder, ')
           ..write('chatModelProvider: $chatModelProvider, ')
           ..write('chatModelId: $chatModelId, ')
+          ..write('extrasJson: $extrasJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -12326,6 +12374,419 @@ class MessagePromptRowsCompanion extends UpdateCompanion<MessagePromptRow> {
   }
 }
 
+class $ExtensionEntityRowsTable extends ExtensionEntityRows
+    with TableInfo<$ExtensionEntityRowsTable, ExtensionEntityRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ExtensionEntityRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    check: () => kind.isNotValue(''),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    check: () => ComparableExpr(sortOrder).isBiggerOrEqualValue(0),
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _ownerIdMeta = const VerificationMeta(
+    'ownerId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerId = GeneratedColumn<String>(
+    'owner_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($ExtensionEntityRowsTable.$converterupdatedAt);
+  @override
+  List<GeneratedColumn> get $columns => [
+    kind,
+    id,
+    sortOrder,
+    ownerId,
+    payload,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'extension_entity_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ExtensionEntityRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sortOrderMeta);
+    }
+    if (data.containsKey('owner_id')) {
+      context.handle(
+        _ownerIdMeta,
+        ownerId.isAcceptableOrUnknown(data['owner_id']!, _ownerIdMeta),
+      );
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {kind, id};
+  @override
+  ExtensionEntityRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ExtensionEntityRow(
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      ownerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_id'],
+      ),
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      )!,
+      updatedAt: $ExtensionEntityRowsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  $ExtensionEntityRowsTable createAlias(String alias) {
+    return $ExtensionEntityRowsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $converterupdatedAt =
+      const MicrosecondDateTimeConverter();
+}
+
+class ExtensionEntityRow extends DataClass
+    implements Insertable<ExtensionEntityRow> {
+  final String kind;
+  final String id;
+  final int sortOrder;
+  final String? ownerId;
+  final String payload;
+  final DateTime updatedAt;
+  const ExtensionEntityRow({
+    required this.kind,
+    required this.id,
+    required this.sortOrder,
+    this.ownerId,
+    required this.payload,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['kind'] = Variable<String>(kind);
+    map['id'] = Variable<String>(id);
+    map['sort_order'] = Variable<int>(sortOrder);
+    if (!nullToAbsent || ownerId != null) {
+      map['owner_id'] = Variable<String>(ownerId);
+    }
+    map['payload'] = Variable<String>(payload);
+    {
+      map['updated_at'] = Variable<int>(
+        $ExtensionEntityRowsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    return map;
+  }
+
+  ExtensionEntityRowsCompanion toCompanion(bool nullToAbsent) {
+    return ExtensionEntityRowsCompanion(
+      kind: Value(kind),
+      id: Value(id),
+      sortOrder: Value(sortOrder),
+      ownerId: ownerId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ownerId),
+      payload: Value(payload),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory ExtensionEntityRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ExtensionEntityRow(
+      kind: serializer.fromJson<String>(json['kind']),
+      id: serializer.fromJson<String>(json['id']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      ownerId: serializer.fromJson<String?>(json['ownerId']),
+      payload: serializer.fromJson<String>(json['payload']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'kind': serializer.toJson<String>(kind),
+      'id': serializer.toJson<String>(id),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'ownerId': serializer.toJson<String?>(ownerId),
+      'payload': serializer.toJson<String>(payload),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  ExtensionEntityRow copyWith({
+    String? kind,
+    String? id,
+    int? sortOrder,
+    Value<String?> ownerId = const Value.absent(),
+    String? payload,
+    DateTime? updatedAt,
+  }) => ExtensionEntityRow(
+    kind: kind ?? this.kind,
+    id: id ?? this.id,
+    sortOrder: sortOrder ?? this.sortOrder,
+    ownerId: ownerId.present ? ownerId.value : this.ownerId,
+    payload: payload ?? this.payload,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  ExtensionEntityRow copyWithCompanion(ExtensionEntityRowsCompanion data) {
+    return ExtensionEntityRow(
+      kind: data.kind.present ? data.kind.value : this.kind,
+      id: data.id.present ? data.id.value : this.id,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      ownerId: data.ownerId.present ? data.ownerId.value : this.ownerId,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ExtensionEntityRow(')
+          ..write('kind: $kind, ')
+          ..write('id: $id, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('ownerId: $ownerId, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(kind, id, sortOrder, ownerId, payload, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ExtensionEntityRow &&
+          other.kind == this.kind &&
+          other.id == this.id &&
+          other.sortOrder == this.sortOrder &&
+          other.ownerId == this.ownerId &&
+          other.payload == this.payload &&
+          other.updatedAt == this.updatedAt);
+}
+
+class ExtensionEntityRowsCompanion extends UpdateCompanion<ExtensionEntityRow> {
+  final Value<String> kind;
+  final Value<String> id;
+  final Value<int> sortOrder;
+  final Value<String?> ownerId;
+  final Value<String> payload;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const ExtensionEntityRowsCompanion({
+    this.kind = const Value.absent(),
+    this.id = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.ownerId = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ExtensionEntityRowsCompanion.insert({
+    required String kind,
+    required String id,
+    required int sortOrder,
+    this.ownerId = const Value.absent(),
+    required String payload,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : kind = Value(kind),
+       id = Value(id),
+       sortOrder = Value(sortOrder),
+       payload = Value(payload),
+       updatedAt = Value(updatedAt);
+  static Insertable<ExtensionEntityRow> custom({
+    Expression<String>? kind,
+    Expression<String>? id,
+    Expression<int>? sortOrder,
+    Expression<String>? ownerId,
+    Expression<String>? payload,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (kind != null) 'kind': kind,
+      if (id != null) 'id': id,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (ownerId != null) 'owner_id': ownerId,
+      if (payload != null) 'payload': payload,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ExtensionEntityRowsCompanion copyWith({
+    Value<String>? kind,
+    Value<String>? id,
+    Value<int>? sortOrder,
+    Value<String?>? ownerId,
+    Value<String>? payload,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return ExtensionEntityRowsCompanion(
+      kind: kind ?? this.kind,
+      id: id ?? this.id,
+      sortOrder: sortOrder ?? this.sortOrder,
+      ownerId: ownerId ?? this.ownerId,
+      payload: payload ?? this.payload,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (ownerId.present) {
+      map['owner_id'] = Variable<String>(ownerId.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $ExtensionEntityRowsTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ExtensionEntityRowsCompanion(')
+          ..write('kind: $kind, ')
+          ..write('id: $id, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('ownerId: $ownerId, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -12384,6 +12845,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $UserProfileFieldRowsTable(this);
   late final $MessagePromptRowsTable messagePromptRows =
       $MessagePromptRowsTable(this);
+  late final $ExtensionEntityRowsTable extensionEntityRows =
+      $ExtensionEntityRowsTable(this);
   late final Index idxConversationsUpdatedAt = Index(
     'idx_conversations_updated_at',
     'CREATE INDEX idx_conversations_updated_at ON conversation_rows (updated_at DESC, id ASC)',
@@ -12460,6 +12923,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_message_prompts_conversation_snapshot',
     'CREATE INDEX idx_message_prompts_conversation_snapshot ON message_prompt_rows (conversation_id, carries_memory_snapshot)',
   );
+  late final Index idxExtensionEntitiesKindOrder = Index(
+    'idx_extension_entities_kind_order',
+    'CREATE INDEX idx_extension_entities_kind_order ON extension_entity_rows (kind, sort_order)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -12495,6 +12962,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     memoryEntryRows,
     userProfileFieldRows,
     messagePromptRows,
+    extensionEntityRows,
     idxConversationsUpdatedAt,
     idxConversationsAssistant,
     idxMessagesConversationOrder,
@@ -12514,6 +12982,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxMemoryEntriesRecent,
     idxMemoryEntriesDedupe,
     idxMessagePromptsConversationSnapshot,
+    idxExtensionEntitiesKindOrder,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -12615,6 +13084,7 @@ typedef $$ConversationRowsTableCreateCompanionBuilder =
       Value<int> lastMemoryExtractedOrder,
       Value<String?> chatModelProvider,
       Value<String?> chatModelId,
+      Value<String> extrasJson,
       Value<int> rowid,
     });
 typedef $$ConversationRowsTableUpdateCompanionBuilder =
@@ -12634,6 +13104,7 @@ typedef $$ConversationRowsTableUpdateCompanionBuilder =
       Value<int> lastMemoryExtractedOrder,
       Value<String?> chatModelProvider,
       Value<String?> chatModelId,
+      Value<String> extrasJson,
       Value<int> rowid,
     });
 
@@ -12878,6 +13349,11 @@ class $$ConversationRowsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get extrasJson => $composableBuilder(
+    column: $table.extrasJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> messageRowsRefs(
     Expression<bool> Function($$MessageRowsTableFilterComposer f) f,
   ) {
@@ -13117,6 +13593,11 @@ class $$ConversationRowsTableOrderingComposer
     column: $table.chatModelId,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get extrasJson => $composableBuilder(
+    column: $table.extrasJson,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ConversationRowsTableAnnotationComposer
@@ -13188,6 +13669,11 @@ class $$ConversationRowsTableAnnotationComposer
 
   GeneratedColumn<String> get chatModelId => $composableBuilder(
     column: $table.chatModelId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get extrasJson => $composableBuilder(
+    column: $table.extrasJson,
     builder: (column) => column,
   );
 
@@ -13401,6 +13887,7 @@ class $$ConversationRowsTableTableManager
                 Value<int> lastMemoryExtractedOrder = const Value.absent(),
                 Value<String?> chatModelProvider = const Value.absent(),
                 Value<String?> chatModelId = const Value.absent(),
+                Value<String> extrasJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ConversationRowsCompanion(
                 id: id,
@@ -13418,6 +13905,7 @@ class $$ConversationRowsTableTableManager
                 lastMemoryExtractedOrder: lastMemoryExtractedOrder,
                 chatModelProvider: chatModelProvider,
                 chatModelId: chatModelId,
+                extrasJson: extrasJson,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -13437,6 +13925,7 @@ class $$ConversationRowsTableTableManager
                 Value<int> lastMemoryExtractedOrder = const Value.absent(),
                 Value<String?> chatModelProvider = const Value.absent(),
                 Value<String?> chatModelId = const Value.absent(),
+                Value<String> extrasJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ConversationRowsCompanion.insert(
                 id: id,
@@ -13454,6 +13943,7 @@ class $$ConversationRowsTableTableManager
                 lastMemoryExtractedOrder: lastMemoryExtractedOrder,
                 chatModelProvider: chatModelProvider,
                 chatModelId: chatModelId,
+                extrasJson: extrasJson,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -21584,6 +22074,242 @@ typedef $$MessagePromptRowsTableProcessedTableManager =
       MessagePromptRow,
       PrefetchHooks Function()
     >;
+typedef $$ExtensionEntityRowsTableCreateCompanionBuilder =
+    ExtensionEntityRowsCompanion Function({
+      required String kind,
+      required String id,
+      required int sortOrder,
+      Value<String?> ownerId,
+      required String payload,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$ExtensionEntityRowsTableUpdateCompanionBuilder =
+    ExtensionEntityRowsCompanion Function({
+      Value<String> kind,
+      Value<String> id,
+      Value<int> sortOrder,
+      Value<String?> ownerId,
+      Value<String> payload,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$ExtensionEntityRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $ExtensionEntityRowsTable> {
+  $$ExtensionEntityRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ownerId => $composableBuilder(
+    column: $table.ownerId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+}
+
+class $$ExtensionEntityRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ExtensionEntityRowsTable> {
+  $$ExtensionEntityRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get ownerId => $composableBuilder(
+    column: $table.ownerId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ExtensionEntityRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ExtensionEntityRowsTable> {
+  $$ExtensionEntityRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<String> get ownerId =>
+      $composableBuilder(column: $table.ownerId, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$ExtensionEntityRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ExtensionEntityRowsTable,
+          ExtensionEntityRow,
+          $$ExtensionEntityRowsTableFilterComposer,
+          $$ExtensionEntityRowsTableOrderingComposer,
+          $$ExtensionEntityRowsTableAnnotationComposer,
+          $$ExtensionEntityRowsTableCreateCompanionBuilder,
+          $$ExtensionEntityRowsTableUpdateCompanionBuilder,
+          (
+            ExtensionEntityRow,
+            BaseReferences<
+              _$AppDatabase,
+              $ExtensionEntityRowsTable,
+              ExtensionEntityRow
+            >,
+          ),
+          ExtensionEntityRow,
+          PrefetchHooks Function()
+        > {
+  $$ExtensionEntityRowsTableTableManager(
+    _$AppDatabase db,
+    $ExtensionEntityRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ExtensionEntityRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ExtensionEntityRowsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$ExtensionEntityRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> kind = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<String?> ownerId = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ExtensionEntityRowsCompanion(
+                kind: kind,
+                id: id,
+                sortOrder: sortOrder,
+                ownerId: ownerId,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String kind,
+                required String id,
+                required int sortOrder,
+                Value<String?> ownerId = const Value.absent(),
+                required String payload,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => ExtensionEntityRowsCompanion.insert(
+                kind: kind,
+                id: id,
+                sortOrder: sortOrder,
+                ownerId: ownerId,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ExtensionEntityRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ExtensionEntityRowsTable,
+      ExtensionEntityRow,
+      $$ExtensionEntityRowsTableFilterComposer,
+      $$ExtensionEntityRowsTableOrderingComposer,
+      $$ExtensionEntityRowsTableAnnotationComposer,
+      $$ExtensionEntityRowsTableCreateCompanionBuilder,
+      $$ExtensionEntityRowsTableUpdateCompanionBuilder,
+      (
+        ExtensionEntityRow,
+        BaseReferences<
+          _$AppDatabase,
+          $ExtensionEntityRowsTable,
+          ExtensionEntityRow
+        >,
+      ),
+      ExtensionEntityRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -21663,4 +22389,6 @@ class $AppDatabaseManager {
       $$UserProfileFieldRowsTableTableManager(_db, _db.userProfileFieldRows);
   $$MessagePromptRowsTableTableManager get messagePromptRows =>
       $$MessagePromptRowsTableTableManager(_db, _db.messagePromptRows);
+  $$ExtensionEntityRowsTableTableManager get extensionEntityRows =>
+      $$ExtensionEntityRowsTableTableManager(_db, _db.extensionEntityRows);
 }

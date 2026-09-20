@@ -246,7 +246,6 @@ class _MessageListHarnessState extends State<_MessageListHarness> {
             selecting: false,
             selectedItems: const {},
             dividerPadding: EdgeInsets.zero,
-            isProcessingFiles: isProcessingFiles,
             onEditMessage: widget.onEditMessage,
           ),
         ),

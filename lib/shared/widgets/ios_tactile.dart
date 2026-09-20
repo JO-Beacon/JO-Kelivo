@@ -19,6 +19,7 @@ class IosIconButton extends StatefulWidget {
     this.pressedColor,
     this.minSize,
     this.semanticLabel,
+    this.tooltip,
     this.enabled = true,
   }) : assert(
          icon != null || builder != null,
@@ -36,6 +37,7 @@ class IosIconButton extends StatefulWidget {
   final Color? pressedColor; // 覆盖按下颜色；默认与 primary 混合
   final double? minSize; // 最小点击目标（例如 AppBar 使用 44）
   final String? semanticLabel;
+  final String? tooltip;
   final bool enabled;
 
   @override
@@ -45,6 +47,9 @@ class IosIconButton extends StatefulWidget {
 class _IosIconButtonState extends State<IosIconButton> {
   bool _pressed = false;
   bool _hovered = false;
+
+  bool get _interactive =>
+      widget.enabled && (widget.onTap != null || widget.onLongPress != null);
 
   @override
   Widget build(BuildContext context) {
@@ -102,57 +107,69 @@ class _IosIconButtonState extends State<IosIconButton> {
                 ).colorScheme.onSurface.withValues(alpha: isDark ? 0.08 : 0.06))
               : Colors.transparent);
 
-    final content = Semantics(
+    // 按压反馈改用 Listener（而非 onTapDown），避免与 Tooltip 抢手势；
+    // onTap 仍走 GestureDetector，这样嵌套按钮能胜过外层 IosCardPress；
+    // onLongPress 为 null 时不下发。
+    Widget content = Semantics(
       button: true,
       enabled: widget.enabled,
       label: widget.semanticLabel,
       child: MouseRegion(
-        cursor:
-            (widget.enabled &&
-                (widget.onTap != null || widget.onLongPress != null))
-            ? SystemMouseCursors.click
-            : MouseCursor.defer,
+        cursor: _interactive ? SystemMouseCursors.click : MouseCursor.defer,
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),
-        child: GestureDetector(
+        child: Listener(
           behavior: HitTestBehavior.opaque,
-          onTapDown:
-              (widget.enabled &&
-                  (widget.onTap != null || widget.onLongPress != null))
+          onPointerDown: _interactive
               ? (_) => setState(() => _pressed = true)
               : null,
-          onTapUp:
-              (widget.enabled &&
-                  (widget.onTap != null || widget.onLongPress != null))
+          onPointerUp: _interactive
               ? (_) => setState(() => _pressed = false)
               : null,
-          onTapCancel:
-              (widget.enabled &&
-                  (widget.onTap != null || widget.onLongPress != null))
-              ? () => setState(() => _pressed = false)
+          onPointerCancel: _interactive
+              ? (_) => setState(() => _pressed = false)
               : null,
-          onTap: widget.enabled ? widget.onTap : null,
-          onLongPress: widget.enabled ? widget.onLongPress : null,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            curve: Curves.easeOutCubic,
-            decoration: BoxDecoration(
-              color: bgTarget,
-              borderRadius: BorderRadius.circular(8),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: widget.enabled ? widget.onTap : null,
+            onLongPress: widget.enabled && widget.onLongPress != null
+                ? widget.onLongPress
+                : null,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOutCubic,
+              decoration: BoxDecoration(
+                color: bgTarget,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Padding(padding: widget.padding, child: child),
             ),
-            child: Padding(padding: widget.padding, child: child),
           ),
         ),
       ),
     );
 
     if (widget.minSize != null) {
-      return ConstrainedBox(
+      content = ConstrainedBox(
         constraints: BoxConstraints(
           minWidth: widget.minSize!,
           minHeight: widget.minSize!,
         ),
         child: Center(child: content),
+      );
+    }
+
+    final tooltip = widget.tooltip;
+    if (tooltip != null && tooltip.isNotEmpty) {
+      content = Tooltip(
+        message: tooltip,
+        preferBelow: true,
+        verticalOffset: 20,
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        triggerMode: TooltipTriggerMode.longPress,
+        showDuration: const Duration(milliseconds: 1500),
+        waitDuration: const Duration(milliseconds: 400),
+        child: content,
       );
     }
     return content;

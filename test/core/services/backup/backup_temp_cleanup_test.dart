@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:Kelivo/core/models/backup_task_progress.dart';
+import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
 import 'package:Kelivo/core/services/backup/backup_isolate_runner.dart';
 import 'package:Kelivo/core/services/backup/data_sync.dart';
 

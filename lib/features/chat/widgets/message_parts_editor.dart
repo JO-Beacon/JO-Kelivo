@@ -351,7 +351,8 @@ Future<String?> showMessagePartExpandedEditor(
   required bool readOnly,
 }) {
   final platform = Theme.of(context).platform;
-  final isDesktopPlatform = platform == TargetPlatform.macOS ||
+  final isDesktopPlatform =
+      platform == TargetPlatform.macOS ||
       platform == TargetPlatform.linux ||
       platform == TargetPlatform.windows;
   if (isDesktopPlatform) {
@@ -362,10 +363,7 @@ Future<String?> showMessagePartExpandedEditor(
       builder: (ctx) => Dialog(
         backgroundColor: cs.surface,
         shape: DesktopDialogStyle.shape(ctx),
-        insetPadding: const EdgeInsets.symmetric(
-          horizontal: 24,
-          vertical: 24,
-        ),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: _ExpandedPartDesktopDialog(
           title: title,
           initialText: initialText,
@@ -514,9 +512,8 @@ class _ExpandedPartDesktopDialogState
                   if (!widget.readOnly) ...[
                     const SizedBox(width: 8),
                     TextButton(
-                      onPressed: () => Navigator.of(context).pop(
-                        _controller.text,
-                      ),
+                      onPressed: () =>
+                          Navigator.of(context).pop(_controller.text),
                       child: Text(
                         l10n.messageEditExpandedSave,
                         style: TextStyle(
@@ -624,9 +621,8 @@ class _ExpandedPartMobileSheetState extends State<_ExpandedPartMobileSheet> {
                 ),
                 if (!widget.readOnly)
                   TextButton(
-                    onPressed: () => Navigator.of(context).pop(
-                      _controller.text,
-                    ),
+                    onPressed: () =>
+                        Navigator.of(context).pop(_controller.text),
                     child: Text(
                       l10n.messageEditExpandedSave,
                       style: TextStyle(
@@ -653,10 +649,7 @@ class _ExpandedPartMobileSheetState extends State<_ExpandedPartMobileSheet> {
 
 /// 大窗口里的输入框：铺满可用空间、自身可滚。
 class _ExpandedPartField extends StatelessWidget {
-  const _ExpandedPartField({
-    required this.controller,
-    required this.readOnly,
-  });
+  const _ExpandedPartField({required this.controller, required this.readOnly});
 
   final TextEditingController controller;
   final bool readOnly;

@@ -250,11 +250,11 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                        child: SingleChildScrollView(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              MessagePartsEditor(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            MessagePartsEditor(
                               parts: _editedParts,
                               onChanged: (parts) => setState(() {
                                 _editedParts = parts;

@@ -1,3 +1,5 @@
+import 'package:Kelivo/core/database/generation_run.dart';
+import 'package:Kelivo/core/services/mobile_background.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -25,10 +27,42 @@ import 'package:Kelivo/core/services/network/request_logger.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart'
     show ToolUIPart;
 import 'package:Kelivo/features/home/controllers/home_page_controller.dart';
+import 'package:Kelivo/features/home/controllers/chat_actions.dart';
 import 'package:Kelivo/features/home/controllers/scroll_controller.dart';
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+
+class _CancelFailureChatService extends ChatService {
+  _CancelFailureChatService(ChatDatabaseRepository repository)
+    : super(existingRepository: repository);
+  bool failCancellation = false;
+  @override
+  Future<GenerationRun?> finalizeGenerationRunSilent({
+    required ChatMessage message,
+    required List<Map<String, dynamic>> toolEvents,
+    required String? generationRunId,
+    required GenerationRunState? expectedState,
+    required int? expectedStateRevision,
+    required GenerationRunState terminalState,
+    int? checkpointSeq,
+    String? errorCode,
+  }) {
+    if (failCancellation && terminalState == GenerationRunState.cancelled) {
+      throw StateError('cancel persist failed');
+    }
+    return super.finalizeGenerationRunSilent(
+      message: message,
+      toolEvents: toolEvents,
+      generationRunId: generationRunId,
+      expectedState: expectedState,
+      expectedStateRevision: expectedStateRevision,
+      terminalState: terminalState,
+      checkpointSeq: checkpointSeq,
+      errorCode: errorCode,
+    );
+  }
+}
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);
@@ -62,11 +96,50 @@ void main() {
   var streamRequestCount = 0;
   final streamRequestBodies = <Map<String, dynamic>>[];
   Completer<void>? streamResponseGate;
+  Completer<void>? streamHold;
+  var holdPartialTool = false;
+  Completer<void>? toolBytesSent;
+  Completer<void>? releaseToolResponse;
+  late AskUserInteractionService questions;
 
   Future<void> handleApiRequest(HttpRequest request) async {
     final body =
         jsonDecode(await utf8.decoder.bind(request).join())
             as Map<String, dynamic>;
+    if (body['model'] == 'gpt-4o' &&
+        body['stream'] != true &&
+        !(body['messages'] as List).any((m) => m['role'] == 'tool')) {
+      request.response.headers.contentType = ContentType.json;
+      request.response.write(
+        jsonEncode({
+          'choices': [
+            {
+              'message': {
+                'role': 'assistant',
+                'content': null,
+                'tool_calls': [
+                  {
+                    'id': 'scheduled-ask',
+                    'type': 'function',
+                    'function': {
+                      'name': AskUserToolNames.askUser,
+                      'arguments': jsonEncode({
+                        'questions': [
+                          {'id': 'q1', 'question': 'Which option?'},
+                        ],
+                      }),
+                    },
+                  },
+                ],
+              },
+              'finish_reason': 'tool_calls',
+            },
+          ],
+        }),
+      );
+      await request.response.close();
+      return;
+    }
     if (body['stream'] == true) {
       streamRequestCount++;
       streamRequestBodies.add(body);
@@ -78,6 +151,40 @@ void main() {
         'event-stream',
         charset: 'utf-8',
       );
+      if (holdPartialTool) {
+        request.response.bufferOutput = false;
+        void delta(Map<String, dynamic> value) => request.response.write(
+          'data: ${jsonEncode({
+            'choices': [
+              {'index': 0, 'delta': value, 'finish_reason': null},
+            ],
+          })}\n\n',
+        );
+        delta({'content': 'before tool'});
+        await request.response.flush();
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+        delta({
+          'tool_calls': [
+            {
+              'index': 0,
+              'id': 'pending-call',
+              'type': 'function',
+              'function': {'name': 'lookup', 'arguments': '{"q":"latest"}'},
+            },
+          ],
+        });
+        await request.response.flush();
+        request.response.write(': keepalive\n\n');
+        await request.response.flush();
+        toolBytesSent!.complete();
+        await releaseToolResponse!.future;
+        try {
+          await request.response.close();
+        } on SocketException {
+          /* Client cancelled. */
+        }
+        return;
+      }
       request.response.write(
         'data: ${jsonEncode({
           'id': 'cmpl-race',
@@ -122,11 +229,16 @@ void main() {
       file: File('${directory.path}/kelivo.db'),
     );
     await repository.ensureReady();
-    service = ChatService(existingRepository: repository);
+    service = _CancelFailureChatService(repository);
     await service.init();
     streamRequestCount = 0;
     streamRequestBodies.clear();
     streamResponseGate = null;
+    streamHold = null;
+    holdPartialTool = false;
+    toolBytesSent = null;
+    releaseToolResponse = null;
+    questions = AskUserInteractionService();
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen(handleApiRequest);
   });
@@ -189,6 +301,9 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
+          ChangeNotifierProvider<AskUserInteractionService>.value(
+            value: questions,
+          ),
           ChangeNotifierProvider<SettingsProvider>.value(value: settings),
           ChangeNotifierProvider<ChatService>.value(value: service),
           ChangeNotifierProvider<AssistantProvider>.value(
@@ -291,6 +406,109 @@ void main() {
         'streaming to finish',
       );
     });
+  });
+
+  testWidgets('工具参数刚到达时取消仍保存工具部件', (tester) async {
+    final controller = await pumpHarness(tester);
+    await tester.runAsync(() async {
+      final convo = await openConversation(controller);
+      holdPartialTool = true;
+      toolBytesSent = Completer<void>();
+      releaseToolResponse = Completer<void>();
+      try {
+        await controller.sendMessage(
+          const ChatInputData(text: 'test latest tool'),
+        );
+        await toolBytesSent!.future;
+        final messages = await service.loadMessages(convo.id);
+        final assistant = messages.singleWhere((m) => m.role == 'assistant');
+        await waitFor(
+          () => controller.messages.any(
+            (m) => m.id == assistant.id && m.content == 'before tool',
+          ),
+          'streamed text to arrive',
+        );
+        await ChatActions.flushActiveGenerationProgress();
+        final checkpoint = (await service.loadMessages(
+          convo.id,
+        )).singleWhere((m) => m.id == assistant.id);
+        expect(
+          checkpoint.parts.whereType<ToolCallPart>(),
+          hasLength(1),
+          reason: '切换或退出前刷新也必须保存最新工具部件',
+        );
+        await controller.cancelStreaming();
+        final saved = (await service.loadMessages(
+          convo.id,
+        )).singleWhere((m) => m.id == assistant.id);
+        expect(saved.parts.whereType<ToolCallPart>(), hasLength(1));
+        expect(
+          saved.parts.whereType<ToolCallPart>().single.payloadJson,
+          contains('latest'),
+        );
+        expect(saved.content, 'before tool');
+        expect(saved.isStreaming, isFalse);
+      } finally {
+        await controller.cancelStreaming();
+        releaseToolResponse!.complete();
+      }
+    });
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('取消终态写入失败仍释放后台任务，并把写入错误交给调用方', (tester) async {
+    final controller = await pumpHarness(tester);
+    await tester.runAsync(() async {
+      final convo = await openConversation(controller);
+      final background = MobileBackgroundCoordinator.instance;
+      final previousTasks = background.activeTaskIds;
+      holdPartialTool = true;
+      toolBytesSent = Completer<void>();
+      releaseToolResponse = Completer<void>();
+      var newTasks = <String>{};
+      try {
+        await controller.sendMessage(
+          const ChatInputData(text: 'test cancellation write failure'),
+        );
+        await toolBytesSent!.future;
+        await waitFor(
+          () => controller.messages.any(
+            (m) => m.role == 'assistant' && m.content == 'before tool',
+          ),
+          'stream text',
+        );
+        newTasks = background.activeTaskIds.difference(previousTasks);
+        expect(newTasks, isNotEmpty);
+        (service as _CancelFailureChatService).failCancellation = true;
+        await expectLater(
+          controller.cancelStreaming(),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'message',
+              'cancel persist failed',
+            ),
+          ),
+        );
+        expect(background.activeTaskIds.intersection(newTasks), isEmpty);
+        expect(
+          controller.chatController.isConversationLoading(convo.id),
+          isFalse,
+        );
+      } finally {
+        (service as _CancelFailureChatService).failCancellation = false;
+        await controller.cancelStreaming();
+        releaseToolResponse!.complete();
+        for (final id in newTasks) {
+          await background.finish(
+            id,
+            BackgroundTaskOutcome.cancelled,
+            resultPersisted: false,
+          );
+        }
+      }
+    });
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('single-flight cancel hides loading before slow teardown', (
@@ -1155,6 +1373,317 @@ void main() {
     });
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'a second conversation can send while the first is still streaming',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      await tester.runAsync(() async {
+        streamHold = Completer<void>();
+        final first = await openConversation(controller);
+        await controller.sendMessage(ChatInputData(text: 'from a'));
+        await waitFor(
+          () => controller.chatController.isConversationLoading(first.id),
+          'first conversation to start streaming',
+        );
+
+        final second = await service.createConversation(title: 'Second');
+        await controller.chatController.setCurrentConversationAndLoad(second);
+        final result = await controller.sendMessage(
+          ChatInputData(text: 'from b'),
+        );
+
+        expect(result, ChatInputSubmissionResult.sent);
+        expect(
+          controller.chatController.isConversationLoading(first.id),
+          isTrue,
+        );
+        expect(
+          controller.chatController.isConversationLoading(second.id),
+          isTrue,
+        );
+
+        streamHold!.complete();
+        await waitFor(
+          () =>
+              !controller.chatController.isConversationLoading(first.id) &&
+              !controller.chatController.isConversationLoading(second.id),
+          'both streams to finish',
+        );
+
+        final firstMessages = await service.loadMessages(first.id);
+        final secondMessages = await service.loadMessages(second.id);
+        expect(
+          firstMessages.where((m) => m.role == 'user').single.content,
+          'from a',
+        );
+        expect(
+          secondMessages.where((m) => m.role == 'user').single.content,
+          'from b',
+        );
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets('scheduled send uses its model over the conversation pin', (
+    tester,
+  ) async {
+    final controller = await pumpHarness(tester);
+    await tester.runAsync(() async {
+      final target = await openConversation(controller);
+      await controller.sendMessage(ChatInputData(text: 'Previous question'));
+      await waitFor(
+        () => !controller.chatController.isConversationLoading(target.id),
+        'initial reply',
+      );
+      await service.setConversationModel(
+        target.id,
+        providerKey: 'SiliconFlow',
+        modelId: 'pinned-model',
+      );
+      final foreground = await openConversation(controller);
+      String? startedMessage;
+      final result = await controller.debugViewModel.sendScheduledMessage(
+        input: ChatInputData(text: 'Scheduled follow-up'),
+        conversation: service.getConversation(target.id)!,
+        assistant: assistantProvider.currentAssistant!,
+        modelOverride: (providerKey: 'SiliconFlow', modelId: 'scheduled-model'),
+        onGenerationStarted: (id) => startedMessage = id,
+      );
+      expect(result.success, isTrue);
+      expect(startedMessage, result.assistantMessage!.id);
+      await waitFor(
+        () => !controller.chatController.isConversationLoading(target.id),
+        'scheduled reply',
+      );
+      expect(streamRequestBodies.last['model'], 'scheduled-model');
+      final messages = streamRequestBodies.last['messages'] as List;
+      expect(
+        messages.where((m) => m['role'] == 'user').map((m) => m['content']),
+        ['Previous question', 'Scheduled follow-up'],
+      );
+      expect(service.getConversation(target.id)!.chatModelId, 'pinned-model');
+      expect(settings.currentModelId, 'test-model');
+      expect(controller.chatController.currentConversation!.id, foreground.id);
+    });
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'scheduled rerun uses the task model and keeps the foreground chat',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      await tester.runAsync(() async {
+        final target = await openConversation(controller);
+        for (final question in ['First question', 'Later question']) {
+          await controller.sendMessage(ChatInputData(text: question));
+          await waitFor(
+            () => !controller.chatController.isConversationLoading(target.id),
+            'reply to $question',
+          );
+        }
+        final before = await service.loadMessages(target.id);
+        final question = before.firstWhere((m) => m.role == 'user');
+        final foreground = await openConversation(controller);
+        final result = await controller.debugViewModel
+            .regenerateScheduledMessage(
+              message: question,
+              conversation: service.getConversation(target.id)!,
+              assistant: assistantProvider.currentAssistant!,
+              modelOverride: (
+                providerKey: 'SiliconFlow',
+                modelId: 'rerun-model',
+              ),
+            );
+        expect(result.success, isTrue);
+        expect(result.generationRunId, isNotNull);
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(target.id),
+          'scheduled rerun',
+        );
+        expect(streamRequestBodies.last['model'], 'rerun-model');
+        final messages = streamRequestBodies.last['messages'] as List;
+        expect(
+          messages.where((m) => m['role'] == 'user').map((m) => m['content']),
+          ['First question'],
+        );
+        expect(
+          controller.chatController.currentConversation!.id,
+          foreground.id,
+        );
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'a busy scheduled target and stale cancellation leave the user stream running',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      await tester.runAsync(() async {
+        streamHold = Completer<void>();
+        final target = await openConversation(controller);
+        await controller.sendMessage(ChatInputData(text: 'User is chatting'));
+        await waitFor(() => streamRequestCount == 1, 'held user request');
+        final question = (await service.loadMessages(
+          target.id,
+        )).firstWhere((m) => m.role == 'user');
+        var starts = 0;
+        final send = await controller.debugViewModel.sendScheduledMessage(
+          input: ChatInputData(text: 'Scheduled follow-up'),
+          conversation: target,
+          assistant: assistantProvider.currentAssistant!,
+          onGenerationStarted: (_) => starts++,
+        );
+        final rerun = await controller.debugViewModel
+            .regenerateScheduledMessage(
+              message: question,
+              conversation: target,
+              assistant: assistantProvider.currentAssistant!,
+              onGenerationStarted: (_) => starts++,
+            );
+        expect(send.errorMessage, 'in_flight');
+        expect(rerun.errorMessage, 'in_flight');
+        expect(starts, 0);
+        await ChatActions.cancelActiveGenerationFor(
+          target.id,
+          expectedMessageId: 'finished-scheduled-run',
+        );
+        expect(
+          controller.chatController.isConversationLoading(target.id),
+          isTrue,
+        );
+        streamHold!.complete();
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(target.id),
+          'original user reply',
+        );
+        expect(streamRequestCount, 1);
+        expect((await service.loadMessages(target.id)).last.content, 'ok');
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'scheduled rerun before context reset succeeds without changing the cutoff',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      await tester.runAsync(() async {
+        final target = await openConversation(controller);
+        await controller.sendMessage(ChatInputData(text: 'Original question'));
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(target.id),
+          'original reply',
+        );
+        final question = (await service.loadMessages(
+          target.id,
+        )).firstWhere((m) => m.role == 'user');
+        await service.toggleTruncateAtTail(target.id);
+        final current = service.getConversation(target.id)!;
+        final choices = await repository.getSelectedMessageProjections(
+          target.id,
+        );
+        expect(choices.any((m) => m.id == question.id), isTrue);
+        expect(await repository.getMessage(question.id), isNotNull);
+        final result = await controller.debugViewModel
+            .regenerateScheduledMessage(
+              message: question,
+              conversation: current,
+              assistant: assistantProvider.currentAssistant!,
+            );
+        expect(result.success, isTrue);
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(target.id),
+          'scheduled rerun',
+        );
+        expect(streamRequestCount, 2);
+        expect(
+          service.getConversation(target.id)!.truncateIndex,
+          current.truncateIndex,
+        );
+        expect(
+          (streamRequestBodies.last['messages'] as List)
+              .where((m) => m['role'] == 'user')
+              .map((m) => m['content']),
+          ['Original question'],
+        );
+        await controller.debugViewModel.sendScheduledMessage(
+          input: ChatInputData(text: 'After clear'),
+          conversation: service.getConversation(target.id)!,
+          assistant: assistantProvider.currentAssistant!,
+        );
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(target.id),
+          'follow-up after clear',
+        );
+        expect(
+          (streamRequestBodies.last['messages'] as List)
+              .where((m) => m['role'] == 'user')
+              .map((m) => m['content']),
+          ['After clear'],
+        );
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'scheduled nonstream rerun returns a run while user input is pending',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      await tester.runAsync(() async {
+        final target = await openConversation(controller);
+        await controller.sendMessage(ChatInputData(text: 'Original question'));
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(target.id),
+          'original reply',
+        );
+        final question = (await service.loadMessages(
+          target.id,
+        )).firstWhere((m) => m.role == 'user');
+        var returned = false;
+        final run = controller.debugViewModel
+            .regenerateScheduledMessage(
+              message: question,
+              conversation: service.getConversation(target.id)!,
+              assistant: assistantProvider.currentAssistant!.copyWith(
+                streamOutput: false,
+                localToolIds: [AskUserToolNames.askUser],
+              ),
+              modelOverride: (providerKey: 'SiliconFlow', modelId: 'gpt-4o'),
+            )
+            .then((result) {
+              returned = true;
+              return result;
+            });
+        try {
+          await waitFor(
+            () => questions.pendingRequests.isNotEmpty,
+            'real ask-user tool request',
+          );
+          await Future<void>.delayed(const Duration(milliseconds: 700));
+          expect(returned, isTrue);
+          final result = await run;
+          expect(result.success, isTrue);
+          expect(result.generationRunId, isNotNull);
+          expect(
+            (await repository.getGenerationRun(
+              result.generationRunId!,
+            ))!.state.isTerminal,
+            isFalse,
+          );
+          expect(
+            questions.pendingRequests.values.single.conversationId,
+            target.id,
+          );
+        } finally {
+          await ChatActions.cancelActiveGenerationFor(target.id);
+          await run.timeout(const Duration(seconds: 10));
+        }
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 class _ControllerHarness extends StatefulWidget {

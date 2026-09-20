@@ -8,14 +8,17 @@ import '../../database/business_repository.dart';
 import '../../database/business_settings_router.dart';
 import '../../database/chat_database_repository.dart'
     show ParsedChatImportBatch;
+import '../../../utils/app_directories.dart';
 import '../../models/backup.dart';
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
 import '../../models/conversation_tree.dart';
 import '../../models/message_part.dart';
-import '../../utils/multimodal_input_utils.dart';
-import '../../../utils/sandbox_path_resolver.dart';
-import '../../models/backup_task_progress.dart';
+import 'backup_cancel_token.dart';
+import 'chatbox_shared_parser.dart';
+import 'chatbox_backup_archive.dart';
+import 'data_sync.dart';
+import 'backup_task_progress.dart';
 import '../../models/progress_update.dart';
 import '../../providers/settings_provider.dart'
     show ProviderConfig, ProviderKind;
@@ -87,16 +90,20 @@ class ChatboxImporter {
       'provider_group_collapsed_v1';
   static const String _providerUngroupedPositionKey =
       'provider_ungrouped_position_v1';
+
+  /// 条目级稳定 ID 前缀由 ChatboxSharedParser 提供，
+  /// 这里只管分组的 ID 空间：两代导入的产物必须落在
+  /// 各自的分组里，不得混同。
   static const String _legacyIdPrefix = 'chatbox_legacy_1_21_1_';
-  static const String _chatboxStarredGroupId = '${_legacyIdPrefix}starred_';
-  static const String _chatboxProviderGroupId =
-      '${_legacyIdPrefix}provider_group_';
-  static const String _chatboxDeletedProviderGroupId =
-      '${_legacyIdPrefix}provider_group_deleted_';
+  static const String _archiveIdPrefix = 'chatbox_archive_1_22_';
   static const String _chatboxImportGroupName = 'Chatbox 导入（<1.22）';
   static const String _chatboxStarredGroupName = 'Chatbox 导入（<1.22）·置顶';
   static const String _chatboxDeletedProviderGroupName =
       'Chatbox 导入（<1.22）·已删除';
+  static const String _chatboxModernGroupName = 'Chatbox 导入（≥1.22）';
+  static const String _chatboxModernStarredGroupName = 'Chatbox 导入（≥1.22）·置顶';
+  static const String _chatboxModernDeletedProviderGroupName =
+      'Chatbox 导入（≥1.22）·已删除';
 
   static Future<ChatboxImportResult> importFromChatbox({
     required File file,
@@ -115,12 +122,122 @@ class ChatboxImporter {
       cancelToken: cancelToken,
       onProgress: onProgress,
     );
+    return _importParsedRoot(
+      root: root,
+      mode: mode,
+      businessRepository: businessRepository,
+      chatService: chatService,
+      starredGroupName: starredGroupName ?? _chatboxStarredGroupName,
+      groupIdPrefix: _legacyIdPrefix,
+      regularGroupName: _chatboxImportGroupName,
+      deletedProviderGroupName: _chatboxDeletedProviderGroupName,
+      cancelToken: cancelToken,
+      onProgress: onProgress,
+    );
+  }
+
+  /// Chatbox 1.22+ ZIP（`format=chatbox-backup` / `formatVersion=2`）。
+  ///
+  /// 归档读取与校验由 [ChatboxBackupArchive] 负责：清单、逐条目大小与
+  /// SHA-256、解压预算、防目录穿越。它输出的 root 与旧版 JSON 同形状，
+  /// 因此会话、消息与分叉树复用本导入器既有的解析管线。
+  static Future<ChatboxImportResult> importFromChatboxArchive({
+    required File file,
+    required RestoreMode mode,
+    required BusinessRepository businessRepository,
+    required ChatService chatService,
+    String? starredGroupName,
+    String? regularGroupName,
+    String? deletedProviderGroupName,
+    BackupCancelToken? cancelToken,
+    ProgressCallback? onProgress,
+  }) async {
+    onProgress?.call(
+      const ProgressUpdate(phase: BackupPhase.preparing, value: 0),
+    );
+
+    final staging = await Directory.systemTemp.createTemp(
+      'joaiclient_chatbox_zip_',
+    );
+    DataSync.registerLiveTempPath(staging.path);
+    final upload = await AppDirectories.getUploadDirectory();
+    final resourceDestDir = '${upload.path}/chatbox';
+
+    ChatboxBackupReadResult? archive;
+    Object? failure;
+    try {
+      cancelToken?.throwIfCancelled();
+      onProgress?.call(
+        const ProgressUpdate(phase: BackupPhase.extracting, value: 0.15),
+      );
+      archive = await ChatboxBackupArchive.readZipV2(
+        file: file,
+        stagingDir: staging,
+        resourceDestDir: resourceDestDir,
+      );
+      cancelToken?.throwIfCancelled();
+
+      final result = await _importParsedRoot(
+        root: _validateArchiveRoot(archive.root),
+        mode: mode,
+        businessRepository: businessRepository,
+        chatService: chatService,
+        starredGroupName: starredGroupName ?? _chatboxModernStarredGroupName,
+        groupIdPrefix: _archiveIdPrefix,
+        regularGroupName: regularGroupName ?? _chatboxModernGroupName,
+        deletedProviderGroupName:
+            deletedProviderGroupName ?? _chatboxModernDeletedProviderGroupName,
+        cancelToken: cancelToken,
+        onProgress: onProgress,
+      );
+
+      // 提交阶段会先回填一次资产引用、随后清空 upload/。因此资源必须在
+      // 提交成功之后再落盘，并重跑一次维护，让刚导入的附件登记进
+      // message_asset_rows；否则它们会被当成无主文件，在后续清理中被删掉。
+      await ChatboxBackupArchive.publishStagedResources(archive);
+      await chatService.runAssetReferenceMaintenance();
+      return result;
+    } catch (error) {
+      failure = error;
+      rethrow;
+    } finally {
+      await DataSync.deleteTempDirectoryWhenIsolateSafe(
+        staging,
+        error: failure,
+      );
+    }
+  }
+
+  static Map<String, dynamic> _validateArchiveRoot(Map<String, dynamic> root) {
+    final sessions = root['chat-sessions-list'];
+    final settings = root['settings'];
+    final hasProviders = settings is Map && settings['providers'] is Map;
+    if (sessions is! List && !hasProviders) {
+      throw const ChatboxImportException(
+        'Not a Chatbox backup archive (missing sessions and settings.providers).',
+      );
+    }
+    return root;
+  }
+
+  /// 把已解析的 Chatbox root 走完导入管线。两代共用。
+  static Future<ChatboxImportResult> _importParsedRoot({
+    required Map<String, dynamic> root,
+    required RestoreMode mode,
+    required BusinessRepository businessRepository,
+    required ChatService chatService,
+    required String starredGroupName,
+    required String groupIdPrefix,
+    required String regularGroupName,
+    required String deletedProviderGroupName,
+    BackupCancelToken? cancelToken,
+    ProgressCallback? onProgress,
+  }) async {
     cancelToken?.throwIfCancelled();
     onProgress?.call(
       const ProgressUpdate(phase: BackupPhase.extracting, value: 0.2),
     );
 
-    // 安全考虑：导出未完成时避免破坏性覆盖。
     if (mode == RestoreMode.overwrite) {
       final sessionsList = root['chat-sessions-list'];
       if (sessionsList is! List || sessionsList.isEmpty) {
@@ -189,7 +306,10 @@ class ChatboxImporter {
         assistants: assistantConvRes.assistantPayloads,
         assistantIds: assistantConvRes.assistantIds,
         starredAssistantIds: assistantConvRes.starredAssistantIds,
-        starredGroupName: starredGroupName ?? _chatboxStarredGroupName,
+        starredGroupName: starredGroupName,
+        groupIdPrefix: groupIdPrefix,
+        regularGroupName: regularGroupName,
+        deletedProviderGroupName: deletedProviderGroupName,
       ),
     );
     onProgress?.call(
@@ -286,12 +406,14 @@ class ChatboxImporter {
   ) {
     final messageMap = <String, String>{
       for (final message in batch.messages)
-        message.id: _legacyId('placed_${batch.conversation.id}_${message.id}'),
+        message.id: ChatboxSharedParser.legacyId(
+          'placed_${batch.conversation.id}_${message.id}',
+        ),
     };
     final branchMap = <String, String>{
       for (final branch
           in batch.tree?.branches.values ?? const <ConversationBranch>[])
-        branch.id: _legacyId(
+        branch.id: ChatboxSharedParser.legacyId(
           'placed_branch_${batch.conversation.id}_${branch.id}',
         ),
     };
@@ -376,7 +498,9 @@ class ChatboxImporter {
         final groupVersion = (groupId: groupId, version: message.version);
         if (occupiedGroupVersions.contains(groupVersion)) {
           nextMessage = message.copyWith(
-            groupId: _legacyId('merge_${current.id}_${message.id}'),
+            groupId: ChatboxSharedParser.legacyId(
+              'merge_${current.id}_${message.id}',
+            ),
             version: 0,
           );
         }
@@ -390,19 +514,23 @@ class ChatboxImporter {
         idMap[message.id] = message.id;
       } else {
         final conflictId = _stableUniqueMessageId(
-          _legacyId('conflict_${current.id}_${message.id}'),
+          ChatboxSharedParser.legacyId('conflict_${current.id}_${message.id}'),
           {...localById, ...incomingById},
         );
         idMap[message.id] = conflictId;
         mergedMessages.add(
           message.copyWith(
             id: conflictId,
-            groupId: _legacyId('merge_${current.id}_${message.id}'),
+            groupId: ChatboxSharedParser.legacyId(
+              'merge_${current.id}_${message.id}',
+            ),
             version: 0,
           ),
         );
         occupiedGroupVersions.add((
-          groupId: _legacyId('merge_${current.id}_${message.id}'),
+          groupId: ChatboxSharedParser.legacyId(
+            'merge_${current.id}_${message.id}',
+          ),
           version: 0,
         ));
       }
@@ -460,7 +588,9 @@ class ChatboxImporter {
         final sourceMessage = incomingById[edge.messageId];
         if (sourceMessage != null && mappedId == edge.messageId) {
           mappedId = _stableUniqueMessageId(
-            _legacyId('placement_${current.id}_${edge.messageId}'),
+            ChatboxSharedParser.legacyId(
+              'placement_${current.id}_${edge.messageId}',
+            ),
             {...localById, ...incomingByMappedId},
           );
           idMap[edge.messageId] = mappedId;
@@ -574,7 +704,7 @@ class ChatboxImporter {
         body: _readChatboxFileWorker,
         payload: file.path,
         cancelToken: cancelToken,
-        onProgress: onProgress,
+        onProgress: adaptProgressCallbackToSink(onProgress),
       );
     } on StateError catch (error) {
       switch (error.message) {
@@ -660,7 +790,7 @@ class ChatboxImporter {
 
     final idMap = <String, String>{};
     for (final key in sourceIds) {
-      final targetId = _chatboxImportedProviderId(key);
+      final targetId = ChatboxSharedParser.chatboxImportedProviderId(key);
       idMap[key] = targetId;
     }
 
@@ -750,8 +880,14 @@ class ChatboxImporter {
               (!configuredSourceIds.contains(sourceId) ||
                   !namedConfiguredSourceIds.contains(sourceId)),
         )
-        .map(_chatboxImportedProviderId)
+        .map(ChatboxSharedParser.chatboxImportedProviderId)
         .toSet();
+
+    // 归入“已删除”分组的供应商只用于保留历史引用，导入后一律禁用。
+    // 旧存档即使残留 apiKey，也不能让这些条目默认处于启用状态。
+    for (final providerId in deletedProviderIds) {
+      imported[providerId]?['enabled'] = false;
+    }
 
     return _ChatboxProviderImportPlan(
       configs: imported,
@@ -790,7 +926,9 @@ class ChatboxImporter {
 
     // 当消息时间戳缺失时，`__exported_at` 是不错的回退时间戳基准。
     final exportedAt =
-        _parseIsoDateTime((root['__exported_at'] ?? '').toString()) ??
+        ChatboxSharedParser.parseIsoDateTime(
+          (root['__exported_at'] ?? '').toString(),
+        ) ??
         DateTime.now();
 
     for (final (sessionIndex, meta) in sessionsList.indexed) {
@@ -821,15 +959,17 @@ class ChatboxImporter {
       final contextCount = (sessionSettings['maxContextMessageCount'] as num?)
           ?.toInt();
 
-      final thinkingBudget = _extractThinkingBudget(sessionSettings);
-
-      // 将第一条 system 消息作为助手 system prompt。
-      final sysPrompt = _extractSystemPromptFromSession(
-        session,
-        fallback: _extractDefaultPrompt(root),
+      final thinkingBudget = ChatboxSharedParser.extractThinkingBudget(
+        sessionSettings,
       );
 
-      final assistantId = _legacyId(id);
+      // 将第一条 system 消息作为助手 system prompt。
+      final sysPrompt = ChatboxSharedParser.extractSystemPromptFromSession(
+        session,
+        fallback: ChatboxSharedParser.extractDefaultPrompt(root),
+      );
+
+      final assistantId = ChatboxSharedParser.legacyId(id);
       final assistantJson = <String, dynamic>{
         'id': assistantId,
         'name': name,
@@ -838,7 +978,8 @@ class ChatboxImporter {
         'useAssistantName': false,
         'chatModelProvider': provider.isEmpty
             ? null
-            : providerIdMap[provider] ?? _chatboxImportedProviderId(provider),
+            : providerIdMap[provider] ??
+                  ChatboxSharedParser.chatboxImportedProviderId(provider),
         'chatModelId': provider.isEmpty || modelId.isEmpty ? null : modelId,
         'temperature': temperature,
         'topP': topP,
@@ -893,7 +1034,7 @@ class ChatboxImporter {
       final effectiveThreads = <Map<String, dynamic>>[];
       if (parsedThreads.isEmpty) {
         effectiveThreads.add(<String, dynamic>{
-          'id': _legacyId('default_$id'),
+          'id': ChatboxSharedParser.legacyId('default_$id'),
           'name': name,
           'createdAt': null,
           'messages': sessionMessages,
@@ -930,8 +1071,8 @@ class ChatboxImporter {
 
             final baseId = systemMessageId(sessionMessages);
             final derivedId = baseId.isNotEmpty
-                ? _legacyId('thread_$baseId')
-                : _legacyId('current_$id');
+                ? ChatboxSharedParser.legacyId('thread_$baseId')
+                : ChatboxSharedParser.legacyId('current_$id');
             effectiveThreads.add(<String, dynamic>{
               'id': derivedId,
               'name': threadName.isNotEmpty ? threadName : name,
@@ -948,7 +1089,7 @@ class ChatboxImporter {
         if (sourceTid.isEmpty) continue;
         final tid = sourceTid.startsWith(_legacyIdPrefix)
             ? sourceTid
-            : _legacyId('thread_$sourceTid');
+            : ChatboxSharedParser.legacyId('thread_$sourceTid');
         final title = ((t['name'] ?? '').toString().trim().isNotEmpty)
             ? (t['name'] ?? '').toString()
             : name;
@@ -969,11 +1110,14 @@ class ChatboxImporter {
           if (sourceMsgId.isEmpty) continue;
           final msgId = messageIdMap.putIfAbsent(
             sourceMsgId,
-            () => _legacyId(sourceMsgId),
+            () => ChatboxSharedParser.legacyId(sourceMsgId),
           );
           final roleRaw = (msg['role'] ?? '').toString();
-          final parts = _extractMessageParts(msg, roleHint: roleRaw);
-          final content = _textFromParts(parts);
+          final parts = ChatboxSharedParser.extractMessageParts(
+            msg,
+            roleHint: roleRaw,
+          );
+          final content = ChatboxSharedParser.textFromParts(parts);
 
           // System 消息：第一条作为助手 prompt，其余转为助手可见备注。
           if (roleRaw == 'system') {
@@ -990,18 +1134,20 @@ class ChatboxImporter {
           };
 
           final ts =
-              _parseMessageTimestamp(msg['timestamp']) ??
+              ChatboxSharedParser.parseMessageTimestamp(msg['timestamp']) ??
               exportedAt.add(Duration(milliseconds: fallbackIndex++));
           final sourceProviderId = (msg['aiProvider'] ?? '').toString().trim();
           final providerId = sourceProviderId.isEmpty
               ? ''
               : providerIdMap[sourceProviderId] ??
-                    _chatboxImportedProviderId(sourceProviderId);
+                    ChatboxSharedParser.chatboxImportedProviderId(
+                      sourceProviderId,
+                    );
 
           if (role == 'tool') {
             // 将 tool-result JSON 保留在 TextPart 中以维持工具语义，但不要
             // 丢弃从 contentParts 中提取的 ImagePart/FilePart 附件。
-            final toolPayload = _buildToolMessagePayload(
+            final toolPayload = ChatboxSharedParser.buildToolMessagePayload(
               msg,
               fallbackText: content,
             );
@@ -1014,19 +1160,25 @@ class ChatboxImporter {
                 role: 'tool',
                 parts: <MessagePart>[TextPart(toolPayload), ...attachmentParts],
                 timestamp: ts,
-                modelId: _inferModelIdFromChatboxMessage(msg).trim().isEmpty
+                modelId:
+                    ChatboxSharedParser.inferModelIdFromChatboxMessage(
+                      msg,
+                    ).trim().isEmpty
                     ? null
-                    : _inferModelIdFromChatboxMessage(msg),
+                    : ChatboxSharedParser.inferModelIdFromChatboxMessage(msg),
                 providerId: sourceProviderId.isEmpty
                     ? null
                     : providerIdMap[sourceProviderId] ??
-                          _chatboxImportedProviderId(sourceProviderId),
+                          ChatboxSharedParser.chatboxImportedProviderId(
+                            sourceProviderId,
+                          ),
                 totalTokens: null,
                 conversationId: tid,
               ),
             );
           } else {
-            final inferredModel = _inferModelIdFromChatboxMessage(msg);
+            final inferredModel =
+                ChatboxSharedParser.inferModelIdFromChatboxMessage(msg);
             final totalTokens =
                 (msg['tokenCount'] as num?)?.toInt() ??
                 (msg['tokensUsed'] as num?)?.toInt();
@@ -1064,7 +1216,7 @@ class ChatboxImporter {
           }
         }
 
-        final materialized = _materializeChatboxForks(
+        final materialized = ChatboxSharedParser.materializeForks(
           conversationId: tid,
           rootMessages: messages,
           forkHash: session['messageForksHash'],
@@ -1088,7 +1240,7 @@ class ChatboxImporter {
         } else {
           // Thread 的 createdAt 可能是数字（毫秒）
           final createdRaw = t['createdAt'];
-          final created = _parseEpochMillis(createdRaw);
+          final created = ChatboxSharedParser.parseEpochMillis(createdRaw);
           if (created != null) {
             createdAt = created;
             updatedAt = created;
@@ -1146,306 +1298,6 @@ class ChatboxImporter {
     );
   }
 
-  static ({List<ChatMessage> messages, ConversationTree tree})
-  _materializeChatboxForks({
-    required String conversationId,
-    required List<ChatMessage> rootMessages,
-    required dynamic forkHash,
-    required Map<String, String> messageIdMap,
-    required DateTime fallbackTime,
-    required Map<String, String> providerIdMap,
-    BackupCancelToken? cancelToken,
-  }) {
-    final rootBranchId = _legacyId('root_$conversationId');
-    final createdAt = rootMessages.isEmpty
-        ? fallbackTime
-        : rootMessages.first.timestamp;
-    final messages = List<ChatMessage>.of(rootMessages);
-    final byId = <String, ChatMessage>{
-      for (final message in messages) message.id: message,
-    };
-    final edges = <String, MessageTreeEdge>{};
-    final branchByMessage = <String, String>{};
-    String? previousId;
-    for (final message in rootMessages) {
-      edges[message.id] = MessageTreeEdge(
-        messageId: message.id,
-        parentMessageId: previousId,
-      );
-      branchByMessage[message.id] = rootBranchId;
-      previousId = message.id;
-    }
-
-    final branches = <String, ConversationBranch>{
-      rootBranchId: ConversationBranch(
-        id: rootBranchId,
-        conversationId: conversationId,
-        tipMessageId: previousId,
-        createdAt: createdAt,
-      ),
-    };
-    final branchSelections = <String, String>{};
-    if (forkHash is! Map) {
-      return (
-        messages: messages,
-        tree: ConversationTree(
-          conversationId: conversationId,
-          activeBranchId: rootBranchId,
-          branches: branches,
-          edges: edges,
-        ),
-      );
-    }
-
-    final entries = <String, Map<String, dynamic>>{};
-    for (final rawEntry in forkHash.entries) {
-      if (rawEntry.value is! Map) continue;
-      entries[rawEntry.key.toString()] = rawEntry.value
-          .map((key, value) => MapEntry(key.toString(), value))
-          .cast<String, dynamic>();
-    }
-
-    bool isListAlreadyMaterialized(String pivotId, List<String> ids) {
-      var parentId = pivotId;
-      for (final id in ids) {
-        final edge = edges[id];
-        if (edge == null || edge.parentMessageId != parentId) return false;
-        parentId = id;
-      }
-      return true;
-    }
-
-    final handledPivots = <String>{};
-    var changed = true;
-    while (changed) {
-      cancelToken?.throwIfCancelled();
-      changed = false;
-      for (final entry in entries.entries) {
-        cancelToken?.throwIfCancelled();
-        final sourcePivotId = entry.key;
-        final pivotId = messageIdMap[sourcePivotId] ?? _legacyId(sourcePivotId);
-        if (handledPivots.contains(sourcePivotId) ||
-            !edges.containsKey(pivotId)) {
-          continue;
-        }
-        final listsRaw = entry.value['lists'];
-        if (listsRaw is! List) {
-          handledPivots.add(pivotId);
-          changed = true;
-          continue;
-        }
-        final position = (entry.value['position'] as num?)?.toInt() ?? 0;
-        final activeIndex = position >= 0 && position < listsRaw.length
-            ? position
-            : 0;
-        final parentBranchId = branchByMessage[pivotId] ?? rootBranchId;
-        final forkCreatedAt =
-            _parseEpochMillis(entry.value['createdAt']) ?? fallbackTime;
-        String? selectedBranchId;
-
-        for (var listIndex = 0; listIndex < listsRaw.length; listIndex++) {
-          cancelToken?.throwIfCancelled();
-          final rawList = listsRaw[listIndex];
-          if (rawList is! Map) continue;
-          final list = rawList.map(
-            (key, value) => MapEntry(key.toString(), value),
-          );
-          final rawMessages = list['messages'];
-          if (rawMessages is! List) continue;
-          final listMessages = <Map<String, dynamic>>[];
-          final listIds = <String>[];
-          for (final rawMessage in rawMessages) {
-            if (rawMessage is! Map) continue;
-            final messageMap = rawMessage.map(
-              (key, value) => MapEntry(key.toString(), value),
-            );
-            final sourceMessageId = (messageMap['id'] ?? '').toString().trim();
-            if (sourceMessageId.isEmpty) continue;
-            listMessages.add(messageMap.cast<String, dynamic>());
-            listIds.add(
-              messageIdMap[sourceMessageId] ?? _legacyId(sourceMessageId),
-            );
-          }
-
-          final isActiveList = listIndex == activeIndex;
-          final represented = isListAlreadyMaterialized(pivotId, listIds);
-          final shouldCreateBranch =
-              !isActiveList || (!represented && listIds.isNotEmpty);
-          String? branchId;
-          if (shouldCreateBranch) {
-            final listId = (list['id'] ?? '$listIndex').toString().trim();
-            branchId = _legacyId('fork_${pivotId}_$listId');
-            if (!branches.containsKey(branchId)) {
-              var parentId = pivotId;
-              String? tipId;
-              for (var index = 0; index < listMessages.length; index++) {
-                final messageMap = listMessages[index];
-                final messageId = listIds[index];
-                var message = byId[messageId];
-                if (message == null) {
-                  message = _convertChatboxForkMessage(
-                    messageMap,
-                    conversationId: conversationId,
-                    messageIdMap: messageIdMap,
-                    fallbackTime: fallbackTime,
-                    providerIdMap: providerIdMap,
-                  );
-                  if (message == null) continue;
-                  byId[message.id] = message;
-                  messages.add(message);
-                }
-                final edge = edges[message.id];
-                if (edge == null) {
-                  edges[message.id] = MessageTreeEdge(
-                    messageId: message.id,
-                    parentMessageId: parentId,
-                  );
-                }
-                parentId = message.id;
-                tipId = message.id;
-                branchByMessage.putIfAbsent(message.id, () => branchId!);
-              }
-              branches[branchId] = ConversationBranch(
-                id: branchId,
-                conversationId: conversationId,
-                tipMessageId: tipId ?? pivotId,
-                name: 'Chatbox fork ${listIndex + 1}',
-                createdAt: forkCreatedAt,
-              );
-              changed = true;
-            }
-          }
-
-          if (isActiveList) {
-            selectedBranchId = branchId ?? parentBranchId;
-          }
-        }
-
-        if (selectedBranchId != null &&
-            branches.containsKey(selectedBranchId)) {
-          final selectedBranch = branches[selectedBranchId]!;
-          final directChildCount = edges.values
-              .where((edge) => edge.parentMessageId == pivotId)
-              .length;
-          // A single imported list is a linear continuation, not a branch
-          // selection. Empty active lists intentionally retain a terminal
-          // selection so nested Chatbox fork state can be restored.
-          // Chatbox writes a position for linear records as well.  A
-          // selection is meaningful only when the archive contains multiple
-          // candidate lists; otherwise remembering the current continuation
-          // creates stale selections on the imported tree.
-          if (listsRaw.length > 1 &&
-              (directChildCount > 1 ||
-                  selectedBranch.tipMessageId == pivotId)) {
-            branchSelections[pivotId] = selectedBranchId;
-          }
-        }
-        handledPivots.add(sourcePivotId);
-        changed = true;
-      }
-    }
-
-    // Re-check selections against the completed edge set. Nested fork
-    // materialization can reveal that a previously selected pivot is only a
-    // shared linear prefix, so it must not be persisted as a fork selection.
-    final normalizedSelections = <String, String>{};
-    for (final entry in branchSelections.entries) {
-      final branch = branches[entry.value];
-      if (branch == null || branch.tipMessageId == null) continue;
-      final path = <String>[];
-      final visited = <String>{};
-      String? cursor = branch.tipMessageId;
-      while (cursor != null && visited.add(cursor)) {
-        final edge = edges[cursor];
-        if (edge == null) {
-          path.clear();
-          break;
-        }
-        path.add(cursor);
-        cursor = edge.parentMessageId;
-      }
-      if (path.isEmpty && branch.tipMessageId != null) continue;
-      final orderedPath = path.reversed.toList(growable: false);
-      final index = orderedPath.indexOf(entry.key);
-      if (index < 0) continue;
-      final directChildren = edges.values
-          .where((edge) => edge.parentMessageId == entry.key)
-          .map((edge) => edge.messageId)
-          .toSet();
-      if (index + 1 >= orderedPath.length || directChildren.length >= 2) {
-        normalizedSelections[entry.key] = entry.value;
-      }
-    }
-
-    return (
-      messages: messages,
-      tree: ConversationTree(
-        conversationId: conversationId,
-        activeBranchId: rootBranchId,
-        branches: branches,
-        edges: edges,
-        branchSelections: normalizedSelections,
-      ),
-    );
-  }
-
-  static ChatMessage? _convertChatboxForkMessage(
-    Map<String, dynamic> msg, {
-    required String conversationId,
-    required Map<String, String> messageIdMap,
-    required DateTime fallbackTime,
-    required Map<String, String> providerIdMap,
-  }) {
-    final sourceMessageId = (msg['id'] ?? '').toString().trim();
-    if (sourceMessageId.isEmpty) return null;
-    final messageId = messageIdMap[sourceMessageId] ??= _legacyId(
-      sourceMessageId,
-    );
-    final roleRaw = (msg['role'] ?? '').toString();
-    final parts = _extractMessageParts(msg, roleHint: roleRaw);
-    final content = _textFromParts(parts);
-    final timestamp = _parseMessageTimestamp(msg['timestamp']) ?? fallbackTime;
-    if (roleRaw == 'tool') {
-      final toolPayload = _buildToolMessagePayload(msg, fallbackText: content);
-      return ChatMessage(
-        id: messageId,
-        role: 'tool',
-        parts: <MessagePart>[
-          TextPart(toolPayload),
-          ...parts.where((part) => part is ImagePart || part is FilePart),
-        ],
-        timestamp: timestamp,
-        conversationId: conversationId,
-      );
-    }
-    final role = roleRaw == 'user' ? 'user' : 'assistant';
-    final reasoningTexts = parts
-        .whereType<ReasoningPart>()
-        .map((part) => part.text)
-        .where((text) => text.trim().isNotEmpty)
-        .toList(growable: false);
-    final sourceProviderId = (msg['aiProvider'] ?? '').toString().trim();
-    final providerId = sourceProviderId.isEmpty
-        ? null
-        : providerIdMap[sourceProviderId] ??
-              _chatboxImportedProviderId(sourceProviderId);
-    return ChatMessage(
-      id: messageId,
-      role: role,
-      parts: parts.isEmpty ? const <MessagePart>[TextPart('')] : parts,
-      timestamp: timestamp,
-      modelId: _inferModelIdFromChatboxMessage(msg).trim().isEmpty
-          ? null
-          : _inferModelIdFromChatboxMessage(msg),
-      providerId: providerId,
-      totalTokens:
-          (msg['tokenCount'] as num?)?.toInt() ??
-          (msg['tokensUsed'] as num?)?.toInt(),
-      conversationId: conversationId,
-      reasoningText: reasoningTexts.isEmpty ? null : reasoningTexts.join('\n'),
-    );
-  }
-
   // ---------- 原子业务补丁 ----------
 
   static BusinessSnapshot _transformBusinessData({
@@ -1458,6 +1310,9 @@ class ChatboxImporter {
     required List<String> assistantIds,
     required List<String> starredAssistantIds,
     required String starredGroupName,
+    required String groupIdPrefix,
+    required String regularGroupName,
+    required String deletedProviderGroupName,
   }) {
     final settings = BusinessSettingsRouter.exportSnapshot(current);
     final overwrite = mode == RestoreMode.overwrite && !scopedOverwrite;
@@ -1484,6 +1339,12 @@ class ChatboxImporter {
         final next = local.map((key, value) => MapEntry(key.toString(), value));
         for (final importedField in entry.value.entries) {
           if (importedField.key == 'name') continue;
+          // “已删除”供应商的启停状态只属于本次导入，不得反向覆盖
+          // 本地已有条目；本地记录存在时始终保留其 enabled 状态。
+          if (importedField.key == 'enabled' &&
+              deletedProviderIds.contains(entry.key)) {
+            continue;
+          }
           final value = importedField.value;
           if (value == null || (value is String && value.trim().isEmpty)) {
             continue;
@@ -1541,6 +1402,9 @@ class ChatboxImporter {
       scopedOverwrite: scopedOverwrite,
       importedProviderIds: providers.keys.toSet(),
       deletedProviderIds: deletedProviderIds,
+      groupIdPrefix: groupIdPrefix,
+      regularGroupName: regularGroupName,
+      deletedProviderGroupName: deletedProviderGroupName,
     );
 
     if (assistantIds.isNotEmpty) {
@@ -1571,11 +1435,14 @@ class ChatboxImporter {
       }
 
       final starredGroupId = hasStarred
-          ? (findGroupId(id: _chatboxStarredGroupId, name: starredGroupName) ??
-                _chatboxStarredGroupId)
+          ? (findGroupId(
+                  id: '${groupIdPrefix}starred_',
+                  name: starredGroupName,
+                ) ??
+                '${groupIdPrefix}starred_')
           : null;
       final regularGroupId = hasRegular
-          ? (findGroupId(name: _chatboxImportGroupName) ?? const Uuid().v4())
+          ? (findGroupId(name: regularGroupName) ?? const Uuid().v4())
           : null;
 
       // Keep local groups and the ungrouped section untouched. Within the
@@ -1603,10 +1470,7 @@ class ChatboxImporter {
           if (starredGroupId != null)
             <String, dynamic>{'id': starredGroupId, 'name': starredGroupName},
           if (regularGroupId != null)
-            <String, dynamic>{
-              'id': regularGroupId,
-              'name': _chatboxImportGroupName,
-            },
+            <String, dynamic>{'id': regularGroupId, 'name': regularGroupName},
         ];
         groups.insertAll(
           insertionIndex.clamp(0, groups.length),
@@ -1681,357 +1545,6 @@ class ChatboxImporter {
     return decoded.map((field, value) => MapEntry(field.toString(), value));
   }
 
-  // ---------- 内容辅助 ----------
-
-  static String _extractDefaultPrompt(Map<String, dynamic> root) {
-    final settings = root['settings'];
-    if (settings is Map) {
-      final p = (settings['defaultPrompt'] ?? '').toString();
-      if (p.trim().isNotEmpty) return p;
-    }
-    return '';
-  }
-
-  static String _extractSystemPromptFromSession(
-    Map<String, dynamic> session, {
-    required String fallback,
-  }) {
-    final msgs = session['messages'];
-    if (msgs is List) {
-      for (final raw in msgs) {
-        if (raw is! Map) continue;
-        final m = raw.map((k, v) => MapEntry(k.toString(), v));
-        if ((m['role'] ?? '').toString() != 'system') continue;
-        final content = _textFromParts(
-          _extractMessageParts(m, roleHint: 'system'),
-        );
-        if (content.trim().isNotEmpty) return content;
-      }
-    }
-    return fallback;
-  }
-
-  static int? _extractThinkingBudget(Map<String, dynamic> sessionSettings) {
-    final opts = sessionSettings['providerOptions'];
-    if (opts is Map) {
-      final claude = opts['claude'];
-      if (claude is Map) {
-        final thinking = claude['thinking'];
-        if (thinking is Map) {
-          final type = (thinking['type'] ?? '').toString();
-          if (type == 'disabled') return 0;
-          final budget = (thinking['budgetTokens'] as num?)?.toInt();
-          if (budget != null) return budget;
-        }
-      }
-      final google = opts['google'];
-      if (google is Map) {
-        final thinkingConfig = google['thinkingConfig'];
-        if (thinkingConfig is Map) {
-          final budget = (thinkingConfig['thinkingBudget'] as num?)?.toInt();
-          if (budget != null) return budget;
-        }
-      }
-    }
-    return null;
-  }
-
-  static DateTime? _parseIsoDateTime(String raw) {
-    try {
-      if (raw.trim().isEmpty) return null;
-      return DateTime.parse(raw);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  static DateTime? _parseEpochMillis(dynamic raw) {
-    if (raw is num) {
-      final ms = raw.toInt();
-      if (ms <= 0) return null;
-      return DateTime.fromMillisecondsSinceEpoch(ms);
-    }
-    if (raw is String) {
-      final n = int.tryParse(raw);
-      if (n == null || n <= 0) return null;
-      return DateTime.fromMillisecondsSinceEpoch(n);
-    }
-    return null;
-  }
-
-  static DateTime? _parseMessageTimestamp(dynamic raw) {
-    return _parseEpochMillis(raw);
-  }
-
-  static String _textFromParts(List<MessagePart> parts) {
-    return parts
-        .whereType<TextPart>()
-        .map((part) => part.text)
-        .join('\n')
-        .trim();
-  }
-
-  static List<MessagePart> _extractMessageParts(
-    Map<String, dynamic> msg, {
-    required String roleHint,
-  }) {
-    // 保留 roleHint 以便调用方语义清晰；附件编码与角色无关。
-    final _ = roleHint;
-    final partsRaw = msg['contentParts'];
-    final out = <MessagePart>[];
-    final textChunks = <String>[];
-    // 当附件分隔文本片段时保留一个换行符，使 TextPart
-    // 载荷拼接（无分隔符）得到的是 `before\nafter` 而非 `beforeafter`。
-    var pendingContentNewline = false;
-
-    void flushText() {
-      if (textChunks.isEmpty) return;
-      out.add(TextPart(textChunks.join('\n')));
-      textChunks.clear();
-    }
-
-    void flushTextForAttachment() {
-      flushText();
-      pendingContentNewline = out.any((part) => part is TextPart);
-    }
-
-    void addText(String s) {
-      final t = s.replaceAll('\r\n', '\n');
-      if (t.trim().isEmpty) return;
-      if (pendingContentNewline && textChunks.isEmpty) {
-        textChunks.add('');
-      }
-      pendingContentNewline = false;
-      textChunks.add(t);
-    }
-
-    String? mimeFor(String uri, {String? explicit, String? fileName}) {
-      final e = explicit?.trim();
-      if (e != null && e.isNotEmpty) return e;
-      final source = (fileName != null && fileName.isNotEmpty) ? fileName : uri;
-      final inferred = inferMediaMimeFromSource(source);
-      return inferred.isNotEmpty ? inferred : null;
-    }
-
-    if (partsRaw is List) {
-      for (final p in partsRaw) {
-        if (p is! Map) continue;
-        final part = p.map((k, v) => MapEntry(k.toString(), v));
-        final type = (part['type'] ?? '').toString();
-        switch (type) {
-          case 'text':
-            addText((part['text'] ?? '').toString());
-            break;
-          case 'image':
-            final url = (part['url'] ?? '').toString().trim();
-            final storageKey = (part['storageKey'] ?? '').toString().trim();
-            final ref = url.isNotEmpty ? url : storageKey;
-            if (ref.isEmpty) break;
-            final isResolvable =
-                url.startsWith('http://') ||
-                url.startsWith('https://') ||
-                url.startsWith('data:image') ||
-                storageKey.isNotEmpty;
-            if (isResolvable) {
-              flushTextForAttachment();
-              out.add(
-                ImagePart(
-                  uri: storageKey.isNotEmpty && url.isEmpty
-                      ? storageKey
-                      : SandboxPathResolver.canonicalize(ref),
-                  mime: mimeFor(ref),
-                  unavailable:
-                      !(url.startsWith('http://') ||
-                          url.startsWith('https://') ||
-                          url.startsWith('data:image')),
-                ),
-              );
-            } else {
-              addText('[Chatbox image: $ref]');
-            }
-            break;
-          case 'info':
-            addText((part['text'] ?? '').toString());
-            break;
-          case 'reasoning':
-            final t = (part['text'] ?? '').toString();
-            if (t.trim().isNotEmpty) {
-              flushText();
-              out.add(ReasoningPart(t));
-              // 与附件相同的桥接换行符，使 before/reasoning/after
-              // 推导出的内容为 `before\nafter`。
-              pendingContentNewline = out.any((p) => p is TextPart);
-            }
-            break;
-          case 'tool-call':
-            final state = (part['state'] ?? '').toString();
-            final toolName = (part['toolName'] ?? '').toString();
-            final args = part['args'];
-            if (state.isNotEmpty) {
-              addText(
-                '[tool:$state] ${toolName.isNotEmpty ? toolName : 'tool'} ${args == null ? '' : jsonEncode(args)}'
-                    .trim(),
-              );
-            }
-            break;
-          default:
-            break;
-        }
-      }
-    }
-
-    // 回退到旧版 `content`
-    if (out.isEmpty && textChunks.isEmpty) {
-      final legacy = (msg['content'] ?? '').toString();
-      if (legacy.trim().isNotEmpty) addText(legacy);
-    }
-
-    // v1.21.1 仍可能保留已弃用的 reasoningContent；它不能因为
-    // contentParts 缺失而随正文一起丢失。旧字段没有交错位置信息，
-    // 因此统一放在正文之前，保持 reasoning 与正文的结构化边界。
-    final legacyReasoning = (msg['reasoningContent'] ?? '').toString();
-    if (legacyReasoning.trim().isNotEmpty &&
-        !out.any((part) => part is ReasoningPart)) {
-      flushText();
-      final existing = List<MessagePart>.of(out);
-      out
-        ..clear()
-        ..add(ReasoningPart(legacyReasoning))
-        ..addAll(existing);
-    }
-
-    // 链接
-    final links = msg['links'];
-    if (links is List) {
-      for (final l in links) {
-        if (l is! Map) continue;
-        final url = (l['url'] ?? '').toString().trim();
-        if (url.isEmpty) continue;
-        final title = (l['title'] ?? '').toString().trim();
-        if (title.isNotEmpty) {
-          addText('[$title]($url)');
-        } else {
-          addText(url);
-        }
-      }
-    }
-
-    // 文件——已知附件对象直接转为 FilePart
-    final files = msg['files'];
-    if (files is List) {
-      for (final f in files) {
-        if (f is! Map) continue;
-        final url = (f['url'] ?? '').toString().trim();
-        final storageKey = (f['storageKey'] ?? '').toString().trim();
-        final localPath = (f['localPath'] ?? '').toString().trim();
-        final ref = url.isNotEmpty
-            ? url
-            : (storageKey.isNotEmpty ? storageKey : localPath);
-        if (ref.isEmpty) continue;
-        final name = (f['name'] ?? 'file').toString();
-        final type = (f['fileType'] ?? '').toString();
-        flushTextForAttachment();
-        out.add(
-          FilePart(
-            uri: storageKey.isNotEmpty && url.isEmpty
-                ? storageKey
-                : SandboxPathResolver.canonicalize(ref),
-            name: name.isNotEmpty ? name : 'file',
-            mime:
-                mimeFor(ref, explicit: type, fileName: name) ??
-                'application/octet-stream',
-            unavailable:
-                !(url.startsWith('http://') ||
-                    url.startsWith('https://') ||
-                    url.startsWith('data:')),
-          ),
-        );
-      }
-    }
-
-    // 图片（旧版图片列表）
-    final pics = msg['pictures'];
-    if (pics is List) {
-      for (final p in pics) {
-        if (p is! Map) continue;
-        final url = (p['url'] ?? '').toString().trim();
-        final storageKey = (p['storageKey'] ?? '').toString().trim();
-        final ref = url.isNotEmpty ? url : storageKey;
-        if (ref.isEmpty) continue;
-        flushTextForAttachment();
-        out.add(
-          ImagePart(
-            uri: storageKey.isNotEmpty && url.isEmpty
-                ? storageKey
-                : SandboxPathResolver.canonicalize(ref),
-            mime: mimeFor(ref),
-            unavailable:
-                !(url.startsWith('http://') ||
-                    url.startsWith('https://') ||
-                    url.startsWith('data:')),
-          ),
-        );
-      }
-    }
-
-    // 错误信息
-    final err = (msg['error'] ?? '').toString();
-    if (err.trim().isNotEmpty) {
-      addText('[Error] $err');
-    }
-
-    flushText();
-    return out;
-  }
-
-  static String _inferModelIdFromChatboxMessage(Map<String, dynamic> msg) {
-    final raw = (msg['model'] ?? '').toString().trim();
-    if (raw.isEmpty) return '';
-    final m = RegExp(r'\(([^)]+)\)\s*$').firstMatch(raw);
-    if (m != null) return (m.group(1) ?? '').trim();
-    return raw;
-  }
-
-  static String _buildToolMessagePayload(
-    Map<String, dynamic> msg, {
-    required String fallbackText,
-  }) {
-    String toolName = (msg['name'] ?? '').toString().trim();
-    Map<String, dynamic> args = const <String, dynamic>{};
-    String result = fallbackText;
-
-    final parts = msg['contentParts'];
-    if (parts is List) {
-      for (final p in parts) {
-        if (p is! Map) continue;
-        final part = p.map((k, v) => MapEntry(k.toString(), v));
-        if ((part['type'] ?? '').toString() != 'tool-call') continue;
-        toolName = toolName.isNotEmpty
-            ? toolName
-            : (part['toolName'] ?? '').toString();
-        final a = part['args'];
-        if (a is Map) args = a.cast<String, dynamic>();
-        final state = (part['state'] ?? '').toString();
-        if (state == 'result' && part.containsKey('result')) {
-          final rawResult = part['result'];
-          result = rawResult is String ? rawResult : jsonEncode(rawResult);
-        }
-        break;
-      }
-    }
-
-    final payload = <String, dynamic>{
-      'tool': toolName.isNotEmpty ? toolName : 'tool',
-      'arguments': args,
-      'result': result,
-    };
-    return jsonEncode(payload);
-  }
-
-  static String _chatboxImportedProviderId(String sourceId) {
-    return _legacyId('provider_$sourceId');
-  }
-
   static Set<String> _collectChatboxProviderReferences(dynamic value) {
     final result = <String>{};
     void visit(dynamic current) {
@@ -2061,6 +1574,9 @@ class ChatboxImporter {
     bool scopedOverwrite = false,
     required Set<String> importedProviderIds,
     required Set<String> deletedProviderIds,
+    required String groupIdPrefix,
+    required String regularGroupName,
+    required String deletedProviderGroupName,
   }) {
     if (importedProviderIds.isEmpty) return;
 
@@ -2094,19 +1610,19 @@ class ChatboxImporter {
     if (importedProviderIds.any((id) => !deletedProviderIds.contains(id))) {
       importedGroups.add((
         id: groupIdFor(
-          id: _chatboxProviderGroupId,
-          name: _chatboxImportGroupName,
+          id: '${groupIdPrefix}provider_group_',
+          name: regularGroupName,
         ),
-        name: _chatboxImportGroupName,
+        name: regularGroupName,
       ));
     }
     if (deletedProviderIds.isNotEmpty) {
       importedGroups.add((
         id: groupIdFor(
-          id: _chatboxDeletedProviderGroupId,
-          name: _chatboxDeletedProviderGroupName,
+          id: '${groupIdPrefix}provider_group_deleted_',
+          name: deletedProviderGroupName,
         ),
-        name: _chatboxDeletedProviderGroupName,
+        name: deletedProviderGroupName,
       ));
     }
     if (importedGroups.isEmpty) return;
@@ -2160,8 +1676,6 @@ class ChatboxImporter {
                   importedGroups.length)
               .clamp(0, groups.length);
   }
-
-  static String _legacyId(String sourceId) => '$_legacyIdPrefix$sourceId';
 
   static ProviderKind _chatboxProviderKind(
     String sourceId,

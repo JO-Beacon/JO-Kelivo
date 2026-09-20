@@ -21,6 +21,7 @@ class SectionCard extends StatelessWidget {
     this.variant = SectionCardVariant.standard,
     this.shadow,
     this.dividers = false,
+    this.crossAxisAlignment = CrossAxisAlignment.center,
   }) : assert(
          children != null || child != null,
          'Provide either children or child',
@@ -33,6 +34,7 @@ class SectionCard extends StatelessWidget {
   final SectionCardVariant variant;
   final List<BoxShadow>? shadow;
   final bool dividers;
+  final CrossAxisAlignment crossAxisAlignment;
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +52,7 @@ class SectionCard extends StatelessWidget {
             : const EdgeInsets.symmetric(vertical: 4));
     final body = children != null
         ? Column(
+            crossAxisAlignment: crossAxisAlignment,
             children: [
               for (int i = 0; i < children!.length; i++) ...[
                 if (dividers && i > 0)
@@ -76,3 +79,10 @@ class SectionCard extends StatelessWidget {
     );
   }
 }
+
+/// 面板内操作瓦片的填充色。
+///
+/// 与上游的差别：上游有「分层表单瓦片」开关（关闭时返回透明），本仓库尚无该
+/// 字段，沿用仓库既有的 `surfaceFill` 口径（与 `bottom_tools_sheet.dart`、
+/// `context_management_sheet.dart` 一致）。
+Color sheetTileColor(BuildContext context) => context.appColors.surfaceFill;

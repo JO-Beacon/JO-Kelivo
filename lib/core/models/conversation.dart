@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 
@@ -66,6 +68,10 @@ class Conversation extends HiveObject {
   @HiveField(16)
   String? chatModelId;
 
+  // 仅存于 Drift 的特性包（工作区绑定等）。不是 Hive 字段：旧版适配器
+  // 必须保持冻结，且 Hive 源数据早于 extras。
+  final Map<String, dynamic> extras;
+
   Conversation({
     String? id,
     required this.title,
@@ -84,6 +90,7 @@ class Conversation extends HiveObject {
     int? lastMemoryExtractedOrder,
     this.chatModelProvider,
     this.chatModelId,
+    this.extras = const <String, dynamic>{},
   }) : id = id ?? const Uuid().v4(),
        createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now(),
@@ -113,6 +120,7 @@ class Conversation extends HiveObject {
     int? lastMemoryExtractedOrder,
     String? chatModelProvider,
     String? chatModelId,
+    Map<String, dynamic>? extras,
     bool clearSummary = false,
     bool clearInjectedMemoryHash = false,
     bool clearChatModel = false,
@@ -141,6 +149,7 @@ class Conversation extends HiveObject {
           ? null
           : (chatModelProvider ?? this.chatModelProvider),
       chatModelId: clearChatModel ? null : (chatModelId ?? this.chatModelId),
+      extras: extras ?? this.extras,
     );
   }
 
@@ -163,6 +172,7 @@ class Conversation extends HiveObject {
       'lastMemoryExtractedOrder': lastMemoryExtractedOrder,
       'chatModelProvider': chatModelProvider,
       'chatModelId': chatModelId,
+      'extras': extras,
     };
   }
 
@@ -193,6 +203,25 @@ class Conversation extends HiveObject {
       lastMemoryExtractedOrder: json['lastMemoryExtractedOrder'] as int? ?? -1,
       chatModelProvider: json['chatModelProvider'] as String?,
       chatModelId: json['chatModelId'] as String?,
+      extras: decodeExtras(json['extras']),
     );
+  }
+
+  /// 解析会话 extras：接受 JSON map、JSON 字符串或垃圾输入。
+  /// 非法输入与 `'{}'` 一律解析为空 map。
+  static Map<String, dynamic> decodeExtras(Object? raw) {
+    if (raw == null) return const <String, dynamic>{};
+    if (raw is String) {
+      if (raw.isEmpty || raw == '{}') return const <String, dynamic>{};
+      try {
+        return decodeExtras(jsonDecode(raw));
+      } catch (_) {
+        return const <String, dynamic>{};
+      }
+    }
+    if (raw is Map) {
+      return raw.map((key, value) => MapEntry(key.toString(), value));
+    }
+    return const <String, dynamic>{};
   }
 }

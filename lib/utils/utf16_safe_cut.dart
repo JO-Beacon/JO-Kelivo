@@ -62,5 +62,42 @@ List<String> splitUtf16SafeHalves(String value) {
   return <String>[value.substring(0, midpoint), value.substring(midpoint)];
 }
 
+/// 将 [value] 限制在 [maxLength] 个 code unit 以内，保留由 [marker] 连接
+/// 的首尾预览。切点会做代理对校正，绝不切开代理对；输出长度不超过
+/// [maxLength]。
+String truncateHeadTailUtf16Safe(
+  String value,
+  int maxLength, {
+  required String marker,
+}) {
+  if (value.length <= maxLength) return value;
+  final available = maxLength - marker.length;
+  if (available <= 0) return truncateHeadUtf16Safe(value, maxLength);
+  final head = available ~/ 2;
+  final tail = available - head;
+  final headEnd = _headEndAt(value, head);
+  final tailStart = _tailStartAt(value, value.length - tail);
+  return '${value.substring(0, headEnd)}$marker'
+      '${value.substring(tailStart)}';
+}
+
+/// 返回适合 `value.substring(0, result)` 的结束下标，绝不落在代理对中间。
+int _headEndAt(String value, int end) {
+  if (end <= 0 || end >= value.length) return end;
+  final prev = value.codeUnitAt(end - 1);
+  final cur = value.codeUnitAt(end);
+  if (!_isHighSurrogate(prev) || !_isLowSurrogate(cur)) return end;
+  return end - 1;
+}
+
+/// 返回适合 `value.substring(result)` 的起始下标，绝不落在代理对中间。
+int _tailStartAt(String value, int start) {
+  if (start <= 0 || start >= value.length) return start;
+  final prev = value.codeUnitAt(start - 1);
+  final cur = value.codeUnitAt(start);
+  if (!_isHighSurrogate(prev) || !_isLowSurrogate(cur)) return start;
+  return start + 1;
+}
+
 bool _isHighSurrogate(int unit) => unit >= 0xD800 && unit <= 0xDBFF;
 bool _isLowSurrogate(int unit) => unit >= 0xDC00 && unit <= 0xDFFF;

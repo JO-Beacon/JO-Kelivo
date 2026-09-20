@@ -68,6 +68,9 @@ $chineseMessagesFile = $null
 if (Test-Path $zhLangCompiler) {
   Write-Host "Detected Chinese language file: $zhLangCompiler"
   $chineseMessagesFile = $zhLangCompiler
+} elseif (Test-Path $zhLangLocal) {
+  Write-Host "Using cached Chinese language file: $zhLangLocal"
+  $chineseMessagesFile = $zhLangLocal
 } else {
   Write-Host "Chinese language file is missing from Inno Setup. Downloading a local copy..."
   New-Item -ItemType Directory -Force -Path $zhLangLocalDir | Out-Null

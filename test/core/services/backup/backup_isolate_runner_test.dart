@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:Kelivo/core/models/backup_task_progress.dart';
-import 'package:Kelivo/core/models/progress_update.dart';
+import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
+import 'package:Kelivo/core/services/backup/backup_task_progress.dart';
 import 'package:Kelivo/core/services/backup/backup_isolate_runner.dart';
 
 void main() {
@@ -32,7 +32,7 @@ void main() {
   });
 
   test('runner forwards progress and completes normally', () async {
-    final updates = <ProgressUpdate>[];
+    final updates = <BackupProgress>[];
     final result = await runBackupIsolate<int, int>(
       body: _reportAndReturn,
       payload: 7,
@@ -91,7 +91,9 @@ Future<int> _pollUntilCancelled(BackupIsolateContext context, int limit) async {
 }
 
 int _reportAndReturn(BackupIsolateContext context, int value) {
-  context.reportProgress(const ProgressUpdate(processed: 1, total: 2));
+  context.reportProgress(
+    const BackupProgress(phase: BackupPhase.packing, processed: 1, total: 2),
+  );
   return value;
 }
 

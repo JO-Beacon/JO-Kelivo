@@ -77,16 +77,10 @@ void main() {
         closeTo(result.trueMaxScrollExtent, 0.5),
         reason: '发送后贴底应停在真实末尾',
       );
-      expect(
-        result.estimatedItemCount,
-        0,
-        reason: '预计算应把屏幕外消息的高度也实测出来',
-      );
+      expect(result.estimatedItemCount, 0, reason: '预计算应把屏幕外消息的高度也实测出来');
     });
 
-    testWidgets('未启用预计算时该缺陷会复现（对照，证明本测试有区分力）', (
-      tester,
-    ) async {
+    testWidgets('未启用预计算时该缺陷会复现（对照，证明本测试有区分力）', (tester) async {
       final result = await _probe(
         tester,
         precalculation: false,
@@ -196,7 +190,9 @@ void main() {
             tester.binding.scheduleFrame();
             await tester.pump(const Duration(milliseconds: 16));
           }
-          debugPrint('  [代价] 收敛后 20 帧新增测量=${budget.totalMeasurements - before}');
+          debugPrint(
+            '  [代价] 收敛后 20 帧新增测量=${budget.totalMeasurements - before}',
+          );
 
           // 收敛后不得再有开销——预计算必须是一次性的。
           expect(budget.totalMeasurements, before);
@@ -209,7 +205,11 @@ void main() {
       SuperSliverList.layoutBudget = _CountingBudget(perFrame: 4);
       addTearDown(() => SuperSliverList.layoutBudget = original);
 
-      final h = await _buildList(tester, precalculation: true, initialCount: 200);
+      final h = await _buildList(
+        tester,
+        precalculation: true,
+        initialCount: 200,
+      );
       final listController = h.chatScroll.messageListController;
 
       for (var i = 0; i < 500; i++) {

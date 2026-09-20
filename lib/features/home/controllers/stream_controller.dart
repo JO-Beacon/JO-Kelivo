@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -6,6 +7,8 @@ import '../../../core/models/message_part.dart';
 import '../../../core/models/token_usage.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/stream/stream_chunk.dart';
+import '../../../core/services/api/stream/stream_chunk_handler.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../chat/widgets/chat_message_widget.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
@@ -378,26 +381,7 @@ class StreamController {
     return _DecodedReasoningPayload.decode(json).contentSplits;
   }
 
-  static ContentSplitData _normalizeContentSplitData(ContentSplitData data) {
-    if (!contentSplitsAreUsable(
-      data.offsets,
-      data.reasoningCounts,
-      data.toolCounts,
-    )) {
-      return const ContentSplitData(
-        offsets: <int>[],
-        reasoningCounts: <int>[],
-        toolCounts: <int>[],
-      );
-    }
-    return ContentSplitData(
-      offsets: List<int>.of(data.offsets),
-      reasoningCounts: List<int>.of(data.reasoningCounts),
-      toolCounts: List<int>.of(data.toolCounts),
-    );
-  }
-
-  // 简单 JSON 编解码，避免在此文件导入 dart:convert
+  // 持久化推理片段沿用既有轻量 JSON 编解码。
   String _encodeJson(dynamic obj) {
     return _jsonEncode(obj);
   }
@@ -531,6 +515,7 @@ class StreamController {
     String messageId,
     String conversationId,
     String Function() contentBuilder, {
+    List<MessagePart> Function(String visibleText)? partsBuilder,
     required void Function(String messageId, String content, int totalTokens)
     updateMessageInList,
     required int totalTokens,
@@ -549,6 +534,7 @@ class StreamController {
     state
       ..conversationId = conversationId
       ..contentBuilder = contentBuilder
+      ..partsBuilder = partsBuilder
       ..totalTokens = totalTokens
       ..contentSplitOffsets = contentSplitOffsets
       ..reasoningCountAtSplit = reasoningCountAtSplit
@@ -648,6 +634,7 @@ class StreamController {
       messageId,
       content,
       state.totalTokens,
+      parts: state.partsBuilder?.call(content),
       contentSplitOffsets: state.contentSplitOffsets,
       reasoningCountAtSplit: state.reasoningCountAtSplit,
       toolCountAtSplit: state.toolCountAtSplit,
@@ -809,40 +796,31 @@ class StreamController {
 
   /// 处理流中的推理分块。
   Future<void> handleReasoningChunk(
-    ChatStreamChunk chunk,
+    String reasoning,
     StreamingState state,
   ) async {
-    if ((chunk.reasoning ?? '').isEmpty || !state.ctx.supportsReasoning) return;
+    if (reasoning.isEmpty || !state.ctx.supportsReasoning) return;
 
     final messageId = state.messageId;
     final conversationId = state.conversationId;
-    state.hadThinkingBlock = true;
-    _contentSplits[messageId] = _normalizeContentSplitData(
-      ContentSplitData(
-        offsets: List<int>.of(state.contentSplitOffsets),
-        reasoningCounts: List<int>.of(state.reasoningCountAtSplit),
-        toolCounts: List<int>.of(state.toolCountAtSplit),
-      ),
-    );
-
     if (state.ctx.streamOutput) {
       final initialExpanded = !getSettingsProvider().autoCollapseThinking;
       final isNewReasoning = !_reasoning.containsKey(messageId);
       final r = _reasoning[messageId] ?? ReasoningData();
-      r.text += chunk.reasoning!;
+      r.text += reasoning;
       r.startAt ??= DateTime.now();
-      // 注意：此处不要重置 r.expanded，以保留用户在流式处理期间的展开状态
+      // NOTE: Do not reset r.expanded here - preserve user's toggle state during streaming
       if (isNewReasoning) {
         r.expanded = initialExpanded;
       }
       _reasoning[messageId] = r;
 
-      // 加入推理片段以进行混合显示
+      // Add to reasoning segments for mixed display
       final segments =
           _reasoningSegments[messageId] ?? <ReasoningSegmentData>[];
       if (segments.isEmpty) {
         final newSegment = ReasoningSegmentData();
-        newSegment.text = chunk.reasoning!;
+        newSegment.text = reasoning;
         newSegment.startAt = DateTime.now();
         newSegment.expanded = initialExpanded;
         newSegment.toolStartIndex = (_toolParts[messageId]?.length ?? 0);
@@ -853,13 +831,13 @@ class StreamController {
         final lastSegment = segments.last;
         if (hasToolsAfterLastSegment && lastSegment.finishedAt != null) {
           final newSegment = ReasoningSegmentData();
-          newSegment.text = chunk.reasoning!;
+          newSegment.text = reasoning;
           newSegment.startAt = DateTime.now();
           newSegment.expanded = initialExpanded;
           newSegment.toolStartIndex = (_toolParts[messageId]?.length ?? 0);
           segments.add(newSegment);
         } else {
-          lastSegment.text += chunk.reasoning!;
+          lastSegment.text += reasoning;
           lastSegment.startAt ??= DateTime.now();
         }
       }
@@ -881,13 +859,13 @@ class StreamController {
       _ensureStreamTimer(messageId);
     } else {
       state.reasoningStartAt ??= DateTime.now();
-      state.bufferedReasoning += chunk.reasoning!;
+      state.bufferedReasoning += reasoning;
     }
   }
 
-  /// 处理流中的工具调用分块。
+  /// 处理工具调用事件：开始时显示占位，结束时补齐参数。
   Future<void> handleToolCallsChunk(
-    ChatStreamChunk chunk,
+    StreamChunk chunk,
     StreamingState state, {
     required Future<void> Function(String messageId, String json)
     updateReasoningSegmentsInDb,
@@ -899,20 +877,13 @@ class StreamController {
     required List<Map<String, dynamic>> Function(String messageId)
     getToolEventsFromDb,
   }) async {
-    if ((chunk.toolCalls ?? const []).isEmpty) return;
+    final call = _toolCallUiFromChunk(chunk, state);
+    if (call == null) return;
 
     final messageId = state.messageId;
     final conversationId = state.conversationId;
-    state.hadThinkingBlock = true;
-    _contentSplits[messageId] = _normalizeContentSplitData(
-      ContentSplitData(
-        offsets: List<int>.of(state.contentSplitOffsets),
-        reasoningCounts: List<int>.of(state.reasoningCountAtSplit),
-        toolCounts: List<int>.of(state.toolCountAtSplit),
-      ),
-    );
 
-    // 工具开始时结束所有未完成的推理片段
+    // Finish any unfinished reasoning segment when tools start
     final segments = _reasoningSegments[messageId] ?? <ReasoningSegmentData>[];
     if (segments.isNotEmpty && segments.last.finishedAt == null) {
       segments.last.finishedAt = DateTime.now();
@@ -925,30 +896,22 @@ class StreamController {
       _reasoningSegments[messageId] = segments;
       await updateReasoningSegmentsInDb(
         messageId,
-        serializeReasoningSegmentsWithSplits(
-          segments,
-          contentSplitOffsets: state.contentSplitOffsets,
-          reasoningCountAtSplit: state.reasoningCountAtSplit,
-          toolCountAtSplit: state.toolCountAtSplit,
-        ),
+        serializeReasoningSegmentsWithSplits(segments),
       );
     }
 
-    // 添加工具调用占位项
     final existing = List<ToolUIPart>.of(_toolParts[messageId] ?? const []);
-    for (final c in chunk.toolCalls!) {
-      existing.add(
-        ToolUIPart(
-          id: c.id,
-          toolName: c.name,
-          arguments: c.arguments,
-          loading: true,
-        ),
-      );
-    }
+    existing.add(
+      ToolUIPart(
+        id: call.id,
+        toolName: call.name,
+        arguments: call.arguments,
+        metadata: call.metadata,
+        loading: true,
+      ),
+    );
     if (getCurrentConversationId() == conversationId) {
       _toolParts[messageId] = dedupeToolPartsList(existing);
-      // 通过 StreamingContentNotifier 通知实时 UI 更新
       streamingContentNotifier.notifyToolPartsUpdated(
         messageId,
         contentSplitOffsets: state.contentSplitOffsets,
@@ -957,28 +920,27 @@ class StreamController {
       );
     }
 
-    // 持久化工具事件
     try {
       final prev = getToolEventsFromDb(messageId);
       final newEvents = <Map<String, dynamic>>[
         ...prev,
-        for (final c in chunk.toolCalls!)
-          {
-            'id': c.id,
-            'name': c.name,
-            'arguments': c.arguments,
-            'content': null,
-            if (c.metadata != null && c.metadata!.isNotEmpty)
-              'metadata': c.metadata,
-          },
+        {
+          'id': call.id,
+          'name': call.name,
+          'arguments': call.arguments,
+          'content': null,
+          if (chunk is ServerToolStart) 'server': true,
+          if (call.metadata != null && call.metadata!.isNotEmpty)
+            'metadata': call.metadata,
+        },
       ];
       await setToolEventsInDb(messageId, dedupeToolEvents(newEvents));
     } catch (_) {}
   }
 
-  /// 处理流中的工具结果分块。
+  /// 处理本地工具结果、服务端工具结果或引用事件。
   Future<void> handleToolResultsChunk(
-    ChatStreamChunk chunk,
+    StreamChunk chunk,
     StreamingState state, {
     required Future<void> Function(
       String messageId, {
@@ -990,58 +952,70 @@ class StreamController {
     })
     upsertToolEventInDb,
   }) async {
-    if ((chunk.toolResults ?? const []).isEmpty) return;
+    final result = _toolResultUiFromChunk(chunk, state);
+    if (result == null) return;
 
     final messageId = state.messageId;
     final conversationId = state.conversationId;
 
     final parts = List<ToolUIPart>.of(_toolParts[messageId] ?? const []);
-    for (final r in chunk.toolResults!) {
-      int idx = -1;
+    int idx = -1;
+    for (int i = 0; i < parts.length; i++) {
+      if (parts[i].loading &&
+          (parts[i].id == result.id ||
+              (parts[i].id.isEmpty && parts[i].toolName == result.name))) {
+        idx = i;
+        break;
+      }
+    }
+    if (idx < 0 && result.id.isNotEmpty) {
       for (int i = 0; i < parts.length; i++) {
-        if (parts[i].loading &&
-            (parts[i].id == r.id ||
-                (parts[i].id.isEmpty && parts[i].toolName == r.name))) {
+        if (parts[i].id == result.id) {
           idx = i;
           break;
         }
       }
-      if (idx >= 0) {
-        parts[idx] = ToolUIPart(
-          id: parts[idx].id,
-          toolName: parts[idx].toolName,
-          arguments: r.arguments.isNotEmpty
-              ? Map<String, dynamic>.from(r.arguments)
-              : parts[idx].arguments,
-          content: r.content,
-          loading: false,
-        );
-      } else {
-        parts.add(
-          ToolUIPart(
-            id: r.id,
-            toolName: r.name,
-            arguments: r.arguments,
-            content: r.content,
-            loading: false,
-          ),
-        );
-      }
-      try {
-        final args = Map<String, dynamic>.from(r.arguments);
-        await upsertToolEventInDb(
-          messageId,
-          id: r.id,
-          name: r.name,
-          arguments: args,
-          content: r.content,
-          metadata: r.metadata,
-        );
-      } catch (_) {}
     }
+    if (idx >= 0) {
+      parts[idx] = ToolUIPart(
+        id: parts[idx].id,
+        toolName: parts[idx].toolName,
+        arguments: result.arguments.isNotEmpty
+            ? Map<String, dynamic>.from(result.arguments)
+            : parts[idx].arguments,
+        content: result.content,
+        metadata: result.metadata ?? parts[idx].metadata,
+        loading: false,
+      );
+    } else if (result.id == 'builtin_search' &&
+        parts.any(
+          (part) => part.id != result.id && part.toolName == result.name,
+        )) {
+      return;
+    } else {
+      parts.add(
+        ToolUIPart(
+          id: result.id,
+          toolName: result.name,
+          arguments: result.arguments,
+          content: result.content,
+          metadata: result.metadata,
+          loading: false,
+        ),
+      );
+    }
+    try {
+      await upsertToolEventInDb(
+        messageId,
+        id: result.id,
+        name: result.name,
+        arguments: Map<String, dynamic>.from(result.arguments),
+        content: result.content,
+        metadata: result.metadata,
+      );
+    } catch (_) {}
     if (getCurrentConversationId() == conversationId) {
       _toolParts[messageId] = dedupeToolPartsList(parts);
-      // 通过 StreamingContentNotifier 通知实时 UI 更新
       final splits = _contentSplits[messageId];
       streamingContentNotifier.notifyToolPartsUpdated(
         messageId,
@@ -1052,7 +1026,231 @@ class StreamController {
     }
   }
 
-  /// 当内容开始到达时结束推理片段。
+  ({
+    String id,
+    String name,
+    Map<String, dynamic> arguments,
+    Map<String, dynamic>? metadata,
+  })?
+  _toolCallUiFromChunk(StreamChunk chunk, StreamingState state) {
+    switch (chunk) {
+      case ToolCallStart(:final id, :final toolName, :final metadata):
+        return (
+          id: id,
+          name: toolName.isNotEmpty
+              ? toolName
+              : (state.pendingToolNames[id] ?? ''),
+          arguments: const <String, dynamic>{},
+          metadata: metadata,
+        );
+      case ServerToolStart(
+        :final id,
+        :final toolName,
+        :final input,
+        :final metadata,
+      ):
+        return (
+          id: id,
+          name: toolName.isNotEmpty
+              ? toolName
+              : (state.pendingToolNames[id] ?? ''),
+          arguments: _argumentsFromInputOrHandler(input, state, id),
+          metadata: metadata,
+        );
+      case ToolCallEnd(:final id):
+        final fromHandler = _toolPayloadFromHandler(state, id);
+        return (
+          id: id,
+          name: (fromHandler?['name'] ?? state.pendingToolNames[id] ?? '')
+              .toString(),
+          arguments: _mapOrEmpty(fromHandler?['arguments']),
+          metadata: _mapOrNull(fromHandler?['metadata']),
+        );
+      default:
+        return null;
+    }
+  }
+
+  ({
+    String id,
+    String name,
+    Map<String, dynamic> arguments,
+    String content,
+    Map<String, dynamic>? metadata,
+  })?
+  _toolResultUiFromChunk(StreamChunk chunk, StreamingState state) {
+    switch (chunk) {
+      case ServerToolEnd(
+        :final id,
+        :final input,
+        :final output,
+        :final status,
+        :final metadata,
+      ):
+        final fromHandler = _toolPayloadFromHandler(state, id);
+        return (
+          id: id,
+          name: _toolResultName(state, id),
+          arguments: _argumentsFromInputOrHandler(input, state, id),
+          content: _contentFromOutputOrHandler(
+            output,
+            fromHandler,
+            fallback: status.name,
+          ),
+          metadata: metadata ?? _mapOrNull(fromHandler?['metadata']),
+        );
+      case ToolCallResult(:final id, :final output, :final metadata):
+        final fromHandler = _toolPayloadFromHandler(state, id);
+        return (
+          id: id,
+          name: _toolResultName(
+            state,
+            id,
+            fromHandler: (fromHandler?['name'] ?? '').toString(),
+          ),
+          arguments: _mapOrEmpty(fromHandler?['arguments']),
+          content: _toolOutputText(output),
+          metadata: metadata,
+        );
+      case Annotations(:final id, :final annotations):
+        if (annotations.isEmpty) return null;
+        final existingId = _lastSearchToolId(state);
+        final resolvedId =
+            existingId ?? (id.isNotEmpty ? id : 'builtin_search');
+        final fromHandler =
+            _toolPayloadFromHandler(state, resolvedId) ??
+            (id.isNotEmpty ? _toolPayloadFromHandler(state, id) : null);
+        final incoming = [
+          for (final citation in annotations.whereType<UrlCitationAnnotation>())
+            <String, dynamic>{
+              'url': citation.url,
+              if (citation.title.isNotEmpty) 'title': citation.title,
+            },
+        ];
+        return (
+          id: resolvedId,
+          name: existingId == null
+              ? ((fromHandler?['name'] ?? 'builtin_search').toString())
+              : (_existingToolName(state, existingId) ??
+                    (fromHandler?['name'] ?? 'search_web').toString()),
+          arguments: _mapOrEmpty(fromHandler?['arguments']),
+          content: jsonEncode(
+            StreamChunkHandler.mergeSearchItems(
+              fromHandler?['content'],
+              incoming,
+            ),
+          ),
+          metadata: _mapOrNull(fromHandler?['metadata']),
+        );
+      default:
+        return null;
+    }
+  }
+
+  Map<String, dynamic> _argumentsFromInputOrHandler(
+    Object? input,
+    StreamingState state,
+    String id,
+  ) {
+    final fromInput = _mapOrEmpty(input);
+    if (fromInput.isNotEmpty) return fromInput;
+    return _mapOrEmpty(_toolPayloadFromHandler(state, id)?['arguments']);
+  }
+
+  static String _contentFromOutputOrHandler(
+    Object? output,
+    Map<String, dynamic>? fromHandler, {
+    required String fallback,
+  }) {
+    if (output != null) return _toolOutputText(output);
+    final fromHandlerContent = fromHandler?['content'];
+    if (fromHandlerContent != null) {
+      final text = fromHandlerContent is String
+          ? fromHandlerContent
+          : jsonEncode(fromHandlerContent);
+      if (text.isNotEmpty) return text;
+    }
+    return fallback;
+  }
+
+  Map<String, dynamic>? _toolPayloadFromHandler(
+    StreamingState state,
+    String id,
+  ) {
+    for (final part in state.partsHandler.parts.reversed) {
+      if (part is! ToolCallPart) continue;
+      try {
+        final decoded = jsonDecode(part.payloadJson);
+        if (decoded is Map && (decoded['id'] ?? '').toString() == id) {
+          return decoded.cast<String, dynamic>();
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  String _toolResultName(
+    StreamingState state,
+    String id, {
+    String? fromHandler,
+  }) {
+    final name =
+        state.pendingToolNames.remove(id) ??
+        (fromHandler != null && fromHandler.isNotEmpty ? fromHandler : null) ??
+        _existingToolName(state, id) ??
+        '';
+    if (name.isNotEmpty) return name;
+    if (id == 'builtin_search') return 'builtin_search';
+    return '';
+  }
+
+  String? _lastSearchToolId(StreamingState state) {
+    for (final part
+        in (_toolParts[state.messageId] ?? const <ToolUIPart>[]).reversed) {
+      if ((part.toolName == 'search_web' ||
+              part.toolName == 'builtin_search') &&
+          part.id.isNotEmpty) {
+        return part.id;
+      }
+    }
+    for (final part in state.partsHandler.parts.reversed) {
+      if (part is! ToolCallPart) continue;
+      try {
+        final decoded = jsonDecode(part.payloadJson);
+        if (decoded is! Map) continue;
+        final name = (decoded['name'] ?? '').toString();
+        if (name != 'search_web' && name != 'builtin_search') continue;
+        final toolId = (decoded['id'] ?? '').toString();
+        if (toolId.isNotEmpty) return toolId;
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  String? _existingToolName(StreamingState state, String id) {
+    for (final part in _toolParts[state.messageId] ?? const <ToolUIPart>[]) {
+      if (part.id == id && part.toolName.isNotEmpty) return part.toolName;
+    }
+    return null;
+  }
+
+  static Map<String, dynamic> _mapOrEmpty(Object? value) {
+    if (value is Map) return value.cast<String, dynamic>();
+    return const <String, dynamic>{};
+  }
+
+  static Map<String, dynamic>? _mapOrNull(Object? value) {
+    if (value is Map) return value.cast<String, dynamic>();
+    return null;
+  }
+
+  static String _toolOutputText(Object? output) {
+    if (output == null) return '';
+    if (output is String) return output;
+    return jsonEncode(output);
+  }
+
+  /// Finish reasoning segment when content starts arriving.
   Future<void> finishReasoningOnContent(
     StreamingState state, {
     required Future<void> Function(
@@ -1398,6 +1596,7 @@ class GenerationContext {
     this.ocrActive = false,
     this.generateTitleOnFinish = true,
     this.generationRunId,
+    this.scheduled = false,
   });
 
   final ChatMessage assistantMessage;
@@ -1419,11 +1618,14 @@ class GenerationContext {
   final bool ocrActive;
   final bool generateTitleOnFinish;
   final String? generationRunId;
+  final bool scheduled;
 }
 
 /// 流式消息生成的状态对象。
 class StreamingState {
-  StreamingState(this.ctx) : fullContentRaw = ctx.assistantMessage.content;
+  StreamingState(this.ctx)
+    : fullContentRaw = ctx.assistantMessage.content,
+      partsHandler = StreamChunkHandler(seed: ctx.assistantMessage.parts);
 
   final GenerationContext ctx;
   String fullContentRaw;
@@ -1432,18 +1634,16 @@ class StreamingState {
   String bufferedReasoning = '';
   DateTime? reasoningStartAt;
   bool finishHandled = false;
+  bool terminalPersisted = false;
   bool titleQueued = false;
   DateTime? streamStartedAt;
   int? generationStateRevision;
   bool generationStreamingStarted = false;
-  bool hadThinkingBlock = false;
-  bool hasInlineBase64 = false;
-  String inlineBase64TailProbe = '';
+  final Map<String, String> pendingToolNames = <String, String>{};
   List<int> contentSplitOffsets = <int>[];
   List<int> reasoningCountAtSplit = <int>[];
   List<int> toolCountAtSplit = <int>[];
-
-  /// 自动重试倒计时状态（气泡 UI 用）。
+  final StreamChunkHandler partsHandler;
   RetryStatus? retryStatus;
 
   String get messageId => ctx.assistantMessage.id;
@@ -1583,6 +1783,7 @@ class _StreamSmoothState {
   String targetContent = '';
   String visibleContent = '';
   String Function()? contentBuilder;
+  List<MessagePart> Function(String visibleText)? partsBuilder;
   int totalTokens = 0;
   List<int>? contentSplitOffsets;
   List<int>? reasoningCountAtSplit;

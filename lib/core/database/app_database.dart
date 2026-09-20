@@ -4,7 +4,7 @@ import 'dart:isolate';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
-import 'package:sqlite3/common.dart' show AllowedArgumentCount;
+import 'package:sqlite3/common.dart' show AllowedArgumentCount, CommonDatabase;
 
 import '../../utils/app_directories.dart';
 
@@ -97,6 +97,10 @@ class ConversationRows extends Table {
       .withDefault(const Constant(-1))();
   TextColumn get chatModelProvider => text().nullable()();
   TextColumn get chatModelId => text().nullable()();
+  // v8：会话级无 schema 的扩展位（工作区绑定、子代理归属、群聊参与者等）。
+  // 键必须以功能前缀开头（例如 "workspace.cwd"）。任何将来需要索引、外键或
+  // CHECK 的字段，都应在后续增量迁移里提升为真实列，而不是长期留在这里。
+  TextColumn get extrasJson => text().withDefault(const Constant('{}'))();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -719,6 +723,37 @@ class MessagePromptRows extends Table {
   ];
 }
 
+/// v8：未来各类实体的共享宿主，使新增一种用户管理的实体（主题、插件、
+/// 工作区、SSH 配置、生成任务……）不再需要新建表，因而也不需要 schema 迁移。
+///
+/// 结构上是十三个按类型分表（`assistant_rows` 等）的泛化：字符串 id ＋
+/// `sort_order` ＋ JSON `payload` ＋ `updated_at`，外加 `kind` 判别列，以及
+/// 可选的 `owner_id`（用于挂在另一实体下的实体，对应
+/// `assistant_memory_rows.assistant_id`）。既有类型仍留在各自的表里，只有
+/// 判别值较新引入的类型才放这里。
+@TableIndex(
+  name: 'idx_extension_entities_kind_order',
+  columns: {#kind, #sortOrder},
+)
+class ExtensionEntityRows extends Table {
+  TextColumn get kind =>
+      text()
+      // ignore: recursive_getters
+      .check(kind.isNotValue(''))();
+  TextColumn get id => text()();
+  IntColumn get sortOrder =>
+      integer()
+      // ignore: recursive_getters
+      .check(sortOrder.isBiggerOrEqualValue(0))();
+  TextColumn get ownerId => text().nullable()();
+  TextColumn get payload => text()();
+  IntColumn get updatedAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+
+  @override
+  Set<Column<Object>> get primaryKey => {kind, id};
+}
+
 @DriftDatabase(
   tables: [
     ConversationRows,
@@ -751,6 +786,7 @@ class MessagePromptRows extends Table {
     MemoryEntryRows,
     UserProfileFieldRows,
     MessagePromptRows,
+    ExtensionEntityRows,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -763,16 +799,19 @@ class AppDatabase extends _$AppDatabase {
   // Schema 1 是第一个发布的 SQLite 契约。模式 2 添加显式消息树边、
   // 分支和活动分支状态，模式 3 存储每个共享树前缀下最后选择的分支，
   // 模式 4 将 Kelivo 的助手标签表迁移为 JO-Kelivo 的助手分组表，模式 5
-  // 为冻结提示词绑定消息正文哈希，模式 6 持久化明确的分支关系和活动历史。
-  static const currentSchemaVersion = 7;
+  // 为冻结提示词绑定消息正文哈希，模式 6 持久化明确的分支关系和活动历史，
+  // 模式 7 增加会话级模型覆盖，模式 8 增加会话 extras 扩展位与
+  // `extension_entity_rows` 共享实体表。
+  static const currentSchemaVersion = 8;
 
   /// 曾经发布过的全部 schema 版本。
   ///
   /// 启动失败诊断报告用它说明"本应用能读哪些版本的库"，因此**每发布一个新
   /// schema 就要同步加进来**，否则报告会把一个其实支持的旧库说成不支持。
-  /// 与上游的差别：上游这套是 {1,2,3}，本仓库的迁移链覆盖 1..7（见
-  /// `migration.onUpgrade` 里的 from<2 / 2..3 / from<4 / from<5 / 2..6 / from<7）。
-  static const publishedSchemaVersions = <int>{1, 2, 3, 4, 5, 6, 7};
+  /// 与上游的差别：上游这套是 {1,2,3}，本仓库的迁移链覆盖 1..8（见
+  /// `migration.onUpgrade` 里的 from<2 / 2..3 / from<4 / from<5 / 2..6 /
+  /// from<7 / from<8）。
+  static const publishedSchemaVersions = <int>{1, 2, 3, 4, 5, 6, 7, 8};
   // 保持 SQLite 既定的 1000 页节奏显式声明。按通常 4 KiB 页大小计算，
   // 这大约在 4 MiB 时触发一次检查点，但页大小仍是实际依据。
   static const walAutoCheckpointPages = 1000;
@@ -833,6 +872,31 @@ class AppDatabase extends _$AppDatabase {
         database.execute('PRAGMA journal_size_limit = $journalSizeLimitBytes;');
       },
     );
+  }
+
+  /// 允许任意「已发布」schema 的执行器，供 drift 的迁移器运行。
+  ///
+  /// 只有 `SchemaMigrations` 可以用它。其余连接一律走 [_openExecutor]，
+  /// 那条路径有自己的版本检查。
+  static QueryExecutor upgradeExecutor(File file) =>
+      NativeDatabase.createInBackground(file, setup: _migrationSetup);
+
+  /// [upgradeExecutor] 的 setup。
+  ///
+  /// 必须保持为**无捕获的静态方法引用**：`createInBackground` 会把这个
+  /// 闭包送到 drift 的 worker isolate 上执行。
+  ///
+  /// 刻意不设 `journal_mode = WAL`：备份快照进来时是 DELETE 模式，也必须
+  /// 以 DELETE 模式离开；而一次性的结构重写用 `synchronous = FULL` 更稳。
+  static void _migrationSetup(CommonDatabase database) {
+    final installedSchema = database.userVersion;
+    if (installedSchema != 0 &&
+        !AppDatabase.publishedSchemaVersions.contains(installedSchema)) {
+      throw StateError('database_schema_version');
+    }
+    database.execute('PRAGMA foreign_keys = ON;');
+    database.execute('PRAGMA busy_timeout = $busyTimeoutMillis;');
+    database.execute('PRAGMA synchronous = FULL;');
   }
 
   /// 对在活动 SQLite 连接上执行回调的 isolate 进行采样。
@@ -1151,6 +1215,27 @@ FROM probe;
             conversationRows.chatModelId,
           );
         }
+      }
+      if (from < 8) {
+        final conversationColumns = await customSelect(
+          'PRAGMA table_info(conversation_rows);',
+        ).get();
+        final names = conversationColumns
+            .map((row) => row.read<String>('name'))
+            .toSet();
+        if (!names.contains('extras_json')) {
+          await migrator.addColumn(
+            conversationRows,
+            conversationRows.extrasJson,
+          );
+        }
+        await migrator.createTable(extensionEntityRows);
+        // createTable 只建表不建索引，迁移路径必须显式补上，
+        // 否则从旧版本升上来的库会缺这个索引（新建库由 onCreate 建全）。
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_extension_entities_kind_order '
+          'ON extension_entity_rows (kind, sort_order);',
+        );
       }
     },
     beforeOpen: (details) async {

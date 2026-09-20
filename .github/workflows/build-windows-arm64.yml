@@ -2,6 +2,7 @@ name: Build Windows ARM64
 
 # Windows on ARM（原生 ARM64 版）构建通道。与 build-windows.yml（x64）相互独立：
 # 这条线出问题不会影响 x64 的发版链路。
+# 与 Android / Linux / Windows x64 一样，在版本 tag 推送时自动触发；也可手动触发只出测试产物。
 #
 # 关键背景（2026-09-12 查证，首跑失败后修正）：
 # - `flutter build windows` 没有选择目标架构的参数，目标跟 Dart 虚拟机的芯片走
@@ -32,6 +33,10 @@ on:
         required: false
         default: false
         type: boolean
+
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+\+[0-9]+'
 
 permissions:
   contents: write
@@ -143,14 +148,14 @@ jobs:
           if-no-files-found: error
 
       - name: Upload assets to draft GitHub Release
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_release && inputs.release_tag != '' }}
+        if: ${{ github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && inputs.publish_release && inputs.release_tag != '') }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.release_tag }}
-          name: ${{ inputs.release_tag }}
-          body_path: .github/release-notes/${{ inputs.release_tag }}.md
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || inputs.release_tag }}
+          name: ${{ github.ref_type == 'tag' && github.ref_name || inputs.release_tag }}
+          body_path: .github/release-notes/${{ github.ref_type == 'tag' && github.ref_name || inputs.release_tag }}.md
           draft: true
-          prerelease: ${{ inputs.prerelease || false }}
+          prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || false }}
           files: |
             JO-AIClient-v*-windows-arm64-portable.zip
             JO-AIClient-v*-windows-arm64-portable.zip.sha256

@@ -930,9 +930,7 @@ data: {"type":"message_stop"}
         ).toList();
 
         expect(
-          chunks
-              .whereType<TextDelta>()
-              .where((chunk) => chunk.text == 'done'),
+          chunks.whereType<TextDelta>().where((chunk) => chunk.text == 'done'),
           hasLength(1),
         );
         expect(chunks.isGenerationDone, isTrue);

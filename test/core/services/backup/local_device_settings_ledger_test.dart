@@ -65,16 +65,12 @@ void main() {
     });
 
     test('同指纹重复写入只保留一条，较新的覆盖较旧的', () async {
-      await ledger.upsertCurrent(
-        _identity(_fpA, name: 'Old'),
-        {'window_width_v1': 100.0},
-        savedAtUtc: DateTime.utc(2026, 1, 1),
-      );
-      await ledger.upsertCurrent(
-        _identity(_fpA, name: 'New'),
-        {'window_width_v1': 200.0},
-        savedAtUtc: DateTime.utc(2026, 6, 1),
-      );
+      await ledger.upsertCurrent(_identity(_fpA, name: 'Old'), {
+        'window_width_v1': 100.0,
+      }, savedAtUtc: DateTime.utc(2026, 1, 1));
+      await ledger.upsertCurrent(_identity(_fpA, name: 'New'), {
+        'window_width_v1': 200.0,
+      }, savedAtUtc: DateTime.utc(2026, 6, 1));
 
       final all = await ledger.getAll();
       expect(all, hasLength(1));
@@ -83,16 +79,12 @@ void main() {
     });
 
     test('较旧的记录不会倒退覆盖较新的本机记录', () async {
-      await ledger.upsertCurrent(
-        _identity(_fpA, name: 'Local'),
-        {'window_width_v1': 200.0},
-        savedAtUtc: DateTime.utc(2026, 6, 1),
-      );
-      await ledger.upsertCurrent(
-        _identity(_fpA, name: 'StaleArchive'),
-        {'window_width_v1': 100.0},
-        savedAtUtc: DateTime.utc(2026, 1, 1),
-      );
+      await ledger.upsertCurrent(_identity(_fpA, name: 'Local'), {
+        'window_width_v1': 200.0,
+      }, savedAtUtc: DateTime.utc(2026, 6, 1));
+      await ledger.upsertCurrent(_identity(_fpA, name: 'StaleArchive'), {
+        'window_width_v1': 100.0,
+      }, savedAtUtc: DateTime.utc(2026, 1, 1));
 
       final record = await ledger.findByFingerprint(_fpA);
       expect(record!.deviceName, 'Local');
@@ -125,10 +117,9 @@ void main() {
     });
 
     test('并入不触碰其他设备（累积语义）', () async {
-      await ledger.upsertCurrent(
-        _identity(_fpC, name: 'C'),
-        {'window_width_v1': 3.0},
-      );
+      await ledger.upsertCurrent(_identity(_fpC, name: 'C'), {
+        'window_width_v1': 3.0,
+      });
       await ledger.mergeFromArchive([
         DeviceSettingsRecord(
           fingerprint: _fpA,
@@ -216,7 +207,9 @@ void main() {
       final path = '${tempDir.path}/fresh.sqlite';
       final fresh = DeviceLedgerDatabase(NativeDatabase(File(path)));
       final freshLedger = LocalDeviceSettingsLedger(database: fresh);
-      await freshLedger.upsertCurrent(_identity(_fpA), {'window_width_v1': 1.0});
+      await freshLedger.upsertCurrent(_identity(_fpA), {
+        'window_width_v1': 1.0,
+      });
       expect(await freshLedger.countAll(), 1);
       expect(await File(path).exists(), isTrue);
       await fresh.close();
@@ -228,8 +221,8 @@ void main() {
       final record = LocalDeviceSettingsLedger.parseArchiveFile(
         'device_local_settings/$_fpA.json',
         '{"fingerprint":"$_fpA","deviceName":"A","platform":"windows",'
-        '"savedAtUtc":"2026-01-01T00:00:00.000Z",'
-        '"values":{"window_width_v1":800.0,"window_maximized_v1":false}}',
+            '"savedAtUtc":"2026-01-01T00:00:00.000Z",'
+            '"values":{"window_width_v1":800.0,"window_maximized_v1":false}}',
       );
       expect(record, isNotNull);
       expect(record!.fingerprint, _fpA);
@@ -266,7 +259,7 @@ void main() {
       final record = LocalDeviceSettingsLedger.parseArchiveFile(
         'device_local_settings/$_fpA.json',
         '{"values":{"window_width_v1":1.0,"restore_x":"leak",'
-        '"providers_order_v1":["a"]}}',
+            '"providers_order_v1":["a"]}}',
       );
       expect(record!.values.keys, ['window_width_v1']);
     });
