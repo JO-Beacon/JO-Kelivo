@@ -87,7 +87,7 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".McpOAuthCallbackActivity"
+            android:name=".OAuthCallbackActivity"
             android:excludeFromRecents="true"
             android:exported="true"
             android:launchMode="singleTask"
@@ -102,6 +102,10 @@
                 <data android:scheme="psyche.jokelivo" android:host="mcp-oauth-callback"/>
             </intent-filter>
         </activity>
+        <!-- Custom Tabs binds here only while its authorization window is visible. -->
+        <service
+            android:name=".OAuthBrowserService"
+            android:exported="true" />
         <!-- A separate process keeps Android SQLite handles separate from Drift's
              native SQLite connection and works without starting a Flutter engine. -->
         <provider
@@ -146,6 +150,9 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

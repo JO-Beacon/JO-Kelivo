@@ -3,7 +3,7 @@ part of '../desktop_settings_page.dart';
 // ===== 显示设置主体 =====
 
 class _DisplaySettingsBody extends StatelessWidget {
-  const _DisplaySettingsBody({super.key});
+  const _DisplaySettingsBody();
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -378,15 +378,19 @@ class _SettingsCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 2, 4, 8),
-              child: Text(
-                title,
-                // 使卡片标题与其他面板对齐（15、半粗）
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: AppFontWeights.semibold,
-                  color: cs.onSurface,
+            SettingsSearchTarget.wrap(
+              context,
+              title,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 2, 4, 8),
+                child: Text(
+                  title,
+                  // 使卡片标题与其他面板对齐（15、半粗）
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: AppFontWeights.semibold,
+                    color: cs.onSurface,
+                  ),
                 ),
               ),
             ),
@@ -423,7 +427,7 @@ class _LabeledRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Padding(
+    final row = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(
         mainAxisSize: MainAxisSize.max,
@@ -456,6 +460,7 @@ class _LabeledRow extends StatelessWidget {
         ],
       ),
     );
+    return SettingsSearchTarget.wrap(context, label, row);
   }
 }
 
@@ -3296,7 +3301,7 @@ class _ToggleRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Padding(
+    final row = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(
         children: [
@@ -3332,6 +3337,7 @@ class _ToggleRow extends StatelessWidget {
         ],
       ),
     );
+    return SettingsSearchTarget.wrap(context, label, row);
   }
 }
 

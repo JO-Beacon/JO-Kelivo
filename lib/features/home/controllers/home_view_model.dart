@@ -1113,7 +1113,9 @@ class HomeViewModel extends ChangeNotifier {
     );
 
     _chatController.setDraftConversation(conversation);
-    _streamController.clearAllState();
+    _streamController.clearAllState(
+      keepMessageIds: _chatActions.activeStreamingMessageIds,
+    );
     notifyListeners();
 
     // 将助手预设消息注入新会话（按顺序）
@@ -1173,7 +1175,9 @@ class HomeViewModel extends ChangeNotifier {
     );
 
     _chatController.setDraftConversation(conversation);
-    _streamController.clearAllState();
+    _streamController.clearAllState(
+      keepMessageIds: _chatActions.activeStreamingMessageIds,
+    );
     notifyListeners();
     onScrollToBottom?.call();
   }
@@ -1850,7 +1854,11 @@ class HomeViewModel extends ChangeNotifier {
   // 聊天建议
   // ============================================================================
 
+  /// 每个会话最近一次建议请求的代次标记，用来丢弃过期结果。
+  final Map<String, Object> _suggestionRequests = {};
+
   Future<void> _clearSuggestionsFor(String conversationId) async {
+    _suggestionRequests.remove(conversationId);
     final convo = _chatService.getConversation(conversationId);
     if (convo == null || convo.chatSuggestions.isEmpty) return;
     await _chatService.clearConversationSuggestions(conversationId);
@@ -1887,48 +1895,56 @@ class HomeViewModel extends ChangeNotifier {
       assistant?.thinkingBudget,
     );
 
-    final loadedMessages = await _chatService.loadActiveTimelineMessages(
-      convo.id,
-    );
-    // 用于生成后新鲜度检查的原始修订计数快照：
-    // getMessageCount 统计每个修订，而折叠列表不是。
-    final loadedMessageCount = loadedMessages.length;
-    final msgs = loadedMessages;
-    final lastAssistant = msgs.cast<ChatMessage?>().lastWhere(
-      (m) =>
-          m != null &&
-          m.role == 'assistant' &&
-          !m.isStreaming &&
-          m.content.trim().isNotEmpty,
-      orElse: () => null,
-    );
-    if (lastAssistant == null) return;
+    // 本次请求的代次标记：任一入口条件变了，结果都不再作数。
+    final request = Object();
+    _suggestionRequests[conversationId] = request;
+    final truncateIndex = _chatService.getContextStartIndex(conversationId);
+    final prompt = settings.suggestionPrompt;
+    bool isCurrent() =>
+        identical(_suggestionRequests[conversationId], request) &&
+        settings.isSuggestionGenerationEnabled &&
+        settings.suggestionPrompt == prompt &&
+        _chatService.getConversation(conversationId) != null &&
+        _chatService.getContextStartIndex(conversationId) == truncateIndex;
+
+    // 取的是本会话当前活动分支，与界面此刻显示哪个会话无关。
+    Future<List<ChatMessage>> loadSelectedMessages() =>
+        _chatService.loadActiveTimelineMessages(conversationId);
 
     try {
+      final msgs = await loadSelectedMessages();
+      if (!isCurrent()) return;
+      final content = ChatSuggestionService.buildContent(
+        msgs,
+        truncateIndex: truncateIndex,
+      );
+      if (content.isEmpty) return;
+      final sourceMessageId = msgs.last.id;
       await _chatService.clearConversationSuggestions(conversationId);
+      if (!isCurrent()) return;
       final suggestions = await _suggestionService.generate(
         conversationId: conversationId,
         settings: settings,
         providerKey: provKey,
         modelId: mdlId,
         messages: msgs,
-        truncateIndex: _chatService.getContextStartIndex(conversationId),
+        truncateIndex: truncateIndex,
         locale: locale,
         thinkingBudget: budget,
       );
-      if (suggestions.isEmpty) {
-        onBackgroundTaskError?.call(
-          BackgroundTaskKind.suggestions,
-          'empty_response',
-        );
-        return;
-      }
+      // 返回空数组是一个有效决定：就是不提供建议。
+      if (suggestions.isEmpty || !isCurrent()) return;
 
-      final latest = _chatService.getConversation(conversationId);
-      // 上方 loadMessages 会填充数量；未知值（-1）不等于已加载长度，
-      // 因此正确中止发布过期建议。
-      if (latest == null ||
-          _chatService.getMessageCount(latest.id) != loadedMessageCount) {
+      // 生成期间会话内容变了就丢弃，避免把过期建议贴到新内容上。
+      final latestMessages = await loadSelectedMessages();
+      if (!isCurrent() ||
+          latestMessages.isEmpty ||
+          latestMessages.last.id != sourceMessageId ||
+          ChatSuggestionService.buildContent(
+                latestMessages,
+                truncateIndex: truncateIndex,
+              ) !=
+              content) {
         return;
       }
 
@@ -1943,11 +1959,16 @@ class HomeViewModel extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
+      if (!isCurrent()) return;
       FlutterLogger.log(
         '[SuggestionGen] Generation failed: $e',
         tag: 'HomeViewModel',
       );
       onBackgroundTaskError?.call(BackgroundTaskKind.suggestions, e);
+    } finally {
+      if (identical(_suggestionRequests[conversationId], request)) {
+        _suggestionRequests.remove(conversationId);
+      }
     }
   }
 

@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:io';
 
 import '../../../../models/token_usage.dart';
+import '../../../../models/provider_oauth.dart';
 import '../../../../providers/settings_provider.dart';
 import '../../../../utils/openai_model_compat.dart';
+import '../../../../utils/kimi_model_compat.dart';
 import '../../builtin_tools.dart';
 import '../../chat_api_helpers.dart';
 
@@ -68,6 +70,14 @@ void applyCompatibleResponsesReasoning(
   int? thinkingBudget,
 }) {
   if (config.useResponseApi != true) return;
+
+  // ChatGPT 的 Responses 只认 reasoning.effort，关思考时发 none。
+  if (config.oauthProvider == OAuthProvider.chatgpt) {
+    if (isReasoning && isOff(thinkingBudget)) {
+      body['reasoning'] = {'effort': 'none'};
+    }
+    return;
+  }
 
   final poolsideInfo = OpenAIProviderInfo(
     host: Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '',
@@ -218,8 +228,61 @@ void normalizeMoonshotKimiChatBody(
   Map<String, dynamic> body, {
   required String upstreamModelId,
   required bool isReasoning,
+  required OpenAIProviderInfo info,
   int? thinkingBudget,
 }) {
+  if (info.isKimiCodingModel || info.isKimiCodeThinkingModel) {
+    // k3-256k 不接受视频输入，带着发出去只会拿到 400。
+    if (upstreamModelId.trim().toLowerCase() == 'k3-256k') {
+      final messages = body['messages'];
+      if (messages is List &&
+          messages.whereType<Map>().any((message) {
+            final content = message['content'];
+            return content is List &&
+                content.whereType<Map>().any(
+                  (part) => part['type'] == 'video_url',
+                );
+          })) {
+        throw UnsupportedError(
+          'Kimi Code k3-256k does not support video input.',
+        );
+      }
+    }
+    _removeMoonshotKimiUnsupportedSamplingParams(body);
+    // 账号登录走目录声明的 thinking.type／effort，保留其原生覆盖，
+    // 不套用 API Key 那套 reasoning_effort 规则。
+    if (info.isKimiCodeThinkingModel) return;
+    // 高速版不接受思考档位。
+    if (isKimiCodeHighSpeedModel(upstreamModelId)) {
+      body.remove('reasoning_effort');
+      body.remove('thinking');
+      return;
+    }
+    if (!isReasoning) {
+      body.remove('thinking');
+      body.remove('reasoning_effort');
+      return;
+    }
+    final rawEffort = body['reasoning_effort'];
+    final effort = rawEffort is String && rawEffort.trim().isNotEmpty
+        ? openAINormalizeReasoningEffort(rawEffort, upstreamModelId)
+        : 'auto';
+    final thinking = body['thinking'];
+    final thinkingType = thinking is Map ? thinking['type'] : null;
+    if (thinkingType == 'disabled' ||
+        (effort == 'none' && thinkingType != 'enabled')) {
+      body['thinking'] = {'type': 'disabled'};
+      body.remove('reasoning_effort');
+    } else {
+      body.remove('thinking');
+      if (effort == 'auto' || effort == 'none') {
+        body.remove('reasoning_effort');
+      } else {
+        body['reasoning_effort'] = effort;
+      }
+    }
+    return;
+  }
   if (!_isKimiThinkingModel(upstreamModelId)) return;
 
   if (isKimiK3Model(upstreamModelId)) {
@@ -261,6 +324,81 @@ void normalizeMoonshotKimiChatBody(
   if (_isKimiOmitsSamplingParamsModel(upstreamModelId)) {
     _removeMoonshotKimiUnsupportedSamplingParams(body);
   }
+}
+
+/// Kimi Code 的 OpenAI 端点用 thinking.type／effort，不用 reasoning_effort，
+/// 也不用 Anthropic 的 budget_tokens。按目录里探测到的档位表来发，
+/// 思考强制开启时取最低合法档位。
+void applyKimiCodeChatThinking(
+  Map<String, dynamic> body, {
+  required ProviderConfig config,
+  required String modelId,
+  required bool isReasoning,
+  int? thinkingBudget,
+}) {
+  if (config.oauthProvider != OAuthProvider.kimi ||
+      config.useResponseApi == true) {
+    return;
+  }
+  final raw = config.modelOverrides[modelId];
+  final metadata = raw is Map ? raw : const {};
+  if (metadata['oauthProtocol'] != 'openai') return;
+  final required = metadata['oauthThinkingRequired'] == true;
+  final existing = body['thinking'];
+  final thinking = existing is Map ? existing : const {};
+  final requestedEffort = thinking['effort'];
+  final off =
+      thinking['type'] == 'disabled' ||
+      (thinking['type'] != 'enabled' && isOff(thinkingBudget));
+  body.remove('reasoning_effort');
+  body.remove('reasoning');
+  body.remove('output_config');
+  if (!isReasoning && !required) {
+    body.remove('thinking');
+    return;
+  }
+  if (off && !required) {
+    body['thinking'] = {'type': 'disabled'};
+    return;
+  }
+  const order = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
+  final advertised = metadata['oauthThinkingEfforts'];
+  final levels = [
+    for (final level in order)
+      if (advertised is List && advertised.contains(level)) level,
+  ];
+  String? effort;
+  if (levels.isNotEmpty) {
+    if (off) {
+      effort = levels.first;
+    } else {
+      final requested = requestedEffort is String
+          ? requestedEffort
+          : thinkingBudget != null && thinkingBudget >= 128000
+          ? 'max'
+          : thinkingBudget != null && thinkingBudget >= 64000
+          ? 'xhigh'
+          : effortForBudget(thinkingBudget);
+      if (requested == 'auto') {
+        final defaultEffort = metadata['oauthThinkingDefaultEffort'];
+        if (defaultEffort is String && levels.contains(defaultEffort)) {
+          effort = defaultEffort;
+        }
+      } else {
+        final index = order.indexOf(requested);
+        effort = levels.first;
+        for (final level in levels) {
+          if (order.indexOf(level) > index) break;
+          effort = level;
+        }
+      }
+    }
+  }
+  body['thinking'] = {
+    'type': 'enabled',
+    if (effort != null) 'effort': effort,
+    if (thinking['keep'] == 'all') 'keep': 'all',
+  };
 }
 
 TokenUsage? openaiUsageFromObj(Map<String, dynamic> obj) {
@@ -478,10 +616,14 @@ class OpenAIProviderInfo {
   final String providerId;
   final String upstreamModelId;
 
+  /// 账号登录的 Kimi Code 思考模型（目录声明，不看模型名前缀）。
+  final bool isKimiCodeThinkingModel;
+
   const OpenAIProviderInfo({
     required this.host,
     required this.providerId,
     required this.upstreamModelId,
+    this.isKimiCodeThinkingModel = false,
   });
 
   bool get isZhipu => _isZhipuLikeProvider(
@@ -523,6 +665,23 @@ class OpenAIProviderInfo {
       host.contains('intern') ||
       host.contains('chat.intern-ai.org.cn');
   bool get isKimiThinkingModel => _isKimiThinkingModel(upstreamModelId);
+  bool get isKimiCodeK3Model =>
+      isKimiCodingModel && isKimiCodeK3Alias(upstreamModelId);
+  bool get isKimiCodingModel {
+    if (isKimiForCodingModel(upstreamModelId) ||
+        isKimiK28Model(upstreamModelId)) {
+      return true;
+    }
+    // Coding 用的是 k3 这种短别名。必须同时确认供应商身份，
+    // 否则别处也叫 k3 的模型会被误判成 Kimi 的保留思考契约。
+    final isKimiProvider =
+        host == 'api.kimi.com' ||
+        host == 'api.moonshot.ai' ||
+        host == 'api.moonshot.cn' ||
+        providerId.contains('kimi') ||
+        providerId.contains('moonshot');
+    return isKimiProvider && isKimiCodeK3Alias(upstreamModelId);
+  }
 
   /// Google 的 OpenAI 兼容端点（Gemini 走 chat/completions 形状）会把
   /// 思考签名挂在工具调用的 `extra_content` 上，回放时必须原样带回。
@@ -539,9 +698,13 @@ class OpenAIProviderInfo {
       isDeepSeek ||
       isMimo ||
       isZhipu ||
+      isKimiCodingModel ||
+      isKimiCodeThinkingModel ||
       isKimiThinkingModel;
   ReasoningContentReplayPolicy get reasoningContentReplayPolicy {
     if (usesPoolsideThinking ||
+        isKimiCodingModel ||
+        isKimiCodeThinkingModel ||
         _isKimiPreservedThinkingModel(upstreamModelId)) {
       return ReasoningContentReplayPolicy.all;
     }
@@ -613,6 +776,12 @@ void applyVendorReasoningKnobs(
       body.remove('reasoning');
       body.remove('reasoning_effort');
     }
+  } else if (info.usesPoolsideThinking) {
+    applyPoolsideThinkingKnob(
+      body,
+      isReasoning: isReasoning,
+      thinkingBudget: thinkingBudget,
+    );
   } else if (info.isDashScope) {
     if (isReasoning) {
       if (isDashScopeThinkingOnlyModel(info.upstreamModelId)) {
@@ -674,12 +843,6 @@ void applyVendorReasoningKnobs(
       body.remove('thinking');
       body.remove('reasoning_effort');
     }
-  } else if (info.usesPoolsideThinking) {
-    applyPoolsideThinkingKnob(
-      body,
-      isReasoning: isReasoning,
-      thinkingBudget: thinkingBudget,
-    );
   } else if (info.isVolc) {
     if (isReasoning) {
       body['thinking'] = {'type': off ? 'disabled' : 'enabled'};

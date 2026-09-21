@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 管理桌面窗口尺寸和位置的持久化及默认值。
@@ -18,9 +19,14 @@ class WindowSizeManager {
   static const String _kHeight = 'window_height_v1';
   static const String _kPosX = 'window_pos_x_v1';
   static const String _kPosY = 'window_pos_y_v1';
+  static const String _kPhysicalPosX = 'window_physical_pos_x_v1';
+  static const String _kPhysicalPosY = 'window_physical_pos_y_v1';
   static const String _kMaximized = 'window_maximized_v1';
 
   const WindowSizeManager();
+
+  bool get _usesPhysicalPosition =>
+      defaultTargetPlatform == TargetPlatform.windows;
 
   Size _clamp(Size s) {
     final w = s.width.clamp(minWindowWidth, maxWindowWidth);
@@ -44,8 +50,10 @@ class WindowSizeManager {
 
   Future<Offset?> getPosition() async {
     final prefs = await SharedPreferences.getInstance();
-    final x = prefs.getDouble(_kPosX);
-    final y = prefs.getDouble(_kPosY);
+    // 旧版 Windows 位置是逻辑像素且没有记录当时的 DPI，
+    // 与其把旧值误当成物理像素，不如重新定位。
+    final x = prefs.getDouble(_usesPhysicalPosition ? _kPhysicalPosX : _kPosX);
+    final y = prefs.getDouble(_usesPhysicalPosition ? _kPhysicalPosY : _kPosY);
     if (x == null || y == null) return null;
     // 简单校验：避免无穷值
     if (!x.isFinite || !y.isFinite) return null;
@@ -53,10 +61,11 @@ class WindowSizeManager {
     // 额外保护：如果存储坐标离原点极远，则视为无效，而不是把窗口恢复到
     // 完全不可见的屏幕外（否则应用会看似“无法打开”，直到手动删除偏好）。
     const maxAbsCoord = 10000.0;
-    if (x < -maxAbsCoord ||
-        x > maxAbsCoord ||
-        y < -maxAbsCoord ||
-        y > maxAbsCoord) {
+    if (!_usesPhysicalPosition &&
+        (x < -maxAbsCoord ||
+            x > maxAbsCoord ||
+            y < -maxAbsCoord ||
+            y > maxAbsCoord)) {
       return null;
     }
 
@@ -68,8 +77,8 @@ class WindowSizeManager {
     final x = offset.dx;
     final y = offset.dy;
     if (x.isFinite && y.isFinite) {
-      await prefs.setDouble(_kPosX, x);
-      await prefs.setDouble(_kPosY, y);
+      await prefs.setDouble(_usesPhysicalPosition ? _kPhysicalPosX : _kPosX, x);
+      await prefs.setDouble(_usesPhysicalPosition ? _kPhysicalPosY : _kPosY, y);
     }
   }
 

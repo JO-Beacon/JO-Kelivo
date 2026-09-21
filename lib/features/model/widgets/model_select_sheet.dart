@@ -24,6 +24,7 @@ import '../../../core/services/model_override_resolver.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../home/controllers/home_page_controller.dart';
 import '../../home/utils/model_display_helper.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 class ModelSelection {
@@ -227,11 +228,10 @@ Future<ModelSelection?> showModelSelector(
         inheritSelected: inheritSelected,
       );
     }
-    final cs = Theme.of(context).colorScheme;
     return await showModalBottomSheet<ModelSelection>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -874,8 +874,9 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
               children: [
                 // 带圆角的固定标题区域
                 Container(
+                  key: const ValueKey('model-selector-header'),
                   decoration: BoxDecoration(
-                    color: cs.surface,
+                    color: context.overlaySurface,
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(20),
                     ),
@@ -1003,7 +1004,9 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                 // 可滚动内容
                 Expanded(
                   child: Container(
-                    color: cs.surface, // 确保背景颜色连续
+                    key: const ValueKey('model-selector-list'),
+                    // 确保背景颜色连续
+                    color: context.overlaySurface,
                     child: _isLoading
                         ? const Center(child: CircularProgressIndicator())
                         : _buildContent(context),
@@ -1011,7 +1014,9 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                 ),
                 // 固定底部标签
                 Container(
-                  color: cs.surface, // 确保背景颜色连续
+                  key: const ValueKey('model-selector-bottom-tabs'),
+                  // 确保背景颜色连续
+                  color: context.overlaySurface,
                   child: _buildBottomTabs(context),
                 ),
               ],
@@ -1152,7 +1157,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                 right: 0,
                 child: ColoredBox(
                   key: const ValueKey('model-selector-top-seam-cover'),
-                  color: Theme.of(context).colorScheme.surface,
+                  color: context.overlaySurface,
                   child: const SizedBox(height: 1),
                 ),
               ),
@@ -1293,7 +1298,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       right: 0,
       child: DecoratedBox(
         key: const ValueKey('model-selector-sticky-provider'),
-        decoration: BoxDecoration(color: cs.surface),
+        decoration: BoxDecoration(color: context.overlaySurface),
         child: SizedBox(
           height: _stickyProviderHeaderHeight + 1,
           child: ClipRect(
@@ -1414,7 +1419,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         ? (isDark
               ? cs.primary.withValues(alpha: 0.12)
               : cs.primary.withValues(alpha: 0.08))
-        : cs.surface;
+        : sheetTileColor(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: RepaintBoundary(
@@ -1635,7 +1640,7 @@ class _ProviderChipState extends State<_ProviderChip> {
         ? (isDark
               ? cs.primary.withValues(alpha: 0.08)
               : cs.primary.withValues(alpha: 0.05))
-        : cs.surface;
+        : sheetTileColor(context);
     final Color overlay = cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05);
     final Color bg = _pressed ? Color.alphaBlend(overlay, baseBg) : baseBg;
     // 选中时边框略强；保持标签颜色不变以保持克制
@@ -2180,7 +2185,7 @@ class _DesktopModelSelectDialogBodyState
           maxHeight: 560,
         ),
         child: Material(
-          color: cs.surface,
+          color: context.overlaySurface,
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -2199,7 +2204,7 @@ class _DesktopModelSelectDialogBodyState
                 // 内容区
                 Expanded(
                   child: Container(
-                    color: cs.surface,
+                    color: context.overlaySurface,
                     child: Column(
                       children: [
                         Padding(
@@ -2476,7 +2481,7 @@ class _DesktopModelSelectDialogBodyState
         ? (isDark
               ? cs.primary.withValues(alpha: 0.12)
               : cs.primary.withValues(alpha: 0.08))
-        : cs.surface;
+        : sheetTileColor(context);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),

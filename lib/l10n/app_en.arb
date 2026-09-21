@@ -1,4 +1,12 @@
 {
+  "settingsSearchHint": "Search settings",
+  "settingsSearchCancel": "Cancel",
+  "settingsSearchClear": "Clear search",
+  "settingsSearchSuggestions": "Quick access",
+  "settingsSearchNoResults": "No settings found",
+  "settingsSearchNoResultsHint": "Try a different name or a shorter keyword.",
+  "settingsSearchResultCount": "{count, plural, =1{1 result} other{{count} results}}",
+  "@settingsSearchResultCount": {"placeholders": {"count": {"type": "int"}}},
   "chatImageCropFailed": "Could not crop \"{fileName}\": {error}",
   "@chatImageCropFailed": {
     "placeholders": {
@@ -309,6 +317,9 @@
   "mcpServerEditSheetStdioCommandLabel": "Command",
   "mcpServerEditSheetStdioArgumentsLabel": "Arguments",
   "mcpServerEditSheetStdioWorkingDirectoryLabel": "Working Directory (optional)",
+  "mcpWorkspaceBindingLabel": "Bind workspace (optional)",
+  "mcpWorkspaceBindingHint": "The server can access this workspace at /workspace. Leave Working Directory empty to start there. The binding stays fixed when you switch chats.",
+  "mcpWorkspaceBindingMobileOnly": "Workspace binding is available in the mobile Linux environment. Unbind it to run this server on desktop.",
   "mcpServerEditSheetStdioEnvironmentTitle": "Environment",
   "mcpServerEditSheetStdioEnvNameLabel": "Name",
   "mcpServerEditSheetStdioEnvValueLabel": "Value",
@@ -3330,6 +3341,163 @@
   "assistantEditOrganizeFrequencyCustomHint": "1–20",
   "assistantEditOrganizeFrequencyCustomInvalid": "Enter a number between 1 and 20",
   "worldBookTitle": "World Book",
+  "worldBookStickyLabel": "Sticky (messages)",
+  "worldBookStickyHint": "Keep this entry active for N messages after triggering. Repeated matches do not extend it. 0 disables this effect.",
+  "worldBookCooldownLabel": "Cooldown (messages)",
+  "worldBookCooldownHint": "Prevent reactivation for N messages after triggering or after sticky ends. 0 disables this effect.",
+  "worldBookDelayLabel": "Delay (messages)",
+  "worldBookDelayHint": "Allow activation only after the conversation has at least N messages. Count individual messages, not exchanges. 0 disables this effect.",
+  "worldBookDragToReorder": "Drag to reorder",
+  "worldBookEnabledCount": "{enabled}/{total} enabled",
+  "@worldBookEnabledCount": {
+      "placeholders": {
+          "enabled": {
+              "type": "int"
+          },
+          "total": {
+              "type": "int"
+          }
+      }
+  },
+  "conversationPromptScope": "This conversation",
+  "conversationSystemPromptTitle": "Conversation system prompt",
+  "conversationSystemPromptHint": "Applies only to this conversation. Leave blank to use the assistant’s system prompt.",
+  "conversationSystemPromptClear": "Use assistant prompt",
+  "conversationSystemPromptPlaceholder": "Write a system prompt for this conversation…",
+  "assistantConversationSystemPromptTitle": "Per-conversation system prompt",
+  "assistantConversationSystemPromptHint": "Allow each conversation to use its own system prompt.",
+  "assistantConversationInjectionTitle": "Per-conversation instruction injections",
+  "assistantConversationInjectionHint": "Choose instruction injections and world books for each conversation. None selected by default.",
+  "oauthAccountId": "Account ID",
+  "oauthAccountsTab": "Accounts",
+  "oauthAuthorizationCode": "Authorization code or callback URL",
+  "oauthAuthorizationCodeHint": "If the browser does not return automatically, paste the final callback URL or authorization code here.",
+  "oauthCancel": "Cancel authorization",
+  "oauthCodeHint": "Enter this code on the authorization page",
+  "oauthConnectAnother": "Connect another account",
+  "oauthConnected": "Connected",
+  "oauthConnection": "Connection",
+  "oauthConnectionInfo": "Connection details",
+  "oauthCopyCode": "Copy code",
+  "oauthCustomRequest": "Custom request",
+  "oauthDays": "{count} day window",
+  "@oauthDays": {
+      "placeholders": {
+          "count": {
+              "type": "String"
+          }
+      }
+  },
+  "oauthDenied": "Authorization was not granted. Please try again.",
+  "oauthDetails": "View account details",
+  "oauthDeviceHint": "Enable device code login in your ChatGPT security settings or workspace permissions first.",
+  "oauthDeviceLogin": "Use device code",
+  "oauthEnabledHint": "Show these models in the model picker",
+  "oauthEndpoint": "Endpoint",
+  "oauthExpired": "{provider} login has expired",
+  "@oauthExpired": {
+      "placeholders": {
+          "provider": {
+              "type": "String"
+          }
+      }
+  },
+  "oauthExtraUsage": "Extra usage",
+  "oauthFollowGlobal": "Follow global settings",
+  "oauthHours": "{count} hour window",
+  "@oauthHours": {
+      "placeholders": {
+          "count": {
+              "type": "String"
+          }
+      }
+  },
+  "oauthInvalidAuthorizationCode": "Enter the code or callback URL from this login attempt.",
+  "oauthInvalidResponse": "Authorization did not complete. Please try again.",
+  "oauthLastUpdated": "Updated {time}",
+  "@oauthLastUpdated": {
+      "placeholders": {
+          "time": {
+              "type": "String"
+          }
+      }
+  },
+  "oauthLogin": "Log in",
+  "oauthLoginRestored": "Logged in. Use the message retry button to send again.",
+  "oauthLoginTo": "Log in to {provider}",
+  "@oauthLoginTo": {
+      "placeholders": {
+          "provider": {
+              "type": "String"
+          }
+      }
+  },
+  "oauthLogout": "Log out",
+  "oauthLogoutDescription": "Remove this account’s saved credentials from this device",
+  "oauthMinutes": "{count} minute window",
+  "@oauthMinutes": {
+      "placeholders": {
+          "count": {
+              "type": "String"
+          }
+      }
+  },
+  "oauthModelsHint": "Available models are synced from your account.",
+  "oauthMonthly": "Monthly window",
+  "oauthName": "Provider name",
+  "oauthNeedsLogin": "Login required",
+  "oauthNetwork": "Network proxy",
+  "oauthNetworkError": "Could not connect. Check your network and try again.",
+  "oauthNoModels": "Sync models to start chatting",
+  "oauthNotConnected": "Not connected",
+  "oauthOpenBrowser": "Open authorization page",
+  "oauthPermissionDenied": "This account cannot access this resource.",
+  "oauthPrimaryWindow": "Primary window",
+  "oauthPromptCachingHelp": "Reuse context across messages and choose how long the cache is retained.",
+  "oauthQuotaAvailable": "Quota is available",
+  "oauthQuotaExceeded": "This account has no available quota.",
+  "oauthRateLimited": "Too many requests. Please try again later.",
+  "oauthRefreshUsage": "Refresh usage",
+  "oauthRefreshing": "Refreshing authorization…",
+  "oauthRelogin": "Log in again",
+  "oauthRequestFailed": "The provider could not complete the request.",
+  "oauthResetsAt": "Resets {time}",
+  "@oauthResetsAt": {
+      "placeholders": {
+          "time": {
+              "type": "String"
+          }
+      }
+  },
+  "oauthSavedResets": "Available usage resets: {count}",
+  "@oauthSavedResets": {
+      "placeholders": {
+          "count": {
+              "type": "String"
+          }
+      }
+  },
+  "oauthSaving": "Connecting account…",
+  "oauthScope": "Authorization scope",
+  "oauthSecondaryWindow": "Secondary window",
+  "oauthSubmitAuthorizationCode": "Complete login",
+  "oauthSyncModels": "Sync",
+  "oauthSyncing": "Syncing models…",
+  "oauthTimeout": "Authorization timed out. Please try again.",
+  "oauthTokenExpiry": "Token expires",
+  "oauthTotal": "Total quota",
+  "oauthUsageDetails": "Usage details",
+  "oauthUsageUnavailable": "Usage is currently unavailable",
+  "oauthWaiting": "Waiting for {provider} authorization",
+  "@oauthWaiting": {
+      "placeholders": {
+          "provider": {
+              "type": "String"
+          }
+      }
+  },
+  "oauthWeekly": "Weekly window",
+  "oauthWindow": "Usage window",
   "worldBookAdd": "Add World Book",
   "worldBookEmptyMessage": "No world books yet",
   "worldBookUnnamed": "Unnamed World Book",
@@ -4873,6 +5041,7 @@
   "workspaceEntryBind": "Bind workspace",
   "workspaceEntryUnbind": "Unbind",
   "workspaceEntryChange": "Change",
+  "workspaceEntrySetAssistantDefault": "Set as assistant default",
   "workspaceEntryLocked": "Locked",
   "workspaceEntryChangeConfirmTitle": "Change workspace?",
   "workspaceEntryUnbindConfirmTitle": "Unbind?",
@@ -5204,6 +5373,14 @@
   },
   "workspaceFilesEmptyPickerHint": "Use New folder to add a subfolder",
   "skillsDetailBodyEmpty": "No skill body yet",
+  "skillsDetailBodyTooLarge": "This file is too large to preview ({size}).",
+  "@skillsDetailBodyTooLarge": {
+      "placeholders": {
+          "size": {
+              "type": "String"
+          }
+      }
+  },
   "workspaceEnvSizeTimeout": "Timed out",
   "workspaceEnvInfoCopied": "Environment info copied",
   "workspacePreviewEmptyFile": "This file is empty",
@@ -5218,7 +5395,6 @@
       }
     }
   },
-  "workspaceUnbindHint": "Unbound this conversation; change the assistant's default workspace in assistant settings",
   "storageSpaceCategoryWorkspaceFiles": "Workspace files",
   "storageSpaceCategoryWorkspaceFilesHint": "Files stored in managed workspaces.",
   "storageSpaceCategorySandboxEnvironment": "Sandbox environment",

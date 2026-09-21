@@ -1,3 +1,4 @@
+import '../../models/provider_oauth.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -538,6 +539,21 @@ Map<String, dynamic>? claudeThinkingConfig(
   int? budget, {
   ProviderConfig? config,
 }) {
+  // 账号登录的 Kimi Code 走 Messages 协议时，思考档位由目录声明决定。
+  if (config?.oauthProvider == OAuthProvider.kimi) {
+    final metadata = _modelOverride(config!, modelId);
+    if (!isClaudeReasoningEnabled(budget) &&
+        metadata['oauthThinkingRequired'] != true) {
+      return {'type': 'disabled'};
+    }
+    if (metadata['oauthThinkingMode'] == 'adaptive') {
+      return {'type': 'adaptive'};
+    }
+    return {
+      'type': 'enabled',
+      'budget_tokens': budget != null && budget > 0 ? budget : 2048,
+    };
+  }
   if (_isClaudeThinkingAlwaysOnModel(modelId)) {
     return <String, dynamic>{'type': 'adaptive', 'display': 'summarized'};
   }
@@ -561,6 +577,20 @@ Map<String, dynamic>? claudeOutputConfig(
   int? budget, {
   ProviderConfig? config,
 }) {
+  // 同上：只有自适应模式才发 effort。
+  if (config?.oauthProvider == OAuthProvider.kimi) {
+    final metadata = _modelOverride(config!, modelId);
+    if (metadata['oauthThinkingMode'] != 'adaptive') return null;
+    var effort = _claudeEffortForBudget(budget);
+    if (effort == 'auto') return null;
+    if (effort == 'off') {
+      if (metadata['oauthThinkingRequired'] != true) return null;
+      effort = 'low';
+    }
+    return {
+      'effort': {'xhigh', 'max'}.contains(effort) ? 'high' : effort,
+    };
+  }
   if (_isClaudeThinkingAlwaysOnModel(modelId)) {
     // 自适应思考无法关闭。省略 effort 会默认 high，
     // 因此界面「关闭」必须发送最低合法档位。
@@ -844,13 +874,20 @@ String collectThoughtSigCommentFromParts(List<dynamic> parts) {
       key = 'thought_signature';
       value = part['thought_signature'];
     }
-    final hasText = (part['text'] ?? '').toString().isNotEmpty;
     final hasInline =
         part['inlineData'] is Map ||
         part['inline_data'] is Map ||
         part['fileData'] is Map ||
         part['file_data'] is Map;
-    if (hasText && key != null && textKey == null) {
+    // 与流式解码器同一条判据：认 `text` 这个键，不要求正文非空。
+    // 内置工具轮次先返回的 toolCall／toolResponse part 没有该键，自然被跳过；
+    // Gemini 3 正文为空但带签名的尾部 part 则会被正确收下。
+    final isTextPart =
+        part.containsKey('text') &&
+        !hasInline &&
+        part['thought'] != true &&
+        part['functionCall'] is! Map;
+    if (isTextPart && key != null && value != null && textKey == null) {
       textKey = key;
       textValue = value;
     }

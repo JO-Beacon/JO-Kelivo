@@ -12,6 +12,11 @@ import '../../../shared/widgets/ios_tile_button.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
 String encodeProviderConfig(ProviderConfig cfg) {
+  // 账号登录的凭证通常超过二维码容量，单独走一条分享格式。
+  if (cfg.isOAuth) {
+    final data = {'type': 'oauth', 'config': cfg.toJson()};
+    return 'ai-provider:v1:${base64Encode(utf8.encode(jsonEncode(data)))}';
+  }
   String type;
   final kind = ProviderConfig.classify(cfg.id, explicitType: cfg.providerType);
   switch (kind) {
@@ -113,29 +118,30 @@ Future<void> showShareProviderSheet(
                   child: ListView(
                     controller: sc,
                     children: [
-                      Center(
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            // 始终使用白色背景，确保深色模式下可见
-                            color: Colors.white, // color-gate: ignore（QR 可扫描性）
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: cs.outlineVariant.withValues(alpha: 0.2),
+                      if (!cfg.isOAuth)
+                        Center(
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              // 始终使用白色背景，确保深色模式下可见
+                              color: Colors.white, // color-gate: ignore（QR 可扫描性）
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: cs.outlineVariant.withValues(alpha: 0.2),
+                              ),
                             ),
-                          ),
-                          child: SizedBox.square(
-                            dimension: 180,
-                            child: PrettyQrView.data(
-                              data: code,
-                              errorCorrectLevel: QrErrorCorrectLevel.M,
-                              decoration: const PrettyQrDecoration(
-                                shape: PrettyQrSmoothSymbol(roundFactor: 1),
+                            child: SizedBox.square(
+                              dimension: 180,
+                              child: PrettyQrView.data(
+                                data: code,
+                                errorCorrectLevel: QrErrorCorrectLevel.M,
+                                decoration: const PrettyQrDecoration(
+                                  shape: PrettyQrSmoothSymbol(roundFactor: 1),
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
                       const SizedBox(height: 14),
                       // 显示不可选中的文本；使用复制按钮复制
                       Text(

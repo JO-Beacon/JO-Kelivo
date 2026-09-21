@@ -97,6 +97,14 @@ void main() {
   final streamRequestBodies = <Map<String, dynamic>>[];
   Completer<void>? streamResponseGate;
   Completer<void>? streamHold;
+
+  /// 流式回复正文；需要区分两条分支时改它。
+  var streamText = 'ok';
+  Completer<void>? suggestionHold;
+  final suggestionRequests = <Map<String, dynamic>>[];
+  var suggestionResponse =
+      '{"suggestions":["suggestion one","suggestion two"]}';
+  var suggestionResponsesSent = 0;
   var holdPartialTool = false;
   Completer<void>? toolBytesSent;
   Completer<void>? releaseToolResponse;
@@ -194,7 +202,7 @@ void main() {
           'choices': [
             {
               'index': 0,
-              'delta': {'role': 'assistant', 'content': 'ok'},
+              'delta': {'role': 'assistant', 'content': streamText},
               'finish_reason': 'stop',
             },
           ],
@@ -204,18 +212,34 @@ void main() {
       await request.response.close();
       return;
     }
+    final isSuggestion = (body['messages'] as List).any(
+      (m) =>
+          m['role'] == 'system' &&
+          (m['content'] as String).contains('candidate next messages'),
+    );
+    final response = suggestionResponse;
+    if (isSuggestion) {
+      suggestionRequests.add(body);
+      final hold = suggestionHold;
+      if (hold != null) await hold.future;
+    }
     request.response.statusCode = HttpStatus.ok;
     request.response.headers.contentType = ContentType.json;
     request.response.write(
       jsonEncode({
         'choices': [
           {
-            'message': {'content': '- suggestion one\n- suggestion two'},
+            'message': {'content': isSuggestion ? response : 'Test title'},
           },
         ],
       }),
     );
-    await request.response.close();
+    if (isSuggestion) suggestionResponsesSent++;
+    try {
+      await request.response.close();
+    } on SocketException {
+      /* 客户端提前断开；响应本身已经产生。 */
+    }
   }
 
   setUp(() async {
@@ -235,6 +259,11 @@ void main() {
     streamRequestBodies.clear();
     streamResponseGate = null;
     streamHold = null;
+    streamText = 'ok';
+    suggestionHold = null;
+    suggestionRequests.clear();
+    suggestionResponsesSent = 0;
+    suggestionResponse = '{"suggestions":["suggestion one","suggestion two"]}';
     holdPartialTool = false;
     toolBytesSent = null;
     releaseToolResponse = null;
@@ -1333,6 +1362,212 @@ void main() {
       );
       expect(edited.groupId == null || edited.groupId == edited.id, isTrue);
       expect(edited.version, 0);
+    });
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'suggestion requests isolate rules and preserve literal placeholders',
+    (tester) async {
+      final controller = await pumpHarness(tester, withSuggestions: true);
+      await tester.runAsync(() async {
+        final convo = await openConversation(controller);
+        await controller.sendMessage(
+          ChatInputData(text: 'Explain {locale} and {content}'),
+        );
+        await waitFor(
+          () => service.getConversation(convo.id)!.chatSuggestions.isNotEmpty,
+          'suggestions',
+        );
+        final request = suggestionRequests.single;
+        final messages = request['messages'] as List;
+        expect(messages.first['role'], 'system');
+        expect(messages.first['content'], contains('JSON object'));
+        expect(messages.last['role'], 'user');
+        expect(
+          messages.last['content'],
+          contains('Explain {locale} and {content}'),
+        );
+        expect(messages.last['content'], contains('"role":"assistant"'));
+        expect(request.containsKey('response_format'), isFalse);
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final mutation in [
+    'clear context',
+    'edit answer',
+    'disable',
+    'send again',
+  ]) {
+    testWidgets('discard delayed suggestions after $mutation', (tester) async {
+      final controller = await pumpHarness(tester, withSuggestions: true);
+      await tester.runAsync(() async {
+        suggestionHold = Completer<void>();
+        final convo = await openConversation(controller);
+        await controller.sendMessage(ChatInputData(text: 'hello'));
+        await waitFor(
+          () => suggestionRequests.length == 1,
+          'pending suggestions',
+        );
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(convo.id),
+          'first reply to finish',
+        );
+        switch (mutation) {
+          case 'clear context':
+            await controller.clearContext();
+          case 'edit answer':
+            final messages = await service.loadMessages(convo.id);
+            await service.updateMessage(
+              messages.last.id,
+              content: 'Edited answer',
+            );
+          case 'disable':
+            await settings.disableSuggestionGeneration();
+          case 'send again':
+            streamResponseGate = Completer<void>();
+            await controller.sendMessage(ChatInputData(text: 'new question'));
+            await waitFor(
+              () => streamRequestCount == 2,
+              'second stream to start',
+            );
+        }
+        suggestionHold!.complete();
+        // 用 >= 而不是 ==：被同一个 Completer 放行的请求可能不止一条，
+        // 计数会从 0 直接跳到 2，等值判断会永远错过。
+        await waitFor(() => suggestionResponsesSent >= 1, 'delayed response');
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        expect(service.getConversation(convo.id)!.chatSuggestions, isEmpty);
+        if (streamResponseGate != null) {
+          await settings.disableSuggestionGeneration();
+          streamResponseGate!.complete();
+          streamResponseGate = null;
+          await waitFor(
+            () => !controller.chatController.isConversationLoading(convo.id),
+            'second reply to finish',
+          );
+        }
+      });
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('an empty suggestions array is not a background error', (
+    tester,
+  ) async {
+    final controller = await pumpHarness(tester, withSuggestions: true);
+    final errors = <Object>[];
+    controller.debugViewModel.onBackgroundTaskError = (_, error) =>
+        errors.add(error);
+    await tester.runAsync(() async {
+      suggestionResponse = '{"suggestions":[]}';
+      final convo = await openConversation(controller);
+      await controller.sendMessage(ChatInputData(text: 'Thanks, that is all.'));
+      await waitFor(() => suggestionResponsesSent == 1, 'empty response');
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      expect(service.getConversation(convo.id)!.chatSuggestions, isEmpty);
+      expect(errors, isEmpty);
+    });
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'background suggestions follow that conversations own active branch',
+    (tester) async {
+      final controller = await pumpHarness(tester, withSuggestions: true);
+      await tester.runAsync(() async {
+        final convo = await openConversation(controller);
+        streamText = 'FIRST ANSWER';
+        await controller.sendMessage(ChatInputData(text: 'Compare storage'));
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(convo.id),
+          'first reply to finish',
+        );
+        // 重新生成会派生第二条分支并让它成为活动分支。
+        final before = await service.loadMessages(convo.id);
+        final assistant = before.firstWhere((m) => m.role == 'assistant');
+        streamText = 'SECOND ANSWER';
+        await controller.regenerateAtMessage(assistant);
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(convo.id),
+          'regenerated reply to finish',
+        );
+        // 先等自动生成那一次落地并清掉，避免误判成后台这一次。
+        await waitFor(
+          () => service.getConversation(convo.id)!.chatSuggestions.isNotEmpty,
+          'automatic suggestions',
+        );
+        await service.clearConversationSuggestions(convo.id);
+        final beforeCount = suggestionRequests.length;
+        // 切到另一个会话，再为原会话后台生成建议。
+        final other = await service.createConversation(title: 'Other');
+        await controller.chatController.setCurrentConversationAndLoad(other);
+        controller.debugViewModel.debugChatActions.onMaybeGenerateSuggestions!(
+          convo.id,
+        );
+        await waitFor(
+          () => suggestionRequests.length > beforeCount,
+          'background request',
+        );
+        await waitFor(
+          () => service.getConversation(convo.id)!.chatSuggestions.isNotEmpty,
+          'background suggestions',
+        );
+        final prompt =
+            (suggestionRequests.last['messages'] as List).last['content']
+                as String;
+        expect(prompt, contains('SECOND ANSWER'));
+        expect(prompt, isNot(contains('FIRST ANSWER')));
+        expect(controller.currentConversation!.id, other.id);
+        expect(service.getConversation(other.id)!.chatSuggestions, isEmpty);
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('older suggestion requests cannot overwrite a newer result', (
+    tester,
+  ) async {
+    final controller = await pumpHarness(tester, withSuggestions: true);
+    await tester.runAsync(() async {
+      final convo = await openConversation(controller);
+      await service.addMessage(
+        conversationId: convo.id,
+        role: 'user',
+        content: 'Question',
+      );
+      await service.addMessage(
+        conversationId: convo.id,
+        role: 'assistant',
+        content: 'Answer',
+      );
+      final oldHold = Completer<void>();
+      suggestionHold = oldHold;
+      suggestionResponse = '{"suggestions":["old suggestion"]}';
+      controller.debugViewModel.debugChatActions.onMaybeGenerateSuggestions!(
+        convo.id,
+      );
+      await waitFor(() => suggestionRequests.length == 1, 'old request');
+      suggestionHold = null;
+      suggestionResponse = '{"suggestions":["new suggestion"]}';
+      controller.debugViewModel.debugChatActions.onMaybeGenerateSuggestions!(
+        convo.id,
+      );
+      await waitFor(
+        () => service.getConversation(convo.id)!.chatSuggestions.isNotEmpty,
+        'new result',
+      );
+      expect(service.getConversation(convo.id)!.chatSuggestions, [
+        'new suggestion',
+      ]);
+      oldHold.complete();
+      await waitFor(() => suggestionResponsesSent == 2, 'old response');
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      expect(service.getConversation(convo.id)!.chatSuggestions, [
+        'new suggestion',
+      ]);
     });
     expect(tester.takeException(), isNull);
   });

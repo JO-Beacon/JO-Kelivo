@@ -222,12 +222,14 @@ class StreamingContentNotifier {
     notifier?.dispose();
   }
 
-  /// 清空所有通知器（例如切换会话时）。
-  void clear() {
-    for (final notifier in _notifiers.values) {
+  /// 释放通知器，但放过仍属在跑生成的那些。
+  void clear({Set<String> keepMessageIds = const {}}) {
+    _notifiers.removeWhere((id, notifier) {
+      if (keepMessageIds.contains(id)) return false;
       notifier.dispose();
-    }
-    _notifiers.clear();
+      return true;
+    });
+    _pendingHeightIds.removeWhere((id) => !keepMessageIds.contains(id));
   }
 
   /// 释放全部资源。

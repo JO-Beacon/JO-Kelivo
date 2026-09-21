@@ -152,8 +152,8 @@ void main() {
           'lib/features/settings/pages/about_page.dart',
           'lib/desktop/setting/about_pane.dart',
         ]) {
-          _expectContains(path, "_upstreamKelivoVersion = '1.2.7'");
-          _expectContains(path, "_upstreamKelivoBuildNumber = '76'");
+          _expectContains(path, "_upstreamKelivoVersion = '1.3.0'");
+          _expectContains(path, "_upstreamKelivoBuildNumber = '79'");
           _expectContains(path, 'https://github.com/JO-Beacon/JO-Kelivo');
           _expectContains(path, 'https://github.com/Chevey339/kelivo');
         }
@@ -179,7 +179,7 @@ void main() {
       );
       _expectContains(
         'lib/core/services/network/dio_http_client.dart',
-        "'User-Agent', () => 'JO-AIClient'",
+        "reqHeaders['User-Agent'] = 'JO-AIClient';",
       );
       _expectContains(
         'lib/core/services/tts/network_tts.dart',
@@ -206,11 +206,18 @@ void main() {
 
     test('恢复、后台和定时任务文案以 JO-AIClient 称呼当前应用', () {
       const keys = [
-        'storageSpaceClearDisplacedDatabasesConfirmMessage', 'startupRecoveryDangerBody',
-        'startupDatabaseUpdateRequiredDowngradeStep1', 'backupPageForwardCompatBody',
-        'backupPageSchemaTooNewMessage', 'backgroundTaskTitle', 'backgroundIconDefault',
-        'startupRecoverySnapshotBody', 'startupRecoverySnapshotConfirm', 'startupRecoverySnapshotReady',
-        'scheduledTasksReliability', 'scheduledTasksDesktopReliability',
+        'storageSpaceClearDisplacedDatabasesConfirmMessage',
+        'startupRecoveryDangerBody',
+        'startupDatabaseUpdateRequiredDowngradeStep1',
+        'backupPageForwardCompatBody',
+        'backupPageSchemaTooNewMessage',
+        'backgroundTaskTitle',
+        'backgroundIconDefault',
+        'startupRecoverySnapshotBody',
+        'startupRecoverySnapshotConfirm',
+        'startupRecoverySnapshotReady',
+        'scheduledTasksReliability',
+        'scheduledTasksDesktopReliability',
       ];
       for (final locale in ['en', 'zh', 'zh_Hans', 'zh_Hant']) {
         final path = 'lib/l10n/app_$locale.arb';
@@ -343,9 +350,7 @@ void main() {
     test(
       'uses JO-AIClient OAuth schemes without changing compatibility URI data',
       () {
-        final callback = _read(
-          'lib/core/services/mcp/mcp_oauth_callback_io.dart',
-        );
+        final callback = _read('lib/core/services/auth/oauth_callback_io.dart');
         expect(
           "scheme: 'io.github.jobeacon.joaiclient'".allMatches(callback),
           hasLength(2),

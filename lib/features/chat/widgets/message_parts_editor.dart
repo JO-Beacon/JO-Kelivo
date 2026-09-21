@@ -322,6 +322,8 @@ String _partLabel(AppLocalizations l10n, MessagePart part) => switch (part) {
   FilePart() => l10n.messageEditFilePart,
   UnknownPart() => l10n.messageEditUnknownPart,
   MalformedPart() => l10n.messageEditUnknownPart,
+  // 账号登录失效的恢复入口不是可编辑内容，按未知部件展示。
+  ProviderAuthErrorPart() => l10n.messageEditUnknownPart,
 };
 
 /// 只读部件在卡片和大窗口里展示的文本。

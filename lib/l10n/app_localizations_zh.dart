@@ -9,6 +9,29 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String get settingsSearchHint => '搜索设置';
+
+  @override
+  String get settingsSearchCancel => '取消';
+
+  @override
+  String get settingsSearchClear => '清空搜索';
+
+  @override
+  String get settingsSearchSuggestions => '常用设置';
+
+  @override
+  String get settingsSearchNoResults => '未找到相关设置';
+
+  @override
+  String get settingsSearchNoResultsHint => '试试其他名称，或更简短的关键词。';
+
+  @override
+  String settingsSearchResultCount(int count) {
+    return '找到 $count 项设置';
+  }
+
+  @override
   String chatImageCropFailed(String fileName, String error) {
     return '图片“$fileName”裁剪失败：$error';
   }
@@ -637,6 +660,17 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mcpServerEditSheetStdioWorkingDirectoryLabel => '工作目录（可选）';
+
+  @override
+  String get mcpWorkspaceBindingLabel => '绑定工作区（可选）';
+
+  @override
+  String get mcpWorkspaceBindingHint =>
+      '服务器可通过 /workspace 访问此工作区。工作目录留空时默认进入该目录，切换聊天不会改变绑定。';
+
+  @override
+  String get mcpWorkspaceBindingMobileOnly =>
+      '工作区绑定适用于移动端 Linux 环境。在桌面端运行此服务器前，请先解除绑定。';
 
   @override
   String get mcpServerEditSheetStdioEnvironmentTitle => '环境变量';
@@ -7371,6 +7405,278 @@ class AppLocalizationsZh extends AppLocalizations {
   String get worldBookTitle => '世界书';
 
   @override
+  String get worldBookStickyLabel => '粘滞（消息数）';
+
+  @override
+  String get worldBookStickyHint => '触发后在后续 N 条消息中保持激活，重复命中不延长。0 表示关闭。';
+
+  @override
+  String get worldBookCooldownLabel => '冷却（消息数）';
+
+  @override
+  String get worldBookCooldownHint => '触发后（或粘滞结束后）N 条消息内不再触发。0 表示关闭。';
+
+  @override
+  String get worldBookDelayLabel => '延迟（消息数）';
+
+  @override
+  String get worldBookDelayHint => '对话至少有 N 条消息时才允许触发。按单条消息计数，不是对话轮数。0 表示关闭。';
+
+  @override
+  String get worldBookDragToReorder => '拖动调整顺序';
+
+  @override
+  String worldBookEnabledCount(int enabled, int total) {
+    return '已启用 $enabled/$total';
+  }
+
+  @override
+  String get conversationPromptScope => '仅当前对话';
+
+  @override
+  String get conversationSystemPromptTitle => '对话系统提示词';
+
+  @override
+  String get conversationSystemPromptHint => '仅对当前对话生效，留空时使用助手的系统提示词。';
+
+  @override
+  String get conversationSystemPromptClear => '恢复助手提示词';
+
+  @override
+  String get conversationSystemPromptPlaceholder => '为这个对话编写系统提示词…';
+
+  @override
+  String get assistantConversationSystemPromptTitle => '独立对话系统提示';
+
+  @override
+  String get assistantConversationSystemPromptHint => '允许每个对话设置自己的系统提示词。';
+
+  @override
+  String get assistantConversationInjectionTitle => '独立对话指令注入';
+
+  @override
+  String get assistantConversationInjectionHint => '每个对话单独选择指令注入和世界书，默认不选中。';
+
+  @override
+  String get oauthAccountId => '账号 ID';
+
+  @override
+  String get oauthAccountsTab => '账号登录';
+
+  @override
+  String get oauthAuthorizationCode => '授权码或回调链接';
+
+  @override
+  String get oauthAuthorizationCodeHint => '如果浏览器没有自动返回，请将最后的回调链接或授权码粘贴到这里。';
+
+  @override
+  String get oauthCancel => '取消授权';
+
+  @override
+  String get oauthCodeHint => '在授权页面输入此验证码';
+
+  @override
+  String get oauthConnectAnother => '再连一个';
+
+  @override
+  String get oauthConnected => '已连接';
+
+  @override
+  String get oauthConnection => '接入';
+
+  @override
+  String get oauthConnectionInfo => '接入信息';
+
+  @override
+  String get oauthCopyCode => '复制验证码';
+
+  @override
+  String get oauthCustomRequest => '自定义请求';
+
+  @override
+  String oauthDays(String count) {
+    return '$count 天窗口';
+  }
+
+  @override
+  String get oauthDenied => '授权未获批准，请重试。';
+
+  @override
+  String get oauthDetails => '查看账号详情';
+
+  @override
+  String get oauthDeviceHint => '请先在 ChatGPT 安全设置或工作区权限中启用设备码登录。';
+
+  @override
+  String get oauthDeviceLogin => '使用设备码登录';
+
+  @override
+  String get oauthEnabledHint => '在模型选择器中显示这些模型';
+
+  @override
+  String get oauthEndpoint => '接入端点';
+
+  @override
+  String oauthExpired(String provider) {
+    return '$provider 登录已过期';
+  }
+
+  @override
+  String get oauthExtraUsage => '额外用量';
+
+  @override
+  String get oauthFollowGlobal => '跟随全局设置';
+
+  @override
+  String oauthHours(String count) {
+    return '$count 小时窗口';
+  }
+
+  @override
+  String get oauthInvalidAuthorizationCode => '请输入本次登录的授权码或回调链接。';
+
+  @override
+  String get oauthInvalidResponse => '授权未完成，请重试。';
+
+  @override
+  String oauthLastUpdated(String time) {
+    return '更新于 $time';
+  }
+
+  @override
+  String get oauthLogin => '登录';
+
+  @override
+  String get oauthLoginRestored => '已重新登录，可使用消息的重试按钮再次发送。';
+
+  @override
+  String oauthLoginTo(String provider) {
+    return '登录 $provider';
+  }
+
+  @override
+  String get oauthLogout => '退出登录';
+
+  @override
+  String get oauthLogoutDescription => '清除此账号在本机保存的授权凭证';
+
+  @override
+  String oauthMinutes(String count) {
+    return '$count 分钟窗口';
+  }
+
+  @override
+  String get oauthModelsHint => '可用模型由账号同步。';
+
+  @override
+  String get oauthMonthly => '本月窗口';
+
+  @override
+  String get oauthName => '供应商名称';
+
+  @override
+  String get oauthNeedsLogin => '需重新登录';
+
+  @override
+  String get oauthNetwork => '网络代理';
+
+  @override
+  String get oauthNetworkError => '连接失败，请检查网络后重试。';
+
+  @override
+  String get oauthNoModels => '同步模型后即可开始对话';
+
+  @override
+  String get oauthNotConnected => '未连接';
+
+  @override
+  String get oauthOpenBrowser => '打开授权页面';
+
+  @override
+  String get oauthPermissionDenied => '该账号无权访问此资源。';
+
+  @override
+  String get oauthPrimaryWindow => '主要窗口';
+
+  @override
+  String get oauthPromptCachingHelp => '复用多轮对话中的上下文，可设置缓存保留时长。';
+
+  @override
+  String get oauthQuotaAvailable => '额度可用';
+
+  @override
+  String get oauthQuotaExceeded => '该账号暂无可用额度。';
+
+  @override
+  String get oauthRateLimited => '请求过于频繁，请稍后重试。';
+
+  @override
+  String get oauthRefreshUsage => '刷新用量';
+
+  @override
+  String get oauthRefreshing => '正在续期授权…';
+
+  @override
+  String get oauthRelogin => '重新登录';
+
+  @override
+  String get oauthRequestFailed => '供应商未能完成请求。';
+
+  @override
+  String oauthResetsAt(String time) {
+    return '重置于 $time';
+  }
+
+  @override
+  String oauthSavedResets(String count) {
+    return '可用额度重置次数：$count';
+  }
+
+  @override
+  String get oauthSaving => '正在连接账号…';
+
+  @override
+  String get oauthScope => '授权范围';
+
+  @override
+  String get oauthSecondaryWindow => '次要窗口';
+
+  @override
+  String get oauthSubmitAuthorizationCode => '完成登录';
+
+  @override
+  String get oauthSyncModels => '同步';
+
+  @override
+  String get oauthSyncing => '正在同步模型…';
+
+  @override
+  String get oauthTimeout => '授权超时，请重试。';
+
+  @override
+  String get oauthTokenExpiry => '令牌有效期';
+
+  @override
+  String get oauthTotal => '总额度';
+
+  @override
+  String get oauthUsageDetails => '用量明细';
+
+  @override
+  String get oauthUsageUnavailable => '暂时无法获取用量';
+
+  @override
+  String oauthWaiting(String provider) {
+    return '正在等待 $provider 授权';
+  }
+
+  @override
+  String get oauthWeekly => '本周窗口';
+
+  @override
+  String get oauthWindow => '用量窗口';
+
+  @override
   String get worldBookAdd => '添加世界书';
 
   @override
@@ -10279,6 +10585,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceEntryChange => '更换';
 
   @override
+  String get workspaceEntrySetAssistantDefault => '设为助手默认工作区';
+
+  @override
   String get workspaceEntryLocked => '已锁定';
 
   @override
@@ -10856,6 +11165,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skillsDetailBodyEmpty => '还没有技能正文';
 
   @override
+  String skillsDetailBodyTooLarge(String size) {
+    return '文件较大，暂不支持预览（$size）。';
+  }
+
+  @override
   String get workspaceEnvSizeTimeout => '计算超时';
 
   @override
@@ -10877,9 +11191,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String workspaceBindingSetAssistantDefault(String assistant) {
     return '已设为「$assistant」的默认工作区';
   }
-
-  @override
-  String get workspaceUnbindHint => '已解绑本对话；助手默认工作区可在助手设置中修改';
 
   @override
   String get storageSpaceCategoryWorkspaceFiles => '工作区文件';
@@ -11964,6 +12275,29 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   AppLocalizationsZhHans() : super('zh_Hans');
 
   @override
+  String get settingsSearchHint => '搜索设置';
+
+  @override
+  String get settingsSearchCancel => '取消';
+
+  @override
+  String get settingsSearchClear => '清空搜索';
+
+  @override
+  String get settingsSearchSuggestions => '常用设置';
+
+  @override
+  String get settingsSearchNoResults => '未找到相关设置';
+
+  @override
+  String get settingsSearchNoResultsHint => '试试其他名称，或更简短的关键词。';
+
+  @override
+  String settingsSearchResultCount(int count) {
+    return '找到 $count 项设置';
+  }
+
+  @override
   String chatImageCropFailed(String fileName, String error) {
     return '图片“$fileName”裁剪失败：$error';
   }
@@ -12592,6 +12926,17 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get mcpServerEditSheetStdioWorkingDirectoryLabel => '工作目录（可选）';
+
+  @override
+  String get mcpWorkspaceBindingLabel => '绑定工作区（可选）';
+
+  @override
+  String get mcpWorkspaceBindingHint =>
+      '服务器可通过 /workspace 访问此工作区。工作目录留空时默认进入该目录，切换聊天不会改变绑定。';
+
+  @override
+  String get mcpWorkspaceBindingMobileOnly =>
+      '工作区绑定适用于移动端 Linux 环境。在桌面端运行此服务器前，请先解除绑定。';
 
   @override
   String get mcpServerEditSheetStdioEnvironmentTitle => '环境变量';
@@ -19326,6 +19671,278 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get worldBookTitle => '世界书';
 
   @override
+  String get worldBookStickyLabel => '粘滞（消息数）';
+
+  @override
+  String get worldBookStickyHint => '触发后在后续 N 条消息中保持激活，重复命中不延长。0 表示关闭。';
+
+  @override
+  String get worldBookCooldownLabel => '冷却（消息数）';
+
+  @override
+  String get worldBookCooldownHint => '触发后（或粘滞结束后）N 条消息内不再触发。0 表示关闭。';
+
+  @override
+  String get worldBookDelayLabel => '延迟（消息数）';
+
+  @override
+  String get worldBookDelayHint => '对话至少有 N 条消息时才允许触发。按单条消息计数，不是对话轮数。0 表示关闭。';
+
+  @override
+  String get worldBookDragToReorder => '拖动调整顺序';
+
+  @override
+  String worldBookEnabledCount(int enabled, int total) {
+    return '已启用 $enabled/$total';
+  }
+
+  @override
+  String get conversationPromptScope => '仅当前对话';
+
+  @override
+  String get conversationSystemPromptTitle => '对话系统提示词';
+
+  @override
+  String get conversationSystemPromptHint => '仅对当前对话生效，留空时使用助手的系统提示词。';
+
+  @override
+  String get conversationSystemPromptClear => '恢复助手提示词';
+
+  @override
+  String get conversationSystemPromptPlaceholder => '为这个对话编写系统提示词…';
+
+  @override
+  String get assistantConversationSystemPromptTitle => '独立对话系统提示';
+
+  @override
+  String get assistantConversationSystemPromptHint => '允许每个对话设置自己的系统提示词。';
+
+  @override
+  String get assistantConversationInjectionTitle => '独立对话指令注入';
+
+  @override
+  String get assistantConversationInjectionHint => '每个对话单独选择指令注入和世界书，默认不选中。';
+
+  @override
+  String get oauthAccountId => '账号 ID';
+
+  @override
+  String get oauthAccountsTab => '账号登录';
+
+  @override
+  String get oauthAuthorizationCode => '授权码或回调链接';
+
+  @override
+  String get oauthAuthorizationCodeHint => '如果浏览器没有自动返回，请将最后的回调链接或授权码粘贴到这里。';
+
+  @override
+  String get oauthCancel => '取消授权';
+
+  @override
+  String get oauthCodeHint => '在授权页面输入此验证码';
+
+  @override
+  String get oauthConnectAnother => '再连一个';
+
+  @override
+  String get oauthConnected => '已连接';
+
+  @override
+  String get oauthConnection => '接入';
+
+  @override
+  String get oauthConnectionInfo => '接入信息';
+
+  @override
+  String get oauthCopyCode => '复制验证码';
+
+  @override
+  String get oauthCustomRequest => '自定义请求';
+
+  @override
+  String oauthDays(String count) {
+    return '$count 天窗口';
+  }
+
+  @override
+  String get oauthDenied => '授权未获批准，请重试。';
+
+  @override
+  String get oauthDetails => '查看账号详情';
+
+  @override
+  String get oauthDeviceHint => '请先在 ChatGPT 安全设置或工作区权限中启用设备码登录。';
+
+  @override
+  String get oauthDeviceLogin => '使用设备码登录';
+
+  @override
+  String get oauthEnabledHint => '在模型选择器中显示这些模型';
+
+  @override
+  String get oauthEndpoint => '接入端点';
+
+  @override
+  String oauthExpired(String provider) {
+    return '$provider 登录已过期';
+  }
+
+  @override
+  String get oauthExtraUsage => '额外用量';
+
+  @override
+  String get oauthFollowGlobal => '跟随全局设置';
+
+  @override
+  String oauthHours(String count) {
+    return '$count 小时窗口';
+  }
+
+  @override
+  String get oauthInvalidAuthorizationCode => '请输入本次登录的授权码或回调链接。';
+
+  @override
+  String get oauthInvalidResponse => '授权未完成，请重试。';
+
+  @override
+  String oauthLastUpdated(String time) {
+    return '更新于 $time';
+  }
+
+  @override
+  String get oauthLogin => '登录';
+
+  @override
+  String get oauthLoginRestored => '已重新登录，可使用消息的重试按钮再次发送。';
+
+  @override
+  String oauthLoginTo(String provider) {
+    return '登录 $provider';
+  }
+
+  @override
+  String get oauthLogout => '退出登录';
+
+  @override
+  String get oauthLogoutDescription => '清除此账号在本机保存的授权凭证';
+
+  @override
+  String oauthMinutes(String count) {
+    return '$count 分钟窗口';
+  }
+
+  @override
+  String get oauthModelsHint => '可用模型由账号同步。';
+
+  @override
+  String get oauthMonthly => '本月窗口';
+
+  @override
+  String get oauthName => '供应商名称';
+
+  @override
+  String get oauthNeedsLogin => '需重新登录';
+
+  @override
+  String get oauthNetwork => '网络代理';
+
+  @override
+  String get oauthNetworkError => '连接失败，请检查网络后重试。';
+
+  @override
+  String get oauthNoModels => '同步模型后即可开始对话';
+
+  @override
+  String get oauthNotConnected => '未连接';
+
+  @override
+  String get oauthOpenBrowser => '打开授权页面';
+
+  @override
+  String get oauthPermissionDenied => '该账号无权访问此资源。';
+
+  @override
+  String get oauthPrimaryWindow => '主要窗口';
+
+  @override
+  String get oauthPromptCachingHelp => '复用多轮对话中的上下文，可设置缓存保留时长。';
+
+  @override
+  String get oauthQuotaAvailable => '额度可用';
+
+  @override
+  String get oauthQuotaExceeded => '该账号暂无可用额度。';
+
+  @override
+  String get oauthRateLimited => '请求过于频繁，请稍后重试。';
+
+  @override
+  String get oauthRefreshUsage => '刷新用量';
+
+  @override
+  String get oauthRefreshing => '正在续期授权…';
+
+  @override
+  String get oauthRelogin => '重新登录';
+
+  @override
+  String get oauthRequestFailed => '供应商未能完成请求。';
+
+  @override
+  String oauthResetsAt(String time) {
+    return '重置于 $time';
+  }
+
+  @override
+  String oauthSavedResets(String count) {
+    return '可用额度重置次数：$count';
+  }
+
+  @override
+  String get oauthSaving => '正在连接账号…';
+
+  @override
+  String get oauthScope => '授权范围';
+
+  @override
+  String get oauthSecondaryWindow => '次要窗口';
+
+  @override
+  String get oauthSubmitAuthorizationCode => '完成登录';
+
+  @override
+  String get oauthSyncModels => '同步';
+
+  @override
+  String get oauthSyncing => '正在同步模型…';
+
+  @override
+  String get oauthTimeout => '授权超时，请重试。';
+
+  @override
+  String get oauthTokenExpiry => '令牌有效期';
+
+  @override
+  String get oauthTotal => '总额度';
+
+  @override
+  String get oauthUsageDetails => '用量明细';
+
+  @override
+  String get oauthUsageUnavailable => '暂时无法获取用量';
+
+  @override
+  String oauthWaiting(String provider) {
+    return '正在等待 $provider 授权';
+  }
+
+  @override
+  String get oauthWeekly => '本周窗口';
+
+  @override
+  String get oauthWindow => '用量窗口';
+
+  @override
   String get worldBookAdd => '添加世界书';
 
   @override
@@ -22234,6 +22851,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get workspaceEntryChange => '更换';
 
   @override
+  String get workspaceEntrySetAssistantDefault => '设为助手默认工作区';
+
+  @override
   String get workspaceEntryLocked => '已锁定';
 
   @override
@@ -22811,6 +23431,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get skillsDetailBodyEmpty => '还没有技能正文';
 
   @override
+  String skillsDetailBodyTooLarge(String size) {
+    return '文件较大，暂不支持预览（$size）。';
+  }
+
+  @override
   String get workspaceEnvSizeTimeout => '计算超时';
 
   @override
@@ -22832,9 +23457,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String workspaceBindingSetAssistantDefault(String assistant) {
     return '已设为「$assistant」的默认工作区';
   }
-
-  @override
-  String get workspaceUnbindHint => '已解绑本对话；助手默认工作区可在助手设置中修改';
 
   @override
   String get storageSpaceCategoryWorkspaceFiles => '工作区文件';
@@ -23919,6 +24541,29 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   AppLocalizationsZhHant() : super('zh_Hant');
 
   @override
+  String get settingsSearchHint => '搜尋設定';
+
+  @override
+  String get settingsSearchCancel => '取消';
+
+  @override
+  String get settingsSearchClear => '清除搜尋';
+
+  @override
+  String get settingsSearchSuggestions => '常用設定';
+
+  @override
+  String get settingsSearchNoResults => '找不到相關設定';
+
+  @override
+  String get settingsSearchNoResultsHint => '試試其他名稱，或更簡短的關鍵字。';
+
+  @override
+  String settingsSearchResultCount(int count) {
+    return '找到 $count 項設定';
+  }
+
+  @override
   String chatImageCropFailed(String fileName, String error) {
     return '圖片「$fileName」裁剪失敗：$error';
   }
@@ -24547,6 +25192,17 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get mcpServerEditSheetStdioWorkingDirectoryLabel => '工作目錄（可選）';
+
+  @override
+  String get mcpWorkspaceBindingLabel => '綁定工作區（可選）';
+
+  @override
+  String get mcpWorkspaceBindingHint =>
+      '伺服器可透過 /workspace 存取此工作區。工作目錄留空時預設進入該目錄，切換聊天不會改變綁定。';
+
+  @override
+  String get mcpWorkspaceBindingMobileOnly =>
+      '工作區綁定適用於行動端 Linux 環境。在桌面端執行此伺服器前，請先解除綁定。';
 
   @override
   String get mcpServerEditSheetStdioEnvironmentTitle => '環境變數';
@@ -31283,6 +31939,278 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get worldBookTitle => '世界書';
 
   @override
+  String get worldBookStickyLabel => '黏滯（訊息數）';
+
+  @override
+  String get worldBookStickyHint => '觸發後在後續 N 則訊息中保持啟用，重複命中不延長。0 表示關閉。';
+
+  @override
+  String get worldBookCooldownLabel => '冷卻（訊息數）';
+
+  @override
+  String get worldBookCooldownHint => '觸發後（或黏滯結束後）N 則訊息內不再觸發。0 表示關閉。';
+
+  @override
+  String get worldBookDelayLabel => '延遲（訊息數）';
+
+  @override
+  String get worldBookDelayHint => '對話至少有 N 則訊息時才允許觸發。按單則訊息計數，不是對話輪數。0 表示關閉。';
+
+  @override
+  String get worldBookDragToReorder => '拖曳調整順序';
+
+  @override
+  String worldBookEnabledCount(int enabled, int total) {
+    return '已啟用 $enabled/$total';
+  }
+
+  @override
+  String get conversationPromptScope => '僅目前對話';
+
+  @override
+  String get conversationSystemPromptTitle => '對話系統提示詞';
+
+  @override
+  String get conversationSystemPromptHint => '僅對目前對話生效，留空時使用助理的系統提示詞。';
+
+  @override
+  String get conversationSystemPromptClear => '恢復助理提示詞';
+
+  @override
+  String get conversationSystemPromptPlaceholder => '為這個對話編寫系統提示詞…';
+
+  @override
+  String get assistantConversationSystemPromptTitle => '獨立對話系統提示';
+
+  @override
+  String get assistantConversationSystemPromptHint => '允許每個對話設定自己的系統提示詞。';
+
+  @override
+  String get assistantConversationInjectionTitle => '獨立對話指令注入';
+
+  @override
+  String get assistantConversationInjectionHint => '每個對話單獨選擇指令注入和世界書，預設不選取。';
+
+  @override
+  String get oauthAccountId => '帳號 ID';
+
+  @override
+  String get oauthAccountsTab => '帳號登入';
+
+  @override
+  String get oauthAuthorizationCode => '授權碼或回呼連結';
+
+  @override
+  String get oauthAuthorizationCodeHint => '如果瀏覽器沒有自動返回，請將最後的回呼連結或授權碼貼到這裡。';
+
+  @override
+  String get oauthCancel => '取消授權';
+
+  @override
+  String get oauthCodeHint => '在授權頁面輸入此驗證碼';
+
+  @override
+  String get oauthConnectAnother => '再連一個';
+
+  @override
+  String get oauthConnected => '已連線';
+
+  @override
+  String get oauthConnection => '連線';
+
+  @override
+  String get oauthConnectionInfo => '連線資訊';
+
+  @override
+  String get oauthCopyCode => '複製驗證碼';
+
+  @override
+  String get oauthCustomRequest => '自訂請求';
+
+  @override
+  String oauthDays(String count) {
+    return '$count 天視窗';
+  }
+
+  @override
+  String get oauthDenied => '授權未獲批准，請重試。';
+
+  @override
+  String get oauthDetails => '查看帳號詳情';
+
+  @override
+  String get oauthDeviceHint => '請先在 ChatGPT 安全設定或工作區權限中啟用裝置碼登入。';
+
+  @override
+  String get oauthDeviceLogin => '使用裝置碼登入';
+
+  @override
+  String get oauthEnabledHint => '在模型選擇器中顯示這些模型';
+
+  @override
+  String get oauthEndpoint => '連線端點';
+
+  @override
+  String oauthExpired(String provider) {
+    return '$provider 登入已過期';
+  }
+
+  @override
+  String get oauthExtraUsage => '額外用量';
+
+  @override
+  String get oauthFollowGlobal => '跟隨全域設定';
+
+  @override
+  String oauthHours(String count) {
+    return '$count 小時視窗';
+  }
+
+  @override
+  String get oauthInvalidAuthorizationCode => '請輸入本次登入的授權碼或回呼連結。';
+
+  @override
+  String get oauthInvalidResponse => '授權未完成，請重試。';
+
+  @override
+  String oauthLastUpdated(String time) {
+    return '更新於 $time';
+  }
+
+  @override
+  String get oauthLogin => '登入';
+
+  @override
+  String get oauthLoginRestored => '已重新登入，可使用訊息的重試按鈕再次傳送。';
+
+  @override
+  String oauthLoginTo(String provider) {
+    return '登入 $provider';
+  }
+
+  @override
+  String get oauthLogout => '登出';
+
+  @override
+  String get oauthLogoutDescription => '清除此帳號在本機儲存的授權憑證';
+
+  @override
+  String oauthMinutes(String count) {
+    return '$count 分鐘視窗';
+  }
+
+  @override
+  String get oauthModelsHint => '可用模型由帳號同步。';
+
+  @override
+  String get oauthMonthly => '本月視窗';
+
+  @override
+  String get oauthName => '供應商名稱';
+
+  @override
+  String get oauthNeedsLogin => '需重新登入';
+
+  @override
+  String get oauthNetwork => '網路代理';
+
+  @override
+  String get oauthNetworkError => '連線失敗，請檢查網路後重試。';
+
+  @override
+  String get oauthNoModels => '同步模型後即可開始對話';
+
+  @override
+  String get oauthNotConnected => '未連線';
+
+  @override
+  String get oauthOpenBrowser => '開啟授權頁面';
+
+  @override
+  String get oauthPermissionDenied => '此帳號無權存取此資源。';
+
+  @override
+  String get oauthPrimaryWindow => '主要視窗';
+
+  @override
+  String get oauthPromptCachingHelp => '重用多輪對話中的上下文，可設定快取保留時間。';
+
+  @override
+  String get oauthQuotaAvailable => '額度可用';
+
+  @override
+  String get oauthQuotaExceeded => '此帳號暫無可用額度。';
+
+  @override
+  String get oauthRateLimited => '請求過於頻繁，請稍後重試。';
+
+  @override
+  String get oauthRefreshUsage => '重新整理用量';
+
+  @override
+  String get oauthRefreshing => '正在續期授權…';
+
+  @override
+  String get oauthRelogin => '重新登入';
+
+  @override
+  String get oauthRequestFailed => '供應商未能完成請求。';
+
+  @override
+  String oauthResetsAt(String time) {
+    return '重設於 $time';
+  }
+
+  @override
+  String oauthSavedResets(String count) {
+    return '可用額度重設次數：$count';
+  }
+
+  @override
+  String get oauthSaving => '正在連接帳號…';
+
+  @override
+  String get oauthScope => '授權範圍';
+
+  @override
+  String get oauthSecondaryWindow => '次要視窗';
+
+  @override
+  String get oauthSubmitAuthorizationCode => '完成登入';
+
+  @override
+  String get oauthSyncModels => '同步';
+
+  @override
+  String get oauthSyncing => '正在同步模型…';
+
+  @override
+  String get oauthTimeout => '授權逾時，請重試。';
+
+  @override
+  String get oauthTokenExpiry => '權杖有效期限';
+
+  @override
+  String get oauthTotal => '總額度';
+
+  @override
+  String get oauthUsageDetails => '用量明細';
+
+  @override
+  String get oauthUsageUnavailable => '暫時無法取得用量';
+
+  @override
+  String oauthWaiting(String provider) {
+    return '正在等待 $provider 授權';
+  }
+
+  @override
+  String get oauthWeekly => '本週視窗';
+
+  @override
+  String get oauthWindow => '用量視窗';
+
+  @override
   String get worldBookAdd => '新增世界書';
 
   @override
@@ -34192,6 +35120,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get workspaceEntryChange => '更換';
 
   @override
+  String get workspaceEntrySetAssistantDefault => '設為助手預設工作區';
+
+  @override
   String get workspaceEntryLocked => '已鎖定';
 
   @override
@@ -34769,6 +35700,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get skillsDetailBodyEmpty => '還沒有技能正文';
 
   @override
+  String skillsDetailBodyTooLarge(String size) {
+    return '檔案較大，暫不支援預覽（$size）。';
+  }
+
+  @override
   String get workspaceEnvSizeTimeout => '計算逾時';
 
   @override
@@ -34790,9 +35726,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String workspaceBindingSetAssistantDefault(String assistant) {
     return '已設為「$assistant」的預設工作區';
   }
-
-  @override
-  String get workspaceUnbindHint => '已解除綁定本對話；助手預設工作區可在助手設定中修改';
 
   @override
   String get storageSpaceCategoryWorkspaceFiles => '工作區檔案';

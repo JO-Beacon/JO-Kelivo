@@ -12,6 +12,11 @@ class ActiveStreamingMessageStore {
   /// 当前是否任一会话存在进行中的助手消息。
   bool get isNotEmpty => _messagesByConversation.isNotEmpty;
 
+  /// 仍在跑（或正在收尾）的助手消息 ID。
+  Set<String> get messageIds => {
+    for (final message in _messagesByConversation.values) message.id,
+  };
+
   void put(ChatMessage message) {
     _messagesByConversation[message.conversationId] = message;
   }

@@ -14,8 +14,8 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
   static const Duration _groupReorderCollapseDelay = Duration(milliseconds: 32);
 
   String? _selectedKey;
-  final GlobalKey<_DesktopProviderDetailPaneState> _detailKey =
-      GlobalKey<_DesktopProviderDetailPaneState>();
+  final GlobalKey<DesktopProviderDetailPaneState> _detailKey =
+      GlobalKey<DesktopProviderDetailPaneState>();
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   Timer? _groupReorderRestoreTimer;
@@ -352,7 +352,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
     final selectedKey = _selectedKey;
     final rightPane = selectedKey == null
         ? const SizedBox()
-        : _DesktopProviderDetailPane(
+        : DesktopProviderDetailPane(
             key: _detailKey,
             providerKey: selectedKey,
             displayName: settings.getProviderConfig(selectedKey).name.isNotEmpty
@@ -909,21 +909,32 @@ class _DesktopProviderGroupHeaderRowState
   }
 }
 
-class _DesktopProviderDetailPane extends StatefulWidget {
-  const _DesktopProviderDetailPane({
+class DesktopProviderDetailPane extends StatefulWidget {
+  const DesktopProviderDetailPane({
     super.key,
     required this.providerKey,
     required this.displayName,
+    this.oauthAccount,
+    this.oauthFooter,
+    this.onSyncModels,
+    this.syncingModels = false,
+    this.onClose,
   });
   final String providerKey;
   final String displayName;
+
+  /// 账号登录：账号卡片与底部附加内容，以及同步模型入口。
+  final Widget? oauthAccount;
+  final Widget? oauthFooter;
+  final VoidCallback? onSyncModels;
+  final bool syncingModels;
+  final VoidCallback? onClose;
   @override
-  State<_DesktopProviderDetailPane> createState() =>
-      _DesktopProviderDetailPaneState();
+  State<DesktopProviderDetailPane> createState() =>
+      DesktopProviderDetailPaneState();
 }
 
-class _DesktopProviderDetailPaneState
-    extends State<_DesktopProviderDetailPane> {
+class DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
   bool _showSearch = false;
   final TextEditingController _filterCtrl = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
@@ -1023,7 +1034,7 @@ class _DesktopProviderDetailPaneState
   }
 
   @override
-  void didUpdateWidget(covariant _DesktopProviderDetailPane oldWidget) {
+  void didUpdateWidget(covariant DesktopProviderDetailPane oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.providerKey == widget.providerKey) return;
     _clearProviderScopedState(cancelRunningDetection: true);
@@ -1147,98 +1158,13 @@ class _DesktopProviderDetailPaneState
     final filtered = _applyFilter(models, _filterCtrl.text.trim());
     final groups = _groupModels(filtered);
 
+    // 账号登录的供应商只展示账号与模型，不展示 API Key 等字段。
+    if (cfg.isOAuth) return _buildOAuthDetails(context, cfg, groups);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SizedBox(
-          height: 36,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              children: [
-                // 按需求将标题和设置按钮分组放在左侧
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 480),
-                      child: Text(
-                        cfg.name.isNotEmpty ? cfg.name : widget.providerKey,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: AppFontWeights.emphasis,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _IconBtn(
-                      key: ValueKey(
-                        'desktop-provider-settings-${widget.providerKey}',
-                      ),
-                      icon: lucide.Lucide.Settings,
-                      onTap: () => _showProviderSettingsDialog(context),
-                    ),
-                    if ((kind == ProviderKind.openai ||
-                            ProviderConfig.isDeepSeek(cfg)) &&
-                        cfg.balanceEnabled == true) ...[
-                      const SizedBox(width: 8),
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 120),
-                        child: ProviderBalanceBadge(
-                          providerKey: widget.providerKey,
-                          displayName: widget.displayName,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: AppFontWeights.emphasis,
-                          ),
-                          color: cs.primary,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const Spacer(),
-                IosSwitch(
-                  value: cfg.enabled,
-                  onChanged: (v) async {
-                    final ap = context.read<AssistantProvider>();
-                    final old = sp.getProviderConfig(
-                      widget.providerKey,
-                      defaultName: widget.displayName,
-                    );
-                    await sp.setProviderConfig(
-                      widget.providerKey,
-                      old.copyWith(enabled: v),
-                    );
-                    // 如果供应商现在被禁用，清除引用它的模型选择
-                    if (!v && old.enabled) {
-                      await sp.clearSelectionsForProvider(widget.providerKey);
-                      try {
-                        for (final a in ap.assistants) {
-                          if (a.chatModelProvider == widget.providerKey) {
-                            await ap.updateAssistant(
-                              a.copyWith(clearChatModel: true),
-                            );
-                          }
-                        }
-                      } catch (_) {}
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Divider(
-            height: 1,
-            thickness: 0.5,
-            color: cs.outlineVariant.withValues(alpha: 0.12),
-          ),
-        ),
+        ..._buildHeader(context, cfg),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -2065,6 +1991,189 @@ class _DesktopProviderDetailPaneState
     );
   }
 
+  List<Widget> _buildHeader(BuildContext context, ProviderConfig cfg) {
+    final cs = Theme.of(context).colorScheme;
+    final sp = context.watch<SettingsProvider>();
+    final kind = ProviderConfig.classify(
+      widget.providerKey,
+      explicitType: cfg.providerType,
+    );
+    return [
+      SizedBox(
+        height: 36,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            children: [
+              // 按需求将标题和设置按钮分组放在左侧
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 480),
+                    child: Text(
+                      cfg.name.isNotEmpty ? cfg.name : widget.providerKey,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: AppFontWeights.emphasis,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _IconBtn(
+                    key: ValueKey(
+                      'desktop-provider-settings-${widget.providerKey}',
+                    ),
+                    icon: lucide.Lucide.Settings,
+                    onTap: () => _showProviderSettingsDialog(context),
+                  ),
+                  if ((kind == ProviderKind.openai ||
+                          ProviderConfig.isDeepSeek(cfg)) &&
+                      cfg.balanceEnabled == true) ...[
+                    const SizedBox(width: 8),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 120),
+                      child: ProviderBalanceBadge(
+                        providerKey: widget.providerKey,
+                        displayName: widget.displayName,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: AppFontWeights.emphasis,
+                        ),
+                        color: cs.primary,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const Spacer(),
+              if (widget.onClose != null) ...[
+                _IconBtn(icon: lucide.Lucide.X, onTap: widget.onClose!),
+                const SizedBox(width: 8),
+              ],
+              IosSwitch(
+                value: cfg.enabled,
+                onChanged: (v) async {
+                  if (cfg.isOAuth) {
+                    final current = sp.getProviderConfig(cfg.id);
+                    await sp.setProviderConfig(
+                      cfg.id,
+                      current.copyWith(enabled: v),
+                    );
+                    return;
+                  }
+                  final ap = context.read<AssistantProvider>();
+                  final old = sp.getProviderConfig(
+                    widget.providerKey,
+                    defaultName: widget.displayName,
+                  );
+                  await sp.setProviderConfig(
+                    widget.providerKey,
+                    old.copyWith(enabled: v),
+                  );
+                  // 如果供应商现在被禁用，清除引用它的模型选择
+                  if (!v && old.enabled) {
+                    await sp.clearSelectionsForProvider(widget.providerKey);
+                    try {
+                      for (final a in ap.assistants) {
+                        if (a.chatModelProvider == widget.providerKey) {
+                          await ap.updateAssistant(
+                            a.copyWith(clearChatModel: true),
+                          );
+                        }
+                      }
+                    } catch (_) {}
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Divider(
+          height: 1,
+          thickness: 0.5,
+          color: cs.outlineVariant.withValues(alpha: 0.12),
+        ),
+      ),
+    ];
+  }
+
+  /// 账号登录的供应商：只展示账号卡片、模型列表与底部信息。
+  Widget _buildOAuthDetails(
+    BuildContext context,
+    ProviderConfig cfg,
+    Map<String, List<String>> groups,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ..._buildHeader(context, cfg),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            children: [
+              if (widget.oauthAccount != null) widget.oauthAccount!,
+              if (widget.onSyncModels != null || widget.syncingModels) ...[
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Text(
+                      l10n.oauthAccountsTab,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: AppFontWeights.emphasis,
+                      ),
+                    ),
+                    const Spacer(),
+                    _IconTextBtn(
+                      icon: lucide.Lucide.RefreshCw,
+                      label: widget.syncingModels
+                          ? l10n.oauthSyncing
+                          : l10n.oauthSyncModels,
+                      onTap: () => widget.onSyncModels?.call(),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 6),
+              if (groups.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: Text(
+                      l10n.providerDetailPageModelsTitle,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+              for (final entry in groups.entries)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _ModelGroupAccordion(
+                    group: entry.key,
+                    modelIds: entry.value,
+                    providerKey: cfg.id,
+                  ),
+                ),
+              if (widget.oauthFooter != null) ...[
+                const SizedBox(height: 18),
+                widget.oauthFooter!,
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Map<String, List<String>> _groupModels(List<String> models) {
     final map = <String, List<String>>{};
     for (final m in models) {
@@ -2654,117 +2763,37 @@ class _DesktopProviderDetailPaneState
                               ),
                             ),
                             const SizedBox(height: 4),
-                            // 2）供应商类型
-                            row(
-                              l10n.providerDetailPageProviderTypeTitle,
-                              _ProviderTypeDropdown(
-                                value: kindNow,
-                                onChanged: (k) async {
-                                  final old = spWatch.getProviderConfig(
-                                    widget.providerKey,
-                                    defaultName: widget.displayName,
-                                  );
-                                  await spWatch.setProviderConfig(
-                                    widget.providerKey,
-                                    old.copyWith(providerType: k),
-                                  );
-                                },
+                            if (cfgNow.isOAuth) ...[
+                              OAuthConnectionInfo(
+                                config: cfgNow,
+                                desktop: true,
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            // 3）多密钥
-                            row(
-                              l10n.providerDetailPageMultiKeyModeTitle,
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: IosSwitch(
-                                  value: multiNow,
-                                  onChanged: (v) async {
+                            ] else ...[
+                              // 2）供应商类型
+                              row(
+                                l10n.providerDetailPageProviderTypeTitle,
+                                _ProviderTypeDropdown(
+                                  value: kindNow,
+                                  onChanged: (k) async {
                                     final old = spWatch.getProviderConfig(
                                       widget.providerKey,
                                       defaultName: widget.displayName,
                                     );
                                     await spWatch.setProviderConfig(
                                       widget.providerKey,
-                                      old.copyWith(multiKeyEnabled: v),
+                                      old.copyWith(providerType: k),
                                     );
                                   },
                                 ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            // 4）Response（OpenAI）或 Vertex（Google）。Claude 隐藏，并带动画。
-                            AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 180),
-                              switchInCurve: Curves.easeOutCubic,
-                              switchOutCurve: Curves.easeInCubic,
-                              child: () {
-                                if (kindNow == ProviderKind.openai) {
-                                  return KeyedSubtree(
-                                    key: const ValueKey('openai-resp'),
-                                    child: row(
-                                      l10n.providerDetailPageResponseApiTitle,
-                                      Align(
-                                        alignment: Alignment.centerRight,
-                                        child: IosSwitch(
-                                          value: respNow,
-                                          onChanged: (v) async {
-                                            final old = spWatch
-                                                .getProviderConfig(
-                                                  widget.providerKey,
-                                                  defaultName:
-                                                      widget.displayName,
-                                                );
-                                            await spWatch.setProviderConfig(
-                                              widget.providerKey,
-                                              old.copyWith(useResponseApi: v),
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                }
-                                if (kindNow == ProviderKind.google) {
-                                  return KeyedSubtree(
-                                    key: const ValueKey('google-vertex'),
-                                    child: row(
-                                      l10n.providerDetailPageVertexAiTitle,
-                                      Align(
-                                        alignment: Alignment.centerRight,
-                                        child: IosSwitch(
-                                          value: vertexNow,
-                                          onChanged: (v) async {
-                                            final old = spWatch
-                                                .getProviderConfig(
-                                                  widget.providerKey,
-                                                  defaultName:
-                                                      widget.displayName,
-                                                );
-                                            await spWatch.setProviderConfig(
-                                              widget.providerKey,
-                                              old.copyWith(vertexAI: v),
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                }
-                                return const SizedBox.shrink(
-                                  key: ValueKey('none'),
-                                );
-                              }(),
-                            ),
-                            const SizedBox(height: 4),
-                            if (kindNow == ProviderKind.openai ||
-                                ProviderConfig.isDeepSeek(cfgNow)) ...[
+                              const SizedBox(height: 4),
+                              // 3）多密钥
                               row(
-                                l10n.providerDetailPageBalanceInfo,
+                                l10n.providerDetailPageMultiKeyModeTitle,
                                 Align(
                                   alignment: Alignment.centerRight,
                                   child: IosSwitch(
-                                    value: balanceEnabledNow,
+                                    value: multiNow,
                                     onChanged: (v) async {
                                       final old = spWatch.getProviderConfig(
                                         widget.providerKey,
@@ -2772,346 +2801,436 @@ class _DesktopProviderDetailPaneState
                                       );
                                       await spWatch.setProviderConfig(
                                         widget.providerKey,
-                                        old.copyWith(balanceEnabled: v),
+                                        old.copyWith(multiKeyEnabled: v),
                                       );
-                                      ProviderBalanceBadge.clearCacheFor(
-                                        widget.providerKey,
-                                      );
-                                      if (mounted) setState(() {});
                                     },
                                   ),
                                 ),
                               ),
-                              AnimatedCrossFade(
-                                firstChild: const SizedBox.shrink(),
-                                secondChild: Padding(
-                                  padding: const EdgeInsets.only(top: 8),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      row(
-                                        l10n.providerDetailPageBalanceApiPathLabel,
-                                        TextField(
-                                          controller: _balanceApiPathCtrl,
-                                          style: TextStyle(fontSize: 13),
-                                          decoration: _proxyInputDecoration(
-                                            ctx,
-                                          ),
-                                          onChanged: (_) async {
-                                            if (_balanceApiPathCtrl
-                                                .value
-                                                .composing
-                                                .isValid) {
-                                              return;
-                                            }
-                                            final old = spWatch
-                                                .getProviderConfig(
-                                                  widget.providerKey,
-                                                  defaultName:
-                                                      widget.displayName,
-                                                );
-                                            await spWatch.setProviderConfig(
-                                              widget.providerKey,
-                                              old.copyWith(
-                                                balanceApiPath:
-                                                    _balanceApiPathCtrl.text
-                                                        .trim(),
-                                              ),
-                                            );
-                                            ProviderBalanceBadge.clearCacheFor(
-                                              widget.providerKey,
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      row(
-                                        l10n.providerDetailPageBalanceResultPathLabel,
-                                        TextField(
-                                          controller: _balanceResultPathCtrl,
-                                          style: TextStyle(fontSize: 13),
-                                          decoration: _proxyInputDecoration(
-                                            ctx,
-                                          ),
-                                          onChanged: (_) async {
-                                            if (_balanceResultPathCtrl
-                                                .value
-                                                .composing
-                                                .isValid) {
-                                              return;
-                                            }
-                                            final old = spWatch
-                                                .getProviderConfig(
-                                                  widget.providerKey,
-                                                  defaultName:
-                                                      widget.displayName,
-                                                );
-                                            await spWatch.setProviderConfig(
-                                              widget.providerKey,
-                                              old.copyWith(
-                                                balanceResultPath:
-                                                    _balanceResultPathCtrl.text
-                                                        .trim(),
-                                              ),
-                                            );
-                                            ProviderBalanceBadge.clearCacheFor(
-                                              widget.providerKey,
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      row(
-                                        l10n.providerDetailPageBalanceTitle,
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.end,
-                                          children: [
-                                            Flexible(
-                                              child: Align(
-                                                alignment:
-                                                    Alignment.centerRight,
-                                                child: ConstrainedBox(
-                                                  constraints:
-                                                      const BoxConstraints(
-                                                        minWidth: 72,
-                                                        maxWidth: 120,
-                                                      ),
-                                                  child: ProviderBalanceBadge(
-                                                    providerKey:
-                                                        widget.providerKey,
-                                                    displayName:
+                              const SizedBox(height: 4),
+                              // 4）Response（OpenAI）或 Vertex（Google）。Claude 隐藏，并带动画。
+                              AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 180),
+                                switchInCurve: Curves.easeOutCubic,
+                                switchOutCurve: Curves.easeInCubic,
+                                child: () {
+                                  if (kindNow == ProviderKind.openai) {
+                                    return KeyedSubtree(
+                                      key: const ValueKey('openai-resp'),
+                                      child: row(
+                                        l10n.providerDetailPageResponseApiTitle,
+                                        Align(
+                                          alignment: Alignment.centerRight,
+                                          child: IosSwitch(
+                                            value: respNow,
+                                            onChanged: (v) async {
+                                              final old = spWatch
+                                                  .getProviderConfig(
+                                                    widget.providerKey,
+                                                    defaultName:
                                                         widget.displayName,
-                                                    color: cs.primary,
+                                                  );
+                                              await spWatch.setProviderConfig(
+                                                widget.providerKey,
+                                                old.copyWith(useResponseApi: v),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  if (kindNow == ProviderKind.google) {
+                                    return KeyedSubtree(
+                                      key: const ValueKey('google-vertex'),
+                                      child: row(
+                                        l10n.providerDetailPageVertexAiTitle,
+                                        Align(
+                                          alignment: Alignment.centerRight,
+                                          child: IosSwitch(
+                                            value: vertexNow,
+                                            onChanged: (v) async {
+                                              final old = spWatch
+                                                  .getProviderConfig(
+                                                    widget.providerKey,
+                                                    defaultName:
+                                                        widget.displayName,
+                                                  );
+                                              await spWatch.setProviderConfig(
+                                                widget.providerKey,
+                                                old.copyWith(vertexAI: v),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  return const SizedBox.shrink(
+                                    key: ValueKey('none'),
+                                  );
+                                }(),
+                              ),
+                              const SizedBox(height: 4),
+                              if (kindNow == ProviderKind.openai ||
+                                  ProviderConfig.isDeepSeek(cfgNow)) ...[
+                                row(
+                                  l10n.providerDetailPageBalanceInfo,
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: IosSwitch(
+                                      value: balanceEnabledNow,
+                                      onChanged: (v) async {
+                                        final old = spWatch.getProviderConfig(
+                                          widget.providerKey,
+                                          defaultName: widget.displayName,
+                                        );
+                                        await spWatch.setProviderConfig(
+                                          widget.providerKey,
+                                          old.copyWith(balanceEnabled: v),
+                                        );
+                                        ProviderBalanceBadge.clearCacheFor(
+                                          widget.providerKey,
+                                        );
+                                        if (mounted) setState(() {});
+                                      },
+                                    ),
+                                  ),
+                                ),
+                                AnimatedCrossFade(
+                                  firstChild: const SizedBox.shrink(),
+                                  secondChild: Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        row(
+                                          l10n.providerDetailPageBalanceApiPathLabel,
+                                          TextField(
+                                            controller: _balanceApiPathCtrl,
+                                            style: TextStyle(fontSize: 13),
+                                            decoration: _proxyInputDecoration(
+                                              ctx,
+                                            ),
+                                            onChanged: (_) async {
+                                              if (_balanceApiPathCtrl
+                                                  .value
+                                                  .composing
+                                                  .isValid) {
+                                                return;
+                                              }
+                                              final old = spWatch
+                                                  .getProviderConfig(
+                                                    widget.providerKey,
+                                                    defaultName:
+                                                        widget.displayName,
+                                                  );
+                                              await spWatch.setProviderConfig(
+                                                widget.providerKey,
+                                                old.copyWith(
+                                                  balanceApiPath:
+                                                      _balanceApiPathCtrl.text
+                                                          .trim(),
+                                                ),
+                                              );
+                                              ProviderBalanceBadge.clearCacheFor(
+                                                widget.providerKey,
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        row(
+                                          l10n.providerDetailPageBalanceResultPathLabel,
+                                          TextField(
+                                            controller: _balanceResultPathCtrl,
+                                            style: TextStyle(fontSize: 13),
+                                            decoration: _proxyInputDecoration(
+                                              ctx,
+                                            ),
+                                            onChanged: (_) async {
+                                              if (_balanceResultPathCtrl
+                                                  .value
+                                                  .composing
+                                                  .isValid) {
+                                                return;
+                                              }
+                                              final old = spWatch
+                                                  .getProviderConfig(
+                                                    widget.providerKey,
+                                                    defaultName:
+                                                        widget.displayName,
+                                                  );
+                                              await spWatch.setProviderConfig(
+                                                widget.providerKey,
+                                                old.copyWith(
+                                                  balanceResultPath:
+                                                      _balanceResultPathCtrl
+                                                          .text
+                                                          .trim(),
+                                                ),
+                                              );
+                                              ProviderBalanceBadge.clearCacheFor(
+                                                widget.providerKey,
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        row(
+                                          l10n.providerDetailPageBalanceTitle,
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.end,
+                                            children: [
+                                              Flexible(
+                                                child: Align(
+                                                  alignment:
+                                                      Alignment.centerRight,
+                                                  child: ConstrainedBox(
+                                                    constraints:
+                                                        const BoxConstraints(
+                                                          minWidth: 72,
+                                                          maxWidth: 120,
+                                                        ),
+                                                    child: ProviderBalanceBadge(
+                                                      providerKey:
+                                                          widget.providerKey,
+                                                      displayName:
+                                                          widget.displayName,
+                                                      color: cs.primary,
+                                                    ),
                                                   ),
                                                 ),
                                               ),
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Tooltip(
-                                              message: l10n
-                                                  .providerDetailPageBalanceResetDefaultsTooltip,
-                                              child: _IconBtn(
-                                                icon: lucide.Lucide.RotateCcw,
-                                                color: cs.onSurface.withValues(
-                                                  alpha: 0.78,
+                                              const SizedBox(width: 6),
+                                              Tooltip(
+                                                message: l10n
+                                                    .providerDetailPageBalanceResetDefaultsTooltip,
+                                                child: _IconBtn(
+                                                  icon: lucide.Lucide.RotateCcw,
+                                                  color: cs.onSurface
+                                                      .withValues(alpha: 0.78),
+                                                  onTap: () async {
+                                                    _syncControllerText(
+                                                      _balanceApiPathCtrl,
+                                                      balanceDefaults
+                                                              .balanceApiPath ??
+                                                          '',
+                                                    );
+                                                    _syncControllerText(
+                                                      _balanceResultPathCtrl,
+                                                      balanceDefaults
+                                                              .balanceResultPath ??
+                                                          '',
+                                                    );
+                                                    final old = spWatch
+                                                        .getProviderConfig(
+                                                          widget.providerKey,
+                                                          defaultName: widget
+                                                              .displayName,
+                                                        );
+                                                    await spWatch.setProviderConfig(
+                                                      widget.providerKey,
+                                                      old.copyWith(
+                                                        balanceEnabled:
+                                                            balanceDefaults
+                                                                .balanceEnabled ??
+                                                            false,
+                                                        balanceApiPath:
+                                                            _balanceApiPathCtrl
+                                                                .text
+                                                                .trim(),
+                                                        balanceResultPath:
+                                                            _balanceResultPathCtrl
+                                                                .text
+                                                                .trim(),
+                                                      ),
+                                                    );
+                                                    ProviderBalanceBadge.clearCacheFor(
+                                                      widget.providerKey,
+                                                    );
+                                                    if (mounted) {
+                                                      setState(() {});
+                                                    }
+                                                  },
                                                 ),
-                                                onTap: () async {
-                                                  _syncControllerText(
-                                                    _balanceApiPathCtrl,
-                                                    balanceDefaults
-                                                            .balanceApiPath ??
-                                                        '',
-                                                  );
-                                                  _syncControllerText(
-                                                    _balanceResultPathCtrl,
-                                                    balanceDefaults
-                                                            .balanceResultPath ??
-                                                        '',
-                                                  );
-                                                  final old = spWatch
-                                                      .getProviderConfig(
-                                                        widget.providerKey,
-                                                        defaultName:
-                                                            widget.displayName,
-                                                      );
-                                                  await spWatch.setProviderConfig(
-                                                    widget.providerKey,
-                                                    old.copyWith(
-                                                      balanceEnabled:
-                                                          balanceDefaults
-                                                              .balanceEnabled ??
-                                                          false,
-                                                      balanceApiPath:
-                                                          _balanceApiPathCtrl
-                                                              .text
-                                                              .trim(),
-                                                      balanceResultPath:
-                                                          _balanceResultPathCtrl
-                                                              .text
-                                                              .trim(),
-                                                    ),
-                                                  );
-                                                  ProviderBalanceBadge.clearCacheFor(
-                                                    widget.providerKey,
-                                                  );
-                                                  if (mounted) setState(() {});
-                                                },
                                               ),
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Tooltip(
-                                              message: _balanceLoading
-                                                  ? l10n.providerDetailPageBalanceQuerying
-                                                  : l10n.providerDetailPageBalanceQueryButton,
-                                              child: _IconBtn(
-                                                icon: _balanceLoading
-                                                    ? lucide.Lucide.Loader
-                                                    : lucide
-                                                          .Lucide
-                                                          .RefreshCcwDot,
-                                                color: cs.primary,
-                                                onTap: () =>
-                                                    _queryProviderBalance(
-                                                      context,
-                                                    ),
+                                              const SizedBox(width: 4),
+                                              Tooltip(
+                                                message: _balanceLoading
+                                                    ? l10n.providerDetailPageBalanceQuerying
+                                                    : l10n.providerDetailPageBalanceQueryButton,
+                                                child: _IconBtn(
+                                                  icon: _balanceLoading
+                                                      ? lucide.Lucide.Loader
+                                                      : lucide
+                                                            .Lucide
+                                                            .RefreshCcwDot,
+                                                  color: cs.primary,
+                                                  onTap: () =>
+                                                      _queryProviderBalance(
+                                                        context,
+                                                      ),
+                                                ),
                                               ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                crossFadeState: balanceEnabledNow
-                                    ? CrossFadeState.showSecond
-                                    : CrossFadeState.showFirst,
-                                duration: const Duration(milliseconds: 180),
-                                sizeCurve: Curves.easeOutCubic,
-                              ),
-                            ],
-                            const SizedBox(height: 4),
-                            if (_isAihubmix(cfgNow))
-                              row(
-                                l10n.providerDetailPageAihubmixAppCodeLabel,
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    Tooltip(
-                                      message: l10n
-                                          .providerDetailPageAihubmixAppCodeHelp,
-                                      child: Icon(
-                                        Icons.help_outline,
-                                        size: 16,
-                                        color: cs.onSurface.withValues(
-                                          alpha: 0.6,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    IosSwitch(
-                                      value: aihubmixAppCodeEnabled,
-                                      onChanged: (v) async {
-                                        final old = spWatch.getProviderConfig(
-                                          widget.providerKey,
-                                          defaultName: widget.displayName,
-                                        );
-                                        await spWatch.setProviderConfig(
-                                          widget.providerKey,
-                                          old.copyWith(
-                                            aihubmixAppCodeEnabled: v,
+                                            ],
                                           ),
-                                        );
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            if (supportsClaudePromptCaching) ...[
-                              const SizedBox(height: 4),
-                              row(
-                                l10n.providerDetailPageClaudePromptCachingTitle,
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    Tooltip(
-                                      message: l10n
-                                          .providerDetailPageClaudePromptCachingHelp,
-                                      child: Icon(
-                                        Icons.help_outline,
-                                        size: 16,
-                                        color: cs.onSurface.withValues(
-                                          alpha: 0.6,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    IosSwitch(
-                                      value: claudePromptCachingEnabled,
-                                      semanticLabel: l10n
-                                          .providerDetailPageClaudePromptCachingTitle,
-                                      onChanged: (v) async {
-                                        final old = spWatch.getProviderConfig(
-                                          widget.providerKey,
-                                          defaultName: widget.displayName,
-                                        );
-                                        await spWatch.setProviderConfig(
-                                          widget.providerKey,
-                                          old.copyWith(
-                                            claudePromptCachingEnabled: v,
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              AnimatedCrossFade(
-                                firstChild: const SizedBox.shrink(),
-                                secondChild: Padding(
-                                  padding: const EdgeInsets.only(top: 8),
-                                  child: row(
-                                    l10n.providerDetailPageClaudePromptCachingTtlTitle,
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.end,
-                                      children: [
-                                        Tooltip(
-                                          message: l10n
-                                              .providerDetailPageClaudePromptCachingTtlHelp,
-                                          child: Icon(
-                                            Icons.help_outline,
-                                            size: 16,
-                                            color: cs.onSurface.withValues(
-                                              alpha: 0.6,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        DesktopSelectDropdown<String>(
-                                          value: claudePromptCachingTtl,
-                                          minWidth: 136,
-                                          options: [
-                                            DesktopSelectOption(
-                                              value: ProviderConfig
-                                                  .claudePromptCachingTtl5m,
-                                              label: l10n
-                                                  .providerDetailPageClaudePromptCachingTtl5m,
-                                            ),
-                                            DesktopSelectOption(
-                                              value: ProviderConfig
-                                                  .claudePromptCachingTtl1h,
-                                              label: l10n
-                                                  .providerDetailPageClaudePromptCachingTtl1h,
-                                            ),
-                                          ],
-                                          triggerFillColor:
-                                              ctx.appColors.surfaceFill,
-                                          onSelected: (value) async {
-                                            final old = spWatch
-                                                .getProviderConfig(
-                                                  widget.providerKey,
-                                                  defaultName:
-                                                      widget.displayName,
-                                                );
-                                            await spWatch.setProviderConfig(
-                                              widget.providerKey,
-                                              old.copyWith(
-                                                claudePromptCachingTtl: value,
-                                              ),
-                                            );
-                                          },
                                         ),
                                       ],
                                     ),
                                   ),
+                                  crossFadeState: balanceEnabledNow
+                                      ? CrossFadeState.showSecond
+                                      : CrossFadeState.showFirst,
+                                  duration: const Duration(milliseconds: 180),
+                                  sizeCurve: Curves.easeOutCubic,
                                 ),
-                                crossFadeState: claudePromptCachingEnabled
-                                    ? CrossFadeState.showSecond
-                                    : CrossFadeState.showFirst,
-                                duration: const Duration(milliseconds: 180),
-                                sizeCurve: Curves.easeOutCubic,
-                              ),
+                              ],
+                              const SizedBox(height: 4),
+                              if (_isAihubmix(cfgNow))
+                                row(
+                                  l10n.providerDetailPageAihubmixAppCodeLabel,
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      Tooltip(
+                                        message: l10n
+                                            .providerDetailPageAihubmixAppCodeHelp,
+                                        child: Icon(
+                                          Icons.help_outline,
+                                          size: 16,
+                                          color: cs.onSurface.withValues(
+                                            alpha: 0.6,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      IosSwitch(
+                                        value: aihubmixAppCodeEnabled,
+                                        onChanged: (v) async {
+                                          final old = spWatch.getProviderConfig(
+                                            widget.providerKey,
+                                            defaultName: widget.displayName,
+                                          );
+                                          await spWatch.setProviderConfig(
+                                            widget.providerKey,
+                                            old.copyWith(
+                                              aihubmixAppCodeEnabled: v,
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              if (supportsClaudePromptCaching) ...[
+                                const SizedBox(height: 4),
+                                row(
+                                  l10n.providerDetailPageClaudePromptCachingTitle,
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      Tooltip(
+                                        message: l10n
+                                            .providerDetailPageClaudePromptCachingHelp,
+                                        child: Icon(
+                                          Icons.help_outline,
+                                          size: 16,
+                                          color: cs.onSurface.withValues(
+                                            alpha: 0.6,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      IosSwitch(
+                                        value: claudePromptCachingEnabled,
+                                        semanticLabel: l10n
+                                            .providerDetailPageClaudePromptCachingTitle,
+                                        onChanged: (v) async {
+                                          final old = spWatch.getProviderConfig(
+                                            widget.providerKey,
+                                            defaultName: widget.displayName,
+                                          );
+                                          await spWatch.setProviderConfig(
+                                            widget.providerKey,
+                                            old.copyWith(
+                                              claudePromptCachingEnabled: v,
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                AnimatedCrossFade(
+                                  firstChild: const SizedBox.shrink(),
+                                  secondChild: Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: row(
+                                      l10n.providerDetailPageClaudePromptCachingTtlTitle,
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.end,
+                                        children: [
+                                          Tooltip(
+                                            message: l10n
+                                                .providerDetailPageClaudePromptCachingTtlHelp,
+                                            child: Icon(
+                                              Icons.help_outline,
+                                              size: 16,
+                                              color: cs.onSurface.withValues(
+                                                alpha: 0.6,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          DesktopSelectDropdown<String>(
+                                            value: claudePromptCachingTtl,
+                                            minWidth: 136,
+                                            options: [
+                                              DesktopSelectOption(
+                                                value: ProviderConfig
+                                                    .claudePromptCachingTtl5m,
+                                                label: l10n
+                                                    .providerDetailPageClaudePromptCachingTtl5m,
+                                              ),
+                                              DesktopSelectOption(
+                                                value: ProviderConfig
+                                                    .claudePromptCachingTtl1h,
+                                                label: l10n
+                                                    .providerDetailPageClaudePromptCachingTtl1h,
+                                              ),
+                                            ],
+                                            triggerFillColor:
+                                                ctx.appColors.surfaceFill,
+                                            onSelected: (value) async {
+                                              final old = spWatch
+                                                  .getProviderConfig(
+                                                    widget.providerKey,
+                                                    defaultName:
+                                                        widget.displayName,
+                                                  );
+                                              await spWatch.setProviderConfig(
+                                                widget.providerKey,
+                                                old.copyWith(
+                                                  claudePromptCachingTtl: value,
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  crossFadeState: claudePromptCachingEnabled
+                                      ? CrossFadeState.showSecond
+                                      : CrossFadeState.showFirst,
+                                  duration: const Duration(milliseconds: 180),
+                                  sizeCurve: Curves.easeOutCubic,
+                                ),
+                              ],
                             ],
                             const SizedBox(height: 4),
                             // 5）内联网络代理
@@ -6758,6 +6877,12 @@ class _ModelRow extends StatelessWidget {
     return GestureDetector(
       onTap: isSelectionMode
           ? () => onSelectionChanged?.call(!isSelected)
+          : cfg.isOAuth
+          ? () => showDesktopModelEditDialog(
+              context,
+              providerKey: providerKey,
+              modelId: modelId,
+            )
           : null,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -6841,33 +6966,35 @@ class _ModelRow extends StatelessWidget {
                   );
                 },
               ),
-              const SizedBox(width: 4),
-              _IconBtn(
-                icon: lucide.Lucide.Minus,
-                onTap: () async {
-                  final sp = context.read<SettingsProvider>();
-                  final ap = context.read<AssistantProvider>();
-                  final old = sp.getProviderConfig(providerKey);
-                  final list = List<String>.from(old.models)
-                    ..removeWhere((e) => e == modelId);
-                  await sp.setProviderConfig(
-                    providerKey,
-                    old.copyWith(models: list),
-                  );
-                  // 清除引用已删除模型的全局和助手级模型选择
-                  await sp.clearSelectionsForModel(providerKey, modelId);
-                  try {
-                    for (final a in ap.assistants) {
-                      if (a.chatModelProvider == providerKey &&
-                          a.chatModelId == modelId) {
-                        await ap.updateAssistant(
-                          a.copyWith(clearChatModel: true),
-                        );
+              if (!cfg.isOAuth) ...[
+                const SizedBox(width: 4),
+                _IconBtn(
+                  icon: lucide.Lucide.Minus,
+                  onTap: () async {
+                    final sp = context.read<SettingsProvider>();
+                    final ap = context.read<AssistantProvider>();
+                    final old = sp.getProviderConfig(providerKey);
+                    final list = List<String>.from(old.models)
+                      ..removeWhere((e) => e == modelId);
+                    await sp.setProviderConfig(
+                      providerKey,
+                      old.copyWith(models: list),
+                    );
+                    // 清除引用已删除模型的全局和助手级模型选择
+                    await sp.clearSelectionsForModel(providerKey, modelId);
+                    try {
+                      for (final a in ap.assistants) {
+                        if (a.chatModelProvider == providerKey &&
+                            a.chatModelId == modelId) {
+                          await ap.updateAssistant(
+                            a.copyWith(clearChatModel: true),
+                          );
+                        }
                       }
-                    }
-                  } catch (_) {}
-                },
-              ),
+                    } catch (_) {}
+                  },
+                ),
+              ],
             ],
           ],
         ),

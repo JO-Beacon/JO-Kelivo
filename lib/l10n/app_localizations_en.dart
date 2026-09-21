@@ -9,6 +9,36 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get settingsSearchHint => 'Search settings';
+
+  @override
+  String get settingsSearchCancel => 'Cancel';
+
+  @override
+  String get settingsSearchClear => 'Clear search';
+
+  @override
+  String get settingsSearchSuggestions => 'Quick access';
+
+  @override
+  String get settingsSearchNoResults => 'No settings found';
+
+  @override
+  String get settingsSearchNoResultsHint =>
+      'Try a different name or a shorter keyword.';
+
+  @override
+  String settingsSearchResultCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count results',
+      one: '1 result',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String chatImageCropFailed(String fileName, String error) {
     return 'Could not crop \"$fileName\": $error';
   }
@@ -648,6 +678,17 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get mcpServerEditSheetStdioWorkingDirectoryLabel =>
       'Working Directory (optional)';
+
+  @override
+  String get mcpWorkspaceBindingLabel => 'Bind workspace (optional)';
+
+  @override
+  String get mcpWorkspaceBindingHint =>
+      'The server can access this workspace at /workspace. Leave Working Directory empty to start there. The binding stays fixed when you switch chats.';
+
+  @override
+  String get mcpWorkspaceBindingMobileOnly =>
+      'Workspace binding is available in the mobile Linux environment. Unbind it to run this server on desktop.';
 
   @override
   String get mcpServerEditSheetStdioEnvironmentTitle => 'Environment';
@@ -7694,6 +7735,298 @@ class AppLocalizationsEn extends AppLocalizations {
   String get worldBookTitle => 'World Book';
 
   @override
+  String get worldBookStickyLabel => 'Sticky (messages)';
+
+  @override
+  String get worldBookStickyHint =>
+      'Keep this entry active for N messages after triggering. Repeated matches do not extend it. 0 disables this effect.';
+
+  @override
+  String get worldBookCooldownLabel => 'Cooldown (messages)';
+
+  @override
+  String get worldBookCooldownHint =>
+      'Prevent reactivation for N messages after triggering or after sticky ends. 0 disables this effect.';
+
+  @override
+  String get worldBookDelayLabel => 'Delay (messages)';
+
+  @override
+  String get worldBookDelayHint =>
+      'Allow activation only after the conversation has at least N messages. Count individual messages, not exchanges. 0 disables this effect.';
+
+  @override
+  String get worldBookDragToReorder => 'Drag to reorder';
+
+  @override
+  String worldBookEnabledCount(int enabled, int total) {
+    return '$enabled/$total enabled';
+  }
+
+  @override
+  String get conversationPromptScope => 'This conversation';
+
+  @override
+  String get conversationSystemPromptTitle => 'Conversation system prompt';
+
+  @override
+  String get conversationSystemPromptHint =>
+      'Applies only to this conversation. Leave blank to use the assistant’s system prompt.';
+
+  @override
+  String get conversationSystemPromptClear => 'Use assistant prompt';
+
+  @override
+  String get conversationSystemPromptPlaceholder =>
+      'Write a system prompt for this conversation…';
+
+  @override
+  String get assistantConversationSystemPromptTitle =>
+      'Per-conversation system prompt';
+
+  @override
+  String get assistantConversationSystemPromptHint =>
+      'Allow each conversation to use its own system prompt.';
+
+  @override
+  String get assistantConversationInjectionTitle =>
+      'Per-conversation instruction injections';
+
+  @override
+  String get assistantConversationInjectionHint =>
+      'Choose instruction injections and world books for each conversation. None selected by default.';
+
+  @override
+  String get oauthAccountId => 'Account ID';
+
+  @override
+  String get oauthAccountsTab => 'Accounts';
+
+  @override
+  String get oauthAuthorizationCode => 'Authorization code or callback URL';
+
+  @override
+  String get oauthAuthorizationCodeHint =>
+      'If the browser does not return automatically, paste the final callback URL or authorization code here.';
+
+  @override
+  String get oauthCancel => 'Cancel authorization';
+
+  @override
+  String get oauthCodeHint => 'Enter this code on the authorization page';
+
+  @override
+  String get oauthConnectAnother => 'Connect another account';
+
+  @override
+  String get oauthConnected => 'Connected';
+
+  @override
+  String get oauthConnection => 'Connection';
+
+  @override
+  String get oauthConnectionInfo => 'Connection details';
+
+  @override
+  String get oauthCopyCode => 'Copy code';
+
+  @override
+  String get oauthCustomRequest => 'Custom request';
+
+  @override
+  String oauthDays(String count) {
+    return '$count day window';
+  }
+
+  @override
+  String get oauthDenied => 'Authorization was not granted. Please try again.';
+
+  @override
+  String get oauthDetails => 'View account details';
+
+  @override
+  String get oauthDeviceHint =>
+      'Enable device code login in your ChatGPT security settings or workspace permissions first.';
+
+  @override
+  String get oauthDeviceLogin => 'Use device code';
+
+  @override
+  String get oauthEnabledHint => 'Show these models in the model picker';
+
+  @override
+  String get oauthEndpoint => 'Endpoint';
+
+  @override
+  String oauthExpired(String provider) {
+    return '$provider login has expired';
+  }
+
+  @override
+  String get oauthExtraUsage => 'Extra usage';
+
+  @override
+  String get oauthFollowGlobal => 'Follow global settings';
+
+  @override
+  String oauthHours(String count) {
+    return '$count hour window';
+  }
+
+  @override
+  String get oauthInvalidAuthorizationCode =>
+      'Enter the code or callback URL from this login attempt.';
+
+  @override
+  String get oauthInvalidResponse =>
+      'Authorization did not complete. Please try again.';
+
+  @override
+  String oauthLastUpdated(String time) {
+    return 'Updated $time';
+  }
+
+  @override
+  String get oauthLogin => 'Log in';
+
+  @override
+  String get oauthLoginRestored =>
+      'Logged in. Use the message retry button to send again.';
+
+  @override
+  String oauthLoginTo(String provider) {
+    return 'Log in to $provider';
+  }
+
+  @override
+  String get oauthLogout => 'Log out';
+
+  @override
+  String get oauthLogoutDescription =>
+      'Remove this account’s saved credentials from this device';
+
+  @override
+  String oauthMinutes(String count) {
+    return '$count minute window';
+  }
+
+  @override
+  String get oauthModelsHint =>
+      'Available models are synced from your account.';
+
+  @override
+  String get oauthMonthly => 'Monthly window';
+
+  @override
+  String get oauthName => 'Provider name';
+
+  @override
+  String get oauthNeedsLogin => 'Login required';
+
+  @override
+  String get oauthNetwork => 'Network proxy';
+
+  @override
+  String get oauthNetworkError =>
+      'Could not connect. Check your network and try again.';
+
+  @override
+  String get oauthNoModels => 'Sync models to start chatting';
+
+  @override
+  String get oauthNotConnected => 'Not connected';
+
+  @override
+  String get oauthOpenBrowser => 'Open authorization page';
+
+  @override
+  String get oauthPermissionDenied =>
+      'This account cannot access this resource.';
+
+  @override
+  String get oauthPrimaryWindow => 'Primary window';
+
+  @override
+  String get oauthPromptCachingHelp =>
+      'Reuse context across messages and choose how long the cache is retained.';
+
+  @override
+  String get oauthQuotaAvailable => 'Quota is available';
+
+  @override
+  String get oauthQuotaExceeded => 'This account has no available quota.';
+
+  @override
+  String get oauthRateLimited => 'Too many requests. Please try again later.';
+
+  @override
+  String get oauthRefreshUsage => 'Refresh usage';
+
+  @override
+  String get oauthRefreshing => 'Refreshing authorization…';
+
+  @override
+  String get oauthRelogin => 'Log in again';
+
+  @override
+  String get oauthRequestFailed =>
+      'The provider could not complete the request.';
+
+  @override
+  String oauthResetsAt(String time) {
+    return 'Resets $time';
+  }
+
+  @override
+  String oauthSavedResets(String count) {
+    return 'Available usage resets: $count';
+  }
+
+  @override
+  String get oauthSaving => 'Connecting account…';
+
+  @override
+  String get oauthScope => 'Authorization scope';
+
+  @override
+  String get oauthSecondaryWindow => 'Secondary window';
+
+  @override
+  String get oauthSubmitAuthorizationCode => 'Complete login';
+
+  @override
+  String get oauthSyncModels => 'Sync';
+
+  @override
+  String get oauthSyncing => 'Syncing models…';
+
+  @override
+  String get oauthTimeout => 'Authorization timed out. Please try again.';
+
+  @override
+  String get oauthTokenExpiry => 'Token expires';
+
+  @override
+  String get oauthTotal => 'Total quota';
+
+  @override
+  String get oauthUsageDetails => 'Usage details';
+
+  @override
+  String get oauthUsageUnavailable => 'Usage is currently unavailable';
+
+  @override
+  String oauthWaiting(String provider) {
+    return 'Waiting for $provider authorization';
+  }
+
+  @override
+  String get oauthWeekly => 'Weekly window';
+
+  @override
+  String get oauthWindow => 'Usage window';
+
+  @override
   String get worldBookAdd => 'Add World Book';
 
   @override
@@ -10740,6 +11073,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workspaceEntryChange => 'Change';
 
   @override
+  String get workspaceEntrySetAssistantDefault => 'Set as assistant default';
+
+  @override
   String get workspaceEntryLocked => 'Locked';
 
   @override
@@ -11338,6 +11674,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get skillsDetailBodyEmpty => 'No skill body yet';
 
   @override
+  String skillsDetailBodyTooLarge(String size) {
+    return 'This file is too large to preview ($size).';
+  }
+
+  @override
   String get workspaceEnvSizeTimeout => 'Timed out';
 
   @override
@@ -11359,10 +11700,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String workspaceBindingSetAssistantDefault(String assistant) {
     return 'Set as default workspace for “$assistant”';
   }
-
-  @override
-  String get workspaceUnbindHint =>
-      'Unbound this conversation; change the assistant\'s default workspace in assistant settings';
 
   @override
   String get storageSpaceCategoryWorkspaceFiles => 'Workspace files';

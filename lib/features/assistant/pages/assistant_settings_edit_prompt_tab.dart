@@ -914,6 +914,33 @@ class _PromptTabState extends State<_PromptTab> {
       children: [
         sysCard,
         const SizedBox(height: 12),
+        // 会话级提示词：允许每个会话有自己的系统提示词、单独挑指令注入与世界书。
+        _iosSectionCard(
+          children: [
+            _iosSwitchRow(
+              context,
+              icon: Lucide.FileText,
+              label: l10n.assistantConversationSystemPromptTitle,
+              subtitle: l10n.assistantConversationSystemPromptHint,
+              value: a.allowConversationSystemPrompt,
+              onChanged: (value) => ap.updateAssistant(
+                a.copyWith(allowConversationSystemPrompt: value),
+              ),
+            ),
+            _iosDivider(context),
+            _iosSwitchRow(
+              context,
+              icon: Lucide.Layers,
+              label: l10n.assistantConversationInjectionTitle,
+              subtitle: l10n.assistantConversationInjectionHint,
+              value: a.allowConversationPromptInjection,
+              onChanged: (value) => ap.updateAssistant(
+                a.copyWith(allowConversationPromptInjection: value),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
         appendTimeCard,
         const SizedBox(height: 12),
         tmplCard,

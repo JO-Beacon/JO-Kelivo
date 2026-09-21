@@ -150,6 +150,7 @@ class MessageListView extends StatefulWidget {
     required this.dividerPadding,
     this.topContentPadding = 8,
     this.bottomContentPadding = 16,
+    this.footer,
     this.pinnedStreamingMessageId,
     this.isPinnedIndicatorActive = false,
 
@@ -325,6 +326,10 @@ class MessageListView extends StatefulWidget {
   final OnSelectMessages? onSelectMessages;
   final OnSpeakMessage? onSpeakMessage;
   final List<String> suggestions;
+
+  /// 紧跟在最后一条消息之后、但不属于消息内容的紧凑操作入口。
+  /// 放在最后一行里，索引导航就仍然只数消息。
+  final Widget? footer;
   final OnSuggestionTap? onSuggestionTap;
   final OnRecoveredAskUserAnswer? onRecoveredAskUserAnswer;
   final void Function(String messageId, bool selected)? onToggleSelection;
@@ -389,6 +394,15 @@ class MessageListView extends StatefulWidget {
 }
 
 class _MessageListViewState extends State<MessageListView> {
+  static const _footerExtent = 48.0;
+
+  bool get _hasFooter => _showsFooter(widget);
+
+  static bool _showsFooter(MessageListView view) =>
+      view.footer != null &&
+      !view.hasMoreAfter &&
+      !view.isLoadingWindow &&
+      !view.selecting;
   static const double _streamingUpdateDeferBottomTolerance = 56.0;
 
   bool _historyLoadScheduled = false;
@@ -694,6 +708,15 @@ class _MessageListViewState extends State<MessageListView> {
   /// 按内容推导的估算能让这些修正量保持很小；
   /// 它不必精确，只要量级对就够。
   double _estimateItemExtent(int? index, double crossAxisExtent) {
+    if (index == null) return 0;
+    if (_effectiveRenderModels.isEmpty && _hasFooter) return _footerExtent;
+    final footerExtent = _hasFooter && index == _effectiveRenderModels.length - 1
+        ? _footerExtent
+        : 0;
+    return _estimateMessageExtent(index, crossAxisExtent) + footerExtent;
+  }
+
+  double _estimateMessageExtent(int? index, double crossAxisExtent) {
     // 索引为 null 时是在问“是否有一个高度适用于所有条目”。
     // 若回答正数，SuperSliverList 会把它套用到整个列表，
     // 不再走下面的逐条分支，所以这里必须是 0。
@@ -1304,6 +1327,18 @@ class _MessageListViewState extends State<MessageListView> {
     }
 
     final newModels = _effectiveRenderModels;
+    if ((_hasFooter || _showsFooter(oldWidget)) &&
+        (oldModels.length != newModels.length ||
+            _hasFooter != _showsFooter(oldWidget))) {
+      for (final index in {
+        math.max(0, oldModels.length - 1),
+        math.max(0, newModels.length - 1),
+      }) {
+        if (index < controller.numberOfItems) {
+          controller.invalidateExtent(index);
+        }
+      }
+    }
     final metricInputsChanged =
         oldWidget.chatFontScale != widget.chatFontScale ||
         oldWidget.selecting != widget.selecting ||
@@ -1807,9 +1842,14 @@ class _MessageListViewState extends State<MessageListView> {
                 widget.bottomContentPadding +
                     (widget.isPinnedIndicatorActive ? 12 : 0),
               ),
-              itemCount: _effectiveRenderModels.length,
+              itemCount: _effectiveRenderModels.isEmpty && _hasFooter
+                  ? 1
+                  : _effectiveRenderModels.length,
               keyboardDismissBehavior: _keyboardDismissBehavior,
               itemBuilder: (context, index) {
+                if (_effectiveRenderModels.isEmpty && _hasFooter) {
+                  return SizedBox(height: _footerExtent, child: widget.footer);
+                }
                 if (index < 0 || index >= _effectiveRenderModels.length) {
                   return const SizedBox.shrink();
                 }
@@ -2230,6 +2270,8 @@ class _MessageListViewState extends State<MessageListView> {
             padding: widget.dividerPadding,
             child: _buildContextDivider(context),
           ),
+        if (_hasFooter && index == _effectiveRenderModels.length - 1)
+          SizedBox(height: _footerExtent, child: widget.footer),
       ],
     );
     final isSpotlight =

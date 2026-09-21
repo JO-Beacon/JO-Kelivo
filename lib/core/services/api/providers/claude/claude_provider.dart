@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
+import '../../../../models/provider_oauth.dart';
 import '../../../../models/token_usage.dart';
 import '../../../../providers/model_provider.dart';
 import '../../../../providers/settings_provider.dart';
@@ -12,6 +13,7 @@ import '../../../../../utils/mcp_structured_image.dart';
 import '../../builtin_tools.dart';
 import '../../chat_api_helpers.dart';
 import '../../generation/tool_loop_runner.dart';
+import '../../../auth/claude_oauth_request.dart';
 import '../../google_service_account_auth.dart';
 import '../../stream/sse_framing.dart';
 import '../../stream/stream_chunk.dart';
@@ -401,15 +403,18 @@ Stream<StreamChunk> sendClaudeStreamEvents(
         thinkingBudget,
         topP,
       );
+      final thinkingModelId = config.oauthProvider == OAuthProvider.kimi
+          ? modelId
+          : upstreamModelId;
       final thinking = isReasoning
           ? claudeThinkingConfig(
-              upstreamModelId,
+              thinkingModelId,
               thinkingBudget,
               config: config,
             )
           : null;
       final outputConfig = isReasoning
-          ? claudeOutputConfig(upstreamModelId, thinkingBudget, config: config)
+          ? claudeOutputConfig(thinkingModelId, thinkingBudget, config: config)
           : null;
 
       // 每轮单独准备请求体
@@ -418,9 +423,11 @@ Stream<StreamChunk> sendClaudeStreamEvents(
         if (isVertex) 'anthropic_version': 'vertex-2023-10-16',
         'max_tokens':
             maxTokens ??
-            (isVertex
-                ? claudeVertexMaxOutputTokens(upstreamModelId)
-                : _defaultClaudeMaxOutputTokens(upstreamModelId)),
+            (config.oauthProvider == OAuthProvider.kimi
+                ? 32000
+                : (isVertex
+                      ? claudeVertexMaxOutputTokens(upstreamModelId)
+                      : _defaultClaudeMaxOutputTokens(upstreamModelId))),
         'messages': convo,
         'stream': stream,
         if (systemPrompt.isNotEmpty) 'system': systemPrompt,
@@ -517,7 +524,10 @@ Stream<StreamChunk> sendClaudeStreamEvents(
             } catch (_) {}
           } else if (type == 'tool_use') {
             final id = (it['id'] ?? '').toString();
-            final name = (it['name'] ?? '').toString();
+            final rawName = (it['name'] ?? '').toString();
+            final name = config.oauthProvider == OAuthProvider.claude
+                ? decodeClaudeOAuthToolName(rawName)
+                : rawName;
             final args =
                 (it['input'] as Map?)?.cast<String, dynamic>() ??
                 const <String, dynamic>{};
@@ -556,6 +566,9 @@ Stream<StreamChunk> sendClaudeStreamEvents(
         lastAssistantBlocks = history.sanitize(assistantBlocks);
         nonStreamText.write(joinedTextOfBlocks(assistantBlocks));
         final decoder = ClaudeStreamDecoder(
+          decodeToolName: config.oauthProvider == OAuthProvider.claude
+              ? decodeClaudeOAuthToolName
+              : null,
           skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
           serverToolNames: declaredServerToolNames,
           sourceId: 'round-${streamRound++}',
@@ -586,6 +599,9 @@ Stream<StreamChunk> sendClaudeStreamEvents(
 
       final sse = response.stream.transform(utf8.decoder);
       final decoder = ClaudeStreamDecoder(
+        decodeToolName: config.oauthProvider == OAuthProvider.claude
+            ? decodeClaudeOAuthToolName
+            : null,
         skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
         initialUsage: totalUsage,
         serverToolNames: declaredServerToolNames,

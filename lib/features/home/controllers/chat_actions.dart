@@ -432,6 +432,16 @@ class ChatActions {
   String? activeStreamingMessageId(String conversationId) =>
       _activeAssistantMessages[conversationId]?.id;
 
+  /// 仍在跑的消息 ID，涵盖准备中、收尾中和取消中 —— 这些在流式界面
+  /// 停下之后、最后一次检查点落地之前仍然存在。
+  Set<String> get activeStreamingMessageIds =>
+      _activeAssistantMessages.messageIds;
+
+  @visibleForTesting
+  void debugTrackActiveMessage(ChatMessage message) {
+    _activeAssistantMessages.put(message);
+  }
+
   /// 更新（或清除）气泡内的自动重试倒计时。
   void _setRetryStatus(
     stream_ctrl.StreamingState state,

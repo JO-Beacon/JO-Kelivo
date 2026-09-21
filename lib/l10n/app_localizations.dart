@@ -100,6 +100,48 @@ abstract class AppLocalizations {
     Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
   ];
 
+  /// No description provided for @settingsSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search settings'**
+  String get settingsSearchHint;
+
+  /// No description provided for @settingsSearchCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get settingsSearchCancel;
+
+  /// No description provided for @settingsSearchClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear search'**
+  String get settingsSearchClear;
+
+  /// No description provided for @settingsSearchSuggestions.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick access'**
+  String get settingsSearchSuggestions;
+
+  /// No description provided for @settingsSearchNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No settings found'**
+  String get settingsSearchNoResults;
+
+  /// No description provided for @settingsSearchNoResultsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Try a different name or a shorter keyword.'**
+  String get settingsSearchNoResultsHint;
+
+  /// No description provided for @settingsSearchResultCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 result} other{{count} results}}'**
+  String settingsSearchResultCount(int count);
+
   /// No description provided for @chatImageCropFailed.
   ///
   /// In en, this message translates to:
@@ -1293,6 +1335,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Working Directory (optional)'**
   String get mcpServerEditSheetStdioWorkingDirectoryLabel;
+
+  /// No description provided for @mcpWorkspaceBindingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Bind workspace (optional)'**
+  String get mcpWorkspaceBindingLabel;
+
+  /// No description provided for @mcpWorkspaceBindingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The server can access this workspace at /workspace. Leave Working Directory empty to start there. The binding stays fixed when you switch chats.'**
+  String get mcpWorkspaceBindingHint;
+
+  /// No description provided for @mcpWorkspaceBindingMobileOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace binding is available in the mobile Linux environment. Unbind it to run this server on desktop.'**
+  String get mcpWorkspaceBindingMobileOnly;
 
   /// No description provided for @mcpServerEditSheetStdioEnvironmentTitle.
   ///
@@ -13981,6 +14041,510 @@ abstract class AppLocalizations {
   /// **'World Book'**
   String get worldBookTitle;
 
+  /// No description provided for @worldBookStickyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sticky (messages)'**
+  String get worldBookStickyLabel;
+
+  /// No description provided for @worldBookStickyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep this entry active for N messages after triggering. Repeated matches do not extend it. 0 disables this effect.'**
+  String get worldBookStickyHint;
+
+  /// No description provided for @worldBookCooldownLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cooldown (messages)'**
+  String get worldBookCooldownLabel;
+
+  /// No description provided for @worldBookCooldownHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Prevent reactivation for N messages after triggering or after sticky ends. 0 disables this effect.'**
+  String get worldBookCooldownHint;
+
+  /// No description provided for @worldBookDelayLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Delay (messages)'**
+  String get worldBookDelayLabel;
+
+  /// No description provided for @worldBookDelayHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow activation only after the conversation has at least N messages. Count individual messages, not exchanges. 0 disables this effect.'**
+  String get worldBookDelayHint;
+
+  /// No description provided for @worldBookDragToReorder.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to reorder'**
+  String get worldBookDragToReorder;
+
+  /// No description provided for @worldBookEnabledCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{enabled}/{total} enabled'**
+  String worldBookEnabledCount(int enabled, int total);
+
+  /// No description provided for @conversationPromptScope.
+  ///
+  /// In en, this message translates to:
+  /// **'This conversation'**
+  String get conversationPromptScope;
+
+  /// No description provided for @conversationSystemPromptTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation system prompt'**
+  String get conversationSystemPromptTitle;
+
+  /// No description provided for @conversationSystemPromptHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Applies only to this conversation. Leave blank to use the assistant’s system prompt.'**
+  String get conversationSystemPromptHint;
+
+  /// No description provided for @conversationSystemPromptClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Use assistant prompt'**
+  String get conversationSystemPromptClear;
+
+  /// No description provided for @conversationSystemPromptPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Write a system prompt for this conversation…'**
+  String get conversationSystemPromptPlaceholder;
+
+  /// No description provided for @assistantConversationSystemPromptTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Per-conversation system prompt'**
+  String get assistantConversationSystemPromptTitle;
+
+  /// No description provided for @assistantConversationSystemPromptHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow each conversation to use its own system prompt.'**
+  String get assistantConversationSystemPromptHint;
+
+  /// No description provided for @assistantConversationInjectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Per-conversation instruction injections'**
+  String get assistantConversationInjectionTitle;
+
+  /// No description provided for @assistantConversationInjectionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose instruction injections and world books for each conversation. None selected by default.'**
+  String get assistantConversationInjectionHint;
+
+  /// No description provided for @oauthAccountId.
+  ///
+  /// In en, this message translates to:
+  /// **'Account ID'**
+  String get oauthAccountId;
+
+  /// No description provided for @oauthAccountsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Accounts'**
+  String get oauthAccountsTab;
+
+  /// No description provided for @oauthAuthorizationCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorization code or callback URL'**
+  String get oauthAuthorizationCode;
+
+  /// No description provided for @oauthAuthorizationCodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'If the browser does not return automatically, paste the final callback URL or authorization code here.'**
+  String get oauthAuthorizationCodeHint;
+
+  /// No description provided for @oauthCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel authorization'**
+  String get oauthCancel;
+
+  /// No description provided for @oauthCodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter this code on the authorization page'**
+  String get oauthCodeHint;
+
+  /// No description provided for @oauthConnectAnother.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect another account'**
+  String get oauthConnectAnother;
+
+  /// No description provided for @oauthConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get oauthConnected;
+
+  /// No description provided for @oauthConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection'**
+  String get oauthConnection;
+
+  /// No description provided for @oauthConnectionInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection details'**
+  String get oauthConnectionInfo;
+
+  /// No description provided for @oauthCopyCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy code'**
+  String get oauthCopyCode;
+
+  /// No description provided for @oauthCustomRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom request'**
+  String get oauthCustomRequest;
+
+  /// No description provided for @oauthDays.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} day window'**
+  String oauthDays(String count);
+
+  /// No description provided for @oauthDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorization was not granted. Please try again.'**
+  String get oauthDenied;
+
+  /// No description provided for @oauthDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'View account details'**
+  String get oauthDetails;
+
+  /// No description provided for @oauthDeviceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable device code login in your ChatGPT security settings or workspace permissions first.'**
+  String get oauthDeviceHint;
+
+  /// No description provided for @oauthDeviceLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Use device code'**
+  String get oauthDeviceLogin;
+
+  /// No description provided for @oauthEnabledHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Show these models in the model picker'**
+  String get oauthEnabledHint;
+
+  /// No description provided for @oauthEndpoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Endpoint'**
+  String get oauthEndpoint;
+
+  /// No description provided for @oauthExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'{provider} login has expired'**
+  String oauthExpired(String provider);
+
+  /// No description provided for @oauthExtraUsage.
+  ///
+  /// In en, this message translates to:
+  /// **'Extra usage'**
+  String get oauthExtraUsage;
+
+  /// No description provided for @oauthFollowGlobal.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow global settings'**
+  String get oauthFollowGlobal;
+
+  /// No description provided for @oauthHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} hour window'**
+  String oauthHours(String count);
+
+  /// No description provided for @oauthInvalidAuthorizationCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the code or callback URL from this login attempt.'**
+  String get oauthInvalidAuthorizationCode;
+
+  /// No description provided for @oauthInvalidResponse.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorization did not complete. Please try again.'**
+  String get oauthInvalidResponse;
+
+  /// No description provided for @oauthLastUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated {time}'**
+  String oauthLastUpdated(String time);
+
+  /// No description provided for @oauthLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Log in'**
+  String get oauthLogin;
+
+  /// No description provided for @oauthLoginRestored.
+  ///
+  /// In en, this message translates to:
+  /// **'Logged in. Use the message retry button to send again.'**
+  String get oauthLoginRestored;
+
+  /// No description provided for @oauthLoginTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Log in to {provider}'**
+  String oauthLoginTo(String provider);
+
+  /// No description provided for @oauthLogout.
+  ///
+  /// In en, this message translates to:
+  /// **'Log out'**
+  String get oauthLogout;
+
+  /// No description provided for @oauthLogoutDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this account’s saved credentials from this device'**
+  String get oauthLogoutDescription;
+
+  /// No description provided for @oauthMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} minute window'**
+  String oauthMinutes(String count);
+
+  /// No description provided for @oauthModelsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Available models are synced from your account.'**
+  String get oauthModelsHint;
+
+  /// No description provided for @oauthMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly window'**
+  String get oauthMonthly;
+
+  /// No description provided for @oauthName.
+  ///
+  /// In en, this message translates to:
+  /// **'Provider name'**
+  String get oauthName;
+
+  /// No description provided for @oauthNeedsLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Login required'**
+  String get oauthNeedsLogin;
+
+  /// No description provided for @oauthNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Network proxy'**
+  String get oauthNetwork;
+
+  /// No description provided for @oauthNetworkError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not connect. Check your network and try again.'**
+  String get oauthNetworkError;
+
+  /// No description provided for @oauthNoModels.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync models to start chatting'**
+  String get oauthNoModels;
+
+  /// No description provided for @oauthNotConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Not connected'**
+  String get oauthNotConnected;
+
+  /// No description provided for @oauthOpenBrowser.
+  ///
+  /// In en, this message translates to:
+  /// **'Open authorization page'**
+  String get oauthOpenBrowser;
+
+  /// No description provided for @oauthPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'This account cannot access this resource.'**
+  String get oauthPermissionDenied;
+
+  /// No description provided for @oauthPrimaryWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Primary window'**
+  String get oauthPrimaryWindow;
+
+  /// No description provided for @oauthPromptCachingHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Reuse context across messages and choose how long the cache is retained.'**
+  String get oauthPromptCachingHelp;
+
+  /// No description provided for @oauthQuotaAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Quota is available'**
+  String get oauthQuotaAvailable;
+
+  /// No description provided for @oauthQuotaExceeded.
+  ///
+  /// In en, this message translates to:
+  /// **'This account has no available quota.'**
+  String get oauthQuotaExceeded;
+
+  /// No description provided for @oauthRateLimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many requests. Please try again later.'**
+  String get oauthRateLimited;
+
+  /// No description provided for @oauthRefreshUsage.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh usage'**
+  String get oauthRefreshUsage;
+
+  /// No description provided for @oauthRefreshing.
+  ///
+  /// In en, this message translates to:
+  /// **'Refreshing authorization…'**
+  String get oauthRefreshing;
+
+  /// No description provided for @oauthRelogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Log in again'**
+  String get oauthRelogin;
+
+  /// No description provided for @oauthRequestFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The provider could not complete the request.'**
+  String get oauthRequestFailed;
+
+  /// No description provided for @oauthResetsAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Resets {time}'**
+  String oauthResetsAt(String time);
+
+  /// No description provided for @oauthSavedResets.
+  ///
+  /// In en, this message translates to:
+  /// **'Available usage resets: {count}'**
+  String oauthSavedResets(String count);
+
+  /// No description provided for @oauthSaving.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting account…'**
+  String get oauthSaving;
+
+  /// No description provided for @oauthScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorization scope'**
+  String get oauthScope;
+
+  /// No description provided for @oauthSecondaryWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Secondary window'**
+  String get oauthSecondaryWindow;
+
+  /// No description provided for @oauthSubmitAuthorizationCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete login'**
+  String get oauthSubmitAuthorizationCode;
+
+  /// No description provided for @oauthSyncModels.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync'**
+  String get oauthSyncModels;
+
+  /// No description provided for @oauthSyncing.
+  ///
+  /// In en, this message translates to:
+  /// **'Syncing models…'**
+  String get oauthSyncing;
+
+  /// No description provided for @oauthTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorization timed out. Please try again.'**
+  String get oauthTimeout;
+
+  /// No description provided for @oauthTokenExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'Token expires'**
+  String get oauthTokenExpiry;
+
+  /// No description provided for @oauthTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total quota'**
+  String get oauthTotal;
+
+  /// No description provided for @oauthUsageDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage details'**
+  String get oauthUsageDetails;
+
+  /// No description provided for @oauthUsageUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage is currently unavailable'**
+  String get oauthUsageUnavailable;
+
+  /// No description provided for @oauthWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for {provider} authorization'**
+  String oauthWaiting(String provider);
+
+  /// No description provided for @oauthWeekly.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly window'**
+  String get oauthWeekly;
+
+  /// No description provided for @oauthWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage window'**
+  String get oauthWindow;
+
   /// No description provided for @worldBookAdd.
   ///
   /// In en, this message translates to:
@@ -19253,6 +19817,12 @@ abstract class AppLocalizations {
   /// **'Change'**
   String get workspaceEntryChange;
 
+  /// No description provided for @workspaceEntrySetAssistantDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Set as assistant default'**
+  String get workspaceEntrySetAssistantDefault;
+
   /// No description provided for @workspaceEntryLocked.
   ///
   /// In en, this message translates to:
@@ -20313,6 +20883,12 @@ abstract class AppLocalizations {
   /// **'No skill body yet'**
   String get skillsDetailBodyEmpty;
 
+  /// No description provided for @skillsDetailBodyTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'This file is too large to preview ({size}).'**
+  String skillsDetailBodyTooLarge(String size);
+
   /// No description provided for @workspaceEnvSizeTimeout.
   ///
   /// In en, this message translates to:
@@ -20354,12 +20930,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Set as default workspace for “{assistant}”'**
   String workspaceBindingSetAssistantDefault(String assistant);
-
-  /// No description provided for @workspaceUnbindHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Unbound this conversation; change the assistant\'s default workspace in assistant settings'**
-  String get workspaceUnbindHint;
 
   /// No description provided for @storageSpaceCategoryWorkspaceFiles.
   ///

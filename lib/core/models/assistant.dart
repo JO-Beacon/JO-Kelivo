@@ -47,6 +47,12 @@ class Assistant {
   final int? thinkingBudget; // null = 使用全局/默认值；0 = 关闭；>0 = token 预算
   final int? maxTokens; // null = 不限制
   final String systemPrompt;
+
+  /// 允许每个会话使用自己的系统提示词，覆盖助手的。
+  final bool allowConversationSystemPrompt;
+
+  /// 允许每个会话单独挑选指令注入与世界书。
+  final bool allowConversationPromptInjection;
   final String messageTemplate; // 例如 "{{ message }}"
   final bool searchEnabled; // 每个助手的联网搜索开关
   final List<String> mcpServerIds; // 绑定的 MCP 服务器 ID
@@ -104,6 +110,8 @@ class Assistant {
     this.thinkingBudget,
     this.maxTokens,
     this.systemPrompt = '',
+    this.allowConversationSystemPrompt = false,
+    this.allowConversationPromptInjection = false,
     this.messageTemplate = '{{ message }}',
     this.searchEnabled = false,
     this.mcpServerIds = const <String>[],
@@ -150,6 +158,8 @@ class Assistant {
     int? thinkingBudget,
     int? maxTokens,
     String? systemPrompt,
+    bool? allowConversationSystemPrompt,
+    bool? allowConversationPromptInjection,
     String? messageTemplate,
     bool? searchEnabled,
     List<String>? mcpServerIds,
@@ -211,6 +221,11 @@ class Assistant {
           : (thinkingBudget ?? this.thinkingBudget),
       maxTokens: clearMaxTokens ? null : (maxTokens ?? this.maxTokens),
       systemPrompt: systemPrompt ?? this.systemPrompt,
+      allowConversationSystemPrompt:
+          allowConversationSystemPrompt ?? this.allowConversationSystemPrompt,
+      allowConversationPromptInjection:
+          allowConversationPromptInjection ??
+          this.allowConversationPromptInjection,
       messageTemplate: messageTemplate ?? this.messageTemplate,
       searchEnabled: searchEnabled ?? this.searchEnabled,
       mcpServerIds: mcpServerIds ?? this.mcpServerIds,
@@ -270,6 +285,8 @@ class Assistant {
     'thinkingBudget': thinkingBudget,
     'maxTokens': maxTokens,
     'systemPrompt': systemPrompt,
+    'allowConversationSystemPrompt': allowConversationSystemPrompt,
+    'allowConversationPromptInjection': allowConversationPromptInjection,
     'messageTemplate': messageTemplate,
     'searchEnabled': searchEnabled,
     'mcpServerIds': mcpServerIds,
@@ -321,6 +338,10 @@ class Assistant {
     thinkingBudget: (json['thinkingBudget'] as num?)?.toInt(),
     maxTokens: (json['maxTokens'] as num?)?.toInt(),
     systemPrompt: (json['systemPrompt'] as String?) ?? '',
+    allowConversationSystemPrompt:
+        (json['allowConversationSystemPrompt'] as bool?) ?? false,
+    allowConversationPromptInjection:
+        (json['allowConversationPromptInjection'] as bool?) ?? false,
     messageTemplate: (json['messageTemplate'] as String?) ?? '{{ message }}',
     searchEnabled: json['searchEnabled'] as bool? ?? false,
     mcpServerIds:

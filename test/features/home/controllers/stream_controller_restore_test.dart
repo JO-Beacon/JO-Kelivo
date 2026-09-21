@@ -209,4 +209,52 @@ void main() {
     expect(controller.getReasoningSegments(message.id), isNotNull);
     expect(controller.reasoningPayloadDecodeCount, 2);
   });
+
+  test('clearAllState 只释放不在在跑清单里的消息', () {
+    final controller = buildController();
+    addTearDown(controller.dispose);
+    final active = buildAssistantMessage(controller, reasoningText: 'live');
+    final completed = buildAssistantMessage(
+      controller,
+      id: 'completed',
+      reasoningText: 'done',
+    );
+    for (final message in [active, completed]) {
+      restore(controller, message);
+      controller.streamingContentNotifier.getNotifier(message.id);
+    }
+    final liveReasoning = controller.getReasoningData(active.id);
+    final notifier = controller.streamingContentNotifier.getNotifier(active.id);
+    controller.markStreamingStarted(active.id);
+    // 界面已经停下，但最后一次检查点／取消动作可能还在路上。
+    controller.markStreamingEnded(active.id);
+    controller.clearAllState(keepMessageIds: {active.id});
+
+    expect(controller.getReasoningData(active.id), same(liveReasoning));
+    expect(controller.getReasoningSegments(active.id), hasLength(1));
+    expect(controller.getContentSplitData(active.id), isNotNull);
+    expect(controller.getToolParts(active.id), hasLength(1));
+    expect(controller.reasoningDetails[active.id], isNotNull);
+    expect(
+      controller.streamingContentNotifier.getNotifier(active.id),
+      same(notifier),
+    );
+    expect(controller.getReasoningData(completed.id), isNull);
+    expect(controller.getReasoningSegments(completed.id), isNull);
+    expect(controller.getContentSplitData(completed.id), isNull);
+    expect(controller.getToolParts(completed.id), isNull);
+    expect(controller.reasoningDetails[completed.id], isNull);
+    expect(
+      controller.streamingContentNotifier.hasNotifier(completed.id),
+      isFalse,
+    );
+
+    restore(controller, active);
+    expect(controller.reasoningPayloadDecodeCount, 2);
+    restore(controller, completed);
+    expect(controller.reasoningPayloadDecodeCount, 3);
+    controller.clearAllState();
+    expect(controller.getReasoningData(active.id), isNull);
+    expect(controller.streamingContentNotifier.hasNotifier(active.id), isFalse);
+  });
 }

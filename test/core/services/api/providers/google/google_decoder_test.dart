@@ -317,13 +317,17 @@ void main() {
     expect(decoder.takeBufferedImage()!.data, 'iVBORw0KGgo=');
   });
 
-  test('keeps a signature-only trailing part for the next text turn', () {
+  test('keeps an empty-text trailing part as the turn signature', () {
+    // Gemini 3 把整轮的签名挂在一个正文为空的尾部 part 上。
+    // 判据是「有 text 这个键」，不是「正文非空」；反过来，只有签名、
+    // 完全没有 text 键的 part 不能当正文签名用 —— 内置工具轮次的
+    // toolCall／toolResponse 就长这样，误收会把它们的签名回放到正文上。
     final decoder = GoogleStreamDecoder(persistThoughtSigs: true);
     decoder.accept(
       _event(
         _candidate(
           parts: [
-            <String, dynamic>{'thoughtSignature': 'turn-sig'},
+            <String, dynamic>{'text': '', 'thoughtSignature': 'turn-sig'},
           ],
         ),
       ),
@@ -331,6 +335,22 @@ void main() {
 
     expect(decoder.textThoughtSigKey, 'thoughtSignature');
     expect(decoder.textThoughtSigVal, 'turn-sig');
+  });
+
+  test('a part without a text key is not taken as the turn signature', () {
+    final decoder = GoogleStreamDecoder(persistThoughtSigs: true);
+    decoder.accept(
+      _event(
+        _candidate(
+          parts: [
+            <String, dynamic>{'thoughtSignature': 'bare-sig'},
+          ],
+        ),
+      ),
+    );
+
+    expect(decoder.textThoughtSigKey, isNull);
+    expect(decoder.textThoughtSigVal, isNull);
   });
 
   test('marks MALFORMED_RESPONSE for retry when there are no tool calls', () {
@@ -397,4 +417,52 @@ void main() {
     expect(decoder.textThoughtSigKey, 'thoughtSignature');
     expect(decoder.textThoughtSigVal, 'text-sig');
   });
+
+  test(
+    'a built-in tool round keeps the text signature, not the toolCall one',
+    () {
+      // google_search 轮次先返回 toolCall、toolResponse，最后才是带着本轮签名的
+      // 正文 part。把 toolCall 的签名回放到正文 part 上会被判为无效签名。
+      final decoder = GoogleStreamDecoder(
+        isGemini3: true,
+        persistThoughtSigs: true,
+      );
+      decoder.accept(
+        _event(
+          _candidate(
+            parts: [
+              <String, dynamic>{
+                'toolCall': <String, dynamic>{'name': 'google_search'},
+                'thoughtSignature': 'sig-tool-call',
+              },
+            ],
+          ),
+        ),
+      );
+      decoder.accept(
+        _event(
+          _candidate(
+            parts: [
+              <String, dynamic>{
+                'toolResponse': <String, dynamic>{'name': 'google_search'},
+                'thoughtSignature': 'sig-tool-response',
+              },
+            ],
+          ),
+        ),
+      );
+      decoder.accept(
+        _event(
+          _candidate(
+            parts: [
+              <String, dynamic>{'text': 'Grounded answer.'},
+              <String, dynamic>{'text': '', 'thoughtSignature': 'sig-text'},
+            ],
+          ),
+        ),
+      );
+
+      expect(decoder.textThoughtSigVal, 'sig-text');
+    },
+  );
 }

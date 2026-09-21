@@ -10,6 +10,8 @@ import 'package:file_picker/file_picker.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/services/haptics.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
+import 'oauth_login_panel.dart';
+import '../pages/oauth_provider_detail_page.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
@@ -34,7 +36,7 @@ class _AddProviderSheet extends StatefulWidget {
 
 class _AddProviderSheetState extends State<_AddProviderSheet>
     with SingleTickerProviderStateMixin {
-  late final TabController _tab = TabController(length: 3, vsync: this);
+  late final TabController _tab = TabController(length: 4, vsync: this);
 
   @override
   void initState() {
@@ -517,7 +519,7 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: _SegTabBar(
                   controller: _tab,
-                  tabs: const ['OpenAI', 'Google', 'Claude'],
+                  tabs: ['OpenAI', 'Google', 'Claude', l10n.oauthAccountsTab],
                 ),
               ),
               const SizedBox(height: 12),
@@ -536,6 +538,11 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
                               if (idx == 0) _openaiForm(l10n),
                               if (idx == 1) _googleForm(l10n),
                               if (idx == 2) _claudeForm(l10n),
+                              if (idx == 3)
+                                OAuthLoginPanel(
+                                  onViewDetails: (id) =>
+                                      showOAuthProviderDetails(context, id),
+                                ),
                             ],
                           );
                         },
@@ -545,20 +552,21 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: IosTileButton(
-                    icon: Lucide.Plus,
-                    label: l10n.addProviderSheetAddButton,
-                    backgroundColor: cs.primary,
-                    // 无需设置前景色或边框；组件会轻微着色背景，
-                    // 使用主题色渲染文本，并绘制细微同色系边框。
-                    onTap: _onAdd,
+              if (_tab.index < 3)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: IosTileButton(
+                      icon: Lucide.Plus,
+                      label: l10n.addProviderSheetAddButton,
+                      backgroundColor: cs.primary,
+                      // 无需设置前景色或边框；组件会轻微着色背景，
+                      // 使用主题色渲染文本，并绘制细微同色系边框。
+                      onTap: _onAdd,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),

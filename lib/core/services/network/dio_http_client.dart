@@ -73,8 +73,12 @@ class NetworkProxyConfig {
 }
 
 class DioHttpClient extends http.BaseClient {
-  DioHttpClient({this._proxy, CancelToken? cancelToken, Duration? timeout})
-    : _cancelToken = cancelToken ?? CancelToken(),
+  DioHttpClient({
+    this._proxy,
+    CancelToken? cancelToken,
+    Duration? timeout,
+    this.logRequests = true,
+  }) : _cancelToken = cancelToken ?? CancelToken(),
       _dio = Dio(
         BaseOptions(
           connectTimeout: timeout,
@@ -144,6 +148,8 @@ class DioHttpClient extends http.BaseClient {
     );
   }
 
+  /// 是否写请求日志。账号登录的令牌请求会关掉它，避免把凭据写进日志。
+  final bool logRequests;
   final Dio _dio;
   final NetworkProxyConfig? _proxy;
   final CancelToken _cancelToken;
@@ -180,9 +186,13 @@ class DioHttpClient extends http.BaseClient {
     } catch (_) {}
 
     final reqHeaders = Map<String, String>.from(request.headers);
-    reqHeaders.putIfAbsent('User-Agent', () => 'JO-AIClient');
+    // 大小写不敏感：供应商自定义请求头里的 User-Agent 必须能生效，
+    // 不能被这里补的默认值顶掉。
+    if (!reqHeaders.keys.any((key) => key.toLowerCase() == 'user-agent')) {
+      reqHeaders['User-Agent'] = 'JO-AIClient';
+    }
 
-    if (RequestLogger.enabled) {
+    if (logRequests && RequestLogger.enabled) {
       RequestLogger.logLine(
         '[REQ $reqId] $method ${LogRedactor.redactUrl(uri.toString())}',
       );
@@ -226,7 +236,7 @@ class DioHttpClient extends http.BaseClient {
         headers[name] = values.join(',');
       });
 
-      if (RequestLogger.enabled) {
+      if (logRequests && RequestLogger.enabled) {
         RequestLogger.logLine('[RES $reqId] status=$statusCode');
         if (headers.isNotEmpty) {
           RequestLogger.logLine(
@@ -263,7 +273,8 @@ class DioHttpClient extends http.BaseClient {
         );
       }
 
-      final logChunks = RequestLogger.enabled && RequestLogger.saveOutput;
+      final logChunks =
+          (logRequests && RequestLogger.enabled) && RequestLogger.saveOutput;
       final controller = StreamController<List<int>>(sync: true);
       controller.onListen = () {
         body.stream.listen(
@@ -281,7 +292,7 @@ class DioHttpClient extends http.BaseClient {
             }
           },
           onError: (e, st) {
-            if (RequestLogger.enabled) {
+            if (logRequests && RequestLogger.enabled) {
               RequestLogger.logLine(
                 '[RES $reqId] error=${RequestLogger.escape(LogRedactor.redactText(e.toString()))}',
               );
@@ -290,7 +301,7 @@ class DioHttpClient extends http.BaseClient {
             controller.close();
           },
           onDone: () {
-            if (RequestLogger.enabled) {
+            if (logRequests && RequestLogger.enabled) {
               RequestLogger.logLine('[RES $reqId] done');
             }
             controller.close();
@@ -321,7 +332,7 @@ class DioHttpClient extends http.BaseClient {
         reasonPhrase: resp.statusMessage,
       );
     } on DioException catch (e) {
-      if (RequestLogger.enabled) {
+      if (logRequests && RequestLogger.enabled) {
         RequestLogger.logLine(
           '[RES $reqId] dio_error=${RequestLogger.escape(LogRedactor.redactText(RequestLogger.elidePayloads(e.toString())))}',
         );
@@ -338,7 +349,7 @@ class DioHttpClient extends http.BaseClient {
       }
       throw http.ClientException(e.toString(), uri);
     } catch (e) {
-      if (RequestLogger.enabled) {
+      if (logRequests && RequestLogger.enabled) {
         RequestLogger.logLine(
           '[RES $reqId] error=${RequestLogger.escape(LogRedactor.redactText(e.toString()))}',
         );

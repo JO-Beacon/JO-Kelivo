@@ -54,7 +54,14 @@ enum IncomingShareInbox {
   }
 
   static func pending() throws -> [[String: Any]] {
-    let directories = try FileManager.default.contentsOfDirectory(at: root(), includingPropertiesForKeys: nil)
+    let directory: URL
+    do {
+      directory = try root()
+    } catch InboxError.unavailable {
+      // 重签后的应用可能没有 App Group 访问权。被动检查收件箱时保持安静。
+      return []
+    }
+    let directories = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
     return try directories.sorted { $0.lastPathComponent < $1.lastPathComponent }.compactMap { directory in
       let manifest = directory.appendingPathComponent("share.json")
       guard FileManager.default.fileExists(atPath: manifest.path) else { return nil }

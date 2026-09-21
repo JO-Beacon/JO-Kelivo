@@ -1,5 +1,18 @@
 import '../../../core/models/model_types.dart';
 
+/// 目录同步得到的账号元数据不在模型表单中编辑；保存时从最新覆盖项读取，
+/// 这样编辑期间发生的目录刷新也不会被旧表单覆盖。
+Map<String, dynamic> modelSyncMetadata(Map<String, dynamic> override) => {
+  for (final key in const [
+    'oauthProtocol',
+    'oauthThinkingMode',
+    'oauthThinkingRequired',
+    'oauthThinkingEfforts',
+    'oauthThinkingDefaultEffort',
+  ])
+    if (override.containsKey(key)) key: override[key],
+};
+
 class ModelTypeSwitchResult {
   const ModelTypeSwitchResult({
     required this.input,

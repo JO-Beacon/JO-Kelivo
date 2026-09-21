@@ -4,6 +4,7 @@ import 'dart:convert';
 ///
 /// 载荷约定：
 /// - `text` / `reasoning`：原始字符串
+/// - `provider_auth_error`：`{"providerId"}`，账号登录失效后的恢复入口
 /// - `tool_call`：原样保留的 JSON 字符串
 /// - `image`：`{"uri","mime"?,"assetId"?,"unavailable"?}`
 /// - `file`：`{"uri","name","mime"?,"assetId"?,"unavailable"?}`
@@ -25,6 +26,8 @@ sealed class MessagePart {
         return ImagePart.fromPayload(payload);
       case 'file':
         return FilePart.fromPayload(payload);
+      case 'provider_auth_error':
+        return ProviderAuthErrorPart.fromPayload(payload);
       default:
         return UnknownPart(rawKind: kind, payload: payload);
     }
@@ -33,6 +36,29 @@ sealed class MessagePart {
   String get kind;
 
   String encodePayload();
+}
+
+/// 账号登录失效的持久化恢复入口，不进入模型输入。
+final class ProviderAuthErrorPart extends MessagePart {
+  const ProviderAuthErrorPart({required this.providerId});
+  factory ProviderAuthErrorPart.fromPayload(String payload) {
+    final data = _decodeObjectPayload(payload);
+    final providerId = data['providerId'];
+    if (providerId is! String || providerId.isEmpty) {
+      throw const _MessagePartFormatException('missing_provider_id');
+    }
+    return ProviderAuthErrorPart(providerId: providerId);
+  }
+  final String providerId;
+  @override
+  String get kind => 'provider_auth_error';
+  @override
+  String encodePayload() => jsonEncode({'providerId': providerId});
+  @override
+  bool operator ==(Object other) =>
+      other is ProviderAuthErrorPart && other.providerId == providerId;
+  @override
+  int get hashCode => providerId.hashCode;
 }
 
 final class TextPart extends MessagePart {

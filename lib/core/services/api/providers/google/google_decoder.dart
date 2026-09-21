@@ -345,11 +345,13 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
 
     final inline = p['inlineData'] ?? p['inline_data'];
     final hasFile = p['fileData'] is Map || p['file_data'] is Map;
-    // Gemini 3 hangs the turn's signature on a trailing part whose text is
-    // empty, so the text guard must not require a body. One text signature is
-    // kept per turn — the first; a response has not been seen to carry two.
+    // Gemini 3 把整轮的签名挂在一个正文为空的尾部 part 上，所以这里的判据是
+    // 有 `text` 这个键、而不是正文非空；这同时把内置工具轮次先返回的
+    // `toolCall`／`toolResponse` part 挡在外面 —— 它们的签名回放到正文 part 上
+    // 会被 Google 判为无效。一轮只保留第一个正文签名。
     if (persistThoughtSigs &&
         !thought &&
+        p.containsKey('text') &&
         fc == null &&
         inline is! Map &&
         !hasFile &&

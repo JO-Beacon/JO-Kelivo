@@ -15,6 +15,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
     this.skipRedactedThinkingBlocks = false,
     this.initialUsage,
     this.serverToolNames = const <String>{},
+    this.decodeToolName,
     String sourceId = 'stream',
   }) : _ids = StreamChunkIds(sourceId);
 
@@ -23,6 +24,9 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
 
   /// 本次请求声明为 Anthropic 托管服务端工具的工具名。
   final Set<String> serverToolNames;
+
+  /// 还原客户端工具名（账号登录时请求侧加过前缀）。
+  final String Function(String name)? decodeToolName;
   final StreamChunkIds _ids;
 
   final List<Map<String, dynamic>> assistantBlocks = <Map<String, dynamic>>[];
@@ -214,7 +218,8 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
     } else if (kind == 'tool_use') {
       _flushTextBlock();
       final id = (block['id'] ?? '').toString();
-      final name = (block['name'] ?? '').toString();
+      final rawName = (block['name'] ?? '').toString();
+      final name = decodeToolName?.call(rawName) ?? rawName;
       if (id.isNotEmpty) {
         clientTools.putIfAbsent(id, () => ClaudeClientTool(id: id, name: name));
         assistantBlocks.add({

@@ -80,7 +80,12 @@ void main() {
     // 本仓库把「自动重试」收在「行为与启动」子页面里，首屏不直接给入口
     //（上游后来把它提到了首屏，属本仓库尚未同步的布局差异）。
     expect(find.text('Auto Retry'), findsNothing);
-    await tester.tap(find.text('Behavior & startup'));
+    // 上游改用 defaultTargetPlatform 后，测试环境（android）会渲染移动专属行，
+    // 「行为与启动」可能被挤出视口；先确保可见再点击。
+    final behaviorRow = find.text('Behavior & startup');
+    await tester.ensureVisible(behaviorRow);
+    await tester.pumpAndSettle();
+    await tester.tap(behaviorRow);
     await tester.pumpAndSettle();
     final autoRetry = find.text('Auto Retry');
     await tester.scrollUntilVisible(

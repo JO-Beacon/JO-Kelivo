@@ -1,3 +1,5 @@
+import '../../models/conversation_prompt_settings.dart';
+import '../world_book_activation.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -206,17 +208,25 @@ class ChatService extends ChangeNotifier {
     return Map<String, dynamic>.from(extras);
   }
 
-  Future<void> _copyWorkspaceBindingFrom(
+  /// 新会话要继承的东西：工作区绑定、会话级提示词选择，
+  /// 以及世界书的定时生效状态。
+  Future<void> _copyConversationSettingsFrom(
     String conversationId,
     Map<String, dynamic> sourceExtras,
   ) {
     return updateConversationExtras(conversationId, (_) {
       final source = WorkspaceBinding.fromExtras(sourceExtras);
-      return WorkspaceBinding(
-        workspaceId: source.workspaceId,
-        cwd: source.cwd,
-        allowAll: source.allowAll,
-      ).applyTo({});
+      return ConversationPromptSettings.fromExtras(sourceExtras).applyTo(
+        WorkspaceBinding(
+          workspaceId: source.workspaceId,
+          cwd: source.cwd,
+          allowAll: source.allowAll,
+        ).applyTo({
+          if (sourceExtras.containsKey(WorldBookActivation.extrasKey))
+            WorldBookActivation.extrasKey:
+                sourceExtras[WorldBookActivation.extrasKey],
+        }),
+      );
     });
   }
 
@@ -4193,7 +4203,7 @@ class ChatService extends ChangeNotifier {
       title: title,
       assistantId: assistantId,
     );
-    await _copyWorkspaceBindingFrom(persisted.id, sourceExtras);
+    await _copyConversationSettingsFrom(persisted.id, sourceExtras);
     final sourceIds = sourceMessages
         .map((message) => message.id)
         .where((id) => id.isNotEmpty)

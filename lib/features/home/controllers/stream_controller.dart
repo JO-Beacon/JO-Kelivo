@@ -253,18 +253,19 @@ class StreamController {
     _cleanupStreamTimers(messageId);
   }
 
-  /// 清除所有状态映射（用于新会话）。
-  void clearAllState() {
-    _reasoning.clear();
-    _reasoningSegments.clear();
-    _contentSplits.clear();
-    _toolParts.clear();
-    _geminiThoughtSigs.clear();
-    _reasoningDetails.clear();
-    _decodedReasoningPayloads.clear();
-    _restoredUiMessageIds.clear();
-    _cancelAllTimers();
-    streamingContentNotifier.clear();
+  /// 清除缓存的界面状态，但放过仍由 ChatActions 持有的生成。
+  void clearAllState({Set<String> keepMessageIds = const {}}) {
+    bool discard(String id) => !keepMessageIds.contains(id);
+    _reasoning.removeWhere((id, _) => discard(id));
+    _reasoningSegments.removeWhere((id, _) => discard(id));
+    _contentSplits.removeWhere((id, _) => discard(id));
+    _toolParts.removeWhere((id, _) => discard(id));
+    _geminiThoughtSigs.removeWhere((id, _) => discard(id));
+    _reasoningDetails.removeWhere((id, _) => discard(id));
+    _decodedReasoningPayloads.removeWhere((id, _) => discard(id));
+    _restoredUiMessageIds.removeWhere(discard);
+    _cancelAllTimers(keepMessageIds: keepMessageIds);
+    streamingContentNotifier.clear(keepMessageIds: keepMessageIds);
   }
 
   // ============================================================================
@@ -724,18 +725,18 @@ class StreamController {
     streamingContentNotifier.removeNotifier(messageId);
   }
 
-  /// 取消所有节流计时器。
-  void _cancelAllTimers() {
-    for (final timer in _streamThrottleTimers.values) {
+  /// 取消计时器，但保留仍属在跑生成的那些。
+  void _cancelAllTimers({Set<String> keepMessageIds = const {}}) {
+    bool discardTimer(String id, Timer? timer) {
+      if (keepMessageIds.contains(id)) return false;
       timer?.cancel();
+      return true;
     }
-    _streamThrottleTimers.clear();
-    _streamSmoothStates.clear();
-    for (final timer in _inlineImageSanitizeTimers.values) {
-      timer?.cancel();
-    }
-    _inlineImageSanitizeTimers.clear();
-    _inlineImageSanitizing.clear();
+
+    _streamThrottleTimers.removeWhere(discardTimer);
+    _streamSmoothStates.removeWhere((id, _) => !keepMessageIds.contains(id));
+    _inlineImageSanitizeTimers.removeWhere(discardTimer);
+    _inlineImageSanitizing.removeWhere((id) => !keepMessageIds.contains(id));
   }
 
   // ============================================================================
@@ -910,8 +911,8 @@ class StreamController {
         loading: true,
       ),
     );
+    _toolParts[messageId] = dedupeToolPartsList(existing);
     if (getCurrentConversationId() == conversationId) {
-      _toolParts[messageId] = dedupeToolPartsList(existing);
       streamingContentNotifier.notifyToolPartsUpdated(
         messageId,
         contentSplitOffsets: state.contentSplitOffsets,
@@ -1014,8 +1015,8 @@ class StreamController {
         metadata: result.metadata,
       );
     } catch (_) {}
+    _toolParts[messageId] = dedupeToolPartsList(parts);
     if (getCurrentConversationId() == conversationId) {
-      _toolParts[messageId] = dedupeToolPartsList(parts);
       final splits = _contentSplits[messageId];
       streamingContentNotifier.notifyToolPartsUpdated(
         messageId,

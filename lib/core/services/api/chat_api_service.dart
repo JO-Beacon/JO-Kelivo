@@ -1,3 +1,4 @@
+import '../auth/provider_oauth_service.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:dio/dio.dart';
@@ -202,26 +203,6 @@ class ChatApiService {
     bool builtInSearchOnly = false,
     bool parseMarkdownImageLinks = true,
   }) async* {
-    final kind = ProviderConfig.classify(
-      config.id,
-      explicitType: config.providerType,
-    );
-    final useImagesApi =
-        kind == ProviderKind.openai &&
-        allowImagesApiRouting &&
-        shouldUseOpenAIImagesApi(config, modelId);
-    final useZhipuLayoutParsing = shouldUseZhipuLayoutParsing(config, modelId);
-    final imageOutput = effectiveModelInfo(
-      config,
-      modelId,
-    ).output.contains(Modality.image);
-    final replaySafe = !useImagesApi && !useZhipuLayoutParsing && !imageOutput;
-    final options = retryOverride ?? AutoRetryConfig.current;
-    final sessionHeaders = providerSessionHeaders(
-      config,
-      conversationId: conversationId,
-      extraHeaders: extraHeaders,
-    );
     final sessionToken = CancelToken();
     final toolCancellation = ToolCallCancellation(
       isCancelled: () => sessionToken.isCancelled,
@@ -235,6 +216,44 @@ class ChatApiService {
       } catch (_) {}
       _activeCancelTokens[rid] = sessionToken;
     }
+
+    try {
+      // 账号登录：先确保令牌有效（可取消），再按供应商约束调整请求形态。
+      config = await Future.any<ProviderConfig>([
+        ProviderOAuthService.instance.resolve(config),
+        _whenCancelled(sessionToken).then(
+          (_) => throw const ProviderOAuthException(
+            ProviderOAuthFailure.cancelled,
+          ),
+        ),
+      ]);
+      if (sessionToken.isCancelled) return;
+      if (config.oauthProvider == OAuthProvider.chatgpt) stream = true;
+      if (config.oauthProvider == OAuthProvider.kimi &&
+          (config.modelOverrides[modelId] as Map?)?['oauthProtocol'] ==
+              'anthropic') {
+        config = config.copyWith(providerType: ProviderKind.claude);
+      }
+      final kind = ProviderConfig.classify(
+        config.id,
+        explicitType: config.providerType,
+      );
+      final useImagesApi =
+          kind == ProviderKind.openai &&
+          allowImagesApiRouting &&
+          shouldUseOpenAIImagesApi(config, modelId);
+      final useZhipuLayoutParsing = shouldUseZhipuLayoutParsing(config, modelId);
+      final imageOutput = effectiveModelInfo(
+        config,
+        modelId,
+      ).output.contains(Modality.image);
+      final replaySafe = !useImagesApi && !useZhipuLayoutParsing && !imageOutput;
+      final options = retryOverride ?? AutoRetryConfig.current;
+      final sessionHeaders = providerSessionHeaders(
+        config,
+        conversationId: conversationId,
+        extraHeaders: extraHeaders,
+      );
 
     // 每个工具轮独立重试（U10）：轮内尚未产生任何事件时才重放该轮，
     // 已执行的工具不会重复执行（工具在轮间执行，不在重放范围内）。
@@ -266,37 +285,36 @@ class ChatApiService {
       );
     }
 
-    try {
-      // 首轮与工具续轮共用同一个 retryRound，保证整条链路只包一层重试：
-      // 早先版本外层再套一次 retryingStream，会与轮内重试相乘（3×3 层退避
-      // 叠加超过 30s），让 Vertex/HTTP 错误测试超时。
-      yield* retryRound(
-        () => _sendMessageStreamEventsOnce(
-          config: config,
-          modelId: modelId,
-          messages: messages,
-          userImagePaths: userImagePaths,
-          thinkingBudget: thinkingBudget,
-          temperature: temperature,
-          topP: topP,
-          maxTokens: maxTokens,
-          tools: tools,
-          onToolCall: onToolCall == null
-              ? null
-              : (name, args, {toolCallId}) => toolCancellation.run(
-                  () => onToolCall(name, args, toolCallId: toolCallId),
-                ),
-          extraHeaders: sessionHeaders,
-          extraBody: extraBody,
-          stream: stream,
-          allowImagesApiRouting: allowImagesApiRouting,
-          ocrActive: ocrActive,
-          builtInSearchOnly: builtInSearchOnly,
-          skipImageParsing: !parseMarkdownImageLinks,
-          sessionToken: sessionToken,
-          retryRound: retryRound,
-        ),
-      );
+    // 首轮与工具续轮共用同一个 retryRound，保证整条链路只包一层重试：
+    // 早先版本外层再套一次 retryingStream，会与轮内重试相乘（3×3 层退避
+    // 叠加超过 30s），让 Vertex/HTTP 错误测试超时。
+    yield* retryRound(
+      () => _sendMessageStreamEventsOnce(
+        config: config,
+        modelId: modelId,
+        messages: messages,
+        userImagePaths: userImagePaths,
+        thinkingBudget: thinkingBudget,
+        temperature: temperature,
+        topP: topP,
+        maxTokens: maxTokens,
+        tools: tools,
+        onToolCall: onToolCall == null
+            ? null
+            : (name, args, {toolCallId}) => toolCancellation.run(
+                () => onToolCall(name, args, toolCallId: toolCallId),
+              ),
+        extraHeaders: sessionHeaders,
+        extraBody: extraBody,
+        stream: stream,
+        allowImagesApiRouting: allowImagesApiRouting,
+        ocrActive: ocrActive,
+        builtInSearchOnly: builtInSearchOnly,
+        skipImageParsing: !parseMarkdownImageLinks,
+        sessionToken: sessionToken,
+        retryRound: retryRound,
+      ),
+    );
     } finally {
       if (rid.isNotEmpty) {
         final current = _activeCancelTokens[rid];
@@ -344,7 +362,11 @@ class ChatApiService {
       final cancelToken = CancelToken();
       _bridgeCancel(sessionToken, cancelToken);
       final safeMessages = _sanitizeMessages(messages);
-      final client = _clientFor(config, cancelToken);
+      // 账号登录的请求要带上有效的令牌（失效时自动续期）。
+      final client = ProviderOAuthService.instance.authenticatedClient(
+        _clientFor(config, cancelToken),
+        config,
+      );
       try {
         if (useZhipuLayoutParsing) {
           yield* sendZhipuLayoutParsingStream(
@@ -389,7 +411,11 @@ class ChatApiService {
       final safeUserImagePaths = stripUnsupportedImageInputs
           ? const <String>[]
           : userImagePaths;
-      final client = _clientFor(config, cancelToken);
+      // 账号登录的请求要带上有效的令牌（失效时自动续期）。
+      final client = ProviderOAuthService.instance.authenticatedClient(
+        _clientFor(config, cancelToken),
+        config,
+      );
       try {
         yield* sendOpenAIStream(
           client,
@@ -437,7 +463,11 @@ class ChatApiService {
       final safeUserImagePaths = stripUnsupportedImageInputs
           ? const <String>[]
           : userImagePaths;
-      final client = _clientFor(config, cancelToken);
+      // 账号登录的请求要带上有效的令牌（失效时自动续期）。
+      final client = ProviderOAuthService.instance.authenticatedClient(
+        _clientFor(config, cancelToken),
+        config,
+      );
       try {
         if (useClaudeEvents) {
           yield* sendClaudeStreamEvents(

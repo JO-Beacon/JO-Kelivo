@@ -180,7 +180,17 @@ class MessageGenerationService {
     // 先注入 prompts，以便 WorldBook 能扫描未裁剪的完整历史
     // （与 OCR 后裁剪前相同的关键词触发范围）。文档/OCR 处理
     // 仅在下方单次最终上下文裁剪之后执行。
-    messageBuilderService.injectSystemPrompt(apiMessages, assistant, modelId);
+    // 取一次最新的会话记录，让会话级提示词读到刚落库的 extras。
+    final promptConversation = currentConversation == null
+        ? null
+        : chatService.getConversation(currentConversation.id) ??
+              currentConversation;
+    messageBuilderService.injectSystemPrompt(
+      apiMessages,
+      assistant,
+      modelId,
+      conversation: promptConversation,
+    );
     await messageBuilderService.injectMemoryAndRecentChats(
       apiMessages,
       assistant,
@@ -202,10 +212,17 @@ class MessageGenerationService {
     await messageBuilderService.injectInstructionPrompts(
       apiMessages,
       assistantId,
+      conversation: promptConversation,
+      conversationScoped: assistant?.allowConversationPromptInjection ?? false,
     );
     await messageBuilderService.injectWorldBookPrompts(
       apiMessages,
       assistantId,
+      conversation: promptConversation,
+      conversationScoped: assistant?.allowConversationPromptInjection ?? false,
+      // 本仓库的 messages 已经是活动分支（真树模型），
+      // 不需要再按 groupId／version 折叠。
+      sourceMessages: messages,
     );
 
     WorkspaceToolContext? workspaceContext;

@@ -1,3 +1,4 @@
+import 'package:Kelivo/features/chat/utils/prompt_injection_selection.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -12,8 +13,8 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
-import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
+import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/skills/skills_service.dart';
 import '../../../features/workspace/widgets/environment/environment_status_chip.dart';
@@ -40,6 +41,9 @@ class ChatInputSection extends StatelessWidget {
   const ChatInputSection({
     super.key,
     required this.inputBarKey,
+    this.chatModelProviderKey,
+    this.chatModelId,
+    this.chatModelIsConversationOverride = false,
     required this.inputFocus,
     required this.inputController,
     required this.mediaController,
@@ -74,11 +78,8 @@ class ChatInputSection extends StatelessWidget {
     this.onLongPressLearning,
     this.onClearContext,
     this.onCompressContext,
-    this.clearContextLabel,
     this.conversationId,
-    this.chatModelProviderKey,
-    this.chatModelId,
-    this.chatModelIsConversationOverride = false,
+    this.clearContextLabel,
     this.sendButtonTooltip,
     this.backgroundImageActive = false,
   });
@@ -122,10 +123,22 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onLongPressLearning;
   final VoidCallback? onClearContext;
   final VoidCallback? onCompressContext;
-  final String? clearContextLabel;
   final String? conversationId;
+  final String? clearContextLabel;
+
+  /// The model this conversation sends with, already resolved through
+  /// conversation override -> assistant -> global default. Resolved by the
+  /// caller because only it holds the Conversation; watching ChatService here
+  /// would rebuild the composer on every streaming notification.
   final String? chatModelProviderKey;
   final String? chatModelId;
+
+  /// Whether the resolved model above comes from this conversation's own
+  /// override rather than from the assistant.
+  ///
+  /// Gates the capability enforcement below, which writes to the ASSISTANT: a
+  /// model picked for one conversation must not wipe the MCP selection or the
+  /// thinking budget shared by every other conversation under that assistant.
   final bool chatModelIsConversationOverride;
   final String? sendButtonTooltip;
   final bool backgroundImageActive;
@@ -136,13 +149,12 @@ class ChatInputSection extends StatelessWidget {
     final asr = context.watch<AsrProvider>();
     final ap = context.watch<AssistantProvider>();
     final a = ap.currentAssistant;
-    final assistantId = a?.id;
 
-    // 使用统一辅助函数获取模型标识符
     final pk = chatModelProviderKey;
     final mid = chatModelId;
 
-    // 强制模型能力约束：如果模型不支持工具，则禁用 MCP 选择
+    // 强制模型能力约束：模型不支持工具时禁用 MCP 选择。
+    // 会话覆盖了模型时跳过 —— 这些写入落在助手上，会串到别的会话。
     if (!chatModelIsConversationOverride) {
       _enforceModelCapabilities(context, settings, ap, a, pk, mid);
     }
@@ -159,12 +171,12 @@ class ChatInputSection extends StatelessWidget {
 
     final bar = ChatInputBar(
       key: inputBarKey,
+      chatModelProviderKey: pk,
+      chatModelId: mid,
       onMore: onMore,
       onSelectModel: onSelectModel,
       onLongPressSelectModel: onLongPressSelectModel,
       conversationId: conversationId,
-      chatModelProviderKey: chatModelProviderKey,
-      chatModelId: chatModelId,
       onOpenTools: onOpenTools,
       onLongPressTools: onLongPressTools,
       onOpenWorkspace: onOpenWorkspace,
@@ -230,18 +242,12 @@ class ChatInputSection extends StatelessWidget {
       onToggleLearningMode: isTablet ? onToggleLearningMode : null,
       onOpenWorldBook: hasWorldBooks ? onOpenWorldBook : null,
       onLongPressLearning: isTablet ? onLongPressLearning : null,
-      learningModeActive: isTablet
-          ? context
-                .watch<InstructionInjectionProvider>()
-                .activeIdsFor(assistantId)
-                .isNotEmpty
-          : false,
-      worldBookActive: isTablet
-          ? context
-                .watch<WorldBookProvider>()
-                .activeBookIdsFor(assistantId)
-                .isNotEmpty
-          : false,
+      learningModeActive:
+          isTablet &&
+          _isPromptSelectionActive(context, a, PromptSelectionKind.instruction),
+      worldBookActive:
+          isTablet &&
+          _isPromptSelectionActive(context, a, PromptSelectionKind.worldBook),
       showMoreButton: !isTablet,
       onClearContext: isTablet ? onClearContext : null,
       onCompressContext: isTablet ? onCompressContext : null,
@@ -256,20 +262,43 @@ class ChatInputSection extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.sm,
-            AppSpacing.xxs,
-            AppSpacing.sm,
-            0,
+        if (showEnvChip && workspaceBound)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.sm,
+              AppSpacing.xxs,
+              AppSpacing.sm,
+              0,
+            ),
+            child: EnvironmentStatusChip(
+              onTap: () => WorkspaceNavigation.openEnvironmentPage(context),
+            ),
           ),
-          child: EnvironmentStatusChip(
-            onTap: () => WorkspaceNavigation.openEnvironmentPage(context),
-          ),
-        ),
         bar,
       ],
     );
+  }
+
+  bool _isPromptSelectionActive(
+    BuildContext context,
+    Assistant? assistant,
+    PromptSelectionKind kind,
+  ) {
+    final scoped = assistant?.allowConversationPromptInjection == true;
+    if (scoped && conversationId == null) return false;
+    final ids = promptSelectionIds(
+      context,
+      kind: kind,
+      assistantId: assistant?.id,
+      conversationId: scoped ? conversationId : null,
+    ).toSet();
+    return kind == PromptSelectionKind.worldBook
+        ? context.watch<WorldBookProvider>().books.any(
+            (book) => book.enabled && ids.contains(book.id),
+          )
+        : context.watch<InstructionInjectionProvider>().items.any(
+            (item) => ids.contains(item.id),
+          );
   }
 
   bool _isSkillsActive(BuildContext context, Assistant? assistant) {
