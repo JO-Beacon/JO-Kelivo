@@ -27,6 +27,8 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/local_snapshot_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/backup/data_sync.dart';
+import '../../../core/services/backup/backup_progress_timeline.dart';
+import '../widgets/backup_progress_dialog.dart';
 import '../../../core/services/native_file_save.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
@@ -231,6 +233,8 @@ class _BackupPageState extends State<BackupPage> {
       cancellableTask: cancellableTask,
       label: l10n.backupPageExporting,
       cancelLabel: l10n.backupPageCancel,
+      flow: BackupProgressFlow.export,
+      phaseLabelBuilder: (phase) => backupPhaseLabel(l10n, phase),
     );
   }
 
@@ -247,6 +251,8 @@ class _BackupPageState extends State<BackupPage> {
       cancellableTask: cancellableTask,
       label: l10n.backupPageRestore,
       cancelLabel: l10n.backupPageCancel,
+      flow: BackupProgressFlow.restore,
+      phaseLabelBuilder: (phase) => backupPhaseLabel(l10n, phase),
     );
   }
 

@@ -8749,18 +8749,6 @@ abstract class AppLocalizations {
   /// **'No services. Add from Search Services.'**
   String get searchSettingsSheetNoServicesMessage;
 
-  /// No description provided for @aboutPageEasterEggMessage.
-  ///
-  /// In en, this message translates to:
-  /// **'Thanks for exploring! \n (No egg yet)'**
-  String get aboutPageEasterEggMessage;
-
-  /// No description provided for @aboutPageEasterEggButton.
-  ///
-  /// In en, this message translates to:
-  /// **'Nice!'**
-  String get aboutPageEasterEggButton;
-
   /// No description provided for @aboutPageAppName.
   ///
   /// In en, this message translates to:
@@ -12246,6 +12234,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open Logs Folder'**
   String get logViewerOpenFolder;
+
+  /// No description provided for @logViewerOpenFolderFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the logs folder'**
+  String get logViewerOpenFolderFailed;
 
   /// No description provided for @logViewerRequestsCount.
   ///
@@ -18054,18 +18048,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Follow assistant'**
   String get modelSelectSheetFollowAssistant;
-
-  /// No description provided for @aboutPageKelivoSearchUnlocked.
-  ///
-  /// In en, this message translates to:
-  /// **'An unnamed door opened a crack. You might find it in Settings.'**
-  String get aboutPageKelivoSearchUnlocked;
-
-  /// No description provided for @aboutPageKelivoSearchAlreadyUnlocked.
-  ///
-  /// In en, this message translates to:
-  /// **'You\'ve already been through this door.'**
-  String get aboutPageKelivoSearchAlreadyUnlocked;
 
   /// No description provided for @aboutPageQQGroupThree.
   ///

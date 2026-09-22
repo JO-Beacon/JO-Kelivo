@@ -28,6 +28,8 @@ import '../../core/services/backup/device_ledger_export_settings.dart';
 import '../../core/services/backup/local_device_settings_ledger.dart';
 import '../../core/services/device/device_identity.dart';
 import '../../shared/dialogs/loading_task_dialog.dart';
+import '../../core/services/backup/backup_progress_timeline.dart';
+import '../../features/backup/widgets/backup_progress_dialog.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../shared/widgets/restart_app_action.dart';
 import '../../shared/widgets/section_card.dart';
@@ -277,6 +279,8 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
       await runWithLoadingTaskDialog<void>(
         context: context,
         label: l10n.backupPageExporting,
+        flow: BackupProgressFlow.export,
+        phaseLabelBuilder: (phase) => backupPhaseLabel(l10n, phase),
         task: (onProgress) async {
           file = kelivoCompatible
               ? await backupProvider.exportKelivoBackupToFile()
@@ -333,6 +337,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     BuildContext context, {
     bool kelivoCompatible = false,
   }) async {
+    final l10n = AppLocalizations.of(context)!;
     final backupProvider = context.read<BackupProvider>();
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -345,6 +350,9 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     await _chooseRestoreModeAndRun((mode) async {
       await runWithLoadingTaskDialog<void>(
         context: context,
+        label: l10n.backupPageRestore,
+        flow: BackupProgressFlow.restore,
+        phaseLabelBuilder: (phase) => backupPhaseLabel(l10n, phase),
         task: (onProgress) => backupProvider.restoreFromLocalFile(
           file,
           mode: mode,

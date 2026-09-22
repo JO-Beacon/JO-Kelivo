@@ -291,6 +291,7 @@ final class RestoreBundleStaging {
           (name) => _assetRoots.any((root) => name.startsWith('$root/')),
         );
         var processed = 1;
+        final assetTotal = assetEntries.length + 1;
         for (final entryName in assetEntries) {
           _throwIfCancelled(cancelToken);
           stagedEntries[entryName] = await _copyVerified(
@@ -307,6 +308,8 @@ final class RestoreBundleStaging {
             BackupProgress(
               phase: BackupPhase.stagingCandidate,
               processed: processed,
+              total: assetTotal,
+              unit: BackupProgressUnit.items,
               cancellable: true,
             ),
           );

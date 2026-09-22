@@ -33,7 +33,6 @@ import '../features/home/widgets/assistant_avatar.dart';
 import '../features/assistant/widgets/assistant_selection_bars.dart';
 import '../core/models/assistant_list_item.dart';
 import 'dart:io' show Directory, File, Platform;
-import '../utils/app_directories.dart';
 import 'add_provider_dialog.dart' show showDesktopAddProviderDialog;
 import 'model_edit_dialog.dart'
     show showDesktopCreateModelDialog, showDesktopModelEditDialog;
@@ -73,6 +72,7 @@ import 'setting/network_proxy_pane.dart';
 import 'setting/about_pane.dart';
 import 'setting/stats_pane.dart';
 import '../features/settings/pages/debug_page.dart';
+import '../features/settings/pages/log_viewer_page.dart';
 import 'package:system_fonts/system_fonts.dart';
 import 'package:flutter/gestures.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -128,6 +128,7 @@ enum _SettingsMenuItem {
   scheduledTasks,
   hotkeys,
   stats,
+  logs,
   about,
   debug,
 }
@@ -358,6 +359,12 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                           );
                         case _SettingsMenuItem.stats:
                           return const DesktopStatsPane(key: ValueKey('stats'));
+                        case _SettingsMenuItem.logs:
+                          // 桌面设置根列表直接进入日志页，不再依赖存储空间里的入口。
+                          return const LogViewerPage(
+                            key: ValueKey('logs'),
+                            embedded: true,
+                          );
                         case _SettingsMenuItem.about:
                           return const DesktopAboutPane(key: ValueKey('about'));
                         case _SettingsMenuItem.debug:
@@ -479,6 +486,7 @@ class _SettingsMenu extends StatelessWidget {
         lucide.Lucide.ChartColumnBig,
         l10n.settingsPageStatistics,
       ),
+      (_SettingsMenuItem.logs, lucide.Lucide.FileClock, l10n.settingsPageLogs),
       (
         _SettingsMenuItem.about,
         lucide.Lucide.BadgeInfo,

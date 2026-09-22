@@ -2113,8 +2113,6 @@
   "searchSettingsSheetWebSearchDescription": "Enable web search in chat",
   "searchSettingsSheetOpenSearchServicesTooltip": "Open search services",
   "searchSettingsSheetNoServicesMessage": "No services. Add from Search Services.",
-  "aboutPageEasterEggMessage": "Thanks for exploring! \n (No egg yet)",
-  "aboutPageEasterEggButton": "Nice!",
   "aboutPageAppName": "JO-AIClient",
   "aboutPageKelivoSectionTitle": "About Kelivo",
   "mcpOAuthCallbackPageTitle": "JO-AIClient authorization",
@@ -2876,6 +2874,7 @@
   "logViewerCurrentLog": "Current Log",
   "logViewerExport": "Export",
   "logViewerOpenFolder": "Open Logs Folder",
+  "logViewerOpenFolderFailed": "Could not open the logs folder",
   "logViewerRequestsCount": "{count} requests",
   "@logViewerRequestsCount": {
     "placeholders": {
@@ -4515,8 +4514,6 @@
   "modelDetailSheetOpenrouterShellTool": "Shell",
   "modelDetailSheetOpenrouterShellToolDescription": "Run Shell commands in a hosted, isolated sandbox",
   "modelSelectSheetFollowAssistant": "Follow assistant",
-  "aboutPageKelivoSearchUnlocked": "An unnamed door opened a crack. You might find it in Settings.",
-  "aboutPageKelivoSearchAlreadyUnlocked": "You've already been through this door.",
   "aboutPageQQGroupThree": "Kelivo Group 3",
   "displaySettingsPageForkKeepMessageVersionsTitle": "Keep Message Versions When Forking",
   "displaySettingsPageEditAssistantKeepThinkingToolCardsTitle": "Keep thinking and tool cards when editing assistant",

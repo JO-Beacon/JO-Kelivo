@@ -4594,12 +4594,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchSettingsSheetNoServicesMessage => '暂无可用服务，请先在\"搜索服务\"中添加';
 
   @override
-  String get aboutPageEasterEggMessage => '\n（好吧现在还没彩蛋）';
-
-  @override
-  String get aboutPageEasterEggButton => '好的';
-
-  @override
   String get aboutPageAppName => 'JO-AIClient';
 
   @override
@@ -6441,6 +6435,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get logViewerOpenFolder => '打开日志目录';
+
+  @override
+  String get logViewerOpenFolderFailed => '无法打开日志目录';
 
   @override
   String logViewerRequestsCount(int count) {
@@ -9622,12 +9619,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get modelSelectSheetFollowAssistant => '跟随助手';
-
-  @override
-  String get aboutPageKelivoSearchUnlocked => '有扇没有名字的门开了一条缝。去设置里找找看。';
-
-  @override
-  String get aboutPageKelivoSearchAlreadyUnlocked => '这扇门你已经推开过了。';
 
   @override
   String get aboutPageQQGroupThree => 'Kelivo 三群';
@@ -16860,12 +16851,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get searchSettingsSheetNoServicesMessage => '暂无可用服务，请先在\"搜索服务\"中添加';
 
   @override
-  String get aboutPageEasterEggMessage => '\n（好吧现在还没彩蛋）';
-
-  @override
-  String get aboutPageEasterEggButton => '好的';
-
-  @override
   String get aboutPageAppName => 'JO-AIClient';
 
   @override
@@ -18707,6 +18692,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get logViewerOpenFolder => '打开日志目录';
+
+  @override
+  String get logViewerOpenFolderFailed => '无法打开日志目录';
 
   @override
   String logViewerRequestsCount(int count) {
@@ -21888,12 +21876,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get modelSelectSheetFollowAssistant => '跟随助手';
-
-  @override
-  String get aboutPageKelivoSearchUnlocked => '有扇没有名字的门开了一条缝。去设置里找找看。';
-
-  @override
-  String get aboutPageKelivoSearchAlreadyUnlocked => '这扇门你已经推开过了。';
 
   @override
   String get aboutPageQQGroupThree => 'Kelivo 三群';
@@ -29125,12 +29107,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get searchSettingsSheetNoServicesMessage => '暫無可用服務，請先在\"搜尋服務\"中新增';
 
   @override
-  String get aboutPageEasterEggMessage => '\n（好吧現在還沒彩蛋）';
-
-  @override
-  String get aboutPageEasterEggButton => '好的';
-
-  @override
   String get aboutPageAppName => 'JO-AIClient';
 
   @override
@@ -30975,6 +30951,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get logViewerOpenFolder => '開啟日誌目錄';
+
+  @override
+  String get logViewerOpenFolderFailed => '無法開啟日誌目錄';
 
   @override
   String logViewerRequestsCount(int count) {
@@ -34156,12 +34135,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get modelSelectSheetFollowAssistant => '跟隨助手';
-
-  @override
-  String get aboutPageKelivoSearchUnlocked => '有扇沒有名字的門開了一條縫。去設定裡找找看。';
-
-  @override
-  String get aboutPageKelivoSearchAlreadyUnlocked => '這扇門你已經推開過了。';
 
   @override
   String get aboutPageQQGroupThree => 'Kelivo 三群';

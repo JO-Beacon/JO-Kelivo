@@ -55,6 +55,12 @@ void main() {
           BusinessKeyRegistry.classify('flutter_log_enabled_v1'),
           BusinessKeyDisposition.localOnly,
         );
+        // 上下文日志与请求日志一样属于全局设置，会随备份册子流转；
+        // 之前它没登记，只能靠未登记键也照样导出这条宽松路径碰巧生效。
+        expect(
+          BusinessKeyRegistry.classify('context_log_enabled_v1'),
+          BusinessKeyDisposition.preference,
+        );
         expect(
           BusinessKeyRegistry.classify('pinned_chat_ids'),
           BusinessKeyDisposition.discarded,

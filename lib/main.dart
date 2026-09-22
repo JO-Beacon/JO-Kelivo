@@ -86,6 +86,8 @@ import 'core/services/backup/restore_archive_pruner.dart';
 import 'core/services/backup/associated_backup_path.dart';
 import 'core/services/backup/restore_business_lease.dart';
 import 'core/services/backup/restore_startup_gate.dart';
+import 'core/services/backup/backup_progress_timeline.dart';
+import 'core/services/backup/backup_task_progress.dart';
 import 'core/services/backup/restore_receipt.dart';
 import 'core/services/mcp/mcp_tool_service.dart';
 import 'core/services/logging/flutter_logger.dart';
@@ -240,11 +242,20 @@ Future<void> main(List<String> arguments) async {
           )
           ? ValueNotifier(RestoreStartupStage.checkingBackup)
           : null;
+      // 与备份/恢复弹窗共用同一张阶段权重表，让这一屏也有一条会推进的
+      // 总体进度条；阶段内没有可量化进度时停在区间起点，不编造。
+      final restoreFraction = restoreStage == null
+          ? null
+          : ValueNotifier<double?>(
+              _restoreStageFraction(RestoreStartupStage.checkingBackup),
+            );
       FlutterLogger.stage(
         'restore gate checked pending=${restoreStage != null}',
       );
       if (restoreStage != null) {
-        runApp(_RestoreProgressApp(stage: restoreStage));
+        runApp(
+          _RestoreProgressApp(stage: restoreStage, fraction: restoreFraction),
+        );
       }
       try {
         // 租约通过其内部注册表在进程退出前始终由进程持有，
@@ -259,7 +270,10 @@ Future<void> main(List<String> arguments) async {
               businessLease: businessLease,
               onStage: restoreStage == null
                   ? null
-                  : (stage) => restoreStage.value = stage,
+                  : (stage) {
+                      restoreStage.value = stage;
+                      restoreFraction?.value = _restoreStageFraction(stage);
+                    },
             );
         FlutterLogger.stage('restore recover done');
         reportStartupProgress(0.24);
@@ -575,10 +589,31 @@ Future<void> _initRestoreFailureWindow() async {
 ///
 /// 刻意只用默认值构建：用户的主题与语言设置存在于本次恢复可能正在
 /// 替换的设置里，这里不得打开它们中的任何一个。
+/// 把重启恢复的粗粒度阶段映射成总体进度条的取值。
+///
+/// 复用 [BackupProgressFlow.restore] 的阶段权重表，与恢复弹窗口径一致；
+/// 阶段内没有可量化进度，所以只取区间起点。
+double? _restoreStageFraction(RestoreStartupStage stage) {
+  final phase = switch (stage) {
+    RestoreStartupStage.checkingBackup => BackupPhase.validating,
+    RestoreStartupStage.preservingCurrentData => BackupPhase.stagingCandidate,
+    RestoreStartupStage.installingBackup => BackupPhase.committing,
+    RestoreStartupStage.verifying => BackupPhase.finalizing,
+    RestoreStartupStage.rollingBack => BackupPhase.committing,
+    RestoreStartupStage.finishing => BackupPhase.finalizing,
+  };
+  return globalBackupFraction(
+    flow: BackupProgressFlow.restore,
+    phase: phase,
+    localFraction: null,
+  );
+}
+
 class _RestoreProgressApp extends StatelessWidget {
-  const _RestoreProgressApp({required this.stage});
+  const _RestoreProgressApp({required this.stage, this.fraction});
 
   final ValueNotifier<RestoreStartupStage> stage;
+  final ValueNotifier<double?>? fraction;
 
   @override
   Widget build(BuildContext context) {
@@ -591,7 +626,7 @@ class _RestoreProgressApp extends StatelessWidget {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: buildLightThemeForScheme(palette.light),
       darkTheme: buildDarkThemeForScheme(palette.dark),
-      home: RestoreProgressScreen(stage: stage),
+      home: RestoreProgressScreen(stage: stage, fraction: fraction),
     );
   }
 }

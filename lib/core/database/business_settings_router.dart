@@ -148,6 +148,7 @@ final class BusinessKeyRegistry {
     'global_proxy_password_v1',
     'global_proxy_bypass_v1',
     'request_log_enabled_v1',
+    'context_log_enabled_v1',
     'claude_first_turn_placeholder_enabled_v1',
     'claude_first_turn_placeholder_text_v1',
     'log_save_output_v1',

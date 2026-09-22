@@ -4772,13 +4772,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'No services. Add from Search Services.';
 
   @override
-  String get aboutPageEasterEggMessage =>
-      'Thanks for exploring! \n (No egg yet)';
-
-  @override
-  String get aboutPageEasterEggButton => 'Nice!';
-
-  @override
   String get aboutPageAppName => 'JO-AIClient';
 
   @override
@@ -6713,6 +6706,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get logViewerOpenFolder => 'Open Logs Folder';
+
+  @override
+  String get logViewerOpenFolderFailed => 'Could not open the logs folder';
 
   @override
   String logViewerRequestsCount(int count) {
@@ -10079,14 +10075,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get modelSelectSheetFollowAssistant => 'Follow assistant';
-
-  @override
-  String get aboutPageKelivoSearchUnlocked =>
-      'An unnamed door opened a crack. You might find it in Settings.';
-
-  @override
-  String get aboutPageKelivoSearchAlreadyUnlocked =>
-      'You\'ve already been through this door.';
 
   @override
   String get aboutPageQQGroupThree => 'Kelivo Group 3';

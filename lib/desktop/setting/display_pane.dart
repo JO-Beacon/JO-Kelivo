@@ -165,10 +165,6 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _BackgroundMaskRow(),
                   _RowDivider(),
                   _ChatInputBackgroundOpacityRow(),
-                  _RowDivider(),
-                  _ToggleRowRequestLogging(),
-                  _RowDivider(),
-                  _ToggleRowFlutterLogging(),
                 ],
               ),
             ],
@@ -2881,120 +2877,6 @@ class _FirstTurnPlaceholderContentRowState
                 focusedBorder: focusBorder,
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ToggleRowRequestLogging extends StatelessWidget {
-  const _ToggleRowRequestLogging();
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final sp = context.watch<SettingsProvider>();
-    final cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              l10n.requestLogSettingTitle,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: AppFontWeights.regular,
-                color: cs.onSurface.withValues(alpha: 0.9),
-                decoration: TextDecoration.none,
-              ),
-            ),
-          ),
-          Tooltip(
-            message: l10n.logViewerOpenFolder,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(6),
-              onTap: () async {
-                final dir = await AppDirectories.getAppDataDirectory();
-                final logsDir = Directory('${dir.path}/logs');
-                if (!await logsDir.exists()) {
-                  await logsDir.create(recursive: true);
-                }
-                final uri = Uri.file(logsDir.path);
-                await launchUrl(uri);
-              },
-              child: Padding(
-                padding: const EdgeInsets.all(6),
-                child: Icon(
-                  lucide.Lucide.FolderOpen,
-                  size: 18,
-                  color: cs.primary,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          IosSwitch(
-            value: sp.requestLogEnabled,
-            onChanged: (v) =>
-                context.read<SettingsProvider>().setRequestLogEnabled(v),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ToggleRowFlutterLogging extends StatelessWidget {
-  const _ToggleRowFlutterLogging();
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final sp = context.watch<SettingsProvider>();
-    final cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              l10n.flutterLogSettingTitle,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: AppFontWeights.regular,
-                color: cs.onSurface.withValues(alpha: 0.9),
-                decoration: TextDecoration.none,
-              ),
-            ),
-          ),
-          Tooltip(
-            message: l10n.logViewerOpenFolder,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(6),
-              onTap: () async {
-                final dir = await AppDirectories.getAppDataDirectory();
-                final logsDir = Directory('${dir.path}/logs');
-                if (!await logsDir.exists()) {
-                  await logsDir.create(recursive: true);
-                }
-                final uri = Uri.file(logsDir.path);
-                await launchUrl(uri);
-              },
-              child: Padding(
-                padding: const EdgeInsets.all(6),
-                child: Icon(
-                  lucide.Lucide.FolderOpen,
-                  size: 18,
-                  color: cs.primary,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          IosSwitch(
-            value: sp.flutterLogEnabled,
-            onChanged: (v) =>
-                context.read<SettingsProvider>().setFlutterLogEnabled(v),
           ),
         ],
       ),

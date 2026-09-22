@@ -266,11 +266,17 @@ ProgressCallback? adaptBackupProgressSink(BackupProgressSink? sink) {
   if (sink == null) return null;
   return (update) {
     final value = update.value;
+    // 直接带 processed／total 的上报优先原样透传（真实字节数），
+    // 只有老式比值型上报才按 0..1000 折算，避免丢掉真实总量。
+    final hasCounts = update.processed != null && update.total != null;
     sink(
       BackupProgress(
         phase: update.phase ?? BackupPhase.preparing,
-        processed: value == null ? 0 : (value.clamp(0, 1) * 1000).round(),
-        total: value == null ? null : 1000,
+        processed: hasCounts
+            ? update.processed!
+            : (value == null ? 0 : (value.clamp(0, 1) * 1000).round()),
+        total: hasCounts ? update.total : (value == null ? null : 1000),
+        unit: hasCounts ? BackupProgressUnit.bytes : BackupProgressUnit.none,
       ),
     );
   };
@@ -691,8 +697,13 @@ class DataSync {
       ledgerEntries: ledgerEntries,
     );
     cancelToken?.throwIfCancelled();
+    final zipLength = await zipFile.length();
     onProgress?.call(
-      const ProgressUpdate(phase: BackupPhase.wrapping, value: 0.5),
+      ProgressUpdate(
+        phase: BackupPhase.wrapping,
+        processed: 0,
+        total: zipLength > 0 ? zipLength : null,
+      ),
     );
     final zipBaseName = p.basenameWithoutExtension(zipFile.path);
     const kelivoBackupPrefix = 'kelivo_backup_';
@@ -713,9 +724,8 @@ class DataSync {
         onProgress: (update) => onProgress?.call(
           ProgressUpdate(
             phase: BackupPhase.wrapping,
-            value: update.fraction == null
-                ? null
-                : 0.5 + update.fraction! * 0.5,
+            processed: update.processed,
+            total: update.total,
           ),
         ),
         cancelToken: cancelToken,

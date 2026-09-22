@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
@@ -25,9 +26,17 @@ import '../logs/request_log_parser.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
-/// 移动端日志查看器，显示日志文件列表并支持查看或导出
+/// 日志查看器，显示日志文件列表并支持查看或导出。
+/// 桌面设置页以内嵌方式复用它，移动端仍作为独立页面打开。
 class LogViewerPage extends StatefulWidget {
-  const LogViewerPage({super.key, this.initialTab = contextTab});
+  const LogViewerPage({
+    super.key,
+    this.initialTab = contextTab,
+    this.embedded = false,
+  });
+
+  /// 桌面设置页把日志嵌进右侧内容区；移动端仍使用独立页面。
+  final bool embedded;
 
   static const int contextTab = 0;
   static const int requestTab = 1;
@@ -67,6 +76,24 @@ class _LogViewerPageState extends State<LogViewerPage>
   void dispose() {
     _tab.dispose();
     super.dispose();
+  }
+
+  Future<void> _openLogsFolder() async {
+    final l10n = AppLocalizations.of(context)!;
+    final dir = await AppDirectories.getAppDataDirectory();
+    final logsDir = Directory('${dir.path}/logs');
+    if (!await logsDir.exists()) {
+      await logsDir.create(recursive: true);
+    }
+    if (!mounted) return;
+    final opened = await launchUrl(Uri.file(logsDir.path));
+    if (!opened && mounted) {
+      showAppSnackBar(
+        context,
+        message: l10n.logViewerOpenFolderFailed,
+        type: NotificationType.error,
+      );
+    }
   }
 
   Future<void> _loadLogFiles() async {
@@ -165,6 +192,131 @@ class _LogViewerPageState extends State<LogViewerPage>
       return l10n.storageSpaceSubLogsFlutter;
     }
 
+    final actions = <Widget>[
+      IconButton(
+        icon: Icon(Lucide.FolderOpen, color: cs.onSurface, size: 20),
+        tooltip: l10n.logViewerOpenFolder,
+        onPressed: _openLogsFolder,
+      ),
+      IconButton(
+        icon: Icon(Lucide.RefreshCw, color: cs.onSurface, size: 20),
+        onPressed: _loadLogFiles,
+      ),
+      IconButton(
+        icon: Icon(Lucide.Settings, color: cs.onSurface, size: 20),
+        tooltip: l10n.logSettingsTitle,
+        onPressed: () => _showLogSettings(context),
+      ),
+    ];
+
+    final body = _loading
+        ? const Center(child: CircularProgressIndicator())
+        : Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+                child: _SegTabBar(
+                  controller: _tab,
+                  tabs: [
+                    l10n.contextLogViewerTitle,
+                    l10n.logViewerTitle,
+                    appTabLabel(),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: TabBarView(
+                  controller: _tab,
+                  physics: const BouncingScrollPhysics(),
+                  children: [
+                    _LogFilesList(
+                      files: _contextLogFiles,
+                      activeFileName: _activeContextLog,
+                      emptyIcon: Lucide.MessagesSquare,
+                      emptyText: l10n.logViewerEmpty,
+                      formatFileSize: formatBytes,
+                      formatDate: _formatDate,
+                      onOpenFile: (file, title) {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                _ContextLogFilePage(file: file, title: title),
+                          ),
+                        );
+                      },
+                    ),
+                    _LogFilesList(
+                      files: _requestLogFiles,
+                      activeFileName: _activeRequestLog,
+                      emptyIcon: Lucide.Globe,
+                      emptyText: l10n.logViewerEmpty,
+                      formatFileSize: formatBytes,
+                      formatDate: _formatDate,
+                      onOpenFile: (file, title) {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                _RequestLogFilePage(file: file, title: title),
+                          ),
+                        );
+                      },
+                    ),
+                    _LogFilesList(
+                      files: _appLogFiles,
+                      activeFileName: _activeAppLog,
+                      emptyIcon: Lucide.Terminal,
+                      emptyText: l10n.logViewerEmpty,
+                      formatFileSize: formatBytes,
+                      formatDate: _formatDate,
+                      onOpenFile: (file, title) {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                _PlainLogContentPage(file: file, title: title),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+
+    if (widget.embedded) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              height: 36,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        l10n.storageSpaceCategoryLogs,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: cs.onSurface.withValues(alpha: 0.9),
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                    ),
+                  ),
+                  ...actions,
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
+            Expanded(child: body),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -172,93 +324,9 @@ class _LogViewerPageState extends State<LogViewerPage>
           onPressed: () => Navigator.of(context).maybePop(),
         ),
         title: Text(l10n.storageSpaceCategoryLogs),
-        actions: [
-          IconButton(
-            icon: Icon(Lucide.RefreshCw, color: cs.onSurface, size: 20),
-            onPressed: _loadLogFiles,
-          ),
-          IconButton(
-            icon: Icon(Lucide.Settings, color: cs.onSurface, size: 20),
-            tooltip: l10n.logSettingsTitle,
-            onPressed: () => _showLogSettings(context),
-          ),
-        ],
+        actions: actions,
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-                  child: _SegTabBar(
-                    controller: _tab,
-                    tabs: [
-                      l10n.contextLogViewerTitle,
-                      l10n.logViewerTitle,
-                      appTabLabel(),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: TabBarView(
-                    controller: _tab,
-                    physics: const BouncingScrollPhysics(),
-                    children: [
-                      _LogFilesList(
-                        files: _contextLogFiles,
-                        activeFileName: _activeContextLog,
-                        emptyIcon: Lucide.MessagesSquare,
-                        emptyText: l10n.logViewerEmpty,
-                        formatFileSize: formatBytes,
-                        formatDate: _formatDate,
-                        onOpenFile: (file, title) {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  _ContextLogFilePage(file: file, title: title),
-                            ),
-                          );
-                        },
-                      ),
-                      _LogFilesList(
-                        files: _requestLogFiles,
-                        activeFileName: _activeRequestLog,
-                        emptyIcon: Lucide.Globe,
-                        emptyText: l10n.logViewerEmpty,
-                        formatFileSize: formatBytes,
-                        formatDate: _formatDate,
-                        onOpenFile: (file, title) {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  _RequestLogFilePage(file: file, title: title),
-                            ),
-                          );
-                        },
-                      ),
-                      _LogFilesList(
-                        files: _appLogFiles,
-                        activeFileName: _activeAppLog,
-                        emptyIcon: Lucide.Terminal,
-                        emptyText: l10n.logViewerEmpty,
-                        formatFileSize: formatBytes,
-                        formatDate: _formatDate,
-                        onOpenFile: (file, title) {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => _PlainLogContentPage(
-                                file: file,
-                                title: title,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+      body: body,
     );
   }
 }
@@ -2966,6 +3034,67 @@ class _TactileRowState extends State<_TactileRow> {
   }
 }
 
+/// 单个日志开关行，样式与日志设置里的其它条目一致。
+class _LogToggleTile extends StatelessWidget {
+  const _LogToggleTile({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+    required this.tileBg,
+    required this.border,
+  });
+
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final Color tileBg;
+  final Color border;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: tileBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: border),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: AppFontWeights.semibold,
+                    color: cs.onSurface.withValues(alpha: 0.92),
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: cs.onSurface.withValues(alpha: 0.55),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          IosSwitch(value: value, onChanged: onChanged),
+        ],
+      ),
+    );
+  }
+}
+
 class _LogSettingsSheet extends StatelessWidget {
   const _LogSettingsSheet({required this.onChanged});
   final VoidCallback onChanged;
@@ -3012,6 +3141,44 @@ class _LogSettingsSheet extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
+            // 三类日志的总开关。以前它们藏在“版本号连点七次”的彩蛋里，
+            // 现在直接放在日志设置中，与下面的查看器一一对应。
+            _LogToggleTile(
+              title: l10n.contextLogSettingTitle,
+              subtitle: l10n.contextLogSettingSubtitle,
+              value: settings.contextLogEnabled,
+              onChanged: (v) async {
+                await settings.setContextLogEnabled(v);
+                onChanged();
+              },
+              tileBg: tileBg,
+              border: border,
+            ),
+            const SizedBox(height: 12),
+            _LogToggleTile(
+              title: l10n.requestLogSettingTitle,
+              subtitle: l10n.requestLogSettingSubtitle,
+              value: settings.requestLogEnabled,
+              onChanged: (v) async {
+                await settings.setRequestLogEnabled(v);
+                onChanged();
+              },
+              tileBg: tileBg,
+              border: border,
+            ),
+            const SizedBox(height: 12),
+            _LogToggleTile(
+              title: l10n.flutterLogSettingTitle,
+              subtitle: l10n.flutterLogSettingSubtitle,
+              value: settings.flutterLogEnabled,
+              onChanged: (v) async {
+                await settings.setFlutterLogEnabled(v);
+                onChanged();
+              },
+              tileBg: tileBg,
+              border: border,
+            ),
+            const SizedBox(height: 12),
             // 保存输出开关
             Container(
               decoration: BoxDecoration(

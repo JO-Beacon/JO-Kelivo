@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/services/backup/restore_startup_gate.dart';
 import '../../l10n/app_localizations.dart';
+import 'animated_progress_bar.dart';
 
 /// Shown while the startup gate converges a published restore.
 ///
@@ -12,9 +13,15 @@ import '../../l10n/app_localizations.dart';
 /// gate busy for seconds with no frame of its own: the user sees a black
 /// screen, force-quits it, and the next launch starts the same work over.
 class RestoreProgressScreen extends StatelessWidget {
-  const RestoreProgressScreen({super.key, required this.stage});
+  const RestoreProgressScreen({super.key, required this.stage, this.fraction});
 
   final ValueListenable<RestoreStartupStage> stage;
+
+  /// 总体进度 0..1；为 null 时进度条退化为不确定态。
+  ///
+  /// 这一屏在业务持久化打开前运行，只能根据数据包文件本身的字节数估算，
+  /// 因此允许整段为空。
+  final ValueListenable<double?>? fraction;
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +42,17 @@ class RestoreProgressScreen extends StatelessWidget {
                     height: 28,
                     child: CircularProgressIndicator(strokeWidth: 2.5),
                   ),
+                  if (fraction != null) ...[
+                    const SizedBox(height: 24),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 280),
+                      child: ValueListenableBuilder<double?>(
+                        valueListenable: fraction!,
+                        builder: (context, value, _) =>
+                            AnimatedProgressBar(fraction: value, height: 6),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 28),
                   Text(
                     l10n.restoreProgressTitle,

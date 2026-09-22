@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/models/progress_update.dart';
 import '../../core/services/backup/backup_cancel_token.dart';
+import '../../core/services/backup/backup_progress_timeline.dart';
+import '../../core/services/backup/backup_task_progress.dart';
 import '../widgets/loading_dialog_card.dart';
 
 /// 只有在不可关闭的加载对话框绘制完成后才运行 [task]。
@@ -14,10 +16,14 @@ Future<T> runWithLoadingTaskDialog<T>({
   cancellableTask,
   String? label,
   String? cancelLabel,
+  BackupProgressFlow? flow,
+  String Function(BackupPhase phase)? phaseLabelBuilder,
 }) async {
   assert(task != null || cancellableTask != null);
   final overlay = Overlay.of(context, rootOverlay: true);
   final progress = ValueNotifier<ProgressUpdate?>(null);
+  // 有 flow 时把「阶段内进度」换算成整条流水线的总体进度，否则沿用原始比值。
+  final timeline = flow == null ? null : BackupProgressTimeline(flow);
   final cancelToken = BackupCancelToken();
   late final OverlayEntry entry;
   entry = OverlayEntry(
@@ -28,12 +34,21 @@ Future<T> runWithLoadingTaskDialog<T>({
           const ModalBarrier(dismissible: false, color: Colors.black54),
           ValueListenableBuilder<ProgressUpdate?>(
             valueListenable: progress,
-            builder: (context, update, child) => LoadingDialogCard(
-              label: label,
-              progress: update?.fraction,
-              onCancel: cancellableTask == null ? null : cancelToken.cancel,
-              cancelLabel: cancelLabel,
-            ),
+            builder: (context, update, child) {
+              final phase = update?.phase;
+              final fraction = timeline == null
+                  ? update?.fraction
+                  : timeline.updatePhase(phase, update?.fraction);
+              return LoadingDialogCard(
+                label: label,
+                progress: fraction,
+                phaseLabel: (phase != null && phaseLabelBuilder != null)
+                    ? phaseLabelBuilder(phase)
+                    : null,
+                onCancel: cancellableTask == null ? null : cancelToken.cancel,
+                cancelLabel: cancelLabel,
+              );
+            },
           ),
         ],
       );

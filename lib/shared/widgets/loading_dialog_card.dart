@@ -8,12 +8,19 @@ class LoadingDialogCard extends StatelessWidget {
     super.key,
     this.label,
     this.progress,
+    this.phaseLabel,
     this.onCancel,
     this.cancelLabel,
   });
 
   final String? label;
+
+  /// 0..1 的总体进度；为 null 时进度条退化为不确定的扫动动画。
   final double? progress;
+
+  /// 当前阶段的文字（例如「正在打包」）。有进度时显示在百分比旁边。
+  final String? phaseLabel;
+
   final VoidCallback? onCancel;
   final String? cancelLabel;
 
@@ -21,6 +28,11 @@ class LoadingDialogCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final hasLabel = label != null && label!.trim().isNotEmpty;
+    final hasPhase = phaseLabel != null && phaseLabel!.trim().isNotEmpty;
+    final fraction = progress;
+    final percentText = fraction == null
+        ? null
+        : '${(fraction.clamp(0.0, 1.0) * 100).round()}%';
 
     return Center(
       child: TweenAnimationBuilder<double>(
@@ -63,14 +75,26 @@ class LoadingDialogCard extends StatelessWidget {
                         color: cs.primary,
                       ),
                     ),
-                    if (hasLabel) ...[
+                    if (hasLabel || hasPhase) ...[
                       const SizedBox(height: 12),
                       Text(
-                        label!,
+                        hasPhase ? phaseLabel! : label!,
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 14,
                           color: cs.onSurface.withValues(alpha: 0.8),
+                        ),
+                      ),
+                    ],
+                    if (percentText != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        percentText,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: cs.primary,
                         ),
                       ),
                     ],
