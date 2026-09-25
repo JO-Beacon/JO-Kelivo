@@ -13221,4 +13221,15 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get phoneControlEnableAssistant =>
       'Allow this assistant to use phone control';
+
+  @override
+  String get linuxHideTitleBarTitle => 'Hide system title bar';
+
+  @override
+  String get linuxHideTitleBarDescription =>
+      'Also hides window buttons. Use your window manager to move, resize, and close the window.';
+
+  @override
+  String get linuxHideTitleBarError =>
+      'Unable to change the title bar. Please try again.';
 }

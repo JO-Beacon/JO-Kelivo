@@ -43,6 +43,7 @@ import '../services/api/providers/claude/claude_role_normalizer.dart';
 import '../../theme/palettes.dart';
 import '../../theme/custom_theme.dart';
 import '../../theme/chat_bubble_style.dart';
+import '../services/linux_window_service.dart';
 
 // 桌面端：话题列表位置
 enum DesktopTopicPosition { left, right }
@@ -1284,6 +1285,10 @@ class SettingsProvider extends ChangeNotifier {
             );
     _desktopAutoSwitchTopics =
         prefs.getBool(_displayDesktopAutoSwitchTopicsKey) ?? false;
+    _linuxHideTitleBar =
+        LinuxWindowService.isSupported &&
+        (localPreferences.getBool(LinuxWindowService.hideTitleBarKey) ?? false);
+
     // 桌面：托盘设置（桌面平台默认启用）
     final trayPref = prefs.getBool(_displayDesktopShowTrayKey);
     if (trayPref == null) {
@@ -5356,6 +5361,17 @@ Requirements:
     await prefs.setBool(_displayDesktopAutoSwitchTopicsKey, v);
   }
 
+  bool _linuxHideTitleBar = false;
+  bool get linuxHideTitleBar => _linuxHideTitleBar;
+  Future<void> setLinuxHideTitleBar(bool value) async {
+    if (!LinuxWindowService.isSupported || _linuxHideTitleBar == value) return;
+    await LinuxWindowService.setTitleBarHidden(value);
+    final localPreferences = await SharedPreferences.getInstance();
+    await localPreferences.setBool(LinuxWindowService.hideTitleBarKey, value);
+    _linuxHideTitleBar = value;
+    notifyListeners();
+  }
+
   // 仅桌面端：显示系统托盘图标
   bool _desktopShowTray = false;
   bool get desktopShowTray => _desktopShowTray;
@@ -5838,6 +5854,7 @@ Requirements:
     copy._collapseLongUserMessages = _collapseLongUserMessages;
     copy._collapseLongUserMessageChars = _collapseLongUserMessageChars;
     copy._desktopAutoSwitchTopics = _desktopAutoSwitchTopics;
+    copy._linuxHideTitleBar = _linuxHideTitleBar;
     copy._desktopShowTray = _desktopShowTray;
     copy._desktopMinimizeToTrayOnClose = _desktopMinimizeToTrayOnClose;
     copy._usePureBackground = _usePureBackground;

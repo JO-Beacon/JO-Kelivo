@@ -22,6 +22,7 @@ import 'desktop/desktop_home_page.dart';
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 import 'desktop/desktop_window_controller.dart';
+import 'core/services/linux_window_service.dart';
 import 'desktop/desktop_tray_controller.dart';
 import 'desktop/windows_paste_fix.dart';
 // import 'package:logging/logging.dart' as logging;
@@ -31,7 +32,6 @@ import 'theme/palettes.dart';
 import 'theme/custom_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:dynamic_color/dynamic_color.dart';
-import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'core/providers/user_provider.dart';
 import 'core/providers/settings_provider.dart';
 import 'core/providers/mcp_provider.dart';
@@ -119,8 +119,6 @@ final RouteObserver<ModalRoute<dynamic>> routeObserver =
 bool _didCheckUpdates = false; // 一次性更新检查标记
 bool _didEnsureAssistants = false; // 在 l10n 就绪后确保默认值
 bool _didWireWorkspace = false; // 工作区服务只接线一次
-AppLifecycleListener? _displayModeLifecycleListener;
-const MethodChannel _displayModeChannel = MethodChannel('app.display_mode');
 
 void _wireWorkspaceServices(BuildContext ctx) {
   try {
@@ -203,7 +201,6 @@ Future<void> main(List<String> arguments) async {
       reportStartupProgress(0.02);
       FlutterLogger.installGlobalHandlers();
       FlutterLogger.stage('global handlers installed');
-      _initializeAndroidDisplayMode();
       // 在可能耗时的恢复或数据库准入流程开始前，先配置并显示桌面窗口。
       await _initDesktopWindow();
       FlutterLogger.stage('desktop window ready');
@@ -482,35 +479,6 @@ Future<void> main(List<String> arguments) async {
   );
 }
 
-void _initializeAndroidDisplayMode() {
-  if (!Platform.isAndroid || _displayModeLifecycleListener != null) return;
-
-  // Some Android variants clear refresh-rate requests in background.
-  _displayModeLifecycleListener = AppLifecycleListener(
-    onResume: _requestHighRefreshRate,
-  );
-  _requestHighRefreshRate();
-}
-
-void _requestHighRefreshRate() {
-  unawaited(_applyAndroidHighRefreshRate());
-}
-
-Future<void> _applyAndroidHighRefreshRate() async {
-  try {
-    final handledNatively =
-        await _displayModeChannel.invokeMethod<bool>(
-          'requestHighRefreshRate',
-        ) ??
-        false;
-    if (!handledNatively) {
-      await FlutterDisplayMode.setHighRefreshRate();
-    }
-  } catch (error) {
-    debugPrint('[DisplayMode] High refresh rate request failed: $error');
-  }
-}
-
 enum _AdmissionRecovery { none, rebuilt, remigrate }
 
 /// 名称必须与 HiveToSqliteMigrationService.check() 保持一致。
@@ -716,12 +684,25 @@ class _StartupScreen extends StatelessWidget {
 Future<void> _initDesktopWindow() async {
   if (kIsWeb) return;
   try {
+    final linuxHideTitleBar =
+        LinuxWindowService.isSupported &&
+        ((await SharedPreferences.getInstance()).getBool(
+              LinuxWindowService.hideTitleBarKey,
+            ) ??
+            false);
     // 初始化并按持久化的大小和位置显示桌面窗口
     await DesktopWindowController.instance.initializeAndShow(
       title: 'JO-AIClient',
+      linuxHideTitleBar: linuxHideTitleBar,
     );
   } catch (_) {
-    // 在不支持的平台上忽略。
+    // Linux 偏好或几何恢复失败时，不能让窗口保持隐藏。
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.linux) {
+      try {
+        await windowManager.show();
+        await windowManager.focus();
+      } catch (_) {}
+    }
   }
 }
 

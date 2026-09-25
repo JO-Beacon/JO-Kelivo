@@ -819,6 +819,13 @@ class SettingsSearchIndex {
         (l) => l.desktopDisplaySettingsTopicPositionTitle,
       );
     }
+    if (!kIsWeb && platform == TargetPlatform.linux) {
+      add(
+        'linuxHideTitleBarTitle',
+        SettingsSearchDestination.display,
+        (l) => l.linuxHideTitleBarTitle,
+      );
+    }
     if (desktop) {
       add(
         'displaySettingsPageTrayShowTrayTitle',

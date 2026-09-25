@@ -5925,5 +5925,8 @@
   "phoneControlAssistantHint": "Both permissions are required: enable JO-AIClient phone control in system Accessibility settings, then enable Phone Control under your assistant’s Local Tools (also available in the chat tools menu). Each assistant is configured separately. Keep the phone unlocked while running a task.",
   "phoneControlRestrictedTitle": "Accessibility switch unavailable?",
   "phoneControlRestrictedHint": "For some downloaded APKs, Android requires “Allow restricted settings” in the app info menu first. Tap to open JO-AIClient’s app info, then return to Accessibility settings.",
-  "phoneControlEnableAssistant": "Allow this assistant to use phone control"
+  "phoneControlEnableAssistant": "Allow this assistant to use phone control",
+  "linuxHideTitleBarTitle": "Hide system title bar",
+  "linuxHideTitleBarDescription": "Also hides window buttons. Use your window manager to move, resize, and close the window.",
+  "linuxHideTitleBarError": "Unable to change the title bar. Please try again."
 }

@@ -12610,6 +12610,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get phoneControlEnableAssistant => '允许此助手使用手机控制';
+
+  @override
+  String get linuxHideTitleBarTitle => '隐藏系统标题栏';
+
+  @override
+  String get linuxHideTitleBarDescription => '同时隐藏窗口按钮。请通过窗口管理器移动、调整大小和关闭窗口。';
+
+  @override
+  String get linuxHideTitleBarError => '无法更改标题栏，请重试。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -25218,6 +25227,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get phoneControlEnableAssistant => '允许此助手使用手机控制';
+
+  @override
+  String get linuxHideTitleBarTitle => '隐藏系统标题栏';
+
+  @override
+  String get linuxHideTitleBarDescription => '同时隐藏窗口按钮。请通过窗口管理器移动、调整大小和关闭窗口。';
+
+  @override
+  String get linuxHideTitleBarError => '无法更改标题栏，请重试。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -37832,4 +37850,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get phoneControlEnableAssistant => '允許此助手使用手機控制';
+
+  @override
+  String get linuxHideTitleBarTitle => '隱藏系統標題列';
+
+  @override
+  String get linuxHideTitleBarDescription => '同時隱藏視窗按鈕。請透過視窗管理員移動、調整大小和關閉視窗。';
+
+  @override
+  String get linuxHideTitleBarError => '無法變更標題列，請重試。';
 }
