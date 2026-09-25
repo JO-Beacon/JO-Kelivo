@@ -42,9 +42,9 @@ $outputDirResolved = if (Test-Path $OutputDir) {
 
 if ([string]::IsNullOrWhiteSpace($InnoSetupCompiler)) {
   $candidatePaths = @(
-    (Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 6\ISCC.exe"),
-    "C:\Program Files\Inno Setup 6\ISCC.exe",
-    "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+    (Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 7\ISCC.exe"),
+    "C:\Program Files\Inno Setup 7\ISCC.exe",
+    "C:\Program Files (x86)\Inno Setup 7\ISCC.exe"
   )
 
   $InnoSetupCompiler = $candidatePaths |
@@ -54,7 +54,12 @@ if ([string]::IsNullOrWhiteSpace($InnoSetupCompiler)) {
 
 if ([string]::IsNullOrWhiteSpace($InnoSetupCompiler) -or
     -not (Test-Path $InnoSetupCompiler)) {
-  throw "Inno Setup compiler not found. Install Inno Setup 6 or pass -InnoSetupCompiler explicitly."
+  throw "Inno Setup 7 compiler not found. Install Inno Setup 7 or pass -InnoSetupCompiler explicitly."
+}
+
+$InnoSetupCompiler = (Resolve-Path $InnoSetupCompiler).Path
+if (-not $InnoSetupCompiler.EndsWith("\Inno Setup 7\ISCC.exe", [StringComparison]::OrdinalIgnoreCase)) {
+  throw "Inno Setup 7 is required. Refusing compiler: $InnoSetupCompiler"
 }
 
 Write-Host "Using Inno Setup compiler: $InnoSetupCompiler"

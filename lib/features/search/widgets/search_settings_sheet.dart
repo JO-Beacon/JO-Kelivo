@@ -159,7 +159,21 @@ class _SearchSettingsSheet extends StatelessWidget {
           cfg: cfg,
           modelId: modelId,
         );
-    final builtInMode = hasBuiltInSearch;
+    Future<void> setExternalSearchEnabled(bool value) async {
+      if (value &&
+          cfg != null &&
+          providerKey != null &&
+          (modelId ?? '').isNotEmpty) {
+        await _setBuiltInSearchEnabled(
+          settings: settingsNotifier,
+          providerCfg: cfg,
+          providerKey: providerKey,
+          modelId: modelId!,
+          enabled: false,
+        );
+      }
+      await assistantNotifier.setSearchEnabledForCurrentAssistant(value);
+    }
 
     final maxHeight = MediaQuery.of(context).size.height * 0.8;
     return SafeArea(
@@ -359,16 +373,14 @@ class _SearchSettingsSheet extends StatelessWidget {
                 ],
 
                 // 开关卡片
-                if (!builtInMode) ...[
+                ...[
                   IosCardPress(
                     borderRadius: BorderRadius.circular(14),
                     baseColor: cs.surface,
                     duration: const Duration(milliseconds: 260),
-                    onTap: () {
+                    onTap: () async {
                       Haptics.light();
-                      context
-                          .read<AssistantProvider>()
-                          .setSearchEnabledForCurrentAssistant(!enabled);
+                      await setExternalSearchEnabled(!enabled);
                     },
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -410,9 +422,7 @@ class _SearchSettingsSheet extends StatelessWidget {
                         const SizedBox(width: 4),
                         IosSwitch(
                           value: enabled,
-                          onChanged: (v) => context
-                              .read<AssistantProvider>()
-                              .setSearchEnabledForCurrentAssistant(v),
+                          onChanged: setExternalSearchEnabled,
                         ),
                       ],
                     ),
@@ -420,7 +430,7 @@ class _SearchSettingsSheet extends StatelessWidget {
                   const SizedBox(height: 14),
                 ],
                 // 服务列表（类似学习模式的 iOS 风格行）
-                if (!builtInMode && services.isNotEmpty) ...[
+                if (services.isNotEmpty) ...[
                   ...List.generate(services.length, (i) {
                     final s = services[i];
                     final bool isSelected = i == selected;
@@ -435,11 +445,11 @@ class _SearchSettingsSheet extends StatelessWidget {
                           borderRadius: BorderRadius.circular(14),
                           baseColor: cs.surface,
                           duration: const Duration(milliseconds: 260),
-                          onTap: () {
+                          onTap: () async {
                             Haptics.light();
-                            context
-                                .read<SettingsProvider>()
-                                .setSearchServiceSelected(i);
+                            await settingsNotifier.setSearchServiceSelected(i);
+                            await setExternalSearchEnabled(true);
+                            if (!context.mounted) return;
                             Navigator.of(context).maybePop();
                           },
                           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -471,7 +481,7 @@ class _SearchSettingsSheet extends StatelessWidget {
                     );
                   }),
                   const SizedBox(height: 8),
-                ] else if (!builtInMode) ...[
+                ] else ...[
                   Text(
                     l10n.searchSettingsSheetNoServicesMessage,
                     style: TextStyle(
@@ -518,6 +528,7 @@ class _BrandBadge extends StatelessWidget {
     if (s is GrokOptions) return 'grok';
     if (s is YouSearchOptions) return 'you';
     if (s is ParallelOptions) return 'parallel';
+    if (s is KimiOptions) return 'kimi';
     if (s is AnySearchOptions) return 'anysearch';
     if (s is StepFunOptions) return 'stepfun';
     if (s is FirecrawlOptions) return 'firecrawl';

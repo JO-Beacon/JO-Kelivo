@@ -35,12 +35,13 @@ import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/models/memory_entry.dart';
 import '../../../core/providers/memory_provider.dart';
 import '../../../desktop/widgets/desktop_dialog_style.dart';
+import '../../settings/pages/legacy_memory_page.dart';
+import '../../../shared/widgets/avatar_image_editor.dart';
 import '../../../core/providers/memory_provider_v2.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/memory/memory_gatekeeper.dart';
 import '../../../core/services/memory/memory_pipeline.dart';
-import '../../settings/pages/legacy_memory_page.dart';
 import '../../settings/pages/memory_settings_page.dart';
 import '../../settings/widgets/memory_ui.dart';
 import '../../../core/services/haptics.dart';
@@ -49,15 +50,14 @@ import '../../../desktop/setting/memory_dialogs.dart';
 import '../../../desktop/widgets/desktop_select_dropdown.dart';
 import '../../home/services/local_tool_toggle.dart';
 import '../../home/services/local_tools_service.dart';
+import '../../../core/models/health_data_type.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/emoji_picker_dialog.dart';
-import '../../../shared/widgets/avatar_image_editor.dart';
 import '../../../shared/widgets/emoji_text.dart';
 import '../../../shared/widgets/ios_form_text_field.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
-import '../../../shared/widgets/section_card.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/design_tokens.dart';
@@ -67,11 +67,12 @@ import '../../../utils/platform_utils.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../utils/assistant_edit_tab_layout.dart';
 import 'assistant_regex_tab.dart';
-import '../../../core/models/health_data_type.dart';
 import 'assistant_settings_edit_skills_tab.dart';
-import 'assistant_settings_edit_workspace_tab.dart';
+import '../widgets/assistant_default_workspace_row.dart';
 import 'health_data_settings_page.dart';
+import '../../settings/pages/phone_control_settings_page.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 
 part 'assistant_settings_edit_basic_tab.dart';
 part '../widgets/assistant_gradient_settings.dart';
@@ -82,6 +83,11 @@ part 'assistant_settings_edit_local_tools_tab.dart';
 part 'assistant_settings_edit_mcp_tab.dart';
 part 'assistant_settings_edit_quick_phrase_tab.dart';
 part 'assistant_settings_edit_custom_request_tab.dart';
+
+/// 移动端各 part 共用的 iOS 风格分区卡片。
+Widget _iosSectionCard({required List<Widget> children}) {
+  return SectionCard(children: children);
+}
 
 const int _contextMessageMin = Assistant.minContextMessageSize;
 const int _contextMessageMax = Assistant.maxContextMessageSize;
@@ -160,12 +166,6 @@ List<_AssistantEditTabSpec> _assistantEditTabSpecs(
       icon: Lucide.CaseSensitive,
       child: AssistantRegexTab(assistantId: assistantId),
     ),
-    _AssistantEditTabSpec(
-      id: assistantEditTabWorkspace,
-      label: l10n.assistantEditPageWorkspaceTab,
-      icon: Lucide.FolderCode,
-      child: AssistantSettingsEditWorkspaceTab(assistantId: assistantId),
-    ),
   ];
 }
 
@@ -222,7 +222,9 @@ Future<int?> _showContextMessageInputDialog(
             }
 
             return AlertDialog(
-              shape: DesktopDialogStyle.shape(ctx),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               title: Text(l10n.assistantEditContextMessagesTitle),
               content: SizedBox(
                 width: 360,
@@ -302,7 +304,7 @@ class _AssistantSettingsEditPageState extends State<AssistantSettingsEditPage>
   }
 
   void _handleTabChanged() {
-    // 切换标签时关闭输入法并刷新状态。
+    // Close IME when switching tabs and refresh state.
     FocusManager.instance.primaryFocus?.unfocus();
     if (mounted) setState(() {});
   }
@@ -444,7 +446,7 @@ class _AssistantDetailOutlinePage extends StatelessWidget {
       children: [
         _AssistantOutlineHeader(assistant: assistant, prompt: prompt),
         const SizedBox(height: 18),
-        _iosSectionCard(
+        SectionCard(
           children: [
             for (var i = 0; i < tabs.length; i++) ...[
               _AssistantOutlineItem(tab: tabs[i], assistantId: assistant.id),
@@ -471,7 +473,6 @@ class _AssistantOutlineHeader extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
     final name = assistant.name.trim().isNotEmpty
         ? assistant.name.trim()
         : l10n.assistantEditPageTitle;
@@ -481,10 +482,7 @@ class _AssistantOutlineHeader extends StatelessWidget {
       decoration: BoxDecoration(
         color: context.appColors.surfaceCard,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: isDark ? 0.1 : 0.08),
-          width: 0.7,
-        ),
+        border: Border.all(color: context.appColors.hairline, width: 0.7),
       ),
       child: Column(
         children: [
@@ -761,7 +759,7 @@ class _AssistantOutlineModeSwitch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return _iosSectionCard(
+    return SectionCard(
       children: [
         _iosSwitchRow(
           context,
@@ -916,9 +914,9 @@ class _SegTabBarState extends State<_SegTabBar> {
     final isDark = theme.brightness == Brightness.dark;
 
     const double outerHeight = 44;
-    const double innerPadding = 4; // shell 与选中块之间的间隙
-    const double gap = 6; // 分段之间的间距
-    const double minSegWidth = 88; // 保证可读性；空间不足时滚动
+    const double innerPadding = 4; // gap between shell and selected block
+    const double gap = 6; // spacing between segments
+    const double minSegWidth = 88; // ensure readability; scroll if not enough
     final double pillRadius = 18;
     final double innerRadius = ((pillRadius - innerPadding).clamp(
       0.0,
@@ -1160,7 +1158,7 @@ class _BrandAvatarLike extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    // 将已知名称映射到 default_model_page 使用的品牌资源
+    // Map known names to brand assets used in default_model_page
     final asset = BrandAssets.assetForName(name);
     if (asset != null) {
       if (asset.endsWith('.svg')) {
@@ -1221,7 +1219,7 @@ class _BrandAvatarLike extends StatelessWidget {
   }
 }
 
-// --- iOS 风格辅助函数 ---
+// --- iOS-style helpers ---
 
 class _TactileIconButton extends StatefulWidget {
   const _TactileIconButton({
@@ -1260,7 +1258,7 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
         onTapCancel: () => setState(() => _pressed = false),
         onTap: () {
           Haptics.light();
-          // 点击按钮时关闭输入法
+          // Close IME when tapping buttons
           FocusManager.instance.primaryFocus?.unfocus();
           widget.onTap();
         },
@@ -1271,32 +1269,6 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
       ),
     );
   }
-}
-
-Widget _iosSectionCard({required List<Widget> children}) {
-  return Builder(
-    builder: (context) {
-      final theme = Theme.of(context);
-      final cs = theme.colorScheme;
-      final isDark = theme.brightness == Brightness.dark;
-      final Color bg = context.appColors.surfaceCard;
-      return Container(
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-            width: 0.6,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Column(children: children),
-        ),
-      );
-    },
-  );
 }
 
 Widget _iosDivider(BuildContext context) {
@@ -1386,7 +1358,7 @@ class _TactileRowState extends State<_TactileRow> {
                   context.read<SettingsProvider>().hapticsOnListItemTap) {
                 Haptics.soft();
               }
-              // 点击分段或标签行、列表项时关闭输入法
+              // Close IME when tapping segmented/tab rows or list items
               FocusManager.instance.primaryFocus?.unfocus();
               widget.onTap!.call();
             },
@@ -1399,56 +1371,100 @@ Widget _iosNavRow(
   BuildContext context, {
   required IconData icon,
   required String label,
+  String? subtitle,
+  String? tip,
   String? detailText,
   Widget? accessory,
   VoidCallback? onTap,
 }) {
   final cs = Theme.of(context).colorScheme;
   final interactive = onTap != null;
-  return _TactileRow(
-    onTap: onTap,
-    haptics: true,
-    builder: (pressed) {
-      final baseColor = cs.onSurface.withValues(alpha: 0.9);
-      return _AnimatedPressColor(
-        pressed: pressed,
-        base: baseColor,
-        builder: (c) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-            child: Row(
-              children: [
-                SizedBox(width: 36, child: Icon(icon, size: 20, color: c)),
-                const SizedBox(width: 12),
-                Expanded(
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+    child: Row(
+      children: [
+        Expanded(
+          child: _TactileRow(
+            onTap: onTap,
+            haptics: true,
+            builder: (pressed) {
+              final baseColor = cs.onSurface.withValues(alpha: 0.9);
+              return _AnimatedPressColor(
+                pressed: pressed,
+                base: baseColor,
+                builder: (c) {
+                  return Row(
+                    children: [
+                      SizedBox(
+                        width: 36,
+                        child: Icon(icon, size: 20, color: c),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: subtitle == null
+                            ? Text(
+                                label,
+                                style: TextStyle(fontSize: 15, color: c),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              )
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    label,
+                                    style: TextStyle(fontSize: 15, color: c),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    subtitle,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: cs.onSurface.withValues(
+                                        alpha: 0.6,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        if (tip != null) MemoryTipIcon(message: tip),
+        GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (detailText != null)
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
                   child: Text(
-                    label,
-                    style: TextStyle(fontSize: 15, color: c),
+                    detailText,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: cs.onSurface.withValues(alpha: 0.6),
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (detailText != null)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: Text(
-                      detailText,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: cs.onSurface.withValues(alpha: 0.6),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                if (accessory != null) accessory,
-                if (interactive) Icon(Lucide.ChevronRight, size: 16, color: c),
-              ],
-            ),
-          );
-        },
-      );
-    },
+              if (accessory != null) accessory,
+              if (interactive)
+                Icon(Lucide.ChevronRight, size: 16, color: cs.onSurface),
+            ],
+          ),
+        ),
+      ],
+    ),
   );
 }
 
@@ -1459,6 +1475,7 @@ Widget _iosSwitchRow(
   required bool value,
   required ValueChanged<bool> onChanged,
   String? subtitle,
+  String? tip,
 }) {
   final cs = Theme.of(context).colorScheme;
   return _TactileRow(
@@ -1499,6 +1516,7 @@ Widget _iosSwitchRow(
                           ],
                         ),
                 ),
+                if (tip != null) MemoryTipIcon(message: tip),
                 IosSwitch(
                   value: value,
                   onChanged: onChanged,
@@ -1519,14 +1537,14 @@ class _IosButton extends StatefulWidget {
     required this.onTap,
     this.icon,
     this.filled = false,
-    this.neutral = true, // 聊天背景默认使用中性色
+    this.neutral = true, // Use neutral colors by default for chat background
     this.dense = false,
   });
   final String label;
   final VoidCallback onTap;
   final IconData? icon;
   final bool filled;
-  final bool neutral; // 为 true 时使用中性色而不是 primary
+  final bool neutral; // If true, use neutral colors instead of primary
   final bool dense;
 
   @override
@@ -1540,7 +1558,7 @@ class _IosButtonState extends State<_IosButton> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    // 判断这是否是 Material 图标（需要更多间距）
+    // Determine if this is a Material icon (needs more spacing)
     final isMaterialIcon =
         widget.icon != null &&
         (widget.icon == Icons.image ||
@@ -1608,10 +1626,9 @@ class _IosButtonState extends State<_IosButton> {
   }
 }
 
-// ===== 桌面助手对话框（复用移动端标签） =====
+// ===== Desktop Assistant Dialog (reuses mobile tabs) =====
 
 enum _AssistantDesktopMenu {
-  workspace,
   basic,
   prompts,
   memory,
@@ -1623,21 +1640,37 @@ enum _AssistantDesktopMenu {
   regex,
 }
 
+Future<void> openAssistantBasicSettings(
+  BuildContext context, {
+  required String assistantId,
+}) {
+  if (PlatformUtils.isDesktopTarget) {
+    return showAssistantDesktopDialog(context, assistantId: assistantId);
+  }
+  return Navigator.of(context).push<void>(
+    MaterialPageRoute(
+      builder: (_) => _AssistantDetailSectionPage(
+        assistantId: assistantId,
+        tabId: assistantEditTabBasic,
+      ),
+    ),
+  );
+}
+
 Future<void> showAssistantDesktopDialog(
   BuildContext context, {
   required String assistantId,
 }) async {
-  final cs = Theme.of(context).colorScheme;
   await showDialog<void>(
     context: context,
     barrierDismissible: true,
     builder: (ctx) {
       return Dialog(
-        backgroundColor: cs.surface,
-        shape: DesktopDialogStyle.shape(ctx),
+        backgroundColor: context.overlaySurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
-          constraints: DesktopDialogStyle.editorConstraints(ctx),
+          constraints: const BoxConstraints(maxWidth: 860, maxHeight: 640),
           child: _DesktopAssistantDialogShell(assistantId: assistantId),
         ),
       );
@@ -1717,11 +1750,6 @@ class _DesktopAssistantDialogShellState
                   switchInCurve: Curves.easeOutCubic,
                   child: () {
                     switch (_menu) {
-                      case _AssistantDesktopMenu.workspace:
-                        return AssistantSettingsEditWorkspaceTab(
-                          assistantId: widget.assistantId,
-                          key: const ValueKey('workspace'),
-                        );
                       case _AssistantDesktopMenu.basic:
                         return _DesktopAssistantBasicPane(
                           assistantId: widget.assistantId,
@@ -1786,7 +1814,6 @@ class _DesktopAssistantMenuState extends State<_DesktopAssistantMenu> {
       (_AssistantDesktopMenu.quick, l10n.assistantEditPageQuickPhraseTab),
       (_AssistantDesktopMenu.custom, l10n.assistantEditPageCustomTab),
       (_AssistantDesktopMenu.regex, l10n.assistantEditPageRegexTab),
-      (_AssistantDesktopMenu.workspace, l10n.assistantEditPageWorkspaceTab),
     ];
     return SizedBox(
       width: 220,
@@ -1897,7 +1924,7 @@ class _DesktopAssistantBasicPaneState
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // 助手头像（仅展示）
+            // Assistant avatar (display only)
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               key: _avatarKey,
@@ -1937,10 +1964,13 @@ class _DesktopAssistantBasicPaneState
                     final fixed = SandboxPathResolver.fix(av);
                     final f = File(fixed);
                     if (f.existsSync()) {
-                      inner = AvatarImage(
-                        path: fixed,
-                        size: 56,
-                        transform: a.avatarTransform,
+                      inner = ClipOval(
+                        child: Image.file(
+                          f,
+                          width: 56,
+                          height: 56,
+                          fit: BoxFit.cover,
+                        ),
                       );
                     } else {
                       inner = Container(
@@ -2027,7 +2057,7 @@ class _DesktopAssistantBasicPaneState
     }
 
     Widget labelWithHelp(String text, String help) {
-      // 让图标紧贴文本（不要放在最右侧）
+      // Keep icon right next to the text (not at the far right)
       return Align(
         alignment: Alignment.centerLeft,
         child: Row(
@@ -2047,7 +2077,7 @@ class _DesktopAssistantBasicPaneState
                 color: cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(8),
               ),
-              // 使用主题文本，尊重用户选择的字体
+              // Use themed text to respect user-selected fonts
               textStyle: Theme.of(
                 context,
               ).textTheme.bodySmall?.copyWith(color: cs.onSurface),
@@ -2123,7 +2153,7 @@ class _DesktopAssistantBasicPaneState
           children: [
             header(),
             sectionDivider(),
-            // 温度
+            // Temperature
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
               child: Column(
@@ -2175,7 +2205,7 @@ class _DesktopAssistantBasicPaneState
               ),
             ),
             sectionDivider(),
-            // Top-P 参数
+            // Top-P
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
               child: Column(
@@ -2223,7 +2253,7 @@ class _DesktopAssistantBasicPaneState
               ),
             ),
             sectionDivider(),
-            // 上下文消息
+            // Context messages
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
               child: Column(
@@ -2268,6 +2298,8 @@ class _DesktopAssistantBasicPaneState
                           256.0,
                           512.0,
                           1024.0,
+                          2048.0,
+                          4096.0,
                         ],
                         onLabelTap: a.limitContextMessages
                             ? () async {
@@ -2300,7 +2332,7 @@ class _DesktopAssistantBasicPaneState
               ),
             ),
             sectionDivider(),
-            // 最大 token
+            // Max tokens
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
               child: Column(
@@ -2330,7 +2362,7 @@ class _DesktopAssistantBasicPaneState
                       decoration: InputDecoration(
                         hintText: l10n.assistantEditMaxTokensHint,
                         isDense: true,
-                        // 按桌面规格增加高度
+                        // Increase height for desktop spec
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 20,
@@ -2367,7 +2399,14 @@ class _DesktopAssistantBasicPaneState
               ),
             ),
             sectionDivider(),
-            // 开关
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: AssistantDefaultWorkspaceRow(
+                assistantId: widget.assistantId,
+              ),
+            ),
+            sectionDivider(),
+            // Switches
             Padding(
               padding: const EdgeInsets.only(top: 4, bottom: 4),
               child: Column(
@@ -2399,7 +2438,7 @@ class _DesktopAssistantBasicPaneState
               ),
             ),
             sectionDivider(),
-            // 聊天模型
+            // Chat model
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
               child: Column(
@@ -2527,7 +2566,7 @@ class _DesktopAssistantBasicPaneState
               ),
             ),
             sectionDivider(),
-            // 聊天背景
+            // Chat background
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
               child: Column(
@@ -2713,11 +2752,8 @@ class _DesktopAssistantBasicPaneState
                   : null;
               final path = f?.path;
               if (path != null && path.isNotEmpty) {
-                if (!context.mounted) return;
-                final edited = await showAvatarImageEditor(context, path);
-                if (!context.mounted || edited == null) return;
                 await assistantProvider.updateAssistant(
-                  a.copyWith(avatar: path, avatarTransform: edited.transform),
+                  a.copyWith(avatar: path),
                 );
               }
             } catch (_) {}
@@ -2760,8 +2796,10 @@ class _DesktopAssistantBasicPaneState
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          shape: DesktopDialogStyle.shape(ctx),
-          backgroundColor: cs.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          backgroundColor: context.overlaySurface,
           title: Text(l10n.assistantEditImageUrlDialogTitle),
           content: TextField(
             controller: controller,
@@ -2862,8 +2900,10 @@ class _DesktopAssistantBasicPaneState
         return StatefulBuilder(
           builder: (ctx, setLocal) {
             return AlertDialog(
-              shape: DesktopDialogStyle.shape(ctx),
-              backgroundColor: cs.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              backgroundColor: context.overlaySurface,
               title: Text(l10n.assistantEditQQAvatarDialogTitle),
               content: TextField(
                 controller: controller,

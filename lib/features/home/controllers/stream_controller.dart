@@ -9,6 +9,7 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/api/stream/stream_chunk.dart';
 import '../../../core/services/api/stream/stream_chunk_handler.dart';
+import '../../../core/services/api/stream/stream_text_buffer.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../chat/widgets/chat_message_widget.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
@@ -158,6 +159,28 @@ class StreamController {
   /// 按消息的平滑输出状态。
   final Map<String, _StreamSmoothState> _streamSmoothStates =
       <String, _StreamSmoothState>{};
+  bool _presentationEnabled = true;
+
+  bool _isPresented(String conversationId) =>
+      _presentationEnabled && getCurrentConversationId() == conversationId;
+
+  /// Pause presentation while the home route/app is hidden; ingestion continues.
+  void setPresentationEnabled(bool enabled) {
+    _presentationEnabled = enabled;
+    refreshPresentation();
+  }
+
+  /// Re-arm pending output when returning to a conversation, even during a
+  /// provider pause with no new deltas to wake its presentation timer.
+  void refreshPresentation() {
+    for (final entry in _streamSmoothStates.entries) {
+      if (_isPresented(entry.value.conversationId)) {
+        _ensureStreamTimer(entry.key);
+      } else {
+        _streamThrottleTimers.remove(entry.key)?.cancel();
+      }
+    }
+  }
 
   /// 清理行内 base64 图片前的延迟。
   static const Duration _inlineImageSanitizeDelay = Duration(milliseconds: 120);
@@ -535,6 +558,7 @@ class StreamController {
     state
       ..conversationId = conversationId
       ..contentBuilder = contentBuilder
+      ..contentDirty = true
       ..partsBuilder = partsBuilder
       ..totalTokens = totalTokens
       ..contentSplitOffsets = contentSplitOffsets
@@ -553,41 +577,50 @@ class StreamController {
   }
 
   void _ensureStreamTimer(String messageId) {
-    _streamThrottleTimers[messageId] ??= Timer.periodic(
-      _streamThrottleInterval,
-      (_) => _flushSmoothStreamTick(messageId),
-    );
+    final state = _streamSmoothStates[messageId];
+    if (state == null ||
+        !_isPresented(state.conversationId) ||
+        !state.hasPendingPresentation) {
+      return;
+    }
+    _streamThrottleTimers[messageId] ??= Timer(_streamThrottleInterval, () {
+      _streamThrottleTimers.remove(messageId);
+      _flushSmoothStreamTick(messageId);
+    });
   }
 
-  void _publishDirtyReasoning(
+  void schedulePartsUpdate(
     String messageId,
-    _StreamSmoothState state, {
-    required bool sameConversation,
+    String conversationId, {
+    required String Function() contentBuilder,
+    required List<MessagePart> Function(String) partsBuilder,
+    required int totalTokens,
   }) {
-    if (!state.reasoningDirty) return;
-    if (sameConversation) {
-      streamingContentNotifier.updateReasoning(
-        messageId,
-        reasoningText: state.pendingReasoningText,
-        reasoningStartAt: state.pendingReasoningStartAt,
-        contentSplitOffsets: state.pendingReasoningSplitOffsets,
-        reasoningCountAtSplit: state.pendingReasoningCounts,
-        toolCountAtSplit: state.pendingToolCounts,
-      );
-    }
-    state.reasoningDirty = false;
+    final state = _streamSmoothStates.putIfAbsent(
+      messageId,
+      _StreamSmoothState.new,
+    );
+    state
+      ..conversationId = conversationId
+      ..contentBuilder = contentBuilder
+      ..contentDirty = true
+      ..partsBuilder = partsBuilder
+      ..partsDirty = true
+      ..totalTokens = totalTokens;
+    _ensureStreamTimer(messageId);
   }
 
   void _applyContentBuilder(_StreamSmoothState state) {
     final builder = state.contentBuilder;
-    if (builder == null) return;
+    if (builder == null || !state.contentDirty) return;
+    state.contentDirty = false;
     state.targetContent = builder();
   }
 
   void _flushSmoothStreamTick(String messageId) {
     final state = _streamSmoothStates[messageId];
     if (state == null) return;
-    if (getCurrentConversationId() != state.conversationId) return;
+    if (!_isPresented(state.conversationId)) return;
 
     _applyContentBuilder(state);
     final nextContent = state.takeNextContentSlice(
@@ -597,33 +630,14 @@ class StreamController {
       pickRate: _streamSmoothPickRate,
       moveAverageLength: _streamSmoothMoveAverageLength,
     );
-    final hadDirtyReasoning = state.reasoningDirty;
-    _publishDirtyReasoning(messageId, state, sameConversation: true);
-    if (nextContent != null) {
-      _publishSmoothStreamContent(messageId, state, nextContent);
-      return;
+    if (nextContent != null || state.reasoningDirty || state.partsDirty) {
+      _publishSmoothStreamContent(
+        messageId,
+        state,
+        nextContent ?? state.visibleContent,
+      );
     }
-    if (hadDirtyReasoning) onStreamTick?.call();
-  }
-
-  /// 在流结束前让平滑缓冲按正常节奏追上，避免 cleanup 时一次性倾倒尾部。
-  Future<void> drainSmoothStream(
-    String messageId, {
-    Duration budget = const Duration(milliseconds: 400),
-  }) async {
-    final state = _streamSmoothStates[messageId];
-    if (state == null) return;
-    _applyContentBuilder(state);
-    if (getCurrentConversationId() != state.conversationId) return;
-    final maxTicks =
-        budget.inMicroseconds ~/ _streamThrottleInterval.inMicroseconds;
-    for (var tick = 0; tick < maxTicks; tick++) {
-      if (state.targetContent == state.visibleContent) return;
-      await Future<void>.delayed(_streamThrottleInterval);
-      if (!identical(_streamSmoothStates[messageId], state)) return;
-      if (_streamThrottleTimers[messageId] == null) return;
-      if (getCurrentConversationId() != state.conversationId) return;
-    }
+    _ensureStreamTimer(messageId);
   }
 
   void _publishSmoothStreamContent(
@@ -636,6 +650,8 @@ class StreamController {
       content,
       state.totalTokens,
       parts: state.partsBuilder?.call(content),
+      reasoningText: state.reasoningDirty ? state.pendingReasoning?.text : null,
+      reasoningStartAt: state.pendingReasoningStartAt,
       contentSplitOffsets: state.contentSplitOffsets,
       reasoningCountAtSplit: state.reasoningCountAtSplit,
       toolCountAtSplit: state.toolCountAtSplit,
@@ -644,6 +660,8 @@ class StreamController {
       cachedTokens: state.cachedTokens,
       durationMs: state.durationMs,
     );
+    state.reasoningDirty = false;
+    state.partsDirty = false;
     state.updateMessageInList?.call(
       messageId,
       state.targetContent,
@@ -652,32 +670,58 @@ class StreamController {
     onStreamTick?.call();
   }
 
+  /// Let the smooth-stream buffer catch up before the reply is finalized.
+  ///
+  /// Finishing a stream flushes whatever the smoothing buffer has not shown
+  /// yet in a single frame. While the timeline is pinned to the bottom that
+  /// lands as one large jump right at the end of the reply — a fast or bursty
+  /// provider can leave hundreds of characters (several hundred pixels) in the
+  /// buffer. Waiting for the regular throttle tick to drain it keeps the tail
+  /// moving at streaming speed. The budget bounds how long finalization can be
+  /// delayed; anything still buffered afterwards is flushed as before.
+  Future<void> drainSmoothStream(
+    String messageId, {
+    Duration budget = const Duration(milliseconds: 400),
+  }) async {
+    final state = _streamSmoothStates[messageId];
+    if (state == null) return;
+    _applyContentBuilder(state);
+    if (!_isPresented(state.conversationId)) return;
+    _ensureStreamTimer(messageId);
+    final maxTicks =
+        budget.inMicroseconds ~/ _streamThrottleInterval.inMicroseconds;
+    for (var tick = 0; tick < maxTicks; tick++) {
+      if (state.targetContent == state.visibleContent) return;
+      await Future<void>.delayed(_streamThrottleInterval);
+      // The scheduled tick owns publishing. Bail out if it was cancelled, the
+      // message was cleaned up, or the user switched away meanwhile.
+      if (!identical(_streamSmoothStates[messageId], state)) return;
+      if (_streamThrottleTimers[messageId] == null) return;
+      if (!_isPresented(state.conversationId)) return;
+    }
+  }
+
   String? _flushPendingStreamUpdate(String messageId) {
     final state = _streamSmoothStates[messageId];
     if (state == null) return null;
     _applyContentBuilder(state);
-    final sameConversation = getCurrentConversationId() == state.conversationId;
-    final hadDirtyReasoning = state.reasoningDirty;
-    _publishDirtyReasoning(
-      messageId,
-      state,
-      sameConversation: sameConversation,
-    );
+    final sameConversation = _isPresented(state.conversationId);
     final content = state.flushTargetContent();
-    if (content == null) {
-      if (hadDirtyReasoning && sameConversation) onStreamTick?.call();
-      return state.visibleContent;
-    }
-    if (sameConversation) {
-      _publishSmoothStreamContent(messageId, state, content);
-    } else {
+    if (sameConversation &&
+        (content != null || state.reasoningDirty || state.partsDirty)) {
+      _publishSmoothStreamContent(
+        messageId,
+        state,
+        content ?? state.visibleContent,
+      );
+    } else if (content != null) {
       state.updateMessageInList?.call(
         messageId,
         state.targetContent,
         state.totalTokens,
       );
     }
-    return content;
+    return content ?? state.visibleContent;
   }
 
   /// 获取消息的待处理流内容。
@@ -696,7 +740,9 @@ class StreamController {
     );
     state
       ..targetContent = content
+      ..contentDirty = false
       ..contentBuilder = () => content;
+    _ensureStreamTimer(messageId);
   }
 
   /// 清理消息的流式节流计时器。
@@ -808,7 +854,7 @@ class StreamController {
       final initialExpanded = !getSettingsProvider().autoCollapseThinking;
       final isNewReasoning = !_reasoning.containsKey(messageId);
       final r = _reasoning[messageId] ?? ReasoningData();
-      r.text += reasoning;
+      r.appendText(reasoning);
       r.startAt ??= DateTime.now();
       // NOTE: Do not reset r.expanded here - preserve user's toggle state during streaming
       if (isNewReasoning) {
@@ -838,7 +884,7 @@ class StreamController {
           newSegment.toolStartIndex = (_toolParts[messageId]?.length ?? 0);
           segments.add(newSegment);
         } else {
-          lastSegment.text += reasoning;
+          lastSegment.appendText(reasoning);
           lastSegment.startAt ??= DateTime.now();
         }
       }
@@ -850,17 +896,17 @@ class StreamController {
       );
       smooth
         ..conversationId = conversationId
-        ..pendingReasoningText = r.text
+        ..pendingReasoning = r
         ..pendingReasoningStartAt = r.startAt
-        ..pendingReasoningSplitOffsets = state.contentSplitOffsets
-        ..pendingReasoningCounts = state.reasoningCountAtSplit
-        ..pendingToolCounts = state.toolCountAtSplit
+        ..contentSplitOffsets = state.contentSplitOffsets
+        ..reasoningCountAtSplit = state.reasoningCountAtSplit
+        ..toolCountAtSplit = state.toolCountAtSplit
         ..reasoningDirty = true;
       streamingContentNotifier.getNotifier(messageId);
       _ensureStreamTimer(messageId);
     } else {
       state.reasoningStartAt ??= DateTime.now();
-      state.bufferedReasoning += reasoning;
+      state.appendBufferedReasoning(reasoning);
     }
   }
 
@@ -1598,6 +1644,8 @@ class GenerationContext {
     this.generateTitleOnFinish = true,
     this.generationRunId,
     this.scheduled = false,
+    this.scheduledNotify = true,
+    this.scheduledPreview = true,
   });
 
   final ChatMessage assistantMessage;
@@ -1620,19 +1668,27 @@ class GenerationContext {
   final bool generateTitleOnFinish;
   final String? generationRunId;
   final bool scheduled;
+  final bool scheduledNotify, scheduledPreview;
 }
 
 /// 流式消息生成的状态对象。
 class StreamingState {
   StreamingState(this.ctx)
-    : fullContentRaw = ctx.assistantMessage.content,
+    : _content = StreamTextBuffer(ctx.assistantMessage.content),
       partsHandler = StreamChunkHandler(seed: ctx.assistantMessage.parts);
 
   final GenerationContext ctx;
-  String fullContentRaw;
+  final StreamTextBuffer _content;
+  String get fullContentRaw => _content.value;
+  set fullContentRaw(String text) => _content.value = text;
+  bool get hasContent => !_content.isEmpty;
+  void appendContent(String delta) => _content.add(delta);
   int totalTokens = 0;
   TokenUsage? usage;
-  String bufferedReasoning = '';
+  final StreamTextBuffer _bufferedReasoning = StreamTextBuffer();
+  String get bufferedReasoning => _bufferedReasoning.value;
+  set bufferedReasoning(String text) => _bufferedReasoning.value = text;
+  void appendBufferedReasoning(String delta) => _bufferedReasoning.add(delta);
   DateTime? reasoningStartAt;
   bool finishHandled = false;
   bool terminalPersisted = false;
@@ -1653,7 +1709,10 @@ class StreamingState {
 
 /// 助手消息的推理数据。
 class ReasoningData {
-  String text = '';
+  final StreamTextBuffer _text = StreamTextBuffer();
+  String get text => _text.value;
+  set text(String value) => _text.value = value;
+  void appendText(String delta) => _text.add(delta);
   DateTime? startAt;
   DateTime? finishedAt;
   bool expanded = false;
@@ -1661,7 +1720,10 @@ class ReasoningData {
 
 /// 推理片段数据（用于思考/工具交错显示）。
 class ReasoningSegmentData {
-  String text = '';
+  final StreamTextBuffer _text = StreamTextBuffer();
+  String get text => _text.value;
+  set text(String value) => _text.value = value;
+  void appendText(String delta) => _text.add(delta);
   DateTime? startAt;
   DateTime? finishedAt;
   bool expanded = true;
@@ -1784,6 +1846,8 @@ class _StreamSmoothState {
   String targetContent = '';
   String visibleContent = '';
   String Function()? contentBuilder;
+  bool contentDirty = false;
+  bool partsDirty = false;
   List<MessagePart> Function(String visibleText)? partsBuilder;
   int totalTokens = 0;
   List<int>? contentSplitOffsets;
@@ -1793,16 +1857,19 @@ class _StreamSmoothState {
   int? completionTokens;
   int? cachedTokens;
   int? durationMs;
-  String? pendingReasoningText;
+  ReasoningData? pendingReasoning;
   DateTime? pendingReasoningStartAt;
   bool reasoningDirty = false;
-  List<int>? pendingReasoningSplitOffsets;
-  List<int>? pendingReasoningCounts;
-  List<int>? pendingToolCounts;
   void Function(String messageId, String content, int totalTokens)?
   updateMessageInList;
   final List<int> _recentPickCounts = <int>[];
   int _lastPickCount = 0;
+
+  bool get hasPendingPresentation =>
+      contentDirty ||
+      partsDirty ||
+      reasoningDirty ||
+      targetContent != visibleContent;
 
   String? takeNextContentSlice({
     required int minCount,

@@ -234,6 +234,8 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                 onTap: () => _showMaxTokensSheet(context, a),
               ),
               _iosDivider(context),
+              AssistantDefaultWorkspaceRow(assistantId: widget.assistantId),
+              _iosDivider(context),
               // 使用助手头像
               _iosSwitchRow(
                 context,

@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
-import 'package:flutter/scheduler.dart';
 import '../../../core/database/chat_database_repository.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/screen_wakelock.dart';
+import '../../../core/utils/scheduler_idle.dart';
 import 'message_render_model.dart';
 
 /// 会话切换的初始窗口，由
@@ -362,10 +362,8 @@ class ChatController extends ChangeNotifier {
   void _scheduleIdleCacheBackfill(String conversationId) {
     final Future<void> task;
     try {
-      task = SchedulerBinding.instance.scheduleTask(
-        () => backfillCurrentConversationCache(conversationId),
-        Priority.idle,
-        debugLabel: 'chat.idleCacheBackfill',
+      task = waitForSchedulerIdle().then(
+        (_) => backfillCurrentConversationCache(conversationId),
       );
     } catch (_) {
       // 没有调度器绑定（纯单元测试）：预热是可选的。
@@ -524,6 +522,7 @@ class ChatController extends ChangeNotifier {
   Future<bool> loadWindowAroundMessage(
     String messageId, {
     int leadingContext = ChatService.defaultHistoryPageSize,
+    bool preservePreviousWindowHead = false,
   }) async {
     final conversation = _currentConversation;
     if (conversation == null) return false;
@@ -540,6 +539,9 @@ class ChatController extends ChangeNotifier {
         .toInt();
     final serial = ++_windowLoadSerial;
     _isLoadingWindow = true;
+    final previousSlotIds = preservePreviousWindowHead
+        ? <String>{for (final message in _messages) message.id}
+        : const <String>{};
     try {
       final page = await _chatService.loadTimelinePage(
         conversation.id,
@@ -549,7 +551,11 @@ class ChatController extends ChangeNotifier {
       // 如果加载期间会话发生变化，则丢弃该页。
       if (_currentConversation?.id != conversation.id) return false;
       if (page == null || page.slots.isEmpty) return false;
-      _replaceWindow(page);
+      _replaceWindow(
+        preservePreviousWindowHead
+            ? _withoutBackfilledHead(page, previousSlotIds)
+            : page,
+      );
     } finally {
       if (serial == _windowLoadSerial) _isLoadingWindow = false;
     }
@@ -827,6 +833,7 @@ class ChatController extends ChangeNotifier {
     final opened = await loadWindowAroundMessage(
       message.id,
       leadingContext: ChatService.defaultHistoryPageSize,
+      preservePreviousWindowHead: true,
     );
     return opened;
   }

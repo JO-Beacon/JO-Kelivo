@@ -5,12 +5,74 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../theme/app_font_weights.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
-/// TTS 和 ASR 两半语音服务共享的视觉语言。
+/// Reorders [items] using the index reported by [SliverReorderableList].
 ///
-/// 这些控件刻意沿用 JO-AIClient 已有的紧凑设置界面，
-/// 而不是引入现成的下拉框或开关。
+/// [newIndex] is already the insertion index after [oldIndex] is removed.
+/// Returns [items] unchanged when the move is a no-op.
+List<T> reorderVoiceServiceList<T>(List<T> items, int oldIndex, int newIndex) {
+  if (oldIndex < 0 ||
+      newIndex < 0 ||
+      oldIndex >= items.length ||
+      newIndex >= items.length ||
+      oldIndex == newIndex) {
+    return items;
+  }
+  final next = List<T>.from(items);
+  next.insert(newIndex, next.removeAt(oldIndex));
+  return next;
+}
+
+Widget voiceServiceDragProxy(
+  Widget child,
+  int index,
+  Animation<double> animation,
+) {
+  return AnimatedBuilder(
+    animation: animation,
+    builder: (context, child) {
+      final t = Curves.easeOutCubic.transform(animation.value);
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          color: context.appColors.surfaceCard,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Transform.scale(scale: 0.985 + 0.015 * t, child: child),
+      );
+    },
+    child: child,
+  );
+}
+
+/// iOS-style section card that can wrap a [SliverReorderableList].
+class VoiceServiceCardSliver extends StatelessWidget {
+  const VoiceServiceCardSliver({super.key, required this.sliver});
+
+  final Widget sliver;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return DecoratedSliver(
+      decoration: BoxDecoration(
+        color: colors.surfaceCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colors.hairline, width: 0.6),
+      ),
+      sliver: SliverPadding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        sliver: sliver,
+      ),
+    );
+  }
+}
+
+/// Shared visual vocabulary for the TTS and ASR halves of Voice Services.
+///
+/// These controls intentionally mirror the compact settings surfaces already
+/// used by Kelivo instead of introducing stock dropdowns or switches.
 class VoiceServiceSectionHeader extends StatelessWidget {
   const VoiceServiceSectionHeader({
     super.key,
@@ -137,24 +199,7 @@ class VoiceServiceMobileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    return Container(
-      decoration: BoxDecoration(
-        color: context.appColors.surfaceCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-          width: 0.6,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Column(children: children),
-      ),
-    );
+    return SectionCard(children: children);
   }
 }
 
@@ -491,7 +536,7 @@ Future<T?> _showVoiceServiceMobileOptions<T>(
   final cs = Theme.of(context).colorScheme;
   return showModalBottomSheet<T>(
     context: context,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -645,7 +690,7 @@ Future<T?> _showVoiceServiceOptions<T>(
     context: context,
     barrierDismissible: true,
     builder: (dialogContext) => Dialog(
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       child: ConstrainedBox(

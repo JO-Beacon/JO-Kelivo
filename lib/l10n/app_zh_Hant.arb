@@ -7,16 +7,6 @@
   "settingsSearchNoResultsHint": "試試其他名稱，或更簡短的關鍵字。",
   "settingsSearchResultCount": "找到 {count} 項設定",
   "chatImageCropFailed": "圖片「{fileName}」裁剪失敗：{error}",
-  "@chatImageCropFailed": {
-    "placeholders": {
-      "fileName": {
-        "type": "String"
-      },
-      "error": {
-        "type": "String"
-      }
-    }
-  },
   "helloWorld": "你好，世界！",
   "settingsPageBackButton": "返回",
   "settingsPageTitle": "設定",
@@ -197,13 +187,6 @@
   "assistantEditTabLayoutResetTooltip": "重設標籤頁佈局",
   "assistantEditTabLayoutAtLeastOneVisible": "至少保留一個可見標籤頁",
   "assistantEditTabLayoutDragHandle": "拖動以調整 {tab} 的順序",
-  "@assistantEditTabLayoutDragHandle": {
-    "placeholders": {
-      "tab": {
-        "type": "String"
-      }
-    }
-  },
   "assistantEditRegexDescription": "為使用者/助理訊息配置正則規則，可修改或僅調整顯示效果。",
   "assistantEditAddRegexButton": "新增正則規則",
   "assistantRegexAddTitle": "新增正則規則",
@@ -324,13 +307,6 @@
   "iosBackgroundGenerationActiveDetail": "助理正在後台回覆",
   "iosBackgroundGenerationStreamingDetail": "正在接收助理回覆",
   "iosBackgroundGenerationTokenCount": "{count} tokens",
-  "@iosBackgroundGenerationTokenCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "iosBackgroundGenerationCompleteTitle": "生成完成",
   "iosBackgroundGenerationCompleteDetail": "助理回覆已準備好",
   "iosBackgroundGenerationInterruptedTitle": "生成已中斷",
@@ -364,13 +340,6 @@
   "providersPageDeleteSelectedConfirmContent": "確定要刪除選中的供應商嗎？此操作不可撤銷。",
   "providersPageDeleteSelectedSnackbar": "已刪除選中的供應商",
   "providersPageExportSelectedTitle": "匯出 {count} 個供應商",
-  "@providersPageExportSelectedTitle": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "providersPageExportCopyButton": "複製",
   "providersPageExportShareButton": "分享",
   "providersPageExportCopiedSnackbar": "已複製匯出代碼",
@@ -381,13 +350,6 @@
   "imagePreviewSheetSaveImage": "保存圖片",
   "imagePreviewSheetSaveSuccess": "已儲存到相簿",
   "imagePreviewSheetSaveFailed": "保存失敗: {error}",
-  "@imagePreviewSheetSaveFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
   "assistantEditSystemPromptTitle": "系統提示詞",
   "assistantEditSystemPromptHint": "輸入系統提示詞…",
   "assistantEditSystemPromptImportButton": "從檔案匯入",
@@ -418,23 +380,9 @@
   "assistantEditPromptAppendTimeSubtitle": "在每條使用者訊息末尾追加傳送時刻。時間在請求末尾，不影響 Prompt 快取。",
   "assistantEditPromptAppendTimeInfoTitle": "追加時間格式",
   "assistantEditPromptAppendTimeInfoBody": "開啟後，會在每條使用者訊息末尾先空一行，再追加如下標籤：\n\n{example}\n\n時間取該訊息自己的傳送時刻，重試時保持不變。",
-  "@assistantEditPromptAppendTimeInfoBody": {
-    "placeholders": {
-      "example": {
-        "type": "String"
-      }
-    }
-  },
   "assistantEditPromptAppendTimeInfoClose": "知道了",
   "assistantEditPromptTimeVarDialogTitle": "系統提示詞中含時間變數",
   "assistantEditPromptTimeVarDialogBody": "你的系統提示詞裡用了 {variables}。系統提示詞每次請求都會重新渲染，含時間變數會讓每一輪請求的開頭都不同，Prompt 快取無法命中。建議移除這些變數，改用「追加當前時間」——它把時間放在請求末尾，不影響前綴。",
-  "@assistantEditPromptTimeVarDialogBody": {
-    "placeholders": {
-      "variables": {
-        "type": "String"
-      }
-    }
-  },
   "assistantEditPromptTimeVarDialogRemove": "去移除",
   "assistantEditPromptTimeVarDialogKeep": "仍然開啟",
   "codeBlockPreviewButton": "預覽",
@@ -449,13 +397,6 @@
   "markdownTableCopiedCsvSnackbar": "已複製 CSV，長按複製可複製為圖片",
   "markdownTableCopiedMarkdownSnackbar": "已複製表格",
   "codeBlockCollapsedLines": "… 已摺疊 {n} 行",
-  "@codeBlockCollapsedLines": {
-    "placeholders": {
-      "n": {
-        "type": "int"
-      }
-    }
-  },
   "htmlPreviewNotSupportedOnLinux": "Linux 暫不支援 HTML 預覽",
   "assistantEditSampleUser": "使用者",
   "assistantEditSampleMessage": "你好啊",
@@ -475,26 +416,12 @@
   "assistantSettingsAddSheetCancel": "取消",
   "assistantSettingsAddSheetSave": "儲存",
   "assistantSelectionTitle": "已選擇 {count} 個",
-  "@assistantSelectionTitle": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "assistantSelectionSelectAll": "全選",
   "assistantSelectionDeselectAll": "取消全選",
   "assistantSelectionDelete": "刪除",
   "assistantSelectionMoveToGroup": "移動到分組",
   "assistantSelectionDeleteConfirmTitle": "刪除助理",
   "assistantSelectionDeleteConfirmContent": "確定刪除選中的 {count} 個助理嗎？此操作不可撤銷。",
-  "@assistantSelectionDeleteConfirmContent": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "assistantSelectionGroupPickerTitle": "將助理移動到分組",
   "assistantSelectionGroupUngrouped": "未分組",
   "assistantSelectionActionSelect": "選擇助理",
@@ -549,13 +476,6 @@
   "assistantProviderSampleAssistantName": "範例助理",
   "assistantProviderNewAssistantName": "新助理",
   "assistantProviderSampleAssistantSystemPrompt": "你是{model_name}，一位樂於助人的 AI 助理。請準確、簡潔地回答問題；不確定時如實說明。需要時可使用清晰結構（短段落或列表）。預設使用使用者的語言回覆。",
-  "@assistantProviderSampleAssistantSystemPrompt": {
-    "placeholders": {
-      "model_name": {
-        "type": "String"
-      }
-    }
-  },
   "displaySettingsPageLanguageTitle": "應用程式語言",
   "displaySettingsPageLanguageSubtitle": "選擇介面語言",
   "displaySettingsPageLanguageChineseLabel": "简体中文",
@@ -565,13 +485,6 @@
   "homePagePleaseSetupTranslateModel": "請先設定翻譯模型",
   "homePageTranslating": "翻譯中...",
   "homePageTranslateFailed": "翻譯失敗: {error}",
-  "@homePageTranslateFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
   "chatServiceDefaultConversationTitle": "新對話",
   "userProviderDefaultUserName": "使用者",
   "mcpAssistantSheetTitle": "MCP伺服器",
@@ -592,25 +505,11 @@
   "backupPageRestartRequired": "需要重啟應用程式",
   "backupPageRestartContent": "匯入成功。重新啟動 JO-AIClient 後將安全套用。",
   "backupPageRestartContentWithSkipped": "匯入已完成，但已略過 {count} 個訊息順序無效的會話。重新啟動 JO-AIClient 後將安全套用已匯入的資料。",
-  "@backupPageRestartContentWithSkipped": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "restartAppFailedMessage": "JO-AIClient 無法自動重新啟動，請完全關閉後再重新開啟。",
   "backupRestoreRolledBackTitle": "已保留原有資料",
   "backupRestoreRolledBackContent": "還原未能完成。JO-AIClient 已驗證並保留先前的資料。",
   "contextTreeMigrationWarningsTitle": "舊版對話遷移已修復",
   "contextTreeMigrationWarningsContent": "JO-AIClient 在轉換舊版對話分支時修復了 {count} 筆遺失的選取版本記錄。修復結果已寫入警告記錄，未讀取或修改訊息正文。",
-  "@contextTreeMigrationWarningsContent": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "backupRestoreFailureTitle": "還原需要處理",
   "backupRestoreFailureContent": "JO-AIClient 無法驗證完整的原有或新資料，因此未開啟聊天資料。請關閉 JO-AIClient 後重試；若問題持續發生，請保留診斷碼以供支援人員排查。",
   "backupRestoreBusinessLeaseUnavailableTitle": "JO-AIClient 已在執行",
@@ -627,21 +526,7 @@
   "backupRestoreFailureCopyButton": "複製診斷碼",
   "backupRestoreFailureCopied": "已複製診斷碼",
   "backupRestoreFailureDiagnostic": "診斷碼：{code}",
-  "@backupRestoreFailureDiagnostic": {
-    "placeholders": {
-      "code": {
-        "type": "String"
-      }
-    }
-  },
   "backupRestoreCorruptArchiveMessage": "所選的 JO-AIClient 備份檔案已損壞或不完整，因此未執行還原。目前資料未被修改。診斷碼：{code}",
-  "@backupRestoreCorruptArchiveMessage": {
-    "placeholders": {
-      "code": {
-        "type": "String"
-      }
-    }
-  },
   "startupRecoveryMoreOptions": "更多復原選項",
   "startupRecoveryRepairButton": "修復並重新啟動",
   "startupRecoveryExportButton": "匯出我的資料副本",
@@ -661,41 +546,14 @@
   "startupRecoveryDowngradeSnapshotButton": "進階：還原較早的副本",
   "startupRecoveryChooseSnapshotTitle": "選擇副本",
   "startupRecoverySnapshotDetails": "{date} {time} · {size}",
-  "@startupRecoverySnapshotDetails": {
-    "placeholders": {
-      "date": {
-        "type": "String"
-      },
-      "time": {
-        "type": "String"
-      },
-      "size": {
-        "type": "String"
-      }
-    }
-  },
   "startupRecoveryNoSnapshots": "沒有可用的本機副本。",
   "startupRecoveryRestoreConfirmTitle": "還原這份副本？",
   "startupRecoveryRestoreConfirmContent": "JO-AIClient 將使用 {fileName} 取代目前資料庫。建立該副本後的變更可能遺失；在還原通過驗證前，目前資料庫仍會由還原日誌保留。",
-  "@startupRecoveryRestoreConfirmContent": {
-    "placeholders": {
-      "fileName": {
-        "type": "String"
-      }
-    }
-  },
   "startupRecoveryRestoreConfirmButton": "還原並重新啟動",
   "startupRecoveryProtectionFailedTitle": "無法保護目前資料",
   "startupRecoveryProtectionFailedContent": "降級前必須建立的資料副本失敗。繼續操作可能永久遺失由較新版本寫入的資料。",
   "startupRecoveryContinueWithoutProtection": "不建立副本並繼續",
   "startupRecoverySnapshotFailed": "無法準備該副本。診斷代碼：{code}",
-  "@startupRecoverySnapshotFailed": {
-    "placeholders": {
-      "code": {
-        "type": "String"
-      }
-    }
-  },
   "backupPageRestoreFailedMessage": "還原失敗：{error}",
   "backupPageExportFailedMessage": "匯出失敗：{error}",
   "backupPageOK": "好的",
@@ -790,13 +648,6 @@
   "backupReminderEveryFourteenDays": "每 14 天",
   "backupReminderEveryMonth": "每月",
   "backupReminderCustomDays": "每 {days} 天",
-  "@backupReminderCustomDays": {
-    "placeholders": {
-      "days": {
-        "type": "int"
-      }
-    }
-  },
   "backupReminderCustomOption": "自訂...",
   "backupReminderCustomDialogTitle": "自訂頻率",
   "backupReminderCustomDialogDescription": "輸入兩次備份提醒之間間隔多少天。",
@@ -867,13 +718,6 @@
   "messageEditRemoveAttachment": "移除附件",
   "messageEditAttachmentImportFailed": "無法匯入附件：{error}",
   "messageEditAttachmentCopyFailed": "無法複製所選附件",
-  "@messageEditAttachmentImportFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
   "messageEditCloseConfirmTitle": "關閉而不儲存？",
   "messageEditCloseConfirmContent": "目前的修改將被捨棄。",
   "messageEditCloseConfirmCancel": "取消",
@@ -915,26 +759,6 @@
   "compressContextKeepCountLabel": "保留最近條數",
   "compressContextKeepAllMessages": "保留條數涵蓋全部訊息，無內容可壓縮",
   "compressContextEstimatePreview": "總結 {summarized} 字元，原樣保留 {kept} 字元 → 壓縮後約 {minTokens}–{maxTokens} tokens（原文約 {totalTokens} tokens）",
-  "@compressContextEstimatePreview": {
-    "description": "保留最近訊息模式的壓縮預覽",
-    "placeholders": {
-      "summarized": {
-        "type": "int"
-      },
-      "kept": {
-        "type": "int"
-      },
-      "minTokens": {
-        "type": "int"
-      },
-      "maxTokens": {
-        "type": "int"
-      },
-      "totalTokens": {
-        "type": "int"
-      }
-    }
-  },
   "bottomToolsSheetLearningMode": "學習模式",
   "bottomToolsSheetLearningModeDescription": "幫助你循序漸進地學習知識",
   "bottomToolsSheetConfigurePrompt": "設定提示詞",
@@ -1011,13 +835,6 @@
   "chatMessageWidgetWriteClipboard": "寫入剪貼簿",
   "chatMessageWidgetSpeakingTitle": "正在朗讀:",
   "chatMessageWidgetSpeakText": "正在朗讀: {text}",
-  "@chatMessageWidgetSpeakText": {
-    "placeholders": {
-      "text": {
-        "type": "String"
-      }
-    }
-  },
   "chatMessageWidgetMemoryRead": "讀取記憶",
   "chatMessageWidgetMemoryUpdate": "更新記憶",
   "chatMessageWidgetMemorySearchProfile": "檢索記憶",
@@ -1065,13 +882,6 @@
   "exportDisclaimerAiGenerated": "內容由 AI 生成，請仔細甄別",
   "sideDrawerMenuSelect": "多選",
   "sideDrawerSelectionTitle": "已選 {count} 項",
-  "@sideDrawerSelectionTitle": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "sideDrawerSelectionSelectAll": "全選",
   "sideDrawerSelectionDeselectAll": "取消全選",
   "sideDrawerSelectionPin": "置頂",
@@ -1080,40 +890,9 @@
   "sideDrawerSelectionDelete": "刪除",
   "sideDrawerSelectionDeleteConfirmTitle": "刪除話題",
   "sideDrawerSelectionDeleteConfirmContent": "確定刪除 {count} 個話題？",
-  "@sideDrawerSelectionDeleteConfirmContent": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "sideDrawerDeleteSelectedSnackbar": "已刪除 {count} 個話題",
-  "@sideDrawerDeleteSelectedSnackbar": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "sideDrawerMoveSelectedSnackbar": "已移動 {count} 個話題",
-  "@sideDrawerMoveSelectedSnackbar": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "sideDrawerMoveSelectedWithSkippedSnackbar": "已移動 {moved} 個話題，跳過 {skipped} 個正在生成的話題",
-  "@sideDrawerMoveSelectedWithSkippedSnackbar": {
-    "placeholders": {
-      "moved": {
-        "type": "int"
-      },
-      "skipped": {
-        "type": "int"
-      }
-    }
-  },
   "sideDrawerMenuRename": "重新命名",
   "sideDrawerMenuPin": "置頂",
   "sideDrawerMenuUnpin": "取消置頂",
@@ -1144,13 +923,6 @@
   "sideDrawerGlobalSearchEmptyHint": "在標題與訊息中全域搜尋",
   "sideDrawerGlobalSearchNoResults": "沒有匹配的會話",
   "sideDrawerGlobalSearchResultCount": "共 {count} 筆結果",
-  "@sideDrawerGlobalSearchResultCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "sideDrawerUpdateTitle": "新版：{version}",
   "sideDrawerUpdateTitleWithBuild": "新版：{version} ({build})",
   "sideDrawerLinkCopied": "已複製下載連結",
@@ -1273,13 +1045,6 @@
   "assistantEditRecentChatsSummaryFrequencyTitle": "摘要更新頻率",
   "assistantEditRecentChatsSummaryFrequencyDescription": "累計達到所選條數的新訊息後，會更新歷史聊天摘要。",
   "assistantEditRecentChatsSummaryFrequencyOption": "每 {count} 則",
-  "@assistantEditRecentChatsSummaryFrequencyOption": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "assistantEditRecentChatsSummaryFrequencyCustomButton": "自訂",
   "assistantEditRecentChatsSummaryFrequencyCustomTitle": "自訂摘要頻率",
   "assistantEditRecentChatsSummaryFrequencyCustomDescription": "輸入累計多少則新訊息後再更新歷史聊天摘要。",
@@ -1290,16 +1055,6 @@
   "defaultModelPageTranslateModelSubtitle": "用於翻譯訊息內容的模型，推薦使用快速且準確的模型",
   "defaultModelPageOcrModelTitle": "OCR 模型",
   "backgroundTaskFailed": "{task}失敗：{error}",
-  "@backgroundTaskFailed": {
-    "placeholders": {
-      "task": {
-        "type": "String"
-      },
-      "error": {
-        "type": "String"
-      }
-    }
-  },
   "defaultModelPageOcrModelSubtitle": "用於對圖片執行文字辨識的模型",
   "defaultModelPageOcrModelRequiresImageInput": "請選擇標記為支援圖片輸入的模型用於 OCR",
   "defaultModelPagePromptLabel": "提示詞",
@@ -1425,21 +1180,7 @@
   "providerDetailPageBalanceResetDefaultsButton": "重設",
   "providerDetailPageBalanceResetDefaultsTooltip": "重設餘額設定",
   "providerDetailPageBalanceResult": "餘額：{value}",
-  "@providerDetailPageBalanceResult": {
-    "placeholders": {
-      "value": {
-        "type": "String"
-      }
-    }
-  },
   "providerDetailPageBalanceError": "餘額查詢失敗：{message}",
-  "@providerDetailPageBalanceError": {
-    "placeholders": {
-      "message": {
-        "type": "String"
-      }
-    }
-  },
   "providerDetailPageBalanceFullUrlRequired": "主 API 端點不是 OpenAI 相容格式，請填寫完整的 OpenAI 相容餘額 API 位址。",
   "providerDetailPageVertexAiTitle": "Vertex AI",
   "providerDetailPageLocationLabel": "區域 Location",
@@ -1613,64 +1354,19 @@
   "searchServiceEditorUsageQuery": "查詢用量",
   "searchServiceEditorUsageQuerying": "查詢中…",
   "searchServiceEditorUsageRemaining": "剩餘 {remaining} 額度",
-  "@searchServiceEditorUsageRemaining": {
-    "placeholders": {
-      "remaining": {
-        "type": "String"
-      }
-    }
-  },
   "searchServiceEditorUsageBalance": "餘額 {balance}",
-  "@searchServiceEditorUsageBalance": {
-    "placeholders": {
-      "balance": {
-        "type": "String"
-      }
-    }
-  },
   "searchServiceEditorUsageUsed": "已使用 {used} / {limit} 額度",
-  "@searchServiceEditorUsageUsed": {
-    "placeholders": {
-      "used": {
-        "type": "String"
-      },
-      "limit": {
-        "type": "String"
-      }
-    }
-  },
   "searchServiceEditorUsageFailed": "用量查詢失敗：{message}",
-  "@searchServiceEditorUsageFailed": {
-    "placeholders": {
-      "message": {
-        "type": "String"
-      }
-    }
-  },
   "searchServiceEditorTestTitle": "測試搜尋",
   "searchServiceEditorTestQueryHint": "輸入測試關鍵字",
   "searchServiceEditorTestRun": "執行測試搜尋",
   "searchServiceEditorTestRunning": "搜尋中…",
   "searchServiceEditorTestNoResults": "提供商未回傳任何結果。",
   "searchServiceEditorTestFailed": "搜尋失敗：{message}",
-  "@searchServiceEditorTestFailed": {
-    "placeholders": {
-      "message": {
-        "type": "String"
-      }
-    }
-  },
   "searchServiceEditorResultOpenTooltip": "開啟結果",
   "searchServiceEditorDeleteTooltip": "刪除搜尋服務",
   "searchServiceEditorDeleteTitle": "刪除搜尋服務？",
   "searchServiceEditorDeleteMessage": "確定刪除 {provider} 嗎？此操作無法復原。",
-  "@searchServiceEditorDeleteMessage": {
-    "placeholders": {
-      "provider": {
-        "type": "String"
-      }
-    }
-  },
   "searchServiceEditorDeleteConfirm": "刪除",
   "searchServiceEditorDiscardTitle": "放棄變更？",
   "searchServiceEditorDiscardMessage": "尚未儲存的搜尋服務設定將會遺失。",
@@ -1692,16 +1388,6 @@
   "aboutPageAppDescription": "JO-AIClient 是基於 Kelivo 的開源 AI 助理",
   "aboutPageVersion": "版本",
   "aboutPageVersionDetail": "{version} / {buildNumber}",
-  "@aboutPageVersionDetail": {
-    "placeholders": {
-      "version": {
-        "type": "String"
-      },
-      "buildNumber": {
-        "type": "String"
-      }
-    }
-  },
   "aboutPageSystem": "系統",
   "aboutPageLoadingPlaceholder": "...",
   "aboutPageUnknownPlaceholder": "-",
@@ -1711,13 +1397,6 @@
   "aboutPagePlatformAndroid": "Android",
   "aboutPagePlatformIos": "iOS",
   "aboutPagePlatformOther": "其他（{os}）",
-  "@aboutPagePlatformOther": {
-    "placeholders": {
-      "os": {
-        "type": "String"
-      }
-    }
-  },
   "aboutPageWebsite": "官網",
   "aboutPageGithub": "GitHub",
   "aboutPageLicense": "授權",
@@ -1725,13 +1404,6 @@
   "aboutPageCheckingForUpdates": "正在檢查更新...",
   "aboutPageAlreadyLatest": "目前已是最新版本",
   "aboutPageUpdateCheckFailed": "檢查更新失敗：{error}",
-  "@aboutPageUpdateCheckFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
   "displaySettingsPageShowUserAvatarTitle": "顯示使用者頭像",
   "displaySettingsPageShowUserAvatarSubtitle": "是否在聊天訊息中顯示使用者頭像",
   "displaySettingsPageShowUserNameTimestampTitle": "顯示使用者名稱與時間戳",
@@ -1767,11 +1439,6 @@
   "displaySettingsPageAutoRetryTitle": "自動重試",
   "displaySettingsPageAutoRetrySubtitle": "在收到任何回覆前遇到暫時網路錯誤或流量限制時自動重試",
   "chainOfThoughtExpandSteps": "展開更多 {count} 步",
-  "@chainOfThoughtExpandSteps": {
-    "placeholders": {
-      "count": {}
-    }
-  },
   "chainOfThoughtCollapse": "收起",
   "displaySettingsPageShowChatListDateTitle": "顯示對話列表日期",
   "displaySettingsPageShowChatListDateSubtitle": "在左側對話列表中顯示日期分組標籤",
@@ -2051,37 +1718,10 @@
   "imageViewerPageRotateLeftButton": "向左旋轉",
   "imageViewerPageRotateRightButton": "向右旋轉",
   "imageViewerPageCounter": "{index}/{total}",
-  "@imageViewerPageCounter": {
-    "placeholders": {
-      "index": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
-    }
-  },
   "imageViewerPageImageLabel": "第 {index} 張圖片，共 {total} 張",
-  "@imageViewerPageImageLabel": {
-    "placeholders": {
-      "index": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
-    }
-  },
   "imageViewerPageImageLoadFailed": "無法載入圖片",
   "imageViewerPageSaveSuccess": "已儲存到相簿",
   "imageViewerPageSaveFailed": "儲存失敗: {error}",
-  "@imageViewerPageSaveFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
   "settingsShare": "JO-AIClient - 開源 AI 助理",
   "searchProviderBingLocalDescription": "使用網路抓取工具取得 Bing 搜尋結果。無需 API 金鑰，但可能不夠穩定。",
   "searchProviderDuckDuckGoDescription": "基於 DDGS 的 DuckDuckGo 隱私搜尋，無需 API 金鑰，支援設定地區。",
@@ -2220,13 +1860,6 @@
   "instructionInjectionGroupLabel": "分組",
   "instructionInjectionGroupHint": "可選",
   "instructionInjectionImportSuccess": "已匯入 {count} 個指令注入",
-  "@instructionInjectionImportSuccess": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "assistantEditPageMemoryTab": "記憶",
   "assistantEditLocalToolTimeInfoTitle": "時間資訊",
   "assistantEditLocalToolTimeInfoSubtitle": "讀取裝置日期、星期、時間、時區、UTC 偏移和時間戳。",
@@ -2264,13 +1897,6 @@
   "multiKeyPageAdd": "新增",
   "multiKeyPageAddHint": "請輸入 API Key（多個以逗號或空格分隔）",
   "multiKeyPageImportedSnackbar": "已匯入 {n} 個 key",
-  "@multiKeyPageImportedSnackbar": {
-    "placeholders": {
-      "n": {
-        "type": "int"
-      }
-    }
-  },
   "multiKeyPagePleaseAddModel": "請先新增模型",
   "multiKeyPageTotal": "總數",
   "multiKeyPageNormal": "正常",
@@ -2302,13 +1928,6 @@
   "multiKeyPageDeleteErrorsConfirmTitle": "刪除所有錯誤的 Key？",
   "multiKeyPageDeleteErrorsConfirmContent": "這將移除所有狀態為錯誤的 Key。",
   "multiKeyPageDeletedErrorsSnackbar": "已刪除 {n} 個錯誤 Key",
-  "@multiKeyPageDeletedErrorsSnackbar": {
-    "placeholders": {
-      "n": {
-        "type": "int"
-      }
-    }
-  },
   "providerDetailPageProviderTypeTitle": "供應商類型",
   "displaySettingsPageChatItemDisplayTitle": "聊天項顯示",
   "displaySettingsPageRenderingSettingsTitle": "渲染設定",
@@ -2345,13 +1964,6 @@
   "networkProxyTesting": "測試中…",
   "networkProxyTestSuccess": "連線成功",
   "networkProxyTestFailed": "測試失敗：{error}",
-  "@networkProxyTestFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
   "networkProxyNoUrl": "請輸入測試地址",
   "networkProxyPriorityNote": "同時啟用全域代理與供應商代理時，將優先使用供應商代理。",
   "desktopShowProviderInModelCapsule": "模型膠囊顯示供應商",
@@ -2369,31 +1981,10 @@
   "providerDetailPageDeleteSelectedModelsButton": "刪除",
   "providerDetailPageDeleteSelectedModelsTooltip": "刪除所選模型",
   "providerDetailPageDeleteSelectedModelsConfirm": "確定刪除選中的 {count} 個模型嗎？此操作不可撤回。",
-  "@providerDetailPageDeleteSelectedModelsConfirm": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "providerDetailPageDeleteFailedDetectedModelsButton": "刪除不可用",
   "providerDetailPageDeleteFailedDetectedModelsTooltip": "刪除檢測失敗的模型",
   "providerDetailPageDeleteFailedDetectedModelsConfirm": "確定刪除檢測失敗的 {count} 個模型嗎？此操作不可撤回。",
-  "@providerDetailPageDeleteFailedDetectedModelsConfirm": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "providerDetailPageSelectedModelsDeletedSnackbar": "已刪除 {count} 個模型",
-  "@providerDetailPageSelectedModelsDeletedSnackbar": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "providerDetailPageDeleteAllModelsTooltip": "刪除全部模型",
   "providerDetailPageDeleteAllModelsWarning": "此操作不可撤回",
   "requestLogSettingTitle": "請求日誌列印",
@@ -2553,13 +2144,6 @@
   "memoryEntryScopeGlobal": "全域",
   "memoryEntryScopeAssistant": "僅本助手",
   "memoryEntryScopeAssistantNamed": "{name}",
-  "@memoryEntryScopeAssistantNamed": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
   "memoryEntrySourceManual": "手動",
   "memoryEntrySourceTool": "工具",
   "memoryEntrySourceExtracted": "擷取",
@@ -2567,13 +2151,6 @@
   "memoryEntryStatusActive": "作用中",
   "memoryEntryStatusArchived": "已封存",
   "memoryEntryUpdatedAt": "更新於 {date}",
-  "@memoryEntryUpdatedAt": {
-    "placeholders": {
-      "date": {
-        "type": "String"
-      }
-    }
-  },
   "memoryEntryActionEdit": "編輯",
   "memoryEntryActionDelete": "刪除",
   "memoryEntryActionArchive": "封存",
@@ -2584,13 +2161,6 @@
   "memoryEntryDeleteConfirmTitle": "刪除這條記憶？",
   "memoryEntryDeleteConfirmContent": "將永久刪除該記憶，且無法復原。",
   "memoryEntryBatchDeleteConfirmTitle": "刪除 {count} 條記憶？",
-  "@memoryEntryBatchDeleteConfirmTitle": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "memoryEntryBatchDeleteConfirmContent": "所選記憶將被永久刪除。",
   "memoryEntrySwitchScopeConfirmTitle": "更改記憶範圍？",
   "memoryEntrySwitchScopeToGlobal": "將這條記憶設為全域（所有助手可見）？",
@@ -2613,85 +2183,22 @@
   "memorySearchHint": "搜尋記憶",
   "memorySearchEmpty": "沒有相符的記憶",
   "memoryOrphanBanner": "有 {count} 條孤兒助手記憶（助手已刪除）",
-  "@memoryOrphanBanner": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "memoryOrphanCleanupButton": "清理",
   "memoryOrphanConfirmTitle": "清理孤兒記憶？",
   "memoryOrphanConfirmContent": "將永久刪除 {count} 條所屬助手已不存在的記憶。",
-  "@memoryOrphanConfirmContent": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "memoryOrganizeButton": "整理記憶",
   "memoryOrganizeNeedsConversation": "需要在與該助手的對話中使用",
   "memoryOrganizeNeedsModel": "請先在 設定 → 記憶 中選擇記憶處理模型",
   "memoryOrganizeStatusNever": "尚未整理",
   "memoryOrganizeStatusLast": "上次整理：{when}",
-  "@memoryOrganizeStatusLast": {
-    "placeholders": {
-      "when": {
-        "type": "String"
-      }
-    }
-  },
   "memoryOrganizeStatusExtracted": "擷取 {count} 條",
-  "@memoryOrganizeStatusExtracted": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "memoryOrganizeStatusSkipped": "無需記憶",
   "memoryOrganizeStatusSkippedReason": "已略過：{reason}",
-  "@memoryOrganizeStatusSkippedReason": {
-    "placeholders": {
-      "reason": {
-        "type": "String"
-      }
-    }
-  },
   "memoryOrganizeStatusFailed": "失敗：{reason}",
-  "@memoryOrganizeStatusFailed": {
-    "placeholders": {
-      "reason": {
-        "type": "String"
-      }
-    }
-  },
   "memoryOrganizeJustNow": "剛剛",
   "memoryOrganizeMinutesAgo": "{n} 分鐘前",
-  "@memoryOrganizeMinutesAgo": {
-    "placeholders": {
-      "n": {
-        "type": "int"
-      }
-    }
-  },
   "memoryOrganizeHoursAgo": "{n} 小時前",
-  "@memoryOrganizeHoursAgo": {
-    "placeholders": {
-      "n": {
-        "type": "int"
-      }
-    }
-  },
   "memoryOrganizeDaysAgo": "{n} 天前",
-  "@memoryOrganizeDaysAgo": {
-    "placeholders": {
-      "n": {
-        "type": "int"
-      }
-    }
-  },
   "memoryModelMissingNotice": "需要先在 設定 → 記憶 中選擇記憶處理模型。",
   "memoryModelMissingGoSelect": "去選擇",
   "memoryEntriesPageTitle": "全部記憶",
@@ -2745,24 +2252,10 @@
   "legacyMemoryExport": "匯出",
   "legacyMemoryExportTitle": "JO-AIClient 舊版記憶匯出",
   "legacyMemoryAssistantHeader": "助手：{name}",
-  "@legacyMemoryAssistantHeader": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
   "legacyMemorySearchHint": "搜尋舊版記憶",
   "legacyMemoryMigrate": "遷移",
   "legacyMemoryMigrationTitle": "遷移舊版記憶",
   "legacyMemoryMigrationSubtitle": "使用模型整理並分類 {count} 條舊版記憶，原資料不會改變。",
-  "@legacyMemoryMigrationSubtitle": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "legacyMemoryMigrationModel": "遷移模型",
   "legacyMemoryMigrationChooseModel": "選擇模型",
   "legacyMemoryMigrationTarget": "儲存到",
@@ -2776,55 +2269,15 @@
   "legacyMemoryMigrationAnalyzing": "正在使用模型分析",
   "legacyMemoryMigrationWriting": "正在寫入記憶",
   "legacyMemoryMigrationProgress": "{current} / {total}",
-  "@legacyMemoryMigrationProgress": {
-    "placeholders": {
-      "current": {
-        "type": "int"
-      },
-      "total": {
-        "type": "int"
-      }
-    }
-  },
   "legacyMemoryMigrationComplete": "遷移完成",
   "legacyMemoryMigrationResult": "已遷移 {created} 條 · 略過已有 {skipped} 條",
-  "@legacyMemoryMigrationResult": {
-    "placeholders": {
-      "created": {
-        "type": "int"
-      },
-      "skipped": {
-        "type": "int"
-      }
-    }
-  },
   "legacyMemoryMigrationFailed": "遷移已停止。可以重試，已儲存的記憶會自動略過。",
   "legacyMemoryMigrationContinue": "繼續遷移",
   "legacyMemoryMigrationErrorAuth": "鑑權失敗，請檢查 API 金鑰。",
   "legacyMemoryMigrationErrorFormat": "模型回傳格式不正確。",
   "legacyMemoryMigrationErrorNetwork": "網路異常，請檢查連線後重試。",
   "legacyMemoryMigrationErrorOther": "遷移失敗：{message}",
-  "@legacyMemoryMigrationErrorOther": {
-    "placeholders": {
-      "message": {
-        "type": "String"
-      }
-    }
-  },
   "legacyMemoryMigrationPartial": "已遷移 {created} · 略過 {skipped} · 失敗 {failed}",
-  "@legacyMemoryMigrationPartial": {
-    "placeholders": {
-      "created": {
-        "type": "int"
-      },
-      "skipped": {
-        "type": "int"
-      },
-      "failed": {
-        "type": "int"
-      }
-    }
-  },
   "legacyMemoryMigrationRetry": "重試",
   "legacyMemoryMigrationClose": "完成",
   "legacyMemoryModeTitle": "使用舊版記憶",
@@ -2860,13 +2313,6 @@
   "assistantEditOrganizeFrequencyTitle": "整理頻率",
   "assistantEditOrganizeFrequencySubtitle": "每累積 N 輪助手回覆觸發一次自動整理",
   "assistantEditOrganizeFrequencyOption": "每 {n} 輪",
-  "@assistantEditOrganizeFrequencyOption": {
-    "placeholders": {
-      "n": {
-        "type": "int"
-      }
-    }
-  },
   "assistantEditOrganizeFrequencyCustomButton": "自訂",
   "assistantEditOrganizeFrequencyCustomTitle": "自訂整理頻率",
   "assistantEditOrganizeFrequencyCustomDescription": "請輸入 1 到 20 之間的整數。",
@@ -2882,16 +2328,6 @@
   "worldBookDelayHint": "對話至少有 N 則訊息時才允許觸發。按單則訊息計數，不是對話輪數。0 表示關閉。",
   "worldBookDragToReorder": "拖曳調整順序",
   "worldBookEnabledCount": "已啟用 {enabled}/{total}",
-  "@worldBookEnabledCount": {
-      "placeholders": {
-          "enabled": {
-              "type": "int"
-          },
-          "total": {
-              "type": "int"
-          }
-      }
-  },
   "conversationPromptScope": "僅目前對話",
   "conversationSystemPromptTitle": "對話系統提示詞",
   "conversationSystemPromptHint": "僅對目前對話生效，留空時使用助理的系統提示詞。",
@@ -2978,33 +2414,12 @@
   "worldBookConfig": "設定",
   "worldBookDeleteTitle": "刪除世界書",
   "worldBookDeleteMessage": "確定刪除「{name}」？此操作無法復原。",
-  "@worldBookDeleteMessage": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
   "worldBookCancel": "取消",
   "worldBookDelete": "刪除",
   "worldBookExportFailed": "匯出失敗：{error}",
-  "@worldBookExportFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
   "worldBookNoEntriesHint": "暫無條目",
   "worldBookUnnamedEntry": "未命名條目",
   "worldBookKeywordsLine": "關鍵詞：{keywords}",
-  "@worldBookKeywordsLine": {
-    "placeholders": {
-      "keywords": {
-        "type": "String"
-      }
-    }
-  },
   "worldBookEditEntry": "編輯條目",
   "worldBookDeleteEntry": "刪除條目",
   "worldBookNameLabel": "名稱",
@@ -3069,65 +2484,13 @@
   "debugPageCreatingLongReasoningConversation": "正在建立長思考鏈調試對話...",
   "debugPageNoCurrentAssistant": "目前沒有助手。請先建立或選擇一個助手。",
   "debugPageConversationCreated": "已建立包含 {count} 條訊息的調試對話。",
-  "@debugPageConversationCreated": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "debugPageCreateConversationFailed": "建立調試對話失敗：{error}",
-  "@debugPageCreateConversationFailed": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
   "debugPageOversizedConversationTitle": "超大對話測試（{sizeMB} MiB）",
-  "@debugPageOversizedConversationTitle": {
-    "placeholders": {
-      "sizeMB": {
-        "type": "int"
-      }
-    }
-  },
   "debugPageManyMessagesConversationTitle": "{count} 條訊息測試",
-  "@debugPageManyMessagesConversationTitle": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "debugPageDailyMixedMarkdownConversationTitle": "{count} 條日常混合 Markdown 訊息測試",
-  "@debugPageDailyMixedMarkdownConversationTitle": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "debugPageLongReasoningConversationTitle": "{count} 條長思考鏈測試",
-  "@debugPageLongReasoningConversationTitle": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "debugPageOversizedConversationSeedText": "這是一段用於復現超大對話渲染卡頓的長調試文字。它包含重複的 Markdown 風格文字、標點、中文內容和普通詞語，方便測試聊天渲染、儲存和捲動效能。",
   "debugPageManyMessagesSeedText": "{role} 訊息 #{index}：快速隨機調試樣例，用於測試列表渲染、捲動穩定性、訊息分組和會話歷史效能。",
-  "@debugPageManyMessagesSeedText": {
-    "placeholders": {
-      "role": {
-        "type": "String"
-      },
-      "index": {
-        "type": "int"
-      }
-    }
-  },
   "migrationIntroTitle": "升級聊天記錄儲存",
   "migrationIntroSubtitle": "JO-AIClient 將聊天記錄遷移到更快的 SQLite 資料庫。升級會在應用程式開啟前完成，避免新舊資料同時寫入。",
   "migrationBackupNote": "遷移開始前，會先匯出包含設定、聊天記錄和本地檔案的 ZIP 備份。",
@@ -3141,21 +2504,7 @@
   "migrationMigratingTitle": "正在遷移到 SQLite",
   "migrationMigratingSubtitle": "正在分批寫入對話和訊息，避免超大聊天記錄占滿記憶體。請保持 JO-AIClient 在前台，等待遷移完成。",
   "migrationBackingUpDetail": "正在備份 {fileName}",
-  "@migrationBackingUpDetail": {
-    "placeholders": {
-      "fileName": {
-        "type": "String"
-      }
-    }
-  },
   "migrationMigratingDetail": "已遷移 {count} 條訊息",
-  "@migrationMigratingDetail": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "migrationMigratingPrepareDetail": "正在準備 SQLite 資料庫",
   "migrationMigratingToolEventsDetail": "正在遷移工具呼叫記錄",
   "migrationMigratingValidateDetail": "正在校驗遷移資料",
@@ -3190,13 +2539,6 @@
   "migrationSkipDialogConfirm": "跳過並全新開始",
   "timelineJumpToLatest": "跳到最新",
   "largeContentShowMore": "再顯示 {count} 項",
-  "@largeContentShowMore": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "largeContentCollapse": "收起",
   "imageSettingsPageTitle": "圖片處理",
   "imageSettingsPageEditSectionTitle": "編輯",
@@ -3285,43 +2627,9 @@
   "memoryTraceAfter": "變更後",
   "memoryTraceEmptyValue": "（空）",
   "memoryTraceStepsCount": "{count} 個步驟",
-  "@memoryTraceStepsCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "memoryTraceMutationsCount": "{count} 項變更",
-  "@memoryTraceMutationsCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "memoryTraceRepeatCount": "重複 {count} 次",
-  "@memoryTraceRepeatCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "memoryTraceWindowValue": "{size} 則訊息 · #{start}–#{end}",
-  "@memoryTraceWindowValue": {
-    "placeholders": {
-      "size": {
-        "type": "int"
-      },
-      "start": {
-        "type": "int"
-      },
-      "end": {
-        "type": "int"
-      }
-    }
-  },
   "memoryTraceShowMore": "展開全文",
   "memoryTraceShowLess": "收合",
   "sqliteMigrationTitle": "準備儲存遷移",
@@ -3507,60 +2815,18 @@
   "backupLedgerEmptyDescription": "匯出時選擇「帶」，本機設定就會隨備份記錄在這裡。",
   "backupLedgerThisDevice": "（本機）",
   "backupLedgerDeviceCount": "共 {count} 台裝置",
-  "@backupLedgerDeviceCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "backupLedgerDelete": "刪除",
   "backupLedgerDeleteConfirm": "刪除後，這台裝置的本機設定將不再隨下次備份攜帶。已匯出的備份包不受影響。",
   "backupLedgerClear": "清空全部記錄",
   "backupLedgerClearConfirm": "將刪除全部 {count} 台裝置的記錄，此操作不可撤銷。已匯出的備份包不受影響。",
-  "@backupLedgerClearConfirm": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "backupLedgerItemCount": "{count} 項設定",
-  "@backupLedgerItemCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "backupLedgerLoadMore": "載入更多",
   "backupLedgerSettingsDescription": "視窗大小與位置、桌面快捷鍵、聊天字號、日誌開關屬於本機設定，只跟裝置走，不影響聊天資料。",
   "backupLocalSettingsUnrecognized": "未能識別本機裝置，本次未包含本機目前設定",
   "backupLedgerAbsorbedNotice": "已併入 {count} 台裝置的設定記錄",
-  "@backupLedgerAbsorbedNotice": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "backupLocalSettingsAppliedNotice": "本次已把備份裡的 {count} 項本機設定套用到這台裝置",
-  "@backupLocalSettingsAppliedNotice": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "backupPageMergeCompleted": "合併完成",
   "backupPageMergeCompletedWithSkipped": "備份中有 {count} 個工作階段因訊息順序異常被略過，未併入本機。",
-  "@backupPageMergeCompletedWithSkipped": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "assistantEditGradientBackgroundTitle": "漸層背景",
   "assistantEditGradientStaticTitle": "靜態模式",
   "assistantEditGradientStaticDescription": "更省電，適合長對話和持續輸出。",
@@ -3569,16 +2835,6 @@
   "assistantEditGradientPreview": "預覽",
   "assistantEditGradientNextFrame": "換一幀",
   "backupProgressBytes": "{done} / {total}",
-  "@backupProgressBytes": {
-    "placeholders": {
-      "done": {
-        "type": "String"
-      },
-      "total": {
-        "type": "String"
-      }
-    }
-  },
   "backupProgressCancel": "取消",
   "backupProgressCancelled": "已取消",
   "backupProgressCommitting": "正在提交",
@@ -3588,16 +2844,6 @@
   "backupProgressImportingMessages": "正在匯入訊息",
   "backupProgressImportingSessions": "正在匯入對話",
   "backupProgressItems": "{done} / {total}",
-  "@backupProgressItems": {
-    "placeholders": {
-      "done": {
-        "type": "String"
-      },
-      "total": {
-        "type": "String"
-      }
-    }
-  },
   "backupProgressListingRemote": "正在列出遠端備份",
   "backupProgressMaterializingFiles": "正在寫入檔案",
   "backupProgressPacking": "正在打包",
@@ -3721,27 +2967,10 @@
   "startupDatabaseUpdateRequiredDowngradeIntro": "目前版本無法開啟本機這份資料庫。若你必須留在舊版，請依下列步驟處理；在備份完成之前，不要刪除或覆蓋這裡的資料。",
   "startupDatabaseUpdateRequiredDowngradeStep1": "先安裝並開啟最新版 JO-AIClient，在「設定 → 資料備份」匯出一份備份檔。",
   "startupDatabaseUpdateRequiredDowngradeStep2": "打開 {url}，把備份轉換成你打算使用的舊版格式。",
-  "@startupDatabaseUpdateRequiredDowngradeStep2": {
-    "placeholders": {
-      "url": {
-        "type": "String"
-      }
-    }
-  },
   "startupDatabaseUpdateRequiredDowngradeStep3": "確認本機資料已經另外備份好之後，再安裝舊版，並匯入轉換後的備份。",
   "startupDatabaseUpdateRequiredOpenTool": "打開轉換工具",
   "backupPageForwardCompatTitle": "備份來自更新的版本",
   "backupPageForwardCompatBody": "這份備份由更新版本的 JO-AIClient 建立（資料格式 {backupVersion}，目前版本支援 {currentVersion}），且未聲明舊版本能否讀取。\n\n你可以繼續匯入：目前版本不認識的內容會被略過，備份檔案本身不會被修改。但如果新版本改變了既有資料的儲存方式，部分內容可能會被錯誤匯入。\n\n更穩妥的做法是先升級 JO-AIClient。",
-  "@backupPageForwardCompatBody": {
-    "placeholders": {
-      "backupVersion": {
-        "type": "int"
-      },
-      "currentVersion": {
-        "type": "int"
-      }
-    }
-  },
   "backupPageForwardCompatContinue": "仍然匯入",
   "backupPageForwardCompatCancel": "取消",
   "backupPageSchemaTooNewMessage": "這份備份由更新版本的 JO-AIClient 建立，目前版本無法讀取。請先升級 JO-AIClient 後重試。",
@@ -3760,7 +2989,6 @@
   "modelDetailSheetOpenrouterShellTool": "Shell",
   "modelDetailSheetOpenrouterShellToolDescription": "在託管的隔離沙箱中執行 Shell 命令",
   "modelSelectSheetFollowAssistant": "跟隨助手",
-  "aboutPageQQGroupThree": "Kelivo 三群",
   "displaySettingsPageForkKeepMessageVersionsTitle": "建立分支時保留訊息版本",
   "displaySettingsPageEditAssistantKeepThinkingToolCardsTitle": "編輯助手時保留思考與工具卡片",
   "displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle": "關閉後，目前編輯版本只保留助手正文；切回上一版本仍可查看思考與工具卡片",
@@ -3770,27 +2998,7 @@
   "themeAdvancedSettingsPageUseLayeredSheetTilesTitle": "彈窗內瓦片分層",
   "themeAdvancedSettingsPageUseLayeredSheetTilesSubtitle": "預設瓦片與彈窗同色",
   "searchServiceNameKelivo": "Kelivo",
-  "@autoRetryCountdown": {
-    "placeholders": {
-      "seconds": {
-        "type": "int"
-      },
-      "attempt": {
-        "type": "int"
-      },
-      "maxRetries": {
-        "type": "int"
-      }
-    }
-  },
   "memorySettingsInjectionMaxItemsOption": "{n}",
-  "@memorySettingsInjectionMaxItemsOption": {
-    "placeholders": {
-      "n": {
-        "type": "int"
-      }
-    }
-  },
   "assistantEditMemorySwitchSubtitle": "把已儲存的記憶注入對話，並允許此助手寫入新記憶",
   "assistantEditWriteScopeAlwaysGlobalSubtitle": "新記憶對所有助手可見",
   "assistantEditWriteScopeAlwaysAssistantSubtitle": "新記憶只對本助手可見",
@@ -3972,13 +3180,6 @@
   "workspaceEnvRestartBanner": "請重新啟動 JO-AIClient 以完成安裝",
   "workspaceEnvDetectingMirrors": "正在偵測最快鏡像…",
   "workspaceEnvApplyingMirror": "正在套用 {category} 鏡像…",
-  "@workspaceEnvApplyingMirror": {
-    "placeholders": {
-      "category": {
-        "type": "String"
-      }
-    }
-  },
   "workspaceEnvMirrorsSection": "鏡像",
   "workspaceEnvUseMirror": "使用鏡像",
   "workspaceEnvDetect": "測速",
@@ -4114,13 +3315,6 @@
   "terminalCopiedAll": "已複製全部輸出",
   "terminalConfirm": "確認",
   "terminalExitCode": "exit {code}",
-  "@terminalExitCode": {
-    "placeholders": {
-      "code": {
-        "type": "int"
-      }
-    }
-  },
   "workspaceMgmtNewWorkspace": "新增工作區",
   "workspaceMgmtEmptyHint": "新增一個工作區來存放專案檔案和工作目錄。",
   "workspaceMgmtKindManagedTitle": "託管工作區",
@@ -4139,57 +3333,12 @@
   "workspaceMgmtImportProgressPhase": "正在複製檔案…",
   "workspaceMgmtImportFailed": "無法匯入該資料夾。",
   "workspaceMgmtImportDone": "已匯入 {name}",
-  "@workspaceMgmtImportDone": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
   "workspaceMgmtLastUsedJustNow": "剛剛",
   "workspaceMgmtLastUsedMinutesAgo": "{n} 分鐘前",
-  "@workspaceMgmtLastUsedMinutesAgo": {
-    "placeholders": {
-      "n": {
-        "type": "int"
-      }
-    }
-  },
   "workspaceMgmtLastUsedHoursAgo": "{n} 小時前",
-  "@workspaceMgmtLastUsedHoursAgo": {
-    "placeholders": {
-      "n": {
-        "type": "int"
-      }
-    }
-  },
   "workspaceMgmtLastUsedDaysAgo": "{n} 天前",
-  "@workspaceMgmtLastUsedDaysAgo": {
-    "placeholders": {
-      "n": {
-        "type": "int"
-      }
-    }
-  },
   "workspaceMgmtRowDetail": "{kind} · 上次使用 {when}",
-  "@workspaceMgmtRowDetail": {
-    "placeholders": {
-      "kind": {
-        "type": "String"
-      },
-      "when": {
-        "type": "String"
-      }
-    }
-  },
   "workspaceMgmtRowDetailNever": "{kind} · 從未使用",
-  "@workspaceMgmtRowDetailNever": {
-    "placeholders": {
-      "kind": {
-        "type": "String"
-      }
-    }
-  },
   "workspacePreviewBack": "返回",
   "workspacePreviewWrap": "自動換行",
   "workspacePreviewFontDecrease": "縮小字級",
@@ -4213,13 +3362,6 @@
   "workspaceFilesEmptyOutputs": "助手還沒有產出檔案",
   "workspaceFilesMoveTo": "移動到…",
   "workspaceFilesItemCount": "{count} 項",
-  "@workspaceFilesItemCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "skillsImportTooltip": "匯入技能",
   "skillsImportPasteSubtitle": "貼上帶 frontmatter 的 SKILL.md",
   "skillsImportFileSubtitle": "選擇 .md 或 .zip 檔案",
@@ -4237,47 +3379,12 @@
   "skillsSessionEmpty": "還沒有已啟用的技能，請先在技能庫中啟用",
   "workspaceToolRunning": "執行中",
   "workspaceToolExitCode": "exit {code}",
-  "@workspaceToolExitCode": {
-    "placeholders": {
-      "code": {
-        "type": "int"
-      }
-    }
-  },
   "workspaceToolAwaitingApproval": "等待核准",
   "workspaceToolCompleted": "完成",
   "workspaceToolLines": "{count} 行",
-  "@workspaceToolLines": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "workspaceToolItems": "{count} 項",
-  "@workspaceToolItems": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "workspaceToolFileMatches": "{count} 個符合",
-  "@workspaceToolFileMatches": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "workspaceToolContentMatches": "{count} 處符合",
-  "@workspaceToolContentMatches": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "workspaceToolExpand": "展開",
   "workspaceToolSectionCommand": "命令",
   "workspaceToolSectionPath": "路徑",
@@ -4610,13 +3717,6 @@
   "startupRecoverySnapshotEmpty": "未在本機找到資料庫快照。請先匯出資料，再嘗試其他還原操作。",
   "startupRecoverySnapshotConfirm": "將聊天和設定還原到 {when} 的快照？快照之後的變更不會包含在內。現有附件檔案和快照會保留，JO-AIClient 將重新啟動以完成還原。",
   "startupRecoverySnapshotReady": "快照已準備好，請重新啟動 JO-AIClient 完成還原。",
-  "@startupRecoverySnapshotConfirm": {
-    "placeholders": {
-      "when": {
-        "type": "String"
-      }
-    }
-  },
   "scheduledTasksTitle": "定時任務",
   "scheduledTasksDescription": "在指定時間自動執行任務，支援新增聊天、繼續追問或重新執行。",
   "scheduledTasksEmpty": "把任務交給時間",
@@ -4706,5 +3806,2124 @@
   "mcpServerEditSheetStdioEnvNameHint": "ENV_NAME",
   "mcpServerEditSheetStdioEnvValueHint": "值",
   "mcpServerEditSheetSseUrlHint": "http://localhost:3000/sse",
-  "mcpServerEditSheetHttpUrlHint": "http://localhost:3000"
+  "mcpServerEditSheetHttpUrlHint": "http://localhost:3000",
+  "chatMessageWidgetRegenerateConfirmDeleteTrailingContent": "重新生成將會刪除此訊息下面的所有訊息，且無法復原。確定要繼續嗎？",
+  "aboutPageEasterEggMessage": "\n（好吧現在還沒彩蛋）",
+  "aboutPageEasterEggButton": "好的",
+  "aboutPageKelivoSearchUnlocked": "有扇沒有名字的門開了一條縫。去設定裡找找看。",
+  "aboutPageKelivoSearchAlreadyUnlocked": "這扇門你已經推開過了。",
+  "displaySettingsPageRegenerateDeleteTrailingMessagesTitle": "重新生成時刪除下面的訊息",
+  "searchServiceNameKimi": "Kimi",
+  "searchProviderKimiDescription": "Kimi 搜尋 API。Pro 傳回相關網頁正文片段，Basic 傳回標題、連結和摘要。",
+  "workspaceEntryDefaultWorkspaceUnset": "未設定",
+  "workspaceEntryDefaultWorkspaceAutomaticSubtitle": "首次為對話綁定工作區時，將記為此助手的預設工作區。",
+  "workspaceBindingRememberedDefault": "已記為「{assistant}」的預設工作區，新對話將自動使用。",
+  "workspaceBindingSuggestDefault": "以後與「{assistant}」的新對話也使用這個工作區？",
+  "workspaceBindingUndoDefault": "復原",
+  "workspaceBindingUseAsDefault": "設為預設",
+  "scheduledTasksPreparation": "執行與通知",
+  "scheduledTasksAllowPreparation": "允許提前準備",
+  "scheduledTasksPreparationDetail": "提前準備適合不依賴即時資訊的文字任務，不會使用工具、附件或執行外部操作。",
+  "scheduledTasksIOSDetail": "受 iOS 背景限制，Kelivo 不能在指定時間自動喚醒並執行模型。此功能會在 App 可執行時提前準備內容，由系統到點顯示通知。每次僅準備下一次結果；離開 App 後不保證準備完成，後續任務需再次開啟 Kelivo 才能補充。",
+  "scheduledTasksContextPolicy": "對話上下文",
+  "scheduledTasksContextLatest": "跟隨最新對話",
+  "scheduledTasksContextSnapshot": "使用準備時的快照",
+  "scheduledTasksUnavailable": "無法執行時",
+  "scheduledTasksRemind": "僅傳送提醒",
+  "scheduledTasksSkip": "略過本次",
+  "scheduledTasksNotify": "結果通知",
+  "scheduledTasksShowPreview": "通知顯示結果全文",
+  "scheduledTasksPreparationWindow": "最多提前",
+  "scheduledTasksPreparationAttempts": "每次執行最多準備次數",
+  "scheduledTasksPreparationCooldown": "準備最小間隔（分鐘）",
+  "scheduledTasksPreparationBudget": "所有任務合計最多同時準備一個，每小時最多嘗試六次，取消的請求也計入次數。",
+  "scheduledTasksPreparing": "正在準備結果",
+  "scheduledTasksPrepared": "結果已準備",
+  "scheduledTasksPendingPreparation": "本次尚未準備",
+  "scheduledTasksNotificationRegistered": "通知已登記",
+  "scheduledTasksNotificationUnavailable": "通知未登記",
+  "scheduledTasksReminded": "已到期 · 僅提醒",
+  "scheduledTasksSkipped": "已略過",
+  "scheduledTasksCancelled": "已取消",
+  "scheduledTasksReminderBody": "定時任務已到期，開啟 Kelivo 繼續。",
+  "scheduledTasksResultBody": "定時任務結果已準備好。",
+  "scheduledTasksNotificationPermission": "允許任務通知",
+  "scheduledTasksPreparationCost": "提前準備會呼叫模型，可能產生額外費用。選擇「跟隨最新對話」時，新訊息可能使已準備內容失效。即使結果未使用或請求被取消，仍可能計費；重新準備會再次呼叫模型。",
+  "scheduledTasksAllowPreparationTip": "在 Kelivo 可執行時，提前產生下一次任務的結果，到期前不會顯示在聊天中。僅使用文字，不使用工具、附件或自訂請求內容；呼叫模型可能產生費用。",
+  "scheduledTasksContextPolicyTip": "跟隨最新對話：傳送新訊息、編輯訊息或切換訊息版本後，已準備內容會失效；重新準備會占用次數，並可能增加費用。\n\n使用準備時的快照：對話變化後仍保留已準備結果，內容不會包含後續聊天。",
+  "scheduledTasksPreparationWindowTip": "允許在任務到期前多久開始準備，最長 24 小時。例如第二天早上提醒，前一天中午開啟 Kelivo 時就有機會準備。時間越長，準備機會越多，但內容也可能更早過時。不會改變任務時間，也不代表能在背景定時執行。",
+  "scheduledTasksPreparationAttemptsTip": "同一次任務允許嘗試準備的總次數，包含首次、失敗和取消的請求。次數越多，重試機會越多，也可能多花錢。這是次數限制，不是費用上限。",
+  "scheduledTasksPreparationCooldownTip": "同一次任務兩次開始準備之間，至少間隔多少分鐘。間隔越長，重複請求越少。重試仍需 App 有執行機會，不是在背景設定一個計時器。",
+  "scheduledTasksUnavailableTip": "到期時沒有可用結果、也無法執行任務，就傳送提醒或略過本次。提醒不包含模型產生的回答，且需要開啟通知。如果到期時 Kelivo 正在開啟執行，可直接執行任務。",
+  "scheduledTasksNotifyTip": "允許傳送結果通知和無法執行時的提醒。關閉後仍會執行任務、呼叫模型，提前準備也仍可能產生費用。還需要允許系統通知權限。",
+  "scheduledTasksShowPreviewTip": "在通知中顯示已產生的結果，系統設定允許時也會顯示在鎖定畫面上。關閉後只顯示一般提示，完整結果仍可在聊天中查看；同時遵循全域通知隱私設定。",
+  "scheduledTasksHours": "{count} 小時",
+  "scheduledTasksMinutes": "{count} 分鐘",
+  "searchServiceNameKagi": "Kagi",
+  "searchProviderKagiDescription": "Kagi 搜尋 API，提供 Kagi 的高級網頁搜尋結果。",
+  "scheduledTasksPreparationOff": "未開啟準備",
+  "scheduledTasksPreparationQueued": "排隊中",
+  "scheduledTasksPreparationQueuedDetail": "正在準備其他任務，隨後按到期時間依次準備。",
+  "scheduledTasksPreparationIdle": "等待空閒",
+  "scheduledTasksPreparationIdleDetail": "等待目前回覆完成或此任務的對話狀態穩定後繼續。",
+  "scheduledTasksPreparationWindowWaiting": "未到準備時間",
+  "scheduledTasksPreparationCooldownWaiting": "等待重試",
+  "scheduledTasksPreparationRetryAt": "下次可嘗試：{time}",
+  "scheduledTasksPreparationLimitReached": "自動準備次數已用完",
+  "scheduledTasksPreparationAttemptsUsed": "本次已嘗試 {count} 次，自動準備上限為 {limit} 次。可使用「立刻準備」繼續。",
+  "scheduledTasksPreparationHourlyLimit": "自動準備已達小時上限",
+  "scheduledTasksPreparationHourlyLimitDetail": "已達到每小時準備次數上限，自動準備將在額度恢復後繼續；仍可使用「立刻準備」。",
+  "scheduledTasksPreparationUnavailable": "暫時無法準備",
+  "scheduledTasksPreparationReadFailed": "暫時無法讀取任務資訊，稍後會重新檢查；具體原因見執行記錄。",
+  "scheduledTasksPreparationResultRetained": "暫時無法校驗上下文，已保留準備結果，稍後會重新檢查。",
+  "scheduledTasksPreparationContextChanged": "對話內容或設定已變更，原準備結果已作廢。",
+  "scheduledTasksPreparationPublishing": "待寫入對話",
+  "scheduledTasksPreparationPublishingDetail": "等待目前回覆結束後，將已儲存的結果寫入對話。",
+  "scheduledTasksPreparationPrompt": "準備提示詞",
+  "scheduledTasksPreparationPromptTip": "僅在提前準備本任務時附加的系統提示詞，與任務內容分開。可以自訂語氣和要求，也可以留空，不附加準備提示詞。無論如何設定，提前準備都不能使用工具或取得即時資訊。到期前修改會使已準備的結果失效，再次準備可能產生額外模型費用。",
+  "scheduledTasksPreparationPromptEmpty": "留空則不附加準備提示詞",
+  "scheduledTasksPreparationPromptVariables": "可用佔位符：{timeVariable} 為計劃傳送的本地時間，{offsetVariable} 為該時間的 UTC 偏移。準備時會自動替換。",
+  "scheduledTasksPrepareNow": "立刻準備",
+  "scheduledTasksPrepareNowDetail": "立刻準備下一次內容，到原定時間再傳送。不受自動準備的等待時間和次數上限限制，會呼叫模型並可能產生費用；已有準備結果時直接重用。",
+  "scheduledTasksPrepareNowReady": "本次結果已經準備好，無需再次呼叫模型。",
+  "scheduledTasksPrepareNowStarted": "正在準備下一次內容，將在計劃時間發佈。",
+  "scheduledTasksPrepareNowBusy": "正在準備其他任務，請等待完成後再試。",
+  "scheduledTasksPrepareNowChatBusy": "請等待目前回覆結束後，再嘗試準備。",
+  "scheduledTasksPrepareNowDisabled": "請先啟用任務和「允許提前準備」。重新生成模式不支援提前準備。",
+  "scheduledTasksPrepareNowUnavailable": "暫時無法開始準備，請稍後再試。",
+  "scheduledTasksPrepareNowNoUpcoming": "沒有可提前準備的下一次任務，請檢查任務時間和啟用狀態。",
+  "phoneControlTitle": "手機控制",
+  "phoneControlSubtitle": "透過無障礙讀取畫面並執行操作",
+  "phoneControlAccessibilityService": "無障礙服務",
+  "phoneControlOpenSettings": "前往無障礙設定",
+  "phoneControlRefresh": "重新整理狀態",
+  "phoneControlChecking": "正在檢查服務狀態…",
+  "phoneControlReady": "已啟用並連線",
+  "phoneControlDisabled": "未啟用",
+  "phoneControlDisconnected": "已啟用，但尚未連線。請在系統設定中關閉再開啟服務，然後重新整理狀態。",
+  "phoneControlStatusUnavailable": "無法讀取服務狀態，請重新整理後重試。",
+  "phoneControlSettingsUnavailable": "無法開啟設定，請手動進入 Android 系統設定 → 無障礙。",
+  "phoneControlUsageTitle": "使用說明",
+  "phoneControlDisclosure": "在對話中發起手機控制任務後，助手可以讀取目前畫面、點擊、輸入、滑動、導覽和開啟應用程式。畫面內容會傳送給目前對話設定的模型服務商，並儲存在對話的工具結果中。密碼欄位會隱藏，服務不會持續記錄畫面內容。你可以隨時關閉助手的此項工具，或在系統設定中停用服務。",
+  "phoneControlAssistantTitle": "還需開啟助手工具",
+  "phoneControlAssistantHint": "需要同時完成兩項設定：在系統無障礙設定中啟用「JO-AIClient 手機控制」，並在要使用的助手 → 本地工具中開啟「手機控制」（也可從對話工具選單開啟）。每個助手單獨設定，執行任務時請保持手機解鎖。",
+  "phoneControlRestrictedTitle": "無法開啟無障礙？",
+  "phoneControlRestrictedHint": "部分下載的 APK 需要先在應用程式資訊右上角選單中選擇「允許受限制的設定」。點擊開啟 JO-AIClient 應用程式資訊，完成後再返回無障礙設定。",
+  "phoneControlEnableAssistant": "允許此助手使用手機控制",
+  "@settingsSearchResultCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@chatImageCropFailed": {
+    "placeholders": {
+      "fileName": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@storageSpaceClearableLabel": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "@storageSpaceClearableHint": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "@storageSpaceClearConfirmMessage": {
+    "placeholders": {
+      "targetName": {
+        "type": "String"
+      }
+    }
+  },
+  "@storageSpaceClearDone": {
+    "placeholders": {
+      "targetName": {
+        "type": "String"
+      }
+    }
+  },
+  "@storageSpaceClearFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@storageSpaceExportDone": {
+    "placeholders": {
+      "fileName": {
+        "type": "String"
+      }
+    }
+  },
+  "@storageSpaceExportFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@storageSpaceDeleteUploadsConfirmMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@storageSpaceDeletedUploadsDone": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@storageSpaceSelectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@storageSpaceUploadsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@contextMessageCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@contextMessageCountLimited": {
+    "placeholders": {
+      "actual": {
+        "type": "int"
+      },
+      "configured": {
+        "type": "int"
+      }
+    }
+  },
+  "@assistantProviderSampleAssistantSystemPrompt": {
+    "placeholders": {
+      "model_name": {
+        "type": "String"
+      }
+    }
+  },
+  "@homePageTranslateFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@assistantEditTabLayoutDragHandle": {
+    "placeholders": {
+      "tab": {
+        "type": "String"
+      }
+    }
+  },
+  "@iosBackgroundGenerationTokenCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@multiKeyPageImportedSnackbar": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "@assistantEditPromptAppendTimeInfoBody": {
+    "placeholders": {
+      "example": {
+        "type": "String"
+      }
+    }
+  },
+  "@assistantEditPromptTimeVarDialogBody": {
+    "placeholders": {
+      "variables": {
+        "type": "String"
+      }
+    }
+  },
+  "@codeBlockCollapsedLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "@assistantEditMcpToolsCountTag": {
+    "placeholders": {
+      "enabled": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "@assistantSelectionTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@assistantSelectionDeleteConfirmContent": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@backupPageRestartContentWithSkipped": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@contextTreeMigrationWarningsContent": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@backupRestoreFailureDiagnostic": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "@backupRestoreCorruptArchiveMessage": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "@startupRecoverySnapshotDetails": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "@startupRecoveryRestoreConfirmContent": {
+    "placeholders": {
+      "fileName": {
+        "type": "String"
+      }
+    }
+  },
+  "@startupRecoverySnapshotFailed": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "@backupPageRestoreFailedMessage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@backupPageExportFailedMessage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@backupPageCherryStudioUnsupportedBackupVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "@backupReminderCustomDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "@messageEditAttachmentImportFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@compressContextEstimatePreview": {
+    "description": "Keep-recent compression preview: summarized/kept char counts and the estimated result token band",
+    "placeholders": {
+      "summarized": {
+        "type": "int"
+      },
+      "kept": {
+        "type": "int"
+      },
+      "minTokens": {
+        "type": "int"
+      },
+      "maxTokens": {
+        "type": "int"
+      },
+      "totalTokens": {
+        "type": "int"
+      }
+    }
+  },
+  "@reasoningBudgetSheetCurrentLevel": {
+    "placeholders": {
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "@chatMessageWidgetFileNotFound": {
+    "placeholders": {
+      "fileName": {
+        "type": "String"
+      }
+    }
+  },
+  "@chatMessageWidgetCannotOpenFile": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "@chatMessageWidgetOpenFileError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@chatMessageWidgetCannotOpenUrl": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "@chatMessageWidgetCitationsTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@chatMessageWidgetWebSearch": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "@chatMessageWidgetSpeakText": {
+    "placeholders": {
+      "text": {
+        "type": "String"
+      }
+    }
+  },
+  "@chatMessageWidgetToolCall": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@chatMessageWidgetToolResult": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@chatMessageWidgetCitationsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@chatSelectionSelectedCountTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@chatSelectionDeleteSelectedConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@chatSelectionDeleteSelectedAllVersionsConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@messageExportSheetExportFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@messageExportSheetExportedAs": {
+    "placeholders": {
+      "filename": {
+        "type": "String"
+      }
+    }
+  },
+  "@imagePreviewSheetSaveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@sideDrawerSelectionTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@sideDrawerSelectionDeleteConfirmContent": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@sideDrawerDeleteSelectedSnackbar": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@sideDrawerMoveSelectedSnackbar": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@sideDrawerMoveSelectedWithSkippedSnackbar": {
+    "placeholders": {
+      "moved": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
+  "@sideDrawerDeleteSnackbar": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "@sideDrawerGlobalSearchResultCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@sideDrawerUpdateTitle": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "@sideDrawerUpdateTitleWithBuild": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      },
+      "build": {
+        "type": "int"
+      }
+    }
+  },
+  "@mcpPageToolsCount": {
+    "placeholders": {
+      "enabled": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@mcpConversationSheetToolsCount": {
+    "placeholders": {
+      "enabled": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@assistantEditRecentChatsSummaryFrequencyOption": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@backgroundTaskFailed": {
+    "placeholders": {
+      "task": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@defaultModelPageTitleVars": {
+    "placeholders": {
+      "contentVar": {
+        "type": "String"
+      },
+      "localeVar": {
+        "type": "String"
+      }
+    }
+  },
+  "@defaultModelPageSummaryVars": {
+    "placeholders": {
+      "previousSummaryVar": {
+        "type": "String"
+      },
+      "userMessagesVar": {
+        "type": "String"
+      }
+    }
+  },
+  "@defaultModelPageSuggestionVars": {
+    "placeholders": {
+      "contentVar": {
+        "type": "String"
+      },
+      "localeVar": {
+        "type": "String"
+      }
+    }
+  },
+  "@defaultModelPageCompressVars": {
+    "placeholders": {
+      "contentVar": {
+        "type": "String"
+      },
+      "localeVar": {
+        "type": "String"
+      }
+    }
+  },
+  "@defaultModelPageTranslateVars": {
+    "placeholders": {
+      "sourceVar": {
+        "type": "String"
+      },
+      "targetVar": {
+        "type": "String"
+      }
+    }
+  },
+  "@modelDetailSheetModelIdDisabledHint": {
+    "placeholders": {
+      "modelId": {
+        "type": "String"
+      }
+    }
+  },
+  "@providerDetailPageBalanceResult": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "@providerDetailPageBalanceError": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "@importProviderSheetImportSuccessMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@importProviderSheetImportFailedMessage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@miniMapSearchMatchCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@searchApiKeysPageBatchResult": {
+    "placeholders": {
+      "added": {
+        "type": "String"
+      },
+      "skipped": {
+        "type": "String"
+      }
+    }
+  },
+  "@searchServiceEditorMultiKeyCount": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "@searchServiceEditorUsageRemaining": {
+    "placeholders": {
+      "remaining": {
+        "type": "String"
+      }
+    }
+  },
+  "@searchServiceEditorUsageBalance": {
+    "placeholders": {
+      "balance": {
+        "type": "String"
+      }
+    }
+  },
+  "@searchServiceEditorUsageUsed": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "String"
+      }
+    }
+  },
+  "@searchServiceEditorUsageFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "@searchServiceEditorTestFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "@searchServiceEditorDeleteMessage": {
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+  "@aboutPageVersionDetail": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      },
+      "buildNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "@aboutPagePlatformOther": {
+    "placeholders": {
+      "os": {
+        "type": "String"
+      }
+    }
+  },
+  "@aboutPageUpdateCheckFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@chainOfThoughtExpandSteps": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "@displaySettingsPageEnableImageCropperTitle": {},
+  "@displaySettingsPageEnableImageCropperSubtitle": {},
+  "@asrServicesDownloadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@asrServicesRecognitionFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@ttsServicesPageSystemTtsUnavailableSubtitle": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@ttsServicesValidationSampleRate": {
+    "placeholders": {
+      "format": {
+        "type": "String"
+      },
+      "rates": {
+        "type": "String"
+      }
+    }
+  },
+  "@ttsSaveFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "@imageViewerPageShareFailedOpenFile": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "@imageViewerPageShareFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@imageViewerPageCounter": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@imageViewerPageImageLabel": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@imageViewerPageSaveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@instructionInjectionImportSuccess": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@multiKeyPageDeletedErrorsSnackbar": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "@providersPageExportSelectedTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@networkProxyTestFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@providerDetailPageDeleteSelectedModelsConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@providerDetailPageDeleteFailedDetectedModelsConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@providerDetailPageSelectedModelsDeletedSnackbar": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@contextLogSnapshotMessages": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@contextLogSnapshotTokens": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@contextLogSnapshotsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@logViewerRequestsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@logViewerMoreCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@logSettingsAutoDeleteDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@memoryEntryScopeAssistantNamed": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@memoryEntryUpdatedAt": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "@memoryEntryBatchDeleteConfirmTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@memoryOrphanBanner": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@memoryOrphanConfirmContent": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@memoryOrganizeStatusLast": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "@memoryOrganizeStatusExtracted": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@memoryOrganizeStatusSkippedReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "@memoryOrganizeStatusFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "@memoryOrganizeMinutesAgo": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "@memoryOrganizeHoursAgo": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "@memoryOrganizeDaysAgo": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "@legacyMemoryAssistantHeader": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@legacyMemoryMigrationSubtitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@legacyMemoryMigrationProgress": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@legacyMemoryMigrationResult": {
+    "placeholders": {
+      "created": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  },
+  "@legacyMemoryMigrationErrorOther": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "@legacyMemoryMigrationPartial": {
+    "placeholders": {
+      "created": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "@assistantEditOrganizeFrequencyOption": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "@worldBookEnabledCount": {
+    "placeholders": {
+      "enabled": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@oauthDays": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "@oauthExpired": {
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+  "@oauthHours": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "@oauthLastUpdated": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "@oauthLoginTo": {
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+  "@oauthMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "@oauthResetsAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "@oauthSavedResets": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "@oauthWaiting": {
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+  "@worldBookDeleteMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@worldBookExportFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@worldBookKeywordsLine": {
+    "placeholders": {
+      "keywords": {
+        "type": "String"
+      }
+    }
+  },
+  "@askUserCardQuestionCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@tokenDetailPromptTokens": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@tokenDetailPromptTokensWithCache": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "cached": {
+        "type": "int"
+      }
+    }
+  },
+  "@tokenDetailCompletionTokens": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@tokenDetailSpeed": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "@tokenDetailDuration": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "@tokenDetailTotalTokens": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@debugPageConversationCreated": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@debugPageCreateConversationFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@debugPageOversizedConversationTitle": {
+    "placeholders": {
+      "sizeMB": {
+        "type": "int"
+      }
+    }
+  },
+  "@debugPageManyMessagesConversationTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@debugPageDailyMixedMarkdownConversationTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@debugPageLongReasoningConversationTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@debugPageManyMessagesSeedText": {
+    "placeholders": {
+      "role": {
+        "type": "String"
+      },
+      "index": {
+        "type": "int"
+      }
+    }
+  },
+  "@migrationBackingUpDetail": {
+    "placeholders": {
+      "fileName": {
+        "type": "String"
+      }
+    }
+  },
+  "@migrationMigratingDetail": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@largeContentShowMore": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@memoryTraceStepsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@memoryTraceMutationsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@memoryTraceRepeatCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@memoryTraceWindowValue": {
+    "placeholders": {
+      "size": {
+        "type": "int"
+      },
+      "start": {
+        "type": "int"
+      },
+      "end": {
+        "type": "int"
+      }
+    }
+  },
+  "@toolSchemaSettingsParamDescriptions": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@assistantEditLocalToolHealthSelectedCount": {
+    "placeholders": {
+      "selected": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@healthDataSettingsBadge": {
+    "placeholders": {
+      "selected": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@autoRetryCountdown": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      },
+      "attempt": {
+        "type": "int"
+      },
+      "maxRetries": {
+        "type": "int"
+      }
+    }
+  },
+  "@backupLedgerDeviceCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@backupLedgerClearConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@backupLedgerItemCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@backupLedgerAbsorbedNotice": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@backupLocalSettingsAppliedNotice": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@backupPageMergeCompletedWithSkipped": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@backupProgressBytes": {
+    "placeholders": {
+      "done": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "@backupProgressItems": {
+    "placeholders": {
+      "done": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "@localSnapshotCopyContents": {
+    "placeholders": {
+      "conversations": {
+        "type": "int"
+      },
+      "messages": {
+        "type": "int"
+      }
+    }
+  },
+  "@localSnapshotExportFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "@localSnapshotIntervalDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "@localSnapshotKeepValue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@localSnapshotRestoreMessage": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "@localSnapshotStatusFailure": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      },
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "@localSnapshotStatusSuccess": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "@localSnapshotTakeFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "@localSnapshotUsage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "@startupRecoveryLocalCopiesAvailable": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "@startupRecoveryRecoveredCopiesDeleted": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@backupProgressWrapping": {
+    "description": "JO-AIClient only: sealing the ZIP payload into the .joaiclient container."
+  },
+  "@backupProgressRestoring": {
+    "description": "JO-AIClient only: writing the restored payload back to disk."
+  },
+  "@startupRecoverySchemaValue": {
+    "placeholders": {
+      "installed": {
+        "type": "String"
+      },
+      "expected": {
+        "type": "int"
+      }
+    }
+  },
+  "@startupRecoveryReportStored": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "@startupRecoveryIntegrityDamaged": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "@startupRecoveryReportSaved": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "@startupRecoveryExportSavedTo": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "@startupDatabaseUpdateRequiredDowngradeStep2": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "@backupPageForwardCompatBody": {
+    "placeholders": {
+      "backupVersion": {
+        "type": "int"
+      },
+      "currentVersion": {
+        "type": "int"
+      }
+    }
+  },
+  "@memorySettingsInjectionMaxItemsOption": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "@legacyMemoryModeCacheWarning": {
+    "placeholders": {
+      "token": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspacePreviewLineCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@workspaceFilesDeleteMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspaceFilesDeleteFolderMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspaceFilesOperationFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspaceFilesMinutesAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@workspaceFilesHoursAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@workspaceFilesDaysAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@workspacesLastUsed": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspacesDeleteMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspacesUnlinkMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspaceToolCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@workspaceToolMoreFiles": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@workspaceToolDurationMs": {
+    "placeholders": {
+      "ms": {
+        "type": "int"
+      }
+    }
+  },
+  "@workspaceToolDurationSec": {
+    "placeholders": {
+      "sec": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspaceEnvEngineUbuntu": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspaceEnvEngineAlpine": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspaceEnvMetaLine": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      },
+      "arch": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspaceEnvInstalledAt": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspaceEnvDiskUsage": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspaceEnvRuntimeReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspaceEnvAvailableVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspaceEnvApplyingMirror": {
+    "placeholders": {
+      "category": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspaceEnvMirrorsDisabledReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspaceEnvMirrorLatency": {
+    "placeholders": {
+      "ms": {
+        "type": "int"
+      }
+    }
+  },
+  "@workspaceEnvMirrorFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspaceEnvChipInstalling": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "@workspaceEnvNativeShellPath": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspaceEnvDownloadProgress": {
+    "placeholders": {
+      "downloaded": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      },
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "@skillsUsedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@skillsDeleteMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@terminalExitCode": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "@workspaceMgmtImportDone": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspaceMgmtLastUsedMinutesAgo": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "@workspaceMgmtLastUsedHoursAgo": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "@workspaceMgmtLastUsedDaysAgo": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "@workspaceMgmtRowDetail": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      },
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspaceMgmtRowDetailNever": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspaceFilesItemCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@workspaceToolExitCode": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "@workspaceToolLines": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@workspaceToolItems": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@workspaceToolFileMatches": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@workspaceToolContentMatches": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@workspaceEnvArchVersion": {
+    "placeholders": {
+      "arch": {
+        "type": "String"
+      },
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspaceEnvUpdateAvailableShort": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspaceEnvRelativeMinutesAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@workspaceEnvRelativeHoursAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@workspaceEnvRelativeDaysAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@workspaceEnvDownloadLine": {
+    "placeholders": {
+      "downloaded": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      },
+      "phase": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspaceEnvSelectionNamed": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "region": {
+        "type": "String"
+      }
+    }
+  },
+  "@skillsDetailBodyTooLarge": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspaceBindingSetAssistantDefault": {
+    "placeholders": {
+      "assistant": {
+        "type": "String"
+      }
+    }
+  },
+  "@storageSessionFilesCleanOrphansHint": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "@attachmentRequiresWorkspace": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@startupRecoverySnapshotConfirm": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "@scheduledTasksNextRun": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspaceBindingRememberedDefault": {
+    "placeholders": {
+      "assistant": {
+        "type": "String"
+      }
+    }
+  },
+  "@workspaceBindingSuggestDefault": {
+    "placeholders": {
+      "assistant": {
+        "type": "String"
+      }
+    }
+  },
+  "@scheduledTasksHours": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@scheduledTasksMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@scheduledTasksPreparationRetryAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "@scheduledTasksPreparationAttemptsUsed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "@scheduledTasksPreparationPromptVariables": {
+    "placeholders": {
+      "timeVariable": {
+        "type": "String"
+      },
+      "offsetVariable": {
+        "type": "String"
+      }
+    }
+  }
 }

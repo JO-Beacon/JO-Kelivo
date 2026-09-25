@@ -588,11 +588,13 @@ class _BrandBadge extends StatelessWidget {
     if (s is PerplexityOptions) return 'perplexity';
     if (s is BochaOptions) return 'bocha';
     if (s is DoubaoOptions) return 'doubao';
+    if (s is KagiOptions) return 'kagi';
     if (s is SerperOptions) return 'serper';
     if (s is QueritOptions) return 'querit';
     if (s is GrokOptions) return 'grok';
     if (s is YouSearchOptions) return 'you';
     if (s is ParallelOptions) return 'parallel';
+    if (s is KimiOptions) return 'kimi';
     if (s is AnySearchOptions) return 'anysearch';
     if (s is StepFunOptions) return 'stepfun';
     if (s is FirecrawlOptions) return 'firecrawl';

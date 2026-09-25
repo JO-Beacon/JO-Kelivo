@@ -71,6 +71,16 @@ class DeviceLocalToolsHandler(private val context: Context) {
         channel.setMethodCallHandler { call, result ->
             val argsJson = call.arguments as? String ?: "{}"
             when (call.method) {
+                "phoneControlStatus" -> result.success(PhoneControlService.status(context))
+                "phoneControl" -> PhoneControlService.execute(argsJson) { result.success(it) }
+                "openAccessibilitySettings" -> {
+                    try {
+                        activity.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                        result.success(null)
+                    } catch (e: Exception) {
+                        result.error("SETTINGS_UNAVAILABLE", e.message, null)
+                    }
+                }
                 "hasUsageStatsPermission" -> result.success(hasUsageStatsPermission())
                 "openUsageAccessSettings" -> {
                     openUsageAccessSettings()
@@ -204,7 +214,7 @@ class DeviceLocalToolsHandler(private val context: Context) {
         }
     }
 
-    /** Explicit method-channel permission request for callers that need it. */
+    /** Used by the assistant settings toggle — returns a boolean grant result. */
     private fun requestCalendarPermission(result: MethodChannel.Result) {
         val missing = calendarPermissions().filter {
             ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
@@ -701,6 +711,8 @@ class DeviceLocalToolsHandler(private val context: Context) {
             .put("location", location)
             .put("reminders", JSONArray(savedReminders))
         if (savedReminders.size < reminderMinutes.size) {
+            // 事件已经建好了, 但部分/全部提醒被日历账户拒绝; 必须让模型看见,
+            // 否则它会告诉用户提醒已设置.
             payload
                 .put("reminders_requested", JSONArray(reminderMinutes))
                 .put(
@@ -712,7 +724,10 @@ class DeviceLocalToolsHandler(private val context: Context) {
         return payload.toString()
     }
 
-    /** 提醒偏移（事件开始前多少分钟），兼容数组或单个数字/字符串。 */
+    /**
+     * 提醒偏移(事件开始前多少分钟). 兼容数组、单个数字/字符串; 负值按绝对值处理,
+     * 去重后最多保留 5 条.
+     */
     private fun parseReminderMinutes(raw: Any?): List<Int> {
         if (raw == null || raw == JSONObject.NULL) return emptyList()
         val items: List<Any?> = when (raw) {
@@ -727,13 +742,14 @@ class DeviceLocalToolsHandler(private val context: Context) {
                 else -> null
             } ?: continue
             if (value.isNaN() || value.isInfinite()) continue
-            minutes.add(kotlin.math.abs(value).coerceAtMost(40320.0).toInt())
+            // 用 Double 中转: Math.abs(Int.MIN_VALUE) 仍是负数, 会被当成"事件开始之后"提醒.
+            minutes.add(Math.abs(value).coerceAtMost(40320.0).toInt()) // 上限 4 周
             if (minutes.size == 5) break
         }
         return minutes.toList()
     }
 
-    /** 写入提醒，返回实际成功写入的偏移分钟数。 */
+    /** 写入提醒, 返回实际成功写入的偏移分钟数. */
     private fun insertReminders(eventId: Long, minutes: List<Int>): List<Int> {
         if (minutes.isEmpty()) return emptyList()
         val saved = mutableListOf<Int>()

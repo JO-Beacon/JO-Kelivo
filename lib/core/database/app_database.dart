@@ -220,6 +220,14 @@ class MessageRows extends Table {
       integer()
       // ignore: recursive_getters
       .check(messageOrder.isBiggerOrEqualValue(0))();
+  // v9: last row mutation for sync/LWW. Inserts stay null; readers use
+  // COALESCE(updated_at, timestamp), and every UPDATE path bumps it.
+  IntColumn get updatedAt =>
+      integer().map(const MicrosecondDateTimeConverter()).nullable()();
+  // v9: authoring identity when role alone is ambiguous.
+  TextColumn get senderId => text().nullable()();
+  // v9: schema-less message-scoped extension fields.
+  TextColumn get extrasJson => text().withDefault(const Constant('{}'))();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -344,6 +352,8 @@ class AssetRows extends Table {
       integer().map(const MicrosecondDateTimeConverter())();
   IntColumn get lastReferencedAt =>
       integer().map(const MicrosecondDateTimeConverter())();
+  // v9: schema-less asset-scoped extension fields.
+  TextColumn get extrasJson => text().withDefault(const Constant('{}'))();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -731,6 +741,28 @@ class MessagePromptRows extends Table {
 /// 可选的 `owner_id`（用于挂在另一实体下的实体，对应
 /// `assistant_memory_rows.assistant_id`）。既有类型仍留在各自的表里，只有
 /// 判别值较新引入的类型才放这里。
+/// Deletion tombstones for a future cross-device sync layer.
+///
+/// User-initiated deletes write this table; bulk state replacement
+/// (`clearAllData`, overwrite restore) clears it instead of writing to it:
+/// replacing the whole local state is not a cross-device deletion intent.
+class TombstoneRows extends Table {
+  TextColumn get scope =>
+      text()
+      // ignore: recursive_getters
+      .check(scope.isNotValue(''))();
+  TextColumn get entityId =>
+      text()
+      // ignore: recursive_getters
+      .check(entityId.isNotValue(''))();
+  IntColumn get deletedAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+  TextColumn get payload => text().withDefault(const Constant('{}'))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {scope, entityId};
+}
+
 @TableIndex(
   name: 'idx_extension_entities_kind_order',
   columns: {#kind, #sortOrder},
@@ -786,6 +818,7 @@ class ExtensionEntityRows extends Table {
     MemoryEntryRows,
     UserProfileFieldRows,
     MessagePromptRows,
+    TombstoneRows,
     ExtensionEntityRows,
   ],
 )
@@ -801,17 +834,18 @@ class AppDatabase extends _$AppDatabase {
   // 模式 4 将 Kelivo 的助手标签表迁移为 JO-Kelivo 的助手分组表，模式 5
   // 为冻结提示词绑定消息正文哈希，模式 6 持久化明确的分支关系和活动历史，
   // 模式 7 增加会话级模型覆盖，模式 8 增加会话 extras 扩展位与
-  // `extension_entity_rows` 共享实体表。
-  static const currentSchemaVersion = 8;
+  // `extension_entity_rows` 共享实体表，模式 9 补齐消息更新时间、作者、
+  // 消息扩展、资产扩展与删除墓碑。
+  static const currentSchemaVersion = 9;
 
   /// 曾经发布过的全部 schema 版本。
   ///
   /// 启动失败诊断报告用它说明"本应用能读哪些版本的库"，因此**每发布一个新
   /// schema 就要同步加进来**，否则报告会把一个其实支持的旧库说成不支持。
-  /// 与上游的差别：上游这套是 {1,2,3}，本仓库的迁移链覆盖 1..8（见
+  /// 与上游的差别：上游这套是 {1,2,3}，本仓库的迁移链覆盖 1..9（见
   /// `migration.onUpgrade` 里的 from<2 / 2..3 / from<4 / from<5 / 2..6 /
-  /// from<7 / from<8）。
-  static const publishedSchemaVersions = <int>{1, 2, 3, 4, 5, 6, 7, 8};
+  /// from<7 / from<8 / from<9）。
+  static const publishedSchemaVersions = <int>{1, 2, 3, 4, 5, 6, 7, 8, 9};
   // 保持 SQLite 既定的 1000 页节奏显式声明。按通常 4 KiB 页大小计算，
   // 这大约在 4 MiB 时触发一次检查点，但页大小仍是实际依据。
   static const walAutoCheckpointPages = 1000;
@@ -1236,6 +1270,32 @@ FROM probe;
           'CREATE INDEX IF NOT EXISTS idx_extension_entities_kind_order '
           'ON extension_entity_rows (kind, sort_order);',
         );
+      }
+      if (from < 9) {
+        final messageColumns = await customSelect(
+          'PRAGMA table_info(message_rows);',
+        ).get();
+        final messageColumnNames = messageColumns
+            .map((row) => row.read<String>('name'))
+            .toSet();
+        if (!messageColumnNames.contains('updated_at')) {
+          await migrator.addColumn(messageRows, messageRows.updatedAt);
+        }
+        if (!messageColumnNames.contains('sender_id')) {
+          await migrator.addColumn(messageRows, messageRows.senderId);
+        }
+        if (!messageColumnNames.contains('extras_json')) {
+          await migrator.addColumn(messageRows, messageRows.extrasJson);
+        }
+        final assetColumns = await customSelect(
+          'PRAGMA table_info(asset_rows);',
+        ).get();
+        if (!assetColumns
+            .map((row) => row.read<String>('name'))
+            .contains('extras_json')) {
+          await migrator.addColumn(assetRows, assetRows.extrasJson);
+        }
+        await migrator.createTable(tombstoneRows);
       }
     },
     beforeOpen: (details) async {

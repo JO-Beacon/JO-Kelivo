@@ -23,9 +23,11 @@ import 'providers/querit_search_service.dart';
 import 'providers/stepfun_search_service.dart';
 import 'providers/firecrawl_search_service.dart';
 import 'providers/tinyfish_search_service.dart';
+import 'providers/kagi_search_service.dart';
 import 'providers/doubao_search_service.dart';
 import 'providers/anysearch_search_service.dart';
 import 'providers/parallel_search_service.dart';
+import 'providers/kimi_search_service.dart';
 import 'providers/you_search_service.dart';
 
 // 所有搜索服务的基类接口
@@ -75,10 +77,14 @@ abstract class SearchService<T extends SearchServiceOptions> {
         return LinkUpSearchService() as SearchService;
       case BraveOptions _:
         return BraveSearchService() as SearchService;
+      case KagiOptions _:
+        return KagiSearchService() as SearchService;
       case AnySearchOptions _:
         return AnySearchSearchService() as SearchService;
       case ParallelOptions _:
         return ParallelSearchService() as SearchService;
+      case KimiOptions _:
+        return KimiSearchService() as SearchService;
       case YouSearchOptions _:
         return YouSearchService() as SearchService;
       case MetasoOptions _:
@@ -171,7 +177,7 @@ class SearchCommonOptions {
   final int resultSize;
   final int timeout;
 
-  const SearchCommonOptions({this.resultSize = 10, this.timeout = 5000});
+  const SearchCommonOptions({this.resultSize = 10, this.timeout = 30000});
 
   Map<String, dynamic> toJson() => {
     'resultSize': resultSize,
@@ -181,7 +187,7 @@ class SearchCommonOptions {
   factory SearchCommonOptions.fromJson(Map<String, dynamic> json) =>
       SearchCommonOptions(
         resultSize: json['resultSize'] ?? 10,
-        timeout: json['timeout'] ?? 5000,
+        timeout: json['timeout'] ?? 30000,
       );
 }
 
@@ -230,10 +236,14 @@ abstract class SearchServiceOptions {
         return LinkUpOptions.fromJson(json);
       case 'brave':
         return BraveOptions.fromJson(json);
+      case 'kagi':
+        return KagiOptions.fromJson(json);
       case 'anysearch':
         return AnySearchOptions.fromJson(json);
       case 'parallel':
         return ParallelOptions.fromJson(json);
+      case 'kimi':
+        return KimiOptions.fromJson(json);
       case 'you':
         return YouSearchOptions.fromJson(json);
       case 'metaso':
@@ -963,6 +973,26 @@ class TinyFishOptions extends SearchServiceOptions {
       );
 }
 
+class KagiOptions extends SearchServiceOptions {
+  final String apiKey;
+
+  KagiOptions({required super.id, required this.apiKey, super.extraApiKeys});
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'kagi',
+    'id': id,
+    'apiKey': apiKey,
+    if (extraApiKeys.isNotEmpty) 'apiKeys': extraApiKeys,
+  };
+
+  factory KagiOptions.fromJson(Map<String, dynamic> json) => KagiOptions(
+    id: json['id'],
+    apiKey: json['apiKey'] ?? '',
+    extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
+  );
+}
+
 class DoubaoOptions extends SearchServiceOptions {
   final String apiKey;
 
@@ -1064,6 +1094,44 @@ class ParallelOptions extends SearchServiceOptions {
         mode: normalizeMode(json['mode']),
         extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
       );
+}
+
+class KimiOptions extends SearchServiceOptions {
+  static const String defaultMode = 'pro';
+  static const List<String> modes = ['pro', 'basic'];
+
+  final String apiKey;
+  final String mode;
+
+  KimiOptions({
+    required super.id,
+    required this.apiKey,
+    this.mode = defaultMode,
+    super.extraApiKeys,
+  });
+
+  static String normalizeMode(String? value) {
+    final mode = (value ?? '').trim();
+    return modes.contains(mode) ? mode : defaultMode;
+  }
+
+  static String modeLabel(String mode) => mode == 'basic' ? 'Basic' : 'Pro';
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'kimi',
+    'id': id,
+    'apiKey': apiKey,
+    'mode': mode,
+    if (extraApiKeys.isNotEmpty) 'apiKeys': extraApiKeys,
+  };
+
+  factory KimiOptions.fromJson(Map<String, dynamic> json) => KimiOptions(
+    id: json['id'],
+    apiKey: json['apiKey'] ?? '',
+    mode: normalizeMode(json['mode']),
+    extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
+  );
 }
 
 class YouSearchOptions extends SearchServiceOptions {

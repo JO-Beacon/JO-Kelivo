@@ -577,6 +577,8 @@ class MessageGenerationService {
     required bool generateTitleOnFinish,
     String? generationRunId,
     bool scheduled = false,
+    bool scheduledNotify = true,
+    bool scheduledPreview = true,
   }) {
     final bool ocrActive =
         settings.ocrEnabled &&
@@ -607,6 +609,8 @@ class MessageGenerationService {
       generateTitleOnFinish: generateTitleOnFinish,
       generationRunId: generationRunId,
       scheduled: scheduled,
+      scheduledNotify: scheduledNotify,
+      scheduledPreview: scheduledPreview,
     );
   }
 

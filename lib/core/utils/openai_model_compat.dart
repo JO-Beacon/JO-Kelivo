@@ -299,7 +299,7 @@ OpenAIReasoningSupport? openAIReasoningSupport(String modelId) {
   if (_matchesModel(normalized, r'(^|[/_:@])kimi-k3(?:$|[-.])')) {
     return _kimiK3Support;
   }
-  if (_matchesModel(normalized, r'(^|[/_:@])grok-4\.6(?:$|[-.])')) {
+  if (_matchesModel(normalized, r'(^|[/_:@])grok-4\.(?:6|7)(?:$|[-.])')) {
     return _grok46Support;
   }
   if (_matchesModel(normalized, r'(^|[/_:@])grok-4\.5(?:$|[-.])')) {

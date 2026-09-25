@@ -1,3 +1,4 @@
+import '../../provider/widgets/oauth_message_recovery.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
@@ -6,6 +7,7 @@ import 'dart:ui' as ui;
 import 'dart:math' as math;
 import 'package:flutter/services.dart';
 import '../../../core/services/haptics.dart';
+import '../../../shared/widgets/optional_shader_mask.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 import 'package:open_filex/open_filex.dart';
@@ -28,9 +30,10 @@ import '../../../utils/utf16_safe_cut.dart';
 import '../../../utils/avatar_cache.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant.dart';
+import '../../../core/models/avatar_transform.dart';
 import '../../../core/providers/tts_provider.dart';
-import '../../../shared/widgets/avatar_image_editor.dart';
 import '../../../shared/widgets/markdown_with_highlight.dart';
+import '../../../shared/widgets/avatar_image_editor.dart';
 import '../../../shared/widgets/snackbar.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../l10n/app_localizations.dart';
@@ -38,7 +41,6 @@ import '../../../core/providers/settings_provider.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../core/providers/model_provider.dart';
 import '../../../core/models/assistant_regex.dart';
-import '../../../core/models/avatar_transform.dart';
 import '../../../shared/widgets/custom_bottom_sheet.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_tactile.dart';
@@ -482,6 +484,7 @@ IconData? _localToolIconFor(String name, Map<String, dynamic> args) {
     LocalToolNames.calendarQuery => Lucide.Calendar,
     LocalToolNames.calendarCreate => Lucide.CalendarPlus,
     LocalToolNames.currentLocation => Lucide.MapPin,
+    LocalToolNames.phoneControl => Lucide.Smartphone,
     LocalToolNames.weather => Lucide.CloudSun,
     LocalToolNames.healthSummary => Lucide.HeartPulse,
     LocalToolNames.remindersQuery => Lucide.ListTodo,
@@ -514,6 +517,7 @@ String? _localToolTitleFor(
     LocalToolNames.calendarCreate =>
       l10n.assistantEditLocalToolCalendarCreateTitle,
     LocalToolNames.currentLocation => l10n.assistantEditLocalToolLocationTitle,
+    LocalToolNames.phoneControl => l10n.phoneControlTitle,
     LocalToolNames.weather => l10n.assistantEditLocalToolWeatherTitle,
     LocalToolNames.healthSummary => l10n.assistantEditLocalToolHealthTitle,
     LocalToolNames.remindersQuery =>
@@ -1031,22 +1035,10 @@ class ChatMessageWidget extends StatefulWidget {
   final VoidCallback? onPrevVersion;
   final VoidCallback? onNextVersion;
 
-  // --- 以下是本仓库自有参数（上游没有，合并时保留）---
-
-  /// 助手头像的裁剪变换。上游此处直接用 `Image.file`，本仓库改用
-  /// `AvatarImage` 以支持用户在设置里调整头像的缩放与位移。
+  // JO-AIClient 自有参数：助手头像裁剪、删除范围和生成中确认提示。
   final AvatarTransform? assistantAvatarTransform;
-
-  /// 是否允许“删除此消息及之后”。上游的删除是不分范围的单条删除，
-  /// 本仓库只在“后面还有消息可删”时才给出这个入口。
   final bool canDeleteMessageAndFollowing;
-
-  /// 会话当前是否正在生成。用于在重新生成确认框中追加一句
-  /// “确认后当前回复会先被中断”，避免用户误以为可以直接重来。
   final bool conversationStreaming;
-
-  /// 是否折叠过长的用户消息（默认折叠，显示前若干行 + 展开按钮）。
-  final bool collapseLongUserText;
 
   // Optional reasoning UI props (for reasoning-capable models)
   final String? reasoningText;
@@ -1083,6 +1075,9 @@ class ChatMessageWidget extends StatefulWidget {
   final bool? showToolCards;
   final void Function(String imageKey, double aspectRatio)? onInlineImageAspect;
 
+  /// Off for exports, which must render the whole user message.
+  final bool collapseLongUserText;
+
   const ChatMessageWidget({
     super.key,
     required this.message,
@@ -1109,7 +1104,6 @@ class ChatMessageWidget extends StatefulWidget {
     this.assistantAvatarTransform,
     this.canDeleteMessageAndFollowing = true,
     this.conversationStreaming = false,
-    this.collapseLongUserText = true,
     this.reasoningText,
     this.reasoningExpanded = false,
     this.reasoningLoading = false,
@@ -1133,6 +1127,7 @@ class ChatMessageWidget extends StatefulWidget {
     this.showThinkingCards,
     this.showToolCards,
     this.onInlineImageAspect,
+    this.collapseLongUserText = true,
   });
 
   @override
@@ -1367,8 +1362,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     }
 
     final l10n = AppLocalizations.of(context)!;
-    final baseContent = l10n.chatMessageWidgetRegenerateConfirmContent;
-    // 会话正在生成时补一句说明：确认后当前回复会先被中断。
+    final baseContent = settings.regenerateDeleteTrailingMessages
+        ? l10n.chatMessageWidgetRegenerateConfirmDeleteTrailingContent
+        : l10n.chatMessageWidgetRegenerateConfirmContent;
     final content = widget.conversationStreaming
         ? '$baseContent\n\n'
               '${l10n.chatMessageWidgetRegenerateConfirmInterruptNotice}'
@@ -1771,7 +1767,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             showName: s.showUserName,
             showTimestamp: s.showUserTimestamp,
             enableMarkdown: s.enableUserMarkdown,
-            // 关闭“折叠长消息”时传 0，调用方据此判定不折叠。
             collapseChars: s.collapseLongUserMessages
                 ? s.collapseLongUserMessageChars
                 : 0,
@@ -2082,7 +2077,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     } catch (_) {}
   }
 
-  /// 超长用户消息折叠时保留可见的文本行数。
+  /// Number of text lines kept visible when a long user message is collapsed.
   static const int _collapsedUserTextLines = 9;
 
   Widget _buildUserTextContent(
@@ -2125,7 +2120,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       );
     }
 
-    // 超长用户消息折叠：只在开关打开且确实超过阈值时生效。
     if (collapseChars > 0 && visualText.length > collapseChars) {
       final lineHeight =
           MediaQuery.textScalerOf(context).scale(baseUser) * 1.45;
@@ -3272,8 +3266,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 onTap: () => _showCitationsSheet(searchItems),
               ),
             ],
+            for (final error
+                in widget.message.parts.whereType<ProviderAuthErrorPart>())
+              OAuthMessageRecovery(error: error),
             // Action buttons (hidden while generating)
             AnimatedSwitcher(
+              // Completion previously remounted the row at its final height.
+              // Keep that geometry while retaining the expensive Markdown tree.
+              key: ValueKey(('assistant-actions', widget.message.isStreaming)),
               duration: const Duration(milliseconds: 220),
               switchInCurve: Curves.easeOutCubic,
               switchOutCurve: Curves.easeInCubic,
@@ -4476,11 +4476,6 @@ class _ChainOfThoughtCard extends StatefulWidget {
 class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
   bool _showAllSteps = false;
 
-  /// 步骤指纹：把这一步渲染所依赖的全部输入拼成一个值。指纹不变时
-  /// [_CachedTimelineStep] 复用上一帧的 widget 实例，整棵子树跳过重建。
-  ///
-  /// 文本必须**按值**参与比较：`identityHashCode` 会让流式期间每帧都
-  /// 拿到新指纹，缓存永远不命中，整块思考区每帧重建。
   Object _reasoningStepSignature({
     required ReasoningSegment step,
     required bool isFirst,
@@ -4960,9 +4955,8 @@ class _ChainOfThoughtReasoningStepState
   bool? _localExpanded;
 
   _ReasoningStepState get _stepState {
-    // 持久化的 parts 可能多于时序／交互元数据（例如后台工具轮次之后）。
-    // 这类步骤仍然需要一个可展开的入口，否则思考内容只能看到标题、打不开，
-    // 等于内容在、界面到不了。此时用本地的展开状态兜底。
+    // Persisted parts can outnumber the timing/interaction metadata (for
+    // example after a background tool round). The content still needs a toggle.
     final expanded =
         (_ChainOfThoughtActions.toggleOf(context, widget.sourceIndex) == null
             ? _localExpanded
@@ -5110,46 +5104,35 @@ class _ChainOfThoughtReasoningStepState
     if (state == _ReasoningStepState.preview) {
       content = ConstrainedBox(
         constraints: const BoxConstraints(maxHeight: 100),
-        child: _hasOverflow
-            ? ShaderMask(
-                shaderCallback: (rect) {
-                  final h = rect.height;
-                  const double topFade = 12;
-                  const double bottomFade = 28;
-                  final double sTop = (topFade / h).clamp(0.0, 1.0);
-                  final double sBot = (1.0 - bottomFade / h).clamp(0.0, 1.0);
-                  return LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: const [
-                      Color(
-                        0x00FFFFFF,
-                      ), // color-gate: ignore (dstIn alpha mask)
-                      Color(
-                        0xFFFFFFFF,
-                      ), // color-gate: ignore (dstIn alpha mask)
-                      Color(
-                        0xFFFFFFFF,
-                      ), // color-gate: ignore (dstIn alpha mask)
-                      Color(
-                        0x00FFFFFF,
-                      ), // color-gate: ignore (dstIn alpha mask)
-                    ],
-                    stops: [0.0, sTop, sBot, 1.0],
-                  ).createShader(rect);
-                },
-                blendMode: BlendMode.dstIn,
-                child: SingleChildScrollView(
-                  controller: _scroll,
-                  physics: const BouncingScrollPhysics(),
-                  child: SelectionArea(child: reasoningContent(display)),
-                ),
-              )
-            : SingleChildScrollView(
-                controller: _scroll,
-                physics: const NeverScrollableScrollPhysics(),
-                child: SelectionArea(child: reasoningContent(display)),
-              ),
+        child: OptionalShaderMask(
+          enabled: _hasOverflow,
+          shaderCallback: (rect) {
+            final h = rect.height;
+            const double topFade = 12;
+            const double bottomFade = 28;
+            final double sTop = (topFade / h).clamp(0.0, 1.0);
+            final double sBot = (1.0 - bottomFade / h).clamp(0.0, 1.0);
+            return LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: const [
+                Color(0x00FFFFFF), // color-gate: ignore (dstIn alpha mask)
+                Color(0xFFFFFFFF), // color-gate: ignore (dstIn alpha mask)
+                Color(0xFFFFFFFF), // color-gate: ignore (dstIn alpha mask)
+                Color(0x00FFFFFF), // color-gate: ignore (dstIn alpha mask)
+              ],
+              stops: [0.0, sTop, sBot, 1.0],
+            ).createShader(rect);
+          },
+          blendMode: BlendMode.dstIn,
+          child: SingleChildScrollView(
+            controller: _scroll,
+            // Bouncing physics already declines drags when content fits.
+            // Keeping it stable also retains ScrollPosition on overflow.
+            physics: const BouncingScrollPhysics(),
+            child: SelectionArea(child: reasoningContent(display)),
+          ),
+        ),
       );
     } else if (state == _ReasoningStepState.expanded) {
       content = SelectionArea(child: reasoningContent(display));
@@ -5168,7 +5151,6 @@ class _ChainOfThoughtReasoningStepState
         if (toggle != null) {
           toggle();
         } else {
-          // 没有上行交互可用的步骤（持久化 parts 多于元数据）就地展开／收起。
           setState(() {
             _localExpanded = !(_localExpanded ?? widget.step.expanded);
           });
@@ -7152,54 +7134,41 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
         padding: const EdgeInsets.fromLTRB(8, 2, 8, 6),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxHeight: 80),
-          child: _hasOverflow
-              ? ShaderMask(
-                  shaderCallback: (rect) {
-                    final h = rect.height;
-                    const double topFade = 12.0;
-                    const double bottomFade = 28.0;
-                    final double sTop = (topFade / h).clamp(0.0, 1.0);
-                    final double sBot = (1.0 - bottomFade / h).clamp(0.0, 1.0);
-                    return LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: const [
-                        Color(
-                          0x00FFFFFF,
-                        ), // color-gate: ignore (dstIn alpha mask)
-                        Color(
-                          0xFFFFFFFF,
-                        ), // color-gate: ignore (dstIn alpha mask)
-                        Color(
-                          0xFFFFFFFF,
-                        ), // color-gate: ignore (dstIn alpha mask)
-                        Color(
-                          0x00FFFFFF,
-                        ), // color-gate: ignore (dstIn alpha mask)
-                      ],
-                      stops: [0.0, sTop, sBot, 1.0],
-                    ).createShader(rect);
-                  },
-                  blendMode: BlendMode.dstIn,
-                  child: NotificationListener<ScrollUpdateNotification>(
-                    onNotification: (_) {
-                      WidgetsBinding.instance.addPostFrameCallback(
-                        (_) => _checkOverflow(),
-                      );
-                      return false;
-                    },
-                    child: SingleChildScrollView(
-                      controller: _scroll,
-                      physics: const BouncingScrollPhysics(),
-                      child: reasoningContent(display),
-                    ),
-                  ),
-                )
-              : SingleChildScrollView(
-                  controller: _scroll,
-                  physics: const NeverScrollableScrollPhysics(),
-                  child: reasoningContent(display),
-                ),
+          child: OptionalShaderMask(
+            enabled: _hasOverflow,
+            shaderCallback: (rect) {
+              final h = rect.height;
+              const double topFade = 12.0;
+              const double bottomFade = 28.0;
+              final double sTop = (topFade / h).clamp(0.0, 1.0);
+              final double sBot = (1.0 - bottomFade / h).clamp(0.0, 1.0);
+              return LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: const [
+                  Color(0x00FFFFFF), // color-gate: ignore (dstIn alpha mask)
+                  Color(0xFFFFFFFF), // color-gate: ignore (dstIn alpha mask)
+                  Color(0xFFFFFFFF), // color-gate: ignore (dstIn alpha mask)
+                  Color(0x00FFFFFF), // color-gate: ignore (dstIn alpha mask)
+                ],
+                stops: [0.0, sTop, sBot, 1.0],
+              ).createShader(rect);
+            },
+            blendMode: BlendMode.dstIn,
+            child: NotificationListener<ScrollUpdateNotification>(
+              onNotification: (_) {
+                WidgetsBinding.instance.addPostFrameCallback(
+                  (_) => _checkOverflow(),
+                );
+                return false;
+              },
+              child: SingleChildScrollView(
+                controller: _scroll,
+                physics: const BouncingScrollPhysics(),
+                child: reasoningContent(display),
+              ),
+            ),
+          ),
         ),
       );
     }

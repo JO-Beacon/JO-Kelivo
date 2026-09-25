@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +8,7 @@ void main() {
     late Directory root;
     late File installer;
     late File compiler;
+    late File compilerSource;
     late File harness;
     late File cachedLanguage;
     late File installedLanguage;
@@ -30,13 +30,35 @@ void main() {
       await icon.parent.create(recursive: true);
       await icon.writeAsBytes([]);
       await Directory(p.join(root.path, 'release')).create();
-      compiler = File(p.join(root.path, 'compiler', 'ISCC.ps1'));
-      await compiler.parent.create();
-      compilerArguments = File(p.join(compiler.parent.path, 'arguments.json'));
-      await compiler.writeAsString(r'''
-Set-Content -LiteralPath (Join-Path $PSScriptRoot 'arguments.json') -Value (ConvertTo-Json -InputObject @($args)) -Encoding UTF8
-$global:LASTEXITCODE = 0
+      compiler = File(
+        p.join(root.path, 'compiler', 'Inno Setup 7', 'ISCC.exe'),
+      );
+      await compiler.parent.create(recursive: true);
+      compilerArguments = File(p.join(compiler.parent.path, 'arguments.txt'));
+      compilerSource = File(p.join(root.path, 'StubCompiler.cs'));
+      await compilerSource.writeAsString(r'''
+using System;
+using System.IO;
+
+static class StubCompiler
+{
+    static int Main(string[] args)
+    {
+        var output = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "arguments.txt");
+        File.WriteAllLines(output, args);
+        return 0;
+    }
+}
 ''');
+      final compilerResult = await Process.run(
+        r'C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe',
+        ['/nologo', '/out:${compiler.path}', compilerSource.path],
+      );
+      if (compilerResult.exitCode != 0) {
+        throw StateError(
+          'Failed to compile installer stub:\n${compilerResult.stdout}\n${compilerResult.stderr}',
+        );
+      }
       cachedLanguage = File(
         p.join(
           root.path,
@@ -81,14 +103,11 @@ try {
       p.join(root.path, 'dist'),
     ]);
 
-    Future<List<dynamic>> readArguments() async =>
-        jsonDecode(
-              (await compilerArguments.readAsString()).replaceFirst(
-                '\ufeff',
-                '',
-              ),
-            )
-            as List<dynamic>;
+    Future<List<String>> readArguments() async =>
+        (await compilerArguments.readAsString())
+            .split(RegExp(r'\r?\n'))
+            .where((line) => line.isNotEmpty)
+            .toList();
 
     test('复用已有缓存，不重复联网下载', () async {
       await cachedLanguage.parent.create(recursive: true);

@@ -564,6 +564,30 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
         ),
       ];
     }
+    if (service is KimiOptions) {
+      return [
+        field(
+          key: 'apiKey',
+          label: l10n.searchServicesDialogApiKey,
+          obscure: true,
+          validator: requiredApiKey,
+        ),
+        _buildMultiKeyEntry(context),
+        _SearchEditorDropdown(
+          key: const ValueKey('search-service-field-mode'),
+          label: l10n.searchServicesDialogSearchMode,
+          value: KimiOptions.normalizeMode(_text('mode')),
+          items: [
+            for (final mode in KimiOptions.modes)
+              (value: mode, label: KimiOptions.modeLabel(mode)),
+          ],
+          onChanged: (value) {
+            _controller('mode').text = value;
+            _markDirty();
+          },
+        ),
+      ];
+    }
     if (service is AnySearchOptions) {
       return [
         field(
@@ -1188,6 +1212,8 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
       _putController('apiKey', service.apiKey);
     } else if (service is DoubaoOptions) {
       _putController('apiKey', service.apiKey);
+    } else if (service is KagiOptions) {
+      _putController('apiKey', service.apiKey);
     } else if (service is SerperOptions) {
       _putController('apiKey', service.apiKey);
       _putController('gl', service.gl);
@@ -1211,6 +1237,9 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
       _putController('apiKey', service.apiKey);
       _putController('contentMode', service.contentMode);
     } else if (service is ParallelOptions) {
+      _putController('apiKey', service.apiKey);
+      _putController('mode', service.mode);
+    } else if (service is KimiOptions) {
       _putController('apiKey', service.apiKey);
       _putController('mode', service.mode);
     } else if (service is AnySearchOptions) {
@@ -1351,6 +1380,12 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
           apiKey: _text('apiKey'),
           extraApiKeys: _extraApiKeys,
         );
+      case 'kagi':
+        return KagiOptions(
+          id: _serviceId,
+          apiKey: _text('apiKey'),
+          extraApiKeys: _extraApiKeys,
+        );
       case 'serper':
         return SerperOptions(
           id: _serviceId,
@@ -1397,6 +1432,13 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
           apiKey: _text('apiKey'),
           extraApiKeys: _extraApiKeys,
           mode: ParallelOptions.normalizeMode(_text('mode')),
+        );
+      case 'kimi':
+        return KimiOptions(
+          id: _serviceId,
+          apiKey: _text('apiKey'),
+          extraApiKeys: _extraApiKeys,
+          mode: KimiOptions.normalizeMode(_text('mode')),
         );
       case 'anysearch':
         return AnySearchOptions(
@@ -2465,11 +2507,13 @@ String _typeForService(SearchServiceOptions service) {
   if (service is PerplexityOptions) return 'perplexity';
   if (service is BochaOptions) return 'bocha';
   if (service is DoubaoOptions) return 'doubao';
+  if (service is KagiOptions) return 'kagi';
   if (service is SerperOptions) return 'serper';
   if (service is QueritOptions) return 'querit';
   if (service is GrokOptions) return 'grok';
   if (service is YouSearchOptions) return 'you';
   if (service is ParallelOptions) return 'parallel';
+  if (service is KimiOptions) return 'kimi';
   if (service is AnySearchOptions) return 'anysearch';
   if (service is StepFunOptions) return 'stepfun';
   if (service is FirecrawlOptions) return 'firecrawl';
@@ -2512,6 +2556,8 @@ SearchServiceOptions _defaultService(String type, String id) {
       return BochaOptions(id: id, apiKey: '');
     case 'doubao':
       return DoubaoOptions(id: id, apiKey: '');
+    case 'kagi':
+      return KagiOptions(id: id, apiKey: '');
     case 'serper':
       return SerperOptions(id: id, apiKey: '');
     case 'querit':
@@ -2522,6 +2568,8 @@ SearchServiceOptions _defaultService(String type, String id) {
       return YouSearchOptions(id: id, apiKey: '');
     case 'parallel':
       return ParallelOptions(id: id, apiKey: '');
+    case 'kimi':
+      return KimiOptions(id: id, apiKey: '');
     case 'anysearch':
       return AnySearchOptions(id: id, apiKey: '');
     case 'stepfun':
@@ -2566,6 +2614,8 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameBocha;
     case 'doubao':
       return l10n.searchServiceNameDoubao;
+    case 'kagi':
+      return l10n.searchServiceNameKagi;
     case 'serper':
       return l10n.searchServiceNameSerper;
     case 'querit':
@@ -2576,6 +2626,8 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameYou;
     case 'parallel':
       return l10n.searchServiceNameParallel;
+    case 'kimi':
+      return l10n.searchServiceNameKimi;
     case 'anysearch':
       return l10n.searchServiceNameAnySearch;
     case 'stepfun':
@@ -2604,11 +2656,13 @@ const _providerTypes = <({String type, String brand})>[
   (type: 'perplexity', brand: 'perplexity'),
   (type: 'bocha', brand: 'bocha'),
   (type: 'doubao', brand: 'doubao'),
+  (type: 'kagi', brand: 'kagi'),
   (type: 'serper', brand: 'serper'),
   (type: 'querit', brand: 'querit'),
   (type: 'grok', brand: 'grok'),
   (type: 'you', brand: 'you'),
   (type: 'parallel', brand: 'parallel'),
+  (type: 'kimi', brand: 'kimi'),
   (type: 'anysearch', brand: 'anysearch'),
   (type: 'stepfun', brand: 'stepfun'),
   (type: 'firecrawl', brand: 'firecrawl'),

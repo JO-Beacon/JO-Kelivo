@@ -6,7 +6,13 @@
   "settingsSearchNoResults": "No settings found",
   "settingsSearchNoResultsHint": "Try a different name or a shorter keyword.",
   "settingsSearchResultCount": "{count, plural, =1{1 result} other{{count} results}}",
-  "@settingsSearchResultCount": {"placeholders": {"count": {"type": "int"}}},
+  "@settingsSearchResultCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "chatImageCropFailed": "Could not crop \"{fileName}\": {error}",
   "@chatImageCropFailed": {
     "placeholders": {
@@ -3349,14 +3355,14 @@
   "worldBookDragToReorder": "Drag to reorder",
   "worldBookEnabledCount": "{enabled}/{total} enabled",
   "@worldBookEnabledCount": {
-      "placeholders": {
-          "enabled": {
-              "type": "int"
-          },
-          "total": {
-              "type": "int"
-          }
+    "placeholders": {
+      "enabled": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
       }
+    }
   },
   "conversationPromptScope": "This conversation",
   "conversationSystemPromptTitle": "Conversation system prompt",
@@ -3381,11 +3387,11 @@
   "oauthCustomRequest": "Custom request",
   "oauthDays": "{count} day window",
   "@oauthDays": {
-      "placeholders": {
-          "count": {
-              "type": "String"
-          }
+    "placeholders": {
+      "count": {
+        "type": "String"
       }
+    }
   },
   "oauthDenied": "Authorization was not granted. Please try again.",
   "oauthDetails": "View account details",
@@ -3395,51 +3401,51 @@
   "oauthEndpoint": "Endpoint",
   "oauthExpired": "{provider} login has expired",
   "@oauthExpired": {
-      "placeholders": {
-          "provider": {
-              "type": "String"
-          }
+    "placeholders": {
+      "provider": {
+        "type": "String"
       }
+    }
   },
   "oauthExtraUsage": "Extra usage",
   "oauthFollowGlobal": "Follow global settings",
   "oauthHours": "{count} hour window",
   "@oauthHours": {
-      "placeholders": {
-          "count": {
-              "type": "String"
-          }
+    "placeholders": {
+      "count": {
+        "type": "String"
       }
+    }
   },
   "oauthInvalidAuthorizationCode": "Enter the code or callback URL from this login attempt.",
   "oauthInvalidResponse": "Authorization did not complete. Please try again.",
   "oauthLastUpdated": "Updated {time}",
   "@oauthLastUpdated": {
-      "placeholders": {
-          "time": {
-              "type": "String"
-          }
+    "placeholders": {
+      "time": {
+        "type": "String"
       }
+    }
   },
   "oauthLogin": "Log in",
   "oauthLoginRestored": "Logged in. Use the message retry button to send again.",
   "oauthLoginTo": "Log in to {provider}",
   "@oauthLoginTo": {
-      "placeholders": {
-          "provider": {
-              "type": "String"
-          }
+    "placeholders": {
+      "provider": {
+        "type": "String"
       }
+    }
   },
   "oauthLogout": "Log out",
   "oauthLogoutDescription": "Remove this account’s saved credentials from this device",
   "oauthMinutes": "{count} minute window",
   "@oauthMinutes": {
-      "placeholders": {
-          "count": {
-              "type": "String"
-          }
+    "placeholders": {
+      "count": {
+        "type": "String"
       }
+    }
   },
   "oauthModelsHint": "Available models are synced from your account.",
   "oauthMonthly": "Monthly window",
@@ -3462,19 +3468,19 @@
   "oauthRequestFailed": "The provider could not complete the request.",
   "oauthResetsAt": "Resets {time}",
   "@oauthResetsAt": {
-      "placeholders": {
-          "time": {
-              "type": "String"
-          }
+    "placeholders": {
+      "time": {
+        "type": "String"
       }
+    }
   },
   "oauthSavedResets": "Available usage resets: {count}",
   "@oauthSavedResets": {
-      "placeholders": {
-          "count": {
-              "type": "String"
-          }
+    "placeholders": {
+      "count": {
+        "type": "String"
       }
+    }
   },
   "oauthSaving": "Connecting account…",
   "oauthScope": "Authorization scope",
@@ -3489,11 +3495,11 @@
   "oauthUsageUnavailable": "Usage is currently unavailable",
   "oauthWaiting": "Waiting for {provider} authorization",
   "@oauthWaiting": {
-      "placeholders": {
-          "provider": {
-              "type": "String"
-          }
+    "placeholders": {
+      "provider": {
+        "type": "String"
       }
+    }
   },
   "oauthWeekly": "Weekly window",
   "oauthWindow": "Usage window",
@@ -4514,7 +4520,6 @@
   "modelDetailSheetOpenrouterShellTool": "Shell",
   "modelDetailSheetOpenrouterShellToolDescription": "Run Shell commands in a hosted, isolated sandbox",
   "modelSelectSheetFollowAssistant": "Follow assistant",
-  "aboutPageQQGroupThree": "Kelivo Group 3",
   "displaySettingsPageForkKeepMessageVersionsTitle": "Keep Message Versions When Forking",
   "displaySettingsPageEditAssistantKeepThinkingToolCardsTitle": "Keep thinking and tool cards when editing assistant",
   "displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle": "When off, the edited version keeps only the assistant text. Switching back still shows previous thinking and tool cards.",
@@ -5372,11 +5377,11 @@
   "skillsDetailBodyEmpty": "No skill body yet",
   "skillsDetailBodyTooLarge": "This file is too large to preview ({size}).",
   "@skillsDetailBodyTooLarge": {
-      "placeholders": {
-          "size": {
-              "type": "String"
-          }
+    "placeholders": {
+      "size": {
+        "type": "String"
       }
+    }
   },
   "workspaceEnvSizeTimeout": "Timed out",
   "workspaceEnvInfoCopied": "Environment info copied",
@@ -5762,5 +5767,163 @@
   "mcpServerEditSheetStdioEnvNameHint": "ENV_NAME",
   "mcpServerEditSheetStdioEnvValueHint": "Value",
   "mcpServerEditSheetSseUrlHint": "http://localhost:3000/sse",
-  "mcpServerEditSheetHttpUrlHint": "http://localhost:3000"
+  "mcpServerEditSheetHttpUrlHint": "http://localhost:3000",
+  "chatMessageWidgetRegenerateConfirmDeleteTrailingContent": "Regenerating will delete all messages below this message and cannot be undone. Continue?",
+  "aboutPageEasterEggMessage": "Thanks for exploring! \n (No egg yet)",
+  "aboutPageEasterEggButton": "Nice!",
+  "aboutPageKelivoSearchUnlocked": "An unnamed door opened a crack. You might find it in Settings.",
+  "aboutPageKelivoSearchAlreadyUnlocked": "You've already been through this door.",
+  "displaySettingsPageRegenerateDeleteTrailingMessagesTitle": "Delete messages below when regenerating",
+  "searchServiceNameKimi": "Kimi",
+  "searchProviderKimiDescription": "Kimi Search API. Pro returns relevant web content excerpts; Basic returns titles, links, and snippets.",
+  "workspaceEntryDefaultWorkspaceUnset": "Not set",
+  "workspaceEntryDefaultWorkspaceAutomaticSubtitle": "The first workspace you bind to a conversation will be remembered for new conversations.",
+  "workspaceBindingRememberedDefault": "Remembered as the default workspace for “{assistant}”. New conversations will use it.",
+  "@workspaceBindingRememberedDefault": {
+    "placeholders": {
+      "assistant": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceBindingSuggestDefault": "Use this workspace for future conversations with “{assistant}” too?",
+  "@workspaceBindingSuggestDefault": {
+    "placeholders": {
+      "assistant": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceBindingUndoDefault": "Undo",
+  "workspaceBindingUseAsDefault": "Set as default",
+  "scheduledTasksPreparation": "Execution and notifications",
+  "scheduledTasksAllowPreparation": "Allow advance preparation",
+  "scheduledTasksPreparationDetail": "Advance preparation is for text tasks that do not need current information. It cannot use tools or attachments, or perform external actions.",
+  "scheduledTasksIOSDetail": "iOS background limits prevent Kelivo from waking at a set time to run a model. Instead, content is prepared while the app can run, and the system shows a notification at the scheduled time. Only the next occurrence is prepared. Preparation may not finish after leaving the app; reopen Kelivo to prepare subsequent occurrences.",
+  "scheduledTasksContextPolicy": "Conversation context",
+  "scheduledTasksContextLatest": "Follow the latest conversation",
+  "scheduledTasksContextSnapshot": "Use the prepared snapshot",
+  "scheduledTasksUnavailable": "When unable to execute",
+  "scheduledTasksRemind": "Send a reminder only",
+  "scheduledTasksSkip": "Skip this occurrence",
+  "scheduledTasksNotify": "Result notifications",
+  "scheduledTasksShowPreview": "Show result text in notifications",
+  "scheduledTasksPreparationWindow": "Prepare up to",
+  "scheduledTasksPreparationAttempts": "Attempts per occurrence",
+  "scheduledTasksPreparationCooldown": "Minimum interval (minutes)",
+  "scheduledTasksPreparationBudget": "At most one preparation at a time and six attempts per hour across all tasks. Cancelled attempts count toward the limit.",
+  "scheduledTasksPreparing": "Preparing result",
+  "scheduledTasksPrepared": "Result prepared",
+  "scheduledTasksPendingPreparation": "Result not prepared yet",
+  "scheduledTasksNotificationRegistered": "Notification scheduled",
+  "scheduledTasksNotificationUnavailable": "Notification not scheduled",
+  "scheduledTasksReminded": "Due · reminder only",
+  "scheduledTasksSkipped": "Skipped",
+  "scheduledTasksCancelled": "Cancelled",
+  "scheduledTasksReminderBody": "Your scheduled task is due. Open Kelivo to continue.",
+  "scheduledTasksResultBody": "Your scheduled task result is ready.",
+  "scheduledTasksNotificationPermission": "Allow task notifications",
+  "scheduledTasksPreparationCost": "Preparation calls the model and may cost extra. With “Follow latest conversation”, new messages can invalidate a prepared result. Unused or cancelled output may still be billed, and preparing again makes another model request.",
+  "scheduledTasksAllowPreparationTip": "Generate the next result before its scheduled time, while Kelivo can run. The result stays out of the chat until it is due. Preparation uses text only, without tools, attachments or custom request bodies. It may incur model charges.",
+  "scheduledTasksContextPolicyTip": "Follow latest conversation: new messages, edits or switching message versions invalidate the prepared result; preparing again uses another attempt and may cost extra.\n\nUse preparation snapshot: keep the prepared result even if the conversation changes. It will not reflect later messages.",
+  "scheduledTasksPreparationWindowTip": "How far ahead of the scheduled time preparation may begin, up to 24 hours. For example, opening Kelivo at noon can prepare the next morning’s reminder. A larger window gives more chances to prepare, but the result may be less current. It does not change the scheduled time or guarantee background execution.",
+  "scheduledTasksPreparationAttemptsTip": "Maximum preparation attempts for one occurrence, including the first attempt, failures and cancellations. More attempts allow more retries but may cost more. This limits attempts, not spending.",
+  "scheduledTasksPreparationCooldownTip": "Minimum time between the start of preparation attempts for the same occurrence. Waiting longer reduces repeated requests. A retry still needs the app to be able to run; it is not a background timer.",
+  "scheduledTasksUnavailableTip": "If no prepared result is available and the task cannot run when due, send a reminder or skip the occurrence. A reminder contains no generated answer and requires notifications to be enabled. If Kelivo is open when the task is due, it can run the task then.",
+  "scheduledTasksNotifyTip": "Allow result notifications and fallback reminders. Turning this off does not stop the task or model calls, and does not prevent preparation charges. System notification permission is also required.",
+  "scheduledTasksShowPreviewTip": "Show the prepared result text in the notification, including on the lock screen if allowed by system settings. Turn this off to show a generic notice; the full result remains available in the chat. Global notification privacy settings also apply.",
+  "scheduledTasksHours": "{count, plural, =1{1 hour} other{{count} hours}}",
+  "scheduledTasksMinutes": "{count, plural, =1{1 minute} other{{count} minutes}}",
+  "@scheduledTasksHours": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@scheduledTasksMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "searchServiceNameKagi": "Kagi",
+  "searchProviderKagiDescription": "Kagi Search API. Returns premium web search results from Kagi.",
+  "scheduledTasksPreparationOff": "Preparation off",
+  "scheduledTasksPreparationQueued": "Queued",
+  "scheduledTasksPreparationQueuedDetail": "Another task is being prepared. Eligible tasks continue in due-time order.",
+  "scheduledTasksPreparationIdle": "Waiting for chat",
+  "scheduledTasksPreparationIdleDetail": "Preparation resumes after active replies finish and this task’s context settles.",
+  "scheduledTasksPreparationWindowWaiting": "Outside preparation window",
+  "scheduledTasksPreparationCooldownWaiting": "Waiting to retry",
+  "scheduledTasksPreparationRetryAt": "Can retry after {time}",
+  "scheduledTasksPreparationLimitReached": "Automatic attempt limit reached",
+  "scheduledTasksPreparationAttemptsUsed": "This occurrence has used {count} attempts; the automatic limit is {limit}. Use Prepare now to continue manually.",
+  "scheduledTasksPreparationHourlyLimit": "Automatic hourly limit reached",
+  "scheduledTasksPreparationHourlyLimitDetail": "Automatic preparation is paused until hourly capacity is available. You can still use Prepare now.",
+  "scheduledTasksPreparationUnavailable": "Preparation unavailable",
+  "scheduledTasksPreparationReadFailed": "Could not read task context. It will be checked again shortly; see execution history for details.",
+  "scheduledTasksPreparationResultRetained": "Context could not be checked. The prepared result is retained and will be checked again.",
+  "scheduledTasksPreparationContextChanged": "The conversation or task context changed, so the earlier result was discarded.",
+  "scheduledTasksPreparationPublishing": "Waiting to add to chat",
+  "scheduledTasksPreparationPublishingDetail": "The saved result will be added to the conversation when the current reply finishes.",
+  "@scheduledTasksPreparationRetryAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "@scheduledTasksPreparationAttemptsUsed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "scheduledTasksPreparationPrompt": "Preparation prompt",
+  "scheduledTasksPreparationPromptTip": "Extra system instructions used only when preparing this task in advance, separate from the task instructions. You can change the style or remove these instructions entirely. Tools and live information remain unavailable. Editing this prompt invalidates any result prepared before the due time; preparing it again may incur another model charge.",
+  "scheduledTasksPreparationPromptEmpty": "Leave empty to add no preparation instructions",
+  "scheduledTasksPreparationPromptVariables": "Placeholders: {timeVariable} is the planned local delivery time; {offsetVariable} is its UTC offset. These are replaced when preparing the result.",
+  "@scheduledTasksPreparationPromptVariables": {
+    "placeholders": {
+      "timeVariable": {
+        "type": "String"
+      },
+      "offsetVariable": {
+        "type": "String"
+      }
+    }
+  },
+  "scheduledTasksPrepareNow": "Prepare now",
+  "scheduledTasksPrepareNowDetail": "Prepare the next result now and deliver it at the scheduled time. Automatic waiting periods and attempt limits do not apply. This may incur model charges. An existing prepared result is reused.",
+  "scheduledTasksPrepareNowReady": "The next result is already prepared. No additional model request was made.",
+  "scheduledTasksPrepareNowStarted": "Preparing the next result for its scheduled time.",
+  "scheduledTasksPrepareNowBusy": "Another task is being prepared. Please try again when it finishes.",
+  "scheduledTasksPrepareNowChatBusy": "Please wait for the current reply to finish, then try again.",
+  "scheduledTasksPrepareNowDisabled": "Enable this task and advance preparation first. Regenerate tasks cannot be prepared in advance.",
+  "scheduledTasksPrepareNowUnavailable": "Preparation is not available yet. Please try again shortly.",
+  "scheduledTasksPrepareNowNoUpcoming": "There is no upcoming occurrence to prepare. Check the task time and enabled state.",
+  "phoneControlTitle": "Phone Control",
+  "phoneControlSubtitle": "Read the screen and perform actions through Accessibility",
+  "phoneControlAccessibilityService": "Accessibility service",
+  "phoneControlOpenSettings": "Open accessibility settings",
+  "phoneControlRefresh": "Refresh status",
+  "phoneControlChecking": "Checking service status…",
+  "phoneControlReady": "Enabled and connected",
+  "phoneControlDisabled": "Not enabled",
+  "phoneControlDisconnected": "Enabled, but not connected. Try turning the service off and on in system settings, then refresh.",
+  "phoneControlStatusUnavailable": "Unable to read service status. Refresh to try again.",
+  "phoneControlSettingsUnavailable": "Unable to open settings. Open Android Settings → Accessibility manually.",
+  "phoneControlUsageTitle": "How it works",
+  "phoneControlDisclosure": "For phone control tasks you request in a conversation, the assistant can read the current screen, tap, enter text, scroll, navigate, and open apps. Screen content is sent to the model provider configured for that conversation and is saved in its tool results. Password fields are hidden. This service does not continuously record screen content. You can turn off this tool for the assistant, or disable the service in system settings at any time.",
+  "phoneControlAssistantTitle": "Enable the tool for your assistant",
+  "phoneControlAssistantHint": "Both permissions are required: enable JO-AIClient phone control in system Accessibility settings, then enable Phone Control under your assistant’s Local Tools (also available in the chat tools menu). Each assistant is configured separately. Keep the phone unlocked while running a task.",
+  "phoneControlRestrictedTitle": "Accessibility switch unavailable?",
+  "phoneControlRestrictedHint": "For some downloaded APKs, Android requires “Allow restricted settings” in the app info menu first. Tap to open JO-AIClient’s app info, then return to Accessibility settings.",
+  "phoneControlEnableAssistant": "Allow this assistant to use phone control"
 }

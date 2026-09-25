@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   final Color surfaceFill;
   final Color surfaceCard;
+  final Color hairline;
   final Color success;
   final Color successContainer;
   final Color onSuccessContainer;
@@ -21,6 +22,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   const AppSemanticColors({
     required this.surfaceFill,
     required this.surfaceCard,
+    required this.hairline,
     required this.success,
     required this.successContainer,
     required this.onSuccessContainer,
@@ -50,6 +52,14 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     return Color.alphaBlend(cs.onSurface.withValues(alpha: alpha), cs.surface);
   }
 
+  /// 卡片、列表分隔与描边用的极淡线条色。
+  /// 由 [ColorScheme.outlineVariant] 派生，深浅模式各取一档。
+  static Color _deriveHairline(ColorScheme cs) {
+    return cs.outlineVariant.withValues(
+      alpha: cs.brightness == Brightness.dark ? 0.12 : 0.08,
+    );
+  }
+
   /// iOS 风格的分区卡片背景。
   /// 替代旧的 `isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96)` 写法。
   static Color _deriveSurfaceCard(ColorScheme cs) {
@@ -70,6 +80,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     return AppSemanticColors(
       surfaceFill: layered ? cs.surfaceContainer : _deriveSurfaceFill(cs),
       surfaceCard: layered ? cs.surfaceContainerHigh : _deriveSurfaceCard(cs),
+      hairline: _deriveHairline(cs),
       success: successBase.harmonizeWith(cs.primary),
       successContainer: const Color(0xFFA5D6A7).harmonizeWith(cs.primary),
       onSuccessContainer: const Color(0xFF1B5E20),
@@ -97,6 +108,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     return AppSemanticColors(
       surfaceFill: layered ? cs.surfaceContainer : _deriveSurfaceFill(cs),
       surfaceCard: layered ? cs.surfaceContainerHigh : _deriveSurfaceCard(cs),
+      hairline: _deriveHairline(cs),
       success: successBase.harmonizeWith(cs.primary),
       successContainer: const Color(0xFF1B5E20).harmonizeWith(cs.primary),
       onSuccessContainer: const Color(0xFFC8E6C9),
@@ -122,6 +134,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   AppSemanticColors copyWith({
     Color? surfaceFill,
     Color? surfaceCard,
+    Color? hairline,
     Color? success,
     Color? successContainer,
     Color? onSuccessContainer,
@@ -135,6 +148,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     return AppSemanticColors(
       surfaceFill: surfaceFill ?? this.surfaceFill,
       surfaceCard: surfaceCard ?? this.surfaceCard,
+      hairline: hairline ?? this.hairline,
       success: success ?? this.success,
       successContainer: successContainer ?? this.successContainer,
       onSuccessContainer: onSuccessContainer ?? this.onSuccessContainer,
@@ -156,6 +170,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     return AppSemanticColors(
       surfaceFill: Color.lerp(surfaceFill, other.surfaceFill, t)!,
       surfaceCard: Color.lerp(surfaceCard, other.surfaceCard, t)!,
+      hairline: Color.lerp(hairline, other.hairline, t)!,
       success: Color.lerp(success, other.success, t)!,
       successContainer: Color.lerp(
         successContainer,

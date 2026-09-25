@@ -44,6 +44,7 @@ final class BusinessKeyRegistry {
 
   static const preferenceKeys = <String>{
     'desktop_scheduled_tasks_v1',
+    'scheduled_task_results_v1',
     'current_assistant_id_v1',
     'selected_model_v1',
     'per_chat_model_enabled_v1',
@@ -1014,6 +1015,7 @@ final class BusinessSettingsRouter {
       case 'ollama':
       case 'jina':
       case 'doubao':
+      case 'kagi':
         _validateKnownFields(
           kind,
           payload,
@@ -1076,6 +1078,30 @@ final class BusinessSettingsRouter {
             'countries',
             'languages',
           },
+          stringLists: const {'apiKeys'},
+        );
+      case 'anysearch':
+        _validateKnownFields(
+          kind,
+          payload,
+          strings: const {'apiKey', 'url'},
+          stringLists: const {'apiKeys'},
+        );
+      case 'parallel':
+      case 'kimi':
+        _validateKnownFields(
+          kind,
+          payload,
+          requiredStrings: const {'apiKey'},
+          strings: const {'mode'},
+          stringLists: const {'apiKeys'},
+        );
+      case 'you':
+        _validateKnownFields(
+          kind,
+          payload,
+          requiredStrings: const {'apiKey'},
+          strings: const {'contentMode'},
           stringLists: const {'apiKeys'},
         );
     }

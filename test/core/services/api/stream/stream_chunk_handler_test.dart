@@ -10,6 +10,121 @@ import 'package:Kelivo/core/services/api/stream/stream_chunk_handler.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('materialized snapshots survive later appends and text boundaries', () {
+    final handler = StreamChunkHandler();
+    handler.handle(const ReasoningDelta(id: 'r', text: 'plan'));
+    handler.handle(const TextDelta(id: 't', text: 'before'));
+    final before = handler.parts;
+    handler.handle(const TextDelta(id: 't', text: '\n'));
+    handler.handle(const TextDelta(id: 't', text: '\uD83D'));
+    handler.handle(const TextDelta(id: 't', text: '\uDE42'));
+    final after = handler.parts;
+    expect((before.last as TextPart).text, 'before');
+    expect(identical(before.first, after.first), true);
+    expect(identical(after, handler.parts), true);
+    handler.handle(const TextEnd('t'));
+    handler.handle(const TextDelta(id: 't', text: 'next'));
+    handler.handle(const ReasoningDelta(id: 'r', text: ' finished'));
+    expect(
+      handler.toResult().parts.whereType<ReasoningPart>().single.text,
+      'plan finished',
+    );
+    expect(handler.toResult().parts.whereType<TextPart>().map((p) => p.text), [
+      'before\n\uD83D\uDE42',
+      'next',
+    ]);
+    expect((before.first as ReasoningPart).text, 'plan');
+  });
+
+  test(
+    'a hosted card keeps its input when the result lands a response later',
+    () {
+      // A turn that starts a hosted tool alongside a client one is cut in two:
+      // the call streams its input in the first response and the result only
+      // arrives in the second, whose decoder never saw that input.
+      final handler = StreamChunkHandler();
+      handler.handle(const ToolCallStart(id: 'srvtoolu_1', toolName: 'web 获取'));
+      handler.handle(
+        const ServerToolStart(id: 'srvtoolu_1', toolName: 'web 获取'),
+      );
+      handler.handle(
+        const ToolCallDelta(
+          id: 'srvtoolu_1',
+          inputDelta: '{"url":"https://example.com"}',
+        ),
+      );
+      handler.handle(const ToolCallEnd('srvtoolu_1'));
+      handler.handle(
+        const ServerToolEnd(
+          id: 'srvtoolu_1',
+          output: <String, dynamic>{'content': 'ok'},
+        ),
+      );
+
+      final card = jsonDecode(
+        handler.parts.whereType<ToolCallPart>().single.payloadJson,
+      );
+      expect(card['arguments'], {'url': 'https://example.com'});
+    },
+  );
+
+  test(
+    'an empty input reported for a card does not erase the streamed one',
+    () {
+      // Empty arguments are no news, whoever reports them: a decoder closing an
+      // unfinished call still knows less about its input than the deltas do.
+      final handler = StreamChunkHandler();
+      handler.handle(const ToolCallStart(id: 'srvtoolu_1', toolName: 'web 获取'));
+      handler.handle(
+        const ToolCallDelta(
+          id: 'srvtoolu_1',
+          inputDelta: '{"url":"https://example.com"}',
+        ),
+      );
+      handler.handle(
+        const ServerToolEnd(
+          id: 'srvtoolu_1',
+          input: <String, dynamic>{},
+          status: ServerToolStatus.failed,
+        ),
+      );
+
+      final card = jsonDecode(
+        handler.parts.whereType<ToolCallPart>().single.payloadJson,
+      );
+      expect(card['arguments'], {'url': 'https://example.com'});
+    },
+  );
+
+  test('a generated file becomes an image part only when it is one', () {
+    final handler = StreamChunkHandler();
+    handler.handle(
+      const GeneratedFile(
+        uri: 'kelivo-file:///upload/chart.png',
+        name: 'chart.png',
+        mime: 'image/png',
+      ),
+    );
+    handler.handle(
+      const GeneratedFile(
+        uri: 'kelivo-file:///upload/data.csv',
+        name: 'data.csv',
+        mime: 'text/csv',
+      ),
+    );
+    handler.handle(
+      const GeneratedFile(uri: '', name: 'nothing.txt', mime: 'text/plain'),
+    );
+
+    expect(handler.parts, hasLength(2));
+    final image = handler.parts[0] as ImagePart;
+    expect(image.uri, 'kelivo-file:///upload/chart.png');
+    expect(image.mime, 'image/png');
+    final file = handler.parts[1] as FilePart;
+    expect(file.uri, 'kelivo-file:///upload/data.csv');
+    expect(file.name, 'data.csv');
+  });
+
   test('creates a text part on Delta when Start was omitted', () {
     final handler = StreamChunkHandler();
     handler.handle(const TextDelta(id: 't', text: 'Hello'));

@@ -79,7 +79,7 @@ void main() {
         // （见 AppDatabase._openExecutor）。所以这里用 9——同样会让实时执行器的
         // setup 在 drift 的 worker isolate 上抛错，调用方同样只看到
         // DriftRemoteException，而被夹带出来的诊断码变成 database_schema_too_new。
-        await createDatabaseAtVersion(directory, 9);
+        await createDatabaseAtVersion(directory, 10);
         final database = AppDatabase.open(file: databaseFile(directory));
         Object? caught;
         StackTrace? caughtStack;

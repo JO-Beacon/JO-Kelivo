@@ -4,6 +4,7 @@ import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/database/generation_run.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/message_part.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -61,6 +62,68 @@ void main() {
       }
     });
 
+    test(
+      'checkpoints preserve unchanged parts and remove only a truncated tail',
+      () async {
+        final snapshot = ChatMessage(
+          id: 'streaming',
+          role: 'assistant',
+          conversationId: 'conversation',
+          isStreaming: true,
+          parts: const [
+            ReasoningPart('plan'),
+            TextPart('before'),
+            TextPart('tail'),
+          ],
+        );
+        await repository.updateStreamingCheckpoint(snapshot, const []);
+        final raw = sqlite.sqlite3.open('${directory.path}/chat.sqlite');
+        try {
+          final before = raw.select(
+            "SELECT part_id, updated_at FROM message_part_rows WHERE revision_id = 'streaming' ORDER BY ordinal",
+          );
+          await repository.updateStreamingCheckpoint(
+            snapshot.copyWith(
+              parts: const [
+                ReasoningPart('plan'),
+                TextPart('before'),
+                TextPart('tail more'),
+              ],
+            ),
+            const [],
+          );
+          final after = raw.select(
+            "SELECT part_id, updated_at FROM message_part_rows WHERE revision_id = 'streaming' ORDER BY ordinal",
+          );
+          expect(
+            after.map((r) => r['part_id']),
+            before.map((r) => r['part_id']),
+          );
+          expect(
+            after.take(2).map((r) => r['updated_at']),
+            before.take(2).map((r) => r['updated_at']),
+          );
+          await repository.updateStreamingCheckpoint(
+            snapshot.copyWith(
+              parts: const [ReasoningPart('plan'), TextPart('before')],
+              isStreaming: false,
+            ),
+            const [],
+          );
+          final finalRows = raw.select(
+            "SELECT part_id, payload FROM message_part_rows WHERE revision_id = 'streaming' ORDER BY ordinal",
+          );
+          expect(
+            finalRows.map((r) => r['part_id']),
+            before.take(2).map((r) => r['part_id']),
+          );
+          expect(finalRows.map((r) => r['payload']), ['plan', 'before']);
+        } finally {
+          raw.close();
+        }
+      },
+    );
+
     test('一次事务写入完整消息快照和 tool events 且不改变顺序', () async {
       final snapshot = ChatMessage(
         id: 'streaming',
@@ -109,8 +172,8 @@ void main() {
         );
         expect(parts.map((row) => row['kind']), const [
           'reasoning',
-          'tool_call',
           'text',
+          'tool_call',
         ]);
         expect(
           raw
@@ -275,14 +338,18 @@ void main() {
           'content': 'result',
         },
       ];
-      ChatMessage snapshot(String content) => ChatMessage(
+      // 复用同一份基准消息：part 的 createdAt 取自 message.timestamp，
+      // 每次新建消息都会换时间戳，会让“未变化”判定误判为重写。
+      final baseSnapshot = ChatMessage(
         id: 'streaming',
         role: 'assistant',
-        content: content,
+        content: 'draft one',
         conversationId: 'conversation',
         isStreaming: true,
         reasoningText: 'thinking',
       );
+      ChatMessage snapshot(String content) =>
+          baseSnapshot.copyWith(content: content);
 
       await repository.updateStreamingCheckpoint(
         snapshot('draft one'),
@@ -447,7 +514,7 @@ void main() {
                 "WHERE revision_id = 'streaming' ORDER BY ordinal;",
               )
               .map((row) => row['kind']),
-          const ['reasoning', 'tool_call', 'text'],
+          const ['reasoning', 'text', 'tool_call'],
         );
       } finally {
         raw.close();

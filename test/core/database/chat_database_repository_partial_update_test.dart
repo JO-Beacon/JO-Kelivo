@@ -163,7 +163,7 @@ void main() {
               "WHERE revision_id = '${message.id}' ORDER BY ordinal;",
             )
             .map((row) => row['kind']),
-        const ['reasoning', 'tool_call', 'text'],
+        const ['reasoning', 'text', 'tool_call'],
       );
     } finally {
       raw.close();

@@ -58,8 +58,6 @@ void main() {
       .map((c) => c.arguments as Map<dynamic, dynamic>)
       .toList();
 
-
-
   test(
     'equal appearance settings do not repeatedly sync native resources',
     () async {
@@ -102,7 +100,10 @@ void main() {
     await start('brand');
     await coordinator.flush();
     expect((snapshots().last['labels'] as Map)['app'], l10n.aboutPageAppName);
-    expect((snapshots().last['labels'] as Map).values.join(' '), isNot(contains('Kelivo')));
+    expect(
+      (snapshots().last['labels'] as Map).values.join(' '),
+      isNot(contains('Kelivo')),
+    );
     await coordinator.finish('brand', BackgroundTaskOutcome.cancelled);
   });
 
@@ -424,6 +425,41 @@ void main() {
       await schedule('cancelled');
       await coordinator.finish('cancelled', BackgroundTaskOutcome.cancelled);
       expect(notifications, hasLength(1));
+    },
+  );
+
+  test(
+    'per-task notification and preview controls apply to due-time execution',
+    () async {
+      coordinator.didChangeAppLifecycleState(AppLifecycleState.paused);
+      await coordinator.start(
+        id: 'silent',
+        conversationId: 'chat',
+        title: 'Task',
+        scheduled: true,
+        scheduledNotify: false,
+        cancel: () async {},
+      );
+      await coordinator.finish(
+        'silent',
+        BackgroundTaskOutcome.completed,
+        replyPreview: 'Secret',
+      );
+      expect(notifications, isEmpty);
+      await coordinator.start(
+        id: 'hidden',
+        conversationId: 'chat',
+        title: 'Task',
+        scheduled: true,
+        scheduledPreview: false,
+        cancel: () async {},
+      );
+      await coordinator.finish(
+        'hidden',
+        BackgroundTaskOutcome.completed,
+        replyPreview: 'Secret',
+      );
+      expect(notifications.single['body'], l10n.backgroundCompleted);
     },
   );
 

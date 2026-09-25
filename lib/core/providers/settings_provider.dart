@@ -205,6 +205,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_show_tool_result_summary_v1';
   static const String _displayHideToolResultImagesKey =
       'display_hide_tool_result_images_v1';
+  static const String _displayRegenerateDeleteTrailingMessagesKey =
+      'display_regenerate_delete_trailing_messages_v1';
   static const String _displayShowRegenerateConfirmDialogKey =
       'display_show_regenerate_confirm_dialog_v1';
   static const String _displayShowMessageNavKey = 'display_show_message_nav_v1';
@@ -1118,6 +1120,8 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayShowToolResultSummaryKey) ?? false;
     _hideToolResultImages =
         prefs.getBool(_displayHideToolResultImagesKey) ?? false;
+    _regenerateDeleteTrailingMessages =
+        prefs.getBool(_displayRegenerateDeleteTrailingMessagesKey) ?? false;
     _showRegenerateConfirmDialog =
         prefs.getBool(_displayShowRegenerateConfirmDialogKey) ?? true;
     _showMessageNavButtons = prefs.getBool(_displayShowMessageNavKey) ?? true;
@@ -1691,16 +1695,20 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setTtsServices(List<TtsServiceOptions> v) async {
     _ttsServices = List.unmodifiable(v);
     final prefs = _preferences;
-    final list = v.map((e) => e.toJson()).toList();
-    await prefs.setString(_ttsServicesKey, jsonEncode(list));
-    if (_selectedTtsServiceId != null &&
-        !_ttsServices.any((service) => service.id == _selectedTtsServiceId)) {
+    final selectionMissing =
+        _selectedTtsServiceId != null &&
+        !_ttsServices.any((service) => service.id == _selectedTtsServiceId);
+    if (selectionMissing) {
       _selectedTtsServiceId = _ttsServices.isEmpty
           ? null
           : _ttsServices.first.id;
-      await _persistSelectedTtsServiceId(prefs);
     }
     notifyListeners();
+    final list = v.map((e) => e.toJson()).toList();
+    await prefs.setString(_ttsServicesKey, jsonEncode(list));
+    if (selectionMissing) {
+      await _persistSelectedTtsServiceId(prefs);
+    }
   }
 
   Future<void> setTtsServiceSelected(int index) async {
@@ -1752,13 +1760,13 @@ class SettingsProvider extends ChangeNotifier {
           ? null
           : _asrServices.first.id;
     }
+    notifyListeners();
     final prefs = _preferences;
     await prefs.setString(
       _asrServicesKey,
       jsonEncode(_asrServices.map((service) => service.toJson()).toList()),
     );
     await _persistSelectedAsrServiceId(prefs);
-    notifyListeners();
   }
 
   Future<void> setSelectedAsrServiceId(String? id) async {
@@ -4735,6 +4743,17 @@ Requirements:
     await _preferences.setBool(_displayHideToolResultImagesKey, v);
   }
 
+  bool _regenerateDeleteTrailingMessages = false;
+  bool get regenerateDeleteTrailingMessages =>
+      _regenerateDeleteTrailingMessages;
+  Future<void> setRegenerateDeleteTrailingMessages(bool v) async {
+    if (_regenerateDeleteTrailingMessages == v) return;
+    _regenerateDeleteTrailingMessages = v;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.setBool(_displayRegenerateDeleteTrailingMessagesKey, v);
+  }
+
   bool _showRegenerateConfirmDialog = true;
   bool get showRegenerateConfirmDialog => _showRegenerateConfirmDialog;
   Future<void> setShowRegenerateConfirmDialog(bool v) async {
@@ -5765,6 +5784,7 @@ Requirements:
     copy._collapseThinkingSteps = _collapseThinkingSteps;
     copy._showToolResultSummary = _showToolResultSummary;
     copy._hideToolResultImages = _hideToolResultImages;
+    copy._regenerateDeleteTrailingMessages = _regenerateDeleteTrailingMessages;
     copy._showRegenerateConfirmDialog = _showRegenerateConfirmDialog;
     copy._showMessageNavButtons = _showMessageNavButtons;
     copy._mobileMessageNavButtonsMode = _mobileMessageNavButtonsMode;

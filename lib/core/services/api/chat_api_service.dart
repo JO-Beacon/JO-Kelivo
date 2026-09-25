@@ -150,6 +150,37 @@ class ChatApiService {
     return effectiveModelInfo(config, modelId).input.contains(Modality.image);
   }
 
+  /// 在凭证解析后收紧模型能力。OAuth 会重新读取完整配置，
+  /// 因此外部传入的过滤副本不能提前替代这一步。
+  static ProviderConfig _textOnlyConfig(ProviderConfig config, String modelId) {
+    final raw = config.modelOverrides[modelId];
+    final override = raw is Map ? raw : const <String, dynamic>{};
+    return config.copyWith(
+      customBody: const [],
+      modelOverrides: {
+        modelId: {
+          for (final key in [
+            'apiModelId',
+            'api_model_id',
+            'headers',
+            'abilities',
+            'reasoningEffort',
+            'thinkingBudget',
+            'oauthProtocol',
+            'oauthThinkingMode',
+            'oauthThinkingRequired',
+            'oauthThinkingEfforts',
+            'oauthThinkingDefaultEffort',
+          ])
+            if (override.containsKey(key)) key: override[key],
+          'builtInTools': <String>[],
+          'input': ['text'],
+          'output': ['text'],
+        },
+      },
+    );
+  }
+
   static http.Client _clientFor(ProviderConfig cfg, CancelToken cancelToken) {
     final enabled = cfg.proxyEnabled == true;
     final host = (cfg.proxyHost ?? '').trim();
@@ -201,7 +232,10 @@ class ChatApiService {
     bool allowImagesApiRouting = true,
     bool ocrActive = false,
     bool builtInSearchOnly = false,
+    bool skipImageParsing = false,
     bool parseMarkdownImageLinks = true,
+    // 分离文本生成禁止媒体、工具和自定义请求体。
+    bool textOnly = false,
   }) async* {
     final sessionToken = CancelToken();
     final toolCancellation = ToolCallCancellation(
@@ -228,6 +262,7 @@ class ChatApiService {
         ),
       ]);
       if (sessionToken.isCancelled) return;
+      if (textOnly) config = _textOnlyConfig(config, modelId);
       if (config.oauthProvider == OAuthProvider.chatgpt) stream = true;
       if (config.oauthProvider == OAuthProvider.kimi &&
           (config.modelOverrides[modelId] as Map?)?['oauthProtocol'] ==
@@ -239,15 +274,19 @@ class ChatApiService {
         explicitType: config.providerType,
       );
       final useImagesApi =
+          !textOnly &&
           kind == ProviderKind.openai &&
           allowImagesApiRouting &&
           shouldUseOpenAIImagesApi(config, modelId);
-      final useZhipuLayoutParsing = shouldUseZhipuLayoutParsing(config, modelId);
+      final useZhipuLayoutParsing =
+          !textOnly && shouldUseZhipuLayoutParsing(config, modelId);
+      final toolHandler = textOnly ? null : onToolCall;
       final imageOutput = effectiveModelInfo(
         config,
         modelId,
       ).output.contains(Modality.image);
-      final replaySafe = !useImagesApi && !useZhipuLayoutParsing && !imageOutput;
+      final replaySafe =
+          !useImagesApi && !useZhipuLayoutParsing && !imageOutput;
       final options = retryOverride ?? AutoRetryConfig.current;
       final sessionHeaders = providerSessionHeaders(
         config,
@@ -255,66 +294,70 @@ class ChatApiService {
         extraHeaders: extraHeaders,
       );
 
-    // 每个工具轮独立重试（U10）：轮内尚未产生任何事件时才重放该轮，
-    // 已执行的工具不会重复执行（工具在轮间执行，不在重放范围内）。
-    final emitRetryUi = options.enabled && options.maxRetries > 0;
-    Stream<StreamChunk> retryRound(Stream<StreamChunk> Function() sendRound) {
-      return retryingStream<StreamChunk>(
-        options: options,
-        isCancelled: () => sessionToken.isCancelled,
-        cancelled: _whenCancelled(sessionToken),
-        shouldRetry: (error) => replaySafe && shouldRetryError(error, options),
-        onRetry: (attempt, delay, error) async {
-          FlutterLogger.log(
-            'API request retry ${attempt + 1}/${options.maxRetries} '
-            'after ${delay.inMilliseconds} ms: $error',
-            tag: 'AutoRetry',
-          );
-        },
-        retryEvent: emitRetryUi
-            ? (attempt, delay, error) => RetryPending(
-                attempt: attempt + 1,
-                maxRetries: options.maxRetries,
-                delay: delay,
-                errorText: error.toString(),
-                retryAt: DateTime.now().add(delay),
-              )
-            : null,
-        attemptStartEvent: emitRetryUi ? () => const RetryAttemptStart() : null,
-        attempt: (_) => carrySplitSurrogates(sendRound()),
-      );
-    }
+      // 每个工具轮独立重试（U10）：轮内尚未产生任何事件时才重放该轮，
+      // 已执行的工具不会重复执行（工具在轮间执行，不在重放范围内）。
+      final emitRetryUi = options.enabled && options.maxRetries > 0;
+      Stream<StreamChunk> retryRound(Stream<StreamChunk> Function() sendRound) {
+        return retryingStream<StreamChunk>(
+          options: options,
+          isCancelled: () => sessionToken.isCancelled,
+          cancelled: _whenCancelled(sessionToken),
+          shouldRetry: (error) =>
+              replaySafe && shouldRetryError(error, options),
+          onRetry: (attempt, delay, error) async {
+            FlutterLogger.log(
+              'API request retry ${attempt + 1}/${options.maxRetries} '
+              'after ${delay.inMilliseconds} ms: $error',
+              tag: 'AutoRetry',
+            );
+          },
+          retryEvent: emitRetryUi
+              ? (attempt, delay, error) => RetryPending(
+                  attempt: attempt + 1,
+                  maxRetries: options.maxRetries,
+                  delay: delay,
+                  errorText: error.toString(),
+                  retryAt: DateTime.now().add(delay),
+                )
+              : null,
+          attemptStartEvent: emitRetryUi
+              ? () => const RetryAttemptStart()
+              : null,
+          attempt: (_) => carrySplitSurrogates(sendRound()),
+        );
+      }
 
-    // 首轮与工具续轮共用同一个 retryRound，保证整条链路只包一层重试：
-    // 早先版本外层再套一次 retryingStream，会与轮内重试相乘（3×3 层退避
-    // 叠加超过 30s），让 Vertex/HTTP 错误测试超时。
-    yield* retryRound(
-      () => _sendMessageStreamEventsOnce(
-        config: config,
-        modelId: modelId,
-        messages: messages,
-        userImagePaths: userImagePaths,
-        thinkingBudget: thinkingBudget,
-        temperature: temperature,
-        topP: topP,
-        maxTokens: maxTokens,
-        tools: tools,
-        onToolCall: onToolCall == null
-            ? null
-            : (name, args, {toolCallId}) => toolCancellation.run(
-                () => onToolCall(name, args, toolCallId: toolCallId),
-              ),
-        extraHeaders: sessionHeaders,
-        extraBody: extraBody,
-        stream: stream,
-        allowImagesApiRouting: allowImagesApiRouting,
-        ocrActive: ocrActive,
-        builtInSearchOnly: builtInSearchOnly,
-        skipImageParsing: !parseMarkdownImageLinks,
-        sessionToken: sessionToken,
-        retryRound: retryRound,
-      ),
-    );
+      // 首轮与工具续轮共用同一个 retryRound，保证整条链路只包一层重试：
+      // 早先版本外层再套一次 retryingStream，会与轮内重试相乘（3×3 层退避
+      // 叠加超过 30s），让 Vertex/HTTP 错误测试超时。
+      yield* retryRound(
+        () => _sendMessageStreamEventsOnce(
+          config: config,
+          modelId: modelId,
+          messages: messages,
+          userImagePaths: userImagePaths,
+          thinkingBudget: thinkingBudget,
+          temperature: temperature,
+          topP: topP,
+          maxTokens: maxTokens,
+          tools: textOnly ? null : tools,
+          onToolCall: toolHandler == null
+              ? null
+              : (name, args, {toolCallId}) => toolCancellation.run(
+                  () => toolHandler(name, args, toolCallId: toolCallId),
+                ),
+          extraHeaders: sessionHeaders,
+          extraBody: textOnly ? null : extraBody,
+          stream: stream,
+          allowImagesApiRouting: allowImagesApiRouting,
+          ocrActive: ocrActive,
+          builtInSearchOnly: builtInSearchOnly,
+          skipImageParsing:
+              textOnly || skipImageParsing || !parseMarkdownImageLinks,
+          sessionToken: sessionToken,
+          retryRound: retryRound,
+        ),
+      );
     } finally {
       if (rid.isNotEmpty) {
         final current = _activeCancelTokens[rid];
@@ -557,6 +600,8 @@ class ChatApiService {
     bool ocrActive = false,
     bool builtInSearchOnly = false,
     bool skipImageParsing = false,
+    bool parseMarkdownImageLinks = true,
+    bool textOnly = false,
     AutoRetryOptions? retryOverride,
     void Function(RetryPending? pending)? onRetry,
   }) async {
@@ -582,7 +627,9 @@ class ChatApiService {
       allowImagesApiRouting: allowImagesApiRouting,
       ocrActive: ocrActive,
       builtInSearchOnly: builtInSearchOnly,
-      parseMarkdownImageLinks: !skipImageParsing,
+      skipImageParsing: skipImageParsing,
+      parseMarkdownImageLinks: parseMarkdownImageLinks,
+      textOnly: textOnly,
       retryOverride: retryOverride,
     )) {
       if (chunk is RetryAttemptStart) {

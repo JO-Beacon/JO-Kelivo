@@ -36,6 +36,7 @@ import '../../database/backup_portability.dart';
 import 'backup_settings_validator.dart';
 import 'device_local_settings_writer.dart';
 import 'joaiclient_archive.dart';
+import 'kelivo_schema3_payload.dart';
 import 'local_device_settings_ledger.dart';
 import 'restore_bundle_preparation.dart';
 import 'restore_workspace_lock.dart';
@@ -2492,7 +2493,7 @@ class DataSync {
         throw const FormatException('manifest_database');
       }
       final database = rawDatabase.cast<String, dynamic>();
-      final schemaVersion = database['schemaVersion'];
+      var schemaVersion = database['schemaVersion'];
       final declaredMinimumReadable =
           database[SchemaMigrations.minimumReadableManifestKey];
       final conversationCount = database['conversationCount'];
@@ -2531,6 +2532,21 @@ class DataSync {
       final databaseFile = File(
         p.joinAll([extractDirPath, ..._databaseEntryName.split('/')]),
       );
+      // Kelivo-compatible ZIP 的 schema 3 只代表上游 Kelivo schema 3。
+      // 必须匹配完整表结构；不匹配则明确拒绝，绝不落回本仓库历史迁移链。
+      final upstreamSchema3 =
+          schemaVersion == 3 &&
+          KelivoSchema3Payload.isSchema3Payload(databaseFile);
+      if (schemaVersion == 3 && !upstreamSchema3) {
+        throw const FormatException('kelivo_schema3_payload');
+      }
+      if (upstreamSchema3) {
+        await KelivoSchema3Payload.convertToCurrentSchema(databaseFile);
+        schemaVersion = AppDatabase.currentSchemaVersion;
+        database['schemaVersion'] = schemaVersion;
+        database[SchemaMigrations.minimumReadableManifestKey] =
+            SchemaMigrations.minimumReadableSchemaVersion;
+      }
       final databaseInfo =
           await ChatDatabaseRepository.prepareSnapshotForRestore(
             databaseFile,

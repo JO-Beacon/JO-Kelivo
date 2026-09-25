@@ -2138,6 +2138,17 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosSwitchRow(
                 context,
+                icon: Lucide.RefreshCw,
+                label: l10n
+                    .displaySettingsPageRegenerateDeleteTrailingMessagesTitle,
+                value: sp.regenerateDeleteTrailingMessages,
+                onChanged: (v) => context
+                    .read<SettingsProvider>()
+                    .setRegenerateDeleteTrailingMessages(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
                 icon: Lucide.MessageCircleWarning,
                 label: l10n.displaySettingsPageShowRegenerateConfirmDialogTitle,
                 value: sp.showRegenerateConfirmDialog,

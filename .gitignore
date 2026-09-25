@@ -114,3 +114,7 @@ test/goldens/dialog_scrollbar_probe.png
 # 上游 1.2.7 引入 / 本仓库一并采用
 # proot 的原生库由构建时 tool/fetch_proot.sh 拉取，不入库
 android/app/src/main/jniLibs/**/*.so
+
+# Local iOS profiling tools and device measurements
+/docs/performance/ios-device-*/
+/tool/ios_performance/

@@ -16,7 +16,6 @@ import '../../workspace/pages/skills_page.dart';
 import '../../workspace/pages/workspace_settings_page.dart';
 import '../../assistant/pages/assistant_settings_page.dart';
 import 'about_page.dart';
-import 'debug_page.dart';
 import 'memory_settings_page.dart';
 import 'tts_services_page.dart';
 import 'tool_schema_settings_page.dart';
@@ -26,8 +25,10 @@ import '../../backup/pages/backup_page.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
 import '../../instruction_injection/pages/instruction_injection_page.dart';
 import '../../world_book/pages/world_book_page.dart';
-import '../../../shared/utils/format_bytes.dart';
+import '../../../shared/widgets/section_card.dart';
 import 'network_proxy_page.dart';
+import 'phone_control_settings_page.dart';
+import '../../home/services/local_tools_service.dart';
 import 'storage_space_page.dart';
 import '../../stats/pages/stats_page.dart';
 import '../../../core/services/storage/storage_usage_service.dart';
@@ -46,8 +47,6 @@ class SettingsPage extends StatelessWidget {
     final settings = context.watch<SettingsProvider>();
 
     String modeLabel(ThemeMode m) {
-      // 主题模式弹层可能在搜索流程中跨语言切换后打开，l10n 必须在调用时现读，
-      // 不能复用 build 时捕获的值。
       final l10n = AppLocalizations.of(context)!;
       switch (m) {
         case ThemeMode.dark:
@@ -63,7 +62,7 @@ class SettingsPage extends StatelessWidget {
       final settingsProvider = context.read<SettingsProvider>();
       final selected = await showModalBottomSheet<ThemeMode>(
         context: context,
-        backgroundColor: cs.surface,
+        backgroundColor: context.overlaySurface,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         ),
@@ -105,7 +104,7 @@ class SettingsPage extends StatelessWidget {
       }
     }
 
-    // iOS 风格分区标题（中性色，而不是主题色）
+    // iOS-style section header (neutral color, not theme color)
     Widget header(String text, {bool first = false}) => Padding(
       padding: EdgeInsets.fromLTRB(12, first ? 2 : 12, 12, 6),
       child: Text(
@@ -168,8 +167,17 @@ class SettingsPage extends StatelessWidget {
 
           // 通用设置：使用iOS风格分组卡片，黑色（中性）图标与标题，无描述
           header(l10n.settingsPageGeneralSection, first: true),
-          _iosSectionCard(
+          SectionCard(
             children: [
+              if (DeviceLocalTools.phoneControlSupported) ...[
+                _iosNavRow(
+                  context,
+                  icon: Lucide.Smartphone,
+                  label: l10n.phoneControlTitle,
+                  onTap: () => PhoneControlSettingsPage.open(context),
+                ),
+                _iosDivider(context),
+              ],
               _iosNavRow(
                 context,
                 icon: Lucide.SunMoon,
@@ -208,7 +216,7 @@ class SettingsPage extends StatelessWidget {
 
           const SizedBox(height: 12),
           header(l10n.settingsPageModelsServicesSection),
-          _iosSectionCard(
+          SectionCard(
             children: [
               _iosNavRow(
                 context,
@@ -240,19 +248,6 @@ class SettingsPage extends StatelessWidget {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const SearchServicesPage(),
-                    ),
-                  );
-                },
-              ),
-              _iosDivider(context),
-              _iosNavRow(
-                context,
-                icon: Lucide.FileText,
-                label: l10n.toolSchemaSettingsPageTitle,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const ToolSchemaSettingsPage(),
                     ),
                   );
                 },
@@ -293,7 +288,8 @@ class SettingsPage extends StatelessWidget {
                 },
               ),
               _iosDivider(context),
-              if (defaultTargetPlatform == TargetPlatform.android) ...[
+              if (defaultTargetPlatform == TargetPlatform.android ||
+                  defaultTargetPlatform == TargetPlatform.iOS) ...[
                 _iosNavRow(
                   context,
                   icon: LucideIcons.clock,
@@ -327,21 +323,19 @@ class SettingsPage extends StatelessWidget {
                   );
                 },
               ),
-              if (!settings.legacyMemoryMode) ...[
-                _iosDivider(context),
-                _iosNavRow(
-                  context,
-                  icon: Lucide.Brain,
-                  label: l10n.settingsPageMemory,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const MemorySettingsPage(),
-                      ),
-                    );
-                  },
-                ),
-              ],
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.Brain,
+                label: l10n.settingsPageMemory,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const MemorySettingsPage(),
+                    ),
+                  );
+                },
+              ),
               _iosDivider(context),
               _iosNavRow(
                 context,
@@ -382,7 +376,7 @@ class SettingsPage extends StatelessWidget {
 
           const SizedBox(height: 12),
           header(l10n.settingsPageDataSection),
-          _iosSectionCard(
+          SectionCard(
             children: [
               _iosNavRow(
                 context,
@@ -411,7 +405,7 @@ class SettingsPage extends StatelessWidget {
 
           const SizedBox(height: 12),
           header(l10n.settingsPageAboutSection),
-          _iosSectionCard(
+          SectionCard(
             children: [
               _iosNavRow(
                 context,
@@ -421,17 +415,6 @@ class SettingsPage extends StatelessWidget {
                   Navigator.of(
                     context,
                   ).push(MaterialPageRoute(builder: (_) => const AboutPage()));
-                },
-              ),
-              _iosDivider(context),
-              _iosNavRow(
-                context,
-                icon: Lucide.Wrench,
-                label: l10n.settingsPageDebug,
-                onTap: () {
-                  Navigator.of(
-                    context,
-                  ).push(MaterialPageRoute(builder: (_) => const DebugPage()));
                 },
               ),
               _iosDivider(context),
@@ -451,22 +434,37 @@ class SettingsPage extends StatelessWidget {
                 icon: Lucide.Library,
                 label: l10n.settingsPageDocs,
                 onTap: () async {
-                  final uri = Uri.parse(
-                    'https://github.com/JO-Beacon/JO-Kelivo',
-                  );
+                  final uri = Uri.parse('https://kelivo.psycheas.top/');
                   if (!await launchUrl(uri, mode: LaunchMode.platformDefault)) {
                     await launchUrl(uri, mode: LaunchMode.externalApplication);
                   }
                 },
               ),
+              if (settings.requestLogEnabled ||
+                  settings.flutterLogEnabled ||
+                  settings.contextLogEnabled) ...[
+                _iosDivider(context),
+                _iosNavRow(
+                  context,
+                  icon: Lucide.FileText,
+                  label: l10n.settingsPageLogs,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const LogViewerPage()),
+                    );
+                  },
+                ),
+              ],
               _iosDivider(context),
               _iosNavRow(
                 context,
-                icon: Lucide.FileText,
-                label: l10n.settingsPageLogs,
+                icon: Lucide.Wrench,
+                label: l10n.toolSchemaSettingsPageTitle,
                 onTap: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const LogViewerPage()),
+                    MaterialPageRoute(
+                      builder: (_) => const ToolSchemaSettingsPage(),
+                    ),
                   );
                 },
               ),
@@ -506,38 +504,11 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
-// --- 设置页面使用的 iOS 风格组件 ---
-
-Widget _iosSectionCard({required List<Widget> children}) {
-  return Builder(
-    builder: (context) {
-      final theme = Theme.of(context);
-      final cs = theme.colorScheme;
-      final isDark = theme.brightness == Brightness.dark;
-      // 浅色：带轻微透明度的白色；深色：细微的深色半透明
-      final Color bg = context.appColors.surfaceCard;
-      return Container(
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-            width: 0.6,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Column(children: children),
-        ),
-      );
-    },
-  );
-}
+// --- iOS-style widgets for Settings page ---
 
 Widget _iosDivider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;
-  // 恢复之前的视觉：对齐图标槽（36）、间距（12）和内边距（12）
+  // Restore previous visual: align with icon slot (36) + gap (12) + padding (12)
   return Divider(
     height: 6,
     thickness: 0.6,
@@ -547,7 +518,7 @@ Widget _iosDivider(BuildContext context) {
   );
 }
 
-// 共享颜色渐变包装，模拟 iOS 轻柔按压颜色过渡
+// Shared color tween wrapper to mimic iOS gentle press color transition
 class _AnimatedPressColor extends StatelessWidget {
   const _AnimatedPressColor({
     required this.pressed,
@@ -588,7 +559,15 @@ class _ChatStorageSummaryState extends State<_ChatStorageSummary> {
     _future = StorageUsageService.computeReport();
   }
 
-  String _fmtBytes(int bytes) => formatBytes(bytes);
+  String _fmtBytes(int bytes) {
+    const kb = 1024;
+    const mb = kb * 1024;
+    const gb = mb * 1024;
+    if (bytes >= gb) return '${(bytes / gb).toStringAsFixed(2)} GB';
+    if (bytes >= mb) return '${(bytes / mb).toStringAsFixed(2)} MB';
+    if (bytes >= kb) return '${(bytes / kb).toStringAsFixed(1)} KB';
+    return '$bytes B';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -606,8 +585,7 @@ class _ChatStorageSummaryState extends State<_ChatStorageSummary> {
         if (snapshot.connectionState != ConnectionState.done) {
           return Text(l10n.settingsPageCalculating, style: style);
         }
-        final size = _fmtBytes(data?.totalBytes ?? 0);
-        return Text(size, style: style);
+        return Text(_fmtBytes(data?.totalBytes ?? 0), style: style);
       },
     );
   }
@@ -725,7 +703,7 @@ class _TactileRowState extends State<_TactileRow> {
   }
 }
 
-// AppBar 的纯图标触感按钮：无涟漪，轻微按压缩放
+// Icon-only tactile button for AppBar: no ripple, slight press scale
 class _TactileIconButton extends StatefulWidget {
   const _TactileIconButton({
     required this.icon,
@@ -776,7 +754,7 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   }
 }
 
-// 带触感反馈的底部弹层 iOS 风格选项（无涟漪）
+// Bottom sheet iOS-style option with tactile feedback (no ripple)
 Widget _sheetOption(
   BuildContext context, {
   required IconData icon,

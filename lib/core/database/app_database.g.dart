@@ -1209,6 +1209,38 @@ class $MessageRowsTable extends MessageRows
     requiredDuringInsert: true,
   );
   @override
+  late final GeneratedColumnWithTypeConverter<DateTime?, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      ).withConverter<DateTime?>($MessageRowsTable.$converterupdatedAtn);
+  static const VerificationMeta _senderIdMeta = const VerificationMeta(
+    'senderId',
+  );
+  @override
+  late final GeneratedColumn<String> senderId = GeneratedColumn<String>(
+    'sender_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _extrasJsonMeta = const VerificationMeta(
+    'extrasJson',
+  );
+  @override
+  late final GeneratedColumn<String> extrasJson = GeneratedColumn<String>(
+    'extras_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
+  @override
   List<GeneratedColumn> get $columns => [
     id,
     conversationId,
@@ -1229,6 +1261,9 @@ class $MessageRowsTable extends MessageRows
     cachedTokens,
     durationMs,
     messageOrder,
+    updatedAt,
+    senderId,
+    extrasJson,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1370,6 +1405,18 @@ class $MessageRowsTable extends MessageRows
     } else if (isInserting) {
       context.missing(_messageOrderMeta);
     }
+    if (data.containsKey('sender_id')) {
+      context.handle(
+        _senderIdMeta,
+        senderId.isAcceptableOrUnknown(data['sender_id']!, _senderIdMeta),
+      );
+    }
+    if (data.containsKey('extras_json')) {
+      context.handle(
+        _extrasJsonMeta,
+        extrasJson.isAcceptableOrUnknown(data['extras_json']!, _extrasJsonMeta),
+      );
+    }
     return context;
   }
 
@@ -1467,6 +1514,20 @@ class $MessageRowsTable extends MessageRows
         DriftSqlType.int,
         data['${effectivePrefix}message_order'],
       )!,
+      updatedAt: $MessageRowsTable.$converterupdatedAtn.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        ),
+      ),
+      senderId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sender_id'],
+      ),
+      extrasJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}extras_json'],
+      )!,
     );
   }
 
@@ -1485,6 +1546,10 @@ class $MessageRowsTable extends MessageRows
       const MicrosecondDateTimeConverter();
   static TypeConverter<DateTime?, int?> $converterreasoningFinishedAtn =
       NullAwareTypeConverter.wrap($converterreasoningFinishedAt);
+  static TypeConverter<DateTime, int> $converterupdatedAt =
+      const MicrosecondDateTimeConverter();
+  static TypeConverter<DateTime?, int?> $converterupdatedAtn =
+      NullAwareTypeConverter.wrap($converterupdatedAt);
 }
 
 class MessageRow extends DataClass implements Insertable<MessageRow> {
@@ -1507,6 +1572,9 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
   final int? cachedTokens;
   final int? durationMs;
   final int messageOrder;
+  final DateTime? updatedAt;
+  final String? senderId;
+  final String extrasJson;
   const MessageRow({
     required this.id,
     required this.conversationId,
@@ -1527,6 +1595,9 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     this.cachedTokens,
     this.durationMs,
     required this.messageOrder,
+    this.updatedAt,
+    this.senderId,
+    required this.extrasJson,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1584,6 +1655,15 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       map['duration_ms'] = Variable<int>(durationMs);
     }
     map['message_order'] = Variable<int>(messageOrder);
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<int>(
+        $MessageRowsTable.$converterupdatedAtn.toSql(updatedAt),
+      );
+    }
+    if (!nullToAbsent || senderId != null) {
+      map['sender_id'] = Variable<String>(senderId);
+    }
+    map['extras_json'] = Variable<String>(extrasJson);
     return map;
   }
 
@@ -1632,6 +1712,13 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
           ? const Value.absent()
           : Value(durationMs),
       messageOrder: Value(messageOrder),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+      senderId: senderId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(senderId),
+      extrasJson: Value(extrasJson),
     );
   }
 
@@ -1666,6 +1753,9 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       cachedTokens: serializer.fromJson<int?>(json['cachedTokens']),
       durationMs: serializer.fromJson<int?>(json['durationMs']),
       messageOrder: serializer.fromJson<int>(json['messageOrder']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      senderId: serializer.fromJson<String?>(json['senderId']),
+      extrasJson: serializer.fromJson<String>(json['extrasJson']),
     );
   }
   @override
@@ -1693,6 +1783,9 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       'cachedTokens': serializer.toJson<int?>(cachedTokens),
       'durationMs': serializer.toJson<int?>(durationMs),
       'messageOrder': serializer.toJson<int>(messageOrder),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'senderId': serializer.toJson<String?>(senderId),
+      'extrasJson': serializer.toJson<String>(extrasJson),
     };
   }
 
@@ -1716,6 +1809,9 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     Value<int?> cachedTokens = const Value.absent(),
     Value<int?> durationMs = const Value.absent(),
     int? messageOrder,
+    Value<DateTime?> updatedAt = const Value.absent(),
+    Value<String?> senderId = const Value.absent(),
+    String? extrasJson,
   }) => MessageRow(
     id: id ?? this.id,
     conversationId: conversationId ?? this.conversationId,
@@ -1744,6 +1840,9 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     cachedTokens: cachedTokens.present ? cachedTokens.value : this.cachedTokens,
     durationMs: durationMs.present ? durationMs.value : this.durationMs,
     messageOrder: messageOrder ?? this.messageOrder,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+    senderId: senderId.present ? senderId.value : this.senderId,
+    extrasJson: extrasJson ?? this.extrasJson,
   );
   MessageRow copyWithCompanion(MessageRowsCompanion data) {
     return MessageRow(
@@ -1792,6 +1891,11 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       messageOrder: data.messageOrder.present
           ? data.messageOrder.value
           : this.messageOrder,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      senderId: data.senderId.present ? data.senderId.value : this.senderId,
+      extrasJson: data.extrasJson.present
+          ? data.extrasJson.value
+          : this.extrasJson,
     );
   }
 
@@ -1816,13 +1920,16 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
           ..write('completionTokens: $completionTokens, ')
           ..write('cachedTokens: $cachedTokens, ')
           ..write('durationMs: $durationMs, ')
-          ..write('messageOrder: $messageOrder')
+          ..write('messageOrder: $messageOrder, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('senderId: $senderId, ')
+          ..write('extrasJson: $extrasJson')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     conversationId,
     role,
@@ -1842,7 +1949,10 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     cachedTokens,
     durationMs,
     messageOrder,
-  );
+    updatedAt,
+    senderId,
+    extrasJson,
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1865,7 +1975,10 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
           other.completionTokens == this.completionTokens &&
           other.cachedTokens == this.cachedTokens &&
           other.durationMs == this.durationMs &&
-          other.messageOrder == this.messageOrder);
+          other.messageOrder == this.messageOrder &&
+          other.updatedAt == this.updatedAt &&
+          other.senderId == this.senderId &&
+          other.extrasJson == this.extrasJson);
 }
 
 class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
@@ -1888,6 +2001,9 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
   final Value<int?> cachedTokens;
   final Value<int?> durationMs;
   final Value<int> messageOrder;
+  final Value<DateTime?> updatedAt;
+  final Value<String?> senderId;
+  final Value<String> extrasJson;
   final Value<int> rowid;
   const MessageRowsCompanion({
     this.id = const Value.absent(),
@@ -1909,6 +2025,9 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
     this.cachedTokens = const Value.absent(),
     this.durationMs = const Value.absent(),
     this.messageOrder = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.senderId = const Value.absent(),
+    this.extrasJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   MessageRowsCompanion.insert({
@@ -1931,6 +2050,9 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
     this.cachedTokens = const Value.absent(),
     this.durationMs = const Value.absent(),
     required int messageOrder,
+    this.updatedAt = const Value.absent(),
+    this.senderId = const Value.absent(),
+    this.extrasJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        conversationId = Value(conversationId),
@@ -1957,6 +2079,9 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
     Expression<int>? cachedTokens,
     Expression<int>? durationMs,
     Expression<int>? messageOrder,
+    Expression<int>? updatedAt,
+    Expression<String>? senderId,
+    Expression<String>? extrasJson,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1981,6 +2106,9 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
       if (cachedTokens != null) 'cached_tokens': cachedTokens,
       if (durationMs != null) 'duration_ms': durationMs,
       if (messageOrder != null) 'message_order': messageOrder,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (senderId != null) 'sender_id': senderId,
+      if (extrasJson != null) 'extras_json': extrasJson,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2005,6 +2133,9 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
     Value<int?>? cachedTokens,
     Value<int?>? durationMs,
     Value<int>? messageOrder,
+    Value<DateTime?>? updatedAt,
+    Value<String?>? senderId,
+    Value<String>? extrasJson,
     Value<int>? rowid,
   }) {
     return MessageRowsCompanion(
@@ -2028,6 +2159,9 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
       cachedTokens: cachedTokens ?? this.cachedTokens,
       durationMs: durationMs ?? this.durationMs,
       messageOrder: messageOrder ?? this.messageOrder,
+      updatedAt: updatedAt ?? this.updatedAt,
+      senderId: senderId ?? this.senderId,
+      extrasJson: extrasJson ?? this.extrasJson,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2104,6 +2238,17 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
     if (messageOrder.present) {
       map['message_order'] = Variable<int>(messageOrder.value);
     }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $MessageRowsTable.$converterupdatedAtn.toSql(updatedAt.value),
+      );
+    }
+    if (senderId.present) {
+      map['sender_id'] = Variable<String>(senderId.value);
+    }
+    if (extrasJson.present) {
+      map['extras_json'] = Variable<String>(extrasJson.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2132,6 +2277,9 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
           ..write('cachedTokens: $cachedTokens, ')
           ..write('durationMs: $durationMs, ')
           ..write('messageOrder: $messageOrder, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('senderId: $senderId, ')
+          ..write('extrasJson: $extrasJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -4839,6 +4987,18 @@ class $AssetRowsTable extends AssetRows
         type: DriftSqlType.int,
         requiredDuringInsert: true,
       ).withConverter<DateTime>($AssetRowsTable.$converterlastReferencedAt);
+  static const VerificationMeta _extrasJsonMeta = const VerificationMeta(
+    'extrasJson',
+  );
+  @override
+  late final GeneratedColumn<String> extrasJson = GeneratedColumn<String>(
+    'extras_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -4850,6 +5010,7 @@ class $AssetRowsTable extends AssetRows
     thumbnailPath,
     createdAt,
     lastReferencedAt,
+    extrasJson,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4916,6 +5077,12 @@ class $AssetRowsTable extends AssetRows
         ),
       );
     }
+    if (data.containsKey('extras_json')) {
+      context.handle(
+        _extrasJsonMeta,
+        extrasJson.isAcceptableOrUnknown(data['extras_json']!, _extrasJsonMeta),
+      );
+    }
     return context;
   }
 
@@ -4965,6 +5132,10 @@ class $AssetRowsTable extends AssetRows
           data['${effectivePrefix}last_referenced_at'],
         )!,
       ),
+      extrasJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}extras_json'],
+      )!,
     );
   }
 
@@ -4989,6 +5160,7 @@ class AssetRow extends DataClass implements Insertable<AssetRow> {
   final String? thumbnailPath;
   final DateTime createdAt;
   final DateTime lastReferencedAt;
+  final String extrasJson;
   const AssetRow({
     required this.id,
     required this.contentHash,
@@ -4999,6 +5171,7 @@ class AssetRow extends DataClass implements Insertable<AssetRow> {
     this.thumbnailPath,
     required this.createdAt,
     required this.lastReferencedAt,
+    required this.extrasJson,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -5026,6 +5199,7 @@ class AssetRow extends DataClass implements Insertable<AssetRow> {
         $AssetRowsTable.$converterlastReferencedAt.toSql(lastReferencedAt),
       );
     }
+    map['extras_json'] = Variable<String>(extrasJson);
     return map;
   }
 
@@ -5046,6 +5220,7 @@ class AssetRow extends DataClass implements Insertable<AssetRow> {
           : Value(thumbnailPath),
       createdAt: Value(createdAt),
       lastReferencedAt: Value(lastReferencedAt),
+      extrasJson: Value(extrasJson),
     );
   }
 
@@ -5064,6 +5239,7 @@ class AssetRow extends DataClass implements Insertable<AssetRow> {
       thumbnailPath: serializer.fromJson<String?>(json['thumbnailPath']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       lastReferencedAt: serializer.fromJson<DateTime>(json['lastReferencedAt']),
+      extrasJson: serializer.fromJson<String>(json['extrasJson']),
     );
   }
   @override
@@ -5079,6 +5255,7 @@ class AssetRow extends DataClass implements Insertable<AssetRow> {
       'thumbnailPath': serializer.toJson<String?>(thumbnailPath),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'lastReferencedAt': serializer.toJson<DateTime>(lastReferencedAt),
+      'extrasJson': serializer.toJson<String>(extrasJson),
     };
   }
 
@@ -5092,6 +5269,7 @@ class AssetRow extends DataClass implements Insertable<AssetRow> {
     Value<String?> thumbnailPath = const Value.absent(),
     DateTime? createdAt,
     DateTime? lastReferencedAt,
+    String? extrasJson,
   }) => AssetRow(
     id: id ?? this.id,
     contentHash: contentHash ?? this.contentHash,
@@ -5104,6 +5282,7 @@ class AssetRow extends DataClass implements Insertable<AssetRow> {
         : this.thumbnailPath,
     createdAt: createdAt ?? this.createdAt,
     lastReferencedAt: lastReferencedAt ?? this.lastReferencedAt,
+    extrasJson: extrasJson ?? this.extrasJson,
   );
   AssetRow copyWithCompanion(AssetRowsCompanion data) {
     return AssetRow(
@@ -5122,6 +5301,9 @@ class AssetRow extends DataClass implements Insertable<AssetRow> {
       lastReferencedAt: data.lastReferencedAt.present
           ? data.lastReferencedAt.value
           : this.lastReferencedAt,
+      extrasJson: data.extrasJson.present
+          ? data.extrasJson.value
+          : this.extrasJson,
     );
   }
 
@@ -5136,7 +5318,8 @@ class AssetRow extends DataClass implements Insertable<AssetRow> {
           ..write('height: $height, ')
           ..write('thumbnailPath: $thumbnailPath, ')
           ..write('createdAt: $createdAt, ')
-          ..write('lastReferencedAt: $lastReferencedAt')
+          ..write('lastReferencedAt: $lastReferencedAt, ')
+          ..write('extrasJson: $extrasJson')
           ..write(')'))
         .toString();
   }
@@ -5152,6 +5335,7 @@ class AssetRow extends DataClass implements Insertable<AssetRow> {
     thumbnailPath,
     createdAt,
     lastReferencedAt,
+    extrasJson,
   );
   @override
   bool operator ==(Object other) =>
@@ -5165,7 +5349,8 @@ class AssetRow extends DataClass implements Insertable<AssetRow> {
           other.height == this.height &&
           other.thumbnailPath == this.thumbnailPath &&
           other.createdAt == this.createdAt &&
-          other.lastReferencedAt == this.lastReferencedAt);
+          other.lastReferencedAt == this.lastReferencedAt &&
+          other.extrasJson == this.extrasJson);
 }
 
 class AssetRowsCompanion extends UpdateCompanion<AssetRow> {
@@ -5178,6 +5363,7 @@ class AssetRowsCompanion extends UpdateCompanion<AssetRow> {
   final Value<String?> thumbnailPath;
   final Value<DateTime> createdAt;
   final Value<DateTime> lastReferencedAt;
+  final Value<String> extrasJson;
   final Value<int> rowid;
   const AssetRowsCompanion({
     this.id = const Value.absent(),
@@ -5189,6 +5375,7 @@ class AssetRowsCompanion extends UpdateCompanion<AssetRow> {
     this.thumbnailPath = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.lastReferencedAt = const Value.absent(),
+    this.extrasJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   AssetRowsCompanion.insert({
@@ -5201,6 +5388,7 @@ class AssetRowsCompanion extends UpdateCompanion<AssetRow> {
     this.thumbnailPath = const Value.absent(),
     required DateTime createdAt,
     required DateTime lastReferencedAt,
+    this.extrasJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        contentHash = Value(contentHash),
@@ -5218,6 +5406,7 @@ class AssetRowsCompanion extends UpdateCompanion<AssetRow> {
     Expression<String>? thumbnailPath,
     Expression<int>? createdAt,
     Expression<int>? lastReferencedAt,
+    Expression<String>? extrasJson,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -5230,6 +5419,7 @@ class AssetRowsCompanion extends UpdateCompanion<AssetRow> {
       if (thumbnailPath != null) 'thumbnail_path': thumbnailPath,
       if (createdAt != null) 'created_at': createdAt,
       if (lastReferencedAt != null) 'last_referenced_at': lastReferencedAt,
+      if (extrasJson != null) 'extras_json': extrasJson,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -5244,6 +5434,7 @@ class AssetRowsCompanion extends UpdateCompanion<AssetRow> {
     Value<String?>? thumbnailPath,
     Value<DateTime>? createdAt,
     Value<DateTime>? lastReferencedAt,
+    Value<String>? extrasJson,
     Value<int>? rowid,
   }) {
     return AssetRowsCompanion(
@@ -5256,6 +5447,7 @@ class AssetRowsCompanion extends UpdateCompanion<AssetRow> {
       thumbnailPath: thumbnailPath ?? this.thumbnailPath,
       createdAt: createdAt ?? this.createdAt,
       lastReferencedAt: lastReferencedAt ?? this.lastReferencedAt,
+      extrasJson: extrasJson ?? this.extrasJson,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -5296,6 +5488,9 @@ class AssetRowsCompanion extends UpdateCompanion<AssetRow> {
         ),
       );
     }
+    if (extrasJson.present) {
+      map['extras_json'] = Variable<String>(extrasJson.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -5314,6 +5509,7 @@ class AssetRowsCompanion extends UpdateCompanion<AssetRow> {
           ..write('thumbnailPath: $thumbnailPath, ')
           ..write('createdAt: $createdAt, ')
           ..write('lastReferencedAt: $lastReferencedAt, ')
+          ..write('extrasJson: $extrasJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -12374,6 +12570,320 @@ class MessagePromptRowsCompanion extends UpdateCompanion<MessagePromptRow> {
   }
 }
 
+class $TombstoneRowsTable extends TombstoneRows
+    with TableInfo<$TombstoneRowsTable, TombstoneRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TombstoneRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _scopeMeta = const VerificationMeta('scope');
+  @override
+  late final GeneratedColumn<String> scope = GeneratedColumn<String>(
+    'scope',
+    aliasedName,
+    false,
+    check: () => scope.isNotValue(''),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _entityIdMeta = const VerificationMeta(
+    'entityId',
+  );
+  @override
+  late final GeneratedColumn<String> entityId = GeneratedColumn<String>(
+    'entity_id',
+    aliasedName,
+    false,
+    check: () => entityId.isNotValue(''),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> deletedAt =
+      GeneratedColumn<int>(
+        'deleted_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($TombstoneRowsTable.$converterdeletedAt);
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [scope, entityId, deletedAt, payload];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'tombstone_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TombstoneRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('scope')) {
+      context.handle(
+        _scopeMeta,
+        scope.isAcceptableOrUnknown(data['scope']!, _scopeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_scopeMeta);
+    }
+    if (data.containsKey('entity_id')) {
+      context.handle(
+        _entityIdMeta,
+        entityId.isAcceptableOrUnknown(data['entity_id']!, _entityIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_entityIdMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {scope, entityId};
+  @override
+  TombstoneRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TombstoneRow(
+      scope: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}scope'],
+      )!,
+      entityId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}entity_id'],
+      )!,
+      deletedAt: $TombstoneRowsTable.$converterdeletedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}deleted_at'],
+        )!,
+      ),
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      )!,
+    );
+  }
+
+  @override
+  $TombstoneRowsTable createAlias(String alias) {
+    return $TombstoneRowsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $converterdeletedAt =
+      const MicrosecondDateTimeConverter();
+}
+
+class TombstoneRow extends DataClass implements Insertable<TombstoneRow> {
+  final String scope;
+  final String entityId;
+  final DateTime deletedAt;
+  final String payload;
+  const TombstoneRow({
+    required this.scope,
+    required this.entityId,
+    required this.deletedAt,
+    required this.payload,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['scope'] = Variable<String>(scope);
+    map['entity_id'] = Variable<String>(entityId);
+    {
+      map['deleted_at'] = Variable<int>(
+        $TombstoneRowsTable.$converterdeletedAt.toSql(deletedAt),
+      );
+    }
+    map['payload'] = Variable<String>(payload);
+    return map;
+  }
+
+  TombstoneRowsCompanion toCompanion(bool nullToAbsent) {
+    return TombstoneRowsCompanion(
+      scope: Value(scope),
+      entityId: Value(entityId),
+      deletedAt: Value(deletedAt),
+      payload: Value(payload),
+    );
+  }
+
+  factory TombstoneRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TombstoneRow(
+      scope: serializer.fromJson<String>(json['scope']),
+      entityId: serializer.fromJson<String>(json['entityId']),
+      deletedAt: serializer.fromJson<DateTime>(json['deletedAt']),
+      payload: serializer.fromJson<String>(json['payload']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'scope': serializer.toJson<String>(scope),
+      'entityId': serializer.toJson<String>(entityId),
+      'deletedAt': serializer.toJson<DateTime>(deletedAt),
+      'payload': serializer.toJson<String>(payload),
+    };
+  }
+
+  TombstoneRow copyWith({
+    String? scope,
+    String? entityId,
+    DateTime? deletedAt,
+    String? payload,
+  }) => TombstoneRow(
+    scope: scope ?? this.scope,
+    entityId: entityId ?? this.entityId,
+    deletedAt: deletedAt ?? this.deletedAt,
+    payload: payload ?? this.payload,
+  );
+  TombstoneRow copyWithCompanion(TombstoneRowsCompanion data) {
+    return TombstoneRow(
+      scope: data.scope.present ? data.scope.value : this.scope,
+      entityId: data.entityId.present ? data.entityId.value : this.entityId,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      payload: data.payload.present ? data.payload.value : this.payload,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TombstoneRow(')
+          ..write('scope: $scope, ')
+          ..write('entityId: $entityId, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('payload: $payload')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(scope, entityId, deletedAt, payload);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TombstoneRow &&
+          other.scope == this.scope &&
+          other.entityId == this.entityId &&
+          other.deletedAt == this.deletedAt &&
+          other.payload == this.payload);
+}
+
+class TombstoneRowsCompanion extends UpdateCompanion<TombstoneRow> {
+  final Value<String> scope;
+  final Value<String> entityId;
+  final Value<DateTime> deletedAt;
+  final Value<String> payload;
+  final Value<int> rowid;
+  const TombstoneRowsCompanion({
+    this.scope = const Value.absent(),
+    this.entityId = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TombstoneRowsCompanion.insert({
+    required String scope,
+    required String entityId,
+    required DateTime deletedAt,
+    this.payload = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : scope = Value(scope),
+       entityId = Value(entityId),
+       deletedAt = Value(deletedAt);
+  static Insertable<TombstoneRow> custom({
+    Expression<String>? scope,
+    Expression<String>? entityId,
+    Expression<int>? deletedAt,
+    Expression<String>? payload,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (scope != null) 'scope': scope,
+      if (entityId != null) 'entity_id': entityId,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (payload != null) 'payload': payload,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TombstoneRowsCompanion copyWith({
+    Value<String>? scope,
+    Value<String>? entityId,
+    Value<DateTime>? deletedAt,
+    Value<String>? payload,
+    Value<int>? rowid,
+  }) {
+    return TombstoneRowsCompanion(
+      scope: scope ?? this.scope,
+      entityId: entityId ?? this.entityId,
+      deletedAt: deletedAt ?? this.deletedAt,
+      payload: payload ?? this.payload,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (scope.present) {
+      map['scope'] = Variable<String>(scope.value);
+    }
+    if (entityId.present) {
+      map['entity_id'] = Variable<String>(entityId.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<int>(
+        $TombstoneRowsTable.$converterdeletedAt.toSql(deletedAt.value),
+      );
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TombstoneRowsCompanion(')
+          ..write('scope: $scope, ')
+          ..write('entityId: $entityId, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('payload: $payload, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $ExtensionEntityRowsTable extends ExtensionEntityRows
     with TableInfo<$ExtensionEntityRowsTable, ExtensionEntityRow> {
   @override
@@ -12845,6 +13355,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $UserProfileFieldRowsTable(this);
   late final $MessagePromptRowsTable messagePromptRows =
       $MessagePromptRowsTable(this);
+  late final $TombstoneRowsTable tombstoneRows = $TombstoneRowsTable(this);
   late final $ExtensionEntityRowsTable extensionEntityRows =
       $ExtensionEntityRowsTable(this);
   late final Index idxConversationsUpdatedAt = Index(
@@ -12962,6 +13473,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     memoryEntryRows,
     userProfileFieldRows,
     messagePromptRows,
+    tombstoneRows,
     extensionEntityRows,
     idxConversationsUpdatedAt,
     idxConversationsAssistant,
@@ -14154,6 +14666,9 @@ typedef $$MessageRowsTableCreateCompanionBuilder =
       Value<int?> cachedTokens,
       Value<int?> durationMs,
       required int messageOrder,
+      Value<DateTime?> updatedAt,
+      Value<String?> senderId,
+      Value<String> extrasJson,
       Value<int> rowid,
     });
 typedef $$MessageRowsTableUpdateCompanionBuilder =
@@ -14177,6 +14692,9 @@ typedef $$MessageRowsTableUpdateCompanionBuilder =
       Value<int?> cachedTokens,
       Value<int?> durationMs,
       Value<int> messageOrder,
+      Value<DateTime?> updatedAt,
+      Value<String?> senderId,
+      Value<String> extrasJson,
       Value<int> rowid,
     });
 
@@ -14347,6 +14865,22 @@ class $$MessageRowsTableFilterComposer
 
   ColumnFilters<int> get messageOrder => $composableBuilder(
     column: $table.messageOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime?, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<String> get senderId => $composableBuilder(
+    column: $table.senderId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get extrasJson => $composableBuilder(
+    column: $table.extrasJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -14524,6 +15058,21 @@ class $$MessageRowsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get senderId => $composableBuilder(
+    column: $table.senderId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get extrasJson => $composableBuilder(
+    column: $table.extrasJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$ConversationRowsTableOrderingComposer get conversationId {
     final $$ConversationRowsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -14634,6 +15183,17 @@ class $$MessageRowsTableAnnotationComposer
 
   GeneratedColumn<int> get messageOrder => $composableBuilder(
     column: $table.messageOrder,
+    builder: (column) => column,
+  );
+
+  GeneratedColumnWithTypeConverter<DateTime?, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get senderId =>
+      $composableBuilder(column: $table.senderId, builder: (column) => column);
+
+  GeneratedColumn<String> get extrasJson => $composableBuilder(
+    column: $table.extrasJson,
     builder: (column) => column,
   );
 
@@ -14764,6 +15324,9 @@ class $$MessageRowsTableTableManager
                 Value<int?> cachedTokens = const Value.absent(),
                 Value<int?> durationMs = const Value.absent(),
                 Value<int> messageOrder = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<String?> senderId = const Value.absent(),
+                Value<String> extrasJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MessageRowsCompanion(
                 id: id,
@@ -14785,6 +15348,9 @@ class $$MessageRowsTableTableManager
                 cachedTokens: cachedTokens,
                 durationMs: durationMs,
                 messageOrder: messageOrder,
+                updatedAt: updatedAt,
+                senderId: senderId,
+                extrasJson: extrasJson,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -14808,6 +15374,9 @@ class $$MessageRowsTableTableManager
                 Value<int?> cachedTokens = const Value.absent(),
                 Value<int?> durationMs = const Value.absent(),
                 required int messageOrder,
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<String?> senderId = const Value.absent(),
+                Value<String> extrasJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MessageRowsCompanion.insert(
                 id: id,
@@ -14829,6 +15398,9 @@ class $$MessageRowsTableTableManager
                 cachedTokens: cachedTokens,
                 durationMs: durationMs,
                 messageOrder: messageOrder,
+                updatedAt: updatedAt,
+                senderId: senderId,
+                extrasJson: extrasJson,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -16954,6 +17526,7 @@ typedef $$AssetRowsTableCreateCompanionBuilder =
       Value<String?> thumbnailPath,
       required DateTime createdAt,
       required DateTime lastReferencedAt,
+      Value<String> extrasJson,
       Value<int> rowid,
     });
 typedef $$AssetRowsTableUpdateCompanionBuilder =
@@ -16967,6 +17540,7 @@ typedef $$AssetRowsTableUpdateCompanionBuilder =
       Value<String?> thumbnailPath,
       Value<DateTime> createdAt,
       Value<DateTime> lastReferencedAt,
+      Value<String> extrasJson,
       Value<int> rowid,
     });
 
@@ -17067,6 +17641,11 @@ class $$AssetRowsTableFilterComposer
   get lastReferencedAt => $composableBuilder(
     column: $table.lastReferencedAt,
     builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<String> get extrasJson => $composableBuilder(
+    column: $table.extrasJson,
+    builder: (column) => ColumnFilters(column),
   );
 
   Expression<bool> messageAssetRowsRefs(
@@ -17173,6 +17752,11 @@ class $$AssetRowsTableOrderingComposer
     column: $table.lastReferencedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get extrasJson => $composableBuilder(
+    column: $table.extrasJson,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$AssetRowsTableAnnotationComposer
@@ -17217,6 +17801,11 @@ class $$AssetRowsTableAnnotationComposer
         column: $table.lastReferencedAt,
         builder: (column) => column,
       );
+
+  GeneratedColumn<String> get extrasJson => $composableBuilder(
+    column: $table.extrasJson,
+    builder: (column) => column,
+  );
 
   Expression<T> messageAssetRowsRefs<T extends Object>(
     Expression<T> Function($$MessageAssetRowsTableAnnotationComposer a) f,
@@ -17309,6 +17898,7 @@ class $$AssetRowsTableTableManager
                 Value<String?> thumbnailPath = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> lastReferencedAt = const Value.absent(),
+                Value<String> extrasJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AssetRowsCompanion(
                 id: id,
@@ -17320,6 +17910,7 @@ class $$AssetRowsTableTableManager
                 thumbnailPath: thumbnailPath,
                 createdAt: createdAt,
                 lastReferencedAt: lastReferencedAt,
+                extrasJson: extrasJson,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -17333,6 +17924,7 @@ class $$AssetRowsTableTableManager
                 Value<String?> thumbnailPath = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime lastReferencedAt,
+                Value<String> extrasJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AssetRowsCompanion.insert(
                 id: id,
@@ -17344,6 +17936,7 @@ class $$AssetRowsTableTableManager
                 thumbnailPath: thumbnailPath,
                 createdAt: createdAt,
                 lastReferencedAt: lastReferencedAt,
+                extrasJson: extrasJson,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -22074,6 +22667,188 @@ typedef $$MessagePromptRowsTableProcessedTableManager =
       MessagePromptRow,
       PrefetchHooks Function()
     >;
+typedef $$TombstoneRowsTableCreateCompanionBuilder =
+    TombstoneRowsCompanion Function({
+      required String scope,
+      required String entityId,
+      required DateTime deletedAt,
+      Value<String> payload,
+      Value<int> rowid,
+    });
+typedef $$TombstoneRowsTableUpdateCompanionBuilder =
+    TombstoneRowsCompanion Function({
+      Value<String> scope,
+      Value<String> entityId,
+      Value<DateTime> deletedAt,
+      Value<String> payload,
+      Value<int> rowid,
+    });
+
+class $$TombstoneRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $TombstoneRowsTable> {
+  $$TombstoneRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get scope => $composableBuilder(
+    column: $table.scope,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get entityId => $composableBuilder(
+    column: $table.entityId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get deletedAt =>
+      $composableBuilder(
+        column: $table.deletedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$TombstoneRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $TombstoneRowsTable> {
+  $$TombstoneRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get scope => $composableBuilder(
+    column: $table.scope,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get entityId => $composableBuilder(
+    column: $table.entityId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TombstoneRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TombstoneRowsTable> {
+  $$TombstoneRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get scope =>
+      $composableBuilder(column: $table.scope, builder: (column) => column);
+
+  GeneratedColumn<String> get entityId =>
+      $composableBuilder(column: $table.entityId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+}
+
+class $$TombstoneRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TombstoneRowsTable,
+          TombstoneRow,
+          $$TombstoneRowsTableFilterComposer,
+          $$TombstoneRowsTableOrderingComposer,
+          $$TombstoneRowsTableAnnotationComposer,
+          $$TombstoneRowsTableCreateCompanionBuilder,
+          $$TombstoneRowsTableUpdateCompanionBuilder,
+          (
+            TombstoneRow,
+            BaseReferences<_$AppDatabase, $TombstoneRowsTable, TombstoneRow>,
+          ),
+          TombstoneRow,
+          PrefetchHooks Function()
+        > {
+  $$TombstoneRowsTableTableManager(_$AppDatabase db, $TombstoneRowsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TombstoneRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TombstoneRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TombstoneRowsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> scope = const Value.absent(),
+                Value<String> entityId = const Value.absent(),
+                Value<DateTime> deletedAt = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TombstoneRowsCompanion(
+                scope: scope,
+                entityId: entityId,
+                deletedAt: deletedAt,
+                payload: payload,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String scope,
+                required String entityId,
+                required DateTime deletedAt,
+                Value<String> payload = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TombstoneRowsCompanion.insert(
+                scope: scope,
+                entityId: entityId,
+                deletedAt: deletedAt,
+                payload: payload,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$TombstoneRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TombstoneRowsTable,
+      TombstoneRow,
+      $$TombstoneRowsTableFilterComposer,
+      $$TombstoneRowsTableOrderingComposer,
+      $$TombstoneRowsTableAnnotationComposer,
+      $$TombstoneRowsTableCreateCompanionBuilder,
+      $$TombstoneRowsTableUpdateCompanionBuilder,
+      (
+        TombstoneRow,
+        BaseReferences<_$AppDatabase, $TombstoneRowsTable, TombstoneRow>,
+      ),
+      TombstoneRow,
+      PrefetchHooks Function()
+    >;
 typedef $$ExtensionEntityRowsTableCreateCompanionBuilder =
     ExtensionEntityRowsCompanion Function({
       required String kind,
@@ -22389,6 +23164,8 @@ class $AppDatabaseManager {
       $$UserProfileFieldRowsTableTableManager(_db, _db.userProfileFieldRows);
   $$MessagePromptRowsTableTableManager get messagePromptRows =>
       $$MessagePromptRowsTableTableManager(_db, _db.messagePromptRows);
+  $$TombstoneRowsTableTableManager get tombstoneRows =>
+      $$TombstoneRowsTableTableManager(_db, _db.tombstoneRows);
   $$ExtensionEntityRowsTableTableManager get extensionEntityRows =>
       $$ExtensionEntityRowsTableTableManager(_db, _db.extensionEntityRows);
 }

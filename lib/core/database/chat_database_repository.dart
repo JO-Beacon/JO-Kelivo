@@ -14,6 +14,7 @@ import '../models/conversation.dart';
 import '../models/conversation_tree.dart';
 import '../models/message_part.dart';
 import '../services/backup/restore_previous_plan.dart';
+import '../services/api/stream/stream_chunk_handler.dart';
 import '../utils/multimodal_input_utils.dart';
 import '../../utils/sandbox_path_resolver.dart';
 import '../../utils/kelivo_file_uri.dart';
@@ -563,14 +564,12 @@ class ChatDatabaseRepository {
       }
       database.execute('BEGIN IMMEDIATE;');
       try {
-        // 本仓库的 message_rows 还没有 updated_at 列（上游 1.2.7 的基座比
-        // 本仓库多出 updated_at／sender_id／extras_json 三列），所以这里
-        // 只终止流式状态。上游那条语句会在同一条 UPDATE 里盖上 updated_at，
-        // 好让 LWW／同步消费方看到“已终止”而不是崩溃前的旧值 —— 等这三列
-        // 按基座补齐之后，再把上游的写法恢复过来。
+        // 终止遗留流是真实状态变化；同一条 UPDATE 盖上 updated_at，
+        // 让 LWW／同步消费方看到终止，而不是崩溃前的旧值。
         database.execute(
-          'UPDATE message_rows SET is_streaming = 0 '
+          'UPDATE message_rows SET is_streaming = 0, updated_at = ? '
           'WHERE is_streaming != 0;',
+          [DateTime.now().toUtc().microsecondsSinceEpoch],
         );
         database.execute('DELETE FROM chat_storage_meta_rows WHERE key = ?;', [
           ChatStorageMetaKeys.activeStreamingIds,
@@ -743,6 +742,8 @@ class ChatDatabaseRepository {
       'memory_entry_rows',
       'user_profile_field_rows',
       'message_prompt_rows',
+      'tombstone_rows',
+      'extension_entity_rows',
     };
     final tableRows = database.select(
       "SELECT name FROM sqlite_master WHERE type = 'table';",
@@ -812,6 +813,9 @@ class ChatDatabaseRepository {
       'cached_tokens',
       'duration_ms',
       'message_order',
+      'updated_at',
+      'sender_id',
+      'extras_json',
     ],
     'message_tree_edge_rows': [
       'conversation_id',
@@ -874,6 +878,7 @@ class ChatDatabaseRepository {
       'thumbnail_path',
       'created_at',
       'last_referenced_at',
+      'extras_json',
     ],
     'message_asset_rows': [
       'conversation_id',
@@ -925,6 +930,7 @@ class ChatDatabaseRepository {
       'carries_memory_snapshot',
       'created_at',
     ],
+    'tombstone_rows': ['scope', 'entity_id', 'deleted_at', 'payload'],
     'extension_entity_rows': [
       'kind',
       'id',
@@ -971,6 +977,7 @@ class ChatDatabaseRepository {
       'memory_entry_rows': ['id'],
       'user_profile_field_rows': ['id'],
       'message_prompt_rows': ['revision_id'],
+      'tombstone_rows': ['scope', 'entity_id'],
       'extension_entity_rows': ['kind', 'id'],
     };
     const sortOrderTables = {
@@ -1182,6 +1189,8 @@ class ChatDatabaseRepository {
       'memory_entry_rows': <String>{},
       'user_profile_field_rows': <String>{},
       'message_prompt_rows': {'revision_id->message_rows.id:CASCADE'},
+      'tombstone_rows': <String>{},
+      'extension_entity_rows': <String>{},
     };
     for (final entry in expectedForeignKeys.entries) {
       final actual = database
@@ -1793,6 +1802,76 @@ class ChatDatabaseRepository {
       resultCount: (rows) => rows.length,
     );
   }
+
+  /// Reads only row metadata, never long message bodies or attachment content.
+  /// Covers edits to old messages as well as selected versions and truncation.
+  Future<String?> scheduledContextRevision(String conversationId) async {
+    final conversation = await getConversation(conversationId);
+    if (conversation == null) return null;
+    final rows = await _db
+        .customSelect(
+          'SELECT id, message_order, COALESCE(updated_at, timestamp) AS revision '
+          'FROM message_rows WHERE conversation_id = ? ORDER BY message_order',
+          variables: [Variable.withString(conversationId)],
+        )
+        .get();
+    return sha256
+        .convert(
+          utf8.encode(
+            jsonEncode({
+              'assistant': conversation.assistantId,
+              'versions': conversation.versionSelections,
+              'truncate': conversation.truncateIndex,
+              'summary': conversation.summary,
+              'extras': conversation.extras,
+              'model': [
+                conversation.chatModelProvider,
+                conversation.chatModelId,
+              ],
+              'messages': [for (final row in rows) row.data],
+            }),
+          ),
+        )
+        .toString();
+  }
+
+  Future<Conversation> publishScheduledMessages({
+    required Conversation conversation,
+    required ChatMessage instruction,
+    required ChatMessage response,
+    required bool createConversation,
+    String? expectedContextRevision,
+  }) => _db.transaction(() async {
+    final existing = await getMessage(response.id);
+    if (existing != null) {
+      return (await getConversation(existing.conversationId))!;
+    }
+    var current = await getConversation(conversation.id);
+    if (current == null) {
+      if (!createConversation) throw StateError('conversation_missing');
+      await putConversation(conversation);
+      current = conversation;
+    }
+    if (current.assistantId != conversation.assistantId) {
+      throw StateError('conversation_missing');
+    }
+    if (expectedContextRevision != null &&
+        await scheduledContextRevision(current.id) != expectedContextRevision) {
+      throw StateError('scheduled_context_changed');
+    }
+    final afterInstruction = await _appendLinearMessageToConversation(
+      conversation: current,
+      message: instruction,
+      touchUpdatedAt: true,
+      selectVersion: false,
+    );
+    return _appendLinearMessageToConversation(
+      conversation: afterInstruction,
+      message: response,
+      touchUpdatedAt: true,
+      selectVersion: false,
+    );
+  });
 
   Future<Conversation?> getConversation(String id) async {
     return _observer.measure(
@@ -3938,8 +4017,7 @@ class ChatDatabaseRepository {
         );
       END;
     ''');
-    // 极少数直接重写 payload 的情况（例如沙箱路径迁移）。常规的
-    // checkpoint 改为删除并重新插入 parts。
+    // Payload updates include streaming checkpoints and sandbox path rewrites.
     await _db.customStatement('''
       CREATE TRIGGER IF NOT EXISTS message_search_fts_update
       AFTER UPDATE OF payload, conversation_id, kind ON message_part_rows
@@ -3964,9 +4042,9 @@ class ChatDatabaseRepository {
         WHERE new.kind = 'text';
       END;
     ''');
-    // 流式 checkpoint 会推迟 FTS；当 is_streaming 变为 0 时，索引
-    // 当时存在的文本 parts。随后的 part 重写（如果发生）
-    // 会在 finalized gate 下执行删除并重新插入。
+    // Streaming checkpoints defer FTS; when is_streaming flips to 0, index the
+    // text parts present at that moment. The subsequent part rewrite (if any)
+    // then updates changed parts under the finalized gate.
     await _db.customStatement('''
       CREATE TRIGGER IF NOT EXISTS message_search_fts_finalize
       AFTER UPDATE OF is_streaming ON message_rows
@@ -4180,6 +4258,8 @@ class ChatDatabaseRepository {
                 cachedTokens: Value(message.cachedTokens),
                 durationMs: Value(message.durationMs),
                 messageOrder: message.messageOrder,
+                senderId: Value(message.senderId),
+                extrasJson: Value(message.extrasJson),
               ),
             );
         await _db.customStatement(
@@ -4308,9 +4388,16 @@ class ChatDatabaseRepository {
     final order =
         messageOrder ?? await _nextMessageOrder(message.conversationId);
     await _db.transaction(() async {
+      // Upsert 可能是更新，因此显式盖 updated_at；新插入得到一个接近
+      // timestamp 的值也不会破坏 COALESCE 语义。
       await _db
           .into(_db.messageRows)
-          .insertOnConflictUpdate(_messageCompanion(message, order));
+          .insertOnConflictUpdate(
+            _messageCompanion(
+              message,
+              order,
+            ).copyWith(updatedAt: Value(DateTime.now().toUtc())),
+          );
       await _replaceMessageParts(message);
       await _appendMessageToTree(message.conversationId, message.id);
     });
@@ -4651,6 +4738,17 @@ class ChatDatabaseRepository {
   Future<void> syncLinearConversationTree(String conversationId) {
     return _db.transaction(
       () => _syncLinearTreeForConversation(conversationId),
+    );
+  }
+
+  /// 供外部 Kelivo 导入器重建上游线性／版本组消息树。
+  ///
+  /// 上游 schema 3 没有本仓库的上下文树表；直接线性化会丢版本分支。
+  /// 这里复用 legacy 导入的既有重建算法，按 `group_id`、`version` 与
+  /// 会话 `versionSelections` 生成当前树的等价表示。
+  Future<void> rebuildLegacyConversationTreeForImport(String conversationId) {
+    return _db.transaction(
+      () => _rebuildLegacyConversationTree(conversationId),
     );
   }
 
@@ -5030,12 +5128,10 @@ class ChatDatabaseRepository {
   Future<void> _replaceMessageParts(
     ChatMessage message, {
     List<Map<String, dynamic>>? toolEvents,
-    bool preserveUnchangedToolParts = false,
   }) async {
     if (_messageHasAttachmentParts(message)) {
       await markMessageAssetReferencesDirty(message.id);
     }
-    final preservedToolEvents = toolEvents ?? await getToolEvents(message.id);
     // 流中途的 reasoning 暂停不是移除 reasoning：checkpoint 快照仍带有预分配的
     // reasoningStartAt 时间戳，因此保留持久化 reasoning part，直到无时间戳消息
     // 证明 reasoning 已消失（完全重建、编辑、finalize）。
@@ -5055,193 +5151,50 @@ class ChatDatabaseRepository {
     if (effectiveReasoningText != null && effectiveReasoningText.isNotEmpty) {
       message = message.copyWith(reasoningText: effectiveReasoningText);
     }
-    // 带 attachment 的消息拥有交错排列的 body ordinals；
-    // text/reasoning fast path 无法安全地保留它们。
-    if (preserveUnchangedToolParts &&
-        preservedToolEvents.isNotEmpty &&
-        !_messageHasAttachmentParts(message)) {
-      final keptToolParts = await _unchangedToolPartCount(
-        message,
-        preservedToolEvents,
-      );
-      if (keptToolParts != null) {
-        await _replaceTextAndReasoningParts(message, keptToolParts);
-        return;
-      }
-    }
-    await (_db.delete(
-      _db.messagePartRows,
-    )..where((row) => row.revisionId.equals(message.id))).go();
-    var ordinal = 0;
-    final now = DateTime.now().toUtc();
-    final updatedAt = now.isBefore(message.timestamp) ? message.timestamp : now;
-    Future<void> insertPartRow(String kind, String payload) async {
-      await _db
-          .into(_db.messagePartRows)
-          .insert(
-            MessagePartRowsCompanion.insert(
-              conversationId: message.conversationId,
-              revisionId: message.id,
-              ordinal: ordinal++,
-              kind: kind,
-              payload: payload,
-              createdAt: message.timestamp,
-              updatedAt: updatedAt,
-            ),
-          );
-    }
-
-    // 按消息部件的真实顺序落盘：思维链、工具调用不再强制归位到最前，
-    // 流式产出（含正文/思维链交错）与编辑器重排的顺序原样保留。
-    // 读取侧按 ordinal 排序，天然还原该顺序。
-    final hasReasoningInParts = message.parts.any(
-      (part) => part is ReasoningPart && part.text.isNotEmpty,
-    );
-    if (!hasReasoningInParts) {
-      // 部件里没有思维链（例如流式 checkpoint 回退只保留了字段），
-      // 退回旧行为：从 reasoningText 字段补一行，置于最前。
-      final reasoning = message.reasoningText;
-      if (reasoning != null && reasoning.isNotEmpty) {
-        await insertPartRow('reasoning', reasoning);
-      }
-    }
-    var eventIndex = 0;
-    var bodyRowCount = 0;
-    // 部件未携带工具卡片（旧式 content/reasoningText 构造，如导入器）时，
-    // 工具事件保持旧布局位置：正文之前、思维链之后。
-    final partsHaveToolCards = message.parts.any(
-      (part) => part is ToolCallPart,
-    );
-    for (final part in message.parts) {
-      switch (part) {
-        case ReasoningPart(:final text) when text.isNotEmpty:
-          await insertPartRow('reasoning', text);
-        case ToolCallPart():
-          final payload = eventIndex < preservedToolEvents.length
-              ? jsonEncode(preservedToolEvents[eventIndex])
-              : part.payloadJson;
-          eventIndex++;
-          await insertPartRow('tool_call', payload);
-        case TextPart() ||
-            ImagePart() ||
-            FilePart() ||
-            MalformedPart() ||
-            UnknownPart():
-          if (!partsHaveToolCards && eventIndex < preservedToolEvents.length) {
-            for (; eventIndex < preservedToolEvents.length; eventIndex++) {
-              await insertPartRow(
-                'tool_call',
-                jsonEncode(preservedToolEvents[eventIndex]),
-              );
-            }
-          }
-          await insertPartRow(part.kind, part.encodePayload());
-          bodyRowCount++;
-        default:
-          break;
-      }
-    }
-    // 防御：事件多于部件时（不应发生），剩余事件按旧布局补在末尾，不丢数据。
-    for (; eventIndex < preservedToolEvents.length; eventIndex++) {
-      await insertPartRow(
-        'tool_call',
-        jsonEncode(preservedToolEvents[eventIndex]),
-      );
-    }
-    if (bodyRowCount == 0 && message.content.isNotEmpty) {
-      await insertPartRow(TextPart(message.content).kind, message.content);
-    }
-  }
-
-  /// 当现有持久化 tool_call part 与完整重建为 [toolEvents] 所写内容
-  /// （payload 和 ordinal）一致时返回其数量；任何差异导致完整删除并重插时返回 null。
-  /// reasoning 出现或消失会重新编号工具 ordinal，因此也会强制完整重建。
-  /// 每个 tool event 恰好产生一个 `tool_call` part。
-  Future<int?> _unchangedToolPartCount(
-    ChatMessage message,
-    List<Map<String, dynamic>> toolEvents,
-  ) async {
-    final existing =
-        await (_db.select(_db.messagePartRows)
-              ..where((row) => row.revisionId.equals(message.id))
-              ..orderBy([(row) => OrderingTerm.asc(row.ordinal)]))
-            .get();
-    if (existing.isEmpty) return null;
-    if (existing.any((part) => part.kind == 'image' || part.kind == 'file')) {
-      return null;
-    }
-    final reasoning = message.reasoningText;
-    final hasReasoning = reasoning != null && reasoning.isNotEmpty;
-    final hasPersistedReasoning = existing.any(
-      (part) => part.kind == 'reasoning',
-    );
-    if (hasReasoning != hasPersistedReasoning) return null;
-    final expectedPayloads = [
-      for (final event in toolEvents) jsonEncode(event),
-    ];
-    final persistedToolParts = existing
-        .where((part) => part.kind == 'tool_call')
-        .toList(growable: false);
-    if (persistedToolParts.length != expectedPayloads.length) return null;
-    final firstToolOrdinal = hasReasoning ? 1 : 0;
-    for (var i = 0; i < persistedToolParts.length; i++) {
-      final part = persistedToolParts[i];
-      if (part.payload != expectedPayloads[i] ||
-          part.ordinal != firstToolOrdinal + i) {
-        return null;
-      }
-    }
-    return persistedToolParts.length;
-  }
-
-  /// 仅重写 text/reasoning parts；[toolPartCount] 个已持久化的
-  /// tool parts 保留各自的 rows、ordinals 和 timestamps。
-  Future<void> _replaceTextAndReasoningParts(
-    ChatMessage message,
-    int toolPartCount,
-  ) async {
+    final parts = _partsForPersistence(message, toolEvents);
     await (_db.delete(_db.messagePartRows)..where(
           (row) =>
               row.revisionId.equals(message.id) &
-              (row.kind.equals('text') | row.kind.equals('reasoning')),
+              row.ordinal.isBiggerOrEqualValue(parts.length),
         ))
         .go();
+    var ordinal = 0;
     final now = DateTime.now().toUtc();
     final updatedAt = now.isBefore(message.timestamp) ? message.timestamp : now;
-    var ordinal = 0;
-    final reasoning = message.reasoningText;
-    if (reasoning != null && reasoning.isNotEmpty) {
-      await _db
-          .into(_db.messagePartRows)
-          .insert(
-            MessagePartRowsCompanion.insert(
-              conversationId: message.conversationId,
-              revisionId: message.id,
-              ordinal: ordinal++,
-              kind: 'reasoning',
-              payload: reasoning,
-              createdAt: message.timestamp,
-              updatedAt: updatedAt,
+    await _db.batch((batch) {
+      for (final part in parts) {
+        batch.insert(
+          _db.messagePartRows,
+          MessagePartRowsCompanion.insert(
+            conversationId: message.conversationId,
+            revisionId: message.id,
+            ordinal: ordinal++,
+            kind: part.kind,
+            payload: part.encodePayload(),
+            createdAt: message.timestamp,
+            updatedAt: updatedAt,
+          ),
+          onConflict: DoUpdate<MessagePartRows, MessagePartRow>.withExcluded(
+            (old, incoming) => MessagePartRowsCompanion.custom(
+              conversationId: incoming.conversationId,
+              kind: incoming.kind,
+              payload: incoming.payload,
+              createdAt: incoming.createdAt,
+              updatedAt: incoming.updatedAt,
             ),
-          );
-    }
-    ordinal += toolPartCount;
-    final bodyParts = _bodyPartsForPersistence(message);
-    for (final part in bodyParts) {
-      await _db
-          .into(_db.messagePartRows)
-          .insert(
-            MessagePartRowsCompanion.insert(
-              conversationId: message.conversationId,
-              revisionId: message.id,
-              ordinal: ordinal++,
-              kind: part.kind,
-              payload: part.encodePayload(),
-              createdAt: message.timestamp,
-              updatedAt: updatedAt,
-            ),
-          );
-    }
+            target: [
+              _db.messagePartRows.revisionId,
+              _db.messagePartRows.ordinal,
+            ],
+            where: (old, incoming) =>
+                old.kind.isNotExp(incoming.kind) |
+                old.payload.isNotExp(incoming.payload) |
+                old.conversationId.isNotExp(incoming.conversationId) |
+                old.createdAt.isNotExp(incoming.createdAt),
+          ),
+        );
+      }
+    });
   }
 
   Future<AppendedMessageVersion?> appendMessageVersion({
@@ -6038,6 +5991,19 @@ class ChatDatabaseRepository {
         // 先把 workspace／skill 实体合并进来：被导入的会话会引用它们，
         // 不先插入的话这些引用就是悬空的。
         // 设备本地的“外部目录授权”刻意排除在外（它是本机专属，不该随快照流转）。
+        // 合并备份携带的删除墓碑：只接受同一实体更新的删除时间，
+        // 不在导入时主动删除本机数据；它只服务于未来同步的删除意图。
+        await _db.customStatement('''
+          INSERT INTO tombstone_rows
+            (scope, entity_id, deleted_at, payload)
+          SELECT scope, entity_id, deleted_at, payload
+          FROM merge_source.tombstone_rows
+          WHERE true
+          ON CONFLICT(scope, entity_id) DO UPDATE SET
+            deleted_at = excluded.deleted_at,
+            payload = excluded.payload
+          WHERE excluded.deleted_at > tombstone_rows.deleted_at;
+        ''');
         await _db.customStatement(
           "INSERT OR IGNORE INTO extension_entity_rows "
           "(kind, id, sort_order, owner_id, payload, updated_at) "
@@ -6497,11 +6463,12 @@ class ChatDatabaseRepository {
         'total_tokens, is_streaming, reasoning_start_at, '
         'reasoning_finished_at, translation, reasoning_segments_json, group_id, '
         'version, prompt_tokens, completion_tokens, cached_tokens, duration_ms, '
-        'message_order) '
+        'message_order, updated_at, sender_id, extras_json) '
         'SELECT ?, ?, role, timestamp, model_id, provider_id, total_tokens, 0, '
         'reasoning_start_at, reasoning_finished_at, translation, '
         'reasoning_segments_json, group_id, version, prompt_tokens, '
-        'completion_tokens, cached_tokens, duration_ms, ? '
+        'completion_tokens, cached_tokens, duration_ms, ?, updated_at, '
+        'sender_id, extras_json '
         'FROM merge_source.message_rows WHERE id = ?;',
         [id, sourceId, orderById[id]!, id],
       );
@@ -6800,7 +6767,8 @@ class ChatDatabaseRepository {
           'SELECT role, timestamp, model_id, provider_id, total_tokens, '
           'reasoning_start_at, reasoning_finished_at, translation, '
           'reasoning_segments_json, group_id, version, prompt_tokens, '
-          'completion_tokens, cached_tokens, duration_ms FROM $schema.message_rows '
+          'completion_tokens, cached_tokens, duration_ms, sender_id, '
+          'extras_json FROM $schema.message_rows '
           'WHERE id = ?;',
           variables: [Variable<String>(id)],
         )
@@ -6886,7 +6854,8 @@ class ChatDatabaseRepository {
           'total_tokens, is_streaming, reasoning_start_at, '
           'reasoning_finished_at, translation, reasoning_segments_json, group_id, '
           'version, prompt_tokens, completion_tokens, cached_tokens, duration_ms, '
-          'message_order FROM $schema.message_rows WHERE conversation_id = ? '
+          'message_order, sender_id, extras_json '
+          'FROM $schema.message_rows WHERE conversation_id = ? '
           'ORDER BY message_order, id;',
           variables: [Variable<String>(id)],
         )
@@ -7162,7 +7131,7 @@ class ChatDatabaseRepository {
         'total_tokens, is_streaming, reasoning_start_at, '
         'reasoning_finished_at, translation, reasoning_segments_json, group_id, '
         'version, prompt_tokens, completion_tokens, cached_tokens, duration_ms, '
-        'message_order) '
+        'message_order, updated_at, sender_id, extras_json) '
         'SELECT ?, ?, role, timestamp, model_id, provider_id, '
         'total_tokens, 0, reasoning_start_at, '
         'reasoning_finished_at, translation, reasoning_segments_json, '
@@ -7170,7 +7139,8 @@ class ChatDatabaseRepository {
         'prompt_tokens, completion_tokens, cached_tokens, duration_ms, '
         // message_order 是 conversation fingerprint 的一部分。原样保留它，
         // 以便稀疏的 snapshots 在重复 merge 时保持幂等。
-        'message_order FROM merge_source.message_rows WHERE id = ?;',
+        'message_order, updated_at, sender_id, extras_json '
+        'FROM merge_source.message_rows WHERE id = ?;',
         [entry.value, targetId, targetGroupId, entry.key],
       );
       await _db.customStatement(
@@ -7489,6 +7459,7 @@ class ChatDatabaseRepository {
     int? durationMs,
   }) {
     final companion = MessageRowsCompanion(
+      updatedAt: Value(DateTime.now().toUtc()),
       role: role != null ? Value(role) : const Value.absent(),
       totalTokens: totalTokens != null
           ? Value(totalTokens)
@@ -7583,11 +7554,7 @@ class ChatDatabaseRepository {
       // 保持 message_rows（包括 is_streaming）先于 parts 重写，以便
       // FTS finalize 触发器正确索引重写前的 text part。
       await _updateMessageRow(message);
-      await _replaceMessageParts(
-        message,
-        toolEvents: toolEvents,
-        preserveUnchangedToolParts: true,
-      );
+      await _replaceMessageParts(message, toolEvents: toolEvents);
       if (generationRunId != null && checkpointSeq != null) {
         await GenerationRunCommands(_db).checkpoint(
           id: generationRunId,
@@ -7617,10 +7584,41 @@ class ChatDatabaseRepository {
     });
   }
 
+  static const tombstoneScopeConversation = 'conversation';
+  static const tombstoneRetention = Duration(days: 90);
+
   Future<void> deleteConversation(String id) async {
-    await (_db.delete(
-      _db.conversationRows,
-    )..where((t) => t.id.equals(id))).go();
+    await _db.transaction(() async {
+      final deleted = await (_db.delete(
+        _db.conversationRows,
+      )..where((t) => t.id.equals(id))).go();
+      if (deleted == 0) return;
+      final now = DateTime.now().toUtc();
+      await _db
+          .into(_db.tombstoneRows)
+          .insertOnConflictUpdate(
+            TombstoneRowsCompanion.insert(
+              scope: tombstoneScopeConversation,
+              entityId: id,
+              deletedAt: now,
+            ),
+          );
+      await (_db.delete(_db.tombstoneRows)..where(
+            (t) => t.deletedAt.isSmallerThanValue(
+              now.subtract(tombstoneRetention).microsecondsSinceEpoch,
+            ),
+          ))
+          .go();
+    });
+  }
+
+  Future<List<TombstoneRow>> readTombstones({String? scope}) {
+    final query = _db.select(_db.tombstoneRows)
+      ..orderBy([(t) => OrderingTerm.desc(t.deletedAt)]);
+    if (scope != null) {
+      query.where((t) => t.scope.equals(scope));
+    }
+    return query.get();
   }
 
   Future<void> deleteMessage(String messageId) async {
@@ -7893,9 +7891,14 @@ class ChatDatabaseRepository {
         _db.messageRows,
       )..where((row) => row.id.isIn(deletedIds))).go();
       for (final rewrite in anchorRewrites.entries) {
-        await (_db.update(_db.messageRows)
-              ..where((row) => row.id.equals(rewrite.key)))
-            .write(MessageRowsCompanion(messageOrder: Value(rewrite.value)));
+        await (_db.update(
+          _db.messageRows,
+        )..where((row) => row.id.equals(rewrite.key))).write(
+          MessageRowsCompanion(
+            messageOrder: Value(rewrite.value),
+            updatedAt: Value(DateTime.now().toUtc()),
+          ),
+        );
       }
       await _writeConversationTree(treeAfterDelete);
       final currentConversation = await _conversationFromRow(
@@ -7969,6 +7972,7 @@ class ChatDatabaseRepository {
   }
 
   Future<void> _clearChatRows() async {
+    await _db.delete(_db.tombstoneRows).go();
     await _db.delete(_db.conversationMcpServerRows).go();
     await _db.delete(_db.messageRows).go();
     await _db.delete(_db.conversationRows).go();
@@ -8391,9 +8395,14 @@ class ChatDatabaseRepository {
       }
       // 清除 is_streaming 会触发 message_search_fts_finalize，从而索引
       // 已放弃流所留下的 checkpointed text parts。
-      await (_db.update(_db.messageRows)
-            ..where((row) => row.isStreaming.equals(true)))
-          .write(const MessageRowsCompanion(isStreaming: Value(false)));
+      await (_db.update(
+        _db.messageRows,
+      )..where((row) => row.isStreaming.equals(true))).write(
+        MessageRowsCompanion(
+          isStreaming: const Value(false),
+          updatedAt: Value(DateTime.now().toUtc()),
+        ),
+      );
       await clearActiveStreamingIds();
       return runs.length;
     });
@@ -8490,7 +8499,12 @@ class ChatDatabaseRepository {
                 t.conversationId.equals(conversationId) &
                 t.id.equals(messageIds[i]),
           ))
-          .write(MessageRowsCompanion(messageOrder: Value(i)));
+          .write(
+            MessageRowsCompanion(
+              messageOrder: Value(i),
+              updatedAt: Value(DateTime.now().toUtc()),
+            ),
+          );
     }
   }
 
@@ -8642,24 +8656,182 @@ class ChatDatabaseRepository {
     );
   }
 
-  /// Body parts 的过滤规则：只保留随正文部件持久化的种类。
-  /// reasoning/tool_call 行的位置由 [_replaceMessageParts] 按部件真实顺序写入；
-  /// 此函数仅供仅重写 text/reasoning 的快速路径使用（该路径只在
-  /// "reasoning 在最前" 的标准布局下启用）。
-  List<MessagePart> _bodyPartsForPersistence(ChatMessage message) {
-    final body = <MessagePart>[
-      for (final part in message.parts)
-        if (part is TextPart ||
-            part is ImagePart ||
-            part is FilePart ||
-            part is MalformedPart ||
-            part is UnknownPart)
-          part,
-    ];
-    if (body.isEmpty) {
+  /// Persist [message.parts] in arrival order.
+  ///
+  /// [toolEvents] / [ChatMessage.reasoningText] are compatibility overlays.
+  /// Empty [toolEvents] never strips [ToolCallPart]s already on the message —
+  /// those cards are the write source during a server-tool gap. Extra events
+  /// that do not match a part are inserted after the last tool slot.
+  List<MessagePart> _partsForPersistence(
+    ChatMessage message,
+    List<Map<String, dynamic>>? toolEvents,
+  ) {
+    var parts = List<MessagePart>.of(message.parts);
+    if (!parts.any((part) => part is ReasoningPart)) {
+      final reasoning = message.reasoningText;
+      if (reasoning != null && reasoning.isNotEmpty) {
+        parts = [ReasoningPart(reasoning), ...parts];
+      }
+    }
+    if (toolEvents != null) {
+      if (parts.any((part) => part is ToolCallPart)) {
+        parts = _applyToolEventsToParts(parts, toolEvents);
+      } else if (toolEvents.isNotEmpty) {
+        parts = [
+          ...parts,
+          for (final event in toolEvents) ToolCallPart(jsonEncode(event)),
+        ];
+      }
+    }
+    if (parts.isEmpty) {
       return <MessagePart>[TextPart(message.content)];
     }
-    return body;
+    return parts;
+  }
+
+  List<MessagePart> _applyToolEventsToParts(
+    List<MessagePart> parts,
+    List<Map<String, dynamic>> toolEvents,
+  ) {
+    final partCount = parts.whereType<ToolCallPart>().length;
+    if (partCount != toolEvents.length) {
+      debugPrint(
+        'toolEvents/parts count mismatch: events=${toolEvents.length} '
+        'parts=$partCount',
+      );
+    }
+    final unused = [for (final event in toolEvents) event];
+    Map<String, dynamic>? takeById(String id) {
+      if (id.isEmpty) return null;
+      final index = unused.indexWhere(
+        (event) => (event['id'] ?? '').toString() == id,
+      );
+      if (index < 0) return null;
+      return unused.removeAt(index);
+    }
+
+    final matchedByPart = List<Map<String, dynamic>?>.filled(
+      parts.length,
+      null,
+    );
+    for (var i = 0; i < parts.length; i++) {
+      final part = parts[i];
+      if (part is! ToolCallPart) continue;
+      final partId = _toolCallPartId(part) ?? '';
+      if (partId.isEmpty) continue;
+      matchedByPart[i] = takeById(partId);
+    }
+    for (var i = 0; i < parts.length; i++) {
+      final part = parts[i];
+      if (part is! ToolCallPart) continue;
+      if ((_toolCallPartId(part) ?? '').isNotEmpty) continue;
+      if (unused.isEmpty) break;
+      matchedByPart[i] = unused.removeAt(0);
+    }
+
+    final out = <MessagePart>[];
+    var lastToolIndex = -1;
+    for (var i = 0; i < parts.length; i++) {
+      final part = parts[i];
+      if (part is! ToolCallPart) {
+        out.add(part);
+        continue;
+      }
+      final matched = matchedByPart[i];
+      if (matched != null) {
+        out.add(ToolCallPart(jsonEncode(_mergeToolPayload(part, matched))));
+      } else {
+        out.add(part);
+      }
+      lastToolIndex = out.length - 1;
+    }
+    if (unused.isNotEmpty) {
+      final extras = [
+        for (final event in unused) ToolCallPart(jsonEncode(event)),
+      ];
+      final insertAt = lastToolIndex >= 0 ? lastToolIndex + 1 : out.length;
+      out.insertAll(insertAt, extras);
+    }
+    return out;
+  }
+
+  Map<String, dynamic> _mergeToolPayload(
+    ToolCallPart part,
+    Map<String, dynamic> event,
+  ) {
+    Map<String, dynamic> base = const <String, dynamic>{};
+    try {
+      final decoded = jsonDecode(part.payloadJson);
+      if (decoded is Map) {
+        base = Map<String, dynamic>.from(decoded);
+      }
+    } catch (_) {}
+    final merged = Map<String, dynamic>.from(base);
+    for (final entry in event.entries) {
+      if (_isEmptyToolOverlay(entry.value) &&
+          !_isEmptyToolOverlay(base[entry.key])) {
+        continue;
+      }
+      merged[entry.key] = entry.value;
+    }
+    if (base['server'] == true && event['server'] != false) {
+      merged['server'] = true;
+    }
+    if (_isSearchToolName(merged['name'] ?? base['name'] ?? event['name'])) {
+      merged['content'] = jsonEncode(
+        StreamChunkHandler.mergeSearchItems(
+          base['content'],
+          _searchItemsOf(event['content']),
+        ),
+      );
+    }
+    return merged;
+  }
+
+  bool _isEmptyToolOverlay(Object? value) {
+    if (value == null) return true;
+    if (value is String) return value.isEmpty;
+    if (value is Map) return value.isEmpty;
+    if (value is List) return value.isEmpty;
+    return false;
+  }
+
+  bool _isSearchToolName(Object? name) {
+    final toolName = (name ?? '').toString();
+    return toolName == 'search_web' || toolName == 'builtin_search';
+  }
+
+  List<Map<String, dynamic>> _searchItemsOf(Object? raw) {
+    final map = _asStringKeyedMap(raw);
+    final items = map?['items'];
+    if (items is! List) return const <Map<String, dynamic>>[];
+    return [
+      for (final item in items)
+        if (item is Map) Map<String, dynamic>.from(item),
+    ];
+  }
+
+  Map<String, dynamic>? _asStringKeyedMap(Object? raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    if (raw is String) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) return Map<String, dynamic>.from(decoded);
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  String? _toolCallPartId(ToolCallPart part) {
+    try {
+      final decoded = jsonDecode(part.payloadJson);
+      if (decoded is Map) {
+        final id = (decoded['id'] ?? '').toString();
+        return id.isEmpty ? null : id;
+      }
+    } catch (_) {}
+    return null;
   }
 
   MessagePart _hydratePart({
@@ -8723,6 +8895,7 @@ class ChatDatabaseRepository {
 
   MessageRowsCompanion _messageUpdate(ChatMessage message) {
     return MessageRowsCompanion(
+      updatedAt: Value(DateTime.now().toUtc()),
       totalTokens: Value(message.totalTokens),
       isStreaming: Value(message.isStreaming),
       reasoningStartAt: Value(message.reasoningStartAt),

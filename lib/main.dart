@@ -23,6 +23,7 @@ import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 import 'desktop/desktop_window_controller.dart';
 import 'desktop/desktop_tray_controller.dart';
+import 'desktop/windows_paste_fix.dart';
 // import 'package:logging/logging.dart' as logging;
 // 主题现在由 SettingsProvider 管理
 import 'theme/theme_factory.dart';
@@ -165,6 +166,7 @@ Future<void> main(List<String> arguments) async {
   await runZoned(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+      WindowsPasteFix.instance.install();
       FlutterLogger.stage('main entered');
       // 日志开关原本要等读完偏好设置才生效，启动全程因此没有记录。这里在最
       // 早的时刻同步解析一次数据目录与开关，让启动脚印从一开始就能落盘。
@@ -177,6 +179,11 @@ Future<void> main(List<String> arguments) async {
       StartupRecorder.installFrameCounter();
       if (Platform.isWindows) AssociatedBackupPathEvents.instance.initialize();
       // 启动阶段只注册通知点击回调，不申请运行时通知权限。
+      WindowsPasteFix.instance.install();
+      // Register notification tap handling for every Android launch. This is
+      // independent of the current background-chat mode: an older completion
+      // notification can still launch the app after the mode has changed.
+      // Initialization does not request notification permission.
       if (Platform.isAndroid || Platform.isIOS) {
         try {
           await NotificationService.ensureInitialized();
@@ -445,8 +452,9 @@ Future<void> main(List<String> arguments) async {
       }
       // 桌面退出钩子：在进程退出前排空已排队的偏好写入。
       _installExitFlush(businessPreferences);
-      // 经过几次冷启动后，尽力清理已归档的恢复运行。
-      ScheduledTasksService.configureDesktop(businessPreferences);
+      // 业务租约就绪后，计划任务可跨设备配置。
+      ScheduledTasksService.configureDevice(businessPreferences);
+      // 冷启动数次后择机清理历史恢复运行，失败不影响启动。
       unawaited(_pruneRestoreArchive(appDataDirectory));
       // 启用 edge-to-edge，让内容延伸到系统栏下方（Android）
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);

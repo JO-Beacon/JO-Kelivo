@@ -395,6 +395,9 @@ class MessageListView extends StatefulWidget {
 
 class _MessageListViewState extends State<MessageListView> {
   static const _footerExtent = 48.0;
+  static final _idleStreamingContent = AlwaysStoppedAnimation(
+    StreamingContentData(content: '', totalTokens: 0),
+  );
 
   bool get _hasFooter => _showsFooter(widget);
 
@@ -710,7 +713,8 @@ class _MessageListViewState extends State<MessageListView> {
   double _estimateItemExtent(int? index, double crossAxisExtent) {
     if (index == null) return 0;
     if (_effectiveRenderModels.isEmpty && _hasFooter) return _footerExtent;
-    final footerExtent = _hasFooter && index == _effectiveRenderModels.length - 1
+    final footerExtent =
+        _hasFooter && index == _effectiveRenderModels.length - 1
         ? _footerExtent
         : 0;
     return _estimateMessageExtent(index, crossAxisExtent) + footerExtent;
@@ -2191,9 +2195,10 @@ class _MessageListViewState extends State<MessageListView> {
                           textScale * presentation.chatFontScale,
                         ),
                       ),
-                      child: isStreaming
+                      child: message.role == 'assistant'
                           ? _buildStreamingMessageWidget(
                               context,
+                              isStreaming: isStreaming,
                               message: message,
                               index: index,
                               r: r,
@@ -2319,10 +2324,12 @@ class _MessageListViewState extends State<MessageListView> {
     );
   }
 
-  /// 构建使用 ValueListenableBuilder 的流式消息控件，
-  /// 以避免流式期间整页重建。
+  /// Keep the assistant subtree mounted when its stream finishes. Inactive
+  /// rows use immutable listenables, so they don't subscribe to stream/scroll
+  /// changes or retain a completed stream's payload.
   Widget _buildStreamingMessageWidget(
     BuildContext context, {
+    required bool isStreaming,
     required ChatMessage message,
     required int index,
     required stream_ctrl.ReasoningData? r,
@@ -2340,8 +2347,12 @@ class _MessageListViewState extends State<MessageListView> {
     required _MessagePresentation presentation,
   }) {
     return _StreamingMessageDataGate(
-      notifier: widget.streamingContentNotifier!.getNotifier(message.id),
-      deferUpdates: _deferStreamingMessageUpdates,
+      notifier: isStreaming
+          ? widget.streamingContentNotifier!.getNotifier(message.id)
+          : _idleStreamingContent,
+      deferUpdates: isStreaming
+          ? _deferStreamingMessageUpdates
+          : const AlwaysStoppedAnimation(false),
       deferredHold: _deferredStreamingHolds[message.id],
       builder: (context, data, deferUpdates) {
         final painted = deferUpdates
@@ -2355,16 +2366,18 @@ class _MessageListViewState extends State<MessageListView> {
             ? painted.totalTokens
             : message.totalTokens;
 
-        // 用流式内容构造一条改过的消息
-        final streamingMessage = message.copyWith(
-          parts: painted.parts,
-          content: painted.parts == null ? displayContent : null,
-          totalTokens: displayTokens,
-          promptTokens: painted.promptTokens,
-          completionTokens: painted.completionTokens,
-          cachedTokens: painted.cachedTokens,
-          durationMs: painted.durationMs,
-        );
+        // Create a modified message with streaming content
+        final streamingMessage = isStreaming
+            ? message.copyWith(
+                parts: painted.parts,
+                content: painted.parts == null ? displayContent : null,
+                totalTokens: displayTokens,
+                promptTokens: painted.promptTokens,
+                completionTokens: painted.completionTokens,
+                cachedTokens: painted.cachedTokens,
+                durationMs: painted.durationMs,
+              )
+            : message;
 
         // 用流式数据更新推理文本，同时保留 r 里的展开状态
         // 这样流式期间用户手动切换的展开状态不会被重置
@@ -2397,7 +2410,7 @@ class _MessageListViewState extends State<MessageListView> {
             isProcessingFiles: isProcessingFiles,
             suggestions: suggestions,
             presentation: presentation,
-            enableStreamingTextMotion: !deferUpdates,
+            enableStreamingTextMotion: !isStreaming || !deferUpdates,
             contentSplitOffsets: painted.contentSplitOffsets,
             reasoningCountAtSplit: painted.reasoningCountAtSplit,
             toolCountAtSplit: painted.toolCountAtSplit,
@@ -2895,7 +2908,7 @@ class _StreamingMessageDataGate extends StatefulWidget {
     required this.builder,
   });
 
-  final ValueNotifier<StreamingContentData> notifier;
+  final ValueListenable<StreamingContentData> notifier;
   final ValueListenable<bool> deferUpdates;
   final StreamingContentData? deferredHold;
   final Widget Function(

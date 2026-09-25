@@ -17,6 +17,7 @@ import '../widgets/voice_service_widgets.dart';
 import '../widgets/mimo_reference_audio_picker.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 
 class TtsServicesPage extends StatelessWidget {
   const TtsServicesPage({super.key});
@@ -72,131 +73,153 @@ class TtsServicesPage extends StatelessWidget {
                       ? '?'
                       : titleText.trim().substring(0, 1))
                   .toUpperCase();
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-            children: [
-              VoiceServiceSectionHeader(
-                title: l10n.ttsServicesSectionTitle,
-                addTooltip: l10n.ttsServicesPageAddTooltip,
-                onAdd: () => _handleAddNetworkTts(context),
-                first: true,
-              ),
-              _iosSectionCard(
-                children: [
-                  // 系统 TTS 作为第一行
-                  _TactileRow(
-                    pressedScale: 0.98,
-                    haptics: false,
-                    onTap: available
-                        ? () async {
-                            await sp.setSelectedTtsServiceId(null);
-                          }
-                        : null,
-                    builder: (pressed) {
-                      final cs2 = Theme.of(context).colorScheme;
-                      final base = cs2.onSurface.withValues(alpha: 0.9);
-                      return _AnimatedPressColor(
-                        pressed: pressed,
-                        base: base,
-                        builder: (c) {
-                          final isDark =
-                              Theme.of(context).brightness == Brightness.dark;
-                          final overlay = pressed
-                              ? cs2.surface.withValues(
-                                  alpha: isDark ? 0.06 : 0.05,
-                                )
-                              : Colors.transparent;
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 11,
-                            ),
-                            child: Row(
-                              children: [
-                                _AvatarBadge(
-                                  letter: systemLetter,
-                                  overlay: overlay,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        titleText,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          color: c,
-                                          fontWeight: AppFontWeights.semibold,
-                                        ),
+          return CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                sliver: SliverMainAxisGroup(
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: VoiceServiceSectionHeader(
+                        title: l10n.ttsServicesSectionTitle,
+                        addTooltip: l10n.ttsServicesPageAddTooltip,
+                        onAdd: () => _handleAddNetworkTts(context),
+                        first: true,
+                      ),
+                    ),
+                    VoiceServiceCardSliver(
+                      sliver: SliverMainAxisGroup(
+                        slivers: [
+                          SliverToBoxAdapter(
+                            child: _TactileRow(
+                              pressedScale: 0.98,
+                              haptics: false,
+                              onTap: available
+                                  ? () async {
+                                      await sp.setSelectedTtsServiceId(null);
+                                    }
+                                  : null,
+                              builder: (pressed) {
+                                final cs2 = Theme.of(context).colorScheme;
+                                final base = cs2.onSurface.withValues(
+                                  alpha: 0.9,
+                                );
+                                return _AnimatedPressColor(
+                                  pressed: pressed,
+                                  base: base,
+                                  builder: (c) {
+                                    final isDark =
+                                        Theme.of(context).brightness ==
+                                        Brightness.dark;
+                                    final overlay = pressed
+                                        ? cs2.surface.withValues(
+                                            alpha: isDark ? 0.06 : 0.05,
+                                          )
+                                        : Colors.transparent;
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 11,
                                       ),
-                                      const SizedBox(height: 3),
-                                      Text(
-                                        subText,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: c.withValues(alpha: 0.7),
-                                        ),
+                                      child: Row(
+                                        children: [
+                                          _AvatarBadge(
+                                            letter: systemLetter,
+                                            overlay: overlay,
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  titleText,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                    fontSize: 15,
+                                                    color: c,
+                                                    fontWeight:
+                                                        AppFontWeights.semibold,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 3),
+                                                Text(
+                                                  subText,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: c.withValues(
+                                                      alpha: 0.7,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          _SmallTactileIcon(
+                                            icon: Lucide.Volume2,
+                                            baseColor: c,
+                                            onTap: available
+                                                ? () async {
+                                                    final demo = l10n
+                                                        .ttsServicesPageTestSpeechText;
+                                                    await tts.speakSystem(demo);
+                                                  }
+                                                : () {},
+                                            enabled: available,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          _SmallTactileIcon(
+                                            icon: Lucide.Settings2,
+                                            baseColor: c,
+                                            onTap: available
+                                                ? () => _showSystemTtsConfig(
+                                                    context,
+                                                  )
+                                                : () {},
+                                            enabled: available,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          // right indicator: show check only when selected
+                                          Builder(
+                                            builder: (_) {
+                                              final sp2 = context
+                                                  .watch<SettingsProvider>();
+                                              final sel = sp2.usingSystemTts;
+                                              return sel
+                                                  ? Icon(
+                                                      Lucide.Check,
+                                                      size: 16,
+                                                      color: c,
+                                                    )
+                                                  : const SizedBox(width: 16);
+                                            },
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                _SmallTactileIcon(
-                                  icon: Lucide.Volume2,
-                                  baseColor: c,
-                                  onTap: available
-                                      ? () async {
-                                          final demo = l10n
-                                              .ttsServicesPageTestSpeechText;
-                                          await tts.speakSystem(demo);
-                                        }
-                                      : () {},
-                                  enabled: available,
-                                ),
-                                const SizedBox(width: 6),
-                                _SmallTactileIcon(
-                                  icon: Lucide.Settings2,
-                                  baseColor: c,
-                                  onTap: available
-                                      ? () => _showSystemTtsConfig(context)
-                                      : () {},
-                                  enabled: available,
-                                ),
-                                const SizedBox(width: 8),
-                                // 右侧指示器：仅选中时显示对勾
-                                Builder(
-                                  builder: (_) {
-                                    final sp2 = context
-                                        .watch<SettingsProvider>();
-                                    final sel = sp2.usingSystemTts;
-                                    return sel
-                                        ? Icon(Lucide.Check, size: 16, color: c)
-                                        : const SizedBox(width: 16);
+                                    );
                                   },
-                                ),
-                              ],
+                                );
+                              },
                             ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                  if (services.isNotEmpty) _iosDivider(context),
-                  if (services.isNotEmpty) ...[
-                    for (int i = 0; i < services.length; i++) ...[
-                      _NetworkTtsRowMobile(service: services[i], index: i),
-                      if (i != services.length - 1) _iosDivider(context),
-                    ],
+                          ),
+                          if (services.isNotEmpty)
+                            SliverToBoxAdapter(child: _iosDivider(context)),
+                          if (services.isNotEmpty)
+                            _MobileNetworkTtsList(services: services),
+                        ],
+                      ),
+                    ),
+                    const AsrServicesSection(),
                   ],
-                ],
+                ),
               ),
-              const AsrServicesSection(),
             ],
           );
         },
@@ -205,7 +228,7 @@ class TtsServicesPage extends StatelessWidget {
   }
 }
 
-// --- iOS 风格组件和辅助函数 ---
+// --- iOS-style widgets and helpers ---
 
 Widget _header(BuildContext context, String text, {bool first = false}) {
   final cs = Theme.of(context).colorScheme;
@@ -351,32 +374,6 @@ class _AnimatedPressColor extends StatelessWidget {
       builder: (context, color, _) => builder(color ?? base),
     );
   }
-}
-
-Widget _iosSectionCard({required List<Widget> children}) {
-  return Builder(
-    builder: (context) {
-      final theme = Theme.of(context);
-      final cs = theme.colorScheme;
-      final isDark = theme.brightness == Brightness.dark;
-      final Color bg = context.appColors.surfaceCard;
-      return Container(
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-            width: 0.6,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Column(children: children),
-        ),
-      );
-    },
-  );
 }
 
 Widget _iosDivider(BuildContext context) {
@@ -529,23 +526,104 @@ class _AvatarBrandBadge extends StatelessWidget {
   }
 }
 
-class _NetworkTtsRowMobile extends StatefulWidget {
-  const _NetworkTtsRowMobile({required this.service, required this.index});
-  final TtsServiceOptions service;
-  final int index;
+class _MobileNetworkTtsList extends StatefulWidget {
+  const _MobileNetworkTtsList({required this.services});
+
+  final List<TtsServiceOptions> services;
+
   @override
-  State<_NetworkTtsRowMobile> createState() => _NetworkTtsRowMobileState();
+  State<_MobileNetworkTtsList> createState() => _MobileNetworkTtsListState();
 }
 
-class _NetworkTtsRowMobileState extends State<_NetworkTtsRowMobile> {
-  bool _testing = false;
-  String? _error;
+class _MobileNetworkTtsListState extends State<_MobileNetworkTtsList> {
+  final Map<String, bool> _testing = <String, bool>{};
+  final Map<String, String?> _errors = <String, String?>{};
+
+  Future<void> _reorder(int oldIndex, int newIndex) async {
+    final settings = context.read<SettingsProvider>();
+    final updated = reorderVoiceServiceList(
+      settings.ttsServices,
+      oldIndex,
+      newIndex,
+    );
+    if (identical(updated, settings.ttsServices)) return;
+    await settings.setTtsServices(updated);
+  }
+
+  Future<void> _test(TtsServiceOptions service) async {
+    final id = service.id;
+    setState(() {
+      _testing[id] = true;
+      _errors[id] = null;
+    });
+    final demo = AppLocalizations.of(context)!.ttsServicesPageTestSpeechText;
+    final err = await context.read<TtsProvider>().testNetworkService(
+      service,
+      demo,
+    );
+    if (!mounted) return;
+    setState(() {
+      _testing[id] = false;
+      _errors[id] = err;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final services = widget.services;
+    return SliverReorderableList(
+      itemCount: services.length,
+      onReorderItem: _reorder,
+      onReorderStart: (_) {
+        Tooltip.dismissAllToolTips();
+        Haptics.light();
+      },
+      proxyDecorator: voiceServiceDragProxy,
+      itemBuilder: (context, index) {
+        final service = services[index];
+        return Column(
+          key: ValueKey('mobile-tts-${service.id}'),
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ReorderableDelayedDragStartListener(
+              index: index,
+              child: _NetworkTtsRowMobile(
+                service: service,
+                index: index,
+                testing: _testing[service.id] == true,
+                error: _errors[service.id],
+                onTest: () => _test(service),
+              ),
+            ),
+            if (index != services.length - 1) _iosDivider(context),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _NetworkTtsRowMobile extends StatelessWidget {
+  const _NetworkTtsRowMobile({
+    required this.service,
+    required this.index,
+    required this.testing,
+    required this.error,
+    required this.onTest,
+  });
+
+  final TtsServiceOptions service;
+  final int index;
+  final bool testing;
+  final String? error;
+  final VoidCallback onTest;
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final displayName = widget.service.name.trim().isEmpty
-        ? networkTtsKindDisplayName(widget.service.kind)
-        : widget.service.name.trim();
+    final displayName = service.name.trim().isEmpty
+        ? networkTtsKindDisplayName(service.kind)
+        : service.name.trim();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -554,7 +632,7 @@ class _NetworkTtsRowMobileState extends State<_NetworkTtsRowMobile> {
           haptics: false,
           onTap: () async => context
               .read<SettingsProvider>()
-              .setSelectedTtsServiceId(widget.service.id),
+              .setSelectedTtsServiceId(service.id),
           builder: (pressed) {
             final base = cs.onSurface.withValues(alpha: 0.9);
             return _AnimatedPressColor(
@@ -594,38 +672,22 @@ class _NetworkTtsRowMobileState extends State<_NetworkTtsRowMobile> {
                           final sp = context.read<SettingsProvider>();
                           final updated = await _showEditNetworkTtsSheet(
                             context,
-                            widget.service,
+                            service,
                           );
                           if (updated != null) {
                             final list = List<TtsServiceOptions>.from(
                               sp.ttsServices,
                             );
-                            list[widget.index] = updated;
+                            list[index] = updated;
                             await sp.setTtsServices(list);
                           }
                         },
                       ),
                       const SizedBox(width: 6),
                       _SmallTactileIcon(
-                        icon: _testing ? Lucide.Loader : Lucide.Volume2,
+                        icon: testing ? Lucide.Loader : Lucide.Volume2,
                         baseColor: c,
-                        onTap: () async {
-                          setState(() {
-                            _testing = true;
-                            _error = null;
-                          });
-                          final demo = AppLocalizations.of(
-                            context,
-                          )!.ttsServicesPageTestSpeechText;
-                          final err = await context
-                              .read<TtsProvider>()
-                              .testNetworkService(widget.service, demo);
-                          if (!mounted) return;
-                          setState(() {
-                            _testing = false;
-                            _error = err;
-                          });
-                        },
+                        onTap: onTest,
                       ),
                       const SizedBox(width: 6),
                       _SmallTactileIcon(
@@ -636,7 +698,7 @@ class _NetworkTtsRowMobileState extends State<_NetworkTtsRowMobile> {
                           final list = List<TtsServiceOptions>.from(
                             sp.ttsServices,
                           );
-                          list.removeAt(widget.index);
+                          list.removeAt(index);
                           await sp.setTtsServices(list);
                         },
                       ),
@@ -644,8 +706,7 @@ class _NetworkTtsRowMobileState extends State<_NetworkTtsRowMobile> {
                       Builder(
                         builder: (_) {
                           final sp2 = context.watch<SettingsProvider>();
-                          final sel =
-                              sp2.selectedTtsServiceId == widget.service.id;
+                          final sel = sp2.selectedTtsServiceId == service.id;
                           return sel
                               ? Icon(Lucide.Check, size: 16, color: c)
                               : const SizedBox(width: 16);
@@ -658,9 +719,9 @@ class _NetworkTtsRowMobileState extends State<_NetworkTtsRowMobile> {
             );
           },
         ),
-        if (_error != null && _error!.isNotEmpty) ...[
+        if (error != null && error!.isNotEmpty) ...[
           const SizedBox(height: 6),
-          _ErrorInlineMobile(message: _error!),
+          _ErrorInlineMobile(message: error!),
         ],
       ],
     );
@@ -708,7 +769,7 @@ void _showMobileErrorDetails(BuildContext context, String message) {
   final l10n = AppLocalizations.of(context)!;
   showModalBottomSheet<void>(
     context: context,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -765,7 +826,7 @@ void _showMobileErrorDetails(BuildContext context, String message) {
   );
 }
 
-// 已移除选中标签；背景高亮表示选中状态
+// Removed selected tag; background highlight indicates selection
 
 Future<TtsServiceOptions?> _showAddNetworkTtsSheet(BuildContext context) =>
     _showNetworkTtsEditorPage(context, null);
@@ -1025,7 +1086,7 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
                       l10n.ttsServicesDialogProviderType,
                       first: true,
                     ),
-                    _iosSectionCard(
+                    SectionCard(
                       children: [
                         Padding(
                           padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
@@ -1037,7 +1098,7 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
                       ],
                     ),
                     _header(context, l10n.ttsServicesPageTitle),
-                    _iosSectionCard(
+                    SectionCard(
                       children: [
                         _TtsEditorTextField(
                           label: l10n.ttsServicesFieldNameLabel,
@@ -1890,7 +1951,7 @@ Future<void> _showSystemTtsConfig(BuildContext context) async {
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: false,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -1924,7 +1985,7 @@ Future<void> _showSystemTtsConfig(BuildContext context) async {
                 ),
               ),
               const SizedBox(height: 10),
-              // 引擎选择器
+              // Engine selector
               FutureBuilder<List<String>>(
                 future: tts.listEngines(),
                 builder: (context, snap) {
@@ -1944,7 +2005,7 @@ Future<void> _showSystemTtsConfig(BuildContext context) async {
                 },
               ),
               const SizedBox(height: 4),
-              // 语言选择器
+              // Language selector
               FutureBuilder<List<String>>(
                 future: tts.listLanguages(),
                 builder: (context, snap) {
@@ -1982,7 +2043,7 @@ Future<void> _showSystemTtsConfig(BuildContext context) async {
                 max: 1.0,
                 onChanged: (v) {
                   rate = v;
-                  // 重建此底部弹层
+                  // Rebuild this bottom sheet
                   (ctx as Element).markNeedsBuild();
                 },
                 onChangeEnd: (v) async {
@@ -2041,14 +2102,13 @@ Widget _sheetSelectRow(
   required List<String> options,
   required Future<void> Function(String picked) onSelected,
 }) {
-  final cs = Theme.of(context).colorScheme;
   return _TactileRow(
     onTap: options.isEmpty
         ? null
         : () async {
             final picked = await showModalBottomSheet<String>(
               context: context,
-              backgroundColor: cs.surface,
+              backgroundColor: context.overlaySurface,
               shape: const RoundedRectangleBorder(
                 borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
               ),
@@ -2113,7 +2173,7 @@ Widget _sheetSelectRow(
   );
 }
 
-// 底部弹层 iOS 风格选项
+// Bottom sheet iOS-style option
 Widget _sheetOption(
   BuildContext context, {
   required String label,
@@ -2338,7 +2398,7 @@ String _voiceLabelFor(NetworkTtsKind k, AppLocalizations l10n) {
     case NetworkTtsKind.openai:
       return l10n.ttsServicesFieldVoiceLabel;
     case NetworkTtsKind.gemini:
-      return l10n.ttsServicesFieldVoiceLabel; // 相同标签
+      return l10n.ttsServicesFieldVoiceLabel; // same label
     case NetworkTtsKind.azure:
       return l10n.ttsServicesFieldVoiceLabel;
     case NetworkTtsKind.minimax:

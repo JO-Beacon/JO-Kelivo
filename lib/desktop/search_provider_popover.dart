@@ -401,8 +401,6 @@ class _SearchContent extends StatelessWidget {
       sp,
       ap,
     );
-    final builtInMode = builtInEnabled;
-
     final rows = <Widget>[];
 
     // 1）顶部取消项
@@ -455,8 +453,8 @@ class _SearchContent extends StatelessWidget {
       }
     }
 
-    // 3）外部服务列表（url_context 激活时隐藏）
-    if (!builtInMode) {
+    // 3）外部服务保持可见，便于从内置搜索直接切换；两种模式互斥。
+    {
       for (int i = 0; i < services.length; i++) {
         final s = services[i];
         final svc = SearchService.getService(s);

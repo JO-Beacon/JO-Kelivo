@@ -1666,6 +1666,51 @@ void main() {
       expect(controller.hasMoreAfter, isFalse);
     });
 
+    test(
+      'regeneration after a tail deletion does not backfill the window head',
+      () async {
+        messages = List<ChatMessage>.generate(100, _message);
+        conversation = Conversation(
+          id: 'conversation-1',
+          title: 'Long chat',
+          messageIds: messages.map((message) => message.id).toList(),
+        );
+        chatService = _FakeLazyChatService(messages);
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+        await controller.setCurrentConversationAndLoad(conversation);
+        final removed = <String>{
+          for (var index = 90; index < 100; index++) 'message-$index',
+        };
+        messages.removeRange(90, 100);
+
+        await controller.refreshTimelineAfterMutation(
+          removedRevisionIds: removed,
+          activePathIds: messages.map((message) => message.id).toList(),
+        );
+        expect(controller.messages.first.id, 'message-60');
+        expect(controller.messages.last.id, 'message-89');
+
+        final regenerated = ChatMessage(
+          id: 'message-regenerated',
+          role: 'assistant',
+          content: '',
+          conversationId: conversation.id,
+          isStreaming: true,
+        );
+        messages.add(regenerated);
+
+        await controller.openAroundPersistedMessage(regenerated);
+
+        // The old tail window must remain a prefix after the generated message
+        // is opened. Backfilling message-50..59 shifts every slot by ten and
+        // leaves SuperSliverList reusing stale layout offsets above the new tail.
+        expect(controller.messages.first.id, 'message-60');
+        expect(controller.messages.last.id, regenerated.id);
+        expect(controller.hasMoreAfter, isFalse);
+      },
+    );
+
     test('mutation refresh does not backfill the window head', () async {
       messages = List<ChatMessage>.generate(1000, _message);
       conversation = Conversation(

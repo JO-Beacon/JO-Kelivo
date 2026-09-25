@@ -38,7 +38,7 @@ import 'tool_approval_service.dart';
 class ToolHandlerService {
   ToolHandlerService({required this.contextProvider});
 
-  /// 构建上下文（用于访问 providers）
+  /// Build context (used for accessing providers)
   final BuildContext contextProvider;
 
   WorkspaceToolsService _workspaceTools() {
@@ -71,18 +71,22 @@ class ToolHandlerService {
   }
 
   // ============================================================================
-  // 工具 Schema 清洗
+  // Tool Schema Sanitization
   // ============================================================================
 
-  /// 清洗/转换 JSON Schema 到各供应商接受的子集。
+  /// Sanitize/translate JSON Schema to each provider's accepted subset.
   ///
-  /// 不同供应商（Google、OpenAI、Claude）对工具参数 Schema 有不同要求。
-  /// 此方法将 Schema 归一化以跨供应商工作。
+  /// Different providers (Google, OpenAI, Claude) have different requirements
+  /// for tool parameter schemas. This method normalizes schemas to work across
+  /// all providers.
   static Map<String, dynamic> sanitizeToolParametersForProvider(
     Map<String, dynamic> schema,
     ProviderKind kind,
   ) {
     Map<String, dynamic> clone = _deepCloneMap(schema);
+    // Inline local $ref targets first: the allow-list below drops $ref/$defs,
+    // so an unresolved reference would reach the model as an empty schema and
+    // the whole nested object would silently vanish from the tool call.
     clone = resolveJsonSchemaRefs(
       clone,
       expandAdditionalProperties: kind != ProviderKind.google,
@@ -98,27 +102,32 @@ class ToolHandlerService {
     if (node is! Map) return node;
 
     final m = Map<String, dynamic>.from(node);
-    // 移除 $schema，工具定义中不需要它
+    // Remove $schema as it's not needed for tool definitions
     m.remove(r'$schema');
 
-    // 将 'const' 转换为 'enum' 以保持兼容性
+    // Convert 'const' to 'enum' for compatibility
     if (m.containsKey('const')) {
       final v = m['const'];
       if (v is String || v is num || v is bool) {
         m['enum'] = [v];
+        // Keep the declared type in sync so a non-string const is not mistaken
+        // for a string enum downstream.
         if (m['type'] == null) {
-          m['type'] = switch (v) {
-            bool _ => 'boolean',
-            int _ => 'integer',
-            num _ => 'number',
-            _ => 'string',
-          };
+          if (v is bool) {
+            m['type'] = 'boolean';
+          } else if (v is int) {
+            m['type'] = 'integer';
+          } else if (v is num) {
+            m['type'] = 'number';
+          } else {
+            m['type'] = 'string';
+          }
         }
       }
       m.remove('const');
     }
 
-    // 为简化将 anyOf/oneOf/allOf 展平为首个变体
+    // Flatten anyOf/oneOf/allOf to first variant for simplicity
     for (final key in [
       'anyOf',
       'oneOf',
@@ -141,16 +150,16 @@ class ToolHandlerService {
       }
     }
 
-    // 将 type 数组归一化为单一 type
+    // Normalize type array to single type
     final t = m['type'];
     if (t is List && t.isNotEmpty) m['type'] = t.first.toString();
 
-    // 将 items 数组归一化为单个 item
+    // Normalize items array to single item
     final items = m['items'];
     if (items is List && items.isNotEmpty) m['items'] = items.first;
     if (m['items'] is Map) m['items'] = _sanitizeNode(m['items'], kind);
 
-    // 递归清洗 properties
+    // Recursively sanitize properties
     if (m['properties'] is Map) {
       final props = Map<String, dynamic>.from(m['properties']);
       final norm = <String, dynamic>{};
@@ -160,7 +169,7 @@ class ToolHandlerService {
       m['properties'] = norm;
     }
 
-    // additionalProperties 本身可以是 Schema。
+    // additionalProperties can itself be a schema.
     if (m['additionalProperties'] is Map) {
       m['additionalProperties'] = _sanitizeNode(
         m['additionalProperties'],
@@ -168,7 +177,7 @@ class ToolHandlerService {
       );
     }
 
-    // 按供应商只保留允许的键
+    // Keep only allowed keys based on provider
     Set<String> allowed;
     switch (kind) {
       case ProviderKind.google:
@@ -218,7 +227,7 @@ class ToolHandlerService {
   }
 
   // ============================================================================
-  // 工具定义构建器
+  // Tool Definitions Builder
   // ============================================================================
 
   McpToolRouteSnapshot captureMcpToolRoutes(Assistant? assistant) {
@@ -230,15 +239,15 @@ class ToolHandlerService {
     );
   }
 
-  /// 为 API 调用构建工具定义。
+  /// Build tool definitions for API call.
   ///
-  /// 返回工具定义列表，包括：
-  /// - 搜索工具（启用且模型支持工具时）
-  /// - 记忆工具（助手启用记忆/历史召回时）
-  /// - MCP 工具（来自助手选择的服务器）
-  /// 正在生成的聊天是否为临时的。
+  /// Returns a list of tool definitions including:
+  /// - Search tool (if enabled and model supports tools)
+  /// - Memory tools (if assistant has memory / past-recall enabled)
+  /// - MCP tools (from selected servers for the assistant)
+  /// Whether the chat being generated is a throwaway one.
   ///
-  /// 定时发送可能指向与当前可见会话不同的会话。
+  /// Scheduled sends can target a different conversation from the visible one.
   bool _isTemporaryConversation(String? conversationId) {
     try {
       final chatService = contextProvider.read<ChatService>();
@@ -264,14 +273,14 @@ class ToolHandlerService {
     final List<Map<String, dynamic>> toolDefs = <Map<String, dynamic>>[];
     final supportsTools = isToolModel(providerKey, modelId);
 
-    // Search 工具（当 Gemini 内置搜索启用时跳过）
+    // Search tool (skip when Gemini built-in search is active)
     if (assistant?.searchEnabled == true &&
         !hasBuiltInSearch &&
         supportsTools) {
       toolDefs.add(SearchToolService.getToolDefinition());
     }
 
-    // Memory 工具 (§10.1)
+    // Memory tools (§10.1)
     if (settings.legacyMemoryMode) {
       if (assistant?.enableMemory == true && supportsTools) {
         toolDefs.addAll(
@@ -290,7 +299,7 @@ class ToolHandlerService {
       );
     }
 
-    // 本地工具
+    // Local tools
     toolDefs.addAll(
       LocalToolsService.buildToolDefinitions(
         assistant: assistant,
@@ -298,7 +307,7 @@ class ToolHandlerService {
       ),
     );
 
-    // MCP 工具
+    // MCP tools
     final mcpTools = _buildMcpToolDefinitions(
       settings: settings,
       assistant: assistant,
@@ -317,7 +326,7 @@ class ToolHandlerService {
     return ToolSchemaOverrides.apply(toolDefs, overrides);
   }
 
-  /// 从已连接的服务器构建 MCP 工具定义。
+  /// Build MCP tool definitions from connected servers.
   List<Map<String, dynamic>> _buildMcpToolDefinitions({
     required SettingsProvider settings,
     required Assistant? assistant,
@@ -378,16 +387,16 @@ class ToolHandlerService {
   }
 
   // ============================================================================
-  // 工具调用处理器
+  // Tool Call Handler
   // ============================================================================
 
-  /// 构建工具调用处理函数。
+  /// Build tool call handler function.
   ///
-  /// 返回一个按名称和参数处理工具调用的函数。
-  /// 支持：
-  /// - Search 工具调用
-  /// - Memory 工具调用 (§10)
-  /// - MCP 工具调用
+  /// Returns a function that handles tool calls by name and arguments.
+  /// Supports:
+  /// - Search tool calls
+  /// - Memory tool calls (§10)
+  /// - MCP tool calls
   ToolCallHandler? buildToolCallHandler(
     SettingsProvider settings,
     Assistant? assistant, {
@@ -399,8 +408,8 @@ class ToolHandlerService {
   }) {
     final mcp = contextProvider.read<McpProvider>();
     final toolSvc = contextProvider.read<McpToolService>();
-    // 在异步间隙前捕获 AssistantProvider 引用，以避免
-    // use_build_context_synchronously 警告
+    // Capture AssistantProvider reference before async gap to avoid
+    // use_build_context_synchronously warning
     final assistantProvider = contextProvider.read<AssistantProvider>();
     final routes =
         mcpRouteSnapshot ??
@@ -410,6 +419,12 @@ class ToolHandlerService {
           assistantId: assistant?.id,
           reservedNames: BuiltInToolNames.all,
         );
+
+    String approvalIdFor(String name, String? toolCallId) {
+      final trimmed = toolCallId?.trim();
+      if (trimmed != null && trimmed.isNotEmpty) return trimmed;
+      return '${name}_${DateTime.now().microsecondsSinceEpoch}';
+    }
 
     Future<Object?> approveAndExecuteMcp(
       String name,
@@ -425,11 +440,8 @@ class ToolHandlerService {
             routeSnapshot: routes,
             reservedNames: BuiltInToolNames.all,
           )) {
-        final approvalId = (toolCallId?.trim().isNotEmpty == true)
-            ? toolCallId!.trim()
-            : '${name}_${DateTime.now().microsecondsSinceEpoch}';
         final result = await approvalService.requestApproval(
-          toolCallId: approvalId,
+          toolCallId: approvalIdFor(name, toolCallId),
           toolName: name,
           arguments: args,
           conversationId: conversationId,
@@ -442,6 +454,7 @@ class ToolHandlerService {
           );
         }
       }
+
       return toolSvc.callToolForAssistant(
         mcp,
         assistantProvider,
@@ -474,14 +487,14 @@ class ToolHandlerService {
           return await approveAndExecuteMcp(name, args, toolCallId: toolCallId);
         }
 
-        // Search 工具
+        // Search tool
         if (name == SearchToolService.toolName &&
             assistant?.searchEnabled == true) {
           final q = (args['query'] ?? '').toString();
           return await SearchToolService.executeSearch(q, settings);
         }
 
-        // Memory 工具
+        // Memory tools
         final memoryResult = await _handleMemoryToolCall(
           name,
           args,
@@ -492,17 +505,14 @@ class ToolHandlerService {
           return memoryResult;
         }
 
-        // 创建日历事件或修改提醒事项会修改用户数据，因此这些
-        // 本地工具运行前始终需要用户显式批准。
+        // Creating calendar events or changing reminders modifies user data,
+        // so those tools always require explicit user approval first.
         if (LocalToolNames.requiresUserApproval.contains(name) &&
             assistant != null &&
             assistant.localToolIds.contains(name) &&
             approvalService != null) {
-          final approvalId = (toolCallId?.trim().isNotEmpty == true)
-              ? toolCallId!.trim()
-              : '${name}_${DateTime.now().microsecondsSinceEpoch}';
           final approval = await approvalService.requestApproval(
-            toolCallId: approvalId,
+            toolCallId: approvalIdFor(name, toolCallId),
             toolName: name,
             arguments: args,
             conversationId: conversationId,
@@ -516,7 +526,22 @@ class ToolHandlerService {
           }
         }
 
-        // 本地工具
+        // Re-read phone-control permission on every call so disabling it also
+        // stops a tool loop that was built with an older assistant snapshot.
+        if (name == LocalToolNames.phoneControl) {
+          final current = assistant == null
+              ? null
+              : assistantProvider.getById(assistant.id);
+          if (current == null || !current.localToolIds.contains(name)) {
+            return _toolError(
+              error: 'permission_denied',
+              message: 'Phone control is disabled for this assistant.',
+              tool: name,
+            );
+          }
+        }
+
+        // Local tools
         final localResult = await LocalToolsService.tryHandleToolCall(
           name,
           args,
@@ -532,7 +557,7 @@ class ToolHandlerService {
                   FlutterErrorDetails(
                     exception: error,
                     stack: stack,
-                    library: 'JO-AIClient local tools',
+                    library: 'Kelivo local tools',
                     context: ErrorDescription('while playing text-to-speech'),
                   ),
                 );
@@ -572,48 +597,10 @@ class ToolHandlerService {
           }
         }
 
-        // MCP 工具的审批关卡
-        if (approvalService != null &&
-            toolSvc.toolNeedsApprovalForAssistant(
-              mcp,
-              assistantProvider,
-              assistantId: assistant?.id,
-              toolName: name,
-              routeSnapshot: routes,
-              reservedNames: BuiltInToolNames.all,
-            )) {
-          final approvalId = (toolCallId?.trim().isNotEmpty == true)
-              ? toolCallId!.trim()
-              : '${name}_${DateTime.now().microsecondsSinceEpoch}';
-          final result = await approvalService.requestApproval(
-            toolCallId: approvalId,
-            toolName: name,
-            arguments: args,
-            conversationId: conversationId,
-          );
-          if (!result.approved) {
-            return _toolError(
-              error: 'approval_denied',
-              message: result.denyReason ?? 'User denied the tool call',
-              tool: name,
-            );
-          }
-        }
-
-        // MCP 工具
-        final text = await toolSvc.callToolTextForAssistant(
-          mcp,
-          assistantProvider,
-          assistantId: assistant?.id,
-          toolName: name,
-          arguments: args,
-          routeSnapshot: routes,
-          reservedNames: BuiltInToolNames.all,
-        );
-        return text;
+        return await approveAndExecuteMcp(name, args, toolCallId: toolCallId);
       } catch (e) {
-        // 捕获意外异常并向 LLM 返回错误 JSON
-        // 这可防止工具失败终止聊天流程
+        // Catch unexpected exceptions and return error JSON to LLM
+        // This prevents tool failures from terminating the chat flow
         return _toolError(
           error: 'execution_error',
           message: e.toString(),
@@ -625,9 +612,9 @@ class ToolHandlerService {
     };
   }
 
-  /// 处理 memory 工具调用 (§10)。
+  /// Handle memory tool calls (§10).
   ///
-  /// 若工具不是 memory 工具或相关门控关闭，则返回 null。
+  /// Returns null if the tool is not a memory tool or the relevant gate is off.
   Future<String?> _handleMemoryToolCall(
     String name,
     Map<String, dynamic> args,
@@ -685,14 +672,14 @@ class ToolHandlerService {
       chatRepository: memoryV2.chatRepository,
       chatService: chatService,
       conversationId: conversationId,
-      // 重新加载，但不改变已打开的记忆 UI 正在显示的助手。
+      // Reload without changing which assistants the open memory UI is showing.
       onMutated: memoryV2.reloadCurrentScope,
       smartAdd: pipeline?.smartAdd,
       promptLang: settings.resolvedMemoryPromptLang,
       memoryLlmCall: memoryLlmCall,
       smartAddPromptZh: settings.memorySmartAddPromptZh,
       smartAddPromptEn: settings.memorySmartAddPromptEn,
-      // 临时聊天在退出时丢弃；其工具 trace 不得残留。
+      // Temporary chats are discarded on exit; their tool traces must not linger.
       traceRecorder: temporary ? null : pipeline?.traceRecorder,
       conversationTitle: conversationId == null
           ? null
@@ -700,9 +687,9 @@ class ToolHandlerService {
     );
   }
 
-  /// 通过 [MemoryProvider] 处理旧版 create/edit/delete_memory 调用。
+  /// Handle legacy create/edit/delete_memory calls via [MemoryProvider].
   ///
-  /// 若记忆已禁用或 [name] 不是旧版 memory 工具，则返回 null。
+  /// Returns null if memory is disabled or [name] is not a legacy memory tool.
   Future<String?> _handleLegacyMemoryToolCall(
     String name,
     Map<String, dynamic> args,

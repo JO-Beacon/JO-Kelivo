@@ -43,6 +43,9 @@ permissions:
 
 env:
   FLUTTER_VERSION: '3.44.9'
+  INNO_SETUP_VERSION: '7.0.2'
+  INNO_SETUP_URL: 'https://github.com/jrsoftware/issrc/releases/download/is-7_0_2/innosetup-7.0.2-x64.exe'
+  INNO_SETUP_SHA256: '5ad54ca3def786f8f4212552e54cc6d8d61329e2d24a1cfee0571d42c2684ff1'
 
 jobs:
   build-windows-arm64:
@@ -122,10 +125,30 @@ jobs:
           $ErrorActionPreference = 'Stop'
           Compress-Archive -Path 'build/windows/arm64/runner/Release/*' -DestinationPath "JO-AIClient-v$env:VERSION-windows-arm64-portable.zip"
 
+      - name: Setup Inno Setup 7
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Join-Path $env:RUNNER_TEMP "innosetup-$env:INNO_SETUP_VERSION-x64.exe"
+          Invoke-WebRequest -Uri $env:INNO_SETUP_URL -OutFile $installer -UseBasicParsing
+          $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $installer).Hash.ToLowerInvariant()
+          if ($actualHash -ne $env:INNO_SETUP_SHA256) {
+            throw "Inno Setup checksum mismatch: $actualHash"
+          }
+          $process = Start-Process -FilePath $installer -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "Inno Setup installer failed with exit code $($process.ExitCode)"
+          }
+          $iscc = Join-Path $env:ProgramFiles 'Inno Setup 7\ISCC.exe'
+          if (-not (Test-Path -LiteralPath $iscc)) {
+            throw "Inno Setup 7 compiler not found: $iscc"
+          }
+          "INNO_SETUP_COMPILER=$iscc" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Package setup EXE
         shell: pwsh
         run: |
-          ./scripts/windows/build_installer.ps1 -AppVersion $env:VERSION -SourceDir "build/windows/arm64/runner/Release" -SetupArch arm64 -OutputDir .
+          ./scripts/windows/build_installer.ps1 -AppVersion $env:VERSION -SourceDir "build/windows/arm64/runner/Release" -SetupArch arm64 -OutputDir . -InnoSetupCompiler "$env:INNO_SETUP_COMPILER"
 
       - name: Generate SHA-256 checksums
         shell: pwsh

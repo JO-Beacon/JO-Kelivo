@@ -312,6 +312,73 @@ CREATE TABLE message_asset_rows (
       },
     );
 
+    test('prepare stamps updated_at on rows it stops streaming', () async {
+      final createdAt = DateTime.utc(2026, 8, 1);
+      await sourceRepository.putMigrationBatch(
+        conversations: [
+          Conversation(
+            id: 'stream',
+            title: 'Streaming',
+            createdAt: createdAt,
+            updatedAt: createdAt,
+            messageIds: const ['live-msg', 'idle-msg'],
+          ),
+        ],
+        messages: [
+          (
+            message: ChatMessage(
+              id: 'live-msg',
+              role: 'assistant',
+              content: 'interrupted',
+              conversationId: 'stream',
+              timestamp: createdAt,
+            ),
+            messageOrder: 0,
+          ),
+          (
+            message: ChatMessage(
+              id: 'idle-msg',
+              role: 'assistant',
+              content: 'finished',
+              conversationId: 'stream',
+              timestamp: createdAt,
+            ),
+            messageOrder: 1,
+          ),
+        ],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+      await sourceRepository.close();
+      sourceClosed = true;
+      final raw = sqlite.sqlite3.open(sourceFile.path);
+      try {
+        raw.execute(
+          "UPDATE message_rows SET is_streaming = 1 WHERE id = 'live-msg';",
+        );
+      } finally {
+        raw.close();
+      }
+
+      await ChatDatabaseRepository.prepareSnapshotForRestore(sourceFile);
+
+      final after = sqlite.sqlite3.open(
+        sourceFile.path,
+        mode: sqlite.OpenMode.readOnly,
+      );
+      try {
+        final rows = after.select(
+          'SELECT id, is_streaming, updated_at FROM message_rows ORDER BY id;',
+        );
+        final byId = {for (final row in rows) row['id'] as String: row};
+        expect(byId['live-msg']!['is_streaming'], 0);
+        expect(byId['live-msg']!['updated_at'], isNotNull);
+        expect(byId['idle-msg']!['updated_at'], isNull);
+      } finally {
+        after.close();
+      }
+    });
+
     test('rejects a same-version database missing the memory index', () async {
       await sourceRepository.close();
       sourceClosed = true;
@@ -380,7 +447,8 @@ CREATE TABLE asset_rows (
   height INTEGER CHECK(height > 0),
   thumbnail_path TEXT,
   created_at INTEGER NOT NULL,
-  last_referenced_at INTEGER NOT NULL
+  last_referenced_at INTEGER NOT NULL,
+  extras_json TEXT NOT NULL DEFAULT '{}'
 );
 ''');
         } finally {
