@@ -85,6 +85,11 @@ jobs:
           Remove-Item -Recurse -Force "$cache\dart-sdk"
           Expand-Archive -Path $zip -DestinationPath $cache -Force
           Remove-Item -Force $zip
+          # The restored x64 Flutter tool snapshot cannot run on the ARM VM.
+          # Remove its stamp so the next Flutter invocation rebuilds it with
+          # the native ARM64 Dart SDK just installed above.
+          Remove-Item -Force "$cache\flutter_tools.snapshot" -ErrorAction SilentlyContinue
+          Remove-Item -Force "$cache\flutter_tools.stamp" -ErrorAction SilentlyContinue
           Write-Host "Dart in use now:"
           & "$cache\dart-sdk\bin\dart.exe" --version
 
