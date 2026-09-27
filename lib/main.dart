@@ -22,6 +22,7 @@ import 'desktop/desktop_home_page.dart';
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 import 'desktop/desktop_window_controller.dart';
+import 'core/services/android_refresh_rate_service.dart';
 import 'core/services/linux_window_service.dart';
 import 'desktop/desktop_tray_controller.dart';
 import 'desktop/windows_paste_fix.dart';
@@ -186,6 +187,10 @@ Future<void> main(List<String> arguments) async {
         try {
           await NotificationService.ensureInitialized();
         } catch (_) {}
+      }
+      if (Platform.isAndroid) {
+        // 读一次安卓 API 级别，用于决定是否展示「自适应刷新率」开关。
+        unawaited(AndroidRefreshRateService.ensureSdkIntLoaded());
       }
       // 在恢复或数据库准入前渲染一个不依赖持久化数据的启动外壳。
       // 恢复切换会在真正构建应用之前校验并移动可能很大的数据包；

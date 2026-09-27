@@ -31,7 +31,6 @@ class HomeMobileScaffold extends StatelessWidget {
     super.key,
     required this.scaffoldKey,
     required this.drawerController,
-    required this.assistantPickerCloseTick,
     required this.loadingConversationIds,
     required this.title,
     required this.providerName,
@@ -58,7 +57,6 @@ class HomeMobileScaffold extends StatelessWidget {
 
   final GlobalKey<ScaffoldState> scaffoldKey;
   final InteractiveDrawerController drawerController;
-  final ValueNotifier<int> assistantPickerCloseTick;
   final Set<String> loadingConversationIds;
   final String title;
   final String? providerName;
@@ -97,7 +95,6 @@ class HomeMobileScaffold extends StatelessWidget {
       drawer: SideDrawer(
         userName: context.watch<UserProvider>().name,
         assistantName: _getAssistantName(context),
-        closePickerTicker: assistantPickerCloseTick,
         loadingConversationIds: loadingConversationIds,
         presentation: SidebarPresentation.overlay,
         capabilities: const SidebarCapabilities(

@@ -34,6 +34,7 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/app_directories.dart';
+import '../../../utils/newline_normalization.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
@@ -1631,6 +1632,8 @@ class _ChatInputBarState extends State<ChatInputBar>
 
   Future<void> _handlePastedText(String text) async {
     if (!mounted) return;
+    // 剪贴板来源不同会给出 \r\n 或孤立的 \r，统一成 \n 再落盘/插入。
+    text = normalizeNewlines(text);
     final settings = context.read<SettingsProvider>();
     final threshold = settings.longPasteAsFileThreshold;
     final isLongPaste =
@@ -1689,6 +1692,7 @@ class _ChatInputBarState extends State<ChatInputBar>
 
   void _insertPastedText(String text) {
     if (!mounted) return;
+    text = normalizeNewlines(text);
     final value = _controller.value;
     final selection = value.selection;
     if (!selection.isValid) {
@@ -2856,6 +2860,9 @@ class _ChatInputBarState extends State<ChatInputBar>
                                             controller: _controller,
                                             focusNode: widget.focusNode,
                                             onChanged: _onTextChanged,
+                                            inputFormatters: const [
+                                              NormalizeNewlinesFormatter(),
+                                            ],
                                             contentInsertionConfiguration:
                                                 ContentInsertionConfiguration(
                                                   onContentInserted:

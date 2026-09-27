@@ -13,12 +13,23 @@ import android.view.Window
 
 /**
  * Window-owned requests also work when a headless Flutter engine gains a new Activity.
- * On API 30+, Surface rate votes leave mode selection to Android for adaptive refresh.
+ *
+ * Two strategies, chosen by the user:
+ * - [adaptive] off (default): pin the highest available display mode through
+ *   `preferredDisplayModeId`. Some vendor ROMs (observed on ColorOS) ignore the
+ *   frame-rate vote below, so this is the only path that actually reaches the
+ *   high-refresh mode there.
+ * - [adaptive] on: vote with `Surface.setFrameRate` on API 30+, leaving mode
+ *   selection to Android for adaptive refresh. Kept as an opt-in because it is
+ *   the upstream behaviour and can save power on adaptive displays.
+ *
+ * API 24–29 has no frame-rate vote, so the fixed path is always used there.
  */
 internal class HighRefreshRateController(private val window: Window) : SurfaceHolder.Callback {
     private val displayManager = window.context.getSystemService(DisplayManager::class.java)
     private var view: SurfaceView? = null
     private var started = false
+    private var adaptive = false
     private var requestedSurface: Surface? = null
     private var requestedRate = 0f
     private val displayListener = object : DisplayManager.DisplayListener {
@@ -36,6 +47,14 @@ internal class HighRefreshRateController(private val window: Window) : SurfaceHo
         view = surfaceView
         surfaceView.holder.addCallback(this)
         request()
+    }
+
+    /** Switches between the fixed-high-mode and adaptive strategies. */
+    fun setAdaptive(value: Boolean) {
+        if (adaptive == value) return
+        adaptive = value
+        clearRequest()
+        request(force = true)
     }
 
     fun resume() {
@@ -77,14 +96,11 @@ internal class HighRefreshRateController(private val window: Window) : SurfaceHo
                 .filter { it.physicalWidth == activeMode.physicalWidth && it.physicalHeight == activeMode.physicalHeight }
                 .filter { it.refreshRate.isFinite() && it.refreshRate > 0f }
                 .maxByOrNull { it.refreshRate } ?: return
-            val rate = if (Build.VERSION.SDK_INT >= 36) {
-                display.getSuggestedFrameRate(Display.FRAME_RATE_CATEGORY_HIGH)
-                    .takeIf { it.isFinite() && it > 0f } ?: highestMode.refreshRate
-            } else highestMode.refreshRate
 
-            if (Build.VERSION.SDK_INT >= 30) {
+            if (adaptive && Build.VERSION.SDK_INT >= 30) {
                 val surface = view?.holder?.surface?.takeIf { it.isValid } ?: return
                 setWindowMode(0)
+                val rate = rateFor(display, highestMode)
                 if (!force && requestedSurface === surface && requestedRate == rate) return
                 val compatibility = if (Build.VERSION.SDK_INT >= 36) {
                     Surface.FRAME_RATE_COMPATIBILITY_AT_LEAST
@@ -97,13 +113,21 @@ internal class HighRefreshRateController(private val window: Window) : SurfaceHo
                 requestedSurface = surface
                 requestedRate = rate
             } else {
-                // API 24–29 resolves rate-only requests at the default resolution.
-                // Keep the selected mode ID to preserve the current resolution.
+                // Pin the highest mode. API 24–29 always takes this path; API 30+
+                // takes it when adaptive refresh is turned off.
                 setWindowMode(highestMode.modeId)
             }
         } catch (error: RuntimeException) {
             Log.w("HighRefreshRate", "Unable to request a high refresh rate", error)
         }
+    }
+
+    private fun rateFor(display: Display, highestMode: Display.Mode): Float {
+        if (Build.VERSION.SDK_INT >= 36) {
+            display.getSuggestedFrameRate(Display.FRAME_RATE_CATEGORY_HIGH)
+                .takeIf { it.isFinite() && it > 0f }?.let { return it }
+        }
+        return highestMode.refreshRate
     }
 
     private fun setWindowMode(modeId: Int) {

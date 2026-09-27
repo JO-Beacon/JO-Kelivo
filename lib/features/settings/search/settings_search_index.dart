@@ -320,11 +320,10 @@ class SettingsSearchIndex {
     }
     if (!kIsWeb && platform == TargetPlatform.android) {
       add(
-        'phoneControl',
-        SettingsSearchDestination.phoneControl,
-        (l) => l.phoneControlTitle,
-        page: true,
-        keywords: 'phone control accessibility 手机控制 手機控制 无障碍 無障礙',
+        'adaptiveRefreshRate',
+        SettingsSearchDestination.behavior,
+        (l) => l.displaySettingsPageAdaptiveRefreshRateTitle,
+        keywords: 'refresh rate 90hz 120hz smooth display 刷新率 高刷 自適應 自适应',
       );
     }
     add(
@@ -417,6 +416,15 @@ class SettingsSearchIndex {
       page: true,
       keywords: 'memory remember 记忆 記憶 长期 長期',
     );
+    if (!kIsWeb && platform == TargetPlatform.android) {
+      add(
+        'phoneControl',
+        SettingsSearchDestination.phoneControl,
+        (l) => l.phoneControlTitle,
+        page: true,
+        keywords: 'phone control accessibility 手机控制 手機控制 无障碍 無障礙',
+      );
+    }
     add(
       'networkProxy',
       SettingsSearchDestination.networkProxy,
@@ -717,14 +725,6 @@ class SettingsSearchIndex {
         'displaySettingsPageKeepSidebarOpenOnTopicTapTitle',
         SettingsSearchDestination.behavior,
         (l) => l.displaySettingsPageKeepSidebarOpenOnTopicTapTitle,
-      );
-    }
-    if (!desktop) {
-      add(
-        'displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle',
-        SettingsSearchDestination.behavior,
-        (l) =>
-            l.displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle,
       );
     }
     add(

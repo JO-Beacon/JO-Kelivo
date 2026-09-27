@@ -9139,12 +9139,6 @@ abstract class AppLocalizations {
   /// **'Keep sidebar open when selecting topic'**
   String get displaySettingsPageKeepSidebarOpenOnTopicTapTitle;
 
-  /// No description provided for @displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Don\'t collapse assistant list when closing sidebar'**
-  String get displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle;
-
   /// No description provided for @displaySettingsPageShowUpdatesTitle.
   ///
   /// In en, this message translates to:
@@ -9168,6 +9162,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Prevents the lock screen from interrupting generation. Increases battery use.'**
   String get displaySettingsPageKeepScreenOnDuringGenerationSubtitle;
+
+  /// No description provided for @displaySettingsPageAdaptiveRefreshRateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Adaptive refresh rate'**
+  String get displaySettingsPageAdaptiveRefreshRateTitle;
+
+  /// No description provided for @displaySettingsPageAdaptiveRefreshRateSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Off: always use the highest refresh rate. On: let the system adapt; some devices may stay at 60 Hz to save power.'**
+  String get displaySettingsPageAdaptiveRefreshRateSubtitle;
 
   /// No description provided for @displaySettingsPageMessageNavButtonsTitle.
   ///
@@ -23595,7 +23601,7 @@ abstract class AppLocalizations {
   /// No description provided for @linuxHideTitleBarDescription.
   ///
   /// In en, this message translates to:
-  /// **'Also hides window buttons. Use your window manager to move, resize, and close the window.'**
+  /// **'Hides the system title bar and instead shows an app-drawn title bar with window controls.'**
   String get linuxHideTitleBarDescription;
 
   /// No description provided for @linuxHideTitleBarError.

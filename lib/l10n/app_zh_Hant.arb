@@ -1444,11 +1444,12 @@
   "displaySettingsPageShowChatListDateSubtitle": "在左側對話列表中顯示日期分組標籤",
   "displaySettingsPageKeepSidebarOpenOnAssistantTapTitle": "點選助手時不自動關閉側邊欄",
   "displaySettingsPageKeepSidebarOpenOnTopicTapTitle": "點選話題時不自動關閉側邊欄",
-  "displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle": "關閉側邊欄時不折疊助手列表",
   "displaySettingsPageShowUpdatesTitle": "顯示更新",
   "displaySettingsPageShowUpdatesSubtitle": "顯示應用程式更新通知",
   "displaySettingsPageKeepScreenOnDuringGenerationTitle": "生成時保持螢幕常亮",
   "displaySettingsPageKeepScreenOnDuringGenerationSubtitle": "防止生成中途鎖屏導致中斷，會增加耗電",
+  "displaySettingsPageAdaptiveRefreshRateTitle": "自適應刷新率",
+  "displaySettingsPageAdaptiveRefreshRateSubtitle": "關閉：始終使用最高刷新率；開啟：由系統自適應，部分機型可能保持 60Hz 以省電",
   "displaySettingsPageMessageNavButtonsTitle": "訊息導航按鈕",
   "displaySettingsPageMessageNavButtonsSubtitle": "選擇快速跳轉按鈕的顯示時機",
   "displaySettingsPageMessageNavButtonsModeAlways": "始終顯示",
@@ -5927,6 +5928,6 @@
     }
   },
   "linuxHideTitleBarTitle": "隱藏系統標題列",
-  "linuxHideTitleBarDescription": "同時隱藏視窗按鈕。請透過視窗管理員移動、調整大小和關閉視窗。",
+  "linuxHideTitleBarDescription": "隱藏系統標題列，改用應用程式自帶的標題列（含視窗按鈕）。",
   "linuxHideTitleBarError": "無法變更標題列，請重試。"
 }

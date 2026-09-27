@@ -694,7 +694,6 @@ class _HomePageState extends State<HomePage>
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final InteractiveDrawerController _drawerController =
       InteractiveDrawerController();
-  final ValueNotifier<int> _assistantPickerCloseTick = ValueNotifier<int>(0);
   final FocusNode _inputFocus = FocusNode();
   final TextEditingController _inputController = TextEditingController();
   final ChatInputBarController _mediaController = ChatInputBarController();
@@ -839,13 +838,6 @@ class _HomePageState extends State<HomePage>
 
   void _onDrawerValueChanged() {
     _controller.onDrawerValueChanged(_drawerController.value);
-    // 抽屉关闭时关闭助手选择器
-    if (_drawerController.value < 0.95) {
-      final sp = context.read<SettingsProvider>();
-      if (!sp.keepAssistantListExpandedOnSidebarClose) {
-        _assistantPickerCloseTick.value++;
-      }
-    }
   }
 
   void _initProcessText() {
@@ -1020,7 +1012,6 @@ class _HomePageState extends State<HomePage>
     return HomeMobileScaffold(
       scaffoldKey: _scaffoldKey,
       drawerController: _drawerController,
-      assistantPickerCloseTick: _assistantPickerCloseTick,
       loadingConversationIds: _controller.loadingConversationIds,
       title: title,
       providerName: providerName,
@@ -1162,7 +1153,6 @@ class _HomePageState extends State<HomePage>
 
     return HomeDesktopScaffold(
       scaffoldKey: _scaffoldKey,
-      assistantPickerCloseTick: _assistantPickerCloseTick,
       loadingConversationIds: _controller.loadingConversationIds,
       title: title,
       providerName: providerName,

@@ -1,13 +1,13 @@
-# Kelivo AI 流
+# JO-AIClient AI 流
 
 协议无关的流式事件、decoder 契约、轨迹回放，以及如何加一个新 provider。
 请求体构造和 vendor heuristics 不在这里——那是各 provider 请求文件和 `providers/openai/openai_vendor_compat.dart` 的资产。
 
-当前 JO-Kelivo 的 provider 事件迁移已覆盖标准 OpenAI Chat Completions / Responses、
+当前 JO-AIClient 的 provider 事件迁移已覆盖标准 OpenAI Chat Completions / Responses、
 Claude Messages、Gemini、OpenAI Images、智谱布局解析、Vertex Claude 和 Vertex Gemini。
 这些请求均由 `sendMessageStreamEvents` 直接产出 provider-independent 事件。
 主聊天运行时已经由 `ChatActions` 消费统一事件，并通过兼容投影维持现有 UI 状态更新；
-`StreamChunkHandler` 负责累积结构化 parts，检查点和最终消息继续由 JO-Kelivo 的上下文树、
+`StreamChunkHandler` 负责累积结构化 parts，检查点和最终消息继续由 JO-AIClient 的上下文树、
 工具事件和 SQLite 持久化链路驱动；旧 `ChatStreamChunk` 仅作为尚未迁移调用方的兼容入口。
 
 Vertex 的事件入口、事件折叠、SQLite round-trip 和 HTTP 错误传播已有本地 mock 回归；真实 Vertex 云端验收需要用户提供有效配置，本地环境不自动创建或下载凭据。

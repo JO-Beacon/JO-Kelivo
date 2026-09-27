@@ -63,6 +63,7 @@ import '../../../theme/app_font_weights.dart';
 import '../../../theme/design_tokens.dart';
 import '../../../utils/avatar_cache.dart';
 import '../../../utils/brand_assets.dart';
+import '../../../utils/newline_normalization.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../utils/assistant_edit_tab_layout.dart';
@@ -222,9 +223,7 @@ Future<int?> _showContextMessageInputDialog(
             }
 
             return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+              shape: DesktopDialogStyle.shape(ctx),
               title: Text(l10n.assistantEditContextMessagesTitle),
               content: SizedBox(
                 width: 360,
@@ -1661,16 +1660,17 @@ Future<void> showAssistantDesktopDialog(
   BuildContext context, {
   required String assistantId,
 }) async {
+  final cs = Theme.of(context).colorScheme;
   await showDialog<void>(
     context: context,
     barrierDismissible: true,
     builder: (ctx) {
       return Dialog(
-        backgroundColor: context.overlaySurface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: cs.surface,
+        shape: DesktopDialogStyle.shape(ctx),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 860, maxHeight: 640),
+          constraints: DesktopDialogStyle.editorConstraints(ctx),
           child: _DesktopAssistantDialogShell(assistantId: assistantId),
         ),
       );
@@ -2796,10 +2796,8 @@ class _DesktopAssistantBasicPaneState
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          backgroundColor: context.overlaySurface,
+          shape: DesktopDialogStyle.shape(ctx),
+          backgroundColor: cs.surface,
           title: Text(l10n.assistantEditImageUrlDialogTitle),
           content: TextField(
             controller: controller,
@@ -2900,10 +2898,8 @@ class _DesktopAssistantBasicPaneState
         return StatefulBuilder(
           builder: (ctx, setLocal) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              backgroundColor: context.overlaySurface,
+              shape: DesktopDialogStyle.shape(ctx),
+              backgroundColor: cs.surface,
               title: Text(l10n.assistantEditQQAvatarDialogTitle),
               content: TextField(
                 controller: controller,

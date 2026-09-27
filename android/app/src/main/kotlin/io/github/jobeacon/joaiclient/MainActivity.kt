@@ -74,9 +74,11 @@ class MainActivity : FlutterActivity() {
     private val processTextChannelName = "app.process_text"
     private val fileSaveChannelName = "app.file_save"
     private val deviceStorageChannelName = "app.device_storage"
+    private val refreshRateChannelName = "app.refresh_rate"
     private var processTextChannel: MethodChannel? = null
     private var fileSaveChannel: MethodChannel? = null
     private var deviceStorageChannel: MethodChannel? = null
+    private var refreshRateChannel: MethodChannel? = null
     private var pendingProcessText: String? = null
      private var pendingSaveResult: MethodChannel.Result? = null
      private var pendingSaveSourcePath: String? = null
@@ -145,6 +147,16 @@ class MainActivity : FlutterActivity() {
         deviceStorageChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
                 "freeBytes" -> result.success(usableBytesForAppData())
+                else -> result.notImplemented()
+            }
+        }
+        refreshRateChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, refreshRateChannelName)
+        refreshRateChannel?.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "setAdaptiveRefreshRate" -> {
+                    highRefreshRate.setAdaptive(call.argument<Boolean>("adaptive") ?: false)
+                    result.success(null)
+                }
                 else -> result.notImplemented()
             }
         }

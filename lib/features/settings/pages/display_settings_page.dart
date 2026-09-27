@@ -9,6 +9,7 @@ import '../../../icons/lucide_adapter.dart';
 import 'package:syncfusion_flutter_sliders/sliders.dart';
 import 'package:syncfusion_flutter_core/theme.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/android_refresh_rate_service.dart';
 import '../../../core/services/api/providers/claude/claude_role_normalizer.dart';
 import 'image_settings_page.dart';
 import 'message_style_settings_page.dart';
@@ -2181,6 +2182,19 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                       .setKeepScreenOnDuringGeneration(v),
                 ),
               ],
+              if (AndroidRefreshRateService.supportsAdaptiveRefreshRate) ...[
+                _iosDivider(context),
+                _iosSwitchRow(
+                  context,
+                  icon: Lucide.Gauge,
+                  label: l10n.displaySettingsPageAdaptiveRefreshRateTitle,
+                  subtitle: l10n.displaySettingsPageAdaptiveRefreshRateSubtitle,
+                  value: sp.androidAdaptiveRefreshRate,
+                  onChanged: (v) => context
+                      .read<SettingsProvider>()
+                      .setAndroidAdaptiveRefreshRate(v),
+                ),
+              ],
               _iosDivider(context),
               _iosNavRow(
                 context,
@@ -2226,17 +2240,6 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                 onChanged: (v) => context
                     .read<SettingsProvider>()
                     .setKeepSidebarOpenOnTopicTap(v),
-              ),
-              _iosDivider(context),
-              _iosSwitchRow(
-                context,
-                icon: Lucide.UnfoldVertical,
-                label: l10n
-                    .displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle,
-                value: sp.keepAssistantListExpandedOnSidebarClose,
-                onChanged: (v) => context
-                    .read<SettingsProvider>()
-                    .setKeepAssistantListExpandedOnSidebarClose(v),
               ),
               _iosDivider(context),
               _iosSwitchRow(

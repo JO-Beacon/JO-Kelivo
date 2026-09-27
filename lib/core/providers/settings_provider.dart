@@ -43,6 +43,7 @@ import '../services/api/providers/claude/claude_role_normalizer.dart';
 import '../../theme/palettes.dart';
 import '../../theme/custom_theme.dart';
 import '../../theme/chat_bubble_style.dart';
+import '../services/android_refresh_rate_service.dart';
 import '../services/linux_window_service.dart';
 
 // 桌面端：话题列表位置
@@ -245,8 +246,6 @@ class SettingsProvider extends ChangeNotifier {
       'display_keep_sidebar_open_on_assistant_tap_v1';
   static const String _displayKeepSidebarOpenOnTopicTapKey =
       'display_keep_sidebar_open_on_topic_tap_v1';
-  static const String _displayKeepAssistantListExpandedOnSidebarCloseKey =
-      'display_keep_assistant_list_expanded_on_sidebar_close_v1';
   static const String _displayNewChatOnAssistantSwitchKey =
       'display_new_chat_on_assistant_switch_v1';
   static const String _displayNewChatOnLaunchKey =
@@ -1158,9 +1157,6 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayKeepSidebarOpenOnAssistantTapKey) ?? false;
     _keepSidebarOpenOnTopicTap =
         prefs.getBool(_displayKeepSidebarOpenOnTopicTapKey) ?? false;
-    _keepAssistantListExpandedOnSidebarClose =
-        prefs.getBool(_displayKeepAssistantListExpandedOnSidebarCloseKey) ??
-        false;
     _requestLogEnabled = prefs.getBool(_requestLogEnabledKey) ?? true;
     await RequestLogger.setEnabled(_requestLogEnabled);
     _contextLogEnabled = prefs.getBool(_contextLogEnabledKey) ?? true;
@@ -1288,6 +1284,16 @@ class SettingsProvider extends ChangeNotifier {
     _linuxHideTitleBar =
         LinuxWindowService.isSupported &&
         (localPreferences.getBool(LinuxWindowService.hideTitleBarKey) ?? false);
+    _androidAdaptiveRefreshRate =
+        AndroidRefreshRateService.isSupported &&
+        (localPreferences.getBool(AndroidRefreshRateService.adaptiveKey) ??
+            false);
+    if (AndroidRefreshRateService.isSupported) {
+      // 不阻塞设置加载：通道不可用（如无 Activity）时静默跳过。
+      unawaited(
+        AndroidRefreshRateService.setAdaptive(_androidAdaptiveRefreshRate),
+      );
+    }
 
     // 桌面：托盘设置（桌面平台默认启用）
     final trayPref = prefs.getBool(_displayDesktopShowTrayKey);
@@ -5372,6 +5378,24 @@ Requirements:
     notifyListeners();
   }
 
+  // 仅 Android：自适应刷新率；关闭时固定到最高刷新率。
+  bool _androidAdaptiveRefreshRate = false;
+  bool get androidAdaptiveRefreshRate => _androidAdaptiveRefreshRate;
+  Future<void> setAndroidAdaptiveRefreshRate(bool value) async {
+    if (!AndroidRefreshRateService.isSupported ||
+        _androidAdaptiveRefreshRate == value) {
+      return;
+    }
+    await AndroidRefreshRateService.setAdaptive(value);
+    final localPreferences = await SharedPreferences.getInstance();
+    await localPreferences.setBool(
+      AndroidRefreshRateService.adaptiveKey,
+      value,
+    );
+    _androidAdaptiveRefreshRate = value;
+    notifyListeners();
+  }
+
   // 仅桌面端：显示系统托盘图标
   bool _desktopShowTray = false;
   bool get desktopShowTray => _desktopShowTray;
@@ -5516,18 +5540,6 @@ Requirements:
     notifyListeners();
     final prefs = _preferences;
     await prefs.setBool(_displayKeepSidebarOpenOnTopicTapKey, v);
-  }
-
-  // 显示：关闭侧边栏时保持助手列表展开（移动端）
-  bool _keepAssistantListExpandedOnSidebarClose = false;
-  bool get keepAssistantListExpandedOnSidebarClose =>
-      _keepAssistantListExpandedOnSidebarClose;
-  Future<void> setKeepAssistantListExpandedOnSidebarClose(bool v) async {
-    if (_keepAssistantListExpandedOnSidebarClose == v) return;
-    _keepAssistantListExpandedOnSidebarClose = v;
-    notifyListeners();
-    final prefs = _preferences;
-    await prefs.setBool(_displayKeepAssistantListExpandedOnSidebarCloseKey, v);
   }
 
   // 网络：请求日志记录（调试）
@@ -5817,8 +5829,6 @@ Requirements:
     copy._showAppUpdates = _showAppUpdates;
     copy._keepSidebarOpenOnAssistantTap = _keepSidebarOpenOnAssistantTap;
     copy._keepSidebarOpenOnTopicTap = _keepSidebarOpenOnTopicTap;
-    copy._keepAssistantListExpandedOnSidebarClose =
-        _keepAssistantListExpandedOnSidebarClose;
     copy._requestLogEnabled = _requestLogEnabled;
     copy._claudeFirstTurnPlaceholderEnabled =
         _claudeFirstTurnPlaceholderEnabled;
@@ -5855,6 +5865,7 @@ Requirements:
     copy._collapseLongUserMessageChars = _collapseLongUserMessageChars;
     copy._desktopAutoSwitchTopics = _desktopAutoSwitchTopics;
     copy._linuxHideTitleBar = _linuxHideTitleBar;
+    copy._androidAdaptiveRefreshRate = _androidAdaptiveRefreshRate;
     copy._desktopShowTray = _desktopShowTray;
     copy._desktopMinimizeToTrayOnClose = _desktopMinimizeToTrayOnClose;
     copy._usePureBackground = _usePureBackground;

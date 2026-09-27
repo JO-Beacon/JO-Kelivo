@@ -66,7 +66,6 @@ class SideDrawer extends StatefulWidget {
     required this.assistantName,
     this.onSelectConversation,
     this.onNewConversation,
-    this.closePickerTicker,
     this.loadingConversationIds = const <String>{},
     this.embeddedWidth,
     this.showBottomBar = true,
@@ -85,7 +84,6 @@ class SideDrawer extends StatefulWidget {
   final FutureOr<void> Function(String id, {bool closeDrawer})?
   onSelectConversation;
   final FutureOr<void> Function({bool closeDrawer})? onNewConversation;
-  final ValueNotifier<int>? closePickerTicker;
   final Set<String> loadingConversationIds;
   final double? embeddedWidth; // 停靠模式的可选显式宽度
   final bool showBottomBar; // 桌面端可隐藏此底部区域
@@ -156,16 +154,11 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   bool get _assistantReorder => widget.capabilities.assistantReorder;
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
-  final GlobalKey _assistantTileKey = GlobalKey();
-  OverlayEntry? _assistantPickerEntry;
-  ValueNotifier<int>? _closeTicker;
-  bool _assistantsExpanded = false;
   final ScrollController _listController = ScrollController();
   final ScrollController _assistantListController = ScrollController();
   ChatSidebarStateStore? _sidebarStateStore;
   Timer? _assistantScrollSaveTimer;
   bool _assistantScrollRestored = false;
-  bool _assistantHeaderHovered = false;
   double _mobileSearchSwipeDx = 0;
   bool _mobileSearchSwipeHandled = false;
   final FocusNode _mobileSearchFocusNode = FocusNode();
@@ -212,7 +205,6 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
         _debugRequestConversationListHostRebuild;
     SideDrawer.debugEnterSelectionMode = _enterSelectionMode;
     SideDrawer.debugEnterAssistantSelectionMode = _enterAssistantSelectionMode;
-    _attachCloseTicker(widget.closePickerTicker);
     _mobileSearchFocusNode.addListener(() {
       if (_pointerInteractions) return;
       final visible = _mobileSearchFocusNode.hasFocus;
@@ -1112,9 +1104,6 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       SideDrawer.debugEnterAssistantSelectionMode = null;
     }
     _unbindHostDrawer();
-    _assistantPickerEntry?.remove();
-    _assistantPickerEntry = null;
-    _closeTicker?.removeListener(_handleCloseTick);
     _mobileSearchFocusNode.dispose();
     _searchController.dispose();
     _listController.dispose();
@@ -1138,12 +1127,6 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       _tabBusSub?.cancel();
     } catch (_) {}
     super.dispose();
-  }
-
-  @override
-  void deactivate() {
-    _closeAssistantPicker();
-    super.deactivate();
   }
 
   @override
@@ -1182,9 +1165,6 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   @override
   void didUpdateWidget(covariant SideDrawer oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.closePickerTicker != widget.closePickerTicker) {
-      _attachCloseTicker(widget.closePickerTicker);
-    }
     // 当全局搜索查询从外部变化时同步搜索文本。
     // 使用 copyWith 保留用户光标位置，而不是将其重置到 0
     // （直接给 .text 赋值会重置到 0）。
@@ -1492,17 +1472,6 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
         ),
       ],
     );
-  }
-
-  void _attachCloseTicker(ValueNotifier<int>? ticker) {
-    if (_closeTicker == ticker) return;
-    _closeTicker?.removeListener(_handleCloseTick);
-    _closeTicker = ticker;
-    _closeTicker?.addListener(_handleCloseTick);
-  }
-
-  void _handleCloseTick() {
-    _closeAssistantPicker();
   }
 
   String _dateLabel(BuildContext context, DateTime date) {
@@ -2531,99 +2500,6 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                           textColor: textBase,
                           controller: _tabController!,
                           pointerInteractions: _pointerInteractions,
-                        )
-                      else if (!assistOnly && !topicsOnly)
-                        // 当前助手区域（固定）
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 2),
-                          child: KeyedSubtree(
-                            key: _assistantTileKey,
-                            child: MouseRegion(
-                              onEnter: (_) {
-                                if (_pointerInteractions) {
-                                  setState(
-                                    () => _assistantHeaderHovered = true,
-                                  );
-                                }
-                              },
-                              onExit: (_) {
-                                if (_pointerInteractions) {
-                                  setState(
-                                    () => _assistantHeaderHovered = false,
-                                  );
-                                }
-                              },
-                              cursor: _pointerInteractions
-                                  ? SystemMouseCursors.click
-                                  : SystemMouseCursors.basic,
-                              child: IosCardPress(
-                                baseColor: (() {
-                                  final docked = _docked;
-                                  final base = docked
-                                      ? Colors.transparent
-                                      : cs.surface;
-                                  if (_pointerInteractions &&
-                                      _assistantHeaderHovered) {
-                                    return docked
-                                        ? cs.primary.withValues(alpha: 0.08)
-                                        : cs.surface.withValues(alpha: 0.9);
-                                  }
-                                  return base;
-                                })(),
-                                borderRadius: BorderRadius.circular(16),
-                                onTap: _toggleAssistantPicker,
-                                onLongPress: _pointerInteractions
-                                    ? null
-                                    : () {
-                                        final id = context
-                                            .read<AssistantProvider>()
-                                            .currentAssistantId;
-                                        if (id != null) {
-                                          _openAssistantSettings(id);
-                                        }
-                                      },
-                                padding: const EdgeInsets.fromLTRB(4, 6, 12, 6),
-                                child: Row(
-                                  children: [
-                                    AssistantAvatar(
-                                      assistant: ap.currentAssistant,
-                                      fallbackName: widget.assistantName,
-                                      size: 32,
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: Text(
-                                        (ap.currentAssistant?.name ??
-                                            widget.assistantName),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: _pointerInteractions
-                                              ? 14
-                                              : 15,
-                                          fontWeight: AppFontWeights.medium,
-                                          color: textBase,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    AnimatedRotation(
-                                      turns: _assistantsExpanded ? 0.5 : 0.0,
-                                      duration: const Duration(
-                                        milliseconds: 350,
-                                      ),
-                                      curve: Curves.easeOutCubic,
-                                      child: Icon(
-                                        Lucide.ChevronDown,
-                                        size: 18,
-                                        color: textBase.withValues(alpha: 0.7),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
                         ),
                     ],
 
@@ -2691,43 +2567,20 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                           ),
                         );
                       }
-                      if (topicsOnly) {
-                        final isDesktop = _pointerInteractions;
-                        final topPad =
-                            context.watch<SettingsProvider>().showChatListDate
-                            ? (isDesktop ? 2.0 : 4.0)
-                            : 10.0;
-                        return _buildConversationsList(
-                          context,
-                          cs,
-                          textBase,
-                          chatService,
-                          rows,
-                          includeUpdateBanner: true,
-                          controller: _listController,
-                          padding: EdgeInsets.fromLTRB(10, topPad, 10, 16),
-                        );
-                      }
-                      return _LegacyListArea(
-                        isDesktop: _pointerInteractions,
-                        assistantsExpanded: _assistantsExpanded,
-                        buildAssistants: () => _buildAssistantsList(
-                          context,
-                          inlineMode: true,
-                          constrainInline: true,
-                        ),
-                        buildConversations: (leading, padding) =>
-                            _buildConversationsList(
-                              context,
-                              cs,
-                              textBase,
-                              chatService,
-                              rows,
-                              includeUpdateBanner: true,
-                              controller: _listController,
-                              padding: padding,
-                              leading: leading,
-                            ),
+                      final isDesktop = _pointerInteractions;
+                      final topPad =
+                          context.watch<SettingsProvider>().showChatListDate
+                          ? (isDesktop ? 2.0 : 4.0)
+                          : 10.0;
+                      return _buildConversationsList(
+                        context,
+                        cs,
+                        textBase,
+                        chatService,
+                        rows,
+                        includeUpdateBanner: true,
+                        controller: _listController,
+                        padding: EdgeInsets.fromLTRB(10, topPad, 10, 16),
                       );
                     },
                   );
@@ -2915,20 +2768,9 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     );
   }
 
-  void _toggleAssistantPicker() {
-    final goingToExpand = !_assistantsExpanded;
-    setState(() {
-      _assistantsExpanded = goingToExpand;
-    });
-    if (goingToExpand && !_assistantScrollRestored) {
-      unawaited(_restoreAssistantListScroll());
-    }
-  }
-
   String get _assistantScrollScope {
     if (_assistantsOnly) return 'assistants-only';
-    if (_showTabs) return 'assistant-tab';
-    return 'assistant-inline';
+    return 'assistant-tab';
   }
 
   Future<void> _restoreAssistantListScroll() async {
@@ -2968,19 +2810,9 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     });
   }
 
-  void _closeAssistantPicker() {
-    if (!_assistantsExpanded) return;
-    setState(() {
-      _assistantsExpanded = false;
-    });
-  }
-
   Future<void> _handleSelectAssistant(String assistantId) async {
     final sp = context.read<SettingsProvider>();
     final closeDrawer = !sp.keepSidebarOpenOnAssistantTap;
-    if (closeDrawer) {
-      _closeAssistantPicker();
-    }
     final ap = context.read<AssistantProvider>();
     await ap.setCurrentAssistant(assistantId);
     // 桌面端：根据用户偏好可选切换到主题标签
@@ -3028,11 +2860,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   }
 
   void _openAssistantSettings(String id) {
-    AssistantEntryActions.openAssistantSettings(
-      context,
-      id,
-      beforeAction: _closeAssistantPicker,
-    );
+    AssistantEntryActions.openAssistantSettings(context, id);
   }
 
   Future<void> _showAssistantItemMenu(
@@ -3047,7 +2875,6 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       context: context,
       assistant: assistant,
       globalPosition: anchor,
-      beforeAction: _closeAssistantPicker,
       onSelect: () => _enterAssistantSelectionMode(assistant.id),
     );
   }
@@ -3810,11 +3637,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
 
   // 构建助手列表（未分组 + 按标签分组）。当 inlineMode=false（桌面标签）时，
   // 对助手名称应用搜索筛选。
-  Widget _buildAssistantsList(
-    BuildContext context, {
-    bool inlineMode = false,
-    bool constrainInline = false,
-  }) {
+  Widget _buildAssistantsList(BuildContext context, {bool inlineMode = false}) {
     final ap2 = context.watch<AssistantProvider>();
     final groupProvider = context.watch<AssistantGroupProvider>();
     final textBase2 = Theme.of(context).colorScheme.onSurface;
@@ -4113,15 +3936,6 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       );
     }
 
-    // 内联助手列表位于会话列表的 leading 中，必须有有限高度，
-    // 否则 Flutter 无法布局内部视口。限制高度也避免展开大量助手时
-    // 把会话列表整体顶出屏幕。
-    if (constrainInline) {
-      return ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 360),
-        child: list,
-      );
-    }
     return list;
   }
 
@@ -4136,7 +3950,6 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     bool includeUpdateBanner = false,
     ScrollController? controller,
     EdgeInsetsGeometry? padding,
-    Widget? leading,
   }) {
     // 仅冷启动：ChatService 初始化完成前下方列表为空，
     // 因此渲染占位块而不是空白区域。
@@ -4144,10 +3957,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       return ListView(
         controller: controller,
         padding: padding ?? EdgeInsets.zero,
-        children: [
-          if (leading != null) leading,
-          const _ConversationListSkeleton(),
-        ],
+        children: [const _ConversationListSkeleton()],
       );
     }
 
@@ -4242,9 +4052,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
           row,
     ];
 
-    final leadingCount = leading != null ? 1 : 0;
     final bannerCount = banner != null ? 1 : 0;
-    final prefixCount = leadingCount + bannerCount;
+    final prefixCount = bannerCount;
 
     return PageTransitionSwitcher(
       duration: const Duration(milliseconds: 260),
@@ -4264,8 +4073,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
         padding: padding ?? EdgeInsets.zero,
         itemCount: prefixCount + visibleRows.length,
         itemBuilder: (context, index) {
-          if (leading != null && index == 0) return leading;
-          if (banner != null && index == leadingCount) return banner;
+          if (banner != null && index == 0) return banner;
           final rowIndex = index - prefixCount;
           final row = visibleRows[rowIndex];
           if (row is _SidebarHeaderRow) {
@@ -5116,54 +4924,6 @@ class _DesktopTabViews extends StatelessWidget {
         buildConversations(),
       ],
     );
-  }
-}
-
-// 旧版（移动端/平板）：带可选内联助手的原始单列表布局
-class _LegacyListArea extends StatelessWidget {
-  const _LegacyListArea({
-    required this.isDesktop,
-    required this.assistantsExpanded,
-    required this.buildAssistants,
-    required this.buildConversations,
-  });
-  final bool isDesktop;
-  final bool assistantsExpanded;
-  final Widget Function() buildAssistants;
-
-  /// 构建拥有滚动的虚拟化会话列表，带内联助手 [leading] 控件
-  /// 和共享 [padding]。
-  final Widget Function(Widget leading, EdgeInsets padding) buildConversations;
-
-  @override
-  Widget build(BuildContext context) {
-    final padding = EdgeInsets.fromLTRB(
-      10,
-      (context.watch<SettingsProvider>().showChatListDate || assistantsExpanded)
-          ? (isDesktop ? 2 : 4)
-          : 10,
-      10,
-      16,
-    );
-    final leading = AnimatedSize(
-      duration: const Duration(milliseconds: 260),
-      curve: Curves.easeInOutCubic,
-      alignment: Alignment.topCenter,
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 220),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
-        transitionBuilder: (child, animation) =>
-            FadeTransition(opacity: animation, child: child),
-        child: !assistantsExpanded
-            ? const SizedBox.shrink()
-            : KeyedSubtree(
-                key: const ValueKey('assistants-inline'),
-                child: buildAssistants(),
-              ),
-      ),
-    );
-    return buildConversations(leading, padding);
   }
 }
 

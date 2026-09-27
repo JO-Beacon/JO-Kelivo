@@ -2215,11 +2215,12 @@
   "@displaySettingsPageEnableImageCropperSubtitle": {},
   "displaySettingsPageKeepSidebarOpenOnAssistantTapTitle": "Keep sidebar open when selecting assistant",
   "displaySettingsPageKeepSidebarOpenOnTopicTapTitle": "Keep sidebar open when selecting topic",
-  "displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle": "Don't collapse assistant list when closing sidebar",
   "displaySettingsPageShowUpdatesTitle": "Show Updates",
   "displaySettingsPageShowUpdatesSubtitle": "Show app update notifications",
   "displaySettingsPageKeepScreenOnDuringGenerationTitle": "Keep Screen On While Generating",
   "displaySettingsPageKeepScreenOnDuringGenerationSubtitle": "Prevents the lock screen from interrupting generation. Increases battery use.",
+  "displaySettingsPageAdaptiveRefreshRateTitle": "Adaptive refresh rate",
+  "displaySettingsPageAdaptiveRefreshRateSubtitle": "Off: always use the highest refresh rate. On: let the system adapt; some devices may stay at 60 Hz to save power.",
   "displaySettingsPageMessageNavButtonsTitle": "Message Navigation Buttons",
   "displaySettingsPageMessageNavButtonsSubtitle": "Choose when quick jump buttons appear",
   "displaySettingsPageMessageNavButtonsModeAlways": "Always show",
@@ -5927,6 +5928,6 @@
   "phoneControlRestrictedHint": "For some downloaded APKs, Android requires “Allow restricted settings” in the app info menu first. Tap to open JO-AIClient’s app info, then return to Accessibility settings.",
   "phoneControlEnableAssistant": "Allow this assistant to use phone control",
   "linuxHideTitleBarTitle": "Hide system title bar",
-  "linuxHideTitleBarDescription": "Also hides window buttons. Use your window manager to move, resize, and close the window.",
+  "linuxHideTitleBarDescription": "Hides the system title bar and instead shows an app-drawn title bar with window controls.",
   "linuxHideTitleBarError": "Unable to change the title bar. Please try again."
 }

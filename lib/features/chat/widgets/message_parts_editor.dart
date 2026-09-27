@@ -10,6 +10,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_form_text_field.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../utils/newline_normalization.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'message_attachment_editor.dart';
 
@@ -65,11 +66,14 @@ class _MessagePartsEditorState extends State<MessagePartsEditor> {
   }
 
   TextEditingController _controllerFor(int index, String text) {
+    final normalized = normalizeNewlines(text);
     final controller = _controllers.putIfAbsent(
       index,
-      () => TextEditingController(text: text),
+      () => TextEditingController(text: normalized),
     );
-    if (controller.text != text && !_editing(index)) controller.text = text;
+    if (controller.text != normalized && !_editing(index)) {
+      controller.text = normalized;
+    }
     return controller;
   }
 
@@ -297,6 +301,7 @@ class _PartCard extends StatelessWidget {
                 hintText: l10n.messageEditTextPart,
                 minLines: 3,
                 maxLines: _maxPartEditorLines,
+                inputFormatters: const [NormalizeNewlinesFormatter()],
                 onChanged: onTextChanged,
                 outerPadding: EdgeInsets.zero,
               )
@@ -409,7 +414,7 @@ class _ExpandedPartDesktopDialog extends StatefulWidget {
 class _ExpandedPartDesktopDialogState
     extends State<_ExpandedPartDesktopDialog> {
   late final TextEditingController _controller = TextEditingController(
-    text: widget.initialText,
+    text: normalizeNewlines(widget.initialText),
   );
 
   @override
@@ -553,7 +558,7 @@ class _ExpandedPartMobileSheet extends StatefulWidget {
 
 class _ExpandedPartMobileSheetState extends State<_ExpandedPartMobileSheet> {
   late final TextEditingController _controller = TextEditingController(
-    text: widget.initialText,
+    text: normalizeNewlines(widget.initialText),
   );
 
   @override
@@ -673,6 +678,7 @@ class _ExpandedPartField extends StatelessWidget {
         maxLines: null,
         minLines: null,
         keyboardType: TextInputType.multiline,
+        inputFormatters: const [NormalizeNewlinesFormatter()],
         textAlignVertical: TextAlignVertical.top,
         decoration: const InputDecoration(
           border: InputBorder.none,

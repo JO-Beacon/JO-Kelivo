@@ -7,7 +7,7 @@ enum SidebarPresentation { overlay, docked }
 
 class SidebarCapabilities {
   const SidebarCapabilities({
-    this.showTabs = false,
+    this.showTabs = true,
     this.assistantsOnly = false,
     this.topicsOnly = false,
     this.pointerInteractions = false,

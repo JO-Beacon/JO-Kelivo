@@ -5008,10 +5008,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Keep sidebar open when selecting topic';
 
   @override
-  String get displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle =>
-      'Don\'t collapse assistant list when closing sidebar';
-
-  @override
   String get displaySettingsPageShowUpdatesTitle => 'Show Updates';
 
   @override
@@ -5025,6 +5021,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get displaySettingsPageKeepScreenOnDuringGenerationSubtitle =>
       'Prevents the lock screen from interrupting generation. Increases battery use.';
+
+  @override
+  String get displaySettingsPageAdaptiveRefreshRateTitle =>
+      'Adaptive refresh rate';
+
+  @override
+  String get displaySettingsPageAdaptiveRefreshRateSubtitle =>
+      'Off: always use the highest refresh rate. On: let the system adapt; some devices may stay at 60 Hz to save power.';
 
   @override
   String get displaySettingsPageMessageNavButtonsTitle =>
@@ -13227,7 +13231,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get linuxHideTitleBarDescription =>
-      'Also hides window buttons. Use your window manager to move, resize, and close the window.';
+      'Hides the system title bar and instead shows an app-drawn title bar with window controls.';
 
   @override
   String get linuxHideTitleBarError =>

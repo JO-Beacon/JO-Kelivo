@@ -1475,11 +1475,12 @@
   "displaySettingsPageShowChatListDateSubtitle": "在左侧对话列表中显示日期分组标签",
   "displaySettingsPageKeepSidebarOpenOnAssistantTapTitle": "点选助手时不自动关闭侧边栏",
   "displaySettingsPageKeepSidebarOpenOnTopicTapTitle": "点选话题时不自动关闭侧边栏",
-  "displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle": "关闭侧边栏时不折叠助手列表",
   "displaySettingsPageShowUpdatesTitle": "显示更新",
   "displaySettingsPageShowUpdatesSubtitle": "显示应用更新通知",
   "displaySettingsPageKeepScreenOnDuringGenerationTitle": "生成时保持屏幕常亮",
   "displaySettingsPageKeepScreenOnDuringGenerationSubtitle": "防止生成中途锁屏导致中断，会增加耗电",
+  "displaySettingsPageAdaptiveRefreshRateTitle": "自适应刷新率",
+  "displaySettingsPageAdaptiveRefreshRateSubtitle": "关闭：始终使用最高刷新率；开启：由系统自适应，部分机型可能保持 60Hz 以省电",
   "displaySettingsPageMessageNavButtonsTitle": "消息导航按钮",
   "displaySettingsPageMessageNavButtonsSubtitle": "选择快速跳转按钮的显示时机",
   "displaySettingsPageMessageNavButtonsModeAlways": "始终显示",
@@ -5927,6 +5928,6 @@
     }
   },
   "linuxHideTitleBarTitle": "隐藏系统标题栏",
-  "linuxHideTitleBarDescription": "同时隐藏窗口按钮。请通过窗口管理器移动、调整大小和关闭窗口。",
+  "linuxHideTitleBarDescription": "隐藏系统标题栏，改用应用自带的标题栏（含窗口按钮）。",
   "linuxHideTitleBarError": "无法更改标题栏，请重试。"
 }

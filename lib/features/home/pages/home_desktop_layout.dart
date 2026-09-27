@@ -38,7 +38,6 @@ class HomeDesktopScaffold extends StatelessWidget {
   const HomeDesktopScaffold({
     super.key,
     required this.scaffoldKey,
-    required this.assistantPickerCloseTick,
     required this.loadingConversationIds,
     required this.title,
     required this.providerName,
@@ -74,7 +73,6 @@ class HomeDesktopScaffold extends StatelessWidget {
   });
 
   final GlobalKey<ScaffoldState> scaffoldKey;
-  final ValueNotifier<int> assistantPickerCloseTick;
   final Set<String> loadingConversationIds;
   final String title;
   final String? providerName;
@@ -189,7 +187,6 @@ class HomeDesktopScaffold extends StatelessWidget {
       embeddedWidth: embeddedSidebarWidth,
       userName: context.watch<UserProvider>().name,
       assistantName: _getAssistantName(context),
-      closePickerTicker: assistantPickerCloseTick,
       loadingConversationIds: loadingConversationIds,
       presentation: SidebarPresentation.docked,
       capabilities: SidebarCapabilities(
@@ -259,7 +256,6 @@ class HomeDesktopScaffold extends StatelessWidget {
                   embeddedWidth: rightSidebarWidth,
                   userName: context.watch<UserProvider>().name,
                   assistantName: _getAssistantName(context),
-                  closePickerTicker: assistantPickerCloseTick,
                   loadingConversationIds: loadingConversationIds,
                   presentation: SidebarPresentation.docked,
                   capabilities: const SidebarCapabilities(

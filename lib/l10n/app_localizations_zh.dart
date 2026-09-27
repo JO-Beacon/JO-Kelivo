@@ -4808,10 +4808,6 @@ class AppLocalizationsZh extends AppLocalizations {
       '点选话题时不自动关闭侧边栏';
 
   @override
-  String get displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle =>
-      '关闭侧边栏时不折叠助手列表';
-
-  @override
   String get displaySettingsPageShowUpdatesTitle => '显示更新';
 
   @override
@@ -4824,6 +4820,13 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get displaySettingsPageKeepScreenOnDuringGenerationSubtitle =>
       '防止生成中途锁屏导致中断，会增加耗电';
+
+  @override
+  String get displaySettingsPageAdaptiveRefreshRateTitle => '自适应刷新率';
+
+  @override
+  String get displaySettingsPageAdaptiveRefreshRateSubtitle =>
+      '关闭：始终使用最高刷新率；开启：由系统自适应，部分机型可能保持 60Hz 以省电';
 
   @override
   String get displaySettingsPageMessageNavButtonsTitle => '消息导航按钮';
@@ -12615,7 +12618,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get linuxHideTitleBarTitle => '隐藏系统标题栏';
 
   @override
-  String get linuxHideTitleBarDescription => '同时隐藏窗口按钮。请通过窗口管理器移动、调整大小和关闭窗口。';
+  String get linuxHideTitleBarDescription => '隐藏系统标题栏，改用应用自带的标题栏（含窗口按钮）。';
 
   @override
   String get linuxHideTitleBarError => '无法更改标题栏，请重试。';
@@ -17425,10 +17428,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '点选话题时不自动关闭侧边栏';
 
   @override
-  String get displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle =>
-      '关闭侧边栏时不折叠助手列表';
-
-  @override
   String get displaySettingsPageShowUpdatesTitle => '显示更新';
 
   @override
@@ -17441,6 +17440,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get displaySettingsPageKeepScreenOnDuringGenerationSubtitle =>
       '防止生成中途锁屏导致中断，会增加耗电';
+
+  @override
+  String get displaySettingsPageAdaptiveRefreshRateTitle => '自适应刷新率';
+
+  @override
+  String get displaySettingsPageAdaptiveRefreshRateSubtitle =>
+      '关闭：始终使用最高刷新率；开启：由系统自适应，部分机型可能保持 60Hz 以省电';
 
   @override
   String get displaySettingsPageMessageNavButtonsTitle => '消息导航按钮';
@@ -25232,7 +25238,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get linuxHideTitleBarTitle => '隐藏系统标题栏';
 
   @override
-  String get linuxHideTitleBarDescription => '同时隐藏窗口按钮。请通过窗口管理器移动、调整大小和关闭窗口。';
+  String get linuxHideTitleBarDescription => '隐藏系统标题栏，改用应用自带的标题栏（含窗口按钮）。';
 
   @override
   String get linuxHideTitleBarError => '无法更改标题栏，请重试。';
@@ -30042,10 +30048,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '點選話題時不自動關閉側邊欄';
 
   @override
-  String get displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle =>
-      '關閉側邊欄時不折疊助手列表';
-
-  @override
   String get displaySettingsPageShowUpdatesTitle => '顯示更新';
 
   @override
@@ -30058,6 +30060,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get displaySettingsPageKeepScreenOnDuringGenerationSubtitle =>
       '防止生成中途鎖屏導致中斷，會增加耗電';
+
+  @override
+  String get displaySettingsPageAdaptiveRefreshRateTitle => '自適應刷新率';
+
+  @override
+  String get displaySettingsPageAdaptiveRefreshRateSubtitle =>
+      '關閉：始終使用最高刷新率；開啟：由系統自適應，部分機型可能保持 60Hz 以省電';
 
   @override
   String get displaySettingsPageMessageNavButtonsTitle => '訊息導航按鈕';
@@ -37855,7 +37864,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get linuxHideTitleBarTitle => '隱藏系統標題列';
 
   @override
-  String get linuxHideTitleBarDescription => '同時隱藏視窗按鈕。請透過視窗管理員移動、調整大小和關閉視窗。';
+  String get linuxHideTitleBarDescription => '隱藏系統標題列，改用應用程式自帶的標題列（含視窗按鈕）。';
 
   @override
   String get linuxHideTitleBarError => '無法變更標題列，請重試。';

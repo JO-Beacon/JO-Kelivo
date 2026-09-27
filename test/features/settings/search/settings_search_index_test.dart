@@ -97,7 +97,6 @@ void main() {
       'haptics',
       'storage',
       'displaySettingsPageKeepSidebarOpenOnAssistantTapTitle',
-      'displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle',
       'displaySettingsPageMobileCodeBlockWrapTitle',
     ]) {
       expect(desktop, isNot(contains(id)), reason: id);

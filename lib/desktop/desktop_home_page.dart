@@ -11,7 +11,13 @@ import 'hotkeys/chat_action_bus.dart';
 import 'desktop_settings_navigation_bus.dart';
 import 'desktop_tray_controller.dart';
 import 'window_appearance.dart';
+import 'window_title_bar.dart';
 import '../core/services/notification_service.dart';
+import '../core/providers/settings_provider.dart';
+import '../l10n/app_localizations.dart';
+import '../theme/app_font_weights.dart';
+import '../utils/platform_utils.dart';
+import 'package:provider/provider.dart';
 
 /// 桌面首页：左侧紧凑导航栏加主内容。
 /// 第一阶段关注结构以及适合平台端的交互和悬停效果。
@@ -256,7 +262,13 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
 
         // Windows 已改用原生标题栏，自绘标题栏（WindowTitleBar）随之移除；
         // 仅保留为窗口尺寸不足时居中的约束包装。
-        final content = Stack(
+        // Linux 上隐藏系统标题栏后，用应用内自绘标题栏顶替，提供拖动区和
+        // 窗口按钮；未隐藏时仍使用系统标题栏，Windows／macOS 不走这里。
+        final bool showLinuxTitleBar =
+            PlatformUtils.isLinux &&
+            context.watch<SettingsProvider>().linuxHideTitleBar;
+
+        Widget content = Stack(
           children: [
             body,
             // 需要时将延迟构建的设置页注入 IndexedStack，
@@ -264,6 +276,20 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
             if (_tabIndex == 3) const SizedBox.shrink(),
           ],
         );
+
+        if (showLinuxTitleBar) {
+          content = Column(
+            children: [
+              WindowTitleBar(
+                leftChildren: [
+                  const SizedBox(width: DesktopNavRail.width / 2 - 8 - 6 - 12),
+                  const _TitleBarLeading(),
+                ],
+              ),
+              Expanded(child: content),
+            ],
+          );
+        }
 
         // if (!needsWidthPad && !needsHeightPad) return content;
 
@@ -302,3 +328,34 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
 }
 
 // 没有额外路由或垫片；我们直接在上方导入 DesktopSettingsPage。
+
+class _TitleBarLeading extends StatelessWidget {
+  const _TitleBarLeading();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Image.asset(
+          'assets/app_icon.png',
+          width: 16,
+          height: 16,
+          filterQuality: FilterQuality.medium,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          l10n.aboutPageAppName,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: AppFontWeights.semibold,
+            color: cs.onSurface.withValues(alpha: 0.8),
+            decoration: TextDecoration.none,
+          ),
+        ),
+      ],
+    );
+  }
+}

@@ -23,8 +23,10 @@ class _PromptTabState extends State<_PromptTab> {
     super.initState();
     final ap = context.read<AssistantProvider>();
     final a = ap.getById(widget.assistantId)!;
-    _sysCtrl = TextEditingController(text: a.systemPrompt);
-    _tmplCtrl = TextEditingController(text: a.messageTemplate);
+    _sysCtrl = TextEditingController(text: normalizeNewlines(a.systemPrompt));
+    _tmplCtrl = TextEditingController(
+      text: normalizeNewlines(a.messageTemplate),
+    );
     _sysFocus = FocusNode(debugLabel: 'systemPromptFocus');
     _tmplFocus = FocusNode(debugLabel: 'messageTemplateFocus');
     _presetCtrl = TextEditingController();
@@ -351,6 +353,7 @@ class _PromptTabState extends State<_PromptTab> {
               maxLines: 8,
               keyboardType: TextInputType.multiline,
               textInputAction: TextInputAction.newline,
+              inputFormatters: const [NormalizeNewlinesFormatter()],
               enableInteractiveSelection: true,
               decoration: InputDecoration(
                 hintText: l10n.assistantEditSystemPromptHint,
@@ -503,6 +506,7 @@ class _PromptTabState extends State<_PromptTab> {
               maxLines: 4,
               keyboardType: TextInputType.multiline,
               textInputAction: TextInputAction.newline,
+              inputFormatters: const [NormalizeNewlinesFormatter()],
               enableInteractiveSelection: true,
               onChanged: (v) => context
                   .read<AssistantProvider>()
@@ -1236,7 +1240,7 @@ class _SystemPromptMobileSheet extends StatefulWidget {
 
 class _SystemPromptMobileSheetState extends State<_SystemPromptMobileSheet> {
   late final TextEditingController _controller = TextEditingController(
-    text: widget.initial,
+    text: normalizeNewlines(widget.initial),
   );
 
   @override
@@ -1293,6 +1297,7 @@ class _SystemPromptMobileSheetState extends State<_SystemPromptMobileSheet> {
                   maxLines: null,
                   minLines: null,
                   keyboardType: TextInputType.multiline,
+                  inputFormatters: const [NormalizeNewlinesFormatter()],
                   textAlignVertical: TextAlignVertical.top,
                   decoration: InputDecoration(
                     hintText: l10n.assistantEditSystemPromptHint,
@@ -1321,7 +1326,7 @@ class _SystemPromptDesktopDialog extends StatefulWidget {
 class _SystemPromptDesktopDialogState
     extends State<_SystemPromptDesktopDialog> {
   late final TextEditingController _controller = TextEditingController(
-    text: widget.initial,
+    text: normalizeNewlines(widget.initial),
   );
 
   @override
@@ -1389,6 +1394,7 @@ class _SystemPromptDesktopDialogState
                     maxLines: null,
                     minLines: null,
                     keyboardType: TextInputType.multiline,
+                    inputFormatters: const [NormalizeNewlinesFormatter()],
                     textAlignVertical: TextAlignVertical.top,
                     decoration: InputDecoration(
                       hintText: l10n.assistantEditSystemPromptHint,
@@ -1488,7 +1494,7 @@ Future<void> _showEditPresetDialog(
 ) async {
   final l10n = AppLocalizations.of(context)!;
   final cs = Theme.of(context).colorScheme;
-  final controller = TextEditingController(text: m.content);
+  final controller = TextEditingController(text: normalizeNewlines(m.content));
   final platform = Theme.of(context).platform;
   final isDesktop =
       platform == TargetPlatform.macOS ||
@@ -1547,6 +1553,7 @@ Future<void> _showEditPresetDialog(
                   controller: controller,
                   minLines: 3,
                   maxLines: 8,
+                  inputFormatters: const [NormalizeNewlinesFormatter()],
                   decoration: InputDecoration(
                     hintText: m.role == 'assistant'
                         ? l10n.assistantEditPresetInputHintAssistant
@@ -1630,6 +1637,7 @@ Future<void> _showEditPresetDialog(
                 controller: controller,
                 minLines: 1,
                 maxLines: 8,
+                inputFormatters: const [NormalizeNewlinesFormatter()],
                 decoration: InputDecoration(
                   hintText: m.role == 'assistant'
                       ? l10n.assistantEditPresetInputHintAssistant

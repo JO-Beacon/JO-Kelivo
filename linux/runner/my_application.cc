@@ -101,6 +101,12 @@ static void my_application_activate(GApplication* application) {
   gtk_widget_show(GTK_WIDGET(view));
   gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(view));
 
+  // Keep the Flutter view from being laid out below the desktop shell's
+  // usable minimum. A widget size request is used instead of GDK window
+  // geometry hints because Wayland compositors ignore the latter.
+  // Mirrors WindowSizeManager.minWindowWidth / minWindowHeight.
+  gtk_widget_set_size_request(GTK_WIDGET(view), 960, 640);
+
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
 
   // logind reports system suspend/hibernate, independently of Flutter focus.
