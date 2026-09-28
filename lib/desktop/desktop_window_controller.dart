@@ -16,10 +16,17 @@ import 'dart:async';
 
 /// 处理桌面窗口初始化和持久化（尺寸、位置、最大化状态）。
 class DesktopWindowController with WindowListener {
-  DesktopWindowController._() : _whenWindowReady = _whenWindowsReady;
+  DesktopWindowController._()
+    : _whenWindowReady = _whenWindowsReady,
+      _windowShownTimeout = const Duration(seconds: 3);
 
   @visibleForTesting
-  DesktopWindowController.forTesting(this._whenWindowReady);
+  DesktopWindowController.forTesting(
+    this._whenWindowReady, {
+    Duration windowShownTimeout = const Duration(seconds: 3),
+    // 参数名要公开给测试注入，字段本身保持私有，无法用初始化形参。
+    // ignore: prefer_initializing_formals
+  }) : _windowShownTimeout = windowShownTimeout;
 
   static final DesktopWindowController instance = DesktopWindowController._();
 
@@ -32,6 +39,9 @@ class DesktopWindowController with WindowListener {
 
   final Future<void> Function(WindowOptions options, AsyncCallback callback)
   _whenWindowReady;
+
+  /// 等原生首帧门禁显示窗口的上限；超时后由 Dart 兜底显示。
+  final Duration _windowShownTimeout;
   final WindowSizeManager _sizeMgr = const WindowSizeManager();
   bool _attached = false;
   // 还原窗口边界期间要屏蔽监听器保存，否则会把中间态写进偏好。
@@ -98,7 +108,11 @@ class DesktopWindowController with WindowListener {
           } else {
             await restoreWindowsWindowBounds(placement);
           }
-          await windowManager.show();
+          // 显示窗口交给原生 runner 的「首帧门禁」：它在 Flutter 交出第一帧
+          // 之后才 Show()。Dart 侧若也直接 show()，会和门禁抢跑，窗口可能在
+          // 首帧上屏前就显示，留下无法恢复的白屏——重装后的首次冷启动最
+          // 容易撞上这个时序。这里只等门禁把窗口显示出来。
+          await _awaitWindowShown();
           await windowManager.focus();
           if (wasMax) await windowManager.maximize();
         } catch (_) {
@@ -130,6 +144,20 @@ class DesktopWindowController with WindowListener {
         } catch (_) {}
       }
     });
+  }
+
+  /// 等原生首帧门禁把窗口显示出来。
+  ///
+  /// 正常情况下门禁在第一帧上屏时立即显示窗口，几十毫秒内返回。若首帧迟迟
+  /// 不出，门禁不会触发、窗口会一直隐藏；超时后主动显示兜底，避免应用变成
+  /// 「进程在、窗口不见」。
+  Future<void> _awaitWindowShown() async {
+    final deadline = DateTime.now().add(_windowShownTimeout);
+    while (DateTime.now().isBefore(deadline)) {
+      if (await windowManager.isVisible()) return;
+      await Future<void>.delayed(const Duration(milliseconds: 16));
+    }
+    await windowManager.show();
   }
 
   Future<Rect?> _windowsPlacement(Size size, Offset? position) async {

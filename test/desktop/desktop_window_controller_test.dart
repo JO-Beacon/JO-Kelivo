@@ -163,6 +163,30 @@ void main() {
     },
   );
 
+  windowsTest('Dart does not show the window before the native first frame', (
+    tester,
+  ) async {
+    // 窗口必须由原生 runner 的「首帧门禁」显示。Dart 侧再调 show() 会抢在
+    // 首帧之前，正是白屏的成因。
+    await initialize();
+    expect(window.calls, isNot(contains('show')));
+    expect(window.calls, contains('focus'));
+  });
+
+  windowsTest('falls back to showing when the native gate never fires', (
+    tester,
+  ) async {
+    // 首帧迟迟不出时门禁不会触发，窗口不能永远隐藏。
+    window.visible = false;
+    final fallback = DesktopWindowController.forTesting((_, callback) async {
+      ready = callback;
+    }, windowShownTimeout: Duration.zero);
+    addTearDown(() => windowManager.removeListener(fallback));
+    await fallback.initializeAndShow();
+    await ready!();
+    expect(window.calls, contains('show'));
+  });
+
   windowsTest('a large high-DPI initial frame restores onto a low-DPI screen', (
     tester,
   ) async {
@@ -282,6 +306,7 @@ class _NativeWindow {
 
   final List<WindowsDisplay> Function() displays;
   Rect bounds = const Rect.fromLTWH(10, 10, 1280, 720);
+  bool visible = true;
   bool maximized = false;
   bool minimized = false;
   bool fullscreen = false;
@@ -362,7 +387,11 @@ class _NativeWindow {
         boundsAtMaximize = bounds;
         maximized = true;
         return null;
+      case 'isVisible':
+        return visible;
       case 'show':
+        visible = true;
+        return null;
       case 'focus':
       case 'ensureInitialized':
       case 'setTitleBarStyle':
