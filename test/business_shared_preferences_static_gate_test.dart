@@ -11,6 +11,9 @@ void main() {
         'lib/core/database/business_migration_engine.dart',
         'lib/core/providers/hotkey_provider.dart',
         'lib/core/providers/settings_provider.dart',
+        // ModelSpec 解析器依赖的模型目录：只读写设备本地的自动更新偏好
+        // （`model_catalog_auto_update_v1`），不涉及业务数据。
+        'lib/core/services/model_catalog/model_catalog_service.dart',
         // 本机设置随备份流转：导出档位记忆、写回 10 键，两处都直接读写
         // SharedPreferences。
         // 恢复流程（restore_local_settings_applier）不经手：它只按切换时机调度

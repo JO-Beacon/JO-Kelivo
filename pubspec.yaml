@@ -207,6 +207,7 @@ flutter:
     - assets/icon_mac.png
     - assets/mermaid.min.js
     - assets/html/mark.html
+    - assets/model_catalog/models_dev.json
     - assets/skills/skill-creator/
   #   - images/a_dot_ham.jpeg
 

@@ -5,12 +5,14 @@ import 'dart:convert';
 import 'dart:io' show HttpException;
 import 'package:http/http.dart' as http;
 import 'settings_provider.dart';
-import '../services/network/dio_http_client.dart';
+import '../services/network/provider_http_client.dart';
 import '../services/api_key_manager.dart';
 import '../services/api/provider_request_headers.dart';
 import '../services/model_override_payload_parser.dart';
+import '../services/model_override_resolver.dart';
 import '../services/custom_request_merger.dart';
 import '../services/api/google_service_account_auth.dart';
+import '../services/api/embedding/embedding_api_service.dart';
 import '../models/model_types.dart';
 import '../utils/kimi_model_compat.dart';
 
@@ -194,28 +196,6 @@ class _Http {
       ),
     );
   }
-
-  static http.Client clientFor(ProviderConfig cfg) {
-    final enabled = cfg.proxyEnabled == true;
-    final host = (cfg.proxyHost ?? '').trim();
-    final portStr = (cfg.proxyPort ?? '').trim();
-    final user = (cfg.proxyUsername ?? '').trim();
-    final pass = (cfg.proxyPassword ?? '').trim();
-    if (enabled && host.isNotEmpty && portStr.isNotEmpty) {
-      final port = int.tryParse(portStr) ?? 8080;
-      return DioHttpClient(
-        proxy: NetworkProxyConfig(
-          enabled: true,
-          type: ProviderConfig.resolveProxyType(cfg.proxyType),
-          host: host,
-          port: port,
-          username: user.isEmpty ? null : user,
-          password: pass.isEmpty ? null : pass,
-        ),
-      );
-    }
-    return DioHttpClient();
-  }
 }
 
 String _appendPath(String baseUrl, String path) {
@@ -255,7 +235,7 @@ class OpenAIProvider extends BaseProvider {
   @override
   Future<List<ModelInfo>> listModels(ProviderConfig cfg) async {
     final key = ProviderManager._effectiveApiKey(cfg);
-    final client = _Http.clientFor(cfg);
+    final client = providerHttpClient(cfg);
     try {
       final uri = _modelListUri(cfg, anthropic: false);
       final headers = <String, String>{};
@@ -289,7 +269,7 @@ class ClaudeProvider extends BaseProvider {
   @override
   Future<List<ModelInfo>> listModels(ProviderConfig cfg) async {
     final key = ProviderManager._effectiveApiKey(cfg);
-    final client = _Http.clientFor(cfg);
+    final client = providerHttpClient(cfg);
     try {
       final isDeepSeek = _isDeepSeekProvider(cfg);
       final uri = _modelListUri(cfg, anthropic: true);
@@ -343,7 +323,7 @@ class GoogleProvider extends BaseProvider {
 
   @override
   Future<List<ModelInfo>> listModels(ProviderConfig cfg) async {
-    final client = _Http.clientFor(cfg);
+    final client = providerHttpClient(cfg);
     try {
       final url = _buildUrl(cfg);
       final headers = <String, String>{};
@@ -520,6 +500,19 @@ class ProviderManager {
     String modelId, {
     bool useStream = false,
   }) async {
+    // 向量模型没有聊天接口，连接测试改走供应商的 embeddings 端点。
+    final embeddingOverride = _modelOverride(cfg, modelId);
+    final modelType =
+        ModelOverrideResolver.parseModelTypeOverride(embeddingOverride) ??
+        ModelRegistry.infer(ModelInfo(id: modelId, displayName: modelId)).type;
+    if (modelType == ModelType.embedding) {
+      await EmbeddingApiService.embed(
+        config: cfg,
+        modelId: modelId,
+        inputs: const ['hello'],
+      );
+      return;
+    }
     // 账号登录：先确保令牌有效，再按供应商约束调整请求形态。
     cfg = await ProviderOAuthService.instance.resolve(cfg);
     if (cfg.oauthProvider == OAuthProvider.chatgpt) useStream = true;
@@ -533,7 +526,7 @@ class ProviderManager {
       explicitType: cfg.providerType,
     );
     final client = ProviderOAuthService.instance.authenticatedClient(
-      _Http.clientFor(cfg),
+      providerHttpClient(cfg),
       cfg,
     );
     try {

@@ -13,7 +13,7 @@ import '../../utils/openai_model_compat.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../logging/flutter_logger.dart';
 import '../model_override_payload_parser.dart';
-import '../model_override_resolver.dart';
+import '../model_spec/model_spec_resolver.dart';
 import '../custom_request_merger.dart';
 import 'builtin_tools.dart';
 import 'provider_request_headers.dart';
@@ -119,23 +119,18 @@ bool _isAihubmix(ProviderConfig cfg) {
   return base.contains('aihubmix.com');
 }
 
-// 按模型覆盖解析有效模型信息；没有覆盖时回退到推断结果。
+// 按模型覆盖解析有效模型信息。现在由 ModelSpec 解析器派生，
+// 旧调用点仍拿到兼容的 [ModelInfo] 视图。
 ModelInfo effectiveModelInfo(ProviderConfig cfg, String modelId) {
-  final upstreamId = apiModelId(cfg, modelId);
-  final base = ModelRegistry.infer(
-    ModelInfo(id: upstreamId, displayName: upstreamId),
+  final spec = ModelSpecResolver.instance.spec(cfg, modelId);
+  return ModelInfo(
+    id: modelId,
+    displayName: spec.displayName,
+    type: spec.type,
+    input: spec.input,
+    output: spec.output,
+    abilities: spec.abilities,
   );
-  final ov = _modelOverride(cfg, modelId);
-  if (ov.isEmpty) return base;
-  try {
-    return ModelOverrideResolver.applyModelOverride(base, ov);
-  } catch (e, st) {
-    FlutterLogger.log(
-      '[ModelOverride] applyModelOverride failed: $e\n$st',
-      tag: 'ModelOverride',
-    );
-    return base;
-  }
 }
 
 String mimeFromPath(String path) {

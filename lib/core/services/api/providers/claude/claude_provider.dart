@@ -12,6 +12,8 @@ import '../../../../utils/multimodal_input_utils.dart';
 import '../../../../../utils/mcp_structured_image.dart';
 import '../../builtin_tools.dart';
 import '../../chat_api_helpers.dart';
+import '../../tool_result_content.dart';
+import '../../../model_spec/model_spec_resolver.dart';
 import '../../generation/tool_loop_runner.dart';
 import '../../../auth/claude_oauth_request.dart';
 import '../../google_service_account_auth.dart';
@@ -19,7 +21,8 @@ import '../../stream/sse_framing.dart';
 import '../../stream/stream_chunk.dart';
 import '../../stream/stream_chunk_emit.dart';
 import '../../stream/stream_chunk_ids.dart';
-import '../google/google_provider.dart' show downloadRemoteAsBase64;
+import '../google/google_provider.dart'
+    show downloadRemoteAsBase64, vertexOrigin;
 import 'claude_container.dart';
 import 'claude_decoder.dart';
 import 'claude_files.dart';
@@ -31,25 +34,6 @@ export 'claude_history.dart'
         isClaudeSupportedImageMime,
         claudeToolResultContent;
 
-int _defaultClaudeMaxOutputTokens(String modelId) {
-  final lower = modelId.trim().toLowerCase();
-  if (RegExp(
-    r'claude-(?:fable-5|mythos-5|opus-(?:5|4-8)|sonnet-5)(?:$|[._:@/-])',
-    caseSensitive: false,
-  ).hasMatch(lower)) {
-    return 128000;
-  }
-  return 64000;
-}
-
-/// Vertex AI 上 Claude 各模型的输出上限，依据 Google Vertex AI 的模型说明。
-///
-/// **只在 Vertex 端点上使用**：官方 Anthropic 端点沿用上面的通用规则。
-/// Vertex 不认通用规则的理由是老模型的上限比 64000 小得多，按 64000 发会被拒。
-///
-/// 前 16 款与上游同名表逐字一致；末尾三款是上游表未收录、但本仓库的 Vertex
-/// 模型清单会注入的模型（见 `model_provider.dart` 的 `knownClaude`），若不补，
-/// 它们会落到兜底 4096，其中 `claude-3-7-sonnet@20250219` 会明显截断回答。
 int claudeVertexMaxOutputTokens(String modelId) {
   switch (modelId) {
     case 'claude-fable-5-1':
@@ -148,10 +132,15 @@ Stream<StreamChunk> sendClaudeStreamEvents(
     );
   }
 
+  final canImageInput = effectiveModelInfo(
+    config,
+    modelId,
+  ).input.contains(Modality.image);
   final history = ClaudeHistory(
     replayServerToolBlocks: replayServerToolBlocks,
     skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
     skipImageParsing: skipImageParsing,
+    canImageInput: canImageInput,
     userImagePaths: userImagePaths,
     // Vertex 不接受 URL 图片源，远程媒体必须先下载再内联为 base64。
     remoteMediaBase64: isVertex
@@ -418,16 +407,12 @@ Stream<StreamChunk> sendClaudeStreamEvents(
           : null;
 
       // 每轮单独准备请求体
+      totalUsage = null;
+      final spec = ModelSpecResolver.instance.spec(config, modelId);
       final body = <String, dynamic>{
         if (!isVertex) 'model': upstreamModelId,
         if (isVertex) 'anthropic_version': 'vertex-2023-10-16',
-        'max_tokens':
-            maxTokens ??
-            (config.oauthProvider == OAuthProvider.kimi
-                ? 32000
-                : (isVertex
-                      ? claudeVertexMaxOutputTokens(upstreamModelId)
-                      : _defaultClaudeMaxOutputTokens(upstreamModelId))),
+        'max_tokens': maxTokens ?? spec.maxOutput ?? 64000,
         'messages': convo,
         'stream': stream,
         if (systemPrompt.isNotEmpty) 'system': systemPrompt,
@@ -654,7 +639,10 @@ Stream<StreamChunk> sendClaudeStreamEvents(
                 if (resultChunk is ToolCallResult) {
                   decoder.recordToolResult(
                     tool.id,
-                    (resultChunk.output ?? '').toString(),
+                    ClientToolResult(
+                      (resultChunk.output ?? '').toString(),
+                      metadata: resultChunk.metadata,
+                    ),
                   );
                 }
                 yield resultChunk;
@@ -709,20 +697,25 @@ Stream<StreamChunk> sendClaudeStreamEvents(
           ),
       ];
       for (final tool in decoder.clientTools.values) {
-        var res = toolResultsContent[tool.id] ?? '';
-        if (res.isEmpty && onToolCall != null) {
+        var res = toolResultsContent[tool.id];
+        if (res == null && onToolCall != null) {
           res = ClientToolResult.fromHandler(
             await onToolCall(
               tool.name,
               tool.decodedArguments,
               toolCallId: tool.id,
             ),
-          ).content;
+          );
         }
         lastStreamResults.add({
           'type': 'tool_result',
           'tool_use_id': tool.id,
-          'content': claudeToolResultContent(res),
+          'content': (await ToolResultContent.read(
+            tool.name,
+            res?.content ?? '',
+            metadata: res?.metadata,
+            canImageInput: canImageInput,
+          )).claudeContent,
         });
       }
     },
@@ -731,7 +724,7 @@ Stream<StreamChunk> sendClaudeStreamEvents(
     executeAfterRound: !stream,
     emitCalls: !stream,
     onToolCall: onToolCall,
-    append: (executed) {
+    append: (executed) async {
       if (pauseTurn) {
         convo = [
           ...convo,
@@ -746,7 +739,12 @@ Stream<StreamChunk> sendClaudeStreamEvents(
                 <String, dynamic>{
                   'type': 'tool_result',
                   'tool_use_id': item.call.id,
-                  'content': claudeToolResultContent(item.content),
+                  'content': (await ToolResultContent.read(
+                    item.call.name,
+                    item.content,
+                    metadata: item.metadata,
+                    canImageInput: canImageInput,
+                  )).claudeContent,
                 },
             ];
       convo = [
@@ -774,12 +772,10 @@ Uri _vertexClaudeUrl(
 }) {
   final location = (config.location ?? 'us-central1').trim();
   final projectId = (config.projectId ?? '').trim();
-  final host = location.toLowerCase() == 'global'
-      ? 'aiplatform.googleapis.com'
-      : '$location-aiplatform.googleapis.com';
+  final origin = vertexOrigin(config, location);
   final endpoint = stream ? 'streamRawPredict' : 'rawPredict';
   return Uri.parse(
-    'https://$host/v1/projects/$projectId/locations/$location/'
+    '$origin/v1/projects/$projectId/locations/$location/'
     'publishers/anthropic/models/$modelId:$endpoint',
   );
 }
@@ -788,7 +784,7 @@ Future<String?> _vertexAccessToken(ProviderConfig config) async {
   final json = (config.serviceAccountJson ?? '').trim();
   if (json.isEmpty) {
     // 兼容把临时 OAuth token 直接填入 apiKey 的配置。
-    final key = config.apiKey.trim();
+    final key = effectiveApiKey(config).trim();
     return key.isEmpty ? null : key;
   }
   return GoogleServiceAccountAuth.getAccessTokenFromJson(json);

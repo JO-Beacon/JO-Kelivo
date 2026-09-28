@@ -304,7 +304,6 @@ class AssistantProvider extends ChangeNotifier {
     id: const Uuid().v4(),
     name: l10n.assistantProviderDefaultAssistantName,
     systemPrompt: '',
-    thinkingBudget: null,
     temperature: null,
     topP: null,
     limitContextMessages: false,

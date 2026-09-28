@@ -10,9 +10,12 @@ import '../../../../providers/settings_provider.dart';
 import '../../../../utils/multimodal_input_utils.dart';
 import '../../../../../utils/app_directories.dart';
 import '../../../../../utils/markdown_media_sanitizer.dart';
+import '../../../../../utils/mcp_structured_image.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../builtin_tools.dart';
 import '../../chat_api_helpers.dart';
+import '../../tool_result_content.dart';
+import '../../../model_spec/model_spec_resolver.dart';
 import '../../gemini_tool_config.dart';
 import '../../generation/tool_loop_runner.dart';
 import '../../google_service_account_auth.dart';
@@ -262,11 +265,18 @@ void _ensureGeminiFunctionCallThoughtSig(List<Map<String, dynamic>> parts) {
   }
 }
 
-Map<String, dynamic> _googleFunctionResponsePartFromToolMessage(
-  Map<String, dynamic> message,
-) {
+Future<List<Map<String, dynamic>>> _googleFunctionResponsePartsFromToolMessage(
+  Map<String, dynamic> message, {
+  required bool canImageInput,
+}) async {
   final name = (message['name'] ?? '').toString();
-  final content = (message['content'] ?? '').toString();
+  final result = await ToolResultContent.read(
+    name,
+    (message['content'] ?? '').toString(),
+    metadata: (message['metadata'] as Map?)?.cast<String, dynamic>(),
+    canImageInput: canImageInput,
+  );
+  final content = result.text;
   Map<String, dynamic> response;
   try {
     response = (jsonDecode(content) as Map).cast<String, dynamic>();
@@ -283,7 +293,7 @@ Map<String, dynamic> _googleFunctionResponsePartFromToolMessage(
   if (id != null && id.isNotEmpty) {
     (part['functionResponse'] as Map<String, dynamic>)['id'] = id;
   }
-  return part;
+  return [part, ...result.googleImageParts];
 }
 
 List<Map<String, dynamic>> _googleApiContents(
@@ -311,14 +321,6 @@ Map<String, dynamic>? _googleApiPart(Map part) {
   // 保留签名与其他字段的 part 即便文本为空也照常保留。
   if (out.length == 1 && out['text'] == '') return null;
   return out;
-}
-
-int? _defaultGeminiMaxOutputTokens(String upstreamModelId) {
-  final flashMinor = _gemini3FlashMinor(upstreamModelId);
-  if (flashMinor != null && flashMinor >= _gemini3FlashModernMinor) {
-    return 65536;
-  }
-  return null;
 }
 
 bool _shouldRequestGoogleThoughts(
@@ -454,7 +456,10 @@ Stream<StreamChunk> sendGoogleStreamEvents(
       if (roleRaw == 'tool') {
         contents.add({
           'role': 'user',
-          'parts': [_googleFunctionResponsePartFromToolMessage(msg)],
+          'parts': await _googleFunctionResponsePartsFromToolMessage(
+            msg,
+            canImageInput: effective.input.contains(Modality.image),
+          ),
         });
         continue;
       }
@@ -660,9 +665,9 @@ Stream<StreamChunk> sendGoogleStreamEvents(
     final thinkingConfig = isReasoning
         ? _googleThinkingConfig(upstreamModelId, thinkingBudget)
         : const <String, dynamic>{};
-    final defaultMaxOutputTokens = _defaultGeminiMaxOutputTokens(
-      upstreamModelId,
-    );
+    final defaultMaxOutputTokens = ModelSpecResolver.instance
+        .spec(config, modelId)
+        .maxOutput;
     final omitSamplingParams = _shouldOmitGeminiSamplingParams(upstreamModelId);
     final generationConfig = <String, dynamic>{
       if (maxTokens ?? defaultMaxOutputTokens case final resolvedMaxTokens?)
@@ -841,7 +846,16 @@ Stream<StreamChunk> sendGoogleStreamEvents(
       executeAfterRound: true,
       emitCalls: true,
       onToolCall: onToolCall,
-      append: (executed) {
+      append: (executed) async {
+        final results = [
+          for (final item in executed)
+            await ToolResultContent.read(
+              item.call.name,
+              item.content,
+              metadata: item.metadata,
+              canImageInput: effective.input.contains(Modality.image),
+            ),
+        ];
         currentContents = [
           ...currentContents,
           {'role': 'model', 'parts': lastParts},
@@ -852,7 +866,7 @@ Stream<StreamChunk> sendGoogleStreamEvents(
                 <String, dynamic>{
                   'functionResponse': {
                     'name': executed[i].call.name,
-                    'response': {'result': executed[i].content},
+                    'response': {'result': results[i].text},
                     if (i < lastFunctionCallParts.length &&
                         lastFunctionCallParts[i] is Map &&
                         ((lastFunctionCallParts[i] as Map)['functionCall']
@@ -864,6 +878,7 @@ Stream<StreamChunk> sendGoogleStreamEvents(
                               as Map)['id'],
                   },
                 },
+              for (final result in results) ...result.googleImageParts,
             ],
           },
         ];
@@ -919,7 +934,10 @@ Stream<StreamChunk> sendGoogleStreamEvents(
     if (roleRaw == 'tool') {
       contents.add({
         'role': 'user',
-        'parts': [_googleFunctionResponsePartFromToolMessage(msg)],
+        'parts': await _googleFunctionResponsePartsFromToolMessage(
+          msg,
+          canImageInput: effective.input.contains(Modality.image),
+        ),
       });
       continue;
     }
@@ -1129,9 +1147,9 @@ Stream<StreamChunk> sendGoogleStreamEvents(
       lastRoundCalls = [];
       lastRoundModelParts = [];
       retryMalformed = false;
-      final defaultMaxOutputTokens = _defaultGeminiMaxOutputTokens(
-        upstreamModelId,
-      );
+      final defaultMaxOutputTokens = ModelSpecResolver.instance
+          .spec(config, modelId)
+          .maxOutput;
       final omitSamplingParams = _shouldOmitGeminiSamplingParams(
         upstreamModelId,
       );
@@ -1283,7 +1301,7 @@ Stream<StreamChunk> sendGoogleStreamEvents(
               decoder.isClientFunctionCall(chunk.id) &&
               onToolCall != null) {
             final call = decoder.functionCallById(chunk.id)!;
-            if (call.result.isEmpty) {
+            if (call.result == null) {
               final emitCall = emitToolCall(
                 id: call.id,
                 name: call.name,
@@ -1307,7 +1325,10 @@ Stream<StreamChunk> sendGoogleStreamEvents(
                 totalTokens: decoder.usage?.totalTokens ?? 0,
               )) {
                 if (resultChunk is ToolCallResult) {
-                  call.result = (resultChunk.output ?? '').toString();
+                  call.result = ClientToolResult(
+                    (resultChunk.output ?? '').toString(),
+                    metadata: resultChunk.metadata,
+                  );
                 }
                 yield resultChunk;
               }
@@ -1411,14 +1432,21 @@ Stream<StreamChunk> sendGoogleStreamEvents(
     continueWithoutCalls: () => retryMalformed,
     executeAfterRound: false,
     onToolCall: onToolCall,
-    append: (executed) {
+    append: (executed) async {
       if (retryMalformed) return;
       if (isGemini3) {
         convo.add({'role': 'model', 'parts': lastRoundModelParts});
         final responseParts = <Map<String, dynamic>>[];
         for (final c in lastRoundCalls) {
           final name = (c['name'] ?? '').toString();
-          final resText = (c['result'] ?? '').toString();
+          final toolResult = c['result'] as ClientToolResult?;
+          final result = await ToolResultContent.read(
+            name,
+            toolResult?.content ?? '',
+            metadata: toolResult?.metadata,
+            canImageInput: effective.input.contains(Modality.image),
+          );
+          final resText = result.text;
           final apiId = c['apiId'] as String?;
           Map<String, dynamic> responseObj;
           try {
@@ -1433,6 +1461,7 @@ Stream<StreamChunk> sendGoogleStreamEvents(
               if (apiId != null) 'id': apiId,
             },
           });
+          responseParts.addAll(result.googleImageParts);
         }
         convo.add({'role': 'user', 'parts': responseParts});
         return;
@@ -1441,7 +1470,14 @@ Stream<StreamChunk> sendGoogleStreamEvents(
         final name = (c['name'] ?? '').toString();
         final args =
             (c['args'] as Map<String, dynamic>? ?? const <String, dynamic>{});
-        final resText = (c['result'] ?? '').toString();
+        final toolResult = c['result'] as ClientToolResult?;
+        final result = await ToolResultContent.read(
+          name,
+          toolResult?.content ?? '',
+          metadata: toolResult?.metadata,
+          canImageInput: effective.input.contains(Modality.image),
+        );
+        final resText = result.text;
         final thoughtSigKey = c['thoughtSigKey'] as String?;
         final thoughtSigVal = c['thoughtSigVal'];
 
@@ -1468,6 +1504,7 @@ Stream<StreamChunk> sendGoogleStreamEvents(
             {
               'functionResponse': {'name': name, 'response': responseObj},
             },
+            ...result.googleImageParts,
           ],
         });
       }
@@ -1486,7 +1523,7 @@ Future<String?> maybeVertexAccessToken(ProviderConfig cfg) async {
   final jsonStr = (cfg.serviceAccountJson ?? '').trim();
   if (jsonStr.isEmpty) {
     // 兼容把临时 OAuth token 直接填入 apiKey 的配置。
-    final key = cfg.apiKey.trim();
+    final key = effectiveApiKey(cfg).trim();
     return key.isEmpty ? null : key;
   }
   return GoogleServiceAccountAuth.getAccessTokenFromJson(jsonStr);
@@ -1529,4 +1566,28 @@ bool shouldAttachVertexMediaAuth(Uri uri) {
       host == 'googleusercontent.com' ||
       host.endsWith('.googleusercontent.com') ||
       host == 'storage.cloud.google.com';
+}
+
+/// 官方 Vertex 主机跟随 [loc]（global、`us` / `eu` 多区域，或单区域）；
+/// 自定义的 [ProviderConfig.baseUrl]（测试、网关）则原样作为 origin。
+String vertexOrigin(ProviderConfig config, String loc) {
+  final raw = config.baseUrl.trim();
+  final host = (Uri.tryParse(raw)?.host ?? '').toLowerCase();
+  // 把 Gemini 供应商切到 Vertex 后仍带着 Gemini API 的 baseUrl。
+  final official =
+      host.isEmpty ||
+      host == 'generativelanguage.googleapis.com' ||
+      host == 'aiplatform.googleapis.com' ||
+      host.endsWith('-aiplatform.googleapis.com') ||
+      RegExp(r'^aiplatform\.[a-z]+\.rep\.googleapis\.com$').hasMatch(host);
+  if (official) {
+    final l = loc.toLowerCase();
+    final regional = switch (l) {
+      'global' => 'aiplatform.googleapis.com',
+      'us' || 'eu' => 'aiplatform.$l.rep.googleapis.com',
+      _ => '$l-aiplatform.googleapis.com',
+    };
+    return 'https://$regional';
+  }
+  return raw.endsWith('/') ? raw.substring(0, raw.length - 1) : raw;
 }

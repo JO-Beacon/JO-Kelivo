@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../../../../../utils/utf16_safe_cut.dart';
+import '../../../../../utils/mcp_structured_image.dart';
 
 import '../../../../models/token_usage.dart';
 import '../../stream/sse_event.dart';
@@ -32,7 +33,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
   final List<Map<String, dynamic>> assistantBlocks = <Map<String, dynamic>>[];
   final Map<String, ClaudeClientTool> clientTools =
       <String, ClaudeClientTool>{};
-  final Map<String, String> toolResults = <String, String>{};
+  final Map<String, ClientToolResult> toolResults = {};
 
   TokenUsage? _round;
 
@@ -73,8 +74,8 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
 
   bool isClientTool(String id) => clientTools.containsKey(id);
 
-  void recordToolResult(String id, String content) {
-    toolResults[id] = content;
+  void recordToolResult(String id, ClientToolResult result) {
+    toolResults[id] = result;
   }
 
   /// 从完整的非流式响应中提取托管调用。

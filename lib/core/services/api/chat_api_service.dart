@@ -2,11 +2,10 @@ import '../auth/provider_oauth_service.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:dio/dio.dart';
-import 'package:http/http.dart' as http;
 import '../../providers/settings_provider.dart';
 import '../../providers/model_provider.dart';
 import '../../models/token_usage.dart';
-import '../network/dio_http_client.dart';
+import '../network/provider_http_client.dart';
 import '../../../utils/unicode_sanitizer.dart';
 import '../logging/context_log_models.dart';
 import '../logging/flutter_logger.dart';
@@ -179,29 +178,6 @@ class ChatApiService {
         },
       },
     );
-  }
-
-  static http.Client _clientFor(ProviderConfig cfg, CancelToken cancelToken) {
-    final enabled = cfg.proxyEnabled == true;
-    final host = (cfg.proxyHost ?? '').trim();
-    final portStr = (cfg.proxyPort ?? '').trim();
-    final user = (cfg.proxyUsername ?? '').trim();
-    final pass = (cfg.proxyPassword ?? '').trim();
-    if (enabled && host.isNotEmpty && portStr.isNotEmpty) {
-      final port = int.tryParse(portStr) ?? 8080;
-      return DioHttpClient(
-        proxy: NetworkProxyConfig(
-          enabled: true,
-          type: ProviderConfig.resolveProxyType(cfg.proxyType),
-          host: host,
-          port: port,
-          username: user.isEmpty ? null : user,
-          password: pass.isEmpty ? null : pass,
-        ),
-        cancelToken: cancelToken,
-      );
-    }
-    return DioHttpClient(cancelToken: cancelToken);
   }
 
   /// 兼容入口：把现有供应商流式结果转换为 provider-independent 事件。
@@ -407,7 +383,7 @@ class ChatApiService {
       final safeMessages = _sanitizeMessages(messages);
       // 账号登录的请求要带上有效的令牌（失效时自动续期）。
       final client = ProviderOAuthService.instance.authenticatedClient(
-        _clientFor(config, cancelToken),
+        providerHttpClient(config, cancelToken: cancelToken),
         config,
       );
       try {
@@ -456,7 +432,7 @@ class ChatApiService {
           : userImagePaths;
       // 账号登录的请求要带上有效的令牌（失效时自动续期）。
       final client = ProviderOAuthService.instance.authenticatedClient(
-        _clientFor(config, cancelToken),
+        providerHttpClient(config, cancelToken: cancelToken),
         config,
       );
       try {
@@ -508,7 +484,7 @@ class ChatApiService {
           : userImagePaths;
       // 账号登录的请求要带上有效的令牌（失效时自动续期）。
       final client = ProviderOAuthService.instance.authenticatedClient(
-        _clientFor(config, cancelToken),
+        providerHttpClient(config, cancelToken: cancelToken),
         config,
       );
       try {

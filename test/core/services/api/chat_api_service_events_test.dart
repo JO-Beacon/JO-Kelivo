@@ -279,7 +279,9 @@ void main() {
         enabled: true,
         name: 'VertexClaudeEventsTest',
         apiKey: 'vertex-token',
-        baseUrl: 'https://unused.invalid',
+        // 自定义 baseUrl 现在会被当作 origin（网关/测试），这里给官方区域主机
+        // 以验证区域主机的拼装。
+        baseUrl: 'https://us-central1-aiplatform.googleapis.com',
         providerType: ProviderKind.google,
         vertexAI: true,
         location: 'us-central1',

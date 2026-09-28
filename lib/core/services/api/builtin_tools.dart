@@ -1,3 +1,5 @@
+import '../../models/model_spec.dart';
+import '../model_spec/model_spec_resolver.dart';
 import '../../providers/settings_provider.dart';
 
 class BuiltInToolsRequestPayload {
@@ -889,7 +891,15 @@ abstract class BuiltInToolsHelper {
     return kind == ProviderKind.google || kind == ProviderKind.openai;
   }
 
-  static Set<String> modelSettingsToolNames(ProviderConfig cfg) {
+  static Set<String> modelSettingsToolNames(
+    ProviderConfig cfg, {
+    String? modelId,
+  }) {
+    if (modelId != null &&
+        modelId.trim().isNotEmpty &&
+        ModelSpecResolver.instance.spec(cfg, modelId).type != ModelType.chat) {
+      return const <String>{};
+    }
     final kind = ProviderConfig.classify(
       cfg.id,
       explicitType: cfg.providerType,
@@ -923,8 +933,9 @@ abstract class BuiltInToolsHelper {
     required ProviderConfig cfg,
     required Iterable<String> current,
     required Iterable<String> selected,
+    String? modelId,
   }) {
-    final editable = modelSettingsToolNames(cfg);
+    final editable = modelSettingsToolNames(cfg, modelId: modelId);
     final result = BuiltInToolNames.parseAndNormalize(current);
     result.removeAll(editable);
     result.addAll(

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
+import '../../../core/models/model_types.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/environment_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
@@ -12,6 +13,7 @@ import '../../../core/providers/memory_provider_v2.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/tts_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/chat_api_helpers.dart' show effectiveModelInfo;
 import '../../../core/services/api/json_schema_utils.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
@@ -318,7 +320,19 @@ class ToolHandlerService {
     toolDefs.addAll(mcpTools);
 
     if (supportsTools && workspaceContext != null) {
-      toolDefs.addAll(_workspaceTools().buildToolDefinitions(workspaceContext));
+      final canImageInput = effectiveModelInfo(
+        settings.getProviderConfig(providerKey),
+        modelId,
+      ).input.contains(Modality.image);
+      toolDefs.addAll(
+        _workspaceTools()
+            .buildToolDefinitions(workspaceContext)
+            .where(
+              (definition) =>
+                  canImageInput ||
+                  (definition['function'] as Map)['name'] != 'view_image',
+            ),
+      );
     }
 
     final overrides = settings.toolSchemaOverrides;

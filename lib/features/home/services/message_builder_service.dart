@@ -2362,6 +2362,12 @@ class MessageBuilderService {
   /// 将本地 Markdown 图片链接转换为模型上下文可用的行内 base64。
   Future<void> inlineLocalImages(List<Map<String, dynamic>> apiMessages) async {
     for (int i = 0; i < apiMessages.length; i++) {
+      // view_image 的快照在供应商边界由成功的工具结果元数据解析。
+      // 错误文本里可能含有不可信的图片链接，不能据此读文件。
+      if (apiMessages[i]['role'] == 'tool' &&
+          apiMessages[i]['name'] == 'view_image') {
+        continue;
+      }
       final s = (apiMessages[i]['content'] ?? '').toString();
       if (s.isNotEmpty) {
         apiMessages[i]['content'] =

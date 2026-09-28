@@ -24,6 +24,7 @@ import '../models/auto_retry_options.dart';
 import '../models/backup.dart';
 import '../models/compress_context_options.dart';
 import '../models/provider_group.dart';
+import '../models/reasoning_request.dart';
 import '../models/tool_schema_override.dart';
 import '../services/app_exit_flush.dart';
 import '../services/haptics.dart';
@@ -98,6 +99,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _themeModeKey = 'theme_mode_v1';
   static const String _providerConfigsKey = 'provider_configs_v1';
   static const String _pinnedModelsKey = 'pinned_models_v1';
+  static const String _reasoningChoiceByModelKey =
+      'reasoning_choice_by_model_v1';
   static const String _selectedModelKey = 'selected_model_v1';
   static const String _perChatModelEnabledKey = 'per_chat_model_enabled_v1';
   static const String _titleModelKey = 'title_model_v1';
@@ -1262,6 +1265,9 @@ class SettingsProvider extends ChangeNotifier {
     }
     _toolSchemaOverrides = _decodeToolSchemaOverrides(
       prefs.getString(_toolSchemaOverridesKey),
+    );
+    _reasoningChoiceByModel = _decodeReasoningChoiceByModel(
+      prefs.getString(_reasoningChoiceByModelKey),
     );
     _mobileAssistantEditTabOrder = List.unmodifiable(
       prefs.getStringList(_mobileAssistantEditTabOrderKey) ?? const <String>[],
@@ -3394,6 +3400,71 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setStringList(_providersOrderKey, _providersOrder);
     await prefs.setString(_providerGroupMapKey, jsonEncode(_providerGroupMap));
     notifyListeners();
+  }
+
+  // 逐模型推理档位选择。
+  Map<String, ReasoningRequest> _reasoningChoiceByModel =
+      <String, ReasoningRequest>{};
+
+  static String reasoningChoiceKey(String providerKey, String modelId) =>
+      '$providerKey::$modelId';
+
+  ReasoningRequest? reasoningChoiceFor(String providerKey, String modelId) {
+    return _reasoningChoiceByModel[reasoningChoiceKey(providerKey, modelId)];
+  }
+
+  Future<void> setReasoningChoice(
+    String providerKey,
+    String modelId,
+    ReasoningRequest? choice,
+  ) async {
+    final key = reasoningChoiceKey(providerKey, modelId);
+    final next = Map<String, ReasoningRequest>.from(_reasoningChoiceByModel);
+    if (choice == null) {
+      if (!next.containsKey(key)) return;
+      next.remove(key);
+    } else if (next[key] == choice) {
+      return;
+    } else {
+      next[key] = choice;
+    }
+    _reasoningChoiceByModel = next;
+    notifyListeners();
+    await _persistReasoningChoiceByModel();
+  }
+
+  Future<void> _persistReasoningChoiceByModel() async {
+    final prefs = _preferences;
+    if (_reasoningChoiceByModel.isEmpty) {
+      await prefs.remove(_reasoningChoiceByModelKey);
+      return;
+    }
+    await prefs.setString(
+      _reasoningChoiceByModelKey,
+      jsonEncode({
+        for (final e in _reasoningChoiceByModel.entries)
+          e.key: e.value.toJson(),
+      }),
+    );
+  }
+
+  static Map<String, ReasoningRequest> _decodeReasoningChoiceByModel(
+    String? raw,
+  ) {
+    if (raw == null || raw.isEmpty) return <String, ReasoningRequest>{};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return <String, ReasoningRequest>{};
+      final out = <String, ReasoningRequest>{};
+      for (final entry in decoded.entries) {
+        final value = entry.value;
+        if (value is! Map) continue;
+        out[entry.key.toString()] = ReasoningRequest.fromJson(value);
+      }
+      return out;
+    } catch (_) {
+      return <String, ReasoningRequest>{};
+    }
   }
 
   // 收藏（置顶模型）
@@ -6348,6 +6419,10 @@ class ProviderConfig {
     final name = config.name.trim().toLowerCase();
     return id.contains('deepseek') || name.contains('deepseek');
   }
+
+  /// 上游（1.3.0 后续）使用的名字；保留 [isDeepSeek] 作为本仓库旧调用点。
+  static bool isDeepSeekConfig(ProviderConfig? config) =>
+      config != null && isDeepSeek(config);
 
   static String _defaultBase(String key) {
     final k = key.toLowerCase();

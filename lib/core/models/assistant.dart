@@ -3,6 +3,8 @@ import 'assistant_regex.dart';
 import 'preset_message.dart';
 import 'avatar_transform.dart';
 import 'health_data_type.dart';
+import 'reasoning_request.dart';
+import 'model_spec.dart' show ReasoningLevel;
 
 enum MemorySmartAddMode { batched, perItem }
 
@@ -46,7 +48,37 @@ class Assistant {
   final int contextMessageSize; // 要包含的先前消息数量
   final bool limitContextMessages; // 是否强制执行 contextMessageSize
   final bool streamOutput; // 是否使用流式响应
-  final int? thinkingBudget; // null = 使用全局/默认值；0 = 关闭；>0 = token 预算
+  final ReasoningRequest? reasoning; // null = 无助手默认档位
+
+  /// 兼容旧调用点的临时垫片：由 [reasoning] 折算回旧的整数预算。
+  /// S5 将调用点改到 [reasoning] 后删除。
+  int? get thinkingBudget {
+    final r = reasoning;
+    if (r == null) return null;
+    if (r.budgetTokens != null) return r.budgetTokens;
+    return switch (r.level) {
+      ReasoningLevel.off => 0,
+      ReasoningLevel.auto => -1,
+      _ => null,
+    };
+  }
+
+  static ReasoningRequest? _reasoningFromLegacyBudget(int? budget) {
+    if (budget == null) return null;
+    if (budget == 0) return ReasoningRequest.off;
+    if (budget < 0) return ReasoningRequest.auto;
+    // 与旧 openAIEffortForBudget 的阀值一致，保留 xhigh / max 区分。
+    final level = budget >= 128000
+        ? ReasoningLevel.max
+        : budget >= 64000
+        ? ReasoningLevel.xhigh
+        : budget <= 2000
+        ? ReasoningLevel.low
+        : budget <= 20000
+        ? ReasoningLevel.medium
+        : ReasoningLevel.high;
+    return ReasoningRequest(level, budgetTokens: budget);
+  }
   final int? maxTokens; // null = 不限制
   final String systemPrompt;
 
@@ -116,7 +148,7 @@ class Assistant {
     this.contextMessageSize = 64,
     this.limitContextMessages = false,
     this.streamOutput = true,
-    this.thinkingBudget,
+    this.reasoning,
     this.maxTokens,
     this.systemPrompt = '',
     this.allowConversationSystemPrompt = false,
@@ -166,6 +198,7 @@ class Assistant {
     int? contextMessageSize,
     bool? limitContextMessages,
     bool? streamOutput,
+    ReasoningRequest? reasoning,
     int? thinkingBudget,
     int? maxTokens,
     String? systemPrompt,
@@ -206,6 +239,7 @@ class Assistant {
     bool clearAvatarTransform = false,
     bool clearTemperature = false,
     bool clearTopP = false,
+    bool clearReasoning = false,
     bool clearThinkingBudget = false,
     bool clearMaxTokens = false,
     bool clearBackground = false,
@@ -228,9 +262,13 @@ class Assistant {
       contextMessageSize: contextMessageSize ?? this.contextMessageSize,
       limitContextMessages: limitContextMessages ?? this.limitContextMessages,
       streamOutput: streamOutput ?? this.streamOutput,
-      thinkingBudget: clearThinkingBudget
+      reasoning: clearReasoning
           ? null
-          : (thinkingBudget ?? this.thinkingBudget),
+          : (clearThinkingBudget
+                ? null
+                : (reasoning ??
+                      _reasoningFromLegacyBudget(thinkingBudget) ??
+                      this.reasoning)),
       maxTokens: clearMaxTokens ? null : (maxTokens ?? this.maxTokens),
       systemPrompt: systemPrompt ?? this.systemPrompt,
       allowConversationSystemPrompt:
@@ -305,7 +343,7 @@ class Assistant {
     'contextMessageSize': contextMessageSize,
     'limitContextMessages': limitContextMessages,
     'streamOutput': streamOutput,
-    'thinkingBudget': thinkingBudget,
+    'reasoning': reasoning?.toJson(),
     'maxTokens': maxTokens,
     'systemPrompt': systemPrompt,
     'allowConversationSystemPrompt': allowConversationSystemPrompt,
@@ -340,6 +378,18 @@ class Assistant {
     'regexRules': regexRules.map((e) => e.toJson()).toList(),
   };
 
+  static ReasoningRequest? _readReasoning(Object? value) {
+    if (value is Map) return ReasoningRequest.fromJson(value);
+    // 老数据兼容：旧字段 thinkingBudget 是整数预算。
+    if (value is num) {
+      final budget = value.toInt();
+      if (budget == 0) return ReasoningRequest.off;
+      if (budget < 0) return ReasoningRequest.auto;
+      return ReasoningRequest(ReasoningLevel.auto, budgetTokens: budget);
+    }
+    return null;
+  }
+
   static double _readGradientBackgroundPhase(Object? value) =>
       value is num && value.isFinite && value >= 0
       ? value.toDouble()
@@ -359,7 +409,7 @@ class Assistant {
     contextMessageSize: (json['contextMessageSize'] as num?)?.toInt() ?? 64,
     limitContextMessages: json['limitContextMessages'] as bool? ?? false,
     streamOutput: json['streamOutput'] as bool? ?? true,
-    thinkingBudget: (json['thinkingBudget'] as num?)?.toInt(),
+    reasoning: _readReasoning(json['reasoning'] ?? json['thinkingBudget']),
     maxTokens: (json['maxTokens'] as num?)?.toInt(),
     systemPrompt: (json['systemPrompt'] as String?) ?? '',
     allowConversationSystemPrompt:

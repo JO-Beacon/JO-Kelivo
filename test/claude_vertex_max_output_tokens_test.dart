@@ -98,7 +98,7 @@ void main() {
   });
 
   group('这条规则只在 Vertex 端点生效', () {
-    test('官方 Anthropic 端点上的 3.5 sonnet 仍按通用规则发 64000', () async {
+    test('官方 Anthropic 端点按模型规格发 max_tokens', () async {
       Map<String, dynamic>? requestBody;
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() async {
@@ -140,8 +140,8 @@ void main() {
 
       final body = requestBody;
       expect(body, isNotNull);
-      // Vertex 上这款模型只允许 8192；官方端点走通用规则，这里是 64000。
-      expect(body!['max_tokens'], 64000);
+      // 现在按 ModelSpec 的模型上限发：claude-3-5-sonnet 的实际上限为 8192。
+      expect(body!['max_tokens'], 8192);
     });
   });
 }

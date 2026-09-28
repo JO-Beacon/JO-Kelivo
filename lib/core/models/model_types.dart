@@ -1,11 +1,15 @@
 import 'package:flutter/foundation.dart';
 
-enum ModelType { chat, embedding }
+import 'model_spec.dart';
 
-enum Modality { text, image }
+// 模型类型/模态/能力枚举的唯一来源已迁到 model_spec.dart（与上游一致）。
+// 这里只做转出，供尚未迁移的旧调用点继续引用。
+export 'model_spec.dart' show ModelType, Modality, ModelAbility;
 
-enum ModelAbility { tool, reasoning }
-
+/// 旧版「模型信息」结构。
+///
+/// 上游已用 [ModelSpec] 取代它；本文件保留它只是为了让尚未迁移的调用点
+/// 在 S4 期间继续编译，待请求层全部切到 ModelSpec 后删除。
 @immutable
 class ModelInfo {
   final String id;
