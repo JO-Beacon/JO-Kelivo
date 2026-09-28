@@ -380,6 +380,16 @@ class HomePageController extends ChangeNotifier {
     );
   }
 
+  /// 分支节点 ID 集合：直接父消息是分叉锚点，或存在多个根时的根消息。
+  ///
+  /// 分支删除项按树结构判定，而不是按派生出的兄弟分支表：
+  /// 锚点降级后派生表可能为空，但消息仍然是分支节点。
+  Set<String> get branchNodeMessageIds {
+    final tree = _viewModel.conversationTree;
+    if (tree == null) return const <String>{};
+    return Set<String>.unmodifiable(tree.edges.keys.where(tree.isBranchNode));
+  }
+
   List<ChatMessage> _filterActivePath(Iterable<ChatMessage> source) {
     final tree = _viewModel.conversationTree;
     if (tree == null) return source.toList(growable: false);

@@ -134,6 +134,10 @@ class MessageListView extends StatefulWidget {
     /// 会不会连带删掉别处仍在引用的节点。
     this.messageIdsWithChildren = const <String>{},
 
+    /// 分支节点 ID 集合（直接父消息是分叉锚点，或存在多个根时的根消息）。
+    /// 分支删除项按树结构判定，避免锚点降级后派生兄弟表为空而误判。
+    this.branchNodeMessageIds = const <String>{},
+
     /// 内容最大宽度。桌面端用它约束消息气泡的横向伸展。
     this.maxContentWidth = ChatLayoutConstants.maxContentWidth,
 
@@ -251,6 +255,9 @@ class MessageListView extends StatefulWidget {
 
   /// 有子消息的消息 ID 集合（本仓库树模型自有）。
   final Set<String> messageIdsWithChildren;
+
+  /// 分支节点 ID 集合（本仓库树模型自有）。
+  final Set<String> branchNodeMessageIds;
 
   /// 内容最大宽度（本仓库自有，桌面端约束气泡宽度）。
   final double? maxContentWidth;
@@ -2138,10 +2145,11 @@ class _MessageListViewState extends State<MessageListView> {
     // “版本”相关的语义与之等价（同一位置可选几条）。
     final siblingBranchIds =
         widget.siblingBranchIdsByMessageId[message.id] ?? const <String>[];
+    final isBranchNode = widget.branchNodeMessageIds.contains(message.id);
     final useBranchSelector = siblingBranchIds.length > 1;
+    // §4.1 / §4.2：「删除此消息」与「删除此消息及后续」只适用于非分支节点。
     final canDeleteMessageAndFollowing =
-        !useBranchSelector &&
-        widget.messageIdsWithChildren.contains(message.id);
+        !isBranchNode && widget.messageIdsWithChildren.contains(message.id);
     final selectedBranchIndex = useBranchSelector
         ? siblingBranchIds.indexOf(widget.activeBranchId ?? '')
         : 0;
@@ -2445,11 +2453,11 @@ class _MessageListViewState extends State<MessageListView> {
     List<int>? toolCountAtSplit,
     RetryStatus? retryStatus,
   }) {
+    final isBranchNode = widget.branchNodeMessageIds.contains(message.id);
     final currentIdx = useBranchSelector ? selectedBranchIndex : 0;
-    // “删除所有分支”只在当前节点确实还有子节点时才有意义：
-    // 叶子节点删掉整条分支就等同于删掉自己，入口应收起。
+    // §4.5：「删除所有分支」必须是分支节点且必须不是叶子分支节点。
     final canDeleteAllVersions =
-        useBranchSelector && widget.messageIdsWithChildren.contains(message.id);
+        isBranchNode && widget.messageIdsWithChildren.contains(message.id);
     return ChatMessageWidget(
       message: message,
       enableStreamingTextMotion: enableStreamingTextMotion,
@@ -2546,9 +2554,9 @@ class _MessageListViewState extends State<MessageListView> {
           context,
           message,
           canDeleteAllVersions: canDeleteAllVersions,
-          canDeleteCurrentBranch: siblingBranchIds.length > 1,
-          canDeleteMessageNode: siblingBranchIds.length > 1,
-          canDeleteMessageOnly: !useBranchSelector,
+          canDeleteCurrentBranch: isBranchNode,
+          canDeleteMessageNode: isBranchNode,
+          canDeleteMessageOnly: !isBranchNode,
           canDeleteMessageAndFollowing: canDeleteMessageAndFollowing,
           canCreateBranch: widget.onMessageFork != null,
           canCreateConversationFork: widget.onConversationFork != null,

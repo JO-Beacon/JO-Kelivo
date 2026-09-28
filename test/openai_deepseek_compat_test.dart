@@ -302,7 +302,7 @@ void main() {
     });
 
     test(
-      'xhigh reasoning keeps thinking enabled and maps to high effort',
+      'xhigh reasoning keeps thinking enabled and is sent as xhigh',
       () async {
         final requests = <Map<String, dynamic>>[];
 
@@ -351,7 +351,7 @@ void main() {
         expect(chunks.isGenerationDone, isTrue);
         expect(requests, hasLength(1));
         expect(requests.single['thinking'], {'type': 'enabled'});
-        expect(requests.single['reasoning_effort'], 'high');
+        expect(requests.single['reasoning_effort'], 'xhigh');
       },
     );
 

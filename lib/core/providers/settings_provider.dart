@@ -128,7 +128,6 @@ class SettingsProvider extends ChangeNotifier {
   static const String _legacyCustomSeedColorKey = 'theme_custom_seed_v1';
   static const String _legacyCustomPrimaryOverrideKey =
       'theme_custom_primary_v1';
-  static const String _thinkingBudgetKey = 'thinking_budget_v1';
   static const String _titleGenerationThinkingEnabledKey =
       'title_generation_thinking_enabled_v1';
   static const String _summaryGenerationThinkingEnabledKey =
@@ -565,134 +564,6 @@ class SettingsProvider extends ChangeNotifier {
     return resolveApiModelIdOverride(ov, modelId);
   }
 
-  bool supportsXhighReasoning(String providerKey, String modelId) {
-    final cfg = getProviderConfig(providerKey);
-    final kind = ProviderConfig.classify(
-      cfg.id,
-      explicitType: cfg.providerType,
-    );
-    switch (kind) {
-      case ProviderKind.openai:
-        final modelForCheck = resolveOpenAIUpstreamModelId(
-          providerKey,
-          modelId,
-        );
-        return openAISupportsXhighReasoning(modelForCheck);
-      case ProviderKind.claude:
-        final rawOv = cfg.modelOverrides[modelId];
-        final ov = rawOv is Map ? rawOv.cast<String, dynamic>() : null;
-        final modelForCheck = resolveApiModelIdOverride(ov, modelId);
-        return !_isDeepSeekClaudeCompatible(cfg, modelForCheck) &&
-            _claudeSupportsXhighReasoning(modelForCheck);
-      case ProviderKind.google:
-        return false;
-    }
-  }
-
-  bool supportsMaxReasoning(String providerKey, String modelId) {
-    final cfg = getProviderConfig(providerKey);
-    final kind = ProviderConfig.classify(
-      cfg.id,
-      explicitType: cfg.providerType,
-    );
-    switch (kind) {
-      case ProviderKind.openai:
-        final modelForCheck = resolveOpenAIUpstreamModelId(
-          providerKey,
-          modelId,
-        );
-        return openAISupportsMaxReasoning(modelForCheck);
-      case ProviderKind.google:
-        return false;
-      case ProviderKind.claude:
-        final rawOv = cfg.modelOverrides[modelId];
-        final ov = rawOv is Map ? rawOv.cast<String, dynamic>() : null;
-        final modelForCheck = resolveApiModelIdOverride(ov, modelId);
-        return _isDeepSeekClaudeCompatible(cfg, modelForCheck) ||
-            _claudeSupportsMaxReasoning(modelForCheck);
-    }
-  }
-
-  bool supportsOpenAIXhighReasoning(String providerKey, String modelId) {
-    return supportsXhighReasoning(providerKey, modelId);
-  }
-
-  bool _claudeSupportsXhighReasoning(String modelId) {
-    final lower = modelId.trim().toLowerCase();
-    if (!lower.contains('claude-')) return false;
-    if (lower.contains('fable') || lower.contains('mythos')) return true;
-    if (RegExp(
-      r'claude-(?:opus|sonnet)-5(?:$|[._:@/-])',
-      caseSensitive: false,
-    ).hasMatch(lower)) {
-      return true;
-    }
-    final m = RegExp(
-      r'claude-(opus|sonnet)-(\d+)[-.](\d+)',
-      caseSensitive: false,
-    ).firstMatch(lower);
-    if (m == null) {
-      return lower.contains('claude-opus-4-7') ||
-          lower.contains('claude-opus-4.7') ||
-          lower.contains('claude-opus-4-8') ||
-          lower.contains('claude-opus-4.8');
-    }
-    final family = (m.group(1) ?? '').toLowerCase();
-    final major = int.tryParse(m.group(2) ?? '');
-    final minor = int.tryParse(m.group(3) ?? '');
-    if (major == null || minor == null) return false;
-    if (family == 'opus' && (major > 4 || (major == 4 && minor >= 7))) {
-      return true;
-    }
-    return false;
-  }
-
-  bool _claudeSupportsMaxReasoning(String modelId) {
-    final lower = modelId.trim().toLowerCase();
-    if (!lower.contains('claude-')) return false;
-    if (lower.contains('fable') || lower.contains('mythos')) return true;
-    if (RegExp(
-      r'claude-(?:opus|sonnet)-5(?:$|[._:@/-])',
-      caseSensitive: false,
-    ).hasMatch(lower)) {
-      return true;
-    }
-    final m = RegExp(
-      r'claude-(opus|sonnet)-(\d+)[-.](\d+)',
-      caseSensitive: false,
-    ).firstMatch(lower);
-    if (m == null) {
-      return lower.contains('claude-opus-4-7') ||
-          lower.contains('claude-opus-4.7') ||
-          lower.contains('claude-opus-4-8') ||
-          lower.contains('claude-opus-4.8') ||
-          lower.contains('claude-opus-4-6') ||
-          lower.contains('claude-opus-4.6') ||
-          lower.contains('claude-sonnet-4-6') ||
-          lower.contains('claude-sonnet-4.6');
-    }
-    final family = (m.group(1) ?? '').toLowerCase();
-    final major = int.tryParse(m.group(2) ?? '');
-    final minor = int.tryParse(m.group(3) ?? '');
-    if (major == null || minor == null) return false;
-    if (family == 'opus' && (major > 4 || (major == 4 && minor >= 7))) {
-      return true;
-    }
-    if (major == 4 && minor == 6) return true;
-    return false;
-  }
-
-  bool _isDeepSeekClaudeCompatible(ProviderConfig cfg, String modelId) {
-    final lowerModelId = modelId.trim().toLowerCase();
-    if (lowerModelId.contains('deepseek')) return true;
-    final baseUrl = cfg.baseUrl.trim().toLowerCase();
-    final providerId = cfg.id.trim().toLowerCase();
-    final providerName = cfg.name.trim().toLowerCase();
-    return baseUrl.contains('api.deepseek.com') ||
-        providerId.contains('deepseek') ||
-        providerName.contains('deepseek');
-  }
-
   // 显式确保内存中存在一个提供者配置（不持久化到存储）。
   // 用于初始化首次运行的默认值。
   ProviderConfig ensureProviderConfig(String key, {String? defaultName}) {
@@ -957,8 +828,6 @@ class SettingsProvider extends ChangeNotifier {
     _learningModePrompt = (lmp == null || lmp.trim().isEmpty)
         ? defaultLearningModePrompt
         : lmp;
-    // 加载思考预算（推理强度）
-    _thinkingBudget = prefs.getInt(_thinkingBudgetKey);
     _titleGenerationThinkingEnabled =
         prefs.getBool(_titleGenerationThinkingEnabledKey) ?? false;
     _summaryGenerationThinkingEnabled =
@@ -4042,19 +3911,6 @@ Requirements:
       setLearningModePrompt(defaultLearningModePrompt);
 
   // 推理强度 / 思考预算
-  int? _thinkingBudget; // null = 未设置，使用提供商默认值；-1 = 自动；0 = 关闭；>0 = 预算 token
-  int? get thinkingBudget => _thinkingBudget;
-  Future<void> setThinkingBudget(int? budget) async {
-    _thinkingBudget = budget;
-    notifyListeners();
-    final prefs = _preferences;
-    if (budget == null) {
-      await prefs.remove(_thinkingBudgetKey);
-    } else {
-      await prefs.setInt(_thinkingBudgetKey, budget);
-    }
-  }
-
   // 后台模型思考开关。默认全部关闭，以保持这些
   // 对延迟敏感的实用请求快速响应。
   bool _titleGenerationThinkingEnabled = false;
@@ -4524,7 +4380,8 @@ Requirements:
 
   int? _backgroundThinkingBudgetFor(bool enabled, int? assistantBudget) {
     if (!enabled) return 0;
-    return assistantBudget ?? _thinkingBudget;
+    // 助手没设档位就是「自动」；全局预算已废弃，不再有第二处兜底。
+    return assistantBudget;
   }
 
   AutoRetryOptions _autoRetry = const AutoRetryOptions.defaults().copyWith(
@@ -5759,7 +5616,6 @@ Requirements:
     copy._ocrModelId = _ocrModelId;
     copy._ocrPrompt = _ocrPrompt;
     copy._ocrEnabled = _ocrEnabled;
-    copy._thinkingBudget = _thinkingBudget;
     copy._titleGenerationThinkingEnabled = _titleGenerationThinkingEnabled;
     copy._summaryGenerationThinkingEnabled = _summaryGenerationThinkingEnabled;
     copy._suggestionGenerationThinkingEnabled =

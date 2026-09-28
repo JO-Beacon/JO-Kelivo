@@ -643,13 +643,14 @@ void main() {
       expect(body.containsKey('top_p'), isFalse);
     });
 
-    test('Sonnet 4.6 clamps large budget to max instead of xhigh', () async {
+    test('Sonnet 4.6 的 xhigh 不再被替换成 max：原样发出', () async {
       final body = await _captureClaudeRequestBody(
         modelId: 'claude-sonnet-4-6',
         thinkingBudget: 64000,
       );
 
-      expect(body['output_config'], {'effort': 'max'});
+      // xhigh 也原样发出，由供应商决定接受还是报错。
+      expect(body['output_config'], {'effort': 'xhigh'});
     });
 
     test('Opus 4.7 allows xhigh for large but non-max budgets', () async {

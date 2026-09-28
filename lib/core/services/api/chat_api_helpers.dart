@@ -493,47 +493,6 @@ String _claudeEffortForBudget(int? budget) {
   return 'max';
 }
 
-String _normalizeClaudeEffort(String effort, String modelId) {
-  final normalizedEffort = effort.trim().toLowerCase();
-  if (normalizedEffort.isEmpty) return effort;
-  if (normalizedEffort == 'auto' || normalizedEffort == 'off') {
-    return normalizedEffort;
-  }
-
-  final lower = modelId.trim().toLowerCase();
-  final supportsXhigh =
-      _isClaude5AdaptiveThinkingModel(lower) ||
-      lower.contains('claude-opus-4-7') ||
-      lower.contains('claude-opus-4.7') ||
-      lower.contains('claude-opus-4-8') ||
-      lower.contains('claude-opus-4.8') ||
-      lower.contains('claude-fable') ||
-      lower.contains('claude-mythos');
-  final supportsMax =
-      supportsXhigh ||
-      lower.contains('claude-opus-4-6') ||
-      lower.contains('claude-opus-4.6') ||
-      lower.contains('claude-sonnet-4-6') ||
-      lower.contains('claude-sonnet-4.6') ||
-      lower.contains('mythos');
-
-  switch (normalizedEffort) {
-    case 'max':
-      if (supportsMax) return 'max';
-      return supportsXhigh ? 'xhigh' : 'high';
-    case 'xhigh':
-      if (supportsXhigh) return 'xhigh';
-      if (supportsMax) return 'max';
-      return 'high';
-    case 'high':
-    case 'medium':
-    case 'low':
-      return normalizedEffort;
-    default:
-      return normalizedEffort;
-  }
-}
-
 Map<String, dynamic>? claudeThinkingConfig(
   String modelId,
   int? budget, {
@@ -596,7 +555,7 @@ Map<String, dynamic>? claudeOutputConfig(
     // 因此界面「关闭」必须发送最低合法档位。
     var effort = _claudeEffortForBudget(budget);
     if (effort == 'off') effort = 'low';
-    effort = _normalizeClaudeEffort(effort, modelId);
+    // 这里不做档位替换：max 与 xhigh 原样发出，由供应商决定接受还是报错。
     if (effort == 'auto') return null;
     return <String, dynamic>{'effort': effort};
   }
@@ -617,10 +576,7 @@ Map<String, dynamic>? claudeOutputConfig(
       !isClaudeReasoningEnabled(budget)) {
     return null;
   }
-  final effort = _normalizeClaudeEffort(
-    _claudeEffortForBudget(budget),
-    modelId,
-  );
+  final effort = _claudeEffortForBudget(budget);
   if (effort == 'auto' || effort == 'off') return null;
   return <String, dynamic>{'effort': effort};
 }

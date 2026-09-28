@@ -87,84 +87,6 @@ void main() {
       expect(muse.id, 'muse-spark-1.1');
     });
 
-    test(
-      'OpenAI-compatible latest models expose documented effort caps',
-      () async {
-        final harness = await createBusinessTestHarness(initial: {});
-        final settings = SettingsProvider(harness.preferences);
-
-        await settings.loaded;
-
-        expect(
-          settings.supportsXhighReasoning('OpenAI', 'gpt-5.6-sol'),
-          isTrue,
-        );
-        expect(settings.supportsMaxReasoning('OpenAI', 'gpt-5.6-sol'), isTrue);
-        expect(
-          settings.supportsXhighReasoning('OpenRouter', 'openai/gpt-5.6-sol'),
-          isTrue,
-        );
-        expect(
-          settings.supportsMaxReasoning('OpenRouter', 'openai/gpt-5.6-sol'),
-          isTrue,
-        );
-        expect(settings.supportsMaxReasoning('OpenAI', 'kimi-k3'), isTrue);
-        expect(
-          settings.supportsMaxReasoning('OpenRouter', 'moonshotai/kimi-k3'),
-          isTrue,
-        );
-        expect(settings.supportsMaxReasoning('OpenAI', 'grok-4.5'), isFalse);
-        expect(settings.supportsXhighReasoning('OpenAI', 'grok-4.6'), isTrue);
-        expect(settings.supportsMaxReasoning('OpenAI', 'grok-4.6'), isFalse);
-        expect(settings.supportsXhighReasoning('OpenAI', 'grok-4.7'), isTrue);
-        expect(settings.supportsMaxReasoning('OpenAI', 'grok-4.7'), isFalse);
-        expect(
-          settings.supportsXhighReasoning('OpenRouter', 'x-ai/grok-4.7'),
-          isTrue,
-        );
-        expect(
-          settings.supportsXhighReasoning('OpenAI', 'deepseek-v4-pro'),
-          isFalse,
-        );
-        expect(
-          settings.supportsMaxReasoning('OpenAI', 'deepseek-v4-pro'),
-          isTrue,
-        );
-        expect(
-          settings.supportsMaxReasoning('OpenAI', 'muse-spark-1.1'),
-          isFalse,
-        );
-        expect(
-          settings.supportsMaxReasoning('OpenAI', 'muse-spark-1.3'),
-          isTrue,
-        );
-        expect(
-          settings.supportsXhighReasoning('OpenAI', 'gpt-6-astra'),
-          isTrue,
-        );
-        expect(settings.supportsMaxReasoning('OpenAI', 'gpt-6-astra'), isTrue);
-        expect(settings.supportsMaxReasoning('OpenAI', 'glm-5.3'), isTrue);
-        expect(
-          settings.supportsXhighReasoning('OpenAI', 'glm-5.3-flash'),
-          isFalse,
-        );
-        expect(settings.supportsXhighReasoning('OpenAI', 'glm-5.2'), isTrue);
-        expect(settings.supportsMaxReasoning('OpenAI', 'glm-5.2'), isTrue);
-        expect(
-          settings.supportsXhighReasoning('OpenAI', 'gpt-5.3-codex'),
-          isTrue,
-        );
-        expect(
-          settings.supportsXhighReasoning('OpenAI', 'gpt-5.1-codex'),
-          isFalse,
-        );
-        expect(
-          settings.supportsXhighReasoning('OpenAI', 'gpt-5.1-codex-max'),
-          isTrue,
-        );
-      },
-    );
-
     test('OpenRouter can be routed through Anthropic format explicitly', () {
       final cfg = ProviderConfig(
         id: 'OpenRouterAnthropic',
@@ -181,46 +103,6 @@ void main() {
         ProviderKind.claude,
       );
     });
-
-    test(
-      'Claude provider resolves apiModelId before DeepSeek max check',
-      () async {
-        final harness = await createBusinessTestHarness(initial: {});
-        final settings = SettingsProvider(harness.preferences);
-
-        await settings.loaded;
-        await settings.setProviderConfig(
-          'ClaudeProxy',
-          ProviderConfig(
-            id: 'ClaudeProxy',
-            enabled: true,
-            name: 'Claude Proxy',
-            apiKey: 'test-key',
-            baseUrl: 'https://proxy.example/anthropic',
-            providerType: ProviderKind.claude,
-            models: const ['pro-alias'],
-            modelOverrides: const {
-              'pro-alias': {
-                'apiModelId': 'deepseek-v4-pro',
-                'type': 'chat',
-                'input': ['text'],
-                'output': ['text'],
-                'abilities': ['reasoning'],
-              },
-            },
-          ),
-        );
-
-        expect(
-          settings.supportsXhighReasoning('ClaudeProxy', 'pro-alias'),
-          isFalse,
-        );
-        expect(
-          settings.supportsMaxReasoning('ClaudeProxy', 'pro-alias'),
-          isTrue,
-        );
-      },
-    );
 
     group('title generation thinking', () {
       test('defaults to disabled', () async {
@@ -243,7 +125,6 @@ void main() {
           final settings = SettingsProvider(harness.preferences);
 
           await settings.loaded;
-          await settings.setThinkingBudget(16000);
           await settings.setTitleGenerationThinkingEnabled(true);
           await settings.setTitleGenerationThinkingEnabled(false);
 
@@ -312,7 +193,9 @@ void main() {
           await settings.setTranslateGenerationThinkingEnabled(true);
           await settings.setOcrGenerationThinkingEnabled(true);
 
-          expect(settings.summaryGenerationThinkingBudgetFor(null), 16000);
+          // 全局思考预算已废弃：助手没设档位就是「自动」，不再有第二处兜底。
+          // 备份里残留的 thinking_budget_v1 也不再被 SettingsProvider 读取。
+          expect(settings.summaryGenerationThinkingBudgetFor(null), isNull);
           expect(settings.suggestionGenerationThinkingBudgetFor(1024), 1024);
           expect(settings.compressGenerationThinkingBudgetFor(1024), 1024);
           expect(settings.translateGenerationThinkingBudgetFor(1024), 1024);
@@ -376,17 +259,6 @@ void main() {
           ),
         );
 
-        for (final model in const [
-          'claude-fable-5-1',
-          'claude-fable-5',
-          'claude-mythos-5',
-          'claude-opus-4-8',
-          'claude-opus-5',
-          'claude-sonnet-5',
-        ]) {
-          expect(settings.supportsXhighReasoning('Claude', model), isTrue);
-          expect(settings.supportsMaxReasoning('Claude', model), isTrue);
-        }
         expect(settings.getProviderConfig('Claude').models, [
           'claude-fable-5-1',
           'claude-fable-5',
@@ -397,39 +269,5 @@ void main() {
         ]);
       },
     );
-
-    test('OpenRouter Anthropic format exposes Claude max reasoning', () async {
-      final harness = await createBusinessTestHarness(initial: {});
-      final settings = SettingsProvider(harness.preferences);
-
-      await settings.loaded;
-      await settings.setProviderConfig(
-        'OpenRouterAnthropic',
-        ProviderConfig(
-          id: 'OpenRouterAnthropic',
-          enabled: true,
-          name: 'OpenRouter Anthropic',
-          apiKey: 'test-key',
-          baseUrl: 'https://openrouter.ai/api/v1',
-          providerType: ProviderKind.claude,
-          models: const ['anthropic/claude-fable-5'],
-        ),
-      );
-
-      expect(
-        settings.supportsXhighReasoning(
-          'OpenRouterAnthropic',
-          'anthropic/claude-fable-5',
-        ),
-        isTrue,
-      );
-      expect(
-        settings.supportsMaxReasoning(
-          'OpenRouterAnthropic',
-          'anthropic/claude-fable-5',
-        ),
-        isTrue,
-      );
-    });
   });
 }

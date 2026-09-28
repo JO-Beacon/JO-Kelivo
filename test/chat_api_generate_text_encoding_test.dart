@@ -339,7 +339,8 @@ void main() {
         );
 
         expect(enabledBody['thinking'], {'type': 'enabled'});
-        expect(enabledBody['reasoning_effort'], 'high');
+        // xhigh 原样发出（以前被映射成 high）。
+        expect(enabledBody['reasoning_effort'], 'xhigh');
         expect(disabledBody['thinking'], {'type': 'disabled'});
         expect(disabledBody.containsKey('reasoning_effort'), isFalse);
       },

@@ -151,6 +151,7 @@ void main() {
           siblingBranchIdsByMessageId: const <String, List<String>>{
             'leaf-branch': <String>['root', 'alternate'],
           },
+          branchNodeMessageIds: const <String>{'leaf-branch'},
           onEditMessage: (_) {},
         ),
       );
@@ -164,6 +165,37 @@ void main() {
       debugDefaultTargetPlatformOverride = null;
     }
   });
+
+  testWidgets('锚点降级后没有兄弟分支表的消息仍按分支节点处理', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      await tester.pumpWidget(
+        _MessageListHarness(
+          messages: <ChatMessage>[
+            ChatMessage(
+              id: 'degraded-branch',
+              role: 'assistant',
+              content: 'degraded branch answer',
+              conversationId: 'conversation-1',
+            ),
+          ],
+          // 兄弟分支表为空（锚点已降级为单子），但树里它仍是分支节点，
+          // 菜单不能再退回成「删除此消息」。
+          branchNodeMessageIds: const <String>{'degraded-branch'},
+          onEditMessage: (_) {},
+        ),
+      );
+
+      await tester.tap(find.byIcon(Lucide.Ellipsis));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delete This Branch Node'), findsOneWidget);
+      expect(find.text('Delete Current Branch'), findsOneWidget);
+      expect(find.text('Delete This Message'), findsNothing);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
 }
 
 class _MessageListHarness extends StatefulWidget {
@@ -172,12 +204,14 @@ class _MessageListHarness extends StatefulWidget {
     required this.onEditMessage,
     this.messageIdsWithChildren = const <String>{},
     this.siblingBranchIdsByMessageId = const <String, List<String>>{},
+    this.branchNodeMessageIds = const <String>{},
   });
 
   final List<ChatMessage> messages;
   final ValueChanged<ChatMessage> onEditMessage;
   final Set<String> messageIdsWithChildren;
   final Map<String, List<String>> siblingBranchIdsByMessageId;
+  final Set<String> branchNodeMessageIds;
 
   @override
   State<_MessageListHarness> createState() => _MessageListHarnessState();
@@ -237,6 +271,7 @@ class _MessageListHarnessState extends State<_MessageListHarness> {
             byGroup: const {},
             messageIdsWithChildren: widget.messageIdsWithChildren,
             siblingBranchIdsByMessageId: widget.siblingBranchIdsByMessageId,
+            branchNodeMessageIds: widget.branchNodeMessageIds,
             reasoning: const <String, stream_ctrl.ReasoningData>{},
             reasoningSegments:
                 const <String, List<stream_ctrl.ReasoningSegmentData>>{},

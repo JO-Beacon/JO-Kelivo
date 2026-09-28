@@ -3,10 +3,7 @@ import 'dart:ui' as ui;
 import 'package:Kelivo/theme/app_font_weights.dart';
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
-import '../core/providers/assistant_provider.dart';
-import '../core/providers/settings_provider.dart';
 import '../theme/design_tokens.dart';
 import '../icons/lucide_adapter.dart';
 import '../icons/reasoning_icons.dart';
@@ -18,6 +15,8 @@ Future<void> showDesktopReasoningBudgetPopover(
   required GlobalKey anchorKey,
   String? modelProvider,
   String? modelId,
+  required int? initialBudget,
+  required ValueChanged<int> onChanged,
 }) async {
   final overlay = Overlay.maybeOf(context);
   if (overlay == null) return;
@@ -44,6 +43,8 @@ Future<void> showDesktopReasoningBudgetPopover(
       anchorWidth: size.width,
       modelProvider: modelProvider,
       modelId: modelId,
+      initialBudget: initialBudget,
+      onChanged: onChanged,
       onClose: () {
         try {
           entry.remove();
@@ -62,6 +63,8 @@ class _ReasoningPopoverOverlay extends StatefulWidget {
     required this.anchorWidth,
     this.modelProvider,
     this.modelId,
+    required this.initialBudget,
+    required this.onChanged,
     required this.onClose,
   });
 
@@ -69,6 +72,8 @@ class _ReasoningPopoverOverlay extends StatefulWidget {
   final double anchorWidth;
   final String? modelProvider;
   final String? modelId;
+  final int? initialBudget;
+  final ValueChanged<int> onChanged;
   final VoidCallback onClose;
 
   @override
@@ -172,6 +177,8 @@ class _ReasoningPopoverOverlayState extends State<_ReasoningPopoverOverlay>
                               },
                               modelProvider: widget.modelProvider,
                               modelId: widget.modelId,
+                              initialBudget: widget.initialBudget,
+                              onChanged: widget.onChanged,
                             ),
                           ),
                         ),
@@ -229,72 +236,57 @@ class _GlassPanel extends StatelessWidget {
   }
 }
 
-class _ReasoningContent extends StatelessWidget {
+class _ReasoningContent extends StatefulWidget {
   const _ReasoningContent({
     required this.onDone,
     required this.onSuspendedChanged,
+    required this.initialBudget,
+    required this.onChanged,
     this.modelProvider,
     this.modelId,
   });
   final Future<void> Function() onDone;
   final ValueChanged<bool> onSuspendedChanged;
+  final int? initialBudget;
+
+  /// 面板不自己持久化：存到哪一级（助手覆盖）由调用方决定。助手是档位的
+  /// 唯一所有者，`null` 等于「自动」。
+  final ValueChanged<int> onChanged;
   final String? modelProvider;
   final String? modelId;
 
-  bool _isCustomSelected(
-    int? budget, {
-    required bool showXhigh,
-    required bool showMax,
-  }) {
+  @override
+  State<_ReasoningContent> createState() => _ReasoningContentState();
+}
+
+class _ReasoningContentState extends State<_ReasoningContent> {
+  late int _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = widget.initialBudget ?? -1;
+  }
+
+  /// 先交给调用方持久化：选项一点弹层就会关闭，本地状态更新并非必须。
+  Future<void> _select(int value) async {
+    widget.onChanged(value);
+    if (mounted) setState(() => _selected = value);
+    await widget.onDone();
+  }
+
+  bool _isCustomSelected(int? budget) {
     final v = budget ?? -1;
-    final presets = <int>{
-      -1,
-      0,
-      1024,
-      16000,
-      32000,
-      if (showXhigh) 64000,
-      if (showMax) 128000,
-    };
+    final presets = <int>{-1, 0, 1024, 16000, 32000, 64000, 128000};
     return !presets.contains(v);
-  }
-
-  bool _showXhighOption(BuildContext context, SettingsProvider settings) {
-    final assistant = context.read<AssistantProvider>().currentAssistant;
-    final currentProvider =
-        modelProvider ??
-        assistant?.chatModelProvider ??
-        settings.currentModelProvider;
-    final currentModelId =
-        modelId ?? assistant?.chatModelId ?? settings.currentModelId;
-    if (currentProvider == null || currentModelId == null) return false;
-    return settings.supportsXhighReasoning(currentProvider, currentModelId);
-  }
-
-  bool _showMaxOption(BuildContext context, SettingsProvider settings) {
-    final assistant = context.read<AssistantProvider>().currentAssistant;
-    final currentProvider =
-        modelProvider ??
-        assistant?.chatModelProvider ??
-        settings.currentModelProvider;
-    final currentModelId =
-        modelId ?? assistant?.chatModelId ?? settings.currentModelId;
-    if (currentProvider == null || currentModelId == null) return false;
-    return settings.supportsMaxReasoning(currentProvider, currentModelId);
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final sp = context.watch<SettingsProvider>();
-    final showXhigh = _showXhighOption(context, sp);
-    final showMax = _showMaxOption(context, sp);
-    final selected = sp.thinkingBudget ?? -1;
-    final customActive = _isCustomSelected(
-      sp.thinkingBudget,
-      showXhigh: showXhigh,
-      showMax: showMax,
-    );
+    final selected = _selected;
+    // xhigh 与 max 一律常显，不再按模型表预先隐藏。
+    final customActive = _isCustomSelected(_selected);
 
     Widget tile({
       required Widget Function(Color color) leadingBuilder,
@@ -318,8 +310,7 @@ class _ReasoningContent extends StatelessWidget {
           onTap:
               onTap ??
               () async {
-                await context.read<SettingsProvider>().setThinkingBudget(value);
-                await onDone();
+                await _select(value);
               },
           labelStyle: TextStyle(
             fontSize: 13,
@@ -382,26 +373,24 @@ class _ReasoningContent extends StatelessWidget {
               label: l10n.reasoningBudgetSheetHeavy,
               value: 32000,
             ),
-            if (showXhigh)
-              tile(
-                leadingBuilder: (c) => ReasoningIcons.budgetIcon(
-                  ReasoningIcons.xhighBudget,
-                  size: 16,
-                  color: c,
-                ),
-                label: l10n.reasoningBudgetSheetXhigh,
-                value: 64000,
+            tile(
+              leadingBuilder: (c) => ReasoningIcons.budgetIcon(
+                ReasoningIcons.xhighBudget,
+                size: 16,
+                color: c,
               ),
-            if (showMax)
-              tile(
-                leadingBuilder: (c) => ReasoningIcons.budgetIcon(
-                  ReasoningIcons.maxBudget,
-                  size: 16,
-                  color: c,
-                ),
-                label: l10n.reasoningBudgetSheetMax,
-                value: 128000,
+              label: l10n.reasoningBudgetSheetXhigh,
+              value: 64000,
+            ),
+            tile(
+              leadingBuilder: (c) => ReasoningIcons.budgetIcon(
+                ReasoningIcons.maxBudget,
+                size: 16,
+                color: c,
               ),
+              label: l10n.reasoningBudgetSheetMax,
+              value: 128000,
+            ),
             tile(
               leadingBuilder: (c) => Icon(Lucide.Hash, size: 16, color: c),
               label: l10n.reasoningBudgetSheetCustomLabel,
@@ -426,7 +415,7 @@ class _ReasoningContent extends StatelessWidget {
                     ),
               onTap: () async {
                 final initialValue = customActive ? selected : 2048;
-                onSuspendedChanged(true);
+                widget.onSuspendedChanged(true);
                 var restore = true;
                 try {
                   final chosen = await ReasoningBudgetCustomDialog.show(
@@ -436,13 +425,11 @@ class _ReasoningContent extends StatelessWidget {
                   if (!context.mounted) return;
                   if (chosen == null) return;
                   restore = false;
-                  await context.read<SettingsProvider>().setThinkingBudget(
-                    chosen,
-                  );
-                  if (!context.mounted) return;
-                  await onDone();
+                  await _select(chosen);
                 } finally {
-                  if (restore && context.mounted) onSuspendedChanged(false);
+                  if (restore && context.mounted) {
+                    widget.onSuspendedChanged(false);
+                  }
                 }
               },
             ),

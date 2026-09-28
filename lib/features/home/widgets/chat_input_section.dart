@@ -201,15 +201,12 @@ class ChatInputSection extends StatelessWidget {
       asrProvider: asr,
       onConfigureReasoning: onConfigureReasoning,
       reasoningActive: isReasoningEnabled(
-        (context.watch<AssistantProvider>().currentAssistant?.thinkingBudget) ??
-            settings.thinkingBudget,
+        context.watch<AssistantProvider>().currentAssistant?.thinkingBudget,
       ),
-      reasoningBudget:
-          (context
-              .watch<AssistantProvider>()
-              .currentAssistant
-              ?.thinkingBudget) ??
-          settings.thinkingBudget,
+      reasoningBudget: context
+          .watch<AssistantProvider>()
+          .currentAssistant
+          ?.thinkingBudget,
       supportsReasoning: (pk != null && mid != null)
           ? isReasoningModel(pk, mid)
           : false,
@@ -358,9 +355,7 @@ class ChatInputSection extends StatelessWidget {
 
     final supportsReasoning = isReasoningModel(pk, mid);
     if (!supportsReasoning && a != null) {
-      final enabledNow = isReasoningEnabled(
-        a.thinkingBudget ?? settings.thinkingBudget,
-      );
+      final enabledNow = isReasoningEnabled(a.thinkingBudget);
       if (enabledNow) {
         WidgetsBinding.instance.addPostFrameCallback((_) async {
           final aa = ap.currentAssistant;

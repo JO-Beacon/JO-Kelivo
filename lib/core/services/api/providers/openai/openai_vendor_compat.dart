@@ -424,7 +424,8 @@ String openAIEffortForBudget(int? budget, String upstreamModelId) {
   final baseEffort = effortForBudget(budget);
   var requestedEffort = baseEffort;
   if (baseEffort == 'high' && budget != null) {
-    if (budget >= 128000 && openAISupportsMaxReasoning(upstreamModelId)) {
+    // max 不再按表判断：预算到了就发 max，由供应商决定接受还是报错。
+    if (budget >= 128000) {
       requestedEffort = 'max';
     } else if (budget >= 64000) {
       requestedEffort = 'xhigh';

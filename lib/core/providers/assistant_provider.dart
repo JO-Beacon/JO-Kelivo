@@ -89,9 +89,30 @@ class AssistantProvider extends ChangeNotifier {
     _rebuildAssistantIndex();
     _rebuildAssistantDirectory();
 
+    // 一次性迁移：老版本还有「全局思考预算」这一层，现在档位只由助手拥有。
+    //
+    // 键不存在时（绝大多数启动）这里必须保持完全同步：助手列表要在首个
+    // await 之前就绪，否则会破坏启动快照的同步恢复。只有真的存在这个废弃
+    // 键时才会引入一次异步写入，属于一次性升级事件。
+    final retiredGlobalBudget = preferences.getInt(
+      _retiredGlobalThinkingBudgetKey,
+    );
+    var materializedGlobalBudget = false;
+    if (retiredGlobalBudget != null) {
+      for (var i = 0; i < _assistants.length; i++) {
+        final assistant = _assistants[i];
+        if (assistant.thinkingBudget != null) continue;
+        _assistants[i] = assistant.copyWith(
+          thinkingBudget: retiredGlobalBudget,
+        );
+        materializedGlobalBudget = true;
+      }
+      await preferences.remove(_retiredGlobalThinkingBudgetKey);
+    }
+
     if (_assistants.isNotEmpty) {
       // 修复从其他平台导入的沙盒本地路径（头像/背景）
-      bool changed = false;
+      bool changed = materializedGlobalBudget;
       for (int i = 0; i < _assistants.length; i++) {
         final a = _assistants[i];
         String? av = a.avatar;
@@ -147,6 +168,13 @@ class AssistantProvider extends ChangeNotifier {
     }
     notifyListeners();
   }
+
+  /// 已废弃的「全局思考预算」存储键。
+  ///
+  /// 该层级已删除：思考档位只由助手拥有，`null` 明确等于「自动」。这个键仍
+  /// 保留在 [BusinessKeyRegistry.preferenceKeys] 里，是为了让带它的老备份恢复
+  /// 后还能被读一次、落到助手上；`_load()` 里那一段就是唯一的消费点。
+  static const String _retiredGlobalThinkingBudgetKey = 'thinking_budget_v1';
 
   List<Assistant> _decodeAssistants(String raw) {
     try {

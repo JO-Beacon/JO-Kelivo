@@ -1352,10 +1352,7 @@ class ChatActions {
       streamController.toolParts.remove(assistantMessage.id);
       final supportsReasoning = _isReasoningModel(providerKey, modelId);
       final enableReasoning =
-          supportsReasoning &&
-          _isReasoningEnabled(
-            assistant?.thinkingBudget ?? settings.thinkingBudget,
-          );
+          supportsReasoning && _isReasoningEnabled(assistant?.thinkingBudget);
       _bindFileProcessingCallbacks();
       await messageGenerationService.initializeReasoningState(
         messageId: assistantMessage.id,
@@ -1703,10 +1700,7 @@ class ChatActions {
       // 初始化推理
       final supportsReasoning = _isReasoningModel(providerKey, modelId);
       final enableReasoning =
-          supportsReasoning &&
-          _isReasoningEnabled(
-            assistant?.thinkingBudget ?? settings.thinkingBudget,
-          );
+          supportsReasoning && _isReasoningEnabled(assistant?.thinkingBudget);
       _bindFileProcessingCallbacks();
       try {
         await messageGenerationService.initializeReasoningState(
@@ -1862,10 +1856,7 @@ class ChatActions {
 
     final supportsReasoning = _isReasoningModel(providerKey, modelId);
     final enableReasoning =
-        supportsReasoning &&
-        _isReasoningEnabled(
-          assistant?.thinkingBudget ?? settings.thinkingBudget,
-        );
+        supportsReasoning && _isReasoningEnabled(assistant?.thinkingBudget);
 
     _bindFileProcessingCallbacks();
     try {
@@ -2152,8 +2143,7 @@ class ChatActions {
         modelId: ctx.modelId,
         messages: ctx.apiMessages,
         userImagePaths: ctx.userImagePaths,
-        thinkingBudget:
-            assistant?.thinkingBudget ?? ctx.settings.thinkingBudget,
+        thinkingBudget: assistant?.thinkingBudget,
         temperature: assistant?.temperature,
         topP: assistant?.topP,
         maxTokens: assistant?.maxTokens,

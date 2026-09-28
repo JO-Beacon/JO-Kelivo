@@ -29,19 +29,20 @@ void main() {
   group('Xiaomi MiMo Responses compatibility', () {
     test('normalizes reasoning efforts to the documented values', () {
       expect(openAINormalizeReasoningEffort('off', 'mimo-v2.5-pro'), 'none');
-      expect(openAINormalizeReasoningEffort('xhigh', 'mimo-v2.5-pro'), 'high');
-      expect(openAINormalizeReasoningEffort('max', 'xiaomi/mimo-v2.5'), 'high');
+      expect(openAINormalizeReasoningEffort('xhigh', 'mimo-v2.5-pro'), 'xhigh');
+      // max 不再按表替换：选了就原样发出，由供应商决定接受还是报错。
+      expect(openAINormalizeReasoningEffort('max', 'xiaomi/mimo-v2.5'), 'max');
       expect(openAINormalizeReasoningEffort('off', 'mimo-v2.6-pro'), 'none');
       expect(
         openAINormalizeReasoningEffort('xhigh', 'mimo-v2.6-flash'),
-        'high',
+        'xhigh',
       );
       expect(
         openAINormalizeReasoningEffort(
           'max',
           'xiaomi/mimo-v2.6-pro-ultraspeed',
         ),
-        'high',
+        'max',
       );
     });
 

@@ -16,8 +16,6 @@ class OpenAIReasoningSupport {
   final String? offFallback;
 
   bool get supportsNone => supportedEfforts.contains('none');
-  bool get supportsXhigh => supportedEfforts.contains('xhigh');
-  bool get supportsMax => supportedEfforts.contains('max');
 }
 
 const OpenAIReasoningSupport _gpt5Support = OpenAIReasoningSupport(
@@ -175,18 +173,6 @@ bool isGlm52FamilyModel(String modelId) {
   );
 }
 
-bool openAISupportsXhighReasoning(String modelId) {
-  return openAIReasoningSupport(modelId)?.supportsXhigh ?? false;
-}
-
-bool openAISupportsMaxReasoning(String modelId) {
-  return openAIReasoningSupport(modelId)?.supportsMax ?? false;
-}
-
-bool openAISupportsNoneReasoning(String modelId) {
-  return openAIReasoningSupport(modelId)?.supportsNone ?? false;
-}
-
 bool openAIChatCompletionsToolsRequireNone(String modelId) {
   return _matchesModel(
     modelId.trim().toLowerCase(),
@@ -201,16 +187,12 @@ String openAINormalizeReasoningEffort(String effort, String modelId) {
 
   final support = openAIReasoningSupport(modelId);
   if (support?.effortParameterSupported == false) return 'auto';
-  if (support == _kimiCodeSupport && normalizedEffort == 'xhigh') {
-    return 'max';
-  }
+  // max 与 xhigh 不再按表降级：选了就原样发出，由供应商决定接受还是报错。
+  if (normalizedEffort == 'max') return 'max';
+  if (normalizedEffort == 'xhigh') return 'xhigh';
   if (normalizedEffort == 'off') {
     if (support?.supportsNone == true) return 'none';
     return support?.offFallback ?? 'off';
-  }
-  if ((normalizedEffort == 'xhigh' || normalizedEffort == 'max') &&
-      support == null) {
-    return 'high';
   }
   if (support == null) return normalizedEffort;
   if (support.supportedEfforts.contains(normalizedEffort)) {
@@ -248,24 +230,6 @@ String openAINormalizeReasoningEffort(String effort, String modelId) {
         'high',
         'xhigh',
         'max',
-        'medium',
-        'low',
-        'none',
-      ]);
-    case 'xhigh':
-      return _pickSupportedEffort(support, const <String>[
-        'xhigh',
-        'high',
-        'max',
-        'medium',
-        'low',
-        'none',
-      ]);
-    case 'max':
-      return _pickSupportedEffort(support, const <String>[
-        'max',
-        'xhigh',
-        'high',
         'medium',
         'low',
         'none',

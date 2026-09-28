@@ -651,7 +651,7 @@ class ToolHandlerService {
     if (provKey != null && mdlId != null) {
       final cfg = settings.getProviderConfig(provKey);
       final budget = settings.memoryModelThinkingEnabled
-          ? (assistant.thinkingBudget ?? settings.thinkingBudget)
+          ? (assistant.thinkingBudget)
           : 0;
       memoryLlmCall = (prompt) => ChatApiService.generateText(
         conversationId: conversationId,

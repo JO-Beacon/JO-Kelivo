@@ -1504,6 +1504,7 @@ class _HomePageState extends State<HomePage>
       renderModels: _controller.visibleMessageRenderModels,
       byGroup: _controller.visibleGroupedMessages,
       messageIdsWithChildren: _controller.messageIdsWithChildren,
+      branchNodeMessageIds: _controller.branchNodeMessageIds,
       siblingBranchIdsByMessageId: _controller.siblingBranchIdsByMessageId,
       activeBranchId: _controller.activeBranchId,
       onBranchChange: _controller.switchConversationBranch,
@@ -1694,26 +1695,9 @@ class _HomePageState extends State<HomePage>
       onOpenSearch: _openSearchSettings,
       onConfigureReasoning: () async {
         final assistantProvider = context.read<AssistantProvider>();
-        final settingsProvider = context.read<SettingsProvider>();
         final assistant = assistantProvider.currentAssistant;
         if (assistant == null) return;
-        if (PlatformUtils.isDesktop) {
-          // Desktop popover keeps the legacy global-settings sync flow.
-          if (assistant.thinkingBudget != null) {
-            settingsProvider.setThinkingBudget(assistant.thinkingBudget);
-          }
-          await _openReasoningSettings();
-          if (!mounted) return;
-          final chosen = settingsProvider.thinkingBudget;
-          await assistantProvider.updateAssistant(
-            assistant.copyWith(thinkingBudget: chosen),
-          );
-          return;
-        }
-        // Mobile: seed the sheet via initialBudget instead of pre-writing
-        // global settings. setThinkingBudget notifies synchronously and would
-        // rebuild the home page (message list, input bar, drawer) on the
-        // first frames of the sheet's entrance animation, dropping frames.
+        // 两端都只改当前助手的档位：面板/弹层不再读写全局默认值。
         int? chosen;
         await _openReasoningSettings(
           initialBudget: assistant.thinkingBudget,
@@ -2004,11 +1988,16 @@ class _HomePageState extends State<HomePage>
       );
 
   Future<void> _openReasoningSettings({
-    int? initialBudget,
-    ValueChanged<int>? onChanged,
+    required int? initialBudget,
+    required ValueChanged<int> onChanged,
   }) async {
     if (PlatformUtils.isDesktop) {
-      await showDesktopReasoningBudgetPopover(context, anchorKey: _inputBarKey);
+      await showDesktopReasoningBudgetPopover(
+        context,
+        anchorKey: _inputBarKey,
+        initialBudget: initialBudget,
+        onChanged: onChanged,
+      );
     } else {
       await showReasoningBudgetSheet(
         context,

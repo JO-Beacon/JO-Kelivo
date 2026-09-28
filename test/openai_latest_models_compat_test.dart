@@ -144,18 +144,16 @@ void main() {
         openAINormalizeReasoningEffort('off', 'moonshotai/kimi-k3'),
         'low',
       );
-      expect(openAISupportsMaxReasoning('moonshotai/kimi-k3'), isTrue);
       expect(openAINormalizeReasoningEffort('off', 'grok-4.5'), 'low');
-      expect(openAINormalizeReasoningEffort('max', 'grok-4.5'), 'high');
+      // max 不再按表替换：选了就原样发出，由供应商决定接受还是报错。
+      expect(openAINormalizeReasoningEffort('max', 'grok-4.5'), 'max');
       expect(openAINormalizeReasoningEffort('off', 'x-ai/grok-4.5'), 'low');
       expect(openAINormalizeReasoningEffort('off', 'grok-4.6'), 'low');
       expect(openAINormalizeReasoningEffort('xhigh', 'grok-4.6'), 'xhigh');
-      expect(openAINormalizeReasoningEffort('max', 'x-ai/grok-4.6'), 'xhigh');
+      expect(openAINormalizeReasoningEffort('max', 'x-ai/grok-4.6'), 'max');
       expect(openAINormalizeReasoningEffort('off', 'grok-4.7'), 'low');
       expect(openAINormalizeReasoningEffort('xhigh', 'grok-4.7'), 'xhigh');
-      expect(openAINormalizeReasoningEffort('max', 'x-ai/grok-4.7'), 'xhigh');
-      expect(openAISupportsXhighReasoning('grok-4.7'), isTrue);
-      expect(openAISupportsMaxReasoning('grok-4.5'), isFalse);
+      expect(openAINormalizeReasoningEffort('max', 'x-ai/grok-4.7'), 'max');
       expect(openAINormalizeReasoningEffort('off', 'deepseek-v4-pro'), 'off');
       expect(
         openAINormalizeReasoningEffort('medium', 'deepseek-v4-flash'),
@@ -163,7 +161,7 @@ void main() {
       );
       expect(
         openAINormalizeReasoningEffort('xhigh', 'deepseek-v4-pro'),
-        'high',
+        'xhigh',
       );
       expect(
         openAINormalizeReasoningEffort('max', 'deepseek-v4-flash-vision-exp'),
@@ -184,25 +182,21 @@ void main() {
         'low',
       );
       expect(openAINormalizeReasoningEffort('max', 'gpt-6-astra'), 'max');
-      expect(openAISupportsNoneReasoning('gpt-6-astra'), isFalse);
-      expect(openAISupportsMaxReasoning('gpt-6-astra'), isTrue);
       expect(
         openAINormalizeReasoningEffort('high', 'meta/muse-spark-1.1'),
         'high',
       );
       expect(openAINormalizeReasoningEffort('off', 'muse-spark-1.3'), 'low');
-      expect(openAISupportsMaxReasoning('muse-spark-1.3'), isTrue);
-      expect(openAISupportsMaxReasoning('muse-spark-1.3-contributor'), isFalse);
       expect(openAINormalizeReasoningEffort('medium', 'glm-5.3'), 'high');
       expect(openAINormalizeReasoningEffort('off', 'glm-5.3-flash'), 'low');
-      expect(openAISupportsMaxReasoning('z-ai/glm-5.3'), isTrue);
       expect(openAINormalizeReasoningEffort('off', 'gpt-5-codex'), 'low');
       expect(openAINormalizeReasoningEffort('off', 'gpt-5.1-codex'), 'low');
       expect(
         openAINormalizeReasoningEffort('off', 'openai/gpt-5.1-codex-max'),
         'low',
       );
-      expect(openAINormalizeReasoningEffort('xhigh', 'gpt-5.1-codex'), 'high');
+      // xhigh 也原样发出：表里没有 xhigh 的模型不再被降成 high。
+      expect(openAINormalizeReasoningEffort('xhigh', 'gpt-5.1-codex'), 'xhigh');
       expect(
         openAINormalizeReasoningEffort('xhigh', 'gpt-5.1-codex-max'),
         'xhigh',
@@ -217,12 +211,9 @@ void main() {
       expect(openAINormalizeReasoningEffort('off', 'gpt-5.2-pro'), 'medium');
       expect(openAINormalizeReasoningEffort('off', 'gpt-5.4-pro'), 'medium');
       expect(openAINormalizeReasoningEffort('off', 'gpt-5.5-pro'), 'medium');
-      expect(openAISupportsNoneReasoning('gpt-5.3-codex'), isFalse);
-      expect(openAISupportsXhighReasoning('gpt-5.3-codex'), isTrue);
       expect(openAINormalizeReasoningEffort('off', 'glm-5.2'), 'off');
       expect(openAINormalizeReasoningEffort('low', 'glm-5.2'), 'low');
       expect(openAINormalizeReasoningEffort('xhigh', 'z-ai/glm-5.2'), 'xhigh');
-      expect(openAISupportsMaxReasoning('glm-5.2'), isTrue);
     });
 
     test(

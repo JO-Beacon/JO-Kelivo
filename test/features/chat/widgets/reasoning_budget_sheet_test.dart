@@ -38,6 +38,7 @@ Future<SettingsProvider> _settingsForClaudeModel(
 Future<void> _pumpSheetLauncher(
   WidgetTester tester, {
   required SettingsProvider settings,
+  ValueChanged<int>? onChanged,
 }) async {
   await tester.pumpWidget(
     MultiProvider(
@@ -56,7 +57,10 @@ Future<void> _pumpSheetLauncher(
             builder: (context) {
               return TextButton(
                 key: const ValueKey('open-reasoning-sheet'),
-                onPressed: () => showReasoningBudgetSheet(context),
+                onPressed: () => showReasoningBudgetSheet(
+                  context,
+                  onChanged: onChanged ?? (_) {},
+                ),
                 child: const Text('open'),
               );
             },
@@ -78,7 +82,12 @@ void main() {
   group('ReasoningBudgetSheet', () {
     testWidgets('shows max reasoning stop for Claude Fable 5', (tester) async {
       final settings = await _settingsForClaudeModel(tester, 'claude-fable-5');
-      await _pumpSheetLauncher(tester, settings: settings);
+      int? picked;
+      await _pumpSheetLauncher(
+        tester,
+        settings: settings,
+        onChanged: (v) => picked = v,
+      );
 
       await _openSheet(tester);
 
@@ -96,23 +105,40 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(settings.thinkingBudget, 128000);
+      expect(picked, 128000);
       expect(find.text('Max'), findsOneWidget);
     });
 
-    testWidgets('keeps max reasoning stop hidden for older Claude models', (
-      tester,
-    ) async {
+    testWidgets('xhigh 与 max 档位常显：表里没有的模型也照样显示并可选中', (tester) async {
       final settings = await _settingsForClaudeModel(
         tester,
         'claude-sonnet-4-5',
       );
-      await _pumpSheetLauncher(tester, settings: settings);
+      int? picked;
+      await _pumpSheetLauncher(
+        tester,
+        settings: settings,
+        onChanged: (v) => picked = v,
+      );
 
       await _openSheet(tester);
 
-      expect(find.byKey(const ValueKey('reasoning-stop-64000')), findsNothing);
-      expect(find.byKey(const ValueKey('reasoning-stop-128000')), findsNothing);
+      // claude-sonnet-4-5 的档位表里既没有 xhigh 也没有 max，但两者都常显。
+      expect(
+        find.byKey(const ValueKey('reasoning-stop-64000')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('reasoning-stop-128000')),
+        findsOneWidget,
+      );
+
+      await tester.tapAt(
+        tester.getCenter(find.byKey(const ValueKey('reasoning-stop-64000'))),
+      );
+      await tester.pumpAndSettle();
+
+      expect(picked, 64000);
     });
 
     testWidgets(
@@ -157,10 +183,10 @@ void main() {
 
         await _openSheet(tester);
 
-        // Opening must not mutate or notify global settings — that rebuilds
+        // Opening must not notify callers or global settings — that rebuilds
         // the caller's page during the entrance animation.
         expect(notifies, 0);
-        expect(settings.thinkingBudget, isNull);
+        expect(changed, isNull);
         // The sheet still displays the seeded selection.
         expect(find.text('High'), findsOneWidget);
 
@@ -169,8 +195,8 @@ void main() {
         );
         await tester.pumpAndSettle();
 
+        // 选择只报告给调用方；面板不自己持久化任何一级。
         expect(changed, 16000);
-        expect(settings.thinkingBudget, 16000);
       },
     );
 
@@ -196,8 +222,11 @@ void main() {
               body: Builder(
                 builder: (context) => TextButton(
                   key: const ValueKey('open-reasoning-sheet'),
-                  onPressed: () =>
-                      showReasoningBudgetSheet(context, initialBudget: 16000),
+                  onPressed: () => showReasoningBudgetSheet(
+                    context,
+                    initialBudget: 16000,
+                    onChanged: (_) {},
+                  ),
                   child: const Text('open'),
                 ),
               ),

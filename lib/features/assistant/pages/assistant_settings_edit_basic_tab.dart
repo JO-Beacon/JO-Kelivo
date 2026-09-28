@@ -201,7 +201,10 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                 context,
                 icon: Lucide.Brain,
                 label: l10n.assistantEditThinkingBudgetTitle,
-                detailText: a.thinkingBudget?.toString() ?? '-',
+                // null 不再表示「没设过」，而是明确的「自动」。
+                detailText:
+                    a.thinkingBudget?.toString() ??
+                    l10n.reasoningBudgetSheetAuto,
                 onTap: () async {
                   final assistantProvider = context.read<AssistantProvider>();
                   // Seed via initialBudget instead of pre-writing global

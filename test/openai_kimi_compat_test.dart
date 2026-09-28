@@ -93,6 +93,8 @@ void main() {
             null || -1 || 0 => null,
             1024 => 'low',
             16000 => 'high',
+            // 64000 是 xhigh，128000 是 max；两者都原样发出。
+            64000 => 'xhigh',
             _ => 'max',
           };
           expect(body['reasoning_effort'], expectedEffort);
@@ -123,7 +125,8 @@ void main() {
           ],
         );
         expect(body['model'], 'kimi-for-coding');
-        expect(body['reasoning_effort'], 'max');
+        // 自定义 body 里的 reasoning_effort 也原样保留（以前 xhigh 会被换成 max）。
+        expect(body['reasoning_effort'], 'xhigh');
         for (final key in [
           'temperature',
           'top_p',

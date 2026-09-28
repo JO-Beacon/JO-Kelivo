@@ -11,14 +11,18 @@ void expectVisible(ConversationTree tree, String messageId) {
     isTrue,
     reason: '$messageId 应仍存在于树中',
   );
-  final onActivePath = tree.activePath().contains(messageId);
-  final parent = tree.edges[messageId]!.parentMessageId;
-  final navigable = tree.childrenOf(parent).length >= 2;
-  expect(
-    onActivePath || navigable,
-    isTrue,
-    reason: '$messageId 既不在活动路径上，其直接父消息也不是分叉锚点（搁浅）',
-  );
+  final activePath = tree.activePath().toSet();
+  if (activePath.contains(messageId)) return;
+  // 按分支导航闭包判定（契约 §8）：只要存在一个位于活动路径上的
+  // 分叉锚点祖先，就能逐层导航到这条消息；不再看直接父的出度。
+  var cursor = tree.edges[messageId]!.parentMessageId;
+  while (cursor != null) {
+    if (activePath.contains(cursor) && tree.childrenOf(cursor).length >= 2) {
+      return;
+    }
+    cursor = tree.edges[cursor]?.parentMessageId;
+  }
+  fail('$messageId 既不在活动路径上，也没有位于活动路径上的分叉锚点祖先（搁浅）');
 }
 
 /// 契约 §4.3 场景树：m0 ← second-m1 ← {nested-m2, sib-m2}。
@@ -357,6 +361,24 @@ void main() {
       expect(normalized.activePath(), const ['m0', 'second-m1', 'sib-m2']);
       expectVisible(normalized, 'sib-m2');
       expect(normalized.validateIntegrity, returnsNormally);
+    });
+
+    test('搁浅消息在活动侧时，切走后归一化仍让它可导航', () {
+      final tree = strandedTree();
+      // 让搁浅的 sib 成为活动分支：此时 sib-m2 在活动路径上，
+      // 加载时不会被归一化（§8 只看活动路径）。
+      final onSib = ConversationTree(
+        conversationId: tree.conversationId,
+        activeBranchId: 'sib',
+        branches: tree.branches,
+        edges: tree.edges,
+        activeBranchHistory: const ['second', 'root'],
+      );
+      // 服务层切换分支后会立即归一化，不再等到下次重新加载。
+      final switched = onSib.switchBranch('second').normalizeDegradedAnchors();
+      expectVisible(switched, 'sib-m2');
+      expect(switched.branches.containsKey('sib'), isFalse);
+      expect(switched.branches['second']?.tipMessageId, 'sib-m2');
     });
 
     test('归一化幂等：重复执行结果不变', () {

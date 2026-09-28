@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
-import 'package:provider/provider.dart';
-import '../../../core/providers/assistant_provider.dart';
-import '../../../core/providers/settings_provider.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../icons/reasoning_icons.dart';
 import '../../../l10n/app_localizations.dart';
@@ -16,7 +13,7 @@ Future<void> showReasoningBudgetSheet(
   String? modelProvider,
   String? modelId,
   int? initialBudget,
-  ValueChanged<int>? onChanged,
+  required ValueChanged<int> onChanged,
 }) async {
   await showModalBottomSheet(
     context: context,
@@ -52,18 +49,20 @@ class _ReasoningBudgetSheet extends StatefulWidget {
     this.modelProvider,
     this.modelId,
     this.initialBudget,
-    this.onChanged,
+    required this.onChanged,
   });
   final String? modelProvider;
   final String? modelId;
 
-  /// Selection to display when opening, without writing it into global
-  /// settings first. Lets callers seed the assistant's budget without a
-  /// synchronous [SettingsProvider] notify mid route-animation.
+  /// Selection to display when opening。由调用方给出（当前助手的档位），
+  /// 面板不读全局，也不写任何一级。
   final int? initialBudget;
 
-  /// Fires only when the user actually picks a value inside the sheet.
-  final ValueChanged<int>? onChanged;
+  /// Fires when the user picks a value inside the sheet.
+  ///
+  /// 面板不自己持久化：存到哪一级（助手覆盖）由调用方决定。助手是档位的
+  /// 唯一所有者，`null` 等于「自动」。
+  final ValueChanged<int> onChanged;
   @override
   State<_ReasoningBudgetSheet> createState() => _ReasoningBudgetSheetState();
 }
@@ -88,10 +87,7 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet>
   @override
   void initState() {
     super.initState();
-    _selected =
-        widget.initialBudget ??
-        context.read<SettingsProvider>().thinkingBudget ??
-        -1;
+    _selected = widget.initialBudget ?? -1;
     _snap = AnimationController.unbounded(vsync: this)
       ..addListener(() {
         final last = (_stops.length - 1).toDouble();
@@ -105,11 +101,7 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet>
     super.dispose();
   }
 
-  List<_EffortStop> _buildStops(
-    AppLocalizations l10n, {
-    required bool showXhigh,
-    required bool showMax,
-  }) {
+  List<_EffortStop> _buildStops(AppLocalizations l10n) {
     return [
       _EffortStop(
         title: l10n.reasoningBudgetSheetOff,
@@ -141,20 +133,18 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet>
         value: 32000,
         icon: ReasoningIcons.heavyBudget,
       ),
-      if (showXhigh)
-        _EffortStop(
-          title: l10n.reasoningBudgetSliderXhigh,
-          subtitle: l10n.reasoningBudgetSheetXhighSubtitle,
-          value: 64000,
-          icon: ReasoningIcons.xhighBudget,
-        ),
-      if (showMax)
-        _EffortStop(
-          title: l10n.reasoningBudgetSliderMax,
-          subtitle: l10n.reasoningBudgetSheetXhighSubtitle,
-          value: 128000,
-          icon: ReasoningIcons.maxBudget,
-        ),
+      _EffortStop(
+        title: l10n.reasoningBudgetSliderXhigh,
+        subtitle: l10n.reasoningBudgetSheetXhighSubtitle,
+        value: 64000,
+        icon: ReasoningIcons.xhighBudget,
+      ),
+      _EffortStop(
+        title: l10n.reasoningBudgetSliderMax,
+        subtitle: l10n.reasoningBudgetSheetXhighSubtitle,
+        value: 128000,
+        icon: ReasoningIcons.maxBudget,
+      ),
     ];
   }
 
@@ -183,10 +173,7 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet>
     if (value == _selected) return;
     Haptics.soft();
     setState(() => _selected = value);
-    widget.onChanged?.call(value);
-    // Fire-and-forget: persistence is not interactive-blocking.
-    // ignore: discarded_futures
-    context.read<SettingsProvider>().setThinkingBudget(value);
+    widget.onChanged(value);
   }
 
   void _animateTo(int index) {
@@ -220,33 +207,7 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet>
       _selected = chosen;
       _position = _indexForSelection().toDouble();
     });
-    widget.onChanged?.call(chosen);
-    // ignore: discarded_futures
-    context.read<SettingsProvider>().setThinkingBudget(chosen);
-  }
-
-  bool _showXhighOption(SettingsProvider settings) {
-    final assistant = context.read<AssistantProvider>().currentAssistant;
-    final currentProvider =
-        widget.modelProvider ??
-        assistant?.chatModelProvider ??
-        settings.currentModelProvider;
-    final currentModelId =
-        widget.modelId ?? assistant?.chatModelId ?? settings.currentModelId;
-    if (currentProvider == null || currentModelId == null) return false;
-    return settings.supportsXhighReasoning(currentProvider, currentModelId);
-  }
-
-  bool _showMaxOption(SettingsProvider settings) {
-    final assistant = context.read<AssistantProvider>().currentAssistant;
-    final currentProvider =
-        widget.modelProvider ??
-        assistant?.chatModelProvider ??
-        settings.currentModelProvider;
-    final currentModelId =
-        widget.modelId ?? assistant?.chatModelId ?? settings.currentModelId;
-    if (currentProvider == null || currentModelId == null) return false;
-    return settings.supportsMaxReasoning(currentProvider, currentModelId);
+    widget.onChanged(chosen);
   }
 
   Widget _buildLabelPill(BuildContext context) {
@@ -390,15 +351,9 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet>
 
   @override
   Widget build(BuildContext context) {
-    final settings = context.watch<SettingsProvider>();
-    final showXhigh = _showXhighOption(settings);
-    final showMax = _showMaxOption(settings);
     final cs = Theme.of(context).colorScheme;
-    _stops = _buildStops(
-      l10nOf(context),
-      showXhigh: showXhigh,
-      showMax: showMax,
-    );
+    // xhigh 与 max 一律常显，不再按模型表预先隐藏（选了按原档发出）。
+    _stops = _buildStops(l10nOf(context));
     if (_position > _stops.length - 1) {
       _position = (_stops.length - 1).toDouble();
     }

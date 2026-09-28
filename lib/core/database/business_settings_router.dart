@@ -119,6 +119,8 @@ final class BusinessKeyRegistry {
     'local_snapshot_last_failure_v1',
     'compress_model_v1',
     'compress_prompt_v1',
+    // 已废弃：思考档位改由助手独占。保留在此只是为了让带它的老备份恢复后
+    // 仍能被 AssistantProvider 读一次、落到还没有档位的助手上。
     'thinking_budget_v1',
     'image_cropper_enabled_v1',
     'image_upload_quality_v1',

@@ -1,8 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/providers/model_provider.dart';
-import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/utils/openai_model_compat.dart';
-import 'support/business_test_harness.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -35,34 +33,23 @@ void main() {
     }
   });
 
-  test(
-    'Kimi Code effort caps reach settings and preserve off support',
-    () async {
-      final harness = await createBusinessTestHarness(initial: {});
-      final settings = SettingsProvider(harness.preferences);
-      await settings.loaded;
-      for (final id in [
-        'k3',
-        'k3-256k',
-        'kimi-for-coding',
-        'kimi-k2.8-preview',
-      ]) {
-        expect(settings.supportsMaxReasoning('OpenAI', id), isTrue);
-        expect(settings.supportsXhighReasoning('OpenAI', id), isFalse);
-        expect(openAINormalizeReasoningEffort('off', id), 'none');
-        expect(openAINormalizeReasoningEffort('medium', id), 'high');
-        expect(openAINormalizeReasoningEffort('xhigh', id), 'max');
-      }
-      expect(
-        settings.supportsMaxReasoning('OpenAI', 'kimi-for-coding-highspeed'),
-        isFalse,
-      );
-      expect(
-        openAINormalizeReasoningEffort('max', 'kimi-for-coding-highspeed'),
-        'auto',
-      );
-      // The open-platform K3 endpoint still requires thinking.
-      expect(openAINormalizeReasoningEffort('off', 'kimi-k3'), 'low');
-    },
-  );
+  test('Kimi Code effort caps preserve off support', () {
+    for (final id in [
+      'k3',
+      'k3-256k',
+      'kimi-for-coding',
+      'kimi-k2.8-preview',
+    ]) {
+      expect(openAINormalizeReasoningEffort('off', id), 'none');
+      expect(openAINormalizeReasoningEffort('medium', id), 'high');
+      // xhigh 原样发出（以前会被替换成 max），由供应商决定接受还是报错。
+      expect(openAINormalizeReasoningEffort('xhigh', id), 'xhigh');
+    }
+    expect(
+      openAINormalizeReasoningEffort('max', 'kimi-for-coding-highspeed'),
+      'auto',
+    );
+    // The open-platform K3 endpoint still requires thinking.
+    expect(openAINormalizeReasoningEffort('off', 'kimi-k3'), 'low');
+  });
 }
